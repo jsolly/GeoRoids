@@ -70,7 +70,7 @@
     "@types/jsdom": "^21.1.1",
     "@types/selenium-webdriver": "^4.1.28",
     "@vercel/node": "^5.3.6",
-    "canvas": "^3.1.2",
+    "canvas": "^3.2.3",
     "chromedriver": "^152.0.1",
     "concurrently": "^10.0.3",
     "jsdom": "^26.1.0",

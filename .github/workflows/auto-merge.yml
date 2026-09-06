@@ -1,5 +1,32 @@
 name: Auto Merge
 
+# Squash-merge eligible same-repo PRs from a human User who is the repo owner
+# or an org OWNER/MEMBER, only after this repo's `CI / ci` check is success on
+# the open PR's current head SHA.
+#
+# Do not use `gh pr merge --auto`. GitHub `--auto` waits only for *required*
+# status checks; this private repo has none (Free-plan branch protection and
+# rulesets are unavailable), so `--auto` can squash a ready PR before CI
+# finishes (observed: jsolly/shared-infra #38 landed red).
+#
+# pull_request opened/reopened/synchronize/ready_for_review: merge if `ci` is
+# already success on the current head (e.g. marked ready after CI passed);
+# otherwise exit 0 and wait for workflow_run.
+# workflow_run for workflow `CI` (types: completed): resolve the open PR whose
+# current head equals the completed SHA via `gh pr list`.
+# `github.event.workflow_run.pull_requests` can be empty (push-to-main, and
+# some pull_request-triggered runs), so do not rely on it.
+#
+# This repo's CI workflow `name:` is `CI` and the job `name:` is `ci`
+# (check run `ci`, status context `CI / ci`). Merge only when eligible AND
+# that check conclusion is success AND the success SHA equals the open PR's
+# current head. Otherwise exit 0.
+# Failed/cancelled CI, push-to-main CI with no open PR, or green CI for a stale
+# SHA after a new push: do not merge.
+#
+# Excludes drafts, forks, Dependabot/bots. Do not put `secrets.*` in `if:`.
+# Squash + delete-branch with GITHUB_TOKEN (this repo has no App-token mint).
+
 on:
   pull_request:
     types:
@@ -7,21 +34,130 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  checks: read
 
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
     if: >-
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success'
+      ) ||
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.type == 'User' &&
+        (
+          github.event.pull_request.user.login == github.repository_owner ||
+          github.event.pull_request.author_association == 'OWNER' ||
+          github.event.pull_request.author_association == 'MEMBER'
+        )
+      )
     steps:
-      - name: Enable auto-merge
+      - name: Squash-merge if CI / ci is green on the current head
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$PR_URL"
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CI_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            if [ "${CI_CONCLUSION:-}" != "success" ]; then
+              echo "CI conclusion is ${CI_CONCLUSION:-unset}; not merging."
+              exit 0
+            fi
+            SHA="${CI_SHA:-}"
+            if [ -z "$SHA" ]; then
+              echo "workflow_run has no head SHA; not merging."
+              exit 0
+            fi
+            # workflow_run.pull_requests is often empty; map via current head SHA.
+            PR_NUMBER="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+              --json number,headRefOid \
+              --jq "[.[] | select(.headRefOid == \"$SHA\")] | .[0].number // empty")"
+            if [ -z "$PR_NUMBER" ]; then
+              echo "No open PR whose current head is $SHA; not merging."
+              exit 0
+            fi
+          else
+            SHA="${PR_HEAD_SHA:-}"
+            if [ -z "${PR_NUMBER:-}" ] || [ -z "$SHA" ]; then
+              echo "pull_request event missing number or head SHA; not merging."
+              exit 0
+            fi
+          fi
+
+          PR="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")"
+          DRAFT="$(jq -r '.draft' <<<"$PR")"
+          HEAD_SHA="$(jq -r '.head.sha' <<<"$PR")"
+          HEAD_REPO="$(jq -r '.head.repo.full_name' <<<"$PR")"
+          USER_TYPE="$(jq -r '.user.type' <<<"$PR")"
+          USER_LOGIN="$(jq -r '.user.login' <<<"$PR")"
+          ASSOC="$(jq -r '.author_association' <<<"$PR")"
+          STATE="$(jq -r '.state' <<<"$PR")"
+
+          if [ "$STATE" != "open" ]; then
+            echo "PR #$PR_NUMBER is $STATE; not merging."
+            exit 0
+          fi
+          if [ "$DRAFT" = "true" ]; then
+            echo "PR #$PR_NUMBER is draft; not merging."
+            exit 0
+          fi
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "PR #$PR_NUMBER head repo is $HEAD_REPO; not merging."
+            exit 0
+          fi
+          if [ "$USER_TYPE" != "User" ]; then
+            echo "PR #$PR_NUMBER author type is $USER_TYPE; not merging."
+            exit 0
+          fi
+          if [ "$USER_LOGIN" != "$GITHUB_REPOSITORY_OWNER" ] &&
+            [ "$ASSOC" != "OWNER" ] &&
+            [ "$ASSOC" != "MEMBER" ]; then
+            echo "PR #$PR_NUMBER author $USER_LOGIN ($ASSOC) is not owner/member; not merging."
+            exit 0
+          fi
+          if [ "$HEAD_SHA" != "$SHA" ]; then
+            echo "CI SHA $SHA is stale; PR #$PR_NUMBER head is $HEAD_SHA; not merging."
+            exit 0
+          fi
+
+          CHECK="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+            --jq '.check_runs[] | select(.name == "ci" or .name == "CI / ci")' \
+            | jq -s 'sort_by(.completed_at // "") | last // empty')"
+          if [ -z "$CHECK" ] || [ "$CHECK" = "null" ]; then
+            echo "No ci check on $HEAD_SHA; not merging."
+            exit 0
+          fi
+          CHECK_CONCLUSION="$(jq -r '.conclusion // empty' <<<"$CHECK")"
+          CHECK_SHA="$(jq -r '.head_sha // empty' <<<"$CHECK")"
+          CHECK_NAME="$(jq -r '.name // empty' <<<"$CHECK")"
+          if [ "$CHECK_CONCLUSION" != "success" ]; then
+            echo "Check $CHECK_NAME conclusion is ${CHECK_CONCLUSION:-unset} on $HEAD_SHA; not merging."
+            exit 0
+          fi
+          if [ -n "$CHECK_SHA" ] && [ "$CHECK_SHA" != "$HEAD_SHA" ]; then
+            echo "Check $CHECK_NAME head_sha $CHECK_SHA != PR head $HEAD_SHA; not merging."
+            exit 0
+          fi
+
+          echo "Merging PR #$PR_NUMBER at $HEAD_SHA (check $CHECK_NAME success)."
+          gh pr merge --squash --delete-branch --repo "$GITHUB_REPOSITORY" "$PR_NUMBER"

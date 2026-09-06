@@ -81,7 +81,7 @@
     "ts-node": "^10.9.1",
     "ts-prune": "^0.10.3",
     "vercel": "^54.18.1",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "shell-quote": ">=1.8.4",

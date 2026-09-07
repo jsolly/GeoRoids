@@ -123,7 +123,41 @@ export class GameServerWorld {
     });
   }
 
+  shootSatellite(attacker: Pilot, satelliteId: string, damage: number = DAMAGE.LASER_HIT): void {
+    const satellite = this.engine.getSatellite(satelliteId);
+    if (!satellite) {
+      return;
+    }
+
+    // The server accepts a satelliteDamage report only when it can consume a
+    // matching server-owned human laser. Keep this test helper on that same
+    // wire path instead of bypassing the authoritative shot check.
+    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
+    for (let i = 0; i < hitCount; i++) {
+      const laserPosition = { ...satellite.position };
+      this.engine.spawnLaser(attacker.id, laserPosition, { x: 0, y: 0 });
+      this.send(attacker, {
+        type: 'satelliteDamage',
+        data: {
+          satelliteId,
+          attackerId: attacker.id,
+          damage: DAMAGE.LASER_HIT,
+          laserPosition,
+        },
+      });
+    }
+  }
+
   shootBot(attacker: Pilot, botId: string, damage: number = DAMAGE.LASER_HIT): void {
+    const bot = this.engine.getBot(botId);
+    if (!bot) {
+      return;
+    }
+
+    // The wire message predates positional hit evidence. Seed the server's
+    // tracked human-shot list at the authoritative bot position so this
+    // helper exercises the same one-use evidence gate as a live client.
+    this.engine.spawnLaser(attacker.id, { ...bot.position }, { x: 0, y: 0 });
     this.send(attacker, {
       type: 'botDamage',
       data: { botId, attackerId: attacker.id, damage },

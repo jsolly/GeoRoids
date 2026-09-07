@@ -1,44 +1,17 @@
-import { test } from 'vitest';
+import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { TestConfig } from '../../utils/test-config';
-import { bootTwoClientGames } from '../../utils/multi-client-setup';
+import { bootLaserClients, localPlayerId, observeLaser } from './laser-observation';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks(__dirname);
 
 test('remote player lasers are visible on other clients', async () => {
-  const { page1, page2, game1 } = await bootTwoClientGames(browserManager);
-
-  await page1.screenshot({
-    path: screenshotManager.getScreenshotPath(
-      screenshotManager.getTimestampedFilename('client1-before-lasers')
-    ),
-  });
-  await page2.screenshot({
-    path: screenshotManager.getScreenshotPath(
-      screenshotManager.getTimestampedFilename('client2-before-lasers')
-    ),
-  });
-
-  await game1.fireLasersWithMouse(3, 800);
-
-  await page2.waitForFunction(
-    () => {
-      const gc = (window as any).gameController;
-      const remotePlayers = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      return remotePlayers.some((p: any) => (p.ship?.lasers?.length ?? 0) > 0);
-    },
-    undefined,
-    { timeout: 15000, polling: 200 }
-  );
-
-  await page1.screenshot({
-    path: screenshotManager.getScreenshotPath(
-      screenshotManager.getTimestampedFilename('client1-after-lasers')
-    ),
-  });
-  await page2.screenshot({
-    path: screenshotManager.getScreenshotPath(
-      screenshotManager.getTimestampedFilename('client2-after-lasers')
-    ),
-  });
+  const { page1, page2, game1 } = await bootLaserClients(browserManager);
+  const shooterId = await localPlayerId(page1);
+  const [seen] = await Promise.all([
+    observeLaser(page2, shooterId, true, true),
+    game1.fireLasersWithMouse(1),
+  ]);
+  expect(seen.ownerId).toBe(shooterId);
+  expect(seen.onCanvas).toBe(true);
 }, TestConfig.DEFAULT_TIMEOUT * 2);

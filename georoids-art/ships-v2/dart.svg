@@ -4,6 +4,6 @@
   <title>dart — needle</title>
   <rect width="64" height="64" fill="#000011"/>
   <g fill="none" stroke="#5EEAD4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 7.2 L29 53.6 L32 46.8 L35 53.6 Z"/>
+    <path d="M32 9.25 L28.75 54.5 L30.75 58.75 L32 51 L33.25 58.75 L35.25 55 Z"/>
   </g>
 </svg>

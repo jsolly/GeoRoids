@@ -1,7 +1,7 @@
-import { GAME_FPS } from './constants/health';
+import { GAME } from '../src/constants';
 
 /** One simulation frame at the authoritative 60 Hz tick. */
-export const GAME_TICK_MS = 1000 / GAME_FPS;
+export const GAME_TICK_MS = 1000 / GAME.FPS;
 
 /**
  * Cap catch-up after a hitch. 60 frames is one second — enough to finish

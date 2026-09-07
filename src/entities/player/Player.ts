@@ -46,9 +46,6 @@ export class Player {
   /** Ship position when death forced server-authoritative movement (respawn latch). */
   private respawnLatchOrigin: Position | null = null;
 
-  /** Last health value accepted from the server (local player regen guard). */
-  private lastServerHealthEcho?: number;
-
   // Server-authoritative spawn-protection countdown (frames). While > 0 the
   // server ignores all incoming damage. Mirrored from the gameState so callers
   // (notably tests) can tell exactly when the player becomes vulnerable.
@@ -264,38 +261,24 @@ export class Player {
     if (data.health !== undefined) {
       if (isLocal && this.lives <= 0) {
         this.ship.health = 0;
-        this.lastServerHealthEcho = 0;
       } else {
         const wasDead = this.ship.health <= 0;
         const wasExploding = this.ship.exploding;
         const oldHealth = this.ship.health;
         const serverHealth = data.health;
 
-        // Local player health regen runs client-side; the server echo can lag
-        // behind regen progress. Accept authoritative damage and respawn heals,
-        // but don't let a stale server snapshot rewind regen.
-        if (isLocal && !wasDead && !wasExploding) {
-          if (serverHealth >= this.ship.maxHealth) {
-            this.ship.health = serverHealth;
-            this.lastServerHealthEcho = serverHealth;
-          } else if (
-            this.lastServerHealthEcho === undefined ||
-            serverHealth < this.lastServerHealthEcho
-          ) {
-            this.ship.health = serverHealth;
-            this.lastServerHealthEcho = serverHealth;
-          }
-        } else if (isLocal && (wasDead || wasExploding) && serverHealth >= this.ship.maxHealth) {
+        // Health, including gradual regeneration, is server-owned. Living
+        // ships accept each ordered echo exactly. A partial healing echo must
+        // not revive a locally predicted death before the full respawn arrives.
+        if (
+          !isLocal ||
+          (!wasDead && !wasExploding) ||
+          serverHealth <= 0 ||
+          (serverHealth >= (data.maxHealth ?? this.ship.maxHealth) &&
+            data.exploding !== true &&
+            !isServerRespawnActive(data.respawnTimer))
+        ) {
           this.ship.health = serverHealth;
-          this.lastServerHealthEcho = serverHealth;
-        } else if (!isLocal) {
-          this.ship.health = serverHealth;
-        } else if (isLocal && serverHealth <= 0) {
-          this.ship.health = 0;
-          this.lastServerHealthEcho = 0;
-        } else if (isLocal && serverHealth > this.ship.health) {
-          this.ship.health = serverHealth;
-          this.lastServerHealthEcho = serverHealth;
         }
 
         const newHealth = this.ship.health;
@@ -417,11 +400,6 @@ export class Player {
     }
 
     this.lastUpdate = Date.now();
-  }
-
-  /** Record authoritative health from a direct damage event (not gameState echo). */
-  syncServerHealthEcho(health: number): void {
-    this.lastServerHealthEcho = health;
   }
 
   /**

@@ -1,3 +1,4 @@
+import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
@@ -7,6 +8,9 @@ import type {
   PlayerLeave,
   PlayerUpdate,
   Position,
+  SatellitePickupCollected,
+  SatelliteShoot,
+  ServerGameSnapshot,
   ServerGameState,
   ShockwaveEvent,
   Velocity,
@@ -18,8 +22,10 @@ import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { shouldApplyRemoteShoot } from '../../entities/player/remoteLasers';
+import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
+import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
-import { applyShipKitToShip } from '../../entities/ship/shipKits';
+import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
@@ -61,6 +67,11 @@ export interface ConnectionState {
 export class ConnectionManager {
   private static instance: ConnectionManager;
   private state: ConnectionState;
+  private readonly snapshotDecoder = new SnapshotDecoder();
+  private snapshotNegotiated = false;
+  private snapshotOffered = false;
+  private snapshotResyncPending = false;
+  private localHarpoonAcknowledged = false;
 
   private clientId: string;
   private localPlayerName: string = '';
@@ -70,6 +81,7 @@ export class ConnectionManager {
   private hasInitializedAsteroidsForConnection = false;
   private readonly playerListCache = new PlayerListCache<Player>();
   private readonly snapshotEntityIds = new Set<string>();
+  private readonly taggedAsteroidIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
   private readonly pingPayload = { type: 'ping', timestamp: 0 };
   private readonly updateEnvelope: ClientMessage = {
@@ -151,6 +163,7 @@ export class ConnectionManager {
 
         const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || computedUrl;
         logger.debug('NETWORK', 'Connecting to WebSocket', { url: wsUrl });
+        this.resetSnapshotSession();
         this.state.socket = new WebSocket(wsUrl);
 
         this.state.socket.onopen = (): void => {
@@ -173,6 +186,7 @@ export class ConnectionManager {
         };
 
         this.state.socket.onclose = (): void => {
+          this.resetSnapshotSession();
           this.state.isConnected = false;
           this.state.socket = null;
           this.stopHeartbeat();
@@ -235,13 +249,17 @@ export class ConnectionManager {
         socket.close();
       }
     }
+    this.resetSnapshotSession();
     this.state.isConnected = false;
     this.state.socket = null;
     this.allPlayers.clear();
+    this.taggedAsteroidIds.clear();
     this.playerListCache.invalidate();
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
     LootField.getInstance().clear();
+    SatelliteManager.getInstance().clear();
+    SatellitePickupManager.getInstance().clear();
     this.localPlayerId = '';
     // pagehide / unexpected close keep the stored id (#467). Game-over Start
     // mints a new one so we do not rejoin a 0-life ship.
@@ -476,6 +494,11 @@ export class ConnectionManager {
     // Get the player's current position
     const playerPosition = this.getLocalPlayerPosition();
 
+    // A same-socket rejoin can race snapshots already queued by the server.
+    // Keep its current decoder/format until the ordered joined acknowledgment
+    // establishes the new session. New physical sockets reset in openSocket.
+    this.snapshotOffered = import.meta.env.VITE_SNAPSHOT_PROTOCOL === '1';
+
     // First join the game
     const joinMessage: ClientMessage = {
       type: 'join',
@@ -485,6 +508,7 @@ export class ConnectionManager {
         color: this.getLocalPlayerColor(),
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
+        ...(this.snapshotOffered ? { snapshotVersion: SNAPSHOT_VERSION } : {}),
       },
       timestamp: Date.now(),
     };
@@ -539,6 +563,12 @@ export class ConnectionManager {
       return;
     }
 
+    if (
+      message.type === 'useAbility' &&
+      (message.data as { abilityId?: unknown } | undefined)?.abilityId === 'harpoon'
+    ) {
+      this.localHarpoonAcknowledged = false;
+    }
     this.state.socket.send(JSON.stringify(message));
     logger.debug('NETWORK', 'Sent message', { message });
   }
@@ -547,7 +577,14 @@ export class ConnectionManager {
     // Prefer message.data, fallback to message.payload for backward compatibility
     const data = (message.data ?? message.payload) as unknown;
     switch (message.type) {
+      case 'snapshot':
+        this.handleSnapshot(data);
+        break;
       case 'gameState':
+        if (this.snapshotNegotiated) {
+          this.requestSnapshotResync(new Error('Legacy state after snapshot negotiation'));
+          break;
+        }
         this.handleGameState(data as ServerGameState);
         break;
       case 'joined':
@@ -599,6 +636,12 @@ export class ConnectionManager {
         break;
       case 'botDestroyed':
         this.handleBotDestroyed(data as { botId: string });
+        break;
+      case 'satelliteShoot':
+        this.handleSatelliteShoot(data as SatelliteShoot);
+        break;
+      case 'satellitePickupCollected':
+        this.handleSatellitePickupCollected(data as SatellitePickupCollected);
         break;
       case 'playerShoot':
         this.handlePlayerShoot(
@@ -660,6 +703,43 @@ export class ConnectionManager {
     }
   }
 
+  private resetSnapshotSession(): void {
+    this.snapshotDecoder.reset();
+    this.snapshotNegotiated = false;
+    this.snapshotOffered = false;
+    this.snapshotResyncPending = false;
+    this.localHarpoonAcknowledged = false;
+  }
+
+  private requestSnapshotResync(error: unknown): void {
+    logger.error(
+      'NETWORK',
+      'Rejected snapshot; requesting complete keyframe',
+      error instanceof Error ? error : new Error(String(error))
+    );
+    if (!this.snapshotNegotiated) {
+      this.state.socket?.close(1002, 'Snapshot was not negotiated');
+      return;
+    }
+    if (!this.snapshotResyncPending) {
+      this.snapshotResyncPending = true;
+      this.sendMessage({ type: 'snapshotResync', data: {}, timestamp: Date.now() });
+    }
+  }
+
+  private handleSnapshot(data: unknown): void {
+    try {
+      if (!this.snapshotNegotiated) {
+        throw new Error('Snapshot was not negotiated');
+      }
+      const state = this.snapshotDecoder.decode(data);
+      this.snapshotResyncPending = false;
+      this.handleGameState(state, true);
+    } catch (error) {
+      this.requestSnapshotResync(error);
+    }
+  }
+
   private handleAbilityUsed(data: {
     id?: string;
     harpoonTimer?: number;
@@ -675,6 +755,9 @@ export class ConnectionManager {
     if (!entity) {
       return;
     }
+    if (localPlayer?.id === data.id && (data.harpoonTimer ?? 0) > 0) {
+      this.localHarpoonAcknowledged = true;
+    }
     const latch = {
       ...(data.harpoonTimer !== undefined ? { harpoonTimer: data.harpoonTimer } : {}),
       ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
@@ -686,7 +769,7 @@ export class ConnectionManager {
     }
   }
 
-  private handleGameState(data: ServerGameState): void {
+  private handleGameState(data: ServerGameState, complete = false): void {
     applyTerrainSeed(data.terrainSeed);
 
     // Update local game state from server using unified entity system
@@ -699,7 +782,7 @@ export class ConnectionManager {
         const isLocalPlayer = isLocalGameEntity(entityData, {
           clientId: this.clientId,
           localPlayerId: this.localPlayerId,
-          localPlayerName: this.localPlayerName,
+          localPlayerName: complete ? '' : this.localPlayerName,
         });
 
         let entity = this.allPlayers.get(entityData.id);
@@ -725,7 +808,7 @@ export class ConnectionManager {
           }
 
           if (!entity) {
-            if (!entityData.name || !entityData.type) {
+            if (!complete && (!entityData.name || !entityData.type)) {
               continue;
             }
             entity = entityFactory.createPlayer({
@@ -756,6 +839,51 @@ export class ConnectionManager {
 
         // Apply the parsed entity directly — no per-tick snapshot wrapper.
         // Kit / faction / ability / deathCause / mass / F-key shield stay on the row.
+        // A gameState row is complete: omission means protection expired.
+        // Partial playerUpdate messages retain their existing merge semantics.
+        entityData.spawnProtectionTimer ??= 0;
+        if (complete) {
+          // Complete snapshots clear optional values that legacy partial updates retain.
+          entity.name = entityData.name;
+          entity.factionId = entityData.factionId;
+          entity.ship.factionId = entityData.factionId;
+          if (entity.type !== 'local') {
+            entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
+          }
+          if (isLocalPlayer && (entityData.harpoonTimer ?? 0) > 0) {
+            this.localHarpoonAcknowledged = true;
+          }
+          // Preserve only the existing, locally ticking visual prediction while
+          // this socket has not acknowledged its latch. Reconnect does not revive
+          // server ability state or extend the timer. Once acknowledged, a zero
+          // is authoritative expiry; a missing target also ends warm prediction.
+          const targetId = entity.ship.harpoonTargetId;
+          const preservePredictedLatch =
+            isLocalPlayer &&
+            entity.type === 'local' &&
+            entity.ship.kitId === 'hauler' &&
+            !this.localHarpoonAcknowledged &&
+            entity.ship.harpoonTimer > 0 &&
+            !entityData.exploding &&
+            entityData.health > 0 &&
+            (data.asteroids.some((rock) => rock.id === targetId) ||
+              data.entities.some((player) => player.id === targetId));
+          if (!preservePredictedLatch) {
+            entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
+            entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
+            entity.ship.harpoonTimer = entityData.harpoonTimer ?? 0;
+            entity.ship.harpoonTargetId = entityData.harpoonTargetId;
+            entity.ship.harpoonLatchPos = entityData.harpoonLatchPos;
+          }
+          entity.ship.shieldTimer = entityData.shieldTimer ?? 0;
+          entity.ship.shieldActive = entityData.shieldActive ?? false;
+          entity.ship.shieldTime = entityData.shieldTime ?? 0;
+          entity.ship.shieldCooldown = entityData.shieldCooldown ?? 0;
+          entity.ship.shieldFlashTime = entityData.shieldFlashTime ?? 0;
+          if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
+            entity.deathCause = undefined;
+          }
+        }
         entity.updateFromServer(entityData);
 
         if (isLocalPlayer && localPlayer && localPlayer !== entity) {
@@ -765,7 +893,14 @@ export class ConnectionManager {
 
       // Drop remotes that vanished from the snapshot so a closed tab leaves
       // the leaderboard even if `playerLeft` was missed. Bots are left alone.
-      if (data.entities.length > 0) {
+      if (complete) {
+        for (const [id, entity] of this.allPlayers) {
+          if (entity.type !== 'local' && !this.snapshotEntityIds.has(id)) {
+            this.forgetPlayer(id);
+          }
+        }
+      }
+      if (!complete && data.entities.length > 0) {
         const removedRemotes = pruneStaleRemotePlayers(this.allPlayers, this.snapshotEntityIds);
         const removedDupes = pruneDuplicateOwnRemotes(this.allPlayers, this.localPlayerName);
         if (removedRemotes + removedDupes > 0) {
@@ -781,11 +916,37 @@ export class ConnectionManager {
     // Apply the authoritative field: create unseen roids, then keep pose in sync
     // so late joiners and every client share the same moving asteroids.
     if (data.asteroids) {
-      this.applyAuthoritativeAsteroids(data.asteroids);
+      this.applyAuthoritativeAsteroids(data.asteroids, complete);
     }
 
     if (Array.isArray(data.loot)) {
       LootField.getInstance().applySnapshot(data.loot as LootData[]);
+    }
+
+    if (Array.isArray(data.satellites)) {
+      SatelliteManager.getInstance().syncFromServer(data.satellites);
+    }
+    if (Array.isArray(data.satellitePickups)) {
+      SatellitePickupManager.getInstance().syncFromServer(data.satellitePickups);
+    }
+    if (complete) {
+      const snapshot = data as ServerGameSnapshot;
+      SatelliteManager.getInstance().syncProjectilesFromServer(snapshot.satelliteProjectiles);
+      const activeTags = new Set(snapshot.collabTags.map((tag) => tag.asteroidId));
+      for (const id of this.taggedAsteroidIds) {
+        if (!activeTags.has(id)) {
+          notifyAsteroidTagged({ asteroidId: id, shooterId: '', expiresAt: 0 });
+        }
+      }
+      this.taggedAsteroidIds.clear();
+      for (const tag of snapshot.collabTags) {
+        this.taggedAsteroidIds.add(tag.asteroidId);
+        notifyAsteroidTagged({
+          asteroidId: tag.asteroidId,
+          shooterId: tag.hits[0]?.shooterId ?? '',
+          expiresAt: tag.expiresAt,
+        });
+      }
     }
   }
 
@@ -804,13 +965,21 @@ export class ConnectionManager {
     }
   }
 
-  private applyAuthoritativeAsteroids(asteroids: AsteroidData[]): void {
+  private applyAuthoritativeAsteroids(asteroids: AsteroidData[], complete = false): void {
     applyAsteroidFieldPartition(
-      partitionAsteroidSnapshot(asteroids, this.seenAsteroidIds, this.asteroidScratch)
+      partitionAsteroidSnapshot(asteroids, this.seenAsteroidIds, this.asteroidScratch, complete),
+      complete
     );
   }
 
   private handleJoined(data: PlayerJoin): void {
+    this.snapshotDecoder.reset();
+    this.snapshotResyncPending = false;
+    this.snapshotNegotiated = this.snapshotOffered && data.snapshotVersion === SNAPSHOT_VERSION;
+    if (data.snapshotVersion !== undefined && !this.snapshotNegotiated) {
+      this.state.socket?.close(1002, 'Unsupported snapshot negotiation');
+      return;
+    }
     logger.info(
       'NETWORK',
       'Player joined successfully',
@@ -821,6 +990,8 @@ export class ConnectionManager {
     if (!keepField) {
       this.seenAsteroidIds.clear();
       LootField.getInstance().clear();
+      SatelliteManager.getInstance().clear();
+      SatellitePickupManager.getInstance().clear();
     }
     // `keepField` controls whether the warm local belt is retained. It must
     // not suppress the handshake: a reconnect can land on a fresh server
@@ -900,6 +1071,7 @@ export class ConnectionManager {
     if (!data?.asteroidId) {
       return;
     }
+    this.taggedAsteroidIds.add(data.asteroidId);
     notifyAsteroidTagged(data);
   }
 
@@ -941,6 +1113,30 @@ export class ConnectionManager {
       exploding: data.exploding,
     });
     // Bot handling is now done through unified entity system in handleGameState
+  }
+
+  private handleSatelliteShoot(data: SatelliteShoot): void {
+    logger.debug('NETWORK', 'Satellite shot laser', {
+      satelliteId: data.id,
+      laserStart: data.laserStart,
+      laserDirection: data.laserDirection,
+    });
+    if (typeof data.shotId !== 'string' || data.shotId.length === 0) {
+      return;
+    }
+    SatelliteManager.getInstance().addLaser(
+      data.id,
+      data.shotId,
+      data.laserStart,
+      data.laserDirection
+    );
+  }
+
+  private handleSatellitePickupCollected(data: SatellitePickupCollected): void {
+    if (!data?.playerId || !data.pickupId) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('satellitePickupCollected', { detail: data }));
   }
 
   private handleBotDestroyed(data: { botId: string }): void {
@@ -1124,9 +1320,6 @@ export class ConnectionManager {
       return;
     }
     player.ship.health = remainingHealth;
-    if (player.type === 'local') {
-      player.syncServerHealthEcho(remainingHealth);
-    }
   }
 
   private handlePlayerKilled(data: {

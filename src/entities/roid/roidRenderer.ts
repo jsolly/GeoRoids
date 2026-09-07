@@ -1,3 +1,4 @@
+import type { AsteroidMaterial } from '../../../shared-types';
 import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
 import { isAsteroidPending, pendingElapsedMs } from '../../physics/collision/asteroidHitFeel';
@@ -10,11 +11,24 @@ import {
   strokePhosphorPolyline,
   type Vec2,
 } from '../../rendering/vectorJuice';
-
+import { drawAsteroidMaterialDetails } from './materialArt';
 import type { Roid } from './Roid';
 
 const zoomRockScratch: PlayfieldRock[] = [];
 const roidScreen = { x: 0, y: 0 };
+const shatterBursts: Array<{ roid: Roid; startedAt: number }> = [];
+
+/** Keep the approved break visible after the authoritative rock is removed. */
+export function recordAsteroidShatter(roid: Roid, now = performance.now()): void {
+  shatterBursts.push({ roid, startedAt: now });
+  if (shatterBursts.length > 48) {
+    shatterBursts.shift();
+  }
+}
+
+export function clearAsteroidShatters(): void {
+  shatterBursts.length = 0;
+}
 
 /** Zoom from rocks the playfield will actually stroke — not pending or NaN poses. */
 export function rocksForPlayfieldZoom(roids: readonly Roid[]): PlayfieldRock[] {
@@ -99,10 +113,14 @@ function drawRoidShatter(
   origin: Vec2,
   points: readonly Vec2[],
   radius: number,
-  t: number
+  t: number,
+  material?: AsteroidMaterial
 ): void {
   const alpha = 1 - t * 0.85;
-  const spread = radius * VISUAL.ROID_SHATTER_SPREAD;
+  const spread =
+    radius *
+    VISUAL.ROID_SHATTER_SPREAD *
+    (material === 'ice' ? 1.2 : material === 'metal' ? 0.55 : 1);
   ctx.save();
   ctx.strokeStyle = PALETTE.ROID;
   ctx.shadowColor = PALETTE.ROID;
@@ -118,9 +136,10 @@ function drawRoidShatter(
       continue;
     }
     const edge = driftSegment(a, b, origin, t, spread);
+    const wobble = material === 'rubble' ? Math.sin(i * 2.4 + t * 8) * radius * t * 0.3 : 0;
     ctx.beginPath();
-    ctx.moveTo(edge.a.x, edge.a.y);
-    ctx.lineTo(edge.b.x, edge.b.y);
+    ctx.moveTo(edge.a.x + wobble, edge.a.y - wobble);
+    ctx.lineTo(edge.b.x - wobble, edge.b.y + wobble);
     ctx.stroke();
   }
   ctx.restore();
@@ -173,16 +192,69 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     if (isAsteroidPending(roid)) {
       const elapsed = pendingElapsedMs(roid);
       if (elapsed !== null && elapsed < VISUAL.ROID_SHATTER_MS) {
-        drawRoidShatter(ctx, screenPos, outline, r, elapsed / VISUAL.ROID_SHATTER_MS);
+        drawRoidShatter(
+          ctx,
+          screenPos,
+          outline,
+          r,
+          elapsed / VISUAL.ROID_SHATTER_MS,
+          roid.material
+        );
       }
       continue;
     }
 
-    const inner = shouldDrawRoidInnerFacet(roid.r)
-      ? roidOutline(screenPos, r, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
-      : [];
+    const inner =
+      !roid.material && shouldDrawRoidInnerFacet(roid.r)
+        ? roidOutline(screenPos, r, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
+        : [];
     drawRoidSilhouette(ctx, outline, roid.r, inner);
+    if (roid.material) {
+      drawAsteroidMaterialDetails(
+        ctx,
+        roid.material,
+        screenPos.x,
+        screenPos.y,
+        r,
+        roid.angle,
+        roid.health / roid.maxHealth
+      );
+    }
   }
 
+  const now = performance.now();
+  for (let i = shatterBursts.length - 1; i >= 0; i--) {
+    const burst = shatterBursts[i];
+    if (!burst) {
+      continue;
+    }
+    const elapsed = now - burst.startedAt;
+    if (elapsed >= VISUAL.ROID_SHATTER_MS) {
+      shatterBursts.splice(i, 1);
+      continue;
+    }
+    const rock = burst.roid;
+    if (!canDrawAsteroid(rock)) {
+      continue;
+    }
+    const screen = canvasManager.worldToScreenInto(roidScreen, rock.position, ship.position);
+    const radius = rock.r * scale;
+    if (
+      screen.x < -radius * 3 ||
+      screen.y < -radius * 3 ||
+      screen.x > viewW + radius * 3 ||
+      screen.y > viewH + radius * 3
+    ) {
+      continue;
+    }
+    const outline = roidOutline(
+      screen,
+      radius,
+      rock.angle,
+      rock.vertices,
+      drawingOffsets(rock.offsets)
+    );
+    drawRoidShatter(ctx, screen, outline, radius, elapsed / VISUAL.ROID_SHATTER_MS, rock.material);
+  }
   ctx.shadowBlur = 0;
 }

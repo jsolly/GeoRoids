@@ -14,7 +14,8 @@ test('leaderboard updates when score changes', async () => {
   await game.waitForBots(1);
 
   const target = (await game.getBots())[0]!;
-  await game.attackBotWithLasers(target.id, 12);
+  const combat = await game.attackBotWithLasers(target.id, 12);
+  expect(combat.everExploding || combat.minHealthObserved <= 0).toBe(true);
 
   await expect
     .poll(() => game.getScore(), { timeout: 8000 })

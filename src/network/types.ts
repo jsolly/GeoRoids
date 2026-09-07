@@ -10,6 +10,7 @@ export interface ServerMessage {
     | 'playerKilled'
     | 'scoreUpdate'
     | 'gameState'
+    | 'snapshot'
     | 'error'
     | 'joined'
     | 'asteroidCreate'
@@ -22,7 +23,9 @@ export interface ServerMessage {
     | 'botUpdate'
     | 'botDestroyed'
     | 'abilityUsed'
-    | 'lootExploded';
+    | 'lootExploded'
+    | 'satelliteShoot'
+    | 'satellitePickupCollected';
   // Prefer `data`; accept `payload` temporarily during transition
   data?: PlayerJoin | PlayerLeave | PlayerUpdate | PlayerShoot | string | unknown;
   payload?: PlayerJoin | PlayerLeave | PlayerUpdate | PlayerShoot | string | unknown;
@@ -36,6 +39,7 @@ export interface ServerMessage {
 export interface ClientMessage {
   type:
     | 'join'
+    | 'snapshotResync'
     | 'leave'
     | 'update'
     | 'shoot'
@@ -49,7 +53,9 @@ export interface ClientMessage {
     | 'asteroidDestroyed'
     | 'clientLog'
     | 'useAbility'
-    | 'lootExplode';
+    | 'lootExplode'
+    | 'satelliteDamage'
+    | 'satellitePickupCollected';
   id?: string; // Optional ID field for messages that need it
   data: PlayerJoin | PlayerLeave | PlayerUpdate | PlayerShoot | unknown; // Flexible payload for custom messages
   timestamp: number;

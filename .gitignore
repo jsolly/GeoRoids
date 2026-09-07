@@ -32,15 +32,4 @@ dist/*
 
 # Materialized agent config (fetched by .dotagents/bootstrap.sh; not committed)
 
-# AD sheets may land here; keep topology md, skip binary dumps
-/georoids-art/**/*.png
-/georoids-art/**/*.svg
-# Confirmed saucer NPC assets (AD box paths)
-!/georoids-art/saucer-npc.svg
-!/georoids-art/saucer-npc-firing.svg
-!/georoids-art/saucer-silhouette-svgish.png
-# AD v2 player-kit hull bake (topology only; no v1 sheets)
-!/georoids-art/ships-v2/*.svg
-!/georoids-art/ship-silhouettes-contact-v2.png
-!/georoids-art/ship-silhouettes-play-scale-v2.png
-
+# Canonical art references and generated vector assets are versioned in georoids-art/.

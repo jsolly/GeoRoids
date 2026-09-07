@@ -71,8 +71,8 @@ export const AD_V2_HULL_SHEET = {
     dart: 'needle — tall thin isosceles, inverted-V notch at aft',
     hauler: 'barge hex — wide low polygon, flat keel, faceted bow',
     warden: 'delta + detached forward shield arc above the apex',
-    skirmisher: 'Y-fork — two forward prongs, pointed aft',
-    quake: 'terraced mountain — stepped tiers, triangular peak',
+    skirmisher: 'Y-fork — two forward prongs, notched aft',
+    quake: 'terraced mountain — triangular peak, cross ledges, narrow rear stem',
   },
 } as const;
 

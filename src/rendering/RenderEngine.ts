@@ -5,7 +5,7 @@
 
 import type { Player } from '../entities/player/Player';
 import type { RoidBelt } from '../entities/roid/Roid';
-import { drawRoidsRelative, rocksForPlayfieldZoom } from '../entities/roid/roidRenderer';
+import { drawRoidsRelative } from '../entities/roid/roidRenderer';
 import type { Ship } from '../entities/ship/Ship';
 import {
   drawLasers,
@@ -114,10 +114,7 @@ export class RenderEngine {
 
       // Clear canvas with optimized method
       this.clearCanvas();
-      canvasManager.beginPlayfieldFrame(
-        frame.player.ship.position,
-        rocksForPlayfieldZoom(frame.roidBelt.getRoids())
-      );
+      canvasManager.beginPlayfieldFrame(frame.player.ship.position, frame.roidBelt.getRoids());
 
       // Render game world in order of depth (back to front)
       this.renderBackground(frame);

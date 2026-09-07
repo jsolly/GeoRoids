@@ -5,7 +5,6 @@ export default mergeConfig(
   baseConfig,
   defineConfig({
     test: {
-      include: ['tests/integration/browser/**/*.test.ts'],
       testTimeout: 120_000,
       hookTimeout: 90_000,
     },

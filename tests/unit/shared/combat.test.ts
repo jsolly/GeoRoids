@@ -66,6 +66,7 @@ describe('shared combat helpers', () => {
     expect(isClientOwnedCollisionAttacker('asteroid')).toBe(false);
     expect(isServerOwnedRamAttacker('asteroid')).toBe(true);
     expect(isServerOwnedRamAttacker('asteroid-collision')).toBe(true);
+    expect(isServerOwnedRamAttacker('server-sat-0')).toBe(true);
     expect(isServerOwnedRamAttacker('player-1')).toBe(false);
   });
 

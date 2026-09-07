@@ -1,14 +1,19 @@
 import { expect, test } from 'vitest';
-import type { AsteroidData } from '../../../shared-types';
+import type { AsteroidData, AsteroidDestroyEvent } from '../../../shared-types';
 import {
   applyAsteroidKinematics,
+  applyAsteroidFieldPartition,
   applyAsteroidRowToBelt,
   asteroidHasSpawnPose,
+  bindAsteroidFieldApply,
   asteroidKinematicUpdates,
   createAsteroidFieldSyncScratch,
+  notifyAsteroidDestroyed,
   partitionAsteroidSnapshot,
   shouldPreserveSeenAsteroidsOnJoin,
   shouldSnapAsteroidPose,
+  writeAsteroidKinematicUpdates,
+  unbindAsteroidFieldApply,
 } from '../../../src/network/services/asteroidFieldSync';
 
 function roid(id: string, x: number, y: number): AsteroidData {
@@ -179,10 +184,61 @@ test('lean kinematics without size do not invent a belt rock', () => {
   expect(action).toBe('skipped');
 });
 
+test('an unknown material in a snapshot is rejected before it can reach the belt', () => {
+  const seen = new Set<string>();
+  const invalid = { ...roid('invalid-material', 80, -12), material: 'plasma' } as unknown as AsteroidData;
+
+  const result = partitionAsteroidSnapshot([invalid], seen);
+
+  expect(result.created).toEqual([]);
+  expect(result.updated).toEqual([]);
+  expect(result.removed).toEqual([]);
+  expect(seen.has(invalid.id)).toBe(false);
+  expect(asteroidHasSpawnPose(invalid)).toBe(false);
+});
+
+test('an invalid material update is ignored without changing an existing local material', () => {
+  const local = { ...localRoid(1, 2), material: 'ice' as const };
+
+  applyAsteroidKinematics(local, {
+    material: 'plasma',
+  } as unknown as Partial<AsteroidData>);
+
+  expect(local.material).toBe('ice');
+});
+
+test('snapshot reconciliation removes stale rows without looking like an explicit destroy', () => {
+  const reconciled: string[] = [];
+  const destroyed: AsteroidDestroyEvent[] = [];
+  bindAsteroidFieldApply({
+    onCreated: () => {},
+    onUpdated: () => {},
+    onDestroyed: (event) => destroyed.push(event),
+    onReconciled: (asteroidId) => reconciled.push(asteroidId),
+  });
+
+  try {
+    applyAsteroidFieldPartition({ created: [], updated: [], removed: ['replaced-row'] });
+    notifyAsteroidDestroyed({ asteroidId: 'authoritative-destroy', collabSplit: true });
+  } finally {
+    unbindAsteroidFieldApply();
+  }
+
+  expect(reconciled).toEqual(['replaced-row']);
+  expect(destroyed).toEqual([{ asteroidId: 'authoritative-destroy', collabSplit: true }]);
+});
+
 test('kinematic updates omit undefined fields so a lean row cannot wipe pose', () => {
   expect(asteroidKinematicUpdates({ id: 'server-asteroid-0', position: { x: 3, y: 4 } })).toEqual({
     position: { x: 3, y: 4 },
   });
+});
+
+test('writeAsteroidKinematicUpdates reuses the caller envelope and drops stale keys', () => {
+  const into: Partial<AsteroidData> = { health: 9, size: 40 };
+  const same = writeAsteroidKinematicUpdates({ position: { x: 3, y: 4 } }, into);
+  expect(same).toBe(into);
+  expect(into).toEqual({ position: { x: 3, y: 4 } });
 });
 
 test('collab flag copies onto the local rock so both pilots can chip it', () => {

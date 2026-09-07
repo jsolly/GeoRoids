@@ -100,4 +100,58 @@ describe('incoming lasers use the shared hull path', () => {
 
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
+
+  test('enemy lasers flash an active F shield while allied lasers stay quiet', () => {
+    const enemyLaser = {
+      position: { x: 100, y: 100 },
+      explodeTime: 0,
+      hasExploded: false,
+      updateExplodeTime: vi.fn(),
+      playHitSound: vi.fn(),
+    } as unknown as Laser;
+    const allyLaser = {
+      position: { x: 100, y: 100 },
+      explodeTime: 0,
+      hasExploded: false,
+      updateExplodeTime: vi.fn(),
+      playHitSound: vi.fn(),
+    } as unknown as Laser;
+    const enemyTarget = new Ship();
+    enemyTarget.position = { x: 100, y: 100 };
+    enemyTarget.shieldActive = true;
+    enemyTarget.shieldTime = 30;
+    const allyTarget = new Ship();
+    allyTarget.position = { x: 100, y: 100 };
+    allyTarget.shieldActive = true;
+    allyTarget.shieldTime = 30;
+
+    collisionManager.explodeIncomingLasersOnShieldedShip([enemyLaser], enemyTarget, false);
+    collisionManager.explodeIncomingLasersOnShieldedShip([allyLaser], allyTarget, true);
+
+    expect(enemyLaser.updateExplodeTime).toHaveBeenCalledTimes(1);
+    expect(enemyTarget.shieldFlashTime).toBeGreaterThan(0);
+    expect(allyLaser.updateExplodeTime).not.toHaveBeenCalled();
+    expect(allyTarget.shieldFlashTime).toBe(0);
+  });
+
+  test('an enemy laser also flashes a Warden E shield without changing F state', () => {
+    const laser = {
+      position: { x: 100, y: 100 },
+      explodeTime: 0,
+      hasExploded: false,
+      updateExplodeTime: vi.fn(),
+      playHitSound: vi.fn(),
+    } as unknown as Laser;
+    const warden = new Ship({ kitId: 'warden' });
+    warden.position = { x: 100, y: 100 };
+    expect(warden.activateAbility()).toBe(true);
+    expect(warden.shieldTimer).toBeGreaterThan(0);
+    expect(warden.shieldActive).toBe(false);
+
+    collisionManager.explodeIncomingLasersOnShieldedShip([laser], warden, false);
+
+    expect(laser.updateExplodeTime).toHaveBeenCalledTimes(1);
+    expect(warden.shieldFlashTime).toBeGreaterThan(0);
+    expect(warden.shieldTimer).toBeGreaterThan(0);
+  });
 });

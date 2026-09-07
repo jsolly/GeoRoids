@@ -15,7 +15,11 @@ test('laser collision priority works correctly', async () => {
   await game.waitForAsteroids(1);
 
   const scoreBefore = await game.getScore();
-  const asteroid = (await game.getAsteroidDetails())[0]!;
+  const asteroid = (await game.getAsteroidPositions()).find(
+    (candidate) => candidate.isCollabTarget !== true && candidate.radius < 40
+  );
+  expect(asteroid, 'expected an ordinary asteroid smaller than the collab class').toBeDefined();
+  if (!asteroid) return;
 
   await game.destroyAsteroidWithLaser(asteroid, 25000);
 

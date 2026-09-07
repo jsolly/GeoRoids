@@ -12,11 +12,25 @@ test('ship respawns after asteroid collision when spawn protection ends', async 
   if (!page) throw new Error('Page not available');
 
   const game = new GameInteractions(page);
-  await game.bootGame();
-
-  expect(await game.getShipHealth()).toBe(100);
-
+  // Join first so the local ship can be moved before waiting on the asteroid
+  // field; that keeps the initial spawn outside ambient combat while its
+  // server protection is still settling.
+  await game.navigateToGame();
+  await game.startGame();
+  await game.waitForGameReady();
+  await game.waitForServerJoin();
+  // The initial spawn can receive a live snapshot while the boot barrier is
+  // still settling. Move outside the belt, acknowledge that pose, and only
+  // then assert the authoritative full-health starting state.
+  await game.placeShipAt(-1800, -1800);
+  await game.syncShipPositionToServer();
+  await game.waitForNetworkAsteroids(1);
   await game.waitForCombatReady();
+  const [initialHealth, initialMaxHealth] = await Promise.all([
+    game.getShipHealth(),
+    game.getShipMaxHealth(),
+  ]);
+  expect(initialHealth).toBe(initialMaxHealth);
   const initialLives = await game.getLives();
 
   await game.waitForAsteroids(1);
@@ -30,8 +44,17 @@ test('ship respawns after asteroid collision when spawn protection ends', async 
     .toBeLessThan(initialLives);
 
   await expect
-    .poll(() => game.getShipHealth(), { timeout: 12000, message: 'ship should respawn at full health' })
-    .toBe(100);
+    .poll(
+      async () => {
+        const [health, maxHealth] = await Promise.all([
+          game.getShipHealth(),
+          game.getShipMaxHealth(),
+        ]);
+        return health === maxHealth;
+      },
+      { timeout: 12000, message: 'ship should respawn at full health' }
+    )
+    .toBe(true);
   expect(await game.isShipExploding()).toBe(false);
   await expect
     .poll(() => game.getShipDistanceFromCenter(), {

@@ -32,4 +32,6 @@ export const TERRAIN = {
   /** Gradient magnitude that maps to full slope force. */
   REF_GRADIENT: 0.0035,
   GRADIENT_EPS: 6,
+  /** Below this, contour-laser ticks stay off (flat spawn saddle stays quiet). */
+  CONTOUR_LASER_MIN_GRAD: 0.00045,
 } as const;

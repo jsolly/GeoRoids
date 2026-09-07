@@ -19,15 +19,17 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
     REMOTE: '#7DD3FC',
     BOT: '#FB923C',
     ROID: '#94A3B8',
-    CONTOUR: '#334155',
+    CONTOUR: '#5A6B7D',
     LASER_LOCAL: '#FDE68A',
     LASER_ENEMY: '#FCA5A5',
     HUD: '#E2E8F0',
     HUD_MUTED: '#64748B',
     DANGER: '#F43F5E',
     HEALTH: '#4ADE80',
-    LOOT: '#FBBF24',
-    SHIELD: '#67E8F9',
+    LOOT: '#E8D5A3',
+    SHIELD: '#7DD3C8',
+    SATELLITE: '#C4B5FD',
+    SATELLITE_PICKUP: '#FBBF24',
   });
   expect(TITLE.ACCENT).toBe('#A78BFA');
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');
@@ -107,6 +109,8 @@ test('projectWorldToMiniMap maps the arena center to the radar center', () => {
 
   const east = projectWorldToMiniMap(boundary, 0, 0, 80, 100, 0);
   expect(east).toEqual({ x: 80, y: 40 });
+  expect(east).not.toBe(center);
+  expect(center).toEqual({ x: 40, y: 40 });
 
   const outside = projectWorldToMiniMap(boundary, 0, 0, 80, 400, 0, 10);
   expect(outside).toBeNull();

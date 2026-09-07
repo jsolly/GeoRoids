@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -34 68 68" width="68" height="68" role="img" aria-label="WorldView-3">
+  <title>WorldView-3</title>
+  <g fill="none" stroke="#C4B5FD" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="-6,-24 -6,9 -10,16 -6,24 6,24 10,16 6,9 6,-24"/>
+    <polyline points="-6,9 6,9"/>
+    <polyline points="-10,16 10,16"/>
+    <polyline points="-22,-4 -10,-4 -10,6 -22,6 -22,-4"/>
+    <polyline points="10,-4 22,-4 22,6 10,6 10,-4"/>
+    <polyline points="-16,-4 -16,6"/>
+    <polyline points="16,-4 16,6"/>
+    <polyline points="-10,1 -6,1"/>
+    <polyline points="6,1 10,1"/>
+    <polyline points="0,-27 0,-31"/>
+    <ellipse cx="0" cy="-24" rx="6" ry="3"/>
+  </g>
+</svg>

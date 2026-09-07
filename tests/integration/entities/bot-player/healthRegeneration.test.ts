@@ -1,3 +1,4 @@
+import { calculateHealthRegenDelayFrames, calculateHealthRegenPerFrame } from '../../../../shared/constants/health';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { GAME } from '../../../../src/constants';
 import { Player } from '../../../../src/entities/player/Player';
@@ -5,8 +6,6 @@ import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { entityFactory } from '../../../../src/entities/EntityFactory';
 import { Ship } from '../../../../src/entities/ship/Ship';
 import {
-  calculateHealthRegenDelayFrames,
-  calculateHealthRegenPerFrame,
   shouldStartHealthRegeneration,
 } from '../../../../src/entities/ship/shipUtils';
 

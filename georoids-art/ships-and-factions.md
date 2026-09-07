@@ -13,11 +13,11 @@ Canonical sheets (John lock): `ship-silhouettes-contact-v2.png` /
 
 Sheet construction (play-scale must still read class at a glance):
 
-- Dart — 4-point needle; two downward tail fins; small inverted-V notch
+- Dart — 6-point needle; two downward tail fins; small inverted-V notch
 - Hauler — squat barge; flat keel; vertical sides; single bow apex
-- Warden — tall delta with a large aft triangular notch + detached shield arc
-- Skirmisher — vertical parallel prongs; inners meet; outers taper to a point
-- Quake — triangular peak on two 90° rectangular terraces; wide flat base
+- Warden — tall delta with flat aft edges, a shallow triangular notch and detached shield arc
+- Skirmisher — tall forked prongs; deep inner valley; two aft tips around a second notch
+- Quake — triangular peak, stepped cross ledges and a narrower flat rear stem
 
 ## Kits (John lock — exactly five)
 
@@ -28,8 +28,8 @@ There is **no Hook sixth ship class**. Harpoon is a **Hauler-only** ability.
 | Dart | needle — tall thin isosceles; inverted-V notch at aft | Boost dash |
 | Hauler | barge hex — wide low polygon; flat keel; faceted bow | **Harpoon** (tether / latch) |
 | Warden | Δ + forward shield arc — detached arc above the apex | Shield |
-| Skirmisher | Y-fork — two forward prongs; pointed aft | Burst fire |
-| Quake | terraced mountain — stepped tiers; triangular peak | Shock pulse |
+| Skirmisher | Y-fork — two forward prongs; notched aft | Burst fire |
+| Quake | terraced mountain — triangular peak, cross ledges, narrow rear stem | Shock pulse |
 
 Soft factions stay on the factions stream (#465). Names stay **ION** / **EMBER**.
 Art is tiny marks only via `FACTION_MARK_PAINTERS`:
@@ -55,19 +55,14 @@ tether VFX. It is not a sixth class and not “VFX-only until Hook.”
 
 See `src/entities/ship/shipAbilities.ts` and `drawHaulerHarpoonVfx`.
 
-## Saucer NPC (separate language)
+## EO satellite NPCs
 
-Ambient NPC. Not player line-ship DNA. Not a faction mark.
+The six ambient hostiles use the hardware outlines in `eo-satellites/`: Landsat 7, Terra, Aqua, GOES-16, ENVISAT and WorldView-3. Their common neutral lilac hull (`#C4B5FD`) and pale shot accents (`#E9D5FF`) distinguish them from both factions. Geometry lives in `src/entities/satellite/eoOutlines.ts`; the SVGs use the same paths.
 
-The current UFO-disc is **TEMPORARY only**. John locked an **EO satellite**
-redesign — **art-first**. No new saucer/satellite drawing until Game Director
-hands packs (`SAUCER_EO_SATELLITE_PACKS_HANDED`). Do not expand disc fidelity.
-Swap slot is `eo-sat` on `registerSaucerNpcPainter` when packs land.
+The source pack contained briefs but no EO vector assets. Codex completed the hardware drawings from those briefs during the September 7 takeover. The recovered UFO discs are historical references and are not the active renderer.
 
-Temporary disc files (box paths, do not polish):
+## Mineral asteroids
 
-| State | Path |
-| --- | --- |
-| Idle | `georoids-art/saucer-npc.svg` |
-| Firing | `georoids-art/saucer-npc-firing.svg` |
-| Preview | `georoids-art/saucer-silhouette-svgish.png` |
+Ice has clean crystal facets and straight spreading shards. Metal has compact plated facets, survives three ordinary shots, shows progressive cracks and yields a denser shard. Rubble has a broken perimeter and separates into three unequal fragments when large enough. Fragment size and the field cap bound growth. All three retain neutral asteroid ink; none uses faction paint.
+
+`personality-roids/` contains the matching SVGs and a play-scale contact sheet. The server owns composition, health, fragments and rewards; clients render the same material after join or reconnect.

@@ -74,16 +74,21 @@ export const PALETTE = {
   REMOTE: '#7DD3FC',
   BOT: '#FB923C',
   ROID: '#94A3B8',
-  /** Darker than HUD_MUTED so topo lines stay behind ships/lasers/roids. */
-  CONTOUR: '#334155',
+  /** Canonical terrain slate; subdued beneath ships, lasers, and pickups. */
+  CONTOUR: '#5A6B7D',
   LASER_LOCAL: '#FDE68A',
   LASER_ENEMY: '#FCA5A5',
   HUD: '#E2E8F0',
   HUD_MUTED: '#64748B',
   DANGER: '#F43F5E',
   HEALTH: '#4ADE80',
-  LOOT: '#FBBF24',
-  SHIELD: '#67E8F9',
+  /** Locked cream — wreckage/shard pickups + contour-laser blush. Same hex as Hauler tether. */
+  LOOT: '#E8D5A3',
+  /** F-key laser bubble ring. Mint, distinct from local teal and remote sky. */
+  SHIELD: '#7DD3C8',
+  /** Ambient EO hardware; deliberately independent of ION/EMBER. */
+  SATELLITE: '#C4B5FD',
+  SATELLITE_PICKUP: '#FBBF24',
 } as const;
 
 export const TITLE = {
@@ -131,8 +136,13 @@ export const VISUAL = {
   STAR_SEED: 0x9e3779b9,
   STAR_ALPHA_MIN: 0.3,
   STAR_ALPHA_MAX: 0.8,
-  LOOT_STROKE_WIDTH: 1.25,
-  LOOT_GLOW: 1.25,
+  LOOT_STROKE_WIDTH: 1.5,
+  LOOT_GLOW: 1.5,
+  LOOT_UNDERSTROKE: 2.75,
+  LOOT_SHARD_INNER: 0.42,
+  LOOT_SHARD_DENSE_INNER: 0.68,
+  /** Positive screen-space radius keeps tiny world drops visible at deep zoom. */
+  LOOT_MIN_SCREEN_PX: 3.25,
   FUEL_BAR_WIDTH: 72,
   FUEL_BAR_HEIGHT: 2,
   // Title void uses the same 1px #8BA3C7 points; density matches play (~48 / 1080p).
@@ -156,6 +166,10 @@ export const VISUAL = {
   CONTOUR_ALPHA: 0.16,
   CONTOUR_INDEX_ALPHA: 0.24,
   CONTOUR_INDEX_EVERY: 3,
+  // Cream iso-tangent under each live shot. Terrain answers; shots stay amber on top.
+  CONTOUR_LASER_LENGTH: 28,
+  CONTOUR_LASER_STROKE_WIDTH: 1.25,
+  CONTOUR_LASER_ALPHA: 0.5,
   // Hairline shield ring; glow capped to stroke so it stays a vector outline.
   SHIELD_STROKE_WIDTH: 1.25,
   SHIELD_GLOW: 1.25,
@@ -257,6 +271,46 @@ export const ROID = {
 } as const;
 
 // ============================================================================
+// AMBIENT EO SATELLITE NPC
+// ============================================================================
+// Ambient, server-owned. Not a ship kit and not ION/EMBER-aligned.
+export const SATELLITE = {
+  SIZE: 32,
+  ORBIT_RADIUS: 160,
+  ORBIT_SPEED: 0.018,
+  DRIFT_SPEED: 0.35,
+  /** Keep the whole six-bird product roster visible in an active arena. */
+  AMBIENT_COUNT: 6,
+  MAX_COUNT: 6,
+  HEALTH: 50,
+  POINTS: 75,
+  COLLISION_DAMAGE: 50,
+  DESPAWN_DISTANCE: 2600,
+  BOUNDARY_RADIUS: 2800,
+  EXPLODE_DURATION_FRAMES: 18,
+  RESPAWN_FRAMES: 180,
+  MASS: 1,
+  PROJECTILE_MAX_FRAMES: 240,
+} as const;
+
+// Collectible EO communications hardware (Echo + Relay). This is a pickup
+// effect, not a sixth ship kit or a faction.
+export const SATELLITE_PICKUP = {
+  SIZE: 18,
+  ORBIT_RADIUS: 42,
+  ORBIT_SPEED: 0.08,
+  DRIFT_SPEED: 0.28,
+  LOOSE_ORBIT_RADIUS: 70,
+  SCORE_BONUS: 50,
+  SHIELD_FRAMES: 180,
+  MAX_COUNT: 2,
+  SPAWN_RING_MIN: 380,
+  SPAWN_RING_MAX: 480,
+  FIELD_RADIUS: 700,
+  COLLECT_SLACK: 18,
+} as const;
+
+// ============================================================================
 // EMP PULSE CONFIGURATION
 // ============================================================================
 export const EMP = {
@@ -296,7 +350,7 @@ export const SHOCKWAVE = {
 // FUEL CONFIGURATION
 // ============================================================================
 // Shared tank on every kit. Biggest rocks drop fuel; Quake shock / leftover
-// EMP spends it. Reuses PALETTE.LOOT (matt amber) — do not add a sixth kit.
+// EMP spends it. Reuses PALETTE.LOOT (locked cream) — do not add a sixth kit.
 export const FUEL = {
   MAX: 100,
   START: 50,
@@ -316,6 +370,8 @@ export const SHIELD = {
   COOLDOWN_SECONDS: 6,
   RADIUS_RATIO: 1.55,
   FLASH_SECONDS: 0.12,
+  IDLE_ALPHA: 0.78,
+  FLASH_ALPHA: 0.98,
   BOT_HEALTH_THRESHOLD: 0.7,
   BOT_ACTIVATE_CHANCE: 0.02,
 } as const;
@@ -368,6 +424,17 @@ export const DEBUG = {
     MOVEMENT: true,
     LASERS: true,
     SPAWN_PROTECTION: false,
+  },
+
+  SATELLITE: {
+    COUNT: 6,
+    MOVEMENT: true,
+    LASERS: true,
+  },
+
+  SATELLITE_PICKUP: {
+    COUNT: 2,
+    MOVEMENT: true,
   },
 
   // Roid settings (overrides ROID.INITIAL_ROID_COUNT when in debug mode)

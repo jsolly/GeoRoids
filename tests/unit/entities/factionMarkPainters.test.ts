@@ -5,6 +5,7 @@ import {
   FACTION_MARK_COLORS,
   FACTION_MARK_PAINTERS,
   FACTION_MARK_RADIUS_RATIO,
+  factionMarkScreenSize,
   getFactionMarkColor,
   OWNERSHIP_HULL_COLORS,
   registerFactionMarkPainter,
@@ -90,6 +91,15 @@ test('ION paints a tiny chevron and EMBER paints a tiny diamond', () => {
   expect(ember.colors).toContain('#D4B896');
   expect(ember.calls).toContain('closePath');
   expect(ember.calls).not.toContain('fill');
+});
+
+test('faction marks use restrained context-specific screen sizes', () => {
+  expect(factionMarkScreenSize(2, 'hull')).toBe(2.4);
+  expect(factionMarkScreenSize(16, 'hull')).toBeLessThanOrEqual(4.5);
+  expect(factionMarkScreenSize(6, 'label')).toBeGreaterThanOrEqual(2.2);
+  expect(factionMarkScreenSize(6, 'hud')).toBeGreaterThanOrEqual(2.2);
+  expect(factionMarkScreenSize(5, 'minimap')).toBeLessThanOrEqual(2.6);
+  expect(factionMarkScreenSize(Number.NaN, 'hull')).toBe(2.4);
 });
 
 test('FACTION_MARK_PAINTERS hook can swap a side without touching hull colors', () => {

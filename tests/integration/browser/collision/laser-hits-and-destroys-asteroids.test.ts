@@ -15,7 +15,11 @@ test('laser hits and destroys asteroids', async () => {
   await game.waitForAsteroids(1);
 
   const initialScore = await game.getScore();
-  const target = (await game.getAsteroidDetails())[0]!;
+  const target = (await game.getAsteroidPositions()).find(
+    (candidate) => candidate.isCollabTarget !== true && candidate.radius < 40
+  );
+  expect(target, 'expected an ordinary asteroid smaller than the collab class').toBeDefined();
+  if (!target) return;
 
   await game.destroyAsteroidWithLaser(target, 25000);
 

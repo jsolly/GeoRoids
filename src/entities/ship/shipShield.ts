@@ -107,6 +107,11 @@ export function isShieldBlockingLasers(state: ShieldState): boolean {
   return state.shieldActive && state.shieldTime > 0;
 }
 
+/** One visual predicate for the F bubble and Warden's independent E timer. */
+export function isReadableShieldUp(state: ShieldState & { shieldTimer?: number }): boolean {
+  return isShieldBlockingLasers(state) || (state.shieldTimer ?? 0) > 0;
+}
+
 export function shouldBlockDamage(state: ShieldState, source: CombatDamageSource): boolean {
   return source === 'laser' && isShieldBlockingLasers(state);
 }
@@ -127,6 +132,13 @@ export function resolveCombatDamageSource(
 
 export function noteShieldLaserHit(state: ShieldState): void {
   if (isShieldBlockingLasers(state)) {
+    state.shieldFlashTime = shieldFlashFrames();
+  }
+}
+
+/** Record an enemy laser impact for either shield mechanic's shared ring. */
+export function noteReadableShieldLaserHit(state: ShieldState & { shieldTimer?: number }): void {
+  if (isReadableShieldUp(state)) {
     state.shieldFlashTime = shieldFlashFrames();
   }
 }

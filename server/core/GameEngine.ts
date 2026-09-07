@@ -1,7 +1,22 @@
 import { WebSocket } from 'ws';
-import type { AsteroidData, LootData, Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
+import type {
+  AsteroidData,
+  ActiveCollabTag,
+  SatelliteProjectileState,
+  ServerGameState,
+  ServerEntityData,
+  LootData,
+  Position,
+  SatellitePickupData,
+  SatelliteData,
+  SatelliteShoot,
+  ShipKitId,
+  SoftFactionId,
+  Velocity,
+} from '../../shared-types';
 import { asteroidRamDamage, shipShipTickDamage } from '../../shared/combat';
 import { applyFuelPickup, ensureFuelTank, isFuelLoot } from '../../shared/fuel';
+import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { consumeTickAccumulator, GAME_TICK_MS } from '../../shared/gameClock';
 import {
   LOOT_BLAST,
@@ -11,11 +26,11 @@ import {
   isSmallRoid,
 } from '../../shared/lootBlast';
 import { GROWTH, applyLootMass, applyShipMass, radiusFromMass } from '../../shared/shipGrowth';
-import { CANVAS, DAMAGE, LASER, ROID } from '../../src/constants';
+import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE, SATELLITE_PICKUP, SHIP } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
-import { applyShipKitStats, isShipKitId } from '../../src/entities/ship/shipKits';
+import { getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import {
   requestShield,
   resolveCombatDamageSource,
@@ -32,6 +47,7 @@ import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/p
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../src/physics/terrain/terrainSession';
 import { getVelocityMagnitude } from '../../src/utils/mathUtils';
+import { isWithinCollectRange } from '../../src/entities/satellitePickup/satellitePickupMath';
 import { logger } from '../../setup/serverLogger';
 import {
   AsteroidManager,
@@ -40,9 +56,14 @@ import {
   type ExpiredCollabHit,
 } from './AsteroidManager.ts';
 import { CollisionAuthority } from './CollisionAuthority';
+import { killScoreFor, shouldAwardHumanKillPoints } from './combatScoring';
 import { EntityManager, GameEntity } from './EntityManager';
 import { LootManager } from './LootManager';
+import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import { RNGService } from './RNGService';
+import { SatelliteManager } from './SatelliteManager';
+import { SatellitePickupManager } from './SatellitePickupManager';
+import type { SatelliteHit } from './SatelliteManager';
 
 export interface ServerLaser {
   id: string;
@@ -87,6 +108,13 @@ export type CombatSink = (result: CombatBroadcast) => void;
 
 /** Matches client Laser.isExpired when the canvas is the internal playfield. */
 const SERVER_LASER_MAX_DISTANCE = LASER.TRAVEL_DISTANCE_RATIO + CANVAS.INTERNAL_WIDTH;
+/** 250 ms covers a delayed position packet at 30 Hz plus a brief browser/network hitch. */
+export const HUMAN_SHOOT_POSE_ALLOWANCE_MS = 250;
+/** Bounded positional rounding/muzzle disagreement in addition to the movement allowance. */
+const HUMAN_SHOOT_MUZZLE_SLOP = 8;
+/** Stationary/counter-thrust shots must not remain in the authoritative list forever. */
+export const HUMAN_LASER_MAX_LIFETIME_MS = 5000;
+
 
 type PendingShockwave = {
   origin: Position;
@@ -99,6 +127,8 @@ export class GameEngine {
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
   private lootManager: LootManager;
+  private satelliteManager: SatelliteManager;
+  private satellitePickupManager: SatellitePickupManager;
   private rngService: RNGService;
   private collisionAuthority = new CollisionAuthority();
   private combatSink: CombatSink | null = null;
@@ -115,12 +145,17 @@ export class GameEngine {
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private pendingShockwaves: PendingShockwave[] = [];
   private pendingBotShots: BotShot[] = [];
+  private pendingSatelliteShots: SatelliteShoot[] = [];
+  private readonly humanShootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
+  private readonly humanLaserExpiry = new WeakMap<ServerLaser, number>();
 
   constructor(rngSeed?: number) {
     this.rngService = new RNGService(rngSeed);
     this.entityManager = new EntityManager(this.rngService);
     this.asteroidManager = new AsteroidManager(this.rngService);
     this.lootManager = new LootManager(this.rngService);
+    this.satelliteManager = new SatelliteManager(this.rngService);
+    this.satellitePickupManager = new SatellitePickupManager(this.rngService);
     ensureTerrain(TERRAIN.DEFAULT_SEED);
 
     // Don't initialize pause state yet - will be called after initialization
@@ -180,8 +215,10 @@ export class GameEngine {
     this.entityManager.updateRespawns();
     this.tickAbilities();
     this.entityManager.updateShields();
+    this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime);
     this.collectLoot();
+    this.tickSatellitePickups();
     this.asteroidManager.updateMotion();
     this.emitAsteroidHits(this.advanceLasersAndResolveHits());
     this.flushDueShockwaves();
@@ -193,6 +230,11 @@ export class GameEngine {
     // Destruction can remove the last row during this frame. Refill before
     // the next snapshot so active players never wait for a reconnect.
     this.ensureAsteroidField();
+    const shots = this.satelliteManager.update(this.satelliteHuntTargets());
+    if (shots.length > 0) {
+      this.pendingSatelliteShots.push(...shots);
+    }
+    this.applySatelliteHits(this.satelliteManager.drainHits());
   }
 
   /** Combat pair + clock — scenario tests drive death→respawn without moving the belt. */
@@ -205,6 +247,7 @@ export class GameEngine {
     this.entityManager.updateRespawns();
     this.tickAbilities();
     this.entityManager.updateShields();
+    this.entityManager.updateHealthRegeneration();
   }
 
   public stopGameLoop(): void {
@@ -238,7 +281,21 @@ export class GameEngine {
           logger.info(`🤖 Recreated ${bots.length} bots on resume`);
         }
       }
+      this.ensureAmbientSatellites();
+    } else if (humanPlayerCount > 0) {
+      this.ensureAmbientSatellites();
     }
+  }
+
+  private ensureAmbientSatellites(): void {
+    if (this.satelliteManager.getCount() === 0) {
+      const satellites = this.createSatellites(SATELLITE.AMBIENT_COUNT);
+      if (satellites) {
+        logger.info(`🛰️ Ambient hostile NPCs in arena: ${satellites.length}`);
+      }
+    }
+
+    this.ensureSatellitePickups();
 
     // Asteroids are server-owned world state. A fresh active session must not
     // depend on a client's initAsteroids message to seed the belt.
@@ -257,6 +314,8 @@ export class GameEngine {
     bots: number;
     asteroids: number;
     loot: number;
+    satellites: number;
+    satellitePickups: number;
   } {
     return {
       isPaused: this.isPaused,
@@ -265,6 +324,8 @@ export class GameEngine {
       bots: this.entityManager.getBotCount(),
       asteroids: this.asteroidManager.getAsteroidCount(),
       loot: this.lootManager.getCount(),
+      satellites: this.satelliteManager.getCount(),
+      satellitePickups: this.satellitePickupManager.getCount(),
     };
   }
 
@@ -297,6 +358,9 @@ export class GameEngine {
     this.lasers = [];
     this.laserSeq = 0;
     this.pendingAsteroidHits = [];
+    this.satelliteManager.clearSatellites();
+    this.pendingSatelliteShots = [];
+    this.satellitePickupManager.clear();
     
     // Clear all entities (bots, players, etc.)
     this.entityManager.clearAll();
@@ -331,6 +395,7 @@ export class GameEngine {
   }
 
   public removePlayer(id: string): GameEntity | undefined {
+    this.satellitePickupManager.releaseOwner(id);
     const entity = this.entityManager.removeEntity(id);
     this.updatePauseState();
     return entity;
@@ -432,7 +497,8 @@ export class GameEngine {
   }
 
   public getBot(botId: string): GameEntity | undefined {
-    return this.entityManager.getEntity(botId);
+    const entity = this.entityManager.getEntity(botId);
+    return entity?.type === 'bot' ? entity : undefined;
   }
 
   public getAllBots(): GameEntity[] {
@@ -441,6 +507,177 @@ export class GameEngine {
 
   public getBotCount(): number {
     return this.entityManager.getBotCount();
+  }
+
+  public createSatellites(count: number): SatelliteData[] | null {
+    return this.satelliteManager.createSatellitesSafely(count);
+  }
+
+  public getSatellite(satelliteId: string) {
+    return this.satelliteManager.getSatellite(satelliteId);
+  }
+
+  public getAllSatellites(): SatelliteData[] {
+    return this.satelliteManager.getAllSatellites();
+  }
+
+  public getSatelliteCount(): number {
+    return this.satelliteManager.getCount();
+  }
+
+  /** Snapshot source for active EO projectiles; transport owns serialization. */
+  public getActiveSatelliteProjectiles(): SatelliteProjectileState[] {
+    return this.satelliteManager.getActiveProjectiles();
+  }
+
+  /** Snapshot source for the server-owned collaborative hit window. */
+  public getActiveCollabTags(now = Date.now()): ActiveCollabTag[] {
+    return this.asteroidManager.getActiveCollabTags(now);
+  }
+
+  public createSatellitePickups(count: number = SATELLITE_PICKUP.MAX_COUNT): SatellitePickupData[] {
+    return this.satellitePickupManager.createPickups(count);
+  }
+
+  public getSatellitePickup(pickupId: string): SatellitePickupData | undefined {
+    return this.satellitePickupManager.getAllPickups().find((pickup) => pickup.id === pickupId);
+  }
+
+  public getAllSatellitePickups(): SatellitePickupData[] {
+    return this.satellitePickupManager.getAllPickups();
+  }
+
+  public getSatellitePickupCount(): number {
+    return this.satellitePickupManager.getCount();
+  }
+
+  /** Keep the pickup field alive for every active arena. */
+  public ensureSatellitePickups(): SatellitePickupData[] {
+    if (this.isPaused || this.entityManager.getHumanPlayerCount() === 0) {
+      return [];
+    }
+    if (this.satellitePickupManager.getCount() > 0) {
+      return [];
+    }
+    return this.satellitePickupManager.createPickups();
+  }
+
+  public tickSatellitePickups(): SatellitePickupData[] {
+    if (this.isPaused) {
+      return this.getAllSatellitePickups();
+    }
+    this.satellitePickupManager.update(
+      this.entityManager.getAllEntities().map((entity) => ({
+        id: entity.id,
+        position: entity.position,
+        health: entity.health,
+        exploding: entity.exploding,
+      }))
+    );
+    return this.getAllSatellitePickups();
+  }
+
+  /** First living server-positioned human overlapping a pickup wins. */
+  public handleSatellitePickupCollected(
+    pickupId: string,
+    playerId: string
+  ): { success: boolean; pickup?: SatellitePickupData } {
+    const pickup = this.satellitePickupManager.getPickup(pickupId);
+    const collector = this.entityManager.getEntity(playerId);
+    if (
+      !pickup ||
+      pickup.state !== 'loose' ||
+      !collector ||
+      collector.type !== 'human' ||
+      collector.health <= 0 ||
+      collector.exploding ||
+      collector.respawnTimer !== undefined
+    ) {
+      return { success: false };
+    }
+
+    if (
+      !isWithinCollectRange(
+        collector.position,
+        pickup.position,
+        radiusFromMass(collector.mass ?? GROWTH.BASE_MASS),
+        pickup.radius,
+        SATELLITE_PICKUP.COLLECT_SLACK
+      )
+    ) {
+      return { success: false };
+    }
+
+    const collected = this.satellitePickupManager.collect(
+      pickupId,
+      playerId,
+      this.satellitePickupManager.countOrbitingFor(playerId)
+    );
+    if (!collected) {
+      return { success: false };
+    }
+
+    collector.score += SATELLITE_PICKUP.SCORE_BONUS;
+    collector.spawnProtectionTimer = Math.max(
+      collector.spawnProtectionTimer ?? 0,
+      SATELLITE_PICKUP.SHIELD_FRAMES
+    );
+    collector.lastUpdate = Date.now();
+    return { success: true, pickup: collected };
+  }
+
+  public drainSatelliteShots(): SatelliteShoot[] {
+    const shots = this.pendingSatelliteShots;
+    this.pendingSatelliteShots = [];
+    return shots;
+  }
+
+  public handleSatelliteDamage(satelliteId: string, attackerId: string, damage: number): boolean {
+    const damaged = this.satelliteManager.damageSatellite(satelliteId, damage);
+    if (!damaged) {
+      return false;
+    }
+    if (damaged.health <= 0 && damaged.exploding) {
+      this.lootManager.spawnFromPosition(damaged.position, SATELLITE.MASS, this.gameTime);
+      this.awardPoints(attackerId, SATELLITE.POINTS);
+      return true;
+    }
+    return false;
+  }
+
+  public tickSatellites(): SatelliteShoot[] {
+    const shots = this.satelliteManager.update(this.satelliteHuntTargets());
+    if (shots.length > 0) {
+      this.pendingSatelliteShots.push(...shots);
+    }
+    this.applySatelliteHits(this.satelliteManager.drainHits());
+    return shots;
+  }
+
+  private satelliteHuntTargets(): Array<{
+    id: string;
+    position: Position;
+    radius: number;
+    health: number;
+    exploding: boolean;
+  }> {
+    return this.entityManager.getAllEntities().map((entity) => ({
+      id: entity.id,
+      position: entity.position,
+      radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
+      health: entity.health,
+      exploding: entity.exploding,
+      respawnTimer: entity.respawnTimer,
+    }));
+  }
+
+  private applySatelliteHits(hits: SatelliteHit[]): void {
+    for (const hit of hits) {
+      const result = this.applyDirectedHit(hit.targetId, hit.satelliteId, hit.damage, 'laser');
+      if (result) {
+        this.combatSink?.(result);
+      }
+    }
   }
 
   public updateBot(botId: string, updates: Partial<GameEntity>): GameEntity | undefined {
@@ -501,7 +738,7 @@ export class GameEngine {
       return { applied: true, isDestroyed: false, entity: damaged };
     }
 
-    this.applyShipDeath(damaged, attackerId, damaged.type === 'human' ? 200 : 50);
+    this.applyShipDeath(damaged, attackerId, killScoreFor(damaged.type));
     return { applied: true, isDestroyed: true, entity: damaged };
   }
 
@@ -511,6 +748,10 @@ export class GameEngine {
     damage: number,
     source?: CombatDamageSource
   ): boolean {
+    const existing = this.getPlayer(targetPlayerId);
+    if (!existing || existing.type !== 'human') {
+      return false;
+    }
     return this.handleShipDamage(targetPlayerId, attackerId, damage, source).isDestroyed;
   }
 
@@ -520,14 +761,18 @@ export class GameEngine {
     damage: number,
     source?: CombatDamageSource
   ): boolean {
+    const existing = this.getBot(botId);
+    if (!existing || existing.type !== 'bot') {
+      return false;
+    }
     return this.handleShipDamage(botId, attackerId, damage, source).isDestroyed;
   }
 
   /**
-   * Server-owned ship↔asteroid and ship↔ship resolution. Humans and bots
-   * share the same overlap + handleShipDamage path. Asteroid motion already
-   * ran in the game loop (`updateMotion`); this only applies health.
-   * Ram uses the tip collision destroy path so laser collab stays intact.
+   * Server-owned ship↔asteroid, ship↔satellite, and ship↔ship resolution.
+   * Humans and bots share the same overlap + handleShipDamage path. Asteroid
+   * motion already ran in the game loop (`updateMotion`); this only applies
+   * health. Ram uses the tip collision destroy path so laser collab stays intact.
    */
   public resolveAuthoritativeCombat(now: number = Date.now()): CombatBroadcast[] {
     if (this.isPaused) {
@@ -554,7 +799,10 @@ export class GameEngine {
         if (destruction.outcome === 'destroyed') {
           result.destroyedAsteroidId = hit.asteroidId;
           result.newAsteroids = destruction.newAsteroids;
-          result.collabSplit = destruction.split;
+          // Rubble has its own ordinary three-fragment break. Keep the
+          // cooperative shockwave reserved for the collaborative split path,
+          // even if a future collision destroyer starts returning fragments.
+          result.collabSplit = destruction.split && destruction.destroyed?.material !== 'rubble';
           result.origin = destruction.destroyed?.position;
           const scorer = this.entityManager.getEntity(hit.shipId);
           if (scorer) {
@@ -563,6 +811,23 @@ export class GameEngine {
         }
       }
       results.push(result);
+    }
+
+    const satHits = this.collisionAuthority.collectShipSatelliteHits(
+      entities,
+      this.satelliteManager.getAllSatellites()
+    );
+    for (const hit of satHits) {
+      const result = this.applyDirectedHit(
+        hit.shipId,
+        hit.satelliteId,
+        SATELLITE.COLLISION_DAMAGE,
+        'collision'
+      );
+      if (result) {
+        results.push(result);
+      }
+      this.handleSatelliteDamage(hit.satelliteId, hit.shipId, SATELLITE.COLLISION_DAMAGE);
     }
 
     const pairTicks = this.collisionAuthority.collectShipShipTicks(entities, now);
@@ -618,6 +883,7 @@ export class GameEngine {
     if (attackerId) {
       entity.deathCause = attackerId;
     }
+    this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
     if (entity.type === 'human') {
       const prevLives = entity.lives;
@@ -628,9 +894,13 @@ export class GameEngine {
         livesBefore: prevLives,
         livesAfter: entity.lives,
       });
-      const attackerIsValidPlayer =
-        !!attackerId && attackerId !== entity.id && !!this.entityManager.getEntity(attackerId);
-      if (attackerIsValidPlayer) {
+      if (
+        shouldAwardHumanKillPoints(
+          attackerId,
+          entity.id,
+          !!this.entityManager.getEntity(attackerId)
+        )
+      ) {
         this.awardPoints(attackerId, killPoints);
       }
     } else if (attackerId) {
@@ -652,7 +922,7 @@ export class GameEngine {
 
     if (result.outcome === 'destroyed' && result.destroyed) {
       this.awardPoints(playerId, pointsForRoidSize(result.destroyed.size));
-      this.dropShardAt(result.destroyed.position);
+      this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
       this.maybeDropFuel(result.destroyed);
     }
 
@@ -709,7 +979,9 @@ export class GameEngine {
       playerId,
       points: result.destroyed ? pointsForRoidSize(result.destroyed.size) : 0,
       newAsteroids: result.newAsteroids,
-      split: result.split,
+      // The wire flag activates the cooperative shockwave. Ordinary mineral
+      // fragments still broadcast through newAsteroids without that reward.
+      split: result.split && asteroid.material !== 'rubble',
       expiresAt: result.expiresAt,
       origin,
     };
@@ -719,7 +991,7 @@ export class GameEngine {
     const expired = this.asteroidManager.expireStaleHits(now);
     for (const item of expired) {
       this.awardPoints(item.playerId, item.points);
-      this.dropShardAt(item.destroyed.position);
+      this.dropShardAt(item.destroyed.position, asteroidShardMass(item.destroyed.material));
       this.maybeDropFuel(item.destroyed);
       this.resolvedCollabHits.push(item);
     }
@@ -749,6 +1021,63 @@ export class GameEngine {
     if (this.pendingAsteroidHits.length > 0) {
       listener(this.pendingAsteroidHits.splice(0));
     }
+  }
+
+  /**
+   * Untrusted human wire entry point. Bots/tests use spawnLaser for server-authored shots.
+   * Aim remains client-predicted, but ownership alone is not proof of a valid muzzle.
+   */
+  public spawnHumanLaser(
+    ownerId: string,
+    start: Position,
+    velocity: Velocity,
+    now = Date.now()
+  ): ServerLaser | null {
+    const shooter = this.entityManager.getEntity(ownerId);
+    if (
+      !shooter || shooter.type !== 'human' || shooter.health <= 0 || shooter.exploding ||
+      shooter.respawnTimer !== undefined || !Number.isFinite(now) ||
+      !Number.isFinite(start?.x) || !Number.isFinite(start?.y) ||
+      !Number.isFinite(velocity?.x) || !Number.isFinite(velocity?.y) ||
+      !Number.isFinite(shooter.position.x) || !Number.isFinite(shooter.position.y) ||
+      !Number.isFinite(shooter.velocity.x) || !Number.isFinite(shooter.velocity.y)
+    ) {
+      return null;
+    }
+    const kit = getShipKit(shooter.kitId);
+    // Account for legitimate dash and radial impulse before the next movement clamp.
+    const maxShipSpeed = kit.maxVelocity + SHIP_ABILITY.DASH_BOOST + SHIP_ABILITY.SHOCK_FORCE;
+    const maxLaserSpeed = maxShipSpeed + LASER.SPEED / GAME.FPS;
+    const muzzleRadius = (4 / 3) * Math.max(kit.size / 2, radiusFromMass(shooter.mass));
+    const maxOriginDistance = muzzleRadius + HUMAN_SHOOT_MUZZLE_SLOP +
+      maxShipSpeed * GAME.FPS * (HUMAN_SHOOT_POSE_ALLOWANCE_MS / 1000);
+    if (
+      Math.hypot(start.x - shooter.position.x, start.y - shooter.position.y) > maxOriginDistance ||
+      Math.hypot(velocity.x, velocity.y) > maxLaserSpeed ||
+      Math.hypot(shooter.velocity.x, shooter.velocity.y) > maxShipSpeed
+    ) {
+      return null;
+    }
+    // A bounded burst bucket tolerates packet bunching and the three-shot E volley
+    // (whose shoot packets precede useAbility). Sustained rate follows kit cooldown;
+    // Skirmisher also earns its two additional volley rounds per ability cooldown.
+    const previous = this.humanShootBudgets.get(shooter);
+    const bonusRate = (kit.burstCount - 1) /
+      (SHIP_ABILITY.COOLDOWN_FRAMES[kit.id] * (1000 / GAME.FPS));
+    const rate = 1 / kit.shotCooldown + bonusRate;
+    const available = previous
+      ? Math.min(SHIP.MAX_LASERS, previous.tokens + Math.max(0, now - previous.at) * rate)
+      : SHIP.MAX_LASERS;
+    if (available < 1) {
+      return null;
+    }
+    const laser = this.spawnLaser(ownerId, start, velocity);
+    if (!laser) {
+      return null;
+    }
+    this.humanShootBudgets.set(shooter, { tokens: available - 1, at: now });
+    this.humanLaserExpiry.set(laser, now + HUMAN_LASER_MAX_LIFETIME_MS);
+    return laser;
   }
 
   /** Spawn a simulated shot. Used for human `shoot` and the same helper can take a bot id. */
@@ -821,6 +1150,101 @@ export class GameEngine {
     return true;
   }
 
+  /**
+   * Bot loot reports use the same one-use server projectile evidence as bot
+   * asteroid reports. The client may report where it saw the bot laser, but
+   * it cannot create or replay the shot itself.
+   */
+  public consumeActiveBotLaserNearLoot(botId: string, lootId: string): boolean {
+    const bot = this.entityManager.getEntity(botId);
+    const loot = this.lootManager.get(lootId);
+    if (bot?.type !== 'bot' || !loot) {
+      return false;
+    }
+
+    const laser = this.lasers.find(
+      (candidate) =>
+        !candidate.hasExploded &&
+        candidate.ownerId === botId &&
+        isLaserNearAsteroid(candidate.position, loot.position, loot.radius)
+    );
+    if (!laser) {
+      return false;
+    }
+
+    laser.hasExploded = true;
+    return true;
+  }
+
+  /**
+   * Consume one server-tracked human shot when its live geometry is near a
+   * target. A report may omit its hit position for legacy clients; the server
+   * still requires the tracked laser itself to be near the authoritative
+   * target before consuming it.
+   */
+  public consumeHumanLaserNearTarget(
+    attackerId: string,
+    targetPosition: Position,
+    targetRadius: number,
+    reportedPosition?: Position
+  ): boolean {
+    if (
+      !this.validatePosition(targetPosition) ||
+      !Number.isFinite(targetRadius) ||
+      targetRadius < 0 ||
+      (reportedPosition !== undefined && !this.validatePosition(reportedPosition))
+    ) {
+      return false;
+    }
+
+    const shooter = this.entityManager.getEntity(attackerId);
+    if (shooter?.type !== 'human') {
+      return false;
+    }
+
+    const laser = this.lasers.find(
+      (candidate) =>
+        !candidate.hasExploded &&
+        candidate.ownerId === attackerId &&
+        (isLaserNearAsteroid(candidate.position, targetPosition, targetRadius) ||
+          isLaserNearAsteroid(candidate.prevPosition, targetPosition, targetRadius)) &&
+        (reportedPosition === undefined ||
+          isLaserNearAsteroid(reportedPosition, targetPosition, targetRadius))
+    );
+    if (!laser) {
+      return false;
+    }
+    laser.hasExploded = true;
+    return true;
+  }
+
+  /** Consume one server-tracked human shot when its client hit report is near an EO hull. */
+  public consumeHumanLaserNearSatellite(
+    attackerId: string,
+    satelliteId: string,
+    reportedPosition: Position
+  ): boolean {
+    if (!this.validatePosition(reportedPosition)) {
+      return false;
+    }
+    const satellite = this.satelliteManager.getSatellite(satelliteId);
+    if (
+      !satellite ||
+      satellite.exploding ||
+      satellite.respawnTimer > 0 ||
+      satellite.health <= 0
+    ) {
+      return false;
+    }
+
+    return this.consumeHumanLaserNearTarget(
+      attackerId,
+      satellite.position,
+      satellite.radius,
+      reportedPosition
+    );
+  }
+
   /** Move live lasers and apply at most one break per asteroid / laser. */
   public advanceLasersAndResolveHits(): AppliedAsteroidHit[] {
     const hits: AppliedAsteroidHit[] = [];
@@ -830,7 +1254,7 @@ export class GameEngine {
       if (laser === undefined) {
         continue;
       }
-      if (laser.hasExploded) {
+      if (laser.hasExploded || Date.now() >= (this.humanLaserExpiry.get(laser) ?? Infinity)) {
         this.lasers.splice(i, 1);
         continue;
       }
@@ -994,15 +1418,17 @@ export class GameEngine {
         harpoonTimer: entity.harpoonTimer,
         harpoonTargetId: entity.harpoonTargetId,
         harpoonLatchPos: entity.harpoonLatchPos,
-        ...(entity.deathCause ? { deathCause: entity.deathCause } : {}),
+        deathCause: entity.deathCause || undefined,
         ...shieldSnapshot(entity),
-      })),
+      } satisfies ServerEntityData & Record<keyof ServerEntityData, unknown>)),
       asteroids: this.asteroidManager.getAllAsteroids(),
       loot: this.lootManager.getAll(),
+      satellites: this.satelliteManager.getAllSatellites(),
+      satellitePickups: this.satellitePickupManager.getAllPickups(),
       gameTime: this.gameTime,
       isPaused: this.isPaused,
       terrainSeed: getTerrainSeed(),
-    };
+    } satisfies ServerGameState & Record<keyof ServerGameState, unknown>;
     
     // Debug logging for health values
     const humanPlayers = allEntities.filter(e => e.type === 'human');
@@ -1023,7 +1449,14 @@ export class GameEngine {
   }
 
   private combatSidesAllowDamage(attackerId: string, targetId: string): boolean {
-    if (!attackerId || attackerId === 'asteroid' || attackerId === 'boundary' || attackerId === 'loot') {
+    if (
+      !attackerId ||
+      attackerId === 'asteroid' ||
+      attackerId === 'boundary' ||
+      attackerId === 'loot' ||
+      attackerId.startsWith('server-sat-') ||
+      targetId.startsWith('server-sat-')
+    ) {
       return true;
     }
     const attacker = this.entityManager.getEntity(attackerId);
@@ -1040,8 +1473,11 @@ export class GameEngine {
     if (!entity) {
       return false;
     }
-    if (isShipKitId(requestedKitId) && entity.kitId !== requestedKitId) {
-      applyShipKitStats(entity, requestedKitId);
+    // Kit selection is authoritative at join time. Keep accepting the
+    // client's matching echo, but reject an alternate or malformed kit so an
+    // ability request cannot rewrite health, size, or movement stats.
+    if (requestedKitId !== undefined && requestedKitId !== entity.kitId) {
+      return false;
     }
     const world = {
       asteroids: this.asteroidManager.getAllAsteroids().map((asteroid) => ({
@@ -1089,7 +1525,7 @@ export class GameEngine {
     const result = this.asteroidManager.destroyFromCollision(asteroidId);
     if (result.destroyed) {
       this.awardPoints(playerId, pointsForRoidSize(result.destroyed.size));
-      this.dropShardAt(result.destroyed.position);
+      this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
       this.maybeDropFuel(result.destroyed);
     }
     return {
@@ -1189,8 +1625,8 @@ export class GameEngine {
     return { success: true, loot, origin, damagedIds, pushedAsteroidIds };
   }
 
-  private dropShardAt(position: Position): LootData {
-    return this.lootManager.spawnShard(position, this.gameTime);
+  private dropShardAt(position: Position, mass?: number): LootData {
+    return this.lootManager.spawnShard(position, this.gameTime, mass);
   }
 
   private harmFromLootBlast(entity: GameEntity): 'hit' | 'killed' | 'ignored' {
@@ -1201,7 +1637,11 @@ export class GameEngine {
       return 'ignored';
     }
 
+    const previousHealth = entity.health;
     entity.health = Math.max(0, entity.health - LOOT_BLAST.DAMAGE);
+    if (entity.health < previousHealth) {
+      entity.healthRegenTimer = calculateHealthRegenDelayFrames();
+    }
     entity.lastUpdate = Date.now();
     if (entity.health <= 0) {
       this.applyShipDeath(entity, 'loot', 0);
@@ -1227,7 +1667,6 @@ export class GameEngine {
   }
 
   // Bot-specific update methods for testing
-  // Health regeneration is now handled client-side
 
   public updateBotMovement(): BotShot[] {
     const shots = this.entityManager.updateBotMovement();

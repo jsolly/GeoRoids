@@ -20,8 +20,8 @@ test('destroying a roid drops a collectible shard that uses grow/loot collect', 
   const initialMass = await game.getShipMass();
   const roids = await game.getAsteroidPositions();
   const target =
-    roids.find((roid) => roid.radius < 40 && !roid.isCollabTarget) ??
-    roids.find((roid) => !roid.isCollabTarget);
+    roids.find((roid) => roid.radius < 40 && !roid.isCollabTarget && roid.material === 'ice') ??
+    roids.find((roid) => !roid.isCollabTarget && roid.material === 'ice');
   expect(target).toBeTruthy();
   if (!target) {
     return;

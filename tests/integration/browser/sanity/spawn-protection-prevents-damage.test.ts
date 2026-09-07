@@ -11,18 +11,29 @@ test('spawn protection prevents damage', async () => {
 
   const game = new GameInteractions(page);
   await game.bootGame({ waitForCombatReady: false });
+  // Keep ambient combat away from this single-hit protection scenario while
+  // retaining the actual server-issued protection and normal position updates.
+  await page.evaluate(() => {
+    const ship = (window as any).gameController.playerManager.getLocalPlayer().ship;
+    ship.position.x = -1800;
+    ship.position.y = -1800;
+    ship.velocity.x = 0;
+    ship.velocity.y = 0;
+  });
   await game.waitForServerSpawnProtection();
 
   expect(await game.isServerSpawnProtected()).toBe(true);
+  const healthWhileProtected = await game.getShipHealth();
   await game.applyLaserDamageToLocal(1, 25);
   await page.waitForTimeout(400);
-  expect(await game.getShipHealth()).toBe(100);
+  expect(await game.getShipHealth()).toBe(healthWhileProtected);
 
   await game.waitForCombatReady();
   expect(await game.isServerSpawnProtected()).toBe(false);
 
+  const healthBeforeDamage = await game.getShipHealth();
   await game.applyLaserDamageToLocal(1, 25);
   await expect
     .poll(() => game.getShipHealth(), { timeout: 5000, message: 'damage should apply after protection ends' })
-    .toBe(75);
+    .toBe(healthBeforeDamage - 25);
 }, TestConfig.DEFAULT_TIMEOUT);

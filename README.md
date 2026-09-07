@@ -1,161 +1,58 @@
-# GeoAsteroids
+# GeoRoids
 
-[![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org)
+A multiplayer vector spaceship game. Play at [www.georoids.com](https://www.georoids.com).
 
-A 2D spaceship game, <a href="https://geoasteroids.com" target="_blank" >Geoasteroids.com</a>
+The Vite + TypeScript client renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, bots, NPCs and rewards. MongoDB is not required.
 
----
+## Local development
 
-## Table of Contents
+Use Node 24 or newer. On macOS, the native `canvas` dependency requires Cairo, Pango, libjpeg, giflib and librsvg.
 
-- [Installation](#installation)
-- [Setup](#setup)
-- [Development](#development)
-- [Tests, Linting](#tests-linting)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Installation
-
-1. (Install <a href="https://nodejs.org/en/" rel="noopener noreferrer">Node.js</a>)
-2. (Install <a href="https://www.mongodb.com/try/download/community" rel="noopener noreferrer">MongoDB</a>) (Or use a cloud service like <a href="https://www.mongodb.com/cloud/atlas" rel="noopener noreferrer">MongoDB Atlas</a>)
-
-```shell
-    git clone git@github.com:jsolly/GeoAsteroids.git
-    cd GeoAsteroids
-    npm install
+```sh
+git clone git@github.com:jsolly/GeoRoids.git
+cd GeoRoids
+npm ci
+touch .env
+npm run dev
 ```
 
-## Setup
+Vite serves the client at `http://localhost:5173`; the game server listens on port 3001. Vite proxies `/ws` to the local server. Optional `VITE_WEBSOCKET_URL` configuration is documented in `.env.example`.
 
-```shell
-  $ cd <mongoDB_install_dir>/bin
-  # Start MongoDB Server Locally (Or use a cloud service like MongoDB Atlas)
-  $ ./mongod --dbpath <path to data directory>
-  $ mongo # Or use a GUI like MongoDB Compass
-  $ use geoasteroids
-  $ db.createCollection("highscores")
-  # Check src/database.ts for connection string
-  $ vercel dev # Allows us to mock serverless functions locally
-```
+Choose a ship, enter the game, use arrow keys to turn and thrust, Space to fire, E for the selected kit's ability and F for the shield. Mobile players use the on-screen controls. The minimap provides the wider arena view.
 
-## Development
+## Verification
 
-### Environment Variables
+Run commands from the repository directory:
 
-The following environment variables can be configured:
-
-#### Debug Mode
-
-Debug behavior is controlled by constants defined in `src/constants/index.ts`:
-
-**Logging Configuration:**
-
-- `LOGGING.GLOBAL_LOG_LEVEL` - Sets the global log level (error, warn, info, debug). This controls what gets written to both `server.log` and `client.log`.
-- `LOGGING.FORWARD_TO_SERVER` - Whether to forward client logs to the server (default: true).
-- `LOGGING.WRITE_TO_CONSOLE` - Whether to write logs to browser console (default: true).
-
-**Debug Configuration:**
-
-- `DEBUG.ENABLED` - Master switch for all debug features (default: false)
-- `DEBUG.LOCAL_PLAYER.INVINCIBLE` - Makes the local player invincible in debug mode (default: false)
-- `DEBUG.LOCAL_PLAYER.SPAWN_PROTECTION` - Enables local player spawn protection in debug mode (default: true)
-- `DEBUG.BOT_PLAYER.COUNT` - Number of bots to spawn in debug mode (default: 1)
-- `DEBUG.BOT_PLAYER.SPAWN_PROTECTION` - Enables bot spawn protection in debug mode (default: false)
-- `DEBUG.BOT_PLAYER.MOVEMENT` - Enables bot movement when set to true (default: false)
-- `DEBUG.BOT_PLAYER.LASERS` - Enables bot shooting when set to true (default: false)
-- `DEBUG.ROIDS.INITIAL_COUNT` - Alternative roid count control for debug mode (default: 100)
-- `DEBUG.ROIDS.PLACE_ON_BOT` - Places roids on bots for testing (default: false)
-- `DEBUG.ROIDS.MOVEMENT` - Enables roid movement when set to true (default: false)
-- `DEBUG.PLACE_PLAYERS_NEAR_CENTER` - Places all players (local, remote, bots) near the center in debug mode (default: true)
-
-**Note**: To enable debug mode, you need to set both:
-
-1. `LOGGING.GLOBAL_LOG_LEVEL` to `'debug'` in `src/constants/index.ts`
-2. `DEBUG.ENABLED` to `true` in the same file
-
-#### Network
-
-- `VITE_WEBSOCKET_URL` - WebSocket server URL for network
-
-#### Build Info
-
-- `VITE_BUILD_TIME` - Build timestamp (auto-generated)
-- `VITE_COMMIT_HASH` - Git commit hash (auto-generated)
-
-### Network Development Setup
-
-For local network development, use the following commands:
-
-```shell
-# Run all development servers (Vite + WebSocket)
-npm run dev:full
-
-# Run individual servers
-npm run dev              # Vite dev server (port 5173)
-npm run dev:network  # WebSocket server (port 3001)
-```
-
-## Tests, Linting
-
-### Test
-
-```shell
+```sh
+npm run gate
 npm run test
+npm run test:integration:server
+npm run test:integration:browser
 ```
 
-#### Browser Tests
+`npm run gate` checks dependencies, lint, configuration, TypeScript, unit tests and the production build. Browser tests need the Playwright browser installation (`npx playwright install`). Always use `./scripts/test-runner.sh` for individual integration scenarios; it enforces serialized execution.
 
-For end-to-end testing with actual browser automation:
-
-```shell
-npm run test:browser
+```sh
+./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose
 ```
 
-This runs tests using Selenium WebDriver to control the game in a real Chrome browser.
+Debug switches and log levels live in `src/constants/index.ts`. Set `DEBUG.ENABLED` and `LOGGING.GLOBAL_LOG_LEVEL` deliberately; client and server logs are written under `logs/`. See `AGENTS.md` for architecture, commands and detailed test guidance.
 
-### Linting (with Biome)
+## Production
 
-```shell
-npm run lint
-```
+The static client deploys through Vercel's Git integration when a CI-approved PR merges to `main`. The authoritative game server deploys separately on Railway. A client deployment alone does not publish server changes.
 
-- Biome is now configured using `biome.jsonc` for fast, reliable linting and formatting.
-- The old ESLint configuration has been removed in favor of Biome's unified approach.
-- To update rules or configuration, edit `biome.jsonc`.
+- Client: [www.georoids.com](https://www.georoids.com)
+- Server health: [Railway health endpoint](https://geoasteroids-production-2403.up.railway.app/health)
+- Client production WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`
 
----
+Verify the deployed commit using each service's `x-release-id` header. Full deployment instructions are in `AGENTS.md`.
 
-## Contributing
+## Art and contributions
 
-Want to work on this with me? DM me on X <a href="https://x.com/_jsolly" target="_blank">`@_jsolly`</a>
+The recovered reference sheets, canonical vector assets, palette and provenance are indexed in [georoids-art/README.md](georoids-art/README.md). Runtime ship, EO satellite and mineral geometry generates the matching SVG assets.
 
-### Step 1
+Contributions use topic branches and pull requests with green `CI / ci`; direct pushes to `main` are reserved for emergencies. Use Conventional Commits with a scope and include relevant validation.
 
-- **Option 1**
-  - 🍴 Fork this repo!
-
-- **Option 2**
-  - 👯 Clone to your local machine using `git@github.com:jsolly/GeoAsteroids.git`
-
-### Step 2
-
-- **HACK AWAY!** 🔨🔨🔨
-
-### Step 3
-
-- 🔃 Create a new pull request using <a href="https://github.com/jsolly/GeoAsteroids/compare" target="_blank">`https://github.com/jsolly/GeoAsteroids/compare`</a>.
-
----
-
-## UML Diagram
-
-<img src="config/geoAsteroidsUML.png" alt="GeoAsteroids UML diagram"></img>
-
----
-
-## License
-
-[![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)](http://badges.mit-license.org)
-
-- **[MIT license](http://opensource.org/licenses/mit-license.php)**
+[MIT license](LICENSE)

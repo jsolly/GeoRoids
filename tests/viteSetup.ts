@@ -104,6 +104,16 @@ Object.defineProperty(globalThis, 'localStorage', {
   value: localStorageMock,
   writable: true,
 });
+Object.defineProperty(window, 'sessionStorage', {
+  configurable: true,
+  value: localStorageMock,
+  writable: true,
+});
+Object.defineProperty(globalThis, 'sessionStorage', {
+  configurable: true,
+  value: localStorageMock,
+  writable: true,
+});
 
 // Silence jsdom "Not implemented: HTMLMediaElement.prototype.play" by stubbing media methods
 type MediaProto = {

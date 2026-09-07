@@ -16,6 +16,21 @@ import {
   KIT_HULLS_ARE_PLACEHOLDERS,
   SHIP_KIT_IDS,
 } from '../../../src/entities/ship/shipKits';
+import {
+  EO_OUTLINES,
+  serializeEoSatelliteSvg,
+  type EoOutlineId,
+} from '../../../src/entities/satellite/eoOutlines';
+
+const EO_SVG_PACK_DIR = 'georoids-art/eo-satellites';
+const EO_SVG_FILE_NAMES: Record<EoOutlineId, string> = {
+  'landsat-7': 'landsat-7.svg',
+  terra: 'terra.svg',
+  aqua: 'aqua.svg',
+  'goes-16': 'goes-16.svg',
+  envisat: 'envisat.svg',
+  'worldview-3': 'worldview-3.svg',
+};
 
 test('AD v2 hull bake is locked and no longer a shared placeholder', () => {
   expect(AD_V2_HULL_BAKE_LOCKED).toBe(true);
@@ -45,10 +60,10 @@ test('each kit bakes a unique v2 topology', () => {
   expect(new Set(fingerprints).size).toBe(5);
 });
 
-test('Dart needle is a four-point isosceles with an inverted-V aft notch', () => {
+test('Dart needle keeps two tail fins around its inverted-V aft notch', () => {
   const dart = getKitHullOutline('dart');
   expect(dart.topology).toBe('needle');
-  expect(dart.hull.points).toHaveLength(4);
+  expect(dart.hull.points).toHaveLength(6);
   const minF = Math.min(...dart.hull.points.map((point) => point.f));
   const wings = dart.hull.points.filter((point) => point.f === minF);
   expect(wings).toHaveLength(2);
@@ -56,7 +71,7 @@ test('Dart needle is a four-point isosceles with an inverted-V aft notch', () =>
   expect(notch).toBeTruthy();
 });
 
-test('Hauler barge hex is squat with a pointed bow, vertical sides, and a flat keel', () => {
+test('Hauler barge is squat with a pointed bow, bevelled sides, and a flat keel', () => {
   const hauler = getKitHullOutline('hauler');
   expect(hauler.topology).toBe('barge-hex');
   const minF = Math.min(...hauler.hull.points.map((point) => point.f));
@@ -67,19 +82,18 @@ test('Hauler barge hex is squat with a pointed bow, vertical sides, and a flat k
   const bow = hauler.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
   expect(bow.p).toBe(0);
   expect(maxP * 2).toBeGreaterThan(maxF - minF);
-  const vertical = [...new Set(hauler.hull.points.map((point) => point.p))].filter(
-    (p) => hauler.hull.points.filter((point) => point.p === p).length >= 2
-  );
-  expect(vertical.length).toBeGreaterThanOrEqual(2);
+  const widest = hauler.hull.points.filter((point) => Math.abs(point.p) > 1);
+  expect(widest).toHaveLength(2);
+  expect(widest.every((point) => point.f > minF && point.f < maxF)).toBe(true);
 });
 
 test('Warden is a notched delta with a detached forward shield arc', () => {
   const warden = getKitHullOutline('warden');
   expect(warden.topology).toBe('delta-shield-arc');
-  expect(warden.hull.points).toHaveLength(4);
+  expect(warden.hull.points).toHaveLength(6);
   const minF = Math.min(...warden.hull.points.map((point) => point.f));
   const aft = warden.hull.points.filter((point) => point.f === minF);
-  expect(aft).toHaveLength(2);
+  expect(aft).toHaveLength(4);
   const notch = warden.hull.points.find((point) => point.p === 0 && point.f > minF && point.f < 0);
   expect(notch).toBeTruthy();
   expect(warden.extras).toHaveLength(1);
@@ -90,7 +104,7 @@ test('Warden is a notched delta with a detached forward shield arc', () => {
   expect(arcMinF).toBeGreaterThan(apex.f);
 });
 
-test('Skirmisher is a Y-fork with vertical prongs and a pointed aft', () => {
+test('Skirmisher keeps a deep forward fork and a separate notched aft', () => {
   const skirmisher = getKitHullOutline('skirmisher');
   expect(skirmisher.topology).toBe('y-fork');
   const tips = skirmisher.hull.points.filter((point) => point.f > 1);
@@ -98,16 +112,18 @@ test('Skirmisher is a Y-fork with vertical prongs and a pointed aft', () => {
   expect(tips.every((tip) => Math.abs(tip.p) > 0.3)).toBe(true);
   expect(tips[0] && tips[1] && tips[0].f === tips[1].f).toBe(true);
   const valley = skirmisher.hull.points.find(
-    (point) => point.p === 0 && point.f > 0 && point.f < 0.2
+    (point) => point.p === 0 && point.f > -0.5 && point.f < 0
   );
   expect(valley).toBeTruthy();
-  const vertical = tips.filter((tip) =>
-    skirmisher.hull.points.some((point) => point.p === tip.p && point.f < tip.f)
+  const aft = skirmisher.hull.points.filter((point) => point.f < -1);
+  expect(aft).toHaveLength(2);
+  const aftNotch = skirmisher.hull.points.find(
+    (point) => point.p === 0 && point.f < -0.5 && point.f > -1
   );
-  expect(vertical).toHaveLength(2);
+  expect(aftNotch).toBeTruthy();
 });
 
-test('Quake is a terraced mountain with a triangular peak', () => {
+test('Quake keeps a triangular peak, stepped cross ledges, and narrow rear stem', () => {
   const quake = getKitHullOutline('quake');
   expect(quake.topology).toBe('terraced-mountain');
   const peak = quake.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
@@ -116,6 +132,11 @@ test('Quake is a terraced mountain with a triangular peak', () => {
     (f) => quake.hull.points.filter((point) => point.f === f).length >= 2
   );
   expect(terraceFs.length).toBeGreaterThanOrEqual(3);
+  const rearF = Math.min(...quake.hull.points.map((point) => point.f));
+  const rear = quake.hull.points.filter((point) => point.f === rearF);
+  const widest = Math.max(...quake.hull.points.map((point) => Math.abs(point.p)));
+  expect(rear).toHaveLength(2);
+  expect(rear.every((point) => Math.abs(point.p) < widest * 0.6)).toBe(true);
 });
 
 test('v2 SVG pack matches the outline bake and names no v1 sheets', () => {
@@ -127,6 +148,18 @@ test('v2 SVG pack matches the outline bake and names no v1 sheets', () => {
     expect(onDisk).not.toMatch(/v1/i);
     expect(onDisk).toContain('#5EEAD4');
     expect(onDisk).toContain('#000011');
+  }
+});
+
+test('EO SVG pack matches the authored hardware outlines and keeps the neutral hull stroke', () => {
+  for (const typeId of Object.keys(EO_OUTLINES) as EoOutlineId[]) {
+    const onDisk = readFileSync(
+      resolve(process.cwd(), EO_SVG_PACK_DIR, EO_SVG_FILE_NAMES[typeId]),
+      'utf8'
+    );
+    expect(onDisk).toBe(serializeEoSatelliteSvg(typeId));
+    expect(onDisk).toContain('#C4B5FD');
+    expect(onDisk).toContain('fill="none"');
   }
 });
 

@@ -1,54 +1,20 @@
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
-import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { bootLaserClients, localPlayerId, observeLaser } from './laser-observation';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks(__dirname);
 
-// Test: Server receives and broadcasts laser events
 test('server properly handles and broadcasts laser events', async () => {
-  const page = browserManager.getCurrentPage();
-  if (!page) throw new Error('Page not available');
-  
-  const game = new GameInteractions(page);
-  
-  // Navigate and start the game
-  await game.bootGame();
-
-  const networkMessages: string[] = [];
-  page.on('console', (msg) => {
-    const text = msg.text();
-    if (text.includes('NETWORK') || text.includes('shoot')) {
-      networkMessages.push(text);
-    }
-  });
-
-  await game.fireLasersWithMouse(2, 1000);
-
-  await page.waitForFunction(
-    () => {
-      const gc = (window as any).gameController;
-      return (gc?.playerManager?.getLocalPlayer?.()?.ship?.lasers?.length ?? 0) > 0;
-    },
-    undefined,
-    { timeout: 15000, polling: 200 }
-  );
-  
-  // Take a screenshot
-  const screenshotPath = screenshotManager.getScreenshotPath(
-    screenshotManager.getTimestampedFilename('server-laser-broadcast-test')
-  );
-  await page.screenshot({ path: screenshotPath });
-  
-  // Check for network messages
-  console.log('📝 Network messages:', networkMessages);
-  
-  // Verify that shoot messages were sent
-  const shootMessages = networkMessages.filter(msg => 
-    msg.includes('Sending shoot message to server') ||
-    msg.includes('Sending shoot event')
-  );
-  
-  expect(shootMessages.length).toBeGreaterThan(0);
-  console.log('✅ Server laser communication is working');
-}, TestConfig.DEFAULT_TIMEOUT);
+  const { page1, page2, page3, game1 } = await bootLaserClients(browserManager, 3);
+  const shooterId = await localPlayerId(page1);
+  const [peer2, peer3] = await Promise.all([
+    observeLaser(page2, shooterId, true),
+    observeLaser(page3!, shooterId, true),
+    game1.fireLasersWithMouse(1),
+  ]);
+  expect(peer2.ownerId).toBe(shooterId);
+  expect(peer3.ownerId).toBe(shooterId);
+  expect(peer2.vx).toBeCloseTo(peer3.vx, 4);
+  expect(peer2.vy).toBeCloseTo(peer3.vy, 4);
+}, TestConfig.DEFAULT_TIMEOUT * 2);

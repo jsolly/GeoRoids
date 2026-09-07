@@ -46,7 +46,7 @@ describe('Server scoring via asteroidDestroyed', () => {
           const rows: AsteroidData[] = msg?.type === 'asteroidCreateBatch'
             ? (msg.data?.asteroids ?? [])
             : msg?.type === 'asteroidCreate' && msg.data?.asteroid ? [msg.data.asteroid] : [];
-          const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
+          const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.material === 'ice' && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
           if (asteroid) {
             clearTimeout(timeout);
             resolve(asteroid.id);
@@ -123,7 +123,7 @@ describe('Server scoring via asteroidDestroyed', () => {
           const rows: AsteroidData[] = msg?.type === 'asteroidCreateBatch'
             ? (msg.data?.asteroids ?? [])
             : msg?.type === 'asteroidCreate' && msg.data?.asteroid ? [msg.data.asteroid] : [];
-          const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
+          const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.material === 'ice' && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
           if (asteroid) {
             clearTimeout(timeout);
             resolve(asteroid.id);

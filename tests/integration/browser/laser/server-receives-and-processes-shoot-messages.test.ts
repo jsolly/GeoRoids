@@ -1,47 +1,16 @@
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
-import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { ServerLogHelper } from '../../utils/server-log-helper';
+import { bootLaserClients, localPlayerId, observeLaser } from './laser-observation';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks(__dirname);
 
-// Test: Verify that server receives shoot messages
 test('server receives and processes shoot messages', async () => {
-  const page = browserManager.getCurrentPage();
-  if (!page) throw new Error('Page not available');
-
-  const game = new GameInteractions(page);
-  const logLineOffset = ServerLogHelper.markLineOffset();
-
-  const clientMessages: string[] = [];
-  page.on('console', (msg) => {
-    const text = msg.text();
-    if (
-      text.includes('NETWORK') ||
-      text.includes('SHIP') ||
-      text.includes('Sending shoot') ||
-      text.includes('MOUSE') ||
-      text.includes('INPUT')
-    ) {
-      clientMessages.push(text);
-    }
-  });
-
-  await game.bootGame();
-
-  await game.fireLasersWithMouse(3, 1000);
-
-  const shootLogMatches = await game.waitForServerLogPattern(
-    /Server received shoot message|broadcastPlayerShoot|handlePlayerShoot/,
-    logLineOffset
-  );
-
-  const screenshotPath = screenshotManager.getScreenshotPath(
-    screenshotManager.getTimestampedFilename('server-shoot-messages-test')
-  );
-  await page.screenshot({ path: screenshotPath });
-
-  expect(shootLogMatches.length).toBeGreaterThan(0);
-  console.log('📱 Client-side messages:', clientMessages);
-}, TestConfig.DEFAULT_TIMEOUT);
+  const { page1, page2, game1 } = await bootLaserClients(browserManager);
+  const shooterId = await localPlayerId(page1);
+  // A local predicted laser or a pre-validation receive log cannot prove that
+  // the server accepted the request. Only the other client's exact owner can.
+  const [accepted] = await Promise.all([observeLaser(page2, shooterId, true), game1.fireLasersWithMouse(1)]);
+  expect(accepted.ownerId).toBe(shooterId);
+  expect(Math.hypot(accepted.vx, accepted.vy)).toBeGreaterThan(0);
+}, TestConfig.DEFAULT_TIMEOUT * 2);

@@ -1,4 +1,4 @@
-import type { SoftFactionId } from '../../../shared-types';
+import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import {
@@ -29,7 +29,7 @@ import {
   type HullProfile,
   type ShipKitId,
 } from './shipKits';
-import { isShieldBlockingLasers, shieldCooldownFrames } from './shipShield';
+import { isReadableShieldUp, shieldCooldownFrames } from './shipShield';
 
 const shipTriangle = {
   nose: { x: 0, y: 0 },
@@ -308,7 +308,8 @@ export function drawPlayerName(
   x: number,
   y: number,
   shipRadius: number,
-  color: string = PALETTE.HUD
+  color: string = PALETTE.HUD,
+  factionId?: SoftFactionId
 ): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
@@ -322,7 +323,17 @@ export function drawPlayerName(
   ctx.font = VISUAL.NAME_LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(name, x, nameY);
+  const nameWidth = ctx.measureText(name).width;
+  ctx.fillText(name, x + (factionId ? 3 : 0), nameY);
+  if (factionId) {
+    drawSoftFactionMark(ctx, factionId, {
+      x: x - nameWidth / 2 - 5,
+      y: nameY + 5,
+      radius: 6,
+      angle: Math.PI / 2,
+      context: 'label',
+    });
+  }
   ctx.restore();
 }
 
@@ -452,26 +463,24 @@ export function drawShipExplosionAtPosition(
   );
 }
 
-export function drawLasers(
-  ship: Ship,
-  color?: string,
-  viewerShipPosition?: { x: number; y: number }
+export function drawLaserBolts(
+  lasers: Array<{ position: Position; velocity: Velocity; explodeTime: number }>,
+  color: string,
+  viewerPosition: Position
 ): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
     return;
   }
 
-  const boltColor = color || PALETTE.LASER_LOCAL;
   const cvs = canvasManager.getCanvas();
   const viewW = cvs?.width ?? Number.POSITIVE_INFINITY;
   const viewH = cvs?.height ?? Number.POSITIVE_INFINITY;
   const cullPad =
     (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * canvasManager.getPlayfieldScale();
 
-  for (const laser of ship.lasers) {
-    const referencePos = viewerShipPosition || ship.position;
-    const screenPos = canvasManager.worldToScreenInto(laserScreen, laser.position, referencePos);
+  for (const laser of lasers) {
+    const screenPos = canvasManager.worldToScreenInto(laserScreen, laser.position, viewerPosition);
     if (
       screenPos.x < -cullPad ||
       screenPos.y < -cullPad ||
@@ -496,7 +505,7 @@ export function drawLasers(
         screenPos.y - halfY - trailY,
         screenPos.x - halfX,
         screenPos.y - halfY,
-        boltColor,
+        color,
         VISUAL.LASER_STROKE_WIDTH * 0.7,
         VISUAL.LASER_GLOW * 0.55,
         0.38
@@ -507,7 +516,7 @@ export function drawLasers(
         screenPos.y - halfY,
         screenPos.x + halfX,
         screenPos.y + halfY,
-        boltColor,
+        color,
         VISUAL.LASER_STROKE_WIDTH,
         VISUAL.LASER_GLOW
       );
@@ -516,9 +525,9 @@ export function drawLasers(
       const ringRadius = VISUAL.LASER_EXPLODE_RADIUS * (0.55 + t * 1.15);
       const alpha = 1 - t * 0.7;
       ctx.save();
-      ctx.shadowColor = boltColor;
+      ctx.shadowColor = color;
       ctx.shadowBlur = VISUAL.LASER_GLOW;
-      ctx.strokeStyle = hexToRgba(boltColor, alpha);
+      ctx.strokeStyle = hexToRgba(color, alpha);
       ctx.lineWidth = 1.25;
       ctx.beginPath();
       ctx.arc(screenPos.x, screenPos.y, ringRadius, 0, Math.PI * 2, false);
@@ -532,13 +541,21 @@ export function drawLasers(
         t * 0.5,
         ringRadius * 0.35,
         ringRadius * 1.35,
-        boltColor,
+        color,
         alpha,
         1,
         VISUAL.LASER_GLOW
       );
     }
   }
+}
+
+export function drawLasers(
+  ship: Ship,
+  color?: string,
+  viewerShipPosition?: { x: number; y: number }
+): void {
+  drawLaserBolts(ship.lasers, color || PALETTE.LASER_LOCAL, viewerShipPosition || ship.position);
 }
 
 export function drawEmpPulse(ship: Ship, empRadius: number, empAlpha: number): void {
@@ -628,6 +645,7 @@ export function drawShipAtPosition(
     y: screenY,
     radius: shipR,
     angle: ship.angle,
+    context: 'hull',
   });
   drawAbilityFx(ctx, ship, screenX, screenY, shipR, shipPosition);
 
@@ -637,7 +655,7 @@ export function drawShipAtPosition(
 
   // Draw player name under ship if provided
   if (playerName) {
-    drawPlayerName(playerName, screenX, screenY, shipR, shipColor);
+    drawPlayerName(playerName, screenX, screenY, shipR, shipColor, factionId);
   }
 }
 
@@ -738,14 +756,6 @@ function drawAbilityFx(
   shipR: number,
   _cameraShipPosition: { x: number; y: number }
 ): void {
-  if (ship.shieldTimer > 0) {
-    const pulse = 0.45 + 0.25 * Math.sin(Date.now() / 90);
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, shipR + 10, 0, Math.PI * 2);
-    ctx.strokeStyle = hexToRgba(PALETTE.HUD, pulse);
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
   if (canDrawGenericAbilityRing(ship)) {
     ctx.beginPath();
     ctx.arc(screenX, screenY, shipR + 6, 0, Math.PI * 2);
@@ -768,14 +778,14 @@ export function drawShipShield(
 
   const radius = shipR * SHIELD.RADIUS_RATIO;
 
-  if (isShieldBlockingLasers(ship)) {
+  if (isReadableShieldUp(ship)) {
     const flashing = ship.shieldFlashTime > 0;
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineWidth = flashing ? VISUAL.SHIELD_STROKE_WIDTH + 0.5 : VISUAL.SHIELD_STROKE_WIDTH;
     ctx.shadowColor = PALETTE.SHIELD;
     ctx.shadowBlur = VISUAL.SHIELD_GLOW;
-    ctx.strokeStyle = hexToRgba(PALETTE.SHIELD, flashing ? 1 : 0.9);
+    ctx.strokeStyle = hexToRgba(PALETTE.SHIELD, flashing ? SHIELD.FLASH_ALPHA : SHIELD.IDLE_ALPHA);
     ctx.beginPath();
     ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
     ctx.stroke();

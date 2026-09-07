@@ -1,9 +1,24 @@
+import { isAsteroidMaterial } from '../../../shared/asteroidMaterials';
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
+  AsteroidMaterial,
   AsteroidTaggedEvent,
 } from '../../../shared-types';
 import { containAsteroidPositionInto, isPoseInAsteroidField } from '../../physics/asteroidMotion';
+import { logger } from '../../utils/Logger';
+
+function writeOptionalField<K extends keyof AsteroidData>(
+  into: Partial<AsteroidData>,
+  key: K,
+  value: AsteroidData[K] | undefined
+): void {
+  if (value !== undefined) {
+    into[key] = value;
+  } else {
+    delete into[key];
+  }
+}
 
 export interface AsteroidFieldSyncResult {
   created: AsteroidData[];
@@ -29,6 +44,30 @@ export function shouldPreserveSeenAsteroidsOnJoin(seenCount: number): boolean {
   return seenCount > 0;
 }
 
+const invalidMaterialWarnings = new Set<string>();
+
+function reportInvalidAsteroidMaterial(asteroidId: unknown, material: unknown): void {
+  const key = `${typeof asteroidId === 'string' ? asteroidId : '<unknown>'}:${String(material)}`;
+  if (invalidMaterialWarnings.has(key)) {
+    return;
+  }
+  if (invalidMaterialWarnings.size >= 256) {
+    invalidMaterialWarnings.clear();
+  }
+  invalidMaterialWarnings.add(key);
+  logger.error('NETWORK', 'Rejected asteroid row with invalid material', undefined, {
+    asteroidId: typeof asteroidId === 'string' ? asteroidId : undefined,
+    material: String(material),
+  });
+}
+
+/** JSON snapshots arrive after the TypeScript cast, so validate optional material at runtime. */
+export function asteroidHasValidMaterial(
+  asteroid: Partial<AsteroidData> & { id?: string }
+): boolean {
+  return asteroid.material === undefined || isAsteroidMaterial(asteroid.material);
+}
+
 /** Enough pose to spawn a visible rock. Lean rows without size must wait. */
 export function asteroidHasSpawnPose(
   asteroid: Partial<AsteroidData> & { id?: string }
@@ -38,7 +77,8 @@ export function asteroidHasSpawnPose(
     Number.isFinite(asteroid.position.x) &&
     Number.isFinite(asteroid.position.y) &&
     typeof asteroid.size === 'number' &&
-    Number.isFinite(asteroid.size)
+    Number.isFinite(asteroid.size) &&
+    asteroidHasValidMaterial(asteroid)
   );
 }
 
@@ -51,7 +91,8 @@ export function asteroidHasSpawnPose(
 export function partitionAsteroidSnapshot(
   asteroids: AsteroidData[],
   seenIds: Set<string>,
-  scratch?: AsteroidFieldSyncScratch
+  scratch?: AsteroidFieldSyncScratch,
+  complete = false
 ): AsteroidFieldSyncResult {
   const created = scratch ? scratch.created : [];
   const updated = scratch ? scratch.updated : [];
@@ -66,6 +107,10 @@ export function partitionAsteroidSnapshot(
 
   for (const asteroid of asteroids) {
     snapshotIds.add(asteroid.id);
+    if (!asteroidHasValidMaterial(asteroid)) {
+      reportInvalidAsteroidMaterial(asteroid.id, asteroid.material);
+      continue;
+    }
     if (seenIds.has(asteroid.id)) {
       updated.push(asteroid);
     } else if (asteroidHasSpawnPose(asteroid)) {
@@ -76,7 +121,7 @@ export function partitionAsteroidSnapshot(
 
   // An empty snapshot is not a wipe — last-player reset + a dropped packet
   // must not clear the remaining tab's local belt.
-  if (asteroids.length > 0) {
+  if (complete || asteroids.length > 0) {
     for (const id of seenIds) {
       if (!snapshotIds.has(id)) {
         removed.push(id);
@@ -91,33 +136,29 @@ export function partitionAsteroidSnapshot(
 }
 
 /** Pose + health fields that must stay server-authoritative after first create. */
+export function writeAsteroidKinematicUpdates(
+  asteroid: Partial<AsteroidData>,
+  into: Partial<AsteroidData>
+): Partial<AsteroidData> {
+  writeOptionalField(into, 'position', asteroid.position);
+  writeOptionalField(into, 'velocity', asteroid.velocity);
+  writeOptionalField(into, 'rotation', asteroid.rotation);
+  writeOptionalField(into, 'angularVelocity', asteroid.angularVelocity);
+  writeOptionalField(into, 'health', asteroid.health);
+  writeOptionalField(into, 'maxHealth', asteroid.maxHealth);
+  writeOptionalField(into, 'size', asteroid.size);
+  writeOptionalField(into, 'isCollabTarget', asteroid.isCollabTarget);
+  if (asteroid.material === undefined || isAsteroidMaterial(asteroid.material)) {
+    writeOptionalField(into, 'material', asteroid.material);
+  } else {
+    delete into.material;
+    reportInvalidAsteroidMaterial(asteroid.id, asteroid.material);
+  }
+  return into;
+}
+
 export function asteroidKinematicUpdates(asteroid: Partial<AsteroidData>): Partial<AsteroidData> {
-  const updates: Partial<AsteroidData> = {};
-  if (asteroid.position) {
-    updates.position = asteroid.position;
-  }
-  if (asteroid.velocity) {
-    updates.velocity = asteroid.velocity;
-  }
-  if (asteroid.rotation !== undefined) {
-    updates.rotation = asteroid.rotation;
-  }
-  if (asteroid.angularVelocity !== undefined) {
-    updates.angularVelocity = asteroid.angularVelocity;
-  }
-  if (asteroid.health !== undefined) {
-    updates.health = asteroid.health;
-  }
-  if (asteroid.maxHealth !== undefined) {
-    updates.maxHealth = asteroid.maxHealth;
-  }
-  if (asteroid.size !== undefined) {
-    updates.size = asteroid.size;
-  }
-  if (asteroid.isCollabTarget !== undefined) {
-    updates.isCollabTarget = asteroid.isCollabTarget;
-  }
-  return updates;
+  return writeAsteroidKinematicUpdates(asteroid, {});
 }
 
 /**
@@ -128,14 +169,19 @@ export function applyAsteroidRowToBelt(
   findById: (id: string) => AsteroidKinematicTarget | undefined,
   asteroidId: string,
   updates: Partial<AsteroidData>,
-  createMissing: (asteroid: AsteroidData) => void
+  createMissing: (asteroid: AsteroidData) => void,
+  complete = false
 ): 'updated' | 'created' | 'skipped' {
   const roid = findById(asteroidId);
   if (roid) {
-    applyAsteroidKinematics(roid, updates);
+    applyAsteroidKinematics(roid, updates, { complete });
     return 'updated';
   }
   const candidate = { id: asteroidId, ...updates };
+  if (!asteroidHasValidMaterial(candidate)) {
+    reportInvalidAsteroidMaterial(asteroidId, candidate.material);
+    return 'skipped';
+  }
   if (asteroidHasSpawnPose(candidate)) {
     createMissing(candidate);
     return 'created';
@@ -156,6 +202,10 @@ export interface AsteroidKinematicTarget {
   maxHealth: number;
   r: number;
   isCollabTarget?: boolean;
+  material?: AsteroidMaterial;
+  offsets?: number[];
+  vertices?: number;
+  jaggedness?: number;
 }
 
 export function shouldSnapAsteroidPose(
@@ -176,8 +226,21 @@ export function shouldSnapAsteroidPose(
 export function applyAsteroidKinematics(
   roid: AsteroidKinematicTarget,
   updates: Partial<AsteroidData>,
-  options: { snapPosition?: boolean } = {}
+  options: { snapPosition?: boolean; complete?: boolean } = {}
 ): void {
+  if (options.complete) {
+    roid.material = updates.material;
+    roid.isCollabTarget = updates.isCollabTarget ?? false;
+    if (updates.offsets) {
+      roid.offsets = [...updates.offsets];
+    }
+    if (updates.vertices !== undefined) {
+      roid.vertices = updates.vertices;
+    }
+    if (updates.jaggedness !== undefined) {
+      roid.jaggedness = updates.jaggedness;
+    }
+  }
   if (updates.position) {
     const localEscaped = !isPoseInAsteroidField(roid.position.x, roid.position.y);
     if (
@@ -210,12 +273,19 @@ export function applyAsteroidKinematics(
   if (updates.isCollabTarget !== undefined) {
     roid.isCollabTarget = updates.isCollabTarget;
   }
+  if (updates.material !== undefined && isAsteroidMaterial(updates.material)) {
+    roid.material = updates.material;
+  } else if (updates.material !== undefined) {
+    reportInvalidAsteroidMaterial(undefined, updates.material);
+  }
 }
 
 export type AsteroidFieldApplyHandlers = {
   onCreated: (asteroid: AsteroidData) => void;
-  onUpdated: (asteroidId: string, updates: Partial<AsteroidData>) => void;
+  onUpdated: (asteroidId: string, updates: Partial<AsteroidData>, complete?: boolean) => void;
   onDestroyed: (event: AsteroidDestroyEvent) => void;
+  /** Snapshot reconciliation removes stale local rows without destruction VFX. */
+  onReconciled: (asteroidId: string) => void;
   onTagged?: (event: AsteroidTaggedEvent) => void;
 };
 
@@ -230,30 +300,49 @@ export function unbindAsteroidFieldApply(): void {
 }
 
 export function notifyAsteroidCreated(asteroid: AsteroidData): void {
+  if (!asteroidHasValidMaterial(asteroid)) {
+    reportInvalidAsteroidMaterial(asteroid.id, asteroid.material);
+    return;
+  }
   applyHandlers?.onCreated(asteroid);
 }
 
-export function notifyAsteroidUpdated(asteroidId: string, updates: Partial<AsteroidData>): void {
-  applyHandlers?.onUpdated(asteroidId, updates);
+export function notifyAsteroidUpdated(
+  asteroidId: string,
+  updates: Partial<AsteroidData>,
+  complete = false
+): void {
+  applyHandlers?.onUpdated(
+    asteroidId,
+    complete ? updates : asteroidKinematicUpdates(updates),
+    complete
+  );
 }
 
 export function notifyAsteroidDestroyed(event: string | AsteroidDestroyEvent): void {
   applyHandlers?.onDestroyed(typeof event === 'string' ? { asteroidId: event } : event);
 }
 
+export function notifyAsteroidReconciled(asteroidId: string): void {
+  applyHandlers?.onReconciled(asteroidId);
+}
+
 export function notifyAsteroidTagged(event: AsteroidTaggedEvent): void {
   applyHandlers?.onTagged?.(event);
 }
 
-/** Fan a partition out to the bound belt handlers. Full rows keep #469 heal. */
-export function applyAsteroidFieldPartition(result: AsteroidFieldSyncResult): void {
+/** Fan a partition out to the bound belt handlers. Snapshot removals are reconciliation, not destroys. */
+export function applyAsteroidFieldPartition(
+  result: AsteroidFieldSyncResult,
+  complete = false
+): void {
   for (const asteroid of result.created) {
     notifyAsteroidCreated(asteroid);
   }
   for (const asteroid of result.updated) {
-    notifyAsteroidUpdated(asteroid.id, asteroid);
+    notifyAsteroidUpdated(asteroid.id, asteroid, complete);
   }
   for (const id of result.removed) {
-    notifyAsteroidDestroyed(id);
+    notifyAsteroidReconciled(id);
   }
 }

@@ -141,5 +141,9 @@ export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
 
 /** Asteroid ram is resolved on the server; ignore leftover client reports. */
 export function isServerOwnedRamAttacker(attackerId: string): boolean {
-  return attackerId === 'asteroid' || attackerId.startsWith('asteroid');
+  return (
+    attackerId === 'asteroid' ||
+    attackerId.startsWith('asteroid') ||
+    attackerId.startsWith('server-sat-')
+  );
 }

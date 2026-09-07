@@ -19,9 +19,13 @@ test('laser hits and damages bots', async () => {
   await game.verifyGameCanvas();
 
   // Find a bot and fire on it at close range.
+  await game.waitForCombatReady();
   await game.waitForBots(1);
-  const target = (await game.getBots())[0]!;
-  expect(target).toBeTruthy();
+  const hostileBotId = await game.getHostileBotId();
+  const target = (await game.getBots()).find((bot) => bot.id === hostileBotId);
+  expect(target, 'an alive hostile bot should be available for laser damage').toBeDefined();
+  if (!target) return;
+  const initialHealth = target.health;
 
   const result = await game.attackBotWithLasers(target.id, 10);
 
@@ -31,5 +35,5 @@ test('laser hits and damages bots', async () => {
   await page.screenshot({ path: screenshotPath });
 
   // The bot's health dropped below full as a direct result of being shot.
-  expect(result.minHealthObserved, 'laser fire should damage the bot').toBeLessThan(100);
+  expect(result.minHealthObserved, 'laser fire should damage the hostile bot').toBeLessThan(initialHealth);
 }, TestConfig.DEFAULT_TIMEOUT);

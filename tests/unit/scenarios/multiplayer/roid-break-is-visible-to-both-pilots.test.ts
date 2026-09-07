@@ -26,7 +26,7 @@ describe('A roid break is visible to both pilots', () => {
   test('destroying a roid notifies every connected socket', () => {
     const roid = world.engine
       .createAsteroids(20)
-      .find((asteroid) => !asteroid.isCollabTarget);
+      .find((asteroid) => !asteroid.isCollabTarget && asteroid.material === 'ice');
     expect(roid).toBeTruthy();
 
     alice.socket.clear();

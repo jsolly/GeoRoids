@@ -1,9 +1,21 @@
 import { WebSocket } from 'ws';
 import { GameEngine, type CombatBroadcast } from '../core/GameEngine';
 import { logger } from '../../setup/serverLogger';
+import type { ServerGameSnapshot } from '../../shared-types';
+import { captureSnapshot, encodeSnapshot, SNAPSHOT_VERSION, SNAPSHOT_KEYFRAME_INTERVAL, SNAPSHOT_BACKPRESSURE_BYTES, type SnapshotBaseline } from '../../shared/snapshotProtocol';
+
+interface SnapshotRecipient {
+  baseline?: SnapshotBaseline;
+  sequence: number;
+  sinceKeyframe: number;
+  pending: boolean;
+  needsKeyframe: boolean;
+}
+
 
 export class GameStateBroadcaster {
   private gameEngine: GameEngine;
+  private readonly snapshotRecipients = new WeakMap<WebSocket, SnapshotRecipient>();
   private broadcastInterval: NodeJS.Timeout | null = null;
 
   constructor(gameEngine: GameEngine) {
@@ -19,6 +31,9 @@ export class GameStateBroadcaster {
     this.broadcastInterval = setInterval(() => {
       this.flushExpiredCollabHits();
       if (this.gameEngine.getPlayerCount() > 0) {
+        for (const shot of this.gameEngine.drainSatelliteShots()) {
+          this.broadcastSatelliteShoot(shot);
+        }
         this.broadcastGameState();
         this.broadcastPendingBotShots();
       }
@@ -51,7 +66,92 @@ export class GameStateBroadcaster {
       timestamp: Date.now(),
     };
 
-    this.broadcastToAll(message, excludeId);
+    const players = this.gameEngine.entityManager.getHumanPlayers();
+    let canonical: ServerGameSnapshot | undefined;
+    let legacy: string | undefined;
+    for (const player of players) {
+      const ws = player.ws;
+      if (!ws || (excludeId && player.id === excludeId)) {
+        continue;
+      }
+      const recipient = this.snapshotRecipients.get(ws);
+      if (!recipient) {
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            legacy ??= JSON.stringify(message);
+            ws.send(legacy);
+          } catch (error) {
+            logger.error('Failed to send legacy game state', error);
+            this.closeFailedSnapshotSocket(ws);
+          }
+        }
+        continue;
+      }
+      if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES || recipient.pending) {
+        recipient.needsKeyframe = true;
+        continue;
+      }
+      try {
+        canonical ??= captureSnapshot({
+          ...gameState,
+          satelliteProjectiles: this.gameEngine.getActiveSatelliteProjectiles().map(projectile => ({ id: projectile.shotId, ...projectile })),
+          collabTags: this.gameEngine.getActiveCollabTags().map(tag => ({ id: tag.asteroidId, ...tag })),
+        });
+        const sequence = recipient.sequence + 1;
+        const full = recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
+        const frame = encodeSnapshot(canonical, sequence, full ? undefined : recipient.baseline);
+        recipient.pending = true;
+        recipient.needsKeyframe = false;
+        const deliveredState = canonical;
+        ws.send(JSON.stringify({ type: 'snapshot', data: frame, timestamp: message.timestamp }), error => {
+          recipient.pending = false;
+          if (error) {
+            recipient.needsKeyframe = true;
+            logger.error('Snapshot send failed; next send requires keyframe', error);
+            return;
+          }
+          // Rejoin replaces the WeakMap entry; an old callback cannot advance it.
+          if (this.snapshotRecipients.get(ws) !== recipient) {
+            return;
+          }
+          recipient.sequence = sequence;
+          recipient.baseline = { sequence, state: deliveredState };
+          recipient.sinceKeyframe = frame.kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
+        });
+      } catch (error) {
+        recipient.pending = false;
+        recipient.needsKeyframe = true;
+        logger.error('Failed to encode or send snapshot', error);
+        // No partial state or silent format fallback after negotiation.
+        this.closeFailedSnapshotSocket(ws);
+      }
+    }
+  }
+
+  private closeFailedSnapshotSocket(ws: WebSocket): void {
+    try {
+      ws.close(1011, 'Snapshot encoding failed');
+    } catch (error) {
+      logger.error('Failed to close snapshot socket', error);
+    }
+  }
+
+  /** Called before joined; absent/unsupported offers preserve the exact legacy wire. */
+  public negotiateSnapshot(ws: WebSocket, offer: unknown): 1 | undefined {
+    this.snapshotRecipients.delete(ws);
+    if (offer !== SNAPSHOT_VERSION) {
+      return undefined;
+    }
+    this.snapshotRecipients.set(ws, { sequence: 0, sinceKeyframe: 0, pending: false, needsKeyframe: true });
+    return SNAPSHOT_VERSION;
+  }
+
+  public requestSnapshotKeyframe(ws: WebSocket): void {
+    const recipient = this.snapshotRecipients.get(ws);
+    if (recipient) {
+      // Coalesce requests; the periodic broadcast supplies the keyframe.
+      recipient.needsKeyframe = true;
+    }
   }
 
   public broadcastPlayerLeft(playerId: string): void {
@@ -88,6 +188,19 @@ export class GameStateBroadcaster {
     };
 
     this.broadcastToAll(message, playerId);
+  }
+
+  public broadcastSatelliteShoot(shot: {
+    id: string;
+    shotId: string;
+    laserStart: { x: number; y: number };
+    laserDirection: { x: number; y: number };
+  }): void {
+    this.broadcastToAll({
+      type: 'satelliteShoot',
+      data: shot,
+      timestamp: Date.now(),
+    });
   }
 
   public broadcastPlayerShoot(playerId: string, laserStart: any, laserDirection: any): void {
@@ -189,6 +302,21 @@ export class GameStateBroadcaster {
     };
 
     this.broadcastToAll(message);
+  }
+
+  public broadcastSatellitePickupCollected(data: {
+    pickupId: string;
+    playerId: string;
+    playerName: string;
+    pickupName: 'Echo' | 'Relay';
+    scoreBonus: number;
+    shieldFrames: number;
+  }): void {
+    this.broadcastToAll({
+      type: 'satellitePickupCollected',
+      data,
+      timestamp: Date.now(),
+    });
   }
 
   public broadcastAsteroidCreation(asteroids: any[]): void {

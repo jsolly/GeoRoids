@@ -32,11 +32,15 @@ export class LootManager {
   }
 
   public spawnFromKill(entity: GameEntity, gameTime: number): LootData[] {
-    const { pelletMasses } = planKillLoot(entity.mass ?? GROWTH.BASE_MASS);
+    return this.spawnFromPosition(entity.position, entity.mass ?? GROWTH.BASE_MASS, gameTime);
+  }
+
+  public spawnFromPosition(position: Position, mass: number, gameTime: number): LootData[] {
+    const { pelletMasses } = planKillLoot(mass);
     const spawned: LootData[] = [];
 
     for (const pelletMass of pelletMasses) {
-      const drop = this.createPellet(entity.position, pelletMass, gameTime);
+      const drop = this.createPellet(position, pelletMass, gameTime);
       this.loot.set(drop.id, drop);
       spawned.push(this.toPublic(drop));
     }
@@ -46,11 +50,11 @@ export class LootManager {
   }
 
   /** One shard at the break site. Collect uses the existing overlap/growth path. */
-  public spawnShard(position: Position, gameTime: number): LootData {
+  public spawnShard(position: Position, gameTime: number, mass: number = GROWTH.SHARD_MASS): LootData {
     const drop: TrackedLoot = {
       id: `loot-${this.nextId++}`,
       position: { x: position.x, y: position.y },
-      mass: GROWTH.SHARD_MASS,
+      mass,
       radius: GROWTH.LOOT_RADIUS,
       kind: 'shard',
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,

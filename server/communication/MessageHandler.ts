@@ -1,9 +1,10 @@
 import { WebSocket } from 'ws';
+import type { Position, Velocity } from '../../shared-types';
 import { GameEngine, type AppliedAsteroidHit } from '../core/GameEngine';
 import { GameStateBroadcaster } from '../services/GameStateBroadcaster';
 import { ClientLogger } from '../services/ClientLogger';
 import { logger } from '../../setup/serverLogger';
-import { DAMAGE } from '../../src/constants';
+import { DAMAGE, SATELLITE_PICKUP } from '../../src/constants';
 import {
   clampLaserDamage,
   isAllowedLaserReporter,
@@ -11,8 +12,17 @@ import {
   isServerOwnedRamAttacker,
 } from '../../shared/combat';
 import { LOOT_BLAST } from '../../shared/lootBlast';
+import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
 import { isStaleDeathPose } from '../core/EntityManager';
+
+function isFiniteMovementVector(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const vector = value as Record<string, unknown>;
+  return Number.isFinite(vector.x) && Number.isFinite(vector.y);
+}
 
 const PAYLOAD_PREVIEW_MAX_CHARS = 500;
 
@@ -71,6 +81,12 @@ export class MessageHandler {
           this.handleJoin(ws, id, name, restData);
           break;
 
+        case 'snapshotResync':
+          if (this.gameEngine.getPlayerBySocket(ws)?.type === 'human') {
+            this.broadcaster.requestSnapshotKeyframe(ws);
+          }
+          break;
+
         case 'useAbility':
           this.handleUseAbility(ws, id, restData);
           break;
@@ -105,6 +121,14 @@ export class MessageHandler {
 
         case 'botDamage':
           this.handleBotDamage(ws, restData);
+          break;
+
+        case 'satelliteDamage':
+          this.handleSatelliteDamage(ws, restData);
+          break;
+
+        case 'satellitePickupCollected':
+          this.handleSatellitePickupCollected(ws, restData);
           break;
 
         case 'asteroidDestroyed':
@@ -168,6 +192,8 @@ export class MessageHandler {
       this.broadcaster.broadcastPlayerLeft(replacedId);
     }
 
+    const snapshotVersion = this.broadcaster.negotiateSnapshot(ws, data.snapshotVersion ?? data.data?.snapshotVersion);
+
     // Send confirmation to the joining player
     this.broadcaster.sendToWebSocket(ws, {
       type: 'joined',
@@ -179,6 +205,7 @@ export class MessageHandler {
         kitId: player.kitId,
         factionId: player.factionId,
         terrainSeed: this.gameEngine.getTerrainSeed(),
+        ...(snapshotVersion ? { snapshotVersion } : {}),
       },
       timestamp: Date.now(),
     });
@@ -197,6 +224,21 @@ export class MessageHandler {
     }
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
     if (socketPlayer?.type !== 'human' || socketPlayer.id !== id) {
+      return;
+    }
+
+    // Validate the complete movement packet before acknowledging a respawn
+    // anchor or mutating/broadcasting any field. Malformed coordinates would
+    // otherwise poison the shared snapshot and crash the next collision tick.
+    if (
+      (data.position !== undefined && !isFiniteMovementVector(data.position)) ||
+      (data.velocity !== undefined && !isFiniteMovementVector(data.velocity)) ||
+      ['angle', 'angularVelocity', 'rotation', 'a'].some(
+        (field) => data[field] !== undefined && !Number.isFinite(data[field])
+      ) ||
+      (data.thrusting !== undefined && typeof data.thrusting !== 'boolean')
+    ) {
+      this.broadcaster.sendError(ws, 'Invalid player movement update');
       return;
     }
 
@@ -219,39 +261,35 @@ export class MessageHandler {
       existing.respawnAnchor = undefined;
     }
 
-    // Server-authoritative fields: the client only mirrors these back from our
-    // own broadcasts, so accepting them lets a stale client value clobber the
-    // authoritative state (e.g. a freshly-awarded score getting reset to 0).
-    const sanitizedData: any = { ...data };
-    delete (sanitizedData as any).health;
-    delete (sanitizedData as any).maxHealth;
-    delete (sanitizedData as any).fuel;
-    delete (sanitizedData as any).maxFuel;
-    delete (sanitizedData as any).mass;
-    delete (sanitizedData as any).score;
-    delete (sanitizedData as any).lives;
-    delete (sanitizedData as any).respawnTimer;
-    delete (sanitizedData as any).spawnProtectionTimer;
-    delete (sanitizedData as any).kitId;
-    delete (sanitizedData as any).factionId;
-    delete (sanitizedData as any).faction;
-    delete (sanitizedData as any).color;
-    delete (sanitizedData as any).abilityCooldownFrames;
-    delete (sanitizedData as any).abilityActiveFrames;
-    delete (sanitizedData as any).shieldTimer;
-    delete (sanitizedData as any).harpoonTimer;
-    delete (sanitizedData as any).harpoonTargetId;
-    delete (sanitizedData as any).shieldActive;
-    delete (sanitizedData as any).shieldTime;
-    delete (sanitizedData as any).shieldCooldown;
-    delete (sanitizedData as any).shieldFlashTime;
-
-    // Normalize client fields to server schema
-    if (sanitizedData.angle !== undefined && sanitizedData.rotation === undefined) {
-      sanitizedData.rotation = sanitizedData.angle;
+    // Only client-owned movement may enter entity state. Health, lifecycle,
+    // socket identity, abilities (including the harpoon endpoint), and future
+    // server fields cannot be introduced through an untrusted update spread.
+    // Copy vector coordinates explicitly so extra/prototype keys cannot enter
+    // the public snapshot through an otherwise valid movement vector.
+    const sanitizedData: {
+      position?: Position;
+      velocity?: Velocity;
+      angle?: number;
+      thrusting?: boolean;
+      rotation?: number;
+      angularVelocity?: number;
+      a?: number;
+    } = {};
+    if (data.position !== undefined) {
+      sanitizedData.position = { x: data.position.x, y: data.position.y };
     }
-    if (sanitizedData.a !== undefined && sanitizedData.angularVelocity === undefined) {
-      sanitizedData.angularVelocity = sanitizedData.a;
+    if (data.velocity !== undefined) {
+      sanitizedData.velocity = { x: data.velocity.x, y: data.velocity.y };
+    }
+    if (data.angle !== undefined) sanitizedData.angle = data.angle;
+    if (data.thrusting !== undefined) sanitizedData.thrusting = data.thrusting;
+    // Preserve the finite legacy rotation/angular-velocity aliases.
+    if (data.rotation !== undefined || data.angle !== undefined) {
+      sanitizedData.rotation = data.rotation ?? data.angle;
+    }
+    if (data.a !== undefined) sanitizedData.a = data.a;
+    if (data.angularVelocity !== undefined || data.a !== undefined) {
+      sanitizedData.angularVelocity = data.angularVelocity ?? data.a;
     }
 
     const player = this.gameEngine.updatePlayer(id, sanitizedData);
@@ -259,13 +297,9 @@ export class MessageHandler {
       return; // Player not found
     }
 
-    // Include laser data if provided
-    const updateData: any = { ...sanitizedData };
-    if (sanitizedData.lasers !== undefined) {
-      updateData.lasers = sanitizedData.lasers;
-    }
-
-    this.broadcaster.broadcastPlayerUpdate(id, updateData);
+    // Projectiles travel through the validated shoot path; no production
+    // receiver consumes a movement packet's legacy lasers array.
+    this.broadcaster.broadcastPlayerUpdate(id, sanitizedData);
   }
 
   private handlePlayerShoot(ws: WebSocket, id: string, data: any): void {
@@ -280,7 +314,7 @@ export class MessageHandler {
       return;
     }
 
-    const laser = this.gameEngine.spawnLaser(shooter.id, data.laserStart, data.laserDirection);
+    const laser = this.gameEngine.spawnHumanLaser(shooter.id, data.laserStart, data.laserDirection);
     if (!laser) {
       return;
     }
@@ -371,6 +405,22 @@ export class MessageHandler {
       return;
     }
 
+    const bot = this.gameEngine.getBot(data.targetPlayerId);
+    if (bot?.type === 'bot') {
+      if (
+        reporterId !== data.attackerId ||
+        !this.gameEngine.consumeHumanLaserNearTarget(
+          reporterId,
+          bot.position,
+          radiusFromMass(bot.mass ?? GROWTH.BASE_MASS)
+        )
+      ) {
+        return;
+      }
+      this.emitShipDamage(bot.id, reporterId, DAMAGE.LASER_HIT, bot.health, 'laser');
+      return;
+    }
+
     const damage = clampLaserDamage(data.damage);
     if (damage <= 0) {
       return;
@@ -388,6 +438,7 @@ export class MessageHandler {
     }
 
     // Ship↔asteroid and ship↔ship are resolved in the server game loop.
+    // Satellite hull damage stays on satelliteDamage, not this leftover path.
     if (!isClientOwnedCollisionAttacker(data.attackerId)) {
       return;
     }
@@ -406,8 +457,80 @@ export class MessageHandler {
     );
   }
 
+  private handleSatelliteDamage(ws: WebSocket, data: any): void {
+    if (
+      typeof data.satelliteId !== 'string' ||
+      data.satelliteId.length === 0 ||
+      typeof data.attackerId !== 'string' ||
+      data.attackerId.length === 0
+    ) {
+      this.broadcaster.sendError(ws, 'Missing required fields for satelliteDamage');
+      return;
+    }
+
+    const reporterId = this.getReporterId(ws);
+    const laserPosition = this.readFinitePosition(data.laserPosition);
+    if (!reporterId || reporterId !== data.attackerId || !laserPosition) {
+      return;
+    }
+    if (!this.gameEngine.consumeHumanLaserNearSatellite(reporterId, data.satelliteId, laserPosition)) {
+      return;
+    }
+
+    const isDestroyed = this.gameEngine.handleSatelliteDamage(
+      data.satelliteId,
+      reporterId,
+      DAMAGE.LASER_HIT
+    );
+    this.broadcaster.broadcastGameState();
+
+    if (isDestroyed) {
+      const attacker = this.gameEngine.getPlayer(reporterId);
+      if (attacker) {
+        this.broadcaster.broadcastScoreUpdate(reporterId, attacker.score);
+      }
+    }
+  }
+
+  private handleSatellitePickupCollected(ws: WebSocket, data: any): void {
+    if (typeof data.pickupId !== 'string' || data.pickupId.length === 0) {
+      this.broadcaster.sendError(ws, 'Missing pickup ID for satellitePickupCollected');
+      return;
+    }
+
+    const reporterId = this.getReporterId(ws);
+    if (!reporterId || (data.playerId !== undefined && data.playerId !== reporterId)) {
+      return;
+    }
+    const result = this.gameEngine.handleSatellitePickupCollected(data.pickupId, reporterId);
+    if (!result.success || !result.pickup) {
+      return;
+    }
+
+    const player = this.gameEngine.getPlayer(reporterId);
+    if (!player) {
+      return;
+    }
+    this.broadcaster.broadcastScoreUpdate(reporterId, player.score);
+    this.broadcaster.broadcastSatellitePickupCollected({
+      pickupId: result.pickup.id,
+      playerId: reporterId,
+      playerName: player.name,
+      pickupName: result.pickup.name,
+      scoreBonus: SATELLITE_PICKUP.SCORE_BONUS,
+      shieldFrames: SATELLITE_PICKUP.SHIELD_FRAMES,
+    });
+    this.broadcaster.broadcastGameState();
+  }
+
   private handleBotDamage(ws: WebSocket, data: any): void {
-    if (!data.botId || !data.attackerId || data.damage === undefined) {
+    if (
+      typeof data.botId !== 'string' ||
+      data.botId.length === 0 ||
+      typeof data.attackerId !== 'string' ||
+      data.attackerId.length === 0 ||
+      data.damage === undefined
+    ) {
       this.broadcaster.sendError(ws, 'Missing required fields for botDamage');
       return;
     }
@@ -417,12 +540,23 @@ export class MessageHandler {
     }
 
     const reporterId = this.getReporterId(ws);
-    if (!reporterId || (reporterId !== data.attackerId && reporterId !== data.botId)) {
+    if (!reporterId || reporterId !== data.attackerId) {
       return;
     }
 
-    const before = this.gameEngine.getBot(data.botId);
-    this.emitShipDamage(data.botId, data.attackerId, data.damage, before?.health, 'laser');
+    const bot = this.gameEngine.getBot(data.botId);
+    if (
+      !bot ||
+      !this.gameEngine.consumeHumanLaserNearTarget(
+        reporterId,
+        bot.position,
+        radiusFromMass(bot.mass ?? GROWTH.BASE_MASS)
+      )
+    ) {
+      return;
+    }
+
+    this.emitShipDamage(bot.id, reporterId, DAMAGE.LASER_HIT, bot.health, 'laser');
   }
 
   private handleUseAbility(ws: WebSocket, id: string, data: any): void {
@@ -433,6 +567,12 @@ export class MessageHandler {
     }
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
     if (socketPlayer?.type !== 'human' || socketPlayer.id !== playerId) {
+      return;
+    }
+    // The join payload selects the kit. An ability request may echo that
+    // selection for compatibility, but it cannot change authoritative ship
+    // stats after the socket has joined.
+    if (data.kitId !== undefined && data.kitId !== socketPlayer.kitId) {
       return;
     }
     const canvasWidth = Number(data.canvasWidth);
@@ -617,12 +757,12 @@ export class MessageHandler {
 
   private handleLootExplode(ws: WebSocket, id: string, data: any): void {
     const lootId = data.lootId;
-    if (!lootId) {
+    if (typeof lootId !== 'string' || lootId.length === 0) {
       this.broadcaster.sendError(ws, 'Missing loot ID for lootExplode');
       return;
     }
 
-    const shooterId = this.resolveAuxiliaryShooter(ws, data.playerId ?? id);
+    const shooterId = this.resolveAuxiliaryShooter(ws, data.playerId ?? id, lootId);
     if (!shooterId) {
       this.broadcaster.sendError(ws, 'Unknown shooter for lootExplode');
       return;
@@ -677,15 +817,31 @@ export class MessageHandler {
     return null;
   }
 
-  /** Auxiliary events still bind human claims to their owning socket. */
-  private resolveAuxiliaryShooter(ws: WebSocket, claimedId: string): string | null {
+  /**
+   * Human claims bind to this socket. A bot claim additionally requires a
+   * live server projectile at this specific drop, consumed exactly once.
+   */
+  private resolveAuxiliaryShooter(
+    ws: WebSocket,
+    claimedId: unknown,
+    lootId: string
+  ): string | null {
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type === 'human' && socketPlayer.id === claimedId) {
+    if (socketPlayer?.type !== 'human') {
+      return null;
+    }
+    if (claimedId === undefined || claimedId === socketPlayer.id) {
       return socketPlayer.id;
     }
 
-    const claimed = this.gameEngine.getPlayer(claimedId);
-    return claimed?.type === 'bot' ? claimed.id : null;
+    const claimed = this.gameEngine.getPlayer(typeof claimedId === 'string' ? claimedId : '');
+    if (
+      claimed?.type === 'bot' &&
+      this.gameEngine.consumeActiveBotLaserNearLoot(claimed.id, lootId)
+    ) {
+      return claimed.id;
+    }
+    return null;
   }
 
   private readFinitePosition(value: unknown): { x: number; y: number } | null {
@@ -708,6 +864,11 @@ export class MessageHandler {
     logger.debug('Handling initAsteroids message', { id });
     if (!id) {
       this.broadcaster.sendError(ws, 'Missing player ID for initAsteroids');
+      return;
+    }
+
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (socketPlayer?.type !== 'human' || socketPlayer.id !== id) {
       return;
     }
 

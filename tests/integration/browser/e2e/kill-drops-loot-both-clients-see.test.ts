@@ -1,19 +1,39 @@
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
-import { bootTwoClientGames } from '../../utils/multi-client-setup';
+import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 test('two clients see the same kill-loot drops', async () => {
-  const { page1, page2, game1, game2 } = await bootTwoClientGames(browserManager);
+  const page1 = browserManager.getCurrentPage();
+  if (!page1) throw new Error('Page 1 not available');
+  const page2 = await browserManager.createAdditionalPage();
+  const game1 = new GameInteractions(page1);
+  const game2 = new GameInteractions(page2);
+
+  // Park the collector as soon as it joins. Waiting for combat readiness on
+  // both clients first leaves client 1 at the default spawn long enough for
+  // ambient combat to kill it before this fixture starts.
+  await game1.bootGame({ waitForCombatReady: false });
+  await game1.placeShipAt(-1800, -1800);
+  await game1.syncShipPositionToServer();
+  await game2.bootGame({ waitForCombatReady: false });
+
   const startMass = await game1.getShipMass();
   const startRadius = await game1.getShipRadius();
   const startMaxHealth = await game1.getShipMaxHealth();
 
-  await game2.waitForCombatReady();
-  await game2.placeShipAt(80, 0);
+  // Keep the collector outside the active asteroid belt and away from the
+  // ambient combatants while the other client is being destroyed. The victim
+  // is also placed outside the belt so the only death in this fixture is the
+  // hostile server-authoritative laser sequence.
+  await game2.placeShipAt(1800, 1800);
   await game2.syncShipPositionToServer();
+  await game1.waitForRemoteHumanPlayers(1);
+  await game2.waitForRemoteHumanPlayers(1);
+  await game1.waitForCombatReady();
+  await game2.waitForCombatReady();
   await game2.killLocalPlayerUntilLifeLost();
 
   await expect

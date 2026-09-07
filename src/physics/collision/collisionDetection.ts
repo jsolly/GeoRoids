@@ -41,6 +41,17 @@ export function checkBoundaryCollision(shipPos: Position, shipRadius: number): b
 }
 
 /**
+ * Check if a laser hits a circular target (asteroid, player, or bot).
+ */
+export function checkLaserHit(
+  laserPos: Position,
+  targetPos: Position,
+  targetRadius: number
+): boolean {
+  return checkCircularCollision(laserPos, LASER_HIT_RADIUS, targetPos, targetRadius);
+}
+
+/**
  * Check if a laser hits an asteroid
  */
 export function checkLaserAsteroidCollision(
@@ -48,7 +59,7 @@ export function checkLaserAsteroidCollision(
   asteroidPos: Position,
   asteroidRadius: number
 ): boolean {
-  return checkCircularCollision(laserPos, LASER_HIT_RADIUS, asteroidPos, asteroidRadius);
+  return checkLaserHit(laserPos, asteroidPos, asteroidRadius);
 }
 
 /**
@@ -105,9 +116,7 @@ export function checkLaserShipCollision(
   shipPos: Position,
   shipRadius: number
 ): boolean {
-  // Lasers are small, so we use a small collision radius
-  const laserRadius = 2;
-  return checkCircularCollision(laserPos, laserRadius, shipPos, shipRadius);
+  return checkLaserHit(laserPos, shipPos, shipRadius);
 }
 
 /**

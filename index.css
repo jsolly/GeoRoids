@@ -113,6 +113,11 @@ a {
   text-decoration: none;
 }
 
+.screen,
+.screen * {
+  box-sizing: border-box;
+}
+
 .screen {
   touch-action: manipulation;
   position: fixed;
@@ -523,6 +528,7 @@ a {
 }
 
 .game-modes .form-control {
+  box-sizing: border-box;
   background-color: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
@@ -660,10 +666,7 @@ a {
 .screen::before {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
+  inset: 0;
   background: linear-gradient(
     45deg,
     rgba(255, 255, 255, 0.1),
@@ -690,7 +693,7 @@ a {
   opacity: 1;
 }
 
-/* On-screen stick + fire. Hidden unless body.touch-play (phone/tablet / coarse pointer). */
+/* On-screen stick + fire + kit actions. Hidden unless body.touch-play. */
 .touch-controls {
   display: none;
   position: absolute;
@@ -708,7 +711,9 @@ body.touch-play .touch-controls:not([hidden]) {
 }
 
 .touch-stick,
-.touch-fire {
+.touch-fire,
+.touch-ability,
+.touch-shield {
   pointer-events: auto;
   touch-action: none;
   user-select: none;
@@ -764,6 +769,61 @@ body.touch-play .touch-controls:not([hidden]) {
   box-shadow: 0 0 16px color-mix(in srgb, var(--palette-laser, #fde68a) 55%, transparent);
 }
 
+.touch-ability,
+.touch-shield {
+  --action-cool: 0;
+  position: absolute;
+  bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 8px);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  padding: 0;
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--palette-hud, #e2e8f0);
+  background: color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent);
+  border: 1.5px solid var(--palette-hud, #e2e8f0);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--palette-hud, #e2e8f0) 28%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--palette-hud, #e2e8f0) 35%, transparent);
+}
+
+.touch-shield {
+  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 148px);
+  color: var(--palette-shield, #7dd3c8);
+  border-color: var(--palette-shield, #7dd3c8);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--palette-shield, #7dd3c8) 28%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--palette-shield, #7dd3c8) 35%, transparent);
+}
+
+.touch-ability {
+  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 82px);
+}
+
+.touch-ability.is-pressed,
+.touch-ability.is-active,
+.touch-shield.is-pressed,
+.touch-shield.is-active {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.touch-ability.is-cooling,
+.touch-shield.is-cooling {
+  opacity: 0.58;
+  background: conic-gradient(
+    color-mix(in srgb, currentColor 45%, transparent)
+      calc(var(--action-cool) * 360deg),
+    color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent) 0
+  );
+}
+
+.touch-ability.is-unavailable,
+.touch-shield.is-unavailable {
+  opacity: 0.42;
+}
+
 @media (orientation: landscape) and (max-height: 500px) {
   .touch-stick {
     width: 96px;
@@ -783,6 +843,22 @@ body.touch-play .touch-controls:not([hidden]) {
     right: max(20px, env(safe-area-inset-right, 0px));
     bottom: max(12px, env(safe-area-inset-bottom, 0px));
     font-size: 0.64rem;
+  }
+
+  .touch-ability,
+  .touch-shield {
+    width: 48px;
+    height: 48px;
+    bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 8px);
+    font-size: 0.48rem;
+  }
+
+  .touch-shield {
+    right: calc(max(20px, env(safe-area-inset-right, 0px)) + 130px);
+  }
+
+  .touch-ability {
+    right: calc(max(20px, env(safe-area-inset-right, 0px)) + 72px);
   }
 
   .screen {

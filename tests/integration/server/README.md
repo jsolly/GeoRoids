@@ -10,10 +10,7 @@ This directory contains integration tests that test server-side functionality di
 
 ## Requirements
 
-These tests require:
-
-- A running WebSocket server (`npm run server`)
-- Node.js environment (no browser needed)
+These tests run through `scripts/test-runner.sh`, which starts the local WebSocket/Vite services when needed. They require Node.js, but no browser.
 
 ## Running Tests
 

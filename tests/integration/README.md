@@ -71,16 +71,16 @@ The tests are organized using a modular utility-based architecture:
 
 ## Prerequisites
 
-1. **Node.js**: Version 16 or higher
-2. **Game Server**: Must be running on port 3001
-3. **Playwright browsers**: Required for browser tests. Install with `npx playwright install`.
+1. **Node.js**: Version 24 or higher
+2. **Game Server**: The test runner starts a server on port 3001 when one is not already running
+3. **Playwright browsers**: Required for browser tests. Install with `npx --no-install playwright install chromium`.
 
 ## Setup
 
 1. Install Playwright browsers:
 
    ```bash
-   npx playwright install
+   npx --no-install playwright install chromium
    ```
 
 2. Ensure the game server is running:
@@ -176,14 +176,14 @@ These tests integrate seamlessly with your existing Vitest setup:
 
 - Use the same test runner and configuration
 - Can be run alongside unit tests
-- Support for test parallelization and timeouts
+- Repository-scoped serialization with one Vitest worker to protect the shared WebSocket server
 - Built-in assertions and mocking
 
 ## Troubleshooting
 
-- **Connection refused**: Make sure the game server is running on port 3001
+- **Connection refused**: Make sure the test runner can start the game server on port 3001
 - **Element not found**: Check that the game UI elements have the expected IDs
-- **Browser not found**: re-run `npx playwright install`; if the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
+- **Browser not found**: re-run `npx --no-install playwright install chromium`; if the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
 - **Test timeouts**: Increase timeout values if the game loads slowly
 - **Screenshot issues**: Check that the screenshots directory is writable
 

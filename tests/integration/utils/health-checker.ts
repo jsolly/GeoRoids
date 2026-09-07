@@ -119,7 +119,7 @@ export class HealthChecker {
           `- WebSocket server (${TestConfig.SERVER_URL}): ${wsHealthy ? '✅' : '❌'}\n` +
           `- Vite dev server (${TestConfig.GAME_URL}): ${viteHealthy ? '✅' : '❌'}\n` +
           `- WebSocket /ws endpoint: ${wsEndpointHealthy ? '✅' : '❌'}\n\n` +
-          `Please start both servers with: npm run dev\n` +
+          `Run this scenario through: ./scripts/test-runner.sh <test-path>\n` +
           `Errors: ${errors.join(', ')}`
       );
     }

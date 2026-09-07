@@ -1,6 +1,6 @@
 # Integration Tests - Entity-Based Structure
 
-This directory contains integration tests organized by entity types rather than by component types. This structure better reflects the game's architecture where core functionality revolves around different entity interactions.
+This directory contains integration tests organized by entity types. This structure reflects the game's architecture where core functionality revolves around different entity interactions.
 
 ## Directory Structure
 
@@ -50,15 +50,15 @@ Tests for input handling systems:
 To run all entity integration tests:
 
 ```bash
-npm test tests/integration/entities/
+./scripts/test-runner.sh tests/integration/entities/
 ```
 
 To run tests for a specific entity:
 
 ```bash
-npm test tests/integration/entities/roid/
-npm test tests/integration/entities/local-player/
-npm test tests/integration/entities/remote-player/
-npm test tests/integration/entities/bot-player/
-npm test tests/integration/entities/input/
+./scripts/test-runner.sh tests/integration/entities/roid/
+./scripts/test-runner.sh tests/integration/entities/local-player/
+./scripts/test-runner.sh tests/integration/entities/remote-player/
+./scripts/test-runner.sh tests/integration/entities/bot-player/
+./scripts/test-runner.sh tests/integration/entities/input/
 ```

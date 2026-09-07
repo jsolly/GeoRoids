@@ -92,17 +92,17 @@ npm run fix                # biome write + tsc + unit tests
 
 # Tests
 npm run test               # unit only (tests/unit/)
-npm run test:all           # everything (vitest run)
+npm run test:all           # unit, server, and entity integration tests
 npm run test:integration:browser   # browser tests via test-runner.sh
 npm run test:integration:server    # server-side integration
-npm run test:integration:component # component integration
+npm run test:integration:entities  # entity integration
 
 # Single test file (integration must use the runner script — not raw vitest)
 ./scripts/test-runner.sh tests/integration/browser/sanity/<file>.test.ts --reporter=verbose
 npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 ```
 
-**Use `./scripts/test-runner.sh` for integration tests** — it enforces single-instance execution. Running `npx vitest` directly opens multiple Vitest forks, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. The `vitest.config.ts` is hard-coded to `singleFork`, `concurrent: false`, `maxConcurrency: 1`, `fileParallelism: false`; keep those settings.
+**Use `./scripts/test-runner.sh` for integration tests** — it enforces repository-scoped single-instance execution. Running `npx vitest` directly bypasses that lock and can open multiple Vitest workers, each spawning a WebSocket client to `:3001`, which hits the connection rate limiter and fails. The `vitest.config.ts` keeps `pool: 'forks'`, `maxWorkers: 1`, `isolate: true`, `fileParallelism: false`, `sequence.concurrent: false`, and `maxConcurrency: 1`; keep those settings.
 
 ## Architecture
 
@@ -147,10 +147,10 @@ Filter with grep prefixes: `[KEYBINDINGS]`, `[GAME_LOOP]`, `[RENDERING]`, `[NETW
 
 - `tests/unit/` — pure, fast. Run via `npm run test`.
 - `tests/integration/server/` — vitest against server modules directly.
-- `tests/integration/component/` — vitest with jsdom against client modules.
+- `tests/integration/entities/` — vitest against entity interactions and input behavior.
 - `tests/integration/browser/` — Selenium/Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `bots-explode-and-respawn-after-asteroid-collision.test.ts` (what happens) over `test-bot-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
 
-Integration tests boot the dev servers if not already running. If a test hangs or fails strangely, run `npm run dev:kill` then re-run.
+Integration tests start their own dev servers through `scripts/test-runner.sh` on unused configured ports. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
 
 ## Project conventions
 
@@ -168,7 +168,7 @@ Integration tests boot the dev servers if not already running. If a test hangs o
 - **Node:** `package.json` requires `>=24`; `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
-- **Playwright browsers** (browser E2E): `npx playwright install`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
+- **Playwright browsers** (browser E2E): `npx --no-install playwright install chromium`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
 
 ### Services
 
@@ -177,7 +177,7 @@ Integration tests boot the dev servers if not already running. If a test hangs o
 | Vite (client + `/ws` proxy) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
 | Game server (HTTP + WS) | 3001 | `curl http://localhost:3001/health` |
 
-Start both with `npm run dev` (`./scripts/dev-server.sh`). Status: `npm run dev:check`. Stop: `npm run dev:kill`. If integration tests hang or rate-limit, kill then restart dev before re-running `./scripts/test-runner.sh`.
+Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. Status: `npm run dev:check`. Stop: `npm run dev:kill`. Integration tests start their own pair through `scripts/test-runner.sh`; do not leave another service listening on the configured test ports.
 
 **Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
 
@@ -187,7 +187,7 @@ See **Commands** above. Browser E2E must use `./scripts/test-runner.sh` (never r
 
 ### Hello-world smoke
 
-With dev servers up: open `http://localhost:5173`, click Play, thrust (arrow keys) and fire (Space). Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose` — navigates to the game, clicks Play, and asserts canvas, HUD, and asteroids.
+For a manual smoke, open `http://localhost:5173`, click Play, thrust (arrow keys) and fire (Space). Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose`; the runner starts the required services on unused configured ports and asserts canvas, HUD, and asteroids.
 
 ### Logs
 

@@ -25,7 +25,7 @@ export class GameInteractions {
     });
 
     try {
-      await this.page.goto('http://localhost:5173', { 
+      await this.page.goto(TestConfig.GAME_URL, {
         waitUntil: 'load',
         timeout: 30000 
       });

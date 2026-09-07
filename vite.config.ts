@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   const define: Record<string, string> = {};
+  const testVitePort = Number(process.env.GEOROIDS_TEST_VITE_PORT ?? 5173);
+  const testServerPort = process.env.GEOROIDS_TEST_SERVER_PORT ?? '3001';
 
   // Inject build time
   define['import.meta.env.VITE_BUILD_TIME'] = JSON.stringify(new Date().toISOString());
@@ -30,17 +32,17 @@ export default defineConfig(() => {
       modulePreload: false,
     },
     server: {
-      port: 5173,
+      port: testVitePort,
       strictPort: true, // Fail if port is not available
       proxy: {
         '/ws': {
-          target: 'ws://localhost:3001',
+          target: `ws://localhost:${testServerPort}`,
           ws: true,
           changeOrigin: true,
           secure: false,
         },
         '/logs': {
-          target: 'ws://localhost:3001',
+          target: `ws://localhost:${testServerPort}`,
           ws: true,
           changeOrigin: true,
           secure: false,

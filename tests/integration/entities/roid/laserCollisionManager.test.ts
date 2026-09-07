@@ -7,12 +7,18 @@ import { Ship } from '../../../../src/entities/ship/Ship';
 // Mock NetworkManager for integration testing
 const mockSendMessage = vi.fn();
 const mockUpdatePlayerState = vi.fn();
+const mockGetPlayer = vi.fn();
+const mockGetLocalPlayerId = vi.fn();
+const mockGetAllPlayers = vi.fn(() => []);
 
 vi.mock('../../../../src/network/networkManager', () => ({
   NetworkManager: {
     getInstance: vi.fn(() => ({
       sendMessage: mockSendMessage,
       updatePlayerState: mockUpdatePlayerState,
+      getPlayer: mockGetPlayer,
+      getLocalPlayerId: mockGetLocalPlayerId,
+      getAllPlayers: mockGetAllPlayers,
     })),
   },
 }));

@@ -11,23 +11,19 @@ export default defineConfig({
       VITEST: 'true',
       NODE_ENV: 'test',
     },
-    // CRITICAL: Prevent multiple Vitest instances to avoid rate limiting
-    pool: 'forks', // Use separate processes instead of threads
-    poolOptions: {
-      forks: {
-        singleFork: true, // Run all tests in a single fork - CRITICAL for rate limiting
-      },
-    },
-    // Force sequential execution to prevent multiple browser instances
+    // Keep one isolated worker so integration tests cannot burst WebSocket
+    // connections while still resetting module state between files.
+    pool: 'forks',
+    maxWorkers: 1,
+    isolate: true,
+    fileParallelism: false,
     sequence: {
-      concurrent: false, // Run tests one at a time
+      concurrent: false,
     },
-    // Additional safeguards
-    maxConcurrency: 1, // Only allow 1 concurrent test
-    // Prevent parallel test execution
-    isolate: true, // Isolate each test file
-    // Ensure tests run in order
-    fileParallelism: false, // Disable file-level parallelism
+    maxConcurrency: 1,
+    // Preserve the pre-v5 mock lifecycle until individual tests opt into
+    // clearing mocks explicitly.
+    clearMocks: false,
   },
   resolve: {
     extensions: ['.ts'],

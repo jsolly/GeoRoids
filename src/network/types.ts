@@ -10,6 +10,7 @@ export interface ServerMessage {
     | 'playerKilled'
     | 'scoreUpdate'
     | 'gameState'
+    | 'snapshot'
     | 'error'
     | 'joined'
     | 'asteroidCreate'
@@ -38,6 +39,7 @@ export interface ServerMessage {
 export interface ClientMessage {
   type:
     | 'join'
+    | 'snapshotResync'
     | 'leave'
     | 'update'
     | 'shoot'

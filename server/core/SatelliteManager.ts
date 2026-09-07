@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Position, SatelliteData, SatelliteShoot, Velocity } from '../../shared-types';
+import type { Position, SatelliteData, SatelliteShoot, SatelliteProjectileState } from '../../shared-types';
 import {
   satelliteProfileAt,
   type SatelliteProfile,
@@ -32,15 +32,6 @@ export interface SatelliteHit {
   satelliteId: string;
   targetId: string;
   damage: number;
-}
-
-/** Server-authoritative state for a projectile that is still in flight. */
-export interface SatelliteProjectileState {
-  satelliteId: string;
-  shotId: string;
-  position: Position;
-  velocity: Velocity;
-  age: number;
 }
 
 type SatelliteProjectile = SatelliteProjectileState;

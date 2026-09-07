@@ -71,6 +71,12 @@ export class MessageHandler {
           this.handleJoin(ws, id, name, restData);
           break;
 
+        case 'snapshotResync':
+          if (this.gameEngine.getPlayerBySocket(ws)?.type === 'human') {
+            this.broadcaster.requestSnapshotKeyframe(ws);
+          }
+          break;
+
         case 'useAbility':
           this.handleUseAbility(ws, id, restData);
           break;
@@ -176,6 +182,8 @@ export class MessageHandler {
       this.broadcaster.broadcastPlayerLeft(replacedId);
     }
 
+    const snapshotVersion = this.broadcaster.negotiateSnapshot(ws, data.snapshotVersion ?? data.data?.snapshotVersion);
+
     // Send confirmation to the joining player
     this.broadcaster.sendToWebSocket(ws, {
       type: 'joined',
@@ -187,6 +195,7 @@ export class MessageHandler {
         kitId: player.kitId,
         factionId: player.factionId,
         terrainSeed: this.gameEngine.getTerrainSeed(),
+        ...(snapshotVersion ? { snapshotVersion } : {}),
       },
       timestamp: Date.now(),
     });

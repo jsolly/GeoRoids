@@ -1,6 +1,10 @@
 import { WebSocket } from 'ws';
 import type {
   AsteroidData,
+  ActiveCollabTag,
+  SatelliteProjectileState,
+  ServerGameState,
+  ServerEntityData,
   LootData,
   Position,
   SatellitePickupData,
@@ -46,7 +50,6 @@ import { isWithinCollectRange } from '../../src/entities/satellitePickup/satelli
 import { logger } from '../../setup/serverLogger';
 import {
   AsteroidManager,
-  type ActiveCollabTag,
   type AsteroidHitCause,
   type AsteroidHitOutcome,
   type ExpiredCollabHit,
@@ -59,7 +62,7 @@ import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import { RNGService } from './RNGService';
 import { SatelliteManager } from './SatelliteManager';
 import { SatellitePickupManager } from './SatellitePickupManager';
-import type { SatelliteHit, SatelliteProjectileState } from './SatelliteManager';
+import type { SatelliteHit } from './SatelliteManager';
 
 export interface ServerLaser {
   id: string;
@@ -1346,9 +1349,9 @@ export class GameEngine {
         harpoonTimer: entity.harpoonTimer,
         harpoonTargetId: entity.harpoonTargetId,
         harpoonLatchPos: entity.harpoonLatchPos,
-        ...(entity.deathCause ? { deathCause: entity.deathCause } : {}),
+        deathCause: entity.deathCause || undefined,
         ...shieldSnapshot(entity),
-      })),
+      } satisfies ServerEntityData & Record<keyof ServerEntityData, unknown>)),
       asteroids: this.asteroidManager.getAllAsteroids(),
       loot: this.lootManager.getAll(),
       satellites: this.satelliteManager.getAllSatellites(),
@@ -1356,7 +1359,7 @@ export class GameEngine {
       gameTime: this.gameTime,
       isPaused: this.isPaused,
       terrainSeed: getTerrainSeed(),
-    };
+    } satisfies ServerGameState & Record<keyof ServerGameState, unknown>;
     
     // Debug logging for health values
     const humanPlayers = allEntities.filter(e => e.type === 'human');

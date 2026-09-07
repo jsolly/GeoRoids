@@ -263,7 +263,8 @@ export class GameController {
 
   private applyServerAsteroidUpdated = (
     asteroidId: string,
-    updates: Partial<AsteroidData>
+    updates: Partial<AsteroidData>,
+    complete = false
   ): void => {
     logger.debug('GAME', 'Updating server asteroid in local belt', { asteroidId });
 
@@ -274,7 +275,8 @@ export class GameController {
       (id) => this.currRoidBelt.roids.find((roid) => roid.id === id),
       asteroidId,
       updates,
-      this.applyServerAsteroidCreated
+      this.applyServerAsteroidCreated,
+      complete
     );
   };
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AsteroidData, Position } from '../../shared-types';
+import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { DAMAGE, DEBUG, ROID } from '../../src/constants';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/roidScore';
@@ -33,17 +33,6 @@ type LaserHitRecord = {
   at: number;
   points: number;
 };
-
-/** Read-only collab tag state for a reconnect/keyframe snapshot. */
-export interface ActiveCollabTag {
-  asteroidId: string;
-  hits: Array<{
-    shooterId: string;
-    at: number;
-    points: number;
-  }>;
-  expiresAt: number;
-}
 
 export class AsteroidManager {
   private asteroids = new Map<string, AsteroidData>();
@@ -114,7 +103,7 @@ export class AsteroidManager {
     const active: ActiveCollabTag[] = [];
     for (const [asteroidId, hits] of this.laserHits) {
       const asteroid = this.asteroids.get(asteroidId);
-      if (!asteroid?.isCollabTarget) {
+      if (!asteroid) {
         continue;
       }
       const windowHits = hits.filter((hit) => now - hit.at <= ROID.COLLAB_SPLIT_WINDOW_MS);

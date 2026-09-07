@@ -1,14 +1,11 @@
-import type { Position, SatelliteData, Velocity } from '../../../shared-types';
+import type {
+  Position,
+  SatelliteData,
+  SatelliteProjectileState,
+  Velocity,
+} from '../../../shared-types';
 import { entityFactory } from '../EntityFactory';
 import { Satellite } from './Satellite';
-
-export interface SatelliteProjectileSnapshot {
-  satelliteId: string;
-  shotId: string;
-  position: Position;
-  velocity: Velocity;
-  age: number;
-}
 
 export class SatelliteManager {
   private static instance: SatelliteManager;
@@ -92,9 +89,9 @@ export class SatelliteManager {
   }
 
   /** Apply a complete server keyframe without duplicating live shot events. */
-  syncProjectilesFromServer(projectiles: readonly SatelliteProjectileSnapshot[]): void {
+  syncProjectilesFromServer(projectiles: readonly SatelliteProjectileState[]): void {
     const snapshotShotIds = new Set<string>();
-    const validProjectiles: SatelliteProjectileSnapshot[] = [];
+    const validProjectiles: SatelliteProjectileState[] = [];
     for (const projectile of projectiles) {
       if (
         typeof projectile.satelliteId !== 'string' ||

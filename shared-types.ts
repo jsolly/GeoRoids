@@ -49,6 +49,8 @@ export interface PlayerUpdate {
 }
 
 export interface PlayerJoin {
+  /** Present only after an explicit supported join offer. */
+  snapshotVersion?: 1;
   id: string;
   name: string;
   position: Position;
@@ -236,6 +238,38 @@ export interface ServerGameState {
   isPaused: boolean;
   /** Same seed on every client → same contours and slope field. */
   terrainSeed?: number;
+}
+
+/** Public authoritative projectile state, shared by simulation, transport and client. */
+export interface SatelliteProjectileState {
+  satelliteId: string;
+  shotId: string;
+  position: Position;
+  velocity: Velocity;
+  age: number;
+}
+
+/** Complete collaborative hit window; omitted windows are no longer active. */
+export interface ActiveCollabTag {
+  asteroidId: string;
+  hits: Array<{ shooterId: string; at: number; points: number }>;
+  expiresAt: number;
+}
+
+export interface SnapshotSatelliteProjectile extends SatelliteProjectileState {
+  /** Identical to shotId; enables the generic keyed collection delta. */
+  id: string;
+}
+
+export interface SnapshotCollabTag extends ActiveCollabTag {
+  /** Identical to asteroidId; enables explicit tag removals. */
+  id: string;
+}
+
+/** Negotiated-only recovery state. Never add these fields to legacy gameState. */
+export interface ServerGameSnapshot extends ServerGameState {
+  satelliteProjectiles: SnapshotSatelliteProjectile[];
+  collabTags: SnapshotCollabTag[];
 }
 
 export interface ServerEntityData {

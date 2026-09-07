@@ -91,7 +91,8 @@ export function asteroidHasSpawnPose(
 export function partitionAsteroidSnapshot(
   asteroids: AsteroidData[],
   seenIds: Set<string>,
-  scratch?: AsteroidFieldSyncScratch
+  scratch?: AsteroidFieldSyncScratch,
+  complete = false
 ): AsteroidFieldSyncResult {
   const created = scratch ? scratch.created : [];
   const updated = scratch ? scratch.updated : [];
@@ -120,7 +121,7 @@ export function partitionAsteroidSnapshot(
 
   // An empty snapshot is not a wipe — last-player reset + a dropped packet
   // must not clear the remaining tab's local belt.
-  if (asteroids.length > 0) {
+  if (complete || asteroids.length > 0) {
     for (const id of seenIds) {
       if (!snapshotIds.has(id)) {
         removed.push(id);
@@ -168,11 +169,12 @@ export function applyAsteroidRowToBelt(
   findById: (id: string) => AsteroidKinematicTarget | undefined,
   asteroidId: string,
   updates: Partial<AsteroidData>,
-  createMissing: (asteroid: AsteroidData) => void
+  createMissing: (asteroid: AsteroidData) => void,
+  complete = false
 ): 'updated' | 'created' | 'skipped' {
   const roid = findById(asteroidId);
   if (roid) {
-    applyAsteroidKinematics(roid, updates);
+    applyAsteroidKinematics(roid, updates, { complete });
     return 'updated';
   }
   const candidate = { id: asteroidId, ...updates };
@@ -201,6 +203,9 @@ export interface AsteroidKinematicTarget {
   r: number;
   isCollabTarget?: boolean;
   material?: AsteroidMaterial;
+  offsets?: number[];
+  vertices?: number;
+  jaggedness?: number;
 }
 
 export function shouldSnapAsteroidPose(
@@ -221,8 +226,21 @@ export function shouldSnapAsteroidPose(
 export function applyAsteroidKinematics(
   roid: AsteroidKinematicTarget,
   updates: Partial<AsteroidData>,
-  options: { snapPosition?: boolean } = {}
+  options: { snapPosition?: boolean; complete?: boolean } = {}
 ): void {
+  if (options.complete) {
+    roid.material = updates.material;
+    roid.isCollabTarget = updates.isCollabTarget ?? false;
+    if (updates.offsets) {
+      roid.offsets = [...updates.offsets];
+    }
+    if (updates.vertices !== undefined) {
+      roid.vertices = updates.vertices;
+    }
+    if (updates.jaggedness !== undefined) {
+      roid.jaggedness = updates.jaggedness;
+    }
+  }
   if (updates.position) {
     const localEscaped = !isPoseInAsteroidField(roid.position.x, roid.position.y);
     if (
@@ -264,7 +282,7 @@ export function applyAsteroidKinematics(
 
 export type AsteroidFieldApplyHandlers = {
   onCreated: (asteroid: AsteroidData) => void;
-  onUpdated: (asteroidId: string, updates: Partial<AsteroidData>) => void;
+  onUpdated: (asteroidId: string, updates: Partial<AsteroidData>, complete?: boolean) => void;
   onDestroyed: (event: AsteroidDestroyEvent) => void;
   /** Snapshot reconciliation removes stale local rows without destruction VFX. */
   onReconciled: (asteroidId: string) => void;
@@ -289,8 +307,16 @@ export function notifyAsteroidCreated(asteroid: AsteroidData): void {
   applyHandlers?.onCreated(asteroid);
 }
 
-export function notifyAsteroidUpdated(asteroidId: string, updates: Partial<AsteroidData>): void {
-  applyHandlers?.onUpdated(asteroidId, asteroidKinematicUpdates(updates));
+export function notifyAsteroidUpdated(
+  asteroidId: string,
+  updates: Partial<AsteroidData>,
+  complete = false
+): void {
+  applyHandlers?.onUpdated(
+    asteroidId,
+    complete ? updates : asteroidKinematicUpdates(updates),
+    complete
+  );
 }
 
 export function notifyAsteroidDestroyed(event: string | AsteroidDestroyEvent): void {
@@ -306,12 +332,15 @@ export function notifyAsteroidTagged(event: AsteroidTaggedEvent): void {
 }
 
 /** Fan a partition out to the bound belt handlers. Snapshot removals are reconciliation, not destroys. */
-export function applyAsteroidFieldPartition(result: AsteroidFieldSyncResult): void {
+export function applyAsteroidFieldPartition(
+  result: AsteroidFieldSyncResult,
+  complete = false
+): void {
   for (const asteroid of result.created) {
     notifyAsteroidCreated(asteroid);
   }
   for (const asteroid of result.updated) {
-    notifyAsteroidUpdated(asteroid.id, asteroid);
+    notifyAsteroidUpdated(asteroid.id, asteroid, complete);
   }
   for (const id of result.removed) {
     notifyAsteroidReconciled(id);

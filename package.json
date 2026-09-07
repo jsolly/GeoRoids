@@ -84,7 +84,7 @@
     "selenium-webdriver": "^4.35.0",
     "ts-node": "^10.9.1",
     "ts-prune": "^0.10.3",
-    "vercel": "^54.18.1",
+    "vercel": "^59.11.7",
     "vitest": "^3.2.6"
   },
   "overrides": {

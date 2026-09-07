@@ -18,6 +18,7 @@
     "types": ["node"]
   },
   "include": [
+    "middleware.ts",
     "src",
     "api",
     "tests",

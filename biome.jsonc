@@ -12,6 +12,8 @@
       "src/**/*.{ts,tsx,json,css,html,md}",
       "shared/**/*.{ts,tsx,json}",
       "shared-types.ts",
+      "middleware.ts",
+      "tests/unit/release-id.test.ts",
       "test/**/*.{ts,tsx,json}",
       "api/**/*.{ts,tsx,json}",
       "setup/**/*.{ts,tsx,json}",

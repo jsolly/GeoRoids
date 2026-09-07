@@ -8,14 +8,14 @@ Ship profile: `vercel-static`
 
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
-Local gate before push: `npm run fix && npm run build` (full gate also runs in GitHub CI on the PR).
+Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.
 
 ### Post-push verification (`/ship` step 12)
 
 **Client-only changes** (default — `src/**`, client assets, docs, no server paths):
 
 1. Wait for Vercel Git deployment READY (project `georoids`, team `jsollys-projects`).
-2. `curl -sf -o /dev/null -w '%{http_code}\n' https://www.georoids.com` → `200`
+2. Require the `x-release-id` response header at `https://www.georoids.com` to resolve to the merge commit or a descendant. The root Vercel middleware reads `VERCEL_GIT_COMMIT_SHA`; HTTP 200 alone does not prove the release.
 3. Optional smoke: `<title>` is `GeoRoids` or page contains the Play button.
 4. Record: `deploy: verified (Vercel Git)` at `https://www.georoids.com`
 
@@ -45,7 +45,7 @@ Two separate deploy targets — client and server do not share a host.
 | **Project** | `georoids` (`jsollys-projects`) |
 | **Production URLs** | **Canonical:** <https://www.georoids.com>; **apex:** <https://georoids.com> (redirects to www); **Vercel default:** `https://georoids-jsollys-projects.vercel.app` |
 | **Build** | `npm run build` → `dist/` (Vite; framework auto-detected — no `vercel.json` required) |
-| **Trigger** | Push to `main` after the pre-push gate; Vercel GitHub integration |
+| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration |
 | **Local deploy** | None — no `npm run deploy` or CLI deploy step |
 
 **Required Vercel production env vars:**
@@ -69,9 +69,9 @@ Local dev: `VITE_WEBSOCKET_URL=ws://localhost:3001/ws` in `.env.local` (see `.en
 
 Smoke: `curl https://geoasteroids-production.up.railway.app/health`
 
-## CI (local pre-push gate)
+## CI (local pre-commit gate)
 
-- `.git-hooks/pre-push` (wired via `core.hooksPath=.git-hooks`, fires on push to `main`) runs dep grounding → lint → yaml → tsc → vitest. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → lint → yaml → actionlint → tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
 ## Commands
 

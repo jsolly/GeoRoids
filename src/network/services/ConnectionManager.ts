@@ -497,7 +497,7 @@ export class ConnectionManager {
     // A same-socket rejoin can race snapshots already queued by the server.
     // Keep its current decoder/format until the ordered joined acknowledgment
     // establishes the new session. New physical sockets reset in openSocket.
-    this.snapshotOffered = import.meta.env.VITE_SNAPSHOT_PROTOCOL === '1';
+    this.snapshotOffered = (import.meta.env.VITE_SNAPSHOT_PROTOCOL ?? '1') === '1';
 
     // First join the game
     const joinMessage: ClientMessage = {

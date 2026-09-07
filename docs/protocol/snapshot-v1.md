@@ -6,8 +6,10 @@ implicit version detection and no lean variant of `gameState`.
 
 ## Deployment and rollback
 
-The client offer is **off by default**. Build with `VITE_SNAPSHOT_PROTOCOL=1` to
-include `snapshotVersion:1` in the join data. Unset it or set `0` to disable it.
+The client offer is **on by default**, after the supporting server deployment.
+An unset `VITE_SNAPSHOT_PROTOCOL` or explicit `1` includes `snapshotVersion:1` in
+the join data. Build with `VITE_SNAPSHOT_PROTOCOL=0` to disable the offer; changing
+the build setting requires a new client deployment.
 An old server ignores this extra join field: unless its `joined.data` explicitly
 confirms `snapshotVersion:1`, the new client continues the legacy path.
 

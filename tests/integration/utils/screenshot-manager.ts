@@ -1,4 +1,4 @@
-import { rmSync, mkdirSync, existsSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { join } from 'path';
 
 export class ScreenshotManager {
@@ -10,18 +10,10 @@ export class ScreenshotManager {
   }
 
   /**
-   * Clear the screenshots directory and recreate it
+   * Preserve timestamped evidence from every scenario in this run.
    */
-  clearScreenshots(): void {
-    try {
-      if (existsSync(this.screenshotsDir)) {
-        rmSync(this.screenshotsDir, { recursive: true, force: true });
-      }
-      mkdirSync(this.screenshotsDir, { recursive: true });
-      console.log('🧹 Cleared screenshots directory');
-    } catch (error) {
-      console.log('⚠️ Could not clear screenshots directory:', error);
-    }
+  ensureScreenshotsDirectory(): void {
+    mkdirSync(this.screenshotsDir, { recursive: true });
   }
 
   /**

@@ -149,6 +149,15 @@ export class GameServerWorld {
   }
 
   shootBot(attacker: Pilot, botId: string, damage: number = DAMAGE.LASER_HIT): void {
+    const bot = this.engine.getBot(botId);
+    if (!bot) {
+      return;
+    }
+
+    // The wire message predates positional hit evidence. Seed the server's
+    // tracked human-shot list at the authoritative bot position so this
+    // helper exercises the same one-use evidence gate as a live client.
+    this.engine.spawnLaser(attacker.id, { ...bot.position }, { x: 0, y: 0 });
     this.send(attacker, {
       type: 'botDamage',
       data: { botId, attackerId: attacker.id, damage },

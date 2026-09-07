@@ -11,7 +11,7 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirna
 const KITS = [
   { kitId: 'dart' as const, label: 'DASH', name: 'Boost dash' },
   { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
-  { kitId: 'warden' as const, label: 'SHIELD', name: 'Shield' },
+  { kitId: 'warden' as const, label: 'ABSORB', name: 'Timed absorb shield' },
   { kitId: 'skirmisher' as const, label: 'BURST', name: 'Burst fire' },
   { kitId: 'quake' as const, label: 'PULSE', name: 'Shock pulse' },
 ];
@@ -88,7 +88,7 @@ async function readLocalTouchState(page: Page): Promise<{
 }
 
 test.each(KITS)(
-  'touch E and F work with simultaneous movement, firing, cancellation, cooldown, and death for $kitId',
+  'touch E and F support movement, firing, cancellation, cooldown, and local death reset for $kitId',
   async ({ kitId, label, name }) => {
     await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
@@ -105,7 +105,7 @@ test.each(KITS)(
 
     expect(await page.locator('#touch-ability').textContent()).toBe(label);
     expect(await page.locator('#touch-ability').getAttribute('aria-label')).toBe(name);
-    expect(await page.locator('#touch-shield').getAttribute('aria-label')).toBe('Shield');
+    expect(await page.locator('#touch-shield').getAttribute('aria-label')).toBe('Shield bubble');
 
     const stick = await centerOf(page, '#touch-stick');
     const fire = await centerOf(page, '#touch-fire');

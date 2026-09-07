@@ -14,7 +14,7 @@ export function createBrowserScenarioHooks(testDir: string): {
 
   beforeAll(async () => {
     await HealthChecker.checkAllServers();
-    screenshotManager.clearScreenshots();
+    screenshotManager.ensureScreenshotsDirectory();
     await browserManager.initialize();
   });
 

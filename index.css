@@ -113,6 +113,11 @@ a {
   text-decoration: none;
 }
 
+.screen,
+.screen * {
+  box-sizing: border-box;
+}
+
 .screen {
   touch-action: manipulation;
   position: fixed;
@@ -523,6 +528,7 @@ a {
 }
 
 .game-modes .form-control {
+  box-sizing: border-box;
   background-color: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
@@ -660,10 +666,7 @@ a {
 .screen::before {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
+  inset: 0;
   background: linear-gradient(
     45deg,
     rgba(255, 255, 255, 0.1),

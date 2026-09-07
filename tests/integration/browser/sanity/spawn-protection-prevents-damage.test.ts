@@ -23,15 +23,17 @@ test('spawn protection prevents damage', async () => {
   await game.waitForServerSpawnProtection();
 
   expect(await game.isServerSpawnProtected()).toBe(true);
+  const healthWhileProtected = await game.getShipHealth();
   await game.applyLaserDamageToLocal(1, 25);
   await page.waitForTimeout(400);
-  expect(await game.getShipHealth()).toBe(100);
+  expect(await game.getShipHealth()).toBe(healthWhileProtected);
 
   await game.waitForCombatReady();
   expect(await game.isServerSpawnProtected()).toBe(false);
 
+  const healthBeforeDamage = await game.getShipHealth();
   await game.applyLaserDamageToLocal(1, 25);
   await expect
     .poll(() => game.getShipHealth(), { timeout: 5000, message: 'damage should apply after protection ends' })
-    .toBe(75);
+    .toBe(healthBeforeDamage - 25);
 }, TestConfig.DEFAULT_TIMEOUT);

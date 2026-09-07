@@ -34,8 +34,12 @@ named optional fields. An omitted field is unchanged. Collection patches contain
 `add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
 `order` (complete ID order when membership/order changes). Empty arrays are
 complete empty collections. Removed bots/remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
-Decoded harpoon expiry clears both target and cached latch position, including
-on the predicting local ship.
+Acknowledged harpoon expiry clears both target and cached latch position,
+including on the predicting local ship. An unacknowledged local Hauler prediction
+may survive a brief reconnect only for its remaining, locally ticking lifetime
+while its target still exists. Acknowledged expiry, target removal, death or
+natural timer expiry clears it. Reconnect neither extends that timer nor replays
+an ability request; this prediction does not restore server ability state.
 
 The codec preserves all public JSON fields recursively. It does not whitelist
 ship or asteroid fields; future keyed arrays automatically participate in delta

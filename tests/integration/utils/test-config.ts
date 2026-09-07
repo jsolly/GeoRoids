@@ -36,7 +36,7 @@ export const TestSelectors = {
   START_SCREEN: '#start-screen',
   START_GAME_BUTTON: '#start-game',
   GAME_AREA: '#gameArea',
-  GAME_CANVAS: 'canvas',
+  GAME_CANVAS: '#gameCanvas',
   DEBUG_INFO: 'text=Asteroids:',
   DEBUG_MODE: 'text=DEBUG MODE'
 } as const;

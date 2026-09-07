@@ -4,7 +4,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 test('mobile viewport fits chrome and exposes stick, fire, ability, and shield', async () => {
   const page = await browserManager.recreatePage({ hasTouch: true });
@@ -117,3 +117,31 @@ test('mobile viewport fits chrome and exposes stick, fire, ability, and shield',
   });
   expect(shieldRaised).toBe(true);
 }, TestConfig.DEFAULT_TIMEOUT);
+
+
+test('mobile menu stays inside the viewport before play and after game over', async () => {
+  const page = await browserManager.recreatePage({ hasTouch: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const game = new GameInteractions(page);
+  const assertMenuFits = async (phase: string) => {
+    await page.locator('#start-screen').waitFor({ state: 'visible' });
+    const menu = await page.locator('#start-screen').evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: window.innerWidth,
+        scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+    });
+    expect(menu.left).toBeGreaterThanOrEqual(0);
+    expect(menu.right).toBeLessThanOrEqual(menu.width);
+    expect(menu.scrollWidth).toBeLessThanOrEqual(menu.clientWidth + 1);
+    await page.screenshot({ path: screenshotManager.getScreenshotPath(
+      screenshotManager.getTimestampedFilename(`mobile-menu-${phase}`)) });
+  };
+  await game.navigateToGame();
+  await assertMenuFits('before-play');
+  await game.startGame();
+  await game.waitForGameReady();
+  await game.waitForServerJoin();
+  await game.dieUntilGameOver();
+  await expect.poll(() => game.isStartScreenVisible(), { timeout: 10000 }).toBe(true);
+  await assertMenuFits('after-game-over');
+}, TestConfig.DEFAULT_TIMEOUT * 3);

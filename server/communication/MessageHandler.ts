@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws';
+import type { Position, Velocity } from '../../shared-types';
 import { GameEngine, type AppliedAsteroidHit } from '../core/GameEngine';
 import { GameStateBroadcaster } from '../services/GameStateBroadcaster';
 import { ClientLogger } from '../services/ClientLogger';
@@ -11,8 +12,17 @@ import {
   isServerOwnedRamAttacker,
 } from '../../shared/combat';
 import { LOOT_BLAST } from '../../shared/lootBlast';
+import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
 import { isStaleDeathPose } from '../core/EntityManager';
+
+function isFiniteMovementVector(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const vector = value as Record<string, unknown>;
+  return Number.isFinite(vector.x) && Number.isFinite(vector.y);
+}
 
 const PAYLOAD_PREVIEW_MAX_CHARS = 500;
 
@@ -217,6 +227,21 @@ export class MessageHandler {
       return;
     }
 
+    // Validate the complete movement packet before acknowledging a respawn
+    // anchor or mutating/broadcasting any field. Malformed coordinates would
+    // otherwise poison the shared snapshot and crash the next collision tick.
+    if (
+      (data.position !== undefined && !isFiniteMovementVector(data.position)) ||
+      (data.velocity !== undefined && !isFiniteMovementVector(data.velocity)) ||
+      ['angle', 'angularVelocity', 'rotation', 'a'].some(
+        (field) => data[field] !== undefined && !Number.isFinite(data[field])
+      ) ||
+      (data.thrusting !== undefined && typeof data.thrusting !== 'boolean')
+    ) {
+      this.broadcaster.sendError(ws, 'Invalid player movement update');
+      return;
+    }
+
     // Ignore movement updates while the player is dead, exploding, or waiting to
     // respawn. Otherwise the client's stale position keeps overwriting the
     // server-chosen respawn position, leaving the ship frozen where it died
@@ -236,39 +261,35 @@ export class MessageHandler {
       existing.respawnAnchor = undefined;
     }
 
-    // Server-authoritative fields: the client only mirrors these back from our
-    // own broadcasts, so accepting them lets a stale client value clobber the
-    // authoritative state (e.g. a freshly-awarded score getting reset to 0).
-    const sanitizedData: any = { ...data };
-    delete (sanitizedData as any).health;
-    delete (sanitizedData as any).maxHealth;
-    delete (sanitizedData as any).fuel;
-    delete (sanitizedData as any).maxFuel;
-    delete (sanitizedData as any).mass;
-    delete (sanitizedData as any).score;
-    delete (sanitizedData as any).lives;
-    delete (sanitizedData as any).respawnTimer;
-    delete (sanitizedData as any).spawnProtectionTimer;
-    delete (sanitizedData as any).kitId;
-    delete (sanitizedData as any).factionId;
-    delete (sanitizedData as any).faction;
-    delete (sanitizedData as any).color;
-    delete (sanitizedData as any).abilityCooldownFrames;
-    delete (sanitizedData as any).abilityActiveFrames;
-    delete (sanitizedData as any).shieldTimer;
-    delete (sanitizedData as any).harpoonTimer;
-    delete (sanitizedData as any).harpoonTargetId;
-    delete (sanitizedData as any).shieldActive;
-    delete (sanitizedData as any).shieldTime;
-    delete (sanitizedData as any).shieldCooldown;
-    delete (sanitizedData as any).shieldFlashTime;
-
-    // Normalize client fields to server schema
-    if (sanitizedData.angle !== undefined && sanitizedData.rotation === undefined) {
-      sanitizedData.rotation = sanitizedData.angle;
+    // Only client-owned movement may enter entity state. Health, lifecycle,
+    // socket identity, abilities (including the harpoon endpoint), and future
+    // server fields cannot be introduced through an untrusted update spread.
+    // Copy vector coordinates explicitly so extra/prototype keys cannot enter
+    // the public snapshot through an otherwise valid movement vector.
+    const sanitizedData: {
+      position?: Position;
+      velocity?: Velocity;
+      angle?: number;
+      thrusting?: boolean;
+      rotation?: number;
+      angularVelocity?: number;
+      a?: number;
+    } = {};
+    if (data.position !== undefined) {
+      sanitizedData.position = { x: data.position.x, y: data.position.y };
     }
-    if (sanitizedData.a !== undefined && sanitizedData.angularVelocity === undefined) {
-      sanitizedData.angularVelocity = sanitizedData.a;
+    if (data.velocity !== undefined) {
+      sanitizedData.velocity = { x: data.velocity.x, y: data.velocity.y };
+    }
+    if (data.angle !== undefined) sanitizedData.angle = data.angle;
+    if (data.thrusting !== undefined) sanitizedData.thrusting = data.thrusting;
+    // Preserve the finite legacy rotation/angular-velocity aliases.
+    if (data.rotation !== undefined || data.angle !== undefined) {
+      sanitizedData.rotation = data.rotation ?? data.angle;
+    }
+    if (data.a !== undefined) sanitizedData.a = data.a;
+    if (data.angularVelocity !== undefined || data.a !== undefined) {
+      sanitizedData.angularVelocity = data.angularVelocity ?? data.a;
     }
 
     const player = this.gameEngine.updatePlayer(id, sanitizedData);
@@ -276,13 +297,9 @@ export class MessageHandler {
       return; // Player not found
     }
 
-    // Include laser data if provided
-    const updateData: any = { ...sanitizedData };
-    if (sanitizedData.lasers !== undefined) {
-      updateData.lasers = sanitizedData.lasers;
-    }
-
-    this.broadcaster.broadcastPlayerUpdate(id, updateData);
+    // Projectiles travel through the validated shoot path; no production
+    // receiver consumes a movement packet's legacy lasers array.
+    this.broadcaster.broadcastPlayerUpdate(id, sanitizedData);
   }
 
   private handlePlayerShoot(ws: WebSocket, id: string, data: any): void {
@@ -385,6 +402,22 @@ export class MessageHandler {
 
     const reporterId = this.getReporterId(ws);
     if (!reporterId || !isAllowedLaserReporter(reporterId, data.attackerId, data.targetPlayerId)) {
+      return;
+    }
+
+    const bot = this.gameEngine.getBot(data.targetPlayerId);
+    if (bot?.type === 'bot') {
+      if (
+        reporterId !== data.attackerId ||
+        !this.gameEngine.consumeHumanLaserNearTarget(
+          reporterId,
+          bot.position,
+          radiusFromMass(bot.mass ?? GROWTH.BASE_MASS)
+        )
+      ) {
+        return;
+      }
+      this.emitShipDamage(bot.id, reporterId, DAMAGE.LASER_HIT, bot.health, 'laser');
       return;
     }
 
@@ -491,7 +524,13 @@ export class MessageHandler {
   }
 
   private handleBotDamage(ws: WebSocket, data: any): void {
-    if (!data.botId || !data.attackerId || data.damage === undefined) {
+    if (
+      typeof data.botId !== 'string' ||
+      data.botId.length === 0 ||
+      typeof data.attackerId !== 'string' ||
+      data.attackerId.length === 0 ||
+      data.damage === undefined
+    ) {
       this.broadcaster.sendError(ws, 'Missing required fields for botDamage');
       return;
     }
@@ -501,12 +540,23 @@ export class MessageHandler {
     }
 
     const reporterId = this.getReporterId(ws);
-    if (!reporterId || (reporterId !== data.attackerId && reporterId !== data.botId)) {
+    if (!reporterId || reporterId !== data.attackerId) {
       return;
     }
 
-    const before = this.gameEngine.getBot(data.botId);
-    this.emitShipDamage(data.botId, data.attackerId, data.damage, before?.health, 'laser');
+    const bot = this.gameEngine.getBot(data.botId);
+    if (
+      !bot ||
+      !this.gameEngine.consumeHumanLaserNearTarget(
+        reporterId,
+        bot.position,
+        radiusFromMass(bot.mass ?? GROWTH.BASE_MASS)
+      )
+    ) {
+      return;
+    }
+
+    this.emitShipDamage(bot.id, reporterId, DAMAGE.LASER_HIT, bot.health, 'laser');
   }
 
   private handleUseAbility(ws: WebSocket, id: string, data: any): void {
@@ -768,9 +818,8 @@ export class MessageHandler {
   }
 
   /**
-   * Client auxiliary events can only act as the human attached to this socket.
-   * Server-owned bots may still use GameEngine.handleLootExplode directly;
-   * their IDs are never authorized by a client payload.
+   * Human claims bind to this socket. A bot claim additionally requires a
+   * live server projectile at this specific drop, consumed exactly once.
    */
   private resolveAuxiliaryShooter(
     ws: WebSocket,
@@ -815,6 +864,11 @@ export class MessageHandler {
     logger.debug('Handling initAsteroids message', { id });
     if (!id) {
       this.broadcaster.sendError(ws, 'Missing player ID for initAsteroids');
+      return;
+    }
+
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (socketPlayer?.type !== 'human' || socketPlayer.id !== id) {
       return;
     }
 

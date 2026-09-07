@@ -15,6 +15,7 @@ import {
   type ShieldState,
 } from '../../src/entities/ship/shipShield';
 import { createFuelTank } from '../../shared/fuel';
+import { calculateHealthRegenDelayFrames, calculateHealthRegenPerFrame } from '../../shared/constants/health';
 import { BOT_AI, BotBrain, makeBotShot, type BotShot } from '../ai/botController';
 import { applyShipMotionSteps, containShipInArena } from '../ai/shipMotion';
 import { DEBUG, FUEL, PALETTE, SHIP } from '../../src/constants';
@@ -49,6 +50,8 @@ export interface GameEntity extends ShieldState {
   score: number;
   health: number;
   maxHealth: number;
+  /** Frames remaining before server-authoritative health regeneration resumes. */
+  healthRegenTimer: number;
   fuel: number;
   maxFuel: number;
   mass: number;
@@ -186,7 +189,11 @@ export class EntityManager {
 
     // Validate and apply health, clamped to [0, entity.maxHealth]
     if (typeof allowedUpdates.health === 'number' && Number.isFinite(allowedUpdates.health)) {
+      const previousHealth = entity.health;
       entity.health = Math.max(0, Math.min(entity.maxHealth, allowedUpdates.health));
+      if (entity.health < previousHealth) {
+        entity.healthRegenTimer = calculateHealthRegenDelayFrames();
+      }
     }
 
     // Apply other allowed properties. Shield timers are owned by requestShield /
@@ -195,6 +202,7 @@ export class EntityManager {
       maxHealth: ignoredMaxHealth,
       health: ignoredHealth,
       mass: ignoredMass,
+      healthRegenTimer: _ignoredHealthRegenTimer,
       maxFuel: _ignoredMaxFuel,
       fuel: _ignoredFuel,
       shieldActive: _ignoredShieldActive,
@@ -269,6 +277,7 @@ export class EntityManager {
       score: restored?.score ?? 0,
       health: 100,
       maxHealth: 100,
+      healthRegenTimer: 0,
       ...createFuelTank(FUEL.START, FUEL.MAX),
       mass: GROWTH.BASE_MASS,
       lastUpdate: Date.now(),
@@ -432,6 +441,7 @@ export class EntityManager {
         score: 0,
         health: 100,
         maxHealth: 100,
+        healthRegenTimer: 0,
         ...createFuelTank(FUEL.START, FUEL.MAX),
         mass: GROWTH.BASE_MASS,
         lastUpdate: Date.now(),
@@ -494,8 +504,12 @@ export class EntityManager {
       return null;
     }
 
-    const wasAlive = entity.health > 0;
+    const previousHealth = entity.health;
+    const wasAlive = previousHealth > 0;
     entity.health = Math.max(0, entity.health - damage);
+    if (entity.health < previousHealth) {
+      entity.healthRegenTimer = calculateHealthRegenDelayFrames();
+    }
 
     // If entity is destroyed, set exploding state
     if (entity.health <= 0 && wasAlive) {
@@ -603,11 +617,44 @@ export class EntityManager {
     }
   }
 
+  /** Tick the shared server-owned health regeneration clock for every ship. */
+  public updateHealthRegeneration(): number {
+    const regenPerFrame = calculateHealthRegenPerFrame();
+    let healedEntities = 0;
+
+    for (const entity of this.entities.values()) {
+      if (
+        entity.exploding ||
+        entity.health <= 0 ||
+        entity.respawnTimer !== undefined ||
+        entity.health >= entity.maxHealth
+      ) {
+        continue;
+      }
+
+      if (entity.healthRegenTimer > 0) {
+        entity.healthRegenTimer--;
+        continue;
+      }
+
+      const nextHealth = Math.min(entity.maxHealth, entity.health + regenPerFrame);
+      if (nextHealth === entity.health) {
+        continue;
+      }
+      entity.health = nextHealth;
+      entity.lastUpdate = Date.now();
+      healedEntities++;
+    }
+
+    return healedEntities;
+  }
+
   private respawnShip(entity: GameEntity): void {
     entity.respawnTimer = undefined;
     resetShipMass(entity);
     applyShipKitStats(entity, entity.kitId);
     entity.health = entity.maxHealth;
+    entity.healthRegenTimer = 0;
     entity.fuel = FUEL.START;
     entity.maxFuel = FUEL.MAX;
     entity.exploding = false;

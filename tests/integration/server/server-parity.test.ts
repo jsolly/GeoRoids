@@ -219,11 +219,12 @@ describe('Server Message Parity', () => {
 
     wsCore.handleClientMessage(shootMessage, mockWs);
 
-    // Verify shoot event was broadcast
-    expect(sentMessages.length).toBe(1);
-    const rawBroadcast = sentMessages[0];
-    expect(rawBroadcast).toBeDefined();
-    const broadcastMessage = JSON.parse(rawBroadcast!);
+    // A muzzle can also hit a live asteroid immediately. Verify the shoot
+    // event exactly once without mistaking authoritative hit events for duplicates.
+    const shots = sentMessages.map((message) => JSON.parse(message))
+      .filter((message) => message.type === 'playerShoot');
+    expect(shots).toHaveLength(1);
+    const broadcastMessage = shots[0]!;
     expect(broadcastMessage.type).toBe('playerShoot');
     expect(broadcastMessage.data.id).toBe('shoot-test-id');
     expect(broadcastMessage.data.laserStart).toEqual({ x: 10, y: 20 });

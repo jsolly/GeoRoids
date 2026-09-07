@@ -1,3 +1,7 @@
+import { entityFactory } from '../../../src/entities/EntityFactory';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { tickAbilityHost } from '../../../src/entities/ship/shipAbilities';
+import { setSelectedShipKitId } from '../../../src/ui/shipKitSelect';
 import { SatelliteManager } from '../../../src/entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 import { Roid } from '../../../src/entities/roid/Roid';
@@ -33,7 +37,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager = ConnectionManager.getInstance();
     manager.disconnect();
   });
-  afterEach(() => { manager.disconnect(); unbindAsteroidFieldApply(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+  afterEach(() => { manager.disconnect(); unbindAsteroidFieldApply(); vi.restoreAllMocks(); setSelectedShipKitId('dart'); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
   async function connect(offer: boolean) {
     vi.stubEnv('VITE_SNAPSHOT_PROTOCOL', offer ? '1' : '');
     const connecting = manager.connect(); Transport.latest.onopen?.(); await connecting;
@@ -138,6 +142,74 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', encodeSnapshot(first, 1));
     expect(satellites.get('eo-0')?.lasers).toHaveLength(1);
     expect(pickups.get('pickup-0')?.ownerId).toBe('pilot-0');
+  });
+
+  test('local Hauler prediction survives queued zeros, while acknowledged expiry clears immediately', async () => {
+    setSelectedShipKitId('hauler');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect(true); acknowledge(ws, 1);
+    const zero = captureSnapshot(snapshotFixture());
+    zero.entities[0]!.id = manager.getClientId(); zero.entities[0]!.kitId = 'hauler';
+    ws.receive('snapshot', encodeSnapshot(zero, 1));
+    Object.assign(player.ship, { harpoonTimer: 30, harpoonTargetId: 'asteroid-1',
+      harpoonLatchPos: { x: 1, y: 2 }, abilityActiveFrames: 30, abilityCooldownFrames: 80 });
+    manager.sendMessage({ type: 'useAbility', data: { abilityId: 'harpoon' } });
+    ws.receive('snapshot', encodeSnapshot(zero, 2));
+    expect(player.ship.harpoonTimer).toBe(30);
+    expect(player.ship.abilityActiveFrames).toBe(30);
+    const active = captureSnapshot(zero);
+    Object.assign(active.entities[0]!, { harpoonTimer: 28, harpoonTargetId: 'asteroid-1',
+      harpoonLatchPos: { x: 3, y: 4 }, abilityActiveFrames: 28, abilityCooldownFrames: 78 });
+    ws.receive('snapshot', encodeSnapshot(active, 3));
+    expect(player.ship.harpoonTimer).toBe(28);
+    ws.receive('snapshot', encodeSnapshot(zero, 4));
+    expect(player.ship.harpoonTimer).toBe(0);
+    expect(player.ship.harpoonTargetId).toBeUndefined();
+    expect(player.ship.harpoonLatchPos).toBeUndefined();
+    expect(player.ship.abilityActiveFrames).toBe(0);
+    // A second locally predicted use is pending until its server acknowledgment.
+    Object.assign(player.ship, { harpoonTimer: 20, harpoonTargetId: 'asteroid-1', harpoonLatchPos: { x: 1, y: 2 } });
+    manager.sendMessage({ type: 'useAbility', data: { abilityId: 'harpoon' } });
+    ws.receive('snapshot', encodeSnapshot(zero, 5));
+    expect(player.ship.harpoonTimer).toBe(20);
+    ws.receive('abilityUsed', { id: player.id, harpoonTimer: 18, harpoonTargetId: 'asteroid-1', harpoonLatchPos: { x: 3, y: 4 } });
+    ws.receive('snapshot', encodeSnapshot(zero, 6));
+    expect(player.ship.harpoonTimer).toBe(0);
+  });
+
+  test('socket-flap Hauler visuals keep only their remaining timer and end on expiry or target removal', async () => {
+    setSelectedShipKitId('hauler');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    let ws = await connect(true); acknowledge(ws, 1);
+    const active = captureSnapshot(snapshotFixture());
+    Object.assign(active.entities[0]!, { id: manager.getClientId(), kitId: 'hauler', harpoonTimer: 3,
+      harpoonTargetId: 'asteroid-1', harpoonLatchPos: { x: 1, y: 2 }, abilityActiveFrames: 3 });
+    ws.receive('snapshot', encodeSnapshot(active, 1));
+    ws.close(); // Actual onclose resets the socket's authority acknowledgment.
+    ws = await connect(true); acknowledge(ws, 1);
+    const zero = captureSnapshot(active);
+    zero.entities[0]!.harpoonTimer = 0; zero.entities[0]!.abilityActiveFrames = 0;
+    delete zero.entities[0]!.harpoonTargetId; delete zero.entities[0]!.harpoonLatchPos;
+    ws.receive('snapshot', encodeSnapshot(zero, 1));
+    expect(player.ship.harpoonTimer).toBe(3);
+    tickAbilityHost(player.ship);
+    ws.receive('snapshot', encodeSnapshot(zero, 2));
+    expect(player.ship.harpoonTimer).toBe(2); // No keyframe may restart/extend it.
+    tickAbilityHost(player.ship); tickAbilityHost(player.ship);
+    ws.receive('snapshot', encodeSnapshot(zero, 3));
+    expect(player.ship.harpoonTimer).toBe(0);
+    expect(player.ship.harpoonLatchPos).toBeUndefined();
+    // A warm prediction also stops immediately if its target vanished.
+    Object.assign(player.ship, { harpoonTimer: 3, harpoonTargetId: 'asteroid-1', harpoonLatchPos: { x: 1, y: 2 } });
+    const removed = captureSnapshot(zero);
+    removed.asteroids = removed.asteroids.filter(rock => rock.id !== 'asteroid-1');
+    ws.receive('snapshot', encodeSnapshot(removed, 4));
+    expect(player.ship.harpoonTimer).toBe(0);
+    expect(player.ship.harpoonTargetId).toBeUndefined();
+    expect(player.ship.harpoonLatchPos).toBeUndefined();
+    expect(ws.sent.filter(message => message.type === 'useAbility')).toHaveLength(0);
   });
 
   test('rejoin accepts in-flight old-session snapshots until its delayed acknowledgment resets sequence', async () => {

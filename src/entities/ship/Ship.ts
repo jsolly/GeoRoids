@@ -1,4 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
+import {
+  calculateHealthRegenDelayFrames,
+  calculateHealthRegenPerFrame,
+} from '../../../shared/constants/health';
 import { applyFuelSnapshot, createFuelTank, trySpendEmpFuel } from '../../../shared/fuel';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../../shared-types';
@@ -40,8 +44,6 @@ import {
   applyThrustOrFriction,
   calculateHealthAfterDamage,
   calculateHealthAfterHeal,
-  calculateHealthRegenDelayFrames,
-  calculateHealthRegenPerFrame,
   canTakeCollisionDamage,
   moveFrictionForShip,
   shouldStartHealthRegeneration,

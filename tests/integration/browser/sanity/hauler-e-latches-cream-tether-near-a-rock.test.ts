@@ -44,8 +44,6 @@ test.each([
   expect(before.selected).toBe('true');
   expect(before.joined).toBe(true);
 
-  await page.locator('#gameCanvas').click({ force: true }).catch(() => undefined);
-
   const flyDeadline = Date.now() + 9000;
   let lastNav: Record<string, unknown> = {};
   let startGap = Number.POSITIVE_INFINITY;
@@ -201,33 +199,53 @@ test.each([
     const ship = gc.playerManager.getLocalPlayer().ship;
     const socket: WebSocket = connection.state.socket;
     const targetId = ship.harpoonTargetId;
+    const startedAt = Date.now();
     const closed = new Promise<void>((resolve) => socket.addEventListener('close', () => resolve(), { once: true }));
     socket.close(4000, 'Browser regression: brief connection flap');
     await closed;
     return {
+      startedAt,
       targetId,
       timer: ship.harpoonTimer,
       rocks: gc.getCurrRoidBelt().getRoids().length,
+      health: ship.health,
+      lives: gc.playerManager.getLocalPlayer().lives,
     };
   });
   expect(flap.timer).toBeGreaterThan(0);
   expect(flap.rocks).toBeGreaterThan(0);
+  const reconnectWaitStartedAt = Date.now();
   await page.waitForFunction(() => {
     const gc = (window as { gameController?: any }).gameController;
     const connection = gc?.getNetworkManager?.().connectionManager;
     return connection?.state.isConnected && connection.hasInitializedAsteroidsForConnection;
   }, undefined, { timeout: 2500 });
+  const reconnectedAt = Date.now();
   // Let the newly joined connection receive authoritative game-state frames.
   await page.waitForTimeout(80);
   const resumed = await page.evaluate(() => {
     const gc = (window as { gameController?: any }).gameController;
     const ship = gc.playerManager.getLocalPlayer().ship;
+    const targetId = ship.harpoonTargetId;
+    const rocks = gc.getCurrRoidBelt().getRoids();
     return {
-      targetId: ship.harpoonTargetId,
+      targetId,
       timer: ship.harpoonTimer,
-      rocks: gc.getCurrRoidBelt().getRoids().map((rock: { id: string }) => rock.id).sort(),
+      rocks: rocks.map((rock: { id: string }) => rock.id).sort(),
+      targetInField: rocks.some((rock: { id: string }) => rock.id === targetId),
+      health: ship.health,
+      lives: gc.playerManager.getLocalPlayer().lives,
+      connected: Boolean(gc.getNetworkManager()?.isConnected),
     };
   });
+  // eslint-disable-next-line no-console
+  console.log('[hauler-reconnect]', JSON.stringify({
+    viewport,
+    flap,
+    reconnectWaitMs: reconnectedAt - reconnectWaitStartedAt,
+    postReconnectMs: Date.now() - reconnectedAt,
+    resumed,
+  }));
   expect(resumed.timer).toBeGreaterThan(0);
   expect(resumed.targetId).toBe(flap.targetId);
   expect(resumed.rocks.length).toBeGreaterThan(0);

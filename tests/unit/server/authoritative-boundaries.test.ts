@@ -5,6 +5,7 @@ import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import type { AsteroidData } from '../../../shared-types';
+import { DAMAGE } from '../../../src/constants';
 
 function mockWs(): WebSocket {
   return {
@@ -95,7 +96,6 @@ describe('server authority boundaries', () => {
 
     const botShot = engine.spawnLaser(bot!.id, shard!.position, { x: 0, y: 0 });
     expect(botShot).toBeDefined();
-    expect(engine.hasActiveBotLaserNearLoot(bot!.id, shard!.id)).toBe(true);
     core.handleClientMessage(
       {
         type: 'lootExplode',
@@ -106,7 +106,6 @@ describe('server authority boundaries', () => {
     );
     expect(engine.getLoot()).toHaveLength(0);
     expect(botShot?.hasExploded).toBe(true);
-    expect(engine.hasActiveBotLaserNearLoot(bot!.id, shard!.id)).toBe(false);
 
     addDropAsteroid(engine, 'second-drop-source');
     expect(engine.handleAsteroidHit('second-drop-source', 'owner', 'laser').outcome).toBe('destroyed');
@@ -171,6 +170,125 @@ describe('server authority boundaries', () => {
     );
     expect(pilot!.kitId).toBe('dart');
     expect(pilot!.abilityCooldownFrames).toBeGreaterThan(0);
+  });
+
+  test('bot damage needs one joined owner shot and applies canonical damage once', () => {
+    engine = new GameEngine(44);
+    const core = new WebSocketCore(engine);
+    const pilotWs = mockWs();
+    const otherWs = mockWs();
+    const unjoinedWs = mockWs();
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
+      pilotWs
+    );
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 1000, y: 0 } } },
+      otherWs
+    );
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.removeAsteroid(asteroid.id);
+    }
+
+    const bot = engine.createBots(1)?.[0];
+    expect(bot).toBeDefined();
+    engine.updatePlayer('pilot', {
+      factionId: 'ion',
+      spawnProtectionTimer: undefined,
+      position: { x: 0, y: 0 },
+    });
+    engine.updateBot(bot!.id, {
+      factionId: 'ember',
+      spawnProtectionTimer: undefined,
+      position: { x: 0, y: 0 },
+    });
+    const healthBefore = bot!.health;
+    const report = {
+      type: 'botDamage',
+      data: { botId: bot!.id, attackerId: 'pilot', damage: 999_999 },
+    };
+
+    // A forged/oversized report, including from another or unjoined socket,
+    // has no effect without a server-tracked shot.
+    core.handleClientMessage(report, pilotWs);
+    core.handleClientMessage(report, otherWs);
+    core.handleClientMessage(report, unjoinedWs);
+    core.handleClientMessage(
+      {
+        type: 'laserDamage',
+        data: { targetPlayerId: bot!.id, attackerId: 'pilot', damage: 999_999 },
+      },
+      pilotWs
+    );
+    expect(bot!.health).toBe(healthBefore);
+
+    core.handleClientMessage(
+      {
+        type: 'shoot',
+        id: 'pilot',
+        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 0, y: 0 } },
+      },
+      pilotWs
+    );
+    const shot = engine.getServerLasers()[0];
+    expect(shot).toBeDefined();
+
+    core.handleClientMessage(report, pilotWs);
+    expect(bot!.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(shot!.hasExploded).toBe(true);
+
+    // The consumed shot cannot be replayed for another damage tick.
+    core.handleClientMessage(report, pilotWs);
+    expect(bot!.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+
+    // The legacy laserDamage envelope uses the same one-use evidence gate.
+    core.handleClientMessage(
+      {
+        type: 'shoot',
+        id: 'pilot',
+        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 0, y: 0 } },
+      },
+      pilotWs
+    );
+    core.handleClientMessage(
+      {
+        type: 'laserDamage',
+        data: { targetPlayerId: bot!.id, attackerId: 'pilot', damage: 999_999 },
+      },
+      pilotWs
+    );
+    expect(bot!.health).toBe(healthBefore - DAMAGE.LASER_HIT * 2);
+  });
+
+  test('initAsteroids only serves the joined socket owner', () => {
+    engine = new GameEngine(45);
+    const core = new WebSocketCore(engine);
+    const ownerWs = mockWs();
+    const otherWs = mockWs();
+    const unjoinedWs = mockWs();
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'owner', name: 'Owner', position: { x: 0, y: 0 } } },
+      ownerWs
+    );
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 100, y: 0 } } },
+      otherWs
+    );
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.removeAsteroid(asteroid.id);
+    }
+
+    const request = {
+      type: 'initAsteroids',
+      id: 'owner',
+      data: { asteroidCount: 999_999 },
+    };
+    core.handleClientMessage(request, otherWs);
+    core.handleClientMessage(request, unjoinedWs);
+    expect(engine.getAsteroidCount()).toBe(0);
+
+    core.handleClientMessage(request, ownerWs);
+    expect(engine.getAsteroidCount()).toBeGreaterThan(0);
   });
 
   test('a rammed rubble rock does not announce a cooperative split', () => {

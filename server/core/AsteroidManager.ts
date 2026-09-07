@@ -238,7 +238,7 @@ export class AsteroidManager {
       // Check if we're in test mode (when PLACE_ON_LOCAL_PLAYER is true, assume test mode)
       const isTestMode = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
       
-      if (DEBUG.ROIDS.ALL_LARGE && !isTestMode) {
+      if (DEBUG.ENABLED && DEBUG.ROIDS.ALL_LARGE && !isTestMode) {
         size = 50; // Large size
       } else if (isTestMode) {
         // In test mode, create medium asteroids (size 20-30). Only the biggest
@@ -266,6 +266,7 @@ export class AsteroidManager {
 
       // One voluntary coop rock in live fields. Test placement (on-player) stays one-shot.
       if (i === 0 && !DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER) {
+        asteroid.size = Math.max(asteroid.size, ROID.COLLAB_SPLIT_MIN_SIZE);
         asteroid.isCollabTarget = true;
         asteroid.health = 100;
         asteroid.maxHealth = 100;

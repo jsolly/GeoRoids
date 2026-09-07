@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { GameEngine } from '../../server/core/GameEngine';
-import { DEBUG } from '../../src/constants';
+import { GameEngine } from '../../../server/core/GameEngine';
+import { DEBUG } from '../../../src/constants';
 
 describe('Roid Placement Integration Tests', () => {
   let gameEngine: GameEngine;

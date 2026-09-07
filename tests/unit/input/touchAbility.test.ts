@@ -18,10 +18,11 @@ import { triggerTouchAbility, triggerTouchShield } from '../../../src/input/touc
 test('each kit exposes its own E action label and name', () => {
   expect(touchAbilityLabel('dart')).toBe('DASH');
   expect(touchAbilityLabel('hauler')).toBe('HOOK');
-  expect(touchAbilityLabel('warden')).toBe('SHIELD');
+  expect(touchAbilityLabel('warden')).toBe('ABSORB');
   expect(touchAbilityLabel('skirmisher')).toBe('BURST');
   expect(touchAbilityLabel('quake')).toBe('PULSE');
   expect(touchAbilityName('hauler')).toBe('Harpoon');
+  expect(touchAbilityName('warden')).toBe('Timed absorb shield');
   expect(touchAbilityLabel('unknown-kit')).toBe('DASH');
 });
 

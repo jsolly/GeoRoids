@@ -14,7 +14,8 @@ test('laser chip damage does not kill player', async () => {
   await game.waitForCombatReady();
 
   const livesBefore = await game.getLives();
+  const healthBeforeDamage = await game.getShipHealth();
   await game.applyLaserDamageToLocal(1, 25);
-  await game.waitForShipHealth(75, 20000);
+  await game.waitForShipHealth(healthBeforeDamage - 25, 20000);
   expect(await game.getLives()).toBe(livesBefore);
 }, TestConfig.DEFAULT_TIMEOUT);

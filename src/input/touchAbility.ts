@@ -15,7 +15,7 @@ import {
 const ABILITY_LABEL: Record<ShipAbilityId, string> = {
   boostDash: 'DASH',
   harpoon: 'HOOK',
-  shieldFocus: 'SHIELD',
+  shieldFocus: 'ABSORB',
   burstFire: 'BURST',
   shockPulse: 'PULSE',
 };
@@ -46,7 +46,7 @@ export type ShieldChromeHost = ShieldState & {
 
 export type ShieldChromeState = {
   label: 'SHIELD';
-  name: 'Shield';
+  name: 'Shield bubble';
   ready: boolean;
   active: boolean;
   cooling: boolean;
@@ -60,7 +60,8 @@ export function touchAbilityLabel(kitId: unknown): string {
 }
 
 export function touchAbilityName(kitId: unknown): string {
-  return getShipKit(kitId).abilityName;
+  const kit = getShipKit(kitId);
+  return kit.abilityId === 'shieldFocus' ? 'Timed absorb shield' : kit.abilityName;
 }
 
 export function abilityCooldownRatio(
@@ -93,7 +94,7 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const active = Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0;
   return {
     label: ABILITY_LABEL[kit.abilityId],
-    name: kit.abilityName,
+    name: touchAbilityName(kit.id),
     ready: alive && !cooling && !unavailable,
     active,
     cooling,
@@ -115,7 +116,7 @@ export function readShieldChrome(host: ShieldChromeHost): ShieldChromeState {
   const cooling = Number.isFinite(host.shieldCooldown) && host.shieldCooldown > 0;
   return {
     label: 'SHIELD',
-    name: 'Shield',
+    name: 'Shield bubble',
     ready: alive && (active || canActivateShield(host)),
     active,
     cooling,

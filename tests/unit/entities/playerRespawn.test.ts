@@ -34,6 +34,43 @@ describe('Player Respawn System', () => {
     expect(ship.exploding).toBe(true);
   });
 
+  test('a living local ship displays gradual authoritative healing and subsequent damage', () => {
+    player.updateFromServer({ health: 50, exploding: false });
+    expect(ship.health).toBe(50);
+
+    player.updateFromServer({ health: 50 + 1 / 60, exploding: false });
+    expect(ship.health).toBeCloseTo(50 + 1 / 60);
+    player.updateFromServer({ health: 50 + 2 / 60, exploding: false });
+    expect(ship.health).toBeCloseTo(50 + 2 / 60);
+
+    // Repeated snapshots must not add healing locally, and actual damage
+    // following regeneration must still be reflected immediately.
+    player.updateFromServer({ health: 50 + 2 / 60, exploding: false });
+    expect(ship.health).toBeCloseTo(50 + 2 / 60);
+    player.updateFromServer({ health: 47 + 2 / 60, exploding: false });
+    expect(ship.health).toBeCloseTo(47 + 2 / 60);
+  });
+
+  test('a delayed healing echo cannot revive a locally predicted death', () => {
+    player.updateFromServer({ health: 50, exploding: false });
+    ship.health = 0;
+    ship.exploding = true;
+    ship.blinkCount = 0;
+
+    player.updateFromServer({ health: 50 + 1 / 60, exploding: false });
+    expect(ship.health).toBe(0);
+    expect(ship.blinkCount).toBe(0);
+
+    // A complete authoritative respawn still restores health and its cue.
+    player.updateFromServer({
+      health: ship.maxHealth,
+      exploding: false,
+      respawnTimer: 0,
+    });
+    expect(ship.health).toBe(ship.maxHealth);
+    expect(ship.blinkCount).toBeGreaterThan(0);
+  });
+
   test('player respawns with full health when health updates from server', () => {
     // Simulate death
     ship.health = 0;

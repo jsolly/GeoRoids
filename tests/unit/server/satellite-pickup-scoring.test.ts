@@ -6,14 +6,17 @@ import { SATELLITE_PICKUP } from '../../../src/constants';
 
 describe('Server scoring via satellitePickupCollected', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
+  let client: WebSocket | null = null;
 
   afterEach(async () => {
     try {
+      client?.terminate();
       if (server) {
         await server.close();
       }
     } finally {
       server = null;
+      client = null;
     }
   });
 
@@ -21,6 +24,7 @@ describe('Server scoring via satellitePickupCollected', () => {
     server = createServerInstance({ port: 0, nodeEnv: 'test' });
     const port = await server.listening;
     const ws = new WebSocket(`ws://localhost:${port}/ws`);
+    client = ws;
     await new Promise<void>((resolve, reject) => {
       ws.once('open', () => resolve());
       ws.once('error', (err) => reject(err));

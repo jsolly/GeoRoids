@@ -6,7 +6,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import type { AsteroidData, AsteroidMaterial } from '../../../shared-types';
 import { ASTEROID_MATERIALS, MATERIAL_OUTLINES } from '../../../shared/asteroidMaterials';
-import { DAMAGE } from '../../../src/constants';
+import { DAMAGE, ROID } from '../../../src/constants';
 import { Roid } from '../../../src/entities/roid/Roid';
 import { serializeAsteroidMaterialSvg } from '../../../src/entities/roid/materialArt';
 import { applyAsteroidKinematics } from '../../../src/network/services/asteroidFieldSync';
@@ -26,6 +26,9 @@ describe('mineral asteroids break with distinct rewards', () => {
   test('a shared field supplies all three readable contours and syncs them to a joining pilot', () => {
     const rocks = new AsteroidManager(new RNGService(42)).createAsteroids(6);
     expect(new Set(rocks.map((rock) => rock.material))).toEqual(new Set(['ice', 'metal', 'rubble']));
+    expect(new Set(rocks.map((rock) => rock.size)).size).toBeGreaterThan(1);
+    expect(rocks.every((rock) => rock.size >= 18 && rock.size <= 48)).toBe(true);
+    expect(rocks.find((rock) => rock.isCollabTarget)?.size).toBeGreaterThanOrEqual(ROID.COLLAB_SPLIT_MIN_SIZE);
     for (const rock of rocks) {
       const local = new Roid({ x: 0, y: 0 }, 1, rock.id);
       applyAsteroidKinematics(local, rock);

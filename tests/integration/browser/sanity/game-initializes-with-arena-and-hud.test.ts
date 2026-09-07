@@ -18,6 +18,7 @@ test('game initializes with arena and hud', async () => {
 
   expect(await game.getLives()).toBe(3);
   expect(await game.getScore()).toBe(0);
-  expect(await game.getShipHealth()).toBe(100);
+  const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);
+  expect(health).toBe(maxHealth);
   expect(await game.getAsteroidCount()).toBeGreaterThan(0);
 }, TestConfig.DEFAULT_TIMEOUT);

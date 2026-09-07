@@ -241,14 +241,6 @@ export function calculateHealthAfterHeal(
   return Math.min(currentHealth + healAmount, maxHealth);
 }
 
-export function calculateHealthRegenPerFrame(): number {
-  return SHIP.HEALTH_REGEN_RATE / GAME.FPS;
-}
-
-export function calculateHealthRegenDelayFrames(): number {
-  return Math.ceil(SHIP.HEALTH_REGEN_DELAY * GAME.FPS);
-}
-
 export function shouldStartHealthRegeneration(
   lastDamageTime: number,
   currentHealth: number,

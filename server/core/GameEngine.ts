@@ -16,6 +16,7 @@ import type {
 } from '../../shared-types';
 import { asteroidRamDamage, shipShipTickDamage } from '../../shared/combat';
 import { applyFuelPickup, ensureFuelTank, isFuelLoot } from '../../shared/fuel';
+import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { consumeTickAccumulator, GAME_TICK_MS } from '../../shared/gameClock';
 import {
   LOOT_BLAST,
@@ -214,6 +215,7 @@ export class GameEngine {
     this.entityManager.updateRespawns();
     this.tickAbilities();
     this.entityManager.updateShields();
+    this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime);
     this.collectLoot();
     this.tickSatellitePickups();
@@ -245,6 +247,7 @@ export class GameEngine {
     this.entityManager.updateRespawns();
     this.tickAbilities();
     this.entityManager.updateShields();
+    this.entityManager.updateHealthRegeneration();
   }
 
   public stopGameLoop(): void {
@@ -494,7 +497,8 @@ export class GameEngine {
   }
 
   public getBot(botId: string): GameEntity | undefined {
-    return this.entityManager.getEntity(botId);
+    const entity = this.entityManager.getEntity(botId);
+    return entity?.type === 'bot' ? entity : undefined;
   }
 
   public getAllBots(): GameEntity[] {
@@ -1151,22 +1155,6 @@ export class GameEngine {
    * asteroid reports. The client may report where it saw the bot laser, but
    * it cannot create or replay the shot itself.
    */
-  public hasActiveBotLaserNearLoot(botId: string, lootId: string): boolean {
-    const bot = this.entityManager.getEntity(botId);
-    const loot = this.lootManager.get(lootId);
-    if (bot?.type !== 'bot' || !loot) {
-      return false;
-    }
-
-    return this.lasers.some(
-      (laser) =>
-        !laser.hasExploded &&
-        laser.ownerId === botId &&
-        isLaserNearAsteroid(laser.position, loot.position, loot.radius)
-    );
-  }
-
-  /** Consume one validated bot projectile for a loot detonation. */
   public consumeActiveBotLaserNearLoot(botId: string, lootId: string): boolean {
     const bot = this.entityManager.getEntity(botId);
     const loot = this.lootManager.get(lootId);
@@ -1184,6 +1172,48 @@ export class GameEngine {
       return false;
     }
 
+    laser.hasExploded = true;
+    return true;
+  }
+
+  /**
+   * Consume one server-tracked human shot when its live geometry is near a
+   * target. A report may omit its hit position for legacy clients; the server
+   * still requires the tracked laser itself to be near the authoritative
+   * target before consuming it.
+   */
+  public consumeHumanLaserNearTarget(
+    attackerId: string,
+    targetPosition: Position,
+    targetRadius: number,
+    reportedPosition?: Position
+  ): boolean {
+    if (
+      !this.validatePosition(targetPosition) ||
+      !Number.isFinite(targetRadius) ||
+      targetRadius < 0 ||
+      (reportedPosition !== undefined && !this.validatePosition(reportedPosition))
+    ) {
+      return false;
+    }
+
+    const shooter = this.entityManager.getEntity(attackerId);
+    if (shooter?.type !== 'human') {
+      return false;
+    }
+
+    const laser = this.lasers.find(
+      (candidate) =>
+        !candidate.hasExploded &&
+        candidate.ownerId === attackerId &&
+        (isLaserNearAsteroid(candidate.position, targetPosition, targetRadius) ||
+          isLaserNearAsteroid(candidate.prevPosition, targetPosition, targetRadius)) &&
+        (reportedPosition === undefined ||
+          isLaserNearAsteroid(reportedPosition, targetPosition, targetRadius))
+    );
+    if (!laser) {
+      return false;
+    }
     laser.hasExploded = true;
     return true;
   }
@@ -1207,18 +1237,12 @@ export class GameEngine {
       return false;
     }
 
-    const laser = this.lasers.find(
-      (candidate) =>
-        !candidate.hasExploded &&
-        candidate.ownerId === attackerId &&
-        isLaserNearAsteroid(candidate.position, satellite.position, satellite.radius) &&
-        isLaserNearAsteroid(reportedPosition, satellite.position, satellite.radius)
+    return this.consumeHumanLaserNearTarget(
+      attackerId,
+      satellite.position,
+      satellite.radius,
+      reportedPosition
     );
-    if (!laser) {
-      return false;
-    }
-    laser.hasExploded = true;
-    return true;
   }
 
   /** Move live lasers and apply at most one break per asteroid / laser. */
@@ -1613,7 +1637,11 @@ export class GameEngine {
       return 'ignored';
     }
 
+    const previousHealth = entity.health;
     entity.health = Math.max(0, entity.health - LOOT_BLAST.DAMAGE);
+    if (entity.health < previousHealth) {
+      entity.healthRegenTimer = calculateHealthRegenDelayFrames();
+    }
     entity.lastUpdate = Date.now();
     if (entity.health <= 0) {
       this.applyShipDeath(entity, 'loot', 0);
@@ -1639,7 +1667,6 @@ export class GameEngine {
   }
 
   // Bot-specific update methods for testing
-  // Health regeneration is now handled client-side
 
   public updateBotMovement(): BotShot[] {
     const shots = this.entityManager.updateBotMovement();

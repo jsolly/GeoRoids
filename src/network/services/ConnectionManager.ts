@@ -71,6 +71,7 @@ export class ConnectionManager {
   private snapshotNegotiated = false;
   private snapshotOffered = false;
   private snapshotResyncPending = false;
+  private localHarpoonAcknowledged = false;
 
   private clientId: string;
   private localPlayerName: string = '';
@@ -562,6 +563,12 @@ export class ConnectionManager {
       return;
     }
 
+    if (
+      message.type === 'useAbility' &&
+      (message.data as { abilityId?: unknown } | undefined)?.abilityId === 'harpoon'
+    ) {
+      this.localHarpoonAcknowledged = false;
+    }
     this.state.socket.send(JSON.stringify(message));
     logger.debug('NETWORK', 'Sent message', { message });
   }
@@ -701,6 +708,7 @@ export class ConnectionManager {
     this.snapshotNegotiated = false;
     this.snapshotOffered = false;
     this.snapshotResyncPending = false;
+    this.localHarpoonAcknowledged = false;
   }
 
   private requestSnapshotResync(error: unknown): void {
@@ -746,6 +754,9 @@ export class ConnectionManager {
       this.allPlayers.get(data.id) ?? (localPlayer?.id === data.id ? localPlayer : undefined);
     if (!entity) {
       return;
+    }
+    if (localPlayer?.id === data.id && (data.harpoonTimer ?? 0) > 0) {
+      this.localHarpoonAcknowledged = true;
     }
     const latch = {
       ...(data.harpoonTimer !== undefined ? { harpoonTimer: data.harpoonTimer } : {}),
@@ -839,16 +850,36 @@ export class ConnectionManager {
           if (entity.type !== 'local') {
             entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
           }
-          entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
-          entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
+          if (isLocalPlayer && (entityData.harpoonTimer ?? 0) > 0) {
+            this.localHarpoonAcknowledged = true;
+          }
+          // Preserve only the existing, locally ticking visual prediction while
+          // this socket has not acknowledged its latch. Reconnect does not revive
+          // server ability state or extend the timer. Once acknowledged, a zero
+          // is authoritative expiry; a missing target also ends warm prediction.
+          const targetId = entity.ship.harpoonTargetId;
+          const preservePredictedLatch =
+            isLocalPlayer &&
+            entity.type === 'local' &&
+            entity.ship.kitId === 'hauler' &&
+            !this.localHarpoonAcknowledged &&
+            entity.ship.harpoonTimer > 0 &&
+            !entityData.exploding &&
+            entityData.health > 0 &&
+            (data.asteroids.some((rock) => rock.id === targetId) ||
+              data.entities.some((player) => player.id === targetId));
+          if (!preservePredictedLatch) {
+            entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
+            entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
+            entity.ship.harpoonTimer = entityData.harpoonTimer ?? 0;
+            entity.ship.harpoonTargetId = entityData.harpoonTargetId;
+            entity.ship.harpoonLatchPos = entityData.harpoonLatchPos;
+          }
           entity.ship.shieldTimer = entityData.shieldTimer ?? 0;
           entity.ship.shieldActive = entityData.shieldActive ?? false;
           entity.ship.shieldTime = entityData.shieldTime ?? 0;
           entity.ship.shieldCooldown = entityData.shieldCooldown ?? 0;
           entity.ship.shieldFlashTime = entityData.shieldFlashTime ?? 0;
-          entity.ship.harpoonTimer = entityData.harpoonTimer ?? 0;
-          entity.ship.harpoonTargetId = entityData.harpoonTargetId;
-          entity.ship.harpoonLatchPos = entityData.harpoonLatchPos;
           if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
             entity.deathCause = undefined;
           }
@@ -1289,9 +1320,6 @@ export class ConnectionManager {
       return;
     }
     player.ship.health = remainingHealth;
-    if (player.type === 'local') {
-      player.syncServerHealthEcho(remainingHealth);
-    }
   }
 
   private handlePlayerKilled(data: {

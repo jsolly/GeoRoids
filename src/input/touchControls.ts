@@ -316,14 +316,14 @@ function ensureTouchDom(): {
     shield.id = SHIELD_ID;
     shield.className = 'touch-shield';
     shield.setAttribute('type', 'button');
-    shield.setAttribute('aria-label', 'Shield');
+    shield.setAttribute('aria-label', 'Shield bubble');
     shield.setAttribute('aria-disabled', 'true');
     shield.textContent = 'SHIELD';
     root.appendChild(shield);
   }
   shield.setAttribute('type', 'button');
   if (!shield.getAttribute('aria-label')) {
-    shield.setAttribute('aria-label', 'Shield');
+    shield.setAttribute('aria-label', 'Shield bubble');
   }
 
   let fire = document.getElementById(FIRE_ID);

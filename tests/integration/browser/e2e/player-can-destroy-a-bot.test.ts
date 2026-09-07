@@ -19,7 +19,11 @@ test('a player destroys a bot with lasers and is awarded the kill', async () => 
   await game.waitForBots(1);
   const bots = await game.getBots();
   expect(bots.length).toBeGreaterThan(0);
-  const target = bots[0]!;
+  const hostileBotId = await game.getHostileBotId();
+  const target = bots.find((bot) => bot.id === hostileBotId);
+  expect(target, 'an alive hostile bot should be available for laser damage').toBeDefined();
+  if (!target) return;
+  const initialHealth = target.health;
 
   const scoreBefore = await game.getScore();
 
@@ -27,7 +31,7 @@ test('a player destroys a bot with lasers and is awarded the kill', async () => 
   const result = await game.attackBotWithLasers(target.id, 12);
 
   // The bot visibly took damage from our fire...
-  expect(result.minHealthObserved, 'bot should take laser damage').toBeLessThan(100);
+  expect(result.minHealthObserved, 'bot should take laser damage').toBeLessThan(initialHealth);
 
   // ...and was destroyed: a bot kill is worth 50 points, which the server
   // awards to us and syncs back.

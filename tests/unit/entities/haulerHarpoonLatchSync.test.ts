@@ -20,6 +20,31 @@ test('local Hauler adopts a server ship latch so the tether can draw', () => {
   expect(canDrawHaulerHarpoon(local.ship)).toBe(true);
 });
 
+test('local Hauler keeps the cable through a brief socket rejoin snapshot gap', () => {
+  const local = new Player({
+    id: 'alice',
+    name: 'Alice',
+    type: 'local',
+    input: new MockPlayerInput(),
+    kitId: 'hauler',
+  });
+
+  local.updateFromServer({
+    harpoonTimer: 80,
+    harpoonTargetId: 'server-asteroid-1-0',
+    harpoonLatchPos: { x: 120, y: 15 },
+  });
+  // handleJoined resets transient death state but intentionally preserves a
+  // live predictive latch until a real authoritative latch arrives.
+  local.resetCombatLifecycle();
+  local.updateFromServer({ harpoonTimer: 0, harpoonTargetId: '' });
+
+  expect(local.ship.harpoonTimer).toBe(80);
+  expect(local.ship.harpoonTargetId).toBe('server-asteroid-1-0');
+  expect(local.ship.harpoonLatchPos).toEqual({ x: 120, y: 15 });
+  expect(canDrawHaulerHarpoon(local.ship)).toBe(true);
+});
+
 test('local Hauler keeps its kit when a stale snapshot echoes dart', () => {
   const local = new Player({
     id: 'alice',

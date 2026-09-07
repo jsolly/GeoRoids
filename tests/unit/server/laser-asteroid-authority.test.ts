@@ -40,6 +40,9 @@ describe('Server laser↔asteroid authority', () => {
   test('breaks a medium asteroid once and ignores a second apply of the same hit', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.removeAsteroid(asteroid.id);
+    }
     engine.addAsteroid(mediumAsteroid('roid-once'));
 
     const first = engine.applyLaserAsteroidHit('roid-once', 'p1');

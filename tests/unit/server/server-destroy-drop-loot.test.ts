@@ -112,6 +112,7 @@ describe('shared destroy-drop shards over WebSocket', () => {
         playerId: 'pilot-a',
         points: ROID.POINTS_SMALL,
         cause: 'laser',
+        laserPosition: { x: 450, y: -450 },
       })
     );
 

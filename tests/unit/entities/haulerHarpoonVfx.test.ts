@@ -53,12 +53,10 @@ test('PASS bar cream line and amber tip are exact hex', () => {
   expect(HAULER_TETHER_TIP_COLOR).toBe('#FDE68A');
 });
 
-test('tethers stay solid cream and thicken under playfield zoom', () => {
-  expect(harpoonTetherStyle(8).dash).toEqual([]);
-  expect(harpoonTetherStyle(8).ring).toBeGreaterThanOrEqual(14);
-  expect(harpoonTetherStyle(80).dash).toEqual([]);
-  expect(harpoonTetherStyle(80, 0.25).lineWidth).toBeGreaterThan(harpoonTetherStyle(80, 1).lineWidth);
-  expect(harpoonTetherStyle(80, 1).lineWidth).toBeGreaterThanOrEqual(5);
+test('tethers stay solid and hairline in screen space at every zoom', () => {
+  expect(harpoonTetherStyle().dash).toEqual([]);
+  expect(harpoonTetherStyle().lineWidth).toBe(1.5);
+  expect(harpoonTetherStyle().tipRadius).toBe(3.5);
 });
 
 test('tether VFX can resolve a latched ship from the shared field', () => {
@@ -76,9 +74,17 @@ test('tether VFX can resolve a latched ship from the shared field', () => {
   ).toBe(true);
 });
 
-function paintRecorder(): { ctx: CanvasRenderingContext2D; strokes: string[]; fills: string[] } {
+function paintRecorder(): {
+  ctx: CanvasRenderingContext2D;
+  strokes: string[];
+  fills: string[];
+  strokeWidths: number[];
+  arcRadii: number[];
+} {
   const strokes: string[] = [];
   const fills: string[] = [];
+  const strokeWidths: number[] = [];
+  const arcRadii: number[] = [];
   const state = {
     strokeStyle: '',
     fillStyle: '',
@@ -122,16 +128,22 @@ function paintRecorder(): { ctx: CanvasRenderingContext2D; strokes: string[]; fi
     beginPath: () => undefined,
     moveTo: () => undefined,
     lineTo: () => undefined,
-    arc: () => undefined,
+    arc: (...args: unknown[]) => {
+      const radius = args[2];
+      if (typeof radius === 'number') {
+        arcRadii.push(radius);
+      }
+    },
     setLineDash: () => undefined,
     stroke() {
       strokes.push(state.strokeStyle);
+      strokeWidths.push(state.lineWidth);
     },
     fill() {
       fills.push(state.fillStyle);
     },
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, strokes, fills };
+  return { ctx, strokes, fills, strokeWidths, arcRadii };
 }
 
 test('tether VFX still resolves a server asteroid id suffix', () => {
@@ -141,10 +153,13 @@ test('tether VFX still resolves a server asteroid id suffix', () => {
   const hauler = new Ship({ kitId: 'hauler' });
   hauler.harpoonTimer = 40;
   hauler.harpoonTargetId = 'asteroid-10';
-  const { ctx, strokes, fills } = paintRecorder();
+  const { ctx, strokes, fills, strokeWidths, arcRadii } = paintRecorder();
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
-  expect(fills).toContain('#FDE68A');
+  expect(strokes).toContain('#FDE68A');
+  expect(fills).toEqual([]);
+  expect(strokeWidths.every((width) => width <= 2)).toBe(true);
+  expect(arcRadii).toEqual([3.5]);
 });
 
 test('timer-only Hauler still paints cream from the nearest field rock', () => {
@@ -153,10 +168,13 @@ test('timer-only Hauler still paints cream from the nearest field rock', () => {
   ]);
   const hauler = new Ship({ kitId: 'hauler' });
   hauler.harpoonTimer = 40;
-  const { ctx, strokes, fills } = paintRecorder();
+  const { ctx, strokes, fills, strokeWidths, arcRadii } = paintRecorder();
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
-  expect(fills).toContain('#FDE68A');
+  expect(strokes).toContain('#FDE68A');
+  expect(fills).toEqual([]);
+  expect(strokeWidths.every((width) => width <= 2)).toBe(true);
+  expect(arcRadii).toEqual([3.5]);
   expect(hauler.harpoonLatchPos?.x).toBe(40);
 });
 
@@ -166,10 +184,13 @@ test('tether VFX still paints from a stored latch pose when the field id is stal
   hauler.harpoonTimer = 40;
   hauler.harpoonTargetId = 'server-asteroid-0';
   hauler.harpoonLatchPos = { x: 40, y: 0 };
-  const { ctx, strokes, fills } = paintRecorder();
+  const { ctx, strokes, fills, strokeWidths, arcRadii } = paintRecorder();
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
-  expect(fills).toContain('#FDE68A');
+  expect(strokes).toContain('#FDE68A');
+  expect(fills).toEqual([]);
+  expect(strokeWidths.every((width) => width <= 2)).toBe(true);
+  expect(arcRadii).toEqual([3.5]);
 });
 
 test('Hauler latch paints opaque cream line and amber tip', () => {
@@ -181,7 +202,7 @@ test('Hauler latch paints opaque cream line and amber tip', () => {
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
   expect(strokes).toContain('#FDE68A');
-  expect(fills).toContain('#FDE68A');
+  expect(fills).toEqual([]);
 });
 
 test('non-Hauler draw is a no-op even if a latch is spoofed', () => {

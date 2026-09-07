@@ -358,12 +358,12 @@ describe('Bot-Asteroid Collision System', () => {
 
   describe('Bot Movement and Collision Avoidance', () => {
     test('bots move and can collide with asteroids', () => {
-      // Create bots and asteroids (DEBUG.BOT_PLAYER.COUNT=2, DEBUG.ROIDS.INITIAL_COUNT=20)
+      // Create bots and an explicit five-asteroid fixture.
       const bots = gameEngine.createBots(2);
       const asteroids = gameEngine.createAsteroids(5);
 
       expect(bots).toHaveLength(2);
-      expect(asteroids).toHaveLength(20); // DEBUG.ROIDS.INITIAL_COUNT overrides the requested count
+      expect(asteroids).toHaveLength(5);
 
       // Start game loop for bot movement
       gameEngine.startGameLoop();

@@ -31,15 +31,15 @@ describe('Server pause functionality', () => {
   it('should create and preserve asteroids when game is paused', () => {
     // Create asteroids
     const asteroids = gameEngine.createAsteroids(5);
-    expect(asteroids.length).toBe(20); // DEBUG.ROIDS.INITIAL_COUNT overrides the requested count
-    expect(gameEngine.getAsteroidCount()).toBe(20);
+    expect(asteroids.length).toBe(5);
+    expect(gameEngine.getAsteroidCount()).toBe(5);
     
     // Game should still be paused (no players)
     gameEngine.updatePauseState();
     expect(gameEngine.isGamePaused()).toBe(true);
     
     // Asteroids should persist
-    expect(gameEngine.getAsteroidCount()).toBe(20);
+    expect(gameEngine.getAsteroidCount()).toBe(5);
   });
 
   it('should resume game when players join', () => {
@@ -51,7 +51,7 @@ describe('Server pause functionality', () => {
     expect(gameEngine.isGamePaused()).toBe(false);
     
     // Asteroids should still exist
-    expect(gameEngine.getAsteroidCount()).toBe(20);
+    expect(gameEngine.getAsteroidCount()).toBe(5);
   });
 
   it('should pause and reset the world when all players leave', () => {
@@ -70,8 +70,8 @@ describe('Server pause functionality', () => {
     // With the world reset, requesting asteroids creates a brand-new field.
     const asteroids = gameEngine.createAsteroids(10);
 
-    // DEBUG.ROIDS.INITIAL_COUNT (20) overrides the requested count.
-    expect(asteroids.length).toBe(20);
-    expect(gameEngine.getAsteroidCount()).toBe(20);
+    // Explicit field creation honors the requested count outside debug mode.
+    expect(asteroids.length).toBe(10);
+    expect(gameEngine.getAsteroidCount()).toBe(10);
   });
 });

@@ -78,7 +78,7 @@ describe('Bot-Asteroid Collision Integration', () => {
       };
       asteroidManager.addAsteroid(asteroid);
 
-      // Simulate collision damage (as would be sent by client)
+      // Apply collision damage through the authoritative engine.
       const collisionDamage = 35;
       const isDestroyed = gameEngine.handleBotDamage(bot.id, 'asteroid-collision', collisionDamage);
 
@@ -164,7 +164,7 @@ describe('Bot-Asteroid Collision Integration', () => {
       
       for (const bot of bots!) {
         const updatedBot = gameEngine.getBot(bot.id);
-        expect(updatedBot!.health).toBe(70); // 100 - 30
+        expect(updatedBot!.health).toBe(bot.maxHealth - collisionDamage);
         expect(updatedBot!.exploding).toBe(false);
       }
     });
@@ -222,7 +222,7 @@ describe('Bot-Asteroid Collision Integration', () => {
       const asteroids = gameEngine.createAsteroids(3);
 
       expect(bots).toHaveLength(2);
-      expect(asteroids).toHaveLength(20); // DEBUG.ROIDS.INITIAL_COUNT overrides the requested count
+      expect(asteroids).toHaveLength(3);
 
       // Start game loop for bot movement
       gameEngine.startGameLoop();

@@ -33,6 +33,12 @@ function clearProtection(engine: GameEngine, id: string): void {
   engine.entityManager.updateEntity(id, { spawnProtectionTimer: undefined });
 }
 
+function clearAsteroidField(engine: GameEngine): void {
+  for (const asteroid of engine.getAllAsteroids()) {
+    engine.removeAsteroid(asteroid.id);
+  }
+}
+
 describe('server-authoritative combat', () => {
   let engine: GameEngine;
 
@@ -47,6 +53,7 @@ describe('server-authoritative combat', () => {
   test('overlapping human and asteroid apply one ram and destroy the roid', () => {
     engine.addPlayer('p1', 'Pilot', mockWs(), { x: 0, y: 0 });
     clearProtection(engine, 'p1');
+    clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid());
 
     const results = engine.resolveAuthoritativeCombat(1_000);
@@ -78,6 +85,7 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('retro', 'Retro', mockWs(), { x: 4, y: 0 });
     clearProtection(engine, 'nova');
     clearProtection(engine, 'retro');
+    clearAsteroidField(engine);
 
     const first = engine.resolveAuthoritativeCombat(10_000);
     expect(first).toHaveLength(2);
@@ -139,8 +147,277 @@ describe('server-authoritative combat', () => {
       retroWs
     );
 
+    const serverOwnedAsteroid = testAsteroid({
+      id: 'server-owned-roid',
+      isCollabTarget: true,
+    });
+    engine.addAsteroid(serverOwnedAsteroid);
+    wsCore.handleClientMessage(
+      {
+        type: 'asteroidUpdate',
+        data: {
+          asteroidId: serverOwnedAsteroid.id,
+          updates: { health: 0, position: { x: 999, y: 999 } },
+        },
+      },
+      novaWs
+    );
+    wsCore.handleClientMessage(
+      {
+        type: 'asteroidDestroy',
+        data: { asteroidId: serverOwnedAsteroid.id },
+      },
+      novaWs
+    );
+
     expect(engine.getPlayer('nova')?.health).toBe(SHIP.MAX_HEALTH);
     expect(engine.getPlayer('retro')?.health).toBe(SHIP.MAX_HEALTH);
+    expect(engine.getAsteroid(serverOwnedAsteroid.id)).toMatchObject({
+      health: serverOwnedAsteroid.health,
+      position: serverOwnedAsteroid.position,
+    });
+  });
+
+  test('human state mutations stay bound to their joined sockets', () => {
+    const wsCore = new WebSocketCore(engine);
+    const alphaWs = mockWs();
+    const betaWs = mockWs();
+    const unjoinedWs = mockWs();
+    wsCore.handleClientMessage(
+      {
+        type: 'join',
+        data: { id: 'alpha', name: 'Alpha', kitId: 'dart', position: { x: 0, y: 0 } },
+      },
+      alphaWs
+    );
+    wsCore.handleClientMessage(
+      {
+        type: 'join',
+        data: { id: 'beta', name: 'Beta', kitId: 'dart', position: { x: 100, y: 0 } },
+      },
+      betaWs
+    );
+
+    const alpha = engine.getPlayer('alpha');
+    const beta = engine.getPlayer('beta');
+    expect(alpha?.kitId).toBe('dart');
+    expect(beta?.kitId).toBe('dart');
+
+    wsCore.handleClientMessage(
+      { type: 'update', id: 'beta', data: { position: { x: 999, y: 999 } } },
+      alphaWs
+    );
+    wsCore.handleClientMessage(
+      { type: 'update', id: 'alpha', data: { position: { x: 888, y: 888 } } },
+      unjoinedWs
+    );
+    expect(engine.getPlayer('beta')?.position).toEqual({ x: 100, y: 0 });
+    expect(engine.getPlayer('alpha')?.position).toEqual({ x: 0, y: 0 });
+
+    wsCore.handleClientMessage(
+      { type: 'shield', id: 'beta', data: { active: true } },
+      alphaWs
+    );
+    wsCore.handleClientMessage(
+      { type: 'shield', id: 'alpha', data: { active: true } },
+      unjoinedWs
+    );
+    expect(engine.getPlayer('beta')?.shieldActive).toBe(false);
+    expect(engine.getPlayer('alpha')?.shieldActive).toBe(false);
+
+    wsCore.handleClientMessage(
+      {
+        type: 'useAbility',
+        id: 'beta',
+        data: { kitId: 'hauler', abilityId: 'harpoon' },
+      },
+      alphaWs
+    );
+    wsCore.handleClientMessage(
+      {
+        type: 'useAbility',
+        id: 'alpha',
+        data: { kitId: 'quake', abilityId: 'shockPulse' },
+      },
+      unjoinedWs
+    );
+    expect(engine.getPlayer('beta')?.kitId).toBe('dart');
+    expect(engine.getPlayer('alpha')?.kitId).toBe('dart');
+  });
+
+  test('shoot reports bind to the socket before creating a server laser', () => {
+    const wsCore = new WebSocketCore(engine);
+    const pilotWs = mockWs();
+    const otherWs = mockWs();
+    wsCore.handleClientMessage(
+      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
+      pilotWs
+    );
+    wsCore.handleClientMessage(
+      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 10, y: 0 } } },
+      otherWs
+    );
+    clearAsteroidField(engine);
+
+    wsCore.handleClientMessage(
+      {
+        type: 'shoot',
+        id: 'other',
+        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 1, y: 0 } },
+      },
+      pilotWs
+    );
+    wsCore.handleClientMessage(
+      {
+        type: 'shoot',
+        id: 'server-bot-0',
+        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 1, y: 0 } },
+      },
+      pilotWs
+    );
+
+    expect(engine.getServerLasers()).toHaveLength(0);
+
+    wsCore.handleClientMessage(
+      {
+        type: 'shoot',
+        id: 'pilot',
+        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 1, y: 0 } },
+      },
+      pilotWs
+    );
+    expect(engine.getServerLasers()).toHaveLength(1);
+    expect(engine.getServerLasers()[0]?.ownerId).toBe('pilot');
+  });
+
+  test('asteroid laser reports require a finite position, laser cause, and socket owner', () => {
+    const wsCore = new WebSocketCore(engine);
+    const pilotWs = mockWs();
+    const otherWs = mockWs();
+    wsCore.handleClientMessage(
+      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
+      pilotWs
+    );
+    wsCore.handleClientMessage(
+      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 10, y: 0 } } },
+      otherWs
+    );
+    clearAsteroidField(engine);
+    const asteroid = testAsteroid({ id: 'reported-roid', size: 25, health: 25, maxHealth: 25 });
+    engine.addAsteroid(asteroid);
+
+    const report = (data: Record<string, unknown>) =>
+      wsCore.handleClientMessage({ type: 'asteroidDestroyed', data }, pilotWs);
+
+    report({ asteroidId: asteroid.id, playerId: 'pilot', cause: 'laser' });
+    expect(engine.getAsteroid(asteroid.id)).toBeDefined();
+
+    report({
+      asteroidId: asteroid.id,
+      playerId: 'pilot',
+      cause: 'collision',
+      laserPosition: { x: 0, y: 0 },
+    });
+    expect(engine.getAsteroid(asteroid.id)).toBeDefined();
+
+    report({
+      asteroidId: asteroid.id,
+      playerId: 'other',
+      cause: 'laser',
+      laserPosition: { x: 0, y: 0 },
+    });
+    expect(engine.getAsteroid(asteroid.id)).toBeDefined();
+
+    report({
+      asteroidId: asteroid.id,
+      playerId: 'pilot',
+      cause: 'laser',
+      laserPosition: { x: 0, y: 0 },
+    });
+    expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
+    expect(engine.getPlayer('pilot')?.score).toBeGreaterThan(0);
+  });
+
+  test('collab asteroid reports use fixed damage and validate bot projectiles', () => {
+    const wsCore = new WebSocketCore(engine);
+    const pilotWs = mockWs();
+    const otherWs = mockWs();
+    const unjoinedWs = mockWs();
+    wsCore.handleClientMessage(
+      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
+      pilotWs
+    );
+    wsCore.handleClientMessage(
+      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 10, y: 0 } } },
+      otherWs
+    );
+    clearAsteroidField(engine);
+    const asteroid = testAsteroid({
+      id: 'collab-report-roid',
+      size: 50,
+      health: 100,
+      maxHealth: 100,
+      isCollabTarget: true,
+    });
+    const normal = testAsteroid({ id: 'normal-report-roid' });
+    engine.addAsteroid(asteroid);
+    engine.addAsteroid(normal);
+
+    const report = (
+      playerId: string,
+      damage: unknown,
+      points: unknown,
+      asteroidId = asteroid.id,
+      ws: WebSocket = pilotWs
+    ) =>
+      wsCore.handleClientMessage(
+        {
+          type: 'asteroidDamage',
+          data: { asteroidId, playerId, damage, points },
+        },
+        ws
+      );
+
+    wsCore.handleClientMessage(
+      {
+        type: 'asteroidDestroyed',
+        data: {
+          asteroidId: asteroid.id,
+          playerId: 'pilot',
+          cause: 'laser',
+          laserPosition: asteroid.position,
+        },
+      },
+      pilotWs
+    );
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
+
+    report('pilot', 999, 999);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
+    expect(engine.getPlayer('pilot')?.score).toBe(0);
+
+    report('pilot', 0, 999);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
+    report('pilot', 25, 999, normal.id);
+    expect(engine.getAsteroid(normal.id)?.health).toBe(normal.health);
+
+    const bot = engine.createBots(1)?.[0];
+    expect(bot).toBeDefined();
+    report(bot!.id, DAMAGE.LASER_HIT, 999);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
+
+    engine.spawnLaser(bot!.id, asteroid.position, { x: 0, y: 0 });
+    report(bot!.id, DAMAGE.LASER_HIT, 999);
+    report(bot!.id, DAMAGE.LASER_HIT, 999, asteroid.id, otherWs);
+    report(bot!.id, DAMAGE.LASER_HIT, 999, asteroid.id, unjoinedWs);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT * 2);
+    expect(engine.getServerLasers()[0]?.hasExploded).toBe(true);
+
+    engine.getAsteroid(asteroid.id)!.health = DAMAGE.LASER_HIT;
+    const lethalShot = engine.spawnLaser(bot!.id, asteroid.position, { x: 0, y: 0 });
+    report(bot!.id, DAMAGE.LASER_HIT, 999);
+    expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
+    expect(lethalShot?.hasExploded).toBe(true);
   });
 
   test('validated laserDamage is the only client path that chips a remote human', () => {

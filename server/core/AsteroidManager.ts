@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import type { AsteroidData, Position } from '../../shared-types';
 import { DEBUG, ROID } from '../../src/constants';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { getAsteroidFieldRadius, stepAsteroidMotion } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
+import { isDebugMode } from '../../src/utils/debugUtils';
 import { logger } from '../../setup/serverLogger';
 import { RNGService } from './RNGService';
 
@@ -35,6 +37,10 @@ export class AsteroidManager {
   private asteroids = new Map<string, AsteroidData>();
   private laserHits = new Map<string, LaserHitRecord[]>();
   private rng: RNGService;
+  /** Per-manager identity prevents delayed reports surviving a server restart. */
+  private readonly managerNonce = randomUUID();
+  /** Monotonic field generation; never reused after a clear in this manager. */
+  private fieldGeneration = 0;
   
   // Asteroid splitting constants - can be overridden by DEBUG settings
   private readonly MIN_ASTEROID_SIZE = 10;
@@ -157,14 +163,19 @@ export class AsteroidManager {
 
     // Reset RNG for deterministic asteroid generation
     this.rng.reset();
+    this.fieldGeneration += 1;
+    const generation = this.fieldGeneration;
 
-    // Use DEBUG asteroid count if available
-    const asteroidCount = DEBUG.ROIDS.INITIAL_COUNT ?? count;
+    // The requested count remains useful to deterministic tests and explicit
+    // tools. Only the opt-in debug mode overrides it; production callers pass
+    // the canonical ROID.INITIAL_ROID_COUNT from GameEngine.
+    const asteroidCount = isDebugMode() ? DEBUG.ROIDS.INITIAL_COUNT : count;
     const newAsteroids: AsteroidData[] = [];
 
-    // Create new asteroids with deterministic IDs
+    // Scope deterministic slot IDs to this field generation. A delayed
+    // destroy/hit from a prior depleted field must never address a new rock.
     for (let i = 0; i < asteroidCount; i++) {
-      const asteroidId = `server-asteroid-${i}`;
+      const asteroidId = `server-asteroid-${this.managerNonce}-${generation}-${i}`;
       
       // Determine position based on DEBUG settings
       let position: Position;
@@ -415,7 +426,7 @@ export class AsteroidManager {
       }
 
       newAsteroids.push({
-        id: `server-asteroid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `server-asteroid-${this.managerNonce}-${this.fieldGeneration}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         position: {
           x: destroyed.position.x + offsetX,
           y: destroyed.position.y + offsetY,

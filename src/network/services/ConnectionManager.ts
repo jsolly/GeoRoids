@@ -12,7 +12,7 @@ import type {
   Velocity,
 } from '../../../shared-types';
 import { playLaserSound } from '../../audio/gameSounds';
-import { PALETTE, SHIP } from '../../constants';
+import { PALETTE, ROID, SHIP } from '../../constants';
 import { entityFactory } from '../../entities/EntityFactory';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
@@ -176,6 +176,10 @@ export class ConnectionManager {
           this.state.isConnected = false;
           this.state.socket = null;
           this.stopHeartbeat();
+          // A reconnect must perform the asteroid handshake again. Keep the
+          // cached belt for warm rejoin rendering, but do not treat it as
+          // proof that the server process still owns the same field.
+          this.hasInitializedAsteroidsForConnection = false;
           // Keep the last belt + latch list. Wiping here is why KeyE during
           // a Reconnecting banner found zero rocks after #485.
           setHoldEmptyHarpoonField(true);
@@ -407,7 +411,11 @@ export class ConnectionManager {
       score?: number;
     }
   ): void {
-    if (!this.state.isConnected || !this.state.socket) {
+    if (
+      !this.state.isConnected ||
+      !this.state.socket ||
+      this.state.socket.readyState !== WebSocket.OPEN
+    ) {
       return;
     }
 
@@ -418,7 +426,11 @@ export class ConnectionManager {
 
   // Send shoot event to server
   sendShootEvent(laserPosition: Position, laserVelocity: Velocity): void {
-    if (!this.state.isConnected || !this.state.socket) {
+    if (
+      !this.state.isConnected ||
+      !this.state.socket ||
+      this.state.socket.readyState !== WebSocket.OPEN
+    ) {
       logger.debug('NETWORK', 'Cannot send shoot event - not connected or no socket');
       return;
     }
@@ -439,7 +451,11 @@ export class ConnectionManager {
 
   // Initialize asteroid sync
   initializeAsteroidSync(): void {
-    if (!this.state.isConnected || !this.state.socket) {
+    if (
+      !this.state.isConnected ||
+      !this.state.socket ||
+      this.state.socket.readyState !== WebSocket.OPEN
+    ) {
       logger.warn('NETWORK', 'Cannot initialize asteroid sync - not connected');
       return;
     }
@@ -483,7 +499,11 @@ export class ConnectionManager {
     if (this.hasInitializedAsteroidsForConnection) {
       return;
     }
-    if (!this.state.isConnected || !this.state.socket) {
+    if (
+      !this.state.isConnected ||
+      !this.state.socket ||
+      this.state.socket.readyState !== WebSocket.OPEN
+    ) {
       logger.warn('NETWORK', 'Cannot initialize asteroids - not connected');
       return;
     }
@@ -494,13 +514,13 @@ export class ConnectionManager {
 
     logger.debug('NETWORK', 'Sending initAsteroids message', {
       playerId: this.localPlayerId,
-      asteroidCount: 10,
+      asteroidCount: ROID.INITIAL_ROID_COUNT,
     });
 
     const message: ClientMessage = {
       type: 'initAsteroids',
       id: this.localPlayerId,
-      data: { asteroidCount: 10 },
+      data: { asteroidCount: ROID.INITIAL_ROID_COUNT },
       timestamp: Date.now(),
     };
 
@@ -511,7 +531,11 @@ export class ConnectionManager {
 
   // Send a generic message to the server
   sendMessage(message: Record<string, unknown>): void {
-    if (!this.state.isConnected || !this.state.socket) {
+    if (
+      !this.state.isConnected ||
+      !this.state.socket ||
+      this.state.socket.readyState !== WebSocket.OPEN
+    ) {
       return;
     }
 
@@ -798,7 +822,10 @@ export class ConnectionManager {
       this.seenAsteroidIds.clear();
       LootField.getInstance().clear();
     }
-    this.hasInitializedAsteroidsForConnection = keepField;
+    // `keepField` controls whether the warm local belt is retained. It must
+    // not suppress the handshake: a reconnect can land on a fresh server
+    // process whose asteroid manager is empty.
+    this.hasInitializedAsteroidsForConnection = false;
 
     applyTerrainSeed(data.terrainSeed);
 
@@ -826,9 +853,7 @@ export class ConnectionManager {
       localPlayer.factionId = data.factionId;
       localPlayer.ship.factionId = data.factionId;
     }
-    if (!keepField) {
-      this.initializeAsteroids();
-    }
+    this.initializeAsteroids();
   }
 
   private handlePlayerJoined(data: PlayerJoin): void {

@@ -25,7 +25,7 @@ Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDO
 
 1. Complete client verification above if the push also touched client files.
 2. Deploy manually on [Railway](https://railway.app) (linked GitHub repo or Railway CLI).
-3. Smoke: `curl -sf https://geoasteroids-production.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
+3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
 4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
 
 Do not run `vercel deploy` from `/ship` unless Git integration is broken.
@@ -52,7 +52,7 @@ Two separate deploy targets — client and server do not share a host.
 
 | Variable | Purpose |
 | --- | --- |
-| `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://geoasteroids-production.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
+| `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://geoasteroids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
 
 `VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel.
 
@@ -63,11 +63,13 @@ Local dev: `VITE_WEBSOCKET_URL=ws://localhost:3001/ws` in `.env.local` (see `.en
 | | |
 | --- | --- |
 | **Config** | `railway.json` (Nixpacks, `tsx server.ts`, healthcheck `/health`) |
-| **Public URL** | `https://geoasteroids-production.up.railway.app` (WebSocket: `wss://geoasteroids-production.up.railway.app/ws`) |
+| **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
 | **Deploy** | Manual / separate from the Git push flow — Railway dashboard or CLI |
 | **When required** | Changes under `server.ts`, `server/**`, `railway.json`, or server protocol changes in `shared-types.ts` |
 
-Smoke: `curl https://geoasteroids-production.up.railway.app/health`
+Smoke: `curl -i https://geoasteroids-production-2403.up.railway.app/health`. The server exposes `RAILWAY_GIT_COMMIT_SHA` as `x-release-id` and health JSON `releaseId`; `dev` is local-only and never production proof.
+
+The older `geoasteroids-production.up.railway.app` domain has no target port and returns an edge 404. Use the `-2403` host (port 8080) for client configuration and verification.
 
 ## CI (local pre-commit gate)
 

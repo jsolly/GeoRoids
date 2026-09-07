@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { GameEngine } from './core/GameEngine';
 import type { WebSocketCore } from './communication/WebSocketCore';
+import { SERVER_RELEASE_ID } from './release';
 
 export type GameEngineDiagnostics = {
   isPaused: boolean;
@@ -22,6 +23,7 @@ export function buildHealthPayload(
   const diagnostics = gameEngine.getDiagnostics();
   return {
     status: 'healthy',
+    releaseId: SERVER_RELEASE_ID,
     timestamp: new Date().toISOString(),
     players: wsCore.getPlayerCount(),
     uptime: process.uptime(),

@@ -669,18 +669,13 @@ export function canDrawGenericAbilityRing(ship: {
   );
 }
 
-/** Zoomed playfields shrink nearby latches; dashes must not eat the cable. */
-export function harpoonTetherStyle(
-  screenDist: number,
-  playfieldScale = 1
-): { dash: number[]; ring: number; lineWidth: number; tipRadius: number } {
-  const scale = Number.isFinite(playfieldScale) && playfieldScale > 0 ? playfieldScale : 1;
+/** Tether geometry is already in screen space; keep it hairline at every zoom. */
+export function harpoonTetherStyle(): { dash: number[]; lineWidth: number; tipRadius: number } {
   return {
     // Solid cream — dashes ate the GD lock pixels on zoomed 1:1 samples.
     dash: [],
-    ring: Math.max(14, Math.min(22, 10 + screenDist * 0.12)),
-    lineWidth: Math.max(5, 4 / scale),
-    tipRadius: Math.max(8, 7 / scale),
+    lineWidth: 1.5,
+    tipRadius: 3.5,
   };
 }
 
@@ -714,12 +709,11 @@ export function drawHaulerHarpoonVfx(
   }
 
   const latch = canvasManager.worldToScreen(latchWorld, cameraShipPosition);
-  const screenDist = Math.hypot(latch.x - screenX, latch.y - screenY);
-  const style = harpoonTetherStyle(screenDist, canvasManager.getPlayfieldScale());
+  const style = harpoonTetherStyle();
   ctx.save();
   ctx.strokeStyle = HAULER_TETHER_COLOR;
   ctx.shadowColor = HAULER_TETHER_COLOR;
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = 2.5;
   ctx.lineWidth = style.lineWidth;
   ctx.setLineDash(style.dash);
   ctx.beginPath();
@@ -728,14 +722,9 @@ export function drawHaulerHarpoonVfx(
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.shadowBlur = 0;
-  ctx.beginPath();
-  ctx.arc(screenX, screenY, Math.max(10, style.ring * 0.7), 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = HAULER_TETHER_TIP_COLOR;
   ctx.strokeStyle = HAULER_TETHER_TIP_COLOR;
   ctx.beginPath();
   ctx.arc(latch.x, latch.y, style.tipRadius, 0, Math.PI * 2);
-  ctx.fill();
   ctx.stroke();
   ctx.restore();
 }

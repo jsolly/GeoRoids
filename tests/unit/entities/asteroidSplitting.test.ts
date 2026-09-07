@@ -140,6 +140,30 @@ describe('Collaborative asteroid split', () => {
     expect(result.newAsteroids).toHaveLength(0);
   });
 
+  test('a depleted field generation cannot be targeted after a fresh field is seeded', () => {
+    const first = asteroidManager.createAsteroids(1)[0];
+    expect(first).toBeDefined();
+
+    asteroidManager.clearAsteroids();
+    const second = asteroidManager.createAsteroids(1)[0];
+    expect(second).toBeDefined();
+    expect(new Set([first!.id, second!.id]).size).toBe(2);
+
+    const delayedOldHit = asteroidManager.destroyFromCollision(first!.id);
+    expect(delayedOldHit.outcome).toBe('missing');
+    expect(asteroidManager.getAsteroid(second!.id)).toBeDefined();
+  });
+
+  test('separate asteroid managers never reuse a field identity', () => {
+    const first = asteroidManager.createAsteroids(1)[0];
+    const restartedManager = new AsteroidManager(new RNGService());
+    const afterRestart = restartedManager.createAsteroids(1)[0];
+
+    expect(first).toBeDefined();
+    expect(afterRestart).toBeDefined();
+    expect(new Set([first!.id, afterRestart!.id]).size).toBe(2);
+  });
+
   test('asteroid splitting respects max count limit', () => {
     const maxCount = 200;
     for (let i = 0; i < maxCount - 1; i++) {

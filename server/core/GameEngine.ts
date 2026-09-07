@@ -29,7 +29,7 @@ import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE, SATELLITE_PICKUP, SHIP } 
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
-import { applyShipKitStats, getShipKit, isShipKitId, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
+import { getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import {
   requestShield,
   resolveCombatDamageSource,
@@ -795,7 +795,10 @@ export class GameEngine {
         if (destruction.outcome === 'destroyed') {
           result.destroyedAsteroidId = hit.asteroidId;
           result.newAsteroids = destruction.newAsteroids;
-          result.collabSplit = destruction.split;
+          // Rubble has its own ordinary three-fragment break. Keep the
+          // cooperative shockwave reserved for the collaborative split path,
+          // even if a future collision destroyer starts returning fragments.
+          result.collabSplit = destruction.split && destruction.destroyed?.material !== 'rubble';
           result.origin = destruction.destroyed?.position;
           const scorer = this.entityManager.getEntity(hit.shipId);
           if (scorer) {
@@ -1143,6 +1146,48 @@ export class GameEngine {
     return true;
   }
 
+  /**
+   * Bot loot reports use the same one-use server projectile evidence as bot
+   * asteroid reports. The client may report where it saw the bot laser, but
+   * it cannot create or replay the shot itself.
+   */
+  public hasActiveBotLaserNearLoot(botId: string, lootId: string): boolean {
+    const bot = this.entityManager.getEntity(botId);
+    const loot = this.lootManager.get(lootId);
+    if (bot?.type !== 'bot' || !loot) {
+      return false;
+    }
+
+    return this.lasers.some(
+      (laser) =>
+        !laser.hasExploded &&
+        laser.ownerId === botId &&
+        isLaserNearAsteroid(laser.position, loot.position, loot.radius)
+    );
+  }
+
+  /** Consume one validated bot projectile for a loot detonation. */
+  public consumeActiveBotLaserNearLoot(botId: string, lootId: string): boolean {
+    const bot = this.entityManager.getEntity(botId);
+    const loot = this.lootManager.get(lootId);
+    if (bot?.type !== 'bot' || !loot) {
+      return false;
+    }
+
+    const laser = this.lasers.find(
+      (candidate) =>
+        !candidate.hasExploded &&
+        candidate.ownerId === botId &&
+        isLaserNearAsteroid(candidate.position, loot.position, loot.radius)
+    );
+    if (!laser) {
+      return false;
+    }
+
+    laser.hasExploded = true;
+    return true;
+  }
+
   /** Consume one server-tracked human shot when its client hit report is near an EO hull. */
   public consumeHumanLaserNearSatellite(
     attackerId: string,
@@ -1404,8 +1449,11 @@ export class GameEngine {
     if (!entity) {
       return false;
     }
-    if (isShipKitId(requestedKitId) && entity.kitId !== requestedKitId) {
-      applyShipKitStats(entity, requestedKitId);
+    // Kit selection is authoritative at join time. Keep accepting the
+    // client's matching echo, but reject an alternate or malformed kit so an
+    // ability request cannot rewrite health, size, or movement stats.
+    if (requestedKitId !== undefined && requestedKitId !== entity.kitId) {
+      return false;
     }
     const world = {
       asteroids: this.asteroidManager.getAllAsteroids().map((asteroid) => ({

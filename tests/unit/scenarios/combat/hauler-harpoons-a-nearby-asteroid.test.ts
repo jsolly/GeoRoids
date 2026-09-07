@@ -52,7 +52,7 @@ describe('A Hauler fires harpoon at a nearby rock', () => {
     expect(rock?.velocity.x).toBeLessThan(0);
   });
 
-  test('useAbility applies Hauler when the live ship was still Dart', () => {
+  test('a joined Hauler stays authoritative when the ability echoes its kit', () => {
     world.engine.addAsteroid({
       id: 'haul-rock',
       position: { x: 80, y: 0 },
@@ -67,7 +67,7 @@ describe('A Hauler fires harpoon at a nearby rock', () => {
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
 
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'dart' });
+    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
     world.parkBots();
     world.send(alice, {
       type: 'useAbility',

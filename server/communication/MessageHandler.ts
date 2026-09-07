@@ -519,6 +519,12 @@ export class MessageHandler {
     if (socketPlayer?.type !== 'human' || socketPlayer.id !== playerId) {
       return;
     }
+    // The join payload selects the kit. An ability request may echo that
+    // selection for compatibility, but it cannot change authoritative ship
+    // stats after the socket has joined.
+    if (data.kitId !== undefined && data.kitId !== socketPlayer.kitId) {
+      return;
+    }
     const canvasWidth = Number(data.canvasWidth);
     const canvasHeight = Number(data.canvasHeight);
     const playfieldScale = Number(data.playfieldScale);
@@ -701,12 +707,12 @@ export class MessageHandler {
 
   private handleLootExplode(ws: WebSocket, id: string, data: any): void {
     const lootId = data.lootId;
-    if (!lootId) {
+    if (typeof lootId !== 'string' || lootId.length === 0) {
       this.broadcaster.sendError(ws, 'Missing loot ID for lootExplode');
       return;
     }
 
-    const shooterId = this.resolveAuxiliaryShooter(ws, data.playerId ?? id);
+    const shooterId = this.resolveAuxiliaryShooter(ws, data.playerId ?? id, lootId);
     if (!shooterId) {
       this.broadcaster.sendError(ws, 'Unknown shooter for lootExplode');
       return;
@@ -761,15 +767,32 @@ export class MessageHandler {
     return null;
   }
 
-  /** Auxiliary events still bind human claims to their owning socket. */
-  private resolveAuxiliaryShooter(ws: WebSocket, claimedId: string): string | null {
+  /**
+   * Client auxiliary events can only act as the human attached to this socket.
+   * Server-owned bots may still use GameEngine.handleLootExplode directly;
+   * their IDs are never authorized by a client payload.
+   */
+  private resolveAuxiliaryShooter(
+    ws: WebSocket,
+    claimedId: unknown,
+    lootId: string
+  ): string | null {
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type === 'human' && socketPlayer.id === claimedId) {
+    if (socketPlayer?.type !== 'human') {
+      return null;
+    }
+    if (claimedId === undefined || claimedId === socketPlayer.id) {
       return socketPlayer.id;
     }
 
-    const claimed = this.gameEngine.getPlayer(claimedId);
-    return claimed?.type === 'bot' ? claimed.id : null;
+    const claimed = this.gameEngine.getPlayer(typeof claimedId === 'string' ? claimedId : '');
+    if (
+      claimed?.type === 'bot' &&
+      this.gameEngine.consumeActiveBotLaserNearLoot(claimed.id, lootId)
+    ) {
+      return claimed.id;
+    }
+    return null;
   }
 
   private readFinitePosition(value: unknown): { x: number; y: number } | null {

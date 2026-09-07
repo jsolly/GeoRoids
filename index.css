@@ -192,6 +192,14 @@ a {
 }
 
 /* Title/menu only — phosphor control legend. Hidden in live play via body.in-play. */
+.game-description {
+  max-width: 34rem;
+  margin: 0 auto 1rem;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .controls-hint {
   margin: 0.35em 0 1.15em;
   font-family: 'Courier New', ui-monospace, monospace;

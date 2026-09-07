@@ -13,6 +13,50 @@ interface LeaderboardEntry {
   isCurrentPlayer?: boolean;
 }
 
+const LEADERBOARD_FONT = '11px Arial';
+const LEADERBOARD_RANK_X_OFFSET = 4;
+const LEADERBOARD_FACTION_MARK_X_OFFSET = 20;
+const LEADERBOARD_NAME_X_OFFSET = 28;
+const LEADERBOARD_SCORE_X_INSET = 4;
+const LEADERBOARD_NAME_SCORE_GAP = 6;
+const LEADERBOARD_ELLIPSIS = '…';
+
+type TextMeasurer = Pick<CanvasRenderingContext2D, 'measureText'>;
+
+/**
+ * Keep the full name when it fits, otherwise use the longest measured prefix
+ * that leaves room for an ellipsis. Array.from keeps surrogate pairs intact.
+ */
+export function fitLeaderboardName(ctx: TextMeasurer, name: string, maxWidth: number): string {
+  if (!Number.isFinite(maxWidth) || maxWidth <= 0) {
+    return '';
+  }
+  if (ctx.measureText(name).width <= maxWidth) {
+    return name;
+  }
+
+  const ellipsisWidth = ctx.measureText(LEADERBOARD_ELLIPSIS).width;
+  if (ellipsisWidth > maxWidth) {
+    return '';
+  }
+
+  const characters = Array.from(name);
+  let low = 0;
+  let high = characters.length;
+  while (low < high) {
+    const count = Math.ceil((low + high) / 2);
+    const candidatePrefix = characters.slice(0, count).join('').trimEnd();
+    const candidate = `${candidatePrefix}${LEADERBOARD_ELLIPSIS}`;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      low = count;
+    } else {
+      high = count - 1;
+    }
+  }
+
+  return `${characters.slice(0, low).join('').trimEnd()}${LEADERBOARD_ELLIPSIS}`;
+}
+
 /** One row per name so a drop-then-rejoin clone does not list PilotB three times. */
 export function uniquePlayersForLeaderboard<
   T extends { id: string; name: string; type: string; score: number },
@@ -68,13 +112,23 @@ export function drawLeaderboard(
     const alpha = entry.isCurrentPlayer ? 0.92 : 0.78;
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.4);
-    ctx.font = '11px Arial';
+    ctx.font = LEADERBOARD_FONT;
     ctx.textAlign = 'left';
-    ctx.fillText(`${index + 1}.`, boardX + 4, y);
+    const rankText = `${index + 1}.`;
+    const rankX = boardX + LEADERBOARD_RANK_X_OFFSET;
+    const nameX = boardX + LEADERBOARD_NAME_X_OFFSET;
+    const scoreText = entry.score.toString();
+    const scoreX = boardX + boardWidth - LEADERBOARD_SCORE_X_INSET;
+    const scoreWidth = ctx.measureText(scoreText).width;
+    const nameMaxWidth = Math.max(0, scoreX - scoreWidth - LEADERBOARD_NAME_SCORE_GAP - nameX);
+
+    // The fixed name anchor leaves the rank and faction mark on the left;
+    // score measurement reserves the right column on compact boards.
+    ctx.fillText(rankText, rankX, y);
 
     if (entry.factionId) {
       drawSoftFactionMark(ctx, entry.factionId, {
-        x: boardX + 20,
+        x: boardX + LEADERBOARD_FACTION_MARK_X_OFFSET,
         y: y - 4,
         radius: 6,
         angle: Math.PI / 2,
@@ -83,11 +137,11 @@ export function drawLeaderboard(
     }
 
     ctx.fillStyle = hexToRgba(nameColor, alpha);
-    ctx.fillText(entry.name, boardX + 28, y);
+    ctx.fillText(fitLeaderboardName(ctx, entry.name, nameMaxWidth), nameX, y);
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.55);
     ctx.textAlign = 'right';
-    ctx.fillText(entry.score.toString(), boardX + boardWidth - 4, y);
+    ctx.fillText(scoreText, scoreX, y);
   });
 
   ctx.restore();

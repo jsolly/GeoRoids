@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -34 68 68" width="68" height="68" role="img" aria-label="Landsat 7">
+  <title>Landsat 7</title>
+  <g fill="none" stroke="#C4B5FD" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="-15,-7 -6,-12 3,-8 6,-3 6,7 -3,12 -14,8 -15,-7"/>
+    <polyline points="-6,-12 -5,7 -14,8"/>
+    <polyline points="-5,7 6,7"/>
+    <polyline points="6,1 10,1"/>
+    <polyline points="10,-5 30,-5 30,7 10,7 10,-5"/>
+    <polyline points="15,-5 15,7"/>
+    <polyline points="20,-5 20,7"/>
+    <polyline points="25,-5 25,7"/>
+    <polyline points="-3,12 -3,17"/>
+    <ellipse cx="0" cy="-2" rx="3.5" ry="5"/>
+  </g>
+</svg>

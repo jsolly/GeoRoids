@@ -20,9 +20,9 @@ import {
 } from '../../../server/ai/shipMotion';
 import { GAME, LASER, SHIP } from '../../../src/constants';
 import {
-  calculateLaserStartPosition,
   generateLaserVelocity,
 } from '../../../src/entities/laser/laserUtils';
+import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 
 const fixedRng = { random: () => 0.5 };
 

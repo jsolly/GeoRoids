@@ -11,7 +11,7 @@ test('two players hit big roid within 1s → split', async () => {
 
   await game1.waitForAsteroids(1, 30000);
   const asteroids = await game1.getAsteroidPositions();
-  const large = asteroids.find((a) => a.radius >= 40 && !a.isCollabTarget);
+  const large = asteroids.find((a) => a.radius >= 40 && !a.isCollabTarget && a.material === 'ice');
   expect(large, 'expected at least one biggest asteroid in the field').toBeTruthy();
   if (!large) return;
 

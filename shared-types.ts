@@ -70,6 +70,8 @@ export interface PlayerShoot {
 }
 
 // Game state types that might be shared
+export type AsteroidMaterial = 'ice' | 'metal' | 'rubble';
+
 export interface AsteroidData {
   id: string;
   position: Position;
@@ -82,6 +84,8 @@ export interface AsteroidData {
   maxHealth: number;
   vertices: number;
   offsets: number[];
+  /** Absent on legacy rocks; current fields carry a mineral composition. */
+  material?: AsteroidMaterial;
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
 }
@@ -119,6 +123,62 @@ export interface LootData {
   radius: number;
   kind: LootKind;
   fuel?: number;
+}
+
+/** Server-owned ambient hostile EO NPC. No kit, no soft faction. */
+export interface SatelliteData {
+  id: string;
+  name: string;
+  /** Stable roster identity used by both the renderer and server AI. */
+  typeId: import('./shared/eoSatellites').SatelliteTypeId;
+  /** Stable key for the six canonical EO hardware outlines. */
+  assetKey: string;
+  shotManner: import('./shared/eoSatellites').SatelliteShotManner;
+  position: Position;
+  velocity: Velocity;
+  angle: number;
+  exploding: boolean;
+  color: string;
+  health: number;
+  maxHealth: number;
+  radius: number;
+}
+
+export interface SatelliteShoot {
+  id: string;
+  /** One server-authored projectile identity; clients use it only for visuals. */
+  shotId: string;
+  laserStart: Position;
+  laserDirection: Velocity;
+}
+
+export type SatellitePickupTypeId = 'echo' | 'relay';
+export type SatellitePickupState = 'loose' | 'orbiting';
+
+/** Server-owned collectible EO communications hardware. */
+export interface SatellitePickupData {
+  id: string;
+  name: 'Echo' | 'Relay';
+  typeId: SatellitePickupTypeId;
+  /** Stable asset hook; pickups are distinct communications hardware. */
+  assetKey: `pickup/${SatellitePickupTypeId}`;
+  position: Position;
+  velocity: Velocity;
+  angle: number;
+  radius: number;
+  color: string;
+  state: SatellitePickupState;
+  ownerId: string | null;
+  shieldFramesRemaining: number;
+}
+
+export interface SatellitePickupCollected {
+  pickupId: string;
+  playerId: string;
+  playerName: string;
+  pickupName: 'Echo' | 'Relay';
+  scoreBonus: number;
+  shieldFrames: number;
 }
 
 // Server game state structure (what the server actually sends)
@@ -170,6 +230,8 @@ export interface ServerGameState {
   entities: ServerEntityData[];
   asteroids: AsteroidData[];
   loot: LootData[];
+  satellites: SatelliteData[];
+  satellitePickups: SatellitePickupData[];
   gameTime: number;
   isPaused: boolean;
   /** Same seed on every client → same contours and slope field. */

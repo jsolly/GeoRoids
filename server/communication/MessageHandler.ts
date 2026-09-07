@@ -3,7 +3,7 @@ import { GameEngine, type AppliedAsteroidHit } from '../core/GameEngine';
 import { GameStateBroadcaster } from '../services/GameStateBroadcaster';
 import { ClientLogger } from '../services/ClientLogger';
 import { logger } from '../../setup/serverLogger';
-import { DAMAGE } from '../../src/constants';
+import { DAMAGE, SATELLITE_PICKUP } from '../../src/constants';
 import {
   clampLaserDamage,
   isAllowedLaserReporter,
@@ -105,6 +105,14 @@ export class MessageHandler {
 
         case 'botDamage':
           this.handleBotDamage(ws, restData);
+          break;
+
+        case 'satelliteDamage':
+          this.handleSatelliteDamage(ws, restData);
+          break;
+
+        case 'satellitePickupCollected':
+          this.handleSatellitePickupCollected(ws, restData);
           break;
 
         case 'asteroidDestroyed':
@@ -280,7 +288,7 @@ export class MessageHandler {
       return;
     }
 
-    const laser = this.gameEngine.spawnLaser(shooter.id, data.laserStart, data.laserDirection);
+    const laser = this.gameEngine.spawnHumanLaser(shooter.id, data.laserStart, data.laserDirection);
     if (!laser) {
       return;
     }
@@ -388,6 +396,7 @@ export class MessageHandler {
     }
 
     // Ship↔asteroid and ship↔ship are resolved in the server game loop.
+    // Satellite hull damage stays on satelliteDamage, not this leftover path.
     if (!isClientOwnedCollisionAttacker(data.attackerId)) {
       return;
     }
@@ -404,6 +413,72 @@ export class MessageHandler {
       DAMAGE.BOUNDARY_COLLISION,
       before?.health
     );
+  }
+
+  private handleSatelliteDamage(ws: WebSocket, data: any): void {
+    if (
+      typeof data.satelliteId !== 'string' ||
+      data.satelliteId.length === 0 ||
+      typeof data.attackerId !== 'string' ||
+      data.attackerId.length === 0
+    ) {
+      this.broadcaster.sendError(ws, 'Missing required fields for satelliteDamage');
+      return;
+    }
+
+    const reporterId = this.getReporterId(ws);
+    const laserPosition = this.readFinitePosition(data.laserPosition);
+    if (!reporterId || reporterId !== data.attackerId || !laserPosition) {
+      return;
+    }
+    if (!this.gameEngine.consumeHumanLaserNearSatellite(reporterId, data.satelliteId, laserPosition)) {
+      return;
+    }
+
+    const isDestroyed = this.gameEngine.handleSatelliteDamage(
+      data.satelliteId,
+      reporterId,
+      DAMAGE.LASER_HIT
+    );
+    this.broadcaster.broadcastGameState();
+
+    if (isDestroyed) {
+      const attacker = this.gameEngine.getPlayer(reporterId);
+      if (attacker) {
+        this.broadcaster.broadcastScoreUpdate(reporterId, attacker.score);
+      }
+    }
+  }
+
+  private handleSatellitePickupCollected(ws: WebSocket, data: any): void {
+    if (typeof data.pickupId !== 'string' || data.pickupId.length === 0) {
+      this.broadcaster.sendError(ws, 'Missing pickup ID for satellitePickupCollected');
+      return;
+    }
+
+    const reporterId = this.getReporterId(ws);
+    if (!reporterId || (data.playerId !== undefined && data.playerId !== reporterId)) {
+      return;
+    }
+    const result = this.gameEngine.handleSatellitePickupCollected(data.pickupId, reporterId);
+    if (!result.success || !result.pickup) {
+      return;
+    }
+
+    const player = this.gameEngine.getPlayer(reporterId);
+    if (!player) {
+      return;
+    }
+    this.broadcaster.broadcastScoreUpdate(reporterId, player.score);
+    this.broadcaster.broadcastSatellitePickupCollected({
+      pickupId: result.pickup.id,
+      playerId: reporterId,
+      playerName: player.name,
+      pickupName: result.pickup.name,
+      scoreBonus: SATELLITE_PICKUP.SCORE_BONUS,
+      shieldFrames: SATELLITE_PICKUP.SHIELD_FRAMES,
+    });
+    this.broadcaster.broadcastGameState();
   }
 
   private handleBotDamage(ws: WebSocket, data: any): void {

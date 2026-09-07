@@ -2,18 +2,8 @@ import type { Velocity } from '../../../shared-types';
 import { GAME, LASER } from '../../constants';
 import { addVectors } from '../../utils/mathUtils';
 import type { Ship } from '../ship/Ship';
+import { calculateLaserStartPosition } from '../ship/shipUtils';
 import { Laser } from './Laser';
-
-export function calculateLaserStartPosition(
-  shipPosition: { x: number; y: number },
-  shipAngle: number,
-  shipRadius: number
-): { x: number; y: number } {
-  return {
-    x: shipPosition.x + (4 / 3) * shipRadius * Math.cos(shipAngle),
-    y: shipPosition.y - (4 / 3) * shipRadius * Math.sin(shipAngle),
-  };
-}
 
 export function generateLaserVelocity(shipAngle: number, shipVelocity: Velocity): Velocity {
   const baseVelocity: Velocity = {

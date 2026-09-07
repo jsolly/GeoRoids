@@ -33,7 +33,7 @@ test('setPlayView announces play chrome so the overlay can appear', () => {
   window.removeEventListener('playViewOff', off);
 });
 
-test('phone-sized play view unhides the stick and fire overlay', () => {
+test('phone-sized play view unhides the full touch control overlay', () => {
   initializeTouchControls();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
@@ -44,6 +44,8 @@ test('phone-sized play view unhides the stick and fire overlay', () => {
   expect(root?.hidden).toBe(false);
   expect(document.getElementById('touch-stick')).toBeTruthy();
   expect(document.getElementById('touch-fire')).toBeTruthy();
+  expect(document.getElementById('touch-ability')).toBeTruthy();
+  expect(document.getElementById('touch-shield')).toBeTruthy();
 });
 
 test('desktop-sized play view keeps the overlay hidden', () => {

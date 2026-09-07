@@ -1,5 +1,4 @@
 import type { Position } from '../../shared-types';
-import { containAsteroidPositionInto } from '../physics/asteroidMotion';
 
 export type PlayfieldSize = { width: number; height: number };
 export type PlayfieldRock = {
@@ -10,20 +9,9 @@ export type PlayfieldRock = {
 };
 
 const projectScratch = { x: 0, y: 0 };
-const centroidScratch = { x: 0, y: 0 };
-const containScratch = { x: 0, y: 0 };
 
-/** Floor: stay 1:1 only when at least this many drawable rocks sit inside the inset. */
-export const PLAYFIELD_MIN_VISIBLE = 2;
-/** Stay 1:1 only when at least this share of the belt is on the playfield. */
-export const PLAYFIELD_MIN_FRACTION = 0.25;
-/** Pixels inside the canvas edge a rock center must be to count as "on the playfield". */
-export const PLAYFIELD_COMFORT_INSET = 48;
-
-/** How many comfortable rocks are required before 1:1 is allowed. */
-export function playfieldMinVisible(beltCount: number): number {
-  return Math.max(PLAYFIELD_MIN_VISIBLE, Math.ceil(beltCount * PLAYFIELD_MIN_FRACTION));
-}
+/** Single close/play scale used by the renderer; the minimap is the wide view. */
+export const PLAYFIELD_CLOSE_SCALE = 1;
 
 /** Ship-centered projection. Scale 1 matches today's 1:1 camera. */
 export function projectWorldToScreenInto(
@@ -96,59 +84,13 @@ export function countRocksOnCanvas(
   return count;
 }
 
-/**
- * Keep 1:1 only while a real share of the belt is on the playfield:
- * ≥ max(2, 25% of drawable rocks) inside the comfort inset *and* the
- * contained pack centroid still on the canvas.
- *
- * #469's "2 rocks + centroid" pin failed when the belt was a ring around
- * the ship (centroid at the camera, 2 inner stragglers, 18 dots on radar
- * only) — Pilot B ~60s nearly-empty. One escaped wrap pose also must not
- * set the fit distance; frame the contained belt so late-join 10k rocks
- * cannot crush the pack to hairlines.
- */
+/** Compatibility helper: gameplay is always rendered at the fixed close scale. */
 export function playfieldZoom(
-  roids: readonly PlayfieldRock[],
-  ship: Position,
-  canvas: PlayfieldSize
+  _roids: readonly PlayfieldRock[],
+  _ship: Position,
+  _canvas: PlayfieldSize
 ): number {
-  let drawable = 0;
-  let sx = 0;
-  let sy = 0;
-  let maxDist = 1;
-  let comfortable = 0;
-  for (const roid of roids) {
-    if (!isDrawablePlayfieldRock(roid)) {
-      continue;
-    }
-    drawable += 1;
-    containAsteroidPositionInto(containScratch, roid.position.x, roid.position.y);
-    sx += containScratch.x;
-    sy += containScratch.y;
-    const reach = Math.hypot(containScratch.x - ship.x, containScratch.y - ship.y) + (roid.r ?? 0);
-    if (Number.isFinite(reach) && reach > maxDist) {
-      maxDist = reach;
-    }
-    if (isRockOnCanvas(containScratch, ship, canvas, 1, -PLAYFIELD_COMFORT_INSET)) {
-      comfortable += 1;
-    }
-  }
-  if (drawable === 0) {
-    return 1;
-  }
-  centroidScratch.x = sx / drawable;
-  centroidScratch.y = sy / drawable;
-  const lookingAtPack =
-    comfortable >= playfieldMinVisible(drawable) &&
-    isRockOnCanvas(centroidScratch, ship, canvas, 1, -PLAYFIELD_COMFORT_INSET);
-  if (lookingAtPack) {
-    return 1;
-  }
-  const inset = Math.min(canvas.width, canvas.height) / 2 - 24;
-  if (inset <= 0) {
-    return 1;
-  }
-  return Math.min(1, inset / maxDist);
+  return PLAYFIELD_CLOSE_SCALE;
 }
 
 /** PO / QA bar: if radar has dots, the playfield must show at least one rock. */
@@ -166,7 +108,7 @@ export function radarBeltVisibleOnPlayfield(
   if (drawable === 0) {
     return false;
   }
-  const scale = playfieldZoom(roids, ship, canvas);
+  const scale = PLAYFIELD_CLOSE_SCALE;
   for (const roid of roids) {
     if (isDrawablePlayfieldRock(roid) && isRockOnCanvas(roid.position, ship, canvas, scale)) {
       return true;

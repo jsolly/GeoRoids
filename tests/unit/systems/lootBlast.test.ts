@@ -31,8 +31,9 @@ describe('loot blast math', () => {
   });
 
   test('kind colors stay on the locked palette', () => {
-    expect(lootStrokeColor('shard')).toBe(PALETTE.LASER_LOCAL);
+    expect(lootStrokeColor('shard')).toBe(PALETTE.LOOT);
     expect(lootStrokeColor('wreckage')).toBe(PALETTE.LOOT);
     expect(lootStrokeColor('fuel')).toBe(PALETTE.HEALTH);
+    expect(PALETTE.LOOT).toBe('#E8D5A3');
   });
 });

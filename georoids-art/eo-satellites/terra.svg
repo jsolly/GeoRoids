@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -34 68 68" width="68" height="68" role="img" aria-label="Terra">
+  <title>Terra</title>
+  <g fill="none" stroke="#C4B5FD" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="-20,-5 -14,-11 0,-11 7,-5 7,11 -14,11 -20,5 -20,-5"/>
+    <polyline points="-14,-11 -14,11"/>
+    <polyline points="-14,-5 7,-5"/>
+    <polyline points="0,-11 8,-20 16,-18 23,-23 31,-21 25,-7 18,-2 11,-5 7,0"/>
+    <polyline points="8,-20 11,-5"/>
+    <polyline points="16,-18 18,-2"/>
+    <polyline points="23,-23 25,-7"/>
+    <polyline points="-10,11 -10,17"/>
+    <polyline points="-3,11 -3,17"/>
+    <ellipse cx="-10" cy="17" rx="2.5" ry="2"/>
+    <ellipse cx="-3" cy="17" rx="2.5" ry="2"/>
+  </g>
+</svg>

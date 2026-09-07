@@ -19,7 +19,7 @@ test('small roids do not split', async () => {
   await game.waitForAsteroids(1);
 
   const before = await game.getAsteroidPositions();
-  const large = before.find((a) => a.radius >= 40 && !a.isCollabTarget);
+  const large = before.find((a) => a.radius >= 40 && !a.isCollabTarget && a.material === 'ice');
   expect(large).toBeTruthy();
   if (!large) return;
 

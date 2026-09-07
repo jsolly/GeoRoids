@@ -8,7 +8,7 @@ import {
   clearShield,
   createShieldState,
   maybeActivateBotShield,
-  noteShieldLaserHit,
+  noteReadableShieldLaserHit,
   shouldBlockDamage,
   updateShield,
   type CombatDamageSource,
@@ -481,12 +481,15 @@ export class EntityManager {
     }
 
     if (absorbDamageWithShield(entity)) {
+      if (source === 'laser') {
+        noteReadableShieldLaserHit(entity);
+      }
       entity.lastUpdate = Date.now();
       return entity;
     }
 
     if (shouldBlockDamage(entity, source)) {
-      noteShieldLaserHit(entity);
+      noteReadableShieldLaserHit(entity);
       entity.lastUpdate = Date.now();
       return null;
     }

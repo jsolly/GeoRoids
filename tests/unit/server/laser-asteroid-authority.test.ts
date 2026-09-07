@@ -28,6 +28,13 @@ function asteroidAt(
   };
 }
 
+function isolateAsteroid(engine: GameEngine, asteroid: AsteroidData): void {
+  for (const existing of engine.getAllAsteroids()) {
+    engine.removeAsteroid(existing.id);
+  }
+  engine.addAsteroid(asteroid);
+}
+
 function mediumAsteroid(id: string, position = { x: 400, y: 300 }): AsteroidData {
   return asteroidAt(id, 25, position);
 }
@@ -98,7 +105,7 @@ describe('Server laser↔asteroid authority', () => {
   test('server laser tick breaks an overlapping medium asteroid once', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
-    engine.addAsteroid(mediumAsteroid('roid-tick', { x: 100, y: 100 }));
+    isolateAsteroid(engine, mediumAsteroid('roid-tick', { x: 100, y: 100 }));
 
     engine.spawnLaser('p1', { x: 70, y: 100 }, { x: 40, y: 0 });
     const hits = engine.advanceLasersAndResolveHits();
@@ -116,7 +123,7 @@ describe('Server laser↔asteroid authority', () => {
   test('server laser tick tags a large asteroid without finishing the collab window', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
-    engine.addAsteroid(largeAsteroid('roid-tag', { x: 100, y: 100 }));
+    isolateAsteroid(engine, largeAsteroid('roid-tag', { x: 100, y: 100 }));
 
     engine.spawnLaser('p1', { x: 70, y: 100 }, { x: 40, y: 0 });
     const hits = engine.advanceLasersAndResolveHits();
@@ -131,7 +138,7 @@ describe('Server laser↔asteroid authority', () => {
   test('server lasers skip the kits chip rock', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
-    engine.addAsteroid(asteroidAt('chip-rock', 50, { x: 100, y: 100 }, { isCollabTarget: true }));
+    isolateAsteroid(engine, asteroidAt('chip-rock', 50, { x: 100, y: 100 }, { isCollabTarget: true }));
 
     engine.spawnLaser('p1', { x: 70, y: 100 }, { x: 40, y: 0 });
     const hits = engine.advanceLasersAndResolveHits();

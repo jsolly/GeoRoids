@@ -1,66 +1,159 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
-import { PALETTE } from '../../../src/constants';
+import { InputManager } from '../../../src/core/services/InputManager';
+import { Player } from '../../../src/entities/player/Player';
+import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
+import { drawShipShield, strokeKitHullOutline, strokePhosphorSegment } from '../../../src/entities/ship/shipRenderer';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import { PALETTE, VISUAL } from '../../../src/constants';
+import { Point } from '../../../src/physics/Point';
+import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
+import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
+import { canvasManager } from '../../../src/rendering/canvas';
+import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRenderer';
+import { drawIsoContours } from '../../../src/rendering/contourRenderer';
+import { lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 
-const canvasSrc = readFileSync(resolve(process.cwd(), 'src/rendering/canvas.ts'), 'utf8');
-const inputSrc = readFileSync(resolve(process.cwd(), 'src/core/services/InputManager.ts'), 'utf8');
-const shipSrc = readFileSync(resolve(process.cwd(), 'src/entities/ship/shipRenderer.ts'), 'utf8');
-const loopSrc = readFileSync(resolve(process.cwd(), 'src/core/gameController.ts'), 'utf8');
-const contourSrc = readFileSync(resolve(process.cwd(), 'src/rendering/contourRenderer.ts'), 'utf8');
+type RecordingContext = CanvasRenderingContext2D & {
+  operations: string[];
+  strokes: number;
+  arcs: number;
+  fills: number;
+};
 
-test('player and bot ships share the phosphor hull draw path', () => {
-  expect(shipSrc).toMatch(/export function strokePhosphorPolyline/);
-  expect(shipSrc).toMatch(/export function strokeKitHullOutline/);
-  expect(shipSrc).toMatch(
-    /strokeKitHullOutline\(ctx, screenX, screenY, shipR, ship\.angle, shipColor, ship\.kitId\)/
-  );
-  expect(canvasSrc).toMatch(/const ship = isLocal \? currShip : player\.ship/);
-  expect(canvasSrc).toMatch(/drawShipAtPosition\(\s*ship,/);
-  expect(shipSrc).toMatch(/drawSoftFactionMark\(ctx, factionId/);
-  expect(canvasSrc).toMatch(/drawLootRelative/);
-  expect(canvasSrc).not.toMatch(/drawBotShip|drawLocalShip|drawRemoteShip/);
+function recordingContext(): RecordingContext {
+  const operations: string[] = [];
+  let ctx = {} as RecordingContext;
+  ctx = {
+    operations,
+    strokes: 0,
+    arcs: 0,
+    fills: 0,
+    save: () => operations.push('save'),
+    restore: () => operations.push('restore'),
+    beginPath: () => operations.push('beginPath'),
+    closePath: () => operations.push('closePath'),
+    moveTo: () => operations.push('moveTo'),
+    lineTo: () => operations.push('lineTo'),
+    arc: () => {
+      operations.push('arc');
+      ctx.arcs += 1;
+    },
+    stroke: () => {
+      operations.push('stroke');
+      ctx.strokes += 1;
+    },
+    fill: () => {
+      operations.push('fill');
+      ctx.fills += 1;
+    },
+    setLineDash: () => undefined,
+  } as unknown as RecordingContext;
+  return ctx;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
-test('shield ring is a shared phosphor stroke, not a filled disc', () => {
-  const start = shipSrc.indexOf('export function drawShipShield');
-  const end = shipSrc.indexOf('function drawShipImpactFlash');
-  const shieldFn = shipSrc.slice(start, end);
-  expect(start).toBeGreaterThan(-1);
-  expect(shipSrc).toMatch(/drawShipShield\(ctx, ship, screenX, screenY, shipR\)/);
-  expect(shieldFn).toMatch(/ctx\.arc\(screenX, screenY, radius/);
-  expect(shieldFn).toMatch(/PALETTE\.SHIELD/);
-  expect(shieldFn).not.toMatch(/\.fill\(/);
+test('every playable ship kit renders through the phosphor hull renderer', () => {
+  const ctx = recordingContext();
+  for (const kitId of ['dart', 'hauler', 'warden', 'skirmisher', 'quake'] as const) {
+    strokeKitHullOutline(ctx, 100, 80, 24, 0.4, PALETTE.LOCAL, kitId);
+  }
+
+  expect(ctx.strokes).toBeGreaterThan(10);
+  expect(ctx.operations).toContain('closePath');
+  expect(ctx.fills).toBe(0);
 });
 
-test('live ship and laser strokes never use white', () => {
+test('shield impact renders as a phosphor ring and never fills the ship', () => {
+  const player = new Player({
+    id: 'visual-shield',
+    name: 'Visual Shield',
+    type: 'local',
+    input: new MockPlayerInput(),
+  });
+  player.ship.shieldActive = true;
+  player.ship.shieldTime = 30;
+  player.ship.shieldFlashTime = 4;
+  const ctx = recordingContext();
+
+  drawShipShield(ctx, player.ship, 100, 80, 24);
+
+  expect(ctx.arcs).toBe(1);
+  expect(ctx.strokes).toBe(1);
+  expect(ctx.fills).toBe(0);
+});
+
+test('live ship and laser strokes use the configured phosphor palette', () => {
+  const ctx = recordingContext();
+  strokePhosphorSegment(ctx, 10, 20, 50, 60, PALETTE.LASER_LOCAL, VISUAL.LASER_STROKE_WIDTH, 0);
+
+  expect(ctx.strokes).toBe(2);
   expect(PALETTE.LOCAL.toLowerCase()).not.toBe('#ffffff');
   expect(PALETTE.REMOTE.toLowerCase()).not.toBe('#ffffff');
   expect(PALETTE.BOT.toLowerCase()).not.toBe('#ffffff');
   expect(PALETTE.LASER_LOCAL).toBe('#FDE68A');
   expect(PALETTE.LASER_ENEMY.toLowerCase()).not.toBe('#ffffff');
-  expect(shipSrc).toMatch(/strokePhosphorSegment/);
-  expect(shipSrc).toMatch(/VISUAL\.LASER_LENGTH/);
-  expect(shipSrc).toMatch(/drawGenericThruster/);
-  expect(shipSrc).not.toMatch(/#fff|#ffffff|#FFFFFF/i);
 });
 
-test('play loop ticks remote ships on the shared 60 Hz lifecycle clock', () => {
-  expect(loopSrc).toMatch(/advanceRemotePlayerShips\(allPlayers, lifecycleFrames\)/);
+test('remote ship lifecycle advances on the shared update clock', () => {
+  const remote = new Player({
+    id: 'remote-visual',
+    name: 'Remote Visual',
+    type: 'remote',
+    input: new MockPlayerInput(),
+  });
+  const updateLifecycle = vi.spyOn(remote.ship, 'updateLifecycle');
+
+  advanceRemotePlayerShips([remote], 3);
+
+  expect(updateLifecycle).toHaveBeenCalledWith(3);
 });
 
-test('iso contours stay muted hairlines with no phosphor bloom', () => {
-  expect(PALETTE.CONTOUR).toBe('#334155');
-  expect(contourSrc).toMatch(/VISUAL\.CONTOUR_STROKE_WIDTH/);
-  expect(contourSrc).toMatch(/shadowBlur = 0/);
-  expect(contourSrc).not.toMatch(/shadowBlur = [1-9]/);
-  expect(canvasSrc).toMatch(/drawIsoContours\(currShip\.position\)/);
+test('terrain and contour laser renderers emit finite muted strokes at runtime', () => {
+  const ctx = recordingContext();
+  const canvas = { width: 800, height: 600 } as HTMLCanvasElement;
+  vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
+  vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+  vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
+    (world) => new Point(world.x + 400, world.y + 300)
+  );
+  vi.spyOn(canvasManager, 'worldToScreenInto').mockImplementation((out, world) => {
+    out.x = world.x + 400;
+    out.y = world.y + 300;
+    return out;
+  });
+  ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: 3100 });
+
+  drawIsoContours({ x: 0, y: 0 });
+  drawContourLaserTicks({ x: 0, y: 0 }, [{ x: 1100, y: 0 }]);
+
+  expect(ctx.strokes).toBeGreaterThan(0);
+  expect(PALETTE.CONTOUR).toBe('#5A6B7D');
+  expect(PALETTE.LOOT).toBe('#E8D5A3');
+  expect(VISUAL.CONTOUR_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.SHIP_STROKE_WIDTH);
+  expect(VISUAL.CONTOUR_LASER_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH);
+  expect(lootScreenRadius(20, 1)).toBeGreaterThan(0);
+  expect(lootScreenRadius(Number.POSITIVE_INFINITY, 1)).toBeNull();
 });
 
-test('play canvas and mouse input bind to #gameCanvas, not the title starfield', () => {
-  expect(canvasSrc).toMatch(/getElementById\('gameCanvas'\)/);
-  expect(inputSrc).toMatch(/getElementById\('gameCanvas'\)/);
-  expect(canvasSrc).not.toMatch(/querySelector\('canvas'\)/);
-  expect(inputSrc).not.toMatch(/querySelector\('canvas'\)/);
+test('mouse input is attached to the game canvas while the title starfield stays passive', () => {
+  InputManager.getInstance().initializeListeners();
+  const gameCanvas = document.getElementById('gameCanvas');
+  const titleStarfield = document.getElementById('title-starfield');
+  expect(gameCanvas?.tagName).toBe('CANVAS');
+  expect(titleStarfield?.tagName).toBe('CANVAS');
+  if (!gameCanvas || !titleStarfield) {
+    throw new Error('expected both canvases in the play shell');
+  }
+
+  const gameTouch = new Event('touchstart', { cancelable: true });
+  const titleTouch = new Event('touchstart', { cancelable: true });
+  gameCanvas.dispatchEvent(gameTouch);
+  titleStarfield.dispatchEvent(titleTouch);
+
+  expect(gameTouch.defaultPrevented).toBe(true);
+  expect(titleTouch.defaultPrevented).toBe(false);
 });

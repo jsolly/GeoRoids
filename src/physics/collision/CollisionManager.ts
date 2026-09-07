@@ -4,14 +4,20 @@ import type { Laser } from '../../entities/laser/Laser';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
+import type { Combatant } from '../../entities/player/playerKinds';
 import { canDealCombatDamage } from '../../entities/player/softFactions';
 import type { Roid } from '../../entities/roid/Roid';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../entities/roid/roidScore';
+import type { Satellite } from '../../entities/satellite/Satellite';
+import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
+import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
+import { isWithinCollectRange } from '../../entities/satellitePickup/satellitePickupMath';
 import type { Ship } from '../../entities/ship/Ship';
 import {
+  isReadableShieldUp,
   isShieldBlockingLasers,
   laserCollisionRadius,
-  noteShieldLaserHit,
+  noteReadableShieldLaserHit,
 } from '../../entities/ship/shipShield';
 import { applyShipBoundaryDeath, isShipCollisionImmune } from '../../entities/ship/shipUtils';
 import { NetworkManager } from '../../network/networkManager';
@@ -23,6 +29,7 @@ import {
   checkLaserShipCollision,
   checkShipCollision,
 } from './collisionDetection';
+import { asteroidDestroyedMessage, laserHitDamageMessage } from './combatMessages';
 
 export interface LaserTarget {
   ship: Ship;
@@ -36,6 +43,8 @@ export interface LaserCollisionOptions {
   reportAsteroidHits?: boolean;
   attackerFaction?: FactionId;
 }
+
+type CollisionPlayer = Combatant & { ship: Ship };
 
 export class CollisionManager {
   private static instance: CollisionManager;
@@ -98,10 +107,7 @@ export class CollisionManager {
   /**
    * Check player collisions with asteroids (unified for all player types)
    */
-  checkPlayerAsteroidCollisions(
-    player: { ship: Ship; id: string; type: 'local' | 'remote' | 'bot' },
-    asteroids: Roid[]
-  ): void {
+  checkPlayerAsteroidCollisions(player: CollisionPlayer, asteroids: Roid[]): void {
     const ship = player.ship;
 
     // Skip if ship is exploding, has no health, or is under spawn protection (blinking)
@@ -255,8 +261,8 @@ export class CollisionManager {
             checkLaserShipCollision(laser.position, ship.position, hitRadius)
           ) {
             this.handleLaserPlayerHit(laser, player, localPlayerId);
-            if (isShieldBlockingLasers(ship)) {
-              noteShieldLaserHit(ship);
+            if (isReadableShieldUp(ship)) {
+              noteReadableShieldLaserHit(ship);
             }
             // Mark laser for explosion — blocked shots still read as a hit.
             laser.updateExplodeTime();
@@ -297,7 +303,11 @@ export class CollisionManager {
     }
 
     // Biggest rocks stay visible through the server-owned 1s tag window.
-    if (!isBiggestAsteroid(asteroid.r) && (asteroid.taggedUntil ?? 0) <= Date.now()) {
+    if (
+      asteroid.material !== 'metal' &&
+      !isBiggestAsteroid(asteroid.r) &&
+      (asteroid.taggedUntil ?? 0) <= Date.now()
+    ) {
       lockAsteroidPending(asteroid);
     }
   }
@@ -313,16 +323,9 @@ export class CollisionManager {
     cause: 'laser' | 'collision',
     laserPosition?: { x: number; y: number }
   ): void {
-    this.networkManager.sendMessage({
-      type: 'asteroidDestroyed',
-      data: {
-        asteroidId,
-        playerId,
-        points: pointsForRoidSize(radius),
-        cause,
-        ...(laserPosition ? { laserPosition: { x: laserPosition.x, y: laserPosition.y } } : {}),
-      },
-    });
+    this.networkManager.sendMessage(
+      asteroidDestroyedMessage(asteroidId, playerId, radius, cause, laserPosition)
+    );
   }
 
   /**
@@ -339,25 +342,9 @@ export class CollisionManager {
       attackerId,
     });
 
-    // Send appropriate damage message based on player type
-    if (player.type === 'bot') {
-      this.networkManager.sendMessage({
-        type: 'botDamage',
-        data: {
-          botId: player.id,
-          attackerId: attackerId,
-          damage: DAMAGE.LASER_HIT,
-        },
-      });
-    } else if (player.type === 'remote' || player.type === 'local') {
-      this.networkManager.sendMessage({
-        type: 'laserDamage',
-        data: {
-          targetPlayerId: player.id,
-          attackerId: attackerId,
-          damage: DAMAGE.LASER_HIT,
-        },
-      });
+    const message = laserHitDamageMessage(player, attackerId);
+    if (message) {
+      this.networkManager.sendMessage(message);
     }
   }
 
@@ -365,20 +352,25 @@ export class CollisionManager {
    * Visual-only: incoming remote/bot lasers pop on the local shield so both
    * clients see a blocked shot. Damage is still reported by the attacker.
    */
-  explodeIncomingLasersOnShieldedShip(lasers: Laser[], ship: Ship): void {
-    if (!isShieldBlockingLasers(ship) || ship.exploding) {
+  explodeIncomingLasersOnShieldedShip(lasers: Laser[], ship: Ship, sameSide = false): void {
+    if (!isReadableShieldUp(ship) || ship.exploding) {
+      return;
+    }
+    if (sameSide) {
       return;
     }
 
-    const hitRadius = laserCollisionRadius(ship.r, ship);
+    // Warden E is a visual/authoritative timed block but does not enlarge the
+    // F bubble's collision radius. Preserve the two mechanics separately.
+    const hitRadius = isShieldBlockingLasers(ship) ? laserCollisionRadius(ship.r, ship) : ship.r;
     for (const laser of lasers) {
-      if (laser.hasExploded) {
+      if (laser.hasExploded || laser.explodeTime !== 0) {
         continue;
       }
       if (checkLaserShipCollision(laser.position, ship.position, hitRadius)) {
         laser.updateExplodeTime();
         laser.playHitSound();
-        noteShieldLaserHit(ship);
+        noteReadableShieldLaserHit(ship);
       }
     }
   }
@@ -386,10 +378,7 @@ export class CollisionManager {
   /**
    * Handle player hitting an asteroid (unified for all player types)
    */
-  private handlePlayerAsteroidCollision(
-    player: { ship: Ship; id: string; type: 'local' | 'remote' | 'bot' },
-    asteroid: Roid
-  ): void {
+  private handlePlayerAsteroidCollision(player: CollisionPlayer, asteroid: Roid): void {
     const ship = player.ship;
 
     logger.debug('COLLISION', 'Player hit asteroid', {
@@ -435,6 +424,117 @@ export class CollisionManager {
   private factionForShip(ship: Ship): Player['factionId'] {
     const match = this.networkManager.getAllPlayers().find((player) => player.ship === ship);
     return match?.factionId;
+  }
+
+  checkLaserSatelliteCollisions(
+    lasers: Laser[],
+    satellites: Satellite[],
+    attackerId: string
+  ): void {
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      const laser = lasers[i];
+      if (laser === undefined || laser.hasExploded) {
+        continue;
+      }
+
+      for (const satellite of satellites) {
+        if (satellite.exploding || satellite.health <= 0) {
+          continue;
+        }
+        if (checkLaserShipCollision(laser.position, satellite.position, satellite.radius)) {
+          this.networkManager.sendMessage({
+            type: 'satelliteDamage',
+            data: {
+              satelliteId: satellite.id,
+              attackerId,
+              damage: DAMAGE.LASER_HIT,
+              laserPosition: { x: laser.position.x, y: laser.position.y },
+            },
+          });
+          laser.updateExplodeTime();
+          laser.playHitSound();
+          break;
+        }
+      }
+    }
+  }
+
+  /** Send a collection request for the locally-overlapped loose pickup. */
+  checkPlayerSatellitePickupCollisions(
+    player: { ship: Ship; id: string; type: 'local' | 'remote' | 'bot' },
+    pickups: SatellitePickup[]
+  ): void {
+    if (
+      player.type !== 'local' ||
+      !player.ship ||
+      player.ship.health <= 0 ||
+      player.ship.exploding
+    ) {
+      return;
+    }
+
+    const pickupManager = SatellitePickupManager.getInstance();
+    const collectorId = this.networkManager.getLocalPlayerId() || player.id;
+    const now = Date.now();
+    for (const pickup of pickups) {
+      if (pickup.state !== 'loose' || pickupManager.shouldDebounceCollect(pickup.id, now)) {
+        continue;
+      }
+      if (
+        !isWithinCollectRange(
+          player.ship.position,
+          pickup.position,
+          player.ship.r,
+          pickup.radius,
+          0
+        )
+      ) {
+        continue;
+      }
+      pickupManager.markCollectAttempt(pickup.id, now);
+      this.networkManager.sendMessage({
+        type: 'satellitePickupCollected',
+        data: { pickupId: pickup.id, playerId: collectorId },
+      });
+      break;
+    }
+  }
+
+  checkSatelliteLaserCollisions(
+    satellites: Satellite[],
+    localShip: Ship,
+    _localPlayerId?: string
+  ): void {
+    if (!localShip || isShipCollisionImmune(localShip)) {
+      return;
+    }
+
+    for (const satellite of satellites) {
+      for (const laser of satellite.lasers) {
+        if (laser.hasExploded) {
+          continue;
+        }
+        if (
+          checkLaserShipCollision(
+            laser.position,
+            localShip.position,
+            laserCollisionRadius(localShip.r, localShip)
+          )
+        ) {
+          if (isReadableShieldUp(localShip)) {
+            noteReadableShieldLaserHit(localShip);
+            laser.updateExplodeTime();
+            laser.playHitSound();
+            return;
+          }
+          // The server simulates EO projectiles and owns the damage result.
+          // This local overlap only removes the visual bolt at the same time.
+          laser.updateExplodeTime();
+          laser.playHitSound();
+          return;
+        }
+      }
+    }
   }
 
   /**

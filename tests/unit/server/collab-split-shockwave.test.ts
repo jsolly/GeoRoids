@@ -26,10 +26,11 @@ function waitForOneShotLargeId(ws: WebSocket): Promise<string> {
             id: string;
             size?: number;
             isCollabTarget?: boolean;
+            material?: string;
           }>;
           const fallback = rocks[0];
           const oneShot = rocks.find(
-            (rock) => !rock.isCollabTarget && (rock.size ?? 0) >= ROID.COLLAB_SPLIT_MIN_SIZE
+            (rock) => !rock.isCollabTarget && rock.material === 'ice' && (rock.size ?? 0) >= ROID.COLLAB_SPLIT_MIN_SIZE
           );
           const target = oneShot ?? fallback;
           if (!target) {

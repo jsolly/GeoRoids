@@ -11,6 +11,10 @@ export class GameStateManager {
   private killMessageTimer = 0;
   private readonly KILL_MESSAGE_DURATION_FRAMES = 120; // 2 seconds at 60 FPS
 
+  private pickupMessage = '';
+  private pickupMessageTimer = 0;
+  private readonly PICKUP_MESSAGE_DURATION_FRAMES = 120;
+
   private constructor() {}
 
   static getInstance(): GameStateManager {
@@ -41,6 +45,7 @@ export class GameStateManager {
     this.text = '';
     this.textAlpha = 0;
     this.clearKillMessage();
+    this.clearPickupMessage();
   }
 
   toggleIsGameRunning(): void {
@@ -81,6 +86,33 @@ export class GameStateManager {
       this.killMessageTimer--;
       if (this.killMessageTimer <= 0) {
         this.killMessage = '';
+      }
+    }
+  }
+
+  setPickupMessage(pickupName: string, scoreBonus: number): void {
+    this.pickupMessage = `${pickupName} acquired +${scoreBonus}`;
+    this.pickupMessageTimer = this.PICKUP_MESSAGE_DURATION_FRAMES;
+  }
+
+  clearPickupMessage(): void {
+    this.pickupMessage = '';
+    this.pickupMessageTimer = 0;
+  }
+
+  getPickupMessage(): string {
+    return this.pickupMessage;
+  }
+
+  hasPickupMessage(): boolean {
+    return this.pickupMessageTimer > 0;
+  }
+
+  updatePickupMessageTimer(): void {
+    if (this.pickupMessageTimer > 0) {
+      this.pickupMessageTimer--;
+      if (this.pickupMessageTimer <= 0) {
+        this.pickupMessage = '';
       }
     }
   }

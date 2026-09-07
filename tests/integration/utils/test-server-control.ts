@@ -7,6 +7,7 @@ export type ServerWorldDiagnostics = {
   humanPlayers: number;
   bots: number;
   asteroids: number;
+  satellites?: number;
 };
 
 type HealthResponse = {
@@ -60,6 +61,7 @@ export class TestServerControl {
       humanPlayers,
       bots: 0,
       asteroids: humanPlayers === 0 ? 0 : -1,
+      satellites: humanPlayers === 0 ? 0 : -1,
     };
   }
 

@@ -7,14 +7,17 @@ import {
   clearShield,
   createShieldState,
   deactivateShield,
+  isReadableShieldUp,
   isShieldBlockingLasers,
   laserCollisionRadius,
   maybeActivateBotShield,
   noteShieldLaserHit,
+  noteReadableShieldLaserHit,
   requestShield,
   resolveCombatDamageSource,
   shouldBlockDamage,
   shieldCooldownFrames,
+  shieldFlashFrames,
   shieldDurationFrames,
   shieldSnapshot,
   updateShield,
@@ -113,6 +116,21 @@ describe('shared ship shield state machine', () => {
     expect(resolveCombatDamageSource('boundary')).toBe('collision');
     expect(resolveCombatDamageSource('player-1')).toBe('laser');
     expect(resolveCombatDamageSource('asteroid', 'laser')).toBe('laser');
+  });
+
+  test('Warden E uses the visual predicate without changing F mechanics', () => {
+    const state = { ...createShieldState(), shieldTimer: 12 };
+    expect(isReadableShieldUp(state)).toBe(true);
+    expect(isShieldBlockingLasers(state)).toBe(false);
+    expect(laserCollisionRadius(10, state)).toBe(10);
+    noteReadableShieldLaserHit(state);
+    expect(state.shieldFlashTime).toBe(shieldFlashFrames());
+  });
+
+  test('a raised readable shield stays quiet until an enemy laser is recorded', () => {
+    const state = { ...createShieldState(), shieldTimer: 12 };
+    expect(state.shieldFlashTime).toBe(0);
+    expect(shouldBlockDamage(state, 'laser')).toBe(false);
   });
 });
 

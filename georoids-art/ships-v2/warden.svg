@@ -4,7 +4,7 @@
   <title>warden — delta-shield-arc</title>
   <rect width="64" height="64" fill="#000011"/>
   <g fill="none" stroke="#5EEAD4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 12.4 L20.8 51.6 L32 39.2 L43.2 51.6 Z"/>
-    <path d="M25.6 6 L27.6 4 L29.8 2.8 L32 2.4 L34.2 2.8 L36.4 4 L38.4 6"/>
+    <path d="M32.25 13.5 L19.75 52.25 L27.75 52.25 L32 45.5 L36.25 52.25 L44.25 52.25 Z"/>
+    <path d="M23 9.25 L25.75 7 L28.75 5.75 L32 5.5 L35.75 6.25 L39 7.5 L41 9.25"/>
   </g>
 </svg>

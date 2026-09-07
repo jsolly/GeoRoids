@@ -7,6 +7,8 @@ import type {
   PlayerLeave,
   PlayerUpdate,
   Position,
+  SatellitePickupCollected,
+  SatelliteShoot,
   ServerGameState,
   ShockwaveEvent,
   Velocity,
@@ -18,6 +20,8 @@ import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { shouldApplyRemoteShoot } from '../../entities/player/remoteLasers';
+import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
+import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { applyShipKitToShip } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
@@ -242,6 +246,8 @@ export class ConnectionManager {
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
     LootField.getInstance().clear();
+    SatelliteManager.getInstance().clear();
+    SatellitePickupManager.getInstance().clear();
     this.localPlayerId = '';
     // pagehide / unexpected close keep the stored id (#467). Game-over Start
     // mints a new one so we do not rejoin a 0-life ship.
@@ -600,6 +606,12 @@ export class ConnectionManager {
       case 'botDestroyed':
         this.handleBotDestroyed(data as { botId: string });
         break;
+      case 'satelliteShoot':
+        this.handleSatelliteShoot(data as SatelliteShoot);
+        break;
+      case 'satellitePickupCollected':
+        this.handleSatellitePickupCollected(data as SatellitePickupCollected);
+        break;
       case 'playerShoot':
         this.handlePlayerShoot(
           data as {
@@ -787,6 +799,13 @@ export class ConnectionManager {
     if (Array.isArray(data.loot)) {
       LootField.getInstance().applySnapshot(data.loot as LootData[]);
     }
+
+    if (Array.isArray(data.satellites)) {
+      SatelliteManager.getInstance().syncFromServer(data.satellites);
+    }
+    if (Array.isArray(data.satellitePickups)) {
+      SatellitePickupManager.getInstance().syncFromServer(data.satellitePickups);
+    }
   }
 
   private handleLootExploded(data: {
@@ -821,6 +840,8 @@ export class ConnectionManager {
     if (!keepField) {
       this.seenAsteroidIds.clear();
       LootField.getInstance().clear();
+      SatelliteManager.getInstance().clear();
+      SatellitePickupManager.getInstance().clear();
     }
     // `keepField` controls whether the warm local belt is retained. It must
     // not suppress the handshake: a reconnect can land on a fresh server
@@ -941,6 +962,30 @@ export class ConnectionManager {
       exploding: data.exploding,
     });
     // Bot handling is now done through unified entity system in handleGameState
+  }
+
+  private handleSatelliteShoot(data: SatelliteShoot): void {
+    logger.debug('NETWORK', 'Satellite shot laser', {
+      satelliteId: data.id,
+      laserStart: data.laserStart,
+      laserDirection: data.laserDirection,
+    });
+    if (typeof data.shotId !== 'string' || data.shotId.length === 0) {
+      return;
+    }
+    SatelliteManager.getInstance().addLaser(
+      data.id,
+      data.shotId,
+      data.laserStart,
+      data.laserDirection
+    );
+  }
+
+  private handleSatellitePickupCollected(data: SatellitePickupCollected): void {
+    if (!data?.playerId || !data.pickupId) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('satellitePickupCollected', { detail: data }));
   }
 
   private handleBotDestroyed(data: { botId: string }): void {

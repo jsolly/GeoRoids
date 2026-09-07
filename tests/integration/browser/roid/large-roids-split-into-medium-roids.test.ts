@@ -17,7 +17,7 @@ test('solo player destroying a large roid does not split', async () => {
 
   const asteroids = await game.getAsteroidPositions();
   const initialCount = asteroids.length;
-  const large = asteroids.find((a) => a.radius >= 40 && !a.isCollabTarget);
+  const large = asteroids.find((a) => a.radius >= 40 && !a.isCollabTarget && a.material === 'ice');
   expect(large, 'expected at least one large asteroid in the field').toBeTruthy();
   if (!large) return;
 

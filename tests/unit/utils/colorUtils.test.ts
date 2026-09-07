@@ -29,11 +29,14 @@ test('locked palette hexes match the art-direction swatch', () => {
   expect(PALETTE.HUD_MUTED).toBe('#64748B');
   expect(PALETTE.DANGER).toBe('#F43F5E');
   expect(PALETTE.HEALTH).toBe('#4ADE80');
-  expect(PALETTE.LOOT).toBe('#FBBF24');
+  expect(PALETTE.LOOT).toBe('#E8D5A3');
   expect(TITLE.ACCENT).toBe('#A78BFA');
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');
-  expect(PALETTE.SHIELD).toBe('#67E8F9');
+  expect(PALETTE.SHIELD).toBe('#7DD3C8');
   expect(PALETTE.SHIELD.toLowerCase()).not.toBe('#ffffff');
+  expect(PALETTE.SATELLITE_PICKUP).toBe('#FBBF24');
+  expect(PALETTE.SATELLITE_PICKUP.toLowerCase()).not.toBe('#ffffff');
+  expect(PALETTE.SATELLITE_PICKUP.toLowerCase()).not.toBe('#67e8f9');
 });
 
 test('faction colors map local mint, remote sky, bot amber', () => {

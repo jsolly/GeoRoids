@@ -1,4 +1,4 @@
-import type { AsteroidData } from '../../shared-types';
+import type { AsteroidData, SatelliteData } from '../../shared-types';
 import {
   findShipAsteroidOverlaps,
   findShipShipPairs,
@@ -42,6 +42,21 @@ export class CollisionAuthority {
         radius: asteroidCollisionRadius(asteroid),
       }))
     );
+  }
+
+  public collectShipSatelliteHits(
+    entities: GameEntity[],
+    satellites: SatelliteData[]
+  ): Array<{ shipId: string; satelliteId: string }> {
+    const living = satellites.filter((satellite) => !satellite.exploding && satellite.health > 0);
+    return findShipAsteroidOverlaps(
+      entities.map(toCombatCircle),
+      living.map((satellite) => ({
+        id: satellite.id,
+        position: satellite.position,
+        radius: satellite.radius,
+      }))
+    ).map((hit) => ({ shipId: hit.shipId, satelliteId: hit.asteroidId }));
   }
 
   public collectShipShipTicks(

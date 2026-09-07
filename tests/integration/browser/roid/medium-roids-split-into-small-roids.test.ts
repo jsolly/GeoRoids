@@ -16,7 +16,7 @@ test('medium roids do not split', async () => {
   await game.waitForAsteroids(1);
 
   const initial = await game.getAsteroidPositions();
-  const large = initial.find((a) => a.radius >= 40 && !a.isCollabTarget);
+  const large = initial.find((a) => a.radius >= 40 && !a.isCollabTarget && a.material === 'ice');
   expect(large, 'expected a large asteroid').toBeTruthy();
   if (!large) return;
 

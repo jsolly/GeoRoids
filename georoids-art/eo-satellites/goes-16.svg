@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -34 68 68" width="68" height="68" role="img" aria-label="GOES-16">
+  <title>GOES-16</title>
+  <g fill="none" stroke="#C4B5FD" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="0,-6 8,-11 16,-6 16,8 8,13 0,8 0,-6"/>
+    <polyline points="8,-11 8,1 16,8"/>
+    <polyline points="-30,-16 -5,-16 -5,4 -30,4 -30,-16"/>
+    <polyline points="-25,-16 -25,4"/>
+    <polyline points="-20,-16 -20,4"/>
+    <polyline points="-15,-16 -15,4"/>
+    <polyline points="-10,-16 -10,4"/>
+    <polyline points="-5,-5 0,-3"/>
+    <polyline points="16,3 30,24"/>
+    <polyline points="27,25 31,22"/>
+    <polyline points="7,13 7,19"/>
+    <ellipse cx="5" cy="5" rx="3.5" ry="4"/>
+  </g>
+</svg>

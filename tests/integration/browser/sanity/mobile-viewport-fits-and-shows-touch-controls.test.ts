@@ -6,8 +6,8 @@ import { TestConfig } from '../../utils/test-config';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
-test('mobile viewport fits chrome and shows stick + fire', async () => {
-  const page = browserManager.getCurrentPage();
+test('mobile viewport fits chrome and exposes stick, fire, ability, and shield', async () => {
+  const page = await browserManager.recreatePage({ hasTouch: true });
   if (!page) {
     throw new Error('Page not available');
   }
@@ -21,6 +21,8 @@ test('mobile viewport fits chrome and shows stick + fire', async () => {
     const root = document.getElementById('touch-controls');
     const stick = document.getElementById('touch-stick');
     const fire = document.getElementById('touch-fire');
+    const ability = document.getElementById('touch-ability');
+    const shield = document.getElementById('touch-shield');
     const canvas = document.getElementById('gameCanvas');
     const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
     const box = (el: Element | null) => {
@@ -40,6 +42,10 @@ test('mobile viewport fits chrome and shows stick + fire', async () => {
       canvas: canvas ? { width: (canvas as HTMLCanvasElement).width, height: (canvas as HTMLCanvasElement).height } : null,
       stick: box(stick),
       fire: box(fire),
+      ability: box(ability),
+      shield: box(shield),
+      abilityDisabled: ability?.getAttribute('aria-disabled'),
+      shieldDisabled: shield?.getAttribute('aria-disabled'),
     };
   });
 
@@ -51,10 +57,18 @@ test('mobile viewport fits chrome and shows stick + fire', async () => {
   expect(chrome.canvas?.height).toBeGreaterThan(0);
   expect(chrome.stick).toBeTruthy();
   expect(chrome.fire).toBeTruthy();
+  expect(chrome.ability).toBeTruthy();
+  expect(chrome.shield).toBeTruthy();
+  expect(chrome.abilityDisabled).toBe('false');
+  expect(chrome.shieldDisabled).toBe('false');
   expect(chrome.stick?.left).toBeGreaterThanOrEqual(-1);
   expect(chrome.fire?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
+  expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
+  expect(chrome.shield?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
   expect(chrome.stick?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
   expect(chrome.fire?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
+  expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
+  expect(chrome.shield?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
 
   await page.touchscreen.tap(
     Math.round((chrome.fire?.left ?? 0) + 20),
@@ -73,4 +87,33 @@ test('mobile viewport fits chrome and shows stick + fire', async () => {
     return Boolean(ship && (ship.lasers.length > 0 || ship.lastShotTime > 0));
   });
   expect(fired).toBe(true);
+
+  await page.locator('#touch-ability').click();
+  const abilityUsed = await page.evaluate(() => {
+    const gc = window as unknown as {
+      gameController?: {
+        getPlayerManager: () => {
+          getLocalPlayer: () => {
+            ship: { abilityCooldownFrames: number; abilityActiveFrames: number };
+          } | null;
+        };
+      };
+    };
+    const ship = gc.gameController?.getPlayerManager().getLocalPlayer()?.ship;
+    return Boolean(ship && (ship.abilityCooldownFrames > 0 || ship.abilityActiveFrames > 0));
+  });
+  expect(abilityUsed).toBe(true);
+
+  await page.locator('#touch-shield').click();
+  const shieldRaised = await page.evaluate(() => {
+    const gc = window as unknown as {
+      gameController?: {
+        getPlayerManager: () => {
+          getLocalPlayer: () => { ship: { shieldActive: boolean } } | null;
+        };
+      };
+    };
+    return Boolean(gc.gameController?.getPlayerManager().getLocalPlayer()?.ship.shieldActive);
+  });
+  expect(shieldRaised).toBe(true);
 }, TestConfig.DEFAULT_TIMEOUT);

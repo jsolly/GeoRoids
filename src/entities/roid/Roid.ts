@@ -1,9 +1,10 @@
-import type { Position, Velocity } from '../../../shared-types';
+import type { AsteroidMaterial, Position, Velocity } from '../../../shared-types';
 import { playHitSound as playHitSoundAt } from '../../audio/gameSounds';
 import { DEBUG, GAME, ROID } from '../../constants';
 import { stepAsteroidMotionInto } from '../../physics/asteroidMotion';
 import { isDebugMode } from '../../utils/debugUtils';
 import { getRandomPositionInAsteroidField } from '../../utils/spawnPosition';
+import { pointsForRoidSize } from './roidScore';
 
 class Roid {
   id: string;
@@ -14,6 +15,7 @@ class Roid {
   velocity: Velocity;
   health: number;
   maxHealth: number;
+  material?: AsteroidMaterial;
   pendingDestruction: boolean = false; // Track asteroids waiting for server confirmation
   pendingUntilMs: number = 0;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
@@ -110,14 +112,7 @@ class RoidBelt {
     }
     let score = 0;
 
-    // Award points based on size (server handles all splitting logic)
-    if (r.r >= 40) {
-      score += ROID.POINTS_LARGE;
-    } else if (r.r >= 20) {
-      score += ROID.POINTS_MEDIUM;
-    } else {
-      score += ROID.POINTS_SMALL;
-    }
+    score += pointsForRoidSize(r.r);
 
     // Client never creates new roids - server handles all splitting via network messages
     return { score, newRoids: [] };

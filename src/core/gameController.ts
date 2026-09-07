@@ -1,6 +1,12 @@
 import { areAllied } from '../../shared/factions';
 import { consumeTickAccumulator } from '../../shared/gameClock';
-import type { AsteroidData, LootData, Position, ShipKitId } from '../../shared-types';
+import type {
+  AsteroidData,
+  LootData,
+  Position,
+  SatellitePickupCollected,
+  ShipKitId,
+} from '../../shared-types';
 import {
   replaceThrustSources,
   resetThrustSources,
@@ -16,7 +22,9 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import { PlayerNetwork } from '../entities/player/playerNetwork';
 import { advanceRemotePlayerShips } from '../entities/player/remoteLasers';
 import type { RoidBelt } from '../entities/roid/Roid';
-import { rocksForPlayfieldZoom } from '../entities/roid/roidRenderer';
+import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/roidRenderer';
+import { SatelliteManager } from '../entities/satellite/SatelliteManager';
+import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import {
   bindHarpoonFieldSource,
   collectPlayHarpoonField,
@@ -51,7 +59,7 @@ import {
   getTerrainSeed,
 } from '../physics/terrain/terrainSession';
 import { canvasManager } from '../rendering/canvas';
-import { playfieldZoom } from '../rendering/playfieldCamera';
+import { PLAYFIELD_CLOSE_SCALE } from '../rendering/playfieldCamera';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { setPlayView } from '../ui/uiUtils';
 import { formatGameOverText, preferDeathCause } from '../utils/deathCause';
@@ -129,6 +137,7 @@ export class GameController {
 
   // Game lifecycle methods
   newGame(playerName?: string, kitId?: ShipKitId): void {
+    clearAsteroidShatters();
     this.lifecycleAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
@@ -269,34 +278,55 @@ export class GameController {
     );
   };
 
+  private removeServerAsteroid = (
+    event: {
+      asteroidId: string;
+      collabSplit?: boolean;
+      origin?: Position;
+    },
+    showDestructionVfx: boolean
+  ): void => {
+    const { asteroidId, collabSplit, origin } = event;
+    logger.debug('GAME', 'Removing server asteroid from local belt', {
+      asteroidId,
+      collabSplit,
+      showDestructionVfx,
+    });
+
+    if (!this.currRoidBelt) {
+      return;
+    }
+    const index = this.currRoidBelt.roids.findIndex((r) => r.id === asteroidId);
+    if (index === -1) {
+      return;
+    }
+    const roid = this.currRoidBelt.roids[index];
+    if (!roid) {
+      return;
+    }
+    if (showDestructionVfx) {
+      if (collabSplit) {
+        this.spawnCollabShockwave(origin ?? roid.position, asteroidId);
+      }
+      recordAsteroidShatter(roid);
+    }
+    // Clear pending destruction state before removing the local row.
+    roid.pendingDestruction = false;
+    roid.pendingUntilMs = 0;
+    roid.taggedUntil = undefined;
+    this.currRoidBelt.roids.splice(index, 1);
+  };
+
   private applyServerAsteroidDestroyed = (event: {
     asteroidId: string;
     collabSplit?: boolean;
     origin?: Position;
   }): void => {
-    const { asteroidId, collabSplit, origin } = event;
-    logger.debug('GAME', 'Removing server asteroid from local belt', {
-      asteroidId,
-      collabSplit,
-    });
+    this.removeServerAsteroid(event, true);
+  };
 
-    // Remove the asteroid from the local belt
-    if (this.currRoidBelt) {
-      const index = this.currRoidBelt.roids.findIndex((r) => r.id === asteroidId);
-      if (index !== -1) {
-        const roid = this.currRoidBelt.roids[index];
-        if (roid !== undefined) {
-          if (collabSplit) {
-            this.spawnCollabShockwave(origin ?? roid.position, asteroidId);
-          }
-          // Clear pending destruction flag before removing
-          roid.pendingDestruction = false;
-          roid.pendingUntilMs = 0;
-          roid.taggedUntil = undefined;
-          this.currRoidBelt.roids.splice(index, 1);
-        }
-      }
-    }
+  private applyServerAsteroidReconciled = (asteroidId: string): void => {
+    this.removeServerAsteroid({ asteroidId }, false);
   };
 
   private handleServerShockwave = (event: Event): void => {
@@ -365,20 +395,35 @@ export class GameController {
     logger.debug('GAME', 'Server tagged asteroid for collab window', { asteroidId, expiresAt });
   };
 
+  private handleSatellitePickupCollected = (event: Event): void => {
+    const detail = (event as CustomEvent<SatellitePickupCollected>).detail;
+    if (
+      detail?.playerId !== this.networkManager.getLocalPlayerId() ||
+      !detail.pickupName ||
+      !Number.isFinite(detail.scoreBonus)
+    ) {
+      return;
+    }
+    this.gameStateManager.setPickupMessage(detail.pickupName, detail.scoreBonus);
+  };
+
   private setupServerAsteroidListeners(): void {
     this.cleanupServerAsteroidListeners();
     bindAsteroidFieldApply({
       onCreated: this.applyServerAsteroidCreated,
       onUpdated: this.applyServerAsteroidUpdated,
       onDestroyed: this.applyServerAsteroidDestroyed,
+      onReconciled: this.applyServerAsteroidReconciled,
       onTagged: this.applyServerAsteroidTagged,
     });
     window.addEventListener('serverShockwave', this.handleServerShockwave);
+    window.addEventListener('satellitePickupCollected', this.handleSatellitePickupCollected);
   }
 
   private cleanupServerAsteroidListeners(): void {
     unbindAsteroidFieldApply();
     window.removeEventListener('serverShockwave', this.handleServerShockwave);
+    window.removeEventListener('satellitePickupCollected', this.handleSatellitePickupCollected);
   }
 
   /** Drop a pending return-to-menu so Start (or a test) can open a new session. */
@@ -583,6 +628,10 @@ export class GameController {
 
   getLoot(): LootData[] {
     return LootField.getInstance().getAll();
+  }
+
+  getSatellites() {
+    return SatelliteManager.getInstance().getAll();
   }
 
   // Score management — the server is authoritative; the local player's entity
@@ -816,8 +865,13 @@ export class GameController {
       this.publishLiveHarpoonField(currPlayer);
     }
 
+    SatelliteManager.getInstance().update();
+
     // Check laser collisions with asteroids and bots
     this.checkLaserCollisions(allPlayers);
+    this.checkLaserSatelliteCollisions();
+    this.checkSatelliteLaserCollisions();
+    this.checkSatellitePickupCollisions();
 
     // Ship↔asteroid damage is server-owned. Keep local ship-ship overlap
     // for offline DOT / visual contact only. Factions still skip allies.
@@ -828,6 +882,7 @@ export class GameController {
 
     // Update game state manager
     this.gameStateManager.updateKillMessageTimer();
+    this.gameStateManager.updatePickupMessageTimer();
   }
 
   private snapshotHarpoonField(localPlayer?: Player | null) {
@@ -840,12 +895,9 @@ export class GameController {
       );
     const rocks = harpoonBodiesFromRocks(this.currRoidBelt?.roids ?? []);
     const canvas = canvasManager.getCanvas();
-    const shipPos = local?.ship.position ?? { x: 0, y: 0 };
-    // KeyE runs outside the render loop. Recompute zoom here so latch range
-    // matches the playfield the pilot sees, not last frame's stored scale=1.
-    const playfieldScale = canvas
-      ? playfieldZoom(rocksForPlayfieldZoom(this.currRoidBelt?.roids ?? []), shipPos, canvas)
-      : canvasManager.getPlayfieldScale();
+    // KeyE runs outside the render loop. Keep latch range at the same fixed
+    // close/play scale as the renderer, even before the first frame publishes.
+    const playfieldScale = PLAYFIELD_CLOSE_SCALE;
     return {
       bodies: collectPlayHarpoonField(rocks, ships),
       playfieldScale,
@@ -958,8 +1010,50 @@ export class GameController {
       if (other.type === 'local') {
         continue;
       }
-      this.collisionManager.explodeIncomingLasersOnShieldedShip(other.ship.lasers, currPlayer.ship);
+      this.collisionManager.explodeIncomingLasersOnShieldedShip(
+        other.ship.lasers,
+        currPlayer.ship,
+        areAllied(other.factionId, currPlayer.factionId)
+      );
     }
+  }
+
+  private checkLaserSatelliteCollisions(): void {
+    const currPlayer = this.playerManager.getLocalPlayer();
+    if (!currPlayer) {
+      return;
+    }
+    const attackerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
+    this.collisionManager.checkLaserSatelliteCollisions(
+      currPlayer.ship.lasers,
+      SatelliteManager.getInstance().getAll(),
+      attackerId
+    );
+  }
+
+  private checkSatelliteLaserCollisions(): void {
+    const currPlayer = this.playerManager.getLocalPlayer();
+    if (!currPlayer) {
+      return;
+    }
+    const localPlayerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
+    this.collisionManager.checkSatelliteLaserCollisions(
+      SatelliteManager.getInstance().getAll(),
+      currPlayer.ship,
+      localPlayerId
+    );
+  }
+
+  private checkSatellitePickupCollisions(): void {
+    const currPlayer = this.playerManager.getLocalPlayer();
+    if (!currPlayer) {
+      return;
+    }
+    const playerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
+    this.collisionManager.checkPlayerSatellitePickupCollisions(
+      { ship: currPlayer.ship, id: playerId, type: 'local' },
+      SatellitePickupManager.getInstance().getAll()
+    );
   }
 
   // Check boundary collisions for ships

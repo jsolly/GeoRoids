@@ -34,7 +34,7 @@ export function queryViewport(win: WindowLike = window): ViewportQuery {
   };
 }
 
-/** Phone/tablet viewport or a coarse pointer — show on-screen stick + fire. */
+/** Phone/tablet viewport or a coarse pointer — show the full touch control set. */
 export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): boolean {
   if (query.coarsePointer || query.hoverNone) {
     return true;
@@ -52,7 +52,7 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
 }
 
 export const DESKTOP_CONTROLS_HINT = 'WASD + Space / arrows · E ability';
-export const TOUCH_CONTROLS_HINT = 'Stick + fire · landscape recommended';
+export const TOUCH_CONTROLS_HINT = 'Stick · fire · ability · shield · landscape';
 
 export function controlsHintFor(query: ViewportQuery = queryViewport()): string {
   return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;

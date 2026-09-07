@@ -78,6 +78,7 @@ export function drawLeaderboard(
         y: y - 4,
         radius: 6,
         angle: Math.PI / 2,
+        context: 'hud',
       });
     }
 

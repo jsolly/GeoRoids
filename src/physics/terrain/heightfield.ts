@@ -127,9 +127,18 @@ export function sampleHeight(field: Heightfield, x: number, y: number): number {
   return h * flatten;
 }
 
-export function sampleGradient(field: Heightfield, x: number, y: number): { x: number; y: number } {
+export function sampleGradientInto(
+  out: { x: number; y: number },
+  field: Heightfield,
+  x: number,
+  y: number
+): { x: number; y: number } {
   const e = TERRAIN.GRADIENT_EPS;
-  const hx = (sampleHeight(field, x + e, y) - sampleHeight(field, x - e, y)) / (2 * e);
-  const hy = (sampleHeight(field, x, y + e) - sampleHeight(field, x, y - e)) / (2 * e);
-  return { x: hx, y: hy };
+  out.x = (sampleHeight(field, x + e, y) - sampleHeight(field, x - e, y)) / (2 * e);
+  out.y = (sampleHeight(field, x, y + e) - sampleHeight(field, x, y - e)) / (2 * e);
+  return out;
+}
+
+export function sampleGradient(field: Heightfield, x: number, y: number): { x: number; y: number } {
+  return sampleGradientInto({ x: 0, y: 0 }, field, x, y);
 }

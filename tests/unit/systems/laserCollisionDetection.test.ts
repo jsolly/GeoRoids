@@ -3,6 +3,7 @@ import {
   asteroidPointsForRadius,
   checkLaserAsteroidCollision,
   checkLaserAsteroidCollisionSwept,
+  checkLaserHit,
   checkLaserShipCollision,
   isLaserNearAsteroid,
 } from '../../../src/physics/collision/collisionDetection';
@@ -166,6 +167,19 @@ describe('Laser Collision Detection Functions', () => {
         8
       );
       expect(smallResult).toBe(true);
+    });
+  });
+
+  describe('shared laser hit helper', () => {
+    test('asteroid and ship wrappers match checkLaserHit', () => {
+      const laserPos = { x: 10, y: 10 };
+      const targetPos = { x: 12, y: 10 };
+      expect(checkLaserAsteroidCollision(laserPos, targetPos, 20)).toBe(
+        checkLaserHit(laserPos, targetPos, 20)
+      );
+      expect(checkLaserShipCollision(laserPos, targetPos, 15)).toBe(
+        checkLaserHit(laserPos, targetPos, 15)
+      );
     });
   });
 });

@@ -1,16 +1,42 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { PALETTE, VISUAL } from '../../../src/constants';
+import { GAME } from '../../../src/constants';
+import { applyVelocity } from '../../../src/entities/ship/ShipMovementManager';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import { createHeightfield, sampleGradient, sampleHeight } from '../../../src/physics/terrain/heightfield';
 import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { applyTerrainSeed, ensureTerrain, getTerrainSeed } from '../../../src/physics/terrain/terrainSession';
+import { canvasManager } from '../../../src/rendering/canvas';
+import { drawIsoContours } from '../../../src/rendering/contourRenderer';
+import { Point } from '../../../src/physics/Point';
+import { applyShipMotionFrame } from '../../../server/ai/shipMotion';
 import { GameEngine } from '../../../server/core/GameEngine';
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
+
+type TraceContext = CanvasRenderingContext2D & { strokes: number };
+
+function traceContext(): TraceContext {
+  let ctx = {} as TraceContext;
+  ctx = {
+    strokes: 0,
+    save: () => undefined,
+    restore: () => undefined,
+    beginPath: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    stroke: () => {
+      ctx.strokes += 1;
+    },
+  } as unknown as TraceContext;
+  return ctx;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function steepestSample(seed: number): { x: number; y: number; steep: number } {
   const field = createHeightfield(seed, BOUNDS);
@@ -146,17 +172,30 @@ describe('ships feel the slope', () => {
   });
 
   test('player and bot movement both apply the shared slope helper', () => {
-    const shipSrc = readFileSync(resolve(process.cwd(), 'src/entities/ship/Ship.ts'), 'utf8');
-    const moveSrc = readFileSync(
-      resolve(process.cwd(), 'src/entities/ship/ShipMovementManager.ts'),
-      'utf8'
-    );
-    const botSrc = readFileSync(resolve(process.cwd(), 'server/ai/shipMotion.ts'), 'utf8');
-    const entitySrc = readFileSync(resolve(process.cwd(), 'server/core/EntityManager.ts'), 'utf8');
-    expect(shipSrc).toMatch(/applySharedShipSlope\(this\.velocity, this\.position\)/);
-    expect(moveSrc).toMatch(/applySharedShipSlope\(state\.velocity, state\.position\)/);
-    expect(botSrc).toMatch(/applySharedShipSlope\(ship\.velocity, ship\.position\)/);
-    expect(entitySrc).toMatch(/applyShipMotionSteps\(bot,/);
+    const peak = steepestSample(TERRAIN.DEFAULT_SEED);
+    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+    const player = {
+      position: { x: peak.x, y: peak.y },
+      velocity: { x: 0, y: 0 },
+      angle: 0,
+      angularVelocity: 0,
+      thrusting: false,
+      thrusterActive: false,
+      frictionCoefficient: GAME.FRICTION,
+    };
+    const bot = {
+      position: { x: peak.x, y: peak.y },
+      velocity: { x: 0, y: 0 },
+      angle: 0,
+      thrusting: false,
+    };
+
+    applyVelocity(player);
+    applyShipMotionFrame(bot);
+
+    expect(bot.velocity.x).toBeCloseTo(player.velocity.x, 10);
+    expect(bot.velocity.y).toBeCloseTo(player.velocity.y, 10);
+    expect(Math.hypot(player.velocity.x, player.velocity.y)).toBeGreaterThan(0);
   });
 });
 
@@ -171,14 +210,19 @@ describe('muted contour chrome', () => {
     expect(VISUAL.CONTOUR_INDEX_ALPHA).toBeGreaterThan(VISUAL.CONTOUR_ALPHA);
   });
 
-  test('playfield paints contours after the starfield and before ships', () => {
-    const canvasSrc = readFileSync(resolve(process.cwd(), 'src/rendering/canvas.ts'), 'utf8');
-    const star = canvasSrc.indexOf('drawStarfield(');
-    const contour = canvasSrc.indexOf('drawIsoContours(');
-    const ships = canvasSrc.indexOf('drawShipAtPosition(');
-    expect(star).toBeGreaterThan(-1);
-    expect(contour).toBeGreaterThan(star);
-    expect(ships).toBeGreaterThan(contour);
+  test('active room terrain produces muted contour strokes at runtime', () => {
+    const ctx = traceContext();
+    const canvas = { width: 800, height: 600 } as HTMLCanvasElement;
+    vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
+    vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+    vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
+      (world) => new Point(world.x + 400, world.y + 300)
+    );
+    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+
+    drawIsoContours({ x: 0, y: 0 });
+
+    expect(ctx.strokes).toBeGreaterThan(0);
   });
 });
 

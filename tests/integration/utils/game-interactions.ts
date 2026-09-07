@@ -564,7 +564,7 @@ export class GameInteractions {
   }
 
   async getAsteroidPositions(): Promise<
-    Array<{ x: number; y: number; radius: number; id: string; isCollabTarget?: boolean }>
+    Array<{ x: number; y: number; radius: number; id: string; isCollabTarget?: boolean; material?: string }>
   > {
     return await this.page.evaluate(() => {
       const gameController = (window as any).gameController;
@@ -576,6 +576,7 @@ export class GameInteractions {
           radius: roid.r,
           id: roid.id,
           isCollabTarget: roid.isCollabTarget === true,
+          material: roid.material,
         })) : [];
       }
       return [];
@@ -845,6 +846,121 @@ export class GameInteractions {
         ship.spawnProtectionTimer = 600;
       }
     });
+  }
+
+  /** Snapshot of all satellites the client currently knows about. */
+  async getSatellites(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      x: number;
+      y: number;
+      health: number;
+      maxHealth: number;
+      exploding: boolean;
+      r: number;
+      laserCount: number;
+    }>
+  > {
+    return await this.page.evaluate(() => {
+      const gc = (window as any).gameController;
+      const satellites = gc?.getSatellites?.() ?? [];
+      return satellites.map((sat: any) => ({
+        id: sat.id,
+        name: sat.name,
+        x: sat.position.x,
+        y: sat.position.y,
+        health: sat.health,
+        maxHealth: sat.maxHealth,
+        exploding: sat.exploding,
+        r: sat.radius,
+        laserCount: sat.lasers?.length ?? 0,
+      }));
+    });
+  }
+
+  /** Wait until at least `count` satellites are known to the client. */
+  async waitForSatellites(count: number, timeoutMs = 25000): Promise<void> {
+    await this.page.waitForFunction(
+      (expected) => {
+        const gc = (window as any).gameController;
+        return (gc?.getSatellites?.() ?? []).length >= expected;
+      },
+      count,
+      { timeout: timeoutMs }
+    );
+  }
+
+  async attackSatelliteWithLasers(
+    satelliteId: string,
+    shots = 8
+  ): Promise<{ minHealthObserved: number; everExploding: boolean; scoreGain: number }> {
+    const startScore = await this.getScore();
+    let minHealthObserved = Number.POSITIVE_INFINITY;
+    let everExploding = false;
+
+    for (let i = 0; i < shots; i++) {
+      const sample = await this.page.evaluate((id) => {
+        const gc = (window as any).gameController;
+        const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
+        const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+        if (!sat || !ship) {
+          return null;
+        }
+        ship.position = { x: sat.position.x - 45, y: sat.position.y };
+        ship.velocity = { x: 0, y: 0 };
+        ship.thrusting = false;
+        ship.blinkCount = 600;
+        ship.spawnProtectionTimer = 600;
+        ship.angle = Math.atan2(-(sat.position.y - ship.position.y), sat.position.x - ship.position.x);
+        ship.canShoot = true;
+        ship.shoot();
+        return { health: sat.health, exploding: sat.exploding };
+      }, satelliteId);
+
+      if (sample) {
+        minHealthObserved = Math.min(minHealthObserved, sample.health);
+        everExploding = everExploding || sample.exploding;
+      }
+      await this.page.waitForTimeout(160);
+
+      const after = await this.page.evaluate((id) => {
+        const gc = (window as any).gameController;
+        const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
+        return sat ? { health: sat.health, exploding: sat.exploding } : null;
+      }, satelliteId);
+      if (after) {
+        minHealthObserved = Math.min(minHealthObserved, after.health);
+        everExploding = everExploding || after.exploding;
+      }
+    }
+
+    const endScore = await this.getScore();
+    return {
+      minHealthObserved: Number.isFinite(minHealthObserved) ? minHealthObserved : 50,
+      everExploding,
+      scoreGain: endScore - startScore,
+    };
+  }
+
+  async pinShipOnSatellite(satelliteId: string, durationMs = 2500): Promise<void> {
+    const deadline = Date.now() + durationMs;
+    while (Date.now() < deadline) {
+      await this.page.evaluate(
+        ({ id }) => {
+          const gc = (window as any).gameController;
+          const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
+          const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+          if (sat && ship) {
+            ship.position = { x: sat.position.x, y: sat.position.y };
+            ship.velocity = { x: 0, y: 0 };
+            ship.thrusting = false;
+          }
+        },
+        { id: satelliteId }
+      );
+      await this.page.waitForTimeout(100);
+    }
   }
 
   /** Snapshot of all bots the client currently knows about. */
@@ -1422,12 +1538,15 @@ export class GameInteractions {
     });
   }
 
-  /** Server-authoritative spawn protection is still active. */
+  /** The local collision path still has active server-issued protection. */
   async isServerSpawnProtected(): Promise<boolean> {
     return await this.page.evaluate(() => {
       const gc = (window as any).gameController;
-      const lp = gc?.playerManager?.getLocalPlayer?.();
-      return (lp?.serverSpawnProtectionTimer ?? 0) > 0;
+      const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
+      // Lean snapshots omit expired spawnProtectionTimer and the last
+      // positive echo remains on Player.serverSpawnProtectionTimer. The
+      // collision path uses blinkCount, which is cleared when protection ends.
+      return (ship?.blinkCount ?? 0) > 0;
     });
   }
 
@@ -1748,6 +1867,63 @@ export class GameInteractions {
     }, playerId);
   }
 
+  async getSatellitePickups(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      x: number;
+      y: number;
+      state: string;
+      ownerId: string | null;
+      r: number;
+    }>
+  > {
+    return await this.page.evaluate(() => {
+      const gc = (window as any).gameController;
+      const pickups = gc?.getSatellitePickups?.() ?? [];
+      return pickups.map((pickup: any) => ({
+        id: pickup.id,
+        name: pickup.name,
+        x: pickup.position.x,
+        y: pickup.position.y,
+        state: pickup.state,
+        ownerId: pickup.ownerId,
+        r: pickup.radius,
+      }));
+    });
+  }
+
+  async waitForSatellitePickups(count: number, timeoutMs = 25000): Promise<void> {
+    await this.page.waitForFunction(
+      (expected) => {
+        const gc = (window as any).gameController;
+        return (gc?.getSatellitePickups?.() ?? []).length >= expected;
+      },
+      count,
+      { timeout: timeoutMs }
+    );
+  }
+
+  async pinShipOnSatellitePickup(pickupId: string, durationMs = 2000): Promise<void> {
+    const deadline = Date.now() + durationMs;
+    while (Date.now() < deadline) {
+      await this.page.evaluate(
+        ({ id }) => {
+          const gc = (window as any).gameController;
+          const pickup = (gc?.getSatellitePickups?.() ?? []).find((item: any) => item.id === id);
+          const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+          if (pickup && ship) {
+            ship.position = { x: pickup.position.x, y: pickup.position.y };
+            ship.velocity = { x: 0, y: 0 };
+            ship.thrusting = false;
+          }
+        },
+        { id: pickupId }
+      );
+      await this.page.waitForTimeout(100);
+    }
+  }
+
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
     waitForCombatReady?: boolean;
@@ -1766,5 +1942,13 @@ export class GameInteractions {
     if (options?.waitForCombatReady !== false) {
       await this.waitForCombatReady();
     }
+  }
+
+  /** Alias used by satellite-pickup scenario tests. */
+  async bootSinglePlayerGame(options?: {
+    waitForCombatReady?: boolean;
+    kitId?: 'dart' | 'hauler' | 'warden' | 'skirmisher' | 'quake';
+  }): Promise<void> {
+    await this.bootGame(options);
   }
 }

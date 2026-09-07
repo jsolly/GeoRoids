@@ -10,7 +10,11 @@ import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
 import type { RoidBelt } from '../entities/roid/Roid';
-import { drawRoidsRelative, rocksForPlayfieldZoom } from '../entities/roid/roidRenderer';
+import { drawRoidsRelative } from '../entities/roid/roidRenderer';
+import { SatelliteManager } from '../entities/satellite/SatelliteManager';
+import { drawSatellites } from '../entities/satellite/satelliteRenderer';
+import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
+import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
 import type { Ship } from '../entities/ship/Ship';
 import {
   drawLasers,
@@ -27,12 +31,17 @@ import { getFactionColor, getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
 import { logger } from '../utils/Logger';
 import { drawFieryBoundary } from './boundaryRenderer';
+import {
+  drawContourLaserTicks,
+  type LiveLaserSource,
+  liveLaserPositions,
+} from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
-import { playfieldZoom, projectWorldToScreenInto } from './playfieldCamera';
+import { PLAYFIELD_CLOSE_SCALE, projectWorldToScreenInto } from './playfieldCamera';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawStarfield } from './starfield';
 
@@ -43,6 +52,8 @@ class CanvasManager {
   private resizeHandler: (() => void) | null = null;
   private playfieldScale = 1;
   private readonly screenPos = { x: 0, y: 0 };
+  private readonly laserHosts: LiveLaserSource[] = [{ lasers: [] }];
+  private readonly liveLaserPositions: Position[] = [];
 
   // Initialize canvas with proper scaling
   initialize(): void {
@@ -167,14 +178,14 @@ class CanvasManager {
   }
 
   beginPlayfieldFrame(
-    shipPos: Position,
-    roids: ReadonlyArray<{ position: Position; r?: number }>
+    _shipPos: Position,
+    _roids: ReadonlyArray<{ position: Position; r?: number }>
   ): void {
     if (!this.canvas) {
-      this.playfieldScale = 1;
+      this.playfieldScale = PLAYFIELD_CLOSE_SCALE;
       return;
     }
-    this.playfieldScale = playfieldZoom(roids, shipPos, this.canvas);
+    this.playfieldScale = PLAYFIELD_CLOSE_SCALE;
   }
 
   getPlayfieldScale(): number {
@@ -252,10 +263,32 @@ class CanvasManager {
 
     // Draw roids
     const roids = currRoidBelt.getRoids();
-    this.beginPlayfieldFrame(currShip.position, rocksForPlayfieldZoom(roids));
+    this.beginPlayfieldFrame(currShip.position, roids);
 
     drawStarfield(currShip.position);
     drawIsoContours(currShip.position);
+
+    const localId = NetworkManager.getInstance().getLocalPlayerId();
+    this.laserHosts.length = 1;
+    const localLaserHost = this.laserHosts[0];
+    if (localLaserHost) {
+      localLaserHost.lasers = currShip.lasers;
+    }
+    for (const player of allPlayers) {
+      if (player.id !== localId && shouldDrawShipHull(player.ship)) {
+        const hostIndex = this.laserHosts.length;
+        const host = this.laserHosts[hostIndex];
+        if (host) {
+          host.lasers = player.ship.lasers;
+        } else {
+          this.laserHosts.push({ lasers: player.ship.lasers });
+        }
+      }
+    }
+    drawContourLaserTicks(
+      currShip.position,
+      liveLaserPositions(this.laserHosts, this.liveLaserPositions)
+    );
 
     // Draw fiery boundary using actual ship position for proper world coordinates
     drawFieryBoundary(currShip.position);
@@ -265,8 +298,9 @@ class CanvasManager {
     }
 
     drawLootRelative(currShip, LootField.getInstance().getAll());
+    drawSatellites(SatelliteManager.getInstance().getAll(), currShip.position);
+    drawSatellitePickups(SatellitePickupManager.getInstance().getAll(), currShip.position);
 
-    const localId = NetworkManager.getInstance().getLocalPlayerId();
     const localLaserColor = getLaserColor(true);
     const enemyLaserColor = getLaserColor(false);
 

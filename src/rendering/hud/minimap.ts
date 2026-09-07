@@ -4,6 +4,9 @@ import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import { PlayerNetwork } from '../../entities/player/playerNetwork';
 import type { SoftFactionId } from '../../entities/player/softFactions';
 import { canDrawAsteroid } from '../../entities/roid/roidRenderer';
+import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
+import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
+import { drawSatellitePickupMiniMapDot } from '../../entities/satellitePickup/satellitePickupRenderer';
 import type { Ship } from '../../entities/ship/Ship';
 import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
 import type { CircleBoundary } from '../../physics/boundary';
@@ -23,9 +26,34 @@ type RadarMark =
       color: string;
       factionId?: SoftFactionId;
     }
-  | { kind: 'roid'; x: number; y: number };
+  | { kind: 'roid'; x: number; y: number }
+  | { kind: 'satellite'; x: number; y: number; color: string }
+  | { kind: 'pickup'; x: number; y: number };
 
 export function projectWorldToMiniMap(
+  boundary: CircleBoundary,
+  miniMapX: number,
+  miniMapY: number,
+  miniMapSize: number,
+  worldX: number,
+  worldY: number,
+  tolerance = 10
+): { x: number; y: number } | null {
+  return projectWorldToMiniMapInto(
+    { x: 0, y: 0 },
+    boundary,
+    miniMapX,
+    miniMapY,
+    miniMapSize,
+    worldX,
+    worldY,
+    tolerance
+  );
+}
+
+/** Allocation-free projection for the per-frame HUD path. */
+export function projectWorldToMiniMapInto(
+  out: { x: number; y: number },
   boundary: CircleBoundary,
   miniMapX: number,
   miniMapY: number,
@@ -48,7 +76,9 @@ export function projectWorldToMiniMap(
   ) {
     return null;
   }
-  return { x, y };
+  out.x = x;
+  out.y = y;
+  return out;
 }
 
 function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
@@ -66,21 +96,19 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
         y: mark.y,
         radius: VISUAL.MINIMAP_LOCAL_SIZE,
         angle: mark.heading,
+        context: 'minimap',
       });
       return;
     }
     case 'other': {
-      ctx.save();
-      ctx.fillStyle = mark.color;
-      ctx.beginPath();
-      ctx.arc(mark.x, mark.y, VISUAL.MINIMAP_DOT / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      const hull = calculateShipTrianglePoints(mark.x, mark.y, VISUAL.MINIMAP_DOT, mark.heading);
+      strokePhosphorHull(ctx, hull, mark.color);
       drawSoftFactionMark(ctx, mark.factionId, {
         x: mark.x,
         y: mark.y,
         radius: VISUAL.MINIMAP_DOT,
         angle: mark.heading,
+        context: 'minimap',
       });
       return;
     }
@@ -90,6 +118,23 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
       const size = VISUAL.MINIMAP_ROID;
       ctx.fillRect(mark.x - size / 2, mark.y - size / 2, size, size);
       ctx.restore();
+      return;
+    }
+    case 'satellite': {
+      ctx.save();
+      ctx.strokeStyle = hexToRgba(mark.color, 0.9);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(mark.x - 2, mark.y);
+      ctx.lineTo(mark.x + 2, mark.y);
+      ctx.moveTo(mark.x, mark.y - 2);
+      ctx.lineTo(mark.x, mark.y + 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    case 'pickup': {
+      drawSatellitePickupMiniMapDot(ctx, mark.x, mark.y);
       return;
     }
   }
@@ -104,6 +149,7 @@ export function drawMiniMap(
   const { x: miniMapX, y: miniMapY, size: miniMapSize } = hudLayoutForCanvas(canvas).miniMap;
   const centerX = miniMapX + miniMapSize / 2;
   const centerY = miniMapY + miniMapSize / 2;
+  const projection = { x: 0, y: 0 };
 
   ctx.save();
   ctx.beginPath();
@@ -127,7 +173,8 @@ export function drawMiniMap(
         if (isAsteroidPending(roid) || !canDrawAsteroid(roid)) {
           continue;
         }
-        const p = projectWorldToMiniMap(
+        const p = projectWorldToMiniMapInto(
+          projection,
           boundary,
           miniMapX,
           miniMapY,
@@ -141,11 +188,45 @@ export function drawMiniMap(
       }
     }
 
+    for (const satellite of SatelliteManager.getInstance().getAll()) {
+      if (satellite.exploding) {
+        continue;
+      }
+      const sat = projectWorldToMiniMapInto(
+        projection,
+        boundary,
+        miniMapX,
+        miniMapY,
+        miniMapSize,
+        satellite.position.x,
+        satellite.position.y
+      );
+      if (sat) {
+        drawRadarMark(ctx, { kind: 'satellite', x: sat.x, y: sat.y, color: satellite.color });
+      }
+    }
+
+    for (const pickup of SatellitePickupManager.getInstance().getAll()) {
+      const p = projectWorldToMiniMapInto(
+        projection,
+        boundary,
+        miniMapX,
+        miniMapY,
+        miniMapSize,
+        pickup.position.x,
+        pickup.position.y
+      );
+      if (p) {
+        drawRadarMark(ctx, { kind: 'pickup', x: p.x, y: p.y });
+      }
+    }
+
     for (const player of otherPlayers) {
       if (player.ship.exploding) {
         continue;
       }
-      const p = projectWorldToMiniMap(
+      const p = projectWorldToMiniMapInto(
+        projection,
         boundary,
         miniMapX,
         miniMapY,
@@ -167,7 +248,8 @@ export function drawMiniMap(
     }
 
     if (!ship.exploding) {
-      const p = projectWorldToMiniMap(
+      const p = projectWorldToMiniMapInto(
+        projection,
         boundary,
         miniMapX,
         miniMapY,

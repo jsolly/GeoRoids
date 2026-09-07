@@ -1,4 +1,5 @@
-import type { Position } from '../../../shared-types';
+import { GROWTH, maxVelocityFromMass, thrustScaleFromMass } from '../../../shared/shipGrowth';
+import type { Position, Velocity } from '../../../shared-types';
 import { DAMAGE, GAME, SHIP } from '../../constants';
 import { checkBoundaryCollision } from '../../physics/collision/collisionDetection';
 import {
@@ -264,4 +265,41 @@ export function calculateLaserStartPosition(
 ): Position {
   const noseOffset = createPositionFromAngle(shipAngle, (4 / 3) * shipRadius);
   return addPositions(shipPosition, noseOffset);
+}
+
+/** Friction used by the test-only `Ship.move()` path (live tick uses frictionCoefficient). */
+export function moveFrictionForShip(isBot: boolean): number {
+  return isBot ? SHIP.BOT_FRICTION : GAME.FRICTION;
+}
+
+/**
+ * Shared thrust / friction step for local ships, remotes, and bots.
+ * Callers pass their own friction so move() and update() keep their policies.
+ * Scalar mass/kit arguments keep loot growth and Hauler thrust on the same
+ * formula without allocating an options object on every frame.
+ */
+export function applyThrustOrFriction(
+  velocity: Velocity,
+  angle: number,
+  thrusting: boolean,
+  frictionCoefficient: number,
+  thrust: number = SHIP.THRUST,
+  mass: number = GROWTH.BASE_MASS,
+  maxVelocity: number = SHIP.MAX_VELOCITY
+): Velocity {
+  if (thrusting) {
+    const thrustScale = thrustScaleFromMass(mass);
+    const massMax = maxVelocityFromMass(mass);
+    const nextX = velocity.x + (Math.cos(angle) * thrust * thrustScale) / GAME.FPS;
+    const nextY = velocity.y - (Math.sin(angle) * thrust * thrustScale) / GAME.FPS;
+    const currentSpeed = Math.sqrt(nextX * nextX + nextY * nextY);
+    const speedCap = maxVelocity * (massMax / SHIP.MAX_VELOCITY);
+    if (currentSpeed > speedCap) {
+      const scale = speedCap / currentSpeed;
+      return { x: nextX * scale, y: nextY * scale };
+    }
+    return { x: nextX, y: nextY };
+  }
+  const frictionScale = 1 - frictionCoefficient / GAME.FPS;
+  return { x: velocity.x * frictionScale, y: velocity.y * frictionScale };
 }

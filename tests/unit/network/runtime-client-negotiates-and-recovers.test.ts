@@ -38,8 +38,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager.disconnect();
   });
   afterEach(() => { manager.disconnect(); unbindAsteroidFieldApply(); vi.restoreAllMocks(); setSelectedShipKitId('dart'); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
-  async function connect(offer: boolean) {
-    vi.stubEnv('VITE_SNAPSHOT_PROTOCOL', offer ? '1' : '');
+  async function connect(offer?: boolean) {
+    vi.stubEnv('VITE_SNAPSHOT_PROTOCOL', offer === undefined ? undefined : offer ? '1' : '0');
     const connecting = manager.connect(); Transport.latest.onopen?.(); await connecting;
     manager.setLocalPlayerName('Runtime pilot'); manager.initializeAsteroidSync();
     return Transport.latest;
@@ -48,8 +48,10 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('joined', { id: manager.getClientId(), name: 'Runtime pilot', position: { x: 0, y: 0 }, color: '#fff', ...(version ? { snapshotVersion: version } : {}) });
   }
 
-  test('offer defaults off and an old server ignoring an offer remains on legacy state', async () => {
-    let ws = await connect(false);
+  test('an unset build setting offers snapshots, explicit 0 disables them, and an old server remains compatible', async () => {
+    let ws = await connect();
+    expect(ws.sent.find(m => m.type === 'join').data.snapshotVersion).toBe(1);
+    manager.disconnect(); ws = await connect(false);
     expect(ws.sent.find(m => m.type === 'join').data).not.toHaveProperty('snapshotVersion');
     manager.disconnect(); ws = await connect(true);
     expect(ws.sent.find(m => m.type === 'join').data.snapshotVersion).toBe(1);

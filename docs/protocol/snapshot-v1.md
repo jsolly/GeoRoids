@@ -55,8 +55,10 @@ silently dropping state. Unknown valid JSON fields remain intact.
 ## Baselines and recovery
 
 Baselines are keyed by actual sockets in a WeakMap. Join/rejoin replaces the
-entry; reconnect starts at sequence 1. An old asynchronous callback cannot update
-a replacement entry. The first state is full, at most 90 deltas follow a keyframe,
+entry; reconnect starts at sequence 1. During a same-socket rejoin, the client
+continues decoding the old session until the ordered `joined` acknowledgment,
+so snapshots already in flight do not trigger a false protocol error. An old
+asynchronous callback cannot update a replacement entry. The first state is full, at most 90 deltas follow a keyframe,
 and a full frame replaces any delta that would be larger.
 
 Baselines advance only in a successful WebSocket send callback. This acknowledges

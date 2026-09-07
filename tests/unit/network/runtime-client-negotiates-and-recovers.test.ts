@@ -140,15 +140,27 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(pickups.get('pickup-0')?.ownerId).toBe('pilot-0');
   });
 
-  test('rejoin resets the decoder and unnegotiated snapshots close the transport', async () => {
+  test('rejoin accepts in-flight old-session snapshots until its delayed acknowledgment resets sequence', async () => {
     const ws = await connect(true); acknowledge(ws, 1);
     const state = captureSnapshot(snapshotFixture());
     ws.receive('snapshot', encodeSnapshot(state, 15));
-    manager.initializeAsteroidSync(); acknowledge(ws, 1);
+    manager.initializeAsteroidSync();
+    // The previous server session sent this before processing our join. It
+    // arrives during the round trip, before the ordered new-session ack.
+    const queued = captureSnapshot(snapshotFixture(1));
+    queued.entities[1]!.fuel = 23;
+    ws.receive('snapshot', encodeSnapshot(queued, 16, { sequence: 15, state }));
+    expect(ws.close).not.toHaveBeenCalled();
+    expect(manager.getPlayer('pilot-1')?.ship.fuel).toBe(23);
+    acknowledge(ws, 1);
     ws.receive('snapshot', encodeSnapshot(state, 1));
+    expect(manager.getPlayer('pilot-1')?.ship.fuel).toBe(state.entities[1]!.fuel);
     expect(ws.close).not.toHaveBeenCalled();
     manager.disconnect(); const old = await connect(false); acknowledge(old);
     old.receive('snapshot', encodeSnapshot(state, 1));
     expect(old.close).toHaveBeenCalledWith(1002, 'Snapshot was not negotiated');
+    manager.disconnect();
+    const unsupported = await connect(true); acknowledge(unsupported, 2);
+    expect(unsupported.close).toHaveBeenCalledWith(1002, 'Unsupported snapshot negotiation');
   });
 });

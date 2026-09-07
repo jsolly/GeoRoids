@@ -493,7 +493,9 @@ export class ConnectionManager {
     // Get the player's current position
     const playerPosition = this.getLocalPlayerPosition();
 
-    this.resetSnapshotSession();
+    // A same-socket rejoin can race snapshots already queued by the server.
+    // Keep its current decoder/format until the ordered joined acknowledgment
+    // establishes the new session. New physical sockets reset in openSocket.
     this.snapshotOffered = import.meta.env.VITE_SNAPSHOT_PROTOCOL === '1';
 
     // First join the game

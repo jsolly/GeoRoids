@@ -768,6 +768,9 @@ export class ConnectionManager {
 
         // Apply the parsed entity directly — no per-tick snapshot wrapper.
         // Kit / faction / ability / deathCause / mass / F-key shield stay on the row.
+        // A gameState row is complete: omission means protection expired.
+        // Partial playerUpdate messages retain their existing merge semantics.
+        entityData.spawnProtectionTimer ??= 0;
         entity.updateFromServer(entityData);
 
         if (isLocalPlayer && localPlayer && localPlayer !== entity) {

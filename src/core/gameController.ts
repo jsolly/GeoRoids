@@ -634,6 +634,10 @@ export class GameController {
     return SatelliteManager.getInstance().getAll();
   }
 
+  getSatellitePickups() {
+    return SatellitePickupManager.getInstance().getAll();
+  }
+
   // Score management — the server is authoritative; the local player's entity
   // score is synced from the server's gameState broadcast.
   getCurrScore(): number {

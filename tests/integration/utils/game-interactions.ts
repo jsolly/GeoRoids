@@ -276,6 +276,7 @@ export class GameInteractions {
         const lp = gc?.playerManager?.getLocalPlayer?.();
         return (lp?.serverSpawnProtectionTimer ?? 0) > 0;
       },
+      undefined,
       { timeout: timeoutMs, polling: 50 }
     );
   }
@@ -1224,14 +1225,15 @@ export class GameInteractions {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const ready = await this.page.evaluate(() => {
-        const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+        const player = (window as any).gameController?.playerManager?.getLocalPlayer?.();
+        const ship = player?.ship;
         if (!ship) {
           return false;
         }
-        // #467 lean snapshots omit expired spawnProtectionTimer; the last
-        // positive echo sticks on serverSpawnProtectionTimer. Collisions
-        // use the ship blink window, so that is what "combat ready" means.
-        return ship.health > 0 && !ship.exploding && (ship.blinkCount ?? 0) === 0;
+        // Client frames can advance faster than the authoritative server clock.
+        // Wait for both the server expiry and the local collision window.
+        return ship.health > 0 && !ship.exploding && (ship.blinkCount ?? 0) === 0
+          && player.serverSpawnProtectionTimer === 0;
       });
       if (ready) {
         return;
@@ -1538,15 +1540,12 @@ export class GameInteractions {
     });
   }
 
-  /** The local collision path still has active server-issued protection. */
+  /** Whether the latest complete server snapshot still grants protection. */
   async isServerSpawnProtected(): Promise<boolean> {
     return await this.page.evaluate(() => {
       const gc = (window as any).gameController;
-      const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
-      // Lean snapshots omit expired spawnProtectionTimer and the last
-      // positive echo remains on Player.serverSpawnProtectionTimer. The
-      // collision path uses blinkCount, which is cleared when protection ends.
-      return (ship?.blinkCount ?? 0) > 0;
+      const player = gc?.playerManager?.getLocalPlayer?.();
+      return (player?.serverSpawnProtectionTimer ?? 0) > 0;
     });
   }
 
@@ -1702,7 +1701,18 @@ export class GameInteractions {
 
   /** Apply laser damage without killing (single hit by default). */
   async applyLaserDamageToLocal(hits = 1, damagePerHit = 25): Promise<void> {
-    await this.killLocalPlayerWithLaserDamage(hits, damagePerHit);
+    await this.page.evaluate(({ hits, damagePerHit }) => {
+      const gc = (window as any).gameController;
+      const nm = gc?.getNetworkManager?.();
+      const playerId = nm?.getLocalPlayerId?.();
+      if (!nm || !playerId) throw new Error('Local player is not connected');
+      for (let i = 0; i < hits; i++) {
+        nm.sendMessage({
+          type: 'laserDamage',
+          data: { targetPlayerId: playerId, attackerId: 'server-bot-0', damage: damagePerHit },
+        });
+      }
+    }, { hits, damagePerHit });
   }
 
   /** Poll until local health exceeds a threshold. */

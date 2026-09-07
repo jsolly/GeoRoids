@@ -24,7 +24,9 @@ describe('A roid break is visible to both pilots', () => {
   });
 
   test('destroying a roid notifies every connected socket', () => {
-    const [roid] = world.engine.createAsteroids(1);
+    const roid = world.engine
+      .createAsteroids(20)
+      .find((asteroid) => !asteroid.isCollabTarget);
     expect(roid).toBeTruthy();
 
     alice.socket.clear();
@@ -36,6 +38,7 @@ describe('A roid break is visible to both pilots', () => {
         playerId: pilot.id,
         points: ROID.POINTS_LARGE,
         cause: 'laser' as const,
+        laserPosition: { x: roid!.position.x, y: roid!.position.y },
       },
     });
     world.send(alice, hit(alice));

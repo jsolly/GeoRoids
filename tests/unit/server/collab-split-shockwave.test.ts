@@ -48,6 +48,17 @@ function waitForOneShotLargeId(ws: WebSocket): Promise<string> {
   });
 }
 
+function asteroidPosition(
+  server: ReturnType<typeof createServerInstance>,
+  asteroidId: string
+): { x: number; y: number } {
+  const asteroid = server.gameEngine.getAsteroid(asteroidId);
+  if (!asteroid) {
+    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
+  }
+  return { ...asteroid.position };
+}
+
 describe('Scenario: collab split fires a double shockwave', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
   let engine: GameEngine | undefined;
@@ -74,6 +85,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
     const asteroidCreated = waitForOneShotLargeId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'player-a', asteroidCount: 2 }));
     const asteroidId = await asteroidCreated;
+    const laserPosition = asteroidPosition(server, asteroidId);
 
     const messages: Array<{ type?: string; data?: { asteroidId?: string; origin?: { x: number; y: number } } }> =
       [];
@@ -92,6 +104,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
         playerId: 'player-a',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
     playerB.send(
@@ -101,6 +114,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
         playerId: 'player-b',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
 
@@ -125,6 +139,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
     const asteroidCreated = waitForOneShotLargeId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'solo-player', asteroidCount: 2 }));
     const asteroidId = await asteroidCreated;
+    const laserPosition = asteroidPosition(server, asteroidId);
 
     const messages: Array<{ type?: string }> = [];
     playerA.on('message', (raw) => {
@@ -141,6 +156,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
       playerId: 'solo-player',
       points: ROID.POINTS_LARGE,
       cause: 'laser',
+      laserPosition,
     };
     playerA.send(JSON.stringify(hit));
     playerA.send(JSON.stringify(hit));

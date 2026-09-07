@@ -22,5 +22,5 @@ test('Sound Off', () => {
 });
 
 test('ROID_NUM constant', () => {
-  expect(ROID.INITIAL_ROID_COUNT).toBe(10);
+  expect(ROID.INITIAL_ROID_COUNT).toBe(20);
 });

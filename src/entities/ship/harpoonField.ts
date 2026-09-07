@@ -66,8 +66,31 @@ export function publishHarpoonField(
   if (bodies.length === 0 && holdEmptyField && field.length > 0) {
     return;
   }
-  if (bodies.length > 0) {
+  const hasAuthoritativeAsteroids = bodies.some((body) => body.kind !== 'ship');
+  if (holdEmptyField && !hasAuthoritativeAsteroids) {
+    // A game-state tick can still contain remote ships while the authoritative
+    // asteroid list is temporarily empty. Keep the warm rock list until a
+    // snapshot with a live asteroid generation arrives.
+    const heldAsteroids = field.filter((body) => body.kind !== 'ship');
+    if (heldAsteroids.length > 0) {
+      field = [...heldAsteroids, ...bodies];
+      for (const body of bodies) {
+        lastKnown.set(body.id, body);
+      }
+      return;
+    }
+  }
+  if (hasAuthoritativeAsteroids) {
     holdEmptyField = false;
+    // A non-empty authoritative snapshot ends the reconnect grace period.
+    // Retain only bodies from that live field so a stale latch cannot resolve
+    // forever after the server has replaced the asteroid generation.
+    const liveIds = new Set(bodies.map((body) => body.id));
+    for (const knownId of lastKnown.keys()) {
+      if (!liveIds.has(knownId)) {
+        lastKnown.delete(knownId);
+      }
+    }
   }
   field = bodies;
   for (const body of bodies) {

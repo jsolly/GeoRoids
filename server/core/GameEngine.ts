@@ -11,7 +11,7 @@ import {
   isSmallRoid,
 } from '../../shared/lootBlast';
 import { GROWTH, applyLootMass, applyShipMass, radiusFromMass } from '../../shared/shipGrowth';
-import { CANVAS, LASER } from '../../src/constants';
+import { CANVAS, DAMAGE, LASER, ROID } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
@@ -190,6 +190,9 @@ export class GameEngine {
       this.queueBotShots(this.entityManager.updateBotMovement());
     }
     this.resolveAuthoritativeCombat();
+    // Destruction can remove the last row during this frame. Refill before
+    // the next snapshot so active players never wait for a reconnect.
+    this.ensureAsteroidField();
   }
 
   /** Combat pair + clock — scenario tests drive death→respawn without moving the belt. */
@@ -236,6 +239,10 @@ export class GameEngine {
         }
       }
     }
+
+    // Asteroids are server-owned world state. A fresh active session must not
+    // depend on a client's initAsteroids message to seed the belt.
+    this.ensureAsteroidField();
   }
 
   public isGamePaused(): boolean {
@@ -372,6 +379,42 @@ export class GameEngine {
 
   public getAsteroidCount(): number {
     return this.asteroidManager.getAsteroidCount();
+  }
+
+  /**
+   * Ensure an active arena has a canonical server-owned asteroid field.
+   *
+   * Returns the rows created in this call so a transport can broadcast the
+   * replenishment immediately. An existing field, a paused world, and a world
+   * with no human players are all no-ops.
+   */
+  public ensureAsteroidField(): AsteroidData[] {
+    if (this.isPaused || this.entityManager.getHumanPlayerCount() === 0) {
+      return [];
+    }
+    if (this.asteroidManager.getAsteroidCount() > 0) {
+      return [];
+    }
+
+    const entities = this.entityManager.getAllEntities();
+    const playerPositions = entities
+      .filter((entity) => entity.type === 'human')
+      .map((entity) => entity.position);
+    const botPositions = entities
+      .filter((entity) => entity.type === 'bot')
+      .map((entity) => entity.position);
+    const asteroids = this.createAsteroids(
+      ROID.INITIAL_ROID_COUNT,
+      { radius: getAsteroidFieldRadius() },
+      botPositions,
+      playerPositions
+    );
+    logger.info('ASTEROID', 'Seeded active asteroid field', {
+      asteroidCount: asteroids.length,
+      humanPlayers: playerPositions.length,
+      bots: botPositions.length,
+    });
+    return asteroids;
   }
 
   public createAsteroids(
@@ -735,6 +778,49 @@ export class GameEngine {
     return this.lasers;
   }
 
+  /**
+   * Bot asteroid reports are only accepted while the server still has the
+   * corresponding bot projectile in flight near that same server asteroid.
+   * This keeps the existing bot-shot wire shape while rejecting forged bot
+   * identities and reports after a shot has already been consumed.
+   */
+  public hasActiveBotLaserNearAsteroid(botId: string, asteroidId: string): boolean {
+    const bot = this.entityManager.getEntity(botId);
+    const asteroid = this.asteroidManager.getAsteroid(asteroidId);
+    if (bot?.type !== 'bot' || !asteroid) {
+      return false;
+    }
+
+    return this.lasers.some(
+      (laser) =>
+        !laser.hasExploded &&
+        laser.ownerId === botId &&
+        isLaserNearAsteroid(laser.position, asteroid.position, asteroid.size)
+    );
+  }
+
+  /** Consume one validated bot projectile so duplicate client reports cannot replay it. */
+  public consumeActiveBotLaserNearAsteroid(botId: string, asteroidId: string): boolean {
+    const bot = this.entityManager.getEntity(botId);
+    const asteroid = this.asteroidManager.getAsteroid(asteroidId);
+    if (bot?.type !== 'bot' || !asteroid) {
+      return false;
+    }
+
+    const laser = this.lasers.find(
+      (candidate) =>
+        !candidate.hasExploded &&
+        candidate.ownerId === botId &&
+        isLaserNearAsteroid(candidate.position, asteroid.position, asteroid.size)
+    );
+    if (!laser) {
+      return false;
+    }
+
+    laser.hasExploded = true;
+    return true;
+  }
+
   /** Move live lasers and apply at most one break per asteroid / laser. */
   public advanceLasersAndResolveHits(): AppliedAsteroidHit[] {
     const hits: AppliedAsteroidHit[] = [];
@@ -983,11 +1069,16 @@ export class GameEngine {
 
   public handleAsteroidDamage(
     asteroidId: string,
-    playerId: string,
-    damage: number,
-    _points: number
+    playerId: string
   ): { destroyed: boolean; asteroid: AsteroidData | null; newAsteroids: AsteroidData[] } {
-    const asteroid = this.asteroidManager.damageAsteroid(asteroidId, damage);
+    const current = this.asteroidManager.getAsteroid(asteroidId);
+    if (!current?.isCollabTarget) {
+      return { destroyed: false, asteroid: null, newAsteroids: [] };
+    }
+
+    // Collaborative chip damage is deliberately fixed to one canonical
+    // laser hit. Client-supplied damage and points are never authoritative.
+    const asteroid = this.asteroidManager.damageAsteroid(asteroidId, DAMAGE.LASER_HIT);
     if (!asteroid) {
       return { destroyed: false, asteroid: null, newAsteroids: [] };
     }
@@ -1151,8 +1242,14 @@ export class GameEngine {
   }
 
   private queueBotShots(shots: BotShot[]): void {
-    if (shots.length > 0) {
-      this.pendingBotShots.push(...shots);
+    for (const shot of shots) {
+      const bot = this.entityManager.getEntity(shot.botId);
+      if (bot?.type !== 'bot') {
+        continue;
+      }
+      if (this.spawnLaser(shot.botId, shot.laserStart, shot.laserDirection)) {
+        this.pendingBotShots.push(shot);
+      }
     }
   }
 

@@ -3,17 +3,30 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const CREAM = '#E8D5A3';
 const TIP = '#FDE68A';
 
-test('Hauler title → join → fly (no teleport) → KeyE paints cream+tip', async () => {
+test.each([
+  { viewport: 'desktop', width: 1920, height: 1080 },
+  { viewport: 'mobile', width: 390, height: 844 },
+])('Hauler keeps its cable through a brief socket flap at $viewport width', async ({ viewport, width, height }) => {
   const page = browserManager.getCurrentPage();
   if (!page) throw new Error('Page not available');
 
+  await page.setViewportSize({ width, height });
+  const consoleErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => consoleErrors.push(error.message));
   const game = new GameInteractions(page);
   await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
+  const peerPage = await browserManager.createAdditionalPage();
+  const peer = new GameInteractions(peerPage);
+  await peer.bootGame({ waitForCombatReady: false });
+  await page.bringToFront();
 
   const before = await page.evaluate(() => {
     const gc = (window as { gameController?: any }).gameController;
@@ -180,4 +193,46 @@ test('Hauler title → join → fly (no teleport) → KeyE paints cream+tip', as
   expect(best?.findTarget || best?.latchPos).toBeTruthy();
   expect(best?.cream).toBe(true);
   expect(best?.tip).toBe(true);
+
+  await page.screenshot({ path: screenshotManager.getScreenshotPath(`hauler-${viewport}-live-tether.png`) });
+  const flap = await page.evaluate(async () => {
+    const gc = (window as { gameController?: any }).gameController;
+    const connection = gc.getNetworkManager().connectionManager;
+    const ship = gc.playerManager.getLocalPlayer().ship;
+    const socket: WebSocket = connection.state.socket;
+    const targetId = ship.harpoonTargetId;
+    const closed = new Promise<void>((resolve) => socket.addEventListener('close', () => resolve(), { once: true }));
+    socket.close(4000, 'Browser regression: brief connection flap');
+    await closed;
+    return {
+      targetId,
+      timer: ship.harpoonTimer,
+      rocks: gc.getCurrRoidBelt().getRoids().length,
+    };
+  });
+  expect(flap.timer).toBeGreaterThan(0);
+  expect(flap.rocks).toBeGreaterThan(0);
+  await page.waitForFunction(() => {
+    const gc = (window as { gameController?: any }).gameController;
+    const connection = gc?.getNetworkManager?.().connectionManager;
+    return connection?.state.isConnected && connection.hasInitializedAsteroidsForConnection;
+  }, undefined, { timeout: 2500 });
+  // Let the newly joined connection receive authoritative game-state frames.
+  await page.waitForTimeout(80);
+  const resumed = await page.evaluate(() => {
+    const gc = (window as { gameController?: any }).gameController;
+    const ship = gc.playerManager.getLocalPlayer().ship;
+    return {
+      targetId: ship.harpoonTargetId,
+      timer: ship.harpoonTimer,
+      rocks: gc.getCurrRoidBelt().getRoids().map((rock: { id: string }) => rock.id).sort(),
+    };
+  });
+  expect(resumed.timer).toBeGreaterThan(0);
+  expect(resumed.targetId).toBe(flap.targetId);
+  expect(resumed.rocks.length).toBeGreaterThan(0);
+  const peerRocks = (await peer.getAsteroidPositions()).map((rock) => rock.id).sort();
+  expect(resumed.rocks).toEqual(peerRocks);
+  await page.screenshot({ path: screenshotManager.getScreenshotPath(`hauler-${viewport}-after-reconnect.png`) });
+  expect(consoleErrors).toEqual([]);
 }, TestConfig.DEFAULT_TIMEOUT);

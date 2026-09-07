@@ -41,6 +41,9 @@ export class GameStateBroadcaster {
   }
 
   public broadcastGameState(excludeId?: string): void {
+    // Covers destruction paths invoked outside the frame loop (for example a
+    // client asteroid report) before publishing the authoritative snapshot.
+    this.gameEngine.ensureAsteroidField();
     const gameState = this.gameEngine.getGameState();
     const message = {
       type: 'gameState',

@@ -47,9 +47,6 @@ export interface ClientMessage {
     | 'initAsteroids'
     | 'shield'
     | 'asteroidDestroyed'
-    | 'asteroidCreate'
-    | 'asteroidUpdate'
-    | 'asteroidDestroy'
     | 'clientLog'
     | 'useAbility'
     | 'lootExplode';

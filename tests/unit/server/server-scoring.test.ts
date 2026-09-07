@@ -3,6 +3,7 @@ import { describe, expect, test, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { ROID } from '../../../src/constants';
+import type { AsteroidData } from '../../../shared-types';
 
 describe('Server scoring via asteroidDestroyed', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
@@ -33,7 +34,7 @@ describe('Server scoring via asteroidDestroyed', () => {
     const playerId = 'p1-test';
     ws.send(JSON.stringify({ type: 'join', id: playerId, name: 'Tester' }));
 
-    // Request server to create one asteroid
+    // Request the current server field.
     ws.send(JSON.stringify({ type: 'initAsteroids', id: playerId, asteroidCount: 1 }));
 
     // Capture an asteroid id from either asteroidCreateBatch or asteroidCreate
@@ -42,23 +43,40 @@ describe('Server scoring via asteroidDestroyed', () => {
       ws.on('message', (raw) => {
         try {
           const msg = JSON.parse(String(raw));
-          if (msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length > 0) {
+          const rows: AsteroidData[] = msg?.type === 'asteroidCreateBatch'
+            ? (msg.data?.asteroids ?? [])
+            : msg?.type === 'asteroidCreate' && msg.data?.asteroid ? [msg.data.asteroid] : [];
+          const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
+          if (asteroid) {
             clearTimeout(timeout);
-            resolve(msg.data.asteroids[0].id);
-          } else if (msg?.type === 'asteroidCreate' && msg?.data?.asteroid?.id) {
-            clearTimeout(timeout);
-            resolve(msg.data.asteroid.id);
+            resolve(asteroid.id);
           }
         } catch {}
       });
     });
+    const laserPosition = server.gameEngine.getAsteroid(asteroidId)?.position;
+    expect(laserPosition).toBeDefined();
 
     // Biggest asteroids need two laser hits from the same ship to finish
     // without a collab partner. Second hit awards points.
     const points = 20; // matches ROID.POINTS_LARGE
-    ws.send(JSON.stringify({ type: 'asteroidDestroyed', asteroidId, playerId, points, cause: 'laser' }));
+    ws.send(JSON.stringify({
+      type: 'asteroidDestroyed',
+      asteroidId,
+      playerId,
+      points,
+      cause: 'laser',
+      laserPosition,
+    }));
     await new Promise((resolve) => setTimeout(resolve, 120));
-    ws.send(JSON.stringify({ type: 'asteroidDestroyed', asteroidId, playerId, points, cause: 'laser' }));
+    ws.send(JSON.stringify({
+      type: 'asteroidDestroyed',
+      asteroidId,
+      playerId,
+      points,
+      cause: 'laser',
+      laserPosition,
+    }));
 
     // Expect a scoreUpdate reflecting the awarded points
     const updatedScore: number = await new Promise<number>((resolve, reject) => {
@@ -93,7 +111,7 @@ describe('Server scoring via asteroidDestroyed', () => {
     const playerId = 'test-player-server';
     ws.send(JSON.stringify({ type: 'join', id: playerId, name: 'TestPlayer' }));
 
-    // Request server to create one asteroid (mimicking large asteroid from client test)
+    // Request the current server field and choose an ordinary large asteroid.
     ws.send(JSON.stringify({ type: 'initAsteroids', id: playerId, asteroidCount: 1 }));
 
     // Wait for asteroid creation and capture the asteroid ID
@@ -102,12 +120,13 @@ describe('Server scoring via asteroidDestroyed', () => {
       ws.on('message', (raw) => {
         try {
           const msg = JSON.parse(String(raw));
-          if (msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length > 0) {
+          const rows: AsteroidData[] = msg?.type === 'asteroidCreateBatch'
+            ? (msg.data?.asteroids ?? [])
+            : msg?.type === 'asteroidCreate' && msg.data?.asteroid ? [msg.data.asteroid] : [];
+          const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
+          if (asteroid) {
             clearTimeout(timeout);
-            resolve(msg.data.asteroids[0].id);
-          } else if (msg?.type === 'asteroidCreate' && msg?.data?.asteroid?.id) {
-            clearTimeout(timeout);
-            resolve(msg.data.asteroid.id);
+            resolve(asteroid.id);
           }
         } catch {}
       });
@@ -117,6 +136,8 @@ describe('Server scoring via asteroidDestroyed', () => {
     expect(asteroidId).toBeDefined();
     expect(typeof asteroidId).toBe('string');
     expect(asteroidId).toMatch(/^server-asteroid-/);
+    const laserPosition = server.gameEngine.getAsteroid(asteroidId)?.position;
+    expect(laserPosition).toBeDefined();
 
     // Collect all messages received after sending asteroidDestroyed
     const receivedMessages: any[] = [];
@@ -128,14 +149,15 @@ describe('Server scoring via asteroidDestroyed', () => {
     };
     ws.on('message', messageHandler);
 
-    // Ship-ram is not a collab laser hit: destroy immediately, no split.
-    const expectedPoints = ROID.POINTS_LARGE; // 20 points for large asteroid
+    // Ship-ram is server-owned. A client collision report cannot destroy or
+    // score an asteroid, even when it supplies a plausible point value.
     ws.send(JSON.stringify({
       type: 'asteroidDestroyed',
       asteroidId,
       playerId,
-      points: expectedPoints,
+      points: ROID.POINTS_LARGE,
       cause: 'collision',
+      laserPosition,
     }));
 
     // Wait for messages to be processed
@@ -149,33 +171,17 @@ describe('Server scoring via asteroidDestroyed', () => {
       msg?.type === 'scoreUpdate' && msg?.data?.playerId === playerId
     );
 
-    // Verify the scoreUpdate message structure and values
-    expect(scoreUpdate).toBeDefined();
-    expect(scoreUpdate).toHaveProperty('type', 'scoreUpdate');
-    expect(scoreUpdate).toHaveProperty('data');
-    expect(scoreUpdate.data).toHaveProperty('playerId', playerId);
-    expect(scoreUpdate.data).toHaveProperty('score', expectedPoints);
-    expect(scoreUpdate).toHaveProperty('timestamp');
-    expect(typeof scoreUpdate.timestamp).toBe('number');
+    expect(scoreUpdate).toBeUndefined();
 
     // Find the asteroidDestroy message
     const asteroidDestruction = receivedMessages.find(msg =>
       msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
     );
 
-    expect(asteroidDestruction).toBeDefined();
-    expect(asteroidDestruction).toHaveProperty('type', 'asteroidDestroy');
-    expect(asteroidDestruction.data).toHaveProperty('asteroidId', asteroidId);
-
-    // Ramming a biggest asteroid destroys it without a collab split.
-    const asteroidCreation = receivedMessages.find(msg =>
-      msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
-    );
-    expect(asteroidCreation).toBeUndefined();
-    expect(asteroidDestruction.data.collabSplit).toBe(false);
+    expect(asteroidDestruction).toBeUndefined();
+    expect(server.gameEngine.getAsteroid(asteroidId)).toBeDefined();
 
     ws.close();
   });
 });
-
 

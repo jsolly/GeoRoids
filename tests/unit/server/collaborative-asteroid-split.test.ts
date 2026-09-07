@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { ROID } from '../../../src/constants';
+import type { AsteroidData } from '../../../shared-types';
 
 async function openSocket(port: number): Promise<WebSocket> {
   const ws = new WebSocket(`ws://localhost:${port}/ws`);
@@ -19,18 +20,30 @@ function waitForAsteroidId(ws: WebSocket): Promise<string> {
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw));
-        if (msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length > 0) {
+        const rows: AsteroidData[] = msg?.type === 'asteroidCreateBatch'
+          ? (msg.data?.asteroids ?? [])
+          : msg?.type === 'asteroidCreate' && msg.data?.asteroid ? [msg.data.asteroid] : [];
+        const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
+        if (asteroid) {
           clearTimeout(timeout);
-          resolve(msg.data.asteroids[0].id);
-        } else if (msg?.type === 'asteroidCreate' && msg?.data?.asteroid?.id) {
-          clearTimeout(timeout);
-          resolve(msg.data.asteroid.id);
+          resolve(asteroid.id);
         }
       } catch {
         // ignore non-JSON frames
       }
     });
   });
+}
+
+function asteroidPosition(
+  server: ReturnType<typeof createServerInstance>,
+  asteroidId: string
+): { x: number; y: number } {
+  const asteroid = server.gameEngine.getAsteroid(asteroidId);
+  if (!asteroid) {
+    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
+  }
+  return { ...asteroid.position };
 }
 
 describe('Scenario: two players hit a big roid within 1s → split', () => {
@@ -56,6 +69,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'player-a', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
+    const laserPosition = asteroidPosition(server, asteroidId);
 
     const splitMessages: unknown[] = [];
     const onSplit = (raw: Buffer) => {
@@ -74,6 +88,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         playerId: 'player-a',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
     playerB.send(
@@ -83,6 +98,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         playerId: 'player-b',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
 
@@ -115,6 +131,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'tag-player', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
+    const laserPosition = asteroidPosition(server, asteroidId);
 
     const messages: any[] = [];
     playerA.on('message', (raw) => {
@@ -132,6 +149,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         playerId: 'tag-player',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
 
@@ -160,6 +178,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'socket-owner', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
+    const laserPosition = asteroidPosition(server, asteroidId);
 
     const messages: any[] = [];
     playerA.on('message', (raw) => {
@@ -177,6 +196,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         playerId: 'socket-owner',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
     await new Promise((resolve) => setTimeout(resolve, ROID.COLLAB_HIT_DEDUPE_MS + 20));
@@ -187,6 +207,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         playerId: 'forged-partner',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
+        laserPosition,
       })
     );
 
@@ -215,6 +236,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'solo-player', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
+    const laserPosition = asteroidPosition(server, asteroidId);
 
     const messages: any[] = [];
     playerA.on('message', (raw) => {
@@ -231,6 +253,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       playerId: 'solo-player',
       points: ROID.POINTS_LARGE,
       cause: 'laser',
+      laserPosition,
     };
     playerA.send(JSON.stringify(hit));
     await new Promise((resolve) => setTimeout(resolve, ROID.COLLAB_HIT_DEDUPE_MS + 20));

@@ -1,3 +1,4 @@
+import { areAllied } from '../../../shared/factions';
 import { trySpendTrackedEmpFuel } from '../../../shared/fuel';
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import {
@@ -131,6 +132,12 @@ export function isHarpoonableBody(
   if (isEnvironmentLatchBody(body)) {
     return !body.exploding;
   }
+  // A Hauler can pull neutral rocks and hostile ships, but must never latch
+  // onto a same-faction mate. Keep this in the shared predicate so client
+  // prediction and the authoritative server make the same choice.
+  if (areAllied(host.factionId, body.factionId)) {
+    return false;
+  }
   if (!body.id) {
     return false;
   }
@@ -140,8 +147,6 @@ export function isHarpoonableBody(
   if ((body.shieldTimer ?? 0) > 0 || body.shieldActive) {
     return false;
   }
-  // Soft factions block combat, not a utility haul. Live EMBER QA sat
-  // next to same-side bots with no cream tether (#485 still missed).
   return true;
 }
 

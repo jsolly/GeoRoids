@@ -49,11 +49,9 @@ describe('Roid Placement Integration Tests', () => {
         expect(bots).toHaveLength(2);
 
         // Create asteroids with player and bot positions
-        // Note: DEBUG.ROIDS.INITIAL_COUNT overrides the requested count
         const asteroids = gameEngine.createAsteroids(5, { radius: 3100 }, botPositions, playerPositions);
 
-        // DEBUG.ROIDS.INITIAL_COUNT is 20, so we expect 20 asteroids
-        expect(asteroids).toHaveLength(20);
+        expect(asteroids).toHaveLength(5);
 
         // Check if any asteroids are placed on player positions
         const asteroidsOnPlayer = asteroids.filter(asteroid =>
@@ -100,8 +98,8 @@ describe('Roid Placement Integration Tests', () => {
       }
     });
 
-    it('should place roids on bot positions when PLACE_ROID_ON_BOT is true', () => {
-      // Verify the debug setting is enabled
+    it('asteroids avoid bot positions when debug placement is disabled', () => {
+      // Production placement does not pin asteroids onto bots.
       expect(DEBUG.ROIDS.PLACE_ON_BOT).toBe(false);
 
       const botPositions = [
@@ -115,8 +113,7 @@ describe('Roid Placement Integration Tests', () => {
 
       const asteroids = gameEngine.createAsteroids(4, { radius: 3100 }, botPositions, []);
       
-      // DEBUG.ROIDS.INITIAL_COUNT is 20, so we expect 20 asteroids
-      expect(asteroids).toHaveLength(20);
+      expect(asteroids).toHaveLength(4);
 
       // Check if any asteroids are placed on bot positions
       const asteroidsOnBots = asteroids.filter(asteroid => 
@@ -131,15 +128,12 @@ describe('Roid Placement Integration Tests', () => {
     });
   });
 
-  describe('Server startup behavior', () => {
-    it('should not create asteroids at server startup when no players exist', () => {
-      // This test verifies the current problematic behavior
-      // The server currently creates asteroids at startup with empty player positions
+  describe('Explicit field creation', () => {
+    it('honors the requested count without player-position hints', () => {
       
       const asteroids = gameEngine.createAsteroids(10, { radius: 3100 }, [], []);
       
-      // DEBUG.ROIDS.INITIAL_COUNT is 20, so we expect 20 asteroids
-      expect(asteroids).toHaveLength(20);
+      expect(asteroids).toHaveLength(10);
       
       // Verify no asteroids are at origin (0,0) where players typically spawn
       const asteroidsAtOrigin = asteroids.filter(asteroid => 

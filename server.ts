@@ -5,6 +5,7 @@ import { WebSocketCore } from './server/communication/WebSocketCore';
 import { GameEngine } from './server/core/GameEngine';
 import { ClientLogger } from './server/services/ClientLogger';
 import { buildHealthPayload, handleTestResetWorld } from './server/testHttpHandlers';
+import { SERVER_RELEASE_ID } from './server/release';
 
 // Production configuration
 const PORT = process.env.PORT || 3001;
@@ -14,6 +15,7 @@ logger.info(`🚀 Starting ${NODE_ENV} game server on port ${PORT}`);
 
 // Create HTTP server for health checks
 const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+  res.setHeader('x-release-id', SERVER_RELEASE_ID);
   // Add CORS headers for production
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');

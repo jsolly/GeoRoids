@@ -192,6 +192,13 @@ export class GameServerWorld {
     }
   }
 
+  /** Remove the production-seeded belt when a scenario isolates ship combat. */
+  clearAsteroids(): void {
+    for (const asteroid of this.engine.getAllAsteroids()) {
+      this.engine.removeAsteroid(asteroid.id);
+    }
+  }
+
   entity(pilot: Pilot): GameEntity {
     const entity = this.engine.getPlayer(pilot.id);
     if (!entity) {

@@ -241,7 +241,9 @@ export const ROID = {
   COLLAB_HIT_DEDUPE_MS: 100,
 
   // Spawning (can be overridden by DEBUG.ROIDS.INITIAL_COUNT when in debug mode)
-  INITIAL_ROID_COUNT: 10,
+  // Production density; DEBUG.ROIDS.INITIAL_COUNT may override this only
+  // when debug mode is explicitly enabled.
+  INITIAL_ROID_COUNT: 20,
   MIN_COUNT: 5,
   MAX_COUNT: 20,
   SPAWN_TIME_FRAMES: 180, // 3 seconds at 60 FPS
@@ -370,7 +372,7 @@ export const DEBUG = {
 
   // Roid settings (overrides ROID.INITIAL_ROID_COUNT when in debug mode)
   ROIDS: {
-    INITIAL_COUNT: 20, // Overrides ROID.INITIAL_ROID_COUNT
+    INITIAL_COUNT: 20, // Overrides ROID.INITIAL_ROID_COUNT in debug mode
     MOVEMENT: false,
     PLACE_ON_BOT: false,
     PLACE_ON_LOCAL_PLAYER: false,

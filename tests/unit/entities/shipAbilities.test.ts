@@ -265,7 +265,7 @@ test('diagnoseHarpoonLatch reports kit, nearest gap, and chosen target', () => {
   expect(probe.nearest?.reason).toBe('ok');
 });
 
-test('harpoon skips self and a Warden shield but hauls a same-side mate', () => {
+test('harpoon skips self, same-side mates, and a Warden shield', () => {
   const hauler = host('hauler');
   hauler.id = 'hauler-1';
   hauler.factionId = 'ion';
@@ -292,7 +292,7 @@ test('harpoon skips self and a Warden shield but hauls a same-side mate', () => 
     factionId: 'ember' as const,
     health: 100,
   };
-  expect(findHarpoonTarget(hauler, [self, mate, shielded, foe])?.id).toBe('mate');
+  expect(findHarpoonTarget(hauler, [self, mate, shielded, foe])?.id).toBe('foe');
   expect(findHarpoonTarget(hauler, [self, shielded, foe])?.id).toBe('foe');
 });
 

@@ -90,6 +90,15 @@ The tests are organized using a modular utility-based architecture:
    npm run dev
    ```
 
+When another GeoRoids checkout owns the default ports, the runner can start
+this worktree on an isolated pair and passes those URLs to the integration
+helpers:
+
+```bash
+GEOROIDS_TEST_VITE_PORT=5174 GEOROIDS_TEST_SERVER_PORT=3002 \
+  ./scripts/test-runner.sh tests/integration/server/
+```
+
 ## Running Tests
 
 ```bash

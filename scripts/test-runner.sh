@@ -25,6 +25,25 @@ cd "$REPO_ROOT" || {
     exit 1
 }
 
+valid_port() {
+    case "${1:-}" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
+}
+
+TEST_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-5173}"
+TEST_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-3001}"
+if ! valid_port "$TEST_VITE_PORT" || ! valid_port "$TEST_SERVER_PORT"; then
+    echo "❌ GEOROIDS_TEST_VITE_PORT and GEOROIDS_TEST_SERVER_PORT must be valid TCP ports" >&2
+    exit 1
+fi
+
+# Integration helpers read these values so a linked worktree can run against
+# its own Vite/server pair while another checkout owns the default ports.
+export GEOROIDS_TEST_VITE_PORT="$TEST_VITE_PORT"
+export GEOROIDS_TEST_SERVER_PORT="$TEST_SERVER_PORT"
+
 LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
 LOCK_PID_FILE="$LOCK_DIR/pid"
 LOCK_WORKTREE_FILE="$LOCK_DIR/worktree"
@@ -179,12 +198,12 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 servers_ready() {
-    curl -sf http://localhost:5173/ > /dev/null 2>&1 && \
-        curl -sf http://localhost:3001/health > /dev/null 2>&1
+    curl -sf "http://localhost:$TEST_VITE_PORT/" > /dev/null 2>&1 && \
+        curl -sf "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1
 }
 
 servers_have_world_diagnostics() {
-    curl -sf http://localhost:3001/health | grep -q '"world"'
+    curl -sf "http://localhost:$TEST_SERVER_PORT/health" | grep -q '"world"'
 }
 
 wait_for_servers() {
@@ -232,8 +251,8 @@ start_dev_servers() {
         return 1
     fi
 
-    if curl -sf http://localhost:5173/ > /dev/null 2>&1 || \
-        curl -sf http://localhost:3001/health > /dev/null 2>&1; then
+    if curl -sf "http://localhost:$TEST_VITE_PORT/" > /dev/null 2>&1 || \
+        curl -sf "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1; then
         echo "❌ One GeoRoids dev endpoint is already occupied; refusing to attach to a partial startup" >&2
         return 1
     fi
@@ -248,12 +267,14 @@ start_dev_servers() {
     (
         export NODE_ENV=development
         export VITEST=false
+        export PORT="$TEST_SERVER_PORT"
+        export VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws"
         exec npx --no-install concurrently \
             --kill-others \
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
             --names "vite,network" \
-            "vite" \
+            "vite --port $TEST_VITE_PORT" \
             "tsx --env-file=.env.local server.ts"
     ) &
     DEV_PID=$!

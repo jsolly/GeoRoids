@@ -60,6 +60,36 @@ function asteroidPosition(
   return { ...asteroid.position };
 }
 
+function sendTrackedAsteroidReport(
+  server: ReturnType<typeof createServerInstance>,
+  ws: WebSocket,
+  playerId: string,
+  asteroidId: string
+): void {
+  const asteroid = server.gameEngine.getAsteroid(asteroidId);
+  if (!asteroid) {
+    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
+  }
+  const laserPosition = { ...asteroid.position };
+  const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
+  if (!shot) {
+    throw new Error(`Could not seed tracked laser for ${playerId}`);
+  }
+  server.wsCore.handleClientMessage(
+    {
+      type: 'asteroidDestroyed',
+      data: {
+        asteroidId,
+        playerId,
+        points: ROID.POINTS_LARGE,
+        cause: 'laser',
+        laserPosition,
+      },
+    },
+    ws
+  );
+}
+
 describe('Scenario: collab split fires a double shockwave', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
   let engine: GameEngine | undefined;
@@ -86,7 +116,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
     const asteroidCreated = waitForOneShotLargeId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'player-a', asteroidCount: 2 }));
     const asteroidId = await asteroidCreated;
-    const laserPosition = asteroidPosition(server, asteroidId);
+    asteroidPosition(server, asteroidId);
 
     const messages: Array<{ type?: string; data?: { asteroidId?: string; origin?: { x: number; y: number } } }> =
       [];
@@ -98,26 +128,8 @@ describe('Scenario: collab split fires a double shockwave', () => {
       }
     });
 
-    playerA.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'player-a',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      })
-    );
-    playerB.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'player-b',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      })
-    );
+    sendTrackedAsteroidReport(server, playerA, 'player-a', asteroidId);
+    sendTrackedAsteroidReport(server, playerB, 'player-b', asteroidId);
 
     await expect
       .poll(() => {
@@ -140,7 +152,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
     const asteroidCreated = waitForOneShotLargeId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'solo-player', asteroidCount: 2 }));
     const asteroidId = await asteroidCreated;
-    const laserPosition = asteroidPosition(server, asteroidId);
+    asteroidPosition(server, asteroidId);
 
     const messages: Array<{ type?: string }> = [];
     playerA.on('message', (raw) => {
@@ -151,16 +163,19 @@ describe('Scenario: collab split fires a double shockwave', () => {
       }
     });
 
-    const hit = {
-      type: 'asteroidDestroyed',
-      asteroidId,
-      playerId: 'solo-player',
-      points: ROID.POINTS_LARGE,
-      cause: 'laser',
-      laserPosition,
-    };
-    playerA.send(JSON.stringify(hit));
-    playerA.send(JSON.stringify(hit));
+    sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
+    // A report without a second tracked shot is a harmless replay and must
+    // not produce the cooperative shockwave.
+    playerA.send(
+      JSON.stringify({
+        type: 'asteroidDestroyed',
+        asteroidId,
+        playerId: 'solo-player',
+        points: ROID.POINTS_LARGE,
+        cause: 'laser',
+        laserPosition: asteroidPosition(server, asteroidId),
+      })
+    );
 
     await expect
       .poll(() => messages.some((msg) => msg?.type === 'asteroidDestroy'), {

@@ -3,8 +3,16 @@ import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { ROID } from '../../../src/constants';
 import type { AsteroidData } from '../../../shared-types';
+
+function mockWs(): WebSocket {
+  return {
+    readyState: WebSocket.OPEN,
+    send: () => undefined,
+  } as unknown as WebSocket;
+}
 
 function asteroidAt(
   id: string,
@@ -41,6 +49,14 @@ function mediumAsteroid(id: string, position = { x: 400, y: 300 }): AsteroidData
 
 function largeAsteroid(id: string, position = { x: 400, y: 300 }): AsteroidData {
   return asteroidAt(id, 50, position);
+}
+
+function metalAsteroid(id: string, position = { x: 0, y: 0 }): AsteroidData {
+  return asteroidAt(id, 50, position, {
+    material: 'metal',
+    health: 75,
+    maxHealth: 75,
+  });
 }
 
 describe('Server laser↔asteroid authority', () => {
@@ -167,6 +183,118 @@ describe('Server laser↔asteroid authority', () => {
   });
 });
 
+describe('Client asteroid reports consume one tracked projectile', () => {
+  function setup(): {
+    engine: GameEngine;
+    core: WebSocketCore;
+    ownerWs: WebSocket;
+    otherWs: WebSocket;
+    asteroid: AsteroidData;
+  } {
+    const engine = new GameEngine(901);
+    const core = new WebSocketCore(engine);
+    const ownerWs = mockWs();
+    const otherWs = mockWs();
+    engine.addPlayer('pilot', 'Pilot', ownerWs, { x: 0, y: 0 });
+    engine.addPlayer('other', 'Other', otherWs, { x: 0, y: 0 });
+    const asteroid = metalAsteroid('metal-report');
+    isolateAsteroid(engine, asteroid);
+    return { engine, core, ownerWs, otherWs, asteroid };
+  }
+
+  function sendReport(
+    core: WebSocketCore,
+    ws: WebSocket,
+    asteroid: AsteroidData,
+    playerId = 'pilot',
+    laserPosition = asteroid.position
+  ): void {
+    core.handleClientMessage(
+      {
+        type: 'asteroidDestroyed',
+        data: {
+          asteroidId: asteroid.id,
+          playerId,
+          cause: 'laser',
+          laserPosition,
+        },
+      },
+      ws
+    );
+  }
+
+  function spawnAtTarget(engine: GameEngine, asteroid: AsteroidData) {
+    const shot = engine.spawnHumanLaser( 'pilot', asteroid.position, { x: 0, y: 0 });
+    expect(shot).toBeDefined();
+    return shot!;
+  }
+
+  test('applies exactly one canonical hit regardless of client/server arrival order', () => {
+    const { engine, core, ownerWs, asteroid } = setup();
+
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(75);
+
+    // Client report first consumes this shot; the later server tick only
+    // removes the consumed projectile and cannot apply a second hit.
+    const clientFirst = spawnAtTarget(engine, asteroid);
+    sendReport(core, ownerWs, asteroid);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(50);
+    expect(clientFirst.hasExploded).toBe(true);
+    expect(engine.advanceLasersAndResolveHits()).toHaveLength(0);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(50);
+
+    // Server tick first consumes its own exact projectile; the late client
+    // report is an idempotent hint and cannot apply another hit.
+    spawnAtTarget(engine, asteroid);
+    const serverFirst = engine.resolveSpawnedLaserHits();
+    expect(serverFirst).toHaveLength(1);
+    expect(serverFirst[0]?.outcome).toBe('tagged');
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(25);
+    sendReport(core, ownerWs, asteroid);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(25);
+
+    // The third real shot finishes the metal rock once, awarding one score
+    // and one shard; replaying its client report is harmless.
+    spawnAtTarget(engine, asteroid);
+    sendReport(core, ownerWs, asteroid);
+    expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
+    expect(engine.getPlayer('pilot')?.score).toBe(ROID.POINTS_LARGE);
+    expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
+    sendReport(core, ownerWs, asteroid);
+    expect(engine.getPlayer('pilot')?.score).toBe(ROID.POINTS_LARGE);
+    expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
+  });
+
+  test('rejects forged coordinates and cross-socket ownership without spending the shot', () => {
+    const { engine, core, ownerWs, otherWs, asteroid } = setup();
+    const shot = spawnAtTarget(engine, asteroid);
+
+    sendReport(core, otherWs, asteroid, 'pilot');
+    sendReport(core, ownerWs, asteroid, 'pilot', { x: 10_000, y: 10_000 });
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(75);
+    expect(shot.hasExploded).toBe(false);
+
+    sendReport(core, ownerWs, asteroid);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(50);
+    expect(shot.hasExploded).toBe(true);
+  });
+
+  test('does not lose a second coincident shot to client-boundary consumption', () => {
+    const { engine, core, ownerWs, asteroid } = setup();
+    spawnAtTarget(engine, asteroid);
+    spawnAtTarget(engine, asteroid);
+
+    sendReport(core, ownerWs, asteroid);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(50);
+
+    const secondShotHit = engine.advanceLasersAndResolveHits();
+    expect(secondShotHit).toHaveLength(1);
+    expect(secondShotHit[0]?.outcome).toBe('tagged');
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(25);
+    expect(engine.getServerLasers()).toHaveLength(0);
+  });
+});
+
 describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
   let port = 0;
@@ -222,8 +350,13 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
       points: ROID.POINTS_MEDIUM,
       laserPosition: { x: 200, y: 200 },
     };
-    wsA.send(JSON.stringify(payload));
-    wsB.send(JSON.stringify({ ...payload, playerId: 'player-b' }));
+    // A client report is accepted only when the server has the corresponding
+    // human projectile. Keep the report ordering deterministic so this test
+    // covers the network boundary rather than a timer race.
+    const trackedShot = server.gameEngine.spawnLaser('player-a', medium.position, { x: 0, y: 0 });
+    expect(trackedShot).toBeDefined();
+    server.wsCore.handleClientMessage(payload, wsA);
+    server.wsCore.handleClientMessage({ ...payload, playerId: 'player-b' }, wsB);
 
     await new Promise((resolve) => setTimeout(resolve, 400));
 

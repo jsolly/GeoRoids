@@ -46,6 +46,36 @@ function asteroidPosition(
   return { ...asteroid.position };
 }
 
+function sendTrackedAsteroidReport(
+  server: ReturnType<typeof createServerInstance>,
+  ws: WebSocket,
+  playerId: string,
+  asteroidId: string
+): void {
+  const asteroid = server.gameEngine.getAsteroid(asteroidId);
+  if (!asteroid) {
+    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
+  }
+  const laserPosition = { ...asteroid.position };
+  const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
+  if (!shot) {
+    throw new Error(`Could not seed tracked laser for ${playerId}`);
+  }
+  server.wsCore.handleClientMessage(
+    {
+      type: 'asteroidDestroyed',
+      data: {
+        asteroidId,
+        playerId,
+        points: ROID.POINTS_LARGE,
+        cause: 'laser',
+        laserPosition,
+      },
+    },
+    ws
+  );
+}
+
 describe('Scenario: two players hit a big roid within 1s → split', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
 
@@ -69,7 +99,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'player-a', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
-    const laserPosition = asteroidPosition(server, asteroidId);
+    asteroidPosition(server, asteroidId);
 
     const splitMessages: unknown[] = [];
     const onSplit = (raw: Buffer) => {
@@ -81,26 +111,8 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     };
     playerA.on('message', onSplit);
 
-    playerA.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'player-a',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      })
-    );
-    playerB.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'player-b',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      })
-    );
+    sendTrackedAsteroidReport(server, playerA, 'player-a', asteroidId);
+    sendTrackedAsteroidReport(server, playerB, 'player-b', asteroidId);
 
     await expect
       .poll(
@@ -131,7 +143,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'tag-player', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
-    const laserPosition = asteroidPosition(server, asteroidId);
+    asteroidPosition(server, asteroidId);
 
     const messages: any[] = [];
     playerA.on('message', (raw) => {
@@ -142,16 +154,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       }
     });
 
-    playerA.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'tag-player',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      })
-    );
+    sendTrackedAsteroidReport(server, playerA, 'tag-player', asteroidId);
 
     await expect
       .poll(() => {
@@ -178,7 +181,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'socket-owner', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
-    const laserPosition = asteroidPosition(server, asteroidId);
+    asteroidPosition(server, asteroidId);
 
     const messages: any[] = [];
     playerA.on('message', (raw) => {
@@ -189,16 +192,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       }
     });
 
-    playerA.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'socket-owner',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      })
-    );
+    sendTrackedAsteroidReport(server, playerA, 'socket-owner', asteroidId);
     await new Promise((resolve) => setTimeout(resolve, ROID.COLLAB_HIT_DEDUPE_MS + 20));
     playerA.send(
       JSON.stringify({
@@ -207,7 +201,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         playerId: 'forged-partner',
         points: ROID.POINTS_LARGE,
         cause: 'laser',
-        laserPosition,
+        laserPosition: asteroidPosition(server, asteroidId),
       })
     );
 
@@ -236,7 +230,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidCreated = waitForAsteroidId(playerA);
     playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'solo-player', asteroidCount: 1 }));
     const asteroidId = await asteroidCreated;
-    const laserPosition = asteroidPosition(server, asteroidId);
+    asteroidPosition(server, asteroidId);
 
     const messages: any[] = [];
     playerA.on('message', (raw) => {
@@ -247,17 +241,9 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       }
     });
 
-    const hit = {
-      type: 'asteroidDestroyed',
-      asteroidId,
-      playerId: 'solo-player',
-      points: ROID.POINTS_LARGE,
-      cause: 'laser',
-      laserPosition,
-    };
-    playerA.send(JSON.stringify(hit));
+    sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
     await new Promise((resolve) => setTimeout(resolve, ROID.COLLAB_HIT_DEDUPE_MS + 20));
-    playerA.send(JSON.stringify(hit));
+    sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
 
     await expect
       .poll(() => {

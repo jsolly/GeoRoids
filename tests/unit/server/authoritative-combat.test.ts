@@ -328,6 +328,11 @@ describe('server-authoritative combat', () => {
     });
     expect(engine.getAsteroid(asteroid.id)).toBeDefined();
 
+    // The valid client report must correspond to a projectile the server
+    // already tracks. The malformed, collision, and cross-socket reports
+    // above intentionally did not spend one.
+    const trackedShot = engine.spawnLaser('pilot', asteroid.position, { x: 0, y: 0 });
+    expect(trackedShot).toBeDefined();
     report({
       asteroidId: asteroid.id,
       playerId: 'pilot',

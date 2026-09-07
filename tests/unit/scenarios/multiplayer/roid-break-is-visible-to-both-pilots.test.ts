@@ -41,7 +41,9 @@ describe('A roid break is visible to both pilots', () => {
         laserPosition: { x: roid!.position.x, y: roid!.position.y },
       },
     });
+    world.engine.spawnLaser(alice.id, { ...roid!.position }, { x: 0, y: 0 });
     world.send(alice, hit(alice));
+    world.engine.spawnLaser(bob.id, { ...roid!.position }, { x: 0, y: 0 });
     world.send(bob, hit(bob));
 
     for (const socket of [alice.socket, bob.socket]) {

@@ -77,6 +77,36 @@ valid_pid() {
     esac
 }
 
+is_protected_vitest_option() {
+    case "${1:-}" in
+        -c*|--config|--config=*|\
+        --pool|--pool=*|--pool-options|--pool-options=*|--pool-options.*|--poolOptions|--poolOptions=*|--poolOptions.*|\
+        --maxWorkers|--maxWorkers=*|--max-workers|--max-workers=*|\
+        --maxConcurrency|--maxConcurrency=*|--max-concurrency|--max-concurrency=*|\
+        --isolate|--isolate=*|--no-isolate|--no-isolate=*|\
+        --fileParallelism|--fileParallelism=*|--file-parallelism|--file-parallelism=*|\
+        --no-fileParallelism|--no-fileParallelism=*|--no-file-parallelism|--no-file-parallelism=*|\
+        --sequence|--sequence=*|--sequence.*|--sequence-* )
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+reject_protected_vitest_arguments() {
+    local arg
+    for arg in "$@"; do
+        if is_protected_vitest_option "$arg"; then
+            echo "❌ $arg is reserved by test-runner.sh; Vitest's serialized settings cannot be overridden." >&2
+            echo "   Pass test paths and non-runner options such as --reporter only." >&2
+            return 1
+        fi
+    done
+    return 0
+}
+
 write_lock_metadata() {
     if ! printf '%s\n' "$$" > "$LOCK_PID_FILE" || \
         ! printf '%s\n' "$REPO_ROOT" > "$LOCK_WORKTREE_FILE" || \
@@ -202,8 +232,8 @@ servers_ready() {
         curl -sf "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1
 }
 
-servers_have_world_diagnostics() {
-    curl -sf "http://localhost:$TEST_SERVER_PORT/health" | grep -q '"world"'
+port_in_use() {
+    lsof -nP -iTCP:"$1" -sTCP:LISTEN > /dev/null 2>&1
 }
 
 wait_for_servers() {
@@ -239,21 +269,24 @@ prepare_logs() {
 }
 
 start_dev_servers() {
-    echo "🔍 Checking for compatible dev servers..."
+    echo "🔍 Checking that test ports are available..."
 
-    if servers_ready; then
-        if servers_have_world_diagnostics; then
-            echo "✅ Compatible dev servers are already running; leaving them owned by their caller"
-            return 0
-        fi
-        echo "❌ Existing dev servers do not expose world diagnostics; refusing to restart another worktree" >&2
-        echo "   Stop the existing servers after confirming their owner, then retry." >&2
+    if ! command -v lsof > /dev/null 2>&1; then
+        echo "❌ lsof is required to verify that test ports are owned by this runner" >&2
         return 1
     fi
 
-    if curl -sf "http://localhost:$TEST_VITE_PORT/" > /dev/null 2>&1 || \
-        curl -sf "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1; then
-        echo "❌ One GeoRoids dev endpoint is already occupied; refusing to attach to a partial startup" >&2
+    local occupied_ports=()
+    if port_in_use "$TEST_VITE_PORT"; then
+        occupied_ports+=("$TEST_VITE_PORT")
+    fi
+    if port_in_use "$TEST_SERVER_PORT"; then
+        occupied_ports+=("$TEST_SERVER_PORT")
+    fi
+    if [ "${#occupied_ports[@]}" -gt 0 ]; then
+        echo "❌ Test port(s) ${occupied_ports[*]} are already in use; refusing to attach to unowned services." >&2
+        echo "   Stop the owning process after confirming it is safe, or choose unused ports with:" >&2
+        echo "   GEOROIDS_TEST_VITE_PORT=<port> GEOROIDS_TEST_SERVER_PORT=<port> ./scripts/test-runner.sh ..." >&2
         return 1
     fi
 
@@ -274,7 +307,7 @@ start_dev_servers() {
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
             --names "vite,network" \
-            "vite --port $TEST_VITE_PORT" \
+            "vite --port $TEST_VITE_PORT --strictPort" \
             "tsx --env-file=.env.local server.ts"
     ) &
     DEV_PID=$!
@@ -320,7 +353,7 @@ run_tests() {
     fi
     printf '\n📝 Vitest config: %s\n' "$vitest_config"
 
-    "${vitest_command[@]}" "${test_args[@]}" &
+    VITEST_MAX_WORKERS=1 "${vitest_command[@]}" "${test_args[@]}" &
     TEST_PID=$!
     wait "$TEST_PID"
     local exit_code=$?
@@ -336,6 +369,10 @@ run_tests() {
 
 main() {
     local -a test_args=("$@")
+
+    if ! reject_protected_vitest_arguments "${test_args[@]}"; then
+        exit 64
+    fi
 
     echo "🧪 Starting GeoRoids test runner..."
     if ! acquire_lock "${test_args[@]}"; then

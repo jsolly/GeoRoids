@@ -18,6 +18,7 @@ run_step "dep grounding" gate_check_dep_grounding .git-hooks/pre-commit scripts/
 run_step "lint"   npm run lint
 run_step "yaml lint" npm run check:yaml
 run_step "actionlint" npm run check:actions
+run_step "test runner contract" npm run check:test-runner
 run_step "tsc"    npm run check:ts
 run_step "vitest" npm test
 

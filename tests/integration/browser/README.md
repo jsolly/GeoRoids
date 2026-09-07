@@ -12,8 +12,7 @@ This directory contains integration tests that require a real browser environmen
 
 These tests require:
 
-- A running Vite dev server (`npm run dev`)
-- A running WebSocket server (`npm run server`)
+- Unused configured test ports; `scripts/test-runner.sh` starts and owns the Vite and WebSocket services
 - A browser environment (Playwright/Puppeteer)
 
 ## Running Tests

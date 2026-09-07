@@ -72,7 +72,7 @@ The tests are organized using a modular utility-based architecture:
 ## Prerequisites
 
 1. **Node.js**: Version 24 or higher
-2. **Game Server**: The test runner starts a server on port 3001 when one is not already running
+2. **Game Server**: The test runner starts a server on the configured ports, which must be unused
 3. **Playwright browsers**: Required for browser tests. Install with `npx --no-install playwright install chromium`.
 
 ## Setup
@@ -83,16 +83,12 @@ The tests are organized using a modular utility-based architecture:
    npx --no-install playwright install chromium
    ```
 
-2. Ensure the game server is running:
+2. Leave the configured test ports unused. The test runner starts and owns the
+   Vite and WebSocket processes for the duration of the run.
 
-   ```bash
-   # In the main project directory
-   npm run dev
-   ```
-
-When another GeoRoids checkout owns the default ports, the runner can start
-this worktree on an isolated pair and passes those URLs to the integration
-helpers:
+When another GeoRoids checkout owns the default ports, choose an unused
+isolated pair. The runner passes those URLs to the integration helpers and
+refuses to attach to any preexisting service:
 
 ```bash
 GEOROIDS_TEST_VITE_PORT=5174 GEOROIDS_TEST_SERVER_PORT=3002 \

@@ -78,7 +78,7 @@
     "concurrently": "^10.0.3",
     "github-actionlint": "^1.7.12",
     "jsdom": "^26.1.0",
-    "lint-staged": "^16.1.2",
+    "lint-staged": "^17.4.1",
     "markdownlint-cli2": "^0.22.1",
     "playwright": "^1.40.0",
     "selenium-webdriver": "^4.35.0",

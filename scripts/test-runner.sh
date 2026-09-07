@@ -118,6 +118,12 @@ release_lock() {
         return 0
     fi
 
+    if [ "$(read_lock_pid)" != "$$" ]; then
+        echo "⚠️  Test-runner lock ownership changed; leaving the current lock untouched: $LOCK_DIR" >&2
+        LOCK_HELD=false
+        return 0
+    fi
+
     rm -f "$LOCK_PID_FILE" "$LOCK_WORKTREE_FILE" "$LOCK_COMMAND_FILE"
     if ! rmdir "$LOCK_DIR" 2>/dev/null; then
         echo "⚠️  Could not remove test-runner lock directory: $LOCK_DIR" >&2

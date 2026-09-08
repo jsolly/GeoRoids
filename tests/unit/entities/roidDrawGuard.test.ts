@@ -7,7 +7,11 @@ import {
   clearAsteroidShatters,
   drawRoidsRelative,
 } from '../../../src/entities/roid/roidRenderer';
-import { lockAsteroidPending } from '../../../src/physics/collision/asteroidHitFeel';
+import {
+  ASTEROID_PENDING_MS,
+  lockAsteroidPending,
+  pendingElapsedMs,
+} from '../../../src/physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../../src/rendering/canvas';
 import * as vectorJuice from '../../../src/rendering/vectorJuice';
 
@@ -297,4 +301,15 @@ test('large plain asteroids keep a jagged inner facet while medium, pebble and m
     { style: solid, alpha: ctx.globalAlpha },
   ]);
   expect(fill).not.toHaveBeenCalled();
+});
+
+test('roid shatter occupies only the first slice of the pending lock', () => {
+  const roid = { pendingDestruction: false, pendingUntilMs: 0 };
+  lockAsteroidPending(roid, 1_000);
+  expect(pendingElapsedMs(roid, 1_000)).toBe(0);
+  expect(pendingElapsedMs(roid, 1_000 + VISUAL.ROID_SHATTER_MS - 1)).toBe(
+    VISUAL.ROID_SHATTER_MS - 1
+  );
+  expect(VISUAL.ROID_SHATTER_MS).toBeLessThan(ASTEROID_PENDING_MS);
+  expect(pendingElapsedMs({ pendingDestruction: false, pendingUntilMs: 0 }, 1_000)).toBeNull();
 });

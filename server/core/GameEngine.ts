@@ -530,12 +530,13 @@ export class GameEngine {
 
   private seedAsteroidInteractions(): void {
     const rocks = this.getAllAsteroids();
-    if (!rocks.length) {
+    const firstRock = rocks[0];
+    if (!firstRock) {
       return;
     }
     if (!this.decoratedFieldId) {
       seedAsteroidPhenomena(rocks);
-      this.decoratedFieldId = rocks[0]!.id;
+      this.decoratedFieldId = firstRock.id;
     }
   }
 
@@ -713,10 +714,8 @@ export class GameEngine {
     const pickup = this.satellitePickupManager.getPickup(pickupId);
     const collector = this.entityManager.getEntity(playerId);
     if (
-      !pickup ||
-      pickup.state !== 'loose' ||
-      !collector ||
-      collector.type !== 'human' ||
+      pickup?.state !== 'loose' ||
+      collector?.type !== 'human' ||
       collector.health <= 0 ||
       collector.exploding ||
       collector.respawnTimer !== undefined
@@ -943,7 +942,7 @@ export class GameEngine {
     source?: CombatDamageSource
   ): boolean {
     const existing = this.getPlayer(targetPlayerId);
-    if (!existing || existing.type !== 'human') {
+    if (existing?.type !== 'human') {
       return false;
     }
     return this.handleShipDamage(targetPlayerId, attackerId, damage, source).isDestroyed;
@@ -956,7 +955,7 @@ export class GameEngine {
     source?: CombatDamageSource
   ): boolean {
     const existing = this.getBot(botId);
-    if (!existing || existing.type !== 'bot') {
+    if (existing?.type !== 'bot') {
       return false;
     }
     return this.handleShipDamage(botId, attackerId, damage, source).isDestroyed;
@@ -1235,8 +1234,7 @@ export class GameEngine {
   ): ServerLaser | null {
     const shooter = this.entityManager.getEntity(ownerId);
     if (
-      !shooter ||
-      shooter.type !== 'human' ||
+      shooter?.type !== 'human' ||
       shooter.health <= 0 ||
       shooter.exploding ||
       shooter.respawnTimer !== undefined ||

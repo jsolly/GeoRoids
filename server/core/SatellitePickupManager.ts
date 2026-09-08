@@ -77,7 +77,7 @@ export class SatellitePickupManager {
     orbitingAlready: number
   ): SatellitePickupData | null {
     const pickup = this.pickups.get(pickupId);
-    if (!pickup || pickup.state !== 'loose') {
+    if (pickup?.state !== 'loose') {
       return null;
     }
 

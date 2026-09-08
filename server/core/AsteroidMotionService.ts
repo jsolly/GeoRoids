@@ -382,8 +382,7 @@ export class AsteroidMotionService {
       return { ok: false, error: 'Enhanced latch requires the live free Hauler owner' };
     }
     if (
-      !action ||
-      action.action !== 'latch' ||
+      action?.action !== 'latch' ||
       !Number.isSafeInteger(action.sequence) ||
       action.sequence <= session.toolSequence ||
       typeof action.targetId !== 'string' ||

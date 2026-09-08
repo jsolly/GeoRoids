@@ -94,8 +94,7 @@ function measure(mode: 'legacy' | 'complete' | 'lean') {
   let baseline: SnapshotBaseline | undefined;
   const decoder = new SnapshotDecoder();
   const start = performance.now();
-  for (let i = 0; i < iterations; i++) {
-    const world = worlds[i]!;
+  for (const [i, world] of worlds.entries()) {
     if (mode === 'lean') {
       const encoder = new SnapshotEncoder(world);
       const state = encoder.state;

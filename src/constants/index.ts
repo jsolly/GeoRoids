@@ -340,8 +340,8 @@ export const SHOCKWAVE = {
 // ============================================================================
 // FUEL CONFIGURATION
 // ============================================================================
-// Shared tank on every kit. Biggest rocks drop fuel; Quake shock / leftover
-// EMP spends it. Reuses PALETTE.LOOT (locked cream) — do not add a sixth kit.
+// Shared tank on every kit. Biggest rocks drop fuel; Quake shock spends it.
+// Reuses PALETTE.LOOT (locked cream) — do not add a sixth kit.
 export const FUEL = {
   MAX: 100,
   START: 50,

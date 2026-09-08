@@ -6,6 +6,11 @@ Ship profile: `vercel-static`
 
 **Integration: branch → PR → CI-gated auto-merge (canonical).** Open a PR from your branch; `.github/workflows/auto-merge.yml` enables squash auto-merge once **`CI / ci`** is green. Direct push to `main` is break-glass only.
 
+Verify the active branch immediately before committing and pushing. The
+`.git-hooks/pre-push` hook checks the actual destination ref and blocks direct
+`main` updates. Only an explicitly authorized emergency may set
+`GEOROIDS_BREAK_GLASS_PUSH=1`; routine `/ship` runs must use a feature branch.
+
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
 Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.

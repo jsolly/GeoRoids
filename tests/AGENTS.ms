@@ -73,6 +73,11 @@ Use rendered evidence for a test named after UI behavior.
 Matching tokens in renderer source cannot prove drawing behavior; observe the
 executed canvas calls or rendered output instead.
 
+When expected rendering uses a production geometry helper, retain independent
+checks on the captured output, such as known positions, vertex counts, or scale
+ratios. Otherwise a helper that ignores a scale argument can change both the
+rendering and its expected result while the test still passes.
+
 Keep important negative scenarios: invalid ownership, malformed commands,
 production-disabled controls, resource limits, failed writes, deadlines, and
 reconnect exhaustion. Exercise the observable rejection or failure rather than

@@ -76,11 +76,11 @@ function drawRoidSilhouette(
   ctx: CanvasRenderingContext2D,
   points: readonly Vec2[],
   radius: number,
-  inner: readonly Vec2[]
+  inner: readonly Vec2[] | null
 ): void {
   const width = getRoidStrokeWidth(radius);
   strokePhosphorPolyline(ctx, points, PALETTE.ROID, width, VISUAL.ROID_GLOW, true);
-  if (inner.length > 2) {
+  if (inner && inner.length > 2) {
     strokePhosphorPolyline(
       ctx,
       inner,
@@ -244,29 +244,34 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     ) {
       continue;
     }
+    let pendingElapsed: number | null = null;
+    if (isAsteroidPending(roid)) {
+      pendingElapsed = pendingElapsedMs(roid);
+      if (pendingElapsed === null || !(pendingElapsed < VISUAL.ROID_SHATTER_MS)) {
+        continue;
+      }
+    }
+
     const offsets = drawingOffsets(roid.offsets);
     const vertices = Math.max(roid.vertices, 1);
     const outline = roidOutline(screenPos, r, roid.angle, vertices, offsets);
 
-    if (isAsteroidPending(roid)) {
-      const elapsed = pendingElapsedMs(roid);
-      if (elapsed !== null && elapsed < VISUAL.ROID_SHATTER_MS) {
-        drawRoidShatter(
-          ctx,
-          screenPos,
-          outline,
-          r,
-          elapsed / VISUAL.ROID_SHATTER_MS,
-          roid.material
-        );
-      }
+    if (pendingElapsed !== null) {
+      drawRoidShatter(
+        ctx,
+        screenPos,
+        outline,
+        r,
+        pendingElapsed / VISUAL.ROID_SHATTER_MS,
+        roid.material
+      );
       continue;
     }
 
     const inner =
       !roid.material && shouldDrawRoidInnerFacet(roid.r)
         ? roidOutline(screenPos, r, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
-        : [];
+        : null;
     drawRoidSilhouette(ctx, outline, roid.r, inner);
     if (roid.material) {
       drawAsteroidMaterialDetails(

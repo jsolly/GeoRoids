@@ -11,6 +11,12 @@ Verify the active branch immediately before committing and pushing. The
 `main` updates. Only an explicitly authorized emergency may set
 `GEOROIDS_BREAK_GLASS_PUSH=1`; routine `/ship` runs must use a feature branch.
 
+GitHub protects `main`, including administrators: changes require a PR, an
+up-to-date branch, and the GitHub Actions `ci` check. Force pushes and branch
+deletion are blocked. Human approval and conversation resolution are optional so
+CI-gated auto-merge can run unattended. The local break-glass variable does not
+override these GitHub protections.
+
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
 Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.

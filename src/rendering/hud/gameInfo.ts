@@ -8,10 +8,11 @@ import { getShipKit } from '../../entities/ship/shipKits';
 import { hexToRgba } from '../../utils/colorUtils';
 import { layoutHudCluster } from './cluster';
 import { drawFuelGauge } from './fuel';
-import { hudLayoutForCanvas, scaleHudFont } from './hudLayout';
+import { type HudLayout, scaleHudFont } from './hudLayout';
 
 export function drawScoreOverlay(
   ctx: CanvasRenderingContext2D,
+  layout: HudLayout,
   canvas: HTMLCanvasElement,
   score: number,
   lives: number,
@@ -19,7 +20,6 @@ export function drawScoreOverlay(
 ): void {
   ctx.save();
   ctx.fillStyle = PALETTE.HUD;
-  const layout = hudLayoutForCanvas(canvas);
   ctx.font = scaleHudFont(VISUAL.SCORE_FONT, layout.hudTypeScale);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -116,6 +116,7 @@ function drawMultiLineText(
 
 export function drawTextOverlay(
   ctx: CanvasRenderingContext2D,
+  layout: HudLayout,
   canvas: HTMLCanvasElement,
   text: string,
   alpha: number
@@ -126,7 +127,7 @@ export function drawTextOverlay(
   const isGameOver = text.toLowerCase().includes('game over');
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
-  const scale = hudLayoutForCanvas(canvas).overlayFontScale;
+  const scale = layout.overlayFontScale;
 
   if (isGameOver) {
     ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.8);

@@ -1,9 +1,7 @@
 import { PALETTE, VISUAL } from '../../constants';
-import { GameController } from '../../core/gameController';
 import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import { PlayerNetwork } from '../../entities/player/playerNetwork';
 import type { SoftFactionId } from '../../entities/player/softFactions';
-import { canDrawAsteroid } from '../../entities/roid/roidRenderer';
 import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickupMiniMapDot } from '../../entities/satellitePickup/satellitePickupRenderer';
@@ -11,10 +9,9 @@ import type { Ship } from '../../entities/ship/Ship';
 import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
 import type { CircleBoundary } from '../../physics/boundary';
 import { getGameBoundary } from '../../physics/boundary';
-import { isAsteroidPending } from '../../physics/collision/asteroidHitFeel';
 import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
-import { hudLayoutForCanvas } from './hudLayout';
+import type { HudLayout } from './hudLayout';
 
 type RadarMark =
   | { kind: 'local'; x: number; y: number; heading: number; factionId?: SoftFactionId }
@@ -26,7 +23,6 @@ type RadarMark =
       color: string;
       factionId?: SoftFactionId;
     }
-  | { kind: 'roid'; x: number; y: number }
   | { kind: 'satellite'; x: number; y: number; color: string }
   | { kind: 'pickup'; x: number; y: number };
 
@@ -112,14 +108,6 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
       });
       return;
     }
-    case 'roid': {
-      ctx.save();
-      ctx.fillStyle = hexToRgba(PALETTE.ROID, 0.55);
-      const size = VISUAL.MINIMAP_ROID;
-      ctx.fillRect(mark.x - size / 2, mark.y - size / 2, size, size);
-      ctx.restore();
-      return;
-    }
     case 'satellite': {
       ctx.save();
       ctx.strokeStyle = hexToRgba(mark.color, 0.9);
@@ -140,13 +128,9 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
   }
 }
 
-export function drawMiniMap(
-  ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  ship: Ship
-): void {
+export function drawMiniMap(ctx: CanvasRenderingContext2D, layout: HudLayout, ship: Ship): void {
   const boundary = getGameBoundary();
-  const { x: miniMapX, y: miniMapY, size: miniMapSize } = hudLayoutForCanvas(canvas).miniMap;
+  const { x: miniMapX, y: miniMapY, size: miniMapSize } = layout.miniMap;
   const centerX = miniMapX + miniMapSize / 2;
   const centerY = miniMapY + miniMapSize / 2;
   const projection = { x: 0, y: 0 };
@@ -163,30 +147,8 @@ export function drawMiniMap(
   ctx.clip();
 
   try {
-    const gameController = GameController.getInstance();
     const playerNetwork = PlayerNetwork.getInstance();
     const otherPlayers = playerNetwork.getOtherPlayers();
-
-    const currRoidBelt = gameController.getCurrRoidBelt();
-    if (currRoidBelt) {
-      for (const roid of currRoidBelt.getRoids()) {
-        if (isAsteroidPending(roid) || !canDrawAsteroid(roid)) {
-          continue;
-        }
-        const p = projectWorldToMiniMapInto(
-          projection,
-          boundary,
-          miniMapX,
-          miniMapY,
-          miniMapSize,
-          roid.position.x,
-          roid.position.y
-        );
-        if (p) {
-          drawRadarMark(ctx, { kind: 'roid', x: p.x, y: p.y });
-        }
-      }
-    }
 
     for (const satellite of SatelliteManager.getInstance().getAll()) {
       if (satellite.exploding) {

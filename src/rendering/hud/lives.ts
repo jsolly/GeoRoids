@@ -3,15 +3,15 @@ import { DEFAULT_SHIP_KIT_ID, type ShipKitId } from '../../entities/ship/shipKit
 import { strokeKitHullOutline } from '../../entities/ship/shipRenderer';
 
 import { layoutHudCluster } from './cluster';
-import { hudLayoutForCanvas } from './hudLayout';
+import type { HudLayout } from './hudLayout';
 
 export function drawLivesIndicator(
   ctx: CanvasRenderingContext2D,
+  layout: HudLayout,
   lives: number,
   shipColor: string,
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID
 ): void {
-  const layout = hudLayoutForCanvas(ctx.canvas);
   const { lifeCenters } = layoutHudCluster(lives);
   const dx = layout.lives.x - VISUAL.HUD_INSET;
   const dy = layout.lives.y - VISUAL.HUD_INSET;

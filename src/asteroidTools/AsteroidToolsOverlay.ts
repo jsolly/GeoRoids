@@ -239,6 +239,9 @@ function ensureStyles(doc: Document): void {
   }
 }
 @media (orientation: landscape) and (max-height: 500px) {
+  .asteroid-tools-launcher {
+    left: calc(6rem + env(safe-area-inset-left, 0px));
+  }
   .asteroid-tools-overlay {
     max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px));
     width: min(20rem, calc(100vw - 0.7rem));

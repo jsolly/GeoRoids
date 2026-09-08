@@ -150,7 +150,6 @@ export const VISUAL = {
   MINIMAP_SIZE: 96,
   MINIMAP_DOT: 5,
   MINIMAP_LOCAL_SIZE: 6,
-  MINIMAP_ROID: 1.5,
   MINIMAP_VOID_ALPHA: 0.5,
   MINIMAP_RING_ALPHA: 0.85,
   HUD_INSET: 16,
@@ -264,7 +263,7 @@ export const ROID = {
 
   // Shared moving belt. The ship-kill wall is ~3100px; a 1080p camera around a
   // center-spawned ship only sees ~960×540. Opposite-side wrap at the wall
-  // parked every roid at ~3000px (minimap dots, empty canvas). Keep the belt
+  // parked every roid at ~3000px, leaving the canvas empty. Keep the belt
   // inside the same "nearby" radius the audio/network layer already uses.
   FIELD_RADIUS: 1200,
   FIELD_INNER_SCALE: 0.96,

@@ -70,6 +70,8 @@ Mocks should control external boundaries or failure conditions. A mock should
 not return the exact gameplay outcome the test claims to verify. Model state
 can prove synchronization; it cannot alone prove that a HUD element was drawn.
 Use rendered evidence for a test named after UI behavior.
+Matching tokens in renderer source cannot prove drawing behavior; observe the
+executed canvas calls or rendered output instead.
 
 Keep important negative scenarios: invalid ownership, malformed commands,
 production-disabled controls, resource limits, failed writes, deadlines, and

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Guard the actual destination, including an explicit feature-branch:main refspec.
+set -euo pipefail
+
+while read -r _local_ref _local_oid remote_ref _remote_oid; do
+  if [[ "$remote_ref" != refs/heads/main ]]; then
+    continue
+  fi
+  if [[ "${GEOROIDS_BREAK_GLASS_PUSH:-0}" == 1 ]]; then
+    echo "⚠ Explicit break-glass override: pushing directly to main." >&2
+    continue
+  fi
+  echo "✗ Direct pushes to main are blocked. Push a feature branch and use a CI-gated PR." >&2
+  echo "An explicitly authorized emergency may set GEOROIDS_BREAK_GLASS_PUSH=1." >&2
+  exit 1
+done

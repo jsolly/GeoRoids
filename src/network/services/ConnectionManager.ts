@@ -169,7 +169,7 @@ export class ConnectionManager {
             : 'ws://localhost:3001/ws';
 
         const wsEndpoint = new URL(import.meta.env.VITE_WEBSOCKET_URL || computedUrl);
-        if (import.meta.env.VITE_ASTEROID_INTERACTIONS === '1') {
+        if ((import.meta.env.VITE_ASTEROID_INTERACTIONS ?? '1') === '1') {
           wsEndpoint.searchParams.set('asteroidInteractions', '1');
         }
         const wsUrl = wsEndpoint.toString();
@@ -581,7 +581,7 @@ export class ConnectionManager {
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         ...(this.snapshotOffered ? { snapshotVersion: SNAPSHOT_VERSION } : {}),
-        ...(this.snapshotOffered && import.meta.env.VITE_ASTEROID_INTERACTIONS === '1'
+        ...(this.snapshotOffered && (import.meta.env.VITE_ASTEROID_INTERACTIONS ?? '1') === '1'
           ? {
               asteroidInteractions: 1,
               ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),

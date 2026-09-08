@@ -24,7 +24,7 @@ class Transport {
   onerror: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   sent: any[] = [];
-  constructor() { Transport.latest = this; }
+  constructor(public url: string) { Transport.latest = this; }
   send(text: string) { this.sent.push(JSON.parse(text)); }
   close = vi.fn(() => { this.readyState = 3; this.onclose?.(); });
   receive(type: string, data: unknown) { this.onmessage?.({ data: JSON.stringify({ type, data, timestamp: 1 }) }); }
@@ -83,12 +83,19 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('an unset build setting offers snapshots, explicit 0 disables them, and an old server remains compatible', async () => {
+    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', undefined);
     let ws = await connect();
     expect(ws.sent.find(m => m.type === 'join').data.snapshotVersion).toBe(1);
+    expect(ws.sent.find(m => m.type === 'join').data.asteroidInteractions).toBe(1);
+    expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
     manager.disconnect(); ws = await connect(false);
     expect(ws.sent.find(m => m.type === 'join').data).not.toHaveProperty('snapshotVersion');
+    expect(ws.sent.find(m => m.type === 'join').data).not.toHaveProperty('asteroidInteractions');
+    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '0');
     manager.disconnect(); ws = await connect(true);
     expect(ws.sent.find(m => m.type === 'join').data.snapshotVersion).toBe(1);
+    expect(ws.sent.find(m => m.type === 'join').data).not.toHaveProperty('asteroidInteractions');
+    expect(new URL(ws.url).searchParams.has('asteroidInteractions')).toBe(false);
     acknowledge(ws);
     const legacy = snapshotFixture();
     ws.receive('gameState', legacy);

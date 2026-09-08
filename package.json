@@ -58,7 +58,7 @@
     "@types/ws": "^8.18.1",
     "@vercel/functions": "^3.9.5",
     "tsx": "^4.23.13",
-    "typescript": "^5.9.2",
+    "typescript": "^7.0.2",
     "uuid": "^14.0.2",
     "vite": "^8.2.2",
     "ws": "^8.21.0"
@@ -70,7 +70,7 @@
     "concurrently": "^10.0.5",
     "github-actionlint": "^1.7.12",
     "jsdom": "^26.1.0",
-    "markdownlint-cli2": "^0.22.1",
+    "markdownlint-cli2": "^0.23.2",
     "playwright": "^1.63.0",
     "ts-prune": "^0.10.3",
     "vercel": "^59.11.7",

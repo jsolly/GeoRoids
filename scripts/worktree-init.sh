@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Copy the gitignored files listed in .worktreeinclude from the primary checkout into
-# the current worktree. Run by `npm run worktree:init` on the MANUAL `git worktree add`
-# path; the dotagents WorktreeCreate hook copies the same allowlist on the EnterWorktree
-# paths, so this gives manual worktrees parity.
+# the current worktree. Run `npm run worktree:init` after a manual `git worktree add`;
+# Cursor runs that command through .cursor/worktrees.json.
 #
 # Copy, never symlink — a symlinked .env.local resolves outside the worktree root and
 # trips Vite's server.fs.allow. cp -p preserves the 0600 mode on .env.local.
@@ -30,7 +29,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   line="${line#"${line%%[![:space:]]*}"}"             # trim leading whitespace
   line="${line%"${line##*[![:space:]]}"}"             # trim trailing whitespace
   [ -n "$line" ] || continue
-  # Reject absolute paths and `..` traversal (parity with the WorktreeCreate hook).
+  # Reject absolute paths and `..` traversal.
   # .worktreeinclude is repo-controlled, but `../../.ssh/id_rsa` would read outside the
   # primary AND, since the prefix-strip leaves `..` in $rel, write outside the worktree.
   case "/$line/" in

@@ -3,7 +3,7 @@ import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
 import { isAsteroidPending, pendingElapsedMs } from '../../physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../rendering/canvas';
-import { drawingOffsets, type PlayfieldRock } from '../../rendering/playfieldCamera';
+import { drawingOffsets } from '../../rendering/playfieldCamera';
 import {
   driftSegment,
   polygonPoints,
@@ -14,7 +14,6 @@ import {
 import { drawAsteroidMaterialDetails } from './materialArt';
 import type { Roid } from './Roid';
 
-const zoomRockScratch: PlayfieldRock[] = [];
 const roidScreen = { x: 0, y: 0 };
 const shatterBursts: Array<{ roid: Roid; startedAt: number }> = [];
 
@@ -28,20 +27,6 @@ export function recordAsteroidShatter(roid: Roid, now = performance.now()): void
 
 export function clearAsteroidShatters(): void {
   shatterBursts.length = 0;
-}
-
-/** Zoom from rocks the playfield will actually stroke — not pending or NaN poses. */
-export function rocksForPlayfieldZoom(roids: readonly Roid[]): PlayfieldRock[] {
-  let count = 0;
-  for (const roid of roids) {
-    if (isAsteroidPending(roid) || !canDrawAsteroid(roid)) {
-      continue;
-    }
-    zoomRockScratch[count] = roid;
-    count += 1;
-  }
-  zoomRockScratch.length = count;
-  return zoomRockScratch;
 }
 
 export function getRoidStrokeWidth(radius: number): number {

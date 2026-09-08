@@ -49,7 +49,6 @@ class CanvasManager {
   private canvas: HTMLCanvasElement | null = null;
   private context: CanvasRenderingContext2D | null = null;
   private resizeHandler: (() => void) | null = null;
-  private playfieldScale = 1;
   private readonly screenPos = { x: 0, y: 0 };
   private readonly laserHosts: LiveLaserSource[] = [{ lasers: [] }];
   private readonly liveLaserPositions: Position[] = [];
@@ -176,19 +175,8 @@ class CanvasManager {
     };
   }
 
-  beginPlayfieldFrame(
-    _shipPos: Position,
-    _roids: ReadonlyArray<{ position: Position; r?: number }>
-  ): void {
-    if (!this.canvas) {
-      this.playfieldScale = PLAYFIELD_CLOSE_SCALE;
-      return;
-    }
-    this.playfieldScale = PLAYFIELD_CLOSE_SCALE;
-  }
-
   getPlayfieldScale(): number {
-    return this.playfieldScale;
+    return PLAYFIELD_CLOSE_SCALE;
   }
 
   worldToScreenInto(
@@ -196,7 +184,7 @@ class CanvasManager {
     worldPos: Position,
     shipPos: Position
   ): { x: number; y: number } {
-    const scale = this.playfieldScale;
+    const scale = PLAYFIELD_CLOSE_SCALE;
     if (!this.canvas) {
       out.x = (worldPos.x - shipPos.x) * scale;
       out.y = (worldPos.y - shipPos.y) * scale;
@@ -212,7 +200,7 @@ class CanvasManager {
   }
 
   screenToWorld(screenPos: Point, shipPos: Position): Position {
-    const scale = this.playfieldScale || 1;
+    const scale = PLAYFIELD_CLOSE_SCALE;
     if (!this.canvas) {
       return { x: screenPos.x / scale + shipPos.x, y: screenPos.y / scale + shipPos.y };
     }
@@ -262,7 +250,6 @@ class CanvasManager {
 
     // Draw roids
     const roids = currRoidBelt.getRoids();
-    this.beginPlayfieldFrame(currShip.position, roids);
 
     drawStarfield(currShip.position);
     drawIsoContours(currShip.position);

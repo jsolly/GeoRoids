@@ -12,8 +12,8 @@ Verify the active branch immediately before committing and pushing. The
 `GEOROIDS_BREAK_GLASS_PUSH=1`; routine `/ship` runs must use a feature branch.
 
 GitHub protects `main`, including administrators: changes require a PR, an
-up-to-date branch, the GitHub Actions `ci` check, and resolved review conversations.
-Force pushes and branch deletion are blocked. Human approval is optional so
+up-to-date branch, and the GitHub Actions `ci` check. Force pushes and branch
+deletion are blocked. Human approval and conversation resolution are optional so
 CI-gated auto-merge can run unattended. The local break-glass variable does not
 override these GitHub protections.
 

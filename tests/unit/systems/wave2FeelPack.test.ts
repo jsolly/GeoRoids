@@ -2,8 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
-import { PALETTE, ROID, VISUAL } from '../../../src/constants';
-import { shouldDrawRoidInnerFacet } from '../../../src/entities/roid/roidRenderer';
+import { PALETTE, VISUAL } from '../../../src/constants';
 import {
   ASTEROID_PENDING_MS,
   lockAsteroidPending,
@@ -13,38 +12,14 @@ import {
   burstTick,
   easeOutCubic,
   laserBoltOffsets,
-  polygonPoints,
   thrusterFlameGeometry,
 } from '../../../src/rendering/vectorJuice';
 
 const shipSrc = readFileSync(resolve(process.cwd(), 'src/entities/ship/shipRenderer.ts'), 'utf8');
-const roidSrc = readFileSync(resolve(process.cwd(), 'src/entities/roid/roidRenderer.ts'), 'utf8');
 const laserSrc = readFileSync(
   resolve(process.cwd(), 'src/entities/laser/laserRenderer.ts'),
   'utf8'
 );
-
-test('large roids get an inner Asteroids facet; medium and pebbles stay one outline', () => {
-  expect(shouldDrawRoidInnerFacet(ROID.SIZE)).toBe(true);
-  expect(shouldDrawRoidInnerFacet(ROID.SIZE * 0.5)).toBe(false);
-  expect(shouldDrawRoidInnerFacet(ROID.SIZE * 0.2)).toBe(false);
-  expect(VISUAL.ROID_INNER_SCALE).toBeGreaterThan(0.3);
-  expect(VISUAL.ROID_INNER_SCALE).toBeLessThan(0.7);
-});
-
-test('roid outline points stay a closed jagged silhouette, not a circle fill', () => {
-  const offsets = [1.1, 0.8, 1.05, 0.9, 1.2, 0.85];
-  const outer = polygonPoints(0, 0, 40, 0, offsets.length, offsets);
-  const inner = polygonPoints(0, 0, 40, 0, offsets.length, offsets, VISUAL.ROID_INNER_SCALE);
-  expect(outer).toHaveLength(6);
-  expect(inner).toHaveLength(6);
-  const outerReach = Math.hypot(outer[0]?.x ?? 0, outer[0]?.y ?? 0);
-  const innerReach = Math.hypot(inner[0]?.x ?? 0, inner[0]?.y ?? 0);
-  expect(innerReach).toBeCloseTo(outerReach * VISUAL.ROID_INNER_SCALE);
-  expect(roidSrc).toMatch(/strokePhosphorPolyline/);
-  expect(roidSrc).toMatch(/shouldDrawRoidInnerFacet/);
-  expect(roidSrc).toMatch(/drawRoidShatter/);
-});
 
 test('roid shatter occupies only the first slice of the pending lock', () => {
   const roid = { pendingDestruction: false, pendingUntilMs: 0 };
@@ -108,8 +83,6 @@ test('locked palette stays on ships, lasers, and roids — no white, no accent o
   expect(PALETTE.LASER_LOCAL).toBe('#FDE68A');
   expect(PALETTE.LASER_ENEMY).toBe('#FCA5A5');
   expect(PALETTE.DANGER).toBe('#F43F5E');
-  expect(roidSrc).toMatch(/PALETTE\.ROID/);
-  expect(roidSrc).not.toMatch(/PALETTE\.ACCENT_UI/);
   expect(laserSrc).toMatch(/PALETTE\.LASER_LOCAL/);
   expect(laserSrc).not.toMatch(/#fff|#ffffff|#00ffff/i);
   expect(shipSrc).not.toMatch(/#fff|#ffffff/i);

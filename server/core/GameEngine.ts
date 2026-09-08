@@ -931,8 +931,10 @@ export class GameEngine {
 
   /**
    * Sole apply path for laser/ram reports and the server laser tick.
-   * Collab tag/split stays in handleAsteroidHit; this adds spatial reject
-   * and consume-once so a client hint plus the tick cannot double-score.
+   * Collab tag/split stays in handleAsteroidHit; callers that accept a client
+   * report consume its tracked projectile before entering this method. The
+   * authoritative laser tick marks its own exact laser after this apply path,
+   * so applying a client hint cannot consume a second coincident shot.
    */
   public applyLaserAsteroidHit(
     asteroidId: string,
@@ -970,7 +972,6 @@ export class GameEngine {
     }
 
     const origin = result.destroyed?.position ?? asteroid.position;
-    this.consumeOwnerLaserNear(playerId, origin);
 
     return {
       applied: true,
@@ -1129,10 +1130,20 @@ export class GameEngine {
   }
 
   /** Consume one validated bot projectile so duplicate client reports cannot replay it. */
-  public consumeActiveBotLaserNearAsteroid(botId: string, asteroidId: string): boolean {
+  public consumeActiveBotLaserNearAsteroid(
+    botId: string,
+    asteroidId: string,
+    reportedPosition?: Position
+  ): boolean {
     const bot = this.entityManager.getEntity(botId);
     const asteroid = this.asteroidManager.getAsteroid(asteroidId);
-    if (bot?.type !== 'bot' || !asteroid) {
+    if (
+      bot?.type !== 'bot' ||
+      !asteroid ||
+      (reportedPosition !== undefined &&
+        (!this.validatePosition(reportedPosition) ||
+          !isLaserNearAsteroid(reportedPosition, asteroid.position, asteroid.size)))
+    ) {
       return false;
     }
 
@@ -1318,18 +1329,6 @@ export class GameEngine {
       return hit.applied ? hit : null;
     }
     return null;
-  }
-
-  private consumeOwnerLaserNear(ownerId: string, asteroidPos: Position): void {
-    for (const laser of this.lasers) {
-      if (laser.hasExploded || laser.ownerId !== ownerId) {
-        continue;
-      }
-      if (isLaserNearAsteroid(laser.position, asteroidPos, 0)) {
-        laser.hasExploded = true;
-        return;
-      }
-    }
   }
 
   private emitAsteroidHits(hits: AppliedAsteroidHit[]): void {

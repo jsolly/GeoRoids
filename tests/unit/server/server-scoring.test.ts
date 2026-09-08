@@ -5,6 +5,36 @@ import { createServerInstance } from '../../../server/createServer';
 import { ROID } from '../../../src/constants';
 import type { AsteroidData } from '../../../shared-types';
 
+function reportTrackedAsteroidLaser(
+  server: ReturnType<typeof createServerInstance>,
+  ws: WebSocket,
+  playerId: string,
+  asteroidId: string
+): void {
+  const asteroid = server.gameEngine.getAsteroid(asteroidId);
+  if (!asteroid) {
+    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
+  }
+  const laserPosition = { ...asteroid.position };
+  const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
+  if (!shot) {
+    throw new Error(`Could not seed tracked laser for ${playerId}`);
+  }
+  server.wsCore.handleClientMessage(
+    {
+      type: 'asteroidDestroyed',
+      data: {
+        asteroidId,
+        playerId,
+        points: ROID.POINTS_LARGE,
+        cause: 'laser',
+        laserPosition,
+      },
+    },
+    ws
+  );
+}
+
 describe('Server scoring via asteroidDestroyed', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
   let port: number = 0;
@@ -54,29 +84,9 @@ describe('Server scoring via asteroidDestroyed', () => {
         } catch {}
       });
     });
-    const laserPosition = server.gameEngine.getAsteroid(asteroidId)?.position;
-    expect(laserPosition).toBeDefined();
-
     // Biggest asteroids need two laser hits from the same ship to finish
     // without a collab partner. Second hit awards points.
     const points = 20; // matches ROID.POINTS_LARGE
-    ws.send(JSON.stringify({
-      type: 'asteroidDestroyed',
-      asteroidId,
-      playerId,
-      points,
-      cause: 'laser',
-      laserPosition,
-    }));
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    ws.send(JSON.stringify({
-      type: 'asteroidDestroyed',
-      asteroidId,
-      playerId,
-      points,
-      cause: 'laser',
-      laserPosition,
-    }));
 
     // Expect a scoreUpdate reflecting the awarded points
     const updatedScore: number = await new Promise<number>((resolve, reject) => {
@@ -90,6 +100,9 @@ describe('Server scoring via asteroidDestroyed', () => {
           }
         } catch {}
       });
+
+      reportTrackedAsteroidLaser(server!, ws, playerId, asteroidId);
+      setTimeout(() => reportTrackedAsteroidLaser(server!, ws, playerId, asteroidId), 120);
     });
 
     expect(updatedScore).toBe(points);
@@ -136,9 +149,6 @@ describe('Server scoring via asteroidDestroyed', () => {
     expect(asteroidId).toBeDefined();
     expect(typeof asteroidId).toBe('string');
     expect(asteroidId).toMatch(/^server-asteroid-/);
-    const laserPosition = server.gameEngine.getAsteroid(asteroidId)?.position;
-    expect(laserPosition).toBeDefined();
-
     // Collect all messages received after sending asteroidDestroyed
     const receivedMessages: any[] = [];
     const messageHandler = (raw: Buffer) => {
@@ -157,7 +167,7 @@ describe('Server scoring via asteroidDestroyed', () => {
       playerId,
       points: ROID.POINTS_LARGE,
       cause: 'collision',
-      laserPosition,
+      laserPosition: server.gameEngine.getAsteroid(asteroidId)?.position,
     }));
 
     // Wait for messages to be processed
@@ -184,4 +194,3 @@ describe('Server scoring via asteroidDestroyed', () => {
     ws.close();
   });
 });
-

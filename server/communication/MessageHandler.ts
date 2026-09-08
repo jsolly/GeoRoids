@@ -632,10 +632,13 @@ export class MessageHandler {
       return;
     }
 
-    if (
-      this.gameEngine.getPlayer(shooterId)?.type === 'bot' &&
-      !this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
-    ) {
+    const shooter = this.gameEngine.getPlayer(shooterId);
+    const consumed = shooter?.type === 'bot'
+      ? this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
+      : shooter?.type === 'human' && this.gameEngine.consumeHumanLaserNearTarget(
+          shooterId, asteroid.position, asteroid.size
+        );
+    if (!consumed) {
       return;
     }
 
@@ -702,6 +705,30 @@ export class MessageHandler {
       return;
     }
 
+    // Client reports are hints about a shot that the server already tracks.
+    // Consume exactly the owning projectile before applying the hit. The
+    // server laser tick marks its own laser in resolveLaserAgainstAsteroids;
+    // applying this report must never search for and consume another shot.
+    const shooter = this.gameEngine.getPlayer(shooterId);
+    const projectileConsumed =
+      shooter?.type === 'bot'
+        ? this.gameEngine.consumeActiveBotLaserNearAsteroid(
+            shooter.id,
+            asteroid.id,
+            laserPosition
+          )
+        : shooter?.type === 'human'
+          ? this.gameEngine.consumeHumanLaserNearTarget(
+              shooter.id,
+              asteroid.position,
+              asteroid.size,
+              laserPosition
+            )
+          : false;
+    if (!projectileConsumed) {
+      return;
+    }
+
     this.broadcastAppliedAsteroidHits([
       this.gameEngine.applyLaserAsteroidHit(
         asteroid.id,
@@ -759,6 +786,16 @@ export class MessageHandler {
     const lootId = data.lootId;
     if (typeof lootId !== 'string' || lootId.length === 0) {
       this.broadcaster.sendError(ws, 'Missing loot ID for lootExplode');
+      return;
+    }
+
+    // Every observer can report the same bot laser/drop collision. Once the
+    // first valid report removes the authoritative drop, later reports are
+    // harmless duplicate acknowledgements. Check the live target before
+    // resolving shooter identity so a consumed drop does not produce a false
+    // "Unknown shooter" error, while live forged claims still go through the
+    // normal ownership/projectile proof below.
+    if (!this.gameEngine.getLoot().some((loot) => loot.id === lootId)) {
       return;
     }
 

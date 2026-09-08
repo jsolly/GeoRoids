@@ -105,6 +105,16 @@ describe('shared destroy-drop shards over WebSocket', () => {
       offsets: [1, 1, 1, 1, 1, 1, 1, 1],
     });
 
+    // The client destruction report is accepted only when the server has a
+    // corresponding projectile. Seed one at the authoritative asteroid
+    // position so this WebSocket test exercises the real report boundary.
+    const trackedShot = server.gameEngine.spawnLaser(
+      'pilot-a',
+      { x: 450, y: -450 },
+      { x: 0, y: 0 }
+    );
+    expect(trackedShot).toBeDefined();
+
     a.send(
       JSON.stringify({
         type: 'asteroidDestroyed',

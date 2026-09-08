@@ -7,10 +7,19 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE } from '../../../src/constants';
 
-function mockWs(): WebSocket {
+function mockWs(sent?: unknown[]): WebSocket {
   return {
     readyState: WebSocket.OPEN,
-    send: () => undefined,
+    send: (raw: string) => {
+      if (!sent) {
+        return;
+      }
+      try {
+        sent.push(JSON.parse(raw));
+      } catch {
+        sent.push(raw);
+      }
+    },
   } as unknown as WebSocket;
 }
 
@@ -128,6 +137,68 @@ describe('server authority boundaries', () => {
     const internal = engine.handleLootExplode(bot!.id, secondShard!.id);
     expect(internal.success).toBe(true);
     expect(engine.getLoot()).toHaveLength(0);
+  });
+
+  test('two joined observers can report one bot loot shot without a duplicate error', () => {
+    engine = new GameEngine(46);
+    const core = new WebSocketCore(engine);
+    const observerAMessages: unknown[] = [];
+    const observerBMessages: unknown[] = [];
+    const observerAWs = mockWs(observerAMessages);
+    const observerBWs = mockWs(observerBMessages);
+
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'observer-a', name: 'Observer A', position: { x: 0, y: 0 } } },
+      observerAWs
+    );
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'observer-b', name: 'Observer B', position: { x: 1000, y: 0 } } },
+      observerBWs
+    );
+
+    const bot = engine.createBots(1)?.[0];
+    expect(bot).toBeDefined();
+    bot!.position = { x: 0, y: 0 };
+    bot!.spawnProtectionTimer = undefined;
+
+    addDropAsteroid(engine, 'observer-drop-source');
+    expect(engine.handleAsteroidHit('observer-drop-source', 'observer-a', 'laser').outcome).toBe('destroyed');
+    const shard = engine.getLoot()[0];
+    expect(shard).toBeDefined();
+
+    const botShot = engine.spawnLaser(bot!.id, shard!.position, { x: 0, y: 0 });
+    expect(botShot).toBeDefined();
+    const report = {
+      type: 'lootExplode',
+      data: { lootId: shard!.id, playerId: bot!.id },
+    };
+    core.handleClientMessage(report, observerAWs);
+    core.handleClientMessage(report, observerBWs);
+
+    expect(engine.getLoot()).toHaveLength(0);
+    expect(botShot!.hasExploded).toBe(true);
+    const duplicateErrors = [...observerAMessages, ...observerBMessages].filter(
+      (message) => (message as { type?: string }).type === 'error'
+    );
+    expect(duplicateErrors).toHaveLength(0);
+
+    // A live drop still requires a matching server bot projectile; the
+    // idempotent absent-drop path must not become a forgery bypass.
+    addDropAsteroid(engine, 'observer-forgery-source');
+    expect(engine.handleAsteroidHit('observer-forgery-source', 'observer-a', 'laser').outcome).toBe('destroyed');
+    const forgedTarget = engine.getLoot()[0];
+    expect(forgedTarget).toBeDefined();
+    core.handleClientMessage(
+      {
+        type: 'lootExplode',
+        data: { lootId: forgedTarget!.id, playerId: bot!.id },
+      },
+      observerAWs
+    );
+    expect(engine.getLoot()).toHaveLength(1);
+    expect(
+      observerAMessages.filter((message) => (message as { type?: string }).type === 'error')
+    ).toHaveLength(1);
   });
 
   test('an ability request cannot switch the kit selected at join', () => {

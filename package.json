@@ -70,7 +70,7 @@
     "concurrently": "^10.0.5",
     "github-actionlint": "^1.7.12",
     "jsdom": "^26.1.0",
-    "markdownlint-cli2": "^0.22.1",
+    "markdownlint-cli2": "^0.23.2",
     "playwright": "^1.63.0",
     "ts-prune": "^0.10.3",
     "vercel": "^59.11.7",

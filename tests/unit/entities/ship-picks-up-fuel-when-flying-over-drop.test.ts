@@ -83,7 +83,7 @@ describe('ship picks up fuel when flying over a drop', () => {
     expect(applyFuelPickup(tank, FUEL.DROP_AMOUNT)).toBe(FUEL.MAX);
   });
 
-  test('a stale server echo does not rewind a fresh EMP spend', () => {
+  test('a stale server echo does not overwrite a recent local fuel value', () => {
     const player = new Player({
       id: 'local-player-123',
       name: 'Pilot',

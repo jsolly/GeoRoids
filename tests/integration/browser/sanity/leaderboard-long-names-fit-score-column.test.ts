@@ -142,26 +142,47 @@ test(
     await game.bootGame({ waitForCombatReady: false });
     await game.waitForBots(1);
 
-    await verifyViewport(
-      page,
-      1280,
-      900,
-      screenshotManager.getScreenshotPath('leaderboard-long-name-desktop.png')
-    );
-    await verifyViewport(
-      page,
-      390,
-      844,
-      screenshotManager.getScreenshotPath('leaderboard-long-name-mobile.png')
-    );
-    await verifyViewport(
-      page,
-      844,
-      390,
-      screenshotManager.getScreenshotPath('leaderboard-long-name-landscape.png')
-    );
+    const wasRunning = await page.evaluate(() => {
+      const gameController = window.gameController;
+      if (!gameController) {
+        throw new Error('Leaderboard fixture requires a game controller');
+      }
+      const state = gameController.getGameStateManager();
+      const running = state.getIsGameRunning();
+      state.setIsGameRunning(false);
+      return running;
+    });
 
-    expect(consoleErrors).toEqual([]);
+    try {
+      await verifyViewport(
+        page,
+        1280,
+        900,
+        screenshotManager.getScreenshotPath('leaderboard-long-name-desktop.png')
+      );
+      await verifyViewport(
+        page,
+        390,
+        844,
+        screenshotManager.getScreenshotPath('leaderboard-long-name-mobile.png')
+      );
+      await verifyViewport(
+        page,
+        844,
+        390,
+        screenshotManager.getScreenshotPath('leaderboard-long-name-landscape.png')
+      );
+
+      expect(consoleErrors).toEqual([]);
+    } finally {
+      await page.evaluate((running) => {
+        const gameController = window.gameController;
+        if (!gameController) {
+          throw new Error('Leaderboard fixture lost its game controller during cleanup');
+        }
+        gameController.getGameStateManager().setIsGameRunning(running);
+      }, wasRunning);
+    }
   },
   TestConfig.DEFAULT_TIMEOUT
 );

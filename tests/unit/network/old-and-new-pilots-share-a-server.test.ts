@@ -123,6 +123,15 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     const b = socket();
     join(handler, b.ws, 'b', 1);
     expect(b.messages.find((m) => m.type === 'snapshot').data.kind).toBe('keyframe');
+    const reconstruct = (pilot: ReturnType<typeof socket>) => {
+      const decoder = new SnapshotDecoder();
+      return pilot.messages
+        .filter((message) => message.type === 'snapshot')
+        .map((message) => decoder.decode(message.data))
+        .at(-1);
+    };
+    expect(reconstruct(a)).toMatchObject(JSON.parse(JSON.stringify(engine.getGameState())));
+    expect(reconstruct(b)).toEqual(reconstruct(a));
     const count = a.messages.length;
     broadcaster.broadcastGameState('a');
     expect(a.messages).toHaveLength(count);
@@ -130,14 +139,20 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     broadcaster.broadcastGameState();
     expect(a.messages).toHaveLength(count);
     a.fake.bufferedAmount = 0;
+    engine.getPlayer('b')!.position.x = 720;
     broadcaster.broadcastGameState();
     expect(a.messages.at(-1).data.kind).toBe('keyframe');
+    expect(reconstruct(a)).toMatchObject(JSON.parse(JSON.stringify(engine.getGameState())));
+    expect(reconstruct(b)).toEqual(reconstruct(a));
     join(handler, a.ws, 'a', 1);
     expect(a.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
     engine.removePlayer('a');
     const reconnected = socket();
     join(handler, reconnected.ws, 'a', 1);
     expect(reconnected.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
+    expect(reconstruct(reconnected)).toMatchObject(
+      JSON.parse(JSON.stringify(engine.getGameState()))
+    );
   });
 
   test('a laser core stays collectible while older pilots decode both keyframes and deltas', () => {

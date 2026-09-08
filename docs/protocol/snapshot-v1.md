@@ -128,7 +128,41 @@ count individual allocations, and high-water measurements depend on GC timing.
 The decoder retains one detached baseline and returns the application-owned
 reconstructed state; a redundant full clone was removed after initial profiling.
 Server capture is shared once per broadcast. This single-client encode/decode
-benchmark does not claim multi-client server scaling or phone-frame-rate proof.
+measurement does not establish multi-client scaling or phone frame rate.
+
+### Shared broadcast work (2026-09-08)
+
+Each broadcast now owns one `SnapshotEncoder` per capability view. The encoder
+validates and detaches the current world once, then builds each patch once per
+retained baseline state. Recipients still have independent sequence numbers,
+backpressure, successful-send callbacks, and resync state. The callback retains
+only the delivered state and frame; the encoder cache ends with the broadcast.
+
+Frame selection counts the complete serialized metadata for each recipient,
+including changes in sequence-number digits. A size tie sends a keyframe. The
+comparison uses JavaScript string length, preserving the previous algorithm;
+reported wire sizes use UTF-8 bytes.
+
+A warmed, alternating comparison against the encoder at `c60859d` used 181 moving
+worlds, seven samples per implementation, and staggered recipient sequences.
+The timed work includes capture, encoding, final envelope serialization, and byte
+counting. Decoder equality checks ran outside the timed region.
+
+| Recipients | Previous ms/broadcast | Shared ms/broadcast |
+| --- | ---: | ---: |
+| 1 | 0.525 | 0.526 |
+| 2 | 0.769 | 0.488 |
+| 5 | 1.598 | 0.543 |
+| 10 | 3.053 | 0.656 |
+| 25 | 7.361 | 1.014 |
+
+Wire bytes were identical at every recipient count. One-recipient timing was
+within run-to-run variation; ten recipients used about 79% less preparation time.
+These are local synchronous CPU measurements, excluding socket I/O and rendering.
+Most recipients in this comparison share their previous world. Clients stalled
+on different worlds need separate patches. The benchmark script reports current
+broadcast timings for both shared and staggered baselines alongside the existing
+end-to-end encode/decode measurements.
 
 ## Enhanced asteroid capability
 

@@ -491,7 +491,6 @@ async function main(): Promise<void> {
     server: { host: '127.0.0.1', port: 0, strictPort: false },
   });
   let browser: Browser | undefined;
-  let page: Page | undefined;
   const clientFailures: unknown[] = [];
   try {
     await vite.listen();
@@ -500,7 +499,7 @@ async function main(): Promise<void> {
       throw new Error('Vite did not expose a local benchmark URL');
     }
     browser = await chromium.launch({ headless: true });
-    page = await browser.newPage({ viewport: VIEWPORT });
+    const page = await browser.newPage({ viewport: VIEWPORT });
     await page.addInitScript(() => {
       // tsx preserves local helper names with this esbuild hook. Playwright
       // serializes evaluated functions without the module-level helper.
@@ -529,7 +528,6 @@ async function main(): Promise<void> {
     clientFailures.push(error);
   }
   const cleanupTasks = [
-    ...(page ? [{ label: 'page', promise: page.close() }] : []),
     ...(browser ? [{ label: 'browser', promise: browser.close() }] : []),
     { label: 'Vite server', promise: vite.close() },
   ];

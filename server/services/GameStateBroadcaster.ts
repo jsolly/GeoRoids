@@ -1,15 +1,14 @@
 import { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import {
-  captureSnapshot,
-  encodeSnapshot,
   SNAPSHOT_BACKPRESSURE_BYTES,
   SNAPSHOT_KEYFRAME_INTERVAL,
   SNAPSHOT_VERSION,
   type SnapshotBaseline,
+  SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
-import type { AsteroidData, Position, ServerGameSnapshot, Velocity } from '../../shared-types';
+import type { AsteroidData, Position, Velocity } from '../../shared-types';
 import type { GameEntity } from '../core/EntityManager';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { SERVER_RELEASE_ID } from '../release';
@@ -115,7 +114,8 @@ export class GameStateBroadcaster {
       this.broadcastToAll({ type: 'playerShoot', data: bounce, timestamp: Date.now() });
     }
     const players = this.gameEngine.entityManager.getHumanPlayers();
-    let canonical: ServerGameSnapshot | undefined;
+    let canonical: SnapshotEncoder | undefined;
+    let compatible: SnapshotEncoder | undefined;
     let legacy: string | undefined;
     for (const player of players) {
       const ws = player.ws;
@@ -144,7 +144,7 @@ export class GameStateBroadcaster {
         continue;
       }
       try {
-        canonical ??= captureSnapshot({
+        canonical ??= new SnapshotEncoder({
           ...gameState,
           playerProjectiles: this.gameEngine.getPlayerProjectiles(),
           satelliteProjectiles: this.gameEngine
@@ -154,21 +154,18 @@ export class GameStateBroadcaster {
             .getActiveCollabTags()
             .map((tag) => ({ id: tag.asteroidId, ...tag })),
         });
-        const recipientState =
-          player.asteroidInteractions === 1
-            ? canonical
-            : captureSnapshot({ ...canonical, loot: compatibleLoot });
+        let encoder = canonical;
+        if (player.asteroidInteractions !== 1) {
+          compatible ??= new SnapshotEncoder({ ...canonical.state, loot: compatibleLoot });
+          encoder = compatible;
+        }
         const sequence = recipient.sequence + 1;
         const full =
           recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
-        const frame = encodeSnapshot(
-          recipientState,
-          sequence,
-          full ? undefined : recipient.baseline
-        );
+        const frame = encoder.encode(sequence, full ? undefined : recipient.baseline);
         recipient.pending = true;
         recipient.needsKeyframe = false;
-        const deliveredState = recipientState;
+        const deliveredState = encoder.state;
         const recipientPlayerId = player.id;
         ws.send(
           JSON.stringify({ type: 'snapshot', data: frame, timestamp: message.timestamp }),

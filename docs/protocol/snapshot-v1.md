@@ -129,3 +129,26 @@ The decoder retains one detached baseline and returns the application-owned
 reconstructed state; a redundant full clone was removed after initial profiling.
 Server capture is shared once per broadcast. This single-client encode/decode
 benchmark does not claim multi-client server scaling or phone-frame-rate proof.
+
+## Enhanced asteroid capability
+
+An additive `asteroidInteractions:1` join offer requires snapshot v1 and an explicit
+matching acknowledgment. The joined socket alone receives its private resume token.
+A physical gameplay socket close gives that token a two-second neutral-input grace;
+a same-socket rejoin is idempotent, a valid token can atomically supersede an old
+socket, and expiry/leave/reset invalidates it. Ordinary legacy joins cannot acquire
+constrained motion through an asteroid tool packet.
+
+Optional asteroid `phenomenon` and `spinClass` metadata is preserved on
+first creation and complete/delta updates. `playerProjectiles` carries stable
+process-unique shot IDs, geometry, bounded fractional energy, bounce count and age.
+The enhanced client reconciles keyed rows and ignores legacy shot events for bolt
+creation. Reflection energy uses finite numbers in [0,8]; sequences, epochs and
+bounce counters remain integers. Core upgrades carry bounded charges and expiry.
+
+Enhanced Hauler poses use server motion epochs and monotonically increasing input
+sequences. During latch/release/handoff, legacy movement packets cannot overwrite
+position, velocity, fuel or spin. The client rebases each authoritative frame and
+replays only its bounded unacknowledged input queue. A new handoff epoch/anchor and
+reachable-pose acknowledgment are required before free prediction resumes. Server
+time and kit speed bound all subsequent enhanced free poses.

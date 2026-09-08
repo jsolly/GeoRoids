@@ -5,7 +5,13 @@ import {
 } from '../../../shared/constants/health';
 import { applyFuelSnapshot, createFuelTank, trySpendEmpFuel } from '../../../shared/fuel';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
-import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../../shared-types';
+import type {
+  AsteroidMotionState,
+  Position,
+  ShipKitId,
+  SoftFactionId,
+  Velocity,
+} from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
 import { getThrustSound } from '../../audio/gameSounds';
 import type { Sound } from '../../audio/Sound';
@@ -60,6 +66,9 @@ class Ship {
   blinkCount: number = 0;
   spawnProtectionTimer: number = 0;
   canShoot = true;
+  /** Constrained/released/handoff transforms are advanced by the negotiated predictor. */
+  serverOwnsMotion = false;
+  asteroidMotion?: AsteroidMotionState;
 
   exploding = false;
   lasers: Laser[] = [];
@@ -789,7 +798,9 @@ class Ship {
       return;
     }
 
-    this.updateMovement();
+    if (!this.serverOwnsMotion) {
+      this.updateMovement();
+    }
     this.updateEmpPulse();
     updateShield(this);
     this.updateShootCooldown();

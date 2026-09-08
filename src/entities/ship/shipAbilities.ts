@@ -1,6 +1,6 @@
 import { areAllied } from '../../../shared/factions';
 import { trySpendTrackedEmpFuel } from '../../../shared/fuel';
-import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
+import type { AsteroidMotionState, Position, SoftFactionId, Velocity } from '../../../shared-types';
 import {
   findHarpoonFieldBody,
   getHarpoonField,
@@ -25,6 +25,7 @@ export interface AbilityHost {
   harpoonTimer: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
+  asteroidMotion?: AsteroidMotionState;
   r?: number;
   fuel?: number;
   maxFuel?: number;
@@ -88,7 +89,12 @@ function headingVelocity(angle: number, magnitude: number): Velocity {
 }
 
 export function canActivateAbility(host: AbilityHost): boolean {
-  return !host.exploding && host.health > 0 && host.abilityCooldownFrames <= 0;
+  return (
+    !host.exploding &&
+    host.health > 0 &&
+    host.abilityCooldownFrames <= 0 &&
+    host.asteroidMotion?.mode !== 'latched'
+  );
 }
 
 export function absorbDamageWithShield(host: { shieldTimer: number }): boolean {
@@ -160,7 +166,16 @@ export function tickAbilityHost(host: AbilityHost): void {
   if (host.shieldTimer > 0) {
     host.shieldTimer -= 1;
   }
-  if (host.harpoonTimer > 0) {
+  if (
+    host.kitId === 'hauler' &&
+    host.asteroidMotion?.mode === 'latched' &&
+    !host.exploding &&
+    host.health > 0
+  ) {
+    // An asteroid latch lasts until its ownership state changes, across render
+    // frames and transport gaps. The ordinary E ability still expires below.
+    host.harpoonTimer = Math.max(1, host.harpoonTimer);
+  } else if (host.harpoonTimer > 0) {
     host.harpoonTimer -= 1;
     if (host.harpoonTimer <= 0 || host.kitId !== 'hauler') {
       clearHarpoonLatch(host);

@@ -65,6 +65,45 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     expect(reconnected.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
   });
 
+  test('a laser core stays collectible while older pilots decode both keyframes and deltas', () => {
+    const legacy = socket(); const recovery = socket(); const enhanced = socket();
+    join(handler, legacy.ws, 'legacy');
+    join(handler, recovery.ws, 'recovery', 1);
+    handler.handleMessage({ type: 'join', data: { id: 'enhanced', name: 'enhanced', position: { x: 100, y: 100 }, snapshotVersion: 1, asteroidInteractions: 1 } }, enhanced.ws);
+    engine.addAsteroid({ id: 'core-rock', position: { x: 5000, y: 5000 }, velocity: { x: 0, y: 0 }, size: 32, vertices: 4, offsets: [1, 1, 1, 1], jaggedness: 0, rotation: 0, angularVelocity: 0, health: 75, maxHealth: 75, material: 'metal', phenomenon: { kind: 'reflective', clusterId: 'test', energy: 0, maxEnergy: 6 } });
+    for (let hit = 0; hit < 3; hit++) engine.handleAsteroidHit('core-rock', 'enhanced');
+    const core = engine.getLoot().find(loot => loot.kind === 'laserCore')!;
+    expect(core).toBeDefined();
+    broadcaster.broadcastGameState();
+    broadcaster.requestSnapshotKeyframe(recovery.ws);
+    broadcaster.broadcastGameState();
+    const decodeAll = (pilot: ReturnType<typeof socket>) => {
+      const decoder = new SnapshotDecoder();
+      return pilot.messages.filter(message => message.type === 'snapshot').map(message => decoder.decode(message.data));
+    };
+    // The deployed a975 client accepts exactly these enum values. Unknown
+    // additive fields are safe, but a new loot enum rejects the whole world.
+    const deployedLootKinds = ['shard', 'wreckage', 'fuel'];
+    for (const state of decodeAll(recovery)) {
+      expect(state.loot.every(loot => deployedLootKinds.includes(loot.kind!))).toBe(true);
+    }
+    expect(decodeAll(recovery).at(-1)?.loot.find(loot => loot.id === core.id)?.kind).toBe('shard');
+    expect(legacy.messages.filter(message => message.type === 'gameState').at(-1).data.loot.find((loot: { id: string }) => loot.id === core.id).kind).toBe('shard');
+    expect(decodeAll(enhanced).at(-1)?.loot.find(loot => loot.id === core.id)?.kind).toBe('laserCore');
+    const collector = engine.getPlayer('recovery')!;
+    collector.position = { ...core.position };
+    const score = collector.score;
+    engine.collectLoot();
+    expect(collector.laserUpgrade?.charges).toBe(6);
+    expect(collector.score).toBeGreaterThanOrEqual(score + 150);
+    const collectedScore = collector.score;
+    engine.collectLoot();
+    expect(collector.score).toBe(collectedScore);
+    broadcaster.broadcastGameState();
+    expect(decodeAll(recovery).at(-1)?.loot.some(loot => loot.id === core.id)).toBe(false);
+    expect(decodeAll(enhanced).at(-1)?.loot.some(loot => loot.id === core.id)).toBe(false);
+  });
+
   test('pending and failed sends do not advance baseline; periodic/resync keyframes heal state', () => {
     const a = socket(); join(handler, a.ws, 'a', 1);
     a.fake.defer = true;

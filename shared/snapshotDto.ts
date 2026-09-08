@@ -1,8 +1,12 @@
 import type {
   AsteroidData,
   AsteroidMaterial,
+  AsteroidMotionState,
+  AsteroidPhenomenon,
+  LaserUpgrade,
   LootData,
   LootKind,
+  PlayerProjectileState,
   SatelliteData,
   SatellitePickupData,
   SatellitePickupState,
@@ -23,6 +27,7 @@ type Shape<T> = { [K in keyof T]-?: Rule };
 const number: Rule = (value) => typeof value === 'number' && Number.isFinite(value);
 const string: Rule = (value) => typeof value === 'string';
 const boolean: Rule = (value) => typeof value === 'boolean';
+const counter: Rule = (value) => Number.isSafeInteger(value) && (value as number) >= 0;
 const optional =
   (rule: Rule): Rule =>
   (value) =>
@@ -43,7 +48,12 @@ const kit = enumeration<ShipKitId>({
   quake: true,
 });
 const faction = enumeration<SoftFactionId>({ ion: true, ember: true });
-const lootKind = enumeration<LootKind>({ shard: true, wreckage: true, fuel: true });
+const lootKind = enumeration<LootKind>({
+  shard: true,
+  wreckage: true,
+  fuel: true,
+  laserCore: true,
+});
 const array =
   (rule: Rule): Rule =>
   (value) =>
@@ -58,6 +68,25 @@ const shape =
     return Object.entries(rules).every(([name, rule]) => (rule as Rule)(fields[name]));
   };
 const position = shape<{ x: number; y: number }>({ x: number, y: number });
+const energy: Rule = (value) => number(value) && (value as number) >= 0 && (value as number) <= 8;
+const material = enumeration<AsteroidMaterial>({ ice: true, metal: true, rubble: true });
+const motion = shape<AsteroidMotionState>({
+  epoch: counter,
+  mode: choice('free', 'latched', 'released', 'handoff'),
+  ack: counter,
+  tetherMode: optional(choice('spin', 'anchor', 'brake')),
+  asteroidId: optional(string),
+  payloadId: optional(string),
+  latchAngle: optional(number),
+  anchor: optional(position),
+});
+const upgrade = shape<LaserUpgrade>({ charges: counter, expiresAt: number });
+const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
+  kind: choice('reflective'),
+  clusterId: string,
+  energy,
+  maxEnergy: energy,
+});
 const entity = shape<ServerEntityData>({
   id: string,
   name: string,
@@ -90,6 +119,8 @@ const entity = shape<ServerEntityData>({
   shieldTime: optional(number),
   shieldCooldown: optional(number),
   shieldFlashTime: optional(number),
+  asteroidMotion: optional(motion),
+  laserUpgrade: optional(upgrade),
 });
 const asteroid = shape<AsteroidData>({
   id: string,
@@ -104,7 +135,9 @@ const asteroid = shape<AsteroidData>({
   vertices: number,
   offsets: array(number),
   isCollabTarget: optional(boolean),
-  material: optional(enumeration<AsteroidMaterial>({ ice: true, metal: true, rubble: true })),
+  material: optional(material),
+  phenomenon: optional(reflective),
+  spinClass: optional(choice('natural', 'charged')),
 });
 const loot = shape<LootData>({
   id: string,
@@ -165,6 +198,16 @@ const projectile = shape<SnapshotSatelliteProjectile>({
   velocity: position,
   age: (value) => number(value) && (value as number) >= 0,
 });
+const playerProjectile = shape<PlayerProjectileState>({
+  id: string,
+  ownerId: string,
+  position,
+  prevPosition: position,
+  velocity: position,
+  energy,
+  bounces: counter,
+  age: counter,
+});
 const collabTag = shape<SnapshotCollabTag>({
   id: string,
   asteroidId: string,
@@ -187,6 +230,7 @@ const world = shape<ServerGameSnapshot>({
   ...legacyRules,
   satelliteProjectiles: array(projectile),
   collabTags: array(collabTag),
+  playerProjectiles: optional(array(playerProjectile)),
 });
 /** Unknown JSON fields are preserved by the codec, never discarded by this validation. */
 export function validateSnapshotDto(value: unknown): asserts value is ServerGameSnapshot {

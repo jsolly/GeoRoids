@@ -42,6 +42,7 @@ export class AsteroidManager {
   private readonly managerNonce = randomUUID();
   /** Monotonic field generation; never reused after a clear in this manager. */
   private fieldGeneration = 0;
+  private onRemove?: (asteroid: AsteroidData) => void;
   
   // Asteroid splitting constants - can be overridden by DEBUG settings
   private readonly MIN_ASTEROID_SIZE = 10;
@@ -69,11 +70,16 @@ export class AsteroidManager {
     this.asteroids.set(asteroid.id, asteroid);
   }
 
+  public setOnRemove(listener: (asteroid: AsteroidData) => void): void {
+    this.onRemove = listener;
+  }
+
   public removeAsteroid(asteroidId: string): AsteroidData | undefined {
     const asteroid = this.asteroids.get(asteroidId);
     if (asteroid) {
       this.asteroids.delete(asteroidId);
       this.laserHits.delete(asteroidId);
+      this.onRemove?.(asteroid);
     }
     return asteroid;
   }
@@ -121,7 +127,7 @@ export class AsteroidManager {
   }
 
   public clearAsteroids(): void {
-    this.asteroids.clear();
+    for (const id of [...this.asteroids.keys()]) this.removeAsteroid(id);
     this.laserHits.clear();
   }
 
@@ -130,12 +136,13 @@ export class AsteroidManager {
    * velocity is pixels per 60 FPS tick). Debug placement modes stay frozen so
    * collision tests that pin roids on ships/bots do not drift.
    */
-  public updateMotion(): void {
+  public updateMotion(owned?: (id: string) => boolean): void {
     if (DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER || DEBUG.ROIDS.PLACE_ON_BOT) {
       return;
     }
 
     for (const asteroid of this.asteroids.values()) {
+      if (owned?.(asteroid.id)) continue;
       const next = stepAsteroidMotion(asteroid.position, asteroid.velocity);
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;
@@ -181,8 +188,7 @@ export class AsteroidManager {
     }
 
     // Clear existing asteroids only if we're creating new ones
-    this.asteroids.clear();
-    this.laserHits.clear();
+    this.clearAsteroids();
 
     // Reset RNG for deterministic asteroid generation
     this.rng.reset();
@@ -422,8 +428,7 @@ export class AsteroidManager {
       return { outcome: 'missing', newAsteroids: [], split: false };
     }
 
-    this.asteroids.delete(asteroidId);
-    this.laserHits.delete(asteroidId);
+    this.removeAsteroid(asteroidId);
 
     const fragmentCount = destroyed.material === 'rubble' ? 3 : 2;
     const canSplit = destroyed.material === 'rubble'

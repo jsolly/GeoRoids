@@ -13,7 +13,7 @@ import { hexToRgba } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
 import { logger } from '../../utils/Logger';
 import { drawSoftFactionMark } from '../player/factionMarkPainters';
-import { findHarpoonFieldBody, getHarpoonField } from './harpoonField';
+import { findHarpoonFieldBody, getHarpoonField, harpoonSurfaceToward } from './harpoonField';
 import {
   getKitHullOutline,
   projectHullPoint,
@@ -709,7 +709,8 @@ export function drawHaulerHarpoonVfx(
     return;
   }
   const target = findHarpoonFieldBody(ship.harpoonTargetId);
-  let latchWorld = target?.position ?? ship.harpoonLatchPos;
+  const surfaceLatch = ship.asteroidMotion?.mode === 'latched';
+  let latchWorld = surfaceLatch ? ship.harpoonLatchPos : (target?.position ?? ship.harpoonLatchPos);
   if (!latchWorld) {
     latchWorld = findHarpoonTarget(
       ship,
@@ -720,7 +721,7 @@ export function drawHaulerHarpoonVfx(
   if (!latchWorld) {
     return;
   }
-  if (target) {
+  if (target && !surfaceLatch) {
     ship.harpoonLatchPos = { x: target.position.x, y: target.position.y };
   } else if (!ship.harpoonLatchPos) {
     ship.harpoonLatchPos = { x: latchWorld.x, y: latchWorld.y };
@@ -738,6 +739,19 @@ export function drawHaulerHarpoonVfx(
   ctx.moveTo(screenX, screenY);
   ctx.lineTo(latch.x, latch.y);
   ctx.stroke();
+  const payload = surfaceLatch ? findHarpoonFieldBody(ship.asteroidMotion?.payloadId) : undefined;
+  if (payload && target) {
+    const primarySurface = harpoonSurfaceToward(target, payload.position);
+    const payloadSurface = harpoonSurfaceToward(payload, target.position);
+    if (primarySurface && payloadSurface) {
+      const primaryEnd = canvasManager.worldToScreen(primarySurface, cameraShipPosition);
+      const payloadEnd = canvasManager.worldToScreen(payloadSurface, cameraShipPosition);
+      ctx.beginPath();
+      ctx.moveTo(primaryEnd.x, primaryEnd.y);
+      ctx.lineTo(payloadEnd.x, payloadEnd.y);
+      ctx.stroke();
+    }
+  }
   ctx.setLineDash([]);
   ctx.shadowBlur = 0;
   ctx.strokeStyle = HAULER_TETHER_TIP_COLOR;

@@ -10,6 +10,7 @@ import { SERVER_RELEASE_ID } from './server/release';
 // Production configuration
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'production';
+const requireEnhancedClient = process.env.REQUIRE_ASTEROID_CLIENT === '1';
 
 logger.info(`🚀 Starting ${NODE_ENV} game server on port ${PORT}`);
 
@@ -577,7 +578,22 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
 // Create single WebSocket server that handles both paths
 const wss = new WebSocketServer({
   server: httpServer,
-  // Don't specify path here - we'll handle routing manually
+  // Reject stale gameplay clients before open, so successful upgrades cannot
+  // continually reset their reconnect retry counter. Log forwarding is separate.
+  verifyClient: (info, done) => {
+    let url: URL;
+    try {
+      url = new URL(info.req.url ?? '/', 'http://localhost');
+    } catch {
+      done(false, 400, 'Invalid WebSocket URL');
+      return;
+    }
+    if (requireEnhancedClient && url.pathname === '/ws' && url.searchParams.get('asteroidInteractions') !== '1') {
+      done(false, 426, 'Client update required; refresh GeoRoids');
+      return;
+    }
+    done(true);
+  },
 });
 
 // NOTE: Do not manually handle 'upgrade' when passing { server: httpServer } to WebSocketServer.
@@ -678,11 +694,17 @@ logger.info('✅ Game world initialization complete - asteroids will be created 
 gameEngine.updatePauseState();
 
 const wsCore = new WebSocketCore(gameEngine);
+gameEngine.setOnAsteroidHits((hits) => {
+  wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
+});
 wsCore.startPeriodicGameStateBroadcast();
 
 // WebSocket connection handling with routing
 wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-  const url = req.url;
+  // Enhanced clients negotiate their capability on the WebSocket query
+  // string. Route by pathname so the same gameplay handler serves both the
+  // legacy `/ws` and negotiated `/ws?asteroidInteractions=1` endpoints.
+  const url = new URL(req.url ?? '/', 'http://localhost').pathname;
   const clientIp = req.socket.remoteAddress || 'unknown';
   
   if (isRateLimited(clientIp)) {
@@ -747,6 +769,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 
     ws.on('close', () => {
       logger.info('🔌 Player disconnected');
+      if (gameEngine.transportClosed(ws)) return;
       // Find and remove the player
       for (const player of wsCore.getAllPlayers()) {
         if (player.ws === ws) {
@@ -768,7 +791,9 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
 
 // Start the server
 httpServer.listen(PORT, () => {
-  logger.info(`✅ Server listening on port ${PORT}`);
+  const address = httpServer.address();
+  const listeningPort = address && typeof address === 'object' ? address.port : PORT;
+  logger.info(`✅ Server listening on port ${listeningPort}`);
   logger.info(`🌐 Health check: http://localhost:${PORT}/health`);
   logger.info(`📊 Status page: http://localhost:${PORT}/status`);
   logger.info(`🔌 Gameplay WebSocket: ws://localhost:${PORT}/ws`);

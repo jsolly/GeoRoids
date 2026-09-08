@@ -1,7 +1,7 @@
 # GeoRoids art pack — acceptance + gaps
 
 **Pack date:** 2026-09-07
-**For:** Codex / local impl (no Cursor cloud agents until ~Sep 8)
+**For:** Codex implementation; stalled Cursor work has been recovered and archived.
 **Historical hold:** Wave 2 feature merges were held until Hauler cream+tip PASS on a production duo.
 
 ## In this ZIP (produced)
@@ -69,7 +69,7 @@ The table below records what was absent from the recovered source ZIP. Those sta
 | Per-bird shot manner art | Product TBD; not drawn |
 | In-repo bake of hulls from v2 topology | Code/Dev — use PNG sheets until SVGs exist |
 
-## Current ART implementation inventory
+## Recovered ART implementation inventory
 
 | Ask | Status in this ART branch |
 | ----- | -------- |
@@ -123,6 +123,14 @@ Commit under game static dirs (e.g. `client/public/art/` or match existing), wit
 
 Live soft-faction names are **ION / EMBER**. Some older palette lines still say Lyra/Solara — treat those as aliases for the same hexes; prefer ION/EMBER in code/docs.
 
+## Recovery acceptance
+
+Recovered art and gameplay landed in PRs #493/#499/#500, with final production fixes in #501 (a9755405dcfd546ace3e92b4dc8c3ff53d9bb598). Both client and server release identities were verified. Production checks passed for all five hulls, six EO outlines, three minerals, fixed close scale, mobile abilities and shields, a cream/amber Hauler tether across a physical reconnect, allied-target filtering and portrait/landscape leaderboard fitting. Historical source-pack failures above remain provenance rather than current blockers.
+
+## New asteroid interaction cues
+
+Reflective clusters use flat slate facets with small amber charge cues. Asteroid tools show a thin predicted shot path. Laser cores use an amber diamond/bolt mark and show bounded charges in the tools view. Fast spinners retain mineral outlines. The Hauler's primary and payload cables stay cream `#E8D5A3` with amber `#FDE68A` endpoints. No new hull, faction repaint or filled playfield entity is introduced.
+
 ## Cloud agents
 
-Do **not** start/resume Cursor cloud agents. Codex path until ~Sep 8.
+All eight GeoRoids continuation routines have been deleted and all accessible stalled Cursor runs archived under John's takeover instruction. Codex owns the remaining reflective asteroid and Hauler proposals; there is no scheduled Cursor/Grok resume.

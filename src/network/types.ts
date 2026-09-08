@@ -13,6 +13,7 @@ export interface ServerMessage {
     | 'snapshot'
     | 'error'
     | 'joined'
+    | 'sessionExpired'
     | 'asteroidCreate'
     | 'asteroidCreateBatch'
     | 'asteroidUpdate'
@@ -53,6 +54,8 @@ export interface ClientMessage {
     | 'asteroidDestroyed'
     | 'clientLog'
     | 'useAbility'
+    | 'asteroidTool'
+    | 'asteroidInput'
     | 'lootExplode'
     | 'satelliteDamage'
     | 'satellitePickupCollected';

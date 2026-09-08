@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { Position, Velocity } from '../../shared-types';
+import type { AsteroidToolAction, AsteroidMotionInput, Position, Velocity } from '../../shared-types';
 import { GameEngine, type AppliedAsteroidHit } from '../core/GameEngine';
 import { GameStateBroadcaster } from '../services/GameStateBroadcaster';
 import { ClientLogger } from '../services/ClientLogger';
@@ -79,6 +79,35 @@ export class MessageHandler {
       switch (type) {
         case 'join':
           this.handleJoin(ws, id, name, restData);
+          break;
+
+        case 'leave': {
+          const owner = this.gameEngine.getPlayerBySocket(ws);
+          if (owner?.type === 'human') {
+            this.gameEngine.removePlayer(owner.id);
+            this.broadcaster.broadcastPlayerLeft(owner.id);
+          }
+          break;
+        }
+
+        case 'asteroidTool': {
+          const command = payload as AsteroidToolAction;
+          if (command.action !== 'latch') {
+            this.broadcaster.sendError(ws, 'Unsupported asteroid tool action');
+            break;
+          }
+          const outcome = this.gameEngine.asteroidMotion.latch(
+            ws,
+            command,
+            this.gameEngine.getAllAsteroids(),
+            Date.now()
+          ).ok;
+          if (outcome) this.broadcaster.broadcastGameState();
+          break;
+        }
+
+        case 'asteroidInput':
+          this.gameEngine.asteroidMotion.input(ws, payload as AsteroidMotionInput, this.gameEngine.getAllAsteroids(), Date.now());
           break;
 
         case 'snapshotResync':
@@ -184,7 +213,55 @@ export class MessageHandler {
     const factionId = data.factionId ?? data.data?.factionId;
     logger.debug('Player join', { id, position: joinPosition, kitId, factionId });
 
-    const player = this.gameEngine.addPlayer(id, name, ws, joinPosition, undefined, kitId, factionId);
+    const offered = data.asteroidInteractions ?? data.data?.asteroidInteractions;
+    const token = data.resumeToken ?? data.data?.resumeToken;
+    const snapshotOffer = data.snapshotVersion ?? data.data?.snapshotVersion;
+    let resumeToken: string | undefined;
+    let player;
+    if (token !== undefined) {
+      if (offered !== 1 || snapshotOffer !== 1) {
+        this.broadcaster.sendError(ws, 'Resume requires the enhanced snapshot capability');
+        return;
+      }
+      // A bearer token may move an enhanced session between sockets, but it
+      // must never merge that session into a socket which is already carrying
+      // a legacy human. EntityManager resolves socket ownership by scanning
+      // entity rows, so allowing both bindings would make later updates
+      // ambiguous and could strand the resumed pilot.
+      const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+      if (socketPlayer && socketPlayer.asteroidInteractions !== 1) {
+        this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
+        return;
+      }
+      const resumed = this.gameEngine.asteroidMotion.resume(token, ws, Date.now());
+      if (!resumed.ok) {
+        this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
+        return;
+      }
+      player = resumed.actor;
+      id = player.id;
+      name = player.name;
+      resumeToken = resumed.resumeToken;
+      resumed.supersededSocket?.close(4001, 'Session moved to another socket');
+    } else {
+      const existing = this.gameEngine.getAllPlayers().find(candidate => candidate.id === id || candidate.name.toLowerCase() === name.toLowerCase());
+      if (existing?.asteroidInteractions === 1) {
+        this.broadcaster.sendError(ws, 'This pilot requires its private resume token');
+        return;
+      }
+      player = this.gameEngine.addPlayer(id, name, ws, joinPosition, undefined, kitId, factionId);
+      if (offered === 1 && snapshotOffer === 1) {
+        player.asteroidInteractions = 1;
+        const registered = this.gameEngine.asteroidMotion.register(player, ws, offered, Date.now());
+        if (!registered.ok) {
+          this.gameEngine.removePlayer(player.id);
+          this.broadcaster.sendError(ws, registered.error);
+          return;
+        }
+        resumeToken = registered.resumeToken;
+        this.gameEngine.enableAsteroidInteractions(player);
+      }
+    }
     logger.info('✅ Player added to game engine', { id, name, factionId: player.factionId });
 
     const replacedId = this.gameEngine.consumeReplacedHumanId();
@@ -200,7 +277,8 @@ export class MessageHandler {
       data: {
         id,
         name,
-        position: joinPosition,
+        position: player.position,
+        ...(resumeToken ? { resumeToken, asteroidInteractions: 1 } : {}),
         color: player.color,
         kitId: player.kitId,
         factionId: player.factionId,
@@ -212,7 +290,7 @@ export class MessageHandler {
     logger.debug('📤 Sent joined confirmation', { id, name });
 
     // Broadcast to all other players
-    this.broadcaster.broadcastPlayerJoined(id, name, joinPosition);
+    this.broadcaster.broadcastPlayerJoined(id, name, player.position);
     this.broadcaster.broadcastGameState();
     logger.debug('📢 Broadcasted player joined and game state', { id, name });
   }
@@ -248,6 +326,14 @@ export class MessageHandler {
     // (e.g. stuck outside the boundary at full health).
     const existing = this.gameEngine.getPlayer(id);
     if (existing && (existing.exploding || existing.respawnTimer !== undefined || existing.health <= 0)) {
+      return;
+    }
+
+    if (socketPlayer.asteroidInteractions === 1) {
+      this.gameEngine.asteroidMotion.acceptFreePose(ws, {
+        epoch: data.motionEpoch, sequence: data.motionSequence,
+        position: data.position, velocity: data.velocity, angle: data.angle, thrusting: data.thrusting,
+      }, Date.now());
       return;
     }
 
@@ -319,8 +405,8 @@ export class MessageHandler {
       return;
     }
 
-    this.broadcaster.broadcastPlayerShoot(shooter.id, data.laserStart, data.laserDirection);
-    this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits());
+    this.broadcaster.broadcastPlayerShoot(shooter.id, data.laserStart, data.laserDirection, laser.id);
+    this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
   private handleShield(ws: WebSocket, id: string, data: any): void {
@@ -395,6 +481,7 @@ export class MessageHandler {
   }
 
   private handleLaserDamage(ws: WebSocket, data: any): void {
+    if (this.gameEngine.usesAuthoritativeProjectiles()) return;
     if (!data.targetPlayerId || !data.attackerId || data.damage === undefined) {
       this.broadcaster.sendError(ws, 'Missing required fields for laserDamage');
       return;
@@ -458,6 +545,7 @@ export class MessageHandler {
   }
 
   private handleSatelliteDamage(ws: WebSocket, data: any): void {
+    if (this.gameEngine.usesAuthoritativeProjectiles()) return;
     if (
       typeof data.satelliteId !== 'string' ||
       data.satelliteId.length === 0 ||
@@ -524,6 +612,7 @@ export class MessageHandler {
   }
 
   private handleBotDamage(ws: WebSocket, data: any): void {
+    if (this.gameEngine.usesAuthoritativeProjectiles()) return;
     if (
       typeof data.botId !== 'string' ||
       data.botId.length === 0 ||
@@ -609,6 +698,7 @@ export class MessageHandler {
   }
 
   private handleAsteroidDamage(ws: WebSocket, data: any): void {
+    if (this.gameEngine.usesAuthoritativeProjectiles()) return;
     if (
       typeof data.asteroidId !== 'string' ||
       data.asteroidId.length === 0 ||
@@ -632,10 +722,13 @@ export class MessageHandler {
       return;
     }
 
-    if (
-      this.gameEngine.getPlayer(shooterId)?.type === 'bot' &&
-      !this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
-    ) {
+    const shooter = this.gameEngine.getPlayer(shooterId);
+    const consumed = shooter?.type === 'bot'
+      ? this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
+      : shooter?.type === 'human' && this.gameEngine.consumeHumanLaserNearTarget(
+          shooterId, asteroid.position, asteroid.size
+        );
+    if (!consumed) {
       return;
     }
 
@@ -664,6 +757,7 @@ export class MessageHandler {
   }
 
   private handleAsteroidDestroyed(ws: WebSocket, data: any): void {
+    if (this.gameEngine.usesAuthoritativeProjectiles()) return;
     if (
       typeof data.asteroidId !== 'string' ||
       data.asteroidId.length === 0 ||
@@ -693,12 +787,36 @@ export class MessageHandler {
     if (!asteroid) {
       return;
     }
-    if (asteroid.isCollabTarget) {
+    if (asteroid.isCollabTarget || asteroid.phenomenon) {
       return;
     }
 
     const shooterId = this.resolveAsteroidShooter(ws, data.playerId, asteroid.id);
     if (!shooterId) {
+      return;
+    }
+
+    // Client reports are hints about a shot that the server already tracks.
+    // Consume exactly the owning projectile before applying the hit. The
+    // server laser tick marks its own laser in resolveLaserAgainstAsteroids;
+    // applying this report must never search for and consume another shot.
+    const shooter = this.gameEngine.getPlayer(shooterId);
+    const projectileConsumed =
+      shooter?.type === 'bot'
+        ? this.gameEngine.consumeActiveBotLaserNearAsteroid(
+            shooter.id,
+            asteroid.id,
+            laserPosition
+          )
+        : shooter?.type === 'human'
+          ? this.gameEngine.consumeHumanLaserNearTarget(
+              shooter.id,
+              asteroid.position,
+              asteroid.size,
+              laserPosition
+            )
+          : false;
+    if (!projectileConsumed) {
       return;
     }
 
@@ -756,9 +874,20 @@ export class MessageHandler {
   }
 
   private handleLootExplode(ws: WebSocket, id: string, data: any): void {
+    if (this.gameEngine.usesAuthoritativeProjectiles()) return;
     const lootId = data.lootId;
     if (typeof lootId !== 'string' || lootId.length === 0) {
       this.broadcaster.sendError(ws, 'Missing loot ID for lootExplode');
+      return;
+    }
+
+    // Every observer can report the same bot laser/drop collision. Once the
+    // first valid report removes the authoritative drop, later reports are
+    // harmless duplicate acknowledgements. Check the live target before
+    // resolving shooter identity so a consumed drop does not produce a false
+    // "Unknown shooter" error, while live forged claims still go through the
+    // normal ownership/projectile proof below.
+    if (!this.gameEngine.getLoot().some((loot) => loot.id === lootId)) {
       return;
     }
 

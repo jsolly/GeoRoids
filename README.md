@@ -20,6 +20,8 @@ Vite serves the client at `http://localhost:5173`; the game server listens on po
 
 Choose a ship, enter the game, use arrow keys to turn and thrust, Space to fire, E for the selected kit's ability and F for the shield. Mobile players use the on-screen controls. The minimap provides the wider arena view.
 
+The enhanced asteroid tools add reflective clusters, laser cores and Hauler slingshots. Press Q to open the controls and shot preview. See the [asteroid interactions guide](docs/asteroid-interactions.md) for controls and rollout settings.
+
 ## Verification
 
 Run commands from the repository directory:

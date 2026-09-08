@@ -69,6 +69,17 @@ export class LootManager {
     return drop ? this.toPublic(drop) : undefined;
   }
 
+  public spawnLaserCore(position: Position, gameTime: number): LootData {
+    const drop: TrackedLoot = {
+      id: `core-${this.nextId++}`, position: { ...position }, mass: 0,
+      radius: GROWTH.LOOT_RADIUS + 3, kind: 'laserCore',
+      expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+    };
+    this.loot.set(drop.id, drop);
+    this.enforceCap();
+    return this.toPublic(drop);
+  }
+
   public remove(lootId: string): LootData | undefined {
     const drop = this.loot.get(lootId);
     if (!drop) {

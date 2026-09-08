@@ -1,12 +1,22 @@
+import { previewChargedReflections } from '../../shared/asteroidPhenomena';
 import { areAllied } from '../../shared/factions';
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import type {
   AsteroidData,
+  AsteroidToolAction,
   LootData,
   Position,
   SatellitePickupCollected,
+  ServerEntityData,
   ShipKitId,
 } from '../../shared-types';
+import {
+  AsteroidToolsController,
+  type AsteroidToolsControllerUpdate,
+  type AsteroidToolsMotionAction,
+  type AsteroidToolsTarget,
+} from '../asteroidTools/AsteroidToolsController';
+import { AsteroidToolsOverlay } from '../asteroidTools/AsteroidToolsOverlay';
 import {
   replaceThrustSources,
   resetThrustSources,
@@ -16,6 +26,7 @@ import { bindGameAudio } from '../audio/spatialAudio';
 import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
 import { entityFactory } from '../entities/EntityFactory';
+import { AuthoritativeProjectileField } from '../entities/laser/AuthoritativeProjectileField';
 import { LootField } from '../entities/loot/LootField';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
@@ -67,6 +78,19 @@ import { logger } from '../utils/Logger';
 import { GameStateManager } from './services/GameStateManager';
 import { InputManager } from './services/InputManager';
 
+interface AsteroidToolsSnapshotDetail {
+  enabled: boolean;
+  entity?: ServerEntityData;
+  asteroids?: AsteroidData[];
+}
+
+type ConstrainedMotionAction = Exclude<AsteroidToolsMotionAction, 'latch'>;
+type MotionActionDispatcher = (action: ConstrainedMotionAction, targetId?: string) => boolean;
+
+type NetworkWithMotionActions = NetworkManager & {
+  dispatchAsteroidMotionAction?: (action: ConstrainedMotionAction, targetId?: string) => boolean;
+};
+
 export class GameController {
   private static instance: GameController;
 
@@ -88,6 +112,18 @@ export class GameController {
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
   private lifecycleAccumulatorMs = 0;
+  private readonly asteroidToolsController: AsteroidToolsController;
+  private asteroidToolsOverlay: AsteroidToolsOverlay | null = null;
+  private readonly reflectionRocks: AsteroidData[] = [];
+  private readonly asteroidToolsSnapshotHandler = (event: Event): void => {
+    this.applyAsteroidToolsSnapshot(event);
+  };
+  private readonly asteroidToolsKeyHandler = (event: KeyboardEvent): void => {
+    this.asteroidToolsController.handleKeyDown(event);
+  };
+  private readonly asteroidToolsBlurHandler = (): void => {
+    this.asteroidToolsController.cancel();
+  };
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -95,6 +131,12 @@ export class GameController {
     this.inputManager = InputManager.getInstance();
     this.networkManager = NetworkManager.getInstance();
     this.collisionManager = CollisionManager.getInstance();
+    this.asteroidToolsController = new AsteroidToolsController({
+      dispatchTool: (action) => this.dispatchAsteroidTool(action),
+      dispatchMotionAction: (action, targetId) =>
+        this.dispatchAsteroidMotionAction(action, targetId),
+      onChange: (state) => this.asteroidToolsOverlay?.update(state),
+    });
 
     bindGameAudio({
       getListenerPosition: () => this.playerManager.getLocalShip()?.position,
@@ -117,6 +159,9 @@ export class GameController {
 
     // Set up network disconnection handler
     this.setupNetworkDisconnectionHandler();
+    window.addEventListener('asteroidToolsSnapshot', this.asteroidToolsSnapshotHandler);
+    window.addEventListener('keydown', this.asteroidToolsKeyHandler);
+    window.addEventListener('blur', this.asteroidToolsBlurHandler);
 
     // Set up game over handler
     this.setupGameOverHandler();
@@ -135,12 +180,199 @@ export class GameController {
     return GameController.instance;
   }
 
+  getAsteroidToolsController(): AsteroidToolsController {
+    return this.asteroidToolsController;
+  }
+
+  private ensureAsteroidToolsOverlay(): void {
+    if (this.asteroidToolsOverlay || typeof document === 'undefined') {
+      return;
+    }
+    this.asteroidToolsOverlay = AsteroidToolsOverlay.mount({
+      container: document.getElementById('gameArea') ?? undefined,
+      callbacks: {
+        onOpen: () => this.asteroidToolsController.setActive(true),
+        onClose: () => this.asteroidToolsController.cancel(),
+        onSelectTarget: (targetId) => this.asteroidToolsController.selectTarget(targetId),
+        onMotion: (action) => this.asteroidToolsController.requestMotion(action),
+      },
+    });
+    this.asteroidToolsOverlay.update(this.asteroidToolsController.getState());
+  }
+
+  private dispatchAsteroidTool(action: AsteroidToolAction): void {
+    this.networkManager.sendMessage({
+      type: 'asteroidTool',
+      data: action,
+      timestamp: Date.now(),
+    });
+  }
+
+  private dispatchAsteroidMotionAction: MotionActionDispatcher = (action, targetId) => {
+    const network = this.networkManager as NetworkWithMotionActions;
+    if (typeof network.dispatchAsteroidMotionAction === 'function') {
+      return network.dispatchAsteroidMotionAction(action, targetId);
+    }
+    logger.warn('ASTEROID_TOOLS', 'Hauler motion adapter is not connected', { action });
+    return false;
+  };
+
+  private applyAsteroidToolsSnapshot(event: Event): void {
+    const detail = (event as CustomEvent<AsteroidToolsSnapshotDetail>).detail;
+    if (!detail || typeof detail !== 'object' || typeof detail.enabled !== 'boolean') {
+      return;
+    }
+
+    // Capability snapshots update the panel's data without forcing it open on
+    // every 30 Hz frame. The launcher/Q shortcut owns visibility; negotiated
+    // shutdown still closes an already-open panel.
+    const update: AsteroidToolsControllerUpdate = {
+      active: detail.enabled && this.asteroidToolsController.getState().active,
+    };
+    if (detail.entity) {
+      update.pilot = {
+        id: detail.entity.id,
+        position: detail.entity.position,
+        kitId: detail.entity.kitId,
+        factionId: detail.entity.factionId,
+        alive: !detail.entity.exploding && detail.entity.health > 0,
+        asteroidMotion: detail.entity.asteroidMotion,
+        laserUpgrade: detail.entity.laserUpgrade,
+      };
+    }
+    if (detail.asteroids) {
+      update.targets = this.asteroidToolsTargetsFromSnapshot(detail.asteroids);
+    } else if (!detail.enabled) {
+      update.pilot = undefined;
+      update.targets = [];
+    }
+    this.asteroidToolsController.update(update);
+  }
+
+  private asteroidToolsTargetsFromSnapshot(
+    asteroids: readonly AsteroidData[]
+  ): AsteroidToolsTarget[] {
+    const targets: AsteroidToolsTarget[] = [];
+    for (const asteroid of asteroids) {
+      if (
+        !asteroid.id ||
+        !Number.isFinite(asteroid.position.x) ||
+        !Number.isFinite(asteroid.position.y) ||
+        !Number.isFinite(asteroid.size) ||
+        asteroid.size <= 0
+      ) {
+        continue;
+      }
+      targets.push({
+        id: asteroid.id,
+        position: { ...asteroid.position },
+        size: asteroid.size,
+        material: asteroid.material,
+        phenomenon: asteroid.phenomenon,
+      });
+    }
+    return targets;
+  }
+
+  private updateAsteroidToolsPreview(): void {
+    const state = this.asteroidToolsController.getState();
+    const ship = this.playerManager.getLocalShip();
+    if (!state.active || !ship || ship.exploding || !this.currRoidBelt) {
+      if (state.reflectionPreview) {
+        this.asteroidToolsController.setReflectionPreview(undefined);
+      }
+      return;
+    }
+
+    let count = 0;
+    for (const roid of this.currRoidBelt.roids) {
+      const slot = this.reflectionRocks[count];
+      if (slot) {
+        slot.id = roid.id;
+        slot.position = roid.position;
+        slot.velocity = roid.velocity;
+        slot.size = roid.r;
+        slot.jaggedness = roid.jaggedness;
+        slot.rotation = roid.angle;
+        slot.angularVelocity = roid.angularVelocity;
+        slot.health = roid.health;
+        slot.maxHealth = roid.maxHealth;
+        slot.vertices = roid.vertices;
+        slot.offsets = roid.offsets;
+        slot.isCollabTarget = roid.isCollabTarget;
+        slot.material = roid.material;
+        slot.phenomenon = roid.phenomenon;
+        slot.spinClass = roid.spinClass;
+      } else {
+        this.reflectionRocks.push({
+          id: roid.id,
+          position: roid.position,
+          velocity: roid.velocity,
+          size: roid.r,
+          jaggedness: roid.jaggedness,
+          rotation: roid.angle,
+          angularVelocity: roid.angularVelocity,
+          health: roid.health,
+          maxHealth: roid.maxHealth,
+          vertices: roid.vertices,
+          offsets: roid.offsets,
+          isCollabTarget: roid.isCollabTarget,
+          material: roid.material,
+          phenomenon: roid.phenomenon,
+          spinClass: roid.spinClass,
+        });
+      }
+      count += 1;
+    }
+    this.reflectionRocks.length = count;
+
+    if (count === 0) {
+      this.asteroidToolsController.setReflectionPreview(undefined);
+      return;
+    }
+
+    const direction = { x: Math.cos(ship.angle), y: -Math.sin(ship.angle) };
+    const start = {
+      x: ship.position.x + direction.x * ship.r,
+      y: ship.position.y + direction.y * ship.r,
+    };
+    const canvas = canvasManager.getCanvas();
+    const scale = canvasManager.getPlayfieldScale();
+    const maxDistance = canvas
+      ? Math.max(1, (Math.hypot(canvas.width, canvas.height) * 0.8) / Math.max(scale, 0.001))
+      : 1000;
+    const laserUpgrade = state.pilot?.laserUpgrade;
+    const initialEnergy =
+      laserUpgrade && laserUpgrade.charges > 0 && laserUpgrade.expiresAt > Date.now() ? 2 : 1;
+    try {
+      const preview = previewChargedReflections(
+        start,
+        direction,
+        this.reflectionRocks,
+        maxDistance,
+        initialEnergy
+      );
+      this.asteroidToolsController.setReflectionPreview(preview);
+    } catch (error) {
+      logger.warn('ASTEROID_TOOLS', 'Unable to compute bounce preview', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.asteroidToolsController.setReflectionPreview(undefined);
+    }
+  }
+
   // Game lifecycle methods
   newGame(playerName?: string, kitId?: ShipKitId): void {
     clearAsteroidShatters();
     this.lifecycleAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
+    this.asteroidToolsController.update({
+      active: false,
+      pilot: undefined,
+      targets: [],
+      reflectionPreview: undefined,
+    });
 
     // Set the player name if provided
     if (playerName) {
@@ -155,6 +387,7 @@ export class GameController {
     this.resetSessionForNewGame();
     this.newGame(playerName, kitId ?? getSelectedShipKitId());
     setPlayView(true);
+    this.ensureAsteroidToolsOverlay();
     this.gameStateManager.setIsGameRunning(true);
 
     // Reset button text to default state
@@ -439,6 +672,12 @@ export class GameController {
 
   private resetSessionForNewGame(): void {
     this.cancelPendingGameOver();
+    this.asteroidToolsController.update({
+      active: false,
+      pilot: undefined,
+      targets: [],
+      reflectionPreview: undefined,
+    });
     this.gameStateManager.clearOverlay();
     canvasManager.clearPlayfield();
     resetThrustSources();
@@ -451,6 +690,7 @@ export class GameController {
       return;
     }
     this.gameOverInProgress = true;
+    this.asteroidToolsController.cancel();
 
     const localPlayer = this.playerManager.getLocalPlayer();
     const raw = preferDeathCause(
@@ -886,6 +1126,10 @@ export class GameController {
     // Check boundary collisions for ships
     this.checkBoundaryCollisions();
 
+    // Keep the tools' predicted reflective path aligned with the local
+    // predicted heading and the latest authoritative rock geometry.
+    this.updateAsteroidToolsPreview();
+
     // Update game state manager
     this.gameStateManager.updateKillMessageTimer();
     this.gameStateManager.updatePickupMessageTimer();
@@ -952,6 +1196,13 @@ export class GameController {
 
   // Check laser collisions with asteroids and bots
   private checkLaserCollisions(allPlayers: Player[]): void {
+    if (AuthoritativeProjectileField.getInstance().isEnabled()) {
+      // The server's keyed projectile snapshot owns every player laser hit.
+      // Running the client pass too would report duplicate asteroid/bot hits
+      // and could consume a local visual bolt before its authoritative row
+      // arrives. Ship↔ship ramming remains in its separate collision pass.
+      return;
+    }
     const currPlayer = this.playerManager.getLocalPlayer();
     if (!currPlayer || !this.currRoidBelt) {
       return;
@@ -1025,6 +1276,11 @@ export class GameController {
   }
 
   private checkLaserSatelliteCollisions(): void {
+    if (AuthoritativeProjectileField.getInstance().isEnabled()) {
+      // Satellite damage from player projectiles is server-authoritative in
+      // the enhanced snapshot protocol, just like asteroid and bot damage.
+      return;
+    }
     const currPlayer = this.playerManager.getLocalPlayer();
     if (!currPlayer) {
       return;

@@ -3,6 +3,7 @@
  * Consolidates and optimizes the rendering pipeline for better performance
  */
 
+import { AuthoritativeProjectileField } from '../entities/laser/AuthoritativeProjectileField';
 import type { Player } from '../entities/player/Player';
 import type { RoidBelt } from '../entities/roid/Roid';
 import { drawRoidsRelative } from '../entities/roid/roidRenderer';
@@ -223,6 +224,13 @@ export class RenderEngine {
 
   private renderEffects(frame: RenderFrame): void {
     const { player, allPlayers } = frame;
+
+    const projectileField = AuthoritativeProjectileField.getInstance();
+    if (projectileField.isEnabled()) {
+      projectileField.draw(player.ship.position);
+      this.renderStats.drawCalls++;
+      return;
+    }
 
     // Render lasers for all ships
     drawLasers(player.ship);

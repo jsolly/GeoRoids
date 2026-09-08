@@ -13,6 +13,7 @@ import { getVelocityMagnitude } from '../../utils/mathUtils';
 export interface LaserData {
   position: Position;
   prevPosition: Position;
+  serverId?: string;
   velocity: Velocity;
   distTraveled: number;
   explodeTime: number;
@@ -20,6 +21,7 @@ export interface LaserData {
 }
 
 export class Laser implements LaserData {
+  serverId?: string;
   static get fxLaser(): Sound {
     return getLaserSound();
   }

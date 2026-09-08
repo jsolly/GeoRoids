@@ -11,11 +11,13 @@ import { SERVER_RELEASE_ID } from './release';
 type CreateServerOptions = {
   port?: number;
   nodeEnv?: string;
+  requireEnhancedClient?: boolean;
 };
 
 export function createServerInstance(options: CreateServerOptions = {}) {
   const PORT = options.port ?? Number(process.env.PORT ?? 3001);
   const NODE_ENV = options.nodeEnv ?? process.env.NODE_ENV ?? 'production';
+  const requireEnhancedClient = options.requireEnhancedClient ?? process.env.REQUIRE_ASTEROID_CLIENT === '1';
 
   // Create HTTP server for health checks
   const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -141,7 +143,25 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     res.end('Not Found');
   });
 
-  const wss = new WebSocketServer({ server: httpServer });
+  const wss = new WebSocketServer({
+    server: httpServer,
+    verifyClient: (info, done) => {
+      let url: URL;
+      try {
+        url = new URL(info.req.url ?? '/', 'http://localhost');
+      } catch {
+        done(false, 400, 'Invalid WebSocket URL');
+        return;
+      }
+      if (requireEnhancedClient && url.pathname === '/ws' && url.searchParams.get('asteroidInteractions') !== '1') {
+        // Reject before open: old clients otherwise reset their retry counter
+        // on every successful upgrade and reconnect forever after a close.
+        done(false, 426, 'Client update required; refresh GeoRoids');
+        return;
+      }
+      done(true);
+    },
+  });
 
   // Rate limiting
   const connectionAttempts = new Map<string, { count: number; lastAttempt: number }>();
@@ -212,7 +232,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   wsCore.startPeriodicGameStateBroadcast();
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    const url = req.url;
+    const url = new URL(req.url ?? '/', 'http://localhost').pathname;
     const clientIp = req.socket.remoteAddress || 'unknown';
 
     if (isRateLimited(clientIp)) {
@@ -270,6 +290,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         }
       });
       ws.on('close', () => {
+        if (gameEngine.transportClosed(ws)) return;
         for (const player of wsCore.getAllPlayers()) {
           if ((player as any).ws === ws) {
             wsCore.removePlayer((player as any).id);
@@ -335,4 +356,3 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     close,
   };
 }
-

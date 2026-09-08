@@ -124,8 +124,9 @@ for reading log contents. Test-only diagnostic routes stay disabled there.
 The live client frame path is `eventLoop` → `GameController.updateGame` /
 `renderGame` → `canvasManager.drawGame`. Measure that path when investigating
 frame cost. Separate simulation, render and transport measurements, warm up the
-fixture, and state its entity/projectile load. Synchronous frame batches measure
-CPU cost; they do not measure display FPS or real animation-frame scheduling.
+fixture, and state its entity/projectile load. Synchronous render batches measure
+canvas command submission, including any flush work paid inside those calls;
+they do not measure display FPS, GPU completion or animation-frame scheduling.
 
 Run `npm run benchmark:game-loop` from `/Users/johnsolly/code/GeoRoids` for a
 repeatable Chromium client and Node server sample with production log settings.
@@ -135,6 +136,41 @@ evolves during the run. Compare repeated samples on the same machine and browser
 and use a browser performance trace when investigating missed display frames.
 The benchmark also checks that skipping a fully offscreen arena wall preserves
 the rendered pixels. Pixel readback runs after timing.
+
+Client render samples cover desktop 1920x1080, touch portrait 390x844 with notch
+padding on the actual safe-area probe, and touch landscape 844x390. Each viewport
+uses a fresh browser context for each fixture. Both the full `renderGame` path
+and the actual HUD painters run with a normal multiplayer HUD and a visible
+Game Over overlay. Initialization shows the play view, requires a visible canvas
+and document, and awaits fonts while leaving the game loop and network stopped.
+The script reports all seven batch means, their arithmetic mean, median and
+p95, plus entity counts before and after. The p95 is a percentile of batch means,
+not individual frames. Safe-area style reads and pointer-media queries are counted
+in a separate untimed draw; wrappers are restored before warming and timing.
+The synchronous `hud` and `hudOverlay` results include a full background clear
+before every HUD draw, preventing repeated translucent drawing from accumulating.
+Asteroids remain in the simulated world and playfield render. Radar draws pilots,
+satellites and pickups; it does not traverse or draw the asteroid belt.
+
+For repeated comparisons, `scripts/benchmark-game-loop.ts` exports
+`CLIENT_FIXTURES`, `BENCHMARK_VIEWPORTS`, `initializeBenchmarkPage`, and
+`measureClientFixture` without starting a run when imported. Create each context
+with the selected viewport's `viewport` and `hasTouch`, initialize its page, then
+measure a fixture. The measurement options support `includeUpdate: false` for
+render comparisons and positive integer warmup/batch/frame counts, with at least
+seven measured batches. Use the same options on both revisions and alternate
+fresh contexts serially. Raw per-frame batch means are returned in `batchMeansMs`.
+Exported initialization and measurement helpers reject browser console errors and
+uncaught page errors, including drawing failures caught and logged by a painter.
+Their error listeners are removed on both success and failure; warnings stay warnings.
+`meanMsPerFrame` includes every equal-sized measured batch. Periodic recording
+flushes can produce alternating cheap and expensive batches, making their median
+misleading. Inspect the raw distribution and arithmetic mean before interpreting
+a change. For animation behavior, compare visible canvases with one draw per
+`requestAnimationFrame`, retain callback durations and timestamp gaps, and profile
+raster/compositor work separately. HUD-only measurements need a fresh background
+each callback; account for that clear separately from the HUD submission interval.
+Pixel readbacks and screenshots belong outside timed runs.
 
 Vite's profiling tools diagnose development startup, transforms and build work.
 They complement runtime game profiling. See the

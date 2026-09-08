@@ -15,7 +15,6 @@ import { SatelliteManager } from '../entities/satellite/SatelliteManager';
 import { drawSatellites } from '../entities/satellite/satelliteRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
-import type { Ship } from '../entities/ship/Ship';
 import {
   drawLasers,
   drawShipAtPosition,
@@ -37,6 +36,7 @@ import {
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
+import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
@@ -351,34 +351,23 @@ class CanvasManager {
       drawLasers(player.ship, enemyLaserColor, currShip.position);
     }
 
-    this.drawMiniMapWithPlayers(currShip);
+    const hudLayout = hudLayoutForCanvas(canvas);
+    drawMiniMap(ctx, hudLayout, currShip);
 
-    drawScoreOverlay(ctx, canvas, currScore, lives, currPlayer.factionId);
+    drawScoreOverlay(ctx, hudLayout, canvas, currScore, lives, currPlayer.factionId);
 
-    drawLivesIndicator(ctx, lives, PALETTE.LOCAL, currShip.kitId);
+    drawLivesIndicator(ctx, hudLayout, lives, PALETTE.LOCAL, currShip.kitId);
 
     if (text && textAlpha > 0) {
-      drawTextOverlay(ctx, canvas, text, textAlpha);
+      drawTextOverlay(ctx, hudLayout, canvas, text, textAlpha);
     }
 
     if (allPlayers.length > 1) {
-      drawLeaderboard(ctx, canvas, allPlayers, currPlayer.id);
+      drawLeaderboard(ctx, hudLayout, allPlayers, currPlayer.id);
     }
 
     const roidCount = currRoidBelt.roids.length;
     drawDebugInfo(ctx, canvas, roidCount, isDebugMode());
-  }
-
-  // Helper method to draw mini map with all players
-  private drawMiniMapWithPlayers(ship: Ship): void {
-    // Draw the base mini map
-    const ctx = this.getContext();
-    const canvas = this.getCanvas();
-    if (ctx && canvas) {
-      drawMiniMap(ctx, canvas, ship);
-    }
-
-    // The mini map module will handle drawing all players internally
   }
 }
 

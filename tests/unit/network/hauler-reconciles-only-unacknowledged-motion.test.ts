@@ -188,7 +188,7 @@ describe('the local Hauler reconciles pending commands against its server motion
       50
     );
     expect(ship.position.x).toBe(104); // Ordinary client prediction remains local.
-    expect(ship.fuel).toBe(5); // Ordinary EMP echo handling remains in its existing owner.
+    expect(ship.fuel).toBe(5); // Motion reconciliation preserves local fuel prediction.
     expect(ship.lastLocalFuelWriteMs).toBe(49);
   });
 

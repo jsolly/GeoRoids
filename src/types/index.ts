@@ -92,8 +92,6 @@ export interface Ship extends BaseEntity, Damageable, Movable, Shootable {
   readonly blinkOn: boolean;
   readonly exploding: boolean;
   readonly explodeTime: number;
-  readonly empPulseActive: boolean;
-  readonly empPulseTime: number;
   readonly fuel: number;
   readonly maxFuel: number;
   readonly shieldActive: boolean;
@@ -107,8 +105,6 @@ export interface Ship extends BaseEntity, Damageable, Movable, Shootable {
   setBlinkOn(): void;
   explode(): void;
   setExploding(): void;
-  empPulse(): boolean;
-  updateEmpPulse(): void;
   requestShieldToggle(): boolean;
   updateExplosion(): void;
   updateLifecycle(lifecycleFrames?: number): void;
@@ -242,10 +238,6 @@ export interface CustomEventMap {
     cause?: string;
     killerName?: string;
   }>;
-  empPulse: CustomEvent<{
-    shipPosition: Position;
-    shipRadius: number;
-  }>;
   serverAsteroidTagged: CustomEvent<{
     asteroidId: string;
     shooterId: string;
@@ -355,11 +347,6 @@ export interface GameConstants {
     readonly EXPLODE_DURATION_FRAMES: number;
     readonly RESPAWN_FRAMES: number;
     readonly MASS: number;
-  };
-
-  readonly EMP: {
-    readonly RADIUS: number;
-    readonly DURATION: number;
   };
 
   readonly SHOCKWAVE: {

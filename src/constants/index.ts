@@ -310,14 +310,6 @@ export const SATELLITE_PICKUP = {
 } as const;
 
 // ============================================================================
-// EMP PULSE CONFIGURATION
-// ============================================================================
-export const EMP = {
-  RADIUS: 250, // pixels
-  DURATION: 0.5, // seconds
-} as const;
-
-// ============================================================================
 // COLLAB SPLIT SHOCKWAVE
 // ============================================================================
 // Double phosphor ring + radial impulse when a biggest asteroid splits.

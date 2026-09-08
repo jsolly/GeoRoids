@@ -558,49 +558,6 @@ export function drawLasers(
   drawLaserBolts(ship.lasers, color || PALETTE.LASER_LOCAL, viewerShipPosition || ship.position);
 }
 
-export function drawEmpPulse(ship: Ship, empRadius: number, empAlpha: number): void {
-  const ctx = canvasManager.getContext();
-  const cvs = canvasManager.getCanvas();
-  if (!ctx || !cvs) {
-    return;
-  }
-
-  const centerX = cvs.width / 2;
-  const centerY = cvs.height / 2;
-
-  // Create a radial gradient for the EMP effect
-  const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, empRadius);
-
-  // Electric blue to transparent effect
-  gradient.addColorStop(0, `rgba(0, 255, 255, ${empAlpha * 0.8})`); // Cyan center
-  gradient.addColorStop(0.3, `rgba(0, 150, 255, ${empAlpha * 0.6})`); // Blue
-  gradient.addColorStop(0.7, `rgba(0, 100, 255, ${empAlpha * 0.4})`); // Darker blue
-  gradient.addColorStop(1, `rgba(0, 50, 255, ${empAlpha * 0.1})`); // Very faint blue
-
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, empRadius, 0, Math.PI * 2, false);
-  ctx.fill();
-
-  // Add electric arc effects
-  ctx.strokeStyle = `rgba(0, 255, 255, ${empAlpha})`;
-  ctx.lineWidth = 2;
-
-  // Draw some random electric arcs
-  for (let i = 0; i < 8; i++) {
-    const angle = (Math.PI * 2 * i) / 8;
-    const startX = centerX + Math.cos(angle) * ship.r;
-    const startY = centerY + Math.sin(angle) * ship.r;
-    const endX = centerX + Math.cos(angle) * empRadius;
-    const endY = centerY + Math.sin(angle) * empRadius;
-
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-  }
-}
-
 // Ship rendering with world coordinates (for other players)
 export function drawShipAtPosition(
   ship: Ship,

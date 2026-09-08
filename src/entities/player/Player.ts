@@ -509,7 +509,6 @@ export class Player {
       this.ship.shoot();
     }
 
-    // Update EMP pulse state
     if (this.input.getEmpPulse()) {
       this.ship.activateAbility();
     }

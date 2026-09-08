@@ -632,10 +632,13 @@ export class MessageHandler {
       return;
     }
 
-    if (
-      this.gameEngine.getPlayer(shooterId)?.type === 'bot' &&
-      !this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
-    ) {
+    const shooter = this.gameEngine.getPlayer(shooterId);
+    const consumed = shooter?.type === 'bot'
+      ? this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
+      : shooter?.type === 'human' && this.gameEngine.consumeHumanLaserNearTarget(
+          shooterId, asteroid.position, asteroid.size
+        );
+    if (!consumed) {
       return;
     }
 

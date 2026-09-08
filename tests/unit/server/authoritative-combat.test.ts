@@ -343,7 +343,7 @@ describe('server-authoritative combat', () => {
     expect(engine.getPlayer('pilot')?.score).toBeGreaterThan(0);
   });
 
-  test('collab asteroid reports use fixed damage and validate bot projectiles', () => {
+  test('collab asteroid reports use fixed damage and consume human and bot projectiles once', () => {
     const wsCore = new WebSocketCore(engine);
     const pilotWs = mockWs();
     const otherWs = mockWs();
@@ -398,6 +398,14 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
 
     report('pilot', 999, 999);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
+    const humanShot = engine.spawnLaser('pilot', asteroid.position, { x: 0, y: 0 });
+    report('pilot', 999, 999, asteroid.id, otherWs);
+    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
+    expect(humanShot?.hasExploded).toBe(false);
+    report('pilot', 999, 999);
+    report('pilot', 999, 999);
+    expect(humanShot?.hasExploded).toBe(true);
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
     expect(engine.getPlayer('pilot')?.score).toBe(0);
 

@@ -326,22 +326,27 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
       )
     );
 
-    wsA.send(JSON.stringify({ type: 'join', id: 'player-a', name: 'Nova' }));
-    wsB.send(JSON.stringify({ type: 'join', id: 'player-b', name: 'Retro' }));
-
-    const medium = mediumAsteroid('shared-medium', { x: 200, y: 200 });
-    server.gameEngine.addAsteroid(medium);
-
-    const received: unknown[] = [];
-    const collect = (raw: Buffer) => {
-      try {
-        received.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    };
+    const received: Array<{ type?: string; data?: { playerId?: string; score?: number; asteroidId?: string } }> = [];
+    const collect = (raw: Buffer) => received.push(JSON.parse(String(raw)));
     wsA.on('message', collect);
     wsB.on('message', collect);
+    const joined = (ws: WebSocket) => new Promise<void>((resolve) => {
+      const listener = (raw: Buffer) => {
+        if (JSON.parse(String(raw)).type === 'joined') {
+          ws.off('message', listener);
+          resolve();
+        }
+      };
+      ws.on('message', listener);
+    });
+    const bothJoined = Promise.all([joined(wsA), joined(wsB)]);
+    wsA.send(JSON.stringify({ type: 'join', id: 'player-a', name: 'Nova' }));
+    wsB.send(JSON.stringify({ type: 'join', id: 'player-b', name: 'Retro' }));
+    await bothJoined;
+    // Freeze simulation so only the real incoming TCP report can apply this hit.
+    server.gameEngine.stopGameLoop();
+    const medium = mediumAsteroid('shared-medium', { x: 200, y: 200 });
+    server.gameEngine.addAsteroid(medium);
 
     const payload = {
       type: 'asteroidDestroyed',
@@ -350,15 +355,24 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
       points: ROID.POINTS_MEDIUM,
       laserPosition: { x: 200, y: 200 },
     };
-    // A client report is accepted only when the server has the corresponding
-    // human projectile. Keep the report ordering deterministic so this test
-    // covers the network boundary rather than a timer race.
+    // A client report is accepted only with the corresponding tracked shot.
+    // Both reports travel through their owning physical sockets.
     const trackedShot = server.gameEngine.spawnLaser('player-a', medium.position, { x: 0, y: 0 });
     expect(trackedShot).toBeDefined();
-    server.wsCore.handleClientMessage(payload, wsA);
-    server.wsCore.handleClientMessage({ ...payload, playerId: 'player-b' }, wsB);
-
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    wsA.send(JSON.stringify(payload));
+    wsB.send(JSON.stringify({ ...payload, playerId: 'player-b' }));
+    await new Promise<void>((resolve, reject) => {
+      const deadline = setTimeout(() => { clearInterval(poll); reject(new Error('TCP asteroid reports were not broadcast')); }, 2000);
+      const poll = setInterval(() => {
+        if (received.filter(message => message.type === 'asteroidDestroy' && message.data?.asteroidId === medium.id).length === 2) {
+          clearInterval(poll);
+          clearTimeout(deadline);
+          resolve();
+        }
+      }, 10);
+    });
+    expect(trackedShot?.hasExploded).toBe(true);
+    expect(server.gameEngine.getAsteroid(medium.id)).toBeUndefined();
 
     const scoreUpdates = received.filter(
       (msg) => (msg as { type?: string }).type === 'scoreUpdate'

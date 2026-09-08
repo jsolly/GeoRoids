@@ -1,12 +1,6 @@
 import type { Position } from '../../shared-types';
 
 export type PlayfieldSize = { width: number; height: number };
-export type PlayfieldRock = {
-  position: Position;
-  r?: number;
-  angle?: number;
-  pendingDestruction?: boolean;
-};
 
 const projectScratch = { x: 0, y: 0 };
 
@@ -52,24 +46,8 @@ export function isRockOnCanvas(
   );
 }
 
-export function isDrawablePlayfieldRock(roid: PlayfieldRock): boolean {
-  if (roid.pendingDestruction) {
-    return false;
-  }
-  if (!Number.isFinite(roid.position.x) || !Number.isFinite(roid.position.y)) {
-    return false;
-  }
-  if (roid.r !== undefined && !Number.isFinite(roid.r)) {
-    return false;
-  }
-  if (roid.angle !== undefined && !Number.isFinite(roid.angle)) {
-    return false;
-  }
-  return true;
-}
-
 export function countRocksOnCanvas(
-  roids: readonly PlayfieldRock[],
+  roids: ReadonlyArray<{ position: Position }>,
   ship: Position,
   canvas: PlayfieldSize,
   scale = 1,
@@ -84,42 +62,9 @@ export function countRocksOnCanvas(
   return count;
 }
 
-/** Compatibility helper: gameplay is always rendered at the fixed close scale. */
-export function playfieldZoom(
-  _roids: readonly PlayfieldRock[],
-  _ship: Position,
-  _canvas: PlayfieldSize
-): number {
-  return PLAYFIELD_CLOSE_SCALE;
-}
-
-/** PO / QA bar: if radar has dots, the playfield must show at least one rock. */
-export function radarBeltVisibleOnPlayfield(
-  roids: readonly PlayfieldRock[],
-  ship: Position,
-  canvas: PlayfieldSize
-): boolean {
-  let drawable = 0;
-  for (const roid of roids) {
-    if (isDrawablePlayfieldRock(roid)) {
-      drawable += 1;
-    }
-  }
-  if (drawable === 0) {
-    return false;
-  }
-  const scale = PLAYFIELD_CLOSE_SCALE;
-  for (const roid of roids) {
-    if (isDrawablePlayfieldRock(roid) && isRockOnCanvas(roid.position, ship, canvas, scale)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 const EMPTY_OFFSETS = [1];
 
-/** Stroke path for a roid. Empty offsets still paint a circle so radar dots are not holes. */
+/** Keep an asteroid's stroke visible when its snapshot has no radial offsets. */
 export function drawingOffsets(offsets: readonly number[]): readonly number[] {
   return offsets.length > 0 ? offsets : EMPTY_OFFSETS;
 }

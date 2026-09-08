@@ -100,9 +100,8 @@ export function asteroidTickScale(dtMs: number): number {
 }
 
 /**
- * 1:1 visibility only. Do not use this to cull draws — a 1:1 miss is why
- * the minimap can be dense while the playfield looks empty. Pass
- * `playfieldZoom` of the full belt into `isRockOnCanvas` instead.
+ * Test whether a world point falls inside the ship-centered 1:1 viewport.
+ * Draw culling also needs the object's radius and stroke margin.
  */
 export function isOnPlayfieldCanvas(
   world: { x: number; y: number },

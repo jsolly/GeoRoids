@@ -1,16 +1,22 @@
 import { describe, expect, test } from 'vitest';
 import {
   captureSnapshot,
-  encodeSnapshot,
   type SnapshotBaseline,
   SnapshotDecoder,
+  SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
 import { snapshotFixture } from './snapshotFixture';
 
 describe('pilots reconstruct complete authoritative worlds', () => {
   test('moving ticks preserve every field, effect clears, removal, death and respawn', () => {
-    const decoder = new SnapshotDecoder();
-    let baseline: SnapshotBaseline | undefined;
+    const pilots: Array<{
+      decoder: SnapshotDecoder;
+      sequence: number;
+      baseline?: SnapshotBaseline;
+    }> = [1, 8, 98].map((sequence) => ({
+      decoder: new SnapshotDecoder(),
+      sequence,
+    }));
     let deltas = 0;
     for (let tick = 0; tick < 140; tick++) {
       const world = snapshotFixture(tick);
@@ -66,17 +72,24 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         futureFeature: { active: tick < 50, value: [tick, null] },
         futureNpcs: [{ id: 'eo', pattern: 'fan', shots: tick < 60 ? ['a', 'b'] : [] }],
       });
-      const state = captureSnapshot(extended);
-      const frame = encodeSnapshot(state, tick + 1, tick % 90 ? baseline : undefined);
-      if (frame.kind === 'delta') {
-        deltas++;
+      const encoder = new SnapshotEncoder(extended);
+      for (const [index, pilot] of pilots.entries()) {
+        // One pilot stalls while the others receive newer baselines.
+        if (index === 2 && tick >= 40 && tick < 46) {
+          continue;
+        }
+        const sequence = pilot.sequence++;
+        const frame = encoder.encode(sequence, tick % 90 ? pilot.baseline : undefined);
+        if (frame.kind === 'delta') {
+          deltas++;
+        }
+        expect(pilot.decoder.decode(JSON.parse(JSON.stringify(frame)))).toEqual(
+          JSON.parse(JSON.stringify(extended))
+        );
+        pilot.baseline = { sequence, state: encoder.state };
       }
-      expect(decoder.decode(JSON.parse(JSON.stringify(frame)))).toEqual(
-        JSON.parse(JSON.stringify(extended))
-      );
-      baseline = { sequence: tick + 1, state };
     }
-    expect(deltas).toBeGreaterThan(100);
+    expect(deltas).toBeGreaterThan(300);
   });
 
   test('explicit clears delete fields and nested arrays replace without retaining stale values', () => {
@@ -86,8 +99,8 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const b = captureSnapshot(snapshotFixture(1));
     b.asteroids[0]!.offsets = [0.2, 0.3];
     const decoder = new SnapshotDecoder();
-    decoder.decode(encodeSnapshot(a, 1));
-    const delta = encodeSnapshot(b, 2, { sequence: 1, state: a });
+    decoder.decode(new SnapshotEncoder(a).encode(1));
+    const delta = new SnapshotEncoder(b).encode(2, { sequence: 1, state: a });
     expect(delta.kind).toBe('delta');
     const decoded = decoder.decode(delta);
     expect(decoded).toEqual(b);
@@ -97,9 +110,9 @@ describe('pilots reconstruct complete authoritative worlds', () => {
   test('bad packets leave the last baseline intact and a fresh keyframe repairs gaps', () => {
     const decoder = new SnapshotDecoder();
     const state = captureSnapshot(snapshotFixture());
-    decoder.decode(encodeSnapshot(state, 1));
+    decoder.decode(new SnapshotEncoder(state).encode(1));
     const next = captureSnapshot(snapshotFixture(1));
-    const delta = encodeSnapshot(next, 2, { sequence: 1, state });
+    const delta = new SnapshotEncoder(next).encode(2, { sequence: 1, state });
     expect(() => decoder.decode({ ...delta, sequence: 3 })).toThrow(/baseline/);
     expect(() =>
       decoder.decode({
@@ -118,7 +131,9 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     ).toThrow(/DTO/);
     const invalidReference = captureSnapshot(snapshotFixture(2));
     invalidReference.satelliteProjectiles[0]!.satelliteId = 'missing-eo';
-    expect(() => decoder.decode(encodeSnapshot(invalidReference, 2))).toThrow(/references/);
+    expect(() =>
+      decoder.decode({ version: 1, sequence: 2, kind: 'keyframe', state: invalidReference })
+    ).toThrow(/references/);
     expect(decoder.decode(delta)).toEqual(next);
     expect(() => decoder.decode(delta)).toThrow(/Stale/);
     expect(() =>
@@ -128,24 +143,74 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         )
       )
     ).toThrow(/Unsafe/);
-    expect(decoder.decode(encodeSnapshot(state, 50))).toEqual(state);
+    expect(decoder.decode(new SnapshotEncoder(state).encode(50))).toEqual(state);
     decoder.reset();
     expect(() => decoder.decode(delta)).toThrow(/baseline/);
-    expect(decoder.decode(encodeSnapshot(state, 1))).toEqual(state);
+    expect(decoder.decode(new SnapshotEncoder(state).encode(1))).toEqual(state);
+  });
+
+  test('sequence digit changes choose the smaller frame and ties send the complete world', () => {
+    const world = {
+      entities: [],
+      asteroids: [],
+      loot: [],
+      satellites: [],
+      satellitePickups: [],
+      satelliteProjectiles: [],
+      collabTags: [],
+      gameTime: 1,
+      isPaused: false,
+      terrainSeed: 2345,
+      futureAnnouncement: '星🚀\n"pilot"',
+    };
+    for (const shorterBaseline of [9, 99]) {
+      const sequence = shorterBaseline + 2;
+      const full = { version: 1, sequence, kind: 'keyframe', state: world };
+      const delta = {
+        version: 1,
+        sequence,
+        kind: 'delta',
+        baseline: shorterBaseline + 1,
+        patch: { set: {}, clear: ['retired'], collections: {} },
+      };
+      // A retired future field makes the two complete wire frames exactly equal.
+      const padding = JSON.stringify(full).length - JSON.stringify(delta).length;
+      expect(padding).toBeGreaterThan(0);
+      const retired = `retired${'x'.repeat(padding)}`;
+      delta.patch.clear = [retired];
+      expect(JSON.stringify(delta).length).toBe(JSON.stringify(full).length);
+      const baseline = new SnapshotEncoder({ ...world, [retired]: true });
+      const encoder = new SnapshotEncoder(world);
+      for (const baselineSequence of [shorterBaseline, shorterBaseline + 1]) {
+        const recipientSequence = baselineSequence + 1;
+        const frame = encoder.encode(recipientSequence, {
+          sequence: baselineSequence,
+          state: baseline.state,
+        });
+        expect(frame).toEqual(
+          baselineSequence === shorterBaseline
+            ? { ...delta, sequence: recipientSequence, baseline: baselineSequence }
+            : { ...full, sequence: recipientSequence }
+        );
+        const decoder = new SnapshotDecoder();
+        decoder.decode(baseline.encode(baselineSequence));
+        expect(decoder.decode(frame)).toEqual(world);
+      }
+    }
   });
 
   test('engine and application mutations never corrupt the other side of a baseline', () => {
     const engine = snapshotFixture();
-    const captured = captureSnapshot(engine);
+    const encoder = new SnapshotEncoder(engine);
     engine.entities[0]!.position.x = -900;
-    expect(captured.entities[0]!.position.x).toBe(500);
+    expect(encoder.state.entities[0]!.position.x).toBe(500);
     const decoder = new SnapshotDecoder();
-    const applied = decoder.decode(encodeSnapshot(captured, 1));
+    const applied = decoder.decode(JSON.parse(JSON.stringify(encoder.encode(1))));
     applied.entities[0]!.position.x = -800;
-    const changed = captureSnapshot(snapshotFixture());
+    expect(encoder.state.entities[0]?.position.x).toBe(500);
+    const changed = snapshotFixture();
     changed.gameTime = 1;
-    expect(decoder.decode(encodeSnapshot(changed, 2, { sequence: 1, state: captured }))).toEqual(
-      changed
-    );
+    const next = new SnapshotEncoder(changed);
+    expect(decoder.decode(next.encode(2, { sequence: 1, state: encoder.state }))).toEqual(changed);
   });
 });

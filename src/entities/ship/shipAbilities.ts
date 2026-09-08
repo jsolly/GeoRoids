@@ -403,7 +403,8 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: AbilityBody[]): voi
 
   const targetId = host.harpoonTargetId;
   const target =
-    bodies.find((body) => bodyMatchesLatchId(body, targetId)) ?? findHarpoonFieldBody(targetId);
+    bodies.find((body) => body !== host && bodyMatchesLatchId(body, targetId)) ??
+    findHarpoonFieldBody(targetId);
   // Keep cream VFX (timer + latchPos) if the field id is mid-sync. #481
   // cleared here and left abilityActiveFrames — activation ring, no tether.
   if (!target || !latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE_MAX)) {

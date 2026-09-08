@@ -1902,6 +1902,8 @@ export class GameEngine {
     this.entityManager.tickAbilityState();
     const asteroids = this.asteroidManager.getAllAsteroids();
     const entities = this.entityManager.getAllEntities();
+    const emptyCandidates: Array<AsteroidData | GameEntity> = [];
+    let sharedCandidates: Array<AsteroidData | GameEntity> | undefined;
     for (const entity of entities) {
       if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= Date.now()) {
         delete entity.laserUpgrade;
@@ -1909,10 +1911,15 @@ export class GameEngine {
       if (this.asteroidMotion.ownsActorMotion(entity.id)) {
         continue;
       }
-      pullHarpoonTarget(entity, [
-        ...asteroids,
-        ...entities.filter((other) => other.id !== entity.id),
-      ]);
+      const targetId = entity.harpoonTargetId;
+      // Non-Haulers and inactive latches return before reading candidates, but
+      // still need the helper to clear stale state.
+      if (entity.kitId !== 'hauler' || entity.harpoonTimer <= 0 || !targetId) {
+        pullHarpoonTarget(entity, emptyCandidates);
+        continue;
+      }
+      sharedCandidates ??= [...asteroids, ...entities];
+      pullHarpoonTarget(entity, sharedCandidates);
     }
   }
 

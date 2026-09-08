@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { captureSnapshot, encodeSnapshot } from '../../../shared/snapshotProtocol';
+import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { PlayerProjectileState, ServerGameSnapshot } from '../../../shared-types';
 import { AuthoritativeProjectileField } from '../../../src/entities/laser/AuthoritativeProjectileField';
 import { Laser } from '../../../src/entities/laser/Laser';
@@ -112,7 +112,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   test('new snapshots update one existing bolt while repeated shoot events and client predictions cannot duplicate it', async () => {
     const ws = await connect();
     const first = frame([bolt('stable-shot')]);
-    ws.receive('snapshot', encodeSnapshot(first, 1));
+    ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     expect(field.isEnabled()).toBe(true);
     expect(ship().lasers).toHaveLength(1);
     const original = ship().lasers[0];
@@ -120,7 +120,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     // A pending local visual is provisional, while the server id is durable.
     ship().lasers.push(new Laser({ x: 590, y: 150 }, { x: 5, y: 0 }, 0, 0));
     const moved = frame([bolt('stable-shot', 620)]);
-    ws.receive('snapshot', encodeSnapshot(moved, 2, { sequence: 1, state: first }));
+    ws.receive('snapshot', new SnapshotEncoder(moved).encode(2, { sequence: 1, state: first }));
     expect(ship().lasers).toHaveLength(1);
     expect(ship().lasers[0]).toBe(original);
     expect(original?.position).toEqual({ x: 620, y: 150 });
@@ -133,18 +133,24 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
         laserDirection: { x: -5, y: 0 },
       });
     }
-    ws.receive('snapshot', encodeSnapshot(moved, 3, { sequence: 2, state: moved }));
+    ws.receive('snapshot', new SnapshotEncoder(moved).encode(3, { sequence: 2, state: moved }));
     expect(ship().lasers).toEqual([original]);
     expect(field.getProjectiles()).toHaveLength(1);
     expect(original?.position).toEqual({ x: 620, y: 150 });
 
     const replacement = frame([bolt('next-shot', 640)]);
-    ws.receive('snapshot', encodeSnapshot(replacement, 4, { sequence: 3, state: moved }));
+    ws.receive(
+      'snapshot',
+      new SnapshotEncoder(replacement).encode(4, { sequence: 3, state: moved })
+    );
     expect(ship().lasers).toHaveLength(1);
     expect(ship().lasers[0]).not.toBe(original);
     expect(ship().lasers[0]?.serverId).toBe('next-shot');
     const empty = frame([]);
-    ws.receive('snapshot', encodeSnapshot(empty, 5, { sequence: 4, state: replacement }));
+    ws.receive(
+      'snapshot',
+      new SnapshotEncoder(empty).encode(5, { sequence: 4, state: replacement })
+    );
     expect(ship().lasers).toEqual([]);
     expect(field.getProjectiles()).toEqual([]);
     expect(field.isEnabled()).toBe(true);
@@ -153,16 +159,16 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   test('a missed delta requests one resync without replaying old bolts and a rejoin recovers exactly the current keyed list', async () => {
     const ws = await connect();
     const first = frame([bolt('old-shot')]);
-    ws.receive('snapshot', encodeSnapshot(first, 1));
+    ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     const original = ship().lasers[0];
     const advanced = frame([bolt('new-shot')]);
-    const missingBaseline = encodeSnapshot(advanced, 3, { sequence: 2, state: first });
+    const missingBaseline = new SnapshotEncoder(advanced).encode(3, { sequence: 2, state: first });
     ws.receive('snapshot', missingBaseline);
-    ws.receive('snapshot', encodeSnapshot(first, 1));
+    ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     expect(ws.sent.filter((packet) => packet.type === 'snapshotResync')).toHaveLength(1);
     expect(ship().lasers).toEqual([original]);
     expect(field.getProjectiles()).toEqual(first.playerProjectiles);
-    ws.receive('snapshot', encodeSnapshot(advanced, 20));
+    ws.receive('snapshot', new SnapshotEncoder(advanced).encode(20));
     const recovered = ship().lasers[0];
     expect(recovered?.serverId).toBe('new-shot');
     expect(ship().lasers).toHaveLength(1);
@@ -176,10 +182,10 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     expect(ship().lasers).toEqual([recovered]);
     manager.initializeAsteroidSync();
     acknowledge(ws, true);
-    ws.receive('snapshot', encodeSnapshot(advanced, 1));
+    ws.receive('snapshot', new SnapshotEncoder(advanced).encode(1));
     expect(ship().lasers).toEqual([recovered]);
     expect(field.getProjectiles()).toHaveLength(1);
-    ws.receive('snapshot', encodeSnapshot(frame([]), 2));
+    ws.receive('snapshot', new SnapshotEncoder(frame([])).encode(2));
     expect(ship().lasers).toEqual([]);
     expect(field.getProjectiles()).toEqual([]);
     expect(ws.close).not.toHaveBeenCalled();
@@ -188,7 +194,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   test('without enhancement negotiation legacy shoot events still create bolts and snapshot rows never replace them', async () => {
     const ws = await connect(false);
     const state = frame([bolt('server-only-shot')]);
-    ws.receive('snapshot', encodeSnapshot(state, 1));
+    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     expect(field.isEnabled()).toBe(false);
     expect(field.getProjectiles()).toEqual([]);
     expect(ship().lasers).toEqual([]);
@@ -201,7 +207,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     const legacy = ship().lasers[0];
     expect(legacy?.serverId).toBeUndefined();
     expect(legacy?.position).toEqual({ x: 600, y: 150 });
-    ws.receive('snapshot', encodeSnapshot(frame([]), 2, { sequence: 1, state }));
+    ws.receive('snapshot', new SnapshotEncoder(frame([])).encode(2, { sequence: 1, state }));
     expect(ship().lasers).toEqual([legacy]);
     expect(field.isEnabled()).toBe(false);
     expect(field.getProjectiles()).toEqual([]);

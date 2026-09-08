@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
+import type { WebSocket } from 'ws';
+import {
+  FakeSocket,
+  GameServerWorld,
+  type Pilot,
+  useQuietServerConsole,
+} from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -34,6 +40,34 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
     const before = world.entity(bob).velocity.x;
     world.tick(4);
     expect(world.entity(bob).velocity.x).toBeLessThan(before);
+  });
+
+  test('a target whose id contains the Hauler id is still pulled by the server tick', () => {
+    const host = world.engine.entityManager.addHumanPlayer(
+      'host',
+      'Host',
+      new FakeSocket() as unknown as WebSocket,
+      { x: 0, y: 0 },
+      undefined,
+      'hauler',
+      'ion'
+    );
+    const target = world.engine.entityManager.addHumanPlayer(
+      'target-host',
+      'Target',
+      new FakeSocket() as unknown as WebSocket,
+      { x: 80, y: 0 },
+      undefined,
+      'dart',
+      'ember'
+    );
+    host.harpoonTimer = 2;
+    host.harpoonTargetId = target.id;
+
+    const before = target.velocity.x;
+    world.tick();
+
+    expect(target.velocity.x).toBeLessThan(before);
   });
 
   test('same-side mates are never latched', () => {

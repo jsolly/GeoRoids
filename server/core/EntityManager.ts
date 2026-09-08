@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
+import type { AsteroidMotionState, LaserUpgrade, Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
 import { pickBalancedFactionFromShips } from '../../shared/factions';
 import { parseSoftFactionId } from '../../src/entities/player/softFactions';
 import { absorbDamageWithShield, tickAbilityHost } from '../../src/entities/ship/shipAbilities';
@@ -72,6 +72,9 @@ export interface GameEntity extends ShieldState {
   harpoonLatchPos?: Position;
   /** Killer of the current death (cleared on respawn). */
   deathCause?: string;
+  asteroidInteractions?: 1;
+  asteroidMotion?: AsteroidMotionState;
+  laserUpgrade?: LaserUpgrade;
 }
 
 /** True when a client update is still the death pose, not the new spawn. */

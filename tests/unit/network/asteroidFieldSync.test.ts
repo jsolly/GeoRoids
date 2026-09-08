@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import type { AsteroidData, AsteroidDestroyEvent } from '../../../shared-types';
+import type { AsteroidKinematicTarget } from '../../../src/network/services/asteroidFieldSync';
 import {
   applyAsteroidKinematics,
   applyAsteroidFieldPartition,
@@ -32,7 +33,7 @@ function roid(id: string, x: number, y: number): AsteroidData {
   };
 }
 
-function localRoid(x: number, y: number) {
+function localRoid(x: number, y: number): AsteroidKinematicTarget {
   return {
     position: { x, y },
     velocity: { x: 0, y: 0 },
@@ -245,6 +246,20 @@ test('collab flag copies onto the local rock so both pilots can chip it', () => 
   const local = { ...localRoid(1, 2), isCollabTarget: false };
   applyAsteroidKinematics(local, { ...roid('server-asteroid-0', 10, 10), isCollabTarget: true });
   expect(local.isCollabTarget).toBe(true);
+});
+
+test('reflection and spin metadata reaches the local rock for live cues and previews', () => {
+  const local = localRoid(1, 2);
+  const reflective = {
+    ...roid('reflective-0', 10, 10),
+    phenomenon: { kind: 'reflective' as const, clusterId: 'cluster-0', energy: 2, maxEnergy: 6 },
+    spinClass: 'charged' as const,
+  };
+
+  applyAsteroidKinematics(local, reflective);
+
+  expect(local.phenomenon).toEqual(reflective.phenomenon);
+  expect(local.spinClass).toBe('charged');
 });
 
 test('partition scratch arrays and snapshot set stay the same identity', () => {

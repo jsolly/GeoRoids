@@ -108,6 +108,80 @@ function drawRoidSilhouette(
   }
 }
 
+/** Number of reflective facets to show at the current energy level. */
+export function reflectiveFacetCueCount(energy: number, maxEnergy: number): number {
+  if (!Number.isFinite(energy) || !Number.isFinite(maxEnergy) || maxEnergy <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.min(3, Math.ceil((Math.max(0, energy) / maxEnergy) * 3)));
+}
+
+function drawReflectiveCue(
+  ctx: CanvasRenderingContext2D,
+  radius: number,
+  energy: number,
+  maxEnergy: number
+): void {
+  const count = reflectiveFacetCueCount(energy, maxEnergy);
+  ctx.globalAlpha = 0.72;
+  ctx.strokeStyle = PALETTE.ROID;
+  ctx.lineWidth = Math.max(0.7, Math.min(1.1, radius * 0.055));
+  ctx.lineCap = 'round';
+  for (let index = 0; index < count; index += 1) {
+    const angle = -Math.PI * 0.72 + index * Math.PI * 0.72;
+    const inner = radius * 0.22;
+    const outer = radius * (0.5 + index * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+    ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+}
+
+function drawSpinCue(ctx: CanvasRenderingContext2D, radius: number, charged: boolean): void {
+  const ring = radius * 1.18;
+  const arc = charged ? Math.PI * 0.68 : Math.PI * 0.42;
+  ctx.globalAlpha = charged ? 0.88 : 0.56;
+  ctx.strokeStyle = PALETTE.ROID;
+  ctx.lineWidth = Math.max(0.7, Math.min(1.05, radius * 0.045));
+  ctx.beginPath();
+  ctx.arc(0, 0, ring, -Math.PI * 0.95, -Math.PI * 0.95 + arc);
+  ctx.stroke();
+  if (charged) {
+    ctx.beginPath();
+    ctx.arc(0, 0, ring, Math.PI * 0.05, Math.PI * 0.05 + arc);
+    ctx.stroke();
+  }
+}
+
+/** Draw only sparse, screen-readable metadata cues; the rock remains an outline. */
+export function drawRoidInteractionCues(
+  ctx: CanvasRenderingContext2D,
+  roid: Pick<Roid, 'phenomenon' | 'spinClass'>,
+  radius: number,
+  centerX = 0,
+  centerY = 0
+): void {
+  if (!(radius > 0) || !Number.isFinite(radius)) {
+    return;
+  }
+  const phenomenon = roid.phenomenon;
+  if (!phenomenon && !roid.spinClass) {
+    return;
+  }
+  ctx.save();
+  // Cue geometry is authored around the origin so each marker stays aligned
+  // with its rock after the world-to-screen projection.
+  ctx.translate(centerX, centerY);
+  if (phenomenon?.kind === 'reflective') {
+    drawReflectiveCue(ctx, radius, phenomenon.energy, phenomenon.maxEnergy);
+  }
+  if (roid.spinClass) {
+    drawSpinCue(ctx, radius, roid.spinClass === 'charged');
+  }
+  ctx.restore();
+}
+
 function drawRoidShatter(
   ctx: CanvasRenderingContext2D,
   origin: Vec2,
@@ -220,6 +294,7 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
         roid.health / roid.maxHealth
       );
     }
+    drawRoidInteractionCues(ctx, roid, r, screenPos.x, screenPos.y);
   }
 
   const now = performance.now();

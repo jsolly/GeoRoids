@@ -39,6 +39,9 @@ export interface PlayerUpdate {
   kitId?: ShipKitId;
   factionId?: SoftFactionId;
   mass?: number;
+  /** Acknowledges the server's current movement ownership epoch. */
+  motionEpoch?: number;
+  motionSequence?: number;
   lasers?: Array<{
     position: Position;
     velocity: Velocity;
@@ -51,6 +54,9 @@ export interface PlayerUpdate {
 export interface PlayerJoin {
   /** Present only after an explicit supported join offer. */
   snapshotVersion?: 1;
+  asteroidInteractions?: 1;
+  /** Private to the joined socket; never included in world snapshots. */
+  resumeToken?: string;
   id: string;
   name: string;
   position: Position;
@@ -67,12 +73,63 @@ export interface PlayerLeave {
 
 export interface PlayerShoot {
   id: string;
+  shotId?: string;
   laserStart: Position;
   laserDirection: Velocity;
 }
 
 // Game state types that might be shared
 export type AsteroidMaterial = 'ice' | 'metal' | 'rubble';
+
+export interface AsteroidPhenomenon {
+  kind: 'reflective';
+  clusterId: string;
+  energy: number;
+  maxEnergy: number;
+}
+
+export interface AsteroidMotionState {
+  epoch: number;
+  mode: 'free' | 'latched' | 'released' | 'handoff';
+  ack: number;
+  asteroidId?: string;
+  payloadId?: string;
+  latchAngle?: number;
+  tetherMode?: 'spin' | 'anchor' | 'brake';
+  anchor?: Position;
+}
+
+export interface AsteroidMotionInput {
+  epoch: number;
+  sequence: number;
+  thrust: boolean;
+  turn: -1 | 0 | 1;
+  aimAngle: number;
+  action?: 'release' | 'anchor' | 'brake' | 'spin';
+  targetId?: string;
+}
+
+export interface AsteroidToolAction {
+  action: 'latch';
+  sequence: number;
+  targetId?: string;
+}
+
+export interface LaserUpgrade {
+  charges: number;
+  expiresAt: number;
+}
+
+export interface PlayerProjectileState {
+  id: string;
+  ownerId: string;
+  position: Position;
+  prevPosition: Position;
+  velocity: Velocity;
+  energy: number;
+  bounces: number;
+  age: number;
+}
 
 export interface AsteroidData {
   id: string;
@@ -90,6 +147,8 @@ export interface AsteroidData {
   material?: AsteroidMaterial;
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
+  phenomenon?: AsteroidPhenomenon;
+  spinClass?: 'natural' | 'charged';
 }
 
 export interface BotData {
@@ -116,7 +175,7 @@ export interface BotData {
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; fuel fills the EMP tank. */
-export type LootKind = 'shard' | 'wreckage' | 'fuel';
+export type LootKind = 'shard' | 'wreckage' | 'fuel' | 'laserCore';
 
 export interface LootData {
   id: string;
@@ -270,6 +329,7 @@ export interface SnapshotCollabTag extends ActiveCollabTag {
 export interface ServerGameSnapshot extends ServerGameState {
   satelliteProjectiles: SnapshotSatelliteProjectile[];
   collabTags: SnapshotCollabTag[];
+  playerProjectiles?: PlayerProjectileState[];
 }
 
 export interface ServerEntityData {
@@ -305,4 +365,6 @@ export interface ServerEntityData {
   shieldTime?: number;
   shieldCooldown?: number;
   shieldFlashTime?: number;
+  asteroidMotion?: AsteroidMotionState;
+  laserUpgrade?: LaserUpgrade;
 }

@@ -245,8 +245,8 @@ describe('Client asteroid reports consume one tracked projectile', () => {
 
     // Server tick first consumes its own exact projectile; the late client
     // report is an idempotent hint and cannot apply another hit.
-    spawnAtTarget(engine, asteroid);
-    const serverFirst = engine.resolveSpawnedLaserHits();
+    const serverShot = spawnAtTarget(engine, asteroid);
+    const serverFirst = engine.resolveSpawnedLaserHits(serverShot.id);
     expect(serverFirst).toHaveLength(1);
     expect(serverFirst[0]?.outcome).toBe('tagged');
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(25);

@@ -6,6 +6,9 @@ import type { Ship } from '../ship/Ship';
 import { LootField } from './LootField';
 
 export function lootStrokeColor(kind: LootKind): string {
+  if (kind === 'laserCore') {
+    return PALETTE.LASER_LOCAL;
+  }
   if (kind === 'fuel') {
     return PALETTE.HEALTH;
   }
@@ -68,6 +71,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
       continue;
     }
 
+    const isCore = drop.kind === 'laserCore';
     const isFuel = drop.kind === 'fuel';
     const isShard = drop.kind === 'shard';
     const isDenseShard = isShard && Number.isFinite(drop.mass) && drop.mass >= 0.5;
@@ -83,6 +87,12 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
         return;
       }
       traceDiamond(ctx, screen.x, screen.y, r);
+      if (isCore) {
+        ctx.moveTo(screen.x - r * 0.45, screen.y + r * 0.3);
+        ctx.lineTo(screen.x + r * 0.1, screen.y - r * 0.55);
+        ctx.lineTo(screen.x - r * 0.1, screen.y + r * 0.55);
+        ctx.lineTo(screen.x + r * 0.45, screen.y - r * 0.3);
+      }
       if (isShard) {
         traceDiamond(ctx, screen.x, screen.y, r * VISUAL.LOOT_SHARD_INNER);
         if (isDenseShard) {

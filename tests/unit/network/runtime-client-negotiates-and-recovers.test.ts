@@ -48,6 +48,40 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('joined', { id: manager.getClientId(), name: 'Runtime pilot', position: { x: 0, y: 0 }, color: '#fff', ...(version ? { snapshotVersion: version } : {}) });
   }
 
+  test('an expired enhanced session replaces its cached identity before a fresh join', async () => {
+    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'dart');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect(true);
+    const oldId = manager.getClientId();
+    ws.receive('joined', { id: oldId, name: 'Runtime pilot', position: player.ship.position,
+      snapshotVersion: 1, asteroidInteractions: 1, resumeToken: 'a'.repeat(64) });
+    const state = captureSnapshot(snapshotFixture());
+    state.entities = [state.entities[0]!];
+    Object.assign(state.entities[0]!, { id: oldId, name: 'Runtime pilot',
+      asteroidMotion: { epoch: 1, mode: 'free', ack: 0 } });
+    state.asteroids = []; state.loot = []; state.satellites = [];
+    state.satellitePickups = []; state.satelliteProjectiles = []; state.collabTags = [];
+    ws.receive('snapshot', encodeSnapshot(state, 1));
+    expect(manager.getAllPlayers()).toEqual([player]);
+    ws.receive('sessionExpired', {});
+    const freshJoin = ws.sent.filter(message => message.type === 'join').at(-1);
+    const freshId = freshJoin.id;
+    expect(freshId).not.toBe(oldId);
+    expect(freshJoin.data).not.toHaveProperty('resumeToken');
+    expect(manager.getPlayer(oldId)).toBeUndefined();
+    expect(manager.getLocalPlayerId()).toBe(freshId);
+    ws.receive('joined', { id: freshId, name: 'Runtime pilot', position: player.ship.position,
+      snapshotVersion: 1, asteroidInteractions: 1, resumeToken: 'b'.repeat(64) });
+    state.entities[0]!.id = freshId;
+    ws.receive('snapshot', encodeSnapshot(state, 1));
+    expect(manager.getAllPlayers()).toEqual([player]);
+    expect(manager.getPlayer(freshId)).toBe(player);
+    expect(manager.getPlayer(oldId)).toBeUndefined();
+    expect(player.id).toBe(freshId);
+    expect(manager.getLocalPlayerId()).toBe(freshId);
+  });
+
   test('an unset build setting offers snapshots, explicit 0 disables them, and an old server remains compatible', async () => {
     let ws = await connect();
     expect(ws.sent.find(m => m.type === 'join').data.snapshotVersion).toBe(1);

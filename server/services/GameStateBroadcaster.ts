@@ -59,13 +59,22 @@ export class GameStateBroadcaster {
     // Covers destruction paths invoked outside the frame loop (for example a
     // client asteroid report) before publishing the authoritative snapshot.
     this.gameEngine.ensureAsteroidField();
+    for (const id of this.gameEngine.drainDepartedPlayers()) this.broadcastPlayerLeft(id);
     const gameState = this.gameEngine.getGameState();
+    // The deployed snapshot-v1 client validates a closed loot-kind enum.
+    // Preserve each core's identity/position/reward for old pilots using its
+    // existing mineral pickup visual; never send an undecodable new enum.
+    const compatibleLoot = gameState.loot.map(loot => loot.kind === 'laserCore' ? { ...loot, kind: 'shard' as const } : loot);
     const message = {
       type: 'gameState',
       data: gameState,
       timestamp: Date.now(),
     };
 
+    for (const blast of this.gameEngine.drainLootBlasts()) this.broadcastLootExploded(blast);
+    for (const bounce of this.gameEngine.drainReflections()) {
+      this.broadcastToAll({ type: 'playerShoot', data: bounce, timestamp: Date.now() });
+    }
     const players = this.gameEngine.entityManager.getHumanPlayers();
     let canonical: ServerGameSnapshot | undefined;
     let legacy: string | undefined;
@@ -78,7 +87,7 @@ export class GameStateBroadcaster {
       if (!recipient) {
         if (ws.readyState === WebSocket.OPEN) {
           try {
-            legacy ??= JSON.stringify(message);
+            legacy ??= JSON.stringify({ ...message, data: { ...gameState, loot: compatibleLoot } });
             ws.send(legacy);
           } catch (error) {
             logger.error('Failed to send legacy game state', error);
@@ -94,15 +103,20 @@ export class GameStateBroadcaster {
       try {
         canonical ??= captureSnapshot({
           ...gameState,
+          playerProjectiles: this.gameEngine.getPlayerProjectiles(),
           satelliteProjectiles: this.gameEngine.getActiveSatelliteProjectiles().map(projectile => ({ id: projectile.shotId, ...projectile })),
           collabTags: this.gameEngine.getActiveCollabTags().map(tag => ({ id: tag.asteroidId, ...tag })),
         });
+        const recipientState =
+          player.asteroidInteractions === 1
+            ? canonical
+            : captureSnapshot({ ...canonical, loot: compatibleLoot });
         const sequence = recipient.sequence + 1;
         const full = recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
-        const frame = encodeSnapshot(canonical, sequence, full ? undefined : recipient.baseline);
+        const frame = encodeSnapshot(recipientState, sequence, full ? undefined : recipient.baseline);
         recipient.pending = true;
         recipient.needsKeyframe = false;
-        const deliveredState = canonical;
+        const deliveredState = recipientState;
         ws.send(JSON.stringify({ type: 'snapshot', data: frame, timestamp: message.timestamp }), error => {
           recipient.pending = false;
           if (error) {
@@ -203,7 +217,7 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastPlayerShoot(playerId: string, laserStart: any, laserDirection: any): void {
+  public broadcastPlayerShoot(playerId: string, laserStart: any, laserDirection: any, shotId?: string): void {
     const timestamp = Date.now();
     const message = {
       type: 'playerShoot',
@@ -211,6 +225,7 @@ export class GameStateBroadcaster {
         id: playerId,
         laserStart,
         laserDirection,
+        ...(shotId ? { shotId } : {}),
       },
       timestamp,
     };

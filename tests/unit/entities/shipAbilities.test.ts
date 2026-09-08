@@ -47,6 +47,23 @@ test('Dart boost dash adds forward velocity', () => {
   expect(dart.harpoonTimer).toBe(0);
 });
 
+test('a Hauler surface latch survives render ticks until release without replacing its cable with E', () => {
+  const hauler = host('hauler');
+  hauler.harpoonTimer = 1;
+  hauler.harpoonTargetId = 'surface-rock';
+  hauler.harpoonLatchPos = { x: 32, y: 0 };
+  hauler.asteroidMotion = { epoch: 1, mode: 'latched', ack: 0, asteroidId: 'surface-rock' };
+  for (let frame = 0; frame < 120; frame++) tickAbilityHost(hauler);
+  expect(hauler.harpoonTimer).toBe(1);
+  expect(hauler.harpoonLatchPos).toEqual({ x: 32, y: 0 });
+  expect(activateAbilityOnHost(hauler).activated).toBe(false);
+  hauler.asteroidMotion = { epoch: 2, mode: 'released', ack: 0 };
+  tickAbilityHost(hauler);
+  expect(hauler.harpoonTimer).toBe(0);
+  expect(hauler.harpoonTargetId).toBeUndefined();
+  expect(canActivateAbility(hauler)).toBe(true);
+});
+
 test('Hauler harpoon latches one rock and hauls only that rock', () => {
   const hauler = host('hauler');
   const near = { id: 'near-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } };

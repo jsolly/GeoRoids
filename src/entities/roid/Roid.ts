@@ -1,4 +1,9 @@
-import type { AsteroidMaterial, Position, Velocity } from '../../../shared-types';
+import type {
+  AsteroidMaterial,
+  AsteroidPhenomenon,
+  Position,
+  Velocity,
+} from '../../../shared-types';
 import { playHitSound as playHitSoundAt } from '../../audio/gameSounds';
 import { DEBUG, GAME, ROID } from '../../constants';
 import { stepAsteroidMotionInto } from '../../physics/asteroidMotion';
@@ -16,6 +21,9 @@ class Roid {
   health: number;
   maxHealth: number;
   material?: AsteroidMaterial;
+  /** Optional server-owned reflection metadata. */
+  phenomenon?: AsteroidPhenomenon;
+  spinClass?: 'natural' | 'charged';
   pendingDestruction: boolean = false; // Track asteroids waiting for server confirmation
   pendingUntilMs: number = 0;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */

@@ -72,6 +72,7 @@ test('real legacy and negotiated sockets render matching worlds across late join
     broadcaster.broadcastGameState();
     const expected = JSON.parse(JSON.stringify(engine.getGameState()));
     const complete = { ...expected,
+      playerProjectiles: engine.getPlayerProjectiles(),
       satelliteProjectiles: engine.getActiveSatelliteProjectiles().map(shot => ({ id: shot.shotId, ...shot })),
       collabTags: engine.getActiveCollabTags().map(tag => ({ id: tag.asteroidId, ...tag })),
     };

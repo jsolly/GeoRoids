@@ -487,4 +487,5 @@ describe('server-authoritative combat', () => {
     expect(engine.getPlayer('nova')?.health).toBe(0);
     expect(engine.getPlayer('nova')?.lives).toBe(2);
   });
+
 });

@@ -148,6 +148,8 @@ export function writeAsteroidKinematicUpdates(
   writeOptionalField(into, 'maxHealth', asteroid.maxHealth);
   writeOptionalField(into, 'size', asteroid.size);
   writeOptionalField(into, 'isCollabTarget', asteroid.isCollabTarget);
+  writeOptionalField(into, 'phenomenon', asteroid.phenomenon);
+  writeOptionalField(into, 'spinClass', asteroid.spinClass);
   if (asteroid.material === undefined || isAsteroidMaterial(asteroid.material)) {
     writeOptionalField(into, 'material', asteroid.material);
   } else {
@@ -206,6 +208,8 @@ export interface AsteroidKinematicTarget {
   offsets?: number[];
   vertices?: number;
   jaggedness?: number;
+  phenomenon?: AsteroidData['phenomenon'];
+  spinClass?: AsteroidData['spinClass'];
 }
 
 export function shouldSnapAsteroidPose(
@@ -272,6 +276,12 @@ export function applyAsteroidKinematics(
   }
   if (updates.isCollabTarget !== undefined) {
     roid.isCollabTarget = updates.isCollabTarget;
+  }
+  if ('phenomenon' in updates) {
+    roid.phenomenon = updates.phenomenon;
+  }
+  if ('spinClass' in updates) {
+    roid.spinClass = updates.spinClass;
   }
   if (updates.material !== undefined && isAsteroidMaterial(updates.material)) {
     roid.material = updates.material;

@@ -93,6 +93,13 @@ export class NetworkManager {
     this.connectionManager.sendPlayerState(fullPlayerState);
   }
 
+  dispatchAsteroidMotionAction(
+    action: 'release' | 'anchor' | 'brake' | 'spin',
+    targetId?: string
+  ): boolean {
+    return this.connectionManager.dispatchAsteroidMotionAction(action, targetId);
+  }
+
   sendShootEvent(laserPosition: Position, laserVelocity: Velocity): void {
     this.connectionManager.sendShootEvent(laserPosition, laserVelocity);
   }

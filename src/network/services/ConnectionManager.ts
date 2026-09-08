@@ -2,6 +2,7 @@ import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProto
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
+  AsteroidMotionInput,
   AsteroidTaggedEvent,
   LootData,
   PlayerJoin,
@@ -18,6 +19,7 @@ import type {
 import { playLaserSound } from '../../audio/gameSounds';
 import { PALETTE, ROID, SHIP } from '../../constants';
 import { entityFactory } from '../../entities/EntityFactory';
+import { AuthoritativeProjectileField } from '../../entities/laser/AuthoritativeProjectileField';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
@@ -32,6 +34,7 @@ import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage, ServerMessage } from '../types';
+import { AsteroidMotionPrediction } from './AsteroidMotionPrediction';
 import {
   applyAsteroidFieldPartition,
   asteroidHasSpawnPose,
@@ -70,6 +73,10 @@ export class ConnectionManager {
   private readonly snapshotDecoder = new SnapshotDecoder();
   private snapshotNegotiated = false;
   private snapshotOffered = false;
+  private asteroidInteractions = false;
+  private resumeToken?: string;
+  private readonly motionPrediction = new AsteroidMotionPrediction();
+  private motionRocks: AsteroidData[] = [];
   private snapshotResyncPending = false;
   private localHarpoonAcknowledged = false;
 
@@ -161,7 +168,11 @@ export class ConnectionManager {
             ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
             : 'ws://localhost:3001/ws';
 
-        const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || computedUrl;
+        const wsEndpoint = new URL(import.meta.env.VITE_WEBSOCKET_URL || computedUrl);
+        if (import.meta.env.VITE_ASTEROID_INTERACTIONS === '1') {
+          wsEndpoint.searchParams.set('asteroidInteractions', '1');
+        }
+        const wsUrl = wsEndpoint.toString();
         logger.debug('NETWORK', 'Connecting to WebSocket', { url: wsUrl });
         this.resetSnapshotSession();
         this.state.socket = new WebSocket(wsUrl);
@@ -186,6 +197,11 @@ export class ConnectionManager {
         };
 
         this.state.socket.onclose = (): void => {
+          this.motionPrediction.transportClosed();
+          const localShip = PlayerManager.getInstance().getLocalShip();
+          if (localShip && this.asteroidInteractions) {
+            localShip.serverOwnsMotion = true;
+          }
           this.resetSnapshotSession();
           this.state.isConnected = false;
           this.state.socket = null;
@@ -234,6 +250,19 @@ export class ConnectionManager {
   }
 
   disconnect(options?: { newSession?: boolean }): void {
+    if (this.state.socket?.readyState === WebSocket.OPEN && this.asteroidInteractions) {
+      this.state.socket.send(JSON.stringify({ type: 'leave', data: {} }));
+    }
+    this.resumeToken = undefined;
+    this.asteroidInteractions = false;
+    this.motionPrediction.reset();
+    const localShip = PlayerManager.getInstance().getLocalShip();
+    if (localShip) {
+      localShip.serverOwnsMotion = false;
+      localShip.asteroidMotion = undefined;
+    }
+    AuthoritativeProjectileField.getInstance().clear();
+    window.dispatchEvent(new CustomEvent('asteroidToolsSnapshot', { detail: { enabled: false } }));
     this.userRequestedDisconnect = true;
     this.clearReconnectTimer();
     this.reconnectAttempt = 0;
@@ -437,9 +466,52 @@ export class ConnectionManager {
       return;
     }
 
+    if (this.asteroidInteractions) {
+      const ship = PlayerManager.getInstance().getLocalShip();
+      if (!ship) {
+        return;
+      }
+      const input = this.motionPrediction.buildInput(ship, Date.now());
+      if (input) {
+        this.sendMessage({ type: 'asteroidInput', data: input });
+      }
+      this.motionPrediction.predictFrame(ship, Date.now(), this.motionRocks);
+      const pose = this.motionPrediction.buildHandoffPose(ship);
+      if (pose) {
+        Object.assign(playerState, pose);
+      }
+      const reason = this.motionPrediction.recoveryReason();
+      if (reason && !this.snapshotResyncPending) {
+        logger.warn('NETWORK', reason);
+        this.sendMessage({ type: 'snapshotResync', data: {} });
+        this.snapshotResyncPending = true;
+      }
+      if (!pose && this.motionPrediction.shouldSuppressPose()) {
+        return;
+      }
+    }
     this.updateEnvelope.data = playerState;
     this.updateEnvelope.timestamp = Date.now();
     this.state.socket.send(JSON.stringify(this.updateEnvelope));
+  }
+
+  dispatchAsteroidMotionAction(
+    action: NonNullable<AsteroidMotionInput['action']>,
+    targetId?: string
+  ): boolean {
+    const ship = PlayerManager.getInstance().getLocalShip();
+    if (!ship || !this.asteroidInteractions) {
+      return false;
+    }
+    const input = this.motionPrediction.buildInput(ship, Date.now(), {
+      action,
+      ...(targetId ? { targetId } : {}),
+    });
+    if (!input) {
+      return false;
+    }
+    this.sendMessage({ type: 'asteroidInput', data: input });
+    return true;
   }
 
   // Send shoot event to server
@@ -509,11 +581,20 @@ export class ConnectionManager {
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         ...(this.snapshotOffered ? { snapshotVersion: SNAPSHOT_VERSION } : {}),
+        ...(this.snapshotOffered && import.meta.env.VITE_ASTEROID_INTERACTIONS === '1'
+          ? {
+              asteroidInteractions: 1,
+              ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),
+            }
+          : {}),
       },
       timestamp: Date.now(),
     };
 
-    logger.debug('NETWORK', 'Sending join message', { message: joinMessage });
+    logger.debug('NETWORK', 'Sending join message', {
+      id: this.clientId,
+      resumable: !!this.resumeToken,
+    });
     const jsonString = JSON.stringify(joinMessage);
     this.state.socket.send(jsonString);
   }
@@ -587,6 +668,24 @@ export class ConnectionManager {
         }
         this.handleGameState(data as ServerGameState);
         break;
+      case 'sessionExpired': {
+        // Remove the previous map key before initializeAsteroidSync changes
+        // the local Player object's id for the replacement session.
+        const localPlayer = PlayerManager.getInstance().getLocalPlayer();
+        if (localPlayer?.id) {
+          this.forgetPlayer(localPlayer.id);
+        }
+        if (this.localPlayerId) {
+          this.forgetPlayer(this.localPlayerId);
+        }
+        this.localPlayerId = '';
+        this.resumeToken = undefined;
+        this.motionPrediction.reset();
+        this.asteroidInteractions = false;
+        this.clientId = replaceStoredClientId();
+        this.initializeAsteroidSync();
+        break;
+      }
       case 'joined':
         this.handleJoined(data as PlayerJoin);
         break;
@@ -844,6 +943,7 @@ export class ConnectionManager {
         entityData.spawnProtectionTimer ??= 0;
         if (complete) {
           // Complete snapshots clear optional values that legacy partial updates retain.
+          entity.ship.asteroidMotion = entityData.asteroidMotion;
           entity.name = entityData.name;
           entity.factionId = entityData.factionId;
           entity.ship.factionId = entityData.factionId;
@@ -885,6 +985,19 @@ export class ConnectionManager {
           }
         }
         entity.updateFromServer(entityData);
+        if (isLocalPlayer && this.asteroidInteractions) {
+          this.motionPrediction.rebase(entityData, entity.ship, Date.now(), data.asteroids);
+          entity.ship.serverOwnsMotion = this.motionPrediction.shouldSuppressShipMove();
+          window.dispatchEvent(
+            new CustomEvent('asteroidToolsSnapshot', {
+              detail: {
+                entity: entityData,
+                asteroids: data.asteroids,
+                enabled: true,
+              },
+            })
+          );
+        }
 
         if (isLocalPlayer && localPlayer && localPlayer !== entity) {
           localPlayer.updateFromServer(entityData);
@@ -931,6 +1044,14 @@ export class ConnectionManager {
     }
     if (complete) {
       const snapshot = data as ServerGameSnapshot;
+      this.motionRocks = data.asteroids;
+      const projectileField = AuthoritativeProjectileField.getInstance();
+      projectileField.sync(snapshot.playerProjectiles ?? [], this.asteroidInteractions);
+      if (this.asteroidInteractions) {
+        for (const player of this.allPlayers.values()) {
+          projectileField.reconcileShip(player.ship, player.id);
+        }
+      }
       SatelliteManager.getInstance().syncProjectilesFromServer(snapshot.satelliteProjectiles);
       const activeTags = new Set(snapshot.collabTags.map((tag) => tag.asteroidId));
       for (const id of this.taggedAsteroidIds) {
@@ -980,11 +1101,16 @@ export class ConnectionManager {
       this.state.socket?.close(1002, 'Unsupported snapshot negotiation');
       return;
     }
-    logger.info(
-      'NETWORK',
-      'Player joined successfully',
-      data as unknown as Record<string, unknown>
-    );
+    this.asteroidInteractions =
+      this.snapshotNegotiated &&
+      data.asteroidInteractions === 1 &&
+      typeof data.resumeToken === 'string';
+    this.resumeToken = this.asteroidInteractions ? data.resumeToken : undefined;
+    logger.info('NETWORK', 'Player joined successfully', {
+      id: data.id,
+      name: data.name,
+      asteroidInteractions: this.asteroidInteractions,
+    });
 
     const keepField = shouldPreserveSeenAsteroidsOnJoin(this.seenAsteroidIds.size);
     if (!keepField) {
@@ -1152,6 +1278,11 @@ export class ConnectionManager {
     laserStart: Position;
     laserDirection: Velocity;
   }): void {
+    // Complete keyed projectiles also carry ricochets and survive reconnect.
+    // Legacy events never append a second bolt in the negotiated world.
+    if (this.asteroidInteractions) {
+      return;
+    }
     logger.debug('NETWORK', 'Client received playerShoot message', data);
     logger.debug('NETWORK', 'Player shot laser', {
       playerId: data.id,

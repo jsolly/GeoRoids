@@ -1,3 +1,4 @@
+import { findNearestAsteroidImpact } from '../../../shared/asteroidReflection';
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 
 /** Asteroid or ship the Hauler harpoon can latch. Same shape on client and server. */
@@ -11,6 +12,9 @@ export interface HarpoonFieldBody {
   health?: number;
   r?: number;
   size?: number;
+  rotation?: number;
+  vertices?: number;
+  offsets?: number[];
   shieldTimer?: number;
   shieldActive?: boolean;
 }
@@ -134,15 +138,56 @@ export function findHarpoonFieldBody(id: string | undefined): HarpoonFieldBody |
   return undefined;
 }
 
-/** Belt row → latch body. Forces `kind: 'asteroid'` so ship filters cannot reject it. */
-export function harpoonBodyFromRock(roid: {
+/** Render-facing Roid attributes; converters retain the actual moving contour. */
+interface HarpoonRock {
   id?: string;
   position: Position;
   velocity: Velocity;
   r?: number;
+  angle?: number;
+  vertices?: number;
+  offsets?: number[];
   health?: number;
   exploding?: boolean;
-}): HarpoonFieldBody | undefined {
+}
+
+/** Polygon exit toward another rock, using the laser/preview collision contour.
+ * Older radius-only field rows retain their circular outline approximation.
+ */
+export function harpoonSurfaceToward(
+  body: HarpoonFieldBody,
+  toward: Position
+): Position | undefined {
+  const radius = body.r ?? body.size;
+  if (radius === undefined || !Number.isFinite(radius) || radius <= 0) {
+    return undefined;
+  }
+  if (body.rotation !== undefined && body.vertices !== undefined && body.offsets !== undefined) {
+    return findNearestAsteroidImpact(body.position, toward, [
+      {
+        id: body.id,
+        position: body.position,
+        size: radius,
+        rotation: body.rotation,
+        vertices: body.vertices,
+        offsets: body.offsets,
+      },
+    ])?.point;
+  }
+  const dx = toward.x - body.position.x;
+  const dy = toward.y - body.position.y;
+  const distance = Math.hypot(dx, dy);
+  if (!Number.isFinite(distance) || distance <= radius) {
+    return undefined;
+  }
+  return {
+    x: body.position.x + (dx / distance) * radius,
+    y: body.position.y + (dy / distance) * radius,
+  };
+}
+
+/** Belt row → latch body. Forces `kind: 'asteroid'` so ship filters cannot reject it. */
+export function harpoonBodyFromRock(roid: HarpoonRock): HarpoonFieldBody | undefined {
   if (!Number.isFinite(roid.position.x) || !Number.isFinite(roid.position.y)) {
     return undefined;
   }
@@ -158,6 +203,9 @@ export function harpoonBodyFromRock(roid: {
     exploding: roid.exploding,
     health: roid.health,
     r: roid.r,
+    rotation: roid.angle,
+    vertices: roid.vertices,
+    offsets: roid.offsets,
   };
 }
 
@@ -189,16 +237,7 @@ export function harpoonBodyFromShip(
   };
 }
 
-export function harpoonBodiesFromRocks(
-  roids: readonly {
-    id?: string;
-    position: Position;
-    velocity: Velocity;
-    r?: number;
-    health?: number;
-    exploding?: boolean;
-  }[]
-): HarpoonFieldBody[] {
+export function harpoonBodiesFromRocks(roids: readonly HarpoonRock[]): HarpoonFieldBody[] {
   const bodies: HarpoonFieldBody[] = [];
   for (const roid of roids) {
     const body = harpoonBodyFromRock(roid);

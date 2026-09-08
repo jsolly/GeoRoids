@@ -200,12 +200,12 @@ export function harpoonBodyFromRock(roid: HarpoonRock): HarpoonFieldBody | undef
     position: roid.position,
     velocity: roid.velocity,
     kind: 'asteroid',
-    exploding: roid.exploding,
-    health: roid.health,
-    r: roid.r,
-    rotation: roid.angle,
-    vertices: roid.vertices,
-    offsets: roid.offsets,
+    ...(roid.exploding !== undefined ? { exploding: roid.exploding } : {}),
+    ...(roid.health !== undefined ? { health: roid.health } : {}),
+    ...(roid.r !== undefined ? { r: roid.r } : {}),
+    ...(roid.angle !== undefined ? { rotation: roid.angle } : {}),
+    ...(roid.vertices !== undefined ? { vertices: roid.vertices } : {}),
+    ...(roid.offsets !== undefined ? { offsets: roid.offsets } : {}),
   };
 }
 
@@ -223,17 +223,18 @@ export function harpoonBodyFromShip(
   },
   factionId?: SoftFactionId
 ): HarpoonFieldBody {
+  const resolvedFactionId = factionId ?? ship.factionId;
   return {
     id,
     position: ship.position,
     velocity: ship.velocity,
     kind: 'ship',
-    factionId: factionId ?? ship.factionId,
-    exploding: ship.exploding,
-    health: ship.health,
-    r: ship.r,
-    shieldTimer: ship.shieldTimer,
-    shieldActive: ship.shieldActive,
+    ...(resolvedFactionId !== undefined ? { factionId: resolvedFactionId } : {}),
+    ...(ship.exploding !== undefined ? { exploding: ship.exploding } : {}),
+    ...(ship.health !== undefined ? { health: ship.health } : {}),
+    ...(ship.r !== undefined ? { r: ship.r } : {}),
+    ...(ship.shieldTimer !== undefined ? { shieldTimer: ship.shieldTimer } : {}),
+    ...(ship.shieldActive !== undefined ? { shieldActive: ship.shieldActive } : {}),
   };
 }
 

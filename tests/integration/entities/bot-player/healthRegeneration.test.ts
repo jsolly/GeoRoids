@@ -1,13 +1,14 @@
-import { calculateHealthRegenDelayFrames, calculateHealthRegenPerFrame } from '../../../../shared/constants/health';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { GAME } from '../../../../src/constants';
-import { Player } from '../../../../src/entities/player/Player';
-import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
-import { entityFactory } from '../../../../src/entities/EntityFactory';
-import { Ship } from '../../../../src/entities/ship/Ship';
 import {
-  shouldStartHealthRegeneration,
-} from '../../../../src/entities/ship/shipUtils';
+  calculateHealthRegenDelayFrames,
+  calculateHealthRegenPerFrame,
+} from '../../../../shared/constants/health';
+import { GAME } from '../../../../src/constants';
+import { entityFactory } from '../../../../src/entities/EntityFactory';
+import { Player } from '../../../../src/entities/player/Player';
+import { Ship } from '../../../../src/entities/ship/Ship';
+import { shouldStartHealthRegeneration } from '../../../../src/entities/ship/shipUtils';
+import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 
 describe('Health Regeneration', () => {
   let ship: Ship;

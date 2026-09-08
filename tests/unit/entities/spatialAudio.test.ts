@@ -7,7 +7,7 @@ import {
   thrustSourcesFromPlayers,
   upsertThrustSource,
 } from '../../../src/audio/gameSounds';
-import { setSound, Sound } from '../../../src/audio/Sound';
+import { Sound, setSound } from '../../../src/audio/Sound';
 import {
   bindGameAudio,
   isInViewport,
@@ -52,9 +52,7 @@ test('sound with no listener plays at full volume', () => {
 
 test('explosion at the local ship is in the viewport at full volume', () => {
   expect(isInViewport(listener, listener, viewport)).toBe(true);
-  expect(
-    planPositionalPlayback(listener, listener, viewport, { requireViewport: true })
-  ).toEqual({
+  expect(planPositionalPlayback(listener, listener, viewport, { requireViewport: true })).toEqual({
     shouldPlay: true,
     volumeScale: 1,
   });
@@ -73,9 +71,7 @@ test('explosion inside the viewport far from the ship is quieter than a near exp
 test('explosion outside the viewport does not play', () => {
   const offScreen = { x: listener.x + 1000, y: listener.y };
   expect(isInViewport(offScreen, listener, viewport)).toBe(false);
-  expect(
-    planPositionalPlayback(offScreen, listener, viewport, { requireViewport: true })
-  ).toEqual({
+  expect(planPositionalPlayback(offScreen, listener, viewport, { requireViewport: true })).toEqual({
     shouldPlay: false,
     volumeScale: 0,
   });

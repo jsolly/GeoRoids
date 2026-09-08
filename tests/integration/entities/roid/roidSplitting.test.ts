@@ -1,7 +1,7 @@
-import { expect, test, describe, beforeEach, vi, afterEach } from 'vitest';
-import { CollisionManager } from '../../../../src/physics/collision/CollisionManager';
-import { Ship } from '../../../../src/entities/ship/Ship';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Roid, RoidBelt } from '../../../../src/entities/roid/Roid';
+import { Ship } from '../../../../src/entities/ship/Ship';
+import { CollisionManager } from '../../../../src/physics/collision/CollisionManager';
 
 // Mock NetworkManager for integration testing
 const mockSendMessage = vi.fn();
@@ -42,11 +42,11 @@ describe('Integration: Roid splitting on collision', () => {
     localShip = new Ship({ isLocalPlayer: true });
     localShip.position = { x: 400, y: 300 };
     localShip.r = 15;
-    
+
     // Clear spawn protection to allow collisions
     localShip.blinkCount = 0;
     localShip.spawnProtectionTimer = 0;
-    
+
     // Create local player object
     localPlayer = { ship: localShip, id: 'local-player-123', type: 'local' as const };
 
@@ -139,7 +139,7 @@ describe('Integration: Roid splitting on collision', () => {
 
     testCases.forEach(({ size, expectedPoints }) => {
       vi.clearAllMocks();
-      
+
       const roid = new Roid({ x: 400, y: 300 }, size);
       roidBelt.roids = [roid];
 

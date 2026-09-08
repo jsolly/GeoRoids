@@ -1,4 +1,4 @@
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import { type Browser, type BrowserContext, chromium, type Page } from 'playwright';
 
 export class BrowserManager {
   private browser: Browser | null = null;
@@ -13,7 +13,6 @@ export class BrowserManager {
       args: [
         '--no-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
         // Keep the game loop (requestAnimationFrame) and timers running at full
         // speed even when the headless page is treated as backgrounded. Without
@@ -43,10 +42,10 @@ export class BrowserManager {
     this.page = page;
     this.pages.push(page);
     await page.setViewportSize({ width: 1920, height: 1080 });
-    
+
     // Set user agent for consistent behavior
     await page.setExtraHTTPHeaders({
-      'User-Agent': 'GeoAsteroids-Test-Bot/1.0'
+      'User-Agent': 'GeoAsteroids-Test-Bot/1.0',
     });
 
     // Keep the page foregrounded so the game loop is not throttled.
@@ -68,7 +67,9 @@ export class BrowserManager {
   /** Alias for closePage — closes every page opened in this manager. */
   async closeAllPages(): Promise<void> {
     for (const page of this.pages) {
-      await page.close().catch(() => {});
+      await page.close().catch((error: unknown) => {
+        console.error('Failed to close scenario page; browser cleanup will retry', error);
+      });
     }
     this.pages = [];
     this.page = null;
@@ -82,7 +83,9 @@ export class BrowserManager {
   /** Returns the first and second pages for two-client tests. */
   getTwoClientPages(): { first: Page; second: Page } {
     if (this.pages.length < 2) {
-      throw new Error('Expected two pages — call createAdditionalPage() after the first createPage()');
+      throw new Error(
+        'Expected two pages — call createAdditionalPage() after the first createPage()'
+      );
     }
     return { first: this.pages[0]!, second: this.pages[1]! };
   }

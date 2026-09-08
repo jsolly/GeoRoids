@@ -1,29 +1,44 @@
-import { WebSocket } from 'ws';
-import type { AsteroidMotionState, LaserUpgrade, Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
+import type { WebSocket } from 'ws';
+import { logger } from '../../setup/serverLogger';
+import {
+  calculateHealthRegenDelayFrames,
+  calculateHealthRegenPerFrame,
+} from '../../shared/constants/health';
 import { pickBalancedFactionFromShips } from '../../shared/factions';
+import { createFuelTank } from '../../shared/fuel';
+import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
+import type {
+  AsteroidMotionState,
+  LaserUpgrade,
+  Position,
+  ShipKitId,
+  SoftFactionId,
+  Velocity,
+} from '../../shared-types';
+import { DEBUG, FUEL, PALETTE, SHIP } from '../../src/constants';
 import { parseSoftFactionId } from '../../src/entities/player/softFactions';
 import { absorbDamageWithShield, tickAbilityHost } from '../../src/entities/ship/shipAbilities';
-import { applyShipKitStats, DEFAULT_SHIP_KIT_ID, isShipKitId, SHIP_KIT_IDS } from '../../src/entities/ship/shipKits';
 import {
+  applyShipKitStats,
+  DEFAULT_SHIP_KIT_ID,
+  isShipKitId,
+  SHIP_KIT_IDS,
+} from '../../src/entities/ship/shipKits';
+import {
+  type CombatDamageSource,
   clearShield,
   createShieldState,
   maybeActivateBotShield,
   noteReadableShieldLaserHit,
+  type ShieldState,
   shouldBlockDamage,
   updateShield,
-  type CombatDamageSource,
-  type ShieldState,
 } from '../../src/entities/ship/shipShield';
-import { createFuelTank } from '../../shared/fuel';
-import { calculateHealthRegenDelayFrames, calculateHealthRegenPerFrame } from '../../shared/constants/health';
-import { BOT_AI, BotBrain, makeBotShot, type BotShot } from '../ai/botController';
-import { applyShipMotionSteps, containShipInArena } from '../ai/shipMotion';
-import { DEBUG, FUEL, PALETTE, SHIP } from '../../src/constants';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
-import { GROWTH, applyShipMass, resetShipMass } from '../../shared/shipGrowth';
-import { logger } from '../../setup/serverLogger';
-import { RNGService } from './RNGService';
+import { BOT_AI, BotBrain, type BotShot, makeBotShot } from '../ai/botController';
+import { applyShipMotionSteps, containShipInArena } from '../ai/shipMotion';
+import type { RNGService } from './RNGService';
 
 export const RESPAWN_ANCHOR_ACK_DISTANCE = 100;
 /** Keep lives/score after a dropped socket so the same id can rejoin. */
@@ -88,7 +103,6 @@ export function isStaleDeathPose(
   return Math.hypot(position.x - anchor.x, position.y - anchor.y) > RESPAWN_ANCHOR_ACK_DISTANCE;
 }
 
-
 export class EntityManager {
   private entities = new Map<string, GameEntity>();
   private rng: RNGService;
@@ -106,7 +120,7 @@ export class EntityManager {
   // Entity management
   public addEntity(entity: GameEntity): void {
     this.entities.set(entity.id, entity);
-    logger.debug('ENTITY', `Added ${entity.type} entity: ${entity.name} (${entity.id})`);
+    logger.debug('ENTITY', 'Entity added', { entityId: entity.id, entityType: entity.type });
   }
 
   public getEntity(entityId: string): GameEntity | undefined {
@@ -118,7 +132,7 @@ export class EntityManager {
   }
 
   public getHumanPlayers(): GameEntity[] {
-    return Array.from(this.entities.values()).filter(entity => entity.type === 'human');
+    return Array.from(this.entities.values()).filter((entity) => entity.type === 'human');
   }
 
   public getEntityBySocket(ws: WebSocket): GameEntity | undefined {
@@ -131,7 +145,7 @@ export class EntityManager {
   }
 
   public getBots(): GameEntity[] {
-    return Array.from(this.entities.values()).filter(entity => entity.type === 'bot');
+    return Array.from(this.entities.values()).filter((entity) => entity.type === 'bot');
   }
 
   public getHumanBySocket(ws: WebSocket): GameEntity | undefined {
@@ -227,7 +241,7 @@ export class EntityManager {
     if (entity) {
       this.stashHumanForRejoin(entity);
       this.entities.delete(entityId);
-      logger.debug('ENTITY', `Removed ${entity.type} entity: ${entity.name} (${entityId})`);
+      logger.debug('ENTITY', 'Entity removed', { entityId, entityType: entity.type });
     }
     return entity;
   }
@@ -373,7 +387,8 @@ export class EntityManager {
   }
 
   private consumeHumanRejoinStash(id: string, name?: string): HumanRejoinStash | undefined {
-    const stash = this.humanRejoinStash.get(id) ?? (name ? this.humanRejoinByName.get(name) : undefined);
+    const stash =
+      this.humanRejoinStash.get(id) ?? (name ? this.humanRejoinByName.get(name) : undefined);
     if (!stash) {
       return undefined;
     }
@@ -401,9 +416,16 @@ export class EntityManager {
     }
 
     const botNames = [
-      'Crimson Falcon', 'Nebula Viper', 'Quantum Ranger', 'Cosmic Specter',
-      'Lunar Guardian', 'Solar Sentinel', 'Galactic Hunter', 'Star Warden',
-      'Nova Enforcer', 'Meteor Striker'
+      'Crimson Falcon',
+      'Nebula Viper',
+      'Quantum Ranger',
+      'Cosmic Specter',
+      'Lunar Guardian',
+      'Solar Sentinel',
+      'Galactic Hunter',
+      'Star Warden',
+      'Nova Enforcer',
+      'Meteor Striker',
     ];
 
     // Use DEBUG bot count if available
@@ -411,7 +433,7 @@ export class EntityManager {
 
     // Use a separate seed sequence for bots to avoid interference with asteroids
     const originalState = this.rng.getState();
-    this.rng.setState(0x9E3779B9 + 0x12345678); // Different seed for bots
+    this.rng.setState(0x9e3779b9 + 0x12345678); // Different seed for bots
 
     const newBots: GameEntity[] = [];
 
@@ -422,7 +444,7 @@ export class EntityManager {
       const radius = this.rng.random() * bounds.radius * 0.8; // Stay within 80% of boundary
       const position = {
         x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius
+        y: Math.sin(angle) * radius,
       };
 
       const botName = botNames[i];
@@ -581,13 +603,15 @@ export class EntityManager {
         if (entity.respawnTimer === 0) {
           // A leftover timer must not resurrect a human who already spent their last life.
           if (!this.shouldScheduleRespawn(entity)) {
-            entity.respawnTimer = undefined;
+            delete entity.respawnTimer;
             continue;
           }
 
           this.respawnShip(entity);
           finishedRespawning.push(entityId);
-          logger.debug('ENTITY', `Respawned ${entity.type} entity: ${entity.name} (${entityId})`, {
+          logger.debug('ENTITY', 'Entity respawned', {
+            entityId,
+            entityType: entity.type,
             health: entity.health,
             position: entity.position,
             spawnProtection: entity.spawnProtectionTimer,
@@ -602,8 +626,8 @@ export class EntityManager {
         }
 
         if (entity.spawnProtectionTimer === 0) {
-          entity.spawnProtectionTimer = undefined;
-          entity.respawnAnchor = undefined;
+          delete entity.spawnProtectionTimer;
+          delete entity.respawnAnchor;
         }
       }
     }
@@ -653,7 +677,7 @@ export class EntityManager {
   }
 
   private respawnShip(entity: GameEntity): void {
-    entity.respawnTimer = undefined;
+    delete entity.respawnTimer;
     resetShipMass(entity);
     applyShipKitStats(entity, entity.kitId);
     entity.health = entity.maxHealth;
@@ -661,8 +685,8 @@ export class EntityManager {
     entity.fuel = FUEL.START;
     entity.maxFuel = FUEL.MAX;
     entity.exploding = false;
-    entity.explodeTime = undefined;
-    entity.deathCause = undefined;
+    delete entity.explodeTime;
+    delete entity.deathCause;
     clearShield(entity);
     this.placeEntityInArena(entity);
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
@@ -725,7 +749,8 @@ export class EntityManager {
 
     for (const [entityId, entity] of this.entities) {
       // Only cleanup human players (bots are managed by server)
-      if (entity.type === 'human' && now - entity.lastUpdate > 30000) { // 30 seconds
+      if (entity.type === 'human' && now - entity.lastUpdate > 30000) {
+        // 30 seconds
         this.removeEntity(entityId);
         removedEntities.push(entityId);
       }
@@ -763,7 +788,6 @@ export class EntityManager {
       tickAbilityHost(entity);
     }
   }
-
 
   public clearAll(): void {
     this.entities.clear();

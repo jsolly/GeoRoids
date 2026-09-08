@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { PlayerProjectileState, ServerGameSnapshot } from '../../../shared-types';
 import { captureSnapshot, encodeSnapshot } from '../../../shared/snapshotProtocol';
+import type { PlayerProjectileState, ServerGameSnapshot } from '../../../shared-types';
 import { AuthoritativeProjectileField } from '../../../src/entities/laser/AuthoritativeProjectileField';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
@@ -94,7 +94,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     await pending;
     manager.setLocalPlayerName('Projectile observer');
     manager.initializeAsteroidSync();
-    expect(ws.sent.find((packet) => packet.type === 'join')?.data?.asteroidInteractions).toBe(
+    expect(ws.sent.find((packet) => packet.type === 'join')?.data?.['asteroidInteractions']).toBe(
       enhanced ? 1 : undefined
     );
     acknowledge(ws, enhanced);
@@ -103,7 +103,9 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
 
   function ship() {
     const player = manager.getPlayer('pilot-1');
-    if (!player) throw new Error('Decoded remote pilot is missing');
+    if (!player) {
+      throw new Error('Decoded remote pilot is missing');
+    }
     return player.ship;
   }
 

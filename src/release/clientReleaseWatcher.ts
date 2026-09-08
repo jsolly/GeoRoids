@@ -1,3 +1,5 @@
+import { logger } from '../utils/Logger';
+
 /** Only the same-origin Vercel client identity controls page refreshes. */
 export const CLIENT_RELEASE_POLL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 8000;
@@ -24,6 +26,7 @@ export function watchClientRelease(
   }
   const build = buildRelease.toLowerCase();
   let stopped = false;
+  let failureReported = false;
   let pending: AbortController | undefined;
   let candidate: string | undefined;
   let requestTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -66,6 +69,7 @@ export function watchClientRelease(
         candidate = undefined;
         return;
       }
+      failureReported = false;
       // The first same-build response is the normal baseline. A page already
       // stale on load may also refresh, after two matching full-SHA responses.
       if (published.startsWith(build)) {
@@ -92,9 +96,16 @@ export function watchClientRelease(
       environment.storage.setItem(RELOAD_GUARD_KEY, JSON.stringify({ build, target: published }));
       stop();
       environment.reload();
-    } catch {
-      // Offline, unavailable metadata and blocked storage are best-effort misses.
+    } catch (cause) {
       candidate = undefined;
+      if (!stopped && !failureReported) {
+        failureReported = true;
+        logger.error(
+          'CLIENT_RELEASE',
+          'Release check failed; keeping the current client',
+          cause instanceof Error ? cause : new Error(String(cause))
+        );
+      }
     } finally {
       clearTimeout(requestTimeout);
       if (pending === controller) {

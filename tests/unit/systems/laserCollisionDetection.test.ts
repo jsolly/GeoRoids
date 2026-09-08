@@ -1,4 +1,4 @@
-import { expect, test, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import {
   asteroidPointsForRadius,
   checkLaserAsteroidCollision,
@@ -48,21 +48,13 @@ describe('Laser Collision Detection Functions', () => {
 
     test('works with different asteroid sizes', () => {
       const asteroidPos = { x: 100, y: 100 };
-      
+
       // Large asteroid (radius 40)
-      const largeResult = checkLaserAsteroidCollision(
-        { x: 100 + 41.9, y: 100 }, 
-        asteroidPos, 
-        40
-      );
+      const largeResult = checkLaserAsteroidCollision({ x: 100 + 41.9, y: 100 }, asteroidPos, 40);
       expect(largeResult).toBe(true);
 
       // Small asteroid (radius 10)
-      const smallResult = checkLaserAsteroidCollision(
-        { x: 100 + 11.9, y: 100 }, 
-        asteroidPos, 
-        10
-      );
+      const smallResult = checkLaserAsteroidCollision({ x: 100 + 11.9, y: 100 }, asteroidPos, 10);
       expect(smallResult).toBe(true);
     });
 
@@ -151,21 +143,13 @@ describe('Laser Collision Detection Functions', () => {
 
     test('works with different ship sizes', () => {
       const shipPos = { x: 100, y: 100 };
-      
+
       // Large ship (radius 25)
-      const largeResult = checkLaserShipCollision(
-        { x: 100 + 26.9, y: 100 }, 
-        shipPos, 
-        25
-      );
+      const largeResult = checkLaserShipCollision({ x: 100 + 26.9, y: 100 }, shipPos, 25);
       expect(largeResult).toBe(true);
 
       // Small ship (radius 8)
-      const smallResult = checkLaserShipCollision(
-        { x: 100 + 9.9, y: 100 }, 
-        shipPos, 
-        8
-      );
+      const smallResult = checkLaserShipCollision({ x: 100 + 9.9, y: 100 }, shipPos, 8);
       expect(smallResult).toBe(true);
     });
   });

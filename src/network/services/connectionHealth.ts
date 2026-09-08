@@ -10,6 +10,9 @@
  * detects a dead link without any server change.
  */
 
+// Maximum time to establish a new gameplay socket.
+export const CONNECTION_HANDSHAKE_TIMEOUT_MS = 10_000;
+
 // How often the client pings the server and checks liveness.
 export const HEARTBEAT_INTERVAL_MS = 2000;
 

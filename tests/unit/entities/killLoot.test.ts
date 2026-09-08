@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { GROWTH, applyShipMass, planKillLoot, radiusFromMass } from '../../../shared/shipGrowth';
+import { applyShipMass, GROWTH, planKillLoot, radiusFromMass } from '../../../shared/shipGrowth';
 
 describe('kill loot and growth', () => {
   let engine: GameEngine;
@@ -16,14 +16,14 @@ describe('kill loot and growth', () => {
   test('human and bot deaths drop the same pellet count for the same mass', () => {
     const ws = {} as any;
     const human = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     applyShipMass(human, 4);
 
     const bots = engine.createBots(1);
     expect(bots && bots[0]).toBeTruthy();
     const bot = bots![0]!;
     engine.entityManager.updateEntity(bot.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       position: { x: -20, y: 0 },
     });
     applyShipMass(bot, 4);
@@ -41,7 +41,7 @@ describe('kill loot and growth', () => {
   test('two game-state snapshots share the same loot ids and poses', () => {
     const ws = {} as any;
     const victim = engine.addPlayer('victim', 'Victim', ws, { x: 50, y: 25 });
-    engine.entityManager.updateEntity('victim', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('victim', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('victim', 'boundary', victim.health);
 
     const first = engine.getGameState();
@@ -54,8 +54,8 @@ describe('kill loot and growth', () => {
     const ws = {} as any;
     const collector = engine.addPlayer('p1', 'Collector', ws, { x: 200, y: 0 });
     const victim = engine.addPlayer('p2', 'Victim', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
-    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
+    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
 
     engine.handlePlayerDamage('p2', 'p1', victim.health);
     const loot = engine.getLoot();
@@ -79,9 +79,9 @@ describe('kill loot and growth', () => {
     const first = engine.addPlayer('p1', 'First', ws, { x: 400, y: 0 });
     const second = engine.addPlayer('p2', 'Second', ws, { x: 400, y: 40 });
     const victim = engine.addPlayer('p3', 'Victim', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
-    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: undefined });
-    engine.entityManager.updateEntity('p3', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
+    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
+    engine.entityManager.updateEntity('p3', { spawnProtectionTimer: 0 });
 
     engine.handlePlayerDamage('p3', 'boundary', victim.health);
     const pellet = engine.getLoot()[0];
@@ -100,7 +100,7 @@ describe('kill loot and growth', () => {
   test('respawn returns a grown ship to base mass and HP', () => {
     const ws = {} as any;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     applyShipMass(player, 5);
     expect(player.maxHealth).toBeGreaterThan(100);
 

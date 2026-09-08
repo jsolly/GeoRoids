@@ -2,15 +2,15 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
+import { AsteroidMotionService } from '../../../server/core/AsteroidMotionService';
+import { EntityManager } from '../../../server/core/EntityManager';
+import { RNGService } from '../../../server/core/RNGService';
 import {
   ASTEROID_MOTION,
   asteroidInertia,
   asteroidMass,
   coupleAsteroidMomentum,
 } from '../../../shared/asteroidMotion';
-import { AsteroidMotionService } from '../../../server/core/AsteroidMotionService';
-import { EntityManager } from '../../../server/core/EntityManager';
-import { RNGService } from '../../../server/core/RNGService';
 import { radiusFromMass } from '../../../shared/shipGrowth';
 import type { AsteroidData, AsteroidMotionInput } from '../../../shared-types';
 import { GAME, ROID } from '../../../src/constants';
@@ -71,7 +71,9 @@ function fixture() {
   const socket = peers[0];
   const second = peers[1];
   const third = peers[2];
-  if (!socket || !second || !third) throw new Error('Actual WebSocket peers are missing');
+  if (!socket || !second || !third) {
+    throw new Error('Actual WebSocket peers are missing');
+  }
   const entities = new EntityManager(new RNGService(1));
   const actor = entities.addHumanPlayer(
     'hauler',
@@ -84,11 +86,13 @@ function fixture() {
   );
   actor.asteroidInteractions = 1;
   actor.spawnProtectionTimer = 0;
-  actor.respawnTimer = undefined;
+  delete actor.respawnTimer;
   actor.abilityCooldownFrames = 0;
   const service = new AsteroidMotionService();
   const registered = service.register(actor, socket, 1, 0);
-  if (!registered.ok) throw new Error(registered.error);
+  if (!registered.ok) {
+    throw new Error(registered.error);
+  }
   return {
     service,
     actor,
@@ -114,7 +118,9 @@ function latch(f: ReturnType<typeof fixture>) {
     f.service.latch(f.socket, { action: 'latch', targetId: 'spinner', sequence: 0 }, f.field, 0)
   ).toEqual({ ok: true });
   const epoch = f.service.getState(f.actor.id)?.epoch;
-  if (epoch === undefined) throw new Error('Latch epoch missing');
+  if (epoch === undefined) {
+    throw new Error('Latch epoch missing');
+  }
   return epoch;
 }
 
@@ -164,7 +170,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('charges spin from actual thrust and server fuel once per tick, regardless of input spam', () => {
     const f = fixture();
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     primary.angularVelocity = 0.001;
     f.actor.angle = -Math.PI / 2;
     const epoch = latch(f);
@@ -195,7 +203,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     f.actor.fuel = 0;
     const epoch = latch(f);
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     const omega = primary.angularVelocity;
     for (const forged of [
       { ...input(epoch, 0), dt: 1000 },
@@ -204,10 +214,11 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
       { ...input(epoch, 0), epoch: epoch - 1 },
       { ...input(epoch, 0), aimAngle: Infinity },
       { ...input(epoch, 0), thrust: 1 },
-    ])
+    ]) {
       expect(
         f.service.input(f.socket, forged as unknown as AsteroidMotionInput, f.field, 1).ok
       ).toBe(false);
+    }
     expect(f.service.input(f.socket, input(epoch, 0, { thrust: true }), f.field, 1).ok).toBe(true);
     f.service.step(100, f.field);
     expect(primary.angularVelocity).toBe(omega);
@@ -266,7 +277,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('requires two distinct simulation ticks before handoff and stays authoritative without acknowledgment', () => {
     const f = fixture();
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     primary.angularVelocity = 0.01;
     const epoch = latch(f);
     f.service.input(f.socket, input(epoch, 0, { action: 'release' }), f.field, 0);
@@ -297,7 +310,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
         },
         0
       );
-      if (acceptedPose.ok) accepted += 1;
+      if (acceptedPose.ok) {
+        accepted += 1;
+      }
     }
     expect(accepted).toBeGreaterThan(0);
     expect(accepted * 10).toBeLessThanOrEqual(6 * ASTEROID_MOTION.poseLeadFrames);
@@ -321,7 +336,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('treats an exact same-socket rejoin as idempotent without dropping pending motion or granting another owner access', () => {
     const f = fixture();
     const epoch = latch(f);
-    expect(f.service.input(f.socket, input(epoch, 4, { action: 'release' }), f.field, 1).ok).toBe(true);
+    expect(f.service.input(f.socket, input(epoch, 4, { action: 'release' }), f.field, 1).ok).toBe(
+      true
+    );
     const joined = f.service.resume(f.token, f.socket, 2);
     expect(joined.ok).toBe(true);
     expect(joined).not.toHaveProperty('supersededSocket');
@@ -330,7 +347,15 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     f.service.step(1000 / 60, f.field);
     expect(f.service.getState(f.actor.id)?.mode).toBe('released');
     expect(f.service.getState(f.actor.id)?.ack).toBe(4);
-    const other = f.entities.addHumanPlayer('other', 'Other', f.second, { x: 100, y: 0 }, undefined, 'hauler', 'ember');
+    const other = f.entities.addHumanPlayer(
+      'other',
+      'Other',
+      f.second,
+      { x: 100, y: 0 },
+      undefined,
+      'hauler',
+      'ember'
+    );
     other.asteroidInteractions = 1;
     expect(f.service.register(other, f.second, 1, 20).ok).toBe(true);
     expect(f.service.resume(f.token, f.second, 21).ok).toBe(false);
@@ -350,7 +375,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     expect(f.actor.fuel).toBe(fuel);
     const resumed = f.service.resume(f.token, f.second, 100);
     expect(resumed.ok).toBe(true);
-    if (!resumed.ok) throw new Error(resumed.error);
+    if (!resumed.ok) {
+      throw new Error(resumed.error);
+    }
     expect(resumed.actor).toBe(f.actor);
     expect(resumed.resumeToken).toBe(f.token);
     expect(f.actor.ws).toBe(f.second);
@@ -385,12 +412,21 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('contains a coupled payload pair as one body while preserving tether length and reflecting outward momentum', () => {
     const f = fixture();
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     const payload = rock('payload', 180, 0, 30);
     payload.angularVelocity = 0;
     f.field.push(payload);
     const epoch = latch(f);
-    expect(f.service.input(f.socket, input(epoch, 0, { action: 'anchor', targetId: payload.id }), f.field, 0).ok).toBe(true);
+    expect(
+      f.service.input(
+        f.socket,
+        input(epoch, 0, { action: 'anchor', targetId: payload.id }),
+        f.field,
+        0
+      ).ok
+    ).toBe(true);
     f.service.step(100, f.field);
     expect(f.service.getState(f.actor.id)?.payloadId).toBe(payload.id);
 
@@ -406,8 +442,12 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     f.service.step(200, f.field);
 
     const targetRadius = getAsteroidFieldRadius() * ROID.FIELD_INNER_SCALE;
-    expect(Math.hypot(primary.position.x, primary.position.y)).toBeLessThanOrEqual(targetRadius + 1e-8);
-    expect(Math.hypot(payload.position.x, payload.position.y)).toBeLessThanOrEqual(targetRadius + 1e-8);
+    expect(Math.hypot(primary.position.x, primary.position.y)).toBeLessThanOrEqual(
+      targetRadius + 1e-8
+    );
+    expect(Math.hypot(payload.position.x, payload.position.y)).toBeLessThanOrEqual(
+      targetRadius + 1e-8
+    );
     expect(
       Math.hypot(primary.position.x - payload.position.x, primary.position.y - payload.position.y)
     ).toBeCloseTo(separation, 6);
@@ -417,12 +457,19 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('caps both unequal-mass tether rocks after a wall bounce and after release', () => {
     const f = fixture();
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     const payload = rock('payload', 220, 0, 30);
     f.field.push(payload);
     const epoch = latch(f);
     expect(
-      f.service.input(f.socket, input(epoch, 0, { action: 'anchor', targetId: payload.id }), f.field, 0).ok
+      f.service.input(
+        f.socket,
+        input(epoch, 0, { action: 'anchor', targetId: payload.id }),
+        f.field,
+        0
+      ).ok
     ).toBe(true);
     f.service.step(100, f.field);
 
@@ -457,7 +504,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('caps a single latched rock after an external impulse before it can carry the pilot or escape on release', () => {
     const f = fixture();
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     const epoch = latch(f);
     primary.velocity = { x: ASTEROID_MOTION.maxLinearVelocity * 4, y: 0 };
 
@@ -466,7 +515,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     expect(Math.hypot(primary.velocity.x, primary.velocity.y)).toBeLessThanOrEqual(
       ASTEROID_MOTION.maxLinearVelocity + 1e-8
     );
-    expect(f.service.input(f.socket, input(epoch, 0, { action: 'release' }), f.field, 101).ok).toBe(true);
+    expect(f.service.input(f.socket, input(epoch, 0, { action: 'release' }), f.field, 101).ok).toBe(
+      true
+    );
   });
 
   it('rejects an enhanced free pose that crosses the shared arena kill wall', () => {
@@ -517,7 +568,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
   it('brakes a spinning source into a real payload orbit and leaves payload velocity intact on release', () => {
     const f = fixture();
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     const payload = rock('payload', 200, 0, 30);
     payload.angularVelocity = 0;
     f.field.push(payload);
@@ -657,7 +710,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     expect(speed).toBeLessThanOrEqual(ship.maxVelocity + 1e-9);
 
     const state = f.service.getState(f.actor.id);
-    if (!state) throw new Error('Motion state missing');
+    if (!state) {
+      throw new Error('Motion state missing');
+    }
     expect(
       f.service.acceptFreePose(
         f.socket,
@@ -689,7 +744,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     expect(speed).toBeLessThanOrEqual(ship.maxVelocity + 1e-9);
 
     const state = f.service.getState(f.actor.id);
-    if (!state) throw new Error('Motion state missing');
+    if (!state) {
+      throw new Error('Motion state missing');
+    }
     expect(
       f.service.acceptFreePose(
         f.socket,
@@ -708,10 +765,11 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
 
   it('seeds a bounded ordinary spinning population and caps catch-up work after a stalled tick', () => {
     const f = fixture();
-    const ordinary = Array.from({ length: 10 }, (_, index) => ({
-      ...rock(`natural-${index}`),
-      spinClass: undefined,
-    }));
+    const ordinary = Array.from({ length: 10 }, (_, index) => {
+      const asteroid = rock(`natural-${index}`);
+      delete asteroid.spinClass;
+      return asteroid;
+    });
     const patches = f.service.seedNaturalSpinners(ordinary);
     expect(patches).toHaveLength(3);
     expect(
@@ -721,7 +779,9 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     ).toBe(true);
     const epoch = latch(f);
     const primary = f.field[0];
-    if (!primary) throw new Error('Missing spinner');
+    if (!primary) {
+      throw new Error('Missing spinner');
+    }
     const before = primary.rotation;
     f.service.input(f.socket, input(epoch, 0), f.field, 1);
     f.service.step(10000, f.field);

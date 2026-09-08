@@ -1,15 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
+import { logger } from '../../setup/serverLogger';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
+import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
 import { DAMAGE, DEBUG, ROID } from '../../src/constants';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { getAsteroidFieldRadius, stepAsteroidMotion } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import { isDebugMode } from '../../src/utils/debugUtils';
-import { logger } from '../../setup/serverLogger';
-import { RNGService } from './RNGService';
-
-export { isBiggestAsteroid } from '../../src/entities/roid/roidScore';
+import type { RNGService } from './RNGService';
 
 export type AsteroidHitCause = 'laser' | 'collision';
 
@@ -43,7 +41,7 @@ export class AsteroidManager {
   /** Monotonic field generation; never reused after a clear in this manager. */
   private fieldGeneration = 0;
   private onRemove?: (asteroid: AsteroidData) => void;
-  
+
   // Asteroid splitting constants - can be overridden by DEBUG settings
   private readonly MIN_ASTEROID_SIZE = 10;
   private readonly SPLIT_SIZE_RATIO = 0.6; // New asteroids are 60% of original size
@@ -84,7 +82,10 @@ export class AsteroidManager {
     return asteroid;
   }
 
-  public updateAsteroid(asteroidId: string, updates: Partial<AsteroidData>): AsteroidData | undefined {
+  public updateAsteroid(
+    asteroidId: string,
+    updates: Partial<AsteroidData>
+  ): AsteroidData | undefined {
     const asteroid = this.asteroids.get(asteroidId);
     if (asteroid) {
       Object.assign(asteroid, updates);
@@ -127,7 +128,9 @@ export class AsteroidManager {
   }
 
   public clearAsteroids(): void {
-    for (const id of [...this.asteroids.keys()]) this.removeAsteroid(id);
+    for (const id of [...this.asteroids.keys()]) {
+      this.removeAsteroid(id);
+    }
     this.laserHits.clear();
   }
 
@@ -142,7 +145,9 @@ export class AsteroidManager {
     }
 
     for (const asteroid of this.asteroids.values()) {
-      if (owned?.(asteroid.id)) continue;
+      if (owned?.(asteroid.id)) {
+        continue;
+      }
       const next = stepAsteroidMotion(asteroid.position, asteroid.velocity);
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;
@@ -151,11 +156,7 @@ export class AsteroidManager {
   }
 
   /** Radial kick from a collab-split shockwave. Smaller roids move more. */
-  public applyRadialImpulse(
-    origin: Position,
-    radius: number,
-    impulse: number
-  ): number {
+  public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
     let affected = 0;
     for (const asteroid of this.asteroids.values()) {
       const next = applyShockwaveToBody(
@@ -181,7 +182,14 @@ export class AsteroidManager {
     // But if player positions are provided, we should recreate to place roids on players
     // Also recreate if we're in test mode (PLACE_ON_LOCAL_PLAYER is true)
     const isTestMode = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
-    logger.debug('AsteroidManager: isTestMode =', isTestMode, 'playerPositions.length =', playerPositions.length, 'existing asteroids =', this.asteroids.size);
+    logger.debug(
+      'AsteroidManager: isTestMode =',
+      isTestMode,
+      'playerPositions.length =',
+      playerPositions.length,
+      'existing asteroids =',
+      this.asteroids.size
+    );
     if (this.asteroids.size > 0 && playerPositions.length === 0 && !isTestMode) {
       logger.debug('AsteroidManager: Returning existing asteroids instead of recreating');
       return Array.from(this.asteroids.values());
@@ -205,7 +213,7 @@ export class AsteroidManager {
     // destroy/hit from a prior depleted field must never address a new rock.
     for (let i = 0; i < asteroidCount; i++) {
       const asteroidId = `server-asteroid-${this.managerNonce}-${generation}-${i}`;
-      
+
       // Determine position based on DEBUG settings
       let position: Position;
       if (DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER && playerPositions.length > 0) {
@@ -230,20 +238,22 @@ export class AsteroidManager {
         position = this.rng.randomPosition(bounds);
         logger.debug('Placing asteroid randomly', { index: i, position });
       }
-      
+
       const velocity = this.rng.randomVelocity(4);
 
       const material = asteroidMaterialAt(i);
       const healthValue = DAMAGE.LASER_HIT * (material === 'metal' ? 3 : 1);
       const jaggedness = material === 'rubble' ? 0.7 : 0.25;
-      const offsets = MATERIAL_OUTLINES[material].map((offset) => offset * (0.96 + this.rng.random() * 0.08));
+      const offsets = MATERIAL_OUTLINES[material].map(
+        (offset) => offset * (0.96 + this.rng.random() * 0.08)
+      );
       const vertices = offsets.length;
 
       // Determine size based on DEBUG settings
       let size: number;
       // Check if we're in test mode (when PLACE_ON_LOCAL_PLAYER is true, assume test mode)
       const isTestMode = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
-      
+
       if (DEBUG.ENABLED && DEBUG.ROIDS.ALL_LARGE && !isTestMode) {
         size = 50; // Large size
       } else if (isTestMode) {
@@ -281,7 +291,7 @@ export class AsteroidManager {
       this.asteroids.set(asteroidId, asteroid);
       newAsteroids.push(asteroid);
     }
-    
+
     return newAsteroids;
   }
 
@@ -413,7 +423,12 @@ export class AsteroidManager {
     return { destroyed: result.destroyed, newAsteroids: result.newAsteroids };
   }
 
-  private recordHit(asteroidId: string, shooterId: string, points: number, now: number): LaserHitRecord[] {
+  private recordHit(
+    asteroidId: string,
+    shooterId: string,
+    points: number,
+    now: number
+  ): LaserHitRecord[] {
     const existing = this.laserHits.get(asteroidId) ?? [];
     const windowHits = existing.filter((hit) => now - hit.at <= ROID.COLLAB_SPLIT_WINDOW_MS);
     windowHits.push({ shooterId, at: now, points });
@@ -431,9 +446,10 @@ export class AsteroidManager {
     this.removeAsteroid(asteroidId);
 
     const fragmentCount = destroyed.material === 'rubble' ? 3 : 2;
-    const canSplit = destroyed.material === 'rubble'
-      ? destroyed.size > this.minAsteroidSize * 2
-      : isBiggestAsteroid(destroyed.size);
+    const canSplit =
+      destroyed.material === 'rubble'
+        ? destroyed.size > this.minAsteroidSize * 2
+        : isBiggestAsteroid(destroyed.size);
     const newAsteroids =
       split && canSplit && this.asteroids.size + fragmentCount <= this.maxAsteroidCount
         ? this.createSplitFragments(destroyed)
@@ -460,14 +476,19 @@ export class AsteroidManager {
       const ratio = rubble ? 0.3 + i * 0.07 : this.splitSizeRatio;
       const newSize = Math.max(this.minAsteroidSize, destroyed.size * ratio);
       const offsetDistance = rubble ? newSize * 1.4 : newSize * 0.3;
-      const angle = i * Math.PI * 2 / fragmentCount + (rubble ? this.rng.random() * 0.5 : 0);
+      const angle = (i * Math.PI * 2) / fragmentCount + (rubble ? this.rng.random() * 0.5 : 0);
       const offsetX = Math.cos(angle) * offsetDistance;
       const offsetY = Math.sin(angle) * offsetDistance;
 
       const newJaggedness = Math.max(0.3, destroyed.jaggedness * 0.8);
       const newOffsets = destroyed.material
-        ? MATERIAL_OUTLINES[destroyed.material].map((offset) => offset * (0.94 + this.rng.random() * 0.12))
-        : Array.from({ length: Math.floor(this.rng.random() * 8 + 6) }, () => this.rng.random() * newJaggedness * 2 + 1 - newJaggedness);
+        ? MATERIAL_OUTLINES[destroyed.material].map(
+            (offset) => offset * (0.94 + this.rng.random() * 0.12)
+          )
+        : Array.from(
+            { length: Math.floor(this.rng.random() * 8 + 6) },
+            () => this.rng.random() * newJaggedness * 2 + 1 - newJaggedness
+          );
       const newVertices = newOffsets.length;
 
       newAsteroids.push({

@@ -1,6 +1,7 @@
 import { previewChargedReflections } from '../../shared/asteroidPhenomena';
 import { areAllied } from '../../shared/factions';
 import { consumeTickAccumulator } from '../../shared/gameClock';
+import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import type {
   AsteroidData,
   AsteroidToolAction,
@@ -71,6 +72,7 @@ import {
 } from '../physics/terrain/terrainSession';
 import { canvasManager } from '../rendering/canvas';
 import { PLAYFIELD_CLOSE_SCALE } from '../rendering/playfieldCamera';
+import { showNetworkBanner } from '../ui/networkStatus';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { setPlayView } from '../ui/uiUtils';
 import { formatGameOverText, preferDeathCause } from '../utils/deathCause';
@@ -86,10 +88,6 @@ interface AsteroidToolsSnapshotDetail {
 
 type ConstrainedMotionAction = Exclude<AsteroidToolsMotionAction, 'latch'>;
 type MotionActionDispatcher = (action: ConstrainedMotionAction, targetId?: string) => boolean;
-
-type NetworkWithMotionActions = NetworkManager & {
-  dispatchAsteroidMotionAction?: (action: ConstrainedMotionAction, targetId?: string) => boolean;
-};
 
 export class GameController {
   private static instance: GameController;
@@ -169,7 +167,7 @@ export class GameController {
 
     // Expose game controller globally for testing
     if (typeof window !== 'undefined') {
-      (window as { gameController?: GameController }).gameController = this;
+      window.gameController = this;
     }
   }
 
@@ -189,7 +187,7 @@ export class GameController {
       return;
     }
     this.asteroidToolsOverlay = AsteroidToolsOverlay.mount({
-      container: document.getElementById('gameArea') ?? undefined,
+      container: document.getElementById('gameArea') ?? document.body,
       callbacks: {
         onOpen: () => this.asteroidToolsController.setActive(true),
         onClose: () => this.asteroidToolsController.cancel(),
@@ -200,8 +198,8 @@ export class GameController {
     this.asteroidToolsOverlay.update(this.asteroidToolsController.getState());
   }
 
-  private dispatchAsteroidTool(action: AsteroidToolAction): void {
-    this.networkManager.sendMessage({
+  private dispatchAsteroidTool(action: AsteroidToolAction): boolean {
+    return this.networkManager.sendMessage({
       type: 'asteroidTool',
       data: action,
       timestamp: Date.now(),
@@ -209,12 +207,7 @@ export class GameController {
   }
 
   private dispatchAsteroidMotionAction: MotionActionDispatcher = (action, targetId) => {
-    const network = this.networkManager as NetworkWithMotionActions;
-    if (typeof network.dispatchAsteroidMotionAction === 'function') {
-      return network.dispatchAsteroidMotionAction(action, targetId);
-    }
-    logger.warn('ASTEROID_TOOLS', 'Hauler motion adapter is not connected', { action });
-    return false;
+    return this.networkManager.dispatchAsteroidMotionAction(action, targetId);
   };
 
   private applyAsteroidToolsSnapshot(event: Event): void {
@@ -233,17 +226,21 @@ export class GameController {
       update.pilot = {
         id: detail.entity.id,
         position: detail.entity.position,
-        kitId: detail.entity.kitId,
-        factionId: detail.entity.factionId,
+        ...(detail.entity.kitId !== undefined ? { kitId: detail.entity.kitId } : {}),
+        ...(detail.entity.factionId !== undefined ? { factionId: detail.entity.factionId } : {}),
         alive: !detail.entity.exploding && detail.entity.health > 0,
-        asteroidMotion: detail.entity.asteroidMotion,
-        laserUpgrade: detail.entity.laserUpgrade,
+        ...(detail.entity.asteroidMotion !== undefined
+          ? { asteroidMotion: detail.entity.asteroidMotion }
+          : {}),
+        ...(detail.entity.laserUpgrade !== undefined
+          ? { laserUpgrade: detail.entity.laserUpgrade }
+          : {}),
       };
     }
     if (detail.asteroids) {
       update.targets = this.asteroidToolsTargetsFromSnapshot(detail.asteroids);
     } else if (!detail.enabled) {
-      update.pilot = undefined;
+      delete update.pilot;
       update.targets = [];
     }
     this.asteroidToolsController.update(update);
@@ -267,8 +264,8 @@ export class GameController {
         id: asteroid.id,
         position: { ...asteroid.position },
         size: asteroid.size,
-        material: asteroid.material,
-        phenomenon: asteroid.phenomenon,
+        ...(asteroid.material !== undefined ? { material: asteroid.material } : {}),
+        ...(asteroid.phenomenon !== undefined ? { phenomenon: asteroid.phenomenon } : {}),
       });
     }
     return targets;
@@ -300,9 +297,21 @@ export class GameController {
         slot.vertices = roid.vertices;
         slot.offsets = roid.offsets;
         slot.isCollabTarget = roid.isCollabTarget;
-        slot.material = roid.material;
-        slot.phenomenon = roid.phenomenon;
-        slot.spinClass = roid.spinClass;
+        if (roid.material !== undefined) {
+          slot.material = roid.material;
+        } else {
+          delete slot.material;
+        }
+        if (roid.phenomenon !== undefined) {
+          slot.phenomenon = roid.phenomenon;
+        } else {
+          delete slot.phenomenon;
+        }
+        if (roid.spinClass !== undefined) {
+          slot.spinClass = roid.spinClass;
+        } else {
+          delete slot.spinClass;
+        }
       } else {
         this.reflectionRocks.push({
           id: roid.id,
@@ -317,9 +326,9 @@ export class GameController {
           vertices: roid.vertices,
           offsets: roid.offsets,
           isCollabTarget: roid.isCollabTarget,
-          material: roid.material,
-          phenomenon: roid.phenomenon,
-          spinClass: roid.spinClass,
+          ...(roid.material !== undefined ? { material: roid.material } : {}),
+          ...(roid.phenomenon !== undefined ? { phenomenon: roid.phenomenon } : {}),
+          ...(roid.spinClass !== undefined ? { spinClass: roid.spinClass } : {}),
         });
       }
       count += 1;
@@ -383,54 +392,55 @@ export class GameController {
   }
 
   async startGame(playerName?: string, kitId?: ShipKitId): Promise<void> {
-    logger.debug('GAME_CONTROLLER', 'startGame called', { playerName, kitId });
-    this.resetSessionForNewGame();
-    this.newGame(playerName, kitId ?? getSelectedShipKitId());
-    setPlayView(true);
-    this.ensureAsteroidToolsOverlay();
-    this.gameStateManager.setIsGameRunning(true);
-
-    // Reset button text to default state
-    this.inputManager.resetButtonText();
-
-    // Try to connect to network first
+    logger.debug('GAME_CONTROLLER', 'startGame called', { kitId });
     try {
+      this.resetSessionForNewGame();
+      this.newGame(playerName, kitId ?? getSelectedShipKitId());
+      setPlayView(true);
+      this.ensureAsteroidToolsOverlay();
+      this.gameStateManager.setIsGameRunning(true);
+
+      // Reset button text to default state
+      this.inputManager.resetButtonText();
+
+      // Connect before joining the server-owned world.
       await this.networkManager.connect();
 
-      // Add a small delay to ensure WebSocket state is fully established
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
       logger.debug('NETWORK', 'Connected to server, using server-authoritative game state');
+      // Empty belt + listeners must be ready before join so the first
+      // asteroidCreateBatch / gameState cannot land on a static local set.
+      this.currRoidBelt = entityFactory.createEmptyRoidBelt();
+      shockwaveManager.clear();
+      this.setupServerAsteroidListeners();
+      this.networkManager.initializeAsteroidSync();
+
+      // Initialize listeners
+      if (this.playerManager.getLocalPlayer()) {
+        logger.debug('GAME_CONTROLLER', 'Initializing input listeners');
+        this.inputManager.initializeListeners();
+      } else {
+        logger.warn('GAME_CONTROLLER', 'No local player found, cannot initialize input listeners');
+      }
+
+      // Begin sending continuous local player updates to server
+      PlayerNetwork.getInstance().startNetworkUpdates();
+
+      window.dispatchEvent(new CustomEvent('gameStart'));
     } catch (error) {
-      // Connection failed - this is a fatal error since we only support networked play
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.gameStateManager.setIsGameRunning(false);
+      this.networkManager.disconnect();
+      resetThrustSources();
+      setPlayView(false);
+      const reportedError = boundedDiagnosticError(error, 'Unknown connection failure');
+      const errorMessage = reportedError.message;
       const errorType = this.categorizeConnectionError(error);
 
-      logger.error('NETWORK', `Failed to connect to game server (${errorType}): ${errorMessage}`);
+      logger.error('NETWORK', 'Failed to connect to game server', reportedError, { errorType });
 
       // Show error message and stop the game - no local fallback
       this.showConnectionFailureMessage(errorType, 'Cannot connect');
       throw new Error(`Network connection failed: ${errorMessage}`);
     }
-    // Empty belt + listeners must be ready before join so the first
-    // asteroidCreateBatch / gameState cannot land on a static local set.
-    this.currRoidBelt = entityFactory.createEmptyRoidBelt();
-    shockwaveManager.clear();
-    this.setupServerAsteroidListeners();
-    this.networkManager.initializeAsteroidSync();
-
-    // Initialize listeners
-    if (this.playerManager.getLocalPlayer()) {
-      logger.debug('GAME_CONTROLLER', 'Initializing input listeners');
-      this.inputManager.initializeListeners();
-    } else {
-      logger.warn('GAME_CONTROLLER', 'No local player found, cannot initialize input listeners');
-    }
-
-    // Begin sending continuous local player updates to server
-    PlayerNetwork.getInstance().startNetworkUpdates();
-
-    window.dispatchEvent(new CustomEvent('gameStart'));
   }
 
   // Event handler methods for server asteroid synchronization
@@ -548,7 +558,7 @@ export class GameController {
     // Clear pending destruction state before removing the local row.
     roid.pendingDestruction = false;
     roid.pendingUntilMs = 0;
-    roid.taggedUntil = undefined;
+    delete roid.taggedUntil;
     this.currRoidBelt.roids.splice(index, 1);
   };
 
@@ -756,11 +766,15 @@ export class GameController {
 
         if (isGameOver) {
           // Final death - show game over message
-          logger.info('GAME', `Game over - killed by: ${deathCause}`);
+          logger.info('GAME', 'Game over', {
+            playerId: customEvent.detail.playerId,
+          });
           this.gameOver(deathCause);
         } else {
           // Life loss - death message is handled by GameLoopManager during respawn
-          logger.info('GAME', `Life lost - killed by: ${deathCause}`);
+          logger.info('GAME', 'Life lost', {
+            playerId: customEvent.detail.playerId,
+          });
         }
       } else {
         // Handle other player deaths - check if local player killed them
@@ -788,21 +802,6 @@ export class GameController {
             }
           }
         }
-      }
-    });
-
-    // Keep the old game over handler for backward compatibility
-    window.addEventListener('playerGameOver', (event) => {
-      const customEvent = event as CustomEvent<{
-        playerId: string;
-        deathCause: string;
-      }>;
-
-      // Only handle game over for local player
-      const localPlayer = this.playerManager.getLocalPlayer();
-      if (customEvent.detail.playerId === localPlayer?.id) {
-        logger.info('GAME', `Game over - killed by: ${customEvent.detail.deathCause}`);
-        this.gameOver(customEvent.detail.deathCause);
       }
     });
 
@@ -863,8 +862,10 @@ export class GameController {
       connected: this.networkManager.isConnected,
       harpoonTimer: local.ship.harpoonTimer,
       abilityActiveFrames: local.ship.abilityActiveFrames,
-      latchPos: local.ship.harpoonLatchPos,
-      liveTargetId: local.ship.harpoonTargetId,
+      ...(local.ship.harpoonLatchPos !== undefined ? { latchPos: local.ship.harpoonLatchPos } : {}),
+      ...(local.ship.harpoonTargetId !== undefined
+        ? { liveTargetId: local.ship.harpoonTargetId }
+        : {}),
     };
   }
 
@@ -914,6 +915,12 @@ export class GameController {
 
   getIsGameRunning(): boolean {
     return this.gameStateManager.getIsGameRunning();
+  }
+
+  /** Stop a broken frame from repeating while the visible restart notice is shown. */
+  stopAfterFrameFailure(): void {
+    this.gameStateManager.setIsGameRunning(false);
+    PlayerNetwork.getInstance().stopNetworkUpdates();
   }
 
   toggleIsGameRunning(): void {
@@ -1026,10 +1033,7 @@ export class GameController {
         message = `Connection failed: ${reason}.`;
     }
 
-    // Show user feedback - could be enhanced with toast/modal system
-    logger.warn('NETWORK', message);
-    // TODO: Implement proper UI feedback (toast/modal with retry button)
-    // this.uiManager.showToast(message, { action: 'Retry', onAction: () => this.retryConnection() });
+    showNetworkBanner(`${message} Select Enter Game to try again.`);
   }
 
   private setupNetworkDisconnectionHandler(): void {
@@ -1060,7 +1064,7 @@ export class GameController {
       );
 
       // Only stop the game when reconnection has permanently failed
-      this.gameStateManager.toggleIsGameRunning();
+      this.gameStateManager.setIsGameRunning(false);
       resetThrustSources();
       setPlayView(false);
 
@@ -1084,7 +1088,6 @@ export class GameController {
     this.lifecycleAccumulatorMs = remainingMs;
 
     tickTouchControls(currPlayer);
-    this.publishLiveHarpoonField(currPlayer);
     currPlayer.ship.update(lifecycleFrames);
     shockwaveManager.update();
 
@@ -1151,7 +1154,7 @@ export class GameController {
     return {
       bodies: collectPlayHarpoonField(rocks, ships),
       playfieldScale,
-      canvas: canvas ? { width: canvas.width, height: canvas.height } : undefined,
+      ...(canvas ? { canvas: { width: canvas.width, height: canvas.height } } : {}),
     };
   }
 
@@ -1180,13 +1183,17 @@ export class GameController {
         existing.ship = player.ship;
         existing.id = player.id;
         existing.type = player.type;
-        existing.faction = player.factionId;
+        if (player.factionId !== undefined) {
+          existing.faction = player.factionId;
+        } else {
+          delete existing.faction;
+        }
       } else {
         this.laserTargets[count] = {
           ship: player.ship,
           id: player.id,
           type: player.type,
-          faction: player.factionId,
+          ...(player.factionId !== undefined ? { faction: player.factionId } : {}),
         };
       }
       count += 1;
@@ -1220,13 +1227,17 @@ export class GameController {
       incoming.ship = currPlayer.ship;
       incoming.id = attackerId;
       incoming.type = 'local';
-      incoming.faction = currPlayer.factionId;
+      if (currPlayer.factionId !== undefined) {
+        incoming.faction = currPlayer.factionId;
+      } else {
+        delete incoming.faction;
+      }
     } else {
       this.incomingLocalTarget[0] = {
         ship: currPlayer.ship,
         id: attackerId,
         type: 'local',
-        faction: currPlayer.factionId,
+        ...(currPlayer.factionId !== undefined ? { faction: currPlayer.factionId } : {}),
       };
     }
 
@@ -1244,7 +1255,11 @@ export class GameController {
       }
       const ownerType = player.type;
       this.laserHitOptions.reportAsteroidHits = shouldReportLaserAsteroidHit(ownerType);
-      this.laserHitOptions.attackerFaction = player.factionId;
+      if (player.factionId !== undefined) {
+        this.laserHitOptions.attackerFaction = player.factionId;
+      } else {
+        delete this.laserHitOptions.attackerFaction;
+      }
       const ownerAttackerId = ownerType === 'local' ? attackerId : player.id;
       // Human shooters report their own hits. Bots have no shooter client, so
       // incoming bot lasers use the same hull check against the local ship.

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { LOCAL_STORAGE_KEYS } from '../../../../src/constants/user-preferences';
 import { Player } from '../../../../src/entities/player/Player';
-import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { Ship } from '../../../../src/entities/ship/Ship';
 import { resetControlSources } from '../../../../src/input/controlSources';
+import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import {
   handleMouseDown,
   handleMouseMove,

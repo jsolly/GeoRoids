@@ -25,12 +25,10 @@ describe('collab-split shockwave impulse', () => {
   });
 
   test('radial impulse pushes away from the origin', () => {
-    const impulse = computeRadialImpulse(
-      { x: 0, y: 0 },
-      { x: 40, y: 0 },
-      12,
-      { radius: 150, impulse: 4 }
-    );
+    const impulse = computeRadialImpulse({ x: 0, y: 0 }, { x: 40, y: 0 }, 12, {
+      radius: 150,
+      impulse: 4,
+    });
     expect(impulse).toBeTruthy();
     expect(impulse!.x).toBeGreaterThan(0);
     expect(impulse!.y).toBeCloseTo(0);

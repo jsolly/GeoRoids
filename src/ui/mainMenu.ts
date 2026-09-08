@@ -1,7 +1,4 @@
-// Console overrides and error handling are now handled by logLevel.ts which loads first
-
 import { setSound } from '../audio/Sound';
-// Simple logging - removed complex logger dependency
 import { GameController } from '../core/gameController';
 import { initTitleStarfield } from '../rendering/starfield';
 import { getBuildInfoString } from '../utils/buildInfo';
@@ -116,16 +113,18 @@ function generateFunNickname(): string {
 
 // Set up game button - directly start game with nickname input
 attachEventListener(startGameBtn, 'click', () => {
-  startGameWithName();
+  void startGameWithName();
 });
 
 // Function to start game with the entered name
-function startGameWithName(): void {
+let startingGame = false;
+async function startGameWithName(): Promise<void> {
+  if (startingGame) {
+    return;
+  }
   let playerName = '';
 
   logger.debug('UI', 'startGameWithName called');
-  logger.debug('UI', `Input value: ${playerNameInput?.value}`);
-  logger.debug('UI', `Input value trimmed: ${playerNameInput?.value.trim()}`);
 
   if (playerNameInput?.value.trim()) {
     const playerNameRaw = playerNameInput.value.trim();
@@ -137,13 +136,13 @@ function startGameWithName(): void {
     // Validate player name (alphanumeric only)
     playerName = validatedName.replace(/[^A-Za-z0-9]/g, '');
 
-    logger.debug('UI', `Using user-entered name: ${playerName}`);
+    logger.debug('UI', 'Using validated player name', { source: 'user' });
   }
 
   // If no valid name entered, use the pre-generated nickname
   if (!playerName) {
     playerName = generatedNickname;
-    logger.debug('UI', `Using pre-generated nickname: ${playerName}`);
+    logger.debug('UI', 'Using generated player name', { source: 'generated' });
 
     // Update the input field to show the nickname
     if (playerNameInput) {
@@ -157,21 +156,33 @@ function startGameWithName(): void {
     }
   }
 
-  logger.debug('UI', `Final player name: ${playerName}`);
-  logger.debug('UI', `About to call getGameController().startGame(${playerName})`);
+  logger.debug('UI', 'Starting game with selected identity', { nameLength: playerName.length });
 
   // Update button state
   startGameBtn?.classList.add('active-mode');
 
-  // Start the game (this will set the player name)
-  getGameController().startGame(playerName, getSelectedShipKitId());
+  startingGame = true;
+  if (startGameBtn) {
+    startGameBtn.disabled = true;
+  }
+  try {
+    await getGameController().startGame(playerName, getSelectedShipKitId());
+  } catch {
+    // GameController restores the menu, logs the cause and displays the retry banner.
+    startGameBtn?.classList.remove('active-mode');
+  } finally {
+    startingGame = false;
+    if (startGameBtn) {
+      startGameBtn.disabled = false;
+    }
+  }
 }
 
 // Set up player name input to allow Enter key to start game
 if (playerNameInput) {
   attachEventListener(playerNameInput, 'keydown', (ev) => {
     if ((ev as KeyboardEvent).key === 'Enter') {
-      startGameWithName();
+      void startGameWithName();
     }
   });
 
@@ -217,5 +228,5 @@ const generatedNickname = generateFunNickname();
 // Set the generated nickname as placeholder
 if (playerNameInput) {
   playerNameInput.placeholder = generatedNickname;
-  logger.debug('UI', `Set placeholder nickname: ${generatedNickname}`);
+  logger.debug('UI', 'Set generated name placeholder');
 }

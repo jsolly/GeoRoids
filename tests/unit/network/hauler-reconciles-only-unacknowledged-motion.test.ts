@@ -55,7 +55,9 @@ describe('the local Hauler reconciles pending commands against its server motion
       velocity: { ...acknowledged.velocity },
       angle: acknowledged.angle,
     };
-    if (!second) throw new Error('Missing pending input');
+    if (!second) {
+      throw new Error('Missing pending input');
+    }
     stepReleasedMotion(expected, second, 4 / 60, 380, 1);
     ship.position.x = -999;
     prediction.rebase(
@@ -96,7 +98,9 @@ describe('the local Hauler reconciles pending commands against its server motion
       velocity: { ...ship.velocity },
       angle: ship.angle,
     };
-    if (!move) throw new Error('Missing command');
+    if (!move) {
+      throw new Error('Missing command');
+    }
     stepReleasedMotion(before, move, 4 / 60, 380, 1);
     prediction.predictFrame(ship, 0);
     expect(ship.position).toEqual(before.position);
@@ -272,7 +276,9 @@ describe('the local Hauler reconciles pending commands against its server motion
     expect(() =>
       prediction.rebase(row({ asteroidMotion: { epoch: 2, mode: 'handoff', ack: 0 } }), ship, 1)
     ).toThrow(RangeError);
-    expect(() => prediction.rebase(row({ asteroidMotion: undefined }), ship, 1)).toThrow(/omitted/);
+    const missingMotion = row();
+    delete missingMotion.asteroidMotion;
+    expect(() => prediction.rebase(missingMotion, ship, 1)).toThrow(/omitted/);
     expect(() => prediction.buildInput(ship, 1, { aimAngle: Infinity })).toThrow(RangeError);
     expect(prediction.buildInput(ship, 1)?.sequence).toBe(1);
   });

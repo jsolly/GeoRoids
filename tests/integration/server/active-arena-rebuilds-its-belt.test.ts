@@ -1,8 +1,8 @@
 import { once } from 'node:events';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import WebSocket from 'ws';
-import type { AsteroidData } from '../../../shared-types';
 import { createServerInstance } from '../../../server/createServer';
+import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 
 type Message = {
@@ -26,7 +26,10 @@ afterEach(async () => {
   await server.close();
 });
 
-function waitForMessage(socket: WebSocket, matches: (message: Message) => boolean): Promise<Message> {
+function waitForMessage(
+  socket: WebSocket,
+  matches: (message: Message) => boolean
+): Promise<Message> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       socket.off('message', onMessage);
@@ -34,7 +37,9 @@ function waitForMessage(socket: WebSocket, matches: (message: Message) => boolea
     }, 5000);
     function onMessage(raw: WebSocket.RawData): void {
       const message = JSON.parse(String(raw)) as Message;
-      if (!matches(message)) return;
+      if (!matches(message)) {
+        return;
+      }
       clearTimeout(timeout);
       socket.off('message', onMessage);
       resolve(message);
@@ -48,9 +53,14 @@ async function join(id: string): Promise<WebSocket> {
   sockets.push(socket);
   await once(socket, 'open');
   const joined = waitForMessage(socket, (message) => message.type === 'joined');
-  socket.send(JSON.stringify({
-    type: 'join', id, data: { name: id, position: { x: 0, y: 0 } }, timestamp: Date.now(),
-  }));
+  socket.send(
+    JSON.stringify({
+      type: 'join',
+      id,
+      data: { name: id, position: { x: 0, y: 0 } },
+      timestamp: Date.now(),
+    })
+  );
   await joined;
   return socket;
 }
@@ -70,7 +80,9 @@ test('two pilots receive a new belt after depletion without sending asteroid ini
 
   // Simulate depletion at the internal world seam; clients cannot manufacture
   // this state with an init request. The normal running loop must refill it.
-  for (const asteroid of initial) server.gameEngine.removeAsteroid(asteroid.id);
+  for (const asteroid of initial) {
+    server.gameEngine.removeAsteroid(asteroid.id);
+  }
   const [a, b] = await Promise.all([firstView, secondView]);
   expect(a.data.asteroids?.map((asteroid) => asteroid.id).sort()).toEqual(
     b.data.asteroids?.map((asteroid) => asteroid.id).sort()
@@ -81,17 +93,26 @@ test('two pilots receive a new belt after depletion without sending asteroid ini
 test('a pilot briefly disconnects and rejoins the same live field while its peer keeps playing', async () => {
   const first = await join('rejoin-pilot-a');
   const second = await join('rejoin-pilot-b');
-  const ids = server.gameEngine.getAllAsteroids().map((asteroid) => asteroid.id).sort();
-  const peerLeft = waitForMessage(second, (message) =>
-    message.type === 'playerLeft' && message.data.id === 'rejoin-pilot-a'
+  const ids = server.gameEngine
+    .getAllAsteroids()
+    .map((asteroid) => asteroid.id)
+    .sort();
+  const peerLeft = waitForMessage(
+    second,
+    (message) => message.type === 'playerLeft' && message.data.id === 'rejoin-pilot-a'
   );
   first.close();
   await peerLeft;
   const rejoined = await join('rejoin-pilot-a');
   const response = waitForMessage(rejoined, (message) => message.type === 'asteroidCreateBatch');
-  rejoined.send(JSON.stringify({
-    type: 'initAsteroids', id: 'rejoin-pilot-a', data: { asteroidCount: 999999 }, timestamp: Date.now(),
-  }));
+  rejoined.send(
+    JSON.stringify({
+      type: 'initAsteroids',
+      id: 'rejoin-pilot-a',
+      data: { asteroidCount: 999999 },
+      timestamp: Date.now(),
+    })
+  );
   const batch = await response;
   expect(batch.data.asteroids?.map((asteroid) => asteroid.id).sort()).toEqual(ids);
   expect(server.gameEngine.isGamePaused()).toBe(false);

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { ServerLogLevel, resolveServerLogLevel } from '../../../setup/serverLogger';
+import { resolveServerLogLevel, ServerLogLevel } from '../../../setup/serverLogger';
 
 test('production defaults to INFO so 30 Hz game-state debug stays off', () => {
   expect(resolveServerLogLevel({ NODE_ENV: 'production' })).toBe(ServerLogLevel.INFO);

@@ -7,9 +7,9 @@ import type { RNGService } from '../core/RNGService';
 import {
   headingTo,
   laserSpeedPerFrame,
+  STEER_IN_RADIUS,
   shipTurnPerFrame,
   shortestAngleDelta,
-  STEER_IN_RADIUS,
   turnToward,
 } from './shipMotion';
 
@@ -87,10 +87,7 @@ export function chooseTarget(bot: Combatant, humans: Combatant[]): Combatant | n
     if (!isCombatantAlive(human) || !canDealCombatDamage(bot.factionId, human.factionId)) {
       continue;
     }
-    const dist = Math.hypot(
-      human.position.x - bot.position.x,
-      human.position.y - bot.position.y
-    );
+    const dist = Math.hypot(human.position.x - bot.position.x, human.position.y - bot.position.y);
     if (dist < bestDist) {
       best = human;
       bestDist = dist;
@@ -136,11 +133,7 @@ export function interceptTime(
   return Math.min(...hits);
 }
 
-export function leadAimPoint(
-  shooter: Combatant,
-  target: Combatant,
-  leadScale: number
-): Position {
+export function leadAimPoint(shooter: Combatant, target: Combatant, leadScale: number): Position {
   const relPos = {
     x: target.position.x - shooter.position.x,
     y: target.position.y - shooter.position.y,
@@ -174,7 +167,8 @@ export function createBotMemory(rng: Pick<RNGService, 'random'>, heading: number
     nextFireTick: Number.POSITIVE_INFINITY,
     wasAligned: false,
     aimBias: (rng.random() - 0.5) * 2 * BOT_AI.AIM_JITTER_MAX,
-    leadScale: BOT_AI.LEAD_SCALE_MIN + rng.random() * (BOT_AI.LEAD_SCALE_MAX - BOT_AI.LEAD_SCALE_MIN),
+    leadScale:
+      BOT_AI.LEAD_SCALE_MIN + rng.random() * (BOT_AI.LEAD_SCALE_MAX - BOT_AI.LEAD_SCALE_MIN),
     wanderAngle: heading,
   };
 }
@@ -199,10 +193,7 @@ export function decideBotAction(
   } else if (target) {
     const aim = leadAimPoint(bot, target, memory.leadScale);
     desired = headingTo(bot.position, aim) + memory.aimBias;
-    range = Math.hypot(
-      target.position.x - bot.position.x,
-      target.position.y - bot.position.y
-    );
+    range = Math.hypot(target.position.x - bot.position.x, target.position.y - bot.position.y);
   } else if (rng.random() < 0.04) {
     memory.wanderAngle += (rng.random() - 0.5) * 0.5;
     desired = memory.wanderAngle;
@@ -227,9 +218,7 @@ export function decideBotAction(
   }
 
   const alignedForFire =
-    !!target &&
-    range <= BOT_AI.ENGAGE_RANGE &&
-    Math.abs(angleError) <= fireAlignThreshold(range);
+    !!target && range <= BOT_AI.ENGAGE_RANGE && Math.abs(angleError) <= fireAlignThreshold(range);
 
   if (alignedForFire && !memory.wasAligned) {
     memory.nextFireTick = memory.ticks + BOT_AI.REACTION_TICKS;
@@ -262,7 +251,9 @@ export function decideBotAction(
   return { angle: nextAngle, thrusting, fire };
 }
 
-export function makeBotShot(bot: Pick<GameEntity, 'id' | 'position' | 'velocity' | 'angle'>): BotShot {
+export function makeBotShot(
+  bot: Pick<GameEntity, 'id' | 'position' | 'velocity' | 'angle'>
+): BotShot {
   const speed = laserSpeedPerFrame();
   return {
     botId: bot.id,
@@ -287,11 +278,7 @@ export class BotBrain {
     return state;
   }
 
-  decide(
-    bot: GameEntity,
-    humans: Combatant[],
-    rng: Pick<RNGService, 'random'>
-  ): BotDecision {
+  decide(bot: GameEntity, humans: Combatant[], rng: Pick<RNGService, 'random'>): BotDecision {
     const memory = this.remember(bot.id, rng, bot.angle);
     const target = chooseTarget(bot, humans);
     return decideBotAction(bot, target, memory, rng);

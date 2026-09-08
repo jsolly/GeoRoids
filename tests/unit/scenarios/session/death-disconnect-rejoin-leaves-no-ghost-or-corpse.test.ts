@@ -3,8 +3,8 @@ import { DAMAGE } from '../../../../src/constants';
 import {
   FakeSocket,
   GameServerWorld,
-  useQuietServerConsole,
   type Pilot,
+  useQuietServerConsole,
 } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -38,12 +38,15 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     expect(world.entity(ace).health).toBe(0);
 
     const socket = new FakeSocket();
-    world.send({ id: ace.id, name: ace.name, socket }, {
-      type: 'join',
-      id: ace.id,
-      name: ace.name,
-      data: { name: ace.name, position: { x: 0, y: 0 } },
-    });
+    world.send(
+      { id: ace.id, name: ace.name, socket },
+      {
+        type: 'join',
+        id: ace.id,
+        name: ace.name,
+        data: { name: ace.name, position: { x: 0, y: 0 } },
+      }
+    );
 
     const ship = world.entity(ace);
     expect(ship.health).toBe(ship.maxHealth);
@@ -110,12 +113,15 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     world.disconnect(ace);
 
     const socket = new FakeSocket();
-    world.send({ id: ace.id, name: ace.name, socket }, {
-      type: 'join',
-      id: ace.id,
-      name: ace.name,
-      data: { name: ace.name, position: { x: 0, y: 0 } },
-    });
+    world.send(
+      { id: ace.id, name: ace.name, socket },
+      {
+        type: 'join',
+        id: ace.id,
+        name: ace.name,
+        data: { name: ace.name, position: { x: 0, y: 0 } },
+      }
+    );
 
     const ship = world.entity(ace);
     expect(ship.lives).toBe(livesAfterDeath);

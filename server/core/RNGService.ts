@@ -5,7 +5,7 @@ export class RNGService {
 
   constructor(serverSeed?: number) {
     // Store the initial seed for reset functionality
-    this.initialSeed = RNGService.toUint32(serverSeed ?? 0x9E3779B9); // Default seed, normalized to unsigned 32-bit
+    this.initialSeed = RNGService.toUint32(serverSeed ?? 0x9e3779b9); // Default seed, normalized to unsigned 32-bit
     this.rngState = this.initialSeed;
   }
 
@@ -19,7 +19,7 @@ export class RNGService {
 
   // Seeded random number generator (mulberry32)
   public random(): number {
-    this.rngState = (this.rngState + 0x6D2B79F5) >>> 0;
+    this.rngState = (this.rngState + 0x6d2b79f5) >>> 0;
     let t = this.rngState;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -32,7 +32,10 @@ export class RNGService {
   }
 
   // Get random position within bounds (supports both rectangular and circular)
-  public randomPosition(bounds: { width?: number; height?: number; radius?: number }): { x: number; y: number } {
+  public randomPosition(bounds: { width?: number; height?: number; radius?: number }): {
+    x: number;
+    y: number;
+  } {
     if (bounds.radius) {
       // Circular boundary
       const angle = this.random() * Math.PI * 2;
@@ -80,7 +83,7 @@ export class RNGService {
 
   // Create a new RNGService instance with the provided seed or derived from current state
   public fork(seed?: number): RNGService {
-    const newSeed = seed !== undefined ? seed : this.random() * 0xFFFFFFFF;
+    const newSeed = seed !== undefined ? seed : this.random() * 0xffffffff;
     return new RNGService(RNGService.toUint32(newSeed));
   }
 }

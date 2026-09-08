@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { DEBUG } from '../../../src/constants';
 
@@ -33,7 +33,7 @@ describe('Roid Placement Integration Tests', () => {
 
         // Get player positions
         const players = gameEngine.getAllPlayers();
-        const playerPositions = players.map(player => player.position);
+        const playerPositions = players.map((player) => player.position);
 
         expect(playerPositions).toHaveLength(1);
         expect(playerPositions[0]).toEqual(playerPosition);
@@ -41,7 +41,7 @@ describe('Roid Placement Integration Tests', () => {
         // Create bots at specific positions
         const botPositions = [
           { x: 300, y: 400 },
-          { x: 500, y: 600 }
+          { x: 500, y: 600 },
         ];
 
         // Create bots (this will add them to the game engine)
@@ -49,14 +49,20 @@ describe('Roid Placement Integration Tests', () => {
         expect(bots).toHaveLength(2);
 
         // Create asteroids with player and bot positions
-        const asteroids = gameEngine.createAsteroids(5, { radius: 3100 }, botPositions, playerPositions);
+        const asteroids = gameEngine.createAsteroids(
+          5,
+          { radius: 3100 },
+          botPositions,
+          playerPositions
+        );
 
         expect(asteroids).toHaveLength(5);
 
         // Check if any asteroids are placed on player positions
-        const asteroidsOnPlayer = asteroids.filter(asteroid =>
-          Math.abs(asteroid.position.x - playerPosition.x) < 10 &&
-          Math.abs(asteroid.position.y - playerPosition.y) < 10
+        const asteroidsOnPlayer = asteroids.filter(
+          (asteroid) =>
+            Math.abs(asteroid.position.x - playerPosition.x) < 10 &&
+            Math.abs(asteroid.position.y - playerPosition.y) < 10
         );
 
         // With PLACE_ROID_ON_LOCAL_PLAYER enabled, we should have at least one asteroid on the player
@@ -75,19 +81,20 @@ describe('Roid Placement Integration Tests', () => {
         const playerId = 'test-player-2';
         const playerName = 'TestPlayer2';
         const playerPosition = { x: 150, y: 250 };
-        
+
         const mockWs = {} as any;
         gameEngine.addPlayer(playerId, playerName, mockWs, playerPosition);
 
         const players = gameEngine.getAllPlayers();
-        const playerPositions = players.map(player => player.position);
-        
+        const playerPositions = players.map((player) => player.position);
+
         const asteroids = gameEngine.createAsteroids(3, { radius: 3100 }, [], playerPositions);
-        
+
         // Check if any asteroids are placed on player positions
-        const asteroidsOnPlayer = asteroids.filter(asteroid => 
-          Math.abs(asteroid.position.x - playerPosition.x) < 10 &&
-          Math.abs(asteroid.position.y - playerPosition.y) < 10
+        const asteroidsOnPlayer = asteroids.filter(
+          (asteroid) =>
+            Math.abs(asteroid.position.x - playerPosition.x) < 10 &&
+            Math.abs(asteroid.position.y - playerPosition.y) < 10
         );
 
         // With PLACE_ROID_ON_LOCAL_PLAYER disabled, we should have no asteroids on the player
@@ -104,22 +111,23 @@ describe('Roid Placement Integration Tests', () => {
 
       const botPositions = [
         { x: 100, y: 200 },
-        { x: 300, y: 400 }
+        { x: 300, y: 400 },
       ];
-      
+
       // Create bots
       const bots = gameEngine.createBots(2);
       expect(bots).toHaveLength(2);
 
       const asteroids = gameEngine.createAsteroids(4, { radius: 3100 }, botPositions, []);
-      
+
       expect(asteroids).toHaveLength(4);
 
       // Check if any asteroids are placed on bot positions
-      const asteroidsOnBots = asteroids.filter(asteroid => 
-        botPositions.some(botPos => 
-          Math.abs(asteroid.position.x - botPos.x) < 10 &&
-          Math.abs(asteroid.position.y - botPos.y) < 10
+      const asteroidsOnBots = asteroids.filter((asteroid) =>
+        botPositions.some(
+          (botPos) =>
+            Math.abs(asteroid.position.x - botPos.x) < 10 &&
+            Math.abs(asteroid.position.y - botPos.y) < 10
         )
       );
 
@@ -130,17 +138,15 @@ describe('Roid Placement Integration Tests', () => {
 
   describe('Explicit field creation', () => {
     it('honors the requested count without player-position hints', () => {
-      
       const asteroids = gameEngine.createAsteroids(10, { radius: 3100 }, [], []);
-      
+
       expect(asteroids).toHaveLength(10);
-      
+
       // Verify no asteroids are at origin (0,0) where players typically spawn
-      const asteroidsAtOrigin = asteroids.filter(asteroid => 
-        Math.abs(asteroid.position.x) < 10 &&
-        Math.abs(asteroid.position.y) < 10
+      const asteroidsAtOrigin = asteroids.filter(
+        (asteroid) => Math.abs(asteroid.position.x) < 10 && Math.abs(asteroid.position.y) < 10
       );
-      
+
       // This should be 0 or very few since we're not placing on players
       expect(asteroidsAtOrigin.length).toBeLessThan(3);
     });

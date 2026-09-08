@@ -4,6 +4,22 @@
 /** Soft sides for readability + same-side cooperation. Not a team win condition. */
 export type FactionId = 'ion' | 'ember';
 
+export type DiagnosticLogRecord = {
+  version: 1;
+  timestamp: string;
+  source: 'client' | 'server';
+  level: 'debug' | 'info' | 'warn' | 'error';
+  releaseId: string;
+  message: string;
+  category?: string;
+  context?: Record<string, unknown>;
+  sessionId?: string;
+  playerId?: string;
+  connectionId?: string;
+  receivedAt?: string;
+  receiverReleaseId?: string;
+};
+
 // Common position and velocity types used throughout the system
 export interface Position {
   x: number;
@@ -57,6 +73,8 @@ export interface PlayerJoin {
   asteroidInteractions?: 1;
   /** Private to the joined socket; never included in world snapshots. */
   resumeToken?: string;
+  /** Private server build identifier for correlating client and server diagnostics. */
+  serverReleaseId?: string;
   id: string;
   name: string;
   position: Position;

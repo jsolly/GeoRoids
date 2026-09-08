@@ -1,25 +1,18 @@
-# Sanity Tests
+# Game and interface scenarios
 
-This folder contains browser integration tests for basic game functionality and sanity checks.
+Follow [the test-writing guide](../../../AGENTS.ms) and
+[browser execution guidance](../README.md).
 
-## Test Files
+These scenarios cover startup, movement, touch controls, rendered HUD behavior,
+and recovery from connection or release changes. A test should describe one
+player action and its visible result.
 
-- **sanity.test.ts** - Basic sanity tests to verify game initialization and core functionality
+Use model state to synchronize setup, then prove the interface named by the
+scenario. For example, a leaderboard test must observe the drawn row; reading a
+score from the network model alone cannot show that the row fits or updates.
 
-## Test Coverage
+Run from the repository root:
 
-- Game initialization
-- Basic game state verification
-- Core game mechanics validation
-- Server connectivity
-- Basic UI functionality
-
-## Dependencies
-
-These tests use the browser test infrastructure:
-
-- BrowserManager for browser automation
-- ScreenshotManager for test documentation
-- GameInteractions for game control
-- TestConfig for test configuration
-- HealthChecker for server health validation
+```bash
+./scripts/test-runner.sh tests/integration/browser/sanity/ --reporter=verbose
+```

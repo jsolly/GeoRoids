@@ -1,219 +1,305 @@
-// Client log forwarder: streams individual log messages to server via WebSocket
-// Used by Logger.ts for structured logging
-
-import { logger } from './Logger';
+import {
+  createLogRecord,
+  LOG_LINE_MAX_BYTES,
+  parseLogRecord,
+  stringifyLogRecord,
+} from '../../shared/logRecords';
+import { getClientLogContext } from './clientLogContext';
 import { logsWebSocketUrlFromGameplay } from './logsWebSocketUrl';
-import { getStoredItem, setStoredItem } from './safeStorage';
 
-type ClientLogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+type QueuedLine = { line: string; bytes: number };
 
-let sessionId: string | null = null;
 let ws: WebSocket | null = null;
-let messageQueue: string[] = [];
+let messageQueue: QueuedLine[] = [];
+let queuedBytes = 0;
 let reconnectTimer: number | null = null;
-let isConnecting = false; // Prevent multiple simultaneous connection attempts
-let isInitialized = false; // Track if forwarder has been started
-let connectionLock: Promise<void> | null = null;
-
-// Maximum queue size to prevent unbounded memory growth
-const MAX_QUEUE_SIZE = 1000;
+let handshakeTimer: number | null = null;
+let isInitialized = false;
 let droppedMessageCount = 0;
+let reportedDroppedMessageCount = 0;
+let transportFailureReported = false;
 
-function getSessionId(): string {
-  if (sessionId) {
-    return sessionId;
+const MAX_QUEUE_BYTES = 256 * 1024;
+const RECONNECT_DELAY_MS = 5000;
+const HANDSHAKE_TIMEOUT_MS = 10_000;
+const MAX_SOCKET_BUFFERED_BYTES = 64 * 1024;
+
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function safePageUrl(): string {
+  try {
+    const url = new URL(location.href);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '/';
   }
-  const key = 'geoasteroids-session-id';
-  sessionId = getStoredItem(key);
-  if (!sessionId) {
-    sessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    setStoredItem(key, sessionId);
+}
+
+function normalizeLine(line: string): QueuedLine {
+  let normalized = line;
+  if (byteLength(normalized) > LOG_LINE_MAX_BYTES) {
+    const parsed = parseLogRecord(line);
+    normalized = stringifyLogRecord(
+      createLogRecord({
+        timestamp: parsed?.timestamp ?? new Date().toISOString(),
+        source: 'client',
+        level: parsed?.level ?? 'warn',
+        releaseId: parsed?.releaseId ?? import.meta.env['VITE_COMMIT_HASH'] ?? 'dev',
+        category: parsed?.category ?? 'LOG_FORWARD',
+        message: parsed?.message ?? 'Oversized legacy client log',
+        context: { truncated: true },
+        ...getClientLogContext(),
+      })
+    );
   }
-  return sessionId;
+  return { line: normalized, bytes: byteLength(normalized) };
+}
+
+function enqueue(item: QueuedLine, front = false): void {
+  if (item.bytes > MAX_QUEUE_BYTES) {
+    droppedMessageCount++;
+    return;
+  }
+  while (queuedBytes + item.bytes > MAX_QUEUE_BYTES && messageQueue.length > 0) {
+    const dropped = messageQueue.shift();
+    queuedBytes -= dropped?.bytes ?? 0;
+    droppedMessageCount++;
+  }
+  if (front) {
+    messageQueue.unshift(item);
+  } else {
+    messageQueue.push(item);
+  }
+  queuedBytes += item.bytes;
+  if (droppedMessageCount % 100 === 1) {
+    reportTransportFailure('Client log queue dropped records before delivery', {
+      droppedMessageCount,
+      queuedBytes,
+    });
+  }
+}
+
+function reportTransportFailure(message: string, context?: Record<string, unknown>): void {
+  if (transportFailureReported) {
+    return;
+  }
+  transportFailureReported = true;
+  try {
+    console.warn(`[LOG_FORWARD] ${message}`, context ?? {});
+  } catch {
+    // A broken console must not interrupt gameplay.
+  }
+}
+
+function clearHandshakeTimer(): void {
+  if (handshakeTimer !== null) {
+    clearTimeout(handshakeTimer);
+    handshakeTimer = null;
+  }
 }
 
 export function getLogsWebSocketUrl(): string {
+  return logsWebSocketUrlFromGameplay(
+    import.meta.env.VITE_WEBSOCKET_URL,
+    location.host || location.hostname || 'localhost:3001',
+    location.protocol === 'https:'
+  );
+}
+
+function scheduleReconnect(): void {
+  if (!isInitialized || reconnectTimer !== null) {
+    return;
+  }
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = null;
+    connectWebSocket();
+  }, RECONNECT_DELAY_MS);
+}
+
+function retireSocket(socket: WebSocket): void {
+  if (ws !== socket) {
+    return;
+  }
+  clearHandshakeTimer();
+  ws = null;
+  socket.onopen = null;
+  socket.onerror = null;
+  socket.onclose = null;
   try {
-    const gameplay =
-      typeof import.meta !== 'undefined'
-        ? (import.meta.env?.VITE_WEBSOCKET_URL as string | undefined)
-        : undefined;
-    const isSecure = typeof location !== 'undefined' && location.protocol === 'https:';
-    const host =
-      typeof location !== 'undefined' ? location.host || location.hostname : 'localhost:3001';
-    return logsWebSocketUrlFromGameplay(gameplay, host, isSecure);
+    socket.close();
   } catch {
-    return 'ws://localhost:3001/logs';
+    // The reconnect below preserves queued evidence.
+  }
+  scheduleReconnect();
+}
+
+function wirePayload(item: QueuedLine): string {
+  const record = parseLogRecord(item.line);
+  const context = getClientLogContext();
+  return JSON.stringify({
+    type: 'clientLog',
+    timestamp: Date.now(),
+    data: {
+      sessionId: record?.sessionId ?? context.sessionId,
+      level: record?.level ?? 'info',
+      line: item.line,
+      userAgent: navigator.userAgent,
+      pageUrl: safePageUrl(),
+    },
+  });
+}
+
+function trySend(socket: WebSocket, item: QueuedLine): boolean {
+  if (socket.bufferedAmount > MAX_SOCKET_BUFFERED_BYTES) {
+    reportTransportFailure('Log transport backpressure; retaining records for reconnect', {
+      bufferedBytes: socket.bufferedAmount,
+    });
+    retireSocket(socket);
+    return false;
+  }
+  try {
+    socket.send(wirePayload(item));
+    transportFailureReported = false;
+    return true;
+  } catch (error) {
+    reportTransportFailure('Failed to send client log; retaining it for reconnect', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    retireSocket(socket);
+    return false;
+  }
+}
+
+function sendLossTelemetry(socket: WebSocket): boolean {
+  if (droppedMessageCount === reportedDroppedMessageCount) {
+    return true;
+  }
+  const item = normalizeLine(
+    stringifyLogRecord(
+      createLogRecord({
+        timestamp: new Date().toISOString(),
+        source: 'client',
+        level: 'warn',
+        releaseId: import.meta.env['VITE_COMMIT_HASH'] ?? 'dev',
+        category: 'STATE',
+        message: 'Client log records dropped before delivery',
+        context: {
+          droppedRecords: droppedMessageCount,
+          droppedSinceLastReport: droppedMessageCount - reportedDroppedMessageCount,
+        },
+        ...getClientLogContext(),
+      })
+    )
+  );
+  if (!trySend(socket, item)) {
+    return false;
+  }
+  reportedDroppedMessageCount = droppedMessageCount;
+  return true;
+}
+
+function flushQueue(socket: WebSocket): void {
+  while (ws === socket && socket.readyState === WebSocket.OPEN && messageQueue.length > 0) {
+    const item = messageQueue[0];
+    if (!item || !trySend(socket, item)) {
+      return;
+    }
+    messageQueue.shift();
+    queuedBytes -= item.bytes;
   }
 }
 
 function connectWebSocket(): void {
-  // Prevent multiple simultaneous connection attempts using a lock
-  if (connectionLock) {
+  if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) {
     return;
   }
-
-  connectionLock = (async () => {
-    try {
-      // Double-check connection state after acquiring lock
-      if (isConnecting || (ws && ws.readyState === WebSocket.OPEN)) {
-        return;
-      }
-
-      isConnecting = true;
-
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-        isConnecting = false;
-        return;
-      }
-      if (ws) {
-        ws.onclose = null;
-        ws.onerror = null;
-        ws.onopen = null;
-        try {
-          ws.close();
-        } catch {
-          // Previous socket already dead.
-        }
-        ws = null;
-      }
-
-      const wsUrl = getLogsWebSocketUrl();
-      logger.info('LOG_FORWARD', 'Attempting to connect to WebSocket', { wsUrl });
-
-      ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        isConnecting = false;
-        logger.info('LOG_FORWARD', 'WebSocket connected to server');
-
-        // Send any queued messages
-        while (messageQueue.length > 0) {
-          const message = messageQueue.shift();
-          if (message && ws && ws.readyState === WebSocket.OPEN) {
-            sendLogMessage(message);
-          }
-        }
-      };
-
-      ws.onclose = (event) => {
-        isConnecting = false;
-        logger.warn('LOG_FORWARD', 'WebSocket disconnected from server', {
-          code: event.code,
-          reason: event.reason,
-        });
-
-        // Only attempt to reconnect if we haven't been stopped
-        if (isInitialized && reconnectTimer === null) {
-          reconnectTimer = window.setTimeout(() => {
-            logger.info('LOG_FORWARD', 'Attempting to reconnect...');
-            reconnectTimer = null;
-            connectWebSocket();
-          }, 5000);
-        }
-      };
-
-      ws.onerror = (error) => {
-        isConnecting = false;
-        logger.error(
-          'LOG_FORWARD',
-          'WebSocket error',
-          error instanceof Error ? error : new Error(String(error))
-        );
-      };
-    } catch (error) {
-      isConnecting = false;
-      logger.error(
-        'LOG_FORWARD',
-        'Failed to create WebSocket',
-        error instanceof Error ? error : new Error(String(error))
-      );
-    } finally {
-      connectionLock = null;
-    }
-  })();
-}
-
-function sendLogMessage(message: string): void {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    // Queue message for later if not connected, enforcing maximum size
-    if (messageQueue.length >= MAX_QUEUE_SIZE) {
-      // Drop oldest message to make room
-      messageQueue.shift();
-      droppedMessageCount++;
-
-      // Log warning when messages are dropped
-      if (droppedMessageCount % 100 === 1) {
-        // Log every 100th drop to avoid spam
-        logger.warn(
-          'LOG_FORWARD',
-          `Message queue at capacity, dropped ${droppedMessageCount} messages`
-        );
-      }
-    }
-
-    messageQueue.push(message);
-    return;
+  if (ws) {
+    retireSocket(ws);
   }
 
   try {
-    const sid = getSessionId();
-    const ua = navigator.userAgent;
-    const pageUrl = location.href;
-
-    // Parse the message to extract log level and content
-    const levelMatch = message.match(/\[.*?\]\s+(\w+)\s+\[.*?\]/);
-    const level: ClientLogLevel = (levelMatch?.[1] as ClientLogLevel) || 'INFO';
-
-    ws.send(
-      JSON.stringify({
-        type: 'clientLog',
-        timestamp: Date.now(),
-        data: {
-          sessionId: sid,
-          level,
-          line: message,
-          message,
-          userAgent: ua,
-          pageUrl,
-        },
-      })
-    );
+    const socket = new WebSocket(getLogsWebSocketUrl());
+    ws = socket;
+    handshakeTimer = window.setTimeout(() => {
+      if (ws === socket && socket.readyState === WebSocket.CONNECTING) {
+        reportTransportFailure('Log transport handshake timed out; retaining queued records');
+        retireSocket(socket);
+      }
+    }, HANDSHAKE_TIMEOUT_MS);
+    socket.onopen = () => {
+      if (ws === socket) {
+        clearHandshakeTimer();
+        transportFailureReported = false;
+        if (sendLossTelemetry(socket)) {
+          flushQueue(socket);
+        }
+      }
+    };
+    socket.onclose = (event) => {
+      if (ws !== socket) {
+        return;
+      }
+      clearHandshakeTimer();
+      ws = null;
+      reportTransportFailure('Log transport disconnected', {
+        code: event.code,
+        reason: event.reason,
+      });
+      scheduleReconnect();
+    };
+    socket.onerror = () => {
+      if (ws === socket) {
+        retireSocket(socket);
+      }
+    };
   } catch (error) {
-    logger.warn('LOG_FORWARD', 'Failed to send log message', { error });
+    clearHandshakeTimer();
+    ws = null;
+    reportTransportFailure('Failed to create log transport', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    scheduleReconnect();
   }
 }
 
-// Start the log forwarder (establishes WebSocket connection)
 export function startClientLogForwarder(): void {
-  // Prevent multiple initializations
   if (isInitialized) {
     return;
   }
-
   isInitialized = true;
-  logger.info('LOG_FORWARD', 'startClientLogForwarder called, attempting to connect...');
   connectWebSocket();
 }
 
-// Stop the log forwarder
 export function stopClientLogForwarder(): void {
   isInitialized = false;
-
-  if (reconnectTimer) {
+  clearHandshakeTimer();
+  if (reconnectTimer !== null) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-
   if (ws) {
-    ws.close();
+    const socket = ws;
     ws = null;
+    socket.onopen = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    try {
+      socket.close();
+    } catch {
+      // Stop is best effort and discards the in-memory queue below.
+    }
   }
-
   messageQueue = [];
+  queuedBytes = 0;
+  reportedDroppedMessageCount = droppedMessageCount;
 }
 
-// Direct forwarding function for Logger to use
-export function forwardLogToServer(message: string): void {
-  sendLogMessage(message);
+export function forwardLogToServer(line: string): void {
+  const item = normalizeLine(line);
+  const socket = ws;
+  if (!socket || socket.readyState !== WebSocket.OPEN || !trySend(socket, item)) {
+    enqueue(item);
+  }
 }

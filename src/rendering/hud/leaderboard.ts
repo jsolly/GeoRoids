@@ -1,7 +1,7 @@
 import { PALETTE } from '../../constants';
 import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import type { Player } from '../../entities/player/Player';
-import { getShipDisplayColor, hexToRgba } from '../../utils/colorUtils';
+import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
 import { hudLayoutForCanvas } from './hudLayout';
 
 interface LeaderboardEntry {
@@ -108,7 +108,7 @@ export function drawLeaderboard(
 
   visible.forEach((entry, index) => {
     const y = boardY + 6 + index * rowHeight;
-    const nameColor = getShipDisplayColor(entry);
+    const nameColor = getFactionColor(entry.type);
     const alpha = entry.isCurrentPlayer ? 0.92 : 0.78;
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.4);

@@ -1,17 +1,17 @@
-import { WebSocket } from 'ws';
-import { GameEngine } from '../core/GameEngine';
-import { MessageHandler } from './MessageHandler';
+import type { WebSocket } from 'ws';
+import type { GameEngine } from '../core/GameEngine';
 import { GameStateBroadcaster } from '../services/GameStateBroadcaster';
+import { MessageHandler } from './MessageHandler';
 
 export class WebSocketCore {
   private gameEngine: GameEngine;
   private messageHandler: MessageHandler;
   private broadcaster: GameStateBroadcaster;
 
-  constructor(gameEngine: GameEngine) {
+  constructor(gameEngine: GameEngine, requireEnhancedClient = false) {
     this.gameEngine = gameEngine;
     this.broadcaster = new GameStateBroadcaster(gameEngine);
-    this.messageHandler = new MessageHandler(gameEngine, this.broadcaster);
+    this.messageHandler = new MessageHandler(gameEngine, this.broadcaster, requireEnhancedClient);
     this.gameEngine.setCombatSink((result) => this.broadcaster.broadcastCombatResult(result));
   }
 
@@ -23,11 +23,11 @@ export class WebSocketCore {
     this.broadcaster.stopPeriodicBroadcast();
   }
 
-  public handleClientMessage(message: any, ws: WebSocket): void {
+  public handleClientMessage(message: unknown, ws: WebSocket): void {
     this.messageHandler.handleMessage(message, ws);
   }
 
-  public sendToWebSocket(ws: WebSocket, message: any): void {
+  public sendToWebSocket(ws: WebSocket, message: unknown): void {
     this.broadcaster.sendToWebSocket(ws, message);
   }
 
@@ -35,7 +35,7 @@ export class WebSocketCore {
     this.broadcaster.sendError(ws, message);
   }
 
-  public broadcastToAll(message: any, excludeId?: string): void {
+  public broadcastToAll(message: unknown, excludeId?: string): void {
     this.broadcaster.broadcastToAll(message, excludeId);
   }
 

@@ -2,10 +2,10 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { GAME, SHIP } from '../../../../src/constants';
 import { LOCAL_STORAGE_KEYS } from '../../../../src/constants/user-preferences';
 import { Player } from '../../../../src/entities/player/Player';
-import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { Ship } from '../../../../src/entities/ship/Ship';
 import { resetControlSources } from '../../../../src/input/controlSources';
 import { keyDown, keys, keyUp } from '../../../../src/input/keybindings';
+import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 
 // Extend global interface for test-specific properties
 declare global {
@@ -45,7 +45,12 @@ beforeEach(() => {
   // Stub isPlaying to return false initially so sounds will play
   isPlayingStub.mockReturnValue(false);
 
-  mockPlayer = new Player({ id: 'test-player', name: 'TestPlayer', type: 'local', input: new MockPlayerInput() });
+  mockPlayer = new Player({
+    id: 'test-player',
+    name: 'TestPlayer',
+    type: 'local',
+    input: new MockPlayerInput(),
+  });
 
   // Clear any lingering per-player pressed keys by simulating key releases
   releaseKey('ArrowLeft');

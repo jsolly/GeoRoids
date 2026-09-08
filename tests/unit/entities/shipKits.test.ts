@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { SHIP } from '../../../src/constants';
+import { Ship } from '../../../src/entities/ship/Ship';
 import {
   AD_V2_HULL_BAKE_LOCKED,
   AD_V2_HULL_SHEET,
@@ -13,7 +14,6 @@ import {
   listShipKits,
   SHIP_KIT_IDS,
 } from '../../../src/entities/ship/shipKits';
-import { Ship } from '../../../src/entities/ship/Ship';
 
 test('kit roster is Dart / Hauler / Warden / Skirmisher / Quake', () => {
   expect(SHIP_KIT_IDS).toEqual(['dart', 'hauler', 'warden', 'skirmisher', 'quake']);

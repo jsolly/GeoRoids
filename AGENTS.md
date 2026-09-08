@@ -73,7 +73,7 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 
 ## CI (local pre-commit gate)
 
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → lint → yaml → actionlint → tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → lint → yaml → actionlint → runner/dev process contracts → tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
 ## Commands
 
@@ -81,10 +81,10 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 # Dev (Vite on :5173 + ws server on :3001 via concurrently)
 npm run dev                # ./scripts/dev-server.sh
 npm run dev:check          # status of dev servers
-npm run dev:kill           # kill all tsx/vite/concurrently processes
+ npm run dev:kill           # stop only this checkout's owned dev session
 
 # Build / typecheck / lint
-npm run build              # tsc && vite build
+npm run build              # tsc -p tsconfig.build.json && vite build
 npm run check:ts           # tsc --noEmit
 npm run check:lint         # biome check .
 npm run check:fix          # biome check --write .
@@ -110,7 +110,7 @@ npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 
 - **Client** (`src/`, served by Vite): rendering, input, prediction, HUD. Entry is `index.html` → bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
 - **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state. Bots run server-side.
-- **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log`.
+- **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
 
 Vite dev proxies `/ws` to `ws://localhost:3001` so the client always connects via the Vite origin.
 
@@ -125,7 +125,7 @@ Asteroids and bots live on the server; clients render snapshots. Clients still s
 - `src/entities/{player,ship,roid,laser,bot}/` — entity classes + per-entity managers/renderers. `ShipMovementManager` and `ShipCombatManager` split ship behavior.
 - `src/physics/collision/{CollisionManager,collisionDetection}.ts` — collision system.
 - `src/network/networkManager.ts` + `services/ConnectionManager.ts` — WS lifecycle, reconnection, message dispatch.
-- `src/rendering/{RenderEngine,canvas,boundaryRenderer,hud/}` — canvas + HUD.
+- `src/rendering/{canvas,boundaryRenderer,hud/}` — canvas + HUD; `GameController.renderGame` calls `canvasManager.drawGame`.
 - `src/input/{PlayerInput,MockPlayerInput,mouse}.ts` — input abstraction; `MockPlayerInput` is what tests drive.
 - `src/constants/index.ts` — single source of truth for tuning, `LOGGING`, and `DEBUG` flags.
 
@@ -141,7 +141,7 @@ Notable flags under `DEBUG.*`: `LOCAL_PLAYER.INVINCIBLE`, `BOT_PLAYER.{COUNT,MOV
 - `logs/client.log` — client-side (forwarded over WS)
 - `logs/server.log` — server-side
 
-Filter with grep prefixes: `[KEYBINDINGS]`, `[GAME_LOOP]`, `[RENDERING]`, `[NETWORK]`, `[SHIP]`, `[LASER]`, `[COLLISION]`, `[GAME_CONTROLLER]`. See `.cursor/rules/browser-integration-testing.mdc` for the full debugging playbook.
+Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge a player's client/server timeline. Browser warnings, errors and sampled `STATE` checkpoints also reach Railway's searchable logs. See [docs/diagnostics.md](docs/diagnostics.md) for correlation, filtering, loss counters and profiling the actual game loop.
 
 ## Tests
 
@@ -164,6 +164,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 ## Local development
 
+- **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes.
 - **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
 - **Node:** `package.json` requires `>=24`; `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
@@ -177,7 +178,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 | Vite (client + `/ws` proxy) | 5173 | `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/` → `200` |
 | Game server (HTTP + WS) | 3001 | `curl http://localhost:3001/health` |
 
-Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. Status: `npm run dev:check`. Stop: `npm run dev:kill`. Integration tests start their own pair through `scripts/test-runner.sh`; do not leave another service listening on the configured test ports.
+Start both with `npm run dev` (`./scripts/dev-server.sh`) for interactive development. The command refuses to attach to occupied ports; inspect the owner or choose isolated ports for integration tests. Status: `npm run dev:check`. Stop: `npm run dev:kill`, which signals only the process tree recorded for this checkout. Integration tests start their own pair through `scripts/test-runner.sh`; do not leave another service listening on the configured test ports.
 
 **Background dev:** `nohup npm run dev > /tmp/geo-dev.log 2>&1 &` works; tail `/tmp/geo-dev.log` for startup errors.
 
@@ -191,7 +192,7 @@ For a manual smoke, open `http://localhost:5173`, click Play, thrust (arrow keys
 
 ### Logs
 
-`logs/client.log` and `logs/server.log` (see `.cursor/rules/log-files.mdc`). Enable verbose client logs in `src/constants/index.ts` (`LOGGING.GLOBAL_LOG_LEVEL`, `DEBUG.ENABLED`), not via env vars.
+`logs/client.log` and `logs/server.log` contain structured records; see [docs/diagnostics.md](docs/diagnostics.md). Enable verbose client logs in `src/constants/index.ts` (`LOGGING.GLOBAL_LOG_LEVEL`, `DEBUG.ENABLED`), not via env vars.
 
 ### Quick verification checklist
 
@@ -199,5 +200,5 @@ For a manual smoke, open `http://localhost:5173`, click Play, thrust (arrow keys
 npm run check:lint   # biome check — should pass cleanly
 npm run check:ts     # tsc --noEmit — should pass cleanly
 npm run test         # unit tests (~3s)
-npm run build        # tsc && vite build — produces dist/
+npm run build        # tsc -p tsconfig.build.json && vite build — produces dist/
 ```

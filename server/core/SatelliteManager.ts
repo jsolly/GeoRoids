@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import type { Position, SatelliteData, SatelliteShoot, SatelliteProjectileState } from '../../shared-types';
-import {
-  satelliteProfileAt,
-  type SatelliteProfile,
-} from '../../shared/eoSatellites';
-import { DEBUG, DAMAGE, SATELLITE } from '../../src/constants';
+import { logger } from '../../setup/serverLogger';
+import { type SatelliteProfile, satelliteProfileAt } from '../../shared/eoSatellites';
+import type {
+  Position,
+  SatelliteData,
+  SatelliteProjectileState,
+  SatelliteShoot,
+} from '../../shared-types';
+import { DAMAGE, DEBUG, SATELLITE } from '../../src/constants';
 import {
   aimAngleToward,
   applyAimJitter,
@@ -15,8 +18,7 @@ import {
   laserStartFromAngle,
   laserVelocityFromAngle,
 } from '../../src/entities/satellite/satelliteMath';
-import { logger } from '../../setup/serverLogger';
-import { RNGService } from './RNGService';
+import type { RNGService } from './RNGService';
 
 /** Targets are copied from authoritative server entities for one simulation step. */
 export interface SatelliteTarget {
@@ -87,10 +89,7 @@ export class SatelliteManager {
     this.nextShotIndex = 0;
   }
 
-  public createSatellitesSafely(
-    count: number,
-    bounds = { radius: 3100 }
-  ): SatelliteData[] | null {
+  public createSatellitesSafely(count: number, bounds = { radius: 3100 }): SatelliteData[] | null {
     if (this.isCreating) {
       return null;
     }
@@ -111,10 +110,7 @@ export class SatelliteManager {
     this.pendingHits = [];
     this.nextIndex = 0;
     const configuredCount = DEBUG.ENABLED ? DEBUG.SATELLITE.COUNT : count;
-    const satelliteCount = Math.min(
-      Math.max(0, Math.trunc(configuredCount)),
-      SATELLITE.MAX_COUNT
-    );
+    const satelliteCount = Math.min(Math.max(0, Math.trunc(configuredCount)), SATELLITE.MAX_COUNT);
     const created: SatelliteData[] = [];
 
     for (let i = 0; i < satelliteCount; i++) {
@@ -231,7 +227,10 @@ export class SatelliteManager {
     return hits;
   }
 
-  private updateOne(satellite: SatelliteInternal, targets: SatelliteTarget[]): SatelliteShoot | null {
+  private updateOne(
+    satellite: SatelliteInternal,
+    targets: SatelliteTarget[]
+  ): SatelliteShoot | null {
     if (satellite.exploding) {
       satellite.explodeTime -= 1;
       if (satellite.explodeTime <= 0) {
@@ -249,8 +248,7 @@ export class SatelliteManager {
     }
 
     const living = targets.filter(
-      (target) =>
-        !target.exploding && target.health > 0 && target.respawnTimer === undefined
+      (target) => !target.exploding && target.health > 0 && target.respawnTimer === undefined
     );
     if (living.length > 0) {
       let nearestDist = Number.POSITIVE_INFINITY;
@@ -384,8 +382,7 @@ export class SatelliteManager {
 
   private repositionNearTargets(satellite: SatelliteInternal, targets: SatelliteTarget[]): void {
     const living = targets.filter(
-      (target) =>
-        !target.exploding && target.health > 0 && target.respawnTimer === undefined
+      (target) => !target.exploding && target.health > 0 && target.respawnTimer === undefined
     );
     if (living.length > 0) {
       const pick = living[Math.floor(this.rng.random() * living.length)];

@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { logger } from '../../../setup/serverLogger';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE, SHIP } from '../../../src/constants';
 
@@ -30,7 +31,7 @@ function testAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
 }
 
 function clearProtection(engine: GameEngine, id: string): void {
-  engine.entityManager.updateEntity(id, { spawnProtectionTimer: undefined });
+  engine.entityManager.updateEntity(id, { spawnProtectionTimer: 0 });
 }
 
 function clearAsteroidField(engine: GameEngine): void {
@@ -48,6 +49,8 @@ describe('server-authoritative combat', () => {
 
   afterEach(() => {
     engine.stopGameLoop();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   test('overlapping human and asteroid apply one ram and destroy the roid', () => {
@@ -71,7 +74,7 @@ describe('server-authoritative combat', () => {
     const bot = bots![0]!;
     engine.entityManager.updateEntity(bot.id, {
       position: { x: 10, y: 0 },
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
     });
     engine.addAsteroid(testAsteroid({ id: 'server-asteroid-bot', position: { x: 10, y: 0 } }));
 
@@ -108,6 +111,41 @@ describe('server-authoritative combat', () => {
     engine.resolveAuthoritativeCombat(3_000);
     expect(engine.getPlayer('p1')?.health).toBe(SHIP.MAX_HEALTH);
     expect(engine.getAsteroid('server-asteroid-0')).toBeDefined();
+  });
+
+  test('authoritative damage is sampled while death and respawn are always recorded', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    engine.addPlayer('p1', 'Pilot', mockWs(), { x: 0, y: 0 });
+    clearProtection(engine, 'p1');
+
+    for (let hit = 0; hit < 4; hit++) {
+      engine.handleShipDamage('p1', 'asteroid', DAMAGE.LASER_HIT, 'collision');
+    }
+    for (let frame = 0; frame < SHIP.RESPAWN_DELAY_FRAMES; frame++) {
+      engine.advanceCombatFrame();
+    }
+
+    const stateEvents = info.mock.calls.filter(([category]) => category === 'STATE');
+    expect(stateEvents.map(([, event]) => event)).toEqual([
+      'damage_applied',
+      'player_died',
+      'player_respawned',
+    ]);
+    expect(stateEvents[1]?.[2]).toMatchObject({
+      playerId: 'p1',
+      attackerId: 'asteroid',
+      source: 'collision',
+      healthBefore: DAMAGE.LASER_HIT,
+      healthAfter: 0,
+      livesBefore: 3,
+      livesAfter: 2,
+    });
+    expect(stateEvents[2]?.[2]).toMatchObject({
+      playerId: 'p1',
+      state: { health: SHIP.MAX_HEALTH, lives: 2, exploding: false },
+    });
   });
 
   test('client asteroid and ship-ship reports are ignored', () => {
@@ -214,14 +252,8 @@ describe('server-authoritative combat', () => {
     expect(engine.getPlayer('beta')?.position).toEqual({ x: 100, y: 0 });
     expect(engine.getPlayer('alpha')?.position).toEqual({ x: 0, y: 0 });
 
-    wsCore.handleClientMessage(
-      { type: 'shield', id: 'beta', data: { active: true } },
-      alphaWs
-    );
-    wsCore.handleClientMessage(
-      { type: 'shield', id: 'alpha', data: { active: true } },
-      unjoinedWs
-    );
+    wsCore.handleClientMessage({ type: 'shield', id: 'beta', data: { active: true } }, alphaWs);
+    wsCore.handleClientMessage({ type: 'shield', id: 'alpha', data: { active: true } }, unjoinedWs);
     expect(engine.getPlayer('beta')?.shieldActive).toBe(false);
     expect(engine.getPlayer('alpha')?.shieldActive).toBe(false);
 
@@ -487,5 +519,4 @@ describe('server-authoritative combat', () => {
     expect(engine.getPlayer('nova')?.health).toBe(0);
     expect(engine.getPlayer('nova')?.lives).toBe(2);
   });
-
 });

@@ -1,10 +1,10 @@
 import { beforeEach, expect, test } from 'vitest';
 import {
   DISCONNECT_BANNER_TEXT,
-  RECONNECTING_BANNER_TEXT,
   hideNetworkBanner,
   initNetworkStatusUI,
   isNetworkBannerVisible,
+  RECONNECTING_BANNER_TEXT,
   showNetworkBanner,
 } from '../../../src/ui/networkStatus';
 
@@ -53,5 +53,7 @@ test('a reconnecting event shows a temporary banner that hides on reconnect', ()
 
   window.dispatchEvent(new CustomEvent('networkPermanentlyDisconnected', { detail: {} }));
   expect(isNetworkBannerVisible()).toBe(true);
-  expect(document.getElementById('network-status-banner')?.textContent).toBe(DISCONNECT_BANNER_TEXT);
+  expect(document.getElementById('network-status-banner')?.textContent).toBe(
+    DISCONNECT_BANNER_TEXT
+  );
 });

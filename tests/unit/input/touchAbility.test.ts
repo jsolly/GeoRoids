@@ -2,8 +2,8 @@ import { expect, test } from 'vitest';
 
 import { FUEL } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
-import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   abilityCooldownRatio,
   canAffordTouchAbility,

@@ -8,6 +8,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="$ROOT/scripts/test-runner.sh"
 TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/georoids-test-runner-contract.XXXXXX")"
 LISTENER_PID=""
+MOCK_BIN="$TEMP_DIR/mock-bin"
+MOCK_DEV_PID_FILE="$TEMP_DIR/mock-dev.pid"
+MOCK_TEST_PID_FILE="$TEMP_DIR/mock-test.pid"
+MOCK_DEV_CHILD_PID_FILE="$TEMP_DIR/mock-dev-child.pid"
+MOCK_TEST_CHILD_PID_FILE="$TEMP_DIR/mock-test-child.pid"
 GIT_COMMON_DIR="$(git -C "$ROOT" rev-parse --git-common-dir)"
 case "$GIT_COMMON_DIR" in
     /*) ;;
@@ -16,10 +21,24 @@ esac
 LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
 
 cleanup() {
+    local pid_file
+    local pid
     if [ -n "$LISTENER_PID" ] && kill -0 "$LISTENER_PID" 2>/dev/null; then
         kill "$LISTENER_PID" 2>/dev/null || true
         wait "$LISTENER_PID" 2>/dev/null || true
     fi
+    for pid_file in \
+        "$MOCK_TEST_CHILD_PID_FILE" \
+        "$MOCK_TEST_PID_FILE" \
+        "$MOCK_DEV_CHILD_PID_FILE" \
+        "$MOCK_DEV_PID_FILE"; do
+        if [ -f "$pid_file" ]; then
+            IFS= read -r pid < "$pid_file" || true
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+        fi
+    done
     rm -rf "$TEMP_DIR"
 }
 
@@ -34,6 +53,20 @@ fail() {
 
 assert_lock_released() {
     [ ! -e "$LOCK_DIR" ] || fail "runner lock was not released: $LOCK_DIR"
+}
+
+assert_pid_stopped() {
+    local pid_file="$1"
+    local label="$2"
+    local pid=""
+    local attempt
+    [ -s "$pid_file" ] || fail "$label did not record its PID"
+    IFS= read -r pid < "$pid_file" || true
+    for ((attempt = 0; attempt < 10; attempt++)); do
+        kill -0 "$pid" 2>/dev/null || return 0
+        sleep 0.05
+    done
+    fail "$label process $pid survived runner cleanup"
 }
 
 assert_rejected() {
@@ -129,6 +162,222 @@ assert_occupied_port_rejected() {
     LISTENER_PID=""
 }
 
+setup_mock_tools() {
+    mkdir -p "$MOCK_BIN"
+
+    cat > "$MOCK_BIN/lsof" <<'EOF'
+#!/usr/bin/env bash
+# Contract processes never bind ports; report them free.
+exit 1
+EOF
+
+    cat > "$MOCK_BIN/curl" <<'EOF'
+#!/usr/bin/env bash
+# Do not report readiness until the mock concurrently process has started.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ -s "$GEOROIDS_CONTRACT_DEV_PID_FILE" ] && exit 0
+    sleep 0.02
+done
+exit 1
+EOF
+
+    cat > "$MOCK_BIN/npx" <<'EOF'
+#!/usr/bin/env bash
+case " $* " in
+    *" concurrently "*)
+        printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_DEV_PID_FILE"
+        trap '' TERM
+        while :; do
+            sleep 30 &
+            printf '%s\n' "$!" > "$GEOROIDS_CONTRACT_DEV_CHILD_PID_FILE"
+            wait $! || true
+        done
+        ;;
+    *" vitest run "*)
+        printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_TEST_PID_FILE"
+        if [ "$GEOROIDS_CONTRACT_MODE" = timeout ]; then
+            trap '' TERM
+            while :; do
+                sleep 30 &
+                printf '%s\n' "$!" > "$GEOROIDS_CONTRACT_TEST_CHILD_PID_FILE"
+                wait $! || true
+            done
+        fi
+        if [ "$GEOROIDS_CONTRACT_MODE" = cleanup-failure-nonzero ]; then
+            exit 7
+        fi
+        exit 0
+        ;;
+    *)
+echo "unexpected mock package-runner invocation: $*" >&2
+        exit 70
+        ;;
+esac
+EOF
+
+    cat > "$MOCK_BIN/ps" <<'EOF'
+#!/usr/bin/env bash
+pid=""
+previous=""
+for arg in "$@"; do
+    if [ "$previous" = -p ]; then
+        pid="$arg"
+        break
+    fi
+    previous="$arg"
+done
+
+sticky_pid=""
+if [ -s "$GEOROIDS_CONTRACT_DEV_PID_FILE" ]; then
+    IFS= read -r sticky_pid < "$GEOROIDS_CONTRACT_DEV_PID_FILE" || true
+fi
+case "$GEOROIDS_CONTRACT_MODE" in
+    cleanup-failure|cleanup-failure-nonzero) simulate_sticky_process=true ;;
+    *) simulate_sticky_process=false ;;
+esac
+if [ "$simulate_sticky_process" = true ] && [ -n "$pid" ] && [ "$pid" = "$sticky_pid" ]; then
+    case " $* " in
+        *" lstart="*) printf '%s\n' 'Mon Jan  1 00:00:00 2024' ;;
+        *" stat="*) printf '%s\n' 'S' ;;
+        *) exit 1 ;;
+    esac
+    exit 0
+fi
+exec /bin/ps "$@"
+EOF
+
+    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps"
+}
+
+run_mock_runner() {
+    local mode="$1"
+    local max_duration="$2"
+    local output_file="$3"
+    shift 3
+    rm -f \
+        "$MOCK_DEV_PID_FILE" \
+        "$MOCK_TEST_PID_FILE" \
+        "$MOCK_DEV_CHILD_PID_FILE" \
+        "$MOCK_TEST_CHILD_PID_FILE"
+    env \
+        PATH="$MOCK_BIN:$PATH" \
+        GEOROIDS_CONTRACT_MODE="$mode" \
+        GEOROIDS_CONTRACT_DEV_PID_FILE="$MOCK_DEV_PID_FILE" \
+        GEOROIDS_CONTRACT_TEST_PID_FILE="$MOCK_TEST_PID_FILE" \
+        GEOROIDS_CONTRACT_DEV_CHILD_PID_FILE="$MOCK_DEV_CHILD_PID_FILE" \
+        GEOROIDS_CONTRACT_TEST_CHILD_PID_FILE="$MOCK_TEST_CHILD_PID_FILE" \
+        GEOROIDS_TEST_MAX_DURATION_SECONDS="$max_duration" \
+        GEOROIDS_TEST_VITE_PORT=59993 \
+        GEOROIDS_TEST_SERVER_PORT=59994 \
+        "$RUNNER" "$@" > "$output_file" 2>&1
+}
+
+assert_vitest_config() {
+    local name="$1"
+    local expected_config="$2"
+    shift 2
+    local output_file="$TEMP_DIR/config-$name.txt"
+
+    if ! run_mock_runner success 10 "$output_file" "$@"; then
+        cat "$output_file" >&2
+        fail "$name config-selection run failed"
+    fi
+    grep -Fq "Vitest config: $expected_config" "$output_file" || {
+        cat "$output_file" >&2
+        fail "$name did not select $expected_config"
+    }
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "$name mock test"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "$name dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "$name dev-server child"
+    assert_lock_released
+}
+
+assert_invalid_duration_rejected() {
+    local output_file="$TEMP_DIR/invalid-duration.txt"
+    local exit_code
+    if GEOROIDS_TEST_MAX_DURATION_SECONDS=0 "$RUNNER" tests/integration/server/ > "$output_file" 2>&1; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 64 ] || {
+        cat "$output_file" >&2
+        fail "invalid maximum duration was not rejected with usage error (exit $exit_code)"
+    }
+    grep -Fq "must be a positive integer" "$output_file" || {
+        cat "$output_file" >&2
+        fail "invalid maximum duration did not explain the contract"
+    }
+    assert_lock_released
+}
+
+assert_test_timeout_cleans_owned_processes() {
+    local output_file="$TEMP_DIR/timeout.txt"
+    local exit_code
+    if run_mock_runner timeout 1 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 124 ] || {
+        cat "$output_file" >&2
+        fail "hung test process did not return timeout exit 124 (exit $exit_code)"
+    }
+    grep -Fq "Tests exceeded 1s" "$output_file" || {
+        cat "$output_file" >&2
+        fail "timeout did not report its configured deadline"
+    }
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "timed-out test"
+    assert_pid_stopped "$MOCK_TEST_CHILD_PID_FILE" "timed-out test child"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "timeout dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "timeout dev-server child"
+    assert_lock_released
+}
+
+assert_cleanup_failure_is_not_success() {
+    local output_file="$TEMP_DIR/cleanup-failure.txt"
+    local exit_code
+    if run_mock_runner cleanup-failure 10 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 1 ] || {
+        cat "$output_file" >&2
+        fail "failed cleanup did not override a successful test exit (exit $exit_code)"
+    }
+    grep -Fq "Owned process tree rooted at PID" "$output_file" || {
+        cat "$output_file" >&2
+        fail "failed cleanup did not identify the owned process tree"
+    }
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "successful mock test"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "cleanup-failure dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "cleanup-failure dev-server child"
+    assert_lock_released
+}
+
+assert_cleanup_failure_preserves_test_failure() {
+    local output_file="$TEMP_DIR/cleanup-failure-nonzero.txt"
+    local exit_code
+    if run_mock_runner cleanup-failure-nonzero 10 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 7 ] || {
+        cat "$output_file" >&2
+        fail "failed cleanup replaced the mock test's exit 7 (exit $exit_code)"
+    }
+    grep -Fq "Owned process tree rooted at PID" "$output_file" || {
+        cat "$output_file" >&2
+        fail "cleanup failure after a failed test was not reported"
+    }
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "failed mock test"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "nonzero cleanup-failure dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "nonzero cleanup-failure dev-server child"
+    assert_lock_released
+}
+
 assert_rejected "config-equals" --config=alternate.config.ts
 assert_rejected "config-short" -c alternate.config.ts
 assert_rejected "config-short-attached" -c=alternate.config.ts
@@ -141,6 +390,21 @@ assert_rejected "file-parallelism" --fileParallelism=true
 assert_rejected "no-file-parallelism" --no-file-parallelism
 assert_rejected "sequence" --sequence.concurrent=true
 assert_rejected "sequence-shuffle" --sequence.shuffle=true
+assert_invalid_duration_rejected
 assert_occupied_port_rejected
+setup_mock_tools
+assert_vitest_config "default-discovery" vitest.browser.config.ts
+assert_vitest_config "default-with-options" vitest.browser.config.ts --reporter=verbose
+assert_vitest_config "integration-parent" vitest.browser.config.ts tests/integration/
+assert_vitest_config "tests-parent" vitest.browser.config.ts tests/
+assert_vitest_config "browser-file" vitest.browser.config.ts \
+    tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts
+assert_vitest_config "server-only" vitest.config.ts tests/integration/server/
+assert_vitest_config "entities-only" vitest.config.ts tests/integration/entities/
+assert_vitest_config "server-and-entities" vitest.config.ts \
+    tests/integration/server/ tests/integration/entities/
+assert_test_timeout_cleans_owned_processes
+assert_cleanup_failure_is_not_success
+assert_cleanup_failure_preserves_test_failure
 
 echo "✅ Test-runner contract checks passed"

@@ -50,7 +50,7 @@ describe('late client death updates after authoritative respawn', () => {
     );
     const pilot = engine.getPlayer('pilot')!;
     pilot.position = { x: 3150, y: 0 };
-    pilot.spawnProtectionTimer = undefined;
+    delete pilot.spawnProtectionTimer;
     pilot.score = 17;
     expect(engine.handlePlayerDamage(pilot.id, 'boundary', pilot.maxHealth)).toBe(true);
     expect(pilot.health).toBe(0);
@@ -70,18 +70,21 @@ describe('late client death updates after authoritative respawn', () => {
     expect(spawnPosition).not.toEqual({ x: 3150, y: 0 });
     peerMessages.length = 0;
 
-    core.handleClientMessage({
-      type: 'update',
-      id: pilot.id,
-      data: {
-        position: spawnPosition,
-        velocity: { x: 0, y: 0 },
-        exploding: true,
-        health: 0,
-        score: 0,
-        ...extras,
+    core.handleClientMessage(
+      {
+        type: 'update',
+        id: pilot.id,
+        data: {
+          position: spawnPosition,
+          velocity: { x: 0, y: 0 },
+          exploding: true,
+          health: 0,
+          score: 0,
+          ...extras,
+        },
       },
-    }, owner);
+      owner
+    );
 
     expect(pilot.health).toBe(pilot.maxHealth);
     expect(pilot.exploding).toBe(false);
@@ -89,9 +92,16 @@ describe('late client death updates after authoritative respawn', () => {
     expect(pilot.deathCause).toBeUndefined();
     expect(pilot.respawnAnchor).toBeUndefined();
     expect(pilot.score).toBe(17);
-    const update = peerMessages.find(message => message.type === 'playerUpdate');
-    expect(update?.data.position).toEqual(spawnPosition);
-    for (const field of ['exploding', 'explodeTime', 'deathCause', 'respawnAnchor', 'health', 'score']) {
+    const update = peerMessages.find((message) => message.type === 'playerUpdate');
+    expect(update?.data['position']).toEqual(spawnPosition);
+    for (const field of [
+      'exploding',
+      'explodeTime',
+      'deathCause',
+      'respawnAnchor',
+      'health',
+      'score',
+    ]) {
       expect(update?.data).not.toHaveProperty(field);
     }
 
@@ -99,16 +109,25 @@ describe('late client death updates after authoritative respawn', () => {
       engine.advanceCombatFrame();
     }
     const nextPosition = { x: spawnPosition.x + 25, y: spawnPosition.y };
-    core.handleClientMessage({
-      type: 'update', id: pilot.id,
-      data: { position: nextPosition, velocity: { x: 0, y: 0 }, exploding: false },
-    }, owner);
+    core.handleClientMessage(
+      {
+        type: 'update',
+        id: pilot.id,
+        data: { position: nextPosition, velocity: { x: 0, y: 0 }, exploding: false },
+      },
+      owner
+    );
     expect(pilot.position).toEqual(nextPosition);
     expect(pilot.health).toBe(pilot.maxHealth);
     expect(pilot.exploding).toBe(false);
     expect(pilot.respawnTimer).toBeUndefined();
     expect(pilot.lives).toBe(2);
-    const publicState = engine.getGameState().entities.find(entity => entity.id === pilot.id);
-    expect(publicState).toMatchObject({ health: pilot.maxHealth, exploding: false, lives: 2, score: 17 });
+    const publicState = engine.getGameState().entities.find((entity) => entity.id === pilot.id);
+    expect(publicState).toMatchObject({
+      health: pilot.maxHealth,
+      exploding: false,
+      lives: 2,
+      score: 17,
+    });
   });
 });

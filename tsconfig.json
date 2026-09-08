@@ -1,6 +1,11 @@
 {
   "extends": "./tsconfig/fleet/strict-tsc.json",
   "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
@@ -20,13 +25,11 @@
   "include": [
     "middleware.ts",
     "src",
-    "api",
     "tests",
     "scripts",
     "vitest.config.ts",
     "vitest.browser.config.ts",
-    "tsconfig.json",
-    "package.json",
+    "vite.config.ts",
     "setup",
     "server",
     "server.ts",

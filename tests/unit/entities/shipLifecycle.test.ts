@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { GameEngine } from '../../../server/core/GameEngine';
 import { isStaleDeathPose } from '../../../server/core/EntityManager';
+import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
+import { Ship } from '../../../src/entities/ship/Ship';
 import {
   applySharedShipRespawnCue,
   applyShipBoundaryDeath,
@@ -17,22 +18,20 @@ import {
   shouldDrawShipHull,
 } from '../../../src/entities/ship/shipUtils';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { Ship } from '../../../src/entities/ship/Ship';
 import { SHIP_KINDS } from '../scenarios/support/shipKinds';
 
 describe('client explode ticks follow the 60 Hz clock', () => {
-  test.each(SHIP_KINDS)(
-    '$kind hitch-drains explodeTime without dropping the exploding flag',
-    ({ options }) => {
-      const ship = new Ship(options);
-      ship.takeDamage(100);
-      expect(ship.exploding).toBe(true);
-      expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
-      ship.updateLifecycle(SHIP.EXPLODE_DURATION_FRAMES);
-      expect(ship.explodeTime).toBe(0);
-      expect(ship.exploding).toBe(true);
-    }
-  );
+  test.each(SHIP_KINDS)('$kind hitch-drains explodeTime without dropping the exploding flag', ({
+    options,
+  }) => {
+    const ship = new Ship(options);
+    ship.takeDamage(100);
+    expect(ship.exploding).toBe(true);
+    expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
+    ship.updateLifecycle(SHIP.EXPLODE_DURATION_FRAMES);
+    expect(ship.explodeTime).toBe(0);
+    expect(ship.exploding).toBe(true);
+  });
 
   test('a sub-frame update does not burn explode frames', () => {
     const ship = new Ship({ isLocalPlayer: true });
@@ -137,9 +136,7 @@ describe('shared ship collision immunity', () => {
     ship.spawnProtectionTimer = 0;
     ship.health = 100;
     applySharedShipRespawnCue(ship, false, 12);
-    expect(ship.blinkCount).toBe(
-      Math.ceil(12 / SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES)
-    );
+    expect(ship.blinkCount).toBe(Math.ceil(12 / SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES));
     expect(ship.blinkCount).toBeLessThan(
       Math.ceil(SHIP.INVINCIBILITY_DURATION_FRAMES / SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES)
     );
@@ -334,7 +331,7 @@ describe('server ship respawn lifecycle', () => {
   test('human explosion end does not reset an already-scheduled respawn timer', () => {
     const ws = {} as any;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
     engine.handlePlayerDamage('p1', 'boundary', player.health);
     const afterDeath = engine.getPlayer('p1');
@@ -356,7 +353,7 @@ describe('server ship respawn lifecycle', () => {
   test('wall kill respawns as soon as the explode window ends — no corpse freeze', () => {
     const ws = {} as any;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'boundary', player.health);
 
     for (let i = 0; i < SHIP.EXPLODE_DURATION_FRAMES; i++) {
@@ -373,7 +370,7 @@ describe('server ship respawn lifecycle', () => {
   test('respawn grants a full protection window and holds an anchor', () => {
     const ws = {} as any;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 3100, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'asteroid', player.health);
 
     for (let i = 0; i < SHIP.RESPAWN_DELAY_FRAMES; i++) {

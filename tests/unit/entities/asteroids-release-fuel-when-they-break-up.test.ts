@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import type { AsteroidData } from '../../../shared-types';
 import { isFuelLoot } from '../../../shared/fuel';
+import type { AsteroidData } from '../../../shared-types';
 import { FUEL, ROID } from '../../../src/constants';
 
 function makeAsteroid(id: string, size: number): AsteroidData {

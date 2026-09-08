@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE } from '../../../../src/constants';
-import {
-  GameServerWorld,
-  useQuietServerConsole,
-  type Pilot,
-} from '../support/gameServerWorld';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 

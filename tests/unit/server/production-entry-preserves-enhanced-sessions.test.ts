@@ -1,6 +1,7 @@
 /* @vitest-environment node */
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
@@ -16,14 +17,18 @@ async function waitFor<T>(read: () => T | undefined, label: string, timeout = 50
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const value = read();
-    if (value !== undefined) return value;
-    if (child && child.exitCode !== null) throw new Error(`Production entry exited: ${output}`);
+    if (value !== undefined) {
+      return value;
+    }
+    if (child && child.exitCode !== null) {
+      throw new Error(`Production entry exited: ${output}`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Timed out waiting for ${label}: ${output.slice(-6000)}`);
 }
 
-async function start(gated: boolean): Promise<number> {
+async function start(gated: boolean, port = 0): Promise<number> {
   output = '';
   // Execute the actual Railway entry under tsx, without importing the test factory.
   child = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
@@ -32,7 +37,7 @@ async function start(gated: boolean): Promise<number> {
       ...process.env,
       NODE_ENV: 'production',
       VITEST: 'false',
-      PORT: '0',
+      PORT: String(port),
       REQUIRE_ASTEROID_CLIENT: gated ? '1' : '0',
       SERVER_LOG_LEVEL: 'info',
     },
@@ -71,8 +76,12 @@ class Pilot {
       try {
         const packet = JSON.parse(String(raw));
         this.packets.push(packet);
-        if (packet.type === 'joined') this.decoder.reset();
-        if (packet.type === 'snapshot') this.states.push(this.decoder.decode(packet.data));
+        if (packet.type === 'joined') {
+          this.decoder.reset();
+        }
+        if (packet.type === 'snapshot') {
+          this.states.push(this.decoder.decode(packet.data));
+        }
       } catch (error) {
         this.failures.push(error as Error);
       }
@@ -123,11 +132,15 @@ async function disconnect(ws: WebSocket): Promise<void> {
 
 afterEach(async () => {
   for (const ws of sockets.splice(0)) {
-    if (ws.readyState !== WebSocket.CLOSED) ws.terminate();
+    if (ws.readyState !== WebSocket.CLOSED) {
+      ws.terminate();
+    }
   }
   const processToStop = child;
   child = undefined;
-  if (!processToStop || processToStop.exitCode !== null) return;
+  if (!processToStop || processToStop.exitCode !== null) {
+    return;
+  }
   const exited = once(processToStop, 'exit');
   processToStop.kill('SIGTERM');
   const force = setTimeout(() => processToStop.kill('SIGKILL'), 3000);
@@ -169,11 +182,11 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
   const original = await pilot(port);
   const joined = await original.join('entry-pilot');
   expect(joined).toMatchObject({ id: 'entry-pilot', snapshotVersion: 1, asteroidInteractions: 1 });
-  expect(joined.resumeToken).toMatch(/^[a-f0-9]{64}$/);
+  expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
   const before = await observer.state();
   const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.asteroidMotion?.epoch;
   expect(epoch).toBeGreaterThan(0);
-  expect(JSON.stringify(before)).not.toContain(String(joined.resumeToken));
+  expect(JSON.stringify(before)).not.toContain(String(joined['resumeToken']));
   const packetStart = observer.packets.length;
   await disconnect(original.ws);
   // Cross a broadcast interval so the server close callback has really run.
@@ -182,12 +195,12 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
   expect(
     observer.packets
       .slice(packetStart)
-      .some((packet) => packet.type === 'playerLeft' && packet.data.id === 'entry-pilot')
+      .some((packet) => packet.type === 'playerLeft' && packet.data['id'] === 'entry-pilot')
   ).toBe(false);
   const resumed = await pilot(port);
-  expect(await resumed.join('forged-new-id', joined.resumeToken)).toMatchObject({
+  expect(await resumed.join('forged-new-id', joined['resumeToken'])).toMatchObject({
     id: 'entry-pilot',
-    resumeToken: joined.resumeToken,
+    resumeToken: joined['resumeToken'],
     asteroidInteractions: 1,
   });
   expect(
@@ -206,7 +219,7 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
     id: 'expired',
     snapshotVersion: 1,
     asteroidInteractions: 1,
-    resumeToken: joined.resumeToken,
+    resumeToken: joined['resumeToken'],
   });
   await waitFor(
     () => expired.packets.find((packet) => packet.type === 'error'),
@@ -224,7 +237,42 @@ test('the actual support entry admits ordinary clients before the cutover flag i
     () => ordinary.packets.find((packet) => packet.type === 'joined')?.data,
     'ordinary production join'
   );
-  expect(joined.id).toBe('legacy-entry');
-  expect(joined.resumeToken).toBeUndefined();
-  expect(joined.asteroidInteractions).toBeUndefined();
+  expect(joined['id']).toBe('legacy-entry');
+  expect(joined['resumeToken']).toBeUndefined();
+  expect(joined['asteroidInteractions']).toBeUndefined();
 }, 20_000);
+
+test('the production entry completes SIGTERM shutdown and exits successfully', async () => {
+  const port = await start(true);
+  const client = connect(port, '/logs');
+  await once(client, 'open');
+  if (!child) {
+    throw new Error('Production child missing');
+  }
+  const exited = once(child, 'exit', { signal: AbortSignal.timeout(5000) });
+  const closed = once(client, 'close', { signal: AbortSignal.timeout(5000) });
+  expect(child.kill('SIGTERM')).toBe(true);
+  expect(await exited).toEqual([0, null]);
+  expect((await closed)[0]).toBe(1001);
+  expect(output).toContain('Server closed');
+});
+
+test('an occupied production listener fails promptly with a nonzero exit and the cause', async () => {
+  const occupied = createServer();
+  occupied.listen(0);
+  await once(occupied, 'listening');
+  try {
+    const address = occupied.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Expected an ephemeral TCP listener');
+    }
+    await expect(start(true, address.port)).rejects.toThrow('Production entry exited');
+    expect(child?.exitCode).toBe(1);
+    expect(output).toContain('Failed to start server listener');
+    expect(output).toContain('EADDRINUSE');
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      occupied.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

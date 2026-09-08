@@ -1,18 +1,21 @@
 import { afterEach, expect, test, vi } from 'vitest';
-
+import { PALETTE, VISUAL } from '../../../src/constants';
 import { InputManager } from '../../../src/core/services/InputManager';
+import { lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 import { Player } from '../../../src/entities/player/Player';
 import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
-import { drawShipShield, strokeKitHullOutline, strokePhosphorSegment } from '../../../src/entities/ship/shipRenderer';
+import {
+  drawShipShield,
+  strokeKitHullOutline,
+  strokePhosphorSegment,
+} from '../../../src/entities/ship/shipRenderer';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { PALETTE, VISUAL } from '../../../src/constants';
 import { Point } from '../../../src/physics/Point';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvas';
 import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRenderer';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
-import { lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 
 type RecordingContext = CanvasRenderingContext2D & {
   operations: string[];

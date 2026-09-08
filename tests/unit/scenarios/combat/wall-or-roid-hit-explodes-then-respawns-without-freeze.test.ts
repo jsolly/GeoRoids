@@ -3,9 +3,9 @@ import { GAME, SHIP } from '../../../../src/constants';
 import {
   EXPLOSION_FRAMES,
   GameServerWorld,
+  type Pilot,
   SPAWN_PROTECTION_FRAMES,
   useQuietServerConsole,
-  type Pilot,
 } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -66,7 +66,7 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
       bot = world.engine.entityManager.createBots(1)[0];
     }
     expect(bot).toBeDefined();
-    world.engine.entityManager.updateEntity(bot!.id, { spawnProtectionTimer: undefined });
+    world.engine.entityManager.updateEntity(bot!.id, { spawnProtectionTimer: 0 });
 
     world.engine.handleBotDamage(bot!.id, 'asteroid', bot!.health);
     expect(world.ship(bot!.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);

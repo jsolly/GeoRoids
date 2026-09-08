@@ -1,17 +1,17 @@
 import { expect, test } from 'vitest';
+import { Roid } from '../../../src/entities/roid/Roid';
 import {
   harpoonBodiesFromRocks,
   publishHarpoonField,
 } from '../../../src/entities/ship/harpoonField';
+import { Ship } from '../../../src/entities/ship/Ship';
+import { HAULER_TETHER_COLOR, HAULER_TETHER_TIP_COLOR } from '../../../src/entities/ship/shipKits';
 import {
   canDrawGenericAbilityRing,
   canDrawHaulerHarpoon,
   drawHaulerHarpoonVfx,
   harpoonTetherStyle,
 } from '../../../src/entities/ship/shipRenderer';
-import { HAULER_TETHER_COLOR, HAULER_TETHER_TIP_COLOR } from '../../../src/entities/ship/shipKits';
-import { Ship } from '../../../src/entities/ship/Ship';
-import { Roid } from '../../../src/entities/roid/Roid';
 import { canvasManager } from '../../../src/rendering/canvas';
 
 test('tether VFX is Hauler-only while latched', () => {
@@ -253,7 +253,7 @@ test('payload cables follow the actual rotating faceted rock contours through th
   expect(rotated.lines[1]?.[2]).toBeCloseTo(payloadVertex.x, 8);
 
   // Ordinary E remains a single cable to the moving target center.
-  hauler.asteroidMotion = undefined;
+  delete hauler.asteroidMotion;
   const legacy = paintRecorder();
   drawHaulerHarpoonVfx(legacy.ctx, hauler, 0, 0, camera);
   const center = canvasManager.worldToScreen(primary.position, camera);

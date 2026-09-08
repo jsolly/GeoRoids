@@ -5,11 +5,13 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "worktree:init": "bash scripts/worktree-init.sh; npm ci",
+    "worktree:init": "bash scripts/worktree-init.sh && npm ci",
     "prune": "ts-prune",
+    "logs": "tsx scripts/read-game-logs.ts",
+    "benchmark:game-loop": "NODE_ENV=production SERVER_LOG_LEVEL=info tsx scripts/benchmark-game-loop.ts",
     "dev": "./scripts/dev-server.sh",
     "dev:check": "./scripts/check-dev-servers.sh",
-    "dev:kill": "pkill -f 'tsx.*server.ts' || true && pkill -f 'vite' || true && pkill -f 'concurrently' || true && echo '✅ All dev server processes killed'",
+    "dev:kill": "./scripts/dev-server.sh --stop",
     "build": "tsc -p tsconfig.build.json && vite build",
     "start": "vite",
     "watch": "vite build --watch",
@@ -25,6 +27,7 @@
     "test:integration:server": "./scripts/test-runner.sh tests/integration/server/",
     "test:integration:entities": "./scripts/test-runner.sh tests/integration/entities/",
     "check:test-runner": "bash scripts/test-runner-contract.sh",
+    "check:dev-server": "bash scripts/dev-server-contract.sh",
     "check:ts": "tsc --noEmit",
     "check:md": "bash scripts/lint-md.sh",
     "check:yaml": "uvx yamllint@1.38.0 .",
@@ -36,11 +39,6 @@
     "prepare": "if [ -z \"$CI\" ] && git rev-parse --git-dir >/dev/null 2>&1; then git config core.hooksPath .git-hooks; fi",
     "check:actions": "bash scripts/check-actions.sh",
     "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,css,md,yml,yaml}": [
-      "biome check --write --no-errors-on-unmatched"
-    ]
   },
   "repository": {
     "type": "git",
@@ -59,8 +57,6 @@
     "@types/node": "^24.0.15",
     "@types/ws": "^8.18.1",
     "@vercel/functions": "^3.9.5",
-    "mongodb": "^7.3.0",
-    "socket.io-client": "^4.8.3",
     "tsx": "^4.22.4",
     "typescript": "^5.9.2",
     "uuid": "^11.0.0",
@@ -69,21 +65,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
-    "@playwright/test": "^1.63.0",
-    "@types/chromedriver": "^81.0.5",
     "@types/jsdom": "^21.1.1",
-    "@types/selenium-webdriver": "^4.1.28",
-    "@vercel/node": "^5.3.6",
     "canvas": "^3.2.3",
-    "chromedriver": "^152.0.1",
     "concurrently": "^10.0.5",
     "github-actionlint": "^1.7.12",
     "jsdom": "^26.1.0",
-    "lint-staged": "^17.4.1",
     "markdownlint-cli2": "^0.22.1",
     "playwright": "^1.63.0",
-    "selenium-webdriver": "^4.35.0",
-    "ts-node": "^10.9.1",
     "ts-prune": "^0.10.3",
     "vercel": "^59.11.7",
     "vitest": "^5.0.0"
@@ -108,7 +96,6 @@
   },
   "allowScripts": {
     "canvas@3.2.3": true,
-    "chromedriver@152.0.1": true,
     "esbuild@0.27.0": true,
     "esbuild@0.28.1": true,
     "fsevents@2.3.3": true,

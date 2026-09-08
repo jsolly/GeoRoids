@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest';
 import {
+  bindHarpoonFieldSource,
+  harpoonBodyFromRock,
+  publishHarpoonField,
+} from '../../../src/entities/ship/harpoonField';
+import { Ship } from '../../../src/entities/ship/Ship';
+import {
+  type AbilityHost,
   absorbDamageWithShield,
   activateAbilityOnHost,
   applySharedHarpoonLatch,
@@ -12,15 +19,8 @@ import {
   isEnvironmentLatchBody,
   pullHarpoonTarget,
   tickAbilityHost,
-  type AbilityHost,
 } from '../../../src/entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
-import { Ship } from '../../../src/entities/ship/Ship';
-import {
-  bindHarpoonFieldSource,
-  harpoonBodyFromRock,
-  publishHarpoonField,
-} from '../../../src/entities/ship/harpoonField';
 
 function host(kitId: AbilityHost['kitId']): AbilityHost {
   return {
@@ -53,7 +53,9 @@ test('a Hauler surface latch survives render ticks until release without replaci
   hauler.harpoonTargetId = 'surface-rock';
   hauler.harpoonLatchPos = { x: 32, y: 0 };
   hauler.asteroidMotion = { epoch: 1, mode: 'latched', ack: 0, asteroidId: 'surface-rock' };
-  for (let frame = 0; frame < 120; frame++) tickAbilityHost(hauler);
+  for (let frame = 0; frame < 120; frame++) {
+    tickAbilityHost(hauler);
+  }
   expect(hauler.harpoonTimer).toBe(1);
   expect(hauler.harpoonLatchPos).toEqual({ x: 32, y: 0 });
   expect(activateAbilityOnHost(hauler).activated).toBe(false);

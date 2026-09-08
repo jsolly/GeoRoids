@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   CLIENT_RELEASE_POLL_MS,
-  watchClientRelease,
   type ClientReleaseEnvironment,
+  watchClientRelease,
 } from '../../../src/release/clientReleaseWatcher';
+import { logger } from '../../../src/utils/Logger';
+
+vi.mock('../../../src/utils/Logger', () => ({ logger: { error: vi.fn() } }));
 
 const CURRENT = 'a9755405dcfd546ace3e92b4dc8c3ff53d9bb598';
 const NEXT = 'b'.repeat(40);
@@ -44,10 +47,16 @@ async function start(f: ReturnType<typeof fixture>, build = CURRENT.slice(0, 7))
   return stop;
 }
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+});
 afterEach(() => {
-  for (const stop of stops.splice(0)) stop();
+  for (const stop of stops.splice(0)) {
+    stop();
+  }
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('open clients refresh only for a verified published client release', () => {
@@ -130,10 +139,16 @@ describe('open clients refresh only for a verified published client release', ()
   test('visible resume polls promptly, overlapping requests coalesce, and cleanup aborts and detaches the watcher', async () => {
     const f = fixture();
     const stop = await start(f);
-    Object.defineProperty(f.environment.document, 'visibilityState', { value: 'hidden', configurable: true });
+    Object.defineProperty(f.environment.document, 'visibilityState', {
+      value: 'hidden',
+      configurable: true,
+    });
     f.target.dispatchEvent(new Event('visibilitychange'));
     expect(f.fetch).toHaveBeenCalledTimes(1);
-    Object.defineProperty(f.environment.document, 'visibilityState', { value: 'visible', configurable: true });
+    Object.defineProperty(f.environment.document, 'visibilityState', {
+      value: 'visible',
+      configurable: true,
+    });
     let resolve!: (value: Response) => void;
     f.fetch.mockImplementation(
       () =>
@@ -166,4 +181,19 @@ describe('open clients refresh only for a verified published client release', ()
     await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 4);
     expect(f.reload).not.toHaveBeenCalled();
   });
+});
+
+test('an offline release check keeps the loaded client and logs one error during the outage', async () => {
+  const f = fixture();
+  const cause = new Error('offline');
+  const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  f.fetch.mockRejectedValue(cause);
+  await start(f);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS * 3);
+  expect(f.reload).not.toHaveBeenCalled();
+  expect(log).toHaveBeenCalledExactlyOnceWith(
+    'CLIENT_RELEASE',
+    'Release check failed; keeping the current client',
+    cause
+  );
 });

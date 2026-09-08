@@ -9,7 +9,6 @@ import {
   isOnPlayfieldCanvas,
   stepAsteroidMotion,
   stepAsteroidMotionInto,
-  wrapAsteroidPosition,
 } from '../../../src/physics/asteroidMotion';
 
 describe('authoritative asteroid motion', () => {
@@ -66,7 +65,6 @@ describe('authoritative asteroid motion', () => {
     expect(Math.hypot(contained.x, contained.y)).toBeLessThanOrEqual(fieldRadius);
     expect(contained.x).toBeGreaterThan(0);
     expect(contained.y).toBeGreaterThan(0);
-    expect(wrapAsteroidPosition(10000, 8000)).toEqual(contained);
   });
 
   test('a server tick contains an escaped asteroid instead of leaving the camera', () => {

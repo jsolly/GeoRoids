@@ -1,6 +1,6 @@
-import type { AsteroidData, LootData, Position } from '../../shared-types';
 import { createFuelLootData, isFuelLoot, shouldReleaseFuel } from '../../shared/fuel';
-import { GROWTH, canCollectLoot, lootOverlap, planKillLoot } from '../../shared/shipGrowth';
+import { canCollectLoot, GROWTH, lootOverlap, planKillLoot } from '../../shared/shipGrowth';
+import type { AsteroidData, LootData, Position } from '../../shared-types';
 import { FUEL } from '../../src/constants';
 import type { GameEntity } from './EntityManager';
 import type { RNGService } from './RNGService';
@@ -50,7 +50,11 @@ export class LootManager {
   }
 
   /** One shard at the break site. Collect uses the existing overlap/growth path. */
-  public spawnShard(position: Position, gameTime: number, mass: number = GROWTH.SHARD_MASS): LootData {
+  public spawnShard(
+    position: Position,
+    gameTime: number,
+    mass: number = GROWTH.SHARD_MASS
+  ): LootData {
     const drop: TrackedLoot = {
       id: `loot-${this.nextId++}`,
       position: { x: position.x, y: position.y },
@@ -71,8 +75,11 @@ export class LootManager {
 
   public spawnLaserCore(position: Position, gameTime: number): LootData {
     const drop: TrackedLoot = {
-      id: `core-${this.nextId++}`, position: { ...position }, mass: 0,
-      radius: GROWTH.LOOT_RADIUS + 3, kind: 'laserCore',
+      id: `core-${this.nextId++}`,
+      position: { ...position },
+      mass: 0,
+      radius: GROWTH.LOOT_RADIUS + 3,
+      kind: 'laserCore',
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
     };
     this.loot.set(drop.id, drop);
@@ -142,8 +149,7 @@ export class LootManager {
 
   private createPellet(origin: Position, mass: number, gameTime: number): TrackedLoot {
     const angle = this.rng.random() * Math.PI * 2;
-    const dist =
-      GROWTH.SCATTER_MIN + this.rng.random() * (GROWTH.SCATTER_MAX - GROWTH.SCATTER_MIN);
+    const dist = GROWTH.SCATTER_MIN + this.rng.random() * (GROWTH.SCATTER_MAX - GROWTH.SCATTER_MIN);
     return {
       id: `loot-${this.nextId++}`,
       position: {

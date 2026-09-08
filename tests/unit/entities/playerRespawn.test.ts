@@ -1,7 +1,7 @@
-import { expect, test, describe, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
+import { SHIP } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { SHIP } from '../../../src/constants';
 
 describe('Player Respawn System', () => {
   let player: Player;
@@ -12,7 +12,7 @@ describe('Player Respawn System', () => {
       id: 'test-player',
       name: 'Test Player',
       type: 'local',
-      input: new MockPlayerInput()
+      input: new MockPlayerInput(),
     });
     ship = player.ship;
   });
@@ -75,17 +75,17 @@ describe('Player Respawn System', () => {
     // Simulate death
     ship.health = 0;
     ship.exploding = true;
-    
+
     // Simulate server sending respawn data
     const respawnData = {
       health: ship.maxHealth,
       exploding: false,
-      respawnTimer: 0
+      respawnTimer: 0,
     };
-    
+
     // Update from server
     player.updateFromServer(respawnData);
-    
+
     // Should have full health and not be exploding
     expect(ship.health).toBe(ship.maxHealth);
     expect(ship.exploding).toBe(false);
@@ -95,17 +95,17 @@ describe('Player Respawn System', () => {
     // Simulate death
     ship.health = 0;
     ship.exploding = true;
-    
+
     // Simulate server sending respawn data
     const respawnData = {
       health: ship.maxHealth,
       exploding: false,
-      respawnTimer: 0
+      respawnTimer: 0,
     };
-    
+
     // Update from server
     player.updateFromServer(respawnData);
-    
+
     // Should have spawn protection (blinking)
     expect(ship.blinkCount).toBeGreaterThan(0);
     expect(ship.spawnProtectionTimer).toBeGreaterThan(0);
@@ -116,21 +116,21 @@ describe('Player Respawn System', () => {
     // Simulate death and respawn
     ship.health = 0;
     ship.exploding = true;
-    
+
     const respawnData = {
       health: ship.maxHealth,
       exploding: false,
-      respawnTimer: 0
+      respawnTimer: 0,
     };
-    
+
     player.updateFromServer(respawnData);
-    
+
     // Check that spawn protection values match constants
     const expectedBlinkCount = Math.ceil(
       SHIP.INVINCIBILITY_DURATION_FRAMES / SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES
     );
     const expectedSpawnProtectionTimer = SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES;
-    
+
     expect(ship.blinkCount).toBe(expectedBlinkCount);
     expect(ship.spawnProtectionTimer).toBe(expectedSpawnProtectionTimer);
   });
@@ -139,20 +139,20 @@ describe('Player Respawn System', () => {
     // Simulate death and respawn
     ship.health = 0;
     ship.exploding = true;
-    
+
     const respawnData = {
       health: ship.maxHealth,
       exploding: false,
-      respawnTimer: 0
+      respawnTimer: 0,
     };
-    
+
     player.updateFromServer(respawnData);
-    
+
     const initialSpawnProtectionTimer = ship.spawnProtectionTimer;
-    
+
     // Update invincibility (simulate game loop)
     ship.updateInvincibility();
-    
+
     // Should have decremented
     expect(ship.spawnProtectionTimer).toBeLessThan(initialSpawnProtectionTimer);
   });
@@ -161,21 +161,21 @@ describe('Player Respawn System', () => {
     // Simulate death and respawn
     ship.health = 0;
     ship.exploding = true;
-    
+
     const respawnData = {
       health: ship.maxHealth,
       exploding: false,
-      respawnTimer: 0
+      respawnTimer: 0,
     };
-    
+
     player.updateFromServer(respawnData);
-    
+
     // Run through all invincibility frames (180 frames total)
     const totalFrames = SHIP.INVINCIBILITY_DURATION_FRAMES;
     for (let i = 0; i < totalFrames; i++) {
       ship.updateInvincibility();
     }
-    
+
     // Should have no more spawn protection
     expect(ship.blinkCount).toBe(0);
     // The timer should be at its initial value (6) when blinkCount reaches 0

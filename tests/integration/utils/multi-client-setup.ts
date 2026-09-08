@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
-import { GameInteractions } from './game-interactions';
 import type { BrowserManager } from './browser-manager';
+import { GameInteractions } from './game-interactions';
 
 /** Boot two browser clients against the shared server world. */
 export async function bootTwoClientGames(browserManager: BrowserManager): Promise<{

@@ -1,114 +1,191 @@
-import http from 'node:http';
+import type { GameEngine } from '../../../server/core/GameEngine';
 import { TestConfig } from './test-config';
 
-export type ServerWorldDiagnostics = {
-  isPaused: boolean;
-  gameTime: number;
-  humanPlayers: number;
-  bots: number;
-  asteroids: number;
-  satellites?: number;
-};
-
-type HealthResponse = {
-  world?: ServerWorldDiagnostics;
+export type ServerWorldDiagnostics = ReturnType<GameEngine['getDiagnostics']>;
+export type BotShotArrangement = {
+  playerPosition: { x: number; y: number };
+  botPosition: { x: number; y: number };
+  botHealth: number;
+  motionEpoch?: number;
 };
 
 const REQUEST_TIMEOUT_MS = 5000;
 const DEFAULT_POLL_MS = 200;
 const DEFAULT_WAIT_MS = 15000;
 
-function httpRequest(
-  url: string,
-  method: 'GET' | 'POST' = 'GET'
-): Promise<{ ok: boolean; body: string }> {
-  return new Promise((resolve, reject) => {
-    const request = http.request(url, { method }, (response) => {
-      let body = '';
-      response.on('data', (chunk) => {
-        body += chunk;
-      });
-      response.on('end', () => {
-        resolve({ ok: response.statusCode === 200, body });
-      });
-    });
+function isWorldDiagnostics(value: unknown): value is ServerWorldDiagnostics {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const world = value as Record<string, unknown>;
+  return (
+    typeof world['isPaused'] === 'boolean' &&
+    typeof world['gameTime'] === 'number' &&
+    Number.isFinite(world['gameTime']) &&
+    world['gameTime'] >= 0 &&
+    ['humanPlayers', 'bots', 'asteroids', 'loot', 'satellites', 'satellitePickups'].every(
+      (field) =>
+        typeof world[field] === 'number' && Number.isSafeInteger(world[field]) && world[field] >= 0
+    )
+  );
+}
 
-    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      request.destroy(new Error('timeout'));
-    });
-    request.on('error', reject);
-    request.end();
-  });
+function isPosition(value: unknown): value is { x: number; y: number } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'x' in value &&
+    typeof value.x === 'number' &&
+    Number.isFinite(value.x) &&
+    'y' in value &&
+    typeof value.y === 'number' &&
+    Number.isFinite(value.y)
+  );
 }
 
 export class TestServerControl {
   static async getWorldDiagnostics(): Promise<ServerWorldDiagnostics> {
-    const { ok, body } = await httpRequest(`${TestConfig.SERVER_URL}/health`);
-    if (!ok) {
-      throw new Error('Health check failed');
+    const response = await fetch(`${TestConfig.SERVER_URL}/health`, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`Health check failed: HTTP ${response.status}`);
     }
-
-    const parsed = JSON.parse(body) as HealthResponse & { players?: number };
-    if (parsed.world) {
-      return parsed.world;
+    const parsed: unknown = await response.json();
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('world' in parsed) ||
+      !isWorldDiagnostics(parsed.world)
+    ) {
+      throw new Error('Health response omitted valid world diagnostics');
     }
-
-    // Legacy /health payload before world diagnostics were added.
-    const humanPlayers = parsed.players ?? 0;
-    return {
-      isPaused: humanPlayers === 0,
-      gameTime: 0,
-      humanPlayers,
-      bots: 0,
-      asteroids: humanPlayers === 0 ? 0 : -1,
-      satellites: humanPlayers === 0 ? 0 : -1,
-    };
+    return parsed.world;
   }
 
   static isWorldClean(world: ServerWorldDiagnostics): boolean {
-    if (world.humanPlayers !== 0 || !world.isPaused) {
-      return false;
-    }
-    return world.asteroids <= 0;
+    return (
+      world.isPaused &&
+      world.humanPlayers === 0 &&
+      world.bots === 0 &&
+      world.asteroids === 0 &&
+      world.loot === 0 &&
+      world.satellites === 0 &&
+      world.satellitePickups === 0
+    );
   }
 
   static async resetWorld(): Promise<void> {
-    try {
-      const { ok } = await httpRequest(`${TestConfig.SERVER_URL}/test/reset-world`, 'POST');
-      if (ok) {
-        await this.waitForWorldReset();
-        return;
-      }
-    } catch {
-      // Fall through to disconnect-only barrier for older dev servers.
+    const response = await fetch(`${TestConfig.SERVER_URL}/test/reset-world`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`World reset failed: HTTP ${response.status}`);
     }
-
-    await this.waitForPlayersDisconnected();
+    await TestServerControl.waitForWorldReset();
   }
 
-  static async waitForPlayersDisconnected(timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const world = await this.getWorldDiagnostics();
-      if (world.humanPlayers === 0) {
-        return;
-      }
-      await sleep(DEFAULT_POLL_MS);
+  static async placePlayer(
+    playerId: string,
+    position: { x: number; y: number }
+  ): Promise<{ motionEpoch?: number }> {
+    const response = await fetch(`${TestConfig.SERVER_URL}/test/place-player`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, position }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`Player fixture placement failed: HTTP ${response.status}`);
     }
-    throw new Error('Timed out waiting for all players to disconnect');
+    const result: unknown = await response.json();
+    if (
+      typeof result !== 'object' ||
+      result === null ||
+      !('status' in result) ||
+      result.status !== 'placed' ||
+      !('playerId' in result) ||
+      result.playerId !== playerId ||
+      !('position' in result) ||
+      typeof result.position !== 'object' ||
+      result.position === null ||
+      !('x' in result.position) ||
+      result.position.x !== position.x ||
+      !('y' in result.position) ||
+      result.position.y !== position.y
+    ) {
+      throw new Error('Player fixture placement returned an invalid response');
+    }
+    if (
+      'motionEpoch' in result &&
+      (typeof result.motionEpoch !== 'number' ||
+        !Number.isSafeInteger(result.motionEpoch) ||
+        result.motionEpoch < 0)
+    ) {
+      throw new Error('Player fixture placement returned an invalid motion epoch');
+    }
+    return 'motionEpoch' in result ? { motionEpoch: result.motionEpoch as number } : {};
+  }
+
+  static async arrangeBotShot(playerId: string, botId: string): Promise<BotShotArrangement> {
+    const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-bot-shot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId, botId }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(`Bot shot fixture arrangement failed: HTTP ${response.status}`);
+    }
+    const result: unknown = await response.json();
+    if (
+      typeof result !== 'object' ||
+      result === null ||
+      !('status' in result) ||
+      result.status !== 'arranged' ||
+      !('playerId' in result) ||
+      result.playerId !== playerId ||
+      !('botId' in result) ||
+      result.botId !== botId ||
+      !('playerPosition' in result) ||
+      !isPosition(result.playerPosition) ||
+      !('botPosition' in result) ||
+      !isPosition(result.botPosition) ||
+      !('botHealth' in result) ||
+      typeof result.botHealth !== 'number' ||
+      !Number.isFinite(result.botHealth) ||
+      result.botHealth <= 0
+    ) {
+      throw new Error('Bot shot fixture arrangement returned an invalid response');
+    }
+    if (
+      'motionEpoch' in result &&
+      (typeof result.motionEpoch !== 'number' ||
+        !Number.isSafeInteger(result.motionEpoch) ||
+        result.motionEpoch < 0)
+    ) {
+      throw new Error('Bot shot fixture arrangement returned an invalid motion epoch');
+    }
+    return {
+      playerPosition: result.playerPosition,
+      botPosition: result.botPosition,
+      botHealth: result.botHealth,
+      ...('motionEpoch' in result ? { motionEpoch: result.motionEpoch as number } : {}),
+    };
   }
 
   static async waitForWorldReset(timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const world = await this.getWorldDiagnostics();
-      if (this.isWorldClean(world)) {
+      const world = await TestServerControl.getWorldDiagnostics();
+      if (TestServerControl.isWorldClean(world)) {
         return;
       }
       await sleep(DEFAULT_POLL_MS);
     }
 
-    const world = await this.getWorldDiagnostics();
+    const world = await TestServerControl.getWorldDiagnostics();
     throw new Error(`Timed out waiting for server world reset: ${JSON.stringify(world)}`);
   }
 }

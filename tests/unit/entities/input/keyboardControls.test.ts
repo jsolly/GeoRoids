@@ -3,8 +3,8 @@ import { FUEL, GAME, SHIP } from '../../../../src/constants';
 import { Player } from '../../../../src/entities/player/Player';
 import { publishHarpoonField } from '../../../../src/entities/ship/harpoonField';
 import { applyShipKitToShip } from '../../../../src/entities/ship/shipKits';
-import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { keyDown, keyUp } from '../../../../src/input/keybindings';
+import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { setSelectedShipKitId } from '../../../../src/ui/shipKitSelect';
 
 // Covers the "controls appeared unresponsive" report: WASD did nothing and

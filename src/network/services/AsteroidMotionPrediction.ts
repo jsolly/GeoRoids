@@ -143,8 +143,8 @@ export class AsteroidMotionPrediction {
     const wasConstrained = !!previous && previous.mode !== 'free';
     if (newEpoch || resumed) {
       this.pending = [];
-      this.lastCommandFrame = undefined;
-      this.latchRadius = undefined;
+      delete this.lastCommandFrame;
+      delete this.latchRadius;
       this.nextInputSequence = state.ack + 1;
       this.nextPoseSequence = state.ack + 1;
     } else {
@@ -172,19 +172,21 @@ export class AsteroidMotionPrediction {
       ship.velocity = { ...snapshot.velocity };
       ship.angle = snapshot.angle;
       ship.thrusting = snapshot.thrusting;
-      ship.targetPosition = undefined;
-      ship.targetVelocity = undefined;
-      ship.targetAngle = undefined;
+      delete ship.targetPosition;
+      delete ship.targetVelocity;
+      delete ship.targetAngle;
       ship.mass = snapshot.mass;
     }
     if (state.mode === 'latched') {
       const target = rocks.find((rock) => rock.id === state.asteroidId);
-      this.latchRadius = target
-        ? Math.hypot(
-            snapshot.position.x - target.position.x,
-            snapshot.position.y - target.position.y
-          )
-        : undefined;
+      if (target) {
+        this.latchRadius = Math.hypot(
+          snapshot.position.x - target.position.x,
+          snapshot.position.y - target.position.y
+        );
+      } else {
+        delete this.latchRadius;
+      }
     }
     if (state.mode === 'free' || state.mode === 'handoff' || !this.authoritativeAlive) {
       this.pending = [];
@@ -350,21 +352,21 @@ export class AsteroidMotionPrediction {
     }
     this.waitingForResume = true;
     this.pending = [];
-    this.lastCommandFrame = undefined;
+    delete this.lastCommandFrame;
     this.overflow = false;
   }
 
   public reset(): void {
-    this.actorId = undefined;
-    this.motion = undefined;
+    delete this.actorId;
+    delete this.motion;
     this.nextInputSequence = 1;
     this.nextPoseSequence = 0;
     this.pending = [];
-    this.lastCommandFrame = undefined;
+    delete this.lastCommandFrame;
     this.lastSnapshotAt = -1;
     this.waitingForResume = false;
     this.overflow = false;
     this.authoritativeAlive = false;
-    this.latchRadius = undefined;
+    delete this.latchRadius;
   }
 }

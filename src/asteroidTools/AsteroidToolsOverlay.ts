@@ -294,7 +294,7 @@ export class AsteroidToolsOverlay {
       this.callbacks.onOpen?.();
     });
     this.launcher.id = 'asteroid-tools-launcher';
-    this.launcher.dataset.asteroidToolsAction = 'open';
+    this.launcher.dataset['asteroidToolsAction'] = 'open';
     this.launcher.setAttribute('aria-label', 'Open asteroid tools');
     this.launcher.setAttribute('aria-expanded', 'false');
 
@@ -309,7 +309,7 @@ export class AsteroidToolsOverlay {
     const closeButton = createButton(doc, 'Close', 'asteroid-tools-overlay__close', () => {
       this.callbacks.onClose?.();
     });
-    closeButton.dataset.asteroidToolsAction = 'close';
+    closeButton.dataset['asteroidToolsAction'] = 'close';
     closeButton.setAttribute('aria-label', 'Close asteroid tools');
     header.append(title, this.status, closeButton);
 
@@ -319,7 +319,7 @@ export class AsteroidToolsOverlay {
     targetLabel.className = 'asteroid-tools-overlay__target-label';
     this.targetSelect = doc.createElement('select');
     this.targetSelect.className = 'asteroid-tools-overlay__target';
-    this.targetSelect.dataset.asteroidToolsTarget = 'true';
+    this.targetSelect.dataset['asteroidToolsTarget'] = 'true';
     this.targetSelect.setAttribute('aria-label', 'Asteroid target');
     this.targetPlaceholder = doc.createElement('option');
     this.targetPlaceholder.value = '';
@@ -350,7 +350,7 @@ export class AsteroidToolsOverlay {
           this.callbacks.onMotion?.(action);
         }
       );
-      button.dataset.asteroidToolsMotion = action;
+      button.dataset['asteroidToolsMotion'] = action;
       button.setAttribute('aria-label', MOTION_HINTS[action]);
       this.motionButtons.set(action, button);
       motionGrid.append(button);
@@ -396,7 +396,11 @@ export class AsteroidToolsOverlay {
         this.targetSelect.value = nextValue;
       }
     }
-    this.previousSelectedTargetId = state.selectedTargetId;
+    if (state.selectedTargetId !== undefined) {
+      this.previousSelectedTargetId = state.selectedTargetId;
+    } else {
+      delete this.previousSelectedTargetId;
+    }
     this.previousSelectedTargetPresent = selectedTargetPresent;
     this.targetSelect.disabled = !alive || state.targets.length === 0;
 
@@ -466,7 +470,7 @@ export class AsteroidToolsOverlay {
     this.launcher.remove();
     this.root.remove();
     this.targetOptions.clear();
-    this.previousSelectedTargetId = undefined;
+    delete this.previousSelectedTargetId;
     this.previousSelectedTargetPresent = false;
     this.wasActive = false;
     this.mounted = false;

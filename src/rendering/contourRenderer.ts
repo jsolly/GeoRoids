@@ -21,6 +21,9 @@ export function drawIsoContours(shipPosition: Position): void {
   }
 
   const pad = 32;
+  const scale = canvasManager.getPlayfieldScale();
+  const centerX = cvs.width / 2;
+  const centerY = cvs.height / 2;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -36,18 +39,20 @@ export function drawIsoContours(shipPosition: Position): void {
     ctx.beginPath();
 
     for (const segment of level.segments) {
-      const a = canvasManager.worldToScreen({ x: segment.ax, y: segment.ay }, shipPosition);
-      const b = canvasManager.worldToScreen({ x: segment.bx, y: segment.by }, shipPosition);
+      const ax = centerX + (segment.ax - shipPosition.x) * scale;
+      const ay = centerY + (segment.ay - shipPosition.y) * scale;
+      const bx = centerX + (segment.bx - shipPosition.x) * scale;
+      const by = centerY + (segment.by - shipPosition.y) * scale;
       if (
-        (a.x < -pad && b.x < -pad) ||
-        (a.x > cvs.width + pad && b.x > cvs.width + pad) ||
-        (a.y < -pad && b.y < -pad) ||
-        (a.y > cvs.height + pad && b.y > cvs.height + pad)
+        (ax < -pad && bx < -pad) ||
+        (ax > cvs.width + pad && bx > cvs.width + pad) ||
+        (ay < -pad && by < -pad) ||
+        (ay > cvs.height + pad && by > cvs.height + pad)
       ) {
         continue;
       }
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
     }
 
     ctx.stroke();

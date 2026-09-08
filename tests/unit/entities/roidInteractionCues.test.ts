@@ -1,5 +1,8 @@
 import { expect, test, vi } from 'vitest';
-import { drawRoidInteractionCues, reflectiveFacetCueCount } from '../../../src/entities/roid/roidRenderer';
+import {
+  drawRoidInteractionCues,
+  reflectiveFacetCueCount,
+} from '../../../src/entities/roid/roidRenderer';
 
 function context(): CanvasRenderingContext2D {
   return {

@@ -1,27 +1,19 @@
-# Laser Tests
+# Laser scenarios
 
-This folder contains browser integration tests for laser functionality and network communication.
+Follow [the test-writing guide](../../../AGENTS.ms) and
+[browser execution guidance](../README.md).
 
-## Test Files
+A two-pilot shot lifecycle proves that real input creates an owned projectile,
+the peer receives the same trajectory, and both clients remove it on expiry. Keep
+three-client fanout and mouse firing separate because they exercise distinct
+transport and input paths.
 
-- **laserCommunication.test.ts** - Tests laser firing and network communication between client and server
-- **laserNetworkFlow.test.ts** - Tests the complete network flow for laser events
-- **laserServerLogs.test.ts** - Tests server-side logging for laser events
+Capture projectile IDs before firing and match the new projectile's owner and
+motion. Observe received or rendered state; a server log saying that a packet
+arrived does not prove that the command was accepted or broadcast.
 
-## Test Coverage
+Run from the repository root:
 
-- Laser firing mechanics
-- Client-server laser communication
-- Network message flow for laser events
-- Server-side laser event logging
-- Laser state synchronization
-- Error handling for laser network issues
-
-## Dependencies
-
-These tests use the browser test infrastructure:
-
-- BrowserManager for browser automation
-- ScreenshotManager for test documentation
-- GameInteractions for game control
-- HealthChecker for server health validation
+```bash
+./scripts/test-runner.sh tests/integration/browser/laser/ --reporter=verbose
+```

@@ -13,7 +13,9 @@ beforeEach(() => {
 
 test('kit picker lists the five kits and selects Dart by default', () => {
   const buttons = [...document.querySelectorAll<HTMLButtonElement>('#ship-kit-grid [data-kit-id]')];
-  expect(buttons.map((button) => button.dataset.kitId)).toEqual(listShipKits().map((kit) => kit.id));
+  expect(buttons.map((button) => button.dataset['kitId'])).toEqual(
+    listShipKits().map((kit) => kit.id)
+  );
   expect(getSelectedShipKitId()).toBe('dart');
   expect(buttons[0]?.classList.contains('is-selected')).toBe(true);
   expect(buttons.every((button) => button.querySelector('svg.ship-kit-silhouette'))).toBe(true);
@@ -35,6 +37,8 @@ test('Hauler selection survives a remount so join is not stuck on Dart', () => {
   mountShipKitSelect();
   expect(getSelectedShipKitId()).toBe('hauler');
   expect(
-    document.querySelector<HTMLButtonElement>('[data-kit-id="hauler"]')?.getAttribute('aria-pressed')
+    document
+      .querySelector<HTMLButtonElement>('[data-kit-id="hauler"]')
+      ?.getAttribute('aria-pressed')
   ).toBe('true');
 });

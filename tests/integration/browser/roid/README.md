@@ -1,24 +1,19 @@
-# Roid Tests
+# Asteroid scenarios
 
-This folder contains browser integration tests for roid (asteroid) functionality.
+Follow [the test-writing guide](../../../AGENTS.ms) and
+[browser execution guidance](../README.md).
 
-## Test Files
+These scenarios distinguish collaborative splitting, solo destruction,
+non-splitting size classes, and collectible drops. Arrange identified asteroids
+and pilots, then fire real shots.
 
-- **two-players-hit-big-roid-within-one-second-splits.test.ts** - Two players hit a biggest asteroid within 1s → split
-- **large-roids-split-into-medium-roids.test.ts** - Solo finish of a large roid does not split
-- **medium-roids-split-into-small-roids.test.ts** - Medium class never splits
-- **small-roids-do-not-split.test.ts** - Solo large destroy reduces the field (no fragments)
+Compare the selected asteroid and its identified fragments or drop across
+clients. Do not accept unrelated changes to the total field count as proof that
+the intended asteroid split. Arm destruction observers before firing and wait
+for the corresponding snapshot before asserting that a drop is present.
 
-## Test Coverage
+Run from the repository root:
 
-- Collaborative split for the biggest asteroids
-- Solo destroy does not split
-- Collision-based roid destruction
-- Smaller roid classes never split
-
-## Dependencies
-
-These tests use the browser test infrastructure:
-
-- BrowserManager for browser automation
-- GameInteractions for game control
+```bash
+./scripts/test-runner.sh tests/integration/browser/roid/ --reporter=verbose
+```

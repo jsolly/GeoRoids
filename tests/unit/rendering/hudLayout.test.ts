@@ -6,7 +6,10 @@ import { computeHudLayout } from '../../../src/rendering/hud/hudLayout';
 const ZERO = { top: 0, right: 0, bottom: 0, left: 0 };
 
 test('desktop 800x600 keeps the Wave1 compact cluster anchors', () => {
-  const layout = computeHudLayout({ width: 800, height: 600 }, { touchControls: false, safeArea: ZERO });
+  const layout = computeHudLayout(
+    { width: 800, height: 600 },
+    { touchControls: false, safeArea: ZERO }
+  );
   expect(layout.lives).toEqual({ x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET });
   expect(layout.score).toEqual({ x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET });
   expect(layout.killMessageY).toBe(12);

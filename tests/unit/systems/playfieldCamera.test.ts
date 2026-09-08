@@ -4,9 +4,9 @@ import { RNGService } from '../../../server/core/RNGService';
 import { partitionAsteroidSnapshot } from '../../../src/network/services/asteroidFieldSync';
 import { getAsteroidFieldRadius, stepAsteroidMotion } from '../../../src/physics/asteroidMotion';
 import {
-  PLAYFIELD_CLOSE_SCALE,
   countRocksOnCanvas,
   drawingOffsets,
+  PLAYFIELD_CLOSE_SCALE,
   playfieldZoom,
   radarBeltVisibleOnPlayfield,
 } from '../../../src/rendering/playfieldCamera';

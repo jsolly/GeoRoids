@@ -38,7 +38,9 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     engine?.stopGameLoop();
   });
 
-  test.each(invalidMovements)('$label is rejected before respawn acknowledgment or peer broadcast', ({ movement }) => {
+  test.each(
+    invalidMovements
+  )('$label is rejected before respawn acknowledgment or peer broadcast', ({ movement }) => {
     engine = new GameEngine(482);
     const core = new WebSocketCore(engine);
     const ownerMessages: RecordedMessage[] = [];
@@ -48,7 +50,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     core.handleClientMessage({ type: 'join', data: { id: 'pilot', name: 'Pilot' } }, owner);
     core.handleClientMessage({ type: 'join', data: { id: 'peer', name: 'Peer' } }, peer);
     const pilot = engine.getPlayer('pilot')!;
-    pilot.spawnProtectionTimer = undefined;
+    delete pilot.spawnProtectionTimer;
     expect(engine.handlePlayerDamage(pilot.id, 'boundary', pilot.maxHealth)).toBe(true);
     for (let frame = 0; frame <= SHIP.RESPAWN_DELAY_FRAMES && pilot.health <= 0; frame++) {
       engine.advanceCombatFrame();
@@ -62,13 +64,17 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     ownerMessages.length = 0;
     peerMessages.length = 0;
 
-    core.handleClientMessage({
-      type: 'update', id: pilot.id,
-      data: { position, velocity: { x: 3, y: 4 }, angle: 0.75, thrusting: true, ...movement },
-    }, owner);
+    core.handleClientMessage(
+      {
+        type: 'update',
+        id: pilot.id,
+        data: { position, velocity: { x: 3, y: 4 }, angle: 0.75, thrusting: true, ...movement },
+      },
+      owner
+    );
 
-    expect(ownerMessages.some(message => message.type === 'error')).toBe(true);
-    expect(peerMessages.some(message => message.type === 'playerUpdate')).toBe(false);
+    expect(ownerMessages.some((message) => message.type === 'error')).toBe(true);
+    expect(peerMessages.some((message) => message.type === 'playerUpdate')).toBe(false);
     expect(pilot.position).toEqual(position);
     expect(pilot.velocity).toEqual(velocity);
     expect(pilot.angle).toBe(angle);
@@ -78,18 +84,34 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     // Rejection is atomic and does not break the socket's next legitimate
     // pose acknowledgment or input. Legacy angular-velocity alias stays valid.
     const nextPosition = { x: position.x + 5, y: position.y + 5 };
-    core.handleClientMessage({
-      type: 'update', id: pilot.id,
-      data: { position: nextPosition, velocity: { x: 1, y: 2 }, angle: 0.25, a: 0.5, thrusting: true },
-    }, owner);
+    core.handleClientMessage(
+      {
+        type: 'update',
+        id: pilot.id,
+        data: {
+          position: nextPosition,
+          velocity: { x: 1, y: 2 },
+          angle: 0.25,
+          a: 0.5,
+          thrusting: true,
+        },
+      },
+      owner
+    );
     expect(pilot.position).toEqual(nextPosition);
     expect(pilot.velocity).toEqual({ x: 1, y: 2 });
     expect(pilot.angle).toBe(0.25);
     expect(pilot.thrusting).toBe(true);
     expect(pilot.respawnAnchor).toBeUndefined();
-    const accepted = peerMessages.find(message => message.type === 'playerUpdate');
-    expect(accepted?.data).toMatchObject({ position: nextPosition, angularVelocity: 0.5, thrusting: true });
-    expect(engine.getGameState().entities.find(entity => entity.id === pilot.id)?.position).toEqual(nextPosition);
+    const accepted = peerMessages.find((message) => message.type === 'playerUpdate');
+    expect(accepted?.data).toMatchObject({
+      position: nextPosition,
+      angularVelocity: 0.5,
+      thrusting: true,
+    });
+    expect(
+      engine.getGameState().entities.find((entity) => entity.id === pilot.id)?.position
+    ).toEqual(nextPosition);
   });
 
   test('movement cannot overwrite an active latch, socket, or inject unknown snapshot keys', () => {
@@ -99,27 +121,48 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     const peerMessages: RecordedMessage[] = [];
     const owner = recordingSocket(ownerMessages);
     const peer = recordingSocket(peerMessages);
-    core.handleClientMessage({ type: 'join', data: { id: 'pilot', name: 'Pilot', kitId: 'hauler' } }, owner);
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'pilot', name: 'Pilot', kitId: 'hauler' } },
+      owner
+    );
     core.handleClientMessage({ type: 'join', data: { id: 'peer', name: 'Peer' } }, peer);
     const pilot = engine.getPlayer('pilot')!;
     const rock = engine.getAllAsteroids()[0]!;
     // The trusted entity API remains available to the authoritative ability
     // owner; the untrusted movement route may not rewrite its active endpoint.
     const latch = { ...rock.position };
-    engine.updatePlayer(pilot.id, { harpoonTimer: 30, harpoonTargetId: rock.id, harpoonLatchPos: latch });
+    engine.updatePlayer(pilot.id, {
+      harpoonTimer: 30,
+      harpoonTargetId: rock.id,
+      harpoonLatchPos: latch,
+    });
     peerMessages.length = 0;
     const position = JSON.parse('{"x":100,"y":200,"__proto__":{"poison":true},"extra":null}');
     const velocity = { x: 1, y: 2, unexpected: 'not public state' };
     const unknown = JSON.parse('{"__proto__":{"poison":true},"constructor":{"bad":true}}');
-    core.handleClientMessage({
-      type: 'update', id: pilot.id,
-      data: {
-        ...unknown, position, velocity, angle: 0.5, thrusting: false,
-        ws: null, type: 'bot', name: 'Spoofed', socket: {},
-        harpoonTimer: 999, harpoonTargetId: 'missing', harpoonLatchPos: { x: null, y: 'bad' },
-        lasers: [{ position: null }], futureServerField: { poisoned: true },
+    core.handleClientMessage(
+      {
+        type: 'update',
+        id: pilot.id,
+        data: {
+          ...unknown,
+          position,
+          velocity,
+          angle: 0.5,
+          thrusting: false,
+          ws: null,
+          type: 'bot',
+          name: 'Spoofed',
+          socket: {},
+          harpoonTimer: 999,
+          harpoonTargetId: 'missing',
+          harpoonLatchPos: { x: null, y: 'bad' },
+          lasers: [{ position: null }],
+          futureServerField: { poisoned: true },
+        },
       },
-    }, owner);
+      owner
+    );
 
     expect(pilot.ws).toBe(owner);
     expect(pilot.type).toBe('human');
@@ -131,12 +174,15 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     expect(pilot.velocity).toEqual({ x: 1, y: 2 });
     expect(pilot).not.toHaveProperty('futureServerField');
     expect(Object.getPrototypeOf(pilot)).toBe(Object.prototype);
-    const accepted = peerMessages.find(message => message.type === 'playerUpdate');
+    const accepted = peerMessages.find((message) => message.type === 'playerUpdate');
     expect(accepted?.data).toEqual({
-      id: pilot.id, position: { x: 100, y: 200 }, velocity: { x: 1, y: 2 },
-      angle: 0.5, rotation: 0.5, thrusting: false,
+      id: pilot.id,
+      position: { x: 100, y: 200 },
+      velocity: { x: 1, y: 2 },
+      angle: 0.5,
+      rotation: 0.5,
+      thrusting: false,
     });
     expect(engine.getPlayerBySocket(owner)).toBe(pilot);
   });
-
 });

@@ -29,7 +29,6 @@ import { NetworkManager } from '../network/networkManager';
 import { Point } from '../physics/Point';
 import { getFactionColor, getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
-import { logger } from '../utils/Logger';
 import { drawFieryBoundary } from './boundaryRenderer';
 import {
   drawContourLaserTicks,
@@ -269,22 +268,23 @@ class CanvasManager {
     drawIsoContours(currShip.position);
 
     const localId = NetworkManager.getInstance().getLocalPlayerId();
-    this.laserHosts.length = 1;
+    let laserHostCount = 1;
     const localLaserHost = this.laserHosts[0];
     if (localLaserHost) {
       localLaserHost.lasers = currShip.lasers;
     }
     for (const player of allPlayers) {
       if (player.id !== localId && shouldDrawShipHull(player.ship)) {
-        const hostIndex = this.laserHosts.length;
-        const host = this.laserHosts[hostIndex];
+        const host = this.laserHosts[laserHostCount];
         if (host) {
           host.lasers = player.ship.lasers;
         } else {
           this.laserHosts.push({ lasers: player.ship.lasers });
         }
+        laserHostCount++;
       }
     }
+    this.laserHosts.length = laserHostCount;
     drawContourLaserTicks(
       currShip.position,
       liveLaserPositions(this.laserHosts, this.liveLaserPositions)
@@ -304,48 +304,40 @@ class CanvasManager {
     const localLaserColor = getLaserColor(true);
     const enemyLaserColor = getLaserColor(false);
 
-    try {
-      for (const player of allPlayers) {
-        const factionColor = getFactionColor(player.type);
-        const isLocal = player.id === localId;
-        const ship = isLocal ? currShip : player.ship;
+    for (const player of allPlayers) {
+      const factionColor = getFactionColor(player.type);
+      const isLocal = player.id === localId;
+      const ship = isLocal ? currShip : player.ship;
 
-        if (ship.exploding) {
-          if (isLocal) {
-            drawShipExplosion(currShip, factionColor);
-          } else {
-            drawShipExplosionAtPosition(ship, currShip.position, factionColor);
-          }
-        } else if (shouldDrawShipHull(ship)) {
-          drawShipAtPosition(
-            ship,
-            currShip.position,
-            factionColor,
-            isLocal ? currPlayer.name : player.name,
-            player.factionId
-          );
-        }
-      }
-
-      for (const player of allPlayers) {
-        const isLocal = player.id === localId;
-        const ship = isLocal ? currShip : player.ship;
-        if (!shouldDrawShipHull(ship) || !ship.thrusting) {
-          continue;
-        }
-        const factionColor = getFactionColor(player.type);
+      if (ship.exploding) {
         if (isLocal) {
-          drawThruster(currShip, factionColor);
+          drawShipExplosion(currShip, factionColor);
         } else {
-          drawThrusterAtPosition(ship, currShip.position, factionColor);
+          drawShipExplosionAtPosition(ship, currShip.position, factionColor);
         }
+      } else if (shouldDrawShipHull(ship)) {
+        drawShipAtPosition(
+          ship,
+          currShip.position,
+          factionColor,
+          isLocal ? currPlayer.name : player.name,
+          player.factionId
+        );
       }
-    } catch (error: unknown) {
-      logger.error(
-        'RENDERING',
-        'Error drawing game',
-        error instanceof Error ? error : new Error(String(error))
-      );
+    }
+
+    for (const player of allPlayers) {
+      const isLocal = player.id === localId;
+      const ship = isLocal ? currShip : player.ship;
+      if (!shouldDrawShipHull(ship) || !ship.thrusting) {
+        continue;
+      }
+      const factionColor = getFactionColor(player.type);
+      if (isLocal) {
+        drawThruster(currShip, factionColor);
+      } else {
+        drawThrusterAtPosition(ship, currShip.position, factionColor);
+      }
     }
 
     drawShockwaves(currShip.position);

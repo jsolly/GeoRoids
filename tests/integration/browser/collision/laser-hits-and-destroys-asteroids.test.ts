@@ -1,45 +1,88 @@
-import { test, expect } from 'vitest';
+import { expect, test } from 'vitest';
+import { pointsForRoidSize } from '../../../../src/entities/roid/roidScore';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
-test('laser hits and destroys asteroids', async () => {
-  const page = browserManager.getCurrentPage();
-  if (!page) throw new Error('Page not available');
+type ReceivedMessage = {
+  type?: string;
+  data?: { asteroidId?: string };
+};
 
-  const game = new GameInteractions(page);
-  await game.bootGame();
-  await game.waitForCombatReady();
-  await game.waitForAsteroids(1);
+test(
+  'laser hits and destroys asteroids',
+  async () => {
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Page not available');
+    }
 
-  const initialScore = await game.getScore();
-  const target = (await game.getAsteroidPositions()).find(
-    (candidate) => candidate.isCollabTarget !== true && candidate.radius < 40
-  );
-  expect(target, 'expected an ordinary asteroid smaller than the collab class').toBeDefined();
-  if (!target) return;
+    const game = new GameInteractions(page);
+    const destroyedAsteroidIds = new Set<string>();
+    page.on('websocket', (socket) =>
+      socket.on('framereceived', ({ payload }) => {
+        const message = JSON.parse(String(payload)) as ReceivedMessage;
+        if (message.type === 'asteroidDestroy' && message.data?.asteroidId) {
+          destroyedAsteroidIds.add(message.data.asteroidId);
+        }
+      })
+    );
+    await game.bootGame();
+    await game.waitForCombatReady();
+    await game.waitForAsteroids(1);
 
-  await game.destroyAsteroidWithLaser(target, 25000);
+    const initialScore = await game.getScore();
+    const [asteroids, satellites, bots] = await Promise.all([
+      game.getAsteroidPositions(),
+      game.getSatellites(),
+      game.getBots(),
+    ]);
+    const hazards = [
+      ...satellites.map((satellite) => ({ x: satellite.x, y: satellite.y })),
+      ...bots
+        .filter((bot) => bot.health > 0 && !bot.exploding)
+        .map((bot) => ({ x: bot.x, y: bot.y })),
+    ];
+    const target = asteroids
+      .filter(
+        (candidate) =>
+          candidate.isCollabTarget !== true && candidate.material === 'ice' && candidate.radius < 40
+      )
+      .map((candidate) => ({
+        ...candidate,
+        clearance: hazards.length
+          ? Math.min(
+              ...hazards.map((position) =>
+                Math.hypot(candidate.x - position.x, candidate.y - position.y)
+              )
+            )
+          : Number.MAX_SAFE_INTEGER,
+      }))
+      .sort((left, right) => right.clearance - left.clearance)[0];
+    expect(target, 'expected an ordinary ice asteroid clear of hostile actors').toBeDefined();
+    if (!target) {
+      return;
+    }
 
-  await expect
-    .poll(
-      async () => {
-        await game.runGameFrames(8);
-        const roids = await game.getAsteroidDetails();
-        return !roids.some((r) => r.id === target.id);
-      },
-      { timeout: 12000, message: 'target asteroid should be gone (split fragments may remain)' }
-    )
-    .toBe(true);
-  await expect
-    .poll(
-      async () => {
-        await game.runGameFrames(8);
-        return game.getScore();
-      },
-      { timeout: 12000, message: 'destroying an asteroid should award points' }
-    )
-    .toBeGreaterThan(initialScore);
-}, TestConfig.DEFAULT_TIMEOUT);
+    await game.destroyAsteroidWithLaser(target, 25000);
+
+    await expect
+      .poll(() => destroyedAsteroidIds.has(target.id), {
+        timeout: 8000,
+        message: 'server should confirm destruction of the chosen asteroid',
+      })
+      .toBe(true);
+    await expect
+      .poll(
+        async () => {
+          await game.runGameFrames(8);
+          return game.getScore();
+        },
+        { timeout: 12000, message: 'destroying an asteroid should award points' }
+      )
+      .toBe(initialScore + pointsForRoidSize(target.radius));
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);

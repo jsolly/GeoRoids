@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import type { AsteroidData } from '../../../shared-types';
 import { applyFuelPickup, applyFuelSnapshot, isFuelLoot } from '../../../shared/fuel';
+import type { AsteroidData } from '../../../shared-types';
 import { FUEL, ROID } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';

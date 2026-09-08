@@ -43,7 +43,7 @@ type ConstrainedMotionAction = Exclude<AsteroidToolsMotionAction, 'latch'>;
 
 export interface AsteroidToolsControllerOptions {
   /** Send the server-authoritative latch command. */
-  dispatchTool?: (action: AsteroidToolAction) => void;
+  dispatchTool?: (action: AsteroidToolAction) => boolean;
   /** Root adapter that owns the negotiated motion sequence/prediction. */
   dispatchMotionAction?: (action: ConstrainedMotionAction, targetId?: string) => boolean;
   now?: () => number;
@@ -53,9 +53,10 @@ export interface AsteroidToolsControllerOptions {
 /** One snapshot-shaped update for GameController/ConnectionManager wiring. */
 export interface AsteroidToolsControllerUpdate {
   active?: boolean;
-  pilot?: AsteroidToolsPilotState;
+  /** Omit to keep the pilot; undefined explicitly clears it. */
+  pilot?: AsteroidToolsPilotState | undefined;
   targets?: readonly AsteroidToolsTarget[];
-  reflectionPreview?: ReflectionPreview;
+  reflectionPreview?: ReflectionPreview | undefined;
 }
 
 type StateListener = (state: AsteroidToolsState) => void;
@@ -70,11 +71,8 @@ const UI_ACTION_DEBOUNCE_MS = 250;
  * bounded user action to the authoritative transport.
  */
 export class AsteroidToolsController {
-  private readonly dispatchTool?: (action: AsteroidToolAction) => void;
-  private readonly dispatchMotionAction?: (
-    action: ConstrainedMotionAction,
-    targetId?: string
-  ) => boolean;
+  private readonly dispatchTool: AsteroidToolsControllerOptions['dispatchTool'];
+  private readonly dispatchMotionAction: AsteroidToolsControllerOptions['dispatchMotionAction'];
   private readonly now: () => number;
   private readonly listeners = new Set<StateListener>();
   private readonly targetsById = new Map<string, AsteroidToolsTarget>();
@@ -114,8 +112,8 @@ export class AsteroidToolsController {
     return {
       ...this.state,
       targets: [...this.targetsById.values()],
-      selectedTarget,
-      pilot: this.state.pilot ? { ...this.state.pilot } : undefined,
+      ...(selectedTarget ? { selectedTarget } : {}),
+      ...(this.state.pilot ? { pilot: { ...this.state.pilot } } : {}),
     };
   }
 
@@ -131,7 +129,11 @@ export class AsteroidToolsController {
       changed = true;
     }
     if ('reflectionPreview' in snapshot) {
-      this.state.reflectionPreview = snapshot.reflectionPreview;
+      if (snapshot.reflectionPreview) {
+        this.state.reflectionPreview = snapshot.reflectionPreview;
+      } else {
+        delete this.state.reflectionPreview;
+      }
       changed = true;
     }
     if (snapshot.active !== undefined) {
@@ -139,7 +141,7 @@ export class AsteroidToolsController {
       if (nextActive !== this.state.active) {
         this.state.active = nextActive;
         if (!nextActive) {
-          this.state.reflectionPreview = undefined;
+          delete this.state.reflectionPreview;
         }
         changed = true;
       }
@@ -156,7 +158,7 @@ export class AsteroidToolsController {
     }
     this.state.active = nextActive;
     if (!nextActive) {
-      this.state.reflectionPreview = undefined;
+      delete this.state.reflectionPreview;
     }
     this.publish();
   }
@@ -167,8 +169,8 @@ export class AsteroidToolsController {
       this.state.selectedTargetId !== undefined ||
       this.state.reflectionPreview !== undefined;
     this.state.active = false;
-    this.state.selectedTargetId = undefined;
-    this.state.reflectionPreview = undefined;
+    delete this.state.selectedTargetId;
+    delete this.state.reflectionPreview;
     if (changed) {
       this.publish();
     }
@@ -185,7 +187,11 @@ export class AsteroidToolsController {
   }
 
   setReflectionPreview(preview: ReflectionPreview | undefined): void {
-    this.state.reflectionPreview = preview;
+    if (preview) {
+      this.state.reflectionPreview = preview;
+    } else {
+      delete this.state.reflectionPreview;
+    }
     this.publish();
   }
 
@@ -194,8 +200,8 @@ export class AsteroidToolsController {
       if (this.state.selectedTargetId === undefined) {
         return false;
       }
-      this.state.selectedTargetId = undefined;
-      this.state.reflectionPreview = undefined;
+      delete this.state.selectedTargetId;
+      delete this.state.reflectionPreview;
       this.publish();
       return true;
     }
@@ -206,7 +212,7 @@ export class AsteroidToolsController {
       return true;
     }
     this.state.selectedTargetId = targetId;
-    this.state.reflectionPreview = undefined;
+    delete this.state.reflectionPreview;
     this.state.status = 'Target selected';
     this.publish();
     return true;
@@ -235,12 +241,11 @@ export class AsteroidToolsController {
       if (!this.dispatchTool || !this.state.selectedTargetId) {
         return false;
       }
-      this.dispatchTool({
+      dispatched = this.dispatchTool({
         action: 'latch',
         targetId: this.state.selectedTargetId,
         sequence: this.nextSequence(),
       });
-      dispatched = true;
     } else if (this.dispatchMotionAction) {
       dispatched = this.dispatchMotionAction(
         action,
@@ -282,11 +287,15 @@ export class AsteroidToolsController {
   }
 
   private applyPilot(pilot: AsteroidToolsPilotState | undefined): void {
-    this.state.pilot = pilot ? { ...pilot } : undefined;
+    if (pilot) {
+      this.state.pilot = { ...pilot };
+    } else {
+      delete this.state.pilot;
+    }
     if (!pilot || pilot.alive === false) {
       this.state.active = false;
-      this.state.selectedTargetId = undefined;
-      this.state.reflectionPreview = undefined;
+      delete this.state.selectedTargetId;
+      delete this.state.reflectionPreview;
       this.state.status = 'Tools unavailable';
       return;
     }
@@ -309,8 +318,8 @@ export class AsteroidToolsController {
       }
     }
     if (this.state.selectedTargetId && !this.targetsById.has(this.state.selectedTargetId)) {
-      this.state.selectedTargetId = undefined;
-      this.state.reflectionPreview = undefined;
+      delete this.state.selectedTargetId;
+      delete this.state.reflectionPreview;
     }
   }
 

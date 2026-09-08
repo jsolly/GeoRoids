@@ -23,8 +23,12 @@ class PilotSocket {
       try {
         const packet = JSON.parse(String(raw)) as Packet;
         this.messages.push(packet);
-        if (packet.type === 'joined') this.decoder.reset();
-        if (packet.type === 'snapshot') this.snapshots.push(this.decoder.decode(packet.data));
+        if (packet.type === 'joined') {
+          this.decoder.reset();
+        }
+        if (packet.type === 'snapshot') {
+          this.snapshots.push(this.decoder.decode(packet.data));
+        }
       } catch (error) {
         this.failures.push(error instanceof Error ? error : new Error(String(error)));
       }
@@ -38,9 +42,13 @@ class PilotSocket {
   async waitFor<T>(read: () => T | undefined, label: string, timeout = 2500): Promise<T> {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
-      if (this.failures.length) throw this.failures[0];
+      if (this.failures.length) {
+        throw this.failures[0];
+      }
       const value = read();
-      if (value !== undefined) return value;
+      if (value !== undefined) {
+        return value;
+      }
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     throw new Error(`Timed out: ${label}; last packet ${JSON.stringify(this.messages.at(-1))}`);
@@ -98,7 +106,9 @@ class PilotSocket {
   }
 
   async close(): Promise<void> {
-    if (this.ws.readyState === WebSocket.CLOSED) return;
+    if (this.ws.readyState === WebSocket.CLOSED) {
+      return;
+    }
     const closed = once(this.ws, 'close');
     this.ws.close();
     await closed;
@@ -109,7 +119,9 @@ let server: ReturnType<typeof createServerInstance> | undefined;
 const clients: PilotSocket[] = [];
 
 async function connect(): Promise<PilotSocket> {
-  if (!server) throw new Error('Server missing');
+  if (!server) {
+    throw new Error('Server missing');
+  }
   const client = new PilotSocket(new WebSocket(`ws://127.0.0.1:${await server.listening}/ws`));
   clients.push(client);
   await once(client.ws, 'open');
@@ -135,7 +147,9 @@ function rock(id: string, x: number, omega = 0): AsteroidData {
 
 function entity(state: ServerGameSnapshot, id: string): ServerEntityData {
   const row = state.entities.find((item) => item.id === id);
-  if (!row) throw new Error(`Missing ${id} in decoded entities`);
+  if (!row) {
+    throw new Error(`Missing ${id} in decoded entities`);
+  }
   return row;
 }
 
@@ -149,9 +163,12 @@ async function world(observerX = -600) {
   await observer.join('observer', observerX, 'ember');
   // Existing authoritative add/remove seams isolate the world; no service state,
   // handler mocks, snapshot fabrication, or new test-control endpoints are used.
-  for (const bot of server.gameEngine.getAllBots()) server.gameEngine.removeBot(bot.id);
-  for (const asteroid of server.gameEngine.getAllAsteroids())
+  for (const bot of server.gameEngine.getAllBots()) {
+    server.gameEngine.removeBot(bot.id);
+  }
+  for (const asteroid of server.gameEngine.getAllAsteroids()) {
     server.gameEngine.removeAsteroid(asteroid.id);
+  }
   server.gameEngine.addAsteroid(rock('spinner', 0, 0.05));
   server.gameEngine.addAsteroid(rock('mark', 190));
   server.gameEngine.addAsteroid(rock('distant', -700));
@@ -167,14 +184,14 @@ afterEach(async () => {
 describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
   it('retains the visible same-epoch latch through a physical flap and accepts its private token', async () => {
     const { pilot, observer, joined, engine } = await world();
-    expect(joined.snapshotVersion).toBe(1);
-    expect(joined.asteroidInteractions).toBe(1);
-    expect(joined.resumeToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(joined['snapshotVersion']).toBe(1);
+    expect(joined['asteroidInteractions']).toBe(1);
+    expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
     pilot.send('asteroidTool', { action: 'latch', targetId: 'spinner', sequence: 0 });
     const latched = entity(await pilot.state(), 'hauler');
     expect(latched.asteroidMotion?.mode).toBe('latched');
     const epoch = latched.asteroidMotion?.epoch;
-    expect(JSON.stringify(await observer.state())).not.toContain(String(joined.resumeToken));
+    expect(JSON.stringify(await observer.state())).not.toContain(String(joined['resumeToken']));
     await pilot.close();
     const duringGrace = await observer.state();
     expect(duringGrace.entities.find((row) => row.id === 'hauler')?.asteroidMotion).toMatchObject({
@@ -183,7 +200,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     });
     expect(
       observer.messages.some(
-        (message) => message.type === 'playerLeft' && message.data?.id === 'hauler'
+        (message) => message.type === 'playerLeft' && message.data?.['id'] === 'hauler'
       )
     ).toBe(false);
     engine.startGameLoop();
@@ -192,11 +209,11 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
       'different-untrusted-id',
       800,
       'ember',
-      String(joined.resumeToken)
+      String(joined['resumeToken'])
     );
-    expect(resumed.id).toBe('hauler');
-    expect(resumed.factionId).toBe('ion');
-    expect(resumed.resumeToken).toBe(joined.resumeToken);
+    expect(resumed['id']).toBe('hauler');
+    expect(resumed['factionId']).toBe('ion');
+    expect(resumed['resumeToken']).toBe(joined['resumeToken']);
     const restored = entity(await replacement.state(), 'hauler');
     expect(restored.asteroidMotion).toMatchObject({
       mode: 'latched',
@@ -226,7 +243,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
       position: { x: 800, y: 0 },
       snapshotVersion: 1,
       asteroidInteractions: 1,
-      resumeToken: joined.resumeToken,
+      resumeToken: joined['resumeToken'],
     });
     const error = await legacy.waitFor(
       () =>
@@ -234,8 +251,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
           .slice(after)
           .find(
             (message) =>
-              message.type === 'error' &&
-              String(message.data).includes('dedicated gameplay socket')
+              message.type === 'error' && String(message.data).includes('dedicated gameplay socket')
           ),
       'legacy socket resume rejection'
     );
@@ -253,7 +269,9 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     expect(epoch).toBe(2);
     const initialPosition = { ...latched.position };
     const initialFuel = latched.fuel;
-    if (initialFuel === undefined) throw new Error('Authoritative fuel absent');
+    if (initialFuel === undefined) {
+      throw new Error('Authoritative fuel absent');
+    }
     const stalePose = {
       id: 'hauler',
       motionEpoch: 1,
@@ -280,7 +298,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     expect(beforeTick.fuel).toBe(initialFuel);
     expect(beforeTick.asteroidMotion?.ack).toBe(0);
     expect(entity(await observer.state(), 'observer').asteroidMotion?.mode).toBe('free');
-    await pilot.join('hauler', 100, 'ion', String(joined.resumeToken));
+    await pilot.join('hauler', 100, 'ion', String(joined['resumeToken']));
     engine.advanceOneFrame();
     const applied = entity(await pilot.state(), 'hauler');
     expect(applied.asteroidMotion).toMatchObject({ epoch, mode: 'latched', ack: 99 });
@@ -457,7 +475,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
       name: 'hauler',
       snapshotVersion: 1,
       asteroidInteractions: 1,
-      resumeToken: joined.resumeToken,
+      resumeToken: joined['resumeToken'],
     });
     await replacement.waitFor(
       () => replacement.messages.find((message) => message.type === 'sessionExpired'),
@@ -465,7 +483,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     );
     expect(replacement.messages.some((message) => message.type === 'joined')).toBe(false);
     const fresh = await replacement.join('hauler', 100);
-    expect(fresh.resumeToken).not.toBe(joined.resumeToken);
+    expect(fresh['resumeToken']).not.toBe(joined['resumeToken']);
     expect(entity(await replacement.state(), 'hauler').asteroidMotion).toMatchObject({
       mode: 'free',
       epoch: 1,
@@ -479,7 +497,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     const epoch = entity(await pilot.state(), 'hauler').asteroidMotion?.epoch;
     const replacement = await connect();
     const superseded = once(pilot.ws, 'close');
-    await replacement.join('forged-id', 800, 'ember', String(joined.resumeToken));
+    await replacement.join('forged-id', 800, 'ember', String(joined['resumeToken']));
     const [closeCode] = await superseded;
     expect(closeCode).toBe(4001);
     expect(engine.getPlayerCount()).toBe(2);
@@ -489,7 +507,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     });
     expect(
       observer.messages.some(
-        (message) => message.type === 'playerLeft' && message.data?.id === 'hauler'
+        (message) => message.type === 'playerLeft' && message.data?.['id'] === 'hauler'
       )
     ).toBe(false);
     replacement.send('leave');
@@ -506,7 +524,7 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
       name: 'hauler',
       snapshotVersion: 1,
       asteroidInteractions: 1,
-      resumeToken: joined.resumeToken,
+      resumeToken: joined['resumeToken'],
     });
     await replacement.waitFor(
       () => replacement.messages.slice(after).find((message) => message.type === 'sessionExpired'),

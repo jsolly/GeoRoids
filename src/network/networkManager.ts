@@ -38,7 +38,7 @@ export class NetworkManager {
 
   // Player management
   setLocalPlayerName(name: string): void {
-    logger.debug('NETWORK', `NetworkManager.setLocalPlayerName called with: ${name}`);
+    logger.debug('NETWORK', 'Applying local player identity', { nameLength: name.length });
     this.connectionManager.setLocalPlayerName(name);
   }
 
@@ -110,8 +110,8 @@ export class NetworkManager {
   }
 
   // Send a generic message to the server
-  sendMessage(message: Record<string, unknown>): void {
-    this.connectionManager.sendMessage(message);
+  sendMessage(message: Record<string, unknown>): boolean {
+    return this.connectionManager.sendMessage(message);
   }
 
   private setupConnectionHandlers(): void {

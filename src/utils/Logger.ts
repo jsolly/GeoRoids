@@ -1,13 +1,22 @@
-/**
- * Simplified Logging System
- * Forwards logs directly to server via WebSocket for file logging
- */
-
+import { createLogRecord, stringifyLogRecord } from '../../shared/logRecords';
 import { LOGGING } from '../constants';
-// Logging system with automatic server forwarding
+import { getClientLogContext } from './clientLogContext';
 import { LogLevel, shouldEmitLog } from './logLevel';
 
+function describeForwardingFailure(error: unknown): string {
+  try {
+    return error instanceof Error ? error.message : String(error);
+  } catch {
+    return 'unknown forwarding error';
+  }
+}
+
+function levelName(level: LogLevel): 'debug' | 'info' | 'warn' | 'error' {
+  return LogLevel[level].toLowerCase() as 'debug' | 'info' | 'warn' | 'error';
+}
+
 class Logger {
+  private static forwardingFailureReported = false;
   private static instance: Logger;
   private currentLevel: LogLevel;
   private static isForwarderInitialized = false;
@@ -25,25 +34,18 @@ class Logger {
   }
 
   private initializeLogLevel(): void {
-    if (typeof window !== 'undefined') {
-      const configLevel = LOGGING.GLOBAL_LOG_LEVEL;
-      switch (configLevel?.toLowerCase()) {
-        case 'debug':
-          this.currentLevel = LogLevel.DEBUG;
-          break;
-        case 'info':
-          this.currentLevel = LogLevel.INFO;
-          break;
-        case 'warn':
-          this.currentLevel = LogLevel.WARN;
-          break;
-        case 'error':
-          this.currentLevel = LogLevel.ERROR;
-          break;
-        default:
-          this.currentLevel = LogLevel.INFO;
-      }
+    if (typeof window === 'undefined') {
+      return;
     }
+    const configured = LOGGING.GLOBAL_LOG_LEVEL?.toLowerCase();
+    this.currentLevel =
+      configured === 'debug'
+        ? LogLevel.DEBUG
+        : configured === 'warn'
+          ? LogLevel.WARN
+          : configured === 'error'
+            ? LogLevel.ERROR
+            : LogLevel.INFO;
   }
 
   setLogLevel(level: LogLevel): void {
@@ -80,74 +82,73 @@ class Logger {
     if (!shouldEmitLog(level, this.currentLevel)) {
       return;
     }
+    const record = createLogRecord({
+      timestamp: new Date().toISOString(),
+      source: 'client',
+      level: levelName(level),
+      releaseId: import.meta.env['VITE_COMMIT_HASH'] || 'dev',
+      category,
+      message,
+      context: error ? { ...context, error } : context,
+      ...getClientLogContext(),
+    });
+    const line = stringifyLogRecord(record);
 
-    // Format the log message
-    const formattedMessage = this.formatLogMessage(level, category, message, context, error);
-
-    // Write to console if enabled
     if (LOGGING.WRITE_TO_CONSOLE) {
-      this.writeToConsole(level, formattedMessage);
+      this.writeToConsole(level, line);
     }
 
-    // Never forward debug — even if someone opts into a debug console —
-    // so a verbose client cannot stall the gameplay socket or Railway.
-    if (LOGGING.FORWARD_TO_SERVER && level <= LogLevel.WARN && category !== 'LOG_FORWARD') {
-      this.forwardToServer(formattedMessage);
-    }
-  }
-
-  private formatLogMessage(
-    level: LogLevel,
-    category: string,
-    message: string,
-    context?: Record<string, unknown>,
-    error?: Error
-  ): string {
-    const timestamp = new Date().toISOString();
-    const levelName = LogLevel[level];
-    const contextStr = context ? ` ${JSON.stringify(context)}` : '';
-    const errorStr = error ? ` Error: ${error.message}` : '';
-
-    return `[${timestamp}] ${levelName} [${category}] ${message}${contextStr}${errorStr}`;
-  }
-
-  private forwardToServer(message: string): void {
-    try {
-      // Import and forward directly - lazy initialize on first use
-      import('./logForwarder')
-        .then(({ forwardLogToServer, startClientLogForwarder }) => {
-          // Lazy initialize the forwarder only once
-          if (!Logger.isForwarderInitialized) {
-            startClientLogForwarder();
-            Logger.isForwarderInitialized = true;
-          }
-          forwardLogToServer(message);
-        })
-        .catch(() => {
-          // Silently fail if forwarder unavailable
-        });
-    } catch {
-      // Silently fail if import fails
+    const forwardState = level === LogLevel.INFO && category === 'STATE';
+    if (
+      LOGGING.FORWARD_TO_SERVER &&
+      (level <= LogLevel.WARN || forwardState) &&
+      category !== 'LOG_FORWARD'
+    ) {
+      this.forwardToServer(line);
     }
   }
 
-  private writeToConsole(level: LogLevel, message: string): void {
+  private forwardToServer(line: string): void {
+    import('./logForwarder')
+      .then(({ forwardLogToServer, startClientLogForwarder }) => {
+        if (!Logger.isForwarderInitialized) {
+          startClientLogForwarder();
+          Logger.isForwarderInitialized = true;
+        }
+        forwardLogToServer(line);
+        Logger.forwardingFailureReported = false;
+      })
+      .catch((error: unknown) => {
+        if (Logger.forwardingFailureReported) {
+          return;
+        }
+        Logger.forwardingFailureReported = true;
+        try {
+          console.warn(
+            `[LOG_FORWARD] Client log forwarding unavailable: ${describeForwardingFailure(error)}`
+          );
+        } catch {
+          // Console implementations are outside the logger contract.
+        }
+      });
+  }
+
+  private writeToConsole(level: LogLevel, line: string): void {
     switch (level) {
       case LogLevel.ERROR:
-        console.error(message);
+        console.error(line);
         break;
       case LogLevel.WARN:
-        console.warn(message);
+        console.warn(line);
         break;
       case LogLevel.INFO:
-        console.info(message);
+        console.info(line);
         break;
       case LogLevel.DEBUG:
-        console.debug(message);
+        console.debug(line);
         break;
     }
   }
 }
 
-// Export singleton instance
 export const logger = Logger.getInstance();

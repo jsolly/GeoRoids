@@ -4,8 +4,8 @@ import {
   findNearestAsteroidImpact,
   previewAsteroidReflections,
   REFLECTION_LIMITS,
-  reflectVector,
   type ReflectionAsteroid,
+  reflectVector,
 } from '../../../shared/asteroidReflection';
 import { polygonPoints } from '../../../src/rendering/vectorJuice';
 

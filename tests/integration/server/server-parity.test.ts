@@ -221,7 +221,8 @@ describe('Server Message Parity', () => {
 
     // A muzzle can also hit a live asteroid immediately. Verify the shoot
     // event exactly once without mistaking authoritative hit events for duplicates.
-    const shots = sentMessages.map((message) => JSON.parse(message))
+    const shots = sentMessages
+      .map((message) => JSON.parse(message))
       .filter((message) => message.type === 'playerShoot');
     expect(shots).toHaveLength(1);
     const broadcastMessage = shots[0]!;

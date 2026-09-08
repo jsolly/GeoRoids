@@ -5,26 +5,30 @@ import { TestConfig } from '../../utils/test-config';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
-test('ramming a satellite damages the player ship', async () => {
-  const page = browserManager.getCurrentPage();
-  if (!page) {
-    throw new Error('Page not available');
-  }
+test(
+  'ramming a satellite damages the player ship',
+  async () => {
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Page not available');
+    }
 
-  const game = new GameInteractions(page);
-  await game.bootGame();
-  await game.waitForCombatReady();
-  await game.waitForSatellites(1);
+    const game = new GameInteractions(page);
+    await game.bootGame();
+    await game.waitForCombatReady();
+    await game.waitForSatellites(1);
 
-  const satellite = (await game.getSatellites())[0]!;
-  const startHealth = await game.getShipHealth();
+    const satellite = (await game.getSatellites())[0]!;
+    const startHealth = await game.getShipHealth();
 
-  await game.pinShipOnSatellite(satellite.id, 3000);
+    await game.pinShipOnSatellite(satellite.id, 3000);
 
-  await expect
-    .poll(() => game.getShipHealth(), {
-      timeout: 8000,
-      message: 'ramming a satellite should deal collision damage',
-    })
-    .toBeLessThan(startHealth);
-}, TestConfig.DEFAULT_TIMEOUT);
+    await expect
+      .poll(() => game.getShipHealth(), {
+        timeout: 8000,
+        message: 'ramming a satellite should deal collision damage',
+      })
+      .toBeLessThan(startHealth);
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);

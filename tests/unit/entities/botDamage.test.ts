@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Ship } from '../../../src/entities/ship/Ship';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DAMAGE } from '../../../src/constants';
+import { Ship } from '../../../src/entities/ship/Ship';
 
 describe('Bot Damage System', () => {
   let botShip: Ship;
@@ -10,7 +10,7 @@ describe('Bot Damage System', () => {
     botShip = new Ship({
       isBot: true,
       position: { x: 100, y: 100 },
-      color: '#ff8800'
+      color: '#ff8800',
     });
     botShip.health = 100;
     botShip.maxHealth = 100;

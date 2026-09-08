@@ -1,26 +1,11 @@
-import http from 'node:http';
 import WebSocket from 'ws';
 import { TestConfig } from './test-config';
 
 const REQUEST_TIMEOUT_MS = 5000;
 
-function httpGet(url: string): Promise<{ ok: boolean; body: string }> {
-  return new Promise((resolve, reject) => {
-    const request = http.get(url, (response) => {
-      let body = '';
-      response.on('data', (chunk) => {
-        body += chunk;
-      });
-      response.on('end', () => {
-        resolve({ ok: response.statusCode === 200, body });
-      });
-    });
-
-    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      request.destroy(new Error('timeout'));
-    });
-    request.on('error', reject);
-  });
+async function httpGet(url: string): Promise<{ ok: boolean; body: string }> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  return { ok: response.status === 200, body: await response.text() };
 }
 
 export class HealthChecker {
@@ -49,7 +34,11 @@ export class HealthChecker {
         return false;
       }
 
-      if (!body.includes('GeoRoids') && !body.includes('@vite/client') && !body.includes('eventLoop')) {
+      if (
+        !body.includes('GeoRoids') &&
+        !body.includes('@vite/client') &&
+        !body.includes('eventLoop')
+      ) {
         console.error('Vite server responded but content seems incorrect');
         return false;
       }
@@ -97,9 +86,9 @@ export class HealthChecker {
 
     while (Date.now() < deadline) {
       [wsHealthy, viteHealthy, wsEndpointHealthy] = await Promise.all([
-        this.checkWebSocketServer(),
-        this.checkViteServer(),
-        this.checkWebSocketGameplayEndpoint(),
+        HealthChecker.checkWebSocketServer(),
+        HealthChecker.checkViteServer(),
+        HealthChecker.checkWebSocketGameplayEndpoint(),
       ]);
       if (wsHealthy && viteHealthy && wsEndpointHealthy) {
         console.log('🎯 All servers are healthy!');
@@ -110,9 +99,15 @@ export class HealthChecker {
 
     if (!wsHealthy || !viteHealthy || !wsEndpointHealthy) {
       const errors = [];
-      if (!wsHealthy) errors.push('WebSocket server not running');
-      if (!viteHealthy) errors.push('Vite dev server not running');
-      if (!wsEndpointHealthy) errors.push('WebSocket /ws endpoint not reachable');
+      if (!wsHealthy) {
+        errors.push('WebSocket server not running');
+      }
+      if (!viteHealthy) {
+        errors.push('Vite dev server not running');
+      }
+      if (!wsEndpointHealthy) {
+        errors.push('WebSocket /ws endpoint not reachable');
+      }
 
       throw new Error(
         `Required servers not running:\n` +

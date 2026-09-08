@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { SATELLITE } from '../../../../src/constants';
-import {
-  GameServerWorld,
-  useQuietServerConsole,
-  type Pilot,
-} from '../support/gameServerWorld';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
 function latestSatellites(pilot: Pilot) {
   const state = pilot.socket.lastReceived('gameState');
-  const data = state?.data as { satellites?: Array<{ id: string; health: number; position: { x: number; y: number } }> };
+  const data = state?.data as {
+    satellites?: Array<{ id: string; health: number; position: { x: number; y: number } }>;
+  };
   return data?.satellites ?? [];
 }
 
@@ -37,9 +35,7 @@ describe('Hostile NPCs are shared across two clients', () => {
 
     expect(aliceSats.length).toBeGreaterThanOrEqual(SATELLITE.AMBIENT_COUNT);
     expect(bobSats.map((sat) => sat.id).sort()).toEqual(aliceSats.map((sat) => sat.id).sort());
-    expect(bobSats.map((sat) => sat.health)).toEqual(
-      aliceSats.map((sat) => sat.health)
-    );
+    expect(bobSats.map((sat) => sat.health)).toEqual(aliceSats.map((sat) => sat.health));
   });
 
   test('one pilot destroying an NPC updates score, loot, and the other client', () => {

@@ -1,143 +1,27 @@
-# Unit Tests - Organized by Functionality
+# Unit tests
 
-This directory contains unit tests organized by functionality rather than by file structure. This organization makes it easier to find and maintain tests related to specific aspects of the game.
+Follow [the test-writing guide](../AGENTS.ms). Unit tests prove deterministic
+rules and failure boundaries without starting the game server or a browser.
+Group them by feature so the canonical scenario is easy to find.
 
-## Directory Structure
+Use a fresh object graph and fixed inputs. Drive the real rule or state
+transition, then assert its observable result. Mock transport, storage, clocks,
+or logging only when that boundary is outside the behavior under test.
 
-### `/entities/`
+For example, a protocol scenario sends a malformed command and proves that the
+world stays unchanged; a collision scenario resolves a real hit and checks the
+identified victim's damage. Constructing an entity and reading back its input
+fields does not prove either feature.
 
-Tests for game entities and their core functionality:
+Extend an existing scenario when an assertion belongs to the same story. Remove
+placeholder and weaker duplicate tests instead of preserving their count.
+Browser input and rendered HUD behavior belong in browser integration tests.
 
-- **asteroidPoints.test.ts** - Tests asteroid point calculation logic
-- **asteroids.test.ts** - Tests asteroid creation and basic functionality
-- **asteroidSplitting.test.ts** - Tests collaborative split for biggest asteroids
-- **roidScore.test.ts** - Size class and point helpers for collab split
-- **botAsteroidCollisions.test.ts** - Tests bot collision with asteroids
-- **localPlayerRoidCollision.test.ts** - Tests local player collision with asteroids
-- **shipDamage.test.ts** - Tests ship damage system
-- **shipDamageRespawn.test.ts** - Tests ship damage and respawn mechanics
-- **Sound.test.ts** - Tests sound system functionality
-
-### `/systems/`
-
-Tests for game systems and mechanics:
-
-- **boundary.test.ts** - Tests boundary collision system
-- **collisions.test.ts** - Tests collision detection system
-- **deathMessage.test.ts** - Tests death message system
-- **gameOver.test.ts** - Tests game over system
-- **laserCollisionDetection.test.ts** - Tests laser collision detection
-- **laserCollisions.test.ts** - Tests laser collision system
-- **minimap.test.ts** - Tests minimap system
-- **respawn.test.ts** - Tests respawn system
-- **scoring.test.ts** - Tests scoring system
-- **shockwaveImpulse.test.ts** - Inverse-size radial kick for collab-split waves
-- **shockwaveVisual.test.ts** - Fast then heavy phosphor ring timing
-
-### `/server/`
-
-Tests for server-side functionality:
-
-- **env-vars.test.ts** - Tests environment variable handling
-- **remote-player-damage.test.ts** - Tests remote player damage system
-- **remote-player-respawn.test.ts** - Tests remote player respawn system
-- **server-scoring.test.ts** - Tests server-side scoring system
-- **collaborative-asteroid-split.test.ts** - Two players hit a big roid within 1s → split; forged shooter is ignored
-- **collab-split-shockwave.test.ts** - Collab split broadcasts a double shockwave and shoves crumbs harder
-
-### `/utils/`
-
-Tests for utility functions and configuration:
-
-- **config.test.ts** - Tests configuration system
-- **main.test.ts** - Tests main application functionality
-- **utils.test.ts** - Tests utility functions
-
-## Benefits of This Organization
-
-1. **Clear Separation of Concerns**: Tests are grouped by what they test rather than where the code is located
-2. **Easier Test Discovery**: Developers can quickly find tests related to specific functionality
-3. **Better Maintenance**: When working on a specific feature, all related tests are in one place
-4. **Logical Grouping**: Related tests are grouped together, making it easier to understand dependencies
-
-## Running Tests
-
-To run all unit tests:
+Run from the repository root:
 
 ```bash
-npm test tests/unit/
+npm test
+npx vitest run tests/unit/server/wire-commands-are-decoded-before-game-dispatch.test.ts
 ```
 
-To run tests for a specific category:
-
-```bash
-npm test tests/unit/entities/     # Entity tests
-npm test tests/unit/systems/      # System tests
-npm test tests/unit/server/       # Server tests
-npm test tests/unit/utils/        # Utility tests
-```
-
-To run a specific test file:
-
-```bash
-npm test tests/unit/entities/asteroids.test.ts
-npm test tests/unit/systems/collisions.test.ts
-npm test tests/unit/server/server-scoring.test.ts
-```
-
-## Test Categories Explained
-
-### Entity Tests
-
-These tests focus on individual game entities (ships, asteroids, bots) and their core behaviors. They test:
-
-- Entity creation and initialization
-- Entity-specific methods and properties
-- Entity interactions with other entities
-- Entity lifecycle (creation, damage, destruction, respawn)
-
-### System Tests
-
-These tests focus on game systems that coordinate between entities. They test:
-
-- Collision detection and handling
-- Game state management
-- UI systems (minimap, scoring display)
-- Game flow (game over, respawn mechanics)
-
-### Server Tests
-
-These tests focus on server-side functionality and network communication. They test:
-
-- Server environment configuration
-- Network message handling
-- Server-side game state management
-- Multiplayer synchronization
-
-### Utility Tests
-
-These tests focus on utility functions and configuration. They test:
-
-- Helper functions and utilities
-- Configuration management
-- Application initialization
-- Cross-cutting concerns
-
-## Writing New Tests
-
-When adding new unit tests:
-
-1. **Choose the right category**: Determine if your test is for an entity, system, server, or utility
-2. **Follow naming conventions**: Use descriptive test names that explain what is being tested
-3. **Keep tests focused**: Each test should test one specific behavior
-4. **Use appropriate mocks**: Mock external dependencies to isolate the code under test
-5. **Update this README**: Add new test files to the appropriate category list
-
-## Test Structure Guidelines
-
-- **Entity tests**: Test individual entity behavior in isolation
-- **System tests**: Test how systems coordinate between entities
-- **Server tests**: Test server-side logic and network communication
-- **Utility tests**: Test helper functions and configuration
-
-This organization makes the test suite more maintainable and easier to navigate, especially as the codebase grows.
+Do not use raw Vitest for integration paths; those require the repository runner.

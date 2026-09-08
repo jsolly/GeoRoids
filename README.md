@@ -2,7 +2,7 @@
 
 A multiplayer vector spaceship game. Play at [www.georoids.com](https://www.georoids.com).
 
-The Vite + TypeScript client renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, bots, NPCs and rewards. MongoDB is not required.
+The Vite + TypeScript client renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, bots, NPCs and rewards.
 
 ## Local development
 
@@ -33,13 +33,17 @@ npm run test:integration:server
 npm run test:integration:browser
 ```
 
-`npm run gate` checks dependencies, lint, configuration, TypeScript, unit tests and the production build. Browser tests need the Playwright browser installation (`npx playwright install`). Always use `./scripts/test-runner.sh` for individual integration scenarios; it enforces serialized execution.
+`npm run gate` checks dependencies, lint, configuration, TypeScript, unit tests and the production build. Browser tests need the pinned Playwright browser installation (`npx --no-install playwright install chromium`). Always use `./scripts/test-runner.sh` for individual integration scenarios; it enforces serialized execution.
+
+Test-writing conventions are in [tests/AGENTS.ms](tests/AGENTS.ms): focused feature scenarios, controlled setup, and observable outcomes.
+
+TypeScript checks the client, server, shared protocol, scripts, tests and build configuration. `strict` (including `noImplicitAny`) is enforced alongside checked indexed access, exact optional properties, index-signature bracket access and side-effect import checking. Clear absent optional state with `delete`; use `| undefined` only when an API intentionally distinguishes clearing a value from leaving it unchanged.
 
 ```sh
 ./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose
 ```
 
-Debug switches and log levels live in `src/constants/index.ts`. Set `DEBUG.ENABLED` and `LOGGING.GLOBAL_LOG_LEVEL` deliberately; client and server logs are written under `logs/`. See `AGENTS.md` for architecture, commands and detailed test guidance.
+Debug switches and log levels live in `src/constants/index.ts`. Client and server diagnostics share structured records with release, player, session and connection context. The [diagnostics guide](docs/diagnostics.md) explains the incident timeline reader, Railway/Vercel searches, state checkpoints, loss counters and game-loop profiling. See `AGENTS.md` for architecture and commands.
 
 ## Production
 
@@ -58,3 +62,5 @@ The recovered reference sheets, canonical vector assets, palette and provenance 
 Contributions use topic branches and pull requests with green `CI / ci`; direct pushes to `main` are reserved for emergencies. Use Conventional Commits with a scope and include relevant validation.
 
 [MIT license](LICENSE)
+
+Production disables test and diagnostic-write HTTP routes. When `REQUIRE_ASTEROID_CLIENT=1`, both WebSocket admission and join negotiation require the current client; reconnects use the private resume token.

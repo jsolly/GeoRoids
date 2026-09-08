@@ -16,7 +16,9 @@ function connect(port: number, path: string) {
 
 afterEach(async () => {
   for (const socket of sockets.splice(0)) {
-    if (socket.readyState !== WebSocket.CLOSED) socket.terminate();
+    if (socket.readyState !== WebSocket.CLOSED) {
+      socket.terminate();
+    }
   }
   await server?.close();
   server = undefined;
@@ -27,18 +29,34 @@ test('a release cutover rejects stale clients before open while updated gameplay
   const port = await server.listening;
   const stale = connect(port, '/ws');
   let opened = false;
-  stale.on('open', () => { opened = true; });
+  stale.on('open', () => {
+    opened = true;
+  });
   await expect(once(stale, 'open')).rejects.toThrow('426');
   expect(opened).toBe(false);
   expect(server.gameEngine.getPlayerCount()).toBe(0);
 
   const updated = connect(port, '/ws?asteroidInteractions=1');
   await once(updated, 'open');
-  const joined = new Promise<Record<string, unknown>>(resolve => updated.on('message', raw => {
-    const packet = JSON.parse(String(raw));
-    if (packet.type === 'joined') resolve(packet.data);
-  }));
-  updated.send(JSON.stringify({ type: 'join', data: { id: 'current-pilot', name: 'Current pilot', snapshotVersion: 1, asteroidInteractions: 1 } }));
+  const joined = new Promise<Record<string, unknown>>((resolve) =>
+    updated.on('message', (raw) => {
+      const packet = JSON.parse(String(raw));
+      if (packet.type === 'joined') {
+        resolve(packet.data);
+      }
+    })
+  );
+  updated.send(
+    JSON.stringify({
+      type: 'join',
+      data: {
+        id: 'current-pilot',
+        name: 'Current pilot',
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+      },
+    })
+  );
   expect(await joined).toMatchObject({ id: 'current-pilot', asteroidInteractions: 1 });
   const logs = connect(port, '/logs');
   await once(logs, 'open');

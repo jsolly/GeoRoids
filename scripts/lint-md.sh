@@ -15,4 +15,4 @@ else
   echo "lint-md: $bin not found — run 'npm ci'. Falling back to npx (fetches from the registry)." >&2
   cmd=(npx --yes markdownlint-cli2@0.22.1)
 fi
-exec "${cmd[@]}" "$@" "**/*.md"
+exec "${cmd[@]}" "$@" "**/*.md" "**/AGENTS.ms"

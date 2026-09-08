@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import {
-  RECONNECT_DELAYS_MS,
   nextReconnectDelayMs,
+  RECONNECT_DELAYS_MS,
 } from '../../../src/network/services/connectionReconnect';
 
 test('reconnect delays cover five attempts then give up', () => {

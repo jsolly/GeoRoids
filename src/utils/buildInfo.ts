@@ -7,8 +7,8 @@ interface BuildInfo {
 
 // Get build information from build-time injected values
 export function getBuildInfo(): BuildInfo {
-  const commitHash = import.meta.env.VITE_COMMIT_HASH || 'dev';
-  const buildTime = import.meta.env.VITE_BUILD_TIME || new Date().toISOString();
+  const commitHash = import.meta.env['VITE_COMMIT_HASH'] || 'dev';
+  const buildTime = import.meta.env['VITE_BUILD_TIME'] || new Date().toISOString();
   const environment = import.meta.env.MODE || 'development';
 
   // Use commit hash as version, fallback to 'dev'

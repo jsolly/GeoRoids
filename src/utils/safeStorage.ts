@@ -6,12 +6,54 @@
 
 const memory = new Map<string, string>();
 let persistAvailable: boolean | undefined;
+const reportedFailures = new Set<'access' | 'probe' | 'read' | 'write' | 'remove'>();
+
+function normalizeFailureCause(error: unknown): string {
+  try {
+    let cause = 'unknown-error';
+    if (error instanceof Error) {
+      cause = error.name || 'Error';
+    } else if (typeof error === 'object' && error !== null) {
+      const candidate = error as { code?: unknown; name?: unknown };
+      if (typeof candidate['name'] === 'string' && candidate['name']) {
+        cause = candidate['name'];
+      } else if (typeof candidate['code'] === 'string' || typeof candidate['code'] === 'number') {
+        cause = `code-${String(candidate['code'])}`;
+      }
+    }
+    return cause.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 64) || 'unknown-error';
+  } catch {
+    return 'unknown-error';
+  }
+}
+
+function reportStorageFallback(
+  operation: 'access' | 'probe' | 'read' | 'write' | 'remove',
+  error?: unknown
+): void {
+  // Keep the signal bounded and never include the caller's key or value. Keys
+  // can contain account/session identifiers, while one warning per operation
+  // is enough to explain why this tab is using memory-only storage.
+  if (reportedFailures.has(operation)) {
+    return;
+  }
+  reportedFailures.add(operation);
+  const cause = error === undefined ? 'unavailable' : normalizeFailureCause(error);
+  try {
+    console.warn(
+      `[STORAGE] localStorage unavailable during ${operation} (${cause}); using in-memory fallback`
+    );
+  } catch {
+    // Console implementations are outside the storage contract.
+  }
+}
 
 function getLocalStorage(): Storage | null {
   try {
     const storage = globalThis.localStorage;
     return storage ?? null;
-  } catch {
+  } catch (error) {
+    reportStorageFallback('access', error);
     return null;
   }
 }
@@ -23,6 +65,7 @@ function canPersist(): boolean {
   const storage = getLocalStorage();
   if (!storage) {
     persistAvailable = false;
+    reportStorageFallback('probe');
     return false;
   }
   if (persistAvailable === true) {
@@ -34,8 +77,9 @@ function canPersist(): boolean {
     storage.removeItem(probeKey);
     persistAvailable = true;
     return true;
-  } catch {
+  } catch (error) {
     persistAvailable = false;
+    reportStorageFallback('probe', error);
     return false;
   }
 }
@@ -44,8 +88,9 @@ export function getStoredItem(key: string): string | null {
   if (canPersist()) {
     try {
       return getLocalStorage()?.getItem(key) ?? null;
-    } catch {
+    } catch (error) {
       persistAvailable = false;
+      reportStorageFallback('read', error);
     }
   }
   return memory.get(key) ?? null;
@@ -56,8 +101,9 @@ export function setStoredItem(key: string, value: string): void {
     try {
       getLocalStorage()?.setItem(key, value);
       return;
-    } catch {
+    } catch (error) {
       persistAvailable = false;
+      reportStorageFallback('write', error);
     }
   }
   memory.set(key, value);
@@ -68,8 +114,9 @@ export function removeStoredItem(key: string): void {
     try {
       getLocalStorage()?.removeItem(key);
       return;
-    } catch {
+    } catch (error) {
       persistAvailable = false;
+      reportStorageFallback('remove', error);
     }
   }
   memory.delete(key);
@@ -79,4 +126,5 @@ export function removeStoredItem(key: string): void {
 export function resetSafeStorage(): void {
   memory.clear();
   persistAvailable = undefined;
+  reportedFailures.clear();
 }

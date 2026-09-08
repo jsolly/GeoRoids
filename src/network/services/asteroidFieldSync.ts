@@ -233,7 +233,11 @@ export function applyAsteroidKinematics(
   options: { snapPosition?: boolean; complete?: boolean } = {}
 ): void {
   if (options.complete) {
-    roid.material = updates.material;
+    if (updates.material !== undefined) {
+      roid.material = updates.material;
+    } else {
+      delete roid.material;
+    }
     roid.isCollabTarget = updates.isCollabTarget ?? false;
     if (updates.offsets) {
       roid.offsets = [...updates.offsets];

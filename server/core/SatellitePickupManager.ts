@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { logger } from '../../setup/serverLogger';
 import type { Position, SatellitePickupData, SatellitePickupTypeId } from '../../shared-types';
 import { DEBUG, PALETTE, SATELLITE_PICKUP } from '../../src/constants';
 import {
@@ -9,8 +10,7 @@ import {
   spawnRingPosition,
   velocityFromDelta,
 } from '../../src/entities/satellitePickup/satellitePickupMath';
-import { logger } from '../../setup/serverLogger';
-import { RNGService } from './RNGService';
+import type { RNGService } from './RNGService';
 
 const PICKUP_NAMES = ['Echo', 'Relay'] as const;
 
@@ -55,7 +55,10 @@ export class SatellitePickupManager {
   public createPickups(count: number = SATELLITE_PICKUP.MAX_COUNT): SatellitePickupData[] {
     this.pickups.clear();
     const configuredCount = DEBUG.ENABLED ? DEBUG.SATELLITE_PICKUP.COUNT : count;
-    const spawnCount = Math.min(Math.max(0, Math.trunc(configuredCount)), SATELLITE_PICKUP.MAX_COUNT);
+    const spawnCount = Math.min(
+      Math.max(0, Math.trunc(configuredCount)),
+      SATELLITE_PICKUP.MAX_COUNT
+    );
     const created: SatellitePickupData[] = [];
 
     for (let i = 0; i < spawnCount; i++) {
@@ -68,7 +71,11 @@ export class SatellitePickupManager {
     return created;
   }
 
-  public collect(pickupId: string, ownerId: string, orbitingAlready: number): SatellitePickupData | null {
+  public collect(
+    pickupId: string,
+    ownerId: string,
+    orbitingAlready: number
+  ): SatellitePickupData | null {
     const pickup = this.pickups.get(pickupId);
     if (!pickup || pickup.state !== 'loose') {
       return null;
@@ -110,7 +117,10 @@ export class SatellitePickupManager {
     }
   }
 
-  private updateOrbiting(pickup: SatellitePickupInternal, owner: PickupOwnerPose | undefined): void {
+  private updateOrbiting(
+    pickup: SatellitePickupInternal,
+    owner: PickupOwnerPose | undefined
+  ): void {
     if (!owner || owner.health <= 0 || owner.exploding) {
       this.makeLooseAtCurrentPose(pickup);
       return;

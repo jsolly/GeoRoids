@@ -3,7 +3,7 @@ import type { WebSocket } from 'ws';
 
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
-import { GROWTH, applyLootMass } from '../../../shared/shipGrowth';
+import { applyLootMass, GROWTH } from '../../../shared/shipGrowth';
 import { ROID } from '../../../src/constants';
 
 function addSmallAsteroid(engine: GameEngine, id: string, size = 12): void {
@@ -53,7 +53,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
   test('collecting a shard uses existing mass growth and a small score', () => {
     const ws = {} as WebSocket;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', player.id, 'laser');
     const beforeMass = player.mass ?? GROWTH.BASE_MASS;
@@ -70,8 +70,8 @@ describe('destroy-drop shards on the #458 loot path', () => {
     const ws = {} as WebSocket;
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     const bystander = engine.addPlayer('p2', 'Near', ws, { x: 36, y: 30 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
-    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
+    engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
@@ -90,7 +90,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
   test('blast pushes small roids away and leaves big ones', () => {
     const ws = {} as WebSocket;
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.addAsteroid({
       id: 'seed-roid',
       position: { x: 0, y: 0 },

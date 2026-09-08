@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SATELLITE_PICKUP } from '../../../src/constants';
-import type { GameEntity } from '../../../server/core/EntityManager';
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: {
@@ -52,7 +52,9 @@ describe('Satellite pickups', () => {
     const result = gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot');
     expect(result.success).toBe(true);
     expect(gameEngine.getPlayer('pilot')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
-    expect(gameEngine.getPlayer('pilot')?.spawnProtectionTimer).toBe(SATELLITE_PICKUP.SHIELD_FRAMES);
+    expect(gameEngine.getPlayer('pilot')?.spawnProtectionTimer).toBe(
+      SATELLITE_PICKUP.SHIELD_FRAMES
+    );
     // Pickup invuln is spawn-protection, not the #454 F-key laser bubble.
     expect(gameEngine.getPlayer('pilot')?.shieldActive).toBe(false);
     expect(gameEngine.getPlayer('pilot')?.shieldCooldown).toBe(0);
@@ -64,10 +66,7 @@ describe('Satellite pickups', () => {
     gameEngine.updatePlayer('pilot', { position: { x: 80, y: 40 } });
     gameEngine.tickSatellitePickups();
     const later = gameEngine.getSatellitePickup(pickup.id);
-    const dist = Math.hypot(
-      (later?.position.x ?? 0) - 80,
-      (later?.position.y ?? 0) - 40
-    );
+    const dist = Math.hypot((later?.position.x ?? 0) - 80, (later?.position.y ?? 0) - 40);
     expect(dist).toBeCloseTo(SATELLITE_PICKUP.ORBIT_RADIUS, 0);
   });
 

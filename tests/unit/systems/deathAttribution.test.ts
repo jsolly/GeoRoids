@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { GameStateManager } from '../../../src/core/services/GameStateManager';
 import {
   describeDeathCause,
   formatDeathCauseForOverlay,
@@ -6,7 +7,6 @@ import {
   isStaleGameOverSnapshot,
   preferDeathCause,
 } from '../../../src/utils/deathCause';
-import { GameStateManager } from '../../../src/core/services/GameStateManager';
 
 const KNOWN_NAMES = new Map<string, string>([
   ['server-bot-0', 'Crimson Falcon'],
@@ -15,7 +15,6 @@ const KNOWN_NAMES = new Map<string, string>([
 const resolve = (id: string): string | undefined => KNOWN_NAMES.get(id);
 
 describe('death cause attribution', () => {
-
   test('maps asteroid and boundary tokens to readable phrases', () => {
     expect(describeDeathCause('asteroid', resolve)).toBe('an asteroid');
     expect(describeDeathCause('boundary', resolve)).toBe('the arena wall');

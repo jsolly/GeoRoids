@@ -83,7 +83,7 @@ describe('server authority boundaries', () => {
     const bot = engine.createBots(1)?.[0];
     expect(bot).toBeDefined();
     bot!.position = { x: 0, y: 0 };
-    bot!.spawnProtectionTimer = undefined;
+    delete bot!.spawnProtectionTimer;
 
     addDropAsteroid(engine, 'drop-source');
     expect(engine.handleAsteroidHit('drop-source', 'owner', 'laser').outcome).toBe('destroyed');
@@ -117,7 +117,9 @@ describe('server authority boundaries', () => {
     expect(botShot?.hasExploded).toBe(true);
 
     addDropAsteroid(engine, 'second-drop-source');
-    expect(engine.handleAsteroidHit('second-drop-source', 'owner', 'laser').outcome).toBe('destroyed');
+    expect(engine.handleAsteroidHit('second-drop-source', 'owner', 'laser').outcome).toBe(
+      'destroyed'
+    );
     const secondShard = engine.getLoot()[0];
     expect(secondShard).toBeDefined();
 
@@ -159,10 +161,12 @@ describe('server authority boundaries', () => {
     const bot = engine.createBots(1)?.[0];
     expect(bot).toBeDefined();
     bot!.position = { x: 0, y: 0 };
-    bot!.spawnProtectionTimer = undefined;
+    delete bot!.spawnProtectionTimer;
 
     addDropAsteroid(engine, 'observer-drop-source');
-    expect(engine.handleAsteroidHit('observer-drop-source', 'observer-a', 'laser').outcome).toBe('destroyed');
+    expect(engine.handleAsteroidHit('observer-drop-source', 'observer-a', 'laser').outcome).toBe(
+      'destroyed'
+    );
     const shard = engine.getLoot()[0];
     expect(shard).toBeDefined();
 
@@ -185,7 +189,9 @@ describe('server authority boundaries', () => {
     // A live drop still requires a matching server bot projectile; the
     // idempotent absent-drop path must not become a forgery bypass.
     addDropAsteroid(engine, 'observer-forgery-source');
-    expect(engine.handleAsteroidHit('observer-forgery-source', 'observer-a', 'laser').outcome).toBe('destroyed');
+    expect(engine.handleAsteroidHit('observer-forgery-source', 'observer-a', 'laser').outcome).toBe(
+      'destroyed'
+    );
     const forgedTarget = engine.getLoot()[0];
     expect(forgedTarget).toBeDefined();
     core.handleClientMessage(
@@ -265,12 +271,12 @@ describe('server authority boundaries', () => {
     expect(bot).toBeDefined();
     engine.updatePlayer('pilot', {
       factionId: 'ion',
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       position: { x: 0, y: 0 },
     });
     engine.updateBot(bot!.id, {
       factionId: 'ember',
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       position: { x: 0, y: 0 },
     });
     const healthBefore = bot!.health;
@@ -365,7 +371,7 @@ describe('server authority boundaries', () => {
   test('a rammed rubble rock does not announce a cooperative split', () => {
     engine = new GameEngine(43);
     const pilot = engine.addPlayer('pilot', 'Pilot', mockWs(), { x: 0, y: 0 });
-    pilot.spawnProtectionTimer = undefined;
+    delete pilot.spawnProtectionTimer;
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
     }

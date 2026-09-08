@@ -1,10 +1,10 @@
 import { expect, test, vi } from 'vitest';
+import { SHIP } from '../../../src/constants';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { Player } from '../../../src/entities/player/Player';
 import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { canvasManager } from '../../../src/rendering/canvas';
-import { SHIP } from '../../../src/constants';
 
 function makePlayer(type: 'local' | 'remote' | 'bot'): Player {
   return new Player({ id: type, name: type, type, input: new MockPlayerInput() });

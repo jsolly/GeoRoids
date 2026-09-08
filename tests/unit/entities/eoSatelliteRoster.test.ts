@@ -23,9 +23,9 @@ describe('ambient EO satellite roster', () => {
     expect(new Set(SATELLITE_PROFILES.map((profile) => profile.shotPattern)).size).toBe(
       EXPECTED_IDS.length
     );
-    expect(SATELLITE_PROFILES.every((profile) => profile.hullColor === EO_SATELLITE_HULL_COLOR)).toBe(
-      true
-    );
+    expect(
+      SATELLITE_PROFILES.every((profile) => profile.hullColor === EO_SATELLITE_HULL_COLOR)
+    ).toBe(true);
   });
 
   test('profile firing geometry distinguishes sweeps, bursts, beam, and precision fire', () => {

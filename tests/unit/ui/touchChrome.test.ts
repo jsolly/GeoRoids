@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
-
-import { setPlayView } from '../../../src/ui/uiUtils';
 import { initializeTouchControls, syncTouchChrome } from '../../../src/input/touchControls';
+import { setPlayView } from '../../../src/ui/uiUtils';
 
 afterEach(() => {
   document.body.classList.remove('in-play', 'touch-play');

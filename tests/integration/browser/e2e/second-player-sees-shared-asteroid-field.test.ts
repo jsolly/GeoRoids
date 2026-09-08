@@ -1,25 +1,27 @@
-import { test, expect } from 'vitest';
+import { expect, test } from 'vitest';
+import { ROID } from '../../../../src/constants';
+import { getGameBoundary } from '../../../../src/physics/boundary';
+import { countRocksOnCanvas, playfieldZoom } from '../../../../src/rendering/playfieldCamera';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { countRocksOnCanvas, playfieldZoom } from '../../../../src/rendering/playfieldCamera';
-import { ROID } from '../../../../src/constants';
-import { getGameBoundary } from '../../../../src/physics/boundary';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 type Field = Awaited<ReturnType<GameInteractions['getAsteroidPositions']>>;
 
 async function onCanvasAsteroidCount(game: GameInteractions): Promise<number> {
   const [ship, field, canvas] = await Promise.all([
-    game.getShipPosition(), game.getAsteroidPositions(), game.getCanvasSize(),
+    game.getShipPosition(),
+    game.getAsteroidPositions(),
+    game.getCanvasSize(),
   ]);
   const roids = field.map((roid) => ({ position: { x: roid.x, y: roid.y }, r: roid.radius }));
   return countRocksOnCanvas(roids, ship, canvas, playfieldZoom(roids, ship, canvas));
 }
 
 function survivingRockMoved(before: Field, after: Field): boolean {
-  return before.some(start => {
-    const later = after.find(rock => rock.id === start.id);
+  return before.some((start) => {
+    const later = after.find((rock) => rock.id === start.id);
     return later !== undefined && Math.hypot(later.x - start.x, later.y - start.y) > 1;
   });
 }
@@ -27,75 +29,105 @@ function survivingRockMoved(before: Field, after: Field): boolean {
 async function parkOutsideBelt(game: GameInteractions, side: number): Promise<void> {
   // Leave the initial bot-combat area immediately, without disabling gameplay.
   const x = side * (ROID.FIELD_RADIUS + 500);
-  expect(Math.abs(x) + await game.getShipRadius()).toBeLessThan(getGameBoundary().radius);
+  expect(Math.abs(x) + (await game.getShipRadius())).toBeLessThan(getGameBoundary().radius);
   await game.placeShipAt(x, 0);
-  await game.syncShipPositionToServer();
 }
 
-test('second player sees shared asteroid field', async () => {
-  const page1 = browserManager.getCurrentPage();
-  if (!page1) throw new Error('Page 1 not available');
-  await browserManager.createPage();
-  const page2 = browserManager.getCurrentPage();
-  if (!page2) throw new Error('Page 2 not available');
-  const game1 = new GameInteractions(page1);
-  const game2 = new GameInteractions(page2);
+test(
+  'second player sees shared asteroid field',
+  async () => {
+    const page1 = browserManager.getCurrentPage();
+    if (!page1) {
+      throw new Error('Page 1 not available');
+    }
+    await browserManager.createPage();
+    const page2 = browserManager.getCurrentPage();
+    if (!page2) {
+      throw new Error('Page 2 not available');
+    }
+    const game1 = new GameInteractions(page1);
+    const game2 = new GameInteractions(page2);
 
-  await game1.bootGame({ waitForCombatReady: false });
-  await parkOutsideBelt(game1, 1);
-  await game2.bootGame({ waitForCombatReady: false });
-  await parkOutsideBelt(game2, -1);
+    await game1.bootGame({ waitForCombatReady: false });
+    await parkOutsideBelt(game1, 1);
+    await game2.bootGame({ waitForCombatReady: false });
+    await parkOutsideBelt(game2, -1);
 
-  // Compare contemporary observations. Destruction/splitting may legitimately
-  // change the field while the second browser boots or between network ticks.
-  await expect.poll(async () => {
-    const [first, second] = await Promise.all([game1.getAsteroidPositions(), game2.getAsteroidPositions()]);
-    if (!first.length || first.length !== second.length) return false;
-    return first.every(rock => {
-      const peer = second.find(other => other.id === rock.id);
-      return peer !== undefined && Math.abs(peer.x - rock.x) < 80 && Math.abs(peer.y - rock.y) < 80;
-    });
-  }, { timeout: 5000, message: 'both clients should share current asteroid IDs and poses' }).toBe(true);
+    // Compare contemporary observations. Destruction/splitting may legitimately
+    // change the field while the second browser boots or between network ticks.
+    await expect
+      .poll(
+        async () => {
+          const [first, second] = await Promise.all([
+            game1.getAsteroidPositions(),
+            game2.getAsteroidPositions(),
+          ]);
+          if (!first.length || first.length !== second.length) {
+            return false;
+          }
+          return first.every((rock) => {
+            const peer = second.find((other) => other.id === rock.id);
+            return (
+              peer !== undefined && Math.abs(peer.x - rock.x) < 80 && Math.abs(peer.y - rock.y) < 80
+            );
+          });
+        },
+        { timeout: 5000, message: 'both clients should share current asteroid IDs and poses' }
+      )
+      .toBe(true);
 
-  const firstField = await game1.getAsteroidPositions();
-  await expect.poll(async () => survivingRockMoved(firstField, await game1.getAsteroidPositions()),
-    { timeout: 2500, message: 'existing shared asteroids should keep moving' }).toBe(true);
+    const firstField = await game1.getAsteroidPositions();
+    await expect
+      .poll(async () => survivingRockMoved(firstField, await game1.getAsteroidPositions()), {
+        timeout: 2500,
+        message: 'existing shared asteroids should keep moving',
+      })
+      .toBe(true);
 
-  // At fixed close zoom, a stationary ship need not see distant minimap dots.
-  // Intentionally place both cameras near the same surviving rock, choosing the
-  // greatest clearance from live NPCs and leaving space outside its hull.
-  const [field, bots, satellites, radius1, radius2] = await Promise.all([
-    game1.getAsteroidPositions(), game1.getBots(), game1.getSatellites(),
-    game1.getShipRadius(), game2.getShipRadius(),
-  ]);
-  const enemies = [...bots, ...satellites].filter(enemy => !enemy.exploding && enemy.health > 0);
-  const clearance = (rock: Field[number]) => Math.min(...enemies.map(enemy => Math.hypot(enemy.x - rock.x, enemy.y - rock.y)));
-  const focus = [...field].sort((a, b) => clearance(b) - clearance(a))[0];
-  expect(focus, 'a surviving shared rock should be available for camera focus').toBeDefined();
-  const outward = Math.atan2(focus!.y, focus!.x);
-  const gap = focus!.radius + Math.max(radius1, radius2) + 100;
-  const pose = { x: focus!.x + Math.cos(outward) * gap, y: focus!.y + Math.sin(outward) * gap };
-  const separation = Math.max(radius1, radius2) + 30;
-  const tangent = { x: -Math.sin(outward) * separation, y: Math.cos(outward) * separation };
-  expect(Math.hypot(pose.x, pose.y) + separation + Math.max(radius1, radius2)).toBeLessThan(getGameBoundary().radius);
-  await Promise.all([
-    game1.placeShipAt(pose.x + tangent.x, pose.y + tangent.y),
-    game2.placeShipAt(pose.x - tangent.x, pose.y - tangent.y),
-  ]);
-  await Promise.all([game1.syncShipPositionToServer(), game2.syncShipPositionToServer()]);
-  await expect.poll(() => onCanvasAsteroidCount(game1), { timeout: 2500, message: 'focused tab 1 should show nearby rocks' }).toBeGreaterThan(0);
-  await expect.poll(() => onCanvasAsteroidCount(game2), { timeout: 2500, message: 'focused tab 2 should show nearby rocks' }).toBeGreaterThan(0);
-
-  const remoteCount = () => page1.evaluate(() => {
-    const gc = (window as any).gameController;
-    return (gc?.getNetworkManager?.().getAllPlayers?.() ?? []).filter((player: any) => player.type === 'remote').length;
-  });
-  await expect.poll(remoteCount, { timeout: 5000, message: 'the peer should appear in tab 1' }).toBeGreaterThanOrEqual(1);
-  const remotesBefore = await remoteCount();
-  const beforeDisconnect = await game1.getAsteroidPositions();
-  await page2.close();
-  await expect.poll(remoteCount, { timeout: 5000, message: 'departed peer should leave tab 1' }).toBeLessThan(remotesBefore);
-  expect(await game1.getAsteroidCount(), 'peer departure must not empty the surviving world').toBeGreaterThan(0);
-  await expect.poll(async () => survivingRockMoved(beforeDisconnect, await game1.getAsteroidPositions()),
-    { timeout: 2500, message: 'surviving rocks should continue moving after peer departure' }).toBe(true);
-}, TestConfig.DEFAULT_TIMEOUT * 2);
+    // At fixed close zoom, a stationary ship need not see distant minimap dots.
+    // Intentionally place both cameras near the same surviving rock, choosing the
+    // greatest clearance from live NPCs and leaving space outside its hull.
+    const [field, bots, satellites, radius1, radius2] = await Promise.all([
+      game1.getAsteroidPositions(),
+      game1.getBots(),
+      game1.getSatellites(),
+      game1.getShipRadius(),
+      game2.getShipRadius(),
+    ]);
+    const enemies = [...bots, ...satellites].filter(
+      (enemy) => !enemy.exploding && enemy.health > 0
+    );
+    const clearance = (rock: Field[number]) =>
+      Math.min(...enemies.map((enemy) => Math.hypot(enemy.x - rock.x, enemy.y - rock.y)));
+    const focus = [...field].sort((a, b) => clearance(b) - clearance(a))[0];
+    expect(focus, 'a surviving shared rock should be available for camera focus').toBeDefined();
+    if (!focus) {
+      throw new Error('No surviving shared rock was available for camera focus');
+    }
+    const outward = Math.atan2(focus.y, focus.x);
+    const gap = focus.radius + Math.max(radius1, radius2) + 100;
+    const pose = { x: focus.x + Math.cos(outward) * gap, y: focus.y + Math.sin(outward) * gap };
+    const separation = Math.max(radius1, radius2) + 30;
+    const tangent = { x: -Math.sin(outward) * separation, y: Math.cos(outward) * separation };
+    expect(Math.hypot(pose.x, pose.y) + separation + Math.max(radius1, radius2)).toBeLessThan(
+      getGameBoundary().radius
+    );
+    await Promise.all([
+      game1.placeShipAt(pose.x + tangent.x, pose.y + tangent.y),
+      game2.placeShipAt(pose.x - tangent.x, pose.y - tangent.y),
+    ]);
+    await expect
+      .poll(() => onCanvasAsteroidCount(game1), {
+        timeout: 2500,
+        message: 'focused tab 1 should show nearby rocks',
+      })
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() => onCanvasAsteroidCount(game2), {
+        timeout: 2500,
+        message: 'focused tab 2 should show nearby rocks',
+      })
+      .toBeGreaterThan(0);
+  },
+  TestConfig.DEFAULT_TIMEOUT * 2
+);

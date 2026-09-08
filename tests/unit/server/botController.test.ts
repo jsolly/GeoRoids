@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   BOT_AI,
+  type Combatant,
   chooseTarget,
   createBotMemory,
   decideBotAction,
@@ -8,7 +9,6 @@ import {
   interceptTime,
   leadAimPoint,
   makeBotShot,
-  type Combatant,
 } from '../../../server/ai/botController';
 import {
   applyShipMotionSteps,
@@ -19,9 +19,7 @@ import {
   turnToward,
 } from '../../../server/ai/shipMotion';
 import { GAME, LASER, SHIP } from '../../../src/constants';
-import {
-  generateLaserVelocity,
-} from '../../../src/entities/laser/laserUtils';
+import { generateLaserVelocity } from '../../../src/entities/laser/laserUtils';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 
 const fixedRng = { random: () => 0.5 };
@@ -35,8 +33,10 @@ function combatant(overrides: Partial<Combatant> & { angle?: number } = {}): Com
     velocity: overrides.velocity ?? { x: 0, y: 0 },
     health: overrides.health ?? 100,
     exploding: overrides.exploding ?? false,
-    spawnProtectionTimer: overrides.spawnProtectionTimer,
-    factionId: overrides.factionId,
+    ...(overrides.spawnProtectionTimer !== undefined
+      ? { spawnProtectionTimer: overrides.spawnProtectionTimer }
+      : {}),
+    ...(overrides.factionId !== undefined ? { factionId: overrides.factionId } : {}),
     angle: overrides.angle ?? 0,
   };
 }
@@ -204,7 +204,9 @@ describe('shared ship motion and shot spawn', () => {
       thrusting: true,
     };
     applyShipMotionSteps(ship, 120);
-    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(SHIP.MAX_VELOCITY + 1e-9);
+    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(
+      SHIP.MAX_VELOCITY + 1e-9
+    );
   });
 
   test('bot lasers spawn from the same muzzle math as players', () => {

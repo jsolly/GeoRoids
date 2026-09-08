@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { GAME } from '../../../../src/constants';
 import { GameController } from '../../../../src/core/gameController';
 import { GameStateManager } from '../../../../src/core/services/GameStateManager';
 import { PlayerManager } from '../../../../src/entities/player/PlayerManager';
 import { setPlayView, toggleScreen } from '../../../../src/ui/uiUtils';
-import { GAME } from '../../../../src/constants';
-import {
-  GameServerWorld,
-  useQuietServerConsole,
-  type Pilot,
-} from '../support/gameServerWorld';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -157,9 +153,9 @@ describe('Last life on the server', () => {
       remainingLives: 0,
     });
     expect(world.entity(ace).deathCause).toBe('boundary');
-    expect(world.engine.getGameState().entities.find((entity) => entity.id === ace.id)).toMatchObject(
-      { deathCause: 'boundary', lives: 0 }
-    );
+    expect(
+      world.engine.getGameState().entities.find((entity) => entity.id === ace.id)
+    ).toMatchObject({ deathCause: 'boundary', lives: 0 });
     expect(world.entity(ace).respawnTimer).toBeUndefined();
     expect(GAME.START_LIVES).toBe(3);
   });
@@ -168,9 +164,9 @@ describe('Last life on the server', () => {
     world.entity(ace).lives = 2;
     world.hitAsteroid(ace, world.entity(ace).health);
     expect(world.entity(ace).deathCause).toBe('asteroid');
-    expect(world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause).toBe(
-      'asteroid'
-    );
+    expect(
+      world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause
+    ).toBe('asteroid');
 
     world.tick(20);
     expect(world.entity(ace).health).toBeGreaterThan(0);
@@ -185,8 +181,8 @@ describe('Last life on the server', () => {
     expect(bot).toBeDefined();
     world.engine.handlePlayerDamage(ace.id, bot!.id, world.entity(ace).health);
     expect(world.entity(ace).deathCause).toBe(bot!.id);
-    expect(world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause).toBe(
-      bot!.id
-    );
+    expect(
+      world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause
+    ).toBe(bot!.id);
   });
 });

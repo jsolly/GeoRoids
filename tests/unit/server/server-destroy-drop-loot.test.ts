@@ -83,8 +83,12 @@ describe('shared destroy-drop shards over WebSocket', () => {
     const fromA = collectMessages(a);
     const fromB = collectMessages(b);
 
-    a.send(JSON.stringify({ type: 'join', id: 'pilot-a', name: 'A', position: { x: 350, y: -450 } }));
-    b.send(JSON.stringify({ type: 'join', id: 'pilot-b', name: 'B', position: { x: 800, y: 800 } }));
+    a.send(
+      JSON.stringify({ type: 'join', id: 'pilot-a', name: 'A', position: { x: 350, y: -450 } })
+    );
+    b.send(
+      JSON.stringify({ type: 'join', id: 'pilot-b', name: 'B', position: { x: 800, y: 800 } })
+    );
     await waitFor(fromA, (msg) => msg.type === 'joined');
     await waitFor(fromB, (msg) => msg.type === 'joined');
     a.send(JSON.stringify({ type: 'update', id: 'pilot-a', position: { x: 350, y: -450 } }));
@@ -129,14 +133,12 @@ describe('shared destroy-drop shards over WebSocket', () => {
     const stateA = await waitFor(
       fromA,
       (msg) =>
-        msg.type === 'gameState' &&
-        (msg.data?.loot ?? []).some((drop) => drop.kind === 'shard')
+        msg.type === 'gameState' && (msg.data?.loot ?? []).some((drop) => drop.kind === 'shard')
     );
     const stateB = await waitFor(
       fromB,
       (msg) =>
-        msg.type === 'gameState' &&
-        (msg.data?.loot ?? []).some((drop) => drop.kind === 'shard')
+        msg.type === 'gameState' && (msg.data?.loot ?? []).some((drop) => drop.kind === 'shard')
     );
     const shardA = stateA.data?.loot?.find((drop) => drop.kind === 'shard');
     const shardB = stateB.data?.loot?.find((drop) => drop.kind === 'shard');

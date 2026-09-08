@@ -1,8 +1,11 @@
-import { expect, test, describe, beforeEach, vi } from 'vitest';
-import { checkLaserAsteroidCollision, checkLaserShipCollision } from '../../../src/physics/collision/collisionDetection';
-import { Roid } from '../../../src/entities/roid/Roid';
-import { Ship } from '../../../src/entities/ship/Ship';
-import { Laser } from '../../../src/entities/laser/Laser';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { Laser } from '../../../src/entities/laser/Laser';
+import type { Roid } from '../../../src/entities/roid/Roid';
+import type { Ship } from '../../../src/entities/ship/Ship';
+import {
+  checkLaserAsteroidCollision,
+  checkLaserShipCollision,
+} from '../../../src/physics/collision/collisionDetection';
 
 describe('Laser Collision Detection', () => {
   let mockLaser: Laser;
@@ -89,32 +92,28 @@ describe('Laser Collision Detection', () => {
       // Test with large asteroid
       mockAsteroid.r = 40;
       mockLaser.position = { x: 100 + 41.9, y: 100 }; // Just inside collision boundary
-      expect(checkLaserAsteroidCollision(mockLaser.position, mockAsteroid.position, mockAsteroid.r)).toBe(true);
+      expect(
+        checkLaserAsteroidCollision(mockLaser.position, mockAsteroid.position, mockAsteroid.r)
+      ).toBe(true);
 
       // Test with small asteroid
       mockAsteroid.r = 10;
       mockLaser.position = { x: 100 + 11.9, y: 100 }; // Just inside collision boundary
-      expect(checkLaserAsteroidCollision(mockLaser.position, mockAsteroid.position, mockAsteroid.r)).toBe(true);
+      expect(
+        checkLaserAsteroidCollision(mockLaser.position, mockAsteroid.position, mockAsteroid.r)
+      ).toBe(true);
     });
   });
 
   describe('Laser vs Ship Collisions', () => {
     test('laser hits ship when positions overlap', () => {
-      const result = checkLaserShipCollision(
-        mockLaser.position,
-        mockShip.position,
-        mockShip.r
-      );
+      const result = checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r);
       expect(result).toBe(true);
     });
 
     test('laser misses ship when positions are far apart', () => {
       mockLaser.position = { x: 200, y: 200 };
-      const result = checkLaserShipCollision(
-        mockLaser.position,
-        mockShip.position,
-        mockShip.r
-      );
+      const result = checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r);
       expect(result).toBe(false);
     });
 
@@ -122,22 +121,14 @@ describe('Laser Collision Detection', () => {
       // Position laser at the edge of ship (radius 15 + laser radius 2 = 17)
       // Use 16.9 to be just inside the collision boundary
       mockLaser.position = { x: 100 + 16.9, y: 100 };
-      const result = checkLaserShipCollision(
-        mockLaser.position,
-        mockShip.position,
-        mockShip.r
-      );
+      const result = checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r);
       expect(result).toBe(true);
     });
 
     test('laser misses ship when just outside edge', () => {
       // Position laser just outside ship edge
       mockLaser.position = { x: 100 + 17.1, y: 100 };
-      const result = checkLaserShipCollision(
-        mockLaser.position,
-        mockShip.position,
-        mockShip.r
-      );
+      const result = checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r);
       expect(result).toBe(false);
     });
 

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { canAffordFuelCost, trySpendEmpFuel, type FuelTank } from '../../../shared/fuel';
+import { canAffordFuelCost, type FuelTank, trySpendEmpFuel } from '../../../shared/fuel';
 import { FUEL } from '../../../src/constants';
-import { activateAbilityOnHost, type AbilityHost } from '../../../src/entities/ship/shipAbilities';
-import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
 import { Ship } from '../../../src/entities/ship/Ship';
+import { type AbilityHost, activateAbilityOnHost } from '../../../src/entities/ship/shipAbilities';
+import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
 
 function host(kitId: AbilityHost['kitId'], fuel: number = FUEL.START): AbilityHost {
   return {

@@ -22,15 +22,15 @@ describe('Boundary game-over and respawn cues', () => {
   test('a hull past the arena edge is a wall death, never unknown', () => {
     expect(formatDeathCauseForOverlay('unknown')).toBeUndefined();
     expect(formatDeathCauseForOverlay('boundary')).toBe('the arena wall');
-    expect(
-      resolveCombatDeathCause(undefined, { position: { x: 4000, y: 0 }, r: 20 })
-    ).toBe('boundary');
-    expect(
-      resolveCombatDeathCause('server-damage', { position: { x: 4000, y: 0 }, r: 20 })
-    ).toBe('boundary');
-    expect(
-      resolveCombatDeathCause('unknown', { position: { x: 4000, y: 0 }, r: 20 })
-    ).toBe('boundary');
+    expect(resolveCombatDeathCause(undefined, { position: { x: 4000, y: 0 }, r: 20 })).toBe(
+      'boundary'
+    );
+    expect(resolveCombatDeathCause('server-damage', { position: { x: 4000, y: 0 }, r: 20 })).toBe(
+      'boundary'
+    );
+    expect(resolveCombatDeathCause('unknown', { position: { x: 4000, y: 0 }, r: 20 })).toBe(
+      'boundary'
+    );
   });
 
   test('last-life wall contact flashes, explodes, and names the wall on playerDied', () => {

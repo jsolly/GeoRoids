@@ -12,10 +12,15 @@ test('worldToScreenInto writes into the provided object and returns it', () => {
 
 test('projectWorldToScreenInto writes into the provided object and returns it', () => {
   const out = { x: 0, y: 0 };
-  const result = projectWorldToScreenInto(out, { x: 20, y: 10 }, { x: 4, y: 2 }, {
-    width: 200,
-    height: 100,
-  });
+  const result = projectWorldToScreenInto(
+    out,
+    { x: 20, y: 10 },
+    { x: 4, y: 2 },
+    {
+      width: 200,
+      height: 100,
+    }
+  );
   expect(result).toBe(out);
   expect(out).toEqual({ x: 116, y: 58 });
 });

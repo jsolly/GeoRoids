@@ -1,8 +1,8 @@
-import { expect, test, describe, beforeEach, vi, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { Laser } from '../../../../src/entities/laser/Laser';
+import type { Roid } from '../../../../src/entities/roid/Roid';
+import type { Ship } from '../../../../src/entities/ship/Ship';
 import { CollisionManager } from '../../../../src/physics/collision/CollisionManager';
-import { Laser } from '../../../../src/entities/laser/Laser';
-import { Roid } from '../../../../src/entities/roid/Roid';
-import { Ship } from '../../../../src/entities/ship/Ship';
 
 // Mock NetworkManager for integration testing
 const mockSendMessage = vi.fn();
@@ -39,10 +39,10 @@ describe('Laser Collision Manager Integration', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Get collision manager instance
     collisionManager = CollisionManager.getInstance();
-    
+
     // Create mock laser
     mockLaser = {
       position: { x: 100, y: 100 },
@@ -88,7 +88,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots: Ship[] = [];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Verify laser explosion methods were called
       expect(mockLaser.updateExplodeTime).toHaveBeenCalled();
@@ -159,7 +164,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots: Ship[] = [];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       expect(mockSendMessage).toHaveBeenCalledWith({
         type: 'asteroidDestroyed',
@@ -180,7 +190,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots: Ship[] = [];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       expect(mockSendMessage).toHaveBeenCalledWith({
         type: 'asteroidDestroyed',
@@ -201,7 +216,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots: Ship[] = [];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Verify no collision handling occurred
       expect(mockLaser.updateExplodeTime).not.toHaveBeenCalled();
@@ -217,7 +237,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots = [mockBot];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Verify laser explosion methods were called
       expect(mockLaser.updateExplodeTime).toHaveBeenCalled();
@@ -241,7 +266,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots = [mockBot];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Verify no collision handling occurred
       expect(mockSendMessage).not.toHaveBeenCalled();
@@ -254,7 +284,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots = [mockBot];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Verify no collision handling occurred
       expect(mockSendMessage).not.toHaveBeenCalled();
@@ -265,13 +300,18 @@ describe('Laser Collision Manager Integration', () => {
     test('laser hits asteroid before bot when both are present', () => {
       // Position bot at a different location so laser doesn't hit both
       mockBot.position = { x: 200, y: 200 };
-      
+
       const lasers = [mockLaser];
       const asteroids = [mockAsteroid];
       const bots = [mockBot];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Should send asteroid destroyed message, not bot damage
       expect(mockSendMessage).toHaveBeenCalledWith({
@@ -295,7 +335,12 @@ describe('Laser Collision Manager Integration', () => {
       const bots = [mockBot];
       const localPlayerId = 'test-player';
 
-      collisionManager.checkLaserCollisions(lasers, asteroids, bots.map(ship => ({ ship, id: ship.id, type: 'bot' as const })), localPlayerId);
+      collisionManager.checkLaserCollisions(
+        lasers,
+        asteroids,
+        bots.map((ship) => ({ ship, id: ship.id, type: 'bot' as const })),
+        localPlayerId
+      );
 
       // Should send bot damage message
       expect(mockSendMessage).toHaveBeenCalledWith({

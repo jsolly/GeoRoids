@@ -82,15 +82,17 @@ function equal(left: Json | undefined, right: Json | undefined): boolean {
   return false;
 }
 function rows(value: Json | undefined): value is Row[] {
-  return Array.isArray(value) && value.every((item) => object(item) && typeof item.id === 'string');
+  return (
+    Array.isArray(value) && value.every((item) => object(item) && typeof item['id'] === 'string')
+  );
 }
 function indexed(items: Row[]): Map<string, Row> {
   const result = new Map<string, Row>();
   for (const item of items) {
-    if (typeof item.id !== 'string' || result.has(item.id)) {
+    if (typeof item['id'] !== 'string' || result.has(item['id'])) {
       throw new Error('Invalid or duplicate snapshot entity ID');
     }
-    result.set(item.id, item);
+    result.set(item['id'], item);
   }
   return result;
 }
@@ -144,8 +146,8 @@ export function encodeSnapshot(
         }
       }
     }
-    const oldOrder = previous.map((row) => row.id as string);
-    const order = current.map((row) => row.id as string);
+    const oldOrder = previous.map((row) => row['id'] as string);
+    const order = current.map((row) => row['id'] as string);
     const change = { add, update, remove, ...(!equal(oldOrder, order) ? { order } : {}) };
     // Tiny arrays can cost more to patch than replace. Both forms carry complete information.
     if (JSON.stringify(change).length < JSON.stringify(current).length) {
@@ -189,41 +191,41 @@ function applyFields(base: Row, set: unknown, clear: unknown): Row {
   return result;
 }
 function applyPatch(base: ServerGameSnapshot, patch: unknown): ServerGameSnapshot {
-  if (!object(patch) || !object(patch.collections)) {
+  if (!object(patch) || !object(patch['collections'])) {
     throw new Error('Invalid snapshot patch');
   }
-  const state = applyFields(base as unknown as Row, patch.set, patch.clear);
-  for (const [name, change] of Object.entries(patch.collections)) {
+  const state = applyFields(base as unknown as Row, patch['set'], patch['clear']);
+  for (const [name, change] of Object.entries(patch['collections'])) {
     key(name);
     if (
       !object(change) ||
       !rows(state[name]) ||
-      !rows(change.add) ||
-      !Array.isArray(change.update) ||
-      !stringList(change.remove)
+      !rows(change['add']) ||
+      !Array.isArray(change['update']) ||
+      !stringList(change['remove'])
     ) {
       throw new Error('Invalid snapshot collection patch');
     }
-    if (Object.hasOwn(patch.set as Row, name) || (patch.clear as string[]).includes(name)) {
+    if (Object.hasOwn(patch['set'] as Row, name) || (patch['clear'] as string[]).includes(name)) {
       throw new Error('Conflicting snapshot collection patch');
     }
     const items = indexed(state[name]);
     const touched = new Set<string>();
-    for (const id of change.remove) {
+    for (const id of change['remove']) {
       if (!items.delete(id)) {
         throw new Error('Snapshot removes missing entity');
       }
       touched.add(id);
     }
-    for (const row of change.add) {
-      const id = row.id as string;
+    for (const row of change['add']) {
+      const id = row['id'] as string;
       if (items.has(id) || touched.has(id)) {
         throw new Error('Snapshot adds duplicate entity');
       }
       items.set(id, row);
       touched.add(id);
     }
-    for (const update of change.update) {
+    for (const update of change['update']) {
       if (!Array.isArray(update) || update.length !== 3 || typeof update[0] !== 'string') {
         throw new Error('Invalid snapshot entity patch');
       }
@@ -233,21 +235,21 @@ function applyPatch(base: ServerGameSnapshot, patch: unknown): ServerGameSnapsho
         throw new Error('Snapshot updates missing or duplicate entity');
       }
       const next = applyFields(previous, set, clear);
-      if (next.id !== id) {
+      if (next['id'] !== id) {
         throw new Error('Snapshot changes entity identity');
       }
       items.set(id, next);
       touched.add(id);
     }
-    if (change.order !== undefined) {
+    if (change['order'] !== undefined) {
       if (
-        !stringList(change.order) ||
-        change.order.length !== items.size ||
-        change.order.some((id) => !items.has(id))
+        !stringList(change['order']) ||
+        change['order'].length !== items.size ||
+        change['order'].some((id) => !items.has(id))
       ) {
         throw new Error('Invalid snapshot entity order');
       }
-      state[name] = change.order.map((id) => items.get(id) as Row);
+      state[name] = change['order'].map((id) => items.get(id) as Row);
     } else {
       state[name] = [...items.values()];
     }
@@ -259,33 +261,33 @@ function applyPatch(base: ServerGameSnapshot, patch: unknown): ServerGameSnapsho
 export class SnapshotDecoder {
   private baseline?: SnapshotBaseline;
   reset(): void {
-    this.baseline = undefined;
+    delete this.baseline;
   }
   decode(input: unknown): ServerGameSnapshot {
     const frame = input;
     if (
       !object(frame) ||
-      frame.version !== SNAPSHOT_VERSION ||
-      !Number.isSafeInteger(frame.sequence) ||
-      (frame.sequence as number) <= 0
+      frame['version'] !== SNAPSHOT_VERSION ||
+      !Number.isSafeInteger(frame['sequence']) ||
+      (frame['sequence'] as number) <= 0
     ) {
       throw new Error('Unsupported or malformed snapshot');
     }
-    const sequence = frame.sequence as number;
+    const sequence = frame['sequence'] as number;
     if (this.baseline && sequence <= this.baseline.sequence) {
       throw new Error('Stale snapshot sequence');
     }
     let state: ServerGameSnapshot;
-    if (frame.kind === 'keyframe') {
-      validateSnapshot(frame.state);
-      state = frame.state;
+    if (frame['kind'] === 'keyframe') {
+      validateSnapshot(frame['state']);
+      state = frame['state'];
     } else if (
-      frame.kind === 'delta' &&
+      frame['kind'] === 'delta' &&
       this.baseline &&
-      frame.baseline === this.baseline.sequence &&
+      frame['baseline'] === this.baseline.sequence &&
       sequence === this.baseline.sequence + 1
     ) {
-      state = applyPatch(this.baseline.state, frame.patch);
+      state = applyPatch(this.baseline.state, frame['patch']);
     } else {
       throw new Error('Snapshot baseline missing; keyframe required');
     }

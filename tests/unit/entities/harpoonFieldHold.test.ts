@@ -33,12 +33,16 @@ test('a live non-empty publish releases the reconnect hold', () => {
 });
 
 test('a live field snapshot retires stale reconnect latch bodies', () => {
-  publishHarpoonField([{ id: 'old-generation', position: { x: 10, y: 0 }, velocity: { x: 0, y: 0 } }]);
+  publishHarpoonField([
+    { id: 'old-generation', position: { x: 10, y: 0 }, velocity: { x: 0, y: 0 } },
+  ]);
   setHoldEmptyHarpoonField(true);
   publishHarpoonField([]);
   expect(findHarpoonFieldBody('old-generation')).toBeDefined();
 
-  publishHarpoonField([{ id: 'new-generation', position: { x: 20, y: 0 }, velocity: { x: 0, y: 0 } }]);
+  publishHarpoonField([
+    { id: 'new-generation', position: { x: 20, y: 0 }, velocity: { x: 0, y: 0 } },
+  ]);
   expect(findHarpoonFieldBody('old-generation')).toBeUndefined();
   expect(findHarpoonFieldBody('new-generation')?.position.x).toBe(20);
 });

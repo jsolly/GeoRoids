@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
 
 import {
-  DESKTOP_CONTROLS_HINT,
-  TOUCH_CONTROLS_HINT,
   controlsHintFor,
+  DESKTOP_CONTROLS_HINT,
   shouldUseTouchControls,
+  TOUCH_CONTROLS_HINT,
   type ViewportQuery,
 } from '../../../src/ui/viewportChrome';
 

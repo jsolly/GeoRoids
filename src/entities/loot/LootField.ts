@@ -27,7 +27,7 @@ export class LootField {
       mass: drop.mass,
       radius: drop.radius,
       kind: normalizeKind(drop.kind),
-      ...(drop.kind === 'fuel' ? { fuel: drop.fuel } : {}),
+      ...(drop.kind === 'fuel' && drop.fuel !== undefined ? { fuel: drop.fuel } : {}),
     }));
   }
 

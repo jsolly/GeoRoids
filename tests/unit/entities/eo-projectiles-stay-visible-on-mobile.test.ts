@@ -4,9 +4,19 @@ import { SatelliteManager } from '../../../src/entities/satellite/SatelliteManag
 import { canvasManager } from '../../../src/rendering/canvas';
 
 const satellite: SatelliteData = {
-  id: 'eo-mobile', name: 'Landsat 7', typeId: 'landsat-7', assetKey: 'eo/landsat-7',
-  shotManner: 'steady-optical-ping', position: { x: 0, y: 0 }, velocity: { x: 0, y: 0 },
-  angle: 0, exploding: false, color: '#C4B5FD', health: 50, maxHealth: 50, radius: 16,
+  id: 'eo-mobile',
+  name: 'Landsat 7',
+  typeId: 'landsat-7',
+  assetKey: 'eo/landsat-7',
+  shotManner: 'steady-optical-ping',
+  position: { x: 0, y: 0 },
+  velocity: { x: 0, y: 0 },
+  angle: 0,
+  exploding: false,
+  color: '#C4B5FD',
+  health: 50,
+  maxHealth: 50,
+  radius: 16,
 };
 
 afterEach(() => {
@@ -20,8 +30,13 @@ describe('EO projectile visuals follow the authoritative lifetime', () => {
     const manager = SatelliteManager.getInstance();
     manager.syncFromServer([satellite]);
     manager.syncProjectilesFromServer([
-      { satelliteId: satellite.id, shotId: 'old-live-shot', position: { x: 1200, y: 0 },
-        velocity: { x: 10, y: 0 }, age: 120 },
+      {
+        satelliteId: satellite.id,
+        shotId: 'old-live-shot',
+        position: { x: 1200, y: 0 },
+        velocity: { x: 10, y: 0 },
+        age: 120,
+      },
     ]);
     for (let frame = 0; frame < 120; frame += 1) {
       manager.update();

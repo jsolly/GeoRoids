@@ -469,7 +469,7 @@ export const LOGGING = {
   // main thread, misses heartbeats, and disconnects both tabs.
   GLOBAL_LOG_LEVEL: 'info' as 'error' | 'warn' | 'info' | 'debug',
 
-  // Whether to forward client logs to the server (warn+ only; see Logger)
+  // Forward warnings/errors and selected STATE info events to the server.
   FORWARD_TO_SERVER: true,
 
   // Whether to write logs to browser console

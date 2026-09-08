@@ -9,9 +9,12 @@ import {
 } from '../../../src/physics/terrain/contourLaser';
 import { createHeightfield, sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
-import { canvasManager } from '../../../src/rendering/canvas';
-import { drawContourLaserTicks, liveLaserPositions } from '../../../src/rendering/contourLaserRenderer';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
+import { canvasManager } from '../../../src/rendering/canvas';
+import {
+  drawContourLaserTicks,
+  liveLaserPositions,
+} from '../../../src/rendering/contourLaserRenderer';
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
@@ -88,9 +91,12 @@ describe('contour lasers stay a terrain blush, not a new authority path', () => 
     expect(contourLaserTick(field, 0, 0)).toBeNull();
     expect(contourLaserTick(field, Number.NaN, 5)).toBeNull();
     expect(contourLaserTick(field, 5, 5, 0)).toBeNull();
-    expect(contourLaserTicksForShots(field, [{ x: 0, y: 0 }, { x: Number.NaN, y: 1 }])).toEqual(
-      []
-    );
+    expect(
+      contourLaserTicksForShots(field, [
+        { x: 0, y: 0 },
+        { x: Number.NaN, y: 1 },
+      ])
+    ).toEqual([]);
   });
 
   test('the reusable output object is filled only for a valid tangent', () => {
@@ -121,9 +127,9 @@ describe('contour lasers stay a terrain blush, not a new authority path', () => 
         { lasers: [] },
       ])
     ).toEqual([{ x: 10, y: 20 }]);
-    expect(liveLaserPositions([{ lasers: [{ position: { x: 70, y: 80 }, explodeTime: 0 }] }], reusable)).toBe(
-      reusable
-    );
+    expect(
+      liveLaserPositions([{ lasers: [{ position: { x: 70, y: 80 }, explodeTime: 0 }] }], reusable)
+    ).toBe(reusable);
     expect(reusable).toEqual([{ x: 70, y: 80 }]);
   });
 

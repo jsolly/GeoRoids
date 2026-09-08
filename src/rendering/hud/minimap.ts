@@ -12,7 +12,7 @@ import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/
 import type { CircleBoundary } from '../../physics/boundary';
 import { getGameBoundary } from '../../physics/boundary';
 import { isAsteroidPending } from '../../physics/collision/asteroidHitFeel';
-import { getShipDisplayColor, hexToRgba } from '../../utils/colorUtils';
+import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { hudLayoutForCanvas } from './hudLayout';
 
@@ -242,8 +242,8 @@ export function drawMiniMap(
         x: p.x,
         y: p.y,
         heading: player.ship.angle,
-        color: getShipDisplayColor(player),
-        factionId: player.ship.factionId,
+        color: getFactionColor(player.type),
+        ...(player.ship.factionId !== undefined ? { factionId: player.ship.factionId } : {}),
       });
     }
 
@@ -263,7 +263,7 @@ export function drawMiniMap(
           x: p.x,
           y: p.y,
           heading: ship.angle,
-          factionId: ship.factionId,
+          ...(ship.factionId !== undefined ? { factionId: ship.factionId } : {}),
         });
       }
     }

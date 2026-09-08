@@ -5,7 +5,7 @@ if (import.meta.env.PROD) {
   let stop: () => void = () => undefined;
   const start = () => {
     stop();
-    stop = watchClientRelease(import.meta.env.VITE_COMMIT_HASH, {
+    stop = watchClientRelease(import.meta.env['VITE_COMMIT_HASH'], {
       fetch: (input, init) => window.fetch(input, init),
       storage: {
         getItem: (key) => window.sessionStorage.getItem(key),

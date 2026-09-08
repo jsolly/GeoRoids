@@ -53,8 +53,8 @@ export class EntityFactory {
     return this.createPlayer({
       name,
       type: 'local',
-      position,
-      kitId,
+      ...(position !== undefined ? { position: position } : {}),
+      ...(kitId !== undefined ? { kitId: kitId } : {}),
     });
   }
 
@@ -64,7 +64,7 @@ export class EntityFactory {
       name,
       type: 'remote',
       position,
-      color,
+      ...(color !== undefined ? { color: color } : {}),
     });
   }
 
@@ -72,7 +72,7 @@ export class EntityFactory {
     return this.createPlayer({
       name,
       type: 'bot',
-      position,
+      ...(position !== undefined ? { position: position } : {}),
     });
   }
 
@@ -112,8 +112,8 @@ export class EntityFactory {
       name: config.name,
       type: config.type,
       input: new MockPlayerInput(),
-      kitId: config.kitId,
-      factionId: config.factionId,
+      ...(config.kitId !== undefined ? { kitId: config.kitId } : {}),
+      ...(config.factionId !== undefined ? { factionId: config.factionId } : {}),
     });
   }
 

@@ -10,7 +10,5 @@ interface ImportMeta {
 
 // Extend the global Window interface for game controller access
 interface Window {
-  gameController?: {
-    isDebugMode?: () => boolean;
-  };
+  gameController?: import('../core/gameController').GameController;
 }

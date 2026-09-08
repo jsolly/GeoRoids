@@ -75,7 +75,9 @@ test('arena resets and independent worlds cannot reuse satellite or pickup ident
   const nextSatellite = manager.createSatellites(1)[0]!;
   expect(nextSatellite.id).not.toBe(oldSatellite.id);
   expect(manager.damageSatellite(oldSatellite.id, 100)).toBeUndefined();
-  expect(new SatelliteManager(new RNGService(42)).createSatellites(1)[0]!.id).not.toBe(nextSatellite.id);
+  expect(new SatelliteManager(new RNGService(42)).createSatellites(1)[0]!.id).not.toBe(
+    nextSatellite.id
+  );
 
   const pickups = new SatellitePickupManager(new RNGService(42));
   const oldPickup = pickups.createPickups(1)[0]!;

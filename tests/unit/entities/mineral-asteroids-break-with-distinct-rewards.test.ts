@@ -4,31 +4,42 @@ import { describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
-import type { AsteroidData, AsteroidMaterial } from '../../../shared-types';
 import { ASTEROID_MATERIALS, MATERIAL_OUTLINES } from '../../../shared/asteroidMaterials';
+import type { AsteroidData, AsteroidMaterial } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
-import { Roid } from '../../../src/entities/roid/Roid';
 import { serializeAsteroidMaterialSvg } from '../../../src/entities/roid/materialArt';
+import { Roid } from '../../../src/entities/roid/Roid';
 import { applyAsteroidKinematics } from '../../../src/network/services/asteroidFieldSync';
 
 function mineral(material: AsteroidMaterial, size = 36): AsteroidData {
   const offsets = [...MATERIAL_OUTLINES[material]];
   return {
-    id: material, material, position: { x: 400, y: 300 }, velocity: { x: 1, y: 0 },
-    size, jaggedness: 0.3, rotation: 0, angularVelocity: 0,
+    id: material,
+    material,
+    position: { x: 400, y: 300 },
+    velocity: { x: 1, y: 0 },
+    size,
+    jaggedness: 0.3,
+    rotation: 0,
+    angularVelocity: 0,
     health: DAMAGE.LASER_HIT * (material === 'metal' ? 3 : 1),
     maxHealth: DAMAGE.LASER_HIT * (material === 'metal' ? 3 : 1),
-    vertices: offsets.length, offsets,
+    vertices: offsets.length,
+    offsets,
   };
 }
 
 describe('mineral asteroids break with distinct rewards', () => {
   test('a shared field supplies all three readable contours and syncs them to a joining pilot', () => {
     const rocks = new AsteroidManager(new RNGService(42)).createAsteroids(6);
-    expect(new Set(rocks.map((rock) => rock.material))).toEqual(new Set(['ice', 'metal', 'rubble']));
+    expect(new Set(rocks.map((rock) => rock.material))).toEqual(
+      new Set(['ice', 'metal', 'rubble'])
+    );
     expect(new Set(rocks.map((rock) => rock.size)).size).toBeGreaterThan(1);
     expect(rocks.every((rock) => rock.size >= 18 && rock.size <= 48)).toBe(true);
-    expect(rocks.find((rock) => rock.isCollabTarget)?.size).toBeGreaterThanOrEqual(ROID.COLLAB_SPLIT_MIN_SIZE);
+    expect(rocks.find((rock) => rock.isCollabTarget)?.size).toBeGreaterThanOrEqual(
+      ROID.COLLAB_SPLIT_MIN_SIZE
+    );
     for (const rock of rocks) {
       const local = new Roid({ x: 0, y: 0 }, 1, rock.id);
       applyAsteroidKinematics(local, rock);
@@ -49,7 +60,10 @@ describe('mineral asteroids break with distinct rewards', () => {
     expect(engine.getAsteroid('metal')?.health).toBe(DAMAGE.LASER_HIT * 2);
     expect(engine.handleAsteroidHit('metal', 'pilot', 'laser', 10100).outcome).toBe('tagged');
     expect(engine.handleAsteroidHit('metal', 'pilot', 'laser', 10300).outcome).toBe('destroyed');
-    const masses = engine.getLoot().filter((drop) => drop.kind === 'shard').map((drop) => drop.mass);
+    const masses = engine
+      .getLoot()
+      .filter((drop) => drop.kind === 'shard')
+      .map((drop) => drop.mass);
     expect(masses).toEqual([0.25, 0.75]);
     expect(engine.handleAsteroidHit('metal', 'pilot').outcome).toBe('missing');
     expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(2);
@@ -63,7 +77,9 @@ describe('mineral asteroids break with distinct rewards', () => {
     const broken = manager.registerLaserHit('rubble', 'pilot');
     expect(broken.newAsteroids).toHaveLength(3);
     expect(new Set(broken.newAsteroids.map((rock) => rock.size)).size).toBe(3);
-    expect(new Set(broken.newAsteroids.map((rock) => `${rock.velocity.x}:${rock.velocity.y}`)).size).toBe(3);
+    expect(
+      new Set(broken.newAsteroids.map((rock) => `${rock.velocity.x}:${rock.velocity.y}`)).size
+    ).toBe(3);
     for (const fragment of broken.newAsteroids) {
       expect(fragment.material).toBe('rubble');
       expect(fragment.size).toBeLessThan(20);

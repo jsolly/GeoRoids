@@ -29,7 +29,6 @@ describe('shared combat scoring helpers', () => {
     expect(shouldAwardHumanKillPoints('', 'p1', true)).toBe(false);
     expect(shouldAwardHumanKillPoints('p2', 'p1', false)).toBe(false);
   });
-
 });
 
 describe('GameEngine player vs bot damage wrappers', () => {
@@ -46,9 +45,9 @@ describe('GameEngine player vs bot damage wrappers', () => {
   test('handlePlayerDamage does not damage bots; handleBotDamage does not damage humans', () => {
     const ws = {} as any;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     const bot = firstBot(engine);
-    engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
 
     expect(engine.handlePlayerDamage(bot.id, 'p1', 25)).toBe(false);
     expect(engine.getBot(bot.id)?.health).toBe(100);
@@ -61,7 +60,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
     const ws = {} as any;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.addPlayer('p2', 'Rival', ws, { x: 10, y: 10 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
     const destroyed = engine.handlePlayerDamage('p1', 'p2', 100);
     expect(destroyed).toBe(true);
@@ -73,7 +72,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
   test('boundary / self kills do not award human kill points', () => {
     const ws = {} as any;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
     expect(engine.handlePlayerDamage('p1', 'boundary', 100)).toBe(true);
     expect(engine.getPlayer('p1')?.score).toBe(0);
@@ -83,7 +82,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
     const ws = {} as any;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     const bot = firstBot(engine);
-    engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
     const livesBefore = bot.lives;
 
     const destroyed = engine.handleBotDamage(bot.id, 'p1', bot.health);
@@ -97,7 +96,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
     const ws = {} as any;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.addPlayer('p2', 'Rival', ws, { x: 10, y: 10 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'p2', 100);
     const afterDeath = engine.getPlayer('p1');
     expect(afterDeath?.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);

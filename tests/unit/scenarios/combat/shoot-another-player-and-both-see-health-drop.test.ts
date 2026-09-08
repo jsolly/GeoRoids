@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE, SHIP } from '../../../../src/constants';
-import {
-  GameServerWorld,
-  useQuietServerConsole,
-  type Pilot,
-} from '../support/gameServerWorld';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -45,10 +41,16 @@ describe('A player can shoot another player', () => {
     }
 
     world.broadcastGameState();
-    const bobFromAlice = (alice.socket.lastReceived('gameState')?.data as { entities: Array<{ id: string; health: number }> })
-      .entities.find((entity) => entity.id === bob.id);
-    const bobFromBob = (bob.socket.lastReceived('gameState')?.data as { entities: Array<{ id: string; health: number }> })
-      .entities.find((entity) => entity.id === bob.id);
+    const bobFromAlice = (
+      alice.socket.lastReceived('gameState')?.data as {
+        entities: Array<{ id: string; health: number }>;
+      }
+    ).entities.find((entity) => entity.id === bob.id);
+    const bobFromBob = (
+      bob.socket.lastReceived('gameState')?.data as {
+        entities: Array<{ id: string; health: number }>;
+      }
+    ).entities.find((entity) => entity.id === bob.id);
 
     expect(bobFromAlice?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
     expect(bobFromBob?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);

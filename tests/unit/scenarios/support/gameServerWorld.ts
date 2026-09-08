@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, vi } from 'vitest';
 import { WebSocket } from 'ws';
-import type { AsteroidData, Position, ShipKitId, SoftFactionId } from '../../../../shared-types';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
+import type { AsteroidData, Position, ShipKitId, SoftFactionId } from '../../../../shared-types';
 import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
 
 function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {

@@ -1,10 +1,12 @@
 import { canvasManager } from '../rendering/canvas';
 import '../ui/mainMenu'; // wires nickname + Enter Game listeners
+import { reportRenderError } from '../rendering/renderError';
 import { initNetworkStatusUI } from '../ui/networkStatus';
-import { logger } from '../utils/Logger';
+import { installGlobalErrorLogging } from '../utils/globalErrorLogging';
 import { GameController } from './gameController';
 
 const gameController = GameController.getInstance();
+installGlobalErrorLogging();
 
 // Surface a visible banner whenever the game-server connection drops.
 initNetworkStatusUI();
@@ -38,15 +40,12 @@ window.addEventListener('gameStart', () => {
 
       // Then render the current game state
       gameController.renderGame();
+      window.requestAnimationFrame(gameLoop);
     } catch (error) {
-      logger.error(
-        'GAME_LOOP',
-        'Error in game loop',
-        error instanceof Error ? error : new Error(String(error))
-      );
+      gameLoopScheduled = false;
+      gameController.stopAfterFrameFailure();
+      reportRenderError(error);
     }
-
-    window.requestAnimationFrame(gameLoop);
   }
 
   window.requestAnimationFrame(gameLoop);

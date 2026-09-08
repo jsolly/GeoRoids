@@ -30,14 +30,14 @@ describe('soft factions for humans and bots', () => {
     const ws = {} as never;
     const human = engine.addPlayer('human-1', 'Pilot', ws);
     engine.entityManager.updateEntity(human.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ion',
     });
     const bots = engine.createBots(2) ?? [];
     const allyBot = bots[0];
     expect(allyBot).toBeDefined();
     engine.entityManager.updateEntity(allyBot!.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ion',
     });
 
@@ -52,11 +52,11 @@ describe('soft factions for humans and bots', () => {
     const shooter = engine.addPlayer('human-ff-a', 'A', ws);
     const teammate = engine.addPlayer('human-ff-b', 'B', ws);
     engine.entityManager.updateEntity(shooter.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ember',
     });
     engine.entityManager.updateEntity(teammate.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ember',
     });
 
@@ -70,11 +70,11 @@ describe('soft factions for humans and bots', () => {
     const attacker = engine.addPlayer('human-atk', 'Atk', ws);
     const target = engine.addPlayer('human-tgt', 'Tgt', ws);
     engine.entityManager.updateEntity(attacker.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ion',
     });
     engine.entityManager.updateEntity(target.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ember',
     });
 
@@ -86,7 +86,7 @@ describe('soft factions for humans and bots', () => {
     const emberBot = bots.find((bot) => bot.factionId === 'ember') ?? bots[0];
     expect(emberBot).toBeDefined();
     engine.entityManager.updateEntity(emberBot!.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ember',
     });
     const botHealth = emberBot!.health;
@@ -97,7 +97,7 @@ describe('soft factions for humans and bots', () => {
   test('asteroid and boundary hits still damage teammates', () => {
     const ws = {} as never;
     const player = engine.addPlayer('human-env', 'Env', ws);
-    engine.entityManager.updateEntity(player.id, { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity(player.id, { spawnProtectionTimer: 0 });
     const health = player.health;
     engine.handlePlayerDamage(player.id, 'asteroid', 25);
     expect(engine.getPlayer(player.id)?.health).toBe(health - 25);
@@ -111,15 +111,15 @@ describe('soft factions for humans and bots', () => {
     const ally = engine.addPlayer('human-ally', 'Ally', ws);
     const target = engine.addPlayer('human-victim', 'Victim', ws);
     engine.entityManager.updateEntity(attacker.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ion',
     });
     engine.entityManager.updateEntity(ally.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ion',
     });
     engine.entityManager.updateEntity(target.id, {
-      spawnProtectionTimer: undefined,
+      spawnProtectionTimer: 0,
       factionId: 'ember',
       health: 25,
     });

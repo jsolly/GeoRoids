@@ -113,7 +113,7 @@ export function turnToward(current: number, desired: number, maxTurn: number): n
 
 /** Player turn rate in radians per client frame. */
 export function shipTurnPerFrame(): number {
-  return ((SHIP.TURN_SPEED * Math.PI) / 180) / GAME.FPS;
+  return (SHIP.TURN_SPEED * Math.PI) / 180 / GAME.FPS;
 }
 
 /** Laser speed in pixels per client frame (same as `generateLaserVelocity`). */

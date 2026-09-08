@@ -3,8 +3,8 @@ import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { EO_SATELLITE_HULL_COLOR, SATELLITE_PROFILES } from '../../../shared/eoSatellites';
 import { SATELLITE } from '../../../src/constants';
-import { SHIP_KIT_IDS } from '../../../src/entities/ship/shipKits';
 import { SatelliteManager } from '../../../src/entities/satellite/SatelliteManager';
+import { SHIP_KIT_IDS } from '../../../src/entities/ship/shipKits';
 
 const DAMAGE_HALF = SATELLITE.HEALTH / 2;
 
@@ -121,14 +121,30 @@ describe('Ambient hostile EO satellites', () => {
   test('satellites shoot toward the nearest living ship regardless of faction', () => {
     const satellite = firstSatellite(gameEngine);
     const mockWs = {} as GameEntity['ws'];
-    gameEngine.addPlayer('near', 'Near', mockWs as never, {
-      x: satellite.position.x + 180,
-      y: satellite.position.y,
-    }, undefined, 'dart', 'ion');
-    gameEngine.addPlayer('far', 'Far', mockWs as never, {
-      x: satellite.position.x + 1800,
-      y: satellite.position.y,
-    }, undefined, 'warden', 'ember');
+    gameEngine.addPlayer(
+      'near',
+      'Near',
+      mockWs as never,
+      {
+        x: satellite.position.x + 180,
+        y: satellite.position.y,
+      },
+      undefined,
+      'dart',
+      'ion'
+    );
+    gameEngine.addPlayer(
+      'far',
+      'Far',
+      mockWs as never,
+      {
+        x: satellite.position.x + 1800,
+        y: satellite.position.y,
+      },
+      undefined,
+      'warden',
+      'ember'
+    );
 
     let shots = gameEngine.drainSatelliteShots();
     for (let i = 0; i < 240 && shots.length === 0; i++) {
@@ -208,7 +224,15 @@ describe('Ambient hostile EO satellites', () => {
   test('NPCs remain hostile to every soft faction', () => {
     const satellite = firstSatellite(gameEngine);
     const mockWs = {} as GameEntity['ws'];
-    const ion = gameEngine.addPlayer('ion', 'Ion', mockWs as never, { x: 0, y: 0 }, undefined, 'dart', 'ion');
+    const ion = gameEngine.addPlayer(
+      'ion',
+      'Ion',
+      mockWs as never,
+      { x: 0, y: 0 },
+      undefined,
+      'dart',
+      'ion'
+    );
     const ember = gameEngine.addPlayer(
       'ember',
       'Ember',
@@ -233,15 +257,17 @@ describe('Ambient hostile EO satellites', () => {
     gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, { x: 0, y: 0 });
     gameEngine.handleSatelliteDamage(satellite.id, 'pilot', SATELLITE.HEALTH);
 
-    expect(gameEngine.getGameState().satellites.find((row) => row.id === satellite.id)?.exploding).toBe(
-      true
-    );
+    expect(
+      gameEngine.getGameState().satellites.find((row) => row.id === satellite.id)?.exploding
+    ).toBe(true);
 
     for (let i = 0; i < SATELLITE.EXPLODE_DURATION_FRAMES; i++) {
       gameEngine.tickSatellites();
     }
 
-    expect(gameEngine.getGameState().satellites.find((row) => row.id === satellite.id)).toBeUndefined();
+    expect(
+      gameEngine.getGameState().satellites.find((row) => row.id === satellite.id)
+    ).toBeUndefined();
 
     for (let i = 0; i < SATELLITE.RESPAWN_FRAMES; i++) {
       gameEngine.tickSatellites();

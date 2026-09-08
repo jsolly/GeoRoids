@@ -64,12 +64,10 @@ test('a new client id with the same name takes over the live ship instead of clo
   first.lives = 2;
   first.score = 450;
 
-  const taken = manager.addHumanPlayer(
-    'pilot-new',
-    'PilotB',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(taken).toBe(first);
   expect(taken.id).toBe('pilot-new');
@@ -86,12 +84,10 @@ test('drop then rejoin under a new id restores lives and score by name', () => {
   first.score = 450;
   manager.removeEntity('pilot-old');
 
-  const rejoined = manager.addHumanPlayer(
-    'pilot-new',
-    'PilotB',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const rejoined = manager.addHumanPlayer('pilot-new', 'PilotB', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(rejoined.lives).toBe(2);
   expect(rejoined.score).toBe(450);
@@ -105,12 +101,10 @@ test('game-over rejoin starts a new ship instead of restoring 0 lives', () => {
   first.score = 210;
 
   manager.removeEntity('pilot-1');
-  const rejoined = manager.addHumanPlayer(
-    'pilot-1',
-    'Pilot',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(rejoined.lives).toBe(3);
   expect(rejoined.score).toBe(0);
@@ -122,12 +116,10 @@ test('leftover 0-life same-name ship is deleted so Start gets a fresh 3/0', () =
   first.lives = 0;
   first.score = 210;
 
-  const started = manager.addHumanPlayer(
-    'pilot-new',
-    'Pilot',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const started = manager.addHumanPlayer('pilot-new', 'Pilot', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(started).not.toBe(first);
   expect(started.id).toBe('pilot-new');
@@ -143,12 +135,10 @@ test('leftover 0-life same-id ship is replaced instead of taken over', () => {
   first.lives = 0;
   first.score = 210;
 
-  const started = manager.addHumanPlayer(
-    'pilot-1',
-    'Pilot',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const started = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(started).not.toBe(first);
   expect(started.lives).toBe(3);
@@ -166,14 +156,9 @@ test('same-id reconnect mid-explosion finishes respawn instead of inheriting a c
   first.explodeTime = 8;
   first.respawnTimer = 8;
   first.velocity = { x: 0, y: 0 };
-  first.spawnProtectionTimer = undefined;
+  delete first.spawnProtectionTimer;
 
-  const rejoined = manager.addHumanPlayer(
-    'pilot-1',
-    'Pilot',
-    { sent: 2 } as never,
-    { x: 0, y: 0 }
-  );
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, { x: 0, y: 0 });
 
   expect(rejoined).toBe(first);
   expect(rejoined.health).toBe(rejoined.maxHealth);
@@ -193,12 +178,10 @@ test('same-name takeover mid-death respawns and reports the old id', () => {
   first.exploding = true;
   first.respawnTimer = 8;
 
-  const taken = manager.addHumanPlayer(
-    'pilot-new',
-    'PilotB',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(taken.health).toBe(taken.maxHealth);
   expect(taken.exploding).toBe(false);
@@ -230,12 +213,10 @@ test('rejoining after the socket was removed restores lives and score, not a fre
   manager.removeEntity('pilot-1');
   expect(manager.getHumanPlayerCount()).toBe(0);
 
-  const rejoined = manager.addHumanPlayer(
-    'pilot-1',
-    'Pilot',
-    { sent: 2 } as never,
-    { x: 3000, y: 0 }
-  );
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, {
+    x: 3000,
+    y: 0,
+  });
 
   expect(rejoined.lives).toBe(2);
   expect(rejoined.score).toBe(210);

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { createRoidBelt, Roid } from '../../../src/entities/roid/Roid';
 import { DEBUG } from '../../../src/constants';
+import { createRoidBelt, Roid } from '../../../src/entities/roid/Roid';
 
 test('Roid Creation', () => {
   const roidPoint = { x: 10, y: 20 };
@@ -45,7 +45,7 @@ test('Destroy Roid', () => {
   const testRoidBelt = createRoidBelt();
   // const roidCount = testRoidBelt.roids.length;
   const result = testRoidBelt.destroyRoid(0);
-  
+
   // Client no longer handles splitting - server does it via network messages
   expect(result.newRoids.length).toBe(0); // Client never creates new roids
   expect(result.score).toBeGreaterThan(0); // Should still return score

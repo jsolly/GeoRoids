@@ -35,7 +35,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
     const ws = {} as any;
     const target = engine.addPlayer('target', 'Target', ws, { x: 0, y: 0 });
     engine.addPlayer('attacker', 'Attacker', ws, { x: 20, y: 0 });
-    engine.entityManager.updateEntity('target', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('target', { spawnProtectionTimer: 0 });
     expect(engine.requestShield('target', true)).toBe(true);
 
     const healthBefore = target.health;
@@ -51,7 +51,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
   test('asteroid and ship collisions still damage a shielded player', () => {
     const ws = {} as any;
     engine.addPlayer('target', 'Target', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('target', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('target', { spawnProtectionTimer: 0 });
     expect(engine.requestShield('target', true)).toBe(true);
 
     engine.handlePlayerDamage('target', 'asteroid', DAMAGE.LASER_HIT);
@@ -69,7 +69,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
     if (!bot) {
       return;
     }
-    engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: undefined, health: 40 });
+    engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0, health: 40 });
 
     const live = engine.getBot(bot.id);
     expect(live).toBeDefined();

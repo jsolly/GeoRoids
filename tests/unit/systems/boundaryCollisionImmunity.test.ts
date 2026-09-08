@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { CollisionManager } from '../../../src/physics/collision/CollisionManager';
 import { Ship } from '../../../src/entities/ship/Ship';
+import { CollisionManager } from '../../../src/physics/collision/CollisionManager';
 
 const mockSendMessage = vi.fn();
 const mockGetLocalPlayerId = vi.fn(() => 'local-player-123');

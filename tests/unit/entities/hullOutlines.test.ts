@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import {
+  EO_OUTLINES,
+  type EoOutlineId,
+  serializeEoSatelliteSvg,
+} from '../../../src/entities/satellite/eoOutlines';
+import {
   getKitHullOutline,
   HULL_SVG_PACK_DIR,
   kitHullSvgFileName,
@@ -16,11 +21,6 @@ import {
   KIT_HULLS_ARE_PLACEHOLDERS,
   SHIP_KIT_IDS,
 } from '../../../src/entities/ship/shipKits';
-import {
-  EO_OUTLINES,
-  serializeEoSatelliteSvg,
-  type EoOutlineId,
-} from '../../../src/entities/satellite/eoOutlines';
 
 const EO_SVG_PACK_DIR = 'georoids-art/eo-satellites';
 const EO_SVG_FILE_NAMES: Record<EoOutlineId, string> = {

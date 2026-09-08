@@ -1,8 +1,18 @@
 import { WebSocket } from 'ws';
-import { GameEngine, type CombatBroadcast } from '../core/GameEngine';
 import { logger } from '../../setup/serverLogger';
-import type { ServerGameSnapshot } from '../../shared-types';
-import { captureSnapshot, encodeSnapshot, SNAPSHOT_VERSION, SNAPSHOT_KEYFRAME_INTERVAL, SNAPSHOT_BACKPRESSURE_BYTES, type SnapshotBaseline } from '../../shared/snapshotProtocol';
+import {
+  captureSnapshot,
+  encodeSnapshot,
+  SNAPSHOT_BACKPRESSURE_BYTES,
+  SNAPSHOT_KEYFRAME_INTERVAL,
+  SNAPSHOT_VERSION,
+  type SnapshotBaseline,
+} from '../../shared/snapshotProtocol';
+import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
+import type { AsteroidData, Position, ServerGameSnapshot, Velocity } from '../../shared-types';
+import type { GameEntity } from '../core/EntityManager';
+import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
+import { SERVER_RELEASE_ID } from '../release';
 
 interface SnapshotRecipient {
   baseline?: SnapshotBaseline;
@@ -12,6 +22,29 @@ interface SnapshotRecipient {
   needsKeyframe: boolean;
 }
 
+interface PlayerUpdateData {
+  position?: Position;
+  velocity?: Velocity;
+  angle?: number;
+  thrusting?: boolean;
+  rotation?: number;
+  angularVelocity?: number;
+  a?: number;
+}
+
+type AsteroidUpdateData = Partial<AsteroidData>;
+type BroadcastBot = Pick<GameEntity, 'id' | 'name' | 'position'>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function messageType(message: unknown): string | undefined {
+  if (!isRecord(message)) {
+    return undefined;
+  }
+  return typeof message['type'] === 'string' ? message['type'] : undefined;
+}
 
 export class GameStateBroadcaster {
   private gameEngine: GameEngine;
@@ -59,19 +92,25 @@ export class GameStateBroadcaster {
     // Covers destruction paths invoked outside the frame loop (for example a
     // client asteroid report) before publishing the authoritative snapshot.
     this.gameEngine.ensureAsteroidField();
-    for (const id of this.gameEngine.drainDepartedPlayers()) this.broadcastPlayerLeft(id);
+    for (const id of this.gameEngine.drainDepartedPlayers()) {
+      this.broadcastPlayerLeft(id);
+    }
     const gameState = this.gameEngine.getGameState();
     // The deployed snapshot-v1 client validates a closed loot-kind enum.
     // Preserve each core's identity/position/reward for old pilots using its
     // existing mineral pickup visual; never send an undecodable new enum.
-    const compatibleLoot = gameState.loot.map(loot => loot.kind === 'laserCore' ? { ...loot, kind: 'shard' as const } : loot);
+    const compatibleLoot = gameState.loot.map((loot) =>
+      loot.kind === 'laserCore' ? { ...loot, kind: 'shard' as const } : loot
+    );
     const message = {
       type: 'gameState',
       data: gameState,
       timestamp: Date.now(),
     };
 
-    for (const blast of this.gameEngine.drainLootBlasts()) this.broadcastLootExploded(blast);
+    for (const blast of this.gameEngine.drainLootBlasts()) {
+      this.broadcastLootExploded(blast);
+    }
     for (const bounce of this.gameEngine.drainReflections()) {
       this.broadcastToAll({ type: 'playerShoot', data: bounce, timestamp: Date.now() });
     }
@@ -96,7 +135,11 @@ export class GameStateBroadcaster {
         }
         continue;
       }
-      if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES || recipient.pending) {
+      if (
+        ws.readyState !== WebSocket.OPEN ||
+        ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES ||
+        recipient.pending
+      ) {
         recipient.needsKeyframe = true;
         continue;
       }
@@ -104,34 +147,71 @@ export class GameStateBroadcaster {
         canonical ??= captureSnapshot({
           ...gameState,
           playerProjectiles: this.gameEngine.getPlayerProjectiles(),
-          satelliteProjectiles: this.gameEngine.getActiveSatelliteProjectiles().map(projectile => ({ id: projectile.shotId, ...projectile })),
-          collabTags: this.gameEngine.getActiveCollabTags().map(tag => ({ id: tag.asteroidId, ...tag })),
+          satelliteProjectiles: this.gameEngine
+            .getActiveSatelliteProjectiles()
+            .map((projectile) => ({ id: projectile.shotId, ...projectile })),
+          collabTags: this.gameEngine
+            .getActiveCollabTags()
+            .map((tag) => ({ id: tag.asteroidId, ...tag })),
         });
         const recipientState =
           player.asteroidInteractions === 1
             ? canonical
             : captureSnapshot({ ...canonical, loot: compatibleLoot });
         const sequence = recipient.sequence + 1;
-        const full = recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
-        const frame = encodeSnapshot(recipientState, sequence, full ? undefined : recipient.baseline);
+        const full =
+          recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
+        const frame = encodeSnapshot(
+          recipientState,
+          sequence,
+          full ? undefined : recipient.baseline
+        );
         recipient.pending = true;
         recipient.needsKeyframe = false;
         const deliveredState = recipientState;
-        ws.send(JSON.stringify({ type: 'snapshot', data: frame, timestamp: message.timestamp }), error => {
-          recipient.pending = false;
-          if (error) {
-            recipient.needsKeyframe = true;
-            logger.error('Snapshot send failed; next send requires keyframe', error);
-            return;
+        const recipientPlayerId = player.id;
+        ws.send(
+          JSON.stringify({ type: 'snapshot', data: frame, timestamp: message.timestamp }),
+          (error) => {
+            recipient.pending = false;
+            if (error) {
+              recipient.needsKeyframe = true;
+              logger.error('Snapshot send failed; next send requires keyframe', error);
+              return;
+            }
+            // Rejoin replaces the WeakMap entry; an old callback cannot advance it.
+            if (this.snapshotRecipients.get(ws) !== recipient) {
+              return;
+            }
+            recipient.sequence = sequence;
+            recipient.baseline = { sequence, state: deliveredState };
+            recipient.sinceKeyframe = frame.kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
+            if (shouldSampleSnapshot(sequence)) {
+              const authoritative = deliveredState.entities.find(
+                (entity) => entity.id === recipientPlayerId
+              );
+              logger.info('STATE', 'snapshot_sent_to_transport', {
+                releaseId: SERVER_RELEASE_ID,
+                playerId: recipientPlayerId,
+                sentAt: message.timestamp,
+                gameTime: deliveredState.gameTime,
+                snapshotSequence: sequence,
+                snapshotKind: frame.kind,
+                ...(frame.kind === 'delta' ? { snapshotBaseline: frame.baseline } : {}),
+                ...(authoritative?.asteroidMotion
+                  ? {
+                      motionEpoch: authoritative.asteroidMotion.epoch,
+                      motionAck: authoritative.asteroidMotion.ack,
+                      motionMode: authoritative.asteroidMotion.mode,
+                    }
+                  : {}),
+                ...(authoritative
+                  ? { authoritativeRow: captureDiagnosticActorState(authoritative) }
+                  : {}),
+              });
+            }
           }
-          // Rejoin replaces the WeakMap entry; an old callback cannot advance it.
-          if (this.snapshotRecipients.get(ws) !== recipient) {
-            return;
-          }
-          recipient.sequence = sequence;
-          recipient.baseline = { sequence, state: deliveredState };
-          recipient.sinceKeyframe = frame.kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
-        });
+        );
       } catch (error) {
         recipient.pending = false;
         recipient.needsKeyframe = true;
@@ -156,7 +236,12 @@ export class GameStateBroadcaster {
     if (offer !== SNAPSHOT_VERSION) {
       return undefined;
     }
-    this.snapshotRecipients.set(ws, { sequence: 0, sinceKeyframe: 0, pending: false, needsKeyframe: true });
+    this.snapshotRecipients.set(ws, {
+      sequence: 0,
+      sinceKeyframe: 0,
+      pending: false,
+      needsKeyframe: true,
+    });
     return SNAPSHOT_VERSION;
   }
 
@@ -180,7 +265,11 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message, playerId);
   }
 
-  public broadcastPlayerJoined(playerId: string, playerName: string, position: { x: number; y: number }): void {
+  public broadcastPlayerJoined(
+    playerId: string,
+    playerName: string,
+    position: { x: number; y: number }
+  ): void {
     const message = {
       type: 'playerJoined',
       data: {
@@ -194,7 +283,7 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message, playerId);
   }
 
-  public broadcastPlayerUpdate(playerId: string, updateData: any): void {
+  public broadcastPlayerUpdate(playerId: string, updateData: PlayerUpdateData): void {
     const message = {
       type: 'playerUpdate',
       data: { id: playerId, ...updateData },
@@ -217,7 +306,12 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastPlayerShoot(playerId: string, laserStart: any, laserDirection: any, shotId?: string): void {
+  public broadcastPlayerShoot(
+    playerId: string,
+    laserStart: Position,
+    laserDirection: Velocity,
+    shotId?: string
+  ): void {
     const timestamp = Date.now();
     const message = {
       type: 'playerShoot',
@@ -255,10 +349,12 @@ export class GameStateBroadcaster {
     }
 
     if (result.destroyedAsteroidId) {
-      this.broadcastAsteroidDestruction(result.destroyedAsteroidId, {
-        collabSplit: result.collabSplit === true,
-        origin: result.origin,
-      });
+      this.broadcastAsteroidDestruction(
+        result.destroyedAsteroidId,
+        result.origin !== undefined
+          ? { collabSplit: result.collabSplit === true, origin: result.origin }
+          : { collabSplit: result.collabSplit === true }
+      );
       if (result.newAsteroids && result.newAsteroids.length > 0) {
         this.broadcastAsteroidCreation(result.newAsteroids);
       }
@@ -292,7 +388,11 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastPlayerKilled(targetPlayerId: string, targetPlayerName: string, attackerId: string): void {
+  public broadcastPlayerKilled(
+    targetPlayerId: string,
+    targetPlayerName: string,
+    attackerId: string
+  ): void {
     const message = {
       type: 'playerKilled',
       data: {
@@ -334,7 +434,7 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastAsteroidCreation(asteroids: any[]): void {
+  public broadcastAsteroidCreation(asteroids: readonly AsteroidData[]): void {
     const message = {
       type: 'asteroidCreateBatch',
       data: {
@@ -371,7 +471,7 @@ export class GameStateBroadcaster {
       data: {
         asteroidId,
         collabSplit: extras?.collabSplit === true,
-        origin: extras?.origin,
+        ...(extras?.origin !== undefined ? { origin: extras.origin } : {}),
       },
       timestamp: Date.now(),
     };
@@ -379,12 +479,15 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastShockwave(event: { origin: { x: number; y: number }; asteroidId?: string }): void {
+  public broadcastShockwave(event: {
+    origin: { x: number; y: number };
+    asteroidId?: string;
+  }): void {
     const message = {
       type: 'shockwave',
       data: {
         origin: { x: event.origin.x, y: event.origin.y },
-        asteroidId: event.asteroidId,
+        ...(event.asteroidId !== undefined ? { asteroidId: event.asteroidId } : {}),
       },
       timestamp: Date.now(),
     };
@@ -425,7 +528,7 @@ export class GameStateBroadcaster {
     }
   }
 
-  public broadcastAsteroidUpdate(asteroidId: string, updates: any): void {
+  public broadcastAsteroidUpdate(asteroidId: string, updates: AsteroidUpdateData): void {
     const message = {
       type: 'asteroidUpdate',
       data: { asteroidId, updates },
@@ -435,8 +538,8 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastBotCreation(bots: any[]): void {
-    const botSummaries = bots.map(bot => ({
+  public broadcastBotCreation(bots: readonly BroadcastBot[]): void {
+    const botSummaries = bots.map((bot) => ({
       botId: bot.id,
       botName: bot.name,
       position: bot.position,
@@ -456,36 +559,37 @@ export class GameStateBroadcaster {
   public broadcastBotUpdate(botId: string): void {
     const bot = this.gameEngine.getBot(botId);
     if (bot) {
+      const data = {
+        botId: bot.id,
+        playerId: 'server',
+        position: bot.position,
+        velocity: bot.velocity,
+        angle: bot.angle,
+        exploding: bot.exploding,
+        thrusting: bot.thrusting,
+        color: bot.color,
+        lives: bot.lives,
+        health: bot.health,
+        maxHealth: bot.maxHealth,
+        fuel: bot.fuel,
+        maxFuel: bot.maxFuel,
+        mass: bot.mass,
+        kitId: bot.kitId,
+        ...(bot.factionId !== undefined ? { factionId: bot.factionId } : {}),
+        abilityCooldownFrames: bot.abilityCooldownFrames,
+        abilityActiveFrames: bot.abilityActiveFrames,
+        shieldTimer: bot.shieldTimer,
+        harpoonTimer: bot.harpoonTimer,
+        ...(bot.harpoonTargetId !== undefined ? { harpoonTargetId: bot.harpoonTargetId } : {}),
+        ...(bot.harpoonLatchPos !== undefined ? { harpoonLatchPos: bot.harpoonLatchPos } : {}),
+        shieldActive: bot.shieldActive,
+        shieldTime: bot.shieldTime,
+        shieldCooldown: bot.shieldCooldown,
+        shieldFlashTime: bot.shieldFlashTime,
+      };
       const message = {
         type: 'botUpdate',
-        data: {
-          botId: bot.id,
-          playerId: 'server',
-          position: bot.position,
-          velocity: bot.velocity,
-          angle: bot.angle,
-          exploding: bot.exploding,
-          thrusting: bot.thrusting,
-          color: bot.color,
-          lives: bot.lives,
-          health: bot.health,
-          maxHealth: bot.maxHealth,
-          fuel: bot.fuel,
-          maxFuel: bot.maxFuel,
-          mass: bot.mass,
-          kitId: bot.kitId,
-          factionId: bot.factionId,
-          abilityCooldownFrames: bot.abilityCooldownFrames,
-          abilityActiveFrames: bot.abilityActiveFrames,
-          shieldTimer: bot.shieldTimer,
-          harpoonTimer: bot.harpoonTimer,
-          harpoonTargetId: bot.harpoonTargetId,
-          harpoonLatchPos: bot.harpoonLatchPos,
-          shieldActive: bot.shieldActive,
-          shieldTime: bot.shieldTime,
-          shieldCooldown: bot.shieldCooldown,
-          shieldFlashTime: bot.shieldFlashTime,
-        },
+        data,
         timestamp: Date.now(),
       };
 
@@ -517,7 +621,7 @@ export class GameStateBroadcaster {
     this.broadcastToAll(chatMessage);
   }
 
-  public sendToWebSocket(ws: WebSocket, message: any): void {
+  public sendToWebSocket(ws: WebSocket, message: unknown): void {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     }
@@ -531,7 +635,7 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastToAll(message: any, excludeId?: string): void {
+  public broadcastToAll(message: unknown, excludeId?: string): void {
     let messageStr: string;
     try {
       messageStr = JSON.stringify(message);
@@ -539,7 +643,7 @@ export class GameStateBroadcaster {
       // A circular Timeout on player.ws used to kill the process here and
       // flap every client into the Reconnecting banner (#485 live miss).
       logger.error('Failed to serialize broadcast', {
-        type: message?.type,
+        type: messageType(message),
         error: error instanceof Error ? error.message : String(error),
       });
       return;
@@ -555,7 +659,10 @@ export class GameStateBroadcaster {
         try {
           player.ws.send(messageStr);
         } catch (error) {
-          logger.error(`Failed to send message to player ${player.id} (readyState: ${player.ws.readyState})`, error);
+          logger.error(
+            `Failed to send message to player ${player.id} (readyState: ${player.ws.readyState})`,
+            error
+          );
           // For unrecoverable errors, close the connection and remove the player
           try {
             player.ws.close();

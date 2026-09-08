@@ -236,7 +236,6 @@ export interface CustomEventMap {
     deathCause: string;
     isGameOver: boolean;
   }>;
-  playerGameOver: CustomEvent<{ playerId: string; deathCause: string }>;
   shipExploded: CustomEvent<{
     shipId?: string;
     position?: Position;
@@ -405,35 +404,3 @@ export interface GameConstants {
     readonly BOT_ACTIVATE_CHANCE: number;
   };
 }
-
-// ============================================================================
-// ERROR TYPES
-// ============================================================================
-export class GameError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly context?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = 'GameError';
-  }
-}
-
-export class NetworkError extends GameError {
-  constructor(message: string, context?: Record<string, unknown>) {
-    super(message, 'NETWORK_ERROR', context);
-    this.name = 'NetworkError';
-  }
-}
-
-export class ValidationError extends GameError {
-  constructor(message: string, context?: Record<string, unknown>) {
-    super(message, 'VALIDATION_ERROR', context);
-    this.name = 'ValidationError';
-  }
-}
-
-// ============================================================================
-// RE-EXPORT SHARED TYPES
-// ============================================================================

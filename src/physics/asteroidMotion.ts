@@ -37,11 +37,6 @@ export function containAsteroidPosition(x: number, y: number): { x: number; y: n
   return containAsteroidPositionInto({ x: 0, y: 0 }, x, y);
 }
 
-/** @deprecated Use containAsteroidPosition — kept for call sites during the belt fix. */
-export function wrapAsteroidPosition(x: number, y: number): { x: number; y: number } {
-  return containAsteroidPosition(x, y);
-}
-
 export function stepAsteroidMotionInto(
   position: { x: number; y: number },
   velocity: { x: number; y: number },

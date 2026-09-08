@@ -1,8 +1,8 @@
 /* @vitest-environment node */
 import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
-import { createServerInstance } from '../../../server/createServer';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { createServerInstance } from '../../../server/createServer';
 import { ROID, SHOCKWAVE } from '../../../src/constants';
 import { framesToMs } from '../../../src/physics/shockwave';
 
@@ -17,7 +17,10 @@ async function openSocket(port: number): Promise<WebSocket> {
 
 function waitForOneShotLargeId(ws: WebSocket): Promise<string> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timed out waiting for asteroid creation')), 5000);
+    const timeout = setTimeout(
+      () => reject(new Error('Timed out waiting for asteroid creation')),
+      5000
+    );
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw));
@@ -30,7 +33,10 @@ function waitForOneShotLargeId(ws: WebSocket): Promise<string> {
           }>;
           const fallback = rocks[0];
           const oneShot = rocks.find(
-            (rock) => !rock.isCollabTarget && rock.material === 'ice' && (rock.size ?? 0) >= ROID.COLLAB_SPLIT_MIN_SIZE
+            (rock) =>
+              !rock.isCollabTarget &&
+              rock.material === 'ice' &&
+              (rock.size ?? 0) >= ROID.COLLAB_SPLIT_MIN_SIZE
           );
           const target = oneShot ?? fallback;
           if (!target) {
@@ -118,8 +124,10 @@ describe('Scenario: collab split fires a double shockwave', () => {
     const asteroidId = await asteroidCreated;
     asteroidPosition(server, asteroidId);
 
-    const messages: Array<{ type?: string; data?: { asteroidId?: string; origin?: { x: number; y: number } } }> =
-      [];
+    const messages: Array<{
+      type?: string;
+      data?: { asteroidId?: string; origin?: { x: number; y: number } };
+    }> = [];
     playerA.on('message', (raw) => {
       try {
         messages.push(JSON.parse(String(raw)));
@@ -132,10 +140,13 @@ describe('Scenario: collab split fires a double shockwave', () => {
     sendTrackedAsteroidReport(server, playerB, 'player-b', asteroidId);
 
     await expect
-      .poll(() => {
-        const shock = messages.find((msg) => msg?.type === 'shockwave' && msg.data?.origin);
-        return Boolean(shock?.data?.origin && shock.data.asteroidId === asteroidId);
-      }, { timeout: 3000, interval: 25 })
+      .poll(
+        () => {
+          const shock = messages.find((msg) => msg?.type === 'shockwave' && msg.data?.origin);
+          return Boolean(shock?.data?.origin && shock.data.asteroidId === asteroidId);
+        },
+        { timeout: 3000, interval: 25 }
+      )
       .toBe(true);
 
     playerA.close();

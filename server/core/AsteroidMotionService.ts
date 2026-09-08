@@ -1,12 +1,5 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import type {
-  AsteroidData,
-  AsteroidMotionInput,
-  AsteroidMotionState,
-  AsteroidToolAction,
-  Position,
-} from '../../shared-types';
 import {
   ASTEROID_MOTION,
   asteroidInertia,
@@ -20,16 +13,19 @@ import {
   tangentVelocity,
   turnMotionAngle,
 } from '../../shared/asteroidMotion';
-import {
-  radiusFromMass,
-  sizeScaleFromMass,
-  thrustScaleFromMass,
-} from '../../shared/shipGrowth';
+import { radiusFromMass, sizeScaleFromMass, thrustScaleFromMass } from '../../shared/shipGrowth';
+import type {
+  AsteroidData,
+  AsteroidMotionInput,
+  AsteroidMotionState,
+  AsteroidToolAction,
+  Position,
+} from '../../shared-types';
 import { GAME, ROID } from '../../src/constants';
 import { getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
-import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import { getAsteroidFieldRadius, stepAsteroidMotion } from '../../src/physics/asteroidMotion';
 import { getGameBoundary } from '../../src/physics/boundary';
+import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import type { GameEntity } from './EntityManager';
 
 export type MotionOutcome = { ok: true } | { ok: false; error: string };
@@ -40,7 +36,7 @@ export type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle
 
 interface Session {
   actor: GameEntity;
-  socket?: WebSocket;
+  socket?: WebSocket | undefined;
   token: string;
   epoch: number;
   mode: AsteroidMotionState['mode'];
@@ -48,22 +44,22 @@ interface Session {
   inputSequence: number;
   toolSequence: number;
   poseSequence: number;
-  pending?: AsteroidMotionInput;
-  desired?: AsteroidMotionInput;
-  action?: AsteroidMotionInput;
+  pending?: AsteroidMotionInput | undefined;
+  desired?: AsteroidMotionInput | undefined;
+  action?: AsteroidMotionInput | undefined;
   actionSeen: Set<string>;
   lastInputAt: number;
   stepAt: number;
-  disconnectedUntil?: number;
-  targetId?: string;
-  payloadId?: string;
+  disconnectedUntil?: number | undefined;
+  targetId?: string | undefined;
+  payloadId?: string | undefined;
   latchAngle: number;
   latchRadius: number;
   surfaceRadius: number;
   tetherMode: 'spin' | 'anchor' | 'brake';
   latchAt: number;
   releaseTicks: number;
-  anchor?: Position;
+  anchor?: Position | undefined;
   anchorAt: number;
   poseAt: number;
   poseCredit: number;
@@ -81,8 +77,9 @@ export class AsteroidMotionService {
   private rockOwners = new Map<string, string>();
 
   private assertTime(now: number): void {
-    if (!Number.isFinite(now) || now < 0)
+    if (!Number.isFinite(now) || now < 0) {
       throw new RangeError('Motion requires finite server time');
+    }
   }
 
   private alive(actor: GameEntity): boolean {
@@ -150,8 +147,9 @@ export class AsteroidMotionService {
     now: number
   ): { ok: true; resumeToken: string; state: AsteroidMotionState } | { ok: false; error: string } {
     this.assertTime(now);
-    if (capability !== 1)
+    if (capability !== 1) {
       return { ok: false, error: 'Enhanced asteroid motion was not negotiated' };
+    }
     if (
       !this.validActor(actor) ||
       actor.ws !== socket ||
@@ -160,8 +158,9 @@ export class AsteroidMotionService {
     ) {
       return { ok: false, error: 'Invalid or already registered authoritative motion owner' };
     }
-    if (this.sessions.size >= ASTEROID_MOTION.maxSessions)
+    if (this.sessions.size >= ASTEROID_MOTION.maxSessions) {
       return { ok: false, error: 'Motion session capacity exhausted' };
+    }
     const session: Session = {
       actor,
       socket,
@@ -226,7 +225,9 @@ export class AsteroidMotionService {
       return { ok: true, actor: session.actor, resumeToken: session.token };
     }
     const old = session.socket;
-    if (old) this.sockets.delete(old);
+    if (old) {
+      this.sockets.delete(old);
+    }
     session.socket = socket;
     session.actor.ws = socket;
     session.disconnectedUntil = undefined;
@@ -253,10 +254,12 @@ export class AsteroidMotionService {
   public transportClosed(socket: WebSocket, now: number): boolean {
     this.assertTime(now);
     const session = this.owner(socket);
-    if (!session) return false;
+    if (!session) {
+      return false;
+    }
     this.sockets.delete(socket);
     session.socket = undefined;
-    session.actor.ws = undefined;
+    delete session.actor.ws;
     session.disconnectedUntil = now + ASTEROID_MOTION.reconnectGraceMs;
     // `inputSequence` advances on receipt, while `ack` advances only when the
     // game tick consumes the pending command. Dropping pending input must roll
@@ -271,13 +274,17 @@ export class AsteroidMotionService {
   }
 
   private dropAttachments(session: Session): void {
-    if (session.targetId) this.rockOwners.delete(session.targetId);
-    if (session.payloadId) this.rockOwners.delete(session.payloadId);
+    if (session.targetId) {
+      this.rockOwners.delete(session.targetId);
+    }
+    if (session.payloadId) {
+      this.rockOwners.delete(session.payloadId);
+    }
     session.targetId = undefined;
     session.payloadId = undefined;
     session.actor.harpoonTimer = 0;
-    session.actor.harpoonTargetId = undefined;
-    session.actor.harpoonLatchPos = undefined;
+    delete session.actor.harpoonTargetId;
+    delete session.actor.harpoonLatchPos;
     session.actor.abilityActiveFrames = 0;
   }
 
@@ -303,7 +310,9 @@ export class AsteroidMotionService {
   public invalidateLife(actorId: string, now: number): void {
     this.assertTime(now);
     const session = this.sessions.get(actorId);
-    if (!session) return;
+    if (!session) {
+      return;
+    }
     session.wasAlive = this.alive(session.actor);
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
@@ -314,23 +323,29 @@ export class AsteroidMotionService {
 
   public quit(socket: WebSocket): string | undefined {
     const session = this.owner(socket);
-    if (!session) return undefined;
+    if (!session) {
+      return undefined;
+    }
     this.removeSession(session);
     return session.actor.id;
   }
 
   private removeSession(session: Session): void {
     this.dropAttachments(session);
-    if (session.socket) this.sockets.delete(session.socket);
+    if (session.socket) {
+      this.sockets.delete(session.socket);
+    }
     this.tokens.delete(session.token);
     this.sessions.delete(session.actor.id);
-    session.actor.asteroidMotion = undefined;
+    delete session.actor.asteroidMotion;
   }
 
   /** Terminal authoritative removal, including an owner currently in socket grace. */
   public forgetActor(actorId: string): void {
     const session = this.sessions.get(actorId);
-    if (session) this.removeSession(session);
+    if (session) {
+      this.removeSession(session);
+    }
   }
 
   private physical(rock: AsteroidData | undefined): rock is AsteroidData {
@@ -354,7 +369,9 @@ export class AsteroidMotionService {
     now: number
   ): MotionOutcome {
     this.assertTime(now);
-    if (rocks.length > 1024) throw new RangeError('Motion world exceeds bounded work');
+    if (rocks.length > 1024) {
+      throw new RangeError('Motion world exceeds bounded work');
+    }
     const session = this.owner(socket);
     if (
       !session ||
@@ -437,7 +454,9 @@ export class AsteroidMotionService {
     now: number
   ): MotionOutcome {
     this.assertTime(now);
-    if (rocks.length > 1024) throw new RangeError('Motion world exceeds bounded work');
+    if (rocks.length > 1024) {
+      throw new RangeError('Motion world exceeds bounded work');
+    }
     const session = this.owner(socket);
     if (
       !session ||
@@ -576,6 +595,41 @@ export class AsteroidMotionService {
     session.actor.lastUpdate = now;
     this.publish(session);
     return { ok: true };
+  }
+
+  /** Keep test-only fixture placement coherent with enhanced motion ownership. */
+  public placeActorForTesting(actorId: string, position: Position, now: number): boolean {
+    this.assertTime(now);
+    if (!finiteMotionVector(position)) {
+      return false;
+    }
+    const session = this.sessions.get(actorId);
+    if (!session) {
+      return false;
+    }
+    this.dropAttachments(session);
+    session.epoch += 1;
+    session.mode = 'free';
+    session.ack = 0;
+    session.inputSequence = -1;
+    session.poseSequence = -1;
+    session.pending = undefined;
+    session.desired = undefined;
+    session.action = undefined;
+    session.targetId = undefined;
+    session.payloadId = undefined;
+    session.anchor = undefined;
+    session.poseAt = now;
+    session.anchorAt = now;
+    session.stepAt = now;
+    session.lastInputAt = now;
+    session.poseCredit = this.legalSpeed(session.actor) * ASTEROID_MOTION.poseLeadFrames;
+    session.actor.position = { ...position };
+    session.actor.velocity = { x: 0, y: 0 };
+    session.actor.thrusting = false;
+    session.actor.lastUpdate = now;
+    this.publish(session);
+    return true;
   }
 
   private placePilot(session: Session, rock: AsteroidData): void {
@@ -726,10 +780,7 @@ export class AsteroidMotionService {
       // Shockwaves and loot blasts can alter an owned rock after the previous
       // motion tick. Re-cap the single-rock path before integrating it, then
       // use the same boundary bounce as ordinary AsteroidManager motion.
-      primary.velocity = capMotionVelocity(
-        primary.velocity,
-        ASTEROID_MOTION.maxLinearVelocity
-      );
+      primary.velocity = capMotionVelocity(primary.velocity, ASTEROID_MOTION.maxLinearVelocity);
       const next = stepAsteroidMotion(primary.position, primary.velocity, frames);
       primary.position = next.position;
       primary.velocity = next.velocity;
@@ -792,11 +843,15 @@ export class AsteroidMotionService {
    */
   public step(now: number, rocks: readonly AsteroidData[]): string[] {
     this.assertTime(now);
-    if (rocks.length > 1024) throw new RangeError('Motion world exceeds bounded work');
+    if (rocks.length > 1024) {
+      throw new RangeError('Motion world exceeds bounded work');
+    }
     const indexed = new Map(rocks.map((rock) => [rock.id, rock]));
     const expired: string[] = [];
     for (const session of this.sessions.values()) {
-      if (now < session.stepAt) throw new RangeError('Motion clock moved backwards');
+      if (now < session.stepAt) {
+        throw new RangeError('Motion clock moved backwards');
+      }
       if (session.disconnectedUntil !== undefined && now >= session.disconnectedUntil) {
         expired.push(session.actor.id);
         this.removeSession(session);
@@ -812,8 +867,12 @@ export class AsteroidMotionService {
         ((now - session.stepAt) * GAME.FPS) / 1000
       );
       session.stepAt = now;
-      if (!alive || remaining <= 0) continue;
-      if (session.mode === 'free' && session.socket) continue;
+      if (!alive || remaining <= 0) {
+        continue;
+      }
+      if (session.mode === 'free' && session.socket) {
+        continue;
+      }
       const primary = session.targetId ? indexed.get(session.targetId) : undefined;
       let payload = session.payloadId ? indexed.get(session.payloadId) : undefined;
       if (session.targetId && !this.physical(primary)) {
@@ -832,9 +891,15 @@ export class AsteroidMotionService {
       if (session.action && session.socket && session.mode === 'latched') {
         const action = session.action;
         session.action = undefined;
-        if (action.action) session.actionSeen.add(action.action);
-        if (action.action === 'release') this.release(session);
-        else if ((action.action === 'anchor' || action.action === 'brake') && !session.payloadId) {
+        if (action.action) {
+          session.actionSeen.add(action.action);
+        }
+        if (action.action === 'release') {
+          this.release(session);
+        } else if (
+          (action.action === 'anchor' || action.action === 'brake') &&
+          !session.payloadId
+        ) {
           const target = indexed.get(action.targetId ?? '');
           if (
             this.physical(primary) &&
@@ -855,11 +920,13 @@ export class AsteroidMotionService {
             this.rockOwners.set(target.id, session.actor.id);
             session.tetherMode = action.action;
           }
-        } else if (action.action === 'spin' || action.action === 'brake')
+        } else if (action.action === 'spin' || action.action === 'brake') {
           session.tetherMode = action.action;
+        }
       }
-      if (session.mode === 'latched' && now - session.latchAt >= ASTEROID_MOTION.latchLifetimeMs)
+      if (session.mode === 'latched' && now - session.latchAt >= ASTEROID_MOTION.latchLifetimeMs) {
         this.release(session);
+      }
       const active =
         session.socket && now - session.lastInputAt <= ASTEROID_MOTION.inputTimeoutMs
           ? session.desired
@@ -954,9 +1021,12 @@ export class AsteroidMotionService {
   public beforeRemove(asteroidId: string): void {
     const owner = this.rockOwners.get(asteroidId);
     const session = owner ? this.sessions.get(owner) : undefined;
-    if (!session) return;
-    if (session.targetId === asteroidId) this.release(session);
-    else {
+    if (!session) {
+      return;
+    }
+    if (session.targetId === asteroidId) {
+      this.release(session);
+    } else {
       this.rockOwners.delete(asteroidId);
       session.payloadId = undefined;
     }
@@ -971,7 +1041,9 @@ export class AsteroidMotionService {
   public seedNaturalSpinners(
     rocks: readonly AsteroidData[]
   ): Array<Pick<AsteroidData, 'id' | 'angularVelocity' | 'spinClass'>> {
-    if (rocks.length > 1024) throw new RangeError('Motion world exceeds bounded work');
+    if (rocks.length > 1024) {
+      throw new RangeError('Motion world exceeds bounded work');
+    }
     const needed = Math.max(
       0,
       3 - rocks.filter((rock) => rock.spinClass !== undefined && this.physical(rock)).length
@@ -987,7 +1059,9 @@ export class AsteroidMotionService {
       }));
   }
   public reset(): void {
-    for (const session of this.sessions.values()) this.removeSession(session);
+    for (const session of this.sessions.values()) {
+      this.removeSession(session);
+    }
     this.rockOwners.clear();
   }
 }

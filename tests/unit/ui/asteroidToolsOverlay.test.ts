@@ -1,6 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { AsteroidToolsOverlay, type AsteroidToolsOverlayCallbacks } from '../../../src/asteroidTools/AsteroidToolsOverlay';
 import type { AsteroidToolsState } from '../../../src/asteroidTools/AsteroidToolsController';
+import {
+  AsteroidToolsOverlay,
+  type AsteroidToolsOverlayCallbacks,
+} from '../../../src/asteroidTools/AsteroidToolsOverlay';
 
 function state(overrides: Partial<AsteroidToolsState> = {}): AsteroidToolsState {
   return {
@@ -34,13 +37,15 @@ test('overlay exposes target selection, readable distance labels, and Hauler con
 
   const root = overlay.getElement();
   expect(root.hidden).toBe(false);
-  expect(root.querySelector('[data-asteroid-tools-target] option[value="roid-1"]')?.textContent).toBe(
-    'Metal · 2m'
-  );
+  expect(
+    root.querySelector('[data-asteroid-tools-target] option[value="roid-1"]')?.textContent
+  ).toBe('Metal · 2m');
   expect(root.querySelectorAll('[data-asteroid-tools-target] option')).toHaveLength(3);
   expect(root.querySelectorAll('[data-asteroid-tools-motion]')).toHaveLength(5);
   expect(
-    root.querySelector<HTMLButtonElement>('[data-asteroid-tools-motion="anchor"]')?.getAttribute('aria-label')
+    root
+      .querySelector<HTMLButtonElement>('[data-asteroid-tools-motion="anchor"]')
+      ?.getAttribute('aria-label')
   ).toBe('Attach the selected second rock');
 });
 
@@ -58,7 +63,9 @@ test('overlay callbacks receive open, close, target, and motion actions', () => 
   document.querySelector<HTMLButtonElement>('[data-asteroid-tools-action="open"]')?.click();
   root.querySelector<HTMLButtonElement>('[data-asteroid-tools-action="close"]')?.click();
   root.querySelector<HTMLSelectElement>('[data-asteroid-tools-target]')!.value = 'roid-2';
-  root.querySelector<HTMLSelectElement>('[data-asteroid-tools-target]')!.dispatchEvent(new Event('change'));
+  root
+    .querySelector<HTMLSelectElement>('[data-asteroid-tools-target]')!
+    .dispatchEvent(new Event('change'));
   root.querySelector<HTMLButtonElement>('[data-asteroid-tools-motion="release"]')?.click();
 
   expect(callbacks.onSelectTarget).toHaveBeenCalledWith('roid-2');
@@ -180,7 +187,8 @@ test('overlay renders reflection preview and only live laser upgrade charges', (
     })
   );
   expect(
-    (overlay.getElement().querySelector('.asteroid-tools-overlay__upgrade') as HTMLElement | null)?.hidden
+    (overlay.getElement().querySelector('.asteroid-tools-overlay__upgrade') as HTMLElement | null)
+      ?.hidden
   ).toBe(true);
 });
 
@@ -191,16 +199,23 @@ test('overlay hides motion controls for other kits and disables target actions w
   expect(motion).toBeTruthy();
   expect((motion as HTMLElement).hidden).toBe(true);
 
-  overlay.update(
-    state({
-      selectedTargetId: undefined,
-      pilot: { kitId: 'hauler', alive: true, asteroidMotion: { epoch: 2, mode: 'latched', ack: 7 } },
-    })
-  );
+  const unselectedState = state({
+    pilot: { kitId: 'hauler', alive: true, asteroidMotion: { epoch: 2, mode: 'latched', ack: 7 } },
+  });
+  delete unselectedState.selectedTargetId;
+  overlay.update(unselectedState);
   expect(
-    (overlay.getElement().querySelector('[data-asteroid-tools-motion="anchor"]') as HTMLButtonElement).disabled
+    (
+      overlay
+        .getElement()
+        .querySelector('[data-asteroid-tools-motion="anchor"]') as HTMLButtonElement
+    ).disabled
   ).toBe(true);
   expect(
-    (overlay.getElement().querySelector('[data-asteroid-tools-motion="brake"]') as HTMLButtonElement).disabled
+    (
+      overlay
+        .getElement()
+        .querySelector('[data-asteroid-tools-motion="brake"]') as HTMLButtonElement
+    ).disabled
   ).toBe(true);
 });

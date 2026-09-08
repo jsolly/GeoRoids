@@ -92,7 +92,7 @@ test('radar uses a whisper void, a brighter ring, and a local heading mark', () 
   expect(radarSrc).toMatch(/kind: 'local'/);
   expect(radarSrc).toMatch(/MINIMAP_VOID_ALPHA/);
   expect(radarSrc).toMatch(/drawSoftFactionMark/);
-  expect(radarSrc).toMatch(/getShipDisplayColor/);
+  expect(radarSrc).toMatch(/getFactionColor/);
   expect(radarSrc).toMatch(/isAsteroidPending/);
   expect(radarSrc).toMatch(/canDrawAsteroid/);
   expect(radarSrc).not.toMatch(/Game Server/i);

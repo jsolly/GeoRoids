@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { PALETTE, VISUAL } from '../../../src/constants';
+import { LootField } from '../../../src/entities/loot/LootField';
 import {
   drawLootRelative,
   lootScreenRadius,
@@ -8,9 +9,8 @@ import {
 } from '../../../src/entities/loot/lootRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { HAULER_TETHER_COLOR } from '../../../src/entities/ship/shipKits';
-import { canvasManager } from '../../../src/rendering/canvas';
-import { LootField } from '../../../src/entities/loot/LootField';
 import { Point } from '../../../src/physics/Point';
+import { canvasManager } from '../../../src/rendering/canvas';
 
 type TraceContext = CanvasRenderingContext2D & { lineToCount: number };
 

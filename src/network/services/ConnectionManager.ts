@@ -1,4 +1,12 @@
-import { SNAPSHOT_VERSION, SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import {
+  SNAPSHOT_VERSION,
+  SnapshotDecoder,
+  type SnapshotFrame,
+} from '../../../shared/snapshotProtocol';
+import {
+  captureDiagnosticActorState,
+  shouldSampleSnapshot,
+} from '../../../shared/stateDiagnostics';
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
@@ -31,6 +39,7 @@ import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shi
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
+import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage, ServerMessage } from '../types';
@@ -48,6 +57,7 @@ import {
 } from './asteroidFieldSync';
 import { readOrCreateClientId, replaceStoredClientId } from './clientIdentity';
 import {
+  CONNECTION_HANDSHAKE_TIMEOUT_MS,
   CONNECTION_STALE_TIMEOUT_MS,
   HEARTBEAT_INTERVAL_MS,
   isConnectionStale,
@@ -65,6 +75,57 @@ import {
 export interface ConnectionState {
   isConnected: boolean;
   socket: WebSocket | null;
+}
+
+type SnapshotDiagnosticMetadata = Pick<SnapshotFrame, 'kind' | 'sequence'> & {
+  baseline?: number;
+};
+
+let nextConnectionId = 0;
+
+function readSnapshotSequence(data: unknown): number | undefined {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return undefined;
+  }
+  const frame = data as Record<string, unknown>;
+  if (!Number.isSafeInteger(frame['sequence']) || (frame['sequence'] as number) <= 0) {
+    return undefined;
+  }
+  return frame['sequence'] as number;
+}
+
+function readSnapshotDiagnosticMetadata(
+  data: unknown,
+  sequence = readSnapshotSequence(data)
+): SnapshotDiagnosticMetadata | undefined {
+  if (sequence === undefined || !data || typeof data !== 'object' || Array.isArray(data)) {
+    return undefined;
+  }
+  const frame = data as Record<string, unknown>;
+  if (frame['kind'] !== 'keyframe' && frame['kind'] !== 'delta') {
+    return undefined;
+  }
+  return {
+    kind: frame['kind'],
+    sequence,
+    ...(frame['kind'] === 'delta' && Number.isSafeInteger(frame['baseline'])
+      ? { baseline: frame['baseline'] as number }
+      : {}),
+  };
+}
+
+function captureClientPlayerState(player: Player) {
+  return captureDiagnosticActorState({
+    position: player.ship.position,
+    velocity: player.ship.velocity,
+    angle: player.ship.angle,
+    health: player.ship.health,
+    maxHealth: player.ship.maxHealth,
+    lives: player.lives,
+    score: player.score,
+    exploding: player.ship.exploding,
+    spawnProtectionTimer: player.serverSpawnProtectionTimer,
+  });
 }
 
 export class ConnectionManager {
@@ -107,6 +168,11 @@ export class ConnectionManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hasConnectedOnce = false;
   private connectPromise: Promise<void> | null = null;
+  private cancelPendingConnect: ((error: Error) => void) | null = null;
+  private connectionId = '';
+  private serverReleaseId?: string;
+  private lastAcceptedSnapshotSequence = 0;
+  private lastDamageStateLogAt = 0;
 
   private constructor() {
     this.state = {
@@ -157,80 +223,83 @@ export class ConnectionManager {
   }
 
   private openSocket(): Promise<void> {
-    if (this.state.isConnected || this.state.socket) {
-      return Promise.resolve();
-    }
-
     return new Promise((resolve, reject) => {
+      this.connectionId = `connection-${++nextConnectionId}`;
+      setClientLogContext({ connectionId: this.connectionId });
+      let settled = false;
+      const finish = (error?: Error): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeout);
+        this.cancelPendingConnect = null;
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      };
+      const timeout = setTimeout(() => {
+        const error = new Error('WebSocket connection timed out');
+        finish(error);
+        if (this.state.socket) {
+          this.retireSocket(this.state.socket);
+        }
+      }, CONNECTION_HANDSHAKE_TIMEOUT_MS);
+      this.cancelPendingConnect = finish;
       try {
-        const computedUrl =
-          typeof window !== 'undefined'
-            ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
-            : 'ws://localhost:3001/ws';
-
+        const computedUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
         const wsEndpoint = new URL(import.meta.env.VITE_WEBSOCKET_URL || computedUrl);
-        if ((import.meta.env.VITE_ASTEROID_INTERACTIONS ?? '1') === '1') {
+        if ((import.meta.env['VITE_ASTEROID_INTERACTIONS'] ?? '1') === '1') {
           wsEndpoint.searchParams.set('asteroidInteractions', '1');
         }
-        const wsUrl = wsEndpoint.toString();
-        logger.debug('NETWORK', 'Connecting to WebSocket', { url: wsUrl });
+        logger.debug('NETWORK', 'Connecting to WebSocket', { url: wsEndpoint.toString() });
         this.resetSnapshotSession();
-        this.state.socket = new WebSocket(wsUrl);
-
-        this.state.socket.onopen = (): void => {
+        const socket = new WebSocket(wsEndpoint.toString());
+        this.state.socket = socket;
+        socket.onopen = (): void => {
+          if (this.state.socket !== socket || settled) {
+            return;
+          }
           const wasReconnect = this.hasConnectedOnce;
+          const completedReconnectAttempts = this.reconnectAttempt;
           this.state.isConnected = true;
           this.lastServerMessageAt = Date.now();
           this.reconnectAttempt = 0;
           this.startHeartbeat();
           this.hasConnectedOnce = true;
           logger.info('NETWORK', wasReconnect ? 'Reconnected to server' : 'Connected to server');
+          logger.info('STATE', 'transport_connected', {
+            connectedAt: Date.now(),
+            connectionAttempt: completedReconnectAttempts + 1,
+            reconnected: wasReconnect,
+          });
+          finish();
           window.dispatchEvent(
             new CustomEvent(wasReconnect ? 'networkReconnected' : 'networkConnected')
           );
-          resolve();
         };
-
-        this.state.socket.onerror = (): void => {
-          logger.error('NETWORK', 'WebSocket connection error');
-          reject(new Error('WebSocket connection failed'));
-        };
-
-        this.state.socket.onclose = (): void => {
-          this.motionPrediction.transportClosed();
-          const localShip = PlayerManager.getInstance().getLocalShip();
-          if (localShip && this.asteroidInteractions) {
-            localShip.serverOwnsMotion = true;
-          }
-          this.resetSnapshotSession();
-          this.state.isConnected = false;
-          this.state.socket = null;
-          this.stopHeartbeat();
-          // A reconnect must perform the asteroid handshake again. Keep the
-          // cached belt for warm rejoin rendering, but do not treat it as
-          // proof that the server process still owns the same field.
-          this.hasInitializedAsteroidsForConnection = false;
-          // Keep the last belt + latch list. Wiping here is why KeyE during
-          // a Reconnecting banner found zero rocks after #485.
-          setHoldEmptyHarpoonField(true);
-          logger.warn('NETWORK', 'WebSocket connection closed');
-          if (this.userRequestedDisconnect) {
-            window.dispatchEvent(
-              new CustomEvent('networkDisconnected', {
-                detail: { reason: 'Connection closed' },
-              })
-            );
+        socket.onerror = (): void => {
+          if (this.state.socket !== socket) {
             return;
           }
-          // First-connect failure is fatal for startGame; do not retry there.
-          if (!this.hasConnectedOnce) {
+          const error = new Error('WebSocket connection failed');
+          logger.error('NETWORK', 'WebSocket connection error', error);
+          finish(error);
+          this.retireSocket(socket);
+        };
+        socket.onclose = (): void => {
+          if (this.state.socket !== socket) {
             return;
           }
-          this.scheduleReconnect();
+          finish(new Error('WebSocket closed before connecting'));
+          this.handleSocketClosed(socket);
         };
-
-        this.state.socket.onmessage = (event: MessageEvent): void => {
-          // Any inbound traffic (game state, pong, etc.) proves the link is alive.
+        socket.onmessage = (event: MessageEvent): void => {
+          if (this.state.socket !== socket) {
+            return;
+          }
           this.lastServerMessageAt = Date.now();
           try {
             const message: ServerMessage = JSON.parse(event.data);
@@ -243,40 +312,108 @@ export class ConnectionManager {
             );
           }
         };
-      } catch (error) {
-        reject(error);
+      } catch (cause) {
+        finish(cause instanceof Error ? cause : new Error(String(cause)));
+        if (this.state.socket) {
+          this.retireSocket(this.state.socket);
+        }
       }
     });
   }
 
-  disconnect(options?: { newSession?: boolean }): void {
-    if (this.state.socket?.readyState === WebSocket.OPEN && this.asteroidInteractions) {
-      this.state.socket.send(JSON.stringify({ type: 'leave', data: {} }));
+  private handleSocketClosed(socket: WebSocket): void {
+    if (this.state.socket !== socket) {
+      return;
     }
-    this.resumeToken = undefined;
+    const wasConnected = this.state.isConnected;
+    const serverReleaseId = this.serverReleaseId;
+    const lastAcceptedSnapshotSequence = this.lastAcceptedSnapshotSequence;
+    this.motionPrediction.transportClosed();
+    const localShip = PlayerManager.getInstance().getLocalShip();
+    if (localShip && this.asteroidInteractions) {
+      localShip.serverOwnsMotion = true;
+    }
+    this.resetSnapshotSession();
+    this.state.isConnected = false;
+    this.state.socket = null;
+    this.stopHeartbeat();
+    this.hasInitializedAsteroidsForConnection = false;
+    // Preserve the visible belt while the next socket rejoins the authoritative world.
+    setHoldEmptyHarpoonField(true);
+    logger.warn('NETWORK', 'WebSocket connection closed');
+    logger.info('STATE', 'transport_closed', {
+      closedAt: Date.now(),
+      wasConnected,
+      userRequested: this.userRequestedDisconnect,
+      lastAcceptedSnapshotSequence,
+      ...(serverReleaseId ? { serverReleaseId } : {}),
+    });
+    // Failed handshakes are retried by the awaiting reconnect attempt; only
+    // a previously open transport starts a new retry sequence here.
+    if (wasConnected && !this.userRequestedDisconnect && this.hasConnectedOnce) {
+      this.scheduleReconnect();
+    }
+  }
+
+  private retireSocket(socket: WebSocket): void {
+    this.handleSocketClosed(socket);
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    try {
+      socket.close();
+    } catch (error) {
+      logger.error(
+        'NETWORK',
+        'Failed to close retired WebSocket',
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
+
+  /** A failed send invalidates the transport; commands are never silently queued. */
+  private sendPayload(message: unknown): boolean {
+    const socket = this.state.socket;
+    if (!this.state.isConnected || !socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    try {
+      socket.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      logger.error(
+        'NETWORK',
+        'Failed to send gameplay message',
+        error instanceof Error ? error : new Error(String(error))
+      );
+      this.retireSocket(socket);
+      return false;
+    }
+  }
+
+  disconnect(options?: { newSession?: boolean }): void {
+    this.userRequestedDisconnect = true;
+    this.cancelPendingConnect?.(new Error('WebSocket connection cancelled'));
+    if (this.state.socket?.readyState === WebSocket.OPEN && this.asteroidInteractions) {
+      this.sendPayload({ type: 'leave', data: {} });
+    }
+    delete this.resumeToken;
     this.asteroidInteractions = false;
     this.motionPrediction.reset();
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
       localShip.serverOwnsMotion = false;
-      localShip.asteroidMotion = undefined;
+      delete localShip.asteroidMotion;
     }
     AuthoritativeProjectileField.getInstance().clear();
     window.dispatchEvent(new CustomEvent('asteroidToolsSnapshot', { detail: { enabled: false } }));
-    this.userRequestedDisconnect = true;
     this.clearReconnectTimer();
     this.reconnectAttempt = 0;
     this.stopHeartbeat();
     const socket = this.state.socket;
     if (socket) {
-      // Drop handlers first so game-over disconnect does not re-enter via onclose.
-      socket.onopen = null;
-      socket.onmessage = null;
-      socket.onerror = null;
-      socket.onclose = null;
-      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-        socket.close();
-      }
+      this.retireSocket(socket);
     }
     this.resetSnapshotSession();
     this.state.isConnected = false;
@@ -290,6 +427,8 @@ export class ConnectionManager {
     SatelliteManager.getInstance().clear();
     SatellitePickupManager.getInstance().clear();
     this.localPlayerId = '';
+    this.lastDamageStateLogAt = 0;
+    setClientLogContext({});
     // pagehide / unexpected close keep the stored id (#467). Game-over Start
     // mints a new one so we do not rejoin a 0-life ship.
     this.hasConnectedOnce = false;
@@ -317,6 +456,10 @@ export class ConnectionManager {
     }
     const delay = nextReconnectDelayMs(this.reconnectAttempt);
     if (delay === null) {
+      logger.warn('STATE', 'reconnect_exhausted', {
+        observedAt: Date.now(),
+        attempts: this.reconnectAttempt,
+      });
       window.dispatchEvent(
         new CustomEvent('networkDisconnected', {
           detail: { reason: 'Reconnect exhausted' },
@@ -334,6 +477,11 @@ export class ConnectionManager {
         detail: { attempt: this.reconnectAttempt + 1, delayMs: delay },
       })
     );
+    logger.info('STATE', 'reconnect_scheduled', {
+      scheduledAt: Date.now(),
+      attempt: this.reconnectAttempt + 1,
+      delayMs: delay,
+    });
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.reconnectAttempt += 1;
@@ -369,11 +517,9 @@ export class ConnectionManager {
       return;
     }
 
-    try {
-      this.pingPayload.timestamp = Date.now();
-      socket.send(JSON.stringify(this.pingPayload));
-    } catch {
-      // A throwing send on an OPEN socket means it is broken; stale check closes it.
+    this.pingPayload.timestamp = Date.now();
+    if (!this.sendPayload(this.pingPayload)) {
+      return;
     }
 
     if (isConnectionStale(this.lastServerMessageAt, Date.now())) {
@@ -382,22 +528,13 @@ export class ConnectionManager {
         timeoutMs: CONNECTION_STALE_TIMEOUT_MS,
       });
       this.stopHeartbeat();
-      // close() drives onclose -> scheduleReconnect (not the permanent banner).
-      try {
-        socket.close();
-      } catch {
-        this.state.isConnected = false;
-        this.state.socket = null;
-        if (this.hasConnectedOnce && !this.userRequestedDisconnect) {
-          this.scheduleReconnect();
-        }
-      }
+      this.retireSocket(socket);
     }
   }
 
   // Player management
   setLocalPlayerName(name: string): void {
-    logger.debug('NETWORK', `Setting local player name: ${name}`);
+    logger.debug('NETWORK', 'Setting local player name');
     this.localPlayerName = name;
   }
 
@@ -492,7 +629,7 @@ export class ConnectionManager {
     }
     this.updateEnvelope.data = playerState;
     this.updateEnvelope.timestamp = Date.now();
-    this.state.socket.send(JSON.stringify(this.updateEnvelope));
+    this.sendPayload(this.updateEnvelope);
   }
 
   dispatchAsteroidMotionAction(
@@ -510,8 +647,7 @@ export class ConnectionManager {
     if (!input) {
       return false;
     }
-    this.sendMessage({ type: 'asteroidInput', data: input });
-    return true;
+    return this.sendMessage({ type: 'asteroidInput', data: input });
   }
 
   // Send shoot event to server
@@ -535,8 +671,8 @@ export class ConnectionManager {
       timestamp: Date.now(),
     };
 
-    logger.debug('NETWORK', 'Sending shoot message to server', { message });
-    this.state.socket.send(JSON.stringify(message));
+    logger.debug('NETWORK', 'Sending shoot message to server', { playerId: message.id });
+    this.sendPayload(message);
   }
 
   // Initialize asteroid sync
@@ -550,7 +686,7 @@ export class ConnectionManager {
       return;
     }
 
-    logger.debug('NETWORK', `Initializing asteroid sync with player name: ${this.localPlayerName}`);
+    logger.debug('NETWORK', 'Initializing asteroid sync');
 
     // Align local player id with join id before the first gameState (avoids a
     // transient remote duplicate keyed by clientId).
@@ -569,7 +705,7 @@ export class ConnectionManager {
     // A same-socket rejoin can race snapshots already queued by the server.
     // Keep its current decoder/format until the ordered joined acknowledgment
     // establishes the new session. New physical sockets reset in openSocket.
-    this.snapshotOffered = (import.meta.env.VITE_SNAPSHOT_PROTOCOL ?? '1') === '1';
+    this.snapshotOffered = (import.meta.env['VITE_SNAPSHOT_PROTOCOL'] ?? '1') === '1';
 
     // First join the game
     const joinMessage: ClientMessage = {
@@ -581,7 +717,7 @@ export class ConnectionManager {
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         ...(this.snapshotOffered ? { snapshotVersion: SNAPSHOT_VERSION } : {}),
-        ...(this.snapshotOffered && (import.meta.env.VITE_ASTEROID_INTERACTIONS ?? '1') === '1'
+        ...(this.snapshotOffered && (import.meta.env['VITE_ASTEROID_INTERACTIONS'] ?? '1') === '1'
           ? {
               asteroidInteractions: 1,
               ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),
@@ -595,8 +731,7 @@ export class ConnectionManager {
       id: this.clientId,
       resumable: !!this.resumeToken,
     });
-    const jsonString = JSON.stringify(joinMessage);
-    this.state.socket.send(jsonString);
+    this.sendPayload(joinMessage);
   }
 
   // Initialize asteroids after the server acknowledges join
@@ -629,29 +764,28 @@ export class ConnectionManager {
       timestamp: Date.now(),
     };
 
-    this.state.socket.send(JSON.stringify(message));
+    if (!this.sendPayload(message)) {
+      return;
+    }
     this.hasInitializedAsteroidsForConnection = true;
-    logger.debug('NETWORK', 'Sent initAsteroids message', { message });
+    logger.debug('NETWORK', 'Sent initAsteroids message', { playerId: this.localPlayerId });
   }
 
   // Send a generic message to the server
-  sendMessage(message: Record<string, unknown>): void {
-    if (
-      !this.state.isConnected ||
-      !this.state.socket ||
-      this.state.socket.readyState !== WebSocket.OPEN
-    ) {
-      return;
+  sendMessage(message: Record<string, unknown>): boolean {
+    if (!this.sendPayload(message)) {
+      return false;
     }
-
     if (
-      message.type === 'useAbility' &&
-      (message.data as { abilityId?: unknown } | undefined)?.abilityId === 'harpoon'
+      message['type'] === 'useAbility' &&
+      (message['data'] as { abilityId?: unknown } | undefined)?.abilityId === 'harpoon'
     ) {
       this.localHarpoonAcknowledged = false;
     }
-    this.state.socket.send(JSON.stringify(message));
-    logger.debug('NETWORK', 'Sent message', { message });
+    logger.debug('NETWORK', 'Sent message', {
+      messageType: typeof message['type'] === 'string' ? message['type'] : 'unknown',
+    });
+    return true;
   }
 
   private handleServerMessage(message: ServerMessage): void {
@@ -666,7 +800,7 @@ export class ConnectionManager {
           this.requestSnapshotResync(new Error('Legacy state after snapshot negotiation'));
           break;
         }
-        this.handleGameState(data as ServerGameState);
+        this.applyReceivedGameState(data as ServerGameState);
         break;
       case 'sessionExpired': {
         // Remove the previous map key before initializeAsteroidSync changes
@@ -679,7 +813,8 @@ export class ConnectionManager {
           this.forgetPlayer(this.localPlayerId);
         }
         this.localPlayerId = '';
-        this.resumeToken = undefined;
+        setClientLogContext({ connectionId: this.connectionId });
+        delete this.resumeToken;
         this.motionPrediction.reset();
         this.asteroidInteractions = false;
         this.clientId = replaceStoredClientId();
@@ -752,8 +887,7 @@ export class ConnectionManager {
         );
         break;
       case 'playerUpdate':
-        // Handle player update messages (currently just log them)
-        logger.debug('NETWORK', 'Received player update', { data });
+        logger.debug('NETWORK', 'Received player update');
         break;
       case 'playerDamaged':
         this.handlePlayerDamaged(
@@ -808,13 +942,32 @@ export class ConnectionManager {
     this.snapshotOffered = false;
     this.snapshotResyncPending = false;
     this.localHarpoonAcknowledged = false;
+    this.lastAcceptedSnapshotSequence = 0;
+    delete this.serverReleaseId;
   }
 
-  private requestSnapshotResync(error: unknown): void {
+  private requestSnapshotResync(
+    error: unknown,
+    metadata?: SnapshotDiagnosticMetadata,
+    receivedAt = Date.now()
+  ): void {
     logger.error(
-      'NETWORK',
-      'Rejected snapshot; requesting complete keyframe',
-      error instanceof Error ? error : new Error(String(error))
+      'STATE',
+      'snapshot_rejected',
+      error instanceof Error ? error : new Error('Unknown snapshot error'),
+      {
+        receivedAt,
+        lastAcceptedSequence: this.lastAcceptedSnapshotSequence,
+        expectedSequence: this.lastAcceptedSnapshotSequence + 1,
+        ...(metadata
+          ? {
+              receivedSequence: metadata.sequence,
+              receivedKind: metadata.kind,
+              ...(metadata.baseline !== undefined ? { receivedBaseline: metadata.baseline } : {}),
+            }
+          : {}),
+        ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
+      }
     );
     if (!this.snapshotNegotiated) {
       this.state.socket?.close(1002, 'Snapshot was not negotiated');
@@ -827,15 +980,74 @@ export class ConnectionManager {
   }
 
   private handleSnapshot(data: unknown): void {
+    const receivedAt = Date.now();
+    const sequence = readSnapshotSequence(data);
+    const sampled = sequence !== undefined && shouldSampleSnapshot(sequence);
+    const metadata = sampled ? readSnapshotDiagnosticMetadata(data, sequence) : undefined;
+    const localBefore = sampled ? PlayerManager.getInstance().getLocalPlayer() : undefined;
+    const clientBeforeApply = localBefore ? captureClientPlayerState(localBefore) : undefined;
     try {
       if (!this.snapshotNegotiated) {
         throw new Error('Snapshot was not negotiated');
       }
       const state = this.snapshotDecoder.decode(data);
       this.snapshotResyncPending = false;
-      this.handleGameState(state, true);
+      this.applyReceivedGameState(state, true);
+      if (sequence !== undefined) {
+        this.lastAcceptedSnapshotSequence = sequence;
+      }
+      if (sampled && metadata) {
+        const authoritative = state.entities.find(
+          (entity) => entity.id === (this.localPlayerId || this.clientId)
+        );
+        const localAfter = PlayerManager.getInstance().getLocalPlayer();
+        logger.info('STATE', 'snapshot_applied', {
+          receivedAt,
+          gameTime: state.gameTime,
+          snapshotSequence: metadata.sequence,
+          snapshotKind: metadata.kind,
+          ...(metadata.baseline !== undefined ? { snapshotBaseline: metadata.baseline } : {}),
+          ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
+          ...(authoritative?.asteroidMotion
+            ? {
+                motionEpoch: authoritative.asteroidMotion.epoch,
+                motionAck: authoritative.asteroidMotion.ack,
+                motionMode: authoritative.asteroidMotion.mode,
+              }
+            : {}),
+          ...(clientBeforeApply ? { clientBeforeApply } : {}),
+          ...(authoritative
+            ? { authoritativeRow: captureDiagnosticActorState(authoritative) }
+            : {}),
+          ...(localAfter ? { clientAfterApply: captureClientPlayerState(localAfter) } : {}),
+        });
+      }
     } catch (error) {
-      this.requestSnapshotResync(error);
+      this.requestSnapshotResync(
+        error,
+        metadata ?? readSnapshotDiagnosticMetadata(data, sequence),
+        receivedAt
+      );
+    }
+  }
+
+  private applyReceivedGameState(data: ServerGameState, complete = false): void {
+    const localBefore = PlayerManager.getInstance().getLocalPlayer();
+    const wasDead = Boolean(
+      localBefore && (localBefore.ship.health <= 0 || localBefore.ship.exploding)
+    );
+    this.handleGameState(data, complete);
+    if (!wasDead) {
+      return;
+    }
+    const localAfter = PlayerManager.getInstance().getLocalPlayer();
+    if (localAfter && localAfter.ship.health > 0 && !localAfter.ship.exploding) {
+      logger.info('STATE', 'player_respawned', {
+        receivedAt: Date.now(),
+        gameTime: data.gameTime,
+        state: captureClientPlayerState(localAfter),
+        ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
+      });
     }
   }
 
@@ -915,8 +1127,8 @@ export class ConnectionManager {
               name: entityData.name,
               type: entityData.type === 'bot' ? 'bot' : 'remote',
               color: entityData.color,
-              kitId: entityData.kitId,
-              factionId: entityData.factionId,
+              ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
+              ...(entityData.factionId !== undefined ? { factionId: entityData.factionId } : {}),
               position: entityData.position,
             });
           }
@@ -943,10 +1155,22 @@ export class ConnectionManager {
         entityData.spawnProtectionTimer ??= 0;
         if (complete) {
           // Complete snapshots clear optional values that legacy partial updates retain.
-          entity.ship.asteroidMotion = entityData.asteroidMotion;
+          if (entityData.asteroidMotion !== undefined) {
+            entity.ship.asteroidMotion = entityData.asteroidMotion;
+          } else {
+            delete entity.ship.asteroidMotion;
+          }
           entity.name = entityData.name;
-          entity.factionId = entityData.factionId;
-          entity.ship.factionId = entityData.factionId;
+          if (entityData.factionId !== undefined) {
+            entity.factionId = entityData.factionId;
+          } else {
+            delete entity.factionId;
+          }
+          if (entityData.factionId !== undefined) {
+            entity.ship.factionId = entityData.factionId;
+          } else {
+            delete entity.ship.factionId;
+          }
           if (entity.type !== 'local') {
             entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
           }
@@ -972,8 +1196,16 @@ export class ConnectionManager {
             entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
             entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
             entity.ship.harpoonTimer = entityData.harpoonTimer ?? 0;
-            entity.ship.harpoonTargetId = entityData.harpoonTargetId;
-            entity.ship.harpoonLatchPos = entityData.harpoonLatchPos;
+            if (entityData.harpoonTargetId !== undefined) {
+              entity.ship.harpoonTargetId = entityData.harpoonTargetId;
+            } else {
+              delete entity.ship.harpoonTargetId;
+            }
+            if (entityData.harpoonLatchPos !== undefined) {
+              entity.ship.harpoonLatchPos = entityData.harpoonLatchPos;
+            } else {
+              delete entity.ship.harpoonLatchPos;
+            }
           }
           entity.ship.shieldTimer = entityData.shieldTimer ?? 0;
           entity.ship.shieldActive = entityData.shieldActive ?? false;
@@ -981,7 +1213,7 @@ export class ConnectionManager {
           entity.ship.shieldCooldown = entityData.shieldCooldown ?? 0;
           entity.ship.shieldFlashTime = entityData.shieldFlashTime ?? 0;
           if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
-            entity.deathCause = undefined;
+            delete entity.deathCause;
           }
         }
         entity.updateFromServer(entityData);
@@ -1105,11 +1337,25 @@ export class ConnectionManager {
       this.snapshotNegotiated &&
       data.asteroidInteractions === 1 &&
       typeof data.resumeToken === 'string';
-    this.resumeToken = this.asteroidInteractions ? data.resumeToken : undefined;
-    logger.info('NETWORK', 'Player joined successfully', {
-      id: data.id,
-      name: data.name,
+    const resumeTokenValue = this.asteroidInteractions ? data.resumeToken : undefined;
+    if (resumeTokenValue !== undefined) {
+      this.resumeToken = resumeTokenValue;
+    } else {
+      delete this.resumeToken;
+    }
+    if (data.serverReleaseId) {
+      this.serverReleaseId = data.serverReleaseId;
+    } else {
+      delete this.serverReleaseId;
+    }
+    this.lastDamageStateLogAt = 0;
+    setClientLogContext({ playerId: data.id, connectionId: this.connectionId });
+    logger.info('STATE', 'player_joined', {
+      joinedAt: Date.now(),
+      playerId: data.id,
       asteroidInteractions: this.asteroidInteractions,
+      ...(data.snapshotVersion !== undefined ? { snapshotVersion: data.snapshotVersion } : {}),
+      ...(data.serverReleaseId ? { serverReleaseId: data.serverReleaseId } : {}),
     });
 
     const keepField = shouldPreserveSeenAsteroidsOnJoin(this.seenAsteroidIds.size);
@@ -1189,7 +1435,7 @@ export class ConnectionManager {
     notifyAsteroidDestroyed({
       asteroidId: data.asteroidId,
       collabSplit: data.collabSplit === true,
-      origin: data.origin,
+      ...(data.origin !== undefined ? { origin: data.origin } : {}),
     });
   }
 
@@ -1348,6 +1594,7 @@ export class ConnectionManager {
       isLocalTarget && localPlayer && data.remainingLives !== undefined
         ? localPlayer.lives
         : undefined;
+    const beforeHealth = isLocalTarget && localPlayer ? localPlayer.ship.health : undefined;
 
     let targetPlayer = this.allPlayers.get(data.targetPlayerId);
     if (!targetPlayer) {
@@ -1391,6 +1638,25 @@ export class ConnectionManager {
       const deathCause = this.describeAttacker(data.attackerId);
       localPlayer.deathCause = deathCause;
       this.dispatchLocalPlayerDied(localPlayer, data.remainingLives, deathCause);
+    }
+
+    if (isLocalTarget) {
+      const observedAt = Date.now();
+      const shouldLogDamage = data.isDestroyed || observedAt - this.lastDamageStateLogAt >= 1000;
+      if (shouldLogDamage) {
+        this.lastDamageStateLogAt = observedAt;
+        logger.info('STATE', data.isDestroyed ? 'player_died' : 'damage_applied', {
+          observedAt,
+          playerId: data.targetPlayerId,
+          attackerId: data.attackerId,
+          damage: data.damage,
+          ...(beforeHealth !== undefined ? { healthBefore: beforeHealth } : {}),
+          healthAfter: data.remainingHealth,
+          ...(prevLocalLives !== undefined ? { livesBefore: prevLocalLives } : {}),
+          ...(data.remainingLives !== undefined ? { livesAfter: data.remainingLives } : {}),
+          ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
+        });
+      }
     }
   }
 

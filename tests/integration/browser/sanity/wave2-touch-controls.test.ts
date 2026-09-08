@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
-import { expect, test } from 'vitest';
 import type { CDPSession, Page } from 'playwright';
+import { expect, test } from 'vitest';
 
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
@@ -92,14 +92,18 @@ test.each(KITS)(
   async ({ kitId, label, name }) => {
     await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
-    if (!page) throw new Error('Page not available');
+    if (!page) {
+      throw new Error('Page not available');
+    }
 
     const consoleState = collectConsole(page);
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId });
     await page.waitForFunction(
-      () => document.body.classList.contains('touch-play') && !document.getElementById('touch-controls')?.hidden,
+      () =>
+        document.body.classList.contains('touch-play') &&
+        !document.getElementById('touch-controls')?.hidden,
       { timeout: 5000 }
     );
 
@@ -128,9 +132,9 @@ test.each(KITS)(
     const duringTouch = await readLocalTouchState(page);
     expect(duringTouch.thrusting).toBe(true);
     expect(duringTouch.lastShotTime).toBeGreaterThan(beforeMove.lastShotTime);
-    expect(await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))).toBe(
-      true
-    );
+    expect(
+      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
+    ).toBe(true);
     expect(await page.locator('#touch-stick-knob').getAttribute('style')).toContain('translate');
 
     // E and F must remain usable while the two continuous touch sources are
@@ -140,9 +144,9 @@ test.each(KITS)(
     const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
     expect(abilityWhileHeld.thrusting).toBe(true);
-    expect(await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))).toBe(
-      true
-    );
+    expect(
+      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
+    ).toBe(true);
     await page.touchscreen.tap(ability.x, ability.y);
     await game.runGameFrames(1);
     const abilityAfterCoolingTap = await readLocalTouchState(page);
@@ -157,9 +161,9 @@ test.each(KITS)(
     const shieldWhileHeld = await readLocalTouchState(page);
     expect(shieldWhileHeld.shieldActive).toBe(true);
     expect(shieldWhileHeld.thrusting).toBe(true);
-    expect(await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-active'))).toBe(
-      true
-    );
+    expect(
+      await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-active'))
+    ).toBe(true);
 
     await page.touchscreen.tap(shield.x, shield.y);
     await game.runGameFrames(1);
@@ -178,9 +182,9 @@ test.each(KITS)(
     const afterBlur = await readLocalTouchState(page);
     expect(afterBlur.thrusting).toBe(false);
     expect(afterBlur.canShoot).toBe(true);
-    expect(await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))).toBe(
-      false
-    );
+    expect(
+      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
+    ).toBe(false);
 
     // A real orientation change also drops stale pointer ownership before the
     // controls are laid out for the new viewport.
@@ -195,9 +199,9 @@ test.each(KITS)(
     const afterRotation = await readLocalTouchState(page);
     expect(afterRotation.thrusting).toBe(false);
     expect(afterRotation.canShoot).toBe(true);
-    expect(await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))).toBe(
-      false
-    );
+    expect(
+      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
+    ).toBe(false);
     expect(await page.locator('#touch-controls').isHidden()).toBe(false);
     await page.setViewportSize({ width: 390, height: 844 });
     await game.runGameFrames(1);
@@ -207,9 +211,9 @@ test.each(KITS)(
     const afterCancel = await readLocalTouchState(page);
     expect(afterCancel.thrusting).toBe(false);
     expect(afterCancel.canShoot).toBe(true);
-    expect(await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))).toBe(
-      false
-    );
+    expect(
+      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
+    ).toBe(false);
     expect(await page.locator('#touch-stick-knob').getAttribute('style')).toBe(
       'transform: translate(-50%, -50%);'
     );
@@ -233,12 +237,12 @@ test.each(KITS)(
     expect(afterDeath.canShoot).toBe(true);
     expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('true');
     expect(await page.locator('#touch-shield').getAttribute('aria-disabled')).toBe('true');
-    expect(await page.locator('#touch-ability').evaluate((el) => el.classList.contains('is-unavailable'))).toBe(
-      true
-    );
-    expect(await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-unavailable'))).toBe(
-      true
-    );
+    expect(
+      await page.locator('#touch-ability').evaluate((el) => el.classList.contains('is-unavailable'))
+    ).toBe(true);
+    expect(
+      await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-unavailable'))
+    ).toBe(true);
 
     const mobileScreenshot = screenshotManager.getScreenshotPath(`wave2-touch-${kitId}-mobile.png`);
     await page.screenshot({ path: mobileScreenshot });
@@ -250,70 +254,87 @@ test.each(KITS)(
   TestConfig.DEFAULT_TIMEOUT
 );
 
-test('desktop play view keeps the fixed close camera and hides touch chrome', async () => {
-  const page = browserManager.getCurrentPage();
-  if (!page) throw new Error('Page not available');
+test(
+  'desktop play view keeps the fixed close camera and hides touch chrome',
+  async () => {
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Page not available');
+    }
 
-  const consoleState = collectConsole(page);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  const game = new GameInteractions(page);
-  await game.bootGame({ waitForCombatReady: false });
-  await game.runGameFrames(4);
+    const consoleState = collectConsole(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false });
+    await game.runGameFrames(4);
 
-  expect(await page.locator('#touch-controls').isHidden()).toBe(true);
-  expect(await page.locator('#gameCanvas').isVisible()).toBe(true);
-  const desktopScreenshot = screenshotManager.getScreenshotPath('wave2-touch-desktop.png');
-  await page.screenshot({ path: desktopScreenshot });
-  console.log(`📸 ${desktopScreenshot} exists=${existsSync(desktopScreenshot)}`);
-  expect(existsSync(desktopScreenshot)).toBe(true);
-  expect(consoleState.errors).toEqual([]);
-  expect(consoleState.warnings).toEqual([]);
-}, TestConfig.DEFAULT_TIMEOUT);
+    expect(await page.locator('#touch-controls').isHidden()).toBe(true);
+    expect(await page.locator('#gameCanvas').isVisible()).toBe(true);
+    const desktopScreenshot = screenshotManager.getScreenshotPath('wave2-touch-desktop.png');
+    await page.screenshot({ path: desktopScreenshot });
+    console.log(`📸 ${desktopScreenshot} exists=${existsSync(desktopScreenshot)}`);
+    expect(existsSync(desktopScreenshot)).toBe(true);
+    expect(consoleState.errors).toEqual([]);
+    expect(consoleState.warnings).toEqual([]);
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);
 
-test('semantic E and F controls activate from keyboard and programmatic clicks', async () => {
-  await browserManager.recreatePage({ hasTouch: true });
-  const page = browserManager.getCurrentPage();
-  if (!page) throw new Error('Page not available');
+test(
+  'semantic E and F controls activate from keyboard and programmatic clicks',
+  async () => {
+    await browserManager.recreatePage({ hasTouch: true });
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Page not available');
+    }
 
-  const consoleState = collectConsole(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  const game = new GameInteractions(page);
-  await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
-  await page.waitForFunction(
-    () => document.body.classList.contains('touch-play') && !document.getElementById('touch-controls')?.hidden,
-    { timeout: 5000 }
-  );
+    const consoleState = collectConsole(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    await page.waitForFunction(
+      () =>
+        document.body.classList.contains('touch-play') &&
+        !document.getElementById('touch-controls')?.hidden,
+      { timeout: 5000 }
+    );
 
-  const ability = page.locator('#touch-ability');
-  const shield = page.locator('#touch-shield');
-  await ability.focus();
-  await page.keyboard.press('Enter');
-  await game.runGameFrames(2);
-  expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
+    const ability = page.locator('#touch-ability');
+    const shield = page.locator('#touch-shield');
+    await ability.focus();
+    await page.keyboard.press('Enter');
+    await game.runGameFrames(2);
+    expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
 
-  await page.evaluate(() => {
-    const ship = (window as { gameController?: any }).gameController?.playerManager
-      ?.getLocalPlayer?.()?.ship;
-    if (!ship) throw new Error('Local ship unavailable');
-    ship.abilityCooldownFrames = 0;
-    ship.abilityActiveFrames = 0;
-  });
-  await ability.evaluate((element) => (element as HTMLButtonElement).click());
-  await game.runGameFrames(2);
-  expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
+    await page.evaluate(() => {
+      const ship = (
+        window as { gameController?: any }
+      ).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+      if (!ship) {
+        throw new Error('Local ship unavailable');
+      }
+      ship.abilityCooldownFrames = 0;
+      ship.abilityActiveFrames = 0;
+    });
+    await ability.evaluate((element) => (element as HTMLButtonElement).click());
+    await game.runGameFrames(2);
+    expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
 
-  await shield.focus();
-  await page.keyboard.press('Space');
-  await game.runGameFrames(2);
-  expect((await readLocalTouchState(page)).shieldActive).toBe(true);
-  await shield.evaluate((element) => (element as HTMLButtonElement).click());
-  await game.runGameFrames(1);
-  const afterProgrammaticShield = await readLocalTouchState(page);
-  expect(afterProgrammaticShield.shieldActive).toBe(false);
-  expect(afterProgrammaticShield.shieldCooldown).toBeGreaterThan(0);
+    await shield.focus();
+    await page.keyboard.press('Space');
+    await game.runGameFrames(2);
+    expect((await readLocalTouchState(page)).shieldActive).toBe(true);
+    await shield.evaluate((element) => (element as HTMLButtonElement).click());
+    await game.runGameFrames(1);
+    const afterProgrammaticShield = await readLocalTouchState(page);
+    expect(afterProgrammaticShield.shieldActive).toBe(false);
+    expect(afterProgrammaticShield.shieldCooldown).toBeGreaterThan(0);
 
-  expect(await ability.getAttribute('aria-disabled')).toBe('true');
-  expect(await shield.getAttribute('aria-disabled')).toBe('true');
-  expect(consoleState.errors).toEqual([]);
-  expect(consoleState.warnings).toEqual([]);
-}, TestConfig.DEFAULT_TIMEOUT);
+    expect(await ability.getAttribute('aria-disabled')).toBe('true');
+    expect(await shield.getAttribute('aria-disabled')).toBe('true');
+    expect(consoleState.errors).toEqual([]);
+    expect(consoleState.warnings).toEqual([]);
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);

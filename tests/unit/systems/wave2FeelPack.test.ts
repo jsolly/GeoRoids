@@ -19,7 +19,10 @@ import {
 
 const shipSrc = readFileSync(resolve(process.cwd(), 'src/entities/ship/shipRenderer.ts'), 'utf8');
 const roidSrc = readFileSync(resolve(process.cwd(), 'src/entities/roid/roidRenderer.ts'), 'utf8');
-const laserSrc = readFileSync(resolve(process.cwd(), 'src/entities/laser/laserRenderer.ts'), 'utf8');
+const laserSrc = readFileSync(
+  resolve(process.cwd(), 'src/entities/laser/laserRenderer.ts'),
+  'utf8'
+);
 
 test('large roids get an inner Asteroids facet; medium and pebbles stay one outline', () => {
   expect(shouldDrawRoidInnerFacet(ROID.SIZE)).toBe(true);
@@ -70,7 +73,14 @@ test('laser juice is a short dash plus a shorter heading ghost', () => {
 });
 
 test('thruster juice keeps one shared V with a shorter inner core', () => {
-  const flame = thrusterFlameGeometry(0, 0, 0, 30, VISUAL.THRUSTER_LENGTH_RATIO, VISUAL.THRUSTER_CORE_RATIO);
+  const flame = thrusterFlameGeometry(
+    0,
+    0,
+    0,
+    30,
+    VISUAL.THRUSTER_LENGTH_RATIO,
+    VISUAL.THRUSTER_CORE_RATIO
+  );
   const outer = Math.hypot(flame.tip.x - flame.rear.x, flame.tip.y - flame.rear.y);
   const inner = Math.hypot(flame.coreTip.x - flame.rear.x, flame.coreTip.y - flame.rear.y);
   expect(inner).toBeLessThan(outer);

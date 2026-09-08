@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
-import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import type { Page } from 'playwright';
+import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { BrowserManager } from '../../utils/browser-manager';
 import { HealthChecker } from '../../utils/health-checker';
 import { ScreenshotManager } from '../../utils/screenshot-manager';
@@ -12,8 +12,9 @@ const current = 'a9755405dcfd546ace3e92b4dc8c3ff53d9bb598';
 const next = 'b'.repeat(40);
 
 beforeAll(async () => {
-  if (!(await HealthChecker.checkViteServer()))
+  if (!(await HealthChecker.checkViteServer())) {
     throw new Error('Runner Vite origin is unavailable');
+  }
   screenshots.ensureScreenshotsDirectory();
   await browserManager.initialize();
 });
@@ -24,8 +25,12 @@ afterAll(async () => browserManager.cleanup());
 async function waitForProbe(page: Page, minimum: number): Promise<void> {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
-    const count = await page.evaluate(() => Number(document.documentElement.dataset.probes ?? 0));
-    if (count >= minimum) return;
+    const count = await page.evaluate(() =>
+      Number(document.documentElement.dataset['probes'] ?? 0)
+    );
+    if (count >= minimum) {
+      return;
+    }
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error(`Browser did not finish release probe ${minimum}`);
@@ -76,8 +81,12 @@ for (const viewport of [
       const warnings: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
-        if (message.type() === 'error') errors.push(message.text());
-        if (message.type() === 'warning') warnings.push(message.text());
+        if (message.type() === 'error') {
+          errors.push(message.text());
+        }
+        if (message.type() === 'warning') {
+          warnings.push(message.text());
+        }
       });
       let published = current;
       let documentRequests = 0;
@@ -127,7 +136,9 @@ for (const viewport of [
       // Playwright's controlled clock replaces Performance APIs (navigation
       // entries are empty). The real main-frame navigation and second document
       // request above, plus this persisted callback count, prove actual reload.
-      expect(await page.evaluate(() => sessionStorage.getItem('release-fixture-reloads'))).toBe('1');
+      expect(await page.evaluate(() => sessionStorage.getItem('release-fixture-reloads'))).toBe(
+        '1'
+      );
       // Fixture deliberately keeps serving the old bundle after the new header:
       // its persisted per-bundle guard must stop another confirmed reload.
       await page.clock.runFor(30_000);
@@ -135,7 +146,9 @@ for (const viewport of [
       await page.clock.runFor(90_000);
       expect(documentRequests).toBe(2);
       expect(await page.locator('#loads').textContent()).toBe('2');
-      expect(await page.evaluate(() => sessionStorage.getItem('release-fixture-reloads'))).toBe('1');
+      expect(await page.evaluate(() => sessionStorage.getItem('release-fixture-reloads'))).toBe(
+        '1'
+      );
       expect(headRequests.length).toBeGreaterThanOrEqual(5);
       expect(
         headRequests.every((request) => request.url === `${origin}/` && request.method === 'HEAD')

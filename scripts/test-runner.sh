@@ -25,6 +25,9 @@ cd "$REPO_ROOT" || {
     exit 1
 }
 
+# shellcheck source=scripts/process-tree.sh
+source "$REPO_ROOT/scripts/process-tree.sh"
+
 valid_port() {
     case "${1:-}" in
         ''|*[!0-9]*) return 1 ;;
@@ -32,11 +35,23 @@ valid_port() {
     [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
 }
 
+valid_positive_integer() {
+    case "${1:-}" in
+        ''|*[!0-9]*|0) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
 TEST_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-5173}"
 TEST_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-3001}"
+MAX_TEST_DURATION_SECONDS="${GEOROIDS_TEST_MAX_DURATION_SECONDS:-1200}"
 if ! valid_port "$TEST_VITE_PORT" || ! valid_port "$TEST_SERVER_PORT"; then
     echo "❌ GEOROIDS_TEST_VITE_PORT and GEOROIDS_TEST_SERVER_PORT must be valid TCP ports" >&2
     exit 1
+fi
+if ! valid_positive_integer "$MAX_TEST_DURATION_SECONDS"; then
+    echo "❌ GEOROIDS_TEST_MAX_DURATION_SECONDS must be a positive integer" >&2
+    exit 64
 fi
 
 # Integration helpers read these values so a linked worktree can run against
@@ -52,6 +67,8 @@ LOCK_COMMAND_FILE="$LOCK_DIR/command"
 LOCK_HELD=false
 DEV_PID=""
 TEST_PID=""
+WATCHDOG_PID=""
+TEST_TIMED_OUT=false
 CLEANUP_RUNNING=false
 
 read_lock_pid() {
@@ -68,13 +85,6 @@ read_lock_worktree() {
         IFS= read -r lock_worktree < "$LOCK_WORKTREE_FILE" || true
     fi
     printf '%s' "$lock_worktree"
-}
-
-valid_pid() {
-    case "${1:-}" in
-        ''|0|*[!0-9]*) return 1 ;;
-        *) return 0 ;;
-    esac
 }
 
 is_protected_vitest_option() {
@@ -180,27 +190,17 @@ release_lock() {
     LOCK_HELD=false
 }
 
-# Kill only descendants of a process started by this runner. This keeps a
-# failed browser/Vitest run from leaking its own children without inspecting or
-# signalling processes belonging to another worktree or application.
-terminate_process_tree() {
-    local pid="${1:-}"
-    [ -n "$pid" ] || return 0
-    [ "$pid" != "$$" ] || return 1
-
-    local child
-    local children
-    children="$(pgrep -P "$pid" 2>/dev/null || true)"
-    for child in $children; do
-        terminate_process_tree "$child"
-    done
-
-    if kill -0 "$pid" 2>/dev/null; then
-        kill "$pid" 2>/dev/null || true
-        sleep 0.1
-        kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null || true
+stop_watchdog() {
+    [ -n "$WATCHDOG_PID" ] || return 0
+    if terminate_process_tree "$WATCHDOG_PID"; then
+        WATCHDOG_PID=""
+        return 0
     fi
-    wait "$pid" 2>/dev/null || true
+    return 1
+}
+
+on_test_timeout() {
+    TEST_TIMED_OUT=true
 }
 
 cleanup() {
@@ -209,14 +209,21 @@ cleanup() {
         exit "$exit_code"
     fi
     CLEANUP_RUNNING=true
-    trap - EXIT INT TERM
+    trap - EXIT INT TERM ALRM
 
     if [ -n "$TEST_PID" ]; then
-        terminate_process_tree "$TEST_PID"
+        if ! terminate_process_tree "$TEST_PID" && [ "$exit_code" -eq 0 ]; then
+            exit_code=1
+        fi
         TEST_PID=""
     fi
+    if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
+        exit_code=1
+    fi
     if [ -n "$DEV_PID" ]; then
-        terminate_process_tree "$DEV_PID"
+        if ! terminate_process_tree "$DEV_PID" && [ "$exit_code" -eq 0 ]; then
+            exit_code=1
+        fi
         DEV_PID=""
     fi
     release_lock
@@ -226,10 +233,11 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap on_test_timeout ALRM
 
 servers_ready() {
-    curl -sf "http://localhost:$TEST_VITE_PORT/" > /dev/null 2>&1 && \
-        curl -sf "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1
+    curl -sf --connect-timeout 1 --max-time 5 "http://localhost:$TEST_VITE_PORT/" > /dev/null 2>&1 && \
+        curl -sf --connect-timeout 1 --max-time 5 "http://localhost:$TEST_SERVER_PORT/health" > /dev/null 2>&1
 }
 
 port_in_use() {
@@ -271,10 +279,13 @@ prepare_logs() {
 start_dev_servers() {
     echo "🔍 Checking that test ports are available..."
 
-    if ! command -v lsof > /dev/null 2>&1; then
-        echo "❌ lsof is required to verify that test ports are owned by this runner" >&2
-        return 1
-    fi
+    local required_command
+    for required_command in lsof pgrep ps; do
+        if ! command -v "$required_command" > /dev/null 2>&1; then
+            echo "❌ $required_command is required to verify test ports and owned processes" >&2
+            return 1
+        fi
+    done
 
     local occupied_ports=()
     if port_in_use "$TEST_VITE_PORT"; then
@@ -320,12 +331,39 @@ start_dev_servers() {
 
 contains_browser_path() {
     local arg
+    local path
+    local path_filter_found=false
+
+    # With no file filter Vitest discovers every test, including browser
+    # scenarios, so use their longer hook timeout.
+    if [ "$#" -eq 0 ]; then
+        return 0
+    fi
+
     for arg in "$@"; do
         case "$arg" in
-            *tests/integration/browser|*tests/integration/browser/*) return 0 ;;
+            -*) continue ;;
+        esac
+
+        path="${arg%/}"
+        path="${path#./}"
+        case "$path" in
+            ''|.|\
+            "$REPO_ROOT"|"$REPO_ROOT/tests"|"$REPO_ROOT/tests/integration"|\
+            tests|tests/integration|\
+            "$REPO_ROOT/tests/integration/browser"|"$REPO_ROOT/tests/integration/browser/"*|\
+            tests/integration/browser|tests/integration/browser/*)
+                return 0
+                ;;
+        esac
+        case "$path" in
+            tests/*|"$REPO_ROOT"/*|*.test.ts|*.spec.ts) path_filter_found=true ;;
         esac
     done
-    return 1
+
+    # Options such as --reporter do not narrow discovery. If there is no test
+    # path at all, Vitest can still discover the browser suite.
+    [ "$path_filter_found" = false ]
 }
 
 run_tests() {
@@ -355,8 +393,31 @@ run_tests() {
 
     VITEST_MAX_WORKERS=1 "${vitest_command[@]}" "${test_args[@]}" &
     TEST_PID=$!
+    TEST_TIMED_OUT=false
+    (
+        trap 'exit 0' INT TERM
+        sleep "$MAX_TEST_DURATION_SECONDS" &
+        watchdog_sleep_pid=$!
+        wait "$watchdog_sleep_pid" || exit 0
+        kill -ALRM "$$" 2>/dev/null || true
+    ) &
+    WATCHDOG_PID=$!
+
     wait "$TEST_PID"
     local exit_code=$?
+
+    if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
+        exit_code=1
+    fi
+
+    if [ "$TEST_TIMED_OUT" = true ]; then
+        echo "❌ Tests exceeded ${MAX_TEST_DURATION_SECONDS}s; terminating the owned test process tree" >&2
+        if terminate_process_tree "$TEST_PID"; then
+            TEST_PID=""
+        fi
+        return 124
+    fi
+
     TEST_PID=""
 
     if [ "$exit_code" -eq 0 ]; then

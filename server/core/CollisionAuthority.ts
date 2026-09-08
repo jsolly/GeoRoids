@@ -1,13 +1,13 @@
-import type { AsteroidData, SatelliteData } from '../../shared-types';
 import {
+  type CombatCircle,
   findShipAsteroidOverlaps,
   findShipShipPairs,
   isCombatantImmune,
   shipShipPairKey,
   shouldApplyShipShipTick,
-  type CombatCircle,
 } from '../../shared/combat';
 import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
+import type { AsteroidData, SatelliteData } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
 
 export function toCombatCircle(entity: GameEntity): CombatCircle {

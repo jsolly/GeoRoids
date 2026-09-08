@@ -2,19 +2,19 @@ import { expect, test } from 'vitest';
 import type { AsteroidData, AsteroidDestroyEvent } from '../../../shared-types';
 import type { AsteroidKinematicTarget } from '../../../src/network/services/asteroidFieldSync';
 import {
-  applyAsteroidKinematics,
   applyAsteroidFieldPartition,
+  applyAsteroidKinematics,
   applyAsteroidRowToBelt,
   asteroidHasSpawnPose,
-  bindAsteroidFieldApply,
   asteroidKinematicUpdates,
+  bindAsteroidFieldApply,
   createAsteroidFieldSyncScratch,
   notifyAsteroidDestroyed,
   partitionAsteroidSnapshot,
   shouldPreserveSeenAsteroidsOnJoin,
   shouldSnapAsteroidPose,
-  writeAsteroidKinematicUpdates,
   unbindAsteroidFieldApply,
+  writeAsteroidKinematicUpdates,
 } from '../../../src/network/services/asteroidFieldSync';
 
 function roid(id: string, x: number, y: number): AsteroidData {
@@ -143,7 +143,11 @@ test('an escaped local pose contains even when the server echo is also far', () 
 
 test('a lean first-seen row does not mark seen so a later full row can still create', () => {
   const seen = new Set<string>();
-  const lean = { id: 'server-asteroid-0', position: { x: 80, y: -12 }, rotation: 1.2 } as AsteroidData;
+  const lean = {
+    id: 'server-asteroid-0',
+    position: { x: 80, y: -12 },
+    rotation: 1.2,
+  } as AsteroidData;
   const first = partitionAsteroidSnapshot([lean], seen);
   expect(first.created).toEqual([]);
   expect(first.updated).toEqual([]);
@@ -187,7 +191,10 @@ test('lean kinematics without size do not invent a belt rock', () => {
 
 test('an unknown material in a snapshot is rejected before it can reach the belt', () => {
   const seen = new Set<string>();
-  const invalid = { ...roid('invalid-material', 80, -12), material: 'plasma' } as unknown as AsteroidData;
+  const invalid = {
+    ...roid('invalid-material', 80, -12),
+    material: 'plasma',
+  } as unknown as AsteroidData;
 
   const result = partitionAsteroidSnapshot([invalid], seen);
 

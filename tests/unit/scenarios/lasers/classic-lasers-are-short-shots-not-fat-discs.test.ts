@@ -41,12 +41,23 @@ const { recorder } = vi.hoisted(() => {
     },
   });
 
-  return { recorder: { lineTos, arcs, lineWidths, get fillCount() { return fillCount; }, reset() {
-    lineTos.length = 0;
-    arcs.length = 0;
-    lineWidths.length = 0;
-    fillCount = 0;
-  }, ctx } };
+  return {
+    recorder: {
+      lineTos,
+      arcs,
+      lineWidths,
+      get fillCount() {
+        return fillCount;
+      },
+      reset() {
+        lineTos.length = 0;
+        arcs.length = 0;
+        lineWidths.length = 0;
+        fillCount = 0;
+      },
+      ctx,
+    },
+  };
 });
 
 vi.mock('../../../../src/rendering/canvas', () => ({

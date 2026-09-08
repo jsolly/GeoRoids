@@ -17,51 +17,54 @@ type RenderedText = {
 };
 
 async function captureLeaderboardRow(page: import('playwright').Page): Promise<RenderedText[]> {
-  return page.evaluate(({ longName, wideScore }) => {
-    const win = window as typeof window & {
-      __leaderboardFillTextCalls?: RenderedText[];
-      __leaderboardFillTextInstalled?: boolean;
-    };
-    win.__leaderboardFillTextCalls = [];
-
-    if (!win.__leaderboardFillTextInstalled) {
-      const originalFillText = CanvasRenderingContext2D.prototype.fillText;
-      CanvasRenderingContext2D.prototype.fillText = function (
-        text: string,
-        x: number,
-        y: number,
-        maxWidth?: number
-      ): void {
-        if (typeof text === 'string' && (text.includes('…') || text === String(wideScore))) {
-          win.__leaderboardFillTextCalls?.push({
-            text,
-            x,
-            width: this.measureText(text).width,
-          });
-        }
-        originalFillText.call(this, text, x, y, maxWidth);
+  return page.evaluate(
+    ({ longName, wideScore }) => {
+      const win = window as typeof window & {
+        __leaderboardFillTextCalls?: RenderedText[];
+        __leaderboardFillTextInstalled?: boolean;
       };
-      win.__leaderboardFillTextInstalled = true;
-    }
+      win.__leaderboardFillTextCalls = [];
 
-    const gameController = (window as { gameController?: any }).gameController;
-    const local = gameController?.playerManager?.getLocalPlayer?.();
-    const players = gameController?.getNetworkManager?.().getAllPlayers?.() ?? [];
-    if (!local || players.length < 2) {
-      throw new Error('Leaderboard fixture requires a local player and at least one bot');
-    }
-
-    local.name = longName;
-    local.score = wideScore;
-    for (const player of players) {
-      if (player.id === local.id) {
-        player.name = longName;
-        player.score = wideScore;
+      if (!win.__leaderboardFillTextInstalled) {
+        const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+        CanvasRenderingContext2D.prototype.fillText = function (
+          text: string,
+          x: number,
+          y: number,
+          maxWidth?: number
+        ): void {
+          if (typeof text === 'string' && (text.includes('…') || text === String(wideScore))) {
+            win.__leaderboardFillTextCalls?.push({
+              text,
+              x,
+              width: this.measureText(text).width,
+            });
+          }
+          originalFillText.call(this, text, x, y, maxWidth);
+        };
+        win.__leaderboardFillTextInstalled = true;
       }
-    }
-    gameController.renderGame();
-    return win.__leaderboardFillTextCalls ?? [];
-  }, { longName: LONG_NAME, wideScore: WIDE_SCORE });
+
+      const gameController = (window as { gameController?: any }).gameController;
+      const local = gameController?.playerManager?.getLocalPlayer?.();
+      const players = gameController?.getNetworkManager?.().getAllPlayers?.() ?? [];
+      if (!local || players.length < 2) {
+        throw new Error('Leaderboard fixture requires a local player and at least one bot');
+      }
+
+      local.name = longName;
+      local.score = wideScore;
+      for (const player of players) {
+        if (player.id === local.id) {
+          player.name = longName;
+          player.score = wideScore;
+        }
+      }
+      gameController.renderGame();
+      return win.__leaderboardFillTextCalls ?? [];
+    },
+    { longName: LONG_NAME, wideScore: WIDE_SCORE }
+  );
 }
 
 async function verifyViewport(
@@ -92,33 +95,41 @@ async function verifyViewport(
   expect(existsSync(screenshotPath)).toBe(true);
 }
 
-test('long leaderboard names stay separated from scores on portrait and landscape play views', async () => {
-  await browserManager.recreatePage({ hasTouch: true });
-  const page = browserManager.getCurrentPage();
-  if (!page) throw new Error('Page not available');
+test(
+  'long leaderboard names stay separated from scores on portrait and landscape play views',
+  async () => {
+    await browserManager.recreatePage({ hasTouch: true });
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Page not available');
+    }
 
-  const consoleErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => consoleErrors.push(error.message));
+    const consoleErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => consoleErrors.push(error.message));
 
-  const game = new GameInteractions(page);
-  await game.bootGame({ waitForCombatReady: false });
-  await game.waitForBots(1);
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false });
+    await game.waitForBots(1);
 
-  await verifyViewport(
-    page,
-    390,
-    844,
-    screenshotManager.getScreenshotPath('leaderboard-long-name-mobile.png')
-  );
-  await verifyViewport(
-    page,
-    844,
-    390,
-    screenshotManager.getScreenshotPath('leaderboard-long-name-landscape.png')
-  );
+    await verifyViewport(
+      page,
+      390,
+      844,
+      screenshotManager.getScreenshotPath('leaderboard-long-name-mobile.png')
+    );
+    await verifyViewport(
+      page,
+      844,
+      390,
+      screenshotManager.getScreenshotPath('leaderboard-long-name-landscape.png')
+    );
 
-  expect(consoleErrors).toEqual([]);
-}, TestConfig.DEFAULT_TIMEOUT);
+    expect(consoleErrors).toEqual([]);
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);

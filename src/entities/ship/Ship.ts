@@ -622,18 +622,7 @@ class Ship {
       return;
     }
 
-    // Instrumentation for tests: trace damage handling when under test
-    const prevHealth = this.health;
     this.health = calculateHealthAfterDamage(this.health, amount, this.maxHealth);
-    if (process.env.NODE_ENV === 'test') {
-      // eslint-disable-next-line no-console
-      console.debug('SHIP', 'takeDamage', {
-        amount,
-        prevHealth,
-        newHealth: this.health,
-        maxHealth: this.maxHealth,
-      });
-    }
     this.lastDamageTime = GAME.FPS;
     this.healthRegenTimer = calculateHealthRegenDelayFrames();
 
@@ -662,7 +651,7 @@ class Ship {
     this.isCollidingWithPlayer = false;
     this.playerCollisionStartTime = 0;
     this.lastPlayerCollisionDamageTime = 0;
-    this.collidingPlayerId = undefined;
+    delete this.collidingPlayerId;
   }
 
   updatePlayerCollisionDamage(): void {

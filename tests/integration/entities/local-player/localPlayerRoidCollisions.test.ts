@@ -1,7 +1,7 @@
-import { expect, test, describe, beforeEach, vi, afterEach } from 'vitest';
-import { CollisionManager } from '../../../../src/physics/collision/CollisionManager';
-import { Ship } from '../../../../src/entities/ship/Ship';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Roid } from '../../../../src/entities/roid/Roid';
+import { Ship } from '../../../../src/entities/ship/Ship';
+import { CollisionManager } from '../../../../src/physics/collision/CollisionManager';
 
 // Mock NetworkManager for integration testing
 const mockSendMessage = vi.fn();
@@ -65,4 +65,3 @@ describe('Integration: Local player roid collisions', () => {
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 });
-

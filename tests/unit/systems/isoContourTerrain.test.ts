@@ -1,18 +1,24 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-
-import { PALETTE, VISUAL } from '../../../src/constants';
-import { GAME } from '../../../src/constants';
-import { applyVelocity } from '../../../src/entities/ship/ShipMovementManager';
-import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
-import { createHeightfield, sampleGradient, sampleHeight } from '../../../src/physics/terrain/heightfield';
-import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
-import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
-import { applyTerrainSeed, ensureTerrain, getTerrainSeed } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
-import { drawIsoContours } from '../../../src/rendering/contourRenderer';
-import { Point } from '../../../src/physics/Point';
 import { applyShipMotionFrame } from '../../../server/ai/shipMotion';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { GAME, PALETTE, VISUAL } from '../../../src/constants';
+import { applyVelocity } from '../../../src/entities/ship/ShipMovementManager';
+import { Point } from '../../../src/physics/Point';
+import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
+import {
+  createHeightfield,
+  sampleGradient,
+  sampleHeight,
+} from '../../../src/physics/terrain/heightfield';
+import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
+import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
+import {
+  applyTerrainSeed,
+  ensureTerrain,
+  getTerrainSeed,
+} from '../../../src/physics/terrain/terrainSession';
+import { canvasManager } from '../../../src/rendering/canvas';
+import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 

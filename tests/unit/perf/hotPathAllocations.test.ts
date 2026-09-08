@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-
+import type { AsteroidData } from '../../../shared-types';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
@@ -8,9 +8,11 @@ import {
   partitionAsteroidSnapshot,
 } from '../../../src/network/services/asteroidFieldSync';
 import { PlayerListCache } from '../../../src/network/services/playerListCache';
-import { fillSnapshotEntityIds, pruneStaleRemotePlayers } from '../../../src/network/services/playerPresence';
+import {
+  fillSnapshotEntityIds,
+  pruneStaleRemotePlayers,
+} from '../../../src/network/services/playerPresence';
 import { stepAsteroidMotionInto } from '../../../src/physics/asteroidMotion';
-import type { AsteroidData } from '../../../shared-types';
 
 function roid(id: string, x: number, y: number): AsteroidData {
   return {

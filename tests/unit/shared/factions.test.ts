@@ -1,6 +1,4 @@
 import { expect, test } from 'vitest';
-
-import { PALETTE } from '../../../src/constants';
 import {
   areAllied,
   areHostile,
@@ -11,6 +9,7 @@ import {
   pickBalancedFaction,
   pickBalancedFactionFromShips,
 } from '../../../shared/factions';
+import { PALETTE } from '../../../src/constants';
 
 test('side colors are muted mark hexes, not ownership mint or amber', () => {
   expect(FACTION_COLORS.ion).toBe('#A8A0C8');

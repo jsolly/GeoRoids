@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
-import { ROID } from '../../../src/constants';
 import type { AsteroidData } from '../../../shared-types';
+import { ROID } from '../../../src/constants';
 
 async function openSocket(port: number): Promise<WebSocket> {
   const ws = new WebSocket(`ws://localhost:${port}/ws`);
@@ -16,14 +16,25 @@ async function openSocket(port: number): Promise<WebSocket> {
 
 function waitForAsteroidId(ws: WebSocket): Promise<string> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Timed out waiting for asteroid creation')), 5000);
+    const timeout = setTimeout(
+      () => reject(new Error('Timed out waiting for asteroid creation')),
+      5000
+    );
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(String(raw));
-        const rows: AsteroidData[] = msg?.type === 'asteroidCreateBatch'
-          ? (msg.data?.asteroids ?? [])
-          : msg?.type === 'asteroidCreate' && msg.data?.asteroid ? [msg.data.asteroid] : [];
-        const asteroid = rows.find((rock) => !rock.isCollabTarget && rock.material === 'ice' && rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE);
+        const rows: AsteroidData[] =
+          msg?.type === 'asteroidCreateBatch'
+            ? (msg.data?.asteroids ?? [])
+            : msg?.type === 'asteroidCreate' && msg.data?.asteroid
+              ? [msg.data.asteroid]
+              : [];
+        const asteroid = rows.find(
+          (rock) =>
+            !rock.isCollabTarget &&
+            rock.material === 'ice' &&
+            rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE
+        );
         if (asteroid) {
           clearTimeout(timeout);
           resolve(asteroid.id);
@@ -157,15 +168,18 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     sendTrackedAsteroidReport(server, playerA, 'tag-player', asteroidId);
 
     await expect
-      .poll(() => {
-        const tagged = messages.find(
-          (msg) => msg?.type === 'asteroidTagged' && msg?.data?.asteroidId === asteroidId
-        );
-        const destroy = messages.find(
-          (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-        );
-        return Boolean(tagged && !destroy);
-      }, { timeout: 3000, interval: 25 })
+      .poll(
+        () => {
+          const tagged = messages.find(
+            (msg) => msg?.type === 'asteroidTagged' && msg?.data?.asteroidId === asteroidId
+          );
+          const destroy = messages.find(
+            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
+          );
+          return Boolean(tagged && !destroy);
+        },
+        { timeout: 3000, interval: 25 }
+      )
       .toBe(true);
 
     playerA.close();
@@ -206,15 +220,18 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     );
 
     await expect
-      .poll(() => {
-        const destroy = messages.find(
-          (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-        );
-        const splitBatch = messages.find(
-          (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
-        );
-        return destroy && destroy.data.collabSplit === false && !splitBatch;
-      }, { timeout: 3000, interval: 25 })
+      .poll(
+        () => {
+          const destroy = messages.find(
+            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
+          );
+          const splitBatch = messages.find(
+            (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
+          );
+          return destroy && destroy.data.collabSplit === false && !splitBatch;
+        },
+        { timeout: 3000, interval: 25 }
+      )
       .toBeTruthy();
 
     playerA.close();
@@ -246,15 +263,18 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
 
     await expect
-      .poll(() => {
-        const destroy = messages.find(
-          (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-        );
-        const splitBatch = messages.find(
-          (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
-        );
-        return destroy && destroy.data.collabSplit === false && !splitBatch;
-      }, { timeout: 3000, interval: 25 })
+      .poll(
+        () => {
+          const destroy = messages.find(
+            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
+          );
+          const splitBatch = messages.find(
+            (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
+          );
+          return destroy && destroy.data.collabSplit === false && !splitBatch;
+        },
+        { timeout: 3000, interval: 25 }
+      )
       .toBeTruthy();
 
     playerA.close();

@@ -4,11 +4,11 @@ import { logsWebSocketUrlFromGameplay } from '../../../src/utils/logsWebSocketUr
 test('production gameplay URL maps /ws onto Railway /logs', () => {
   expect(
     logsWebSocketUrlFromGameplay(
-      'wss://geoasteroids-production.up.railway.app/ws',
+      'wss://geoasteroids-production-2403.up.railway.app/ws',
       'www.georoids.com',
       true
     )
-  ).toBe('wss://geoasteroids-production.up.railway.app/logs');
+  ).toBe('wss://geoasteroids-production-2403.up.railway.app/logs');
 });
 
 test('without a gameplay URL, logs use the page host so Vite can proxy', () => {

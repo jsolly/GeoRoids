@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { SHIP } from '../../../src/constants';
 import {
-  GROWTH,
   applyLootMass,
   canCollectLoot,
+  GROWTH,
   lootOverlap,
   maxHealthFromMass,
   maxVelocityFromMass,
@@ -12,6 +11,7 @@ import {
   sizeScaleFromMass,
   thrustScaleFromMass,
 } from '../../../shared/shipGrowth';
+import { SHIP } from '../../../src/constants';
 
 describe('ship growth math', () => {
   test('base mass matches the stock hull and HP', () => {

@@ -44,9 +44,7 @@ test('a missed Hauler E does not lock the next tap behind cooldown', () => {
 });
 
 test('local Hauler still sends useAbility after a local latch', () => {
-  publishHarpoonField([
-    { id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } },
-  ]);
+  publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
   const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
   expect(ship.activateAbility()).toBe(true);
   expect(mockSendMessage).toHaveBeenCalledWith(

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas//schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -13,11 +13,13 @@
       "shared/**/*.{ts,tsx,json}",
       "shared-types.ts",
       "middleware.ts",
-      "tests/unit/release-id.test.ts",
-      "test/**/*.{ts,tsx,json}",
-      "api/**/*.{ts,tsx,json}",
+      "server/**/*.ts",
+      "server.ts",
+      "tests/**/*.{ts,tsx,json}",
+      "scripts/*.ts",
       "setup/**/*.{ts,tsx,json}",
-      "{package.json,tsconfig.json,biome.jsonc,vitest.config.ts,vite.config.ts,*.md,server.js}",
+      "{package.json,tsconfig*.json,biome.jsonc,vitest*.config.ts,vite.config.ts,*.md}",
+      "!tests/integration/browser/screenshots/**",
       "!**/node_modules/**/*"
     ]
   },
@@ -25,11 +27,15 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "complexity": {
+        // TypeScript requires bracket access for index signatures.
+        "useLiteralKeys": "off"
+      },
       "correctness": {
         "noUnusedVariables": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
+        "noExplicitAny": "error",
         "noConsole": {
           "level": "error",
           "options": {
@@ -43,6 +49,22 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["tests/**", "scripts/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "warn",
+            "noConsole": {
+              "level": "error",
+              "options": { "allow": ["log", "debug", "info", "warn", "error"] }
+            }
+          }
+        }
+      }
+    }
+  ],
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

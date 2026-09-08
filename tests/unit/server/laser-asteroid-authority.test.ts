@@ -1,11 +1,11 @@
 /* @vitest-environment node */
 import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
-import { createServerInstance } from '../../../server/createServer';
-import { GameEngine } from '../../../server/core/GameEngine';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
-import { ROID } from '../../../src/constants';
+import { GameEngine } from '../../../server/core/GameEngine';
+import { createServerInstance } from '../../../server/createServer';
 import type { AsteroidData } from '../../../shared-types';
+import { ROID } from '../../../src/constants';
 
 function mockWs(): WebSocket {
   return {
@@ -154,7 +154,10 @@ describe('Server laser↔asteroid authority', () => {
   test('server lasers skip the kits chip rock', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
-    isolateAsteroid(engine, asteroidAt('chip-rock', 50, { x: 100, y: 100 }, { isCollabTarget: true }));
+    isolateAsteroid(
+      engine,
+      asteroidAt('chip-rock', 50, { x: 100, y: 100 }, { isCollabTarget: true })
+    );
 
     engine.spawnLaser('p1', { x: 70, y: 100 }, { x: 40, y: 0 });
     const hits = engine.advanceLasersAndResolveHits();
@@ -224,7 +227,7 @@ describe('Client asteroid reports consume one tracked projectile', () => {
   }
 
   function spawnAtTarget(engine: GameEngine, asteroid: AsteroidData) {
-    const shot = engine.spawnHumanLaser( 'pilot', asteroid.position, { x: 0, y: 0 });
+    const shot = engine.spawnHumanLaser('pilot', asteroid.position, { x: 0, y: 0 });
     expect(shot).toBeDefined();
     return shot!;
   }
@@ -326,19 +329,23 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
       )
     );
 
-    const received: Array<{ type?: string; data?: { playerId?: string; score?: number; asteroidId?: string } }> = [];
+    const received: Array<{
+      type?: string;
+      data?: { playerId?: string; score?: number; asteroidId?: string };
+    }> = [];
     const collect = (raw: Buffer) => received.push(JSON.parse(String(raw)));
     wsA.on('message', collect);
     wsB.on('message', collect);
-    const joined = (ws: WebSocket) => new Promise<void>((resolve) => {
-      const listener = (raw: Buffer) => {
-        if (JSON.parse(String(raw)).type === 'joined') {
-          ws.off('message', listener);
-          resolve();
-        }
-      };
-      ws.on('message', listener);
-    });
+    const joined = (ws: WebSocket) =>
+      new Promise<void>((resolve) => {
+        const listener = (raw: Buffer) => {
+          if (JSON.parse(String(raw)).type === 'joined') {
+            ws.off('message', listener);
+            resolve();
+          }
+        };
+        ws.on('message', listener);
+      });
     const bothJoined = Promise.all([joined(wsA), joined(wsB)]);
     wsA.send(JSON.stringify({ type: 'join', id: 'player-a', name: 'Nova' }));
     wsB.send(JSON.stringify({ type: 'join', id: 'player-b', name: 'Retro' }));
@@ -362,9 +369,17 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
     wsA.send(JSON.stringify(payload));
     wsB.send(JSON.stringify({ ...payload, playerId: 'player-b' }));
     await new Promise<void>((resolve, reject) => {
-      const deadline = setTimeout(() => { clearInterval(poll); reject(new Error('TCP asteroid reports were not broadcast')); }, 2000);
+      const deadline = setTimeout(() => {
+        clearInterval(poll);
+        reject(new Error('TCP asteroid reports were not broadcast'));
+      }, 2000);
       const poll = setInterval(() => {
-        if (received.filter(message => message.type === 'asteroidDestroy' && message.data?.asteroidId === medium.id).length === 2) {
+        if (
+          received.filter(
+            (message) =>
+              message.type === 'asteroidDestroy' && message.data?.asteroidId === medium.id
+          ).length === 2
+        ) {
           clearInterval(poll);
           clearTimeout(deadline);
           resolve();

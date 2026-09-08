@@ -8,7 +8,10 @@ test('disconnecting one of two humans does not clear or pause the shared field',
   engine.addPlayer('peer-a', 'PeerA', {} as never);
   engine.addPlayer('peer-b', 'PeerB', {} as never);
 
-  const idsBefore = engine.getAllAsteroids().map((asteroid) => asteroid.id).sort();
+  const idsBefore = engine
+    .getAllAsteroids()
+    .map((asteroid) => asteroid.id)
+    .sort();
   expect(idsBefore.length).toBeGreaterThan(0);
   expect(engine.isGamePaused()).toBe(false);
 
@@ -16,7 +19,12 @@ test('disconnecting one of two humans does not clear or pause the shared field',
 
   expect(engine.isGamePaused()).toBe(false);
   expect(engine.getPlayerCount()).toBe(1);
-  expect(engine.getAllAsteroids().map((asteroid) => asteroid.id).sort()).toEqual(idsBefore);
+  expect(
+    engine
+      .getAllAsteroids()
+      .map((asteroid) => asteroid.id)
+      .sort()
+  ).toEqual(idsBefore);
 
   engine.removePlayer('peer-a');
   expect(engine.isGamePaused()).toBe(true);

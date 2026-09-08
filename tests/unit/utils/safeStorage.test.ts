@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { setSound } from '../../../src/audio/Sound';
 import { soundIsOn } from '../../../src/constants/user-preferences';
@@ -83,6 +83,27 @@ test('blocked get/set does not throw and keeps values in memory for the tab', ()
   expect(() => setStoredItem('currScore', '50')).not.toThrow();
   expect(() => getStoredItem('currScore')).not.toThrow();
   expect(getStoredItem('currScore')).toBe('50');
+});
+
+test('blocked storage reports a bounded warning without exposing keys or values', () => {
+  installStorage(throwingStorage());
+  resetSafeStorage();
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  try {
+    setStoredItem('private-session-token', 'secret-value');
+    getStoredItem('private-session-token');
+    removeStoredItem('private-session-token');
+
+    expect(warning).toHaveBeenCalledTimes(1);
+    const output = warning.mock.calls.flat().join(' ');
+    expect(output).not.toContain('private-session-token');
+    expect(output).not.toContain('secret-value');
+    expect(output).toContain('[STORAGE]');
+    expect(output).toContain('SecurityError');
+  } finally {
+    warning.mockRestore();
+  }
 });
 
 test('accessing localStorage itself throwing is treated as a fresh in-memory session', () => {

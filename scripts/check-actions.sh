@@ -16,6 +16,8 @@ cd "$ROOT"
 
 ACTIONLINT="$ROOT/node_modules/.bin/github-actionlint"
 SHELLCHECK_VERSION=v0.11.0
+DOWNLOAD_CONNECT_TIMEOUT_SECONDS=10
+DOWNLOAD_MAX_TIME_SECONDS=120
 
 if [[ ! -x "$ACTIONLINT" ]]; then
 	echo "✗ github-actionlint not found at $ACTIONLINT — run npm ci" >&2
@@ -35,6 +37,8 @@ work="$(mktemp -d "$cache/run.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 if [[ ! -f "$archive" ]]; then
   curl --fail --location --silent --show-error \
+    --connect-timeout "$DOWNLOAD_CONNECT_TIMEOUT_SECONDS" \
+    --max-time "$DOWNLOAD_MAX_TIME_SECONDS" \
     "https://github.com/koalaman/shellcheck/releases/download/$SHELLCHECK_VERSION/shellcheck-$SHELLCHECK_VERSION.$platform.tar.gz" \
     --output "$work/download.tar.gz"
   archive="$work/download.tar.gz"

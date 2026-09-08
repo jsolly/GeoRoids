@@ -1,19 +1,16 @@
 import { expect, test } from 'vitest';
-
+import { FACTION_COLORS } from '../../../shared/factions';
 import { DEBUG, PALETTE, ROID, SHIP, TITLE, VISUAL } from '../../../src/constants';
-import { getRoidStrokeWidth } from '../../../src/entities/roid/roidRenderer';
 import { Player } from '../../../src/entities/player/Player';
-import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import { getRoidStrokeWidth } from '../../../src/entities/roid/roidRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   applyLockedPaletteCss,
-  generateRandomPlayerColor,
   getFactionColor,
   getLaserColor,
-  getShipDisplayColor,
   hexToRgba,
 } from '../../../src/utils/colorUtils';
-import { FACTION_COLORS } from '../../../shared/factions';
 import { isDebugMode } from '../../../src/utils/debugUtils';
 
 test('locked palette hexes match the art-direction swatch', () => {
@@ -48,11 +45,11 @@ test('faction colors map local mint, remote sky, bot amber', () => {
 });
 
 test('hull display color stays ownership even when a side is assigned', () => {
-  expect(getShipDisplayColor({ type: 'local', faction: 'ember' })).toBe(PALETTE.LOCAL);
-  expect(getShipDisplayColor({ type: 'bot', faction: 'ion' })).toBe(PALETTE.BOT);
-  expect(getShipDisplayColor({ type: 'remote', faction: 'ion' })).toBe(PALETTE.REMOTE);
-  expect(getShipDisplayColor({ type: 'local', faction: 'ember' })).not.toBe(FACTION_COLORS.ember);
-  expect(getShipDisplayColor({ type: 'bot', faction: 'ion' })).not.toBe(FACTION_COLORS.ion);
+  expect(getFactionColor('local')).toBe(PALETTE.LOCAL);
+  expect(getFactionColor('bot')).toBe(PALETTE.BOT);
+  expect(getFactionColor('remote')).toBe(PALETTE.REMOTE);
+  expect(getFactionColor('local')).not.toBe(FACTION_COLORS.ember);
+  expect(getFactionColor('bot')).not.toBe(FACTION_COLORS.ion);
 });
 
 test('laser colors never use white', () => {
@@ -87,7 +84,6 @@ test('new players and ships default to faction colors instead of white', () => {
   expect(remote.color).toBe(PALETTE.REMOTE);
   expect(bot.color).toBe(PALETTE.BOT);
   expect(new Ship().color).toBe(PALETTE.LOCAL);
-  expect(generateRandomPlayerColor().toLowerCase()).not.toBe('#ffffff');
 });
 
 test('hexToRgba preserves locked hex channels', () => {

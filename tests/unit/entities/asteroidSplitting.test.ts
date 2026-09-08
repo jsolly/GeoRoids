@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, test } from 'vitest';
-import { AsteroidManager, isBiggestAsteroid } from '../../../server/core/AsteroidManager';
+import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { RNGService } from '../../../server/core/RNGService';
-import { ROID } from '../../../src/constants';
 import type { AsteroidData } from '../../../shared-types';
+import { ROID } from '../../../src/constants';
+import { isBiggestAsteroid } from '../../../src/entities/roid/roidScore';
 
-function makeAsteroid(overrides: Partial<AsteroidData> & Pick<AsteroidData, 'id' | 'size'>): AsteroidData {
+function makeAsteroid(
+  overrides: Partial<AsteroidData> & Pick<AsteroidData, 'id' | 'size'>
+): AsteroidData {
   return {
     position: { x: 400, y: 300 },
     velocity: { x: 1, y: 1 },

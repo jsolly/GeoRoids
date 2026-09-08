@@ -29,7 +29,7 @@ describe('Game clock catch-up after a hitch', () => {
   test('a hitch during explode still finishes death→respawn in the catch-up', () => {
     const ws = {} as any;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
-    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: undefined });
+    engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'boundary', 100);
 
     engine.stepClock(0);

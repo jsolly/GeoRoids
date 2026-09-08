@@ -11,15 +11,15 @@ import {
   isShieldBlockingLasers,
   laserCollisionRadius,
   maybeActivateBotShield,
-  noteShieldLaserHit,
   noteReadableShieldLaserHit,
+  noteShieldLaserHit,
   requestShield,
   resolveCombatDamageSource,
-  shouldBlockDamage,
   shieldCooldownFrames,
-  shieldFlashFrames,
   shieldDurationFrames,
+  shieldFlashFrames,
   shieldSnapshot,
+  shouldBlockDamage,
   updateShield,
 } from '../../../src/entities/ship/shipShield';
 

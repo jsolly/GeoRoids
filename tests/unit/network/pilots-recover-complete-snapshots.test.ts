@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { captureSnapshot, encodeSnapshot, SnapshotDecoder, type SnapshotBaseline } from '../../../shared/snapshotProtocol';
+import {
+  captureSnapshot,
+  encodeSnapshot,
+  type SnapshotBaseline,
+  SnapshotDecoder,
+} from '../../../shared/snapshotProtocol';
 import { snapshotFixture } from './snapshotFixture';
 
 describe('pilots reconstruct complete authoritative worlds', () => {
@@ -24,27 +29,51 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         pilot.shieldTime = 30 - tick;
       }
       if (tick >= 30 && tick < 60) {
-        pilot.health = 0; pilot.exploding = true; pilot.lives = 2;
-        pilot.respawnTimer = 60 - tick; pilot.deathCause = 'boundary';
+        pilot.health = 0;
+        pilot.exploding = true;
+        pilot.lives = 2;
+        pilot.respawnTimer = 60 - tick;
+        pilot.deathCause = 'boundary';
       }
       pilot.fuel = tick < 70 ? 50 - tick / 2 : 80;
-      if (tick >= 80) { world.entities.pop(); world.loot = []; }
-      if (tick >= 100) { world.asteroids = []; }
+      if (tick >= 80) {
+        world.entities.pop();
+        world.loot = [];
+      }
+      if (tick >= 100) {
+        world.asteroids = [];
+      }
       if (tick >= 45 && tick < 65) {
-        world.satellites[0]!.exploding = true; world.satellites[0]!.health = 0;
-        world.satelliteProjectiles = world.satelliteProjectiles.filter(shot => shot.satelliteId !== 'eo-0');
+        world.satellites[0]!.exploding = true;
+        world.satellites[0]!.health = 0;
+        world.satelliteProjectiles = world.satelliteProjectiles.filter(
+          (shot) => shot.satelliteId !== 'eo-0'
+        );
       }
       if (tick === 25) {
-        world.asteroids[0]!.material = 'metal'; world.asteroids[0]!.health = 25;
-        world.asteroids[0]!.offsets = [1, 0.6, 1.1, 0.8]; world.asteroids[0]!.vertices = 4;
+        world.asteroids[0]!.material = 'metal';
+        world.asteroids[0]!.health = 25;
+        world.asteroids[0]!.offsets = [1, 0.6, 1.1, 0.8];
+        world.asteroids[0]!.vertices = 4;
       }
-      if (tick >= 130) { world.satellites = []; world.satelliteProjectiles = []; world.satellitePickups = []; }
+      if (tick >= 130) {
+        world.satellites = [];
+        world.satelliteProjectiles = [];
+        world.satellitePickups = [];
+      }
       // New fields and collections cannot be dropped by a stale codec whitelist.
-      const extended = Object.assign(world, { futureFeature: { active: tick < 50, value: [tick, null] }, futureNpcs: [{ id: 'eo', pattern: 'fan', shots: tick < 60 ? ['a', 'b'] : [] }] });
+      const extended = Object.assign(world, {
+        futureFeature: { active: tick < 50, value: [tick, null] },
+        futureNpcs: [{ id: 'eo', pattern: 'fan', shots: tick < 60 ? ['a', 'b'] : [] }],
+      });
       const state = captureSnapshot(extended);
       const frame = encodeSnapshot(state, tick + 1, tick % 90 ? baseline : undefined);
-      if (frame.kind === 'delta') { deltas++; }
-      expect(decoder.decode(JSON.parse(JSON.stringify(frame)))).toEqual(JSON.parse(JSON.stringify(extended)));
+      if (frame.kind === 'delta') {
+        deltas++;
+      }
+      expect(decoder.decode(JSON.parse(JSON.stringify(frame)))).toEqual(
+        JSON.parse(JSON.stringify(extended))
+      );
       baseline = { sequence: tick + 1, state };
     }
     expect(deltas).toBeGreaterThan(100);
@@ -72,13 +101,33 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const next = captureSnapshot(snapshotFixture(1));
     const delta = encodeSnapshot(next, 2, { sequence: 1, state });
     expect(() => decoder.decode({ ...delta, sequence: 3 })).toThrow(/baseline/);
-    expect(() => decoder.decode({ version: 1, sequence: 2, kind: 'delta', baseline: 1, patch: { set: {}, clear: [], collections: { entities: { add: [], update: [['pilot-0', { health: 'invalid' }, []]], remove: [] } } } })).toThrow(/DTO/);
+    expect(() =>
+      decoder.decode({
+        version: 1,
+        sequence: 2,
+        kind: 'delta',
+        baseline: 1,
+        patch: {
+          set: {},
+          clear: [],
+          collections: {
+            entities: { add: [], update: [['pilot-0', { health: 'invalid' }, []]], remove: [] },
+          },
+        },
+      })
+    ).toThrow(/DTO/);
     const invalidReference = captureSnapshot(snapshotFixture(2));
     invalidReference.satelliteProjectiles[0]!.satelliteId = 'missing-eo';
     expect(() => decoder.decode(encodeSnapshot(invalidReference, 2))).toThrow(/references/);
     expect(decoder.decode(delta)).toEqual(next);
     expect(() => decoder.decode(delta)).toThrow(/Stale/);
-    expect(() => decoder.decode(JSON.parse('{"version":1,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}'))).toThrow(/Unsafe/);
+    expect(() =>
+      decoder.decode(
+        JSON.parse(
+          '{"version":1,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}'
+        )
+      )
+    ).toThrow(/Unsafe/);
     expect(decoder.decode(encodeSnapshot(state, 50))).toEqual(state);
     decoder.reset();
     expect(() => decoder.decode(delta)).toThrow(/baseline/);
@@ -95,6 +144,8 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     applied.entities[0]!.position.x = -800;
     const changed = captureSnapshot(snapshotFixture());
     changed.gameTime = 1;
-    expect(decoder.decode(encodeSnapshot(changed, 2, { sequence: 1, state: captured }))).toEqual(changed);
+    expect(decoder.decode(encodeSnapshot(changed, 2, { sequence: 1, state: captured }))).toEqual(
+      changed
+    );
   });
 });

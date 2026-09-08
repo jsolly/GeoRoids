@@ -29,14 +29,12 @@ describe('server-authoritative health regeneration', () => {
 
   test('uses the ship tuning for one-frame rate and post-damage delay', () => {
     expect(calculateHealthRegenPerFrame()).toBe(SHIP.HEALTH_REGEN_RATE / GAME.FPS);
-    expect(calculateHealthRegenDelayFrames()).toBe(
-      Math.ceil(SHIP.HEALTH_REGEN_DELAY * GAME.FPS)
-    );
+    expect(calculateHealthRegenDelayFrames()).toBe(Math.ceil(SHIP.HEALTH_REGEN_DELAY * GAME.FPS));
   });
 
   test('human damage waits for the delay and then heals without exceeding max health', () => {
     const pilot = engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
-    pilot.spawnProtectionTimer = undefined;
+    delete pilot.spawnProtectionTimer;
 
     engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     expect(pilot.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
@@ -56,7 +54,7 @@ describe('server-authoritative health regeneration', () => {
 
   test('a repeated hit resets the same regeneration timer', () => {
     const pilot = engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
-    pilot.spawnProtectionTimer = undefined;
+    delete pilot.spawnProtectionTimer;
 
     engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     tick(engine, calculateHealthRegenDelayFrames() - 1);
@@ -76,14 +74,11 @@ describe('server-authoritative health regeneration', () => {
     const ws = {} as WebSocket;
     const core = new WebSocketCore(engine);
     const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: 0, y: 0 });
-    pilot.spawnProtectionTimer = undefined;
+    delete pilot.spawnProtectionTimer;
     engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     const delay = pilot.healthRegenTimer;
 
-    core.handleClientMessage(
-      { type: 'update', id: pilot.id, data: { healthRegenTimer: 0 } },
-      ws
-    );
+    core.handleClientMessage({ type: 'update', id: pilot.id, data: { healthRegenTimer: 0 } }, ws);
     expect(pilot.healthRegenTimer).toBe(delay);
 
     pilot.lives = 0;
@@ -97,7 +92,7 @@ describe('server-authoritative health regeneration', () => {
     engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
     const bot = engine.createBots(1)?.[0];
     expect(bot).toBeDefined();
-    bot!.spawnProtectionTimer = undefined;
+    delete bot!.spawnProtectionTimer;
 
     engine.handleBotDamage(bot!.id, 'asteroid', DAMAGE.LASER_HIT);
     const damagedHealth = bot!.health;

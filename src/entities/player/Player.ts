@@ -84,7 +84,12 @@ export class Player {
     this.name = params.name;
     this.type = params.type;
     this.input = params.input;
-    this.factionId = parseSoftFactionId(params.factionId);
+    const factionIdValue = parseSoftFactionId(params.factionId);
+    if (factionIdValue !== undefined) {
+      this.factionId = factionIdValue;
+    } else {
+      delete this.factionId;
+    }
 
     this.color = getFactionColor(this.type);
 
@@ -94,9 +99,13 @@ export class Player {
       isBot: this.type === 'bot',
       isLocalPlayer: this.type === 'local',
       frictionCoefficient: this.getFrictionCoefficient(),
-      kitId: params.kitId,
+      ...(params.kitId !== undefined ? { kitId: params.kitId } : {}),
     });
-    this.ship.factionId = this.factionId;
+    if (this.factionId !== undefined) {
+      this.ship.factionId = this.factionId;
+    } else {
+      delete this.ship.factionId;
+    }
     this.networkState = {
       position: this.ship.position,
       velocity: this.ship.velocity,
@@ -151,8 +160,17 @@ export class Player {
       this.ship.color = color;
     }
     if (data.factionId !== undefined) {
-      this.factionId = parseSoftFactionId(data.factionId);
-      this.ship.factionId = this.factionId;
+      const factionIdValue = parseSoftFactionId(data.factionId);
+      if (factionIdValue !== undefined) {
+        this.factionId = factionIdValue;
+      } else {
+        delete this.factionId;
+      }
+      if (this.factionId !== undefined) {
+        this.ship.factionId = this.factionId;
+      } else {
+        delete this.ship.factionId;
+      }
     }
     if (data.spawnProtectionTimer !== undefined) {
       this.serverSpawnProtectionTimer = data.spawnProtectionTimer;
@@ -218,13 +236,14 @@ export class Player {
     }
 
     const skipHudReset = isSilentHudReset(this.lives, this.score, data.lives, data.score);
+    const snapshotDeathCause = this.deathCause ?? data.deathCause;
     const staleSnapshot =
       isLocal &&
       data.lives !== undefined &&
       isStaleGameOverSnapshot({
         prevLives: this.lives,
         nextLives: data.lives,
-        deathCause: this.deathCause ?? data.deathCause,
+        ...(snapshotDeathCause !== undefined ? { deathCause: snapshotDeathCause } : {}),
         health: data.health ?? this.ship.health,
         exploding: data.exploding ?? this.ship.exploding,
       });
@@ -311,8 +330,8 @@ export class Player {
           this.ship.health > 0 &&
           (data.health === undefined || data.health > 0)
         ) {
-          this.ship.lastExplodeCause = undefined;
-          this.deathCause = undefined;
+          delete this.ship.lastExplodeCause;
+          delete this.deathCause;
         }
         if (
           this.ship.health > 0 &&
@@ -437,8 +456,8 @@ export class Player {
     this.ship.velocity.x = 0;
     this.ship.velocity.y = 0;
 
-    this.deathCause = undefined;
-    this.ship.lastExplodeCause = undefined;
+    delete this.deathCause;
+    delete this.ship.lastExplodeCause;
     applyShipSpawnProtection(this.ship);
     clearShield(this.ship);
 

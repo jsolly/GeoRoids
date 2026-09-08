@@ -104,7 +104,14 @@ describe('satellite pickup collection', () => {
     ship.spawnProtectionTimer = 180;
     CollisionManager.getInstance().checkPlayerSatellitePickupCollisions(
       { ship, id: 'local-player-123', type: 'local' },
-      [makePickup({ id: 'second-pickup', name: 'Relay', typeId: 'relay', assetKey: 'pickup/relay' })]
+      [
+        makePickup({
+          id: 'second-pickup',
+          name: 'Relay',
+          typeId: 'relay',
+          assetKey: 'pickup/relay',
+        }),
+      ]
     );
     expect(mockSendMessage).toHaveBeenCalledWith({
       type: 'satellitePickupCollected',
@@ -113,8 +120,8 @@ describe('satellite pickup collection', () => {
   });
 
   test('a ship overlapping a pickup hull collides', () => {
-    expect(
-      checkShipCollision({ x: 10, y: 0 }, 15, { x: 0, y: 0 }, SATELLITE_PICKUP.SIZE / 2)
-    ).toBe(true);
+    expect(checkShipCollision({ x: 10, y: 0 }, 15, { x: 0, y: 0 }, SATELLITE_PICKUP.SIZE / 2)).toBe(
+      true
+    );
   });
 });

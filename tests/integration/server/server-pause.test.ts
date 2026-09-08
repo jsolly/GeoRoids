@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocketServer } from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 
@@ -6,12 +6,10 @@ describe('Server pause functionality', () => {
   let wss: WebSocketServer;
   let gameEngine: GameEngine;
 
-
   beforeAll(async () => {
     // Create a test server
     wss = new WebSocketServer({ port: 0 });
 
-    
     // Create game engine
     gameEngine = new GameEngine();
     gameEngine.startGameLoop();
@@ -33,11 +31,11 @@ describe('Server pause functionality', () => {
     const asteroids = gameEngine.createAsteroids(5);
     expect(asteroids.length).toBe(5);
     expect(gameEngine.getAsteroidCount()).toBe(5);
-    
+
     // Game should still be paused (no players)
     gameEngine.updatePauseState();
     expect(gameEngine.isGamePaused()).toBe(true);
-    
+
     // Asteroids should persist
     expect(gameEngine.getAsteroidCount()).toBe(5);
   });
@@ -46,10 +44,10 @@ describe('Server pause functionality', () => {
     // Simulate adding a player
     const mockWs = {} as any;
     const player = gameEngine.addPlayer('test-player', 'TestPlayer', mockWs);
-    
+
     expect(player).toBeDefined();
     expect(gameEngine.isGamePaused()).toBe(false);
-    
+
     // Asteroids should still exist
     expect(gameEngine.getAsteroidCount()).toBe(5);
   });

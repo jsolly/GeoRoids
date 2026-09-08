@@ -18,7 +18,10 @@ manifest="$dest/.worktreeinclude"
 # The first `worktree` entry in --porcelain output is the primary checkout. Strip the
 # fixed `worktree ` prefix rather than field-splitting — the path is verbatim and may
 # contain spaces, which `awk '{print $2}'` would truncate.
-primary="$(git worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' | head -n1)"
+if ! primary="$(git worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' | head -n1)"; then
+  echo "worktree-init: could not inspect Git worktrees; skipping optional provisioning" >&2
+  exit 0
+fi
 [ -n "$primary" ] || exit 0
 [ "$primary" = "$dest" ] && exit 0  # running in the primary itself; nothing to copy
 
@@ -36,8 +39,15 @@ while IFS= read -r line || [ -n "$line" ]; do
   for src in "$primary"/$line; do                     # glob-expand against the primary
     [ -e "$src" ] || continue                         # tolerate zero matches
     rel="${src#"$primary"/}"
-    mkdir -p "$dest/$(dirname "$rel")"
-    cp -p "$src" "$dest/$rel" && echo "worktree-init: copied $rel" >&2
+    if ! mkdir -p "$dest/$(dirname "$rel")"; then
+      echo "worktree-init: could not create destination for '$rel'; continuing without optional copy" >&2
+      continue
+    fi
+    if cp -p "$src" "$dest/$rel"; then
+      echo "worktree-init: copied $rel" >&2
+    else
+      echo "worktree-init: failed to copy '$rel'; continuing without optional copy" >&2
+    fi
   done
 done < "$manifest"
 

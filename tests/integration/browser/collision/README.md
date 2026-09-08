@@ -1,26 +1,19 @@
-# Collision Tests
+# Browser collision scenarios
 
-This folder contains browser integration tests for collision detection and handling.
+Follow [the test-writing guide](../../../AGENTS.ms) and
+[browser execution guidance](../README.md).
 
-## Test Files
+Arrange an identified attacker and target through the local test controls. Use
+real input or a real simulation update for the hit, then observe the exact
+victim, damage, destruction, split, or credited score. Entity presence, movement,
+and screenshots alone do not prove a collision happened.
 
-- **botAsteroidCollisions.test.ts** - Tests bot collision with asteroids, including damage application and bot destruction
-- **laserCollisions.test.ts** - Tests laser collision with asteroids, including asteroid destruction and splitting
+Keep one canonical scenario per outcome. Observe short-lived projectiles and
+notifications before triggering the action, and use bounded waits for the
+corresponding authoritative event or rendered change.
 
-## Test Coverage
+Run from the repository root:
 
-- Bot-asteroid collision damage
-- Bot destruction on collision
-- Laser-asteroid collision detection
-- Asteroid destruction from laser hits
-- Collision-based asteroid splitting
-- Network communication for collision events
-
-## Dependencies
-
-These tests use the browser test infrastructure:
-
-- BrowserManager for browser automation
-- ScreenshotManager for test documentation
-- GameInteractions for game control
-- HealthChecker for server health validation
+```bash
+./scripts/test-runner.sh tests/integration/browser/collision/ --reporter=verbose
+```

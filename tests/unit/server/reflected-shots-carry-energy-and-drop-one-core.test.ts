@@ -2,23 +2,37 @@
 import { describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
-import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { GameEngine } from '../../../server/core/GameEngine';
-import type { AsteroidData } from '../../../shared-types';
+import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
+import {
+  ASTEROID_INTERACTIONS,
+  previewChargedReflections,
+} from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
-import { ASTEROID_INTERACTIONS, previewChargedReflections } from '../../../shared/asteroidPhenomena';
+import type { AsteroidData } from '../../../shared-types';
 
 function arena() {
   const engine = new GameEngine(419);
   const ws = { readyState: WebSocket.OPEN, send: () => undefined } as unknown as WebSocket;
   const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, undefined, 'dart', 'ion');
-  pilot.spawnProtectionTimer = undefined;
+  delete pilot.spawnProtectionTimer;
   engine.enableAsteroidInteractions(pilot);
-  for (const rock of engine.getAllAsteroids()) engine.removeAsteroid(rock.id);
+  for (const rock of engine.getAllAsteroids()) {
+    engine.removeAsteroid(rock.id);
+  }
   const reflector: AsteroidData = {
-    id: 'reflector', position: { x: 0, y: 0 }, velocity: { x: 0, y: 0 },
-    size: 32, jaggedness: 0, rotation: Math.PI / 4, angularVelocity: 0,
-    health: 75, maxHealth: 75, vertices: 4, offsets: [1, 1, 1, 1], material: 'metal',
+    id: 'reflector',
+    position: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    size: 32,
+    jaggedness: 0,
+    rotation: Math.PI / 4,
+    angularVelocity: 0,
+    health: 75,
+    maxHealth: 75,
+    vertices: 4,
+    offsets: [1, 1, 1, 1],
+    material: 'metal',
     phenomenon: { kind: 'reflective', clusterId: 'cluster', energy: 0, maxEnergy: 6 },
   };
   engine.addAsteroid(reflector);
@@ -26,8 +40,12 @@ function arena() {
 }
 
 function snapshot(engine: GameEngine) {
-  return captureSnapshot({ ...engine.getGameState(), playerProjectiles: engine.getPlayerProjectiles(),
-    satelliteProjectiles: [], collabTags: [] });
+  return captureSnapshot({
+    ...engine.getGameState(),
+    playerProjectiles: engine.getPlayerProjectiles(),
+    satelliteProjectiles: [],
+    collabTags: [],
+  });
 }
 
 describe('reflected shots remain authoritative across snapshots and resource collection', () => {
@@ -55,18 +73,32 @@ describe('reflected shots remain authoritative across snapshots and resource col
     engine.advanceLasersAndResolveHits();
     expect(shot.bounces).toBe(1);
     const blocker: AsteroidData = {
-      ...reflector, id: 'off-path-rock', size: 1, material: 'ice', phenomenon: undefined,
-      position: { x: (shot.prevPosition.x + shot.position.x) / 2,
-        y: (shot.prevPosition.y + shot.position.y) / 2 },
+      ...reflector,
+      id: 'off-path-rock',
+      size: 1,
+      material: 'ice',
+      position: {
+        x: (shot.prevPosition.x + shot.position.x) / 2,
+        y: (shot.prevPosition.y + shot.position.y) / 2,
+      },
     };
+    delete blocker.phenomenon;
     // This tiny rock is on the false start/end chord, outside both actual legs.
     engine.addAsteroid(blocker);
     const before = structuredClone(shot);
     const charge = reflector.phenomenon?.energy;
     const handler = new MessageHandler(engine, new GameStateBroadcaster(engine));
-    handler.handleMessage({ type: 'shoot', id: pilot.id, data: {
-      laserStart: { ...pilot.position }, laserDirection: { x: 0, y: -5 },
-    } }, ws);
+    handler.handleMessage(
+      {
+        type: 'shoot',
+        id: pilot.id,
+        data: {
+          laserStart: { ...pilot.position },
+          laserDirection: { x: 0, y: -5 },
+        },
+      },
+      ws
+    );
     expect(engine.getServerLasers()).toHaveLength(2);
     expect(shot).toEqual(before);
     expect(engine.getAsteroid(blocker.id)?.health).toBe(75);
@@ -80,7 +112,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
       engine.advanceLasersAndResolveHits();
     }
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
-    const cores = engine.getLoot().filter(drop => drop.kind === 'laserCore');
+    const cores = engine.getLoot().filter((drop) => drop.kind === 'laserCore');
     expect(cores).toHaveLength(1);
     const score = pilot.score;
     engine.handleAsteroidHit(reflector.id, pilot.id);
@@ -108,7 +140,9 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(pilot.health).toBe(initial);
     direct.hasExploded = true;
     const reflected = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 })!;
-    for (let index = 0; index < 4; index++) engine.advanceLasersAndResolveHits();
+    for (let index = 0; index < 4; index++) {
+      engine.advanceLasersAndResolveHits();
+    }
     expect(reflected.hasExploded).toBe(true);
     expect(pilot.health).toBe(initial - 25 * 1.5);
   });
@@ -116,9 +150,17 @@ describe('reflected shots remain authoritative across snapshots and resource col
   test("a departed pilot's direct shot still protects allies but becomes dangerous after a real reflection", () => {
     const { engine, pilot, ws } = arena();
     const ally = engine.addPlayer('ally', 'Ally', ws, { x: -100, y: 0 }, undefined, 'dart', 'ion');
-    const enemy = engine.addPlayer('enemy', 'Enemy', ws, { x: -100, y: 200 }, undefined, 'dart', 'ember');
-    ally.spawnProtectionTimer = undefined;
-    enemy.spawnProtectionTimer = undefined;
+    const enemy = engine.addPlayer(
+      'enemy',
+      'Enemy',
+      ws,
+      { x: -100, y: 200 },
+      undefined,
+      'dart',
+      'ember'
+    );
+    delete ally.spawnProtectionTimer;
+    delete enemy.spawnProtectionTimer;
     const allyHealth = ally.health;
     const enemyHealth = enemy.health;
     const returning = engine.spawnLaser(pilot.id, { x: -150, y: 0 }, { x: 40, y: 0 })!;
@@ -130,8 +172,12 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(returning.bounces).toBe(0);
     expect(enemy.health).toBe(enemyHealth - 25);
     expect(hostile.hasExploded).toBe(true);
-    expect(snapshot(engine).playerProjectiles?.find(row => row.id === returning.id)).not.toHaveProperty('ownerFaction');
-    for (let frame = 0; frame < 6; frame++) engine.advanceLasersAndResolveHits();
+    expect(
+      snapshot(engine).playerProjectiles?.find((row) => row.id === returning.id)
+    ).not.toHaveProperty('ownerFaction');
+    for (let frame = 0; frame < 6; frame++) {
+      engine.advanceLasersAndResolveHits();
+    }
     expect(returning.bounces).toBe(1);
     expect(returning.hasExploded).toBe(true);
     expect(ally.health).toBe(allyHealth - 25 * 1.5);
@@ -140,10 +186,18 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test('the aim preview ends at the same energy threshold as the actual upgraded shot', () => {
     const { engine, reflector } = arena();
-    if (reflector.phenomenon?.kind !== 'reflective') throw new Error('fixture');
+    if (reflector.phenomenon?.kind !== 'reflective') {
+      throw new Error('fixture');
+    }
     reflector.phenomenon.energy = 4;
     const normal = previewChargedReflections({ x: -50, y: 0 }, { x: 1, y: 0 }, [reflector], 200, 1);
-    const upgraded = previewChargedReflections({ x: -50, y: 0 }, { x: 1, y: 0 }, [reflector], 200, 2);
+    const upgraded = previewChargedReflections(
+      { x: -50, y: 0 },
+      { x: 1, y: 0 },
+      [reflector],
+      200,
+      2
+    );
     expect(normal.segments).toHaveLength(2);
     expect(upgraded.segments).toHaveLength(1);
     expect(upgraded.termination).toBe('blocked');
@@ -160,7 +214,9 @@ describe('reflected shots remain authoritative across snapshots and resource col
     pilot.laserUpgrade = { charges: 4, expiresAt: Date.now() - 1 };
     engine.tickAbilities();
     expect(pilot.laserUpgrade).toBeUndefined();
-    expect(snapshot(engine).entities.find(entity => entity.id === pilot.id)?.laserUpgrade).toBeUndefined();
+    expect(
+      snapshot(engine).entities.find((entity) => entity.id === pilot.id)?.laserUpgrade
+    ).toBeUndefined();
     expect(engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 })?.energy).toBe(1);
   });
 

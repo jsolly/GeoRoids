@@ -1,53 +1,48 @@
-# Browser Integration Tests
+# Browser scenarios
 
-This directory contains integration tests that require a real browser environment to run.
+Browser tests verify real input, rendered state, HUD feedback, and multiplayer
+flows. Prefer a short arrange/action/outcome sequence over a general-purpose
+combat script. Shared mechanics and exhaustive edge cases belong in deterministic
+unit or server tests; see the [test-level guide](../README.md).
 
-## Test Types
+## Run
 
-- **End-to-end tests**: Full game functionality tests that run in a browser
-- **Visual regression tests**: Tests that capture screenshots and verify UI behavior
-- **User interaction tests**: Tests that simulate real user interactions (clicks, keyboard, etc.)
+From the GeoRoids checkout:
 
-## Requirements
-
-These tests require:
-
-- Unused configured test ports; `scripts/test-runner.sh` starts and owns the Vite and WebSocket services
-- A browser environment (Playwright/Puppeteer)
-
-## Running Tests
-
-```bash
-# Run all browser integration tests
+```sh
 npm run test:integration:browser
-
-# Run specific browser test
-npm run test:integration:browser -- sanity/sanity.test.ts
+./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose
 ```
 
-## Test Organization
+The runner requires unused configured ports and an installed Playwright Chromium
+browser. It starts and owns both services. Do not start a second runner or attach
+tests to a developer's existing game server.
 
-Tests are organized into logical folders:
+## Arrange a controlled scene
 
-### `/collision/`
+Use `createBrowserScenarioHooks` for a clean world and fresh pages. Use
+`GameInteractions.placeShipAt` for fixture positioning: it updates the server
+through the local `/test/place-player` control and waits for the client's motion
+epoch acknowledgment. Ordinary gameplay packets still obey movement validation.
+The fixture route is loopback-only and returns 404 in production.
 
-- **botAsteroidCollisions.test.ts** - Bot collision with asteroids
-- **laserCollisions.test.ts** - Laser collision with asteroids
+Choose explicit hostile/friendly participants and isolate the interaction from
+unrelated actors. After setup, use real input and the normal simulation. Do not
+write the expected damage, score, death, or pickup into the fixture.
 
-### `/laser/`
+Observe a specific target and result: the same shot on both clients, the exact
+victim's health change, a credited kill, or the matched drop disappearing on
+collection. Watch transient banners/events before triggering the action. Poll
+for snapshots with deadlines instead of assuming an arbitrary delay is enough.
 
-- **laserCommunication.test.ts** - Laser firing and network communication
-- **laserNetworkFlow.test.ts** - Complete network flow for laser events
-- **laserServerLogs.test.ts** - Server-side logging for laser events
+## Organization and evidence
 
-### `/roid/`
+- `sanity/`: startup, controls, responsive UI, release changes, and asteroid tools.
+- `e2e/`: complete player and multiplayer scenarios.
+- `collision/`: browser-visible combat outcomes.
+- `laser/`: real firing input and shared projectile trajectories and cleanup.
+- `roid/`: asteroid destruction, cooperative splitting, and collectible drops.
 
-- **roidSplitting.test.ts** - Roid splitting behavior on collision
-
-### `/sanity/`
-
-- **sanity.test.ts** - Core game functionality and visual regression tests
-
-## Screenshots
-
-The `screenshots/` directory contains captured screenshots from visual regression tests.
+Name each file for its scenario. Keep one canonical test for a behavior and
+remove redundant or weaker copies when consolidating it. Screenshots in
+`screenshots/` help diagnose failures; they do not establish success by themselves.

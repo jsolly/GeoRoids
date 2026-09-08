@@ -105,8 +105,8 @@ export function clearHarpoonLatch(
   host: Pick<AbilityHost, 'harpoonTimer' | 'harpoonTargetId' | 'harpoonLatchPos'>
 ): void {
   host.harpoonTimer = 0;
-  host.harpoonTargetId = undefined;
-  host.harpoonLatchPos = undefined;
+  delete host.harpoonTargetId;
+  delete host.harpoonLatchPos;
 }
 
 /** Rocks + ships share one latch list. Server and client use the same helper. */
@@ -204,7 +204,12 @@ export function applySharedHarpoonLatch(
   if (snapshot.harpoonTimer !== undefined && snapshot.harpoonTimer > 0) {
     host.harpoonTimer = snapshot.harpoonTimer;
     if (snapshot.harpoonTargetId !== undefined) {
-      host.harpoonTargetId = snapshot.harpoonTargetId || undefined;
+      const harpoonTargetIdValue = snapshot.harpoonTargetId || undefined;
+      if (harpoonTargetIdValue !== undefined) {
+        host.harpoonTargetId = harpoonTargetIdValue;
+      } else {
+        delete host.harpoonTargetId;
+      }
     }
     rememberLatchPos(host, snapshot);
     return;
@@ -216,10 +221,15 @@ export function applySharedHarpoonLatch(
     host.harpoonTimer = snapshot.harpoonTimer;
   }
   if (snapshot.harpoonTargetId !== undefined) {
-    host.harpoonTargetId = snapshot.harpoonTargetId || undefined;
+    const harpoonTargetIdValue = snapshot.harpoonTargetId || undefined;
+    if (harpoonTargetIdValue !== undefined) {
+      host.harpoonTargetId = harpoonTargetIdValue;
+    } else {
+      delete host.harpoonTargetId;
+    }
   }
   if (host.harpoonTimer <= 0) {
-    host.harpoonTargetId = undefined;
+    delete host.harpoonTargetId;
   }
 }
 
@@ -348,17 +358,18 @@ export function diagnoseHarpoonLatch(host: AbilityHost, world?: AbilityWorld): H
       reason = 'out-of-range';
     }
     if (!nearest || gap < nearest.gap) {
-      nearest = { id: body.id, dist, gap, reason };
+      nearest = { ...(body.id !== undefined ? { id: body.id } : {}), dist, gap, reason };
     }
   }
+  const targetId = findHarpoonTarget(host, candidates, range)?.id;
   return {
     kitId: host.kitId,
     canActivate: canActivateAbility(host),
     fieldCount: candidates.length,
     scale,
     range,
-    targetId: findHarpoonTarget(host, candidates, range)?.id,
-    nearest,
+    ...(targetId !== undefined ? { targetId } : {}),
+    ...(nearest !== undefined ? { nearest: nearest } : {}),
   };
 }
 
@@ -482,7 +493,11 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       return { activated: false };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
-    host.harpoonTargetId = target.id;
+    if (target.id !== undefined) {
+      host.harpoonTargetId = target.id;
+    } else {
+      delete host.harpoonTargetId;
+    }
     host.harpoonTimer = SHIP_ABILITY.HARPOON_FRAMES;
     host.abilityActiveFrames = SHIP_ABILITY.HARPOON_FRAMES;
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };

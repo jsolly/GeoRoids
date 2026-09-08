@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { Laser } from '../../../src/entities/laser/Laser';
-import { Ship } from '../../../src/entities/ship/Ship';
+import type { Laser } from '../../../src/entities/laser/Laser';
+import type { Ship } from '../../../src/entities/ship/Ship';
 import { CollisionManager } from '../../../src/physics/collision/CollisionManager';
 
 const mockSendMessage = vi.fn();

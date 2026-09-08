@@ -64,24 +64,29 @@ describe('Server scoring via satellitePickupCollected', () => {
       })
     );
 
-    const collected = await new Promise<{ score: number; pickupName: string }>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timed out waiting for collect')), 5000);
-      let score = -1;
-      ws.on('message', (raw) => {
-        try {
-          const msg = JSON.parse(String(raw));
-          if (msg?.type === 'scoreUpdate' && msg?.data?.playerId === playerId) {
-            score = msg.data.score;
+    const collected = await new Promise<{ score: number; pickupName: string }>(
+      (resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out waiting for collect')), 5000);
+        let score = -1;
+        ws.on('message', (raw) => {
+          try {
+            const msg = JSON.parse(String(raw));
+            if (msg?.type === 'scoreUpdate' && msg?.data?.playerId === playerId) {
+              score = msg.data.score;
+            }
+            if (msg?.type === 'satellitePickupCollected' && msg?.data?.playerId === playerId) {
+              clearTimeout(timeout);
+              resolve({
+                score: score >= 0 ? score : msg.data.scoreBonus,
+                pickupName: msg.data.pickupName,
+              });
+            }
+          } catch {
+            // ignore parse errors from unrelated frames
           }
-          if (msg?.type === 'satellitePickupCollected' && msg?.data?.playerId === playerId) {
-            clearTimeout(timeout);
-            resolve({ score: score >= 0 ? score : msg.data.scoreBonus, pickupName: msg.data.pickupName });
-          }
-        } catch {
-          // ignore parse errors from unrelated frames
-        }
-      });
-    });
+        });
+      }
+    );
 
     expect(collected.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(collected.pickupName).toMatch(/Echo|Relay/);

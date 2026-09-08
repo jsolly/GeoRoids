@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { canDrawAsteroid, rocksForPlayfieldZoom } from '../../../src/entities/roid/roidRenderer';
 import type { Roid } from '../../../src/entities/roid/Roid';
+import { canDrawAsteroid, rocksForPlayfieldZoom } from '../../../src/entities/roid/roidRenderer';
 
 test('a finite pose with offsets is drawable', () => {
   expect(

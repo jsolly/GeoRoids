@@ -3,9 +3,13 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { GAME, SHIP } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
-import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { keyDown, keyUp, reconcilePlayerInput } from '../../../src/input/keybindings';
-import { applyStickSample, setTouchFire, tickTouchControls } from '../../../src/input/touchControls';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import {
+  applyStickSample,
+  setTouchFire,
+  tickTouchControls,
+} from '../../../src/input/touchControls';
 import { readStickSample } from '../../../src/input/touchStick';
 
 const TURN = ((SHIP.TURN_SPEED / 180) * Math.PI) / GAME.FPS;

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { playSplitSound, synthesizeSplitCrack } from '../../../src/audio/splitSound';
 import * as explosionSound from '../../../src/audio/explosionSound';
-import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 import { bindGameAudio, resetGameAudio } from '../../../src/audio/spatialAudio';
+import { playSplitSound, synthesizeSplitCrack } from '../../../src/audio/splitSound';
+import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 
 describe('collab split sound', () => {
   beforeEach(() => {

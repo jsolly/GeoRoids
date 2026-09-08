@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
 import {
-  LOOT_BLAST,
   blastPush,
   inBlastRadius,
   inLootArmRange,
   isSmallRoid,
+  LOOT_BLAST,
 } from '../../../shared/lootBlast';
 import { PALETTE } from '../../../src/constants';
 import { lootStrokeColor } from '../../../src/entities/loot/lootRenderer';

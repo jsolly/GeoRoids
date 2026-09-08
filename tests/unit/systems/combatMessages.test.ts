@@ -26,10 +26,10 @@ describe('shared combat network messages', () => {
       type: 'asteroidDestroyed',
       data: { asteroidId: 'roid-1', playerId: 'p1', points: ROID.POINTS_LARGE, cause: 'laser' },
     });
-    expect(asteroidDestroyedMessage('roid-1', 'p1', 20).data).toMatchObject({
+    expect(asteroidDestroyedMessage('roid-1', 'p1', 20)['data']).toMatchObject({
       points: ROID.POINTS_MEDIUM,
     });
-    expect(asteroidDestroyedMessage('roid-1', 'p1', 10).data).toMatchObject({
+    expect(asteroidDestroyedMessage('roid-1', 'p1', 10)['data']).toMatchObject({
       points: ROID.POINTS_SMALL,
     });
   });

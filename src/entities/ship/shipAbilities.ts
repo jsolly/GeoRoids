@@ -1,5 +1,5 @@
 import { areAllied } from '../../../shared/factions';
-import { trySpendTrackedEmpFuel } from '../../../shared/fuel';
+import { type FuelTank, trySpendEmpFuel } from '../../../shared/fuel';
 import type { AsteroidMotionState, Position, SoftFactionId, Velocity } from '../../../shared-types';
 import {
   findHarpoonFieldBody,
@@ -10,7 +10,7 @@ import {
 } from './harpoonField';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId, type ShipKitId } from './shipKits';
 
-export interface AbilityHost {
+export interface AbilityHost extends FuelTank {
   id?: string;
   kitId: ShipKitId;
   factionId?: SoftFactionId;
@@ -27,8 +27,6 @@ export interface AbilityHost {
   harpoonLatchPos?: Position;
   asteroidMotion?: AsteroidMotionState;
   r?: number;
-  fuel?: number;
-  maxFuel?: number;
 }
 
 export interface AbilityBody {
@@ -477,7 +475,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
   const resolved = resolveAbilityWorld(world);
 
   // Quake shock is the live EMP. Empty tank refuses; other kits stay free.
-  if (kit.abilityId === 'shockPulse' && !trySpendTrackedEmpFuel(host)) {
+  if (kit.abilityId === 'shockPulse' && !trySpendEmpFuel(host)) {
     return { activated: false };
   }
 

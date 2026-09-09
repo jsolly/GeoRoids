@@ -114,6 +114,21 @@ describe('shared ship collision immunity', () => {
     expect(isShipCollisionImmune({ exploding: false, health: 100, blinkCount: 0 })).toBe(false);
   });
 
+  test('a local pilot starts protected while a remote hull waits for server protection', () => {
+    const local = new Ship({ isLocalPlayer: true });
+    const remote = new Ship();
+
+    expect(local.blinkCount).toBe(
+      Math.ceil(SHIP.INVINCIBILITY_DURATION_FRAMES / SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES)
+    );
+    expect(local.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES);
+    expect(local.blinkOn).toBe(true);
+    expect(isShipCollisionImmune(local)).toBe(true);
+    expect(remote.blinkCount).toBe(0);
+    expect(remote.spawnProtectionTimer).toBe(0);
+    expect(isShipCollisionImmune(remote)).toBe(false);
+  });
+
   test('applyShipSpawnProtection arms the same blink window for any ship', () => {
     const ship = new Ship();
     applyShipSpawnProtection(ship);

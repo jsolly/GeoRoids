@@ -84,7 +84,7 @@ export class EntityFactory {
   }
 
   createEmptyRoidBelt(): RoidBelt {
-    return new RoidBelt(false);
+    return new RoidBelt();
   }
 
   // Laser creation method

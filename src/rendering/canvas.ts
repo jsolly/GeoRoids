@@ -1,11 +1,5 @@
 import type { Position } from '../../shared-types';
 import { PALETTE } from '../constants';
-import {
-  CANVAS_DEFAULT_CENTER_X,
-  CANVAS_DEFAULT_CENTER_Y,
-  CANVAS_INTERNAL_HEIGHT,
-  CANVAS_INTERNAL_WIDTH,
-} from '../constants/canvas';
 import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
@@ -151,30 +145,6 @@ class CanvasManager {
     return this.context;
   }
 
-  // Coordinate scaling utilities for dynamic canvas sizes
-  getScaleX(): number {
-    return this.canvas ? this.canvas.width / CANVAS_INTERNAL_WIDTH : 1;
-  }
-
-  getScaleY(): number {
-    return this.canvas ? this.canvas.height / CANVAS_INTERNAL_HEIGHT : 1;
-  }
-
-  scaleX(x: number): number {
-    return x * this.getScaleX();
-  }
-
-  scaleY(y: number): number {
-    return y * this.getScaleY();
-  }
-
-  getCanvasCenter(): { x: number; y: number } {
-    return {
-      x: this.canvas ? this.canvas.width / 2 : CANVAS_DEFAULT_CENTER_X,
-      y: this.canvas ? this.canvas.height / 2 : CANVAS_DEFAULT_CENTER_Y,
-    };
-  }
-
   getPlayfieldScale(): number {
     return PLAYFIELD_CLOSE_SCALE;
   }
@@ -209,21 +179,6 @@ class CanvasManager {
       x: (screenPos.x - this.canvas.width / 2) / scale + shipPos.x,
       y: (screenPos.y - this.canvas.height / 2) / scale + shipPos.y,
     };
-  }
-
-  isWorldPositionVisible(worldPos: Position, shipPos: Position, margin: number = 100): boolean {
-    if (!this.canvas) {
-      // Fallback to true if canvas is not available
-      return true;
-    }
-
-    const screenPos = this.worldToScreenInto(this.screenPos, worldPos, shipPos);
-    return (
-      screenPos.x >= -margin &&
-      screenPos.x <= this.canvas.width + margin &&
-      screenPos.y >= -margin &&
-      screenPos.y <= this.canvas.height + margin
-    );
   }
 
   // Game rendering method that draws all game elements

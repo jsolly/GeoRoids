@@ -32,7 +32,7 @@ Local gate before push: `npm run gate` (full working-tree checks, including an e
 
 Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDOMAIN). The live client is **georoids.com**.
 
-**Server changes** (`server.ts`, `server/**`, `railway.json`, or server-facing changes in `shared-types.ts`):
+**Server changes** (`server.ts`, `server/**`, or server-facing changes in `shared-types.ts`):
 
 1. Complete client verification above if the push also touched client files.
 2. Deploy manually on [Railway](https://railway.app) (linked GitHub repo or Railway CLI).
@@ -73,10 +73,13 @@ Local dev: `VITE_WEBSOCKET_URL=ws://localhost:3001/ws` in `.env.local` (see `.en
 
 | | |
 | --- | --- |
-| **Config** | `railway.json` (Nixpacks, `tsx server.ts`, healthcheck `/health`) |
+| **Config owner** | Railway service settings (Railpack build). Keep the server start and health/restart settings below aligned with the service. |
+| **Start command** | `node_modules/.bin/tsx server.ts` |
+| **Healthcheck** | Path `/health`, timeout `300` seconds |
+| **Restart policy** | `ON_FAILURE`, maximum retries `10` |
 | **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
 | **Deploy** | Manual / separate from the Git push flow — Railway dashboard or CLI |
-| **When required** | Changes under `server.ts`, `server/**`, `railway.json`, or server protocol changes in `shared-types.ts` |
+| **When required** | Changes under `server.ts`, `server/**`, or server protocol changes in `shared-types.ts`; service-setting changes require a separate Railway update |
 
 Smoke: `curl -i https://geoasteroids-production-2403.up.railway.app/health`. The server exposes `RAILWAY_GIT_COMMIT_SHA` as `x-release-id` and health JSON `releaseId`; `dev` is local-only and never production proof.
 
@@ -133,7 +136,7 @@ Asteroids and bots live on the server; clients render snapshots. Clients still s
 
 - `src/core/gameController.ts` — top-level lifecycle (`newGame`, `startGame`, `setupNetworkDisconnectionHandler`).
 - `src/core/eventLoop.ts` — render/update loop.
-- `src/entities/{player,ship,roid,laser,bot}/` — entity classes + per-entity managers/renderers. `ShipMovementManager` and `ShipCombatManager` split ship behavior.
+- `src/entities/{player,ship,roid,laser,bot}/` — entity classes + per-entity managers/renderers. `Ship` owns client movement using `shipUtils`; server bots advance through `server/ai/shipMotion.ts`. `shipAbilities` and `shipShield` own abilities and shield behavior.
 - `src/physics/collision/{CollisionManager,collisionDetection}.ts` — collision system.
 - `src/network/networkManager.ts` + `services/ConnectionManager.ts` — WS lifecycle, reconnection, message dispatch.
 - `src/rendering/{canvas,boundaryRenderer,hud/}` — canvas + HUD; `GameController.renderGame` calls `canvasManager.drawGame`.

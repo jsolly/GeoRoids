@@ -99,7 +99,3 @@ export function handleMouseUp(ev: MouseEvent, player: Player): void {
 export function preventContextMenu(ev: MouseEvent): void {
   ev.preventDefault();
 }
-
-export function isRightClickThrustActive(): boolean {
-  return controlSources.mouseThrust;
-}

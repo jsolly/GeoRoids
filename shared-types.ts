@@ -169,29 +169,6 @@ export interface AsteroidData {
   spinClass?: 'natural' | 'charged';
 }
 
-export interface BotData {
-  id: string;
-  name: string;
-  position: Position;
-  velocity: Velocity;
-  angle: number;
-  exploding: boolean;
-  thrusting: boolean;
-  color: string;
-  lives: number;
-  health: number;
-  maxHealth: number;
-  fuel?: number;
-  maxFuel?: number;
-  kitId?: ShipKitId;
-  factionId?: SoftFactionId;
-  mass?: number;
-  shieldActive?: boolean;
-  shieldTime?: number;
-  shieldCooldown?: number;
-  shieldFlashTime?: number;
-}
-
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; fuel fills the EMP tank. */
 export type LootKind = 'shard' | 'wreckage' | 'fuel' | 'laserCore';
 
@@ -258,32 +235,6 @@ export interface SatellitePickupCollected {
   pickupName: 'Echo' | 'Relay';
   scoreBonus: number;
   shieldFrames: number;
-}
-
-// Server game state structure (what the server actually sends)
-export interface ServerPlayerData {
-  id: string;
-  name: string;
-  position: Position;
-  velocity: Velocity;
-  rotation: number;
-  angularVelocity: number;
-  lives: number;
-  score: number;
-  exploding: boolean;
-  thrusting: boolean;
-  color: string;
-  health: number;
-  maxHealth: number;
-  fuel?: number;
-  maxFuel?: number;
-  respawnTimer?: number;
-  kitId?: ShipKitId;
-  factionId?: SoftFactionId;
-  shieldActive?: boolean;
-  shieldTime?: number;
-  shieldCooldown?: number;
-  shieldFlashTime?: number;
 }
 
 /** Server-owned collab tag. Clients must not destroy the roid until asteroidDestroy. */

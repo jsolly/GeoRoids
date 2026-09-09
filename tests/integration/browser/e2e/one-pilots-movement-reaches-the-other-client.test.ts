@@ -7,7 +7,7 @@ import { TestConfig } from '../../utils/test-config';
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
 test(
-  'remote player ship is visible to other clients',
+  'a second pilot moves and the first client receives the changed position',
   async () => {
     const { game1, game2 } = await bootTwoClientGames(browserManager);
 
@@ -25,13 +25,13 @@ test(
       'client 1 should have an initial position for the remote ship'
     ).not.toBeNull();
 
-    await game2.moveShip('up', 1200);
-    await game2.runGameFrames(30);
+    await game2.holdMovementKey('ArrowUp', 1200);
+    await game2.waitForAnimationFrames(30);
 
     await expect
       .poll(
         async () => {
-          await game1.runGameFrames(10);
+          await game1.waitForAnimationFrames(10);
           const remotePos = await game1.getNetworkPlayerPosition(targetId);
           const remoteHealth = await game1.getPlayerHealthById(targetId);
           if (!remotePos || !startPosOnClient1) {

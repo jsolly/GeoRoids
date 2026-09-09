@@ -4,7 +4,6 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { stepReleasedMotion } from '../../../shared/asteroidMotion';
 import { GAME, PALETTE, VISUAL } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { applyVelocity } from '../../../src/entities/ship/ShipMovementManager';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import {
   createHeightfield,
@@ -152,31 +151,36 @@ describe('ships feel the slope', () => {
     expect(velocity.y).toBeCloseTo(1, 6);
   });
 
-  test('player and bot movement both apply the shared slope helper', () => {
-    const peak = steepestSample(TERRAIN.DEFAULT_SEED);
-    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const player = {
-      position: { x: peak.x, y: peak.y },
-      velocity: { x: 0, y: 0 },
-      angle: 0,
-      angularVelocity: 0,
-      thrusting: false,
-      thrusterActive: false,
-      frictionCoefficient: GAME.FRICTION,
-    };
+  test('a coasting pilot and authoritative bot drift equally downhill', () => {
+    const field = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+    const start = { x: BOUNDS.radius / 2, y: 0 };
+    const player = new Ship({ position: { ...start }, isLocalPlayer: true });
+    player.mass = 1;
+    player.velocity = { x: 0, y: 0 };
+    player.thrusting = false;
+    player.blinkCount = 0;
+    player.spawnProtectionTimer = 0;
     const bot = {
-      position: { x: peak.x, y: peak.y },
+      position: { ...start },
       velocity: { x: 0, y: 0 },
-      angle: 0,
+      angle: player.angle,
       thrusting: false,
+      mass: player.mass,
     };
 
-    applyVelocity(player);
-    applyShipMotionFrame(bot);
+    for (let frame = 0; frame < 60; frame++) {
+      player.move();
+      applyShipMotionFrame(bot);
+    }
 
+    expect(sampleHeight(field, player.position.x, player.position.y)).toBeLessThan(
+      sampleHeight(field, start.x, start.y)
+    );
+    expect(Math.hypot(player.velocity.x, player.velocity.y)).toBeGreaterThan(0);
+    expect(bot.position.x).toBeCloseTo(player.position.x, 10);
+    expect(bot.position.y).toBeCloseTo(player.position.y, 10);
     expect(bot.velocity.x).toBeCloseTo(player.velocity.x, 10);
     expect(bot.velocity.y).toBeCloseTo(player.velocity.y, 10);
-    expect(Math.hypot(player.velocity.x, player.velocity.y)).toBeGreaterThan(0);
   });
 });
 

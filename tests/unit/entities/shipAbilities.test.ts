@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
+import { FUEL } from '../../../src/constants';
 import {
   bindHarpoonFieldSource,
   harpoonBodyFromRock,
@@ -35,6 +36,8 @@ function host(kitId: AbilityHost['kitId']): AbilityHost {
     abilityActiveFrames: 0,
     shieldTimer: 0,
     harpoonTimer: 0,
+    fuel: FUEL.START,
+    maxFuel: FUEL.MAX,
   };
 }
 

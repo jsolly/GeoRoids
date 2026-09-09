@@ -39,13 +39,6 @@ export const SPAWN = {
 // ============================================================================
 export const CANVAS = {
   INTERNAL_WIDTH: 800,
-  INTERNAL_HEIGHT: 600,
-  DEFAULT_CENTER_X: 400,
-  DEFAULT_CENTER_Y: 300,
-
-  // Text rendering
-  TEXT_SIZE: 40,
-  TEXT_FADE_TIME: 2.5,
 } as const;
 
 // ============================================================================
@@ -272,9 +265,6 @@ export const ROID = {
   // Production density; DEBUG.ROIDS.INITIAL_COUNT may override this only
   // when debug mode is explicitly enabled.
   INITIAL_ROID_COUNT: 20,
-  MIN_COUNT: 5,
-  MAX_COUNT: 20,
-  SPAWN_TIME_FRAMES: 180, // 3 seconds at 60 FPS
 
   // Shared moving belt. The ship-kill wall is ~3100px; a 1080p camera around a
   // center-spawned ship only sees ~960×540. Opposite-side wrap at the wall

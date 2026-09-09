@@ -1,7 +1,5 @@
 import type { FactionId } from '../shared-types';
 
-export const FACTION_IDS = ['ion', 'ember'] as const;
-
 /**
  * Mark/label hexes only — never hull stroke.
  * #5EEAD4 (local) and #FB923C (bot) stay ownership/role colors in PALETTE.
@@ -15,10 +13,6 @@ export const FACTION_LABELS: Record<FactionId, string> = {
   ion: 'ION',
   ember: 'EMBER',
 };
-
-export function isFactionId(value: unknown): value is FactionId {
-  return value === 'ion' || value === 'ember';
-}
 
 export function getSideColor(faction: FactionId): string {
   return FACTION_COLORS[faction];

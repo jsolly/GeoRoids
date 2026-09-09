@@ -414,6 +414,60 @@ describe('Asteroid destruction over real sockets', () => {
     wsB.close();
   });
 
+  test('a legacy client ram report cannot destroy an asteroid or award points', async () => {
+    server = createServerInstance({ port: 0, nodeEnv: 'test', requireEnhancedClient: false });
+    server.gameEngine.stopGameLoop();
+    server.wsCore.stopPeriodicGameStateBroadcast();
+    const ws = new WebSocket(`ws://127.0.0.1:${await server.listening}/ws`);
+    const received: { type: string; data: unknown }[] = [];
+    const errors: unknown[] = [];
+    ws.on('message', (raw) => {
+      try {
+        const message: unknown = JSON.parse(String(raw));
+        assert.ok(typeof message === 'object' && message !== null);
+        assert.ok('type' in message && typeof message.type === 'string');
+        assert.ok('data' in message);
+        received.push({ type: message.type, data: message.data });
+      } catch (error) {
+        errors.push(error);
+      }
+    });
+    await once(ws, 'open', { signal: AbortSignal.timeout(2000) });
+    const barrier = async () => {
+      const pong = once(ws, 'pong', { signal: AbortSignal.timeout(2000) });
+      ws.ping();
+      await pong;
+    };
+    ws.send(JSON.stringify({ type: 'join', id: 'ram-reporter', name: 'Ram reporter' }));
+    await barrier();
+    expect(received.filter((message) => message.type === 'joined')).toHaveLength(1);
+    const pilot = server.gameEngine.getPlayer('ram-reporter');
+    assert.ok(pilot);
+    const asteroid = asteroidAt('server-owned-ice', 50, { x: 800, y: 800 }, { material: 'ice' });
+    const before = structuredClone(asteroid);
+    isolateAsteroid(server.gameEngine, asteroid);
+    const scoreBefore = pilot.score;
+    received.length = 0;
+
+    ws.send(
+      JSON.stringify({
+        type: 'asteroidDestroyed',
+        asteroidId: asteroid.id,
+        playerId: pilot.id,
+        points: ROID.POINTS_LARGE,
+        cause: 'collision',
+        laserPosition: { ...asteroid.position },
+      })
+    );
+    await barrier();
+
+    expect(errors).toEqual([]);
+    expect(received.filter((message) => message.type === 'scoreUpdate')).toEqual([]);
+    expect(received.filter((message) => message.type === 'asteroidDestroy')).toEqual([]);
+    expect(server.gameEngine.getAsteroid(asteroid.id)).toEqual(before);
+    expect(pilot.score).toBe(scoreBefore);
+  });
+
   test.each([
     { size: 'medium', radius: 20, points: ROID.POINTS_MEDIUM, shots: 1 },
     { size: 'large', radius: 40, points: ROID.POINTS_LARGE, shots: 2 },

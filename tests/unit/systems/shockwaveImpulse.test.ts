@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { describe, expect, test } from 'vitest';
 import { SHOCKWAVE } from '../../../src/constants';
 import {
@@ -29,9 +30,9 @@ describe('collab-split shockwave impulse', () => {
       radius: 150,
       impulse: 4,
     });
-    expect(impulse).toBeTruthy();
-    expect(impulse!.x).toBeGreaterThan(0);
-    expect(impulse!.y).toBeCloseTo(0);
+    assert.ok(impulse);
+    expect(impulse.x).toBeGreaterThan(0);
+    expect(impulse.y).toBeCloseTo(0);
   });
 
   test('bodies outside the wave are left alone', () => {
@@ -56,17 +57,17 @@ describe('collab-split shockwave impulse', () => {
       origin,
       wave
     );
-    expect(crumb).toBeTruthy();
-    expect(giant).toBeTruthy();
-    expect(Math.abs(crumb!.x)).toBeGreaterThan(Math.abs(giant!.x));
+    assert.ok(crumb);
+    assert.ok(giant);
+    expect(Math.abs(crumb.x)).toBeGreaterThan(Math.abs(giant.x));
   });
 
   test('the heavy wave hits harder than the fast wave at the same range', () => {
     const body = { position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 }, size: 12 };
     const fast = applyShockwaveToBody(body, { x: 0, y: 0 }, SHOCKWAVE.FAST);
     const heavy = applyShockwaveToBody(body, { x: 0, y: 0 }, SHOCKWAVE.HEAVY);
-    expect(fast).toBeTruthy();
-    expect(heavy).toBeTruthy();
-    expect(Math.abs(heavy!.x)).toBeGreaterThan(Math.abs(fast!.x));
+    assert.ok(fast);
+    assert.ok(heavy);
+    expect(Math.abs(heavy.x)).toBeGreaterThan(Math.abs(fast.x));
   });
 });

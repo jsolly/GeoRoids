@@ -37,6 +37,7 @@ import { SatellitePickupManager } from '../../entities/satellitePickup/Satellite
 import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
+import { updateThrustFromKeys } from '../../input/keybindings';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { setClientLogContext } from '../../utils/clientLogContext';
@@ -1219,6 +1220,15 @@ export class ConnectionManager {
         entity.updateFromServer(entityData);
         if (isLocalPlayer && this.asteroidInteractions) {
           this.motionPrediction.rebase(entityData, entity.ship, Date.now(), data.asteroids);
+          if (
+            entity.type === 'local' &&
+            entity.ship.health > 0 &&
+            !entity.ship.exploding &&
+            entity.lives > 0
+          ) {
+            // The snapshot echoes older input; keep the pilot's current held controls.
+            updateThrustFromKeys(entity);
+          }
           entity.ship.serverOwnsMotion = this.motionPrediction.shouldSuppressShipMove();
           window.dispatchEvent(
             new CustomEvent('asteroidToolsSnapshot', {

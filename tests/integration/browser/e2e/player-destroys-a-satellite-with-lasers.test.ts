@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { SATELLITE } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
@@ -20,7 +21,8 @@ test(
 
     const satellites = await game.getSatellites();
     expect(satellites.length).toBeGreaterThan(0);
-    const target = satellites[0]!;
+    const target = satellites[0];
+    assert.ok(target, 'Satellite target missing');
     const scoreBefore = await game.getScore();
 
     const result = await game.attackSatelliteWithLasers(target.id, 10);

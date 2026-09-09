@@ -1,6 +1,6 @@
 /* @vitest-environment node */
+import { strict as assert } from 'node:assert';
 import { describe, expect, test } from 'vitest';
-import WebSocket from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
@@ -10,10 +10,11 @@ import {
 } from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 function arena() {
   const engine = new GameEngine(419);
-  const ws = { readyState: WebSocket.OPEN, send: () => undefined } as unknown as WebSocket;
+  const ws = new RecordingSocket();
   const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, undefined, 'dart', 'ion');
   delete pilot.spawnProtectionTimer;
   engine.enableAsteroidInteractions(pilot);
@@ -51,14 +52,16 @@ function snapshot(engine: GameEngine) {
 describe('reflected shots remain authoritative across snapshots and resource collection', () => {
   test('a flat face reverses one shot and fractional energy survives the actual snapshot validator', () => {
     const { engine, reflector } = arena();
-    const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 })!;
+    const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
+    assert.ok(shot, 'initial reflected shot');
     engine.advanceLasersAndResolveHits();
     expect(shot.velocity.x).toBeCloseTo(-40);
     expect(shot.velocity.y).toBeCloseTo(0);
     expect(shot.bounces).toBe(1);
     expect(shot.energy).toBe(1.5);
     expect(snapshot(engine).playerProjectiles?.[0]?.energy).toBe(1.5);
-    const next = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 })!;
+    const next = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
+    assert.ok(next, 'second reflected shot');
     next.energy = 1.5;
     engine.advanceLasersAndResolveHits();
     expect(reflector.phenomenon?.kind === 'reflective' && reflector.phenomenon.energy).toBe(2.5);
@@ -69,7 +72,8 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test('another shot never replays the chord of an already resolved ricochet', () => {
     const { engine, pilot, ws, reflector } = arena();
-    const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 20 })!;
+    const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 20 });
+    assert.ok(shot, 'chord test shot');
     engine.advanceLasersAndResolveHits();
     expect(shot.bounces).toBe(1);
     const blocker: AsteroidData = {
@@ -117,7 +121,9 @@ describe('reflected shots remain authoritative across snapshots and resource col
     const score = pilot.score;
     engine.handleAsteroidHit(reflector.id, pilot.id);
     expect(pilot.score).toBe(score);
-    pilot.position = { ...cores[0]!.position };
+    const core = cores[0];
+    assert.ok(core, 'laser core');
+    pilot.position = { ...core.position };
     engine.collectLoot();
     const after = pilot.score;
     engine.collectLoot();
@@ -135,11 +141,13 @@ describe('reflected shots remain authoritative across snapshots and resource col
     const { engine, pilot } = arena();
     pilot.position = { x: -100, y: 0 };
     const initial = pilot.health;
-    const direct = engine.spawnLaser(pilot.id, pilot.position, { x: 10, y: 0 })!;
+    const direct = engine.spawnLaser(pilot.id, pilot.position, { x: 10, y: 0 });
+    assert.ok(direct, 'direct self shot');
     engine.advanceLasersAndResolveHits();
     expect(pilot.health).toBe(initial);
     direct.hasExploded = true;
-    const reflected = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 })!;
+    const reflected = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
+    assert.ok(reflected, 'reflected self shot');
     for (let index = 0; index < 4; index++) {
       engine.advanceLasersAndResolveHits();
     }
@@ -163,8 +171,10 @@ describe('reflected shots remain authoritative across snapshots and resource col
     delete enemy.spawnProtectionTimer;
     const allyHealth = ally.health;
     const enemyHealth = enemy.health;
-    const returning = engine.spawnLaser(pilot.id, { x: -150, y: 0 }, { x: 40, y: 0 })!;
-    const hostile = engine.spawnLaser(pilot.id, { x: -150, y: 200 }, { x: 40, y: 0 })!;
+    const returning = engine.spawnLaser(pilot.id, { x: -150, y: 0 }, { x: 40, y: 0 });
+    assert.ok(returning, 'returning direct shot');
+    const hostile = engine.spawnLaser(pilot.id, { x: -150, y: 200 }, { x: 40, y: 0 });
+    assert.ok(hostile, 'hostile direct shot');
     engine.removePlayer(pilot.id);
     engine.advanceLasersAndResolveHits();
     expect(ally.health).toBe(allyHealth);
@@ -201,7 +211,8 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(normal.segments).toHaveLength(2);
     expect(upgraded.segments).toHaveLength(1);
     expect(upgraded.termination).toBe('blocked');
-    const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 })!;
+    const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
+    assert.ok(shot, 'threshold shot');
     shot.energy = 2;
     engine.advanceLasersAndResolveHits();
     expect(shot.hasExploded).toBe(true);
@@ -222,10 +233,16 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test('projectile identities never repeat across world reset or a new server instance', () => {
     const { engine } = arena();
-    const before = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 })!.id;
+    const beforeShot = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    assert.ok(beforeShot, 'pre-reset shot');
+    const before = beforeShot.id;
     engine.removePlayer('pilot');
-    const after = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 })!.id;
-    const restarted = new GameEngine().spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 })!.id;
+    const afterShot = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    assert.ok(afterShot, 'post-reset shot');
+    const after = afterShot.id;
+    const restartedShot = new GameEngine().spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    assert.ok(restartedShot, 'restarted server shot');
+    const restarted = restartedShot.id;
     expect(new Set([before, after, restarted]).size).toBe(3);
   });
 });

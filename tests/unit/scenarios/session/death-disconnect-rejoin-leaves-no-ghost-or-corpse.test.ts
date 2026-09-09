@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE } from '../../../../src/constants';
-import {
-  FakeSocket,
-  GameServerWorld,
-  type Pilot,
-  useQuietServerConsole,
-} from '../support/gameServerWorld';
+import { RecordingSocket } from '../../../support/recordingSocket';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -37,7 +33,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     expect(world.entity(ace).exploding).toBe(true);
     expect(world.entity(ace).health).toBe(0);
 
-    const socket = new FakeSocket();
+    const socket = new RecordingSocket();
     world.send(
       { id: ace.id, name: ace.name, socket },
       {
@@ -112,7 +108,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     const livesAfterDeath = world.entity(ace).lives;
     world.disconnect(ace);
 
-    const socket = new FakeSocket();
+    const socket = new RecordingSocket();
     world.send(
       { id: ace.id, name: ace.name, socket },
       {

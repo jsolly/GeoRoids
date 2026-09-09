@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { afterEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -23,8 +24,8 @@ describe('authoritative asteroid motion', () => {
     const manager = new AsteroidManager(new RNGService(1));
     manager.createAsteroids(3);
     const asteroid = manager.getAllAsteroids()[0];
-    expect(asteroid).toBeDefined();
-    const id = asteroid!.id;
+    assert.ok(asteroid);
+    const id = asteroid.id;
 
     manager.updateAsteroid(id, {
       position: { x: 10, y: 20 },
@@ -46,17 +47,17 @@ describe('authoritative asteroid motion', () => {
     engine.createAsteroids(5);
 
     const tracked = engine.getAllAsteroids()[0];
-    expect(tracked).toBeDefined();
-    engine.updateAsteroid(tracked!.id, {
+    assert.ok(tracked);
+    engine.updateAsteroid(tracked.id, {
       position: { x: 0, y: 0 },
       velocity: { x: 2, y: 0 },
     });
 
     await new Promise((resolve) => setTimeout(resolve, 120));
 
-    const after = engine.getAsteroid(tracked!.id);
-    expect(after).toBeDefined();
-    expect(after!.position.x).toBeGreaterThan(2);
+    const after = engine.getAsteroid(tracked.id);
+    assert.ok(after);
+    expect(after.position.x).toBeGreaterThan(2);
   });
 
   test('an escaped asteroid is pulled back along the same ray, not the opposite rim', () => {
@@ -71,17 +72,18 @@ describe('authoritative asteroid motion', () => {
     const manager = new AsteroidManager(new RNGService(1));
     manager.createAsteroids(1);
     const asteroid = manager.getAllAsteroids()[0];
-    expect(asteroid).toBeDefined();
-    manager.updateAsteroid(asteroid!.id, {
+    assert.ok(asteroid);
+    manager.updateAsteroid(asteroid.id, {
       position: { x: 12000, y: 0 },
       velocity: { x: 2, y: 0 },
     });
     manager.updateMotion();
-    const after = manager.getAsteroid(asteroid!.id);
+    const after = manager.getAsteroid(asteroid.id);
+    assert.ok(after);
     const fieldRadius = getAsteroidFieldRadius();
-    expect(Math.hypot(after!.position.x, after!.position.y)).toBeLessThanOrEqual(fieldRadius);
-    expect(after!.position.x).toBeGreaterThan(0);
-    expect(after!.velocity.x).toBeLessThan(0);
+    expect(Math.hypot(after.position.x, after.position.y)).toBeLessThanOrEqual(fieldRadius);
+    expect(after.position.x).toBeGreaterThan(0);
+    expect(after.velocity.x).toBeLessThan(0);
   });
 
   test('bouncing at the field edge does not teleport to the opposite side', () => {

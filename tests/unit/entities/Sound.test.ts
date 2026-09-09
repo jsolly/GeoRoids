@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Sound, setSound } from '../../../src/audio/Sound';
 import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
@@ -11,9 +12,9 @@ beforeEach(() => {
 
   testSound = new Sound('../public/sounds/thrust.m4a', 1);
   const stream = testSound.streams[0];
-  expect(stream).toBeDefined();
-  stream!.play = mockPlay;
-  stream!.pause = mockPause;
+  assert.ok(stream);
+  stream.play = mockPlay;
+  stream.pause = mockPause;
 });
 
 afterEach(() => {
@@ -46,8 +47,11 @@ test('Sound play skips when Sound is off', async () => {
 test('setSound(false) stops every stream that is already playing', () => {
   setSound(true);
   const extra = new Sound('../public/sounds/laser.m4a', 2);
-  extra.streams[0]!.pause = mockPause;
-  extra.streams[1]!.pause = mockPause;
+  const [firstStream, secondStream] = extra.streams;
+  assert.ok(firstStream);
+  assert.ok(secondStream);
+  firstStream.pause = mockPause;
+  secondStream.pause = mockPause;
   extra.playing = true;
   testSound.playing = true;
 

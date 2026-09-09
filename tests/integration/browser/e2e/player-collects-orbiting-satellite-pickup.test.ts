@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { SATELLITE_PICKUP } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
@@ -22,7 +23,8 @@ test(
     expect(pickups.length).toBeGreaterThanOrEqual(2);
     expect(pickups.every((pickup) => pickup.state === 'loose')).toBe(true);
 
-    const target = pickups[0]!;
+    const target = pickups[0];
+    assert.ok(target, 'Orbiting satellite pickup missing');
     const scoreBefore = await game.getScore();
 
     await expect

@@ -1,5 +1,5 @@
+import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import {
   GameEngine,
@@ -10,6 +10,7 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { DAMAGE, GAME, LASER, SHIP } from '../../../src/constants';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -18,11 +19,11 @@ vi.mock('../../../setup/serverLogger', () => ({
 describe('human shoot evidence is grounded before an EO damage report', () => {
   let engine: GameEngine;
   let handler: MessageHandler;
-  let socket: WebSocket;
+  let socket: RecordingSocket;
   beforeEach(() => {
     engine = new GameEngine(921);
     handler = new MessageHandler(engine, new GameStateBroadcaster(engine));
-    socket = { readyState: WebSocket.OPEN, send: vi.fn() } as unknown as WebSocket;
+    socket = new RecordingSocket();
     engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, undefined, 'dart');
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
@@ -41,8 +42,14 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
   }
 
   test('a joined distant or dead attacker cannot manufacture satellite hit evidence', () => {
-    const satellite = engine.getAllSatellites()[0]!;
-    engine.getSatellite(satellite.id)!.position = { x: 1500, y: 0 };
+    const satellite = engine.getAllSatellites()[0];
+    assert.ok(satellite, 'distant satellite');
+    const distantSatellite = engine.getSatellite(satellite.id);
+    assert.ok(distantSatellite, 'distant satellite state');
+    distantSatellite.position = {
+      x: 1500,
+      y: 0,
+    };
     const remoteOrigin = { x: 1500, y: 0 };
     for (let i = 0; i < 2; i++) {
       shoot(remoteOrigin);
@@ -58,14 +65,22 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
     expect(engine.getSatellite(satellite.id)?.health).toBe(satellite.health);
     expect(engine.getPlayer('pilot')?.score).toBe(0);
     expect(engine.getLoot()).toEqual([]);
-    engine.getPlayer('pilot')!.health = 0;
+    const pilot = engine.getPlayer('pilot');
+    assert.ok(pilot, 'pilot state');
+    pilot.health = 0;
     shoot();
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
   test('a nearby real shot damages the EO hull once and cannot be replayed', () => {
-    const satellite = engine.getAllSatellites()[0]!;
-    engine.getSatellite(satellite.id)!.position = { x: 40, y: 0 };
+    const satellite = engine.getAllSatellites()[0];
+    assert.ok(satellite, 'nearby satellite');
+    const nearbySatellite = engine.getSatellite(satellite.id);
+    assert.ok(nearbySatellite, 'nearby satellite state');
+    nearbySatellite.position = {
+      x: 40,
+      y: 0,
+    };
     shoot();
     const report = {
       type: 'satelliteDamage',
@@ -82,13 +97,16 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
     shoot({ x: Number.POSITIVE_INFINITY, y: 0 });
     shoot({ x: 20, y: 0 }, { x: 1e10, y: 0 });
     shoot({ x: 20, y: 0 }, { x: Number.NaN, y: 0 });
-    engine.getPlayer('pilot')!.respawnTimer = 2;
+    const pilot = engine.getPlayer('pilot');
+    assert.ok(pilot, 'respawning pilot');
+    pilot.respawnTimer = 2;
     shoot();
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
   test('a legitimate muzzle from a 250 ms delayed pose is accepted with inherited ship speed', () => {
-    const player = engine.getPlayer('pilot')!;
+    const player = engine.getPlayer('pilot');
+    assert.ok(player, 'delayed pose pilot');
     const kit = getShipKit(player.kitId);
     player.velocity = { x: kit.maxVelocity, y: 0 };
     const delayedPosition = {
@@ -102,7 +120,8 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
 
   test('normal cadence and bunched skirmisher E rounds work but unbounded bursts do not', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
-    const player = engine.getPlayer('pilot')!;
+    const player = engine.getPlayer('pilot');
+    assert.ok(player, 'skirmisher pilot');
     player.kitId = 'skirmisher';
     for (let i = 0; i < SHIP.MAX_LASERS; i++) {
       shoot();

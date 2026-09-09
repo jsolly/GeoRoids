@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { afterEach, describe, expect, test } from 'vitest';
 import { ShockwaveManager } from '../../../src/fx/ShockwaveManager';
 import {
@@ -18,11 +19,11 @@ describe('phosphor shockwave rings', () => {
 
   test('the fast ring is visible immediately and the heavy ring waits', () => {
     const [fast, heavy] = SHOCKWAVE_WAVES;
-    expect(fast).toBeDefined();
-    expect(heavy).toBeDefined();
-    expect(waveVisualProgress(0, fast!)).toBe(0);
-    expect(waveVisualProgress(0, heavy!)).toBeNull();
-    expect(waveVisualProgress(framesToMs(heavy!.delayFrames), heavy!)).toBe(0);
+    assert.ok(fast);
+    assert.ok(heavy);
+    expect(waveVisualProgress(0, fast)).toBe(0);
+    expect(waveVisualProgress(0, heavy)).toBeNull();
+    expect(waveVisualProgress(framesToMs(heavy.delayFrames), heavy)).toBe(0);
   });
 
   test('rings ease out and fade as they expand', () => {
@@ -60,11 +61,13 @@ describe('phosphor shockwave rings', () => {
   test('debug state reports the padded lifetime and fired waves', () => {
     const manager = ShockwaveManager.getInstance();
     const [fast, heavy] = SHOCKWAVE_WAVES;
+    assert.ok(fast);
+    assert.ok(heavy);
     const t0 = 2_000;
     manager.spawn({ x: 1, y: 2 }, t0);
     const debug = manager.getDebugState(t0);
     expect(debug.count).toBe(1);
-    expect(debug.lifetimeMs).toBe(framesToMs(heavy!.delayFrames + heavy!.durationFrames) + 80);
-    expect(debug.items[0]?.fired).toEqual([fast!.id]);
+    expect(debug.lifetimeMs).toBe(framesToMs(heavy.delayFrames + heavy.durationFrames) + 80);
+    expect(debug.items[0]?.fired).toEqual([fast.id]);
   });
 });

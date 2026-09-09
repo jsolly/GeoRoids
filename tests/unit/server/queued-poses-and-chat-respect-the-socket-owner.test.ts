@@ -1,9 +1,9 @@
 /* @vitest-environment node */
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;
 let core: WebSocketCore;
@@ -64,12 +64,7 @@ test('alternating enhanced-motion rejects stay within one bounded socket summary
   });
 });
 function join(id: string, enhanced = false) {
-  const messages: Array<{ type: string; data: Record<string, unknown> }> = [];
-  const socket = {
-    readyState: WebSocket.OPEN,
-    send: (text: string) => messages.push(JSON.parse(text)),
-    close: vi.fn(),
-  } as unknown as WebSocket;
+  const socket = new RecordingSocket();
   core.handleClientMessage(
     {
       type: 'join',
@@ -77,8 +72,8 @@ function join(id: string, enhanced = false) {
     },
     socket
   );
-  messages.length = 0;
-  return { socket, messages };
+  socket.inbox.length = 0;
+  return { socket, messages: socket.inbox };
 }
 
 test('a pre-acknowledgment pose is ignored without a spurious enhanced-movement warning', () => {

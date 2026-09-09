@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import {
   bindHarpoonFieldSource,
@@ -229,10 +230,10 @@ test('harpoonBodyFromRock tags belt rows as asteroid so ship filters cannot reje
     r: 50,
     health: 0,
   });
-  expect(body).toBeTruthy();
-  expect(body?.kind).toBe('asteroid');
-  expect(body?.id).toMatch(/^rock:/);
-  expect(isEnvironmentLatchBody(body!)).toBe(true);
+  assert.ok(body);
+  expect(body.kind).toBe('asteroid');
+  expect(body.id).toMatch(/^rock:/);
+  expect(isEnvironmentLatchBody(body)).toBe(true);
 });
 
 test('an environment rock without an id still latches via pose', () => {

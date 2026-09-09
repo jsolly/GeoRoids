@@ -1,10 +1,92 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
+import { isAsteroidMaterial } from '../../../../shared/asteroidMaterials';
 import { segmentCircleContact } from '../../../../shared/asteroidPhenomena';
+import type { AsteroidData, AsteroidDestroyEvent } from '../../../../shared-types';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
+
+declare global {
+  interface Window {
+    __collabFieldSamples?: string[][];
+  }
+}
+
+type SplitEvidence =
+  | { type: 'asteroidDestroy'; data: AsteroidDestroyEvent }
+  | {
+      type: 'asteroidCreateBatch';
+      data: { asteroids: Pick<AsteroidData, 'id' | 'material' | 'size' | 'position'>[] };
+    }
+  | { type: 'gameState' | 'snapshot' }
+  | { type: 'error'; data: unknown };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// Validate only the event fields this scenario observes; snapshots are decoded by the clients.
+function readSplitEvidence(value: unknown): SplitEvidence | undefined {
+  assert.ok(isRecord(value), 'Expected a WebSocket message envelope');
+  const type = value['type'];
+  if (type === 'gameState' || type === 'snapshot') {
+    return { type };
+  }
+  if (type === 'error') {
+    return { type, data: value['data'] };
+  }
+  if (type !== 'asteroidDestroy' && type !== 'asteroidCreateBatch') {
+    return undefined;
+  }
+  const data = value['data'];
+  assert.ok(isRecord(data), 'Asteroid event payload missing');
+  if (type === 'asteroidDestroy') {
+    const asteroidId = data['asteroidId'];
+    const origin = data['origin'];
+    const collabSplit = data['collabSplit'];
+    assert.ok(typeof asteroidId === 'string');
+    assert.ok(collabSplit === undefined || typeof collabSplit === 'boolean');
+    if (origin === undefined) {
+      return { type, data: { asteroidId, ...(collabSplit === undefined ? {} : { collabSplit }) } };
+    }
+    assert.ok(
+      isRecord(origin) && typeof origin['x'] === 'number' && typeof origin['y'] === 'number'
+    );
+    return {
+      type,
+      data: {
+        asteroidId,
+        origin: { x: origin['x'], y: origin['y'] },
+        ...(collabSplit === undefined ? {} : { collabSplit }),
+      },
+    };
+  }
+  const asteroids: unknown = data['asteroids'];
+  assert.ok(Array.isArray(asteroids), 'Asteroid batch missing');
+  return {
+    type,
+    data: {
+      asteroids: asteroids.map((asteroid: unknown) => {
+        assert.ok(isRecord(asteroid), 'Asteroid row missing');
+        const id = asteroid['id'];
+        const size = asteroid['size'];
+        const material = asteroid['material'];
+        const position = asteroid['position'];
+        assert.ok(typeof id === 'string' && typeof size === 'number');
+        assert.ok(isAsteroidMaterial(material));
+        assert.ok(
+          isRecord(position) &&
+            typeof position['x'] === 'number' &&
+            typeof position['y'] === 'number'
+        );
+        return { id, size, material, position: { x: position['x'], y: position['y'] } };
+      }),
+    },
+  };
+}
 
 // Scenario: two players shoot an ordinary large ice asteroid within
 // 1s → the server removes it and broadcasts the same fragments to both pilots.
@@ -18,18 +100,26 @@ test(
     const page2 = await browserManager.createAdditionalPage();
     const game1 = new GameInteractions(page1);
     const game2 = new GameInteractions(page2);
-    const received1: any[] = [];
-    const received2: any[] = [];
-    const sent: any[] = [];
+    const received1: SplitEvidence[] = [];
+    const received2: SplitEvidence[] = [];
+    const sent: unknown[] = [];
     for (const [page, messages] of [
       [page1, received1],
       [page2, received2],
     ] as const) {
       page.on('websocket', (socket) => {
-        socket.on('framereceived', ({ payload }) => messages.push(JSON.parse(String(payload))));
+        socket.on('framereceived', ({ payload }) => {
+          const evidence = readSplitEvidence(JSON.parse(String(payload)));
+          if (evidence) {
+            messages.push(evidence);
+          }
+        });
         socket.on('framesent', ({ payload }) => {
-          const message = JSON.parse(String(payload));
-          if (['shoot', 'asteroidDestroyed', 'lootExplode'].includes(message.type)) {
+          const message: unknown = JSON.parse(String(payload));
+          if (
+            isRecord(message) &&
+            ['shoot', 'asteroidDestroyed', 'lootExplode'].includes(String(message['type']))
+          ) {
             sent.push(message);
           }
         });
@@ -182,10 +272,18 @@ test(
       [page1, page2].map((page) =>
         page.evaluate(() => {
           const samples: string[][] = [];
-          (window as any).__collabFieldSamples = samples;
+          window.__collabFieldSamples = samples;
+          const gc = window.gameController;
+          if (!gc) {
+            throw new Error('Field observer requires the game controller');
+          }
           const observe = () => {
-            const gc = (window as any).gameController;
-            samples.push((gc?.getCurrRoidBelt?.()?.getRoids?.() ?? []).map((roid: any) => roid.id));
+            samples.push(
+              gc
+                .getCurrRoidBelt()
+                .getRoids()
+                .map((roid) => roid.id)
+            );
             if (samples.length > 600) {
               samples.shift();
             }
@@ -201,7 +299,7 @@ test(
       game2.fireLaserToward(current2.x, current2.y),
     ]);
 
-    const splitFor = (messages: any[]) =>
+    const splitFor = (messages: SplitEvidence[]) =>
       messages.find(
         (message) =>
           message.type === 'asteroidDestroy' &&
@@ -220,13 +318,15 @@ test(
         target: collaborative,
         sent,
         received: received1.filter(
-          (message) => message.data?.asteroidId === collaborative.id || message.type === 'error'
+          (message) =>
+            message.type === 'error' ||
+            (message.type === 'asteroidDestroy' && message.data.asteroidId === collaborative.id)
         ),
       });
       throw error;
     }
 
-    const fragmentIds = (messages: any[]): string[] => {
+    const fragmentIds = (messages: SplitEvidence[]): string[] => {
       const destroyIndex = messages.findIndex(
         (message) =>
           message.type === 'asteroidDestroy' && message.data?.asteroidId === collaborative.id
@@ -234,7 +334,11 @@ test(
       if (destroyIndex < 0) {
         return [];
       }
-      const origin = messages[destroyIndex].data.origin;
+      const destruction = messages[destroyIndex];
+      if (destruction?.type !== 'asteroidDestroy' || !destruction.data.origin) {
+        throw new Error('Cooperative split must identify its origin');
+      }
+      const origin = destruction.data.origin;
       const subsequent = messages.slice(destroyIndex + 1);
       const nextState = subsequent.findIndex(
         (message) => message.type === 'gameState' || message.type === 'snapshot'
@@ -248,13 +352,13 @@ test(
           message.type === 'asteroidCreateBatch' ? message.data.asteroids : []
         )
         .filter(
-          (asteroid: any) =>
+          (asteroid) =>
             asteroid.material === 'ice' &&
             asteroid.size < collaborative.radius &&
             Math.hypot(asteroid.position.x - origin.x, asteroid.position.y - origin.y) <=
               collaborative.radius
         )
-        .map((asteroid: any) => asteroid.id)
+        .map((asteroid) => asteroid.id)
         .sort();
     };
 
@@ -279,11 +383,16 @@ test(
           const seen = await Promise.all(
             [page1, page2].map((page) =>
               page.evaluate(
-                ({ original, fragments }) =>
-                  ((window as any).__collabFieldSamples as string[][]).some(
+                ({ original, fragments }) => {
+                  const samples = window.__collabFieldSamples;
+                  if (!samples) {
+                    throw new Error('Rendered field observer unavailable');
+                  }
+                  return samples.some(
                     (field) =>
                       !field.includes(original) && fragments.every((id) => field.includes(id))
-                  ),
+                  );
+                },
                 { original: collaborative.id, fragments: expectedFragments }
               )
             )

@@ -398,17 +398,6 @@ export const DEBUG = {
   // DEBUG MODE chrome does not paint in production builds.
   ENABLED: false,
 
-  // Local player settings
-  LOCAL_PLAYER: {
-    INVINCIBLE: false,
-    SPAWN_PROTECTION: true,
-  },
-
-  // Remote player settings
-  REMOTE_PLAYER: {
-    // Add remote player specific settings here as needed
-  },
-
   // Bot player settings
   BOT_PLAYER: {
     COUNT: 2, // Reduced for better performance during development (overrides GAME.BOT_COUNT when in debug mode)

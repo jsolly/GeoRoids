@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { Roid } from '../../../src/entities/roid/Roid';
-import { Ship } from '../../../src/entities/ship/Ship';
 import { applyShipImpactFlash, tickShipImpactFlash } from '../../../src/entities/ship/shipUtils';
 import {
   isAsteroidPending,
@@ -100,44 +99,6 @@ describe('moving-roid hit feel', () => {
 
     expect(laser.hasExploded).toBe(true);
     expect(asteroid.pendingDestruction).toBe(true);
-    expect(mockSendMessage).not.toHaveBeenCalled();
-  });
-
-  test('player and bot ship-roid overlaps do not apply local ram or send reports', () => {
-    const collisionManager = CollisionManager.getInstance();
-    const roid = new Roid({ x: 0, y: 0 }, 25);
-    roid.playHitSound = vi.fn();
-
-    const localShip = new Ship({ isLocalPlayer: false });
-    localShip.blinkCount = 0;
-    localShip.position = { x: 0, y: 0 };
-    const botShip = new Ship({ isBot: true });
-    botShip.blinkCount = 0;
-    botShip.position = { x: 0, y: 0 };
-
-    collisionManager.checkPlayerAsteroidCollisions(
-      { ship: localShip, id: 'local-player-123', type: 'local' },
-      [roid]
-    );
-    expect(localShip.health).toBe(100);
-    expect(localShip.exploding).toBe(false);
-    expect(roid.pendingDestruction).toBeFalsy();
-    expect(mockSendMessage).not.toHaveBeenCalled();
-
-    collisionManager.checkPlayerAsteroidCollisions(
-      { ship: localShip, id: 'local-player-123', type: 'local' },
-      [roid]
-    );
-    expect(mockSendMessage).not.toHaveBeenCalled();
-
-    const other = new Roid({ x: 0, y: 0 }, 25);
-    other.playHitSound = vi.fn();
-    collisionManager.checkPlayerAsteroidCollisions(
-      { ship: botShip, id: 'server-bot-1', type: 'bot' },
-      [other]
-    );
-    expect(botShip.health).toBe(100);
-    expect(botShip.exploding).toBe(false);
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 

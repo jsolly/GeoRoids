@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../../server/core/GameEngine';
 import { GAME_TICK_MS } from '../../../../shared/gameClock';
 import { SHIP } from '../../../../src/constants';
+import { RecordingSocket } from '../../../support/recordingSocket';
 
 describe('Game clock catch-up after a hitch', () => {
   let engine: GameEngine;
@@ -27,7 +28,7 @@ describe('Game clock catch-up after a hitch', () => {
   });
 
   test('a hitch during explode still finishes death→respawn in the catch-up', () => {
-    const ws = {} as any;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'boundary', 100);
@@ -44,7 +45,7 @@ describe('Game clock catch-up after a hitch', () => {
   });
 
   test('gameTime keeps advancing while paused after the last player leaves', () => {
-    const ws = {} as any;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws);
     engine.stepClock(0);
     engine.stepClock(GAME_TICK_MS * 5);

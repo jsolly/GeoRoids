@@ -1,20 +1,13 @@
 /* @vitest-environment node */
+import { strict as assert } from 'node:assert';
 import { afterEach, describe, expect, test } from 'vitest';
-import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
-interface ReceivedMessage {
-  type: string;
-  data: Record<string, unknown>;
-}
-
-function socketRecording(messages: ReceivedMessage[] = []): WebSocket {
-  return {
-    readyState: WebSocket.OPEN,
-    send: (payload: string) => messages.push(JSON.parse(payload)),
-  } as unknown as WebSocket;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 describe('late client death updates after authoritative respawn', () => {
@@ -37,9 +30,8 @@ describe('late client death updates after authoritative respawn', () => {
   ])('$name cannot poison the server or its peer update', ({ extras }) => {
     engine = new GameEngine(481);
     const core = new WebSocketCore(engine);
-    const owner = socketRecording();
-    const peerMessages: ReceivedMessage[] = [];
-    const peer = socketRecording(peerMessages);
+    const owner = new RecordingSocket();
+    const peer = new RecordingSocket();
     core.handleClientMessage(
       { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
       owner
@@ -48,7 +40,8 @@ describe('late client death updates after authoritative respawn', () => {
       { type: 'join', data: { id: 'peer', name: 'Peer', position: { x: 1000, y: 0 } } },
       peer
     );
-    const pilot = engine.getPlayer('pilot')!;
+    const pilot = engine.getPlayer('pilot');
+    assert.ok(pilot, 'respawn pilot');
     pilot.position = { x: 3150, y: 0 };
     delete pilot.spawnProtectionTimer;
     pilot.score = 17;
@@ -68,7 +61,7 @@ describe('late client death updates after authoritative respawn', () => {
     expect(pilot.explodeTime).toBeUndefined();
     const spawnPosition = { ...pilot.position };
     expect(spawnPosition).not.toEqual({ x: 3150, y: 0 });
-    peerMessages.length = 0;
+    peer.clear();
 
     core.handleClientMessage(
       {
@@ -92,8 +85,10 @@ describe('late client death updates after authoritative respawn', () => {
     expect(pilot.deathCause).toBeUndefined();
     expect(pilot.respawnAnchor).toBeUndefined();
     expect(pilot.score).toBe(17);
-    const update = peerMessages.find((message) => message.type === 'playerUpdate');
-    expect(update?.data['position']).toEqual(spawnPosition);
+    const update = peer.inbox.find((message) => message.type === 'playerUpdate');
+    assert.ok(update, 'player update');
+    assert.ok(isRecord(update.data), 'player update data');
+    expect(update.data['position']).toEqual(spawnPosition);
     for (const field of [
       'exploding',
       'explodeTime',
@@ -102,7 +97,7 @@ describe('late client death updates after authoritative respawn', () => {
       'health',
       'score',
     ]) {
-      expect(update?.data).not.toHaveProperty(field);
+      expect(update.data).not.toHaveProperty(field);
     }
 
     for (let frame = 0; frame <= SHIP.EXPLODE_DURATION_FRAMES; frame++) {

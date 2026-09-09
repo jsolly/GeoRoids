@@ -1,282 +1,317 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import { strict as assert } from 'node:assert';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
+import { WireClient, type WireMessage } from '../../support/wireClient';
 
-async function openSocket(port: number): Promise<WebSocket> {
-  const ws = new WebSocket(`ws://localhost:${port}/ws`);
-  await new Promise<void>((resolve, reject) => {
-    ws.once('open', () => resolve());
-    ws.once('error', (err) => reject(err));
-  });
-  return ws;
+type TestServer = ReturnType<typeof createServerInstance>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function waitForAsteroidId(ws: WebSocket): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error('Timed out waiting for asteroid creation')),
-      5000
-    );
-    ws.on('message', (raw) => {
-      try {
-        const msg = JSON.parse(String(raw));
-        const rows: AsteroidData[] =
-          msg?.type === 'asteroidCreateBatch'
-            ? (msg.data?.asteroids ?? [])
-            : msg?.type === 'asteroidCreate' && msg.data?.asteroid
-              ? [msg.data.asteroid]
-              : [];
-        const asteroid = rows.find(
-          (rock) =>
-            !rock.isCollabTarget &&
-            rock.material === 'ice' &&
-            rock.size >= ROID.COLLAB_SPLIT_MIN_SIZE
-        );
-        if (asteroid) {
-          clearTimeout(timeout);
-          resolve(asteroid.id);
-        }
-      } catch {
-        // ignore non-JSON frames
-      }
-    });
+function messageData(message: WireMessage): Record<string, unknown> {
+  assert.ok(isRecord(message.data), `${message.type} message data must be an object`);
+  return message.data;
+}
+
+function asteroidIds(message: WireMessage): string[] {
+  const rawAsteroids = messageData(message)['asteroids'];
+  assert.ok(Array.isArray(rawAsteroids), 'asteroidCreateBatch must contain an array');
+  return rawAsteroids.map((rawAsteroid, index) => {
+    assert.ok(isRecord(rawAsteroid), `fragment ${index} must be an object`);
+    const id = rawAsteroid['id'];
+    assert.ok(typeof id === 'string', `fragment ${index} must have an id`);
+    return id;
   });
 }
 
-function asteroidPosition(
-  server: ReturnType<typeof createServerInstance>,
-  asteroidId: string
-): { x: number; y: number } {
-  const asteroid = server.gameEngine.getAsteroid(asteroidId);
-  if (!asteroid) {
-    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
+function messageAt(client: WireClient, type: string, start = 0): WireMessage {
+  const message = client.messages.slice(start).find((candidate) => candidate.type === type);
+  assert.ok(
+    message,
+    `expected ${type} after message ${start}; saw ${client.messages
+      .slice(start)
+      .map((candidate) => candidate.type)
+      .join(', ')}`
+  );
+  return message;
+}
+
+async function join(
+  client: WireClient,
+  id: string,
+  position: { x: number; y: number }
+): Promise<void> {
+  const start = client.mark();
+  client.send({ type: 'join', id, name: id, position });
+  await client.barrier();
+  const joined = messageAt(client, 'joined', start);
+  expect(messageData(joined)['id']).toBe(id);
+}
+
+let activeServer: TestServer | undefined;
+const activeClients: WireClient[] = [];
+
+async function connect(server: TestServer): Promise<WireClient> {
+  const client = new WireClient(new WebSocket(`ws://127.0.0.1:${await server.listening}/ws`));
+  activeClients.push(client);
+  await client.open();
+  return client;
+}
+
+async function startWorld(
+  pilots: ReadonlyArray<{ id: string; position: { x: number; y: number } }>
+): Promise<{ server: TestServer; clients: WireClient[] }> {
+  const server = createServerInstance({ port: 0, nodeEnv: 'test' });
+  activeServer = server;
+  await server.listening;
+  server.gameEngine.stopGameLoop();
+  server.wsCore.stopPeriodicGameStateBroadcast();
+
+  const clients: WireClient[] = [];
+  for (const pilot of pilots) {
+    const client = await connect(server);
+    await join(client, pilot.id, pilot.position);
+    clients.push(client);
   }
-  return { ...asteroid.position };
+  await Promise.all(clients.map((client) => client.barrier()));
+
+  for (const bot of server.gameEngine.getAllBots()) {
+    server.gameEngine.removeBot(bot.id);
+  }
+  for (const asteroid of server.gameEngine.getAllAsteroids()) {
+    server.gameEngine.removeAsteroid(asteroid.id);
+  }
+  for (const satelliteSnapshot of server.gameEngine.getAllSatellites()) {
+    const satellite = server.gameEngine.getSatellite(satelliteSnapshot.id);
+    assert.ok(satellite, `live satellite ${satelliteSnapshot.id}`);
+    satellite.position = { x: -2_400, y: -2_400 };
+  }
+  expect(server.gameEngine.getLoot()).toEqual([]);
+  expect(server.gameEngine.getActiveSatelliteProjectiles()).toEqual([]);
+
+  return { server, clients };
 }
 
-function sendTrackedAsteroidReport(
-  server: ReturnType<typeof createServerInstance>,
-  ws: WebSocket,
+function largeIceAsteroid(id: string, position: { x: number; y: number }): AsteroidData {
+  return {
+    id,
+    position,
+    velocity: { x: 0, y: 0 },
+    size: 50,
+    jaggedness: 0.5,
+    rotation: 0,
+    angularVelocity: 0,
+    health: 50,
+    maxHealth: 50,
+    vertices: 8,
+    offsets: [1, 1, 1, 1, 1, 1, 1, 1],
+    material: 'ice',
+  };
+}
+
+async function sendTrackedReport(
+  server: TestServer,
+  client: WireClient,
   playerId: string,
   asteroidId: string
-): void {
+): Promise<{ hasExploded: boolean }> {
   const asteroid = server.gameEngine.getAsteroid(asteroidId);
-  if (!asteroid) {
-    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
-  }
+  assert.ok(asteroid, `asteroid ${asteroidId}`);
   const laserPosition = { ...asteroid.position };
   const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
-  if (!shot) {
-    throw new Error(`Could not seed tracked laser for ${playerId}`);
-  }
-  server.wsCore.handleClientMessage(
-    {
-      type: 'asteroidDestroyed',
-      data: {
-        asteroidId,
-        playerId,
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      },
+  assert.ok(shot, `tracked laser for ${playerId}`);
+  client.send({
+    type: 'asteroidDestroyed',
+    data: {
+      asteroidId,
+      playerId,
+      cause: 'laser',
+      laserPosition,
     },
-    ws
-  );
+  });
+  await client.barrier();
+  return shot;
 }
 
-describe('Scenario: two players hit a big roid within 1s → split', () => {
-  let server: ReturnType<typeof createServerInstance> | null = null;
+function countType(client: WireClient, type: string): number {
+  return client.messages.filter((message) => message.type === type).length;
+}
 
-  afterEach(async () => {
-    if (server) {
-      await server.close();
+afterEach(async () => {
+  try {
+    await activeServer?.close();
+    for (const client of activeClients) {
+      client.assertHealthy();
     }
-    server = null;
+  } finally {
+    activeServer = undefined;
+    activeClients.length = 0;
+  }
+});
+
+describe('Scenario: two players hit a big roid within 1s → split', () => {
+  test('real owners tag then split one large ice roid and broadcast one shockwave', async () => {
+    const { server, clients } = await startWorld([
+      { id: 'player-a', position: { x: 0, y: 0 } },
+      { id: 'player-b', position: { x: 100, y: 0 } },
+    ]);
+    const [playerA, playerB] = clients;
+    assert.ok(playerA, 'player A socket');
+    assert.ok(playerB, 'player B socket');
+    const target = largeIceAsteroid('wire-collab-target', { x: 0, y: 0 });
+    server.gameEngine.addAsteroid(target);
+    playerA.resetMessages();
+    playerB.resetMessages();
+
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      const firstAStart = playerA.mark();
+      const firstBStart = playerB.mark();
+      const firstShot = await sendTrackedReport(server, playerA, 'player-a', target.id);
+      await playerB.barrier();
+      const firstTagA = messageAt(playerA, 'asteroidTagged', firstAStart);
+      const firstTagB = messageAt(playerB, 'asteroidTagged', firstBStart);
+      expect(firstTagA.data).toEqual({
+        asteroidId: target.id,
+        shooterId: 'player-a',
+        expiresAt: now + ROID.COLLAB_SPLIT_WINDOW_MS,
+      });
+      expect(firstTagB.data).toEqual(firstTagA.data);
+      expect(countType(playerA, 'asteroidDestroy')).toBe(0);
+      expect(countType(playerA, 'asteroidCreateBatch')).toBe(0);
+      expect(countType(playerA, 'scoreUpdate')).toBe(0);
+      expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
+      expect(server.gameEngine.getPlayer('player-a')?.score).toBe(0);
+
+      const secondAStart = playerA.mark();
+      const secondBStart = playerB.mark();
+      const secondShot = await sendTrackedReport(server, playerB, 'player-b', target.id);
+      await playerA.barrier();
+      const destroyA = messageAt(playerA, 'asteroidDestroy', secondAStart);
+      const destroyB = messageAt(playerB, 'asteroidDestroy', secondBStart);
+      const shockwaveA = messageAt(playerA, 'shockwave', secondAStart);
+      const shockwaveB = messageAt(playerB, 'shockwave', secondBStart);
+      const createA = messageAt(playerA, 'asteroidCreateBatch', secondAStart);
+      const createB = messageAt(playerB, 'asteroidCreateBatch', secondBStart);
+      const scoreA = messageAt(playerA, 'scoreUpdate', secondAStart);
+      const scoreB = messageAt(playerB, 'scoreUpdate', secondBStart);
+
+      expect(destroyA.data).toEqual({
+        asteroidId: target.id,
+        collabSplit: true,
+        origin: target.position,
+      });
+      expect(destroyB.data).toEqual(destroyA.data);
+      expect(shockwaveA.data).toEqual({ origin: target.position, asteroidId: target.id });
+      expect(shockwaveB.data).toEqual(shockwaveA.data);
+      expect(scoreA.data).toEqual({ playerId: 'player-b', score: ROID.POINTS_LARGE });
+      expect(scoreB.data).toEqual(scoreA.data);
+      const fragmentsA = asteroidIds(createA);
+      const fragmentsB = asteroidIds(createB);
+      expect(fragmentsA).toHaveLength(2);
+      expect(new Set(fragmentsA).size).toBe(2);
+      expect(fragmentsB).toEqual(fragmentsA);
+      expect(countType(playerA, 'asteroidDestroy')).toBe(1);
+      expect(countType(playerA, 'asteroidCreateBatch')).toBe(1);
+      expect(countType(playerA, 'shockwave')).toBe(1);
+      expect(countType(playerA, 'scoreUpdate')).toBe(1);
+      expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
+      expect(server.gameEngine.getPlayer('player-b')?.score).toBe(ROID.POINTS_LARGE);
+      expect(firstShot.hasExploded).toBe(true);
+      expect(secondShot.hasExploded).toBe(true);
+      expect(playerA.failures).toEqual([]);
+      expect(playerB.failures).toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
-  test('two players hit big roid within 1s → split', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
-    const port = await server.listening;
+  test('a forged second shooter claim on the owner socket is ignored', async () => {
+    const { server, clients } = await startWorld([
+      { id: 'socket-owner', position: { x: 0, y: 0 } },
+    ]);
+    const [client] = clients;
+    assert.ok(client, 'owner socket');
+    const target = largeIceAsteroid('wire-forged-target', { x: 0, y: 0 });
+    server.gameEngine.addAsteroid(target);
+    client.resetMessages();
 
-    const playerA = await openSocket(port);
-    const playerB = await openSocket(port);
+    const validStart = client.mark();
+    await sendTrackedReport(server, client, 'socket-owner', target.id);
+    const validTag = messageAt(client, 'asteroidTagged', validStart);
+    expect(messageData(validTag)['asteroidId']).toBe(target.id);
+    client.resetMessages();
 
-    playerA.send(JSON.stringify({ type: 'join', id: 'player-a', name: 'Alpha' }));
-    playerB.send(JSON.stringify({ type: 'join', id: 'player-b', name: 'Bravo' }));
-
-    const asteroidCreated = waitForAsteroidId(playerA);
-    playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'player-a', asteroidCount: 1 }));
-    const asteroidId = await asteroidCreated;
-    asteroidPosition(server, asteroidId);
-
-    const splitMessages: unknown[] = [];
-    const onSplit = (raw: Buffer) => {
-      try {
-        splitMessages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    };
-    playerA.on('message', onSplit);
-
-    sendTrackedAsteroidReport(server, playerA, 'player-a', asteroidId);
-    sendTrackedAsteroidReport(server, playerB, 'player-b', asteroidId);
-
-    await expect
-      .poll(
-        () => {
-          const destroy = splitMessages.find(
-            (msg: any) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-          ) as { data?: { collabSplit?: boolean; origin?: { x: number; y: number } } } | undefined;
-          const create = splitMessages.find(
-            (msg: any) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
-          );
-          return Boolean(destroy?.data?.collabSplit && destroy.data.origin && create);
-        },
-        { timeout: 3000, interval: 25 }
-      )
-      .toBe(true);
-
-    playerA.close();
-    playerB.close();
-  });
-
-  test('first laser hit tags and keeps the asteroid until a second shooter', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
-    const port = await server.listening;
-
-    const playerA = await openSocket(port);
-    playerA.send(JSON.stringify({ type: 'join', id: 'tag-player', name: 'Tagger' }));
-
-    const asteroidCreated = waitForAsteroidId(playerA);
-    playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'tag-player', asteroidCount: 1 }));
-    const asteroidId = await asteroidCreated;
-    asteroidPosition(server, asteroidId);
-
-    const messages: any[] = [];
-    playerA.on('message', (raw) => {
-      try {
-        messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    });
-
-    sendTrackedAsteroidReport(server, playerA, 'tag-player', asteroidId);
-
-    await expect
-      .poll(
-        () => {
-          const tagged = messages.find(
-            (msg) => msg?.type === 'asteroidTagged' && msg?.data?.asteroidId === asteroidId
-          );
-          const destroy = messages.find(
-            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-          );
-          return Boolean(tagged && !destroy);
-        },
-        { timeout: 3000, interval: 25 }
-      )
-      .toBe(true);
-
-    playerA.close();
-  });
-
-  test('forged second shooter on the same socket does not split', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
-    const port = await server.listening;
-
-    const playerA = await openSocket(port);
-    playerA.send(JSON.stringify({ type: 'join', id: 'socket-owner', name: 'Owner' }));
-
-    const asteroidCreated = waitForAsteroidId(playerA);
-    playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'socket-owner', asteroidCount: 1 }));
-    const asteroidId = await asteroidCreated;
-    asteroidPosition(server, asteroidId);
-
-    const messages: any[] = [];
-    playerA.on('message', (raw) => {
-      try {
-        messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    });
-
-    sendTrackedAsteroidReport(server, playerA, 'socket-owner', asteroidId);
-    await new Promise((resolve) => setTimeout(resolve, ROID.COLLAB_HIT_DEDUPE_MS + 20));
-    playerA.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
+    client.send({
+      type: 'asteroidDestroyed',
+      data: {
+        asteroidId: target.id,
         playerId: 'forged-partner',
-        points: ROID.POINTS_LARGE,
         cause: 'laser',
-        laserPosition: asteroidPosition(server, asteroidId),
-      })
-    );
+        laserPosition: { ...target.position },
+      },
+    });
+    await client.barrier();
 
-    await expect
-      .poll(
-        () => {
-          const destroy = messages.find(
-            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-          );
-          const splitBatch = messages.find(
-            (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
-          );
-          return destroy && destroy.data.collabSplit === false && !splitBatch;
-        },
-        { timeout: 3000, interval: 25 }
-      )
-      .toBeTruthy();
-
-    playerA.close();
+    expect(client.messages).toEqual([]);
+    expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
+    expect(server.gameEngine.getPlayer('socket-owner')?.score).toBe(0);
+    expect(
+      server.gameEngine.getActiveCollabTags().some((tag) => tag.asteroidId === target.id)
+    ).toBe(true);
+    expect(client.failures).toEqual([]);
   });
 
-  test('one player hitting a big roid twice destroys it without splitting', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
-    const port = await server.listening;
+  test('one owner finishes a tagged large roid after the dedupe window without splitting', async () => {
+    const { server, clients } = await startWorld([{ id: 'solo-player', position: { x: 0, y: 0 } }]);
+    const [client] = clients;
+    assert.ok(client, 'solo socket');
+    const target = largeIceAsteroid('wire-solo-target', { x: 0, y: 0 });
+    server.gameEngine.addAsteroid(target);
+    client.resetMessages();
 
-    const playerA = await openSocket(port);
-    playerA.send(JSON.stringify({ type: 'join', id: 'solo-player', name: 'Solo' }));
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      const firstStart = client.mark();
+      const firstShot = await sendTrackedReport(server, client, 'solo-player', target.id);
+      const tag = messageAt(client, 'asteroidTagged', firstStart);
+      expect(tag.data).toEqual({
+        asteroidId: target.id,
+        shooterId: 'solo-player',
+        expiresAt: now + ROID.COLLAB_SPLIT_WINDOW_MS,
+      });
+      expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
+      client.resetMessages();
+      clock.mockReturnValue(now + ROID.COLLAB_HIT_DEDUPE_MS + 1);
 
-    const asteroidCreated = waitForAsteroidId(playerA);
-    playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'solo-player', asteroidCount: 1 }));
-    const asteroidId = await asteroidCreated;
-    asteroidPosition(server, asteroidId);
-
-    const messages: any[] = [];
-    playerA.on('message', (raw) => {
-      try {
-        messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    });
-
-    sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
-    await new Promise((resolve) => setTimeout(resolve, ROID.COLLAB_HIT_DEDUPE_MS + 20));
-    sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
-
-    await expect
-      .poll(
-        () => {
-          const destroy = messages.find(
-            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-          );
-          const splitBatch = messages.find(
-            (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
-          );
-          return destroy && destroy.data.collabSplit === false && !splitBatch;
-        },
-        { timeout: 3000, interval: 25 }
-      )
-      .toBeTruthy();
-
-    playerA.close();
+      const secondStart = client.mark();
+      const secondShot = await sendTrackedReport(server, client, 'solo-player', target.id);
+      const destroy = messageAt(client, 'asteroidDestroy', secondStart);
+      const score = messageAt(client, 'scoreUpdate', secondStart);
+      expect(destroy.data).toEqual({
+        asteroidId: target.id,
+        collabSplit: false,
+        origin: target.position,
+      });
+      expect(score.data).toEqual({ playerId: 'solo-player', score: ROID.POINTS_LARGE });
+      expect(countType(client, 'shockwave')).toBe(0);
+      expect(countType(client, 'asteroidCreateBatch')).toBe(0);
+      expect(countType(client, 'asteroidDestroy')).toBe(1);
+      expect(countType(client, 'scoreUpdate')).toBe(1);
+      expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
+      expect(server.gameEngine.getPlayer('solo-player')?.score).toBe(ROID.POINTS_LARGE);
+      expect(firstShot.hasExploded).toBe(true);
+      expect(secondShot.hasExploded).toBe(true);
+      expect(client.failures).toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

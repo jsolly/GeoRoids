@@ -1,0 +1,72 @@
+name: Extended behavioral integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: behavioral-integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Prepare behavioral artifacts
+        run: |
+          mkdir -p behavioral-artifacts/logs behavioral-artifacts/screenshots
+          echo "Runner has not started; inspect job setup steps if no test log follows." > behavioral-artifacts/README.txt
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Playwright Chromium and OS dependencies
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Run the complete serialized integration suite
+        run: |
+          set +e
+          set -o pipefail
+          GEOROIDS_TEST_MAX_DURATION_SECONDS=1200 ./scripts/test-runner.sh \
+            tests/integration/ \
+            --reporter=verbose 2>&1 | tee behavioral-artifacts/test-run.log
+          pipeline_statuses=("${PIPESTATUS[@]}")
+          status=${pipeline_statuses[0]}
+          tee_status=${pipeline_statuses[1]}
+          if [[ "$tee_status" != 0 ]]; then
+            echo "Failed to retain the behavioral test log (tee exit $tee_status)" >&2
+            if [[ "$status" == 0 ]]; then status=1; fi
+          fi
+          for source in logs tests/integration/browser/screenshots; do
+            destination=behavioral-artifacts/logs
+            if [[ "$source" == tests/integration/browser/screenshots ]]; then
+              destination=behavioral-artifacts/screenshots
+            fi
+            if [[ -d "$source" ]]; then
+              if ! cp -a "$source"/. "$destination"/; then
+                echo "Failed to copy $source" >&2
+                if [[ "$status" == 0 ]]; then status=1; fi
+              fi
+            else
+              echo "Artifact directory unavailable: $source (runner exit $status)" | tee -a behavioral-artifacts/README.txt
+              if [[ "$status" == 0 ]]; then status=1; fi
+            fi
+          done
+          exit "$status"
+      - name: Upload extended behavioral artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: behavioral-integration-${{ github.run_id }}
+          path: behavioral-artifacts
+          if-no-files-found: error
+          retention-days: 30

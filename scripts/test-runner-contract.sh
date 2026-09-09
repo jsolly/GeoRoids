@@ -206,7 +206,8 @@ case " $* " in
             wait $! || true
         done
         ;;
-    *" vitest run "*)
+    *" vitest run "*|*" tsx benchmarks/realtime-client.ts "*|*" tsx benchmarks/load.ts "*)
+        printf '%s\n' "$*" > "$GEOROIDS_CONTRACT_TEST_PID_FILE.command"
         printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_TEST_PID_FILE"
         if [ "$GEOROIDS_CONTRACT_MODE" = timeout ]; then
             trap '' TERM
@@ -226,6 +227,12 @@ echo "unexpected mock package-runner invocation: $*" >&2
         exit 70
         ;;
 esac
+EOF
+
+    cat > "$MOCK_BIN/npm" <<'EOF'
+#!/usr/bin/env bash
+[ "$*" = "run build" ] || exit 70
+printf '%s\n' "$VITE_WEBSOCKET_URL" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.build"
 EOF
 
     cat > "$MOCK_BIN/ps" <<'EOF'
@@ -259,7 +266,7 @@ fi
 exec /bin/ps "$@"
 EOF
 
-    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps"
+    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/npm" "$MOCK_BIN/ps"
 }
 
 run_mock_runner() {
@@ -391,6 +398,32 @@ assert_cleanup_failure_preserves_test_failure() {
     assert_lock_released
 }
 
+assert_live_benchmark_mode() {
+    local mode="$1"
+    local entry="$2"
+    local output_file="$TEMP_DIR/$mode.txt"
+    if ! run_mock_runner success 10 "$output_file" "--$mode" --seconds 1; then
+        cat "$output_file" >&2
+        fail "$mode failed"
+    fi
+    grep -Fxq -- "--no-install tsx benchmarks/$entry.ts --seconds 1" "$MOCK_TEST_PID_FILE.command" || fail "$mode selected wrong entry point"
+    grep -Fxq 'ws://localhost:59994/ws' "$MOCK_DEV_PID_FILE.build" || fail "$mode did not build for its owned server"
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "$mode driver"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "$mode server"
+    assert_lock_released
+}
+
+assert_invalid_build_rejected() {
+    local exit_code
+    if GEOROIDS_TEST_BUILD=invalid "$RUNNER" > "$TEMP_DIR/invalid-build.txt" 2>&1; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 64 ] || fail "invalid build mode was not rejected"
+    assert_lock_released
+}
+
 assert_rejected "config-equals" --config=alternate.config.ts
 assert_rejected "config-short" -c alternate.config.ts
 assert_rejected "config-short-attached" -c=alternate.config.ts
@@ -404,6 +437,7 @@ assert_rejected "no-file-parallelism" --no-file-parallelism
 assert_rejected "sequence" --sequence.concurrent=true
 assert_rejected "sequence-shuffle" --sequence.shuffle=true
 assert_invalid_duration_rejected
+assert_invalid_build_rejected
 assert_occupied_port_rejected
 setup_mock_tools
 assert_vitest_config "default-discovery" vitest.browser.config.ts
@@ -416,6 +450,8 @@ assert_vitest_config "server-only" vitest.config.ts tests/integration/server/
 assert_vitest_config "entities-only" vitest.config.ts tests/integration/entities/
 assert_vitest_config "server-and-entities" vitest.config.ts \
     tests/integration/server/ tests/integration/entities/
+assert_live_benchmark_mode benchmark-client realtime-client
+assert_live_benchmark_mode benchmark-load load
 assert_test_timeout_cleans_owned_processes
 assert_cleanup_failure_is_not_success
 assert_cleanup_failure_preserves_test_failure

@@ -1,5 +1,9 @@
 # GeoRoids testing and performance strategy
 
+Implementation progress and outstanding acceptance evidence are tracked in
+[`performance/implementation-status.md`](performance/implementation-status.md).
+Historical architecture observations below remain pinned to their stated revision.
+
 ## Recommendation
 
 Use the repeatable benchmark framework in [`benchmarks/README.md`](../benchmarks/README.md) to establish evidence, protect gameplay with behavioral tests, then optimize the work that dominates on real phones. Keep the current Vite client, Canvas2D renderer, Node server, and negotiated WebSocket protocol while establishing evidence. A renderer rewrite, binary protocol, or multiple Railway replicas should require a demonstrated bottleneck and a passing compatibility experiment.
@@ -16,7 +20,7 @@ The historical repository baseline is [`54d8c18d4ce25b3ea6af731582bd615666761a85
 | --- | --- | --- |
 | Client loop | [eventLoop.ts](../src/core/eventLoop.ts) invokes `GameController.updateGame(dtMs)` and `renderGame` through animation frames. [canvas.ts](../src/rendering/canvas.ts) draws terrain, entities, effects, and HUD. | Profile this live path, including message application between frames. |
 | Canvas resolution | `CanvasManager` creates an opaque 2D context and sets backing dimensions to visual viewport dimensions, without multiplying by device pixel ratio. | A generic recommendation to cap DPR would duplicate an effective cap of one. Any higher-resolution mode is a quality/cost experiment. |
-| Rendering reuse | [contourRenderer.ts](../src/rendering/contourRenderer.ts) batches strokes by contour level and rejects offscreen segments. The arena boundary already has culling; HUD layout already caches environment reads. | Optimize remaining traversal and repeated content rather than reintroducing these changes. |
+| Rendering reuse | [contourRenderer.ts](../src/rendering/contourRenderer.ts) batches strokes by contour level and rejects offscreen segments. The arena boundary already has culling; HUD layout reads safe-area styles and media queries on each draw. | Profile remaining traversal and repeated content. Any HUD environment cache must preserve immediate safe-area changes. |
 | CPU benchmark | [`benchmarks/README.md`](../benchmarks/README.md) documents the compiled Chromium client runner for desktop, touch portrait and touch landscape. It records synchronous update/render CPU samples and native `requestAnimationFrame` intervals in separate fields. | Useful for fixture comparisons, not presentation timing or GPU completion. |
 | Simulation | [GameEngine.ts](../server/core/GameEngine.ts) advances fixed simulation frames at 60 Hz and catches up using [gameClock.ts](../shared/gameClock.ts). | Measure scheduled deadlines and accumulated debt in addition to `advanceOneFrame` cost. |
 | Broadcasting | [GameStateBroadcaster.ts](../server/services/GameStateBroadcaster.ts) broadcasts at 30 Hz, shares canonical snapshot preparation, and manages per-socket baselines and backpressure. | A server frame benchmark alone excludes a major capacity boundary. |

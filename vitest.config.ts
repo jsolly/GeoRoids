@@ -5,6 +5,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['tests/viteSetup.ts'],
     globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'lcov'],
+      include: ['src/**/*.ts', 'shared/**/*.ts', 'server/**/*.ts'],
+      exclude: ['src/types/**', 'src/wiki/**'],
+      reportsDirectory: 'coverage',
+    },
     testTimeout: 120000, // browser E2E scenarios (respawn cycles can exceed 60s under load)
     hookTimeout: 30000, // 30 seconds for hooks
     env: {

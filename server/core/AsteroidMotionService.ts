@@ -49,7 +49,6 @@ interface Session {
   action?: AsteroidMotionInput | undefined;
   actionSeen: Set<string>;
   lastInputAt: number;
-  stepAt: number;
   disconnectedUntil?: number | undefined;
   targetId?: string | undefined;
   payloadId?: string | undefined;
@@ -173,7 +172,6 @@ export class AsteroidMotionService {
       poseSequence: -1,
       actionSeen: new Set(),
       lastInputAt: now,
-      stepAt: now,
       latchAngle: 0,
       latchRadius: 0,
       surfaceRadius: 0,
@@ -436,7 +434,6 @@ export class AsteroidMotionService {
     session.actionSeen.clear();
     session.pending = undefined;
     session.desired = undefined;
-    session.stepAt = now;
     session.lastInputAt = now;
     this.rockOwners.set(rock.id, session.actor.id);
     session.actor.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
@@ -620,7 +617,6 @@ export class AsteroidMotionService {
     session.anchor = undefined;
     session.poseAt = now;
     session.anchorAt = now;
-    session.stepAt = now;
     session.lastInputAt = now;
     session.poseCredit = this.legalSpeed(session.actor) * ASTEROID_MOTION.poseLeadFrames;
     session.actor.position = { ...position };
@@ -837,20 +833,23 @@ export class AsteroidMotionService {
     this.capCoupledRockVelocity(primary, payload);
   }
 
-  /** Call once per game tick; skip ordinary physics for the owned IDs. Returned
-   * expired actor IDs must be removed by root's existing disconnect lifecycle.
+  /** Call once per authoritative simulation tick; `now` drives wall-clock
+   * deadlines while `simulationFrames` supplies the fixed physics delta.
+   * Returned expired actor IDs must be removed by root's existing disconnect
+   * lifecycle.
    */
-  public step(now: number, rocks: readonly AsteroidData[]): string[] {
+  public step(now: number, rocks: readonly AsteroidData[], simulationFrames = 1): string[] {
     this.assertTime(now);
+    if (!Number.isFinite(simulationFrames) || simulationFrames < 0) {
+      throw new RangeError('Motion requires finite simulation frames');
+    }
+    const framesPerStep = Math.min(ASTEROID_MOTION.maxFramesPerStep, simulationFrames);
     if (rocks.length > 1024) {
       throw new RangeError('Motion world exceeds bounded work');
     }
     const indexed = new Map(rocks.map((rock) => [rock.id, rock]));
     const expired: string[] = [];
     for (const session of this.sessions.values()) {
-      if (now < session.stepAt) {
-        throw new RangeError('Motion clock moved backwards');
-      }
       if (session.disconnectedUntil !== undefined && now >= session.disconnectedUntil) {
         expired.push(session.actor.id);
         this.removeSession(session);
@@ -861,11 +860,7 @@ export class AsteroidMotionService {
         session.wasAlive = alive;
         this.handoff(session, now);
       }
-      let remaining = Math.min(
-        ASTEROID_MOTION.maxFramesPerStep,
-        ((now - session.stepAt) * GAME.FPS) / 1000
-      );
-      session.stepAt = now;
+      let remaining = framesPerStep;
       if (!alive || remaining <= 0) {
         continue;
       }

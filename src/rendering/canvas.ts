@@ -43,6 +43,7 @@ class CanvasManager {
   private canvas: HTMLCanvasElement | null = null;
   private context: CanvasRenderingContext2D | null = null;
   private resizeHandler: (() => void) | null = null;
+  private resizeFrame: number | null = null;
   private readonly screenPos = { x: 0, y: 0 };
   private readonly laserHosts: LiveLaserSource[] = [{ lasers: [] }];
   private readonly liveLaserPositions: Position[] = [];
@@ -60,13 +61,18 @@ class CanvasManager {
       this.context.imageSmoothingQuality = 'high';
 
       // Add resize handler to maintain full-screen coverage
-      this.resizeHandler = this.handleCanvasResize.bind(this);
+      this.resizeHandler = () => {
+        if (this.resizeFrame !== null) {
+          return;
+        }
+        this.resizeFrame = window.requestAnimationFrame(() => {
+          this.resizeFrame = null;
+          this.handleCanvasResize();
+        });
+      };
       window.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('scroll', this.resizeHandler);
-
-      // Initial resize call
-      this.handleCanvasResize();
     }
   }
 
@@ -83,10 +89,19 @@ class CanvasManager {
       return;
     }
     const { width, height } = this.viewportSize();
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
+    // Assigning an unchanged backing dimension still clears pixels and context state.
+    if (this.canvas.width !== width) {
+      this.canvas.width = width;
+    }
+    if (this.canvas.height !== height) {
+      this.canvas.height = height;
+    }
+    if (this.canvas.style.width !== `${width}px`) {
+      this.canvas.style.width = `${width}px`;
+    }
+    if (this.canvas.style.height !== `${height}px`) {
+      this.canvas.style.height = `${height}px`;
+    }
   }
 
   // Handle canvas resizing to maintain full-screen coverage
@@ -102,6 +117,10 @@ class CanvasManager {
 
   // Cleanup method
   destroy(): void {
+    if (this.resizeFrame !== null) {
+      window.cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = null;
+    }
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
       window.visualViewport?.removeEventListener('resize', this.resizeHandler);

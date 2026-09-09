@@ -33,3 +33,7 @@ dist/*
 # Materialized agent config (fetched by .dotagents/bootstrap.sh; not committed)
 
 # Canonical art references and generated vector assets are versioned in georoids-art/.
+
+# Local benchmark results and progress
+/.performance/
+/coverage/

@@ -13,6 +13,11 @@
 // Maximum time to establish a new gameplay socket.
 export const CONNECTION_HANDSHAKE_TIMEOUT_MS = 10_000;
 
+// Maximum time after a socket opens for the join acknowledgment and first
+// authoritative state to arrive. Socket establishment alone is not a usable
+// game session.
+export const JOIN_COMPLETION_TIMEOUT_MS = 10_000;
+
 // How often the client pings the server and checks liveness.
 export const HEARTBEAT_INTERVAL_MS = 2000;
 

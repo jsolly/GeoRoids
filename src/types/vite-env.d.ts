@@ -10,5 +10,6 @@ interface ImportMeta {
 
 // Extend the global Window interface for game controller access
 interface Window {
+  georoidsPerformance?: import('../diagnostics/performanceMetrics').ClientPerformanceMetrics;
   gameController?: import('../core/gameController').GameController;
 }

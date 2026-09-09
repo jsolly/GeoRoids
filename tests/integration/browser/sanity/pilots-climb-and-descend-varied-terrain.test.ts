@@ -23,9 +23,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function observeAuthoritativePositions(page: Page): {
   getPosition: (playerId: string) => Position | undefined;
+  getAngle: (playerId: string) => number | undefined;
 } {
   const decoder = new SnapshotDecoder();
   const positions = new Map<string, Position>();
+  const angles = new Map<string, number>();
 
   page.on('websocket', (socket) => {
     socket.on('framereceived', ({ payload }) => {
@@ -36,6 +38,7 @@ function observeAuthoritativePositions(page: Page): {
       if (parsed['type'] === 'joined') {
         decoder.reset();
         positions.clear();
+        angles.clear();
         return;
       }
       if (parsed['type'] !== 'snapshot') {
@@ -45,13 +48,19 @@ function observeAuthoritativePositions(page: Page): {
       const snapshot = decoder.decode(parsed['data']);
       for (const entity of snapshot.entities) {
         positions.set(entity.id, { ...entity.position });
+        angles.set(entity.id, entity.angle);
       }
     });
   });
 
   return {
     getPosition: (playerId) => positions.get(playerId),
+    getAngle: (playerId) => angles.get(playerId),
   };
+}
+
+function angleDistance(left: number, right: number): number {
+  return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
 }
 
 async function centerOf(page: Page, selector: string): Promise<Position> {
@@ -143,6 +152,17 @@ for (const viewport of [
       }, angle);
 
       const localPlayerId = await game.getLocalPlayerId();
+      await expect
+        .poll(
+          () => {
+            const authoritativeAngle = authoritative.getAngle(localPlayerId);
+            return authoritativeAngle === undefined
+              ? Number.POSITIVE_INFINITY
+              : angleDistance(authoritativeAngle, angle);
+          },
+          { timeout: 5000, interval: 50, message: 'server should acknowledge the test heading' }
+        )
+        .toBeLessThan(0.01);
       await expect
         .poll(
           () => {

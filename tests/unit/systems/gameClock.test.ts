@@ -3,6 +3,7 @@ import {
   consumeTickAccumulator,
   GAME_TICK_MS,
   MAX_CATCH_UP_TICKS,
+  MAX_TICK_DEBT_MS,
   ticksForElapsed,
 } from '../../../shared/gameClock';
 
@@ -25,5 +26,18 @@ describe('game clock', () => {
     const { frames, remainingMs } = consumeTickAccumulator(GAME_TICK_MS * 2.5);
     expect(frames).toBe(2);
     expect(remainingMs).toBeCloseTo(GAME_TICK_MS * 0.5, 8);
+  });
+
+  test('bounded debt catches up a short stall and a one-second stall completely', () => {
+    expect(consumeTickAccumulator(100).frames).toBe(6);
+    expect(consumeTickAccumulator(1000).frames).toBe(MAX_CATCH_UP_TICKS);
+    expect(consumeTickAccumulator(MAX_TICK_DEBT_MS).discardedMs).toBeCloseTo(0, 8);
+  });
+
+  test('a multi-second stall drops excess debt instead of replaying it forever', () => {
+    const result = consumeTickAccumulator(5000);
+    expect(result.frames).toBe(MAX_CATCH_UP_TICKS);
+    expect(result.remainingMs).toBeCloseTo(0, 8);
+    expect(result.discardedMs).toBeCloseTo(4000, 8);
   });
 });

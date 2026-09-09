@@ -12,7 +12,7 @@ import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidR
 import { asteroidRamDamage, shipShipTickDamage } from '../../shared/combat';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
 import { applyFuelPickup, ensureFuelTank, isFuelLoot } from '../../shared/fuel';
-import { consumeTickAccumulator, GAME_TICK_MS } from '../../shared/gameClock';
+import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
   inBlastRadius,
@@ -69,6 +69,7 @@ import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../src/physics/terrain/terrainSession';
 import { getVelocityMagnitude } from '../../src/utils/mathUtils';
 import type { BotShot } from '../ai/botController';
+import { serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
 import {
   type AsteroidHitCause,
@@ -162,6 +163,7 @@ export class GameEngine {
   private gameLoopInterval: NodeJS.Timeout | null = null;
   private isPaused = false; // Track if game is paused due to no players
   private lastTickAtMs = 0;
+  private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
   private clockPrimed = false;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
@@ -218,11 +220,12 @@ export class GameEngine {
       return; // Already running
     }
 
-    this.lastTickAtMs = Date.now();
+    this.lastTickAtMs = globalThis.performance.now();
+    this.nextTickDueAtMs = this.lastTickAtMs + GAME_TICK_MS;
     this.tickAccumulatorMs = 0;
     this.clockPrimed = true;
     this.gameLoopInterval = setInterval(() => {
-      this.stepClock(Date.now());
+      this.stepClock(globalThis.performance.now());
     }, GAME_TICK_MS);
   }
 
@@ -231,19 +234,62 @@ export class GameEngine {
    * A blocked event loop used to increment gameTime once per late interval
    * fire, which froze explode/respawn and made /health.world.gameTime look stuck.
    */
-  public stepClock(nowMs: number): number {
+  public stepClock(nowMs: number = globalThis.performance.now()): number {
+    if (!Number.isFinite(nowMs)) {
+      if (serverPerformanceMetrics.enabled) {
+        serverPerformanceMetrics.recordClock({
+          timerLatenessMs: 0,
+          catchupTicks: 0,
+          debtMs: this.tickAccumulatorMs,
+          discardedDebtMs: 0,
+          invalid: true,
+        });
+      }
+      return 0;
+    }
     if (!this.clockPrimed) {
       this.lastTickAtMs = nowMs;
+      this.nextTickDueAtMs = nowMs + GAME_TICK_MS;
       this.clockPrimed = true;
+      return 0;
+    }
+    if (nowMs < this.lastTickAtMs) {
+      if (serverPerformanceMetrics.enabled) {
+        serverPerformanceMetrics.recordClock({
+          timerLatenessMs: 0,
+          catchupTicks: 0,
+          debtMs: this.tickAccumulatorMs,
+          discardedDebtMs: 0,
+          backwards: true,
+        });
+      }
       return 0;
     }
     const elapsed = nowMs - this.lastTickAtMs;
     this.lastTickAtMs = nowMs;
-    if (!Number.isFinite(elapsed) || elapsed <= 0) {
+    const timerLatenessMs = Math.max(0, nowMs - this.nextTickDueAtMs);
+    this.nextTickDueAtMs = nowMs + GAME_TICK_MS;
+    if (elapsed <= 0) {
+      if (serverPerformanceMetrics.enabled) {
+        serverPerformanceMetrics.recordClock({
+          timerLatenessMs,
+          catchupTicks: 0,
+          debtMs: this.tickAccumulatorMs,
+          discardedDebtMs: 0,
+        });
+      }
       return 0;
     }
     this.tickAccumulatorMs += elapsed;
-    const { frames, remainingMs } = consumeTickAccumulator(this.tickAccumulatorMs);
+    const { frames, remainingMs, discardedMs } = consumeTickAccumulator(this.tickAccumulatorMs);
+    if (serverPerformanceMetrics.enabled) {
+      serverPerformanceMetrics.recordClock({
+        timerLatenessMs,
+        catchupTicks: frames,
+        debtMs: Math.min(this.tickAccumulatorMs, MAX_TICK_DEBT_MS),
+        discardedDebtMs: discardedMs,
+      });
+    }
     this.tickAccumulatorMs = remainingMs;
     for (let i = 0; i < frames; i++) {
       this.advanceOneFrame();
@@ -253,6 +299,19 @@ export class GameEngine {
 
   /** One 60 Hz frame: clock always ticks; combat/field only while a human is in. */
   public advanceOneFrame(): void {
+    if (!serverPerformanceMetrics.enabled) {
+      this.advanceOneFrameInternal();
+      return;
+    }
+    const startedAt = globalThis.performance.now();
+    try {
+      this.advanceOneFrameInternal();
+    } finally {
+      serverPerformanceMetrics.recordTickDuration(globalThis.performance.now() - startedAt);
+    }
+  }
+
+  private advanceOneFrameInternal(): void {
     this.gameTime++;
     if (this.isPaused) {
       return;
@@ -260,7 +319,7 @@ export class GameEngine {
     this.entityManager.cleanupStaleEntities();
     this.entityManager.updateExplosions();
     this.logRespawns(this.entityManager.updateRespawns());
-    for (const id of this.asteroidMotion.step(Date.now(), this.getAllAsteroids())) {
+    for (const id of this.asteroidMotion.step(Date.now(), this.getAllAsteroids(), 1)) {
       this.removePlayer(id);
       this.departedPlayers.push(id);
     }
@@ -310,6 +369,7 @@ export class GameEngine {
       this.gameLoopInterval = null;
     }
     this.lastTickAtMs = 0;
+    this.nextTickDueAtMs = 0;
     this.tickAccumulatorMs = 0;
     this.clockPrimed = false;
   }

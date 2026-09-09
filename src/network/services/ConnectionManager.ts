@@ -26,6 +26,7 @@ import type {
 } from '../../../shared-types';
 import { playLaserSound } from '../../audio/gameSounds';
 import { PALETTE, ROID, SHIP } from '../../constants';
+import { clientPerformance } from '../../diagnostics/performanceMetrics';
 import { entityFactory } from '../../entities/EntityFactory';
 import { AuthoritativeProjectileField } from '../../entities/laser/AuthoritativeProjectileField';
 import { LootField } from '../../entities/loot/LootField';
@@ -62,6 +63,7 @@ import {
   CONNECTION_STALE_TIMEOUT_MS,
   HEARTBEAT_INTERVAL_MS,
   isConnectionStale,
+  JOIN_COMPLETION_TIMEOUT_MS,
 } from './connectionHealth';
 import { nextReconnectDelayMs } from './connectionReconnect';
 import { PlayerListCache } from './playerListCache';
@@ -162,9 +164,12 @@ export class ConnectionManager {
   // Heartbeat / half-open-socket detection (see connectionHealth.ts).
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastServerMessageAt = 0;
+  private joinCompletionTimer: ReturnType<typeof setTimeout> | null = null;
+  private joinCompletionPending = false;
+  private joinAcknowledged = false;
 
-  // Unexpected close retries. Intentional disconnect() / pagehide do not retry.
-  private userRequestedDisconnect = false;
+  // Only unexpected closes retry; terminal join failures already report an error.
+  private disconnectReason: 'requested' | 'join-failed' | null = null;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hasConnectedOnce = false;
@@ -214,7 +219,7 @@ export class ConnectionManager {
     if (this.connectPromise) {
       return this.connectPromise;
     }
-    this.userRequestedDisconnect = false;
+    this.disconnectReason = null;
     this.connectPromise = this.openSocket();
     try {
       await this.connectPromise;
@@ -236,6 +241,7 @@ export class ConnectionManager {
         clearTimeout(timeout);
         this.cancelPendingConnect = null;
         if (error) {
+          clientPerformance.joinFailed();
           reject(error);
         } else {
           resolve();
@@ -302,8 +308,25 @@ export class ConnectionManager {
             return;
           }
           this.lastServerMessageAt = Date.now();
+          const started = clientPerformance.enabled ? performance.now() : 0;
+          let stateMetric: 'keyframeMessageMs' | 'deltaMessageMs' | 'legacyMessageMs' | undefined;
           try {
             const message: ServerMessage = JSON.parse(event.data);
+            if (clientPerformance.enabled) {
+              const payload: unknown = message.data;
+              if (message.type === 'gameState') {
+                stateMetric = 'legacyMessageMs';
+              }
+              if (
+                message.type === 'snapshot' &&
+                payload &&
+                typeof payload === 'object' &&
+                'kind' in payload
+              ) {
+                stateMetric = payload.kind === 'keyframe' ? 'keyframeMessageMs' : 'deltaMessageMs';
+              }
+              clientPerformance.record('parseMs', performance.now() - started);
+            }
             this.handleServerMessage(message);
           } catch (error) {
             logger.error(
@@ -311,6 +334,15 @@ export class ConnectionManager {
               'Failed to parse server message',
               error instanceof Error ? error : new Error(String(error))
             );
+            clientPerformance.count('messageFailures');
+          } finally {
+            if (clientPerformance.enabled) {
+              const elapsedMs = performance.now() - started;
+              clientPerformance.record('messageMs', elapsedMs);
+              if (stateMetric) {
+                clientPerformance.record(stateMetric, elapsedMs);
+              }
+            }
           }
         };
       } catch (cause) {
@@ -341,17 +373,20 @@ export class ConnectionManager {
     this.hasInitializedAsteroidsForConnection = false;
     // Preserve the visible belt while the next socket rejoins the authoritative world.
     setHoldEmptyHarpoonField(true);
-    logger.warn('NETWORK', 'WebSocket connection closed');
+    if (this.disconnectReason === null) {
+      logger.warn('NETWORK', 'WebSocket connection closed');
+    }
     logger.info('STATE', 'transport_closed', {
       closedAt: Date.now(),
       wasConnected,
-      userRequested: this.userRequestedDisconnect,
+      userRequested: this.disconnectReason === 'requested',
+      reason: this.disconnectReason ?? 'unexpected',
       lastAcceptedSnapshotSequence,
       ...(serverReleaseId ? { serverReleaseId } : {}),
     });
     // Failed handshakes are retried by the awaiting reconnect attempt; only
     // a previously open transport starts a new retry sequence here.
-    if (wasConnected && !this.userRequestedDisconnect && this.hasConnectedOnce) {
+    if (wasConnected && this.disconnectReason === null && this.hasConnectedOnce) {
       this.scheduleReconnect();
     }
   }
@@ -393,8 +428,11 @@ export class ConnectionManager {
     }
   }
 
-  disconnect(options?: { newSession?: boolean }): void {
-    this.userRequestedDisconnect = true;
+  disconnect(options?: { newSession?: boolean; reason?: 'requested' | 'join-failed' }): void {
+    this.disconnectReason = options?.reason ?? 'requested';
+    clientPerformance.joinFailed();
+    clientPerformance.cancelRecovery();
+    this.clearJoinCompletionTimer();
     this.cancelPendingConnect?.(new Error('WebSocket connection cancelled'));
     if (this.state.socket?.readyState === WebSocket.OPEN && this.asteroidInteractions) {
       this.sendPayload({ type: 'leave', data: {} });
@@ -452,7 +490,7 @@ export class ConnectionManager {
   }
 
   private scheduleReconnect(): void {
-    if (this.userRequestedDisconnect || this.reconnectTimer !== null) {
+    if (this.disconnectReason !== null || this.reconnectTimer !== null) {
       return;
     }
     const delay = nextReconnectDelayMs(this.reconnectAttempt);
@@ -487,7 +525,7 @@ export class ConnectionManager {
       this.reconnectTimer = null;
       this.reconnectAttempt += 1;
       void this.connect().catch(() => {
-        if (!this.state.socket && !this.userRequestedDisconnect) {
+        if (!this.state.socket && this.disconnectReason === null) {
           this.scheduleReconnect();
         }
       });
@@ -504,6 +542,46 @@ export class ConnectionManager {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
+  }
+
+  private clearJoinCompletionTimer(): void {
+    if (this.joinCompletionTimer !== null) {
+      clearTimeout(this.joinCompletionTimer);
+      this.joinCompletionTimer = null;
+    }
+    this.joinCompletionPending = false;
+    this.joinAcknowledged = false;
+  }
+
+  private armJoinCompletionTimer(): void {
+    this.clearJoinCompletionTimer();
+    this.joinCompletionPending = true;
+    this.joinAcknowledged = false;
+    this.joinCompletionTimer = setTimeout(() => {
+      if (!this.joinCompletionPending) {
+        return;
+      }
+      this.failJoinCompletion(
+        new Error('Timed out waiting for the joined acknowledgment and authoritative state')
+      );
+    }, JOIN_COMPLETION_TIMEOUT_MS);
+  }
+
+  private failJoinCompletion(error: Error, force = false): void {
+    if (!force && !this.joinCompletionPending) {
+      return;
+    }
+    this.clearJoinCompletionTimer();
+    // Settle recovery before intentional teardown clears it. disconnect()
+    // settles any pending join and leaves both methods idempotent when idle.
+    clientPerformance.recoveryFailed();
+    logger.error('NETWORK', 'Failed to complete server join', error);
+    this.disconnect({ reason: 'join-failed' });
+    window.dispatchEvent(
+      new CustomEvent('networkPermanentlyDisconnected', {
+        detail: { reason: 'Join did not complete' },
+      })
+    );
   }
 
   /**
@@ -621,8 +699,7 @@ export class ConnectionManager {
       const reason = this.motionPrediction.recoveryReason();
       if (reason && !this.snapshotResyncPending) {
         logger.warn('NETWORK', reason);
-        this.sendMessage({ type: 'snapshotResync', data: {} });
-        this.snapshotResyncPending = true;
+        this.sendSnapshotResync();
       }
       if (!pose && this.motionPrediction.shouldSuppressPose()) {
         return;
@@ -732,7 +809,10 @@ export class ConnectionManager {
       id: this.clientId,
       resumable: !!this.resumeToken,
     });
-    this.sendPayload(joinMessage);
+    this.armJoinCompletionTimer();
+    if (!this.sendPayload(joinMessage)) {
+      this.failJoinCompletion(new Error('Failed to send join message'), true);
+    }
   }
 
   // Initialize asteroids after the server acknowledges join
@@ -929,7 +1009,13 @@ export class ConnectionManager {
         );
         break;
       case 'error':
-        // Handle error messages from server
+        if (this.joinCompletionPending && !this.joinAcknowledged) {
+          const messageText = typeof data === 'string' ? data : 'Server rejected the join request';
+          this.failJoinCompletion(new Error(messageText));
+          break;
+        }
+        // Post-join command errors are expected to be reported without
+        // tearing down an otherwise healthy gameplay session.
         logger.warn('NETWORK', 'Server error', { error: data });
         break;
       default:
@@ -938,6 +1024,7 @@ export class ConnectionManager {
   }
 
   private resetSnapshotSession(): void {
+    this.clearJoinCompletionTimer();
     this.snapshotDecoder.reset();
     this.snapshotNegotiated = false;
     this.snapshotOffered = false;
@@ -945,6 +1032,7 @@ export class ConnectionManager {
     this.localHarpoonAcknowledged = false;
     this.lastAcceptedSnapshotSequence = 0;
     delete this.serverReleaseId;
+    clientPerformance.serverReleaseId = undefined;
   }
 
   private requestSnapshotResync(
@@ -952,6 +1040,7 @@ export class ConnectionManager {
     metadata?: SnapshotDiagnosticMetadata,
     receivedAt = Date.now()
   ): void {
+    clientPerformance.count('messageFailures');
     logger.error(
       'STATE',
       'snapshot_rejected',
@@ -975,9 +1064,20 @@ export class ConnectionManager {
       return;
     }
     if (!this.snapshotResyncPending) {
-      this.snapshotResyncPending = true;
-      this.sendMessage({ type: 'snapshotResync', data: {}, timestamp: Date.now() });
+      this.sendSnapshotResync();
     }
+  }
+
+  private sendSnapshotResync(): boolean {
+    if (this.snapshotResyncPending) {
+      return false;
+    }
+    const sent = this.sendMessage({ type: 'snapshotResync', data: {}, timestamp: Date.now() });
+    if (sent) {
+      this.snapshotResyncPending = true;
+      clientPerformance.count('resyncs');
+    }
+    return sent;
   }
 
   private handleSnapshot(data: unknown): void {
@@ -991,7 +1091,16 @@ export class ConnectionManager {
       if (!this.snapshotNegotiated) {
         throw new Error('Snapshot was not negotiated');
       }
+      const decodeStarted = clientPerformance.enabled ? performance.now() : 0;
       const state = this.snapshotDecoder.decode(data);
+      if (clientPerformance.enabled) {
+        clientPerformance.record(
+          data && typeof data === 'object' && 'kind' in data && data.kind === 'keyframe'
+            ? 'keyframeDecodeMs'
+            : 'deltaDecodeMs',
+          performance.now() - decodeStarted
+        );
+      }
       this.snapshotResyncPending = false;
       this.applyReceivedGameState(state, true);
       if (sequence !== undefined) {
@@ -1037,7 +1146,24 @@ export class ConnectionManager {
     const wasDead = Boolean(
       localBefore && (localBefore.ship.health <= 0 || localBefore.ship.exploding)
     );
+    const applyStarted = clientPerformance.enabled ? performance.now() : 0;
     this.handleGameState(data, complete);
+    const localStateApplied =
+      (clientPerformance.enabled || this.joinCompletionPending) &&
+      Boolean(
+        this.localPlayerId &&
+          PlayerManager.getInstance().getLocalPlayer() &&
+          data.entities?.some((entity) => entity.id === this.localPlayerId)
+      );
+    if (clientPerformance.enabled) {
+      clientPerformance.record('applyMs', performance.now() - applyStarted);
+      if (localStateApplied) {
+        clientPerformance.stateApplied();
+      }
+    }
+    if (this.joinCompletionPending && this.joinAcknowledged && localStateApplied) {
+      this.clearJoinCompletionTimer();
+    }
     if (!wasDead) {
       return;
     }
@@ -1343,6 +1469,9 @@ export class ConnectionManager {
       this.state.socket?.close(1002, 'Unsupported snapshot negotiation');
       return;
     }
+    if (this.joinCompletionPending) {
+      this.joinAcknowledged = true;
+    }
     this.asteroidInteractions =
       this.snapshotNegotiated &&
       data.asteroidInteractions === 1 &&
@@ -1355,8 +1484,10 @@ export class ConnectionManager {
     }
     if (data.serverReleaseId) {
       this.serverReleaseId = data.serverReleaseId;
+      clientPerformance.serverReleaseId = data.serverReleaseId;
     } else {
       delete this.serverReleaseId;
+      clientPerformance.serverReleaseId = undefined;
     }
     this.lastDamageStateLogAt = 0;
     setClientLogContext({ playerId: data.id, connectionId: this.connectionId });

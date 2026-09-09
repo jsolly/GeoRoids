@@ -27,6 +27,7 @@ import {
 import { bindGameAudio } from '../audio/spatialAudio';
 import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
+import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { entityFactory } from '../entities/EntityFactory';
 import { AuthoritativeProjectileField } from '../entities/laser/AuthoritativeProjectileField';
 import { LootField } from '../entities/loot/LootField';
@@ -420,8 +421,10 @@ export class GameController {
 
   async startGame(playerName?: string, kitId?: ShipKitId): Promise<void> {
     logger.debug('GAME_CONTROLLER', 'startGame called', { kitId });
+    const joinStartedAt = performance.now();
     try {
       this.resetSessionForNewGame();
+      clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
       setPlayView(true);
       this.ensureFlightControls();
@@ -454,6 +457,7 @@ export class GameController {
 
       window.dispatchEvent(new CustomEvent('gameStart'));
     } catch (error) {
+      clientPerformance.joinFailed();
       this.gameStateManager.setIsGameRunning(false);
       this.networkManager.disconnect();
       resetThrustSources();
@@ -1098,6 +1102,11 @@ export class GameController {
       // Show permanent disconnection message
       this.showConnectionFailureMessage('network', 'Connection permanently lost');
     });
+  }
+
+  /** Resume from current authoritative state instead of replaying hidden presentation time. */
+  resetPresentationClock(): void {
+    this.lifecycleAccumulatorMs = 0;
   }
 
   // Update game state (movement, physics, etc.)

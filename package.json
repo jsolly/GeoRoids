@@ -43,7 +43,10 @@
     "check:wiki": "tsx scripts/wiki-check.ts",
     "wiki:review": "tsx scripts/wiki-check.ts --accept",
     "wiki:media": "tsx scripts/wiki-media.ts",
-    "wiki:media:check": "tsx scripts/wiki-media.ts --verify"
+    "wiki:media:check": "tsx scripts/wiki-media.ts --verify",
+    "test:coverage": "vitest run tests/unit/ --coverage",
+    "benchmark:realtime": "./scripts/test-runner.sh --benchmark-client",
+    "benchmark:load": "./scripts/test-runner.sh --benchmark-load"
   },
   "repository": {
     "type": "git",
@@ -71,6 +74,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
     "@types/jsdom": "^21.1.1",
+    "@vitest/coverage-v8": "5.0.0",
     "canvas": "^3.2.3",
     "concurrently": "^10.0.5",
     "jsdom": "^26.1.0",

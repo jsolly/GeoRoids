@@ -29,7 +29,7 @@ test('successive frames reuse shot sources and remove a departed pilot without r
   vi.spyOn(network, 'getAllPlayers').mockImplementation(() => players);
   const collect = vi.spyOn(contourLasers, 'liveLaserPositions');
   const paint = vi.spyOn(contourLasers, 'drawContourLaserTicks');
-  const belt = new RoidBelt(false);
+  const belt = new RoidBelt();
   const draw = () => canvasManager.drawGame(local, belt, 0, 0, '', local.lives, players);
   const observedPositions = () => paint.mock.calls.at(-1)?.[1].map(({ x, y }) => ({ x, y }));
 

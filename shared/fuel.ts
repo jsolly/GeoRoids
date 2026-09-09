@@ -62,17 +62,6 @@ export function trySpendEmpFuel(tank: FuelTank, cost: number = FUEL.EMP_COST): b
   return true;
 }
 
-/** Tests without a tank still activate; live ships always carry fuel/maxFuel. */
-export function trySpendTrackedEmpFuel(
-  tank: Partial<FuelTank>,
-  cost: number = FUEL.EMP_COST
-): boolean {
-  if (tank.fuel === undefined || tank.maxFuel === undefined) {
-    return true;
-  }
-  return trySpendEmpFuel(tank as FuelTank, cost);
-}
-
 export function applyFuelSnapshot(
   tank: FuelTank & { lastLocalFuelWriteMs?: number },
   data: { fuel?: number; maxFuel?: number },

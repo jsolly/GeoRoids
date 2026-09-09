@@ -65,13 +65,6 @@ export class Player {
     mass: number;
   };
 
-  // Interpolation state for smooth movement (disabled for now to fix popping issue)
-  // private targetPosition?: Position;
-  // private targetVelocity?: Position;
-  // private targetAngle?: number;
-  // private interpolationStartTime?: number;
-  // private interpolationDuration: number = 100; // 100ms interpolation
-
   constructor(params: {
     id: string;
     name: string;
@@ -520,50 +513,6 @@ export class Player {
   getFrictionCoefficient(): number {
     return this.type === 'bot' ? 0.02 : 0.01; // Bot-specific friction
   }
-
-  // Update interpolation for smooth movement (disabled for now to fix popping issue)
-  // updateInterpolation(): void {
-  //   if (this.type === 'local' || !this.interpolationStartTime) {
-  //     return;
-  //   }
-  //
-  //   const now = Date.now();
-  //   const elapsed = now - this.interpolationStartTime;
-  //   const progress = Math.min(elapsed / this.interpolationDuration, 1);
-  //
-  //   // Interpolate position
-  //   if (this.targetPosition) {
-  //     this.ship.position.x += (this.targetPosition.x - this.ship.position.x) * progress;
-  //     this.ship.position.y += (this.targetPosition.y - this.ship.position.y) * progress;
-  //   }
-  //
-  //   // Interpolate velocity
-  //   if (this.targetVelocity) {
-  //     this.ship.velocity.x += (this.targetVelocity.x - this.ship.velocity.x) * progress;
-  //     this.ship.velocity.y += (this.targetVelocity.y - this.ship.velocity.y) * progress;
-  //   }
-  //
-  //   // Interpolate angle
-  //   if (this.targetAngle !== undefined) {
-  //     let angleDiff = this.targetAngle - this.ship.angle;
-  //     // Handle angle wrapping
-  //     if (angleDiff > Math.PI) {
-  //       angleDiff -= 2 * Math.PI;
-  //     }
-  //     if (angleDiff < -Math.PI) {
-  //       angleDiff += 2 * Math.PI;
-  //     }
-  //     this.ship.angle += angleDiff * progress;
-  //   }
-  //
-  //   // If interpolation is complete, clear targets
-  //   if (progress >= 1) {
-  //     this.targetPosition = undefined;
-  //     this.targetVelocity = undefined;
-  //     this.targetAngle = undefined;
-  //     this.interpolationStartTime = undefined;
-  //   }
-  // }
 
   // Get current state for network transmission
   getStateForNetwork() {

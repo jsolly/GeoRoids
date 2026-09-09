@@ -35,7 +35,7 @@ test(
     await expect
       .poll(
         async () => {
-          await game.runGameFrames(4);
+          await game.waitForAnimationFrames(4);
           const loot = await game.getLoot();
           const shard = loot.find((item) => item.kind === 'shard');
           if (shard) {
@@ -57,7 +57,7 @@ test(
     await expect
       .poll(
         async () => {
-          await game.runGameFrames(6);
+          await game.waitForAnimationFrames(6);
           return game.getScore();
         },
         { timeout: 10000, message: 'flying over the shard should tick score' }
@@ -67,7 +67,7 @@ test(
     await expect
       .poll(
         async () => {
-          await game.runGameFrames(4);
+          await game.waitForAnimationFrames(4);
           return game.getShipMass();
         },
         { timeout: 8000, message: 'collecting the shard should grow via the #458 mass path' }

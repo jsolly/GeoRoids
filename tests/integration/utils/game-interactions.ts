@@ -104,9 +104,12 @@ export class GameInteractions {
       const y = box.y + box.height / 2;
       await this.page.mouse.move(x, y);
       await this.page.mouse.down({ button: 'left' });
-      await this.runGameFrames(10);
-      await this.page.mouse.up({ button: 'left' });
-      await this.runGameFrames(5);
+      try {
+        await this.waitForAnimationFrames(10);
+      } finally {
+        await this.page.mouse.up({ button: 'left' });
+      }
+      await this.waitForAnimationFrames(5);
       if (i < count && delayMs > 0) {
         await this.page.waitForTimeout(delayMs);
       }
@@ -131,54 +134,43 @@ export class GameInteractions {
       });
   }
 
-  /**
-   * Move the ship in a specified direction
-   */
-  async moveShip(
-    direction: 'left' | 'right' | 'up' | 'down',
-    durationMs: number = 1000
+  /** Hold a real movement key while the browser runs the game. */
+  async holdMovementKey(
+    key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp',
+    durationMs = 1000
   ): Promise<void> {
-    // Headless Chromium may not run requestAnimationFrame during Playwright timeouts.
-    // Drive the real game loop while thrust/turn are active (same physics as keybindings).
-    await this.page.evaluate(
-      async ({ moveDirection, holdMs }) => {
-        const gc = window.gameController;
-        const ship = gc?.getCurrShip();
-        if (!gc || !ship) {
-          throw new Error('Local ship or gameController.updateGame is not available');
-        }
-        const turnSpeedRadPerFrame = (450 * Math.PI) / (180 * 60);
-        if (moveDirection === 'left') {
-          ship.angularVelocity = turnSpeedRadPerFrame;
-        } else if (moveDirection === 'right') {
-          ship.angularVelocity = -turnSpeedRadPerFrame;
-        } else {
-          ship.thrusting = true;
-        }
-        const deadline = performance.now() + holdMs;
-        while (performance.now() < deadline) {
-          gc.updateGame();
-          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-        }
-        ship.thrusting = false;
-        ship.angularVelocity = 0;
-        gc.updateGame();
-      },
-      { moveDirection: direction, holdMs: durationMs }
-    );
+    await this.page.keyboard.down(key);
+    try {
+      await this.page.waitForTimeout(durationMs);
+    } finally {
+      await this.page.keyboard.up(key);
+    }
   }
 
-  /** Advance the client game loop for a number of frames (headless-safe). */
-  async runGameFrames(frameCount: number): Promise<void> {
+  /** Observe browser frames, including UI frames after the game stops. */
+  async waitForAnimationFrames(frameCount: number): Promise<void> {
+    if (!Number.isInteger(frameCount) || frameCount < 1) {
+      throw new RangeError('Frame count must be a positive integer');
+    }
     await this.page.evaluate(async (frames) => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('gameController.updateGame is not available');
-      }
-      for (let i = 0; i < frames; i++) {
-        gc.updateGame();
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      }
+      await new Promise<void>((resolve, reject) => {
+        let remaining = frames;
+        let animationFrame = 0;
+        const timeout = window.setTimeout(() => {
+          cancelAnimationFrame(animationFrame);
+          reject(new Error(`Timed out waiting for ${frames} animation frames`));
+        }, 15000);
+        const observeFrame = () => {
+          remaining--;
+          if (remaining === 0) {
+            clearTimeout(timeout);
+            resolve();
+          } else {
+            animationFrame = requestAnimationFrame(observeFrame);
+          }
+        };
+        animationFrame = requestAnimationFrame(observeFrame);
+      });
     }, frameCount);
   }
 
@@ -829,7 +821,7 @@ export class GameInteractions {
       },
       { targetX, targetY }
     );
-    await this.runGameFrames(5);
+    await this.waitForAnimationFrames(5);
   }
 
   /**
@@ -940,7 +932,7 @@ export class GameInteractions {
       }
       const lane = await findCurrentFiringLane();
       if (!lane) {
-        await this.runGameFrames(1);
+        await this.waitForAnimationFrames(1);
         continue;
       }
 
@@ -959,7 +951,7 @@ export class GameInteractions {
         if (await targetGone()) {
           return;
         }
-        await this.runGameFrames(1);
+        await this.waitForAnimationFrames(1);
       }
     }
     throw new Error(`Asteroid ${asteroid.id} was not destroyed by laser within ${timeoutMs}ms`);
@@ -1144,7 +1136,7 @@ export class GameInteractions {
       if (ready) {
         return;
       }
-      await this.runGameFrames(3);
+      await this.waitForAnimationFrames(3);
     }
     throw new Error(`Timed out waiting for combat readiness after ${timeoutMs}ms`);
   }
@@ -1161,7 +1153,7 @@ export class GameInteractions {
 
       const world = await getWorldDiagnostics();
       if (world && world.asteroids >= minCount) {
-        await this.runGameFrames(5);
+        await this.waitForAnimationFrames(5);
       } else {
         await this.page.waitForTimeout(200);
       }
@@ -1262,13 +1254,13 @@ export class GameInteractions {
         )[0];
       if (!target) {
         usedAsteroids.clear();
-        await this.runGameFrames(3);
+        await this.waitForAnimationFrames(3);
         continue;
       }
       usedAsteroids.add(target.id);
       lastImpact = { x: target.x, y: target.y };
       await this.placeShipAt(target.x, target.y);
-      await this.runGameFrames(5);
+      await this.waitForAnimationFrames(5);
       await this.page.waitForTimeout(100);
 
       if ((await this.getLives()) < startLives) {
@@ -1337,7 +1329,7 @@ export class GameInteractions {
     const minDistance = 75;
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      await this.runGameFrames(20);
+      await this.waitForAnimationFrames(20);
       const placement = await this.page.evaluate(
         ({ deathPosition, minDistance }) => {
           const ship = window.gameController?.getCurrShip();
@@ -1575,10 +1567,9 @@ export class GameInteractions {
       // wall through the real client collision path.
       await this.placeShipAt((deathPosition.x * 3000) / 3150, (deathPosition.y * 3000) / 3150);
       await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
-      // Playwright timeouts do not reliably advance requestAnimationFrame in
-      // headless Chromium. Drive enough real collision frames to kill even a
-      // ship whose collected mass raised its health above the base 100.
-      await this.runGameFrames(4);
+      // Observe enough collision frames for a ship whose collected mass raised
+      // its health above the base 100, including the final game-over transition.
+      await this.waitForAnimationFrames(4);
       await this.page.waitForTimeout(100);
       if ((await this.getLives()) < livesBefore) {
         await this.requireObservedDeathCause('boundary');

@@ -51,6 +51,11 @@ operation and its assertion; cleanup must also complete.
 - Reuse existing geometry or simulation functions when arranging a scene. Do
   not implement a second physics engine in test helpers.
 
+Browser scenarios use the running game's animation clock. Use
+`waitForAnimationFrames` or wait for the expected state; never call `updateGame`
+alongside the active loop. Hold real keyboard, mouse, or touch input to test
+controls, and release held input in cleanup.
+
 Begin observing transient banners, shots, and events before triggering them.
 Use bounded waits for the actual condition. An immediate destruction event can
 precede the next loot snapshot. A socket receive log can precede validation.

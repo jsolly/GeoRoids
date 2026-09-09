@@ -533,6 +533,8 @@ function makeAbilityHost(kitId: ShipKitId, position: Position, angle = 0): Abili
     angle,
     exploding: false,
     health: getShipKit(kitId).maxHealth,
+    fuel: FUEL.START,
+    maxFuel: FUEL.MAX,
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
     shieldTimer: 0,
@@ -866,8 +868,6 @@ function makeSkirmisherDemo(): Demo {
 
 function makeQuakeDemo(): Demo {
   const host = makeAbilityHost('quake', { x: 0, y: 0 });
-  host.fuel = FUEL.START;
-  host.maxFuel = FUEL.MAX;
   const rocks: AbilityBody[] = [
     {
       id: 'quake-ice',

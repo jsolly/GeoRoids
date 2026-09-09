@@ -138,7 +138,3 @@ export function satelliteProfileAt(index: number): SatelliteProfile {
   const normalized = Math.abs(Math.trunc(index)) % SATELLITE_PROFILES.length;
   return SATELLITE_PROFILES[normalized] ?? SATELLITE_PROFILES[0];
 }
-
-export function satelliteProfileForType(typeId: SatelliteTypeId): SatelliteProfile {
-  return SATELLITE_PROFILES.find((profile) => profile.typeId === typeId) ?? SATELLITE_PROFILES[0];
-}

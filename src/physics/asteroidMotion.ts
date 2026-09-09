@@ -84,15 +84,6 @@ export function stepAsteroidMotion(
   return { position: nextPosition, velocity: nextVelocity };
 }
 
-/** Advance one 60 FPS tick (or a dt-scaled fraction), then keep the belt in-field. */
-export function stepAsteroidPosition(
-  position: { x: number; y: number },
-  velocity: { x: number; y: number },
-  tickScale = 1
-): { x: number; y: number } {
-  return stepAsteroidMotion(position, velocity, tickScale).position;
-}
-
 /** Convert a wall-clock frame delta into 60 FPS tick units. */
 export function asteroidTickScale(dtMs: number): number {
   const frameMs = 1000 / GAME.FPS;

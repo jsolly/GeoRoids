@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 test('status controls show actual log writes and reject unhealthy responses on both viewport sizes', async () => {
   const page = browserManager.getCurrentPage();
@@ -10,7 +10,13 @@ test('status controls show actual log writes and reject unhealthy responses on b
     throw new Error('Status test page unavailable');
   }
   const errors: string[] = [];
+  const consoleIssues: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      consoleIssues.push(message.text());
+    }
+  });
   for (const viewport of [
     { width: 1280, height: 900 },
     { width: 390, height: 844 },
@@ -23,6 +29,15 @@ test('status controls show actual log writes and reject unhealthy responses on b
     await page.waitForFunction(() =>
       document.getElementById('loggingHealth')?.textContent?.includes('Connected log clients:')
     );
+    await page.getByRole('button', { name: 'Connect Game', exact: true }).click();
+    await page.getByRole('button', { name: 'Connect Logs', exact: true }).click();
+    await page.waitForFunction(() =>
+      document.getElementById('overallStatus')?.textContent?.includes('Both WebSockets Connected')
+    );
+    await page.getByRole('button', { name: 'Send Client Log', exact: true }).click();
+    await page.waitForFunction(
+      () => document.getElementById('clientLogBtn')?.textContent === 'Sent!'
+    );
     await page.getByRole('button', { name: 'Send Server Log', exact: true }).click();
     await page.waitForFunction(() =>
       document.getElementById('serverLogBtn')?.textContent?.includes('Written')
@@ -30,7 +45,19 @@ test('status controls show actual log writes and reject unhealthy responses on b
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
     );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`status-controls-${viewport.width}.png`),
+      fullPage: true,
+    });
+    await page.getByRole('button', { name: 'Disconnect Game', exact: true }).click();
+    await page.getByRole('button', { name: 'Disconnect Logs', exact: true }).click();
+    await page.waitForFunction(() =>
+      document
+        .getElementById('overallStatus')
+        ?.textContent?.includes('Both WebSockets Disconnected')
+    );
   }
+  expect(consoleIssues).toEqual([]);
   await page.route('**/health', (route) =>
     route.fulfill({
       status: 503,

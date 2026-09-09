@@ -388,14 +388,23 @@ export class GameEngine {
    * disconnects. Intended for integration/E2E test harnesses only.
    */
   public resetForTesting(): void {
+    const closeErrors: Error[] = [];
     for (const entity of this.entityManager.getAllEntities()) {
       if (entity.type === 'human' && entity.ws) {
+        if (entity.ws.readyState === entity.ws.CLOSED) {
+          continue;
+        }
         try {
           entity.ws.close(1000, 'Test world reset');
-        } catch {
-          // Socket may already be closed.
+        } catch (error) {
+          closeErrors.push(
+            new Error(`Failed to close socket for player ${entity.id}`, { cause: error })
+          );
         }
       }
+    }
+    if (closeErrors.length > 0) {
+      throw new AggregateError(closeErrors, 'Test world reset could not close every human socket');
     }
     this.resetGameState();
     this.isPaused = true;

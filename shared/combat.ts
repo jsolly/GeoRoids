@@ -1,6 +1,5 @@
 import type { Position } from '../shared-types';
 import { DAMAGE, DEBUG, SHIP } from '../src/constants';
-import { pointsForRoidSize } from '../src/entities/roid/roidScore';
 
 /** Collision radius shared by human and bot ships. */
 export const SHIP_COLLISION_RADIUS = SHIP.SIZE / 2;
@@ -59,10 +58,6 @@ export function shipShipTickDamage(): number {
     1,
     Math.round(DAMAGE.PLAYER_COLLISION_PER_SECOND * (DAMAGE.PLAYER_COLLISION_INTERVAL_MS / 1000))
   );
-}
-
-export function asteroidDestroyPoints(radius: number): number {
-  return pointsForRoidSize(radius);
 }
 
 export function findShipAsteroidOverlaps(

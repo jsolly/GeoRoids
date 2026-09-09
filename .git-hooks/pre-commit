@@ -14,7 +14,7 @@ gate_begin_commit "GeoRoids"    # staged secrets/lint and ordinary commit fast p
 gate_require_node               # enforce the pinned Node (.nvmrc), not whatever's on PATH
 
 # --- Quality gate (run_step: silent on green, full output + abort on red) ---
-run_step "dep grounding" gate_check_dep_grounding .git-hooks/pre-commit scripts/*.sh railway.json
+run_step "dep grounding" gate_check_dep_grounding .git-hooks/pre-commit scripts/*.sh
 run_step "lint"   npm run lint
 run_step "yaml lint" npm run check:yaml
 run_step "actionlint" npm run check:actions

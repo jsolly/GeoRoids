@@ -12,7 +12,7 @@ export interface ObservedLaser {
   onCanvas: boolean;
 }
 
-/** Park each pilot before waiting through the next pilot's join countdown. */
+/** Initially park each pilot, then re-park all of them after every client joins. */
 export async function bootLaserClients(browserManager: BrowserManager, count: 2 | 3 = 2) {
   const pages: Page[] = [];
   const games: GameInteractions[] = [];
@@ -30,6 +30,7 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
   }
   await Promise.all(games.map((game) => game.waitForCombatReady()));
   await Promise.all(games.map((game) => game.waitForRemoteHumanPlayers(count - 1)));
+  await parkLaserClients(games);
   const [page1, page2, page3] = pages;
   const [game1, game2, game3] = games;
   if (!page1 || !page2 || !game1 || !game2) {
@@ -48,6 +49,12 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
 /** Keep the actual simulation running in a clear, nearby firing lane. */
 export async function parkLaserClient(game: GameInteractions, index = 0): Promise<void> {
   await game.placeShipAt(ROID.FIELD_RADIUS + 500, index * 100);
+}
+
+/** Re-establish every participant's clear firing lane after all clients join. */
+export async function parkLaserClients(games: readonly GameInteractions[]): Promise<void> {
+  await Promise.all(games.map((game, index) => parkLaserClient(game, index)));
+  await Promise.all(games.map((game) => game.waitForCombatReady()));
 }
 
 export async function localPlayerId(page: Page): Promise<string> {

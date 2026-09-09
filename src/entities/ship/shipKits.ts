@@ -41,8 +41,6 @@ export const CLASSIC_HULL: HullProfile = {
   beam: 0.5,
 };
 
-/** Retired placeholder. Play kits bake from `hullOutlines.ts`, not this triangle. */
-export const KIT_HULL_PLACEHOLDER = CLASSIC_HULL;
 export const KIT_HULLS_ARE_PLACEHOLDERS = false;
 
 /**

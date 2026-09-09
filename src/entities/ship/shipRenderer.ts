@@ -12,7 +12,6 @@ import {
 } from '../../rendering/vectorJuice';
 import { hexToRgba } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
-import { logger } from '../../utils/Logger';
 import { drawSoftFactionMark } from '../player/factionMarkPainters';
 import { findHarpoonFieldBody, getHarpoonField, harpoonSurfaceToward } from './harpoonField';
 import {
@@ -179,42 +178,6 @@ export function strokePhosphorSegment(
   trace();
   ctx.stroke();
   ctx.restore();
-}
-
-// Helper function to draw a targeting line extending from the ship
-export function drawTargetingLine(
-  centerX: number,
-  centerY: number,
-  angle: number,
-  shipRadius: number,
-  lineLength: number = 300,
-  color: string = PALETTE.HUD,
-  alpha: number = 0.6
-): void {
-  const ctx = canvasManager.getContext();
-  if (!ctx) {
-    return;
-  }
-
-  // Calculate end point of the targeting line
-  const endX = centerX + Math.cos(angle) * (shipRadius + lineLength);
-  const endY = centerY - Math.sin(angle) * (shipRadius + lineLength);
-
-  // Set line style with transparency
-  ctx.strokeStyle = color;
-  ctx.globalAlpha = alpha;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]); // Dashed line for better visibility
-
-  // Draw the targeting line
-  ctx.beginPath();
-  ctx.moveTo(centerX, centerY);
-  ctx.lineTo(endX, endY);
-  ctx.stroke();
-
-  // Reset line style
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 1.0;
 }
 
 export function drawGenericThruster(
@@ -857,65 +820,5 @@ function drawFloatingHealthCapsule(
     ctx.textAlign = 'center';
     ctx.fillText(`${Math.ceil(ship.health)}/${ship.maxHealth}`, screenX, barY - 10);
   }
-  ctx.restore();
-}
-
-// Helper function to draw player health bar in the HUD
-export function drawPlayerHealthBar(health: number, maxHealth: number): void {
-  const ctx = canvasManager.getContext();
-  const canvas = canvasManager.getCanvas();
-  if (!ctx || !canvas) {
-    return;
-  }
-
-  // Debug logging for health bar values
-  if (health !== maxHealth) {
-    logger.debug('HEALTH_BAR', 'Drawing health bar with non-full health', {
-      health,
-      maxHealth,
-      healthPercent: health / maxHealth,
-    });
-  }
-
-  const barWidth = 200;
-  const barHeight = 20;
-  const barX = canvas.width - barWidth - 20;
-  const barY = 20;
-
-  // Health percentage
-  const healthPercent = health / maxHealth;
-  const currentWidth = barWidth * healthPercent;
-
-  ctx.save();
-
-  // Background (empty health bar)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(barX, barY, barWidth, barHeight);
-
-  // Health bar color based on health level
-  let healthColor: string;
-  if (healthPercent > 0.6) {
-    healthColor = PALETTE.HEALTH;
-  } else if (healthPercent > 0.3) {
-    healthColor = PALETTE.LASER_LOCAL;
-  } else {
-    healthColor = PALETTE.DANGER;
-  }
-
-  // Current health
-  ctx.fillStyle = healthColor;
-  ctx.fillRect(barX, barY, currentWidth, barHeight);
-
-  // Border
-  ctx.strokeStyle = PALETTE.HUD;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(barX, barY, barWidth, barHeight);
-
-  // Health text
-  ctx.fillStyle = PALETTE.HUD;
-  ctx.font = '14px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${Math.ceil(health)}/${maxHealth}`, barX + barWidth / 2, barY - 8);
-
   ctx.restore();
 }

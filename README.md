@@ -22,6 +22,12 @@ Choose a ship, enter the game, use arrow keys to turn and thrust, Space to fire,
 
 The enhanced asteroid tools add reflective clusters, laser cores and Hauler slingshots. Press Q to open the controls and shot preview. See the [asteroid interactions guide](docs/asteroid-interactions.md) for controls and rollout settings.
 
+## Field manual
+
+The companion player manual is built at `/wiki/` on the same client origin. It covers ship abilities and game mechanics with searchable articles, a ship comparison, and playable GIF demonstrations. The game title screen links to it.
+
+See [manual maintenance](docs/wiki-maintenance.md) for content, reproducible media generation, and the source-review gate, and [coverage](docs/wiki-coverage.md) for the mechanic inventory. `npm run check:wiki` is part of the production build and flags gameplay changes that need a documentation review.
+
 ## Verification
 
 Run commands from the repository directory:

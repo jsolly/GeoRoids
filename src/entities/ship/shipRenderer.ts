@@ -1,6 +1,7 @@
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
+import type { DrawingContext } from '../../rendering/drawingContext';
 import {
   driftSegment,
   easeOutCubic,
@@ -70,7 +71,7 @@ export function calculateShipTrianglePoints(
 
 /** Shared phosphor stroke for v2 kit outlines (and the leftover 3-point helper). */
 export function strokePhosphorPolyline(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   points: readonly { x: number; y: number }[],
   color: string,
   closed = true
@@ -111,7 +112,7 @@ export function strokePhosphorPolyline(
 }
 
 export function strokePhosphorHull(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   hull: {
     nose: { x: number; y: number };
     rearLeft: { x: number; y: number };
@@ -123,7 +124,7 @@ export function strokePhosphorHull(
 }
 
 export function strokeKitHullOutline(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   centerX: number,
   centerY: number,
   radius: number,
@@ -149,7 +150,7 @@ export function strokeKitHullOutline(
 }
 
 export function strokePhosphorSegment(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   x1: number,
   y1: number,
   x2: number,
@@ -339,7 +340,7 @@ export function drawPlayerName(
 
 // Vector break-up: hull edges pop, then drift; ring + ticks — no filled fireball.
 function drawVectorExplosion(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   x: number,
   y: number,
   radius: number,
@@ -656,7 +657,7 @@ export function harpoonTetherStyle(): { dash: number[]; lineWidth: number; tipRa
 
 /** Tether + amber tip. Hauler only — other kits never draw this. */
 export function drawHaulerHarpoonVfx(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -720,7 +721,7 @@ export function drawHaulerHarpoonVfx(
 
 /** Ability rings only. Kit hulls come from the v2 outline bake. */
 function drawAbilityFx(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -737,7 +738,7 @@ function drawAbilityFx(
 }
 
 export function drawShipShield(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -778,7 +779,7 @@ export function drawShipShield(
 }
 
 function drawShipImpactFlash(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -816,7 +817,7 @@ function drawShipImpactFlash(
 }
 
 function drawFloatingHealthCapsule(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,

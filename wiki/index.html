@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Field manual | GeoRoids</title>
+    <meta name="description" content="The GeoRoids field manual. Meet every ship, learn its abilities, and explore combat, asteroids, pickups, and flight with animated demonstrations." />
+    <meta name="theme-color" content="#080e19" />
+    <link rel="canonical" href="https://www.georoids.com/wiki/" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/src/wiki/wiki.css" />
+    <script type="module" src="/src/wiki/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="GeoRoids game"><span class="brand-mark" aria-hidden="true">△</span> GEOROIDS</a>
+      <a class="manual-home" href="#">Field manual</a>
+      <a class="play-link" href="/">Play GeoRoids <span aria-hidden="true">↗</span></a>
+    </header>
+    <div class="layout">
+      <aside class="sidebar" aria-label="Manual navigation">
+        <form role="search" id="search-form">
+          <label for="wiki-search">Find a mechanic</label>
+          <div class="search-box"><input id="wiki-search" type="search" placeholder="Ship, skill, interaction…" autocomplete="off" aria-controls="content" /><button type="button" id="clear-search" aria-label="Clear search" hidden>×</button></div>
+        </form>
+        <details id="navigation" open>
+          <summary>Browse the manual</summary>
+          <nav id="article-nav" aria-label="Topics"></nav>
+        </details>
+        <p class="sidebar-note">Learn the rules.<br />Find your own edge.</p>
+      </aside>
+      <main id="content" tabindex="-1"></main>
+    </div>
+    <footer class="site-footer"><span>GeoRoids / Field manual</span><span>Controlled demonstrations · Real game rules</span><a href="#">Back to index ↑</a></footer>
+    <p id="search-status" class="sr-only" role="status" aria-live="polite"></p>
+    <noscript><p class="noscript">The field manual needs JavaScript to show articles and search. Enable JavaScript and reload this page. <a href="/">Return to GeoRoids</a>.</p></noscript>
+  </body>
+</html>

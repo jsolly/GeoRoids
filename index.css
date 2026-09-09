@@ -944,3 +944,18 @@ body.touch-play .touch-controls:not([hidden]) {
   pointer-events: none;
   opacity: 0.7;
 }
+
+/* Companion reference, reachable before joining a game. */
+.manual-entry {
+  margin: 0;
+}
+.manual-entry a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #5eead4;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import type { WebSocket } from 'ws';
-import {
-  FakeSocket,
-  GameServerWorld,
-  type Pilot,
-  useQuietServerConsole,
-} from '../support/gameServerWorld';
+import { RecordingSocket } from '../../../support/recordingSocket';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -46,7 +41,7 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
     const host = world.engine.entityManager.addHumanPlayer(
       'host',
       'Host',
-      new FakeSocket() as unknown as WebSocket,
+      new RecordingSocket(),
       { x: 0, y: 0 },
       undefined,
       'hauler',
@@ -55,7 +50,7 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
     const target = world.engine.entityManager.addHumanPlayer(
       'target-host',
       'Target',
-      new FakeSocket() as unknown as WebSocket,
+      new RecordingSocket(),
       { x: 80, y: 0 },
       undefined,
       'dart',

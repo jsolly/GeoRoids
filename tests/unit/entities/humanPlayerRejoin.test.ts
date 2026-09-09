@@ -2,13 +2,14 @@ import { expect, test } from 'vitest';
 import { EntityManager } from '../../../server/core/EntityManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { PALETTE } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 test('rejoin and same-name takeover apply the requested Hauler kit', () => {
   const manager = new EntityManager(new RNGService(1));
   const first = manager.addHumanPlayer(
     'pilot-1',
     'Pilot',
-    { sent: 1 } as never,
+    new RecordingSocket(),
     { x: 8, y: 9 },
     '#abc',
     'dart'
@@ -18,7 +19,7 @@ test('rejoin and same-name takeover apply the requested Hauler kit', () => {
   const rejoined = manager.addHumanPlayer(
     'pilot-1',
     'Pilot',
-    { sent: 2 } as never,
+    new RecordingSocket(),
     { x: 0, y: 0 },
     '#def',
     'hauler'
@@ -29,7 +30,7 @@ test('rejoin and same-name takeover apply the requested Hauler kit', () => {
   const taken = manager.addHumanPlayer(
     'pilot-new',
     'Pilot',
-    { sent: 3 } as never,
+    new RecordingSocket(),
     { x: 0, y: 0 },
     '#fff',
     'hauler'
@@ -40,8 +41,8 @@ test('rejoin and same-name takeover apply the requested Hauler kit', () => {
 
 test('rejoining the same human id keeps lives, side, and swaps the socket', () => {
   const manager = new EntityManager(new RNGService(1));
-  const firstSocket = { sent: 1 } as never;
-  const secondSocket = { sent: 2 } as never;
+  const firstSocket = new RecordingSocket();
+  const secondSocket = new RecordingSocket();
   const first = manager.addHumanPlayer('pilot-1', 'Pilot', firstSocket, { x: 8, y: 9 }, '#abc');
   first.lives = 1;
   first.health = 40;
@@ -60,11 +61,14 @@ test('rejoining the same human id keeps lives, side, and swaps the socket', () =
 
 test('a new client id with the same name takes over the live ship instead of cloning it', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-old', 'PilotB', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-old', 'PilotB', new RecordingSocket(), {
+    x: 8,
+    y: 9,
+  });
   first.lives = 2;
   first.score = 450;
 
-  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', { sent: 2 } as never, {
+  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });
@@ -79,12 +83,15 @@ test('a new client id with the same name takes over the live ship instead of clo
 
 test('drop then rejoin under a new id restores lives and score by name', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-old', 'PilotB', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-old', 'PilotB', new RecordingSocket(), {
+    x: 8,
+    y: 9,
+  });
   first.lives = 2;
   first.score = 450;
   manager.removeEntity('pilot-old');
 
-  const rejoined = manager.addHumanPlayer('pilot-new', 'PilotB', { sent: 2 } as never, {
+  const rejoined = manager.addHumanPlayer('pilot-new', 'PilotB', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });
@@ -96,12 +103,12 @@ test('drop then rejoin under a new id restores lives and score by name', () => {
 
 test('game-over rejoin starts a new ship instead of restoring 0 lives', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), { x: 8, y: 9 });
   first.lives = 0;
   first.score = 210;
 
   manager.removeEntity('pilot-1');
-  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, {
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });
@@ -112,11 +119,11 @@ test('game-over rejoin starts a new ship instead of restoring 0 lives', () => {
 
 test('leftover 0-life same-name ship is deleted so Start gets a fresh 3/0', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-old', 'Pilot', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-old', 'Pilot', new RecordingSocket(), { x: 8, y: 9 });
   first.lives = 0;
   first.score = 210;
 
-  const started = manager.addHumanPlayer('pilot-new', 'Pilot', { sent: 2 } as never, {
+  const started = manager.addHumanPlayer('pilot-new', 'Pilot', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });
@@ -131,11 +138,11 @@ test('leftover 0-life same-name ship is deleted so Start gets a fresh 3/0', () =
 
 test('leftover 0-life same-id ship is replaced instead of taken over', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), { x: 8, y: 9 });
   first.lives = 0;
   first.score = 210;
 
-  const started = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, {
+  const started = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });
@@ -148,7 +155,7 @@ test('leftover 0-life same-id ship is replaced instead of taken over', () => {
 
 test('same-id reconnect mid-explosion finishes respawn instead of inheriting a corpse', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), { x: 8, y: 9 });
   first.lives = 2;
   first.score = 210;
   first.health = 0;
@@ -158,7 +165,10 @@ test('same-id reconnect mid-explosion finishes respawn instead of inheriting a c
   first.velocity = { x: 0, y: 0 };
   delete first.spawnProtectionTimer;
 
-  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, { x: 0, y: 0 });
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), {
+    x: 0,
+    y: 0,
+  });
 
   expect(rejoined).toBe(first);
   expect(rejoined.health).toBe(rejoined.maxHealth);
@@ -172,13 +182,16 @@ test('same-id reconnect mid-explosion finishes respawn instead of inheriting a c
 
 test('same-name takeover mid-death respawns and reports the old id', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-old', 'PilotB', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-old', 'PilotB', new RecordingSocket(), {
+    x: 8,
+    y: 9,
+  });
   first.lives = 2;
   first.health = 0;
   first.exploding = true;
   first.respawnTimer = 8;
 
-  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', { sent: 2 } as never, {
+  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });
@@ -193,11 +206,14 @@ test('same-name takeover mid-death respawns and reports the old id', () => {
 
 test('live same-id reuse keeps velocity and does not report a replaced id', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), { x: 8, y: 9 });
   first.velocity = { x: 4, y: -2 };
   first.health = 40;
 
-  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, { x: 0, y: 0 });
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), {
+    x: 0,
+    y: 0,
+  });
 
   expect(rejoined.velocity).toEqual({ x: 4, y: -2 });
   expect(rejoined.health).toBe(40);
@@ -206,14 +222,14 @@ test('live same-id reuse keeps velocity and does not report a replaced id', () =
 
 test('rejoining after the socket was removed restores lives and score, not a fresh 3/0', () => {
   const manager = new EntityManager(new RNGService(1));
-  const first = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 1 } as never, { x: 8, y: 9 });
+  const first = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), { x: 8, y: 9 });
   first.lives = 2;
   first.score = 210;
 
   manager.removeEntity('pilot-1');
   expect(manager.getHumanPlayerCount()).toBe(0);
 
-  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', { sent: 2 } as never, {
+  const rejoined = manager.addHumanPlayer('pilot-1', 'Pilot', new RecordingSocket(), {
     x: 3000,
     y: 0,
   });

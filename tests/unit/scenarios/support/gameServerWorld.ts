@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, vi } from 'vitest';
-import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
 import type { AsteroidData, Position, ShipKitId, SoftFactionId } from '../../../../shared-types';
 import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
+import { RecordingSocket } from '../../../support/recordingSocket';
 
 function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
   return {
@@ -32,45 +32,10 @@ export const SPAWN_PROTECTION_FRAMES = SHIP.INVINCIBILITY_DURATION_FRAMES;
 /** Circular arena used by the server (`getGameBoundary()` / EntityManager). */
 export const ARENA_RADIUS = 3100;
 
-export interface ServerMessage {
-  type: string;
-  data?: Record<string, unknown> & { id?: string };
-  timestamp?: number;
-}
-
-/**
- * In-process stand-in for a browser WebSocket.
- * `GameStateBroadcaster` only needs `readyState` and `send`.
- */
-export class FakeSocket {
-  readyState: number = WebSocket.OPEN;
-  readonly inbox: ServerMessage[] = [];
-
-  send(raw: string): void {
-    this.inbox.push(JSON.parse(raw) as ServerMessage);
-  }
-
-  close(): void {
-    this.readyState = WebSocket.CLOSED;
-  }
-
-  received(type: string): ServerMessage[] {
-    return this.inbox.filter((message) => message.type === type);
-  }
-
-  lastReceived(type: string): ServerMessage | undefined {
-    return this.received(type).at(-1);
-  }
-
-  clear(): void {
-    this.inbox.length = 0;
-  }
-}
-
 export interface Pilot {
   id: string;
   name: string;
-  socket: FakeSocket;
+  socket: RecordingSocket;
 }
 
 /**
@@ -94,7 +59,7 @@ export class GameServerWorld {
   ): Pilot {
     this.joinCount += 1;
     const id = `${name.toLowerCase()}-${this.joinCount}`;
-    const socket = new FakeSocket();
+    const socket = new RecordingSocket();
     this.send(
       { id, name, socket },
       {
@@ -113,7 +78,7 @@ export class GameServerWorld {
   }
 
   send(pilot: Pilot, message: Record<string, unknown>): void {
-    this.core.handleClientMessage(message, pilot.socket as unknown as WebSocket);
+    this.core.handleClientMessage(message, pilot.socket);
   }
 
   shoot(attacker: Pilot, target: Pilot, damage: number = DAMAGE.LASER_HIT): void {
@@ -126,7 +91,7 @@ export class GameServerWorld {
   shootSatellite(attacker: Pilot, satelliteId: string, damage: number = DAMAGE.LASER_HIT): void {
     const satellite = this.engine.getSatellite(satelliteId);
     if (!satellite) {
-      return;
+      throw new Error(`No satellite with id ${satelliteId}`);
     }
 
     // The server accepts a satelliteDamage report only when it can consume a
@@ -151,7 +116,7 @@ export class GameServerWorld {
   shootBot(attacker: Pilot, botId: string, damage: number = DAMAGE.LASER_HIT): void {
     const bot = this.engine.getBot(botId);
     if (!bot) {
-      return;
+      throw new Error(`No bot with id ${botId}`);
     }
 
     // The wire message predates positional hit evidence. Seed the server's
@@ -175,7 +140,7 @@ export class GameServerWorld {
     });
   }
 
-  hitAsteroid(pilot: Pilot, damage: number = DAMAGE.LASER_HIT): void {
+  hitAsteroid(pilot: Pilot): void {
     const ship = this.entity(pilot);
     this.engine.addAsteroid(
       scenarioAsteroid({
@@ -183,13 +148,7 @@ export class GameServerWorld {
         position: { x: ship.position.x, y: ship.position.y },
       })
     );
-    const before = ship.health;
     this.engine.resolveAuthoritativeCombat(Date.now());
-    const applied = Math.max(0, before - this.entity(pilot).health);
-    const remaining = damage - applied;
-    if (remaining > 0 && this.entity(pilot).health > 0) {
-      this.engine.handleShipDamage(pilot.id, 'asteroid', remaining, 'collision');
-    }
   }
 
   move(pilot: Pilot, position: Position): void {

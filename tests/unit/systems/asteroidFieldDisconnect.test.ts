@@ -1,12 +1,13 @@
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ROID } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 test('disconnecting one of two humans does not clear or pause the shared field', () => {
   const engine = new GameEngine(3);
   engine.createAsteroids(10);
-  engine.addPlayer('peer-a', 'PeerA', {} as never);
-  engine.addPlayer('peer-b', 'PeerB', {} as never);
+  engine.addPlayer('peer-a', 'PeerA', new RecordingSocket());
+  engine.addPlayer('peer-b', 'PeerB', new RecordingSocket());
 
   const idsBefore = engine
     .getAllAsteroids()
@@ -33,7 +34,7 @@ test('disconnecting one of two humans does not clear or pause the shared field',
 
 test('an active arena reseeds the canonical belt after its last asteroid is destroyed', () => {
   const engine = new GameEngine(7);
-  const player = engine.addPlayer('pilot', 'Pilot', {} as never, { x: 0, y: 0 });
+  const player = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
   const firstField = engine.getAllAsteroids();
   const firstIds = new Set(firstField.map((asteroid) => asteroid.id));
 

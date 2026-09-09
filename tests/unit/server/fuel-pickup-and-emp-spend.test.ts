@@ -1,8 +1,10 @@
+import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { isFuelLoot } from '../../../shared/fuel';
 import type { AsteroidData } from '../../../shared-types';
 import { FUEL, ROID } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 function makeAsteroid(id: string, size: number): AsteroidData {
   return {
@@ -32,7 +34,7 @@ describe('server fuel pickup and EMP spend', () => {
   });
 
   test('game state snapshots include fuel tanks and live fuel drops', () => {
-    const ws = {} as any;
+    const ws = new RecordingSocket();
     const human = engine.addPlayer('human-state', 'Pilot', ws, { x: 0, y: 0 }, undefined, 'quake');
     engine.addAsteroid(makeAsteroid('roid-state', ROID.SIZE));
     engine.handleAsteroidHit('roid-state', human.id, 'collision');
@@ -45,7 +47,7 @@ describe('server fuel pickup and EMP spend', () => {
   });
 
   test('Quake EMP spend is refused once the shared tank is empty', () => {
-    const ws = {} as any;
+    const ws = new RecordingSocket();
     const quake = engine.addPlayer('human-emp', 'Quake', ws, { x: 0, y: 0 }, undefined, 'quake');
     const dart = engine.addPlayer('human-dart', 'Dart', ws, { x: 20, y: 0 }, undefined, 'dart');
 
@@ -61,14 +63,13 @@ describe('server fuel pickup and EMP spend', () => {
   });
 
   test('shooting a fuel drop uses the destroy-drop blast path', () => {
-    const ws = {} as any;
+    const ws = new RecordingSocket();
     const human = engine.addPlayer('human-blast', 'Pilot', ws, { x: 80, y: 80 });
     engine.addAsteroid(makeAsteroid('roid-blast', ROID.SIZE));
     engine.handleAsteroidHit('roid-blast', human.id, 'collision');
     const fuel = engine.getLoot().find(isFuelLoot);
-    expect(fuel).toBeDefined();
-
-    const blast = engine.handleLootExplode(human.id, fuel!.id);
+    assert.ok(fuel, 'fuel loot');
+    const blast = engine.handleLootExplode(human.id, fuel.id);
 
     expect(blast.success).toBe(true);
     expect(engine.getLoot().some(isFuelLoot)).toBe(false);
@@ -79,7 +80,8 @@ describe('server fuel pickup and EMP spend', () => {
     idle._idleNext = idle;
     idle._idlePrev = idle;
     const timeout = { constructor: { name: 'Timeout' }, _idlePrev: idle, _idleNext: idle };
-    const ws = { _closeTimeout: timeout } as any;
+    const ws = new RecordingSocket();
+    Object.assign(ws, { _closeTimeout: timeout });
     engine.addPlayer('human-ws', 'Pilot', ws, { x: 0, y: 0 }, undefined, 'hauler');
     const live = engine.getPlayer('human-ws');
     expect(() => JSON.stringify({ ...live })).toThrow(/circular/i);
@@ -94,7 +96,7 @@ describe('server fuel pickup and EMP spend', () => {
   });
 
   test('client updates cannot set fuel on the server tank', () => {
-    const ws = {} as any;
+    const ws = new RecordingSocket();
     const human = engine.addPlayer('human-auth', 'Pilot', ws, { x: 0, y: 0 });
     engine.updatePlayer(human.id, { fuel: 99, maxFuel: 200 } as Partial<typeof human>);
     expect(human.fuel).toBe(FUEL.START);

@@ -1,5 +1,6 @@
+import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
+import type { WebSocket } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
@@ -9,31 +10,56 @@ import {
   SNAPSHOT_KEYFRAME_INTERVAL,
   SnapshotDecoder,
 } from '../../../shared/snapshotProtocol';
+import { RecordingSocket } from '../../support/recordingSocket';
+
+type SendCallback = (error?: Error) => void;
+type SendOptions = {
+  mask?: boolean;
+  binary?: boolean;
+  compress?: boolean;
+  fin?: boolean;
+};
+type SendData = Parameters<RecordingSocket['send']>[0];
+
+class DelayedRecordingSocket extends RecordingSocket {
+  defer = false;
+  fail = false;
+
+  constructor(private readonly pending: Array<(error?: Error) => void>) {
+    super();
+  }
+
+  override send(data: SendData, callback?: SendCallback): void;
+  override send(data: SendData, options: SendOptions, callback?: SendCallback): void;
+  override send(
+    data: SendData,
+    optionsOrCallback?: SendOptions | SendCallback,
+    callback?: SendCallback
+  ): void {
+    if (this.fail) {
+      throw new Error('closed during send');
+    }
+    if (typeof optionsOrCallback === 'object') {
+      super.send(data, optionsOrCallback, callback);
+      return;
+    }
+    const done = optionsOrCallback ?? callback;
+    super.send(data);
+    if (done) {
+      if (this.defer) {
+        this.pending.push(done);
+      } else {
+        done();
+      }
+    }
+  }
+}
 
 function socket() {
-  const messages: any[] = [];
   const pending: Array<(error?: Error) => void> = [];
-  const fake = {
-    readyState: WebSocket.OPEN,
-    bufferedAmount: 0,
-    defer: false,
-    fail: false,
-    send: vi.fn((text: string, done?: (error?: Error) => void) => {
-      if (fake.fail) {
-        throw new Error('closed during send');
-      }
-      messages.push(JSON.parse(text));
-      if (done) {
-        if (fake.defer) {
-          pending.push(done);
-        } else {
-          done();
-        }
-      }
-    }),
-    close: vi.fn(),
-  };
-  return { fake, ws: fake as unknown as WebSocket, messages, pending };
+  const fake = new DelayedRecordingSocket(pending);
+  const close = vi.spyOn(fake, 'close');
+  return { fake, close, ws: fake, messages: fake.inbox, pending };
 }
 
 describe('old and new pilots coexist on the production handler and broadcaster', () => {
@@ -71,16 +97,21 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     join(handler, modern.ws, 'modern', 1);
     join(handler, unsupported.ws, 'unsupported', 200);
     broadcaster.broadcastGameState();
-    expect(old.messages.find((m) => m.type === 'joined').data).not.toHaveProperty(
-      'snapshotVersion'
-    );
-    expect(unsupported.messages.find((m) => m.type === 'joined').data).not.toHaveProperty(
-      'snapshotVersion'
-    );
+    const legacyJoined = old.messages.find((m) => m.type === 'joined');
+    assert.ok(legacyJoined, 'legacy joined message');
+    expect(legacyJoined).not.toMatchObject({ data: { snapshotVersion: expect.anything() } });
+    const unsupportedJoined = unsupported.messages.find((m) => m.type === 'joined');
+    assert.ok(unsupportedJoined, 'unsupported joined message');
+    expect(unsupportedJoined).not.toMatchObject({ data: { snapshotVersion: expect.anything() } });
     expect(old.messages.some((m) => m.type === 'snapshot')).toBe(false);
-    expect(modern.messages[0]).toMatchObject({ type: 'joined', data: { snapshotVersion: 1 } });
-    expect(modern.messages[0].data.serverReleaseId).toEqual(expect.any(String));
+    const modernJoined = modern.messages[0];
+    assert.ok(modernJoined, 'modern joined message');
+    expect(modernJoined).toMatchObject({
+      type: 'joined',
+      data: { snapshotVersion: 1, serverReleaseId: expect.any(String) },
+    });
     const legacy = old.messages.filter((m) => m.type === 'gameState').at(-1);
+    assert.ok(legacy, 'legacy gameState message');
     expect(legacy.data).toEqual(JSON.parse(JSON.stringify(engine.getGameState())));
     expect(Object.keys(legacy).sort()).toEqual(['data', 'timestamp', 'type']);
     const decoder = new SnapshotDecoder();
@@ -122,7 +153,9 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     join(handler, a.ws, 'a', 1);
     const b = socket();
     join(handler, b.ws, 'b', 1);
-    expect(b.messages.find((m) => m.type === 'snapshot').data.kind).toBe('keyframe');
+    const pilotBSnapshot = b.messages.find((m) => m.type === 'snapshot');
+    assert.ok(pilotBSnapshot, 'pilot b snapshot');
+    expect(pilotBSnapshot).toMatchObject({ data: { kind: 'keyframe' } });
     const reconstruct = (pilot: ReturnType<typeof socket>) => {
       const decoder = new SnapshotDecoder();
       return pilot.messages
@@ -139,17 +172,31 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     broadcaster.broadcastGameState();
     expect(a.messages).toHaveLength(count);
     a.fake.bufferedAmount = 0;
-    engine.getPlayer('b')!.position.x = 720;
+    const playerB = engine.getPlayer('b');
+    assert.ok(playerB, 'player b');
+    playerB.position.x = 720;
     broadcaster.broadcastGameState();
-    expect(a.messages.at(-1).data.kind).toBe('keyframe');
+    const pilotAKeyframe = a.messages.at(-1);
+    assert.ok(pilotAKeyframe, 'pilot a keyframe');
+    expect(pilotAKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
     expect(reconstruct(a)).toMatchObject(JSON.parse(JSON.stringify(engine.getGameState())));
     expect(reconstruct(b)).toEqual(reconstruct(a));
     join(handler, a.ws, 'a', 1);
-    expect(a.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
+    const rejoinedKeyframe = a.messages.at(-1);
+    assert.ok(rejoinedKeyframe, 'rejoined pilot a keyframe');
+    expect(rejoinedKeyframe.data).toMatchObject({
+      sequence: 1,
+      kind: 'keyframe',
+    });
     engine.removePlayer('a');
     const reconnected = socket();
     join(handler, reconnected.ws, 'a', 1);
-    expect(reconnected.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
+    const reconnectedKeyframe = reconnected.messages.at(-1);
+    assert.ok(reconnectedKeyframe, 'reconnected keyframe');
+    expect(reconnectedKeyframe.data).toMatchObject({
+      sequence: 1,
+      kind: 'keyframe',
+    });
     expect(reconstruct(reconnected)).toMatchObject(
       JSON.parse(JSON.stringify(engine.getGameState()))
     );
@@ -192,8 +239,8 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     for (let hit = 0; hit < 3; hit++) {
       engine.handleAsteroidHit('core-rock', 'enhanced');
     }
-    const core = engine.getLoot().find((loot) => loot.kind === 'laserCore')!;
-    expect(core).toBeDefined();
+    const core = engine.getLoot().find((loot) => loot.kind === 'laserCore');
+    assert.ok(core, 'laser core loot');
     broadcaster.broadcastGameState();
     broadcaster.requestSnapshotKeyframe(recovery.ws);
     broadcaster.broadcastGameState();
@@ -207,25 +254,27 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     // additive fields are safe, but a new loot enum rejects the whole world.
     const deployedLootKinds = ['shard', 'wreckage', 'fuel'];
     for (const state of decodeAll(recovery)) {
-      expect(state.loot.every((loot) => deployedLootKinds.includes(loot.kind!))).toBe(true);
+      expect(state.loot.every((loot) => deployedLootKinds.includes(loot.kind))).toBe(true);
     }
     expect(
       decodeAll(recovery)
         .at(-1)
         ?.loot.find((loot) => loot.id === core.id)?.kind
     ).toBe('shard');
-    expect(
-      legacy.messages
-        .filter((message) => message.type === 'gameState')
-        .at(-1)
-        .data.loot.find((loot: { id: string }) => loot.id === core.id).kind
-    ).toBe('shard');
+    const legacyState = legacy.messages.filter((message) => message.type === 'gameState').at(-1);
+    assert.ok(legacyState, 'legacy game state');
+    expect(legacyState).toMatchObject({
+      data: {
+        loot: expect.arrayContaining([expect.objectContaining({ id: core.id, kind: 'shard' })]),
+      },
+    });
     expect(
       decodeAll(enhanced)
         .at(-1)
         ?.loot.find((loot) => loot.id === core.id)?.kind
     ).toBe('laserCore');
-    const collector = engine.getPlayer('recovery')!;
+    const collector = engine.getPlayer('recovery');
+    assert.ok(collector, 'recovery player');
     collector.position = { ...core.position };
     const score = collector.score;
     engine.collectLoot();
@@ -253,17 +302,30 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     a.fake.defer = true;
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
-    a.pending.shift()!(new Error('write failed'));
+    const failedSend = a.pending.shift();
+    assert.ok(failedSend, 'deferred snapshot callback');
+    failedSend(new Error('write failed'));
     a.fake.defer = false;
     broadcaster.broadcastGameState();
-    expect(a.messages.at(-1).data).toMatchObject({ sequence: 2, kind: 'keyframe' });
+    const recoveryKeyframe = a.messages.at(-1);
+    assert.ok(recoveryKeyframe, 'recovery keyframe');
+    expect(recoveryKeyframe.data).toMatchObject({
+      sequence: 2,
+      kind: 'keyframe',
+    });
     for (let i = 0; i <= SNAPSHOT_KEYFRAME_INTERVAL; i++) {
       broadcaster.broadcastGameState();
     }
-    expect(a.messages.slice(-2).some((m) => m.data.kind === 'keyframe')).toBe(true);
+    expect(a.messages.slice(-2)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ data: expect.objectContaining({ kind: 'keyframe' }) }),
+      ])
+    );
     handler.handleMessage({ type: 'snapshotResync' }, a.ws);
     broadcaster.broadcastGameState();
-    expect(a.messages.at(-1).data.kind).toBe('keyframe');
+    const resyncKeyframe = a.messages.at(-1);
+    assert.ok(resyncKeyframe, 'resync keyframe');
+    expect(resyncKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
     a.fake.fail = true;
     broadcaster.broadcastGameState();
     expect(a.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
@@ -276,7 +338,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     const broken = engine.getGameState();
     Object.assign(broken, { badField: broken });
     vi.spyOn(engine, 'getGameState').mockReturnValue(broken);
-    old.fake.close.mockImplementation(() => {
+    old.close.mockImplementation(() => {
       throw new Error('close failure');
     });
     expect(() => broadcaster.broadcastGameState()).not.toThrow();

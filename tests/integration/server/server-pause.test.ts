@@ -1,75 +1,32 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { WebSocketServer } from 'ws';
+import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { RecordingSocket } from '../../support/recordingSocket';
 
-describe('Server pause functionality', () => {
-  let wss: WebSocketServer;
-  let gameEngine: GameEngine;
+test('a paused field survives the first join, then the last departure clears it for a fresh session', () => {
+  const engine = new GameEngine(731);
+  try {
+    engine.updatePauseState();
+    expect(engine.isGamePaused()).toBe(true);
+    const initial = structuredClone(engine.createAsteroids(5));
+    expect(initial).toHaveLength(5);
+    engine.updatePauseState();
+    engine.advanceOneFrame();
+    expect(engine.getAllAsteroids()).toEqual(initial);
 
-  beforeAll(async () => {
-    // Create a test server
-    wss = new WebSocketServer({ port: 0 });
+    engine.addPlayer('pilot', 'Pilot', new RecordingSocket());
+    expect(engine.isGamePaused()).toBe(false);
+    expect(engine.getAllAsteroids()).toEqual(initial);
 
-    // Create game engine
-    gameEngine = new GameEngine();
-    gameEngine.startGameLoop();
-  });
+    expect(engine.removePlayer('pilot')?.id).toBe('pilot');
+    expect(engine.isGamePaused()).toBe(true);
+    expect(engine.getAllAsteroids()).toEqual([]);
 
-  afterAll(async () => {
-    gameEngine.stopGameLoop();
-    wss.close();
-  });
-
-  it('should pause game when no players are present', () => {
-    // Initially no players, game should be paused
-    gameEngine.updatePauseState();
-    expect(gameEngine.isGamePaused()).toBe(true);
-  });
-
-  it('should create and preserve asteroids when game is paused', () => {
-    // Create asteroids
-    const asteroids = gameEngine.createAsteroids(5);
-    expect(asteroids.length).toBe(5);
-    expect(gameEngine.getAsteroidCount()).toBe(5);
-
-    // Game should still be paused (no players)
-    gameEngine.updatePauseState();
-    expect(gameEngine.isGamePaused()).toBe(true);
-
-    // Asteroids should persist
-    expect(gameEngine.getAsteroidCount()).toBe(5);
-  });
-
-  it('should resume game when players join', () => {
-    // Simulate adding a player
-    const mockWs = {} as any;
-    const player = gameEngine.addPlayer('test-player', 'TestPlayer', mockWs);
-
-    expect(player).toBeDefined();
-    expect(gameEngine.isGamePaused()).toBe(false);
-
-    // Asteroids should still exist
-    expect(gameEngine.getAsteroidCount()).toBe(5);
-  });
-
-  it('should pause and reset the world when all players leave', () => {
-    // Remove the player
-    const removedPlayer = gameEngine.removePlayer('test-player');
-
-    expect(removedPlayer).toBeDefined();
-    expect(gameEngine.isGamePaused()).toBe(true);
-
-    // When the last human leaves, the world resets so the next player starts
-    // fresh: asteroids are cleared.
-    expect(gameEngine.getAsteroidCount()).toBe(0);
-  });
-
-  it('should create a fresh asteroid field when a new player initializes one', () => {
-    // With the world reset, requesting asteroids creates a brand-new field.
-    const asteroids = gameEngine.createAsteroids(10);
-
-    // Explicit field creation honors the requested count outside debug mode.
-    expect(asteroids.length).toBe(10);
-    expect(gameEngine.getAsteroidCount()).toBe(10);
-  });
+    const fresh = engine.createAsteroids(10);
+    expect(fresh).toHaveLength(10);
+    expect(engine.getAsteroidCount()).toBe(10);
+    const oldIds = new Set(initial.map((rock) => rock.id));
+    expect(fresh.some((rock) => oldIds.has(rock.id))).toBe(false);
+  } finally {
+    engine.stopGameLoop();
+  }
 });

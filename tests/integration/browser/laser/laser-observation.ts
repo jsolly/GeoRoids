@@ -52,7 +52,7 @@ export async function parkLaserClient(game: GameInteractions, index = 0): Promis
 
 export async function localPlayerId(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const id = (window as any).gameController?.playerManager?.getLocalPlayer()?.id;
+    const id = window.gameController?.getCurrPlayer()?.id;
     if (!id) {
       throw new Error('Local player has not joined');
     }
@@ -69,13 +69,13 @@ export async function observeLaser(
 ): Promise<ObservedLaser> {
   const handle = await page.waitForFunction(
     ({ ownerId, remote, requireOnCanvas }) => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer();
+      const gc = window.gameController;
+      const local = gc?.getCurrPlayer();
       const owner = remote
         ? gc
             ?.getNetworkManager()
             ?.getAllPlayers()
-            .find((player: any) => player.id === ownerId && player.type === 'remote')
+            .find((player) => player.id === ownerId && player.type === 'remote')
         : local?.id === ownerId
           ? local
           : undefined;
@@ -83,7 +83,7 @@ export async function observeLaser(
       if (!owner || !local || !canvas) {
         return false;
       }
-      const laser = owner.ship.lasers.find((shot: any) => {
+      const laser = owner.ship.lasers.find((shot) => {
         const values = [shot.position.x, shot.position.y, shot.velocity.x, shot.velocity.y];
         return (
           !shot.hasExploded &&
@@ -114,7 +114,11 @@ export async function observeLaser(
     { timeout: 15000, polling: 'raf' }
   );
   try {
-    return (await handle.jsonValue()) as ObservedLaser;
+    const laser = await handle.jsonValue();
+    if (!laser) {
+      throw new Error('Laser observation missing');
+    }
+    return laser;
   } finally {
     await handle.dispose();
   }
@@ -127,13 +131,13 @@ export async function waitForLaserCleanup(
 ): Promise<void> {
   const handle = await page.waitForFunction(
     ({ id, remote }) => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      const local = gc?.getCurrPlayer();
       const owner = remote
         ? gc
             ?.getNetworkManager()
             ?.getAllPlayers()
-            .find((player: any) => player.id === id && player.type === 'remote')
+            .find((player) => player.id === id && player.type === 'remote')
         : local?.id === id
           ? local
           : undefined;

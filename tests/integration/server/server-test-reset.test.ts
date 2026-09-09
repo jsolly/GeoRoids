@@ -1,63 +1,69 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { expect, test } from 'vitest';
 import { createServerInstance } from '../../../server/createServer';
+import { RecordingSocket } from '../../support/recordingSocket';
 
-describe('Server test world reset', () => {
-  let server: Awaited<ReturnType<typeof createServerInstance>>;
-  let baseUrl: string;
+const emptyWorld = {
+  isPaused: true,
+  humanPlayers: 0,
+  bots: 0,
+  asteroids: 0,
+  loot: 0,
+  satellites: 0,
+  satellitePickups: 0,
+};
 
-  beforeAll(async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
+test('resetting a populated test world closes its pilot and health reports the empty arena', async () => {
+  const server = createServerInstance({ port: 0, nodeEnv: 'test' });
+  try {
     const port = await server.listening;
-    baseUrl = `http://127.0.0.1:${port}`;
-  });
-
-  afterAll(async () => {
-    await server.close();
-  });
-
-  it('exposes world diagnostics on /health', async () => {
-    const response = await fetch(`${baseUrl}/health`);
-    expect(response.ok).toBe(true);
-
-    const body = await response.json();
-    expect(body.world).toMatchObject({
-      isPaused: true,
-      humanPlayers: 0,
-      bots: 0,
-      asteroids: 0,
-      satellitePickups: 0,
-    });
-  });
-
-  it('POST /test/reset-world clears humans, bots, and asteroids', async () => {
-    const mockWs = {} as any;
-    server.gameEngine.addPlayer('reset-test-player', 'ResetTest', mockWs);
+    const url = `http://127.0.0.1:${port}`;
+    server.gameEngine.stopGameLoop();
+    server.wsCore.stopPeriodicGameStateBroadcast();
+    const socket = new RecordingSocket();
+    server.gameEngine.addPlayer('pilot', 'Pilot', socket);
     server.gameEngine.createAsteroids(5);
     server.gameEngine.createBots(2);
+    const populated = server.gameEngine.getDiagnostics();
+    expect(populated.humanPlayers).toBe(1);
+    expect(populated.asteroids).toBeGreaterThan(0);
+    expect(populated.bots).toBeGreaterThan(0);
 
-    expect(server.gameEngine.getDiagnostics().humanPlayers).toBe(1);
-    expect(server.gameEngine.getDiagnostics().asteroids).toBeGreaterThan(0);
-    expect(server.gameEngine.getDiagnostics().bots).toBeGreaterThan(0);
-
-    const response = await fetch(`${baseUrl}/test/reset-world`, { method: 'POST' });
-    expect(response.ok).toBe(true);
-
-    const body = await response.json();
-    expect(body.status).toBe('reset');
-    expect(body.world).toMatchObject({
-      isPaused: true,
-      humanPlayers: 0,
-      bots: 0,
-      asteroids: 0,
-      satellitePickups: 0,
+    const reset = await fetch(`${url}/test/reset-world`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(2_000),
     });
-  });
+    expect(reset.status).toBe(200);
+    const resetBody: unknown = await reset.json();
+    expect(resetBody).toMatchObject({ status: 'reset', world: emptyWorld });
+    expect(socket.readyState).toBe(socket.CLOSED);
 
-  it('POST /test/reset-world is unavailable in production mode', async () => {
-    const prodServer = createServerInstance({ port: 0, nodeEnv: 'production' });
-    const port = await prodServer.listening;
-    const response = await fetch(`http://127.0.0.1:${port}/test/reset-world`, { method: 'POST' });
+    const health = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2_000) });
+    expect(health.status).toBe(200);
+    const healthBody: unknown = await health.json();
+    expect(healthBody).toMatchObject({ world: emptyWorld });
+  } finally {
+    await server.close();
+  }
+});
+
+test('production rejects a world reset and preserves the active pilot', async () => {
+  const server = createServerInstance({ port: 0, nodeEnv: 'production' });
+  try {
+    const port = await server.listening;
+    server.gameEngine.stopGameLoop();
+    server.wsCore.stopPeriodicGameStateBroadcast();
+    const socket = new RecordingSocket();
+    const pilot = server.gameEngine.addPlayer('pilot', 'Pilot', socket);
+    const before = server.gameEngine.getDiagnostics();
+    const response = await fetch(`http://127.0.0.1:${port}/test/reset-world`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(2_000),
+    });
     expect(response.status).toBe(404);
-    await prodServer.close();
-  });
+    expect(server.gameEngine.getDiagnostics()).toEqual(before);
+    expect(server.gameEngine.getPlayer(pilot.id)).toBe(pilot);
+    expect(socket.readyState).toBe(socket.OPEN);
+  } finally {
+    await server.close();
+  }
 });

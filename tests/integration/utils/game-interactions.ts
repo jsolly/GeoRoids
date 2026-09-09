@@ -1,7 +1,17 @@
 import type { Page } from 'playwright';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
-import { TestServerControl } from './test-server-control';
+import type { BotShotArrangement } from './test-server-control';
+import {
+  arrangeBotShot,
+  getWorldDiagnostics,
+  isBotShieldActiveError,
+  placePlayer,
+} from './test-server-control';
+
+const BOT_SHOT_SETUP_TIMEOUT_MS = 15_000;
+
+type BotShieldWaitResult = 'clear' | 'dead';
 
 export class GameInteractions {
   constructor(private page: Page) {}
@@ -463,7 +473,7 @@ export class GameInteractions {
       },
       { x, y }
     );
-    const placement = await TestServerControl.placePlayer(playerId, { x, y });
+    const placement = await placePlayer(playerId, { x, y });
     await this.waitForFixtureMotionEpoch(placement.motionEpoch);
     await this.setPredictedShipPosition(x, y);
   }
@@ -751,9 +761,12 @@ export class GameInteractions {
     });
   }
 
-  /** Wait for a bot's real laser shield to expire before the next shot. */
-  async waitForBotShieldToClear(botId: string, timeoutMs = 15000): Promise<void> {
-    await this.page.waitForFunction(
+  /** Wait for a live bot's real laser shield to expire before the next shot. */
+  async waitForBotShieldToClear(
+    botId: string,
+    timeoutMs = BOT_SHOT_SETUP_TIMEOUT_MS
+  ): Promise<BotShieldWaitResult> {
+    const state = await this.page.waitForFunction(
       (id) => {
         const gc = window.gameController;
         if (!gc) {
@@ -761,11 +774,26 @@ export class GameInteractions {
         }
         const players = gc.getNetworkManager().getAllPlayers();
         const bot = players.find((player) => player.id === id);
-        return !bot || (!bot.ship?.shieldActive && (bot.ship?.shieldTime ?? 0) <= 0);
+        if (!bot?.ship) {
+          return false;
+        }
+        if (bot.ship.exploding || bot.ship.health <= 0) {
+          return 'dead';
+        }
+        return !bot.ship.shieldActive && (bot.ship.shieldTime ?? 0) <= 0 ? 'clear' : false;
       },
       botId,
       { timeout: timeoutMs, polling: 100 }
     );
+    try {
+      const result: unknown = await state.jsonValue();
+      if (result !== 'clear' && result !== 'dead') {
+        throw new Error(`Bot ${botId} shield wait returned an invalid state`);
+      }
+      return result;
+    } finally {
+      await state.dispose();
+    }
   }
 
   /** Wait until at least `count` bots are known to the client. */
@@ -954,8 +982,38 @@ export class GameInteractions {
     let fired = 0;
 
     while (fired < shots) {
-      await this.waitForBotShieldToClear(botId);
-      const arrangement = await TestServerControl.arrangeBotShot(playerId, botId);
+      const setupDeadline = Date.now() + BOT_SHOT_SETUP_TIMEOUT_MS;
+      let arrangement: BotShotArrangement | undefined;
+      while (!arrangement) {
+        const remainingMs = setupDeadline - Date.now();
+        if (remainingMs <= 0) {
+          throw new Error(`Timed out arranging bot ${botId} after shield synchronization`);
+        }
+
+        const shieldState = await this.waitForBotShieldToClear(botId, remainingMs);
+        if (shieldState === 'dead') {
+          if (fired === 0) {
+            throw new Error(`Bot ${botId} became terminal before the first fixture shot`);
+          }
+          minHealthObserved = Math.min(minHealthObserved, 0);
+          break;
+        }
+
+        const requestTimeoutMs = setupDeadline - Date.now();
+        if (requestTimeoutMs <= 0) {
+          throw new Error(`Timed out arranging bot ${botId} after shield synchronization`);
+        }
+        try {
+          arrangement = await arrangeBotShot(playerId, botId, requestTimeoutMs);
+        } catch (error) {
+          if (!isBotShieldActiveError(error)) {
+            throw error;
+          }
+        }
+      }
+      if (!arrangement) {
+        break;
+      }
       await this.waitForFixtureMotionEpoch(arrangement.motionEpoch);
       await this.setPredictedShipPosition(
         arrangement.playerPosition.x,
@@ -968,13 +1026,14 @@ export class GameInteractions {
           if (!bot?.ship) {
             return false;
           }
+          const dying = bot.ship.exploding || bot.ship.health <= 0;
           if (
-            bot.ship.health !== expectedHealth ||
-            bot.ship.exploding ||
-            Math.hypot(
-              bot.ship.position.x - expectedPosition.x,
-              bot.ship.position.y - expectedPosition.y
-            ) > 20
+            !dying &&
+            (bot.ship.health !== expectedHealth ||
+              Math.hypot(
+                bot.ship.position.x - expectedPosition.x,
+                bot.ship.position.y - expectedPosition.y
+              ) > 20)
           ) {
             return false;
           }
@@ -1100,7 +1159,7 @@ export class GameInteractions {
         return;
       }
 
-      const world = await TestServerControl.getWorldDiagnostics();
+      const world = await getWorldDiagnostics();
       if (world && world.asteroids >= minCount) {
         await this.runGameFrames(5);
       } else {
@@ -1109,7 +1168,7 @@ export class GameInteractions {
     }
 
     const clientCount = await this.getAsteroidCount();
-    const world = await TestServerControl.getWorldDiagnostics();
+    const world = await getWorldDiagnostics();
     throw new Error(
       `Timed out waiting for ${minCount} synced asteroid(s): client=${clientCount}, server=${world?.asteroids ?? 'unknown'}`
     );

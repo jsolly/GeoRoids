@@ -9,7 +9,6 @@ import { DEBUG, GAME, ROID } from '../../constants';
 import { stepAsteroidMotionInto } from '../../physics/asteroidMotion';
 import { isDebugMode } from '../../utils/debugUtils';
 import { getRandomPositionInAsteroidField } from '../../utils/spawnPosition';
-import { pointsForRoidSize } from './roidScore';
 
 class Roid {
   id: string;
@@ -110,20 +109,6 @@ class RoidBelt {
     const roidPosition = getRandomPositionInAsteroidField();
     const size = DEBUG.ROIDS.ALL_LARGE ? ROID.SIZE : Math.ceil(ROID.SIZE / 2);
     this.roids.push(new Roid(roidPosition, size));
-  }
-
-  destroyRoid(i: number): { score: number; newRoids: Roid[] } {
-    const roids = this.roids;
-    const r = roids[i];
-    if (r === undefined) {
-      return { score: 0, newRoids: [] };
-    }
-    let score = 0;
-
-    score += pointsForRoidSize(r.r);
-
-    // Client never creates new roids - server handles all splitting via network messages
-    return { score, newRoids: [] };
   }
 
   getRoids(): Roid[] {

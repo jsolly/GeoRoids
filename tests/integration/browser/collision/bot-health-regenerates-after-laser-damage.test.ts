@@ -22,9 +22,9 @@ test(
 
     const getBotHealthSnapshot = async (botId: string): Promise<BotHealthSnapshot | null> =>
       page.evaluate((id) => {
-        const gc = (window as any).gameController;
+        const gc = window.gameController;
         const bot = (gc?.getNetworkManager?.().getAllPlayers?.() ?? []).find(
-          (player: any) => player.id === id && player.type === 'bot'
+          (player) => player.id === id && player.type === 'bot'
         );
         if (!bot?.ship) {
           return null;

@@ -5,7 +5,7 @@ import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 
 describe('Player Respawn System', () => {
   let player: Player;
-  let ship: any;
+  let ship: Player['ship'];
 
   beforeEach(() => {
     player = new Player({

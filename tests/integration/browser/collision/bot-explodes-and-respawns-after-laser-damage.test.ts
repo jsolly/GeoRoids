@@ -24,7 +24,7 @@ test(
       .poll(
         () =>
           page.evaluate(() => {
-            const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+            const ship = window.gameController?.getCurrPlayer()?.ship;
             return ship?.shieldTimer ?? 0;
           }),
         { timeout: 5000, message: 'Warden E should activate the real absorb shield' }

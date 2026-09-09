@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { DEBUG } from '../../../src/constants';
 import { createRoidBelt, Roid } from '../../../src/entities/roid/Roid';
@@ -41,22 +42,12 @@ test('Roid Belt Spawn Roids', () => {
   expect(testRoidBelt.roids.length).toEqual(5);
 });
 
-test('Destroy Roid', () => {
-  const testRoidBelt = createRoidBelt();
-  // const roidCount = testRoidBelt.roids.length;
-  const result = testRoidBelt.destroyRoid(0);
-
-  // Client no longer handles splitting - server does it via network messages
-  expect(result.newRoids.length).toBe(0); // Client never creates new roids
-  expect(result.score).toBeGreaterThan(0); // Should still return score
-});
-
 test('Move Roids', () => {
   const testRoidBelt = createRoidBelt();
   testRoidBelt.addRoid();
   const firstRoid = testRoidBelt.roids[0];
-  expect(firstRoid).toBeDefined();
-  const roid = firstRoid!;
+  assert.ok(firstRoid);
+  const roid = firstRoid;
 
   // Set deterministic velocity to ensure movement test is reliable
   roid.velocity = { x: 1, y: 0 }; // Move right at 1 unit per frame

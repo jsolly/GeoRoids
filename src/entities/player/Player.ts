@@ -60,9 +60,9 @@ export class Player {
     score: number;
     exploding: boolean;
     thrusting: boolean;
-    health?: number;
-    maxHealth?: number;
-    mass?: number;
+    health: number;
+    maxHealth: number;
+    mass: number;
   };
 
   // Interpolation state for smooth movement (disabled for now to fix popping issue)
@@ -566,19 +566,7 @@ export class Player {
   // }
 
   // Get current state for network transmission
-  getStateForNetwork(): {
-    position: Position;
-    velocity: Position;
-    r: number;
-    angle: number;
-    lives: number;
-    score: number;
-    exploding: boolean;
-    thrusting: boolean;
-    health?: number;
-    maxHealth?: number;
-    mass?: number;
-  } {
+  getStateForNetwork() {
     this.networkState.position = this.ship.position;
     this.networkState.velocity = this.ship.velocity;
     this.networkState.r = this.ship.r;

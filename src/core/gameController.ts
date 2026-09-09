@@ -11,13 +11,14 @@ import type {
   ServerEntityData,
   ShipKitId,
 } from '../../shared-types';
+import { AsteroidGestures } from '../asteroidTools/AsteroidGestures';
 import {
   AsteroidToolsController,
   type AsteroidToolsControllerUpdate,
   type AsteroidToolsMotionAction,
   type AsteroidToolsTarget,
 } from '../asteroidTools/AsteroidToolsController';
-import { AsteroidToolsOverlay } from '../asteroidTools/AsteroidToolsOverlay';
+import { FlightFeedback } from '../asteroidTools/FlightFeedback';
 import {
   replaceThrustSources,
   resetThrustSources,
@@ -111,16 +112,29 @@ export class GameController {
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
   private lifecycleAccumulatorMs = 0;
   private readonly asteroidToolsController: AsteroidToolsController;
-  private asteroidToolsOverlay: AsteroidToolsOverlay | null = null;
+  private flightFeedback: FlightFeedback | null = null;
+  private asteroidGestures: AsteroidGestures | null = null;
   private readonly reflectionRocks: AsteroidData[] = [];
   private readonly asteroidToolsSnapshotHandler = (event: Event): void => {
     this.applyAsteroidToolsSnapshot(event);
   };
   private readonly asteroidToolsKeyHandler = (event: KeyboardEvent): void => {
+    const target = event.target;
+    if (
+      !this.gameStateManager.getIsGameRunning() ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      (target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest('input, textarea, select, button')))
+    ) {
+      return;
+    }
     this.asteroidToolsController.handleKeyDown(event);
   };
   private readonly asteroidToolsBlurHandler = (): void => {
     this.asteroidToolsController.cancel();
+    this.asteroidGestures?.cancel();
   };
 
   private constructor() {
@@ -133,7 +147,12 @@ export class GameController {
       dispatchTool: (action) => this.dispatchAsteroidTool(action),
       dispatchMotionAction: (action, targetId) =>
         this.dispatchAsteroidMotionAction(action, targetId),
-      onChange: (state) => this.asteroidToolsOverlay?.update(state),
+      onChange: (state) => {
+        this.flightFeedback?.update(state);
+        if (!state.pilot || state.pilot.alive === false) {
+          this.asteroidGestures?.cancel();
+        }
+      },
     });
 
     bindGameAudio({
@@ -182,20 +201,29 @@ export class GameController {
     return this.asteroidToolsController;
   }
 
-  private ensureAsteroidToolsOverlay(): void {
-    if (this.asteroidToolsOverlay || typeof document === 'undefined') {
+  private ensureFlightControls(): void {
+    const canvas = canvasManager.getCanvas();
+    if (!canvas || this.flightFeedback) {
       return;
     }
-    this.asteroidToolsOverlay = AsteroidToolsOverlay.mount({
-      container: document.getElementById('gameArea') ?? document.body,
-      callbacks: {
-        onOpen: () => this.asteroidToolsController.setActive(true),
-        onClose: () => this.asteroidToolsController.cancel(),
-        onSelectTarget: (targetId) => this.asteroidToolsController.selectTarget(targetId),
-        onMotion: (action) => this.asteroidToolsController.requestMotion(action),
+    this.flightFeedback = new FlightFeedback(document.getElementById('gameArea') ?? document.body);
+    this.flightFeedback.update(this.asteroidToolsController.getState());
+    this.asteroidGestures = new AsteroidGestures(canvas, this.asteroidToolsController, {
+      isPlaying: () => this.gameStateManager.getIsGameRunning(),
+      project: (position) => {
+        const ship = this.playerManager.getLocalShip();
+        if (!ship) {
+          return undefined;
+        }
+        const point = canvasManager.worldToScreen(position, ship.position);
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: rect.left + (point.x * rect.width) / canvas.width,
+          y: rect.top + (point.y * rect.height) / canvas.height,
+          scale: (canvasManager.getPlayfieldScale() * rect.width) / canvas.width,
+        };
       },
     });
-    this.asteroidToolsOverlay.update(this.asteroidToolsController.getState());
   }
 
   private dispatchAsteroidTool(action: AsteroidToolAction): boolean {
@@ -216,12 +244,15 @@ export class GameController {
       return;
     }
 
-    // Capability snapshots update the panel's data without forcing it open on
-    // every 30 Hz frame. The launcher/Q shortcut owns visibility; negotiated
-    // shutdown still closes an already-open panel.
-    const update: AsteroidToolsControllerUpdate = {
-      active: detail.enabled && this.asteroidToolsController.getState().active,
-    };
+    if (!detail.enabled) {
+      this.asteroidToolsController.update({
+        pilot: undefined,
+        targets: [],
+        reflectionPreview: undefined,
+      });
+      return;
+    }
+    const update: AsteroidToolsControllerUpdate = {};
     if (detail.entity) {
       update.pilot = {
         id: detail.entity.id,
@@ -239,9 +270,6 @@ export class GameController {
     }
     if (detail.asteroids) {
       update.targets = this.asteroidToolsTargetsFromSnapshot(detail.asteroids);
-    } else if (!detail.enabled) {
-      delete update.pilot;
-      update.targets = [];
     }
     this.asteroidToolsController.update(update);
   }
@@ -274,7 +302,7 @@ export class GameController {
   private updateAsteroidToolsPreview(): void {
     const state = this.asteroidToolsController.getState();
     const ship = this.playerManager.getLocalShip();
-    if (!state.active || !ship || ship.exploding || !this.currRoidBelt) {
+    if (!state.selectedTargetId || !ship || ship.exploding || !this.currRoidBelt) {
       if (state.reflectionPreview) {
         this.asteroidToolsController.setReflectionPreview(undefined);
       }
@@ -377,7 +405,6 @@ export class GameController {
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
     this.asteroidToolsController.update({
-      active: false,
       pilot: undefined,
       targets: [],
       reflectionPreview: undefined,
@@ -397,7 +424,7 @@ export class GameController {
       this.resetSessionForNewGame();
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
       setPlayView(true);
-      this.ensureAsteroidToolsOverlay();
+      this.ensureFlightControls();
       this.gameStateManager.setIsGameRunning(true);
 
       // Reset button text to default state
@@ -683,7 +710,6 @@ export class GameController {
   private resetSessionForNewGame(): void {
     this.cancelPendingGameOver();
     this.asteroidToolsController.update({
-      active: false,
       pilot: undefined,
       targets: [],
       reflectionPreview: undefined,
@@ -701,6 +727,7 @@ export class GameController {
     }
     this.gameOverInProgress = true;
     this.asteroidToolsController.cancel();
+    this.asteroidGestures?.cancel();
 
     const localPlayer = this.playerManager.getLocalPlayer();
     const raw = preferDeathCause(
@@ -1399,5 +1426,6 @@ export class GameController {
       currPlayer.lives,
       playersToRender
     );
+    this.flightFeedback?.draw(this.asteroidToolsController.getState(), currPlayer.ship.position);
   }
 }

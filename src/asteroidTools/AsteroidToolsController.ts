@@ -29,7 +29,6 @@ export interface AsteroidToolsPilotState {
 }
 
 export interface AsteroidToolsState {
-  active: boolean;
   selectedTargetId?: string;
   selectedTarget?: AsteroidToolsTarget;
   targets: readonly AsteroidToolsTarget[];
@@ -52,7 +51,6 @@ export interface AsteroidToolsControllerOptions {
 
 /** One snapshot-shaped update for GameController/ConnectionManager wiring. */
 export interface AsteroidToolsControllerUpdate {
-  active?: boolean;
   /** Omit to keep the pilot; undefined explicitly clears it. */
   pilot?: AsteroidToolsPilotState | undefined;
   targets?: readonly AsteroidToolsTarget[];
@@ -62,6 +60,11 @@ export interface AsteroidToolsControllerUpdate {
 type StateListener = (state: AsteroidToolsState) => void;
 
 const UI_ACTION_DEBOUNCE_MS = 250;
+const MOTION_KEYS: Readonly<Record<string, AsteroidToolsMotionAction | undefined>> = {
+  KeyR: 'anchor',
+  KeyX: 'brake',
+  KeyC: 'spin',
+};
 
 /**
  * Client-side asteroid tools state and action gate.
@@ -77,7 +80,6 @@ export class AsteroidToolsController {
   private readonly listeners = new Set<StateListener>();
   private readonly targetsById = new Map<string, AsteroidToolsTarget>();
   private state: AsteroidToolsState = {
-    active: false,
     targets: [],
     status: 'Tools unavailable',
   };
@@ -136,39 +138,14 @@ export class AsteroidToolsController {
       }
       changed = true;
     }
-    if (snapshot.active !== undefined) {
-      const nextActive = snapshot.active && this.canInteract();
-      if (nextActive !== this.state.active) {
-        this.state.active = nextActive;
-        if (!nextActive) {
-          delete this.state.reflectionPreview;
-        }
-        changed = true;
-      }
-    }
     if (changed) {
       this.publish();
     }
   }
 
-  setActive(active: boolean): void {
-    const nextActive = active && this.canInteract();
-    if (nextActive === this.state.active) {
-      return;
-    }
-    this.state.active = nextActive;
-    if (!nextActive) {
-      delete this.state.reflectionPreview;
-    }
-    this.publish();
-  }
-
   cancel(): void {
     const changed =
-      this.state.active ||
-      this.state.selectedTargetId !== undefined ||
-      this.state.reflectionPreview !== undefined;
-    this.state.active = false;
+      this.state.selectedTargetId !== undefined || this.state.reflectionPreview !== undefined;
     delete this.state.selectedTargetId;
     delete this.state.reflectionPreview;
     if (changed) {
@@ -264,20 +241,50 @@ export class AsteroidToolsController {
     return true;
   }
 
-  /** Open the compact tools panel with Q; no gameplay action is sent. */
+  /** Cycle targets by distance so every action is available without a pointer. */
+  cycleTarget(): boolean {
+    const position = this.state.pilot?.position;
+    if (!this.canInteract() || !position) {
+      return false;
+    }
+    const targets = [...this.targetsById.values()].sort(
+      (a, b) =>
+        Math.hypot(a.position.x - position.x, a.position.y - position.y) -
+          Math.hypot(b.position.x - position.x, b.position.y - position.y) ||
+        a.id.localeCompare(b.id)
+    );
+    const index = targets.findIndex((target) => target.id === this.state.selectedTargetId);
+    return this.selectTarget(targets[(index + 1) % targets.length]?.id);
+  }
+
   handleKeyDown(event: Pick<KeyboardEvent, 'code' | 'repeat' | 'preventDefault'>): boolean {
-    if (event.code === 'Escape' && !event.repeat) {
-      if (!this.state.active) {
+    if (event.repeat || !this.canInteract()) {
+      return false;
+    }
+    if (event.code === 'Escape') {
+      if (!this.state.selectedTargetId) {
         return false;
       }
       this.cancel();
-      event.preventDefault();
-      return true;
+    } else if (event.code === 'KeyT') {
+      if (!this.cycleTarget()) {
+        return false;
+      }
+    } else {
+      let action = MOTION_KEYS[event.code];
+      if (event.code === 'KeyQ') {
+        action = this.state.pilot?.asteroidMotion?.mode === 'latched' ? 'release' : 'latch';
+      }
+      if (!action || this.state.pilot?.kitId !== 'hauler') {
+        return false;
+      }
+      if (!this.state.selectedTargetId && (action === 'latch' || action === 'anchor')) {
+        this.cycleTarget();
+      }
+      if (!this.requestMotion(action)) {
+        return false;
+      }
     }
-    if (event.code !== 'KeyQ' || event.repeat || !this.canInteract()) {
-      return false;
-    }
-    this.setActive(!this.state.active);
     event.preventDefault();
     return true;
   }
@@ -293,7 +300,6 @@ export class AsteroidToolsController {
       delete this.state.pilot;
     }
     if (!pilot || pilot.alive === false) {
-      this.state.active = false;
       delete this.state.selectedTargetId;
       delete this.state.reflectionPreview;
       this.state.status = 'Tools unavailable';

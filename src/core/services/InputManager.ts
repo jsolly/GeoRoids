@@ -91,7 +91,9 @@ export class InputManager {
       canvas.addEventListener(
         'touchstart',
         (ev) => {
-          ev.preventDefault();
+          if (ev.cancelable) {
+            ev.preventDefault();
+          }
         },
         { passive: false }
       );

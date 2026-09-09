@@ -16,20 +16,23 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-test('Q toggles the compact asteroid tools panel without sending a gameplay action', () => {
+test('Q latches the nearest target and releases immediately after the server confirms attachment', () => {
   const dispatchTool = vi.fn(() => true);
-  const controller = new AsteroidToolsController({ dispatchTool });
-  controller.setPilot({ id: 'pilot', alive: true, kitId: 'dart' });
-
+  const motion = vi.fn(() => true);
+  const controller = new AsteroidToolsController({ dispatchTool, dispatchMotionAction: motion });
+  controller.setPilot({ id: 'pilot', alive: true, kitId: 'hauler', position: { x: 0, y: 0 } });
+  controller.setTargets([target]);
   const preventDefault = vi.fn();
   expect(controller.handleKeyDown({ code: 'KeyQ', repeat: false, preventDefault })).toBe(true);
-  expect(controller.getState().active).toBe(true);
+  expect(dispatchTool).toHaveBeenCalledWith({ action: 'latch', targetId: target.id, sequence: 1 });
   expect(controller.handleKeyDown({ code: 'KeyQ', repeat: true, preventDefault })).toBe(false);
-  expect(dispatchTool).not.toHaveBeenCalled();
-  expect(preventDefault).toHaveBeenCalledOnce();
-
-  expect(controller.handleKeyDown({ code: 'Escape', repeat: false, preventDefault })).toBe(true);
-  expect(controller.getState().active).toBe(false);
+  controller.setPilot({
+    alive: true,
+    kitId: 'hauler',
+    asteroidMotion: { epoch: 1, mode: 'latched', ack: 0 },
+  });
+  expect(controller.handleKeyDown({ code: 'KeyQ', repeat: false, preventDefault })).toBe(true);
+  expect(motion).toHaveBeenCalledWith('release', undefined);
 });
 
 test('Hauler motion controls use the negotiated motion sink and reject non-Haulers', () => {
@@ -123,14 +126,12 @@ test('a quick latch-to-anchor transition is accepted while duplicate taps are co
   expect(controller.requestMotion('release')).toBe(true);
 });
 
-test('death closes the tools panel and prevents actions until a living pilot returns', () => {
+test('death clears selection and prevents actions until a living pilot returns', () => {
   const dispatchTool = vi.fn(() => true);
   const controller = new AsteroidToolsController({ dispatchTool });
   controller.setPilot({ alive: true, kitId: 'hauler' });
-  controller.setActive(true);
   controller.setPilot({ alive: false, kitId: 'hauler' });
 
-  expect(controller.getState().active).toBe(false);
   expect(controller.getState().selectedTargetId).toBeUndefined();
   expect(controller.requestMotion('latch')).toBe(false);
   expect(dispatchTool).not.toHaveBeenCalled();
@@ -140,7 +141,6 @@ test('snapshot update batches pilot, targets, and preview state for one UI rende
   const onChange = vi.fn();
   const controller = new AsteroidToolsController({ onChange });
   controller.update({
-    active: true,
     pilot: { alive: true, kitId: 'dart' },
     targets: [target],
     reflectionPreview: {
@@ -154,7 +154,6 @@ test('snapshot update batches pilot, targets, and preview state for one UI rende
 
   expect(onChange).toHaveBeenCalledOnce();
   expect(controller.getState()).toMatchObject({
-    active: true,
     targets: [target],
     pilot: { kitId: 'dart' },
   });
@@ -164,13 +163,11 @@ test('omitted tool updates preserve state while explicit clears remove the optio
   const controller = new AsteroidToolsController();
   controller.update({ pilot: { alive: true, kitId: 'hauler' }, targets: [target] });
   controller.selectTarget(target.id);
-  controller.setActive(true);
   controller.update({ targets: [target] });
   expect(controller.getState().pilot?.kitId).toBe('hauler');
   expect(controller.getState().selectedTargetId).toBe(target.id);
   controller.update({ pilot: undefined, reflectionPreview: undefined });
   const cleared = controller.getState();
-  expect(cleared.active).toBe(false);
   expect(cleared).not.toHaveProperty('pilot');
   expect(cleared).not.toHaveProperty('selectedTargetId');
   expect(cleared).not.toHaveProperty('selectedTarget');
@@ -189,4 +186,20 @@ test('failed latch sends leave the status and debounce available for a real retr
   dispatchTool.mockReturnValue(true);
   expect(controller.requestMotion('latch')).toBe(true);
   expect(controller.getState().status).toBe('Latch requested');
+});
+
+test('T selects nearest-first regardless of snapshot order and wraps after the farthest rock', () => {
+  const controller = new AsteroidToolsController();
+  controller.setPilot({ alive: true, kitId: 'dart', position: { x: 100, y: 100 } });
+  controller.setTargets([
+    { ...target, id: 'far', position: { x: 300, y: 100 } },
+    { ...target, id: 'near', position: { x: 105, y: 100 } },
+    { ...target, id: 'middle', position: { x: 100, y: 150 } },
+  ]);
+  for (const id of ['near', 'middle', 'far', 'near']) {
+    expect(controller.handleKeyDown({ code: 'KeyT', repeat: false, preventDefault: vi.fn() })).toBe(
+      true
+    );
+    expect(controller.getState().selectedTargetId).toBe(id);
+  }
 });

@@ -168,6 +168,8 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 ## Project conventions
 
+- **Keep the Wiki current when features change.** When adding, changing, or removing a feature, review the in-game Wiki at `/wiki/` and update affected controls, behavior, setup, and troubleshooting pages in the same work. Follow [manual maintenance](docs/wiki-maintenance.md), including its source-review gate. Remove obsolete instructions and verify links. If no Wiki page is affected, record that explicitly in the change verification.
+
 - **No barrel files / re-exports** — import from the defining module.
 - **Relative paths only** — no `@`-style aliases.
 - **Biome** is the only linter/formatter (`biome.jsonc`); ESLint is gone.

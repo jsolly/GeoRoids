@@ -81,6 +81,7 @@ test('pilots find rules, follow related entries, and control demonstrations on d
       .poll(() => page.locator('.media-toggle').first().getAttribute('aria-pressed'))
       .toBe('false');
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.png$/);
+    expect(await page.locator('#content').textContent()).toContain('Q latches or releases');
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');
@@ -136,6 +137,9 @@ test('pilots find rules, follow related entries, and control demonstrations on d
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
     await page.screenshot({ path: resolve(output, 'wiki-warden-mobile.png'), fullPage: true });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
+    expect(await page.locator('#content').textContent()).toContain('Flick at least 40 pixels');
+    await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.locator('.breadcrumb a').click();
     await page.screenshot({ path: resolve(output, 'wiki-mobile.png'), fullPage: true });
     await page.locator('#wiki-search').fill('fuel');

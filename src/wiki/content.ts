@@ -629,7 +629,8 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Connection interruptions',
         paragraphs: [
-          'The game automatically tries to reconnect after a lost connection. During an interruption, the local view may lag behind the shared world; wait for the connection to recover before relying on a pickup or hit result. If the disconnected state persists, return to the title screen or reload and rejoin. A full reload can start a new session, so it is not a way to preserve a life or a tether.',
+          'Switching away from the game releases held movement and fire controls. On return, the client requests current server state and resumes drawing without replaying the time the tab was hidden.',
+          'The game automatically tries to reconnect after a lost connection. During an interruption, the local view may lag behind the shared world; wait for the connection to recover before relying on a pickup or hit result. If joining fails or reconnect attempts are exhausted, the game returns to the title screen. Select Enter Game to try again. A full reload can start a new session, so it is not a way to preserve a life or a tether.',
         ],
       },
       {

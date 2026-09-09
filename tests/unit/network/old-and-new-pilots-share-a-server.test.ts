@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { serverPerformanceMetrics } from '../../../server/performanceMetrics';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { logger } from '../../../setup/serverLogger';
 import {
@@ -330,6 +331,176 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     broadcaster.broadcastGameState();
     expect(a.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
   });
+
+  test('a callback send records one terminal outbound outcome', () => {
+    const pilot = socket();
+    join(handler, pilot.ws, 'callback-pilot', 1);
+    pilot.fake.clear();
+    pilot.fake.defer = true;
+    const enabled = vi.spyOn(serverPerformanceMetrics, 'enabled', 'get').mockReturnValue(true);
+    const outbound = vi
+      .spyOn(serverPerformanceMetrics, 'recordOutbound')
+      .mockImplementation(() => undefined);
+
+    broadcaster.broadcastGameState();
+    const beforeCompletion = outbound.mock.calls.length;
+    expect(pilot.pending).toHaveLength(1);
+
+    pilot.pending.shift()?.(new Error('write failed'));
+
+    const completionCalls = outbound.mock.calls.slice(beforeCompletion);
+    expect(completionCalls).toHaveLength(1);
+    expect(completionCalls[0]?.[0]).toMatchObject({
+      kind: 'snapshot',
+      outcome: 'failed',
+    });
+    enabled.mockRestore();
+  });
+
+  test('legacy snapshots skip a pressured socket and recover on the next full state', () => {
+    const pilot = socket();
+    join(handler, pilot.ws, 'legacy');
+    pilot.fake.clear();
+    pilot.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
+
+    broadcaster.broadcastGameState();
+    expect(pilot.messages).toHaveLength(0);
+
+    pilot.fake.bufferedAmount = 0;
+    broadcaster.broadcastGameState();
+    expect(pilot.messages.at(-1)).toMatchObject({ type: 'gameState' });
+  });
+
+  test('pressured event recipients reconnect for state recovery instead of growing queues', () => {
+    const pressured = socket();
+    const peer = socket();
+    join(handler, pressured.ws, 'pressured');
+    join(handler, peer.ws, 'peer');
+    pressured.fake.clear();
+    peer.fake.clear();
+    pressured.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
+
+    broadcaster.broadcastChatMessage('peer', 'peer', 'hello');
+
+    expect(pressured.close).toHaveBeenCalledWith(
+      1013,
+      'Backpressure; reconnect for state recovery'
+    );
+    expect(pressured.messages.some((message) => message.type === 'chat')).toBe(false);
+    expect(engine.getPlayer('pressured')).toBeUndefined();
+    expect(peer.messages.some((message) => message.type === 'playerLeft')).toBe(true);
+  });
+
+  test.each([
+    {
+      cause: 'outbound pressure',
+      code: 1013,
+      reason: 'Backpressure; reconnect for state recovery',
+    },
+    {
+      cause: 'a failed event write',
+      code: 1011,
+      reason: 'Transport failure; reconnect for state recovery',
+    },
+  ])('enhanced recipients retain their pilot and resume after $cause', ({ code, reason }) => {
+    const pressured = socket();
+    const peer = socket();
+    handler.handleMessage(
+      {
+        type: 'join',
+        data: {
+          id: 'enhanced-pressured',
+          name: 'enhanced-pressured',
+          position: { x: 100, y: 100 },
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+        },
+      },
+      pressured.ws
+    );
+    const joined = pressured.messages.find((message) => message.type === 'joined');
+    assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
+    const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
+    assert.equal(typeof resumeToken, 'string');
+
+    join(handler, peer.ws, 'peer');
+    pressured.fake.clear();
+    peer.fake.clear();
+    if (code === 1013) {
+      pressured.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
+    } else {
+      pressured.fake.fail = true;
+    }
+
+    broadcaster.broadcastChatMessage('peer', 'peer', 'hello');
+
+    expect(engine.getPlayer('enhanced-pressured')).toBeDefined();
+    expect(engine.getPlayer('enhanced-pressured')?.ws).toBeUndefined();
+    expect(peer.messages.some((message) => message.type === 'playerLeft')).toBe(false);
+    expect(pressured.close).toHaveBeenCalledWith(code, reason);
+
+    const replacement = socket();
+    handler.handleMessage(
+      {
+        type: 'join',
+        data: {
+          id: 'untrusted-replacement-id',
+          name: 'untrusted-replacement',
+          position: { x: 800, y: 800 },
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+          resumeToken,
+        },
+      },
+      replacement.ws
+    );
+    expect(replacement.messages.find((message) => message.type === 'joined')).toMatchObject({
+      data: { id: 'enhanced-pressured', resumeToken },
+    });
+    expect(engine.getPlayer('enhanced-pressured')?.ws).toBe(replacement.ws);
+  });
+
+  test('projected outbound pressure bounds snapshot, event, and control classes', () => {
+    const snapshot = socket();
+    const event = socket();
+    const control = socket();
+    join(handler, snapshot.ws, 'projected-snapshot');
+    join(handler, event.ws, 'projected-event');
+    join(handler, control.ws, 'projected-control');
+    snapshot.fake.clear();
+    event.fake.clear();
+    control.fake.clear();
+
+    snapshot.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES - 1;
+    broadcaster.sendToWebSocket(snapshot.ws, { type: 'snapshot', data: 'too-large-for-queue' });
+    expect(snapshot.fake.sent).toHaveLength(0);
+    expect(snapshot.close).not.toHaveBeenCalled();
+
+    event.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES - 1;
+    broadcaster.sendToWebSocket(event.ws, { type: 'playerUpdate', data: { x: 1 } });
+    expect(event.close).toHaveBeenCalledWith(1013, 'Backpressure; reconnect for state recovery');
+    expect(engine.getPlayer('projected-event')).toBeUndefined();
+
+    control.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES - 1;
+    broadcaster.sendToWebSocket(control.ws, { type: 'error', data: 'control' });
+    expect(control.close).toHaveBeenCalledWith(1013, 'Backpressure; reconnect for state recovery');
+    expect(engine.getPlayer('projected-control')).toBeUndefined();
+  });
+
+  test('an oversized snapshot closes explicitly instead of retrying forever', () => {
+    const pilot = socket();
+    join(handler, pilot.ws, 'oversized-snapshot');
+    pilot.fake.clear();
+
+    broadcaster.sendToWebSocket(pilot.ws, {
+      type: 'snapshot',
+      data: { kind: 'keyframe', state: 'x'.repeat(SNAPSHOT_BACKPRESSURE_BYTES) },
+    });
+
+    expect(pilot.close).toHaveBeenCalledWith(1013, 'Backpressure; reconnect for state recovery');
+    expect(engine.getPlayer('oversized-snapshot')).toBeUndefined();
+  });
+
   test('serialization and socket-close failures stay contained to recipients', () => {
     const old = socket();
     const modern = socket();

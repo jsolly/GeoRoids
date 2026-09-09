@@ -11,6 +11,7 @@ import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/
 import type { AsteroidData, Position, Velocity } from '../../shared-types';
 import type { GameEntity } from '../core/EntityManager';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
+import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
 
 interface SnapshotRecipient {
@@ -43,6 +44,47 @@ function messageType(message: unknown): string | undefined {
     return undefined;
   }
   return typeof message['type'] === 'string' ? message['type'] : undefined;
+}
+
+type OutboundClass = 'snapshot' | 'event' | 'control';
+type OutboundSendResult = 'sent' | 'skipped-pressure' | 'closed-pressure' | 'not-open';
+const OUTBOUND_FRAME_HEADER_RESERVE_BYTES = 10;
+
+function outboundClass(message: unknown): OutboundClass {
+  switch (messageType(message)) {
+    case 'gameState':
+    case 'snapshot':
+    case 'asteroidCreateBatch':
+      return 'snapshot';
+    case 'error':
+    case 'joined':
+    case 'pong':
+    case 'sessionExpired':
+      return 'control';
+    default:
+      return 'event';
+  }
+}
+
+function bufferedBytes(ws: WebSocket): number {
+  return Number.isFinite(ws.bufferedAmount) ? Math.max(0, ws.bufferedAmount) : 0;
+}
+
+function recordOutbound(
+  kind: OutboundClass,
+  outcome: OutboundOutcome,
+  payloadBytes = 0,
+  queuedBytes = 0
+): void {
+  if (!serverPerformanceMetrics.enabled) {
+    return;
+  }
+  serverPerformanceMetrics.recordOutbound({
+    kind,
+    outcome,
+    payloadBytes,
+    bufferedBytes: queuedBytes,
+  });
 }
 
 export class GameStateBroadcaster {
@@ -88,6 +130,19 @@ export class GameStateBroadcaster {
   }
 
   public broadcastGameState(excludeId?: string): void {
+    if (!serverPerformanceMetrics.enabled) {
+      this.broadcastGameStateInternal(excludeId);
+      return;
+    }
+    const startedAt = globalThis.performance.now();
+    try {
+      this.broadcastGameStateInternal(excludeId);
+    } finally {
+      serverPerformanceMetrics.recordBroadcast(globalThis.performance.now() - startedAt);
+    }
+  }
+
+  private broadcastGameStateInternal(excludeId?: string): void {
     // Covers destruction paths invoked outside the frame loop (for example a
     // client asteroid report) before publishing the authoritative snapshot.
     this.gameEngine.ensureAsteroidField();
@@ -127,7 +182,7 @@ export class GameStateBroadcaster {
         if (ws.readyState === WebSocket.OPEN) {
           try {
             legacy ??= JSON.stringify({ ...message, data: { ...gameState, loot: compatibleLoot } });
-            ws.send(legacy);
+            this.sendSerialized(ws, legacy, 'snapshot');
           } catch (error) {
             logger.error('Failed to send legacy game state', error);
             this.closeFailedSnapshotSocket(ws);
@@ -135,12 +190,13 @@ export class GameStateBroadcaster {
         }
         continue;
       }
-      if (
-        ws.readyState !== WebSocket.OPEN ||
-        ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES ||
-        recipient.pending
-      ) {
+      if (ws.readyState !== WebSocket.OPEN || recipient.pending) {
         recipient.needsKeyframe = true;
+        continue;
+      }
+      if (ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) {
+        recipient.needsKeyframe = true;
+        recordOutbound('snapshot', 'pressure-skipped', 0, bufferedBytes(ws));
         continue;
       }
       try {
@@ -167,48 +223,54 @@ export class GameStateBroadcaster {
         recipient.needsKeyframe = false;
         const deliveredState = encoder.state;
         const recipientPlayerId = player.id;
-        ws.send(
-          JSON.stringify({ type: 'snapshot', data: frame, timestamp: message.timestamp }),
-          (error) => {
-            recipient.pending = false;
-            if (error) {
-              recipient.needsKeyframe = true;
-              logger.error('Snapshot send failed; next send requires keyframe', error);
-              return;
-            }
-            // Rejoin replaces the WeakMap entry; an old callback cannot advance it.
-            if (this.snapshotRecipients.get(ws) !== recipient) {
-              return;
-            }
-            recipient.sequence = sequence;
-            recipient.baseline = { sequence, state: deliveredState };
-            recipient.sinceKeyframe = frame.kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
-            if (shouldSampleSnapshot(sequence)) {
-              const authoritative = deliveredState.entities.find(
-                (entity) => entity.id === recipientPlayerId
-              );
-              logger.info('STATE', 'snapshot_sent_to_transport', {
-                releaseId: SERVER_RELEASE_ID,
-                playerId: recipientPlayerId,
-                sentAt: message.timestamp,
-                gameTime: deliveredState.gameTime,
-                snapshotSequence: sequence,
-                snapshotKind: frame.kind,
-                ...(frame.kind === 'delta' ? { snapshotBaseline: frame.baseline } : {}),
-                ...(authoritative?.asteroidMotion
-                  ? {
-                      motionEpoch: authoritative.asteroidMotion.epoch,
-                      motionAck: authoritative.asteroidMotion.ack,
-                      motionMode: authoritative.asteroidMotion.mode,
-                    }
-                  : {}),
-                ...(authoritative
-                  ? { authoritativeRow: captureDiagnosticActorState(authoritative) }
-                  : {}),
-              });
-            }
+        const serialized = JSON.stringify({
+          type: 'snapshot',
+          data: frame,
+          timestamp: message.timestamp,
+        });
+        const result = this.sendSerialized(ws, serialized, 'snapshot', (error) => {
+          recipient.pending = false;
+          if (error) {
+            recipient.needsKeyframe = true;
+            logger.error('Snapshot send failed; next send requires keyframe', error);
+            return;
           }
-        );
+          // Rejoin replaces the WeakMap entry; an old callback cannot advance it.
+          if (this.snapshotRecipients.get(ws) !== recipient) {
+            return;
+          }
+          recipient.sequence = sequence;
+          recipient.baseline = { sequence, state: deliveredState };
+          recipient.sinceKeyframe = frame.kind === 'keyframe' ? 0 : recipient.sinceKeyframe + 1;
+          if (shouldSampleSnapshot(sequence)) {
+            const authoritative = deliveredState.entities.find(
+              (entity) => entity.id === recipientPlayerId
+            );
+            logger.info('STATE', 'snapshot_sent_to_transport', {
+              releaseId: SERVER_RELEASE_ID,
+              playerId: recipientPlayerId,
+              sentAt: message.timestamp,
+              gameTime: deliveredState.gameTime,
+              snapshotSequence: sequence,
+              snapshotKind: frame.kind,
+              ...(frame.kind === 'delta' ? { snapshotBaseline: frame.baseline } : {}),
+              ...(authoritative?.asteroidMotion
+                ? {
+                    motionEpoch: authoritative.asteroidMotion.epoch,
+                    motionAck: authoritative.asteroidMotion.ack,
+                    motionMode: authoritative.asteroidMotion.mode,
+                  }
+                : {}),
+              ...(authoritative
+                ? { authoritativeRow: captureDiagnosticActorState(authoritative) }
+                : {}),
+            });
+          }
+        });
+        if (result !== 'sent') {
+          recipient.pending = false;
+          recipient.needsKeyframe = true;
+        }
       } catch (error) {
         recipient.pending = false;
         recipient.needsKeyframe = true;
@@ -618,10 +680,78 @@ export class GameStateBroadcaster {
     this.broadcastToAll(chatMessage);
   }
 
-  public sendToWebSocket(ws: WebSocket, message: unknown): void {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
+  private closeSocketForRecovery(ws: WebSocket, code: number, reason: string): void {
+    const player = this.gameEngine.getPlayerBySocket(ws);
+    const resumable = this.gameEngine.transportClosed(ws);
+    if (!resumable && player?.type === 'human') {
+      const removed = this.gameEngine.removePlayer(player.id);
+      if (removed) {
+        this.broadcastPlayerLeft(player.id);
+      }
     }
+    try {
+      ws.close(code, reason);
+    } catch (error) {
+      logger.error('Failed to close WebSocket for state recovery', error);
+    }
+  }
+
+  private sendSerialized(
+    ws: WebSocket,
+    message: string,
+    kind: OutboundClass,
+    onComplete?: (error?: Error) => void
+  ): OutboundSendResult {
+    const queuedBytes = bufferedBytes(ws);
+    const payloadBytes = Buffer.byteLength(message, 'utf8');
+    if (ws.readyState !== WebSocket.OPEN) {
+      recordOutbound(kind, 'not-open', payloadBytes, queuedBytes);
+      return 'not-open';
+    }
+    const projectedBytes = queuedBytes + payloadBytes + OUTBOUND_FRAME_HEADER_RESERVE_BYTES;
+    if (projectedBytes > SNAPSHOT_BACKPRESSURE_BYTES) {
+      const permanentlyOversized =
+        payloadBytes + OUTBOUND_FRAME_HEADER_RESERVE_BYTES > SNAPSHOT_BACKPRESSURE_BYTES;
+      const shouldClose = kind !== 'snapshot' || permanentlyOversized;
+      const outcome = shouldClose ? 'pressure-closed' : 'pressure-skipped';
+      recordOutbound(kind, outcome, payloadBytes, queuedBytes);
+      if (shouldClose) {
+        this.closeSocketForRecovery(ws, 1013, 'Backpressure; reconnect for state recovery');
+        return 'closed-pressure';
+      }
+      return 'skipped-pressure';
+    }
+
+    try {
+      if (onComplete) {
+        ws.send(message, (error) => {
+          recordOutbound(kind, error ? 'failed' : 'accepted', payloadBytes, bufferedBytes(ws));
+          onComplete(error);
+        });
+      } else {
+        ws.send(message);
+        recordOutbound(kind, 'accepted', payloadBytes, queuedBytes);
+      }
+      return 'sent';
+    } catch (error) {
+      recordOutbound(kind, 'failed', payloadBytes, queuedBytes);
+      throw error;
+    }
+  }
+
+  public sendToWebSocket(ws: WebSocket, message: unknown): void {
+    let messageStr: string;
+    try {
+      messageStr = JSON.stringify(message);
+    } catch (error) {
+      recordOutbound(outboundClass(message), 'failed');
+      logger.error('Failed to serialize direct message', {
+        type: messageType(message),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    this.sendSerialized(ws, messageStr, outboundClass(message));
   }
 
   public sendError(ws: WebSocket, message: string): void {
@@ -633,6 +763,19 @@ export class GameStateBroadcaster {
   }
 
   public broadcastToAll(message: unknown, excludeId?: string): void {
+    if (!serverPerformanceMetrics.enabled) {
+      this.broadcastToAllInternal(message, excludeId);
+      return;
+    }
+    const startedAt = globalThis.performance.now();
+    try {
+      this.broadcastToAllInternal(message, excludeId);
+    } finally {
+      serverPerformanceMetrics.recordBroadcast(globalThis.performance.now() - startedAt);
+    }
+  }
+
+  private broadcastToAllInternal(message: unknown, excludeId?: string): void {
     let messageStr: string;
     try {
       messageStr = JSON.stringify(message);
@@ -654,21 +797,17 @@ export class GameStateBroadcaster {
 
       if (player.ws && player.ws.readyState === WebSocket.OPEN) {
         try {
-          player.ws.send(messageStr);
+          this.sendSerialized(player.ws, messageStr, outboundClass(message));
         } catch (error) {
           logger.error(
             `Failed to send message to player ${player.id} (readyState: ${player.ws.readyState})`,
             error
           );
-          // For unrecoverable errors, close the connection and remove the player
-          try {
-            player.ws.close();
-          } catch (closeError) {
-            logger.error(`Failed to close WebSocket for player ${player.id}`, closeError);
-          }
-          // Remove the player from the game engine
-          this.gameEngine.removePlayer(player.id);
-          this.broadcastPlayerLeft(player.id);
+          this.closeSocketForRecovery(
+            player.ws,
+            1011,
+            'Transport failure; reconnect for state recovery'
+          );
         }
       }
     }

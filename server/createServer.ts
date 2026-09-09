@@ -5,6 +5,12 @@ import { shouldLogInboundGameplayMessage } from './communication/inboundMessageL
 import { WebSocketCore } from './communication/WebSocketCore';
 import { readServerConfiguration } from './configuration';
 import { GameEngine } from './core/GameEngine';
+import {
+  acquireServerPerformanceMetrics,
+  releaseServerPerformanceMetrics,
+  serverPerformanceMetrics,
+  serverPerformanceMetricsEnabled,
+} from './performanceMetrics';
 import { SERVER_RELEASE_ID } from './release';
 import { ClientLogger } from './services/ClientLogger';
 import { renderStatusPage } from './statusPage';
@@ -17,10 +23,11 @@ import {
   handleTestResetWorld,
 } from './testHttpHandlers';
 
-type CreateServerOptions = {
+export type CreateServerOptions = {
   port?: number;
   nodeEnv?: string;
   requireEnhancedClient?: boolean;
+  seed?: number;
 };
 
 export function createServerInstance(options: CreateServerOptions = {}) {
@@ -60,7 +67,16 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
     if (req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(buildHealthPayload(wsCore, gameEngine, loggingDiagnostics())));
+      res.end(
+        JSON.stringify(
+          buildHealthPayload(
+            wsCore,
+            gameEngine,
+            loggingDiagnostics(),
+            serverPerformanceMetricsEnabled() ? serverPerformanceMetrics.read() : undefined
+          )
+        )
+      );
       return;
     }
 
@@ -271,7 +287,8 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     logger.error('❌ WebSocket server error:', error);
   });
 
-  const gameEngine = new GameEngine();
+  const gameEngine = new GameEngine(options.seed);
+  acquireServerPerformanceMetrics();
   // Ensure server-side game loop (including bot regen) runs
   gameEngine.startGameLoop();
   gameEngine.updatePauseState();
@@ -411,6 +428,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     clearInterval(cleanupInterval);
     wsCore.stopPeriodicGameStateBroadcast();
     gameEngine.stopGameLoop();
+    releaseServerPerformanceMetrics();
     closing = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
         for (const socket of wss.clients) {

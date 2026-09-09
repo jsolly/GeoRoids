@@ -1,5 +1,12 @@
 import { PlayerManager } from '../../entities/player/PlayerManager';
-import { keyDown, keyUp } from '../../input/keybindings';
+import { resetControlSources } from '../../input/controlSources';
+import {
+  getPressedKeysForPlayer,
+  keyDown,
+  keys,
+  keyUp,
+  reconcilePlayerInput,
+} from '../../input/keybindings';
 import {
   handleMouseDown,
   handleMouseMove,
@@ -107,6 +114,25 @@ export class InputManager {
       }
     });
 
+    const releaseInput = () => {
+      const localPlayer = getLocalPlayer();
+      resetControlSources();
+      for (const key of Object.keys(keys)) {
+        keys[key] = false;
+      }
+      if (localPlayer) {
+        getPressedKeysForPlayer(localPlayer).clear();
+        localPlayer.ship.canShoot = true;
+        reconcilePlayerInput(localPlayer);
+      }
+    };
+    window.addEventListener('blur', releaseInput);
+    window.addEventListener('pagehide', releaseInput);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        releaseInput();
+      }
+    });
     initializeTouchControls();
 
     this.listenersInitialized = true;

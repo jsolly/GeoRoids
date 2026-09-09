@@ -18,6 +18,7 @@ afterEach(() => {
 
 test('an actual game-loop frame failure stops work and offers one restart notice', async () => {
   vi.useFakeTimers();
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const scheduled: FrameRequestCallback[] = [];
   Object.defineProperty(window, 'requestAnimationFrame', {
     configurable: true,

@@ -112,3 +112,63 @@ at [`client-entry.ts`](client-entry.ts).
 Use the historical files under `docs/performance/` only as archived evidence from
 their recorded revision. They are not current benchmark output and do not define
 supported devices, loads, or production behavior.
+
+## Realtime production client and load sessions
+
+Run from `/Users/johnsolly/code/GeoRoids` or the absolute path of the implementation
+worktree. These commands acquire the repository integration lock, build the
+production client, start an owned preview/server pair, and clean up that pair:
+
+```sh
+npm run benchmark:realtime -- --viewport all --warmup 30 --seconds 180 --output .performance/client.json
+npm run benchmark:load -- --pilots 5 --legacy 1 --warmup 30 --seconds 180 --output .performance/load.json
+npm run benchmark:load -- --pilots 5 --network degraded --warmup 30 --seconds 180 --output .performance/load-degraded.json
+```
+
+Use `GEOROIDS_TEST_VITE_PORT` and `GEOROIDS_TEST_SERVER_PORT` to select free ports.
+The runner refuses occupied ports. The default deadline is 1200 seconds; a
+30-minute soak needs a larger `GEOROIDS_TEST_MAX_DURATION_SECONDS` value that also
+allows admission, warmup, build and cleanup. Timed sessions must run separately
+from tests, coverage, builds and other measurements.
+
+These runs measure the current worktree and real scheduling. They do not use the
+archived paired-comparison machinery above. Dirty results are diagnostics, never
+release evidence. Reports retain source/build hashes and fail if either changes
+during the session. The client uses the shipped entry point and real input; its
+`performance=collect` query enables the separate diagnostics recorder. Viewports
+are desktop, touch portrait and touch landscape. Chromium touch uses simultaneous
+trusted joystick/fire events. WebKit is available with `--browser webkit`, but
+desktop WebKit with touch emulation is not an iPhone measurement.
+
+The load driver uses the real protocol and decoder, realistic input/shoot
+messages, phased admissions, pings and resync requests. `--legacy N` mixes legacy
+pilots with negotiated pilots. Enhanced free/handoff motion uses epoch-tagged
+poses; constrained motion uses input messages. Measured authoritative
+acknowledgment advancement for commands sent during measurement is required, so
+warmup acknowledgments and rejected commands cannot pass as useful load. Each
+negotiated session must deliver contiguous sequences. The diagnostic delivery
+checks require at least 27 states/second across the complete measured window,
+including rejoins, and no gap above 250 ms; these are declared workload checks, not calibrated capacity
+budgets. Every offered pilot must finish joined with fresh authoritative state.
+Raw delivery intervals and unanswered measured pings remain in the report; an
+unanswered measured probe fails the run. Shot rates are offered commands. Each
+negotiated pilot must also observe an authoritative projectile born after its
+first measured movement acknowledgment. The legacy protocol does not carry that
+projectile collection, so legacy rows report this witness as unavailable. Game-over pilots leave and rejoin on their existing socket; `gameJoins`
+records this session churn separately from TCP connections. It measures generator CPU, memory and event-loop
+delay alongside server health and client delivery. A shared-host run does not
+establish Railway capacity or prove an independent load generator has headroom.
+
+`benchmarks/tcp-proxy.ts` provides a bounded, ordered TCP impairment building block.
+The load driver's `--network normal` and `--network degraded` modes use it against
+the owned local server's WebSocket path. HTTP health probes bypass the proxy to
+observe the server directly; they do not measure impaired-path availability or
+latency. Client RTT replies and state-delivery gaps validate that path. Limits
+apply to each connection, not shared aggregate
+cellular bandwidth. It delays and throttles chunks without dropping arbitrary protocol deltas. Its
+configured per-chunk delay is an approximation; report measured RTT and delivery
+intervals rather than treating settings as observed network latency.
+
+Isolated architecture experiments are `collision-experiment.ts` and
+`protocol-experiment.ts`; decisions and limits are in
+[`docs/performance/implementation-status.md`](../docs/performance/implementation-status.md).

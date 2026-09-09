@@ -965,13 +965,19 @@ export class GameInteractions {
   async attackBotWithLasers(
     botId: string,
     shots = 8
-  ): Promise<{ minHealthObserved: number; everExploding: boolean; scoreGain: number }> {
+  ): Promise<{
+    minHealthObserved: number;
+    everExploding: boolean;
+    scoreGain: number;
+    firstShotHealthBefore: number;
+  }> {
     const startScore = await this.getScore();
     const playerId = await this.getLocalPlayerId();
     const retreat = { x: -1800, y: -1800 };
     let minHealthObserved = Number.POSITIVE_INFINITY;
     let everExploding = false;
     let fired = 0;
+    let firstShotHealthBefore: number | undefined;
 
     while (fired < shots) {
       const setupDeadline = Date.now() + BOT_SHOT_SETUP_TIMEOUT_MS;
@@ -1046,6 +1052,9 @@ export class GameInteractions {
       if (!before) {
         throw new Error(`Bot ${botId} was unavailable after fixture arrangement`);
       }
+      if (firstShotHealthBefore === undefined) {
+        firstShotHealthBefore = arrangement.botHealth;
+      }
       minHealthObserved = Math.min(minHealthObserved, before.health);
       everExploding = everExploding || before.exploding;
       if (before.exploding || before.health <= 0) {
@@ -1090,11 +1099,15 @@ export class GameInteractions {
     if (fired === 0) {
       throw new Error(`No real laser was fired at hostile bot ${botId}`);
     }
+    if (firstShotHealthBefore === undefined) {
+      throw new Error(`No arranged health observation was available for bot ${botId}`);
+    }
     const endScore = await this.getScore();
     return {
       minHealthObserved,
       everExploding,
       scoreGain: endScore - startScore,
+      firstShotHealthBefore,
     };
   }
 

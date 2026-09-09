@@ -189,13 +189,13 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
       ).toBe(true);
     }
     expect(f.actor.fuel).toBe(fuel);
-    f.service.step(100, f.field);
+    f.service.step(100, f.field, ASTEROID_MOTION.maxFramesPerStep);
     expect(f.actor.fuel).toBeCloseTo(fuel - ASTEROID_MOTION.fuelPerFrame * 6, 10);
     expect(primary.angularVelocity).toBeGreaterThan(omega);
     expect(primary.spinClass).toBe('charged');
     expect(f.service.getState(f.actor.id)?.ack).toBe(99);
-    f.service.step(100, f.field);
-    expect(f.actor.fuel).toBeCloseTo(fuel - ASTEROID_MOTION.fuelPerFrame * 6, 10);
+    f.service.step(100, f.field, 1);
+    expect(f.actor.fuel).toBeCloseTo(fuel - ASTEROID_MOTION.fuelPerFrame * 7, 10);
   });
 
   it('never invents torque from an empty tank or forged client dt, force, fuel or epochs', () => {
@@ -565,6 +565,27 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     expect(h.service.ownsAsteroidMotion('spinner')).toBe(false);
   });
 
+  it('keeps fixed motion ticking across a wall-clock rollback and expires reconnect grace at its deadline', () => {
+    const f = fixture();
+    latch(f);
+    f.service.step(1000, f.field, 1);
+    const before = { ...f.actor.position };
+    expect(f.service.transportClosed(f.socket, 1000)).toBe(true);
+
+    expect(() => f.service.step(900, f.field, 1)).not.toThrow();
+    expect(f.actor.position).not.toEqual(before);
+    expect(f.service.ownsAsteroidMotion('spinner')).toBe(true);
+    expect(f.service.resume(f.token, f.second, 2999).ok).toBe(true);
+
+    const expired = fixture();
+    latch(expired);
+    expired.service.step(1000, expired.field, 1);
+    expect(expired.service.transportClosed(expired.socket, 1000)).toBe(true);
+    expect(() => expired.service.step(900, expired.field, 1)).not.toThrow();
+    expect(expired.service.step(3000, expired.field, 1)).toEqual([expired.actor.id]);
+    expect(expired.service.resume(expired.token, expired.second, 3000).ok).toBe(false);
+  });
+
   it('brakes a spinning source into a real payload orbit and leaves payload velocity intact on release', () => {
     const f = fixture();
     const primary = f.field[0];
@@ -785,12 +806,12 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     }
     const before = primary.rotation;
     f.service.input(f.socket, input(epoch, 0), f.field, 1);
-    f.service.step(10000, f.field);
+    f.service.step(10000, f.field, GAME.FPS * 10);
     expect(primary.rotation - before).toBeLessThanOrEqual(
       ASTEROID_MOTION.maxFramesPerStep * ASTEROID_MOTION.maxAngularVelocity
     );
     const held = primary.rotation;
-    f.service.step(10000, f.field);
-    expect(primary.rotation).toBe(held);
+    f.service.step(10000, f.field, 1);
+    expect(primary.rotation).toBeGreaterThan(held);
   });
 });

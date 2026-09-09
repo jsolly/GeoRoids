@@ -129,3 +129,17 @@ tests. Screenshots are diagnostics, not a success criterion. The repository's
 full pre-push gate remains `npm run gate`. All lint findings are errors, and
 the CLI also rejects warnings. Fix the code or simplify the scenario; do not
 add suppressions, downgrade rules, or weaken an assertion to pass the gate.
+
+## Performance measurement
+
+Keep measurement fixtures and instrumentation under `benchmarks/`; production
+modules must not import them. Benchmark contract tests belong in
+`tests/unit/performance/` and prove rejected changed workloads, invalid results,
+or cleanup failures. Timed benchmark runs stay outside the test gate because
+machine scheduling is not a deterministic correctness assertion.
+
+Compare equivalent scenarios with the same pinned harness. Preserve raw timing
+samples, declared participants, final game state, and exact work counts. A faster
+run that lost a player or skipped work is invalid. Canvas API calls and payload
+bytes are structural counts; elapsed time and frame pacing need calibrated
+repeated measurements. Follow `benchmarks/README.md` for the supported commands.

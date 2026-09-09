@@ -2,22 +2,22 @@
 
 ## Recommendation
 
-Extend the existing benchmarks into a repeatable measurement system, protect gameplay with behavioral tests, then optimize the work that dominates on real phones. Keep the current Vite client, Canvas2D renderer, Node server, and negotiated WebSocket protocol while establishing evidence. A renderer rewrite, binary protocol, or multiple Railway replicas should require a demonstrated bottleneck and a passing compatibility experiment.
+Use the repeatable benchmark framework in [`benchmarks/README.md`](../benchmarks/README.md) to establish evidence, protect gameplay with behavioral tests, then optimize the work that dominates on real phones. Keep the current Vite client, Canvas2D renderer, Node server, and negotiated WebSocket protocol while establishing evidence. A renderer rewrite, binary protocol, or multiple Railway replicas should require a demonstrated bottleneck and a passing compatibility experiment.
 
-The first implementation should produce an automated report connecting frame pacing, client update/render/decode time, server tick deadlines, and transport pressure to the same workload and release. Follow it with small changes to terrain traversal, HUD work, clock recovery, and collision candidate selection where traces show material cost. Every optimization must preserve authoritative combat, touch controls, readable projectiles, and reconnect behavior.
+The current framework produces separate client, server, codec and transport measurements with workload counts and outcome witnesses. The broader plan still calls for an automated report connecting frame pacing, client update/render/decode time, server tick deadlines, and transport pressure to the same workload and release. Follow it with small changes to terrain traversal, HUD work, clock recovery, and collision candidate selection where traces show material cost. Every optimization must preserve authoritative combat, touch controls, readable projectiles, and reconnect behavior.
 
-This is an implementation plan, not a claim that the app already meets the proposed targets. Physical Android/iPhone measurements, Railway capacity tests, and production performance distributions remain unmeasured. Complete those measurements in the phases below before declaring a supported capacity or a mobile frame-rate guarantee.
+This is an implementation plan, not a claim that the app already meets the proposed targets. The benchmark work in this change makes no optimization or supported-capacity claim. Physical Android/iPhone measurements, Railway capacity tests, and production performance distributions remain unmeasured. Complete those measurements in the phases below before declaring a supported capacity or a mobile frame-rate guarantee.
 
 ## Evidence and current architecture
 
-The inspected repository baseline is `54d8c18d4ce25b3ea6af731582bd615666761a85`. Repository observations below refer to that revision; links use local paths for navigation. Public documentation was checked on September 8, 2026. Recheck the baseline against the implementation branch before editing because rendering and protocol work is active.
+The historical repository baseline is [`54d8c18d4ce25b3ea6af731582bd615666761a85`](https://github.com/jsolly/GeoRoids/tree/54d8c18d4ce25b3ea6af731582bd615666761a85). Repository observations below refer to that archived revision; links use local paths for navigation. Public documentation was checked on September 8, 2026. Recheck the current implementation branch before editing because rendering and protocol work is active.
 
 | Area | Existing behavior and evidence | Consequence for the plan |
 | --- | --- | --- |
 | Client loop | [eventLoop.ts](../src/core/eventLoop.ts) invokes `GameController.updateGame(dtMs)` and `renderGame` through animation frames. [canvas.ts](../src/rendering/canvas.ts) draws terrain, entities, effects, and HUD. | Profile this live path, including message application between frames. |
 | Canvas resolution | `CanvasManager` creates an opaque 2D context and sets backing dimensions to visual viewport dimensions, without multiplying by device pixel ratio. | A generic recommendation to cap DPR would duplicate an effective cap of one. Any higher-resolution mode is a quality/cost experiment. |
 | Rendering reuse | [contourRenderer.ts](../src/rendering/contourRenderer.ts) batches strokes by contour level and rejects offscreen segments. The arena boundary already has culling; HUD layout already caches environment reads. | Optimize remaining traversal and repeated content rather than reintroducing these changes. |
-| CPU benchmark | [benchmark-game-loop.ts](../scripts/benchmark-game-loop.ts) runs desktop, touch portrait, and touch landscape with production and loaded fixtures. It warms 180 frames, then measures seven batches of 120 synchronous frames. | Useful for CPU comparisons, not presentation timing. Touch cases currently pass `includeUpdate: false`. |
+| CPU benchmark | [`benchmarks/README.md`](../benchmarks/README.md) documents the compiled Chromium client runner for desktop, touch portrait and touch landscape. It records synchronous update/render CPU samples and native `requestAnimationFrame` intervals in separate fields. | Useful for fixture comparisons, not presentation timing or GPU completion. |
 | Simulation | [GameEngine.ts](../server/core/GameEngine.ts) advances fixed simulation frames at 60 Hz and catches up using [gameClock.ts](../shared/gameClock.ts). | Measure scheduled deadlines and accumulated debt in addition to `advanceOneFrame` cost. |
 | Broadcasting | [GameStateBroadcaster.ts](../server/services/GameStateBroadcaster.ts) broadcasts at 30 Hz, shares canonical snapshot preparation, and manages per-socket baselines and backpressure. | A server frame benchmark alone excludes a major capacity boundary. |
 | Protocol | [snapshot-v1.md](protocol/snapshot-v1.md) documents negotiated deltas, keyframes, atomic validation, legacy fallback, resync, and enhanced capabilities. | Extend the existing codec and compatibility tests. Do not propose delta snapshots as new work. |
@@ -28,11 +28,24 @@ The inspected repository baseline is `54d8c18d4ce25b3ea6af731582bd615666761a85`.
 
 ### What existing numbers establish
 
-The protocol document records a September 7 local fixture comparison of 31,450 legacy bytes per tick versus 8,046 negotiated bytes, with combined encode/decode cost increasing from 0.165 to 0.917 ms per tick. It also records September 8 shared broadcast work at 0.656 ms for ten recipients versus 3.053 ms in the previous implementation. These historical synchronous measurements demonstrate a bandwidth/CPU tradeoff and shared-work savings under their stated fixtures. They do not establish current phone cost or production capacity.
+The protocol document records archived September 7 and September 8 local fixture
+comparisons. Those measurements describe their historical implementations and
+fixtures only. They do not establish current phone cost, an optimization result,
+or production capacity. The current codec runner reports its own seeded fixture
+work, UTF-8 application bytes and separate encode/decode timings.
 
-An exploratory run of `npm run benchmark:game-loop` completed at the inspected revision on Node 24.16.0. Its [retained output](performance/baseline-2026-09-08.txt) contains every benchmark summary and batch mean. Structured server diagnostic rows were omitted from that attachment. The loaded server fixture started with 80 asteroids and 15 loot objects and finished with 69 asteroids and 34 loot objects, showing why entity counts and workload evolution matter.
+An exploratory run of the retired game-loop script at the archived revision
+[`54d8c18`](https://github.com/jsolly/GeoRoids/blob/54d8c18d4ce25b3ea6af731582bd615666761a85/scripts/benchmark-game-loop.ts)
+is retained in [baseline-2026-09-08.txt](performance/baseline-2026-09-08.txt).
+The file contains the old command and every summary and batch mean; it is an
+immutable historical attachment, not a live command or current benchmark result.
+Structured server diagnostic rows were omitted from that attachment.
 
-Treat this single run as evidence that the tool works and needs stronger experimental controls. It used headless Chromium on a shared macOS host, a Vite development server, no real network session, and no controlled thermal state. Some batches vary sharply; do not derive FPS, confidence intervals, phone capacity, or an optimization ranking from them. The attachment's filename uses the local execution date.
+Treat this single run as historical evidence about the retired tool. It used
+headless Chromium on a shared macOS host, a Vite development server, no real
+network session, and no controlled thermal state. Some batches vary sharply; do
+not derive FPS, confidence intervals, phone capacity, or an optimization ranking
+from them. The attachment's filename uses the local execution date.
 
 ## Measurement design
 
@@ -67,13 +80,39 @@ Use animation-frame timestamp differences as a frame-pacing proxy. They show sch
 
 ### Reproducible benchmark records
 
-Extend the two existing scripts with a versioned JSON output format. Record commit and dirty state, lockfile hash, scenario version, seed, Node/browser/OS versions, CPU/device model, viewport, touch capability, DPR/backing size, browser launch flags, power mode, logging mode, and client/server release IDs. For network tests also record server region/resource allocation, generator host, connection mix, rates, and measured rather than merely configured impairment.
+The current framework uses a shared measurement shape in `benchmarks/results.ts`.
+It requires a clean committed harness, records the harness and product revisions,
+lock and dependency hashes, runtime setup, environment, seed, viewport, samples,
+counts, parameters and outcome witness. The client result also records its
+Chromium version and canvas attributes. The broader plan should add scenario
+version, DPR, browser launch flags, power mode, logging mode, client/server
+release IDs, server allocation and measured network impairment as those tests are
+introduced.
 
-Store raw individual frame/tick samples or bounded histograms with counts, run-level summaries, fixture start/end counts, projectile counts, visible entity counts, candidate collision counts, bytes, queue pressure, and failure totals. Raw data belongs in CI artifacts; keep a small reviewed baseline manifest and report in the repo. Do not include player names, tokens, full production snapshots, or unbounded telemetry identifiers.
+The framework stores raw frame/tick or interval samples with counts, fixture
+start/end observations, bytes, queue pressure and failure artifacts in its unique
+`/tmp/georoids-benchmarks/run-*` directory. Raw data belongs in CI artifacts; keep
+a small reviewed baseline manifest and report in the repo. Do not include player
+names, tokens, full production snapshots, or unbounded telemetry identifiers.
 
-Preserve the synchronous benchmark as a diagnostic mode and label its current statistic `p95OfBatchMeanMs`. With seven batches that percentile selects the slowest batch mean; it is not the p95 of individual frames. Add a separate real-time production-build mode that starts from the menu, joins a real server, drives input, and samples the live animation loop. Avoid importing `/src/...` URLs in that mode because those development imports are absent from `dist`.
+The client runner keeps synchronous update/render CPU timing separate from native
+`requestAnimationFrame` intervals. A fresh observation context counts actual
+`CanvasRenderingContext2D` and `Path2D` API calls; these counts are not GPU draw
+counts and stay outside timing. Its compiled diagnostic fixture has no live game
+loop or network connection. The transport runner is the separate realtime path;
+it uses an owned loopback server and is intentionally nondeterministic.
 
-For comparisons, warm up for 30 seconds, then run five independent paired baseline/candidate sessions of at least three minutes, alternating order on the same idle host. Reset seed, clock, world, camera path, and input trace between runs. Keep coverage, pixel readback, screenshots, and detailed tracing outside timed runs; capture a separate diagnostic trace when needed. MDN recommends measuring the actual expensive work before optimizing JavaScript.[^5]
+Current comparisons run three baseline A/A calibration pairs and twelve A/B pairs
+for client, server or codec. Pair order alternates. Parameters and canonical
+outcome witnesses must match; work counts must repeat within each revision.
+Changes in counts between revisions are reported separately, while a faster run
+with a changed game outcome is rejected. The reported interval is fixed-seed and descriptive,
+not a confidence claim or generic performance-win label. The broader five-session
+and three-minute protocol remains the plan for future realtime device and
+capacity work. Reset seed, clock, world, camera path and input trace when those
+workloads exist. Keep coverage, pixel readback, screenshots and detailed tracing
+outside timed runs; capture a separate diagnostic trace when needed. MDN
+recommends measuring the actual expensive work before optimizing JavaScript.[^5]
 
 Compare run-level results, not thousands of autocorrelated frames as independent experiments. Initially report regressions without blocking. After at least 20 unchanged-control runs establish noise, gate a relative regression above 10% only when it also exceeds an agreed absolute floor, initially 0.5 ms for client CPU and 0.2 ms for server tick cost, and reproduces in a confirmatory pair. Preserve the first failure; reruns diagnose it rather than erase it. Hard correctness and queue-limit failures need no statistical allowance.
 
@@ -90,7 +129,14 @@ Compare run-level results, not thousands of autocorrelated frames as independent
 | Capacity staircase | 1, 5, 10, 25, then 50 connected pilots if admission policy allows, holding entity load constant | Transport fanout and capacity knee |
 | Entity staircase | Fixed recipients; separately increase asteroids, projectiles, and clustered collisions | Distinguish simulation cost from connection count |
 
-Reuse existing fixture builders, but version their scenario parameters. Add stationary repeatable snapshots for pure rendering, deterministic evolving worlds for simulation, and real transport sessions for end-to-end behavior. Control wall-clock and RNG dependencies through explicit test inputs; the current benchmark already seeds browser randomness and overrides server time, so extend that work rather than installing a second unrelated fixture system. Record changes in counts as outputs, not necessarily errors, for evolving scenarios.
+Reuse existing fixture builders, but version their scenario parameters. The current
+runner uses a compiled diagnostic scene for client work, a seeded evolving engine
+with two humans and two bots for direct server ticks, the original snapshot
+fixtures for codec work, and a real loopback session for transport. Client and
+direct-server clocks and random streams
+are controlled where the runner owns them; transport scheduling remains native and
+nondeterministic. Record changes in counts as outputs, not necessarily errors, for
+evolving scenarios.
 
 Use desktop Chromium plus WebKit for automated compatibility, and physical Android Chrome plus iPhone Safari for release evidence. Start with the repository's 390×844 and 844×390 touch cases, then add actual device viewport/safe-area dimensions and a large desktop viewport. Device emulation configures properties such as viewport and touch; it does not reproduce a phone's GPU, thermal behavior, or operating system.[^6] Calibrated Chrome CPU throttling helps prioritize candidates, but real devices decide mobile acceptance.[^7]
 
@@ -166,7 +212,16 @@ Audit AI target searches, asteroid motion, and repeated `getAll`/mapping work us
 
 ### Snapshot and socket cost
 
-Extend `benchmark-snapshots.ts` with current enhanced capability fixtures, separate server encode and browser decode/apply timings, and synchronized versus staggered baselines. Include non-ASCII names in synthetic data, since UTF-8 bytes and JavaScript string length differ. Measure keyframe bursts and legacy/negotiated mixtures; average delta bytes alone hides recovery cost.
+The current codec runner uses the original seeded snapshot fixtures, validates
+decoded output against each original world, and exercises shared and staggered
+recipient baselines. It reports separate encode/serialize and decode samples,
+message and keyframe/delta counts, and UTF-8 application payload bytes. Those
+bytes exclude WebSocket transport framing. The current transport runner covers a
+single realtime loopback sample with two clients; its native scheduling and
+factory-owned server seed make it unsuitable for paired comparison. Extend these
+fixtures with non-ASCII names, keyframe bursts and legacy/negotiated mixtures when
+the broader protocol experiments begin; average delta bytes alone hides recovery
+cost.
 
 The server already has pending-send and buffered-byte handling for negotiated snapshots. Audit every outbound class, including legacy state and gameplay events, for bounded queues and explicit loss/recovery semantics. WebSocket's browser API does not provide automatic receive backpressure, so bounded application work remains necessary.[^13] Do not discard arbitrary deltas to catch up: decode their required chain or request a keyframe through the existing resync mechanism.
 
@@ -192,9 +247,9 @@ All phases belong to this plan. Conditional experiments close with a written ado
 
 | Phase / owner | Concrete change and likely paths | Dependency and completion evidence |
 | --- | --- | --- |
-| 1. Baseline / performance owner | Versioned result schema and fixture manifest beside both benchmark scripts; real frame/tick metrics; actual device inventory; documented initial capacity workload. | First. Save reproducible JSON, raw samples, failures, and target-device runs. Calibrate budgets and noise; retain synchronous mode. |
+| 1. Baseline / performance owner | Measurement result schema and fixture manifest in `benchmarks/`; real frame/tick metrics; actual device inventory; documented initial capacity workload. | First. Save reproducible JSON, raw samples, failures, and target-device runs. Calibrate budgets and noise; retain synchronous mode. |
 | 2. Behavioral CI / test owner | Extend `tests/unit`, `tests/integration`, runner utilities, and `ci.yml` with serialized critical scenarios and separate coverage. | Use phase 1 scenarios. Required CI waits for the smoke lane; injected known defects fail; no silent skips. |
-| 3. Real-time benchmark / client + server owners | Production `dist` test path through the owned runner; real WebSocket load driver; network impairment and browser lifecycle cases. | Phases 1–2. Measures update on touch devices, decode/apply, tick deadlines, actual connections, and generator utilization. |
+| 3. Real-time benchmark / client + server owners | Extend the current owned transport sample to a production `dist` path, real WebSocket load driver, network impairment and browser lifecycle cases. | Phases 1–2. Measures update on touch devices, decode/apply, tick deadlines, actual connections, and generator utilization. |
 | 4. Client improvements / rendering owner | Profile-led contour chunks, HUD invalidation, resize deduplication, bounded hot-path allocation, and optional quality tiers. | Phases 1–3. Same fixtures and visual checks pass; target phones meet budgets or show a reviewed quality-tier decision. Retain only measured wins. |
 | 5. Server improvements / simulation owner | Monotonic scheduling/debt policy, collision-index experiment, tick-local views, complete outbound-pressure audit. | Phases 1–3; independent of most phase 4 edits. Clock and collision differential tests pass; capacity/soak evidence shows savings without state divergence. |
 | 6. Protocol experiments / network owner | Current-capability encode/decode breakdown, cadence/interpolation experiment, compression comparison; evaluate binary and interest management only if earlier results justify them. | Phase 3 plus updated phase 4–5 baseline. Adopt/reject report includes CPU, bytes, memory, corrections, recovery, and compatibility. |
@@ -204,18 +259,31 @@ The first PR should implement phase 1 without optimization. Its deliverable is a
 
 ### Commands available now
 
-Run from `/Users/johnsolly/code/GeoRoids`, or substitute the absolute path of the implementation worktree. These are existing commands, not newly implemented tooling.
+Run from `/Users/johnsolly/code/GeoRoids`, or substitute the absolute path of the
+implementation worktree. The benchmark commands write raw artifacts under
+`/tmp/georoids-benchmarks/run-*`; keep the printed directory for review.
 
 ```sh
 cd /Users/johnsolly/code/GeoRoids
 npm run gate
-npm run benchmark:game-loop
-node --expose-gc --import tsx scripts/benchmark-snapshots.ts
+npm run benchmark -- measure client --revision HEAD --seed 42 --viewport desktop
+npm run benchmark -- measure server --revision HEAD --seed 42
+npm run benchmark -- measure codec --revision HEAD --seed 42
+npm run benchmark -- measure transport --revision HEAD --seed 42
+npm run benchmark -- compare client --baseline REV --candidate REV --seed 42 --viewport desktop
+npm run benchmark -- compare server --baseline REV --candidate REV --seed 42
+npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
 ./scripts/test-runner.sh tests/integration/server/mixed-version-pilots-recover-after-reconnect.test.ts
 ./scripts/test-runner.sh tests/integration/browser/sanity/mobile-viewport-fits-and-shows-touch-controls.test.ts
 ```
 
-The full server/entity suite is `npm run test:all`; it does not include browser scenarios. Use `npm run test:integration:browser` for those. Run timed benchmarks separately from tests, builds, coverage, and other benchmarks. The integration runner owns its server processes and ports; use that ownership model for the proposed real-time benchmark instead of attaching to arbitrary local servers.
+The full server/entity suite is `npm run test:all`; it does not include browser
+scenarios. Use `npm run test:integration:browser` for those. Run timed benchmarks
+separately from tests, builds, coverage and other benchmarks. Transport accepts a
+single revision because realtime scheduling is nondeterministic. The integration
+runner owns its server processes and ports; use that ownership model for the
+proposed production realtime benchmark instead of attaching to arbitrary local
+servers.
 
 ## Observability, rollout, and completion
 

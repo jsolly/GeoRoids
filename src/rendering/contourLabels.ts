@@ -1,6 +1,7 @@
 import { PALETTE, VISUAL } from '../constants';
 import type { ContourLevel } from '../physics/terrain/contours';
 import { hexToRgba } from '../utils/colorUtils';
+import type { DrawingContext } from './drawingContext';
 
 interface ElevationLabel {
   x: number;
@@ -45,7 +46,7 @@ function getLabels(levels: readonly ContourLevel[], spacing: number): ElevationL
 }
 
 export function drawContourLabels(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   levels: readonly ContourLevel[],
   view: {
     width: number;

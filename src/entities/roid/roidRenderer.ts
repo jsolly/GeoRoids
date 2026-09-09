@@ -3,6 +3,7 @@ import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
 import { isAsteroidPending, pendingElapsedMs } from '../../physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../rendering/canvas';
+import type { DrawingContext } from '../../rendering/drawingContext';
 import { drawingOffsets } from '../../rendering/playfieldCamera';
 import {
   driftSegment,
@@ -73,7 +74,7 @@ function roidOutline(
 }
 
 function drawRoidSilhouette(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   points: readonly Vec2[],
   radius: number,
   inner: readonly Vec2[] | null
@@ -102,7 +103,7 @@ export function reflectiveFacetCueCount(energy: number, maxEnergy: number): numb
 }
 
 function drawReflectiveCue(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   radius: number,
   energy: number,
   maxEnergy: number
@@ -123,7 +124,7 @@ function drawReflectiveCue(
   }
 }
 
-function drawSpinCue(ctx: CanvasRenderingContext2D, radius: number, charged: boolean): void {
+function drawSpinCue(ctx: DrawingContext, radius: number, charged: boolean): void {
   const ring = radius * 1.18;
   const arc = charged ? Math.PI * 0.68 : Math.PI * 0.42;
   ctx.globalAlpha = charged ? 0.88 : 0.56;
@@ -141,7 +142,7 @@ function drawSpinCue(ctx: CanvasRenderingContext2D, radius: number, charged: boo
 
 /** Draw only sparse, screen-readable metadata cues; the rock remains an outline. */
 export function drawRoidInteractionCues(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   roid: Pick<Roid, 'phenomenon' | 'spinClass'>,
   radius: number,
   centerX = 0,
@@ -168,7 +169,7 @@ export function drawRoidInteractionCues(
 }
 
 function drawRoidShatter(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   origin: Vec2,
   points: readonly Vec2[],
   radius: number,

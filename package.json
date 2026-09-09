@@ -12,7 +12,7 @@
     "dev": "./scripts/dev-server.sh",
     "dev:check": "./scripts/check-dev-servers.sh",
     "dev:kill": "./scripts/dev-server.sh --stop",
-    "build": "tsc -p tsconfig.build.json && vite build",
+    "build": "npm run check:wiki && tsc -p tsconfig.build.json && vite build",
     "start": "vite",
     "watch": "vite build --watch",
     "preview": "vite preview",
@@ -38,7 +38,11 @@
     "format": "biome format --write .",
     "prepare": "if [ -z \"$CI\" ] && git rev-parse --git-dir >/dev/null 2>&1; then git config core.hooksPath .git-hooks; fi",
     "check:actions": "bash scripts/check-actions.sh",
-    "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit"
+    "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit",
+    "check:wiki": "tsx scripts/wiki-check.ts",
+    "wiki:review": "tsx scripts/wiki-check.ts --accept",
+    "wiki:media": "tsx scripts/wiki-media.ts",
+    "wiki:media:check": "tsx scripts/wiki-media.ts --verify"
   },
   "repository": {
     "type": "git",

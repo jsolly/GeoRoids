@@ -1,6 +1,7 @@
 import type { Position } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
+import type { DrawingContext } from '../../rendering/drawingContext';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { SatellitePickup } from './SatellitePickup';
 
@@ -38,7 +39,7 @@ export function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): 
   ctx.restore();
 }
 
-function drawEchoHardware(ctx: CanvasRenderingContext2D, radius: number): void {
+function drawEchoHardware(ctx: DrawingContext, radius: number): void {
   // Echo: compact comms bus, mast, and open dish.
   ctx.beginPath();
   ctx.roundRect(-radius * 0.65, -radius * 0.42, radius * 1.3, radius * 0.84, radius * 0.16);
@@ -54,7 +55,7 @@ function drawEchoHardware(ctx: CanvasRenderingContext2D, radius: number): void {
   ctx.stroke();
 }
 
-function drawRelayHardware(ctx: CanvasRenderingContext2D, radius: number): void {
+function drawRelayHardware(ctx: DrawingContext, radius: number): void {
   // Relay: tall relay box with two opposed paddles and a cross-link boom.
   ctx.beginPath();
   ctx.rect(-radius * 0.38, -radius * 0.7, radius * 0.76, radius * 1.4);
@@ -73,11 +74,7 @@ function drawRelayHardware(ctx: CanvasRenderingContext2D, radius: number): void 
   ctx.stroke();
 }
 
-export function drawSatellitePickupMiniMapDot(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number
-): void {
+export function drawSatellitePickupMiniMapDot(ctx: DrawingContext, x: number, y: number): void {
   ctx.save();
   ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE_PICKUP, 0.95);
   ctx.lineWidth = 1;

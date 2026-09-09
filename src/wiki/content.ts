@@ -96,21 +96,21 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Keyboard',
         paragraphs: [
-          'Use ArrowUp or W to thrust. ArrowLeft or A and ArrowRight or D turn the ship; opposing turn inputs cancel. Space fires. E activates the selected kit ability, F toggles the regular laser shield, Q opens the asteroid tools, and Escape closes the tools panel. E and F are edge-triggered so holding the key does not repeatedly activate them.',
+          'Use ArrowUp or W to thrust. ArrowLeft or A and ArrowRight or D turn the ship; opposing turn inputs cancel. Space fires. E activates the selected kit ability, F toggles the regular laser shield, T cycles targets nearest-first, Q latches or releases a Hauler, R anchors, X brakes, and C spins. Q/R select the nearest rock when none is selected; Escape clears selection. E and F are edge-triggered so holding the key does not repeatedly activate them.',
           `The shared starting movement values are thrust ${SHIP.THRUST}, a maximum velocity of ${SHIP.MAX_VELOCITY}, and a turn rate of ${SHIP.TURN_SPEED} degrees per second. The movement step applies the shared friction value of ${GAME.FRICTION} while the ship is coasting. The kit pages list the handling values that replace these defaults for each hull.`,
         ],
       },
       {
         heading: 'Mouse',
         paragraphs: [
-          'On desktop, the ship aims from the canvas center toward the pointer. Hold the left mouse button to fire and the right mouse button to thrust. Keep the pointer in the direction you want the nose to face; thrust follows that heading.',
+          'On desktop, the ship aims from the canvas center toward the pointer. Hold the left mouse button to fire and the right mouse button to thrust. Keep the pointer in the direction you want the nose to face; thrust follows that heading. Middle-click a rock to select and latch it, or anchor a second rock while latched. Middle-button drags use the same flick directions as touch.',
         ],
       },
       {
         heading: 'Touch',
         paragraphs: [
           `On touch screens, drag the left virtual stick to aim. The stick has a ${TOUCH.STICK_RADIUS} pixel radius and an ${TOUCH.STICK_DEADZONE * 100} percent deadzone; thrust starts at ${TOUCH.STICK_THRUST * 100} percent of the stick radius. Hold the right FIRE control to fire, and use the E and F touch buttons for the same kit ability and shield actions as keyboard controls. The touch control loop repeats firing while FIRE is held.`,
-          'The touch Tools launcher opens the same Q tool panel used on desktop. Any ship can inspect the field, but only the Hauler can latch and move rocks through the tools.',
+          'Tap a rock to select it. A Hauler also latches it, or anchors it as a second rock while latched. Flick at least 40 pixels on the playfield: down releases, left brakes, right spins, and up anchors the rock where the gesture started. These gestures work independently of the stick and action buttons. Any ship can inspect a selected rock; only a Hauler can move it.',
         ],
       },
     ],
@@ -122,6 +122,9 @@ export const articles: WikiArticle[] = [
       'src/input/touchControls.ts',
       'src/input/touchAbility.ts',
       'src/input/controlSources.ts',
+      'src/asteroidTools/AsteroidToolsController.ts',
+      'src/asteroidTools/AsteroidGestures.ts',
+      'tests/unit/ui/asteroidGestures.test.ts',
       'src/constants/index.ts',
       'tests/integration/entities/input/keybindings.test.ts',
       'tests/integration/entities/input/mouse.test.ts',
@@ -181,7 +184,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Asteroid tools',
         paragraphs: [
-          `Q opens the asteroid tools. The Hauler can latch an available rock within ${ASTEROID_MOTION.latchRange} units of its surface, then aim, turn, thrust, spin, brake, couple a second rock, and release it. This is a separate tool path from the short combat harpoon. Read the asteroid tools entry for ownership, fuel, tether, and reconnect rules.`,
+          `Q latches or releases a Hauler without opening a menu. Use T to cycle targets, R to anchor, X to brake, and C to spin. The Hauler can latch an available rock within ${ASTEROID_MOTION.latchRange} units of its surface, then aim, turn, thrust, spin, brake, couple a second rock, and release it. This is a separate tool path from the short combat harpoon. Read the asteroid tools entry for ownership, fuel, tether, and reconnect rules.`,
         ],
       },
     ],
@@ -398,8 +401,8 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Select and latch',
         paragraphs: [
-          'Choose a rock from the Target list. The panel identifies its material and distance. Aim to see a predicted bounce path, including its impact count and stopping point. This preview uses the rocks where they are now; moving targets can change the path before a shot arrives. A collected core also shows its remaining laser charges and lifetime here.',
-          `Press Q on desktop or open Tools on touch to inspect nearby asteroids. A physical latch requires a living Hauler, an unowned rock, and a center distance no greater than the rock size plus the ${ASTEROID_MOTION.latchRange} unit latch range. The motion session lasts ${ASTEROID_MOTION.latchLifetimeMs / 1000} seconds unless the pilot releases, dies, or the rock disappears. Other pilots cannot claim an occupied rock.`,
+          'Select a rock with T, a tap, or a middle-click. The passive readout identifies its material and distance. Aim to see a predicted bounce path, including its impact count and stopping point. This preview uses the rocks where they are now; moving targets can change the path before a shot arrives. A collected core also shows its remaining laser charges and lifetime here.',
+          `Press T to select an asteroid, or tap/middle-click it directly. The passive readout identifies its material and shows the shot preview; a dashed ring marks your target. Q latches or releases, R anchors, X brakes, and C spins. A physical latch requires a living Hauler, an unowned rock, and a center distance no greater than the rock size plus the ${ASTEROID_MOTION.latchRange} unit latch range. The motion session lasts ${ASTEROID_MOTION.latchLifetimeMs / 1000} seconds unless the pilot releases, dies, or the rock disappears. Other pilots cannot claim an occupied rock.`,
         ],
       },
       {
@@ -419,12 +422,15 @@ export const articles: WikiArticle[] = [
     related: ['hauler', 'controls', 'fuel-growth', 'asteroids', 'hud-network'],
     sources: [
       'src/asteroidTools/AsteroidToolsController.ts',
-      'src/asteroidTools/AsteroidToolsOverlay.ts',
+      'src/asteroidTools/AsteroidGestures.ts',
+      'src/asteroidTools/FlightFeedback.ts',
       'shared/asteroidMotion.ts',
       'server/core/AsteroidMotionService.ts',
       'docs/asteroid-interactions.md',
-      'tests/unit/ui/asteroidToolsOverlay.test.ts',
+      'tests/unit/ui/asteroidGestures.test.ts',
       'tests/unit/ui/asteroidToolsController.test.ts',
+      'tests/unit/ui/flightFeedback.test.ts',
+      'tests/unit/ui/disconnecting-clears-direct-flight-controls.test.ts',
       'tests/unit/network/hauler-reconciles-only-unacknowledged-motion.test.ts',
       'tests/unit/server/asteroid-tools-cross-real-sockets.test.ts',
       'tests/unit/server/hauler-slings-surviving-payloads-with-owned-motion.test.ts',
@@ -629,7 +635,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Tethers during a disconnect',
         paragraphs: [
-          'An active Hauler tether coasts with neutral input during a brief interruption. It has a 2 second grace period; a longer interruption releases the tether. Check the Tools panel after reconnecting before trying another spin or release.',
+          'An active Hauler tether coasts with neutral input during a brief interruption. It has a 2 second grace period; a longer interruption releases the tether. Check the passive tether status after reconnecting before trying another spin or release.',
         ],
       },
     ],

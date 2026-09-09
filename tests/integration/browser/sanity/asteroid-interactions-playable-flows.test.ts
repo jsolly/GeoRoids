@@ -1,25 +1,66 @@
 import { expect, test } from 'vitest';
-import { captureConsole, waitForEnhancedTargets } from '../../utils/asteroid-tools-driver';
+import {
+  asteroidScreenPoint,
+  captureConsole,
+  flickPlayfield,
+  selectAsteroidWithKeyboard,
+  waitForEnhancedTargets,
+} from '../../utils/asteroid-tools-driver';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
-test(
-  'Hauler touch controls latch, anchor a second rock, brake, spin, and release with bounded tangent motion',
-  async () => {
-    await browserManager.recreatePage({ hasTouch: true });
+test.each(['touch', 'keyboard', 'mouse'] as const)(
+  'Hauler %s controls latch, anchor a second rock, brake, spin, and release with bounded tangent motion',
+  async (input) => {
+    await browserManager.recreatePage({ hasTouch: input === 'touch' });
     const page = browserManager.getCurrentPage();
     if (!page) {
       throw new Error('Page not available');
     }
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(
+      input === 'touch' ? { width: 390, height: 844 } : { width: 1280, height: 900 }
+    );
     const consoleState = captureConsole(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
     await waitForEnhancedTargets(page);
     await game.waitForBots(2);
+
+    const selectAndAct = async (id: string, key: string): Promise<void> => {
+      if (input !== 'keyboard') {
+        const point = await asteroidScreenPoint(page, id);
+        if (input === 'touch') {
+          await page.touchscreen.tap(point.x, point.y);
+        } else {
+          await page.mouse.click(point.x, point.y, { button: 'middle' });
+        }
+      } else {
+        await selectAsteroidWithKeyboard(page, id);
+        await page.keyboard.press(key);
+      }
+    };
+
+    const motionGesture = async (dx: number, dy: number, key: string): Promise<void> => {
+      if (input === 'touch') {
+        await flickPlayfield(page, dx, dy);
+      } else if (input === 'keyboard') {
+        await page.keyboard.press(key);
+      } else {
+        const box = await page.locator('#gameCanvas').boundingBox();
+        if (!box) {
+          throw new Error('Canvas unavailable');
+        }
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        await page.mouse.move(x, y);
+        await page.mouse.down({ button: 'middle' });
+        await page.mouse.move(x + dx, y + dy, { steps: 3 });
+        await page.mouse.up({ button: 'middle' });
+      }
+    };
 
     const fixture = await page.evaluate(() => {
       const gc = window.gameController;
@@ -121,14 +162,8 @@ test(
     expect(separation).toBeLessThanOrEqual(400);
 
     await game.placeShipAt(fixture.latchPosition.x, fixture.latchPosition.y);
-    const launcher = page.locator('#asteroid-tools-launcher');
-    expect(await launcher.isVisible()).toBe(true);
-    await launcher.tap();
-    expect(await page.locator('#asteroid-tools-overlay').isVisible()).toBe(true);
-    await page
-      .locator('#asteroid-tools-overlay [data-asteroid-tools-target]')
-      .selectOption(fixture.primary.id);
-    await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="latch"]').tap();
+    expect(await page.locator('#asteroid-tools-launcher, #asteroid-tools-overlay').count()).toBe(0);
+    await selectAndAct(fixture.primary.id, 'KeyQ');
     await page.waitForFunction(
       (id) => {
         const motion = window.gameController?.getAsteroidToolsController?.()?.getState?.()
@@ -180,10 +215,7 @@ test(
     expect(latched.tetherMode).toBe('spin');
     expect(latched.tangent).toBeGreaterThanOrEqual(latched.radial);
 
-    await page
-      .locator('#asteroid-tools-overlay [data-asteroid-tools-target]')
-      .selectOption(fixture.payload.id);
-    await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="anchor"]').tap();
+    await selectAndAct(fixture.payload.id, 'KeyR');
     await page.waitForFunction(
       (id) => {
         const motion = window.gameController?.getAsteroidToolsController?.()?.getState?.()
@@ -196,7 +228,7 @@ test(
     // AsteroidToolsController debounces touch actions for 250ms to collapse duplicate
     // taps; wait for that real UI gate before issuing the next command.
     await page.waitForTimeout(300);
-    await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="brake"]').tap();
+    await motionGesture(-65, 0, 'KeyX');
     await page.waitForFunction(
       () =>
         window.gameController?.getAsteroidToolsController?.()?.getState?.()?.pilot?.asteroidMotion
@@ -205,7 +237,7 @@ test(
       { timeout: 15_000, polling: 100 }
     );
     await page.waitForTimeout(300);
-    await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="spin"]').tap();
+    await motionGesture(65, 0, 'KeyC');
     await page.waitForFunction(
       () =>
         window.gameController?.getAsteroidToolsController?.()?.getState?.()?.pilot?.asteroidMotion
@@ -325,7 +357,7 @@ test(
     expect(attached.distance).toBeGreaterThan(fixture.primary.size + fixture.payload.size + 4);
     expect(attached.distance).toBeLessThanOrEqual(410);
 
-    await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="release"]').tap();
+    await motionGesture(0, 65, 'KeyQ');
     await page.waitForFunction(
       () => {
         const motion = window.gameController?.getAsteroidToolsController?.()?.getState?.()
@@ -417,7 +449,7 @@ test(
       )
     ).toBeGreaterThan(0.5);
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath('hauler-touch-anchor-release-mobile.png'),
+      path: screenshotManager.getScreenshotPath(`hauler-direct-${input}.png`),
     });
     expect(consoleState.errors).toEqual([]);
     expect(consoleState.warnings).toEqual([]);

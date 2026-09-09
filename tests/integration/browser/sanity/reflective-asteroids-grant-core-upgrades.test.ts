@@ -7,6 +7,7 @@ import type { AuthoritativeProjectileField } from '../../../../src/entities/lase
 import {
   captureConsole,
   safestReflectiveCluster,
+  selectAsteroidWithKeyboard,
   waitForEnhancedTargets,
 } from '../../utils/asteroid-tools-driver';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
@@ -314,8 +315,7 @@ test(
       await field.dispose();
     }
     try {
-      await page.locator('#asteroid-tools-launcher').click();
-      await page.locator('[data-asteroid-tools-target]').selectOption(primary.id);
+      await selectAsteroidWithKeyboard(page, primary.id);
       await page.evaluate((point) => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
         if (!ship) {
@@ -324,12 +324,12 @@ test(
         ship.angle = Math.atan2(-(point.y - ship.position.y), point.x - ship.position.x);
       }, primary.position);
       await expect
-        .poll(() => page.locator('.asteroid-tools-overlay__preview').isVisible(), { timeout: 5000 })
+        .poll(() => page.locator('#flight-preview').isVisible(), { timeout: 5000 })
         .toBe(true);
       await page.screenshot({
         path: screenshotManager.getScreenshotPath('reflective-aim-preview-desktop.png'),
       });
-      await page.locator('[data-asteroid-tools-action="close"]').click();
+      await page.keyboard.press('Escape');
 
       for (let shot = 0; shot < 16; shot++) {
         const target = await page.evaluate((id) => {
@@ -417,14 +417,11 @@ test(
         .toBe(false);
       const upgradeStation = { x: -1800, y: -1800 };
       await game.placeShipAt(upgradeStation.x, upgradeStation.y);
-      await page.locator('#asteroid-tools-launcher').click();
-      expect(await page.locator('.asteroid-tools-overlay__upgrade').textContent()).toContain(
-        '6 charges'
-      );
+      expect(await page.locator('#flight-upgrade').textContent()).toContain('6 charges');
       await page.screenshot({
         path: screenshotManager.getScreenshotPath('reflective-core-upgrade-desktop.png'),
       });
-      await page.locator('[data-asteroid-tools-action="close"]').click();
+      await page.keyboard.press('Escape');
       const beforeUpgraded = await page.evaluate(() => {
         const evidence = window.__reflectionProof;
         if (!evidence) {

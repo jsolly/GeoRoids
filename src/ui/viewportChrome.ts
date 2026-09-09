@@ -51,8 +51,10 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
   return query.maxTouchPoints > 0 && Math.min(query.width, query.height) <= TOUCH.TABLET_MIN_SIDE;
 }
 
-export const DESKTOP_CONTROLS_HINT = 'WASD + Space / arrows · E ability';
-export const TOUCH_CONTROLS_HINT = 'Stick · fire · ability · shield · landscape';
+export const DESKTOP_CONTROLS_HINT =
+  'WASD + Space · E ability · F shield · T target · Q latch/release · R anchor · X brake · C spin';
+export const TOUCH_CONTROLS_HINT =
+  'Stick + fire · tap rock to latch/anchor · flick ↓ release, ← brake, → spin';
 
 export function controlsHintFor(query: ViewportQuery = queryViewport()): string {
   return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;

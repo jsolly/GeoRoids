@@ -279,63 +279,14 @@ test(
       const radar = arcDrawn(landscape, 32, 44, 117);
       expect(radar).toBeDefined();
       expect(textDrawn(landscape, '2468', true)?.x).toBe(76);
-      const launcher = page.getByRole('button', {
-        name: 'Open asteroid tools',
-        exact: true,
-        includeHidden: true,
-      });
-      const toolsPanel = page.getByRole('region', {
-        name: 'Asteroid tools',
-        exact: true,
-        includeHidden: true,
-      });
-      expect(await launcher.isVisible()).toBe(true);
-      expect(await launcher.getAttribute('aria-expanded')).toBe('false');
-      expect(await toolsPanel.isVisible()).toBe(false);
-      expect(await toolsPanel.getAttribute('aria-hidden')).toBe('true');
-
-      const canvasBox = await page.locator('#gameCanvas').boundingBox();
-      const launcherBox = await launcher.boundingBox();
-      if (!radar || !canvasBox || !launcherBox) {
-        throw new Error(
-          'Landscape HUD proof requires the radar, canvas, and Tools launcher bounds'
-        );
-      }
-      const radarCenter = {
-        x: canvasBox.x + (radar.x / landscape.canvas.width) * canvasBox.width,
-        y: canvasBox.y + (radar.y / landscape.canvas.height) * canvasBox.height,
-      };
-      const radarRadiusX = (radar.radius / landscape.canvas.width) * canvasBox.width;
-      const radarRadiusY = (radar.radius / landscape.canvas.height) * canvasBox.height;
-      const nearestX = Math.max(
-        launcherBox.x,
-        Math.min(radarCenter.x, launcherBox.x + launcherBox.width)
+      expect(await page.locator('#asteroid-tools-launcher, #asteroid-tools-overlay').count()).toBe(
+        0
       );
-      const nearestY = Math.max(
-        launcherBox.y,
-        Math.min(radarCenter.y, launcherBox.y + launcherBox.height)
-      );
-      const normalizedDistance =
-        ((nearestX - radarCenter.x) / radarRadiusX) ** 2 +
-        ((nearestY - radarCenter.y) / radarRadiusY) ** 2;
-      expect(normalizedDistance).toBeGreaterThanOrEqual(1);
-
-      await launcher.click();
-      expect(await toolsPanel.isVisible()).toBe(true);
-      expect(await toolsPanel.getAttribute('aria-hidden')).toBe('false');
-      expect(await launcher.isVisible()).toBe(false);
-      expect(await launcher.getAttribute('aria-expanded')).toBe('true');
-
-      const closeButton = toolsPanel.getByRole('button', {
-        name: 'Close asteroid tools',
-        exact: true,
-      });
-      expect(await closeButton.isVisible()).toBe(true);
-      await closeButton.click();
-      expect(await toolsPanel.isVisible()).toBe(false);
-      expect(await toolsPanel.getAttribute('aria-hidden')).toBe('true');
-      expect(await launcher.isVisible()).toBe(true);
-      expect(await launcher.getAttribute('aria-expanded')).toBe('false');
+      expect(
+        await page
+          .locator('#flight-feedback')
+          .evaluate((element) => getComputedStyle(element).pointerEvents)
+      ).toBe('none');
       await saveScreenshot(
         page,
         screenshotManager.getScreenshotPath('hud-composition-landscape.png')

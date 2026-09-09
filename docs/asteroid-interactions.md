@@ -1,6 +1,10 @@
 # Reflective asteroids and Hauler slingshots
 
-Open **TOOLS** or press **Q** to choose a nearby asteroid, inspect its mineral composition and preview the predicted path of a shot. E and F retain their existing kit ability and shield controls.
+All actions work during flight, with no menu. **T** cycles asteroids nearest-first, **Q** latches the selected rock or releases a latched Hauler, **R** anchors, **X** brakes, and **C** resumes spin. With no selection, Q/R select the nearest rock. **Escape** clears the selection. The passive readout shows the selected rock, shot prediction and remaining laser-core charges.
+
+On touch, **tap a rock** to select it and latch, or anchor it as a second rock while latched. Mouse users do the same with the **middle button**; left-click still fires and right-click still thrusts. Drag at least 40 pixels and release to flick: **down releases, left brakes, right spins, up anchors** the rock where the gesture started. Flicks can start on empty playfield when an action needs no new target. The virtual stick and action buttons remain independent, so you can steer while using a tether.
+
+**E** and **F** activate the kit ability and shield; their touch buttons do the same. Laser cores equip automatically on pickup and enhance the next six shots. There is no weapon-selection menu.
 
 ## Reflective clusters and laser cores
 

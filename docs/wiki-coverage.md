@@ -9,7 +9,7 @@ are also recorded on each article in src/wiki/content.ts.
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, five kits, starting a life |
-| controls | Start here | Keyboard, mouse, touch, movement, tools entry points |
+| controls | Start here | Keyboard, mouse, touch, movement, direct target and tether controls |
 | dart | Ships | Starting hull values, boost dash, regular shield |
 | hauler | Ships | Starting hull values, combat harpoon, enhanced tool path |
 | warden | Ships | Starting hull values, E damage shield, F laser shield distinction |
@@ -28,7 +28,7 @@ are also recorded on each article in src/wiki/content.ts.
 
 | Player question | Article | Primary source families |
 | --- | --- | --- |
-| How do I move, aim, fire, use E/F, or open tools? | controls | src/input/, src/constants/index.ts, input tests |
+| How do I move, aim, fire, use E/F, or use target and tether controls? | controls | src/input/, src/asteroidTools/, src/constants/index.ts, input and gesture tests |
 | Which of the five kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do fuel, mass, shards, cores, and kill loot work? | fuel-growth | shared/fuel.ts, shared/shipGrowth.ts, server/core/LootManager.ts |

@@ -52,68 +52,6 @@ export function generateStarfield(
   return stars;
 }
 
-export function titleStarCountForViewport(width: number, height: number): number {
-  const scale = (width * height) / (1920 * 1080);
-  return Math.max(24, Math.round(VISUAL.TITLE_STARS_PER_1080P * scale));
-}
-
-/** Viewport-local sparse points for the title void — same seed, size, and colour as play. */
-export function generateViewportStars(
-  width: number,
-  height: number,
-  count: number,
-  seed: number
-): Star[] {
-  const rng = createRng(seed);
-  const stars: Star[] = [];
-  const alphaRange = VISUAL.STAR_ALPHA_MAX - VISUAL.STAR_ALPHA_MIN;
-  for (let i = 0; i < count; i++) {
-    const alpha = VISUAL.STAR_ALPHA_MIN + rng() * alphaRange;
-    stars.push({
-      x: rng() * width,
-      y: rng() * height,
-      alpha,
-      fillStyle: hexToRgba(PALETTE.STARS, alpha),
-    });
-  }
-  return stars;
-}
-
-export function paintStars(ctx: CanvasRenderingContext2D, stars: Star[]): void {
-  const size = VISUAL.STAR_SIZE;
-  for (const star of stars) {
-    ctx.fillStyle = star.fillStyle;
-    ctx.fillRect((star.x + 0.5) | 0, (star.y + 0.5) | 0, size, size);
-  }
-}
-
-export function paintTitleStarfield(canvas: HTMLCanvasElement): void {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    return;
-  }
-  ctx.fillStyle = PALETTE.BG;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const count = titleStarCountForViewport(canvas.width, canvas.height);
-  paintStars(ctx, generateViewportStars(canvas.width, canvas.height, count, VISUAL.STAR_SEED));
-}
-
-export function initTitleStarfield(): void {
-  const canvas = document.getElementById('title-starfield');
-  if (!(canvas instanceof HTMLCanvasElement)) {
-    return;
-  }
-
-  const resize = (): void => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    paintTitleStarfield(canvas);
-  };
-
-  resize();
-  window.addEventListener('resize', resize);
-}
-
 let cachedStars: Star[] | null = null;
 
 function getStars(): Star[] {

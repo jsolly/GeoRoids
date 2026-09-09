@@ -415,7 +415,7 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
   }
 });
 
-test('touch input targets the game canvas while the title starfield stays passive', async () => {
+test('touch input targets the game canvas while the title terrain stays passive', async () => {
   vi.resetModules();
   const { InputManager } = await import('../../../src/core/services/InputManager');
   const listeners: Array<() => void> = [];
@@ -435,16 +435,16 @@ test('touch input targets the game canvas while the title starfield stays passiv
   try {
     InputManager.getInstance().initializeListeners();
     const gameCanvas = document.getElementById('gameCanvas');
-    const titleStarfield = document.getElementById('title-starfield');
-    if (!gameCanvas || !titleStarfield) {
+    const titleTerrain = document.getElementById('title-terrain');
+    if (!gameCanvas || !titleTerrain) {
       throw new Error('expected both canvases in the play shell');
     }
     expect(gameCanvas.tagName).toBe('CANVAS');
-    expect(titleStarfield.tagName).toBe('CANVAS');
+    expect(titleTerrain.tagName).toBe('CANVAS');
     const gameTouch = new Event('touchstart', { cancelable: true });
     const titleTouch = new Event('touchstart', { cancelable: true });
     gameCanvas.dispatchEvent(gameTouch);
-    titleStarfield.dispatchEvent(titleTouch);
+    titleTerrain.dispatchEvent(titleTouch);
     expect(gameTouch.defaultPrevented).toBe(true);
     expect(titleTouch.defaultPrevented).toBe(false);
   } finally {

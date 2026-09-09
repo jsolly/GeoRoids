@@ -33,7 +33,7 @@ body {
   padding-left: env(safe-area-inset-left, 0px);
 }
 
-#title-starfield {
+#title-terrain {
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -43,7 +43,7 @@ body {
   background-color: var(--palette-bg, #000011);
 }
 
-body.in-play #title-starfield,
+body.in-play #title-terrain,
 body.in-play #attribution,
 body.in-play .controls-hint {
   display: none;
@@ -51,6 +51,26 @@ body.in-play .controls-hint {
 
 body.in-play {
   touch-action: none;
+}
+
+#start-screen {
+  font-size: 1rem;
+  background: rgba(8, 15, 25, 0.84);
+  border-color: color-mix(in srgb, var(--palette-hud-muted, #64748b) 55%, transparent);
+  backdrop-filter: none;
+}
+
+#start-screen h1 {
+  margin-bottom: 0.6em;
+}
+
+.terrain-eyebrow {
+  margin: 0 0 1rem;
+  color: #a5b6c7;
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 /* Ensure the game wrapper doesn't create black areas */

@@ -1,5 +1,7 @@
 import type { AsteroidData, AsteroidMotionInput, Position, Velocity } from '../shared-types';
 import { GAME } from '../src/constants';
+import { applySlopeForce } from '../src/physics/terrain/slopeForce';
+import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { findNearestAsteroidImpact } from './asteroidReflection';
 
 /** Velocities and angular velocities use the existing world-units/frame convention. */
@@ -239,17 +241,12 @@ export function stepReleasedMotion(
   }
   body.angle = turnMotionAngle(body.angle, input, turnDegreesPerSecond, frames);
   const drag = ASTEROID_MOTION.releaseDrag ** frames;
-  body.velocity = capMotionVelocity(
-    {
-      x:
-        body.velocity.x * drag +
-        (input.thrust ? Math.cos(body.angle) * thrustPerFrame * frames : 0),
-      y:
-        body.velocity.y * drag -
-        (input.thrust ? Math.sin(body.angle) * thrustPerFrame * frames : 0),
-    },
-    ASTEROID_MOTION.maxLinearVelocity
-  );
+  body.velocity = {
+    x: body.velocity.x * drag + (input.thrust ? Math.cos(body.angle) * thrustPerFrame * frames : 0),
+    y: body.velocity.y * drag - (input.thrust ? Math.sin(body.angle) * thrustPerFrame * frames : 0),
+  };
+  applySlopeForce(body.velocity, body.position, getTerrainField(), frames / GAME.FPS);
+  body.velocity = capMotionVelocity(body.velocity, ASTEROID_MOTION.maxLinearVelocity);
   body.position.x += body.velocity.x * frames;
   body.position.y += body.velocity.y * frames;
 }

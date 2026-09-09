@@ -39,13 +39,14 @@ test.each([
     throw new Error('Title canvas context missing');
   }
   const stroke = vi.spyOn(context, 'stroke');
+  const moves = vi.spyOn(context, 'moveTo');
   const labels = vi.spyOn(context, 'fillText');
   const arc = vi.spyOn(context, 'arc');
   initTitleTerrain();
   expect(stroke.mock.calls.length).toBeGreaterThan(10);
   expect(labels.mock.calls.length).toBeGreaterThan(2);
   for (const [label] of labels.mock.calls) {
-    expect(label).toMatch(/^0\.\d{2}$/);
+    expect(label).toMatch(/^-?\d+\.\d{2}$/);
   }
   expect(arc).not.toHaveBeenCalled();
   const paintCount = stroke.mock.calls.length;
@@ -53,6 +54,19 @@ test.each([
   if (typeof resize !== 'function') {
     throw new Error('Missing resize renderer');
   }
+  const originalMove = moves.mock.calls[0];
+  if (!originalMove) {
+    throw new Error('No homepage contour geometry rendered');
+  }
+  const originalMoveCount = moves.mock.calls.length;
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width / 2 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height / 2 });
   resize.call(window, new Event('resize'));
+  const resizedMove = moves.mock.calls[originalMoveCount];
+  if (!resizedMove) {
+    throw new Error('No resized homepage contour geometry rendered');
+  }
+  expect(resizedMove[0]).toBeCloseTo(originalMove[0] / 2, 5);
+  expect(resizedMove[1]).toBeCloseTo(originalMove[1] / 2, 5);
   expect(stroke.mock.calls.length).toBe(paintCount * 2);
 });

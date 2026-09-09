@@ -4,6 +4,7 @@ import { extractIsoContours } from '../physics/terrain/contours';
 import { createHeightfield } from '../physics/terrain/heightfield';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 import { hexToRgba } from '../utils/colorUtils';
+import { drawContourLabels } from './contourLabels';
 
 /** A fixed terrain preview, independent of the live room's terrain cache. */
 export function initTitleTerrain(): void {
@@ -19,7 +20,8 @@ export function initTitleTerrain(): void {
   const bounds = getGameBoundary();
   const contours = extractIsoContours(
     createHeightfield(TERRAIN.DEFAULT_SEED, bounds),
-    VISUAL.TITLE_TERRAIN_GRID_SIZE
+    VISUAL.TITLE_TERRAIN_GRID_SIZE,
+    VISUAL.TITLE_TERRAIN_LEVELS
   );
   const resize = (): void => {
     const width = window.innerWidth;
@@ -55,53 +57,15 @@ export function initTitleTerrain(): void {
       ctx.stroke();
     }
 
-    // Labels interrupt the contours like a printed topo map. Heights are relative,
-    // unitless terrain values, matching the field used by the game.
-    const labels: { x: number; y: number }[] = [];
-    ctx.font = VISUAL.TITLE_LABEL_FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const level of contours) {
-      for (const segment of level.segments) {
-        const x = width / 2 + ((segment.ax + segment.bx) / 2 - bounds.cx) * scale;
-        const y = height / 2 + ((segment.ay + segment.by) / 2 - bounds.cy) * scale;
-        if (
-          x < VISUAL.TITLE_LABEL_MARGIN ||
-          x > width - VISUAL.TITLE_LABEL_MARGIN ||
-          y < VISUAL.TITLE_LABEL_MARGIN ||
-          y > height - VISUAL.TITLE_LABEL_MARGIN
-        ) {
-          continue;
-        }
-        let angle = Math.atan2(segment.by - segment.ay, segment.bx - segment.ax);
-        if (angle > Math.PI / 2) {
-          angle -= Math.PI;
-        } else if (angle < -Math.PI / 2) {
-          angle += Math.PI;
-        }
-        if (
-          Math.abs(angle) > Math.PI / 3 ||
-          labels.some((label) => Math.hypot(label.x - x, label.y - y) < VISUAL.TITLE_LABEL_SPACING)
-        ) {
-          continue;
-        }
-        labels.push({ x, y });
-        const elevation = level.height.toFixed(2);
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.fillStyle = PALETTE.BG;
-        ctx.fillRect(
-          -ctx.measureText(elevation).width / 2 - VISUAL.TITLE_LABEL_PADDING,
-          -VISUAL.TITLE_LABEL_HEIGHT / 2,
-          ctx.measureText(elevation).width + VISUAL.TITLE_LABEL_PADDING * 2,
-          VISUAL.TITLE_LABEL_HEIGHT
-        );
-        ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, VISUAL.TITLE_LABEL_ALPHA);
-        ctx.fillText(elevation, 0, 0);
-        ctx.restore();
-      }
-    }
+    drawContourLabels(ctx, contours, {
+      width,
+      height,
+      x: bounds.cx,
+      y: bounds.cy,
+      scale,
+      alpha: VISUAL.TITLE_LABEL_ALPHA,
+      spacing: VISUAL.TITLE_LABEL_SPACING,
+    });
   };
 
   resize();

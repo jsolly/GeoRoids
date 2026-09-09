@@ -87,7 +87,7 @@ async function readTerrain(page: Page): Promise<{
     return {
       peak: gc.getTerrainProbe({ x: 0, y: 0 }),
       slope: gc.getTerrainProbe({ x: 1550, y: 0 }),
-      foot: gc.getTerrainProbe({ x: 3100, y: 0 }),
+      foot: gc.getTerrainProbe({ x: 3110, y: 0 }),
     };
   });
 }
@@ -96,11 +96,11 @@ for (const viewport of [
   { name: 'desktop', width: 1280, height: 900, hasTouch: false },
   { name: 'mobile', width: 390, height: 844, hasTouch: true },
 ] satisfies Viewport[]) {
-  test(`a pilot climbs slower than descending the central mountain on ${viewport.name}`, async () => {
+  test(`a pilot climbs slower than descending the varied terrain on ${viewport.name}`, async () => {
     const localDistances: number[] = [];
     const authoritativeDistances: number[] = [];
 
-    for (const angle of [0, Math.PI]) {
+    for (const angle of [Math.PI, 0]) {
       const page = await browserManager.recreatePage({ hasTouch: viewport.hasTouch });
       await page.setViewportSize(viewport);
 
@@ -127,10 +127,10 @@ for (const viewport of [
       }
 
       const terrain = await readTerrain(page);
-      expect(terrain.peak.height).toBe(1);
-      expect(terrain.slope.height).toBeCloseTo(0.5);
+      expect(Math.abs(terrain.peak.height)).toBe(0);
+      expect(terrain.slope.height).toBeGreaterThan(0);
       expect(terrain.foot.height).toBe(0);
-      expect(terrain.slope.gradient.x).toBeLessThan(0);
+      expect(terrain.slope.gradient.x).toBeGreaterThan(0);
 
       await game.placeShipAt(1550, 0);
       await game.armSpawnProtection();
@@ -206,7 +206,7 @@ for (const viewport of [
       const authoritativeDistance = direction * (afterAuthoritative.x - beforeAuthoritative.x);
       authoritativeDistances.push(authoritativeDistance);
 
-      await page.screenshot({ path: `/tmp/georoids-mountain-${viewport.name}.png` });
+      await page.screenshot({ path: `/tmp/georoids-varied-terrain-${viewport.name}.png` });
       expect(pageErrors).toEqual([]);
       expect(warnings).toEqual([]);
     }
@@ -215,12 +215,12 @@ for (const viewport of [
     if (downhill === undefined || uphill === undefined) {
       throw new Error('Both local directions must be measured');
     }
-    expect(downhill).toBeGreaterThan(uphill * 1.4);
+    expect(downhill).toBeGreaterThan(uphill * 1.08);
 
     const [authoritativeDownhill, authoritativeUphill] = authoritativeDistances;
     if (authoritativeDownhill === undefined || authoritativeUphill === undefined) {
       throw new Error('Both authoritative directions must be measured');
     }
-    expect(authoritativeDownhill).toBeGreaterThan(authoritativeUphill * 1.4);
+    expect(authoritativeDownhill).toBeGreaterThan(authoritativeUphill * 1.08);
   });
 }

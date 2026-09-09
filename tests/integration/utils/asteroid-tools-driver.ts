@@ -28,8 +28,12 @@ export function captureConsole(page: import('playwright').Page): {
 export async function waitForEnhancedTargets(page: import('playwright').Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const state = (window as any).gameController?.getAsteroidToolsController?.()?.getState?.();
-      return Boolean(state?.pilot?.alive && state.targets?.length > 0);
+      const controller = window.gameController;
+      if (!controller) {
+        return false;
+      }
+      const state = controller.getAsteroidToolsController().getState();
+      return Boolean(state.pilot?.alive && state.targets.length > 0);
     },
     undefined,
     { timeout: 20_000, polling: 100 }
@@ -49,11 +53,12 @@ export async function driveToAsteroid(
     while (Date.now() < deadline) {
       const navigation = await page.evaluate(
         ({ id, requiredGap }) => {
-          const gc = (window as any).gameController;
-          const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
-          const rock = (gc?.getCurrRoidBelt?.()?.getRoids?.() ?? []).find(
-            (candidate: any) => candidate.id === id
-          );
+          const controller = window.gameController;
+          const ship = controller?.getCurrShip();
+          const rock = controller
+            ?.getCurrRoidBelt()
+            .getRoids()
+            .find((candidate) => candidate.id === id);
           if (!ship || !rock) {
             return null;
           }
@@ -91,7 +96,7 @@ export async function driveToAsteroid(
   } finally {
     await page.keyboard.up('KeyW');
     await page.evaluate(() => {
-      const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+      const ship = window.gameController?.getCurrShip();
       if (ship) {
         ship.thrusting = false;
       }

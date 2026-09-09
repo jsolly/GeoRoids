@@ -6,6 +6,8 @@ export class BrowserManager {
   private touchContext: BrowserContext | null = null;
   private page: Page | null = null;
   private pages: Page[] = [];
+  private pageCleanupFailed = false;
+  private readonly pageErrors: Error[] = [];
 
   async initialize(): Promise<void> {
     this.browser = await chromium.launch({
@@ -29,6 +31,9 @@ export class BrowserManager {
   }
 
   async createPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+    if (this.pageCleanupFailed) {
+      await this.closeAllPages();
+    }
     if (!this.browser || !this.context) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
@@ -41,6 +46,9 @@ export class BrowserManager {
     const page = await context.newPage();
     this.page = page;
     this.pages.push(page);
+    const onPageError = (error: Error) => this.pageErrors.push(error);
+    page.on('pageerror', onPageError);
+    page.once('close', () => page.off('pageerror', onPageError));
     await page.setViewportSize({ width: 1920, height: 1080 });
 
     // Set user agent for consistent behavior
@@ -66,13 +74,23 @@ export class BrowserManager {
 
   /** Alias for closePage — closes every page opened in this manager. */
   async closeAllPages(): Promise<void> {
+    const failures: unknown[] = [];
+    const remaining: Page[] = [];
     for (const page of this.pages) {
-      await page.close().catch((error: unknown) => {
-        console.error('Failed to close scenario page; browser cleanup will retry', error);
-      });
+      try {
+        await page.close();
+      } catch (error: unknown) {
+        failures.push(error);
+        remaining.push(page);
+      }
     }
-    this.pages = [];
-    this.page = null;
+    this.pages = remaining;
+    this.page = remaining.at(-1) ?? null;
+    this.pageCleanupFailed = remaining.length > 0;
+    failures.push(...this.pageErrors.splice(0));
+    if (failures.length > 0) {
+      throw new AggregateError(failures, `Scenario pages failed with ${failures.length} error(s)`);
+    }
   }
 
   /** Open an additional browser tab for multi-client scenarios. */
@@ -82,27 +100,46 @@ export class BrowserManager {
 
   /** Returns the first and second pages for two-client tests. */
   getTwoClientPages(): { first: Page; second: Page } {
-    if (this.pages.length < 2) {
+    const [first, second] = this.pages;
+    if (!first || !second) {
       throw new Error(
         'Expected two pages — call createAdditionalPage() after the first createPage()'
       );
     }
-    return { first: this.pages[0]!, second: this.pages[1]! };
+    return { first, second };
   }
 
   async cleanup(): Promise<void> {
-    await this.closeAllPages();
-    if (this.context) {
-      await this.context.close();
+    const failures: unknown[] = [];
+    try {
+      await this.closeAllPages();
+    } catch (error: unknown) {
+      if (error instanceof AggregateError) {
+        failures.push(...error.errors);
+      } else {
+        failures.push(error);
+      }
+    }
+
+    for (const resource of [this.context, this.touchContext, this.browser]) {
+      try {
+        await resource?.close();
+      } catch (error: unknown) {
+        failures.push(error);
+      }
+    }
+    failures.push(...this.pageErrors.splice(0));
+    if (!this.browser?.isConnected()) {
       this.context = null;
-    }
-    if (this.touchContext) {
-      await this.touchContext.close();
       this.touchContext = null;
-    }
-    if (this.browser) {
-      await this.browser.close();
       this.browser = null;
+      this.pages = [];
+      this.page = null;
+      this.pageCleanupFailed = false;
+    }
+
+    if (failures.length > 0) {
+      throw new AggregateError(failures, `Browser cleanup failed with ${failures.length} error(s)`);
     }
   }
 

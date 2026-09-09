@@ -10,127 +10,23 @@ export class GameInteractions {
    * Navigate to the game
    */
   async navigateToGame(): Promise<void> {
-    console.log('🌐 Navigating to game...');
-
-    // Add console error logging
-    this.page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        console.log('🚨 Browser console error during navigation:', msg.text());
-      }
+    await this.page.goto(TestConfig.GAME_URL, {
+      waitUntil: 'load',
+      timeout: 30000,
     });
-
-    // Add page error logging
-    this.page.on('pageerror', (error) => {
-      console.log('🚨 Page error during navigation:', error.message);
-    });
-
-    try {
-      await this.page.goto(TestConfig.GAME_URL, {
-        waitUntil: 'load',
-        timeout: 30000,
-      });
-      console.log('✅ Navigated to game');
-    } catch (error) {
-      console.log('❌ Navigation failed:', error);
-      throw error;
-    }
   }
 
   /**
    * Wait for and click the start game button
    */
   async startGame(): Promise<void> {
-    // Check for console errors first
-    this.page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        console.log('🚨 Browser console error:', msg.text());
-      }
-    });
+    await this.page.locator('#start-screen').waitFor({ state: 'visible', timeout: 10000 });
 
-    // Wait for the start screen to load and be visible
-    await this.page.waitForSelector('#start-screen', { timeout: 5000 });
-
-    // Check if start screen is visible with more detailed logging
-    await this.page.waitForFunction(
-      () => {
-        const startScreen = document.querySelector('#start-screen');
-        if (!startScreen) {
-          console.log('🔍 Start screen element not found');
-          return false;
-        }
-
-        const computedStyle = window.getComputedStyle(startScreen);
-        const rect = (startScreen as HTMLElement).getBoundingClientRect();
-
-        // Check visibility using multiple methods
-        const isVisible =
-          computedStyle.display !== 'none' &&
-          computedStyle.visibility !== 'hidden' &&
-          computedStyle.opacity !== '0' &&
-          rect.width > 0 &&
-          rect.height > 0;
-
-        console.log('🔍 Start screen visibility check:', {
-          element: !!startScreen,
-          display: computedStyle.display,
-          visibility: computedStyle.visibility,
-          opacity: computedStyle.opacity,
-          rect: { width: rect.width, height: rect.height },
-          isVisible,
-        });
-
-        return isVisible;
-      },
-      { timeout: 10000 }
-    );
-    console.log('✅ Start screen loaded');
-
-    // Find and click the play button
-    const playButton = await this.page.locator('#start-game');
-    await this.page.waitForFunction(() => {
-      const button = document.querySelector('#start-game');
-      if (!button) {
-        return false;
-      }
-
-      const computedStyle = window.getComputedStyle(button);
-      const rect = (button as HTMLElement).getBoundingClientRect();
-
-      return (
-        computedStyle.display !== 'none' &&
-        computedStyle.visibility !== 'hidden' &&
-        computedStyle.opacity !== '0' &&
-        rect.width > 0 &&
-        rect.height > 0
-      );
-    });
-    console.log('🎮 Clicking play button...');
+    const playButton = this.page.locator('#start-game');
+    await playButton.waitFor({ state: 'visible', timeout: 30000 });
     await playButton.click();
-    console.log('✅ Play button clicked');
 
-    // Wait for game area to appear and be visible
-    await this.page.waitForSelector('#gameArea', { timeout: 5000 });
-    await this.page.waitForFunction(
-      () => {
-        const gameArea = document.querySelector('#gameArea');
-        if (!gameArea) {
-          return false;
-        }
-
-        const computedStyle = window.getComputedStyle(gameArea);
-        const rect = (gameArea as HTMLElement).getBoundingClientRect();
-
-        return (
-          computedStyle.display !== 'none' &&
-          computedStyle.visibility !== 'hidden' &&
-          computedStyle.opacity !== '0' &&
-          rect.width > 0 &&
-          rect.height > 0
-        );
-      },
-      { timeout: 5000 }
-    );
-    console.log('✅ Game area loaded');
+    await this.page.locator('#gameArea').waitFor({ state: 'visible', timeout: 5000 });
   }
 
   /**
@@ -139,7 +35,7 @@ export class GameInteractions {
   async waitForGameInitialization(timeoutMs: number = TestConfig.GAME_INIT_TIMEOUT): Promise<void> {
     await this.page.waitForFunction(
       () => {
-        const gameController = (window as any).gameController;
+        const gameController = window.gameController;
         if (!gameController) {
           return false;
         }
@@ -150,14 +46,13 @@ export class GameInteractions {
           return false;
         }
 
-        const localPlayer = gameController.playerManager?.getLocalPlayer?.();
-        const networkManager = gameController.getNetworkManager?.();
-        return Boolean(localPlayer && networkManager?.isConnected);
+        const localPlayer = gameController.getCurrPlayer();
+        const networkManager = gameController.getNetworkManager();
+        return Boolean(localPlayer && networkManager.isConnected);
       },
       undefined,
       { timeout: timeoutMs, polling: 200 }
     );
-    console.log('⏳ Game initialization complete');
   }
 
   /**
@@ -171,7 +66,7 @@ export class GameInteractions {
       }
 
       const computedStyle = window.getComputedStyle(canvas);
-      const rect = (canvas as HTMLElement).getBoundingClientRect();
+      const rect = canvas.getBoundingClientRect();
 
       return (
         computedStyle.display !== 'none' &&
@@ -181,19 +76,16 @@ export class GameInteractions {
         rect.height > 0
       );
     });
-    console.log('✅ Game canvas visible');
   }
 
   /**
    * Fire lasers multiple times using mouse clicks (left mouse button)
    */
   async fireLasersWithMouse(count: number, delayMs: number = 500): Promise<void> {
-    console.log(`🔫 Firing ${count} times with mouse clicks...`);
     const canvas = this.page.locator(TestSelectors.GAME_CANVAS);
     await canvas.waitFor({ state: 'visible', timeout: 5000 });
 
     for (let i = 1; i <= count; i++) {
-      console.log(`  Mouse firing ${i}/${count}...`);
       const box = await canvas.boundingBox();
       if (!box) {
         throw new Error('Canvas bounding box unavailable for mouse fire');
@@ -216,7 +108,7 @@ export class GameInteractions {
     await this.page
       .waitForFunction(
         (expectedHealth) => {
-          const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+          const ship = window.gameController?.getCurrShip();
           return ship?.health === expectedHealth;
         },
         expected,
@@ -236,14 +128,13 @@ export class GameInteractions {
     direction: 'left' | 'right' | 'up' | 'down',
     durationMs: number = 1000
   ): Promise<void> {
-    console.log(`🚀 Moving ship ${direction} for ${durationMs}ms...`);
     // Headless Chromium may not run requestAnimationFrame during Playwright timeouts.
     // Drive the real game loop while thrust/turn are active (same physics as keybindings).
     await this.page.evaluate(
       async ({ moveDirection, holdMs }) => {
-        const gc = (window as any).gameController;
-        const ship = gc?.playerManager?.getLocalPlayer()?.ship;
-        if (!gc?.updateGame || !ship) {
+        const gc = window.gameController;
+        const ship = gc?.getCurrShip();
+        if (!gc || !ship) {
           throw new Error('Local ship or gameController.updateGame is not available');
         }
         const turnSpeedRadPerFrame = (450 * Math.PI) / (180 * 60);
@@ -265,14 +156,13 @@ export class GameInteractions {
       },
       { moveDirection: direction, holdMs: durationMs }
     );
-    console.log(`✅ Ship movement complete`);
   }
 
   /** Advance the client game loop for a number of frames (headless-safe). */
   async runGameFrames(frameCount: number): Promise<void> {
     await this.page.evaluate(async (frames) => {
-      const gc = (window as any).gameController;
-      if (!gc?.updateGame) {
+      const gc = window.gameController;
+      if (!gc) {
         throw new Error('gameController.updateGame is not available');
       }
       for (let i = 0; i < frames; i++) {
@@ -286,8 +176,7 @@ export class GameInteractions {
   async waitForServerSpawnProtection(timeoutMs: number = 15000): Promise<void> {
     await this.page.waitForFunction(
       () => {
-        const gc = (window as any).gameController;
-        const lp = gc?.playerManager?.getLocalPlayer?.();
+        const lp = window.gameController?.getCurrPlayer();
         return (lp?.serverSpawnProtectionTimer ?? 0) > 0;
       },
       undefined,
@@ -306,7 +195,7 @@ export class GameInteractions {
       }
 
       const computedStyle = window.getComputedStyle(gameArea);
-      const rect = (gameArea as HTMLElement).getBoundingClientRect();
+      const rect = gameArea.getBoundingClientRect();
 
       return (
         computedStyle.display !== 'none' &&
@@ -316,7 +205,6 @@ export class GameInteractions {
         rect.height > 0
       );
     });
-    console.log('✅ Game area verified');
   }
 
   /**
@@ -337,13 +225,10 @@ export class GameInteractions {
    */
   async waitForGameReady(): Promise<void> {
     await this.page.waitForFunction(
-      () => {
-        const gameController = (window as any).gameController;
-        return gameController?.gameStateManager?.getIsGameRunning?.() === true;
-      },
+      () => window.gameController?.getIsGameRunning() === true,
+      undefined,
       { timeout: 10000 }
     );
-    console.log('✅ Game ready');
   }
 
   /**
@@ -352,22 +237,15 @@ export class GameInteractions {
   async waitForAsteroids(count: number, timeoutMs: number = 20000): Promise<void> {
     await this.page.waitForFunction(
       (expectedCount) => {
-        const gameController = (window as any).gameController;
-        if (gameController?.getCurrRoidBelt) {
-          const roidBelt = gameController.getCurrRoidBelt();
-          const actualCount = roidBelt ? roidBelt.getRoids().length : 0;
-          console.log(
-            `🔍 Checking asteroids: expected >= ${expectedCount}, actual = ${actualCount}`
-          );
-          return actualCount >= expectedCount;
+        const gameController = window.gameController;
+        if (!gameController) {
+          return false;
         }
-        console.log(`🔍 No game controller or roid belt available`);
-        return false;
+        return gameController.getCurrRoidBelt().getRoids().length >= expectedCount;
       },
       count,
       { timeout: timeoutMs }
     );
-    console.log(`✅ Waited for ${count} asteroids`);
   }
 
   /**
@@ -375,12 +253,11 @@ export class GameInteractions {
    */
   async getAsteroidCount(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      if (gameController?.getCurrRoidBelt) {
-        const roidBelt = gameController.getCurrRoidBelt();
-        return roidBelt ? roidBelt.getRoids().length : 0;
+      const gameController = window.gameController;
+      if (!gameController) {
+        throw new Error('gameController is not available');
       }
-      return 0;
+      return gameController.getCurrRoidBelt().getRoids().length;
     });
   }
 
@@ -388,45 +265,49 @@ export class GameInteractions {
     Array<{ id: string; x: number; y: number; mass: number; radius: number; kind: string }>
   > {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      const loot = gameController?.getLoot?.() ?? [];
-      return loot.map(
-        (drop: {
-          id: string;
-          position: { x: number; y: number };
-          mass: number;
-          radius: number;
-          kind?: string;
-        }) => ({
-          id: drop.id,
-          x: drop.position.x,
-          y: drop.position.y,
-          mass: drop.mass,
-          radius: drop.radius,
-          kind: drop.kind ?? 'wreckage',
-        })
-      );
+      const gameController = window.gameController;
+      if (!gameController) {
+        throw new Error('gameController is not available');
+      }
+      const loot = gameController.getLoot();
+      return loot.map((drop) => ({
+        id: drop.id,
+        x: drop.position.x,
+        y: drop.position.y,
+        mass: drop.mass,
+        radius: drop.radius,
+        kind: drop.kind ?? 'wreckage',
+      }));
     });
   }
 
   async getShipMass(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      return gameController?.playerManager?.getLocalPlayer?.()?.ship?.mass ?? 1;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
+      }
+      return ship.mass;
     });
   }
 
   async getShipRadius(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      return gameController?.playerManager?.getLocalPlayer?.()?.ship?.r ?? 15;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
+      }
+      return ship.r;
     });
   }
 
   async getShipMaxHealth(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      return gameController?.playerManager?.getLocalPlayer?.()?.ship?.maxHealth ?? 100;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
+      }
+      return ship.maxHealth;
     });
   }
 
@@ -435,13 +316,12 @@ export class GameInteractions {
    */
   async getShipHealth(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      if (gameController?.playerManager?.getLocalPlayer) {
-        const player = gameController.playerManager.getLocalPlayer();
-        // Use ?? (not ||) so a real health of 0 isn't reported as full health.
-        return player?.ship?.health ?? 100;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
       }
-      return 100;
+      // Preserve a real health of 0 rather than reporting full health.
+      return ship.health;
     });
   }
 
@@ -450,31 +330,15 @@ export class GameInteractions {
    */
   async getShipPosition(): Promise<{ x: number; y: number }> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      if (gameController?.playerManager?.getLocalPlayer) {
-        const player = gameController.playerManager.getLocalPlayer();
-        const pos = player?.ship?.position;
-        if (pos) {
-          return pos;
-        }
+      const ship = window.gameController?.getCurrShip();
+      if (ship) {
+        return ship.position;
       }
       throw new Error('No local ship position available');
     });
   }
 
-  /**
-   * Get asteroid positions. (Roid exposes its radius as `r`, not `radius`.)
-   */
-  async getCanvasSize(): Promise<{ width: number; height: number }> {
-    return await this.page.evaluate(() => {
-      const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
-      return {
-        width: canvas?.width || 800,
-        height: canvas?.height || 600,
-      };
-    });
-  }
-
+  /** Get asteroid positions. (Roid exposes its radius as `r`, not `radius`.) */
   async getAsteroidPositions(): Promise<
     Array<{
       x: number;
@@ -486,45 +350,21 @@ export class GameInteractions {
     }>
   > {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      if (gameController?.getCurrRoidBelt) {
-        const roidBelt = gameController.getCurrRoidBelt();
-        return roidBelt
-          ? roidBelt.getRoids().map((roid: any) => ({
-              x: roid.position.x,
-              y: roid.position.y,
-              radius: roid.r,
-              id: roid.id,
-              isCollabTarget: roid.isCollabTarget === true,
-              material: roid.material,
-            }))
-          : [];
+      const gameController = window.gameController;
+      if (!gameController) {
+        throw new Error('gameController is not available');
       }
-      return [];
-    });
-  }
-
-  /**
-   * Get detailed asteroid information
-   */
-  async getAsteroidDetails(): Promise<
-    Array<{ x: number; y: number; radius: number; size: number; id: string }>
-  > {
-    return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      if (gameController?.getCurrRoidBelt) {
-        const roidBelt = gameController.getCurrRoidBelt();
-        return roidBelt
-          ? roidBelt.getRoids().map((roid: any) => ({
-              x: roid.position.x,
-              y: roid.position.y,
-              radius: roid.r,
-              size: roid.r,
-              id: roid.id || 'unknown',
-            }))
-          : [];
-      }
-      return [];
+      return gameController
+        .getCurrRoidBelt()
+        .getRoids()
+        .map((roid) => ({
+          x: roid.position.x,
+          y: roid.position.y,
+          radius: roid.r,
+          id: roid.id,
+          isCollabTarget: roid.isCollabTarget === true,
+          ...(roid.material !== undefined ? { material: roid.material } : {}),
+        }));
     });
   }
 
@@ -540,12 +380,11 @@ export class GameInteractions {
    */
   async isShipExploding(): Promise<boolean> {
     return await this.page.evaluate(() => {
-      const gameController = (window as any).gameController;
-      if (gameController?.playerManager?.getLocalPlayer) {
-        const player = gameController.playerManager.getLocalPlayer();
-        return player?.ship?.exploding || false;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
       }
-      return false;
+      return ship.exploding;
     });
   }
 
@@ -554,12 +393,19 @@ export class GameInteractions {
    */
   async getLives(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const nm = gc?.getNetworkManager?.();
-      const localId = nm?.getLocalPlayerId?.();
-      const fromNetwork = localId ? nm?.getPlayer?.(localId) : undefined;
-      const local = gc?.playerManager?.getLocalPlayer?.();
-      return fromNetwork?.lives ?? local?.lives ?? 0;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const nm = gc.getNetworkManager();
+      const localId = nm.getLocalPlayerId();
+      const fromNetwork = localId ? nm.getPlayer(localId) : undefined;
+      const local = gc.getCurrPlayer();
+      const player = fromNetwork ?? local;
+      if (!player) {
+        throw new Error('No local player available');
+      }
+      return player.lives;
     });
   }
 
@@ -575,16 +421,22 @@ export class GameInteractions {
   /** Server-assigned id of the local player (used as attackerId in damage). */
   async getLocalPlayerId(): Promise<string> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.getNetworkManager?.().getLocalPlayerId?.() ?? '';
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      return gc.getNetworkManager().getLocalPlayerId();
     });
   }
 
   /** Current score of the local player (server-authoritative, synced down). */
   async getScore(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.getCurrScore ? gc.getCurrScore() : 0;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      return gc.getCurrScore();
     });
   }
 
@@ -595,9 +447,9 @@ export class GameInteractions {
   async placeShipAt(x: number, y: number): Promise<void> {
     const playerId = await this.page.evaluate(
       ({ x, y }) => {
-        const gc = (window as any).gameController;
-        const playerId = gc?.getNetworkManager?.().getLocalPlayerId?.();
-        const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+        const gc = window.gameController;
+        const playerId = gc?.getNetworkManager().getLocalPlayerId();
+        const ship = gc?.getCurrShip();
         if (!playerId || !ship) {
           throw new Error('No connected local ship to place');
         }
@@ -622,7 +474,7 @@ export class GameInteractions {
     }
     await this.page.waitForFunction(
       (expectedEpoch) => {
-        const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+        const ship = window.gameController?.getCurrShip();
         return ship?.asteroidMotion?.epoch === expectedEpoch;
       },
       motionEpoch,
@@ -633,7 +485,7 @@ export class GameInteractions {
   private async setPredictedShipPosition(x: number, y: number): Promise<void> {
     await this.page.evaluate(
       ({ x, y }) => {
-        const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+        const ship = window.gameController?.getCurrShip();
         if (!ship) {
           throw new Error('No local ship to align after fixture placement');
         }
@@ -652,12 +504,12 @@ export class GameInteractions {
    */
   async armSpawnProtection(): Promise<void> {
     await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const ship = gc?.playerManager?.getLocalPlayer()?.ship;
-      if (ship) {
-        ship.blinkCount = 600;
-        ship.spawnProtectionTimer = 600;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship to protect');
       }
+      ship.blinkCount = 600;
+      ship.spawnProtectionTimer = 600;
     });
   }
 
@@ -676,9 +528,12 @@ export class GameInteractions {
     }>
   > {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const satellites = gc?.getSatellites?.() ?? [];
-      return satellites.map((sat: any) => ({
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const satellites = gc.getSatellites();
+      return satellites.map((sat) => ({
         id: sat.id,
         name: sat.name,
         x: sat.position.x,
@@ -696,8 +551,8 @@ export class GameInteractions {
   async waitForSatellites(count: number, timeoutMs = 25000): Promise<void> {
     await this.page.waitForFunction(
       (expected) => {
-        const gc = (window as any).gameController;
-        return (gc?.getSatellites?.() ?? []).length >= expected;
+        const gc = window.gameController;
+        return gc ? gc.getSatellites().length >= expected : false;
       },
       count,
       { timeout: timeoutMs }
@@ -714,11 +569,17 @@ export class GameInteractions {
 
     for (let i = 0; i < shots; i++) {
       const sample = await this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
-        const ship = gc?.playerManager?.getLocalPlayer()?.ship;
-        if (!sat || !ship) {
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('gameController is not available');
+        }
+        const sat = gc?.getSatellites().find((s) => s.id === id);
+        const ship = gc.getCurrShip();
+        if (!sat) {
           return null;
+        }
+        if (!ship) {
+          throw new Error('No local ship available');
         }
         return {
           health: sat.health,
@@ -731,11 +592,17 @@ export class GameInteractions {
         await this.placeShipAt(sample.firingPoint.x, sample.firingPoint.y);
         await this.armSpawnProtection();
         await this.page.evaluate((id) => {
-          const gc = (window as any).gameController;
-          const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
-          const ship = gc?.playerManager?.getLocalPlayer()?.ship;
-          if (!sat || !ship || sat.health <= 0 || sat.exploding) {
+          const gc = window.gameController;
+          if (!gc) {
+            throw new Error('gameController is not available');
+          }
+          const sat = gc.getSatellites().find((s) => s.id === id);
+          const ship = gc.getCurrShip();
+          if (!sat || sat.health <= 0 || sat.exploding) {
             return;
+          }
+          if (!ship) {
+            throw new Error('No local ship available');
           }
           ship.angle = Math.atan2(
             -(sat.position.y - ship.position.y),
@@ -750,8 +617,11 @@ export class GameInteractions {
       await this.page.waitForTimeout(160);
 
       const after = await this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('gameController is not available');
+        }
+        const sat = gc.getSatellites().find((s) => s.id === id);
         return sat ? { health: sat.health, exploding: sat.exploding } : null;
       }, satelliteId);
       if (after) {
@@ -764,8 +634,11 @@ export class GameInteractions {
     }
 
     const endScore = await this.getScore();
+    if (!Number.isFinite(minHealthObserved)) {
+      throw new Error(`No live health observation was available for satellite ${satelliteId}`);
+    }
     return {
-      minHealthObserved: Number.isFinite(minHealthObserved) ? minHealthObserved : 50,
+      minHealthObserved,
       everExploding,
       scoreGain: endScore - startScore,
     };
@@ -775,8 +648,11 @@ export class GameInteractions {
     const deadline = Date.now() + durationMs;
     while (Date.now() < deadline) {
       const position = await this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const sat = (gc?.getSatellites?.() ?? []).find((s: any) => s.id === id);
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('gameController is not available');
+        }
+        const sat = gc.getSatellites().find((s) => s.id === id);
         return sat ? { x: sat.position.x, y: sat.position.y } : null;
       }, satelliteId);
       if (!position) {
@@ -801,11 +677,14 @@ export class GameInteractions {
     }>
   > {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const players = gc.getNetworkManager().getAllPlayers();
       return players
-        .filter((p: any) => p.type === 'bot')
-        .map((p: any) => ({
+        .filter((p) => p.type === 'bot')
+        .map((p) => ({
           id: p.id,
           x: p.ship.position.x,
           y: p.ship.position.y,
@@ -813,7 +692,9 @@ export class GameInteractions {
           maxHealth: p.ship.maxHealth,
           exploding: p.ship.exploding,
           r: p.ship.r,
-          factionId: p.factionId ?? p.ship.factionId,
+          ...((p.factionId ?? p.ship.factionId)
+            ? { factionId: p.factionId ?? p.ship.factionId }
+            : {}),
         }));
     });
   }
@@ -822,14 +703,14 @@ export class GameInteractions {
   async getHostileBotId(timeoutMs = 25000): Promise<string> {
     await this.page.waitForFunction(
       () => {
-        const gc = (window as any).gameController;
-        const local = gc?.playerManager?.getLocalPlayer?.();
+        const gc = window.gameController;
+        const local = gc?.getCurrPlayer();
         const localFaction = local?.factionId ?? local?.ship?.factionId;
         if (!localFaction) {
           return false;
         }
-        const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-        return players.some((player: any) => {
+        const players = gc?.getNetworkManager().getAllPlayers() ?? [];
+        return players.some((player) => {
           const faction = player.factionId ?? player.ship?.factionId;
           return (
             player.type === 'bot' &&
@@ -846,11 +727,11 @@ export class GameInteractions {
     );
 
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      const local = gc?.getCurrPlayer();
       const localFaction = local?.factionId ?? local?.ship?.factionId;
-      const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      const hostile = players.find((player: any) => {
+      const players = gc?.getNetworkManager().getAllPlayers() ?? [];
+      const hostile = players.find((player) => {
         const faction = player.factionId ?? player.ship?.factionId;
         return (
           player.type === 'bot' &&
@@ -874,9 +755,12 @@ export class GameInteractions {
   async waitForBotShieldToClear(botId: string, timeoutMs = 15000): Promise<void> {
     await this.page.waitForFunction(
       (id) => {
-        const gc = (window as any).gameController;
-        const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-        const bot = players.find((player: any) => player.id === id);
+        const gc = window.gameController;
+        if (!gc) {
+          return false;
+        }
+        const players = gc.getNetworkManager().getAllPlayers();
+        const bot = players.find((player) => player.id === id);
         return !bot || (!bot.ship?.shieldActive && (bot.ship?.shieldTime ?? 0) <= 0);
       },
       botId,
@@ -888,9 +772,12 @@ export class GameInteractions {
   async waitForBots(count: number, timeoutMs = 25000): Promise<void> {
     await this.page.waitForFunction(
       (expected) => {
-        const gc = (window as any).gameController;
-        const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-        return players.filter((p: any) => p.type === 'bot').length >= expected;
+        const gc = window.gameController;
+        if (!gc) {
+          return false;
+        }
+        const players = gc.getNetworkManager().getAllPlayers();
+        return players.filter((p) => p.type === 'bot').length >= expected;
       },
       count,
       { timeout: timeoutMs }
@@ -901,8 +788,7 @@ export class GameInteractions {
   async fireLaserToward(targetX: number, targetY: number): Promise<void> {
     await this.page.evaluate(
       ({ targetX, targetY }) => {
-        const gc = (window as any).gameController;
-        const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+        const ship = window.gameController?.getCurrShip();
         if (!ship) {
           throw new Error('No local ship to fire from');
         }
@@ -931,9 +817,14 @@ export class GameInteractions {
   ): Promise<void> {
     const targetGone = () =>
       this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const roids = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
-        return !roids.some((r: any) => r.id === id);
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('gameController is not available');
+        }
+        return !gc
+          .getCurrRoidBelt()
+          .getRoids()
+          .some((r) => r.id === id);
       }, asteroid.id);
 
     const shipRadius = await this.getShipRadius();
@@ -943,9 +834,12 @@ export class GameInteractions {
     } | null> => {
       return await this.page.evaluate(
         ({ id, shipRadius }) => {
-          const gc = (window as any).gameController;
-          const roids = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
-          const target = roids.find((roid: any) => roid.id === id);
+          const gc = window.gameController;
+          if (!gc) {
+            throw new Error('gameController is not available');
+          }
+          const roids = gc.getCurrRoidBelt().getRoids();
+          const target = roids.find((roid) => roid.id === id);
           if (!target?.position || !Number.isFinite(target.r)) {
             return null;
           }
@@ -967,7 +861,7 @@ export class GameInteractions {
             const dx = targetX - shipX;
             const dy = targetY - shipY;
             const segmentLengthSquared = dx * dx + dy * dy;
-            const clear = roids.every((roid: any) => {
+            const clear = roids.every((roid) => {
               if (roid.id === id || !roid.position || !Number.isFinite(roid.r)) {
                 return true;
               }
@@ -997,9 +891,14 @@ export class GameInteractions {
 
     const currentTargetPosition = () =>
       this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const roids = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
-        const target = roids.find((roid: any) => roid.id === id);
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('gameController is not available');
+        }
+        const target = gc
+          .getCurrRoidBelt()
+          .getRoids()
+          .find((roid) => roid.id === id);
         return target?.position ? { x: target.position.x, y: target.position.y } : null;
       }, asteroid.id);
 
@@ -1064,9 +963,8 @@ export class GameInteractions {
       );
       const sample = await this.page.waitForFunction(
         ({ id, expectedHealth, expectedPosition }) => {
-          const gc = (window as any).gameController;
-          const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-          const bot = players.find((player: any) => player.id === id);
+          const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
+          const bot = players.find((player) => player.id === id);
           if (!bot?.ship) {
             return false;
           }
@@ -1110,9 +1008,8 @@ export class GameInteractions {
       while (Date.now() < impactDeadline) {
         await this.page.waitForTimeout(50);
         const after = await this.page.evaluate((id) => {
-          const gc = (window as any).gameController;
-          const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-          const bot = players.find((p: any) => p.id === id);
+          const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
+          const bot = players.find((p) => p.id === id);
           return bot ? { health: bot.ship.health, exploding: bot.ship.exploding } : null;
         }, botId);
         if (!after) {
@@ -1152,50 +1049,28 @@ export class GameInteractions {
 
   /** Wait until the local player is registered on the server (post-join). */
   async waitForServerJoin(timeoutMs = 60000): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const remaining = deadline - Date.now();
-      try {
-        await this.page.waitForFunction(
-          () => {
-            const gc = (window as any).gameController;
-            const nm = gc?.getNetworkManager?.();
-            if (!nm?.isConnected) {
-              return false;
-            }
-            const id = nm.getLocalPlayerId?.();
-            const lp = gc?.playerManager?.getLocalPlayer?.();
-            return Boolean(id && lp);
-          },
-          undefined,
-          { timeout: Math.min(5000, remaining), polling: 200 }
-        );
-        return;
-      } catch {
-        await this.page
-          .evaluate(async () => {
-            const gc = (window as any).gameController;
-            const nm = gc?.getNetworkManager?.();
-            if (!nm?.isConnected) {
-              await nm.connect();
-              nm.initializeAsteroidSync?.();
-            }
-          })
-          .catch((error: unknown) => {
-            console.error('Server-join retry failed', error);
-          });
-      }
-    }
-    throw new Error(`Timed out waiting for server join after ${timeoutMs}ms`);
+    await this.page.waitForFunction(
+      () => {
+        const gc = window.gameController;
+        if (!gc) {
+          return false;
+        }
+        const nm = gc.getNetworkManager();
+        return Boolean(nm.isConnected && nm.getLocalPlayerId() && gc.getCurrPlayer());
+      },
+      undefined,
+      { timeout: timeoutMs, polling: 200 }
+    );
   }
 
   async waitForCombatReady(timeoutMs = 45000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const ready = await this.page.evaluate(() => {
-        const player = (window as any).gameController?.playerManager?.getLocalPlayer?.();
-        const ship = player?.ship;
-        if (!ship) {
+        const gc = window.gameController;
+        const player = gc?.getCurrPlayer();
+        const ship = gc?.getCurrShip();
+        if (!player || !ship) {
           return false;
         }
         // Client frames can advance faster than the authoritative server clock.
@@ -1283,20 +1158,23 @@ export class GameInteractions {
       const [field, hazards] = await Promise.all([
         this.getAsteroidPositions(),
         this.page.evaluate(() => {
-          const gc = (window as any).gameController;
-          const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-          const satellites = gc?.getSatellites?.() ?? [];
+          const gc = window.gameController;
+          if (!gc) {
+            throw new Error('gameController is not available');
+          }
+          const players = gc.getNetworkManager().getAllPlayers();
+          const satellites = gc.getSatellites();
           return [
             ...players
-              .filter((player: any) => player.ship?.health > 0 && !player.ship.exploding)
-              .map((player: any) => ({
+              .filter((player) => player.ship.health > 0 && !player.ship.exploding)
+              .map((player) => ({
                 x: player.ship.position.x,
                 y: player.ship.position.y,
                 radius: player.ship.r,
               })),
             ...satellites
-              .filter((satellite: any) => satellite.health > 0 && !satellite.exploding)
-              .map((satellite: any) => ({
+              .filter((satellite) => satellite.health > 0 && !satellite.exploding)
+              .map((satellite) => ({
                 x: satellite.position.x,
                 y: satellite.position.y,
                 radius: satellite.radius,
@@ -1338,10 +1216,9 @@ export class GameInteractions {
         // Move off the impact point so split fragments cannot re-damage the
         // ship while we wait for the server respawn reposition.
         await this.page.evaluate(({ x, y }) => {
-          const gc = (window as any).gameController;
-          const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+          const ship = window.gameController?.getCurrShip();
           if (!ship) {
-            return;
+            throw new Error('No local ship after asteroid impact');
           }
           const dist = Math.sqrt(x * x + y * y) || 1;
           const step = Math.min(400, dist);
@@ -1358,10 +1235,9 @@ export class GameInteractions {
   /** Distance of the local ship from the world origin (boundary is a circle). */
   async getShipDistanceFromCenter(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+      const ship = window.gameController?.getCurrShip();
       if (!ship) {
-        return 0;
+        throw new Error('No local ship available');
       }
       return Math.sqrt(ship.position.x * ship.position.x + ship.position.y * ship.position.y);
     });
@@ -1377,7 +1253,7 @@ export class GameInteractions {
     const afterDeath = afterDeathPosition ?? (await this.getShipPosition());
     await this.page.waitForFunction(
       ({ death, afterDeath, minDist }) => {
-        const ship = (window as any).gameController?.playerManager?.getLocalPlayer()?.ship;
+        const ship = window.gameController?.getCurrShip();
         if (!ship || ship.health <= 0) {
           return false;
         }
@@ -1405,9 +1281,7 @@ export class GameInteractions {
       await this.runGameFrames(20);
       const placement = await this.page.evaluate(
         ({ deathPosition, minDistance }) => {
-          const gc = (window as any).gameController;
-          const player = gc?.playerManager?.getLocalPlayer();
-          const ship = player?.ship;
+          const ship = window.gameController?.getCurrShip();
           if (!ship || ship.exploding || ship.health <= 0) {
             return null;
           }
@@ -1428,9 +1302,9 @@ export class GameInteractions {
     }
     const debug = await this.page.evaluate(
       ({ deathPosition }) => {
-        const gc = (window as any).gameController;
-        const player = gc?.playerManager?.getLocalPlayer();
-        const ship = player?.ship;
+        const gc = window.gameController;
+        const player = gc?.getCurrPlayer();
+        const ship = gc?.getCurrShip();
         return {
           health: ship?.health,
           exploding: ship?.exploding,
@@ -1466,16 +1340,14 @@ export class GameInteractions {
   /** Whether the main game loop is still running. */
   async isGameRunning(): Promise<boolean> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.getIsGameRunning?.() ?? false;
+      return window.gameController?.getIsGameRunning() ?? false;
     });
   }
 
   /** Whether the latest complete server snapshot still grants protection. */
   async isServerSpawnProtected(): Promise<boolean> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const player = gc?.playerManager?.getLocalPlayer?.();
+      const player = window.gameController?.getCurrPlayer();
       return (player?.serverSpawnProtectionTimer ?? 0) > 0;
     });
   }
@@ -1483,16 +1355,14 @@ export class GameInteractions {
   /** Kill banner text from GameStateManager (empty when inactive). */
   async getKillMessage(): Promise<string> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.getGameStateManager?.().getKillMessage?.() ?? '';
+      return window.gameController?.getGameStateManager().getKillMessage() ?? '';
     });
   }
 
   /** HUD overlay text (game over, death messages). */
   async getHudText(): Promise<string> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.getText?.() ?? '';
+      return window.gameController?.getText() ?? '';
     });
   }
 
@@ -1504,39 +1374,25 @@ export class GameInteractions {
     });
   }
 
-  /** Leaderboard rows derived from synced player entities. */
-  async getLeaderboardEntries(): Promise<
-    Array<{ name: string; score: number; type: string; id: string }>
-  > {
-    return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer?.();
-      const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      const all = local && !players.includes(local) ? [local, ...players] : players;
-      return all
-        .map((p: any) => ({
-          name: p.name,
-          score: p.score ?? 0,
-          type: p.type,
-          id: p.id,
-        }))
-        .sort((a: { score: number }, b: { score: number }) => b.score - a.score);
-    });
-  }
-
   /** Count of active lasers on the local ship. */
   async getLaserCount(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.playerManager?.getLocalPlayer()?.ship?.lasers?.length ?? 0;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
+      }
+      return ship.lasers.length;
     });
   }
 
   /** Local ship heading in radians. */
   async getShipAngle(): Promise<number> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      return gc?.playerManager?.getLocalPlayer()?.ship?.angle ?? 0;
+      const ship = window.gameController?.getCurrShip();
+      if (!ship) {
+        throw new Error('No local ship available');
+      }
+      return ship.angle;
     });
   }
 
@@ -1544,10 +1400,11 @@ export class GameInteractions {
   async waitForRemoteHumanPlayers(minCount = 1, timeoutMs = 20000): Promise<void> {
     await this.page.waitForFunction(
       (expected) => {
-        const gc = (window as any).gameController;
-        const localId = gc?.getNetworkManager?.().getLocalPlayerId?.();
-        const remotes = (gc?.getNetworkManager?.().getAllPlayers?.() ?? []).filter(
-          (p: any) => p.type === 'remote' && p.id !== localId
+        const gc = window.gameController;
+        const nm = gc?.getNetworkManager();
+        const localId = nm?.getLocalPlayerId();
+        const remotes = (nm?.getAllPlayers() ?? []).filter(
+          (p) => p.type === 'remote' && p.id !== localId
         );
         return remotes.length >= expected;
       },
@@ -1559,25 +1416,34 @@ export class GameInteractions {
   /** Remote human player ids visible to this client. */
   async getRemoteHumanPlayerIds(): Promise<string[]> {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const localId = gc?.getNetworkManager?.().getLocalPlayerId?.();
-      return (gc?.getNetworkManager?.().getAllPlayers?.() ?? [])
-        .filter((p: any) => p.type === 'remote' && p.id !== localId)
-        .map((p: any) => p.id);
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const nm = gc.getNetworkManager();
+      const localId = nm.getLocalPlayerId();
+      return nm
+        .getAllPlayers()
+        .filter((p) => p.type === 'remote' && p.id !== localId)
+        .map((p) => p.id);
     });
   }
 
   /** Network-synced ship position for any player id known to this client. */
   async getNetworkPlayerPosition(playerId: string): Promise<{ x: number; y: number } | null> {
     return await this.page.evaluate((id) => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const local = gc.getCurrPlayer();
       if (local?.id === id) {
         return { x: local.ship.position.x, y: local.ship.position.y };
       }
-      const found = (gc?.getNetworkManager?.().getAllPlayers?.() ?? []).find(
-        (p: any) => p.id === id
-      );
+      const found = gc
+        .getNetworkManager()
+        .getAllPlayers()
+        .find((p) => p.id === id);
       if (!found?.ship) {
         return null;
       }
@@ -1590,9 +1456,8 @@ export class GameInteractions {
     const deadline = Date.now() + durationMs;
     while (Date.now() < deadline) {
       const position = await this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-        const bot = players.find((p: any) => p.id === id);
+        const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
+        const bot = players.find((p) => p.id === id);
         return bot?.ship ? { x: bot.ship.position.x, y: bot.ship.position.y } : null;
       }, botId);
       if (!position) {
@@ -1607,9 +1472,8 @@ export class GameInteractions {
   async waitForBotRespawn(botId: string, timeoutMs = 20000): Promise<{ x: number; y: number }> {
     await this.page.waitForFunction(
       (id) => {
-        const gc = (window as any).gameController;
-        const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-        const bot = players.find((p: any) => p.id === id);
+        const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
+        const bot = players.find((p) => p.id === id);
         return Boolean(
           bot?.ship &&
             bot.ship.health > 0 &&
@@ -1647,7 +1511,11 @@ export class GameInteractions {
     }
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
-      await this.placeShipAt(deathPosition.x, deathPosition.y);
+      // A final boundary death disconnects before another motion acknowledgement
+      // can arrive. Finish fixture placement inside the arena, then cross the
+      // wall through the real client collision path.
+      await this.placeShipAt((deathPosition.x * 3000) / 3150, (deathPosition.y * 3000) / 3150);
+      await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
       // Playwright timeouts do not reliably advance requestAnimationFrame in
       // headless Chromium. Drive enough real collision frames to kill even a
       // ship whose collected mass raised its health above the base 100.
@@ -1683,8 +1551,7 @@ export class GameInteractions {
   async waitForShipAlive(timeoutMs = 25000): Promise<void> {
     await this.page.waitForFunction(
       () => {
-        const gc = (window as any).gameController;
-        const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+        const ship = window.gameController?.getCurrShip();
         return Boolean(ship && ship.health > 0 && !ship.exploding);
       },
       undefined,
@@ -1698,11 +1565,11 @@ export class GameInteractions {
    */
   async fireLaserAtRemotePlayer(targetPlayerId: string): Promise<void> {
     const firingPoint = await this.page.evaluate((targetId) => {
-      const gc = (window as any).gameController;
-      const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      const target = players.find((p: any) => p.id === targetId);
-      const local = gc?.playerManager?.getLocalPlayer?.();
-      const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+      const gc = window.gameController;
+      const players = gc?.getNetworkManager().getAllPlayers() ?? [];
+      const target = players.find((p) => p.id === targetId);
+      const local = gc?.getCurrPlayer();
+      const ship = gc?.getCurrShip();
       if (!target?.ship || !ship) {
         throw new Error('Shooter or target ship unavailable');
       }
@@ -1717,10 +1584,10 @@ export class GameInteractions {
     }, targetPlayerId);
     await this.placeShipAt(firingPoint.x, firingPoint.y);
     await this.page.evaluate((targetId) => {
-      const gc = (window as any).gameController;
-      const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      const target = players.find((p: any) => p.id === targetId);
-      const ship = gc?.playerManager?.getLocalPlayer()?.ship;
+      const gc = window.gameController;
+      const players = gc?.getNetworkManager().getAllPlayers() ?? [];
+      const target = players.find((p) => p.id === targetId);
+      const ship = gc?.getCurrShip();
       if (!target?.ship || !ship) {
         throw new Error('Shooter or target ship unavailable after fixture placement');
       }
@@ -1737,13 +1604,16 @@ export class GameInteractions {
   /** Read a remote player's synced health by id. */
   async getPlayerHealthById(playerId: string): Promise<number> {
     return await this.page.evaluate((id) => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const local = gc.getCurrPlayer();
       if (local?.id === id) {
         return local.ship.health;
       }
-      const players = gc?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      const found = players.find((p: any) => p.id === id);
+      const players = gc.getNetworkManager().getAllPlayers();
+      const found = players.find((p) => p.id === id);
       return found?.ship?.health ?? -1;
     }, playerId);
   }
@@ -1760,9 +1630,12 @@ export class GameInteractions {
     }>
   > {
     return await this.page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const pickups = gc?.getSatellitePickups?.() ?? [];
-      return pickups.map((pickup: any) => ({
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('gameController is not available');
+      }
+      const pickups = gc.getSatellitePickups();
+      return pickups.map((pickup) => ({
         id: pickup.id,
         name: pickup.name,
         x: pickup.position.x,
@@ -1777,8 +1650,8 @@ export class GameInteractions {
   async waitForSatellitePickups(count: number, timeoutMs = 25000): Promise<void> {
     await this.page.waitForFunction(
       (expected) => {
-        const gc = (window as any).gameController;
-        return (gc?.getSatellitePickups?.() ?? []).length >= expected;
+        const gc = window.gameController;
+        return gc ? gc.getSatellitePickups().length >= expected : false;
       },
       count,
       { timeout: timeoutMs }
@@ -1789,8 +1662,7 @@ export class GameInteractions {
     const deadline = Date.now() + durationMs;
     while (Date.now() < deadline) {
       const position = await this.page.evaluate((id) => {
-        const gc = (window as any).gameController;
-        const pickup = (gc?.getSatellitePickups?.() ?? []).find((item: any) => item.id === id);
+        const pickup = window.gameController?.getSatellitePickups().find((item) => item.id === id);
         return pickup ? { x: pickup.position.x, y: pickup.position.y } : null;
       }, pickupId);
       if (!position) {

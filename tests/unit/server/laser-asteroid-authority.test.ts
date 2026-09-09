@@ -1,9 +1,12 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { createServerInstance } from '../../../server/createServer';
+import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 
@@ -172,16 +175,16 @@ describe('Server laser↔asteroid authority', () => {
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     const bots = engine.createBots(1);
     const bot = bots?.[0];
-    expect(bot).toBeDefined();
+    assert.ok(bot);
 
     engine.addAsteroid(mediumAsteroid('roid-bot'));
-    const botHit = engine.applyLaserAsteroidHit('roid-bot', bot!.id);
+    const botHit = engine.applyLaserAsteroidHit('roid-bot', bot.id);
     const playerHit = engine.applyLaserAsteroidHit('roid-bot', 'p1');
 
     expect(botHit.applied).toBe(true);
     expect(botHit.points).toBe(ROID.POINTS_MEDIUM);
     expect(playerHit.applied).toBe(false);
-    expect(engine.getBot(bot!.id)?.score).toBe(ROID.POINTS_MEDIUM);
+    expect(engine.getBot(bot.id)?.score).toBe(ROID.POINTS_MEDIUM);
     expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 });
@@ -228,8 +231,8 @@ describe('Client asteroid reports consume one tracked projectile', () => {
 
   function spawnAtTarget(engine: GameEngine, asteroid: AsteroidData) {
     const shot = engine.spawnHumanLaser('pilot', asteroid.position, { x: 0, y: 0 });
-    expect(shot).toBeDefined();
-    return shot!;
+    assert.ok(shot);
+    return shot;
   }
 
   test('applies exactly one canonical hit regardless of client/server arrival order', () => {
@@ -298,7 +301,7 @@ describe('Client asteroid reports consume one tracked projectile', () => {
   });
 });
 
-describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
+describe('Asteroid destruction over real sockets', () => {
   let server: ReturnType<typeof createServerInstance> | null = null;
   let port = 0;
 
@@ -411,49 +414,131 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
     wsB.close();
   });
 
-  test('server shoot overlapping a medium roid destroys it without a client asteroidDestroyed', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
+  test.each([
+    { size: 'medium', radius: 20, points: ROID.POINTS_MEDIUM, shots: 1 },
+    { size: 'large', radius: 40, points: ROID.POINTS_LARGE, shots: 2 },
+  ])('one pilot shoots a $size ice rock and receives its removal without fragments', async ({
+    radius,
+    points,
+    shots,
+  }) => {
+    server = createServerInstance({ port: 0, nodeEnv: 'test', requireEnhancedClient: true });
+    server.gameEngine.stopGameLoop();
+    server.wsCore.stopPeriodicGameStateBroadcast();
     port = await server.listening;
 
-    const ws = new WebSocket(`ws://localhost:${port}/ws`);
-    await new Promise<void>((resolve, reject) => {
-      ws.once('open', () => resolve());
-      ws.once('error', (err) => reject(err));
-    });
-
-    ws.send(JSON.stringify({ type: 'join', id: 'shooter', name: 'Shooter' }));
-    const medium = mediumAsteroid('shoot-medium', { x: 180, y: 180 });
-    server.gameEngine.addAsteroid(medium);
-
-    const received: unknown[] = [];
+    const received: { type: string; data: unknown }[] = [];
+    const decoder = new SnapshotDecoder();
+    const states: ReturnType<SnapshotDecoder['decode']>[] = [];
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`);
     ws.on('message', (raw) => {
-      try {
-        received.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      const message: unknown = JSON.parse(String(raw));
+      assert.ok(typeof message === 'object' && message !== null);
+      assert.ok('type' in message && typeof message.type === 'string');
+      assert.ok('data' in message);
+      received.push({ type: message.type, data: message.data });
+      if (message.type === 'joined') {
+        decoder.reset();
+      }
+      if (message.type === 'snapshot') {
+        states.push(decoder.decode(message.data));
       }
     });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
+    await once(ws, 'open', { signal: AbortSignal.timeout(2000) });
+    const barrier = async () => {
+      const pong = once(ws, 'pong', { signal: AbortSignal.timeout(2000) });
+      ws.ping();
+      await pong;
+    };
     ws.send(
       JSON.stringify({
-        type: 'shoot',
-        id: 'shooter',
-        laserStart: { x: medium.position.x, y: medium.position.y },
-        laserDirection: { x: 10, y: 0 },
+        type: 'join',
+        data: {
+          id: 'shooter',
+          name: 'Shooter',
+          position: { x: 800, y: 800 },
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+        },
       })
     );
-
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
-    const destroyed = received.some(
-      (msg) =>
-        (msg as { type?: string }).type === 'asteroidDestroy' &&
-        (msg as { data?: { asteroidId?: string } }).data?.asteroidId === medium.id
-    );
-    expect(destroyed).toBe(true);
-
-    ws.close();
+    await barrier();
+    expect(received.filter((message) => message.type === 'joined')).toHaveLength(1);
+    const pilot = server.gameEngine.getPlayer('shooter');
+    assert.ok(pilot);
+    for (const bot of server.gameEngine.getAllBots()) {
+      server.gameEngine.removeBot(bot.id);
+    }
+    // Keep the stopped world's other laser targets far from the shot corridor.
+    for (const { id } of server.gameEngine.getAllSatellites()) {
+      const satellite = server.gameEngine.getSatellite(id);
+      assert.ok(satellite);
+      satellite.position = { x: -2400, y: -2400 };
+    }
+    expect(server.gameEngine.getLoot()).toEqual([]);
+    expect(server.gameEngine.getActiveSatelliteProjectiles()).toEqual([]);
+    const targetPosition = { x: 800 + radius + 30, y: 800 };
+    const target = asteroidAt('solo-ice', radius, { ...targetPosition }, { material: 'ice' });
+    isolateAsteroid(server.gameEngine, target);
+    const untouched = asteroidAt('untouched-ice', 20, { x: 0, y: -900 }, { material: 'ice' });
+    server.gameEngine.addAsteroid(untouched);
+    const scoreBefore = pilot.score;
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    received.length = 0;
+    states.length = 0;
+    try {
+      for (let shot = 0; shot < shots; shot++) {
+        clock.mockReturnValue(now + shot * (ROID.COLLAB_HIT_DEDUPE_MS + 1));
+        ws.send(
+          JSON.stringify({
+            type: 'shoot',
+            id: pilot.id,
+            laserStart: { x: targetPosition.x - radius - 2, y: targetPosition.y },
+            laserDirection: { x: 10, y: 0 },
+          })
+        );
+        await barrier();
+        // Advance only the actual projectile pipeline. The stopped world cannot
+        // supply an NPC hit, pickup score, expiry, or replacement asteroid.
+        const hits = server.gameEngine.advanceLasersAndResolveHits();
+        server.wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
+        await barrier();
+        if (shot + 1 < shots) {
+          expect(server.gameEngine.getAsteroid(target.id)).toBeDefined();
+          expect(pilot.score).toBe(scoreBefore);
+          expect(received.filter((message) => message.type === 'asteroidTagged')).toEqual([
+            {
+              type: 'asteroidTagged',
+              data: {
+                asteroidId: target.id,
+                shooterId: pilot.id,
+                expiresAt: now + ROID.COLLAB_SPLIT_WINDOW_MS,
+              },
+            },
+          ]);
+        }
+      }
+      server.wsCore.getBroadcaster().broadcastGameState();
+      await barrier();
+      expect(server.gameEngine.getServerLasers()).toHaveLength(0);
+      expect(received.filter((message) => message.type === 'asteroidDestroy')).toEqual([
+        {
+          type: 'asteroidDestroy',
+          data: { asteroidId: target.id, collabSplit: false, origin: targetPosition },
+        },
+      ]);
+      expect(received.filter((message) => message.type === 'asteroidCreateBatch')).toEqual([]);
+      expect(received.filter((message) => message.type === 'scoreUpdate')).toEqual([
+        { type: 'scoreUpdate', data: { playerId: pilot.id, score: scoreBefore + points } },
+      ]);
+      expect(server.gameEngine.getAllAsteroids().map((asteroid) => asteroid.id)).toEqual([
+        untouched.id,
+      ]);
+      expect(pilot.score).toBe(scoreBefore + points);
+      expect(states.at(-1)?.asteroids.map((asteroid) => asteroid.id)).toEqual([untouched.id]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

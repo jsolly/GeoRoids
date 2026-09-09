@@ -89,6 +89,18 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 
 - `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → lint → yaml → actionlint → runner/dev process contracts → tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
+### Actions helper exception
+
+`scripts/check-actions.sh` intentionally differs from dotagents'
+`templates/github/check-actions.sh`. GeoRoids downloads official Actionlint
+v1.7.12 and ShellCheck v0.11.0 archives, verifies platform-specific SHA-256
+checksums before extraction, and uses 10-second connect / 120-second total
+download limits. The canonical helper instead obtains Actionlint through the
+`github-actionlint` npm package; GeoRoids no longer depends on that wrapper.
+Preserve this repo-local implementation and its verified archive cache. The
+fleet doctor's comparison warning calls for review, not a byte-for-byte copy.
+Run `npm run check:actions` when changing it.
+
 ## Commands
 
 ```shell

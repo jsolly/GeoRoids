@@ -51,6 +51,12 @@ TypeScript checks the client, server, shared protocol, scripts, tests and build 
 
 Debug switches and log levels live in `src/constants/index.ts`. Client and server diagnostics share structured records with release, player, session and connection context. The [diagnostics guide](docs/diagnostics.md) explains the incident timeline reader, Railway/Vercel searches, state checkpoints, loss counters and game-loop profiling. See `AGENTS.md` for architecture and commands.
 
+Repeatable client, server, snapshot codec and loopback transport measurements use
+the [benchmark framework](benchmarks/README.md). It documents clean committed
+harness requirements, revision isolation, paired comparisons and raw artifacts.
+The framework reports fixture timings, work counts and outcome equality; it does
+not claim a generic optimization or supported capacity.
+
 ## Production
 
 The static client deploys through Vercel's Git integration when a CI-approved PR merges to `main`. The authoritative game server deploys separately on Railway. A client deployment alone does not publish server changes.

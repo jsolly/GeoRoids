@@ -145,8 +145,6 @@ export const VISUAL = {
   LOOT_MIN_SCREEN_PX: 3.25,
   FUEL_BAR_WIDTH: 72,
   FUEL_BAR_HEIGHT: 2,
-  // Title void uses the same 1px #8BA3C7 points; density matches play (~48 / 1080p).
-  TITLE_STARS_PER_1080P: 48,
   MINIMAP_SIZE: 96,
   MINIMAP_DOT: 5,
   MINIMAP_LOCAL_SIZE: 6,
@@ -162,9 +160,22 @@ export const VISUAL = {
   NAME_LABEL_ALPHA: 0.4,
   // Iso-contours: hairline slate, no glow. Index lines are only slightly stronger.
   CONTOUR_STROKE_WIDTH: 1,
-  CONTOUR_ALPHA: 0.16,
-  CONTOUR_INDEX_ALPHA: 0.24,
+  CONTOUR_ALPHA: 0.26,
+  CONTOUR_INDEX_ALPHA: 0.44,
   CONTOUR_INDEX_EVERY: 3,
+  // Static title map: crop, line weights, and sparse elevation labels.
+  TITLE_TERRAIN_GRID_SIZE: 180,
+  TITLE_TERRAIN_VIEW_SPAN: 4200,
+  TITLE_CONTOUR_ALPHA: 0.48,
+  TITLE_CONTOUR_INDEX_ALPHA: 0.85,
+  TITLE_CONTOUR_WIDTH: 0.8,
+  TITLE_CONTOUR_INDEX_WIDTH: 1.4,
+  TITLE_LABEL_FONT: '11px "Courier New", monospace',
+  TITLE_LABEL_ALPHA: 0.75,
+  TITLE_LABEL_MARGIN: 32,
+  TITLE_LABEL_SPACING: 180,
+  TITLE_LABEL_PADDING: 4,
+  TITLE_LABEL_HEIGHT: 14,
   // Cream iso-tangent under each live shot. Terrain answers; shots stay amber on top.
   CONTOUR_LASER_LENGTH: 28,
   CONTOUR_LASER_STROKE_WIDTH: 1.25,

@@ -7,7 +7,7 @@ const dom = new JSDOM(
   `<!DOCTYPE html>
 <html lang="en">
   <body>
-    <canvas id="title-starfield"></canvas>
+    <canvas id="title-terrain"></canvas>
     <div id="gameWrapper">
       <div id="start-screen" class="screen">
         <h1 class="text-center">GeoRoids</h1>

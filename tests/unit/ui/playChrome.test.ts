@@ -13,8 +13,8 @@ afterEach(() => {
   }
 });
 
-test('title shell exposes a canvas starfield and keeps stock credit empty', () => {
-  expect(document.getElementById('title-starfield')?.tagName).toBe('CANVAS');
+test('title shell exposes a terrain canvas and keeps stock credit empty', () => {
+  expect(document.getElementById('title-terrain')?.tagName).toBe('CANVAS');
   expect(document.getElementById('attribution')?.textContent?.trim()).toBe('');
 });
 

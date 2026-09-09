@@ -45,8 +45,11 @@ function addSegment(
  * Marching squares on a regular grid of sampleHeight. Same seed → same lines
  * on every client and the server.
  */
-export function extractIsoContours(field: Heightfield): ContourLevel[] {
-  const n = TERRAIN.GRID_SIZE;
+export function extractIsoContours(
+  field: Heightfield,
+  gridSize: number = TERRAIN.GRID_SIZE
+): ContourLevel[] {
+  const n = gridSize;
   const cell = (2 * field.radius) / n;
   const originX = field.cx - field.radius;
   const originY = field.cy - field.radius;
@@ -73,10 +76,9 @@ export function extractIsoContours(field: Heightfield): ContourLevel[] {
     return [];
   }
 
-  const pad = span * 0.04;
   const levels: ContourLevel[] = [];
   for (let li = 0; li < TERRAIN.LEVELS; li++) {
-    const height = minH + pad + ((span - 2 * pad) * (li + 0.5)) / TERRAIN.LEVELS;
+    const height = minH + (span * (li + 0.5)) / TERRAIN.LEVELS;
     const segments: ContourSegment[] = [];
 
     for (let j = 0; j < n; j++) {

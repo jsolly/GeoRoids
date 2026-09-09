@@ -689,7 +689,8 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
 
   it('accepts an actual grown coasting pilot after downhill force and the raw kit cap', () => {
     const f = fixture();
-    const position = { x: -350, y: 600 };
+    // The central mountain is steepest halfway from summit to rim.
+    const position = { x: getTerrainField().radius / 2, y: 0 };
     const ship = new Ship({ kitId: 'hauler', position: { ...position } });
     f.actor.mass = 8;
     f.actor.position = { ...position };

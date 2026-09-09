@@ -13,12 +13,6 @@ MOCK_DEV_PID_FILE="$TEMP_DIR/mock-dev.pid"
 MOCK_TEST_PID_FILE="$TEMP_DIR/mock-test.pid"
 MOCK_DEV_CHILD_PID_FILE="$TEMP_DIR/mock-dev-child.pid"
 MOCK_TEST_CHILD_PID_FILE="$TEMP_DIR/mock-test-child.pid"
-GIT_COMMON_DIR="$(git -C "$ROOT" rev-parse --git-common-dir)"
-case "$GIT_COMMON_DIR" in
-    /*) ;;
-    *) GIT_COMMON_DIR="$ROOT/$GIT_COMMON_DIR" ;;
-esac
-LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
 
 cleanup() {
     local pid_file
@@ -45,6 +39,25 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+# Exercise the real runner in an owned repository. Contract checks must never
+# acquire, remove, or assert on another checkout's integration-runner lock.
+CONTRACT_ROOT="$TEMP_DIR/repository"
+GIT_LOCAL_ENV_VARS="$(git -C "$ROOT" rev-parse --local-env-vars)"
+while IFS= read -r git_variable; do
+    unset "$git_variable"
+done <<< "$GIT_LOCAL_ENV_VARS"
+mkdir -p "$CONTRACT_ROOT/scripts"
+cp "$ROOT/scripts/process-tree.sh" "$CONTRACT_ROOT/scripts/process-tree.sh"
+cp "$ROOT/.env.example" "$CONTRACT_ROOT/.env.example"
+git -C "$CONTRACT_ROOT" init -q
+cd "$CONTRACT_ROOT"
+CONTRACT_GIT_DIR="$(git rev-parse --git-common-dir)"
+case "$CONTRACT_GIT_DIR" in
+    /*) ;;
+    *) CONTRACT_GIT_DIR="$CONTRACT_ROOT/$CONTRACT_GIT_DIR" ;;
+esac
+LOCK_DIR="$CONTRACT_GIT_DIR/georoids-test-runner.lock"
 
 fail() {
     echo "❌ $*" >&2

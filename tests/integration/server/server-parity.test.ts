@@ -1,235 +1,76 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { WebSocket } from 'ws';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { RecordingSocket } from '../../support/recordingSocket';
 
-describe('Server Message Parity', () => {
-  let wsCore: WebSocketCore;
-  let gameEngine: GameEngine;
+describe('supported gameplay message envelopes', () => {
+  let core: WebSocketCore;
+  let engine: GameEngine;
 
-  beforeAll(() => {
-    gameEngine = new GameEngine();
-    wsCore = new WebSocketCore(gameEngine);
+  beforeEach(() => {
+    engine = new GameEngine(731);
+    core = new WebSocketCore(engine);
+  });
+  afterEach(() => {
+    engine.stopGameLoop();
+    core.stopPeriodicGameStateBroadcast();
   });
 
-  afterAll(() => {
-    // Clean up any timers
-    // Note: cleanupStalePlayers is private, so we can't call it directly
-    // The interval will be cleaned up when the process ends
+  test.each([
+    'nested',
+    'top-level',
+  ] as const)('a %s join receives its identity, moves without forging score, and shares a shot with its peer', (shape) => {
+    const owner = new RecordingSocket();
+    const peer = new RecordingSocket();
+    const identity = { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } };
+    core.handleClientMessage(
+      shape === 'nested' ? { type: 'join', data: identity } : { type: 'join', ...identity },
+      owner
+    );
+    expect(core.getPlayerCount()).toBe(1);
+    expect(owner.lastReceived('joined')?.data).toMatchObject(identity);
+    const pilot = engine.getPlayer(identity.id);
+    assert.ok(pilot);
+    expect(pilot.name).toBe(identity.name);
+
+    core.handleClientMessage(
+      { type: 'update', data: { id: pilot.id, position: { x: 100, y: 200 }, score: 150 } },
+      owner
+    );
+    expect(pilot.position).toEqual({ x: 100, y: 200 });
+    expect(pilot.score).toBe(0);
+
+    core.handleClientMessage(
+      { type: 'join', data: { id: 'peer', name: 'Peer', position: { x: 1000, y: 1000 } } },
+      peer
+    );
+    for (const rock of engine.getAllAsteroids()) {
+      engine.removeAsteroid(rock.id);
+    }
+    owner.clear();
+    peer.clear();
+    const shot = { laserStart: { x: 110, y: 200 }, laserDirection: { x: 1, y: 0 } };
+    core.handleClientMessage({ type: 'shoot', id: pilot.id, data: shot }, owner);
+
+    const [trackedShot] = engine.getPlayerProjectiles();
+    assert.ok(trackedShot);
+    expect(owner.received('playerShoot')).toEqual([]);
+    expect(peer.received('playerShoot')).toEqual([
+      {
+        type: 'playerShoot',
+        data: { id: pilot.id, shotId: trackedShot.id, ...shot },
+        timestamp: expect.any(Number),
+      },
+    ]);
   });
 
-  it('should handle join messages with nested data payloads', () => {
-    const sentMessages: string[] = [];
-    const mockWs = {
-      readyState: WebSocket.OPEN,
-      send: (data: string) => {
-        sentMessages.push(data);
-      },
-    } as unknown as WebSocket;
-
-    const joinMessage = {
-      type: 'join',
-      data: {
-        id: 'test-id',
-        name: 'test-name',
-        position: { x: 0, y: 0 },
-      },
-    };
-
-    wsCore.handleClientMessage(joinMessage, mockWs);
-
-    // Verify player was added
-    expect(wsCore.getPlayerCount()).toBe(1);
-    const player = gameEngine.getPlayer('test-id');
-    expect(player).toBeDefined();
-    expect(player?.name).toBe('test-name');
-
-    // Check that we got the joined message and game state
-    expect(sentMessages.length).toBeGreaterThan(0);
-    const joinedMessage = sentMessages.find((msg) => {
-      const parsed = JSON.parse(msg);
-      return parsed.type === 'joined';
-    });
-    expect(joinedMessage).toBeDefined();
-    expect(joinedMessage).toBeTruthy();
-
-    const parsedJoined = JSON.parse(joinedMessage as string);
-    expect(parsedJoined.data.id).toBe('test-id');
-    expect(parsedJoined.data.name).toBe('test-name');
-    expect(parsedJoined.data.position).toBeDefined();
-  });
-
-  it('should handle update messages with nested data payloads', () => {
-    const mockWs = {
-      readyState: WebSocket.OPEN,
-      send: (_data: string) => {
-        // This would be called for broadcasts, but we're not testing that here
-      },
-    } as unknown as WebSocket;
-
-    // First add a player
-    const joinMessage = {
-      type: 'join',
-      data: {
-        id: 'update-test-id',
-        name: 'update-test-name',
-        position: { x: 0, y: 0 },
-      },
-    };
-    wsCore.handleClientMessage(joinMessage, mockWs);
-
-    // Then update the player. Position is client-owned; score/lives/health are
-    // server-authoritative and intentionally ignored from client updates.
-    const updateMessage = {
-      type: 'update',
-      data: {
-        id: 'update-test-id',
-        position: { x: 100, y: 200 },
-        score: 150,
-      },
-    };
-
-    wsCore.handleClientMessage(updateMessage, mockWs);
-
-    // The nested-data update was applied to the client-owned position...
-    const player = gameEngine.getPlayer('update-test-id');
-    expect(player).toBeDefined();
-    expect(player?.position).toEqual({ x: 100, y: 200 });
-    // ...but the client-sent score was ignored (server-authoritative).
-    expect(player?.score).toBe(0);
-  });
-
-  it('should handle top-level id/name fields for backward compatibility', () => {
-    const sentMessages: string[] = [];
-    const mockWs = {
-      readyState: WebSocket.OPEN,
-      send: (data: string) => {
-        sentMessages.push(data);
-      },
-    } as unknown as WebSocket;
-
-    const joinMessage = {
-      type: 'join',
-      id: 'top-level-id',
-      name: 'top-level-name',
-      position: { x: 0, y: 0 },
-    };
-
-    wsCore.handleClientMessage(joinMessage, mockWs);
-
-    // Verify player was added
-    const player = gameEngine.getPlayer('top-level-id');
-    expect(player).toBeDefined();
-    expect(player?.name).toBe('top-level-name');
-
-    // Check that we got the joined message
-    expect(sentMessages.length).toBeGreaterThan(0);
-    const joinedMessage = sentMessages.find((msg) => {
-      const parsed = JSON.parse(msg);
-      return parsed.type === 'joined';
-    });
-    expect(joinedMessage).toBeDefined();
-    expect(joinedMessage).toBeTruthy();
-
-    const parsedJoined = JSON.parse(joinedMessage as string);
-    expect(parsedJoined.data.id).toBe('top-level-id');
-    expect(parsedJoined.data.name).toBe('top-level-name');
-  });
-
-  it('should send standardized error messages', () => {
-    const sentMessages: string[] = [];
-    const mockWs = {
-      readyState: WebSocket.OPEN,
-      send: (data: string) => {
-        sentMessages.push(data);
-      },
-    } as unknown as WebSocket;
-
-    // Send invalid message (missing id)
-    const invalidMessage = {
-      type: 'update',
-      data: {
-        position: { x: 0, y: 0 },
-      },
-    };
-
-    wsCore.handleClientMessage(invalidMessage, mockWs);
-
-    // Verify error was sent
-    expect(sentMessages).toHaveLength(1);
-    const rawMessage = sentMessages[0];
-    expect(rawMessage).toBeDefined();
-    const errorMessage = JSON.parse(rawMessage!);
-    expect(errorMessage.type).toBe('error');
-    expect(errorMessage.data).toBe('Missing player ID');
-    expect(errorMessage.timestamp).toBeDefined();
-  });
-
-  it('should handle shoot messages', () => {
-    const sentMessages: string[] = [];
-    const mockWs = {
-      readyState: WebSocket.OPEN,
-      send: (data: string) => {
-        sentMessages.push(data);
-      },
-    } as unknown as WebSocket;
-
-    // Add the shooter player
-    const joinMessage = {
-      type: 'join',
-      data: {
-        id: 'shoot-test-id',
-        name: 'shoot-test-name',
-        position: { x: 0, y: 0 },
-      },
-    };
-    wsCore.handleClientMessage(joinMessage, mockWs);
-
-    // Add another player to receive the broadcast
-    const otherPlayerWs = {
-      readyState: WebSocket.OPEN,
-      send: (data: string) => {
-        sentMessages.push(data);
-      },
-    } as unknown as WebSocket;
-
-    const otherJoinMessage = {
-      type: 'join',
-      data: {
-        id: 'other-test-id',
-        name: 'other-test-name',
-        position: { x: 100, y: 100 },
-      },
-    };
-    wsCore.handleClientMessage(otherJoinMessage, otherPlayerWs);
-
-    // Clear previous messages
-    sentMessages.length = 0;
-
-    // Then send a shoot message
-    const shootMessage = {
-      type: 'shoot',
-      id: 'shoot-test-id',
-      data: {
-        laserStart: { x: 10, y: 20 },
-        laserDirection: { x: 1, y: 0 },
-      },
-      timestamp: Date.now(),
-    };
-
-    wsCore.handleClientMessage(shootMessage, mockWs);
-
-    // A muzzle can also hit a live asteroid immediately. Verify the shoot
-    // event exactly once without mistaking authoritative hit events for duplicates.
-    const shots = sentMessages
-      .map((message) => JSON.parse(message))
-      .filter((message) => message.type === 'playerShoot');
-    expect(shots).toHaveLength(1);
-    const broadcastMessage = shots[0]!;
-    expect(broadcastMessage.type).toBe('playerShoot');
-    expect(broadcastMessage.data.id).toBe('shoot-test-id');
-    expect(broadcastMessage.data.laserStart).toEqual({ x: 10, y: 20 });
-    expect(broadcastMessage.data.laserDirection).toEqual({ x: 1, y: 0 });
-    expect(broadcastMessage.timestamp).toBeDefined();
+  test('an update without a player identity receives a timestamped error and changes no player', () => {
+    const socket = new RecordingSocket();
+    core.handleClientMessage({ type: 'update', data: { position: { x: 0, y: 0 } } }, socket);
+    expect(socket.inbox).toEqual([
+      { type: 'error', data: 'Missing player ID', timestamp: expect.any(Number) },
+    ]);
+    expect(core.getPlayerCount()).toBe(0);
   });
 });

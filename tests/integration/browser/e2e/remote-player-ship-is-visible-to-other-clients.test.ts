@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { bootTwoClientGames } from '../../utils/multi-client-setup';
@@ -15,7 +16,8 @@ test(
       remoteIdsOnClient1.length,
       'client 1 should see client 2 as a remote human'
     ).toBeGreaterThan(0);
-    const targetId = remoteIdsOnClient1[0]!;
+    const targetId = remoteIdsOnClient1[0];
+    assert.ok(targetId, 'Remote pilot missing');
 
     const startPosOnClient1 = await game1.getNetworkPlayerPosition(targetId);
     expect(

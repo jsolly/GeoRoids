@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -45,7 +46,8 @@ describe('mineral asteroids break with distinct rewards', () => {
       applyAsteroidKinematics(local, rock);
       expect(local.material).toBe(rock.material);
       expect(local.maxHealth).toBe(rock.maxHealth);
-      expect(rock.vertices).toBe(MATERIAL_OUTLINES[rock.material!].length);
+      assert.ok(rock.material);
+      expect(rock.vertices).toBe(MATERIAL_OUTLINES[rock.material].length);
       expect(rock.offsets.every(Number.isFinite)).toBe(true);
     }
   });

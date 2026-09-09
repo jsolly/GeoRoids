@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
@@ -18,7 +19,8 @@ test(
     await game.waitForCombatReady();
     await game.waitForSatellites(1);
 
-    const satellite = (await game.getSatellites())[0]!;
+    const satellite = (await game.getSatellites())[0];
+    assert.ok(satellite, 'Satellite collision target missing');
     const startHealth = await game.getShipHealth();
 
     await game.pinShipOnSatellite(satellite.id, 3000);

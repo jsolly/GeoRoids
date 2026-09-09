@@ -147,7 +147,7 @@ Debug behavior is **constants, not env vars**. To enable debug mode, edit `src/c
 1. `LOGGING.GLOBAL_LOG_LEVEL = 'debug'`
 2. `DEBUG.ENABLED = true`
 
-Notable flags under `DEBUG.*`: `LOCAL_PLAYER.INVINCIBLE`, `BOT_PLAYER.{COUNT,MOVEMENT,LASERS,SPAWN_PROTECTION}`, `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_BOT}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
+Notable flags under `DEBUG.*`: `BOT_PLAYER.{COUNT,MOVEMENT,LASERS,SPAWN_PROTECTION}`, `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_BOT}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
 
 - `logs/client.log` — client-side (forwarded over WS)
 - `logs/server.log` — server-side

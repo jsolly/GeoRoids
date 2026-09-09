@@ -22,36 +22,47 @@ test(
     await game.waitForBots(2);
 
     const fixture = await page.evaluate(() => {
-      const gc = (window as any).gameController;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller unavailable');
+      }
       const state = gc?.getAsteroidToolsController?.()?.getState?.();
-      const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
+      const ship = gc?.getCurrPlayer()?.ship;
       const rocks = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
-      const rocksById = new Map(rocks.map((rock: any) => [rock.id, rock]));
+      const rocksById = new Map(rocks.map((rock) => [rock.id, rock]));
       const bots = (gc?.getNetworkManager?.().getAllPlayers?.() ?? [])
-        .filter((player: any) => player.type === 'bot' && player.ship?.health > 0)
-        .map((player: any) => player.ship.position);
+        .filter((player) => player.type === 'bot' && player.ship?.health > 0)
+        .map((player) => player.ship.position);
       const targets = (state?.targets ?? []).filter(
-        (target: any) => target.phenomenon?.kind === 'reflective' && target.phenomenon.clusterId
+        (target) => target.phenomenon?.kind === 'reflective' && target.phenomenon.clusterId
       );
-      const groups = new Map<string, any[]>();
+      const groups = new Map<string, typeof targets>();
       for (const target of targets) {
-        const group = groups.get(target.phenomenon.clusterId) ?? [];
+        const clusterId = target.phenomenon?.clusterId;
+        if (!clusterId) {
+          continue;
+        }
+        const group = groups.get(clusterId) ?? [];
         group.push(target);
-        groups.set(target.phenomenon.clusterId, group);
+        groups.set(clusterId, group);
       }
       if (!ship || bots.length < 2) {
         throw new Error('Enhanced field did not expose the live Hauler and both hostile bots');
       }
 
-      const pairs: Array<{ primary: any; payload: any; threatClearance: number }> = [];
+      const pairs: Array<{
+        primary: (typeof rocks)[number];
+        payload: (typeof rocks)[number];
+        threatClearance: number;
+      }> = [];
       for (const group of groups.values()) {
         for (const primaryTarget of group) {
           for (const payloadTarget of group) {
             if (primaryTarget.id === payloadTarget.id) {
               continue;
             }
-            const primary = rocksById.get(primaryTarget.id) as any;
-            const payload = rocksById.get(payloadTarget.id) as any;
+            const primary = rocksById.get(primaryTarget.id);
+            const payload = rocksById.get(payloadTarget.id);
             if (
               !primary ||
               !payload ||
@@ -68,7 +79,7 @@ test(
               continue;
             }
             const threatClearance = Math.min(
-              ...bots.flatMap((position: any) => [
+              ...bots.flatMap((position) => [
                 Math.hypot(primary.position.x - position.x, primary.position.y - position.y),
                 Math.hypot(payload.position.x - position.x, payload.position.y - position.y),
               ])
@@ -120,7 +131,7 @@ test(
     await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="latch"]').tap();
     await page.waitForFunction(
       (id) => {
-        const motion = (window as any).gameController?.getAsteroidToolsController?.()?.getState?.()
+        const motion = window.gameController?.getAsteroidToolsController?.()?.getState?.()
           ?.pilot?.asteroidMotion;
         return motion?.mode === 'latched' && motion.asteroidId === id;
       },
@@ -129,12 +140,18 @@ test(
     );
 
     const latched = await page.evaluate((id) => {
-      const gc = (window as any).gameController;
-      const ship = gc.playerManager.getLocalPlayer().ship;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller unavailable');
+      }
+      const ship = gc.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Local ship unavailable');
+      }
       const rock = gc
         .getCurrRoidBelt()
         .getRoids()
-        .find((candidate: any) => candidate.id === id);
+        .find((candidate) => candidate.id === id);
       if (!rock) {
         throw new Error('Primary asteroid disappeared after latch');
       }
@@ -146,11 +163,15 @@ test(
       const radius = Math.hypot(offset.x, offset.y) || 1;
       const tangent = Math.abs((-offset.y * relative.x + offset.x * relative.y) / radius);
       const radial = Math.abs((offset.x * relative.x + offset.y * relative.y) / radius);
+      const motion = gc.getAsteroidToolsController().getState().pilot?.asteroidMotion;
+      if (!motion) {
+        throw new Error('Pilot motion unavailable after latch');
+      }
       return {
         tangent,
         radial,
-        mode: gc.getAsteroidToolsController().getState().pilot.asteroidMotion.mode,
-        tetherMode: gc.getAsteroidToolsController().getState().pilot.asteroidMotion.tetherMode,
+        mode: motion.mode,
+        tetherMode: motion.tetherMode,
         primary: rock.position,
         ship: ship.position,
       };
@@ -165,7 +186,7 @@ test(
     await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="anchor"]').tap();
     await page.waitForFunction(
       (id) => {
-        const motion = (window as any).gameController?.getAsteroidToolsController?.()?.getState?.()
+        const motion = window.gameController?.getAsteroidToolsController?.()?.getState?.()
           ?.pilot?.asteroidMotion;
         return motion?.mode === 'latched' && motion.payloadId === id;
       },
@@ -178,8 +199,8 @@ test(
     await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="brake"]').tap();
     await page.waitForFunction(
       () =>
-        (window as any).gameController?.getAsteroidToolsController?.()?.getState?.()?.pilot
-          ?.asteroidMotion?.tetherMode === 'brake',
+        window.gameController?.getAsteroidToolsController?.()?.getState?.()?.pilot?.asteroidMotion
+          ?.tetherMode === 'brake',
       undefined,
       { timeout: 15_000, polling: 100 }
     );
@@ -187,15 +208,18 @@ test(
     await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="spin"]').tap();
     await page.waitForFunction(
       () =>
-        (window as any).gameController?.getAsteroidToolsController?.()?.getState?.()?.pilot
-          ?.asteroidMotion?.tetherMode === 'spin',
+        window.gameController?.getAsteroidToolsController?.()?.getState?.()?.pilot?.asteroidMotion
+          ?.tetherMode === 'spin',
       undefined,
       { timeout: 15_000, polling: 100 }
     );
 
     const fuelBeforeSpin = await page.evaluate(() => {
-      const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
-      return ship?.fuel ?? -1;
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Local ship unavailable');
+      }
+      return ship.fuel;
     });
     await page.keyboard.down('KeyW');
     let powered:
@@ -208,12 +232,18 @@ test(
     try {
       while (Date.now() < powerDeadline) {
         const sample = await page.evaluate((id) => {
-          const gc = (window as any).gameController;
-          const ship = gc.playerManager.getLocalPlayer().ship;
+          const gc = window.gameController;
+          if (!gc) {
+            throw new Error('Game controller unavailable');
+          }
+          const ship = gc.getCurrPlayer()?.ship;
+          if (!ship) {
+            throw new Error('Local ship unavailable');
+          }
           const rock = gc
             .getCurrRoidBelt()
             .getRoids()
-            .find((candidate: any) => candidate.id === id);
+            .find((candidate) => candidate.id === id);
           if (!rock) {
             return null;
           }
@@ -249,7 +279,7 @@ test(
     } finally {
       await page.keyboard.up('KeyW');
       await page.evaluate(() => {
-        const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+        const ship = window.gameController?.getCurrPlayer()?.ship;
         if (ship) {
           ship.thrusting = false;
         }
@@ -265,26 +295,27 @@ test(
 
     const attached = await page.evaluate(
       ({ primaryId, payloadId }) => {
-        const gc = (window as any).gameController;
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('Game controller unavailable');
+        }
         const roids = gc.getCurrRoidBelt().getRoids();
-        const primary = roids.find((candidate: any) => candidate.id === primaryId);
-        const payload = roids.find((candidate: any) => candidate.id === payloadId);
-        const state = gc.getAsteroidToolsController().getState().pilot.asteroidMotion;
+        const primary = roids.find((candidate) => candidate.id === primaryId);
+        const payload = roids.find((candidate) => candidate.id === payloadId);
+        const state = gc.getAsteroidToolsController().getState().pilot?.asteroidMotion;
+        const ship = gc.getCurrPlayer()?.ship;
+        if (!state || !ship || !primary || !payload) {
+          throw new Error('Attached asteroid fixture unavailable');
+        }
         return {
           mode: state.mode,
           payloadId: state.payloadId,
           payloadPosition: { ...payload.position },
-          distance:
-            primary && payload
-              ? Math.hypot(
-                  payload.position.x - primary.position.x,
-                  payload.position.y - primary.position.y
-                )
-              : -1,
-          velocity: Math.hypot(
-            gc.playerManager.getLocalPlayer().ship.velocity.x,
-            gc.playerManager.getLocalPlayer().ship.velocity.y
+          distance: Math.hypot(
+            payload.position.x - primary.position.x,
+            payload.position.y - primary.position.y
           ),
+          velocity: Math.hypot(ship.velocity.x, ship.velocity.y),
         };
       },
       { primaryId: fixture.primary.id, payloadId: fixture.payload.id }
@@ -297,7 +328,7 @@ test(
     await page.locator('#asteroid-tools-overlay [data-asteroid-tools-motion="release"]').tap();
     await page.waitForFunction(
       () => {
-        const motion = (window as any).gameController?.getAsteroidToolsController?.()?.getState?.()
+        const motion = window.gameController?.getAsteroidToolsController?.()?.getState?.()
           ?.pilot?.asteroidMotion;
         return motion && motion.mode !== 'latched' && !motion.asteroidId && !motion.payloadId;
       },
@@ -305,9 +336,18 @@ test(
       { timeout: 5000, polling: 10 }
     );
     const released = await page.evaluate(() => {
-      const gc = (window as any).gameController;
-      const motion = gc.getAsteroidToolsController().getState().pilot.asteroidMotion;
-      const ship = gc.playerManager.getLocalPlayer().ship;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller unavailable');
+      }
+      const motion = gc.getAsteroidToolsController().getState().pilot?.asteroidMotion;
+      if (!motion) {
+        throw new Error('Pilot motion unavailable');
+      }
+      const ship = gc.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Local ship unavailable');
+      }
       return {
         mode: motion.mode,
         payloadId: motion.payloadId,
@@ -319,9 +359,18 @@ test(
     expect(released.speed).toBeLessThanOrEqual(18.1);
     await page.waitForFunction(
       () => {
-        const gc = (window as any).gameController;
-        const motion = gc.getAsteroidToolsController().getState().pilot.asteroidMotion;
-        const ship = gc.playerManager.getLocalPlayer().ship;
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('Game controller unavailable');
+        }
+        const motion = gc.getAsteroidToolsController().getState().pilot?.asteroidMotion;
+        if (!motion) {
+          throw new Error('Pilot motion unavailable');
+        }
+        const ship = gc.getCurrPlayer()?.ship;
+        if (!ship) {
+          throw new Error('Local ship unavailable');
+        }
         return (
           motion.mode === 'free' &&
           !ship.serverOwnsMotion &&
@@ -333,10 +382,10 @@ test(
     );
     await page.waitForFunction(
       ({ id, origin }) => {
-        const rock = (window as any).gameController
+        const rock = window.gameController
           ?.getCurrRoidBelt?.()
           ?.getRoids?.()
-          ?.find((item: any) => item.id === id);
+          ?.find((item) => item.id === id);
         return rock && Math.hypot(rock.position.x - origin.x, rock.position.y - origin.y) > 0.5;
       },
       { id: fixture.payload.id, origin: attached.payloadPosition },
@@ -344,10 +393,14 @@ test(
     );
 
     const movingPayload = await page.evaluate((id) => {
-      const rock = (window as any).gameController
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller unavailable');
+      }
+      const rock = gc
         .getCurrRoidBelt()
         .getRoids()
-        .find((item: any) => item.id === id);
+        .find((item) => item.id === id);
       if (!rock) {
         throw new Error('Released payload disappeared');
       }

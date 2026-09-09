@@ -19,7 +19,7 @@
       "scripts/*.ts",
       "setup/**/*.{ts,tsx,json}",
       "{package.json,tsconfig*.json,biome.jsonc,vitest*.config.ts,vite.config.ts,*.md}",
-      "!tests/integration/browser/screenshots/**",
+      "!tests/integration/browser/screenshots",
       "!**/node_modules/**/*"
     ]
   },
@@ -28,13 +28,16 @@
     "rules": {
       "recommended": true,
       "complexity": {
+        "noStaticOnlyClass": "error",
+        "useOptionalChain": "error",
         // TypeScript requires bracket access for index signatures.
         "useLiteralKeys": "off"
       },
       "correctness": {
-        "noUnusedVariables": "warn"
+        "noUnusedVariables": "error"
       },
       "suspicious": {
+        "useBiomeIgnoreFolder": "error",
         "noExplicitAny": "error",
         "noConsole": {
           "level": "error",
@@ -44,6 +47,9 @@
         }
       },
       "style": {
+        "noNonNullAssertion": "error",
+        "useNodejsImportProtocol": "error",
+        "useTemplate": "error",
         "useConst": "error",
         "useBlockStatements": "error"
       }
@@ -55,7 +61,6 @@
       "linter": {
         "rules": {
           "suspicious": {
-            "noExplicitAny": "warn",
             "noConsole": {
               "level": "error",
               "options": { "allow": ["log", "debug", "info", "warn", "error"] }

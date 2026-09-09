@@ -66,8 +66,8 @@ async function readLocalTouchState(page: Page): Promise<{
   shieldFlashTime: number;
 }> {
   return page.evaluate(() => {
-    const gc = (window as { gameController?: any }).gameController;
-    const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
+    const gc = window.gameController;
+    const ship = gc?.getCurrPlayer()?.ship;
     if (!ship) {
       throw new Error('Local ship unavailable');
     }
@@ -221,8 +221,8 @@ test.each(KITS)(
     // Drive the real lifecycle path while both touch sources are held. The
     // next game tick must release every source and mark both actions dead.
     await page.evaluate(() => {
-      const gc = (window as { gameController?: any }).gameController;
-      const player = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      const player = gc?.getCurrPlayer();
       if (!gc || !player) {
         throw new Error('Game controller or local player unavailable');
       }
@@ -308,9 +308,7 @@ test(
     expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
 
     await page.evaluate(() => {
-      const ship = (
-        window as { gameController?: any }
-      ).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+      const ship = window.gameController?.getCurrPlayer()?.ship;
       if (!ship) {
         throw new Error('Local ship unavailable');
       }

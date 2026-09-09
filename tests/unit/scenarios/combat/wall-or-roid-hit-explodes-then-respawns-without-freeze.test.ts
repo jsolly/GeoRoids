@@ -1,5 +1,6 @@
+import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { GAME, SHIP } from '../../../../src/constants';
+import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
 import {
   EXPLOSION_FRAMES,
   GameServerWorld,
@@ -45,7 +46,8 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
   });
 
   test('asteroid: same instant-kill path and no multi-second corpse wait', () => {
-    world.hitAsteroid(ace, 100);
+    world.entity(ace).health = DAMAGE.LASER_HIT;
+    world.hitAsteroid(ace);
 
     expect(world.entity(ace).health).toBe(0);
     expect(world.entity(ace).exploding).toBe(true);
@@ -61,19 +63,16 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
   });
 
   test('player and bot ships share the same respawn schedule', () => {
-    let bot = world.engine.getAllBots()[0];
-    if (!bot) {
-      bot = world.engine.entityManager.createBots(1)[0];
-    }
-    expect(bot).toBeDefined();
-    world.engine.entityManager.updateEntity(bot!.id, { spawnProtectionTimer: 0 });
+    const bot = world.engine.createBots(1)?.[0];
+    assert.ok(bot, 'Expected the newly created bot');
+    world.engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
 
-    world.engine.handleBotDamage(bot!.id, 'asteroid', bot!.health);
-    expect(world.ship(bot!.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
+    world.engine.handleBotDamage(bot.id, 'asteroid', bot.health);
+    expect(world.ship(bot.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
 
     world.tick(EXPLOSION_FRAMES);
 
-    const respawned = world.ship(bot!.id);
+    const respawned = world.ship(bot.id);
     expect(respawned.health).toBe(respawned.maxHealth);
     expect(respawned.respawnTimer).toBeUndefined();
     expect(respawned.spawnProtectionTimer).toBeGreaterThan(0);

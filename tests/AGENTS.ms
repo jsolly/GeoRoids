@@ -90,6 +90,10 @@ and outcome. A hand-authored log envelope cannot prove that the runtime logger
 retains player IDs or event-time values. Control clocks and mutate the source
 after logging when proving that recorded state is a detached observation.
 
+Shared transport fixtures used across test levels live in `tests/support/`.
+`RecordingSocket` models an in-process transport boundary; `WireClient` owns a
+real loopback connection and its bounded lifecycle. Keep their use explicit.
+
 ## Consolidate instead of accumulating
 
 Before adding a test, find the canonical scenario for the same feature. Extend
@@ -117,4 +121,6 @@ they share logging or other process resources.
 A failed reset, fixture operation, evidence read, or cleanup must fail the run.
 Report the commands and results actually run, including any skipped or removed
 tests. Screenshots are diagnostics, not a success criterion. The repository's
-full pre-push gate remains `npm run gate`.
+full pre-push gate remains `npm run gate`. All lint findings are errors, and
+the CLI also rejects warnings. Fix the code or simplify the scenario; do not
+add suppressions, downgrade rules, or weaken an assertion to pass the gate.

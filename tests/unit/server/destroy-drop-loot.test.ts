@@ -1,3 +1,4 @@
+import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { WebSocket } from 'ws';
 
@@ -75,10 +76,10 @@ describe('destroy-drop shards on the #458 loot path', () => {
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
-    expect(shard).toBeDefined();
+    assert.ok(shard, 'shard loot');
 
     const healthBefore = bystander.health;
-    const blast = engine.handleLootExplode(shooter.id, shard!.id);
+    const blast = engine.handleLootExplode(shooter.id, shard.id);
 
     expect(blast.success).toBe(true);
     expect(engine.getLoot()).toHaveLength(0);
@@ -133,8 +134,8 @@ describe('destroy-drop shards on the #458 loot path', () => {
 
     engine.handleAsteroidHit('seed-roid', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
-    expect(shard).toBeDefined();
-    const blast = engine.handleLootExplode(shooter.id, shard!.id);
+    assert.ok(shard, 'shard loot');
+    const blast = engine.handleLootExplode(shooter.id, shard.id);
 
     expect(blast.success).toBe(true);
     expect(blast.pushedAsteroidIds).toContain('small-1');

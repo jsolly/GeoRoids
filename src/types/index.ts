@@ -151,7 +151,6 @@ export interface RoidBelt {
   readonly spawnTimer: number;
 
   addRoid(): void;
-  destroyRoid(index: number): { score: number; newRoids: Roid[] };
   moveRoids(tickScale?: number): void;
   spawnRoids(): void;
   getRoids(): readonly Roid[];

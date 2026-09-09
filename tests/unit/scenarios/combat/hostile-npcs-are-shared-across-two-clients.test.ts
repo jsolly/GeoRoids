@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { SATELLITE } from '../../../../src/constants';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
@@ -40,16 +41,16 @@ describe('Hostile NPCs are shared across two clients', () => {
 
   test('one pilot destroying an NPC updates score, loot, and the other client', () => {
     const target = latestSatellites(alice)[0];
-    expect(target).toBeDefined();
+    assert.ok(target);
 
-    world.shootSatellite(alice, target!.id, SATELLITE.HEALTH);
+    world.shootSatellite(alice, target.id, SATELLITE.HEALTH);
     world.broadcastGameState();
 
     expect(world.entity(alice).score).toBe(SATELLITE.POINTS);
     expect(world.engine.getLoot().length).toBeGreaterThan(0);
 
-    const aliceAfter = latestSatellites(alice).find((sat) => sat.id === target!.id);
-    const bobAfter = latestSatellites(bob).find((sat) => sat.id === target!.id);
+    const aliceAfter = latestSatellites(alice).find((sat) => sat.id === target.id);
+    const bobAfter = latestSatellites(bob).find((sat) => sat.id === target.id);
     expect(aliceAfter?.health).toBe(0);
     expect(bobAfter?.health).toBe(0);
   });

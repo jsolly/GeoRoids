@@ -1,218 +1,26 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
-import WebSocket from 'ws';
+import { strict as assert } from 'node:assert';
+import { describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { createServerInstance } from '../../../server/createServer';
-import { ROID, SHOCKWAVE } from '../../../src/constants';
+import { SHOCKWAVE } from '../../../src/constants';
 import { framesToMs } from '../../../src/physics/shockwave';
 
-async function openSocket(port: number): Promise<WebSocket> {
-  const ws = new WebSocket(`ws://localhost:${port}/ws`);
-  await new Promise<void>((resolve, reject) => {
-    ws.once('open', () => resolve());
-    ws.once('error', (err) => reject(err));
-  });
-  return ws;
-}
-
-function waitForOneShotLargeId(ws: WebSocket): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error('Timed out waiting for asteroid creation')),
-      5000
-    );
-    ws.on('message', (raw) => {
-      try {
-        const msg = JSON.parse(String(raw));
-        if (msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length > 0) {
-          const rocks = msg.data.asteroids as Array<{
-            id: string;
-            size?: number;
-            isCollabTarget?: boolean;
-            material?: string;
-          }>;
-          const fallback = rocks[0];
-          const oneShot = rocks.find(
-            (rock) =>
-              !rock.isCollabTarget &&
-              rock.material === 'ice' &&
-              (rock.size ?? 0) >= ROID.COLLAB_SPLIT_MIN_SIZE
-          );
-          const target = oneShot ?? fallback;
-          if (!target) {
-            return;
-          }
-          clearTimeout(timeout);
-          resolve(target.id);
-        } else if (msg?.type === 'asteroidCreate' && msg?.data?.asteroid?.id) {
-          clearTimeout(timeout);
-          resolve(msg.data.asteroid.id);
-        }
-      } catch {
-        // ignore non-JSON frames
-      }
-    });
-  });
-}
-
-function asteroidPosition(
-  server: ReturnType<typeof createServerInstance>,
-  asteroidId: string
-): { x: number; y: number } {
-  const asteroid = server.gameEngine.getAsteroid(asteroidId);
-  if (!asteroid) {
-    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
-  }
-  return { ...asteroid.position };
-}
-
-function sendTrackedAsteroidReport(
-  server: ReturnType<typeof createServerInstance>,
-  ws: WebSocket,
-  playerId: string,
-  asteroidId: string
-): void {
-  const asteroid = server.gameEngine.getAsteroid(asteroidId);
-  if (!asteroid) {
-    throw new Error(`Asteroid ${asteroidId} is no longer on the server`);
-  }
-  const laserPosition = { ...asteroid.position };
-  const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
-  if (!shot) {
-    throw new Error(`Could not seed tracked laser for ${playerId}`);
-  }
-  server.wsCore.handleClientMessage(
-    {
-      type: 'asteroidDestroyed',
-      data: {
-        asteroidId,
-        playerId,
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition,
-      },
-    },
-    ws
-  );
-}
-
-describe('Scenario: collab split fires a double shockwave', () => {
-  let server: ReturnType<typeof createServerInstance> | null = null;
-  let engine: GameEngine | undefined;
-
-  afterEach(async () => {
-    if (server) {
-      await server.close();
-    }
-    server = null;
-    engine?.stopGameLoop();
-    engine = undefined;
-  });
-
-  test('two players splitting a big roid broadcast a shockwave at the break', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
-    const port = await server.listening;
-
-    const playerA = await openSocket(port);
-    const playerB = await openSocket(port);
-
-    playerA.send(JSON.stringify({ type: 'join', id: 'player-a', name: 'Alpha' }));
-    playerB.send(JSON.stringify({ type: 'join', id: 'player-b', name: 'Bravo' }));
-
-    const asteroidCreated = waitForOneShotLargeId(playerA);
-    playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'player-a', asteroidCount: 2 }));
-    const asteroidId = await asteroidCreated;
-    asteroidPosition(server, asteroidId);
-
-    const messages: Array<{
-      type?: string;
-      data?: { asteroidId?: string; origin?: { x: number; y: number } };
-    }> = [];
-    playerA.on('message', (raw) => {
-      try {
-        messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    });
-
-    sendTrackedAsteroidReport(server, playerA, 'player-a', asteroidId);
-    sendTrackedAsteroidReport(server, playerB, 'player-b', asteroidId);
-
-    await expect
-      .poll(
-        () => {
-          const shock = messages.find((msg) => msg?.type === 'shockwave' && msg.data?.origin);
-          return Boolean(shock?.data?.origin && shock.data.asteroidId === asteroidId);
-        },
-        { timeout: 3000, interval: 25 }
-      )
-      .toBe(true);
-
-    playerA.close();
-    playerB.close();
-  });
-
-  test('solo finish does not broadcast a shockwave', async () => {
-    server = createServerInstance({ port: 0, nodeEnv: 'test' });
-    const port = await server.listening;
-
-    const playerA = await openSocket(port);
-    playerA.send(JSON.stringify({ type: 'join', id: 'solo-player', name: 'Solo' }));
-
-    const asteroidCreated = waitForOneShotLargeId(playerA);
-    playerA.send(JSON.stringify({ type: 'initAsteroids', id: 'solo-player', asteroidCount: 2 }));
-    const asteroidId = await asteroidCreated;
-    asteroidPosition(server, asteroidId);
-
-    const messages: Array<{ type?: string }> = [];
-    playerA.on('message', (raw) => {
-      try {
-        messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
-      }
-    });
-
-    sendTrackedAsteroidReport(server, playerA, 'solo-player', asteroidId);
-    // A report without a second tracked shot is a harmless replay and must
-    // not produce the cooperative shockwave.
-    playerA.send(
-      JSON.stringify({
-        type: 'asteroidDestroyed',
-        asteroidId,
-        playerId: 'solo-player',
-        points: ROID.POINTS_LARGE,
-        cause: 'laser',
-        laserPosition: asteroidPosition(server, asteroidId),
-      })
-    );
-
-    await expect
-      .poll(() => messages.some((msg) => msg?.type === 'asteroidDestroy'), {
-        timeout: 3000,
-        interval: 25,
-      })
-      .toBe(true);
-
-    expect(messages.some((msg) => msg?.type === 'shockwave')).toBe(false);
-
-    playerA.close();
-  });
-
-  test('queued waves shove a nearby crumb harder than a nearby giant', () => {
-    engine = new GameEngine(1);
+describe('Scenario: queued collab shockwaves preserve size-scaled impulse', () => {
+  test('a queued wave shoves a nearby crumb harder than a nearby giant', () => {
+    const engine = new GameEngine(1);
     engine.createAsteroids(3);
     const [crumb, giant] = engine.getAllAsteroids();
-    expect(crumb).toBeDefined();
-    expect(giant).toBeDefined();
+    assert.ok(crumb, 'queued crumb asteroid');
+    assert.ok(giant, 'queued giant asteroid');
+    const requiredCrumb = crumb;
+    const requiredGiant = giant;
 
-    engine.updateAsteroid(crumb!.id, {
+    engine.updateAsteroid(requiredCrumb.id, {
       position: { x: 24, y: 0 },
       velocity: { x: 0, y: 0 },
       size: 12,
     });
-    engine.updateAsteroid(giant!.id, {
+    engine.updateAsteroid(requiredGiant.id, {
       position: { x: 24, y: 0 },
       velocity: { x: 0, y: 0 },
       size: 50,
@@ -220,22 +28,24 @@ describe('Scenario: collab split fires a double shockwave', () => {
 
     engine.queueCollabShockwave({ x: 0, y: 0 }, 0);
 
-    const afterFastCrumb = engine.getAsteroid(crumb!.id);
-    const afterFastGiant = engine.getAsteroid(giant!.id);
-    expect(afterFastCrumb).toBeDefined();
-    expect(afterFastGiant).toBeDefined();
-    const fastCrumbKick = Math.hypot(afterFastCrumb!.velocity.x, afterFastCrumb!.velocity.y);
-    const fastGiantKick = Math.hypot(afterFastGiant!.velocity.x, afterFastGiant!.velocity.y);
+    const afterFastCrumb = engine.getAsteroid(requiredCrumb.id);
+    assert.ok(afterFastCrumb, 'fast crumb asteroid');
+    const afterFastGiant = engine.getAsteroid(requiredGiant.id);
+    assert.ok(afterFastGiant, 'fast giant asteroid');
+    const fastCrumbKick = Math.hypot(afterFastCrumb.velocity.x, afterFastCrumb.velocity.y);
+    const fastGiantKick = Math.hypot(afterFastGiant.velocity.x, afterFastGiant.velocity.y);
     expect(fastCrumbKick).toBeGreaterThan(fastGiantKick);
     expect(engine.getPendingShockwaveCount()).toBe(1);
 
     engine.flushDueShockwaves(framesToMs(SHOCKWAVE.HEAVY.delayFrames));
-    const afterHeavyCrumb = engine.getAsteroid(crumb!.id);
-    const afterHeavyGiant = engine.getAsteroid(giant!.id);
-    expect(Math.hypot(afterHeavyCrumb!.velocity.x, afterHeavyCrumb!.velocity.y)).toBeGreaterThan(
+    const afterHeavyCrumb = engine.getAsteroid(requiredCrumb.id);
+    assert.ok(afterHeavyCrumb, 'heavy crumb asteroid');
+    const afterHeavyGiant = engine.getAsteroid(requiredGiant.id);
+    assert.ok(afterHeavyGiant, 'heavy giant asteroid');
+    expect(Math.hypot(afterHeavyCrumb.velocity.x, afterHeavyCrumb.velocity.y)).toBeGreaterThan(
       fastCrumbKick
     );
-    expect(Math.hypot(afterHeavyGiant!.velocity.x, afterHeavyGiant!.velocity.y)).toBeGreaterThan(
+    expect(Math.hypot(afterHeavyGiant.velocity.x, afterHeavyGiant.velocity.y)).toBeGreaterThan(
       fastGiantKick
     );
     expect(engine.getPendingShockwaveCount()).toBe(0);

@@ -46,7 +46,7 @@ test(
     }
     const initialHealth = bot.health;
     const localPlayerId = await page.evaluate(() => {
-      const gc = (window as any).gameController;
+      const gc = window.gameController;
       return gc?.getNetworkManager?.().getLocalPlayerId?.();
     });
     expect(localPlayerId, 'the local player must be joined before firing').toBeTruthy();

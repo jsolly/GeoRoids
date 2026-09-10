@@ -35,7 +35,7 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 
 // Helper function to update thrust state based on aggregate input.
 // Thrust sources: ArrowUp / KeyW, right-mouse, and the left virtual stick.
-export function updateThrustFromKeys(player: Player): void {
+function updateThrustFromKeys(player: Player): void {
   const pressed = getPressedKeysForPlayer(player);
   const shouldThrust =
     player.lives > 0 &&

@@ -537,7 +537,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Lives and respawn',
         paragraphs: [
-          'A human starts with 3 lives and a score of 0. A death decrements one life; the last life reaching zero enters game over. Explosion stops active thrust and turning. The explosion lasts 18 frames and the respawn delay is 18 frames. A respawn restores the kit’s health, starts with 50 fuel, resets mass growth, clears shield and upgrade state, and grants 180 frames, or 3 seconds, of spawn protection. Human respawns are placed randomly within 80 percent of the asteroid field radius, which is 1,200 units; bots always respawn.',
+          'A human starts with 3 lives and a score of 0. A death decrements one life; the last life reaching zero enters game over. Explosion stops active thrust and turning; held controls resume when the server confirms your respawn. The explosion lasts 18 frames and the respawn delay is 18 frames. A respawn restores the kit’s health, starts with 50 fuel, resets mass growth, clears shield and upgrade state, and grants 180 frames, or 3 seconds, of spawn protection. Human respawns are placed randomly within 80 percent of the asteroid field radius, which is 1,200 units; bots always respawn.',
           'Health regenerates at 1 point per second after a 5 second real-damage delay. Score survives a respawn. Kill loot is emitted from the destroyed ship. The visible death message includes the recorded death cause, and the final-life state shows the game-over overlay.',
         ],
       },
@@ -627,6 +627,12 @@ export const articles: WikiArticle[] = [
         ],
       },
       {
+        heading: 'Display refresh rate',
+        paragraphs: [
+          'Flight, projectiles, shields, and HUD message timers advance at 60 simulation steps per second. A faster display does not increase ship speed or shorten cooldowns. After a visible stall, the client catches up at most one second of simulation; switching back from a hidden tab instead resumes from current server state.',
+        ],
+      },
+      {
         heading: 'Connection interruptions',
         paragraphs: [
           'Switching away from the game releases held movement and fire controls. On return, the client requests current server state and resumes drawing without replaying the time the tab was hidden.',
@@ -642,6 +648,9 @@ export const articles: WikiArticle[] = [
     ],
     related: ['field-manual', 'controls', 'asteroid-tools', 'combat-survival', 'factions'],
     sources: [
+      'shared/gameClock.ts',
+      'src/core/eventLoop.ts',
+      'src/core/gameController.ts',
       'src/rendering/hud/gameInfo.ts',
       'src/ui/mainMenu.ts',
       'src/entities/ship/shipRenderer.ts',

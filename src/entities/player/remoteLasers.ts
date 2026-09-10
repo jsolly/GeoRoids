@@ -5,13 +5,12 @@ import type { Player } from './Player';
  *
  * Pose stays server-driven (`updateLifecycle` does not predict movement).
  * Explode / blink must still tick or remotes freeze at the first death frame
- * and stay laser-immune after respawn. Lasers still move once per display
- * frame so shots travel instead of sitting on the muzzle (#418).
+ * and stay laser-immune after respawn. Lasers share that simulation step.
  */
-export function advanceRemotePlayerShips(players: Player[], lifecycleFrames = 1): void {
+export function advanceRemotePlayerShips(players: Player[]): void {
   for (const player of players) {
     if (player.type === 'remote') {
-      player.ship.updateLifecycle(lifecycleFrames);
+      player.ship.updateLifecycle();
       if (!player.ship.exploding && player.ship.health > 0) {
         player.ship.moveLasers();
       }

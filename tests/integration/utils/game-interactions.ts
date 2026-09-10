@@ -1571,7 +1571,9 @@ export class GameInteractions {
         return Boolean(
           bot?.ship &&
             bot.ship.health > 0 &&
-            bot.ship.health === bot.ship.maxHealth &&
+            // The authoritative respawn window survives immediate pickup growth
+            // or new damage; full health is only momentary in the live arena.
+            bot.serverSpawnProtectionTimer > 0 &&
             !bot.ship.exploding
         );
       },

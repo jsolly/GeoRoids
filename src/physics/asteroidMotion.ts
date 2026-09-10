@@ -1,4 +1,4 @@
-import { GAME, ROID } from '../constants';
+import { ROID } from '../constants';
 import { getGameBoundary } from './boundary';
 
 /** Shared belt radius: inside the ship-kill wall, near a typical camera. */
@@ -82,12 +82,6 @@ export function stepAsteroidMotion(
   const nextVelocity = { x: 0, y: 0 };
   stepAsteroidMotionInto(position, velocity, tickScale, nextPosition, nextVelocity);
   return { position: nextPosition, velocity: nextVelocity };
-}
-
-/** Convert a wall-clock frame delta into 60 FPS tick units. */
-export function asteroidTickScale(dtMs: number): number {
-  const frameMs = 1000 / GAME.FPS;
-  return Math.min(Math.max(dtMs, 0), 50) / frameMs;
 }
 
 /**

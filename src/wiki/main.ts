@@ -159,10 +159,11 @@ function renderRoute(moveFocus = true): void {
     id = 'invalid-link';
   }
   const article = articles.find((item) => item.id === id);
-  renderNavigation(article?.id ?? id);
+  const isIndex = !id || id === 'ships' || id === 'content';
+  renderNavigation(isIndex ? '' : id);
   if (article) {
     renderArticle(article);
-  } else if (!id || id === 'ships' || id === 'content') {
+  } else if (isIndex) {
     renderIndex();
   } else {
     content.innerHTML =

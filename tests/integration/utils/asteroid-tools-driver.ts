@@ -89,14 +89,12 @@ export async function asteroidScreenPoint(
       if (!target || !ship || !(canvas instanceof HTMLCanvasElement)) {
         throw new Error('Target projection unavailable');
       }
-      const point = {
-        x: (target.position.x - ship.position.x) * scale + canvas.width / 2,
-        y: (target.position.y - ship.position.y) * scale + canvas.height / 2,
-      };
       const rect = canvas.getBoundingClientRect();
+      // Pointer events and the camera both use logical CSS pixels, independent
+      // of the canvas's higher-density backing bitmap.
       return {
-        x: rect.left + (point.x * rect.width) / canvas.width,
-        y: rect.top + (point.y * rect.height) / canvas.height,
+        x: rect.left + rect.width / 2 + (target.position.x - ship.position.x) * scale,
+        y: rect.top + rect.height / 2 + (target.position.y - ship.position.y) * scale,
       };
     },
     { targetId: id, scale: PLAYFIELD_CLOSE_SCALE }

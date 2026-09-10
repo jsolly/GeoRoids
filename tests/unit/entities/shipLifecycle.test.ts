@@ -38,7 +38,7 @@ describe('client explode ticks follow the 60 Hz clock', () => {
   test('a sub-frame update does not burn explode frames', () => {
     const ship = new Ship({ isLocalPlayer: true });
     ship.takeDamage(100);
-    ship.update(0);
+    ship.updateLifecycle(0);
     expect(ship.exploding).toBe(true);
     expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
   });
@@ -67,7 +67,7 @@ describe('client explode ticks follow the 60 Hz clock', () => {
     ship.velocity = { x: 4, y: 0 };
     ship.health = 0;
     ship.exploding = false;
-    ship.update(1);
+    ship.update();
     expect(ship.position).toEqual({ x: 10, y: 20 });
   });
 });

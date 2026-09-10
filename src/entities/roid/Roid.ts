@@ -77,16 +77,15 @@ class RoidBelt {
     return this.roids;
   }
 
-  moveRoids(tickScale = 1): void {
+  moveRoids(): void {
     // Freeze only when debug mode explicitly disables movement.
-    // Production interpolates with a dt scale so 120 Hz tabs do not race
-    // 60 Hz tabs (or the 60 FPS server) to the wrap/bounce edge.
+    // The controller supplies fixed 60 Hz steps, matching the server.
     if (DEBUG.ENABLED && !DEBUG.ROIDS.MOVEMENT) {
       return;
     }
 
     for (const roid of this.roids) {
-      stepAsteroidMotionInto(roid.position, roid.velocity, tickScale, roid.position, roid.velocity);
+      stepAsteroidMotionInto(roid.position, roid.velocity, 1, roid.position, roid.velocity);
     }
   }
 }

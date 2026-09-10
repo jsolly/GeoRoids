@@ -20,13 +20,13 @@ function writeOptionalField<K extends keyof AsteroidData>(
   }
 }
 
-export interface AsteroidFieldSyncResult {
+interface AsteroidFieldSyncResult {
   created: AsteroidData[];
   updated: AsteroidData[];
   removed: string[];
 }
 
-export interface AsteroidFieldSyncScratch extends AsteroidFieldSyncResult {
+interface AsteroidFieldSyncScratch extends AsteroidFieldSyncResult {
   snapshotIds: Set<string>;
 }
 
@@ -62,9 +62,7 @@ function reportInvalidAsteroidMaterial(asteroidId: unknown, material: unknown): 
 }
 
 /** JSON snapshots arrive after the TypeScript cast, so validate optional material at runtime. */
-export function asteroidHasValidMaterial(
-  asteroid: Partial<AsteroidData> & { id?: string }
-): boolean {
+function asteroidHasValidMaterial(asteroid: Partial<AsteroidData> & { id?: string }): boolean {
   return asteroid.material === undefined || isAsteroidMaterial(asteroid.material);
 }
 
@@ -192,7 +190,7 @@ export function applyAsteroidRowToBelt(
 }
 
 /** Snap only when dead-reckoning has drifted; avoids 30 Hz teleport jitter. */
-export const ASTEROID_POSE_SNAP_PX = 12;
+const ASTEROID_POSE_SNAP_PX = 12;
 
 /** Local belt object that can receive an authoritative kinematic snapshot. */
 export interface AsteroidKinematicTarget {
@@ -294,7 +292,7 @@ export function applyAsteroidKinematics(
   }
 }
 
-export type AsteroidFieldApplyHandlers = {
+type AsteroidFieldApplyHandlers = {
   onCreated: (asteroid: AsteroidData) => void;
   onUpdated: (asteroidId: string, updates: Partial<AsteroidData>, complete?: boolean) => void;
   onDestroyed: (event: AsteroidDestroyEvent) => void;
@@ -337,7 +335,7 @@ export function notifyAsteroidDestroyed(event: string | AsteroidDestroyEvent): v
   applyHandlers?.onDestroyed(typeof event === 'string' ? { asteroidId: event } : event);
 }
 
-export function notifyAsteroidReconciled(asteroidId: string): void {
+function notifyAsteroidReconciled(asteroidId: string): void {
   applyHandlers?.onReconciled(asteroidId);
 }
 

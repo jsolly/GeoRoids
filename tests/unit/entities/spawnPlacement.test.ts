@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SPAWN } from '../../../src/constants';
 import { entityFactory } from '../../../src/entities/EntityFactory';
@@ -57,13 +57,13 @@ test('server bots spawn and bounce inside the shared asteroid field', () => {
     expect(Math.hypot(bot.position.x, bot.position.y)).toBeLessThanOrEqual(field + 1);
   }
   const wanderer = bots[0];
-  expect(wanderer).toBeDefined();
-  wanderer!.position = { x: 3000, y: 0 };
-  wanderer!.velocity = { x: 8, y: 0 };
+  assert.exists(wanderer);
+  wanderer.position = { x: 3000, y: 0 };
+  wanderer.velocity = { x: 8, y: 0 };
   engine.entityManager.updateBotMovement();
-  const after = engine.getBot(wanderer!.id);
-  expect(after).toBeDefined();
-  expect(Math.hypot(after!.position.x, after!.position.y)).toBeLessThanOrEqual(field + 1);
+  const after = engine.getBot(wanderer.id);
+  assert.exists(after);
+  expect(Math.hypot(after.position.x, after.position.y)).toBeLessThanOrEqual(field + 1);
   engine.stopGameLoop();
 });
 

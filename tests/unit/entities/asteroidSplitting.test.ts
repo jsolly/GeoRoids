@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { assert, beforeEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { RNGService } from '../../../server/core/RNGService';
 import type { AsteroidData } from '../../../shared-types';
@@ -145,16 +145,16 @@ describe('Collaborative asteroid split', () => {
 
   test('a depleted field generation cannot be targeted after a fresh field is seeded', () => {
     const first = asteroidManager.createAsteroids(1)[0];
-    expect(first).toBeDefined();
+    assert.exists(first);
 
     asteroidManager.clearAsteroids();
     const second = asteroidManager.createAsteroids(1)[0];
-    expect(second).toBeDefined();
-    expect(new Set([first!.id, second!.id]).size).toBe(2);
+    assert.exists(second);
+    expect(new Set([first.id, second.id]).size).toBe(2);
 
-    const delayedOldHit = asteroidManager.destroyFromCollision(first!.id);
+    const delayedOldHit = asteroidManager.destroyFromCollision(first.id);
     expect(delayedOldHit.outcome).toBe('missing');
-    expect(asteroidManager.getAsteroid(second!.id)).toBeDefined();
+    expect(asteroidManager.getAsteroid(second.id)).toBeDefined();
   });
 
   test('separate asteroid managers never reuse a field identity', () => {
@@ -162,9 +162,9 @@ describe('Collaborative asteroid split', () => {
     const restartedManager = new AsteroidManager(new RNGService());
     const afterRestart = restartedManager.createAsteroids(1)[0];
 
-    expect(first).toBeDefined();
-    expect(afterRestart).toBeDefined();
-    expect(new Set([first!.id, afterRestart!.id]).size).toBe(2);
+    assert.exists(first);
+    assert.exists(afterRestart);
+    expect(new Set([first.id, afterRestart.id]).size).toBe(2);
   });
 
   test('asteroid splitting respects max count limit', () => {

@@ -1,6 +1,7 @@
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
+import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
 import {
   driftSegment,
   easeOutCubic,
@@ -11,7 +12,6 @@ import {
 } from '../../rendering/vectorJuice';
 import { hexToRgba } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
-import { logger } from '../../utils/Logger';
 import { drawSoftFactionMark } from '../player/factionMarkPainters';
 import { findHarpoonFieldBody, getHarpoonField, harpoonSurfaceToward } from './harpoonField';
 import {
@@ -180,42 +180,6 @@ export function strokePhosphorSegment(
   ctx.restore();
 }
 
-// Helper function to draw a targeting line extending from the ship
-export function drawTargetingLine(
-  centerX: number,
-  centerY: number,
-  angle: number,
-  shipRadius: number,
-  lineLength: number = 300,
-  color: string = PALETTE.HUD,
-  alpha: number = 0.6
-): void {
-  const ctx = canvasManager.getContext();
-  if (!ctx) {
-    return;
-  }
-
-  // Calculate end point of the targeting line
-  const endX = centerX + Math.cos(angle) * (shipRadius + lineLength);
-  const endY = centerY - Math.sin(angle) * (shipRadius + lineLength);
-
-  // Set line style with transparency
-  ctx.strokeStyle = color;
-  ctx.globalAlpha = alpha;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]); // Dashed line for better visibility
-
-  // Draw the targeting line
-  ctx.beginPath();
-  ctx.moveTo(centerX, centerY);
-  ctx.lineTo(endX, endY);
-  ctx.stroke();
-
-  // Reset line style
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 1.0;
-}
-
 export function drawGenericThruster(
   x: number,
   y: number,
@@ -272,7 +236,15 @@ export function drawThruster(ship: Ship, color: string = ship.color): void {
   }
 
   if (!ship.exploding && ship.thrusting) {
-    drawGenericThruster(cvs.width / 2, cvs.height / 2, ship.angle, ship.r, color, ship.kitId);
+    const viewport = canvasManager.getViewportSize();
+    drawGenericThruster(
+      viewport.width / 2,
+      viewport.height / 2,
+      ship.angle,
+      ship.r,
+      color,
+      ship.kitId
+    );
   }
 }
 
@@ -288,13 +260,14 @@ export function drawThrusterAtPosition(
 
   if (!ship.exploding && ship.thrusting) {
     const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
-    const scale = canvasManager.getPlayfieldScale();
+    const scale = PLAYFIELD_CLOSE_SCALE;
+    const viewport = canvasManager.getViewportSize();
     const cull = ship.r * 3 * scale;
     if (
       screen.x < -cull ||
       screen.y < -cull ||
-      screen.x > cvs.width + cull ||
-      screen.y > cvs.height + cull
+      screen.x > viewport.width + cull ||
+      screen.y > viewport.height + cull
     ) {
       return;
     }
@@ -426,11 +399,12 @@ export function drawShipExplosion(ship: Ship, color?: string): void {
     return;
   }
 
+  const viewport = canvasManager.getViewportSize();
   drawVectorExplosion(
     ctx,
-    cvs.width / 2,
-    cvs.height / 2,
-    ship.r * canvasManager.getPlayfieldScale(),
+    viewport.width / 2,
+    viewport.height / 2,
+    ship.r * PLAYFIELD_CLOSE_SCALE,
     ship.angle,
     explosionProgress(ship),
     color || ship.color || PALETTE.LOCAL,
@@ -450,7 +424,7 @@ export function drawShipExplosionAtPosition(
   }
 
   const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
-  const scale = canvasManager.getPlayfieldScale();
+  const scale = PLAYFIELD_CLOSE_SCALE;
   drawVectorExplosion(
     ctx,
     screen.x,
@@ -474,10 +448,10 @@ export function drawLaserBolts(
   }
 
   const cvs = canvasManager.getCanvas();
-  const viewW = cvs?.width ?? Number.POSITIVE_INFINITY;
-  const viewH = cvs?.height ?? Number.POSITIVE_INFINITY;
-  const cullPad =
-    (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * canvasManager.getPlayfieldScale();
+  const viewport = cvs ? canvasManager.getViewportSize() : undefined;
+  const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
+  const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
+  const cullPad = (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * PLAYFIELD_CLOSE_SCALE;
 
   for (const laser of lasers) {
     const screenPos = canvasManager.worldToScreenInto(laserScreen, laser.position, viewerPosition);
@@ -491,7 +465,7 @@ export function drawLaserBolts(
     }
 
     if (laser.explodeTime === 0) {
-      const scale = canvasManager.getPlayfieldScale();
+      const scale = PLAYFIELD_CLOSE_SCALE;
       const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
       const { halfX, halfY, trailX, trailY } = laserBoltOffsets(
         laser.velocity.x,
@@ -565,8 +539,9 @@ export function drawEmpPulse(ship: Ship, empRadius: number, empAlpha: number): v
     return;
   }
 
-  const centerX = cvs.width / 2;
-  const centerY = cvs.height / 2;
+  const viewport = canvasManager.getViewportSize();
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
 
   // Create a radial gradient for the EMP effect
   const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, empRadius);
@@ -616,8 +591,9 @@ export function drawShipAtPosition(
     return;
   }
 
+  const viewport = canvasManager.getViewportSize();
   const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
-  const scale = canvasManager.getPlayfieldScale();
+  const scale = PLAYFIELD_CLOSE_SCALE;
   const screenX = screen.x;
   const screenY = screen.y;
   const shipR = ship.r * scale;
@@ -627,8 +603,8 @@ export function drawShipAtPosition(
   if (
     screenX < -cull ||
     screenY < -cull ||
-    screenX > cvs.width + cull ||
-    screenY > cvs.height + cull
+    screenX > viewport.width + cull ||
+    screenY > viewport.height + cull
   ) {
     return;
   }
@@ -899,65 +875,5 @@ function drawFloatingHealthCapsule(
     ctx.textAlign = 'center';
     ctx.fillText(`${Math.ceil(ship.health)}/${ship.maxHealth}`, screenX, barY - 10);
   }
-  ctx.restore();
-}
-
-// Helper function to draw player health bar in the HUD
-export function drawPlayerHealthBar(health: number, maxHealth: number): void {
-  const ctx = canvasManager.getContext();
-  const canvas = canvasManager.getCanvas();
-  if (!ctx || !canvas) {
-    return;
-  }
-
-  // Debug logging for health bar values
-  if (health !== maxHealth) {
-    logger.debug('HEALTH_BAR', 'Drawing health bar with non-full health', {
-      health,
-      maxHealth,
-      healthPercent: health / maxHealth,
-    });
-  }
-
-  const barWidth = 200;
-  const barHeight = 20;
-  const barX = canvas.width - barWidth - 20;
-  const barY = 20;
-
-  // Health percentage
-  const healthPercent = health / maxHealth;
-  const currentWidth = barWidth * healthPercent;
-
-  ctx.save();
-
-  // Background (empty health bar)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(barX, barY, barWidth, barHeight);
-
-  // Health bar color based on health level
-  let healthColor: string;
-  if (healthPercent > 0.6) {
-    healthColor = PALETTE.HEALTH;
-  } else if (healthPercent > 0.3) {
-    healthColor = PALETTE.LASER_LOCAL;
-  } else {
-    healthColor = PALETTE.DANGER;
-  }
-
-  // Current health
-  ctx.fillStyle = healthColor;
-  ctx.fillRect(barX, barY, currentWidth, barHeight);
-
-  // Border
-  ctx.strokeStyle = PALETTE.HUD;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(barX, barY, barWidth, barHeight);
-
-  // Health text
-  ctx.fillStyle = PALETTE.HUD;
-  ctx.font = '14px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(`${Math.ceil(health)}/${maxHealth}`, barX + barWidth / 2, barY - 8);
-
   ctx.restore();
 }

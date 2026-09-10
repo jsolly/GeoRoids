@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import type { WebSocket } from 'ws';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
+import { WebSocket } from 'ws';
 
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
@@ -75,10 +75,10 @@ describe('destroy-drop shards on the #458 loot path', () => {
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
-    expect(shard).toBeDefined();
+    assert.exists(shard);
 
     const healthBefore = bystander.health;
-    const blast = engine.handleLootExplode(shooter.id, shard!.id);
+    const blast = engine.handleLootExplode(shooter.id, shard.id);
 
     expect(blast.success).toBe(true);
     expect(engine.getLoot()).toHaveLength(0);
@@ -133,8 +133,8 @@ describe('destroy-drop shards on the #458 loot path', () => {
 
     engine.handleAsteroidHit('seed-roid', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
-    expect(shard).toBeDefined();
-    const blast = engine.handleLootExplode(shooter.id, shard!.id);
+    assert.exists(shard);
+    const blast = engine.handleLootExplode(shooter.id, shard.id);
 
     expect(blast.success).toBe(true);
     expect(blast.pushedAsteroidIds).toContain('small-1');
@@ -144,13 +144,19 @@ describe('destroy-drop shards on the #458 loot path', () => {
   });
 
   test('reset clears shards with the rest of the world', () => {
-    const ws = {} as WebSocket;
+    const close = vi.fn();
+    const ws = {
+      CLOSED: WebSocket.CLOSED,
+      readyState: WebSocket.OPEN,
+      close,
+    } as unknown as WebSocket;
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', 'p1', 'laser');
     expect(engine.getDiagnostics().loot).toBe(1);
 
     engine.resetForTesting();
+    expect(close).toHaveBeenCalledWith(1000, 'Test world reset');
     expect(engine.getLoot()).toHaveLength(0);
     expect(engine.getDiagnostics().loot).toBe(0);
   });

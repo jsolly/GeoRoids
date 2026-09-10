@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { createServerInstance } from '../../../server/createServer';
@@ -48,8 +48,9 @@ function waitForOneShotLargeId(ws: WebSocket): Promise<string> {
           clearTimeout(timeout);
           resolve(msg.data.asteroid.id);
         }
-      } catch {
-        // ignore non-JSON frames
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
       }
     });
   });
@@ -128,11 +129,12 @@ describe('Scenario: collab split fires a double shockwave', () => {
       type?: string;
       data?: { asteroidId?: string; origin?: { x: number; y: number } };
     }> = [];
+    let parseError: unknown;
     playerA.on('message', (raw) => {
       try {
         messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     });
 
@@ -148,6 +150,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
         { timeout: 3000, interval: 25 }
       )
       .toBe(true);
+    expect(parseError).toBeUndefined();
 
     playerA.close();
     playerB.close();
@@ -166,11 +169,12 @@ describe('Scenario: collab split fires a double shockwave', () => {
     asteroidPosition(server, asteroidId);
 
     const messages: Array<{ type?: string }> = [];
+    let parseError: unknown;
     playerA.on('message', (raw) => {
       try {
         messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     });
 
@@ -196,6 +200,7 @@ describe('Scenario: collab split fires a double shockwave', () => {
       .toBe(true);
 
     expect(messages.some((msg) => msg?.type === 'shockwave')).toBe(false);
+    expect(parseError).toBeUndefined();
 
     playerA.close();
   });
@@ -204,15 +209,15 @@ describe('Scenario: collab split fires a double shockwave', () => {
     engine = new GameEngine(1);
     engine.createAsteroids(3);
     const [crumb, giant] = engine.getAllAsteroids();
-    expect(crumb).toBeDefined();
-    expect(giant).toBeDefined();
+    assert.exists(crumb);
+    assert.exists(giant);
 
-    engine.updateAsteroid(crumb!.id, {
+    engine.updateAsteroid(crumb.id, {
       position: { x: 24, y: 0 },
       velocity: { x: 0, y: 0 },
       size: 12,
     });
-    engine.updateAsteroid(giant!.id, {
+    engine.updateAsteroid(giant.id, {
       position: { x: 24, y: 0 },
       velocity: { x: 0, y: 0 },
       size: 50,
@@ -220,22 +225,24 @@ describe('Scenario: collab split fires a double shockwave', () => {
 
     engine.queueCollabShockwave({ x: 0, y: 0 }, 0);
 
-    const afterFastCrumb = engine.getAsteroid(crumb!.id);
-    const afterFastGiant = engine.getAsteroid(giant!.id);
-    expect(afterFastCrumb).toBeDefined();
-    expect(afterFastGiant).toBeDefined();
-    const fastCrumbKick = Math.hypot(afterFastCrumb!.velocity.x, afterFastCrumb!.velocity.y);
-    const fastGiantKick = Math.hypot(afterFastGiant!.velocity.x, afterFastGiant!.velocity.y);
+    const afterFastCrumb = engine.getAsteroid(crumb.id);
+    const afterFastGiant = engine.getAsteroid(giant.id);
+    assert.exists(afterFastCrumb);
+    assert.exists(afterFastGiant);
+    const fastCrumbKick = Math.hypot(afterFastCrumb.velocity.x, afterFastCrumb.velocity.y);
+    const fastGiantKick = Math.hypot(afterFastGiant.velocity.x, afterFastGiant.velocity.y);
     expect(fastCrumbKick).toBeGreaterThan(fastGiantKick);
     expect(engine.getPendingShockwaveCount()).toBe(1);
 
     engine.flushDueShockwaves(framesToMs(SHOCKWAVE.HEAVY.delayFrames));
-    const afterHeavyCrumb = engine.getAsteroid(crumb!.id);
-    const afterHeavyGiant = engine.getAsteroid(giant!.id);
-    expect(Math.hypot(afterHeavyCrumb!.velocity.x, afterHeavyCrumb!.velocity.y)).toBeGreaterThan(
+    const afterHeavyCrumb = engine.getAsteroid(crumb.id);
+    const afterHeavyGiant = engine.getAsteroid(giant.id);
+    assert.exists(afterHeavyCrumb);
+    assert.exists(afterHeavyGiant);
+    expect(Math.hypot(afterHeavyCrumb.velocity.x, afterHeavyCrumb.velocity.y)).toBeGreaterThan(
       fastCrumbKick
     );
-    expect(Math.hypot(afterHeavyGiant!.velocity.x, afterHeavyGiant!.velocity.y)).toBeGreaterThan(
+    expect(Math.hypot(afterHeavyGiant.velocity.x, afterHeavyGiant.velocity.y)).toBeGreaterThan(
       fastGiantKick
     );
     expect(engine.getPendingShockwaveCount()).toBe(0);

@@ -2,7 +2,7 @@
 import { once } from 'node:events';
 import { type ClientRequest, IncomingMessage, request, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, assert, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import {
@@ -252,73 +252,78 @@ test('invalid or oversized placement cannot change a connected pilot', async () 
 test.each([
   { fragment: '{', expectedStatus: 408 },
   { fragment: 'x'.repeat(1100), expectedStatus: 413 },
-])('an unfinished request fails when it stalls or exceeds the size limit ($expectedStatus)', async ({
-  fragment,
-  expectedStatus,
-}) => {
-  const { origin } = await start();
-  const req = request(`${origin}/test/place-player`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(5000),
-  });
-  requests.push(req);
-  const response = once(req, 'response');
-  req.write(fragment);
-  const [res] = (await response) as [IncomingMessage];
-  expect(res.statusCode).toBe(expectedStatus);
-  res.resume();
-});
-
-test.each([
-  false,
-  true,
-])('placement preserves health and allows subsequent legal movement (enhanced=%s)', async (enhanced) => {
-  const { server, origin, socket, player } = await pilot(enhanced);
-  const previousEpoch = player.asteroidMotion?.epoch;
-  const health = player.health;
-  const position = { x: -1700, y: 0 };
-  const response = await post(origin, { playerId: player.id, position });
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({ status: 'placed', playerId: player.id, position });
-  expect(player.position).toEqual(position);
-  expect(player.health).toBe(health);
-  const epoch = player.asteroidMotion?.epoch;
-  if (enhanced) {
-    expect(epoch).toBeGreaterThan(previousEpoch!);
+])(
+  'an unfinished request fails when it stalls or exceeds the size limit ($expectedStatus)',
+  async ({ fragment, expectedStatus }) => {
+    const { origin } = await start();
+    const req = request(`${origin}/test/place-player`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+    requests.push(req);
+    const response = once(req, 'response');
+    req.write(fragment);
+    const [res] = (await response) as [IncomingMessage];
+    expect(res.statusCode).toBe(expectedStatus);
+    res.resume();
   }
+);
 
-  const sendPose = async (x: number, motionEpoch: number | undefined, sequence: number) => {
-    socket.send(
-      JSON.stringify({
-        type: 'update',
-        data: {
-          id: player.id,
-          position: { x, y: 0 },
-          velocity: { x: 0, y: 0 },
-          angle: 0,
-          thrusting: false,
-          motionEpoch,
-          motionSequence: sequence,
-        },
-      })
-    );
-    const pong = once(socket, 'pong');
-    socket.ping();
-    await pong;
-  };
-  if (enhanced) {
-    await sendPose(1700, previousEpoch, 99);
+test.each([false, true])(
+  'placement preserves health and allows subsequent legal movement (enhanced=%s)',
+  async (enhanced) => {
+    const { server, origin, socket, player } = await pilot(enhanced);
+    const previousEpoch = player.asteroidMotion?.epoch;
+    const health = player.health;
+    const position = { x: -1700, y: 0 };
+    const response = await post(origin, { playerId: player.id, position });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'placed',
+      playerId: player.id,
+      position,
+    });
     expect(player.position).toEqual(position);
-  }
-  await sendPose(-1699, epoch, 1);
-  expect(player.position).toEqual({ x: -1699, y: 0 });
-  if (enhanced) {
-    await sendPose(9000, epoch, 2);
+    expect(player.health).toBe(health);
+    const epoch = player.asteroidMotion?.epoch;
+    if (enhanced) {
+      assert.exists(previousEpoch);
+      expect(epoch).toBeGreaterThan(previousEpoch);
+    }
+
+    const sendPose = async (x: number, motionEpoch: number | undefined, sequence: number) => {
+      socket.send(
+        JSON.stringify({
+          type: 'update',
+          data: {
+            id: player.id,
+            position: { x, y: 0 },
+            velocity: { x: 0, y: 0 },
+            angle: 0,
+            thrusting: false,
+            motionEpoch,
+            motionSequence: sequence,
+          },
+        })
+      );
+      const pong = once(socket, 'pong');
+      socket.ping();
+      await pong;
+    };
+    if (enhanced) {
+      await sendPose(1700, previousEpoch, 99);
+      expect(player.position).toEqual(position);
+    }
+    await sendPose(-1699, epoch, 1);
     expect(player.position).toEqual({ x: -1699, y: 0 });
+    if (enhanced) {
+      await sendPose(9000, epoch, 2);
+      expect(player.position).toEqual({ x: -1699, y: 0 });
+    }
+    expect(server.gameEngine.getPlayerCount()).toBe(1);
   }
-  expect(server.gameEngine.getPlayerCount()).toBe(1);
-});
+);
 
 test('an enhanced pilot with no motion session cannot report successful placement', async () => {
   const { server, origin, player } = await pilot(true);

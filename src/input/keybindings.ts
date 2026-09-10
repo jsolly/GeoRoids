@@ -24,7 +24,7 @@ export const keys: KeyStates = {
 // Track pressed keys per-player to avoid cross-player/global interference (e.g., parallel tests)
 const playerPressedKeys = new WeakMap<Player, Set<string>>();
 
-export function getPressedKeysForPlayer(player: Player): Set<string> {
+function getPressedKeysForPlayer(player: Player): Set<string> {
   let set = playerPressedKeys.get(player);
   if (!set) {
     set = new Set<string>();
@@ -35,7 +35,7 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 
 // Helper function to update thrust state based on aggregate input.
 // Thrust sources: ArrowUp / KeyW, right-mouse, and the left virtual stick.
-export function updateThrustFromKeys(player: Player): void {
+function updateThrustFromKeys(player: Player): void {
   const pressed = getPressedKeysForPlayer(player);
   const shouldThrust =
     pressed.has('ArrowUp') ||
@@ -79,11 +79,11 @@ export function updateThrustFromKeys(player: Player): void {
 // both arrow keys (ArrowLeft/ArrowRight) and WASD (KeyA/KeyD); opposing keys
 // held together cancel out. Using the per-player pressed set (rather than the
 // global `keys` map) keeps combinations correct across arrow/WASD mixes.
-export function turnSpeedForShip(player: Player): number {
+function turnSpeedForShip(player: Player): number {
   return (player.ship.turnSpeed * Math.PI) / (180 * GAME.FPS);
 }
 
-export function updateTurnFromKeys(player: Player): void {
+function updateTurnFromKeys(player: Player): void {
   const pressed = getPressedKeysForPlayer(player);
   const turningLeft = pressed.has('ArrowLeft') || pressed.has('KeyA');
   const turningRight = pressed.has('ArrowRight') || pressed.has('KeyD');

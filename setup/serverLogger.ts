@@ -100,6 +100,7 @@ function levelName(level: ServerLogLevel): 'debug' | 'info' | 'warn' | 'error' {
 function writeStdout(line: string): void {
   if (process.stdout.writableLength > SERVER_STDOUT_MAX_BUFFERED_BYTES) {
     stdoutLogState.droppedRecords++;
+    reportStdoutFailure(new Error('stdout buffer limit exceeded; dropped log record'));
     return;
   }
   try {
@@ -465,5 +466,3 @@ export const logger = {
     }
   },
 };
-
-export const currentLogLevel = CURRENT_LOG_LEVEL;

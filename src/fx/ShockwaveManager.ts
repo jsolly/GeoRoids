@@ -6,13 +6,13 @@ import {
   shockwaveLifetimeMs,
 } from '../physics/shockwave';
 
-export type ActiveShockwave = {
+type ActiveShockwave = {
   origin: Position;
   startedAt: number;
   fired: Set<string>;
 };
 
-export type ShockwaveFireHandler = (origin: Position, wave: ShockwaveWaveSpec) => void;
+type ShockwaveFireHandler = (origin: Position, wave: ShockwaveWaveSpec) => void;
 
 /**
  * Client-side double-wave tracker. Visuals are time-based so they stay

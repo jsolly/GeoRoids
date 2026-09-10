@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'one player laser deals canonical nonlethal damage to a remote player',
@@ -13,7 +13,7 @@ test(
       throw new Error('Page 1 not available');
     }
 
-    const page2 = await browserManager.createAdditionalPage();
+    const page2 = await browserManager.createPage();
 
     const game1 = new GameInteractions(page1);
     const game2 = new GameInteractions(page2);

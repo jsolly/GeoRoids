@@ -10,7 +10,6 @@ import {
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
 import type { AsteroidData, Position, ServerGameSnapshot, Velocity } from '../../shared-types';
-import type { GameEntity } from '../core/EntityManager';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { SERVER_RELEASE_ID } from '../release';
 
@@ -33,7 +32,6 @@ interface PlayerUpdateData {
 }
 
 type AsteroidUpdateData = Partial<AsteroidData>;
-type BroadcastBot = Pick<GameEntity, 'id' | 'name' | 'position'>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -538,24 +536,6 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastBotCreation(bots: readonly BroadcastBot[]): void {
-    const botSummaries = bots.map((bot) => ({
-      botId: bot.id,
-      botName: bot.name,
-      position: bot.position,
-    }));
-
-    const message = {
-      type: 'botsCreated',
-      data: {
-        bots: botSummaries,
-      },
-      timestamp: Date.now(),
-    };
-
-    this.broadcastToAll(message);
-  }
-
   public broadcastBotUpdate(botId: string): void {
     const bot = this.gameEngine.getBot(botId);
     if (bot) {
@@ -595,16 +575,6 @@ export class GameStateBroadcaster {
 
       this.broadcastToAll(message);
     }
-  }
-
-  public broadcastBotDestroyed(botId: string): void {
-    const message = {
-      type: 'botDestroyed',
-      data: { botId },
-      timestamp: Date.now(),
-    };
-
-    this.broadcastToAll(message);
   }
 
   public broadcastChatMessage(playerId: string, playerName: string, message: string): void {

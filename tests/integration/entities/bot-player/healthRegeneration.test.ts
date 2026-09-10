@@ -3,8 +3,6 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../../shared/constants/health';
-import { GAME } from '../../../../src/constants';
-import { entityFactory } from '../../../../src/entities/EntityFactory';
 import { Player } from '../../../../src/entities/player/Player';
 import { Ship } from '../../../../src/entities/ship/Ship';
 import { shouldStartHealthRegeneration } from '../../../../src/entities/ship/shipUtils';
@@ -175,63 +173,20 @@ describe('Health Regeneration', () => {
       expect(botShip.health).toBe(botShip.maxHealth);
     });
 
-    it('should verify bot health regeneration does not get stuck at 81', () => {
-      // Simulate the exact reported issue: bot health stuck at 81
-      botShip.takeDamage(20);
-      expect(botShip.health).toBe(80);
+    it('should accept successive small server regeneration updates for a bot', () => {
+      const botPlayer = new Player({
+        id: 'regenerating-bot',
+        name: 'Regenerating Bot',
+        type: 'bot',
+        input: new MockPlayerInput(),
+      });
+      botPlayer.ship.health = 80;
 
-      // Fast-forward to start regeneration
-      for (let i = 0; i < 360; i++) {
-        botShip.updateHealth();
-      }
+      botPlayer.updateFromServer({ health: 81, maxHealth: 100, exploding: false });
+      expect(botPlayer.ship.health).toBe(81);
 
-      // Should have started regenerating
-      expect(botShip.health).toBeGreaterThan(80);
-
-      // Now test the specific issue: simulate server sending health=81 when client has 80
-      // This should be accepted as small regeneration
-      const clientHealthBefore = botShip.health;
-      expect(clientHealthBefore).toBeGreaterThanOrEqual(80);
-
-      // Simulate server update with health = client health + 1 (small regeneration)
-      const serverHealthUpdate = clientHealthBefore + 1;
-      const mockState = {
-        position: botShip.position,
-        velocity: botShip.velocity,
-        angle: botShip.angle,
-        exploding: false,
-        lives: 3,
-        health: serverHealthUpdate,
-        maxHealth: 100,
-        lasers: undefined,
-      };
-
-      // Simulate the logic from BotSyncManager.updateRemoteBotState
-      const isDamage = mockState.health < clientHealthBefore;
-      const isFullHealth = mockState.health === botShip.maxHealth;
-      const isSmallRegeneration =
-        mockState.health > clientHealthBefore &&
-        mockState.health <= clientHealthBefore + 2 &&
-        mockState.health < botShip.maxHealth;
-
-      // This should be accepted as small regeneration
-      expect(isSmallRegeneration).toBe(true);
-
-      // Update should be accepted
-      if (isDamage || isFullHealth || isSmallRegeneration) {
-        botShip.health = mockState.health;
-      }
-
-      expect(botShip.health).toBe(serverHealthUpdate);
-
-      // Continue regeneration to ensure it doesn't get stuck
-      const healthBeforeContinuedRegen = botShip.health;
-      for (let i = 0; i < 100; i++) {
-        botShip.updateHealth();
-      }
-
-      // Health should continue increasing
-      expect(botShip.health).toBeGreaterThan(healthBeforeContinuedRegen);
+      botPlayer.updateFromServer({ health: 82, maxHealth: 100, exploding: false });
+      expect(botPlayer.ship.health).toBe(82);
     });
   });
 
@@ -279,113 +234,37 @@ describe('Health Regeneration', () => {
     });
   });
 
-  describe('BotSyncManager Health Update Logic', () => {
+  describe('Bot player server health updates', () => {
     let botPlayer: Player;
 
     beforeEach(() => {
-      // Create a bot player
-      botPlayer = entityFactory.createBotPlayer('Test Bot');
+      botPlayer = new Player({
+        id: 'test-bot',
+        name: 'Test Bot',
+        type: 'bot',
+        input: new MockPlayerInput(),
+      });
     });
 
-    it('should accept server health updates that represent damage', () => {
-      // Set bot to full health initially
-      botPlayer.ship.health = 100;
+    it('applies an authoritative damage update', () => {
+      botPlayer.updateFromServer({ health: 80, maxHealth: 100, exploding: false });
 
-      // Simulate server sending lower health (damage)
-      const serverState = {
-        position: botPlayer.ship.position,
-        velocity: botPlayer.ship.velocity,
-        angle: botPlayer.ship.angle,
-        exploding: false,
-        lives: botPlayer.lives,
-        health: 80, // Server says health is 80 (damage occurred)
-        maxHealth: 100,
-        lasers: undefined,
-      };
-
-      // Before the fix, this would have been ignored because 80 < 100 (server health lower)
-      // After the fix, this should be accepted as damage
-      const currentHealth = botPlayer.ship.health;
-      expect(serverState.health).toBeLessThan(currentHealth); // 80 < 100 = true (damage)
-
-      // Simulate the logic from updateRemoteBotState
-      if (serverState.health < currentHealth || serverState.health === botPlayer.ship.maxHealth) {
-        botPlayer.ship.health = serverState.health;
-
-        if (serverState.health < currentHealth) {
-          botPlayer.ship.lastDamageTime = GAME.FPS;
-          botPlayer.ship.healthRegenTimer = calculateHealthRegenDelayFrames();
-        }
-      }
-
-      // Health should be updated to 80
       expect(botPlayer.ship.health).toBe(80);
-      // Timers should be reset for regeneration
-      expect(botPlayer.ship.lastDamageTime).toBe(GAME.FPS);
-      expect(botPlayer.ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
     });
 
-    it('should reject server health updates that represent regeneration', () => {
-      // Set bot to damaged health initially
+    it('applies an authoritative regeneration update', () => {
       botPlayer.ship.health = 80;
 
-      // Simulate server sending higher health (regeneration)
-      const serverState = {
-        position: botPlayer.ship.position,
-        velocity: botPlayer.ship.velocity,
-        angle: botPlayer.ship.angle,
-        exploding: false,
-        lives: botPlayer.lives,
-        health: 85, // Server says health is 85 (regenerated)
-        maxHealth: 100,
-        lasers: undefined,
-      };
+      botPlayer.updateFromServer({ health: 85, maxHealth: 100, exploding: false });
 
-      // Before the fix, this would have been accepted because 85 > 80 (server health higher)
-      // After the fix, this should be rejected to let local regeneration continue
-      const currentHealth = botPlayer.ship.health;
-      expect(serverState.health).toBeGreaterThan(currentHealth); // 85 > 80 = true (regeneration)
-
-      // Simulate the logic from updateRemoteBotState
-      if (serverState.health < currentHealth || serverState.health === botPlayer.ship.maxHealth) {
-        // This condition should be false for regeneration updates
-        expect(serverState.health < currentHealth).toBe(false);
-        expect(serverState.health === botPlayer.ship.maxHealth).toBe(false);
-
-        // Health should NOT be updated
-        expect(botPlayer.ship.health).toBe(80); // Should remain 80
-      } else {
-        // This branch should be taken for regeneration updates (server health > current health)
-        // Health should remain unchanged to let local regeneration continue
-        expect(botPlayer.ship.health).toBe(80);
-      }
+      expect(botPlayer.ship.health).toBe(85);
     });
 
-    it('should accept server health updates when bot reaches max health', () => {
-      // Set bot to nearly full health
+    it('applies an authoritative update when a bot reaches max health', () => {
       botPlayer.ship.health = 99;
 
-      // Simulate server sending max health (regeneration completed)
-      const serverState = {
-        position: botPlayer.ship.position,
-        velocity: botPlayer.ship.velocity,
-        angle: botPlayer.ship.angle,
-        exploding: false,
-        lives: botPlayer.lives,
-        health: 100, // Server says health is 100 (max health)
-        maxHealth: 100,
-        lasers: undefined,
-      };
+      botPlayer.updateFromServer({ health: 100, maxHealth: 100, exploding: false });
 
-      const currentHealth = botPlayer.ship.health;
-      expect(serverState.health).toBe(botPlayer.ship.maxHealth); // 100 === 100 = true
-
-      // Simulate the logic from updateRemoteBotState
-      if (serverState.health < currentHealth || serverState.health === botPlayer.ship.maxHealth) {
-        botPlayer.ship.health = serverState.health;
-      }
-
-      // Health should be updated to 100
       expect(botPlayer.ship.health).toBe(100);
     });
   });

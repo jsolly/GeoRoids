@@ -72,7 +72,7 @@ import {
   pruneStaleRemotePlayers,
 } from './playerPresence';
 
-export interface ConnectionState {
+interface ConnectionState {
   isConnected: boolean;
   socket: WebSocket | null;
 }
@@ -789,8 +789,7 @@ export class ConnectionManager {
   }
 
   private handleServerMessage(message: ServerMessage): void {
-    // Prefer message.data, fallback to message.payload for backward compatibility
-    const data = (message.data ?? message.payload) as unknown;
+    const data = message.data;
     switch (message.type) {
       case 'snapshot':
         this.handleSnapshot(data);

@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, describe, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -48,7 +48,8 @@ describe('late client death updates after authoritative respawn', () => {
       { type: 'join', data: { id: 'peer', name: 'Peer', position: { x: 1000, y: 0 } } },
       peer
     );
-    const pilot = engine.getPlayer('pilot')!;
+    const pilot = engine.getPlayer('pilot');
+    assert.exists(pilot);
     pilot.position = { x: 3150, y: 0 };
     delete pilot.spawnProtectionTimer;
     pilot.score = 17;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import type { WebSocket } from 'ws';
 import { isStaleDeathPose } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
@@ -21,17 +22,18 @@ import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { SHIP_KINDS } from '../scenarios/support/shipKinds';
 
 describe('client explode ticks follow the 60 Hz clock', () => {
-  test.each(SHIP_KINDS)('$kind hitch-drains explodeTime without dropping the exploding flag', ({
-    options,
-  }) => {
-    const ship = new Ship(options);
-    ship.takeDamage(100);
-    expect(ship.exploding).toBe(true);
-    expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
-    ship.updateLifecycle(SHIP.EXPLODE_DURATION_FRAMES);
-    expect(ship.explodeTime).toBe(0);
-    expect(ship.exploding).toBe(true);
-  });
+  test.each(SHIP_KINDS)(
+    '$kind hitch-drains explodeTime without dropping the exploding flag',
+    ({ options }) => {
+      const ship = new Ship(options);
+      ship.takeDamage(100);
+      expect(ship.exploding).toBe(true);
+      expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
+      ship.updateLifecycle(SHIP.EXPLODE_DURATION_FRAMES);
+      expect(ship.explodeTime).toBe(0);
+      expect(ship.exploding).toBe(true);
+    }
+  );
 
   test('a sub-frame update does not burn explode frames', () => {
     const ship = new Ship({ isLocalPlayer: true });
@@ -329,7 +331,7 @@ describe('server ship respawn lifecycle', () => {
   });
 
   test('human explosion end does not reset an already-scheduled respawn timer', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
@@ -351,7 +353,7 @@ describe('server ship respawn lifecycle', () => {
   });
 
   test('wall kill respawns as soon as the explode window ends — no corpse freeze', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'boundary', player.health);
@@ -368,7 +370,7 @@ describe('server ship respawn lifecycle', () => {
   });
 
   test('respawn grants a full protection window and holds an anchor', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 3100, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'asteroid', player.health);
@@ -389,7 +391,7 @@ describe('server ship respawn lifecycle', () => {
 
   test('gameTime keeps advancing after the last player leaves', async () => {
     engine.startGameLoop();
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     engine.addPlayer('p1', 'Pilot', ws);
     await new Promise((resolve) => setTimeout(resolve, 40));
     const beforeLeave = engine.getDiagnostics().gameTime;

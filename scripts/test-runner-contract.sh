@@ -13,12 +13,15 @@ MOCK_DEV_PID_FILE="$TEMP_DIR/mock-dev.pid"
 MOCK_TEST_PID_FILE="$TEMP_DIR/mock-test.pid"
 MOCK_DEV_CHILD_PID_FILE="$TEMP_DIR/mock-dev-child.pid"
 MOCK_TEST_CHILD_PID_FILE="$TEMP_DIR/mock-test-child.pid"
+MOCK_FAILURE_MARKER_FILE="$TEMP_DIR/process-tree-failure-seen"
 GIT_COMMON_DIR="$(git -C "$ROOT" rev-parse --git-common-dir)"
 case "$GIT_COMMON_DIR" in
     /*) ;;
     *) GIT_COMMON_DIR="$ROOT/$GIT_COMMON_DIR" ;;
 esac
 LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
+REAL_RMDIR="$(command -v rmdir)"
+REAL_PGREP="$(command -v pgrep)"
 
 cleanup() {
     local pid_file
@@ -168,6 +171,14 @@ setup_mock_tools() {
     cat > "$MOCK_BIN/lsof" <<'EOF'
 #!/usr/bin/env bash
 # Contract processes never bind ports; report them free.
+    if [ "${GEOROIDS_CONTRACT_MODE:-}" = port-inspection-status-one ]; then
+        echo "simulated lsof inspection failure (status 1)" >&2
+        exit 1
+    fi
+    if [ "${GEOROIDS_CONTRACT_MODE:-}" = port-inspection-failure ]; then
+        echo "simulated lsof inspection failure (status 2)" >&2
+        exit 2
+    fi
 exit 1
 EOF
 
@@ -215,8 +226,17 @@ echo "unexpected mock package-runner invocation: $*" >&2
 esac
 EOF
 
-    cat > "$MOCK_BIN/ps" <<'EOF'
+cat > "$MOCK_BIN/ps" <<'EOF'
 #!/usr/bin/env bash
+if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-status-one ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+    : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
+    echo "simulated ps inspection failure (status 1)" >&2
+    exit 1
+fi
+if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-failure ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+    : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
+    exit 2
+fi
 pid=""
 previous=""
 for arg in "$@"; do
@@ -246,7 +266,24 @@ fi
 exec /bin/ps "$@"
 EOF
 
-    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps"
+    cat > "$MOCK_BIN/pgrep" <<'EOF'
+#!/usr/bin/env bash
+if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-pgrep-failure ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
+    : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
+    exit 2
+fi
+exec "$GEOROIDS_CONTRACT_REAL_PGREP" "$@"
+EOF
+
+    cat > "$MOCK_BIN/rmdir" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "$GEOROIDS_CONTRACT_LOCK_DIR" ] && [ "$GEOROIDS_CONTRACT_MODE" = lock-release-failure ]; then
+    exit 1
+fi
+exec "$GEOROIDS_CONTRACT_REAL_RMDIR" "$@"
+EOF
+
+    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir"
 }
 
 run_mock_runner() {
@@ -258,7 +295,8 @@ run_mock_runner() {
         "$MOCK_DEV_PID_FILE" \
         "$MOCK_TEST_PID_FILE" \
         "$MOCK_DEV_CHILD_PID_FILE" \
-        "$MOCK_TEST_CHILD_PID_FILE"
+        "$MOCK_TEST_CHILD_PID_FILE" \
+        "$MOCK_FAILURE_MARKER_FILE"
     env \
         PATH="$MOCK_BIN:$PATH" \
         GEOROIDS_CONTRACT_MODE="$mode" \
@@ -266,6 +304,10 @@ run_mock_runner() {
         GEOROIDS_CONTRACT_TEST_PID_FILE="$MOCK_TEST_PID_FILE" \
         GEOROIDS_CONTRACT_DEV_CHILD_PID_FILE="$MOCK_DEV_CHILD_PID_FILE" \
         GEOROIDS_CONTRACT_TEST_CHILD_PID_FILE="$MOCK_TEST_CHILD_PID_FILE" \
+        GEOROIDS_CONTRACT_LOCK_DIR="$LOCK_DIR" \
+        GEOROIDS_CONTRACT_REAL_RMDIR="$REAL_RMDIR" \
+        GEOROIDS_CONTRACT_REAL_PGREP="$REAL_PGREP" \
+        GEOROIDS_CONTRACT_FAILURE_MARKER="$MOCK_FAILURE_MARKER_FILE" \
         GEOROIDS_TEST_MAX_DURATION_SECONDS="$max_duration" \
         GEOROIDS_TEST_VITE_PORT=59993 \
         GEOROIDS_TEST_SERVER_PORT=59994 \
@@ -378,6 +420,89 @@ assert_cleanup_failure_preserves_test_failure() {
     assert_lock_released
 }
 
+assert_port_inspection_failure_is_not_success() {
+    local mode="$1"
+    local expected_exit="$2"
+    local expected_cause="$3"
+    local output_file="$TEMP_DIR/port-inspection-failure.txt"
+    local exit_code
+    if run_mock_runner "$mode" 10 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq "$expected_exit" ] || {
+        cat "$output_file" >&2
+        fail "$mode did not preserve its error exit (exit $exit_code)"
+    }
+    grep -Fq "Could not inspect test port" "$output_file" || {
+        cat "$output_file" >&2
+        fail "$mode did not identify the refusal"
+    }
+    grep -Fq "$expected_cause" "$output_file" || {
+        cat "$output_file" >&2
+        fail "$mode did not preserve the actionable lsof cause"
+    }
+    [ ! -e "$MOCK_DEV_PID_FILE" ] || fail "failed port inspection started a dev server"
+    [ ! -e "$MOCK_TEST_PID_FILE" ] || fail "failed port inspection started Vitest"
+    assert_lock_released
+}
+
+assert_lock_release_failure_is_not_success() {
+    local output_file="$TEMP_DIR/lock-release-failure.txt"
+    local exit_code
+    if run_mock_runner lock-release-failure 10 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 1 ] || {
+        cat "$output_file" >&2
+        fail "failed lock cleanup did not override a successful test exit (exit $exit_code)"
+    }
+    grep -Fq "Could not remove test-runner lock directory" "$output_file" || {
+        cat "$output_file" >&2
+        fail "failed lock cleanup did not identify the lock directory"
+    }
+    [ -d "$LOCK_DIR" ] || fail "lock-release fixture did not preserve the failed lock directory"
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "lock-release-failure mock test"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "lock-release-failure dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "lock-release-failure dev-server child"
+    "$REAL_RMDIR" "$LOCK_DIR"
+    assert_lock_released
+}
+
+assert_process_inspection_failure_is_not_success() {
+    local mode="$1"
+    local expected_message="$2"
+    local expected_cause="${3:-}"
+    local output_file="$TEMP_DIR/$mode.txt"
+    local exit_code
+    if run_mock_runner "$mode" 10 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 1 ] || {
+        cat "$output_file" >&2
+        fail "$mode was reported as successful after process inspection failed (exit $exit_code)"
+    }
+    grep -Fq "$expected_message" "$output_file" || {
+        cat "$output_file" >&2
+        fail "$mode did not explain the process inspection failure"
+    }
+    if [ -n "$expected_cause" ]; then
+        grep -Fq "$expected_cause" "$output_file" || {
+            cat "$output_file" >&2
+            fail "$mode did not preserve the actionable process inspection cause"
+        }
+    fi
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "$mode mock test"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "$mode dev server"
+    assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "$mode dev-server child"
+    assert_lock_released
+}
+
 assert_rejected "config-equals" --config=alternate.config.ts
 assert_rejected "config-short" -c alternate.config.ts
 assert_rejected "config-short-attached" -c=alternate.config.ts
@@ -393,6 +518,10 @@ assert_rejected "sequence-shuffle" --sequence.shuffle=true
 assert_invalid_duration_rejected
 assert_occupied_port_rejected
 setup_mock_tools
+assert_port_inspection_failure_is_not_success \
+    port-inspection-failure 2 "simulated lsof inspection failure (status 2)"
+assert_port_inspection_failure_is_not_success \
+    port-inspection-status-one 2 "simulated lsof inspection failure (status 1)"
 assert_vitest_config "default-discovery" vitest.browser.config.ts
 assert_vitest_config "default-with-options" vitest.browser.config.ts --reporter=verbose
 assert_vitest_config "integration-parent" vitest.browser.config.ts tests/integration/
@@ -406,5 +535,13 @@ assert_vitest_config "server-and-entities" vitest.config.ts \
 assert_test_timeout_cleans_owned_processes
 assert_cleanup_failure_is_not_success
 assert_cleanup_failure_preserves_test_failure
+assert_lock_release_failure_is_not_success
+assert_process_inspection_failure_is_not_success \
+    process-tree-pgrep-failure "Could not enumerate children of owned process PID"
+assert_process_inspection_failure_is_not_success \
+    process-tree-ps-failure "Could not inspect process start time for PID"
+assert_process_inspection_failure_is_not_success \
+    process-tree-ps-status-one "Could not inspect process start time for PID" \
+    "simulated ps inspection failure (status 1)"
 
 echo "✅ Test-runner contract checks passed"

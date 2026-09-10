@@ -8,7 +8,7 @@ export const SNAPSHOT_BACKPRESSURE_BYTES = 256 * 1024;
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type Row = { [key: string]: Json };
 /** Field absence means unchanged; clear deletes a field. Nested values replace atomically. */
-export interface SnapshotPatch {
+interface SnapshotPatch {
   set: Row;
   clear: string[];
   collections: Record<

@@ -1,15 +1,13 @@
 {
   "version": "0.2.0",
-    "configurations": [
+  "configurations": [
     {
       "type": "node",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "request": "launch",
       "name": "Launch Development server",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal",
       "outputCapture": "std",
       "serverReadyAction": {
@@ -24,9 +22,7 @@
       "name": "Launch Chrome",
       "url": "http://localhost:5173",
       "webRoot": "${workspaceFolder}",
-      "skipFiles": [
-        "<node_internals>/**"
-      ]
+      "skipFiles": ["<node_internals>/**"]
     }
   ],
   "compounds": [

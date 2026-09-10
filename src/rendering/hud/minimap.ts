@@ -14,6 +14,7 @@ import { getGameBoundary } from '../../physics/boundary';
 import { isAsteroidPending } from '../../physics/collision/asteroidHitFeel';
 import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
+import type { PlayfieldSize } from '../playfieldCamera';
 import { hudLayoutForCanvas } from './hudLayout';
 
 type RadarMark =
@@ -142,11 +143,11 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
 
 export function drawMiniMap(
   ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
+  viewport: PlayfieldSize,
   ship: Ship
 ): void {
   const boundary = getGameBoundary();
-  const { x: miniMapX, y: miniMapY, size: miniMapSize } = hudLayoutForCanvas(canvas).miniMap;
+  const { x: miniMapX, y: miniMapY, size: miniMapSize } = hudLayoutForCanvas(viewport).miniMap;
   const centerX = miniMapX + miniMapSize / 2;
   const centerY = miniMapY + miniMapSize / 2;
   const projection = { x: 0, y: 0 };

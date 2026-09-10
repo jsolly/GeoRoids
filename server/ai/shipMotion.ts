@@ -12,7 +12,7 @@ export const CONTAIN_RADIUS = getAsteroidFieldRadius();
 /** Start steering home before the contain clamp. */
 export const STEER_IN_RADIUS = Math.max(0, CONTAIN_RADIUS - 200);
 
-export interface MovableShip {
+interface MovableShip {
   position: Position;
   velocity: Velocity;
   angle: number;

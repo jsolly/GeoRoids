@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, describe, expect, test } from 'vitest';
 import { ShockwaveManager } from '../../../src/fx/ShockwaveManager';
 import {
   easedRingRadius,
@@ -18,11 +18,11 @@ describe('phosphor shockwave rings', () => {
 
   test('the fast ring is visible immediately and the heavy ring waits', () => {
     const [fast, heavy] = SHOCKWAVE_WAVES;
-    expect(fast).toBeDefined();
-    expect(heavy).toBeDefined();
-    expect(waveVisualProgress(0, fast!)).toBe(0);
-    expect(waveVisualProgress(0, heavy!)).toBeNull();
-    expect(waveVisualProgress(framesToMs(heavy!.delayFrames), heavy!)).toBe(0);
+    assert.exists(fast);
+    assert.exists(heavy);
+    expect(waveVisualProgress(0, fast)).toBe(0);
+    expect(waveVisualProgress(0, heavy)).toBeNull();
+    expect(waveVisualProgress(framesToMs(heavy.delayFrames), heavy)).toBe(0);
   });
 
   test('rings ease out and fade as they expand', () => {
@@ -64,7 +64,9 @@ describe('phosphor shockwave rings', () => {
     manager.spawn({ x: 1, y: 2 }, t0);
     const debug = manager.getDebugState(t0);
     expect(debug.count).toBe(1);
-    expect(debug.lifetimeMs).toBe(framesToMs(heavy!.delayFrames + heavy!.durationFrames) + 80);
-    expect(debug.items[0]?.fired).toEqual([fast!.id]);
+    assert.exists(fast);
+    assert.exists(heavy);
+    expect(debug.lifetimeMs).toBe(framesToMs(heavy.delayFrames + heavy.durationFrames) + 80);
+    expect(debug.items[0]?.fired).toEqual([fast.id]);
   });
 });

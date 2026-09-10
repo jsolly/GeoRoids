@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'player health regenerates after damage',
@@ -22,8 +22,8 @@ test(
 
     const getShipHealthSnapshot = async (): Promise<ShipHealthSnapshot> =>
       page.evaluate(() => {
-        const gc = (window as any).gameController;
-        const player = gc?.playerManager?.getLocalPlayer?.();
+        const gc = window.gameController;
+        const player = gc?.getPlayerManager()?.getLocalPlayer?.();
         if (!player?.ship) {
           throw new Error('Local player snapshot is unavailable');
         }
@@ -42,7 +42,7 @@ test(
     // combatants, then acknowledge the exact pose before applying server damage.
     const fixturePosition = { x: -1700, y: 0 };
     await game.placeShipAt(fixturePosition.x, fixturePosition.y);
-    const attacker = new GameInteractions(await browserManager.createAdditionalPage());
+    const attacker = new GameInteractions(await browserManager.createPage());
     await attacker.bootGame({ waitForCombatReady: false });
     await attacker.placeShipAt(-1800, 0);
     await Promise.all([game.waitForCombatReady(), attacker.waitForCombatReady()]);

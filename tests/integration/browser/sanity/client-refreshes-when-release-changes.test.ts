@@ -7,7 +7,7 @@ import { ScreenshotManager } from '../../utils/screenshot-manager';
 import { TestConfig } from '../../utils/test-config';
 
 const browserManager = new BrowserManager();
-const screenshots = new ScreenshotManager(__dirname);
+const screenshots = new ScreenshotManager();
 const current = 'a9755405dcfd546ace3e92b4dc8c3ff53d9bb598';
 const next = 'b'.repeat(40);
 

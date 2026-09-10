@@ -4,7 +4,7 @@ import { soundIsOn } from '../constants/user-preferences';
 import { playSound, Sound } from './Sound';
 import { planBoundPlayback, playWorldSound, registerAudioResetHook } from './spatialAudio';
 
-export interface ThrustSource {
+interface ThrustSource {
   id: string;
   thrusting: boolean;
   position: Position;

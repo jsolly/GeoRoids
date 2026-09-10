@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test('status controls show actual log writes and reject unhealthy responses on both viewport sizes', async () => {
   const page = browserManager.getCurrentPage();

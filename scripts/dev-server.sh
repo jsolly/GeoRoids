@@ -41,7 +41,17 @@ valid_port() {
 }
 
 port_in_use() {
-    lsof -nP -iTCP:"$1" -sTCP:LISTEN > /dev/null 2>&1
+    local port="$1"
+    local lsof_status=0
+    if process_inspect lsof -nP -iTCP:"$port" -sTCP:LISTEN; then
+        return 0
+    else
+        lsof_status=$?
+    fi
+    if [ "$lsof_status" -gt 1 ]; then
+        report_process_inspection_failure "TCP port" lsof "$port"
+    fi
+    return "$lsof_status"
 }
 
 require_process_tools() {
@@ -59,11 +69,37 @@ require_process_tools() {
 }
 
 process_command() {
-    ps -p "$1" -o command= 2>/dev/null | sed 's/^ *//'
+    local output
+    local ps_status
+    if process_inspect ps -p "$1" -o command=; then
+        output="$PROCESS_INSPECTION_OUTPUT"
+        printf '%s\n' "$output" | sed 's/^ *//'
+        return 0
+    else
+        ps_status=$?
+    fi
+    if [ "$ps_status" -eq 1 ]; then
+        return 0
+    fi
+    report_process_inspection_failure "command for PID" ps "$1"
+    return "$ps_status"
 }
 
 process_cwd() {
-    lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'
+    local output
+    local lsof_status
+    if process_inspect lsof -a -p "$1" -d cwd -Fn; then
+        output="$PROCESS_INSPECTION_OUTPUT"
+        printf '%s\n' "$output" | sed -n 's/^n//p'
+        return 0
+    else
+        lsof_status=$?
+    fi
+    if [ "$lsof_status" -eq 1 ]; then
+        return 0
+    fi
+    report_process_inspection_failure "cwd for process PID" lsof "$1"
+    return "$lsof_status"
 }
 
 read_state_pid() {
@@ -78,23 +114,39 @@ state_is_owned() {
     local pid="${1:-}"
     local expected_start=""
     local expected_root=""
+    local actual_start=""
+    local actual_cwd=""
+    local command=""
     [ -d "$STATE_DIR" ] || return 1
     [ -f "$PID_FILE" ] && [ -f "$START_FILE" ] && [ -f "$ROOT_FILE" ] || return 1
     valid_pid "$pid" || return 1
     IFS= read -r expected_start < "$START_FILE" || return 1
     IFS= read -r expected_root < "$ROOT_FILE" || return 1
     [ "$expected_root" = "$ROOT" ] || return 1
-    [ "$(process_start "$pid")" = "$expected_start" ] || return 1
-    [ "$(process_cwd "$pid")" = "$ROOT" ] || return 1
-    case "$(process_command "$pid")" in
+    actual_start="$(process_start "$pid")" || return $?
+    [ "$actual_start" = "$expected_start" ] || return 1
+    actual_cwd="$(process_cwd "$pid")" || return $?
+    [ "$actual_cwd" = "$ROOT" ] || return 1
+    command="$(process_command "$pid")" || return $?
+    case "$command" in
         *concurrently*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
 remove_state() {
-    rm -f "$PID_FILE" "$START_FILE" "$ROOT_FILE"
-    rmdir "$STATE_DIR" 2>/dev/null || true
+    if ! rm -f "$PID_FILE" "$START_FILE" "$ROOT_FILE"; then
+        echo "❌ Could not remove development session metadata: $STATE_DIR" >&2
+        return 1
+    fi
+    if [ -d "$STATE_DIR" ] && ! rmdir "$STATE_DIR" 2>/dev/null; then
+        echo "❌ Could not remove development session metadata: $STATE_DIR" >&2
+        return 1
+    fi
+    if [ -e "$STATE_DIR" ]; then
+        echo "❌ Development session metadata remains after cleanup: $STATE_DIR" >&2
+        return 1
+    fi
 }
 
 cleanup() {
@@ -110,7 +162,9 @@ cleanup() {
         DEV_PID=""
     fi
     if [ "$STATE_HELD" = true ]; then
-        remove_state
+        if ! remove_state && [ "$exit_code" -eq 0 ]; then
+            exit_code=1
+        fi
         STATE_HELD=false
     fi
     exit "$exit_code"
@@ -153,8 +207,17 @@ prepare_logs() {
 
 check_ports_free() {
     local occupied=()
-    port_in_use "$DEV_SERVER_PORT" && occupied+=("$DEV_SERVER_PORT")
-    port_in_use "$DEV_VITE_PORT" && occupied+=("$DEV_VITE_PORT")
+    local port
+    local port_status
+    for port in "$DEV_SERVER_PORT" "$DEV_VITE_PORT"; do
+        port_status=0
+        port_in_use "$port" || port_status=$?
+        case "$port_status" in
+            0) occupied+=("$port") ;;
+            1) ;;
+            *) return "$port_status" ;;
+        esac
+    done
     if [ "${#occupied[@]}" -gt 0 ]; then
         echo "❌ Development port(s) ${occupied[*]} are already in use; refusing to stop or attach to unowned processes." >&2
         echo "   Inspect the owner with: lsof -nP -iTCP:${occupied[0]} -sTCP:LISTEN" >&2
@@ -169,16 +232,26 @@ acquire_state() {
     fi
 
     local existing_pid
+    local ownership_status
     existing_pid="$(read_state_pid)"
     if state_is_owned "$existing_pid"; then
         echo "❌ GeoRoids development servers are already running for this checkout (PID $existing_pid)." >&2
         echo "   Stop them with: npm run dev:kill" >&2
         return 1
+    else
+        ownership_status=$?
+        if [ "$ownership_status" -gt 1 ]; then
+            echo "❌ Could not verify the existing GeoRoids development session; refusing to replace its metadata" >&2
+            return "$ownership_status"
+        fi
     fi
     if [ -n "$existing_pid" ]; then
         echo "⚠️  Removing stale GeoRoids development session metadata for PID $existing_pid." >&2
     fi
-    remove_state
+    if ! remove_state; then
+        echo "❌ Could not recover the stale GeoRoids development session metadata" >&2
+        return 1
+    fi
     if ! mkdir "$STATE_DIR" 2>/dev/null; then
         echo "❌ Could not claim the GeoRoids development session for this checkout" >&2
         return 1
@@ -188,7 +261,12 @@ acquire_state() {
 
 write_state() {
     local start_time
-    start_time="$(process_start "$DEV_PID")"
+    local ps_status
+    start_time="$(process_start "$DEV_PID")" || {
+        ps_status=$?
+        echo "❌ Could not inspect the owned development process start time (ps exited $ps_status)" >&2
+        return "$ps_status"
+    }
     [ -n "$start_time" ] || {
         echo "❌ Could not determine the owned development process start time" >&2
         return 1
@@ -201,19 +279,38 @@ write_state() {
 status() {
     require_process_tools
     local pid
+    local ownership_status
     pid="$(read_state_pid)"
     if state_is_owned "$pid"; then
         echo "✅ GeoRoids development session is running (PID $pid)"
         echo "   Vite:    http://localhost:$DEV_VITE_PORT"
         echo "   Server:  http://localhost:$DEV_SERVER_PORT"
         return 0
+    else
+        ownership_status=$?
+        if [ "$ownership_status" -gt 1 ]; then
+            echo "❌ Could not verify the recorded GeoRoids development session" >&2
+            return "$ownership_status"
+        fi
     fi
     if [ -d "$STATE_DIR" ]; then
         echo "⚠️  Stale or untrusted GeoRoids development metadata: $STATE_DIR" >&2
         return 1
     fi
-    if port_in_use "$DEV_SERVER_PORT" || port_in_use "$DEV_VITE_PORT"; then
-        echo "⚠️  A development port is occupied by an unowned process; GeoRoids is not running from this checkout." >&2
+    local occupied=()
+    local port
+    local port_status
+    for port in "$DEV_SERVER_PORT" "$DEV_VITE_PORT"; do
+        port_status=0
+        port_in_use "$port" || port_status=$?
+        case "$port_status" in
+            0) occupied+=("$port") ;;
+            1) ;;
+            *) return "$port_status" ;;
+        esac
+    done
+    if [ "${#occupied[@]}" -gt 0 ]; then
+        echo "⚠️  Development port(s) ${occupied[*]} are occupied by unowned processes; GeoRoids is not running from this checkout." >&2
         return 1
     fi
     echo "✅ No GeoRoids development session is running for this checkout"
@@ -227,14 +324,26 @@ stop() {
     fi
 
     local pid
+    local ownership_status
     pid="$(read_state_pid)"
-    if ! state_is_owned "$pid"; then
+    ownership_status=0
+    state_is_owned "$pid" || ownership_status=$?
+    if [ "$ownership_status" -gt 1 ]; then
+        echo "❌ Could not verify the recorded GeoRoids development session; refusing to signal it" >&2
+        return "$ownership_status"
+    fi
+    if [ "$ownership_status" -ne 0 ]; then
         echo "❌ Refusing to signal an untrusted development PID; inspect or remove stale metadata after confirming it is safe: $STATE_DIR" >&2
         return 1
     fi
     echo "🧹 Stopping GeoRoids development session (PID $pid)..."
-    terminate_process_tree "$pid"
-    remove_state
+    if ! terminate_process_tree "$pid"; then
+        echo "❌ Could not stop the recorded GeoRoids development process; leaving session metadata in place" >&2
+        return 1
+    fi
+    if ! remove_state; then
+        return 1
+    fi
     echo "✅ GeoRoids development session stopped"
 }
 

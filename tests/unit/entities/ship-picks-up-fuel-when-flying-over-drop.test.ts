@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
+import type { WebSocket } from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { applyFuelPickup, applyFuelSnapshot, isFuelLoot } from '../../../shared/fuel';
 import type { AsteroidData } from '../../../shared-types';
@@ -34,12 +35,13 @@ describe('ship picks up fuel when flying over a drop', () => {
   });
 
   test('local and bot ships fill from the same server overlap path', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     const human = engine.addPlayer('human-1', 'Pilot', ws, { x: 0, y: 0 });
     const bots = engine.createBots(1);
-    expect(bots && bots[0]).toBeTruthy();
-    const bot = bots![0]!;
-    for (const extra of bots ?? []) {
+    assert.exists(bots);
+    const bot = bots[0];
+    assert.exists(bot);
+    for (const extra of bots) {
       if (extra.id !== bot.id) {
         engine.updatePlayer(extra.id, { position: { x: -800, y: -800 } });
       }
@@ -52,8 +54,12 @@ describe('ship picks up fuel when flying over a drop', () => {
 
     const drops = engine.getLoot().filter(isFuelLoot);
     expect(drops).toHaveLength(2);
-    engine.updatePlayer(human.id, { position: { ...drops[0]!.position } });
-    engine.updatePlayer(bot.id, { position: { ...drops[1]!.position } });
+    const firstDrop = drops[0];
+    const secondDrop = drops[1];
+    assert.exists(firstDrop);
+    assert.exists(secondDrop);
+    engine.updatePlayer(human.id, { position: { ...firstDrop.position } });
+    engine.updatePlayer(bot.id, { position: { ...secondDrop.position } });
 
     const collected = engine.collectLoot();
     expect(collected.length).toBeGreaterThanOrEqual(2);
@@ -63,19 +69,19 @@ describe('ship picks up fuel when flying over a drop', () => {
   });
 
   test('a full tank leaves the fuel drop in the world', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     const human = engine.addPlayer('human-full', 'Pilot', ws, { x: 0, y: 0 });
     human.fuel = FUEL.MAX;
     engine.addAsteroid(makeAsteroid('roid-full', ROID.SIZE, { x: 0, y: 0 }));
     engine.handleAsteroidHit('roid-full', human.id, 'collision');
     const drop = engine.getLoot().find(isFuelLoot);
-    expect(drop).toBeDefined();
-    engine.updatePlayer(human.id, { position: { ...drop!.position } });
+    assert.exists(drop);
+    engine.updatePlayer(human.id, { position: { ...drop.position } });
 
     const collected = engine.collectLoot();
-    expect(collected.every((item) => item.lootId !== drop!.id)).toBe(true);
+    expect(collected.every((item) => item.lootId !== drop.id)).toBe(true);
     expect(human.fuel).toBe(FUEL.MAX);
-    expect(engine.getLoot().some((item) => item.id === drop!.id)).toBe(true);
+    expect(engine.getLoot().some((item) => item.id === drop.id)).toBe(true);
   });
 
   test('pickup caps at the shared max tank', () => {

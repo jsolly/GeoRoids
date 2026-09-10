@@ -1,12 +1,15 @@
 import { expect, test } from 'vitest';
 import { ROID } from '../../../../src/constants';
 import { getGameBoundary } from '../../../../src/physics/boundary';
-import { countRocksOnCanvas, playfieldZoom } from '../../../../src/rendering/playfieldCamera';
+import {
+  countRocksOnCanvas,
+  PLAYFIELD_CLOSE_SCALE,
+} from '../../../../src/rendering/playfieldCamera';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 type Field = Awaited<ReturnType<GameInteractions['getAsteroidPositions']>>;
 
 async function onCanvasAsteroidCount(game: GameInteractions): Promise<number> {
@@ -16,7 +19,7 @@ async function onCanvasAsteroidCount(game: GameInteractions): Promise<number> {
     game.getCanvasSize(),
   ]);
   const roids = field.map((roid) => ({ position: { x: roid.x, y: roid.y }, r: roid.radius }));
-  return countRocksOnCanvas(roids, ship, canvas, playfieldZoom(roids, ship, canvas));
+  return countRocksOnCanvas(roids, ship, canvas, PLAYFIELD_CLOSE_SCALE);
 }
 
 function survivingRockMoved(before: Field, after: Field): boolean {

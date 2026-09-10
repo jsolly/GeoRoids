@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { logger } from '../setup/serverLogger';
 import { segmentCircleContact } from '../shared/asteroidPhenomena';
 import { GROWTH, radiusFromMass } from '../shared/shipGrowth';
 import type { Position } from '../shared-types';
@@ -224,7 +225,29 @@ export function handleTestResetWorld(
     return;
   }
 
-  gameEngine.resetForTesting();
+  try {
+    gameEngine.resetForTesting();
+  } catch (error) {
+    const failure =
+      error instanceof AggregateError
+        ? {
+            message: error.message,
+            failures: Array.from(error.errors, (entry: unknown) =>
+              entry instanceof Error
+                ? { message: entry.message, cause: entry.cause }
+                : String(entry)
+            ),
+          }
+        : error;
+    logger.error('TEST_RESET_FAILED', {
+      operation: 'reset test world',
+      action: 'close or replace the failing human socket, then retry',
+      error: failure,
+    });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Test world reset failed' }));
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(
     JSON.stringify({
@@ -281,7 +304,11 @@ export function handleTestPlacePlayer(
     const position = { x, y };
     const placed =
       player.asteroidInteractions === 1
-        ? gameEngine.asteroidMotion.placeActorForTesting(player.id, position, Date.now())
+        ? gameEngine.asteroidMotion.placeActorForTesting(
+            player.id,
+            position,
+            gameEngine.getServerTime()
+          )
         : gameEngine.updatePlayer(player.id, {
             position,
             velocity: { x: 0, y: 0 },
@@ -358,7 +385,11 @@ export function handleTestArrangeBotShot(
     }
     const playerPlaced =
       player.asteroidInteractions === 1
-        ? gameEngine.asteroidMotion.placeActorForTesting(player.id, lane.playerPosition, Date.now())
+        ? gameEngine.asteroidMotion.placeActorForTesting(
+            player.id,
+            lane.playerPosition,
+            gameEngine.getServerTime()
+          )
         : gameEngine.updatePlayer(player.id, {
             position: lane.playerPosition,
             velocity: { x: 0, y: 0 },

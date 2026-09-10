@@ -22,7 +22,7 @@ describe('LootManager destroy-drop shards', () => {
     const entity = {
       position: { x: 0, y: 0 },
       mass: GROWTH.BASE_MASS,
-    } as any;
+    };
     const pellets = manager.spawnFromKill(entity, 1);
     expect(pellets.length).toBeGreaterThan(0);
     expect(pellets.every((drop) => drop.kind === 'wreckage')).toBe(true);

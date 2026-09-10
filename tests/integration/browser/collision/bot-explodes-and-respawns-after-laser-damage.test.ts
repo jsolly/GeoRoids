@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'a hostile bot explodes and respawns after lethal laser damage',
@@ -24,7 +24,7 @@ test(
       .poll(
         () =>
           page.evaluate(() => {
-            const ship = (window as any).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+            const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
             return ship?.shieldTimer ?? 0;
           }),
         { timeout: 5000, message: 'Warden E should activate the real absorb shield' }

@@ -11,7 +11,7 @@ import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
 
-export interface PlayerMovementUpdate {
+interface PlayerMovementUpdate {
   position?: Position;
   velocity?: Velocity;
   angle?: number;
@@ -84,7 +84,7 @@ export type ClientCommand =
   | { type: 'clientLog'; payload: WireRecord }
   | { type: 'ping' };
 
-export type ClientCommandDecodeResult =
+type ClientCommandDecodeResult =
   | { ok: true; command: ClientCommand }
   | {
       ok: false;

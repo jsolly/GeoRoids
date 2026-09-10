@@ -1,7 +1,7 @@
 import { type Heightfield, sampleHeight } from './heightfield';
 import { TERRAIN } from './terrainConfig';
 
-export interface ContourSegment {
+interface ContourSegment {
   ax: number;
   ay: number;
   bx: number;
@@ -45,8 +45,11 @@ function addSegment(
  * Marching squares on a regular grid of sampleHeight. Same seed → same lines
  * on every client and the server.
  */
-export function extractIsoContours(field: Heightfield): ContourLevel[] {
-  const n = TERRAIN.GRID_SIZE;
+export function extractIsoContours(
+  field: Heightfield,
+  gridSize: number = TERRAIN.GRID_SIZE
+): ContourLevel[] {
+  const n = gridSize;
   const cell = (2 * field.radius) / n;
   const originX = field.cx - field.radius;
   const originY = field.cy - field.radius;

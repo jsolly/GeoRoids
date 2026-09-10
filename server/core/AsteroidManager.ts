@@ -411,18 +411,6 @@ export class AsteroidManager {
     return expired;
   }
 
-  /**
-   * Destroys an asteroid. Splits only when `split` is true, the asteroid is
-   * biggest-class, and the field is under the cap.
-   */
-  public destroyAsteroid(
-    asteroidId: string,
-    options?: { split?: boolean }
-  ): { destroyed: AsteroidData | undefined; newAsteroids: AsteroidData[] } {
-    const result = this.finishDestroy(asteroidId, options?.split === true);
-    return { destroyed: result.destroyed, newAsteroids: result.newAsteroids };
-  }
-
   private recordHit(
     asteroidId: string,
     shooterId: string,

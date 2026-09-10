@@ -14,7 +14,7 @@ import type { RNGService } from './RNGService';
 
 const PICKUP_NAMES = ['Echo', 'Relay'] as const;
 
-export interface PickupOwnerPose {
+interface PickupOwnerPose {
   id: string;
   position: Position;
   health: number;
@@ -77,7 +77,7 @@ export class SatellitePickupManager {
     orbitingAlready: number
   ): SatellitePickupData | null {
     const pickup = this.pickups.get(pickupId);
-    if (!pickup || pickup.state !== 'loose') {
+    if (pickup?.state !== 'loose') {
       return null;
     }
 

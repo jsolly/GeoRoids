@@ -14,7 +14,7 @@ export async function bootTwoClientGames(browserManager: BrowserManager): Promis
     throw new Error('First page not available — beforeEach should create it');
   }
 
-  const page2 = await browserManager.createAdditionalPage();
+  const page2 = await browserManager.createPage();
   const game1 = new GameInteractions(page1);
   const game2 = new GameInteractions(page2);
 

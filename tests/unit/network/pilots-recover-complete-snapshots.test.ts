@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 import {
   captureSnapshot,
   encodeSnapshot,
@@ -14,7 +14,8 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     let deltas = 0;
     for (let tick = 0; tick < 140; tick++) {
       const world = snapshotFixture(tick);
-      const pilot = world.entities[1]!;
+      const pilot = world.entities[1];
+      assert.exists(pilot);
       for (const ship of world.entities) {
         ship.abilityActiveFrames = tick < 25 ? 25 - tick : 0;
         ship.abilityCooldownFrames = tick < 50 ? 50 - tick : 0;
@@ -44,17 +45,21 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         world.asteroids = [];
       }
       if (tick >= 45 && tick < 65) {
-        world.satellites[0]!.exploding = true;
-        world.satellites[0]!.health = 0;
+        const satellite = world.satellites[0];
+        assert.exists(satellite);
+        satellite.exploding = true;
+        satellite.health = 0;
         world.satelliteProjectiles = world.satelliteProjectiles.filter(
           (shot) => shot.satelliteId !== 'eo-0'
         );
       }
       if (tick === 25) {
-        world.asteroids[0]!.material = 'metal';
-        world.asteroids[0]!.health = 25;
-        world.asteroids[0]!.offsets = [1, 0.6, 1.1, 0.8];
-        world.asteroids[0]!.vertices = 4;
+        const asteroid = world.asteroids[0];
+        assert.exists(asteroid);
+        asteroid.material = 'metal';
+        asteroid.health = 25;
+        asteroid.offsets = [1, 0.6, 1.1, 0.8];
+        asteroid.vertices = 4;
       }
       if (tick >= 130) {
         world.satellites = [];
@@ -81,17 +86,23 @@ describe('pilots reconstruct complete authoritative worlds', () => {
 
   test('explicit clears delete fields and nested arrays replace without retaining stale values', () => {
     const a = captureSnapshot(snapshotFixture());
-    a.entities[0]!.harpoonTargetId = 'rock';
-    a.entities[0]!.harpoonLatchPos = { x: 1, y: 2 };
+    const aEntity = a.entities[0];
+    assert.exists(aEntity);
+    aEntity.harpoonTargetId = 'rock';
+    aEntity.harpoonLatchPos = { x: 1, y: 2 };
     const b = captureSnapshot(snapshotFixture(1));
-    b.asteroids[0]!.offsets = [0.2, 0.3];
+    const bAsteroid = b.asteroids[0];
+    assert.exists(bAsteroid);
+    bAsteroid.offsets = [0.2, 0.3];
     const decoder = new SnapshotDecoder();
     decoder.decode(encodeSnapshot(a, 1));
     const delta = encodeSnapshot(b, 2, { sequence: 1, state: a });
     expect(delta.kind).toBe('delta');
     const decoded = decoder.decode(delta);
     expect(decoded).toEqual(b);
-    expect(Object.hasOwn(decoded.entities[0]!, 'harpoonTargetId')).toBe(false);
+    const decodedEntity = decoded.entities[0];
+    assert.exists(decodedEntity);
+    expect(Object.hasOwn(decodedEntity, 'harpoonTargetId')).toBe(false);
   });
 
   test('bad packets leave the last baseline intact and a fresh keyframe repairs gaps', () => {
@@ -117,7 +128,9 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       })
     ).toThrow(/DTO/);
     const invalidReference = captureSnapshot(snapshotFixture(2));
-    invalidReference.satelliteProjectiles[0]!.satelliteId = 'missing-eo';
+    const invalidProjectile = invalidReference.satelliteProjectiles[0];
+    assert.exists(invalidProjectile);
+    invalidProjectile.satelliteId = 'missing-eo';
     expect(() => decoder.decode(encodeSnapshot(invalidReference, 2))).toThrow(/references/);
     expect(decoder.decode(delta)).toEqual(next);
     expect(() => decoder.decode(delta)).toThrow(/Stale/);
@@ -137,11 +150,17 @@ describe('pilots reconstruct complete authoritative worlds', () => {
   test('engine and application mutations never corrupt the other side of a baseline', () => {
     const engine = snapshotFixture();
     const captured = captureSnapshot(engine);
-    engine.entities[0]!.position.x = -900;
-    expect(captured.entities[0]!.position.x).toBe(500);
+    const engineEntity = engine.entities[0];
+    const capturedEntity = captured.entities[0];
+    assert.exists(engineEntity);
+    assert.exists(capturedEntity);
+    engineEntity.position.x = -900;
+    expect(capturedEntity.position.x).toBe(500);
     const decoder = new SnapshotDecoder();
     const applied = decoder.decode(encodeSnapshot(captured, 1));
-    applied.entities[0]!.position.x = -800;
+    const appliedEntity = applied.entities[0];
+    assert.exists(appliedEntity);
+    appliedEntity.position.x = -800;
     const changed = captureSnapshot(snapshotFixture());
     changed.gameTime = 1;
     expect(decoder.decode(encodeSnapshot(changed, 2, { sequence: 1, state: captured }))).toEqual(

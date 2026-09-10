@@ -7,7 +7,7 @@ import { CollisionManager } from '../../../src/physics/collision/CollisionManage
 
 // Mock NetworkManager
 const mockSendMessage = vi.fn();
-const mockGetLocalPlayerId = vi.fn(() => 'local-player-123');
+const mockGetLocalPlayerId = vi.fn((): string | null => 'local-player-123');
 
 vi.mock('../../../src/network/networkManager', () => ({
   NetworkManager: {
@@ -40,7 +40,7 @@ vi.mock('../../../src/physics/collision/collisionDetection', () => ({
 
 describe('Local Player Roid Collision Damage', () => {
   let collisionManager: CollisionManager;
-  let networkManager: any;
+  let networkManager: NetworkManager;
   let localPlayer: { ship: Ship; id: string; type: 'local' };
   let localShip: Ship;
   let roid: Roid;
@@ -231,7 +231,7 @@ describe('Local Player Roid Collision Damage', () => {
     });
 
     test('handles missing local player ID gracefully', async () => {
-      networkManager.getLocalPlayerId.mockReturnValue(null);
+      mockGetLocalPlayerId.mockReturnValue(null);
 
       // Mock the collision detection to return true
       const { checkShipCollision } = await import(

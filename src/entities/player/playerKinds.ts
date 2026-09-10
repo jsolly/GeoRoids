@@ -1,4 +1,4 @@
-export type PlayerKind = 'local' | 'remote' | 'bot';
+type PlayerKind = 'local' | 'remote' | 'bot';
 
 export type Combatant = {
   id: string;

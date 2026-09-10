@@ -1,10 +1,10 @@
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { SATELLITE } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'a player destroys a satellite with lasers and is awarded the kill',
@@ -20,7 +20,8 @@ test(
 
     const satellites = await game.getSatellites();
     expect(satellites.length).toBeGreaterThan(0);
-    const target = satellites[0]!;
+    const target = satellites[0];
+    assert.exists(target);
     const scoreBefore = await game.getScore();
 
     const result = await game.attackSatelliteWithLasers(target.id, 10);

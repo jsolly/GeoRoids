@@ -1,10 +1,10 @@
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { SATELLITE_PICKUP } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'a player collects a shared satellite and it orbits with a score bonus',
@@ -22,7 +22,8 @@ test(
     expect(pickups.length).toBeGreaterThanOrEqual(2);
     expect(pickups.every((pickup) => pickup.state === 'loose')).toBe(true);
 
-    const target = pickups[0]!;
+    const target = pickups[0];
+    assert.exists(target);
     const scoreBefore = await game.getScore();
 
     await expect

@@ -13,8 +13,8 @@ afterEach(() => {
   }
 });
 
-test('title shell exposes a canvas starfield and keeps stock credit empty', () => {
-  expect(document.getElementById('title-starfield')?.tagName).toBe('CANVAS');
+test('title shell exposes a terrain canvas and keeps stock credit empty', () => {
+  expect(document.getElementById('title-terrain')?.tagName).toBe('CANVAS');
   expect(document.getElementById('attribution')?.textContent?.trim()).toBe('');
 });
 
@@ -35,8 +35,7 @@ test('title menu presents the keyboard and E/F control hint', () => {
 
 test('title menu exposes the ship kit picker before entering play', () => {
   const grid = document.getElementById('ship-kit-grid');
-  expect(grid?.getAttribute('role')).toBe('group');
-  expect(grid?.getAttribute('aria-label')).toBe('Ship kit');
+  expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Ship kit');
   expect(document.querySelector('.ship-kit-placeholder-note')?.textContent).toContain(
     'AD v2 silhouettes'
   );

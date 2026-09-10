@@ -5,6 +5,16 @@ import { createServerInstance } from '../../../server/createServer';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 
+interface ObservedAsteroidMessage {
+  type?: string;
+  data?: {
+    asteroidId?: string;
+    asteroids?: AsteroidData[];
+    collabSplit?: boolean;
+    origin?: { x: number; y: number };
+  };
+}
+
 async function openSocket(port: number): Promise<WebSocket> {
   const ws = new WebSocket(`ws://localhost:${port}/ws`);
   await new Promise<void>((resolve, reject) => {
@@ -39,8 +49,9 @@ function waitForAsteroidId(ws: WebSocket): Promise<string> {
           clearTimeout(timeout);
           resolve(asteroid.id);
         }
-      } catch {
-        // ignore non-JSON frames
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
       }
     });
   });
@@ -112,12 +123,13 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidId = await asteroidCreated;
     asteroidPosition(server, asteroidId);
 
-    const splitMessages: unknown[] = [];
+    const splitMessages: ObservedAsteroidMessage[] = [];
+    let parseError: unknown;
     const onSplit = (raw: Buffer) => {
       try {
         splitMessages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     };
     playerA.on('message', onSplit);
@@ -129,16 +141,17 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       .poll(
         () => {
           const destroy = splitMessages.find(
-            (msg: any) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
-          ) as { data?: { collabSplit?: boolean; origin?: { x: number; y: number } } } | undefined;
+            (msg) => msg?.type === 'asteroidDestroy' && msg?.data?.asteroidId === asteroidId
+          );
           const create = splitMessages.find(
-            (msg: any) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
+            (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
           );
           return Boolean(destroy?.data?.collabSplit && destroy.data.origin && create);
         },
         { timeout: 3000, interval: 25 }
       )
       .toBe(true);
+    expect(parseError).toBeUndefined();
 
     playerA.close();
     playerB.close();
@@ -156,12 +169,13 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidId = await asteroidCreated;
     asteroidPosition(server, asteroidId);
 
-    const messages: any[] = [];
+    const messages: ObservedAsteroidMessage[] = [];
+    let parseError: unknown;
     playerA.on('message', (raw) => {
       try {
         messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     });
 
@@ -181,6 +195,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         { timeout: 3000, interval: 25 }
       )
       .toBe(true);
+    expect(parseError).toBeUndefined();
 
     playerA.close();
   });
@@ -197,12 +212,13 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidId = await asteroidCreated;
     asteroidPosition(server, asteroidId);
 
-    const messages: any[] = [];
+    const messages: ObservedAsteroidMessage[] = [];
+    let parseError: unknown;
     playerA.on('message', (raw) => {
       try {
         messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     });
 
@@ -228,11 +244,12 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
           const splitBatch = messages.find(
             (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
           );
-          return destroy && destroy.data.collabSplit === false && !splitBatch;
+          return destroy && destroy.data?.collabSplit === false && !splitBatch;
         },
         { timeout: 3000, interval: 25 }
       )
       .toBeTruthy();
+    expect(parseError).toBeUndefined();
 
     playerA.close();
   });
@@ -249,12 +266,13 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const asteroidId = await asteroidCreated;
     asteroidPosition(server, asteroidId);
 
-    const messages: any[] = [];
+    const messages: ObservedAsteroidMessage[] = [];
+    let parseError: unknown;
     playerA.on('message', (raw) => {
       try {
         messages.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     });
 
@@ -271,11 +289,12 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
           const splitBatch = messages.find(
             (msg) => msg?.type === 'asteroidCreateBatch' && msg?.data?.asteroids?.length === 2
           );
-          return destroy && destroy.data.collabSplit === false && !splitBatch;
+          return destroy && destroy.data?.collabSplit === false && !splitBatch;
         },
         { timeout: 3000, interval: 25 }
       )
       .toBeTruthy();
+    expect(parseError).toBeUndefined();
 
     playerA.close();
   });

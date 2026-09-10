@@ -3,6 +3,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvas';
+import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 
 /**
  * Muted topo lines in world space. Tight spacing is steep; keep alpha low so
@@ -21,9 +22,10 @@ export function drawIsoContours(shipPosition: Position): void {
   }
 
   const pad = 32;
-  const scale = canvasManager.getPlayfieldScale();
-  const centerX = cvs.width / 2;
-  const centerY = cvs.height / 2;
+  const viewport = canvasManager.getViewportSize();
+  const scale = PLAYFIELD_CLOSE_SCALE;
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -45,9 +47,9 @@ export function drawIsoContours(shipPosition: Position): void {
       const by = centerY + (segment.by - shipPosition.y) * scale;
       if (
         (ax < -pad && bx < -pad) ||
-        (ax > cvs.width + pad && bx > cvs.width + pad) ||
+        (ax > viewport.width + pad && bx > viewport.width + pad) ||
         (ay < -pad && by < -pad) ||
-        (ay > cvs.height + pad && by > cvs.height + pad)
+        (ay > viewport.height + pad && by > viewport.height + pad)
       ) {
         continue;
       }

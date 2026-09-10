@@ -12,8 +12,11 @@ tests/integration/browser/screenshots/
 
 # Vite
 dist/*
-# Vercel (local CLI state; the hook passes VERCEL_ORG_ID/VERCEL_PROJECT_ID)
+# Vercel local project metadata
 .vercel
+
+# Railway CLI local link metadata; keep the tracked IaC source and README.
+.railway/*.json
 
 # Logs
 /logs
@@ -29,7 +32,5 @@ dist/*
 !.cursor/rules/
 !.cursor/rules/**
 
-
-# Materialized agent config (fetched by .dotagents/bootstrap.sh; not committed)
 
 # Canonical art references and generated vector assets are versioned in georoids-art/.

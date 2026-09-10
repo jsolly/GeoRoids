@@ -2,7 +2,7 @@ import { findNearestAsteroidImpact } from '../../../shared/asteroidReflection';
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 
 /** Asteroid or ship the Hauler harpoon can latch. Same shape on client and server. */
-export interface HarpoonFieldBody {
+interface HarpoonFieldBody {
   id: string;
   position: Position;
   velocity: Velocity;
@@ -26,7 +26,7 @@ const lastKnown = new Map<string, HarpoonFieldBody>();
 /** Keep the last live latch list across a WS flap empty publish. */
 let holdEmptyField = false;
 
-export type HarpoonFieldSnapshot = {
+type HarpoonFieldSnapshot = {
   bodies: readonly HarpoonFieldBody[];
   playfieldScale?: number;
   canvas?: { width: number; height: number };

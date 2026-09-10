@@ -21,7 +21,7 @@ export type SatelliteShotManner =
   | 'sharp-vhr-stab';
 
 /** Projectile geometry behind each mission's human-readable firing manner. */
-export type SatelliteShotPattern =
+type SatelliteShotPattern =
   | 'steady'
   | 'wide-sweep'
   | 'spin-burst'
@@ -137,8 +137,4 @@ export const SATELLITE_PROFILES = [
 export function satelliteProfileAt(index: number): SatelliteProfile {
   const normalized = Math.abs(Math.trunc(index)) % SATELLITE_PROFILES.length;
   return SATELLITE_PROFILES[normalized] ?? SATELLITE_PROFILES[0];
-}
-
-export function satelliteProfileForType(typeId: SatelliteTypeId): SatelliteProfile {
-  return SATELLITE_PROFILES.find((profile) => profile.typeId === typeId) ?? SATELLITE_PROFILES[0];
 }

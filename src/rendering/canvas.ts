@@ -1,11 +1,5 @@
 import type { Position } from '../../shared-types';
 import { PALETTE } from '../constants';
-import {
-  CANVAS_DEFAULT_CENTER_X,
-  CANVAS_DEFAULT_CENTER_Y,
-  CANVAS_INTERNAL_HEIGHT,
-  CANVAS_INTERNAL_WIDTH,
-} from '../constants/canvas';
 import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
@@ -36,11 +30,16 @@ import {
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
+import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
-import { PLAYFIELD_CLOSE_SCALE, projectWorldToScreenInto } from './playfieldCamera';
+import {
+  PLAYFIELD_CLOSE_SCALE,
+  type PlayfieldSize,
+  projectWorldToScreenInto,
+} from './playfieldCamera';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawStarfield } from './starfield';
 
@@ -49,7 +48,9 @@ class CanvasManager {
   private canvas: HTMLCanvasElement | null = null;
   private context: CanvasRenderingContext2D | null = null;
   private resizeHandler: (() => void) | null = null;
-  private playfieldScale = 1;
+  private stopDevicePixelRatioWatcher: (() => void) | null = null;
+  private readonly viewport = { width: 1, height: 1 };
+  private devicePixelRatio = 1;
   private readonly screenPos = { x: 0, y: 0 };
   private readonly laserHosts: LiveLaserSource[] = [{ lasers: [] }];
   private readonly liveLaserPositions: Position[] = [];
@@ -60,19 +61,16 @@ class CanvasManager {
     this.context = this.canvas?.getContext('2d', { alpha: false }) || null;
 
     if (this.canvas && this.context) {
-      this.applyViewportSize();
-
-      // Enable crisp pixel rendering
-      this.context.imageSmoothingEnabled = true;
-      this.context.imageSmoothingQuality = 'high';
-
       // Add resize handler to maintain full-screen coverage
       this.resizeHandler = this.handleCanvasResize.bind(this);
       window.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('scroll', this.resizeHandler);
+      this.stopDevicePixelRatioWatcher = watchDevicePixelRatio(() => {
+        this.handleCanvasResize();
+      });
 
-      // Initial resize call
+      // Run the same boundary used for later resizes once at startup.
       this.handleCanvasResize();
     }
   }
@@ -85,30 +83,66 @@ class CanvasManager {
     };
   }
 
-  private applyViewportSize(): void {
+  private currentDevicePixelRatio(): number {
+    const dpr = window.devicePixelRatio;
+    return Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  }
+
+  private applyViewportSize(): boolean {
     if (!this.canvas) {
-      return;
+      return false;
     }
     const { width, height } = this.viewportSize();
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
+    const dpr = this.currentDevicePixelRatio();
+    const backingWidth = Math.max(1, Math.round(width * dpr));
+    const backingHeight = Math.max(1, Math.round(height * dpr));
+    const backingSizeChanged =
+      this.canvas.width !== backingWidth || this.canvas.height !== backingHeight;
+    const devicePixelRatioChanged = this.devicePixelRatio !== dpr;
+
+    this.viewport.width = width;
+    this.viewport.height = height;
+
+    if (this.canvas.width !== backingWidth) {
+      this.canvas.width = backingWidth;
+    }
+    if (this.canvas.height !== backingHeight) {
+      this.canvas.height = backingHeight;
+    }
+
+    const cssWidth = `${width}px`;
+    const cssHeight = `${height}px`;
+    if (this.canvas.style.width !== cssWidth) {
+      this.canvas.style.width = cssWidth;
+    }
+    if (this.canvas.style.height !== cssHeight) {
+      this.canvas.style.height = cssHeight;
+    }
+
+    if (backingSizeChanged || devicePixelRatioChanged) {
+      this.context?.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    this.devicePixelRatio = dpr;
+    return backingSizeChanged || devicePixelRatioChanged;
   }
 
   // Handle canvas resizing to maintain full-screen coverage
   private handleCanvasResize(): void {
     if (this.canvas && this.context) {
-      this.applyViewportSize();
+      const changed = this.applyViewportSize();
 
       // Re-enable crisp rendering after resize
-      this.context.imageSmoothingEnabled = true;
-      this.context.imageSmoothingQuality = 'high';
+      if (changed) {
+        this.context.imageSmoothingEnabled = true;
+        this.context.imageSmoothingQuality = 'high';
+      }
     }
   }
 
   // Cleanup method
   destroy(): void {
+    this.stopDevicePixelRatioWatcher?.();
+    this.stopDevicePixelRatioWatcher = null;
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
       window.visualViewport?.removeEventListener('resize', this.resizeHandler);
@@ -117,6 +151,9 @@ class CanvasManager {
     }
     this.canvas = null;
     this.context = null;
+    this.viewport.width = 1;
+    this.viewport.height = 1;
+    this.devicePixelRatio = 1;
   }
 
   // Safe accessor methods for canvas and context
@@ -128,6 +165,10 @@ class CanvasManager {
     return this.context;
   }
 
+  getViewportSize(): Readonly<PlayfieldSize> {
+    return this.viewport;
+  }
+
   clearPlayfield(): void {
     const ctx = this.context;
     const canvas = this.canvas;
@@ -135,7 +176,7 @@ class CanvasManager {
       return;
     }
     ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
   }
 
   requireCanvas(): HTMLCanvasElement {
@@ -152,57 +193,18 @@ class CanvasManager {
     return this.context;
   }
 
-  // Coordinate scaling utilities for dynamic canvas sizes
-  getScaleX(): number {
-    return this.canvas ? this.canvas.width / CANVAS_INTERNAL_WIDTH : 1;
-  }
-
-  getScaleY(): number {
-    return this.canvas ? this.canvas.height / CANVAS_INTERNAL_HEIGHT : 1;
-  }
-
-  scaleX(x: number): number {
-    return x * this.getScaleX();
-  }
-
-  scaleY(y: number): number {
-    return y * this.getScaleY();
-  }
-
-  getCanvasCenter(): { x: number; y: number } {
-    return {
-      x: this.canvas ? this.canvas.width / 2 : CANVAS_DEFAULT_CENTER_X,
-      y: this.canvas ? this.canvas.height / 2 : CANVAS_DEFAULT_CENTER_Y,
-    };
-  }
-
-  beginPlayfieldFrame(
-    _shipPos: Position,
-    _roids: ReadonlyArray<{ position: Position; r?: number }>
-  ): void {
-    if (!this.canvas) {
-      this.playfieldScale = PLAYFIELD_CLOSE_SCALE;
-      return;
-    }
-    this.playfieldScale = PLAYFIELD_CLOSE_SCALE;
-  }
-
-  getPlayfieldScale(): number {
-    return this.playfieldScale;
-  }
-
   worldToScreenInto(
     out: { x: number; y: number },
     worldPos: Position,
     shipPos: Position
   ): { x: number; y: number } {
-    const scale = this.playfieldScale;
+    const scale = PLAYFIELD_CLOSE_SCALE;
     if (!this.canvas) {
       out.x = (worldPos.x - shipPos.x) * scale;
       out.y = (worldPos.y - shipPos.y) * scale;
       return out;
     }
-    return projectWorldToScreenInto(out, worldPos, shipPos, this.canvas, scale);
+    return projectWorldToScreenInto(out, worldPos, shipPos, this.viewport, scale);
   }
 
   // Viewport transformation methods
@@ -212,30 +214,15 @@ class CanvasManager {
   }
 
   screenToWorld(screenPos: Point, shipPos: Position): Position {
-    const scale = this.playfieldScale || 1;
+    const scale = PLAYFIELD_CLOSE_SCALE;
     if (!this.canvas) {
       return { x: screenPos.x / scale + shipPos.x, y: screenPos.y / scale + shipPos.y };
     }
 
     return {
-      x: (screenPos.x - this.canvas.width / 2) / scale + shipPos.x,
-      y: (screenPos.y - this.canvas.height / 2) / scale + shipPos.y,
+      x: (screenPos.x - this.viewport.width / 2) / scale + shipPos.x,
+      y: (screenPos.y - this.viewport.height / 2) / scale + shipPos.y,
     };
-  }
-
-  isWorldPositionVisible(worldPos: Position, shipPos: Position, margin: number = 100): boolean {
-    if (!this.canvas) {
-      // Fallback to true if canvas is not available
-      return true;
-    }
-
-    const screenPos = this.worldToScreenInto(this.screenPos, worldPos, shipPos);
-    return (
-      screenPos.x >= -margin &&
-      screenPos.x <= this.canvas.width + margin &&
-      screenPos.y >= -margin &&
-      screenPos.y <= this.canvas.height + margin
-    );
   }
 
   // Game rendering method that draws all game elements
@@ -258,11 +245,10 @@ class CanvasManager {
 
     // Clear the canvas
     ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
 
-    // Draw roids
     const roids = currRoidBelt.getRoids();
-    this.beginPlayfieldFrame(currShip.position, roids);
+    const viewport = this.getViewportSize();
 
     drawStarfield(currShip.position);
     drawIsoContours(currShip.position);
@@ -351,31 +337,31 @@ class CanvasManager {
       drawLasers(player.ship, enemyLaserColor, currShip.position);
     }
 
-    this.drawMiniMapWithPlayers(currShip);
+    this.drawMiniMapWithPlayers(currShip, viewport);
 
-    drawScoreOverlay(ctx, canvas, currScore, lives, currPlayer.factionId);
+    drawScoreOverlay(ctx, viewport, currScore, lives, currPlayer.factionId);
 
-    drawLivesIndicator(ctx, lives, PALETTE.LOCAL, currShip.kitId);
+    drawLivesIndicator(ctx, lives, PALETTE.LOCAL, viewport, currShip.kitId);
 
     if (text && textAlpha > 0) {
-      drawTextOverlay(ctx, canvas, text, textAlpha);
+      drawTextOverlay(ctx, viewport, text, textAlpha);
     }
 
     if (allPlayers.length > 1) {
-      drawLeaderboard(ctx, canvas, allPlayers, currPlayer.id);
+      drawLeaderboard(ctx, viewport, allPlayers, currPlayer.id);
     }
 
     const roidCount = currRoidBelt.roids.length;
-    drawDebugInfo(ctx, canvas, roidCount, isDebugMode());
+    drawDebugInfo(ctx, viewport, roidCount, isDebugMode());
   }
 
   // Helper method to draw mini map with all players
-  private drawMiniMapWithPlayers(ship: Ship): void {
+  private drawMiniMapWithPlayers(ship: Ship, viewport: PlayfieldSize): void {
     // Draw the base mini map
     const ctx = this.getContext();
     const canvas = this.getCanvas();
     if (ctx && canvas) {
-      drawMiniMap(ctx, canvas, ship);
+      drawMiniMap(ctx, viewport, ship);
     }
 
     // The mini map module will handle drawing all players internally

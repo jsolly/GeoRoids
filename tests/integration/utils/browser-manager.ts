@@ -35,7 +35,7 @@ export class BrowserManager {
 
     let context = this.context;
     if (options.hasTouch) {
-      this.touchContext ??= await this.browser.newContext({ hasTouch: true });
+      this.touchContext ??= await this.browser.newContext({ hasTouch: true, deviceScaleFactor: 2 });
       context = this.touchContext;
     }
     const page = await context.newPage();
@@ -54,56 +54,28 @@ export class BrowserManager {
     return page;
   }
 
-  async closePage(): Promise<void> {
-    await this.closeAllPages();
-  }
-
   /** Replace the scenario page when a test needs a different input device. */
   async recreatePage(options: { hasTouch?: boolean } = {}): Promise<Page> {
     await this.closeAllPages();
     return this.createPage(options);
   }
 
-  /** Alias for closePage — closes every page opened in this manager. */
+  /** Close every page before the next scenario begins. */
   async closeAllPages(): Promise<void> {
     for (const page of this.pages) {
-      await page.close().catch((error: unknown) => {
-        console.error('Failed to close scenario page; browser cleanup will retry', error);
-      });
+      await page.close();
     }
     this.pages = [];
     this.page = null;
   }
 
-  /** Open an additional browser tab for multi-client scenarios. */
-  async createAdditionalPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
-    return this.createPage(options);
-  }
-
-  /** Returns the first and second pages for two-client tests. */
-  getTwoClientPages(): { first: Page; second: Page } {
-    if (this.pages.length < 2) {
-      throw new Error(
-        'Expected two pages — call createAdditionalPage() after the first createPage()'
-      );
-    }
-    return { first: this.pages[0]!, second: this.pages[1]! };
-  }
-
   async cleanup(): Promise<void> {
-    await this.closeAllPages();
-    if (this.context) {
-      await this.context.close();
-      this.context = null;
-    }
-    if (this.touchContext) {
-      await this.touchContext.close();
-      this.touchContext = null;
-    }
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-    }
+    await this.browser?.close();
+    this.browser = null;
+    this.context = null;
+    this.touchContext = null;
+    this.pages = [];
+    this.page = null;
   }
 
   getCurrentPage(): Page | null {

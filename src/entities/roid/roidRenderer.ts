@@ -3,7 +3,11 @@ import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
 import { isAsteroidPending, pendingElapsedMs } from '../../physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../rendering/canvas';
-import { drawingOffsets, type PlayfieldRock } from '../../rendering/playfieldCamera';
+import {
+  drawingOffsets,
+  PLAYFIELD_CLOSE_SCALE,
+  type PlayfieldRock,
+} from '../../rendering/playfieldCamera';
 import {
   driftSegment,
   polygonPoints,
@@ -240,9 +244,10 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     return;
   }
 
-  const scale = canvasManager.getPlayfieldScale();
-  const viewW = cvs?.width ?? Number.POSITIVE_INFINITY;
-  const viewH = cvs?.height ?? Number.POSITIVE_INFINITY;
+  const scale = PLAYFIELD_CLOSE_SCALE;
+  const viewport = cvs ? canvasManager.getViewportSize() : undefined;
+  const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
+  const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
 
   for (const roid of roids) {
     if (!canDrawAsteroid(roid)) {

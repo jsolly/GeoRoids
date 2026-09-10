@@ -115,5 +115,6 @@ export function serializeAsteroidMaterialSvg(material: AsteroidMaterial): string
         `<polyline opacity="0.62" points="${line.map(([x, y]) => `${x * 28},${y * 28}`).join(' ')}"/>`
     )
     .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="68" height="68" viewBox="-34 -34 68 68" fill="none" stroke="${PALETTE.ROID}" stroke-width="1" stroke-linejoin="round"><polygon points="${points}"/>${details}</svg>\n`;
+  const title = `${material.charAt(0).toUpperCase()}${material.slice(1)} asteroid`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="68" height="68" viewBox="-34 -34 68 68" fill="none" stroke="${PALETTE.ROID}" stroke-width="1" stroke-linejoin="round"><title>${title}</title><polygon points="${points}"/>${details}</svg>\n`;
 }

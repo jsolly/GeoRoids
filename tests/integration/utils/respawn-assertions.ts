@@ -1,13 +1,13 @@
 import { expect } from 'vitest';
 
 /** Circular world boundary radius (must match server/client). */
-export const BOUNDARY_RADIUS = 3100;
+const BOUNDARY_RADIUS = 3100;
 
 /** Server respawns within 80% of the boundary radius. */
-export const RESPAWN_MAX_RADIUS = BOUNDARY_RADIUS * 0.8;
+const RESPAWN_MAX_RADIUS = BOUNDARY_RADIUS * 0.8;
 
 /** Respawn must land noticeably away from the death location. */
-export const MIN_RESPAWN_DISTANCE_FROM_DEATH = 75;
+const MIN_RESPAWN_DISTANCE_FROM_DEATH = 75;
 
 /**
  * Assert the server respawned the ship at a new random location inside the

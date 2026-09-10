@@ -1,4 +1,6 @@
+import { once } from 'node:events';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 
 describe('Server test world reset', () => {
@@ -30,8 +32,11 @@ describe('Server test world reset', () => {
   });
 
   it('POST /test/reset-world clears humans, bots, and asteroids', async () => {
-    const mockWs = {} as any;
-    server.gameEngine.addPlayer('reset-test-player', 'ResetTest', mockWs);
+    const ws = new WebSocket(`${baseUrl.replace('http:', 'ws:')}/ws`);
+    await once(ws, 'open');
+    const joined = once(ws, 'message');
+    ws.send(JSON.stringify({ type: 'join', data: { id: 'reset-test-player', name: 'ResetTest' } }));
+    await joined;
     server.gameEngine.createAsteroids(5);
     server.gameEngine.createBots(2);
 
@@ -39,8 +44,12 @@ describe('Server test world reset', () => {
     expect(server.gameEngine.getDiagnostics().asteroids).toBeGreaterThan(0);
     expect(server.gameEngine.getDiagnostics().bots).toBeGreaterThan(0);
 
+    const closed = once(ws, 'close');
     const response = await fetch(`${baseUrl}/test/reset-world`, { method: 'POST' });
     expect(response.ok).toBe(true);
+    const [code, reason] = await closed;
+    expect(code).toBe(1000);
+    expect(String(reason)).toBe('Test world reset');
 
     const body = await response.json();
     expect(body.status).toBe('reset');

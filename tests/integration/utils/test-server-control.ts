@@ -1,8 +1,8 @@
 import type { GameEngine } from '../../../server/core/GameEngine';
 import { TestConfig } from './test-config';
 
-export type ServerWorldDiagnostics = ReturnType<GameEngine['getDiagnostics']>;
-export type BotShotArrangement = {
+type ServerWorldDiagnostics = ReturnType<GameEngine['getDiagnostics']>;
+type BotShotArrangement = {
   playerPosition: { x: number; y: number };
   botPosition: { x: number; y: number };
   botHealth: number;
@@ -43,8 +43,8 @@ function isPosition(value: unknown): value is { x: number; y: number } {
   );
 }
 
-export class TestServerControl {
-  static async getWorldDiagnostics(): Promise<ServerWorldDiagnostics> {
+export const TestServerControl = {
+  async getWorldDiagnostics(): Promise<ServerWorldDiagnostics> {
     const response = await fetch(`${TestConfig.SERVER_URL}/health`, {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
@@ -61,9 +61,9 @@ export class TestServerControl {
       throw new Error('Health response omitted valid world diagnostics');
     }
     return parsed.world;
-  }
+  },
 
-  static isWorldClean(world: ServerWorldDiagnostics): boolean {
+  isWorldClean(world: ServerWorldDiagnostics): boolean {
     return (
       world.isPaused &&
       world.humanPlayers === 0 &&
@@ -73,9 +73,9 @@ export class TestServerControl {
       world.satellites === 0 &&
       world.satellitePickups === 0
     );
-  }
+  },
 
-  static async resetWorld(): Promise<void> {
+  async resetWorld(): Promise<void> {
     const response = await fetch(`${TestConfig.SERVER_URL}/test/reset-world`, {
       method: 'POST',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -84,9 +84,9 @@ export class TestServerControl {
       throw new Error(`World reset failed: HTTP ${response.status}`);
     }
     await TestServerControl.waitForWorldReset();
-  }
+  },
 
-  static async placePlayer(
+  async placePlayer(
     playerId: string,
     position: { x: number; y: number }
   ): Promise<{ motionEpoch?: number }> {
@@ -126,9 +126,9 @@ export class TestServerControl {
       throw new Error('Player fixture placement returned an invalid motion epoch');
     }
     return 'motionEpoch' in result ? { motionEpoch: result.motionEpoch as number } : {};
-  }
+  },
 
-  static async arrangeBotShot(playerId: string, botId: string): Promise<BotShotArrangement> {
+  async arrangeBotShot(playerId: string, botId: string): Promise<BotShotArrangement> {
     const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-bot-shot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -173,9 +173,9 @@ export class TestServerControl {
       botHealth: result.botHealth,
       ...('motionEpoch' in result ? { motionEpoch: result.motionEpoch as number } : {}),
     };
-  }
+  },
 
-  static async waitForWorldReset(timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
+  async waitForWorldReset(timeoutMs = DEFAULT_WAIT_MS): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const world = await TestServerControl.getWorldDiagnostics();
@@ -187,8 +187,8 @@ export class TestServerControl {
 
     const world = await TestServerControl.getWorldDiagnostics();
     throw new Error(`Timed out waiting for server world reset: ${JSON.stringify(world)}`);
-  }
-}
+  },
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

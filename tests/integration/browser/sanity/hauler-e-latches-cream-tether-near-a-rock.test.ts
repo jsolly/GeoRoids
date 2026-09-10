@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 const CREAM = '#E8D5A3';
 const TIP = '#FDE68A';
@@ -26,32 +26,35 @@ test(
     page.on('pageerror', (error) => consoleErrors.push(error.message));
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
-    const peerPage = await browserManager.createAdditionalPage();
+    const peerPage = await browserManager.createPage();
     const peer = new GameInteractions(peerPage);
     await peer.bootGame({ waitForCombatReady: false });
     await page.bringToFront();
 
     await game.waitForAsteroids(1);
     const fixture = await page.evaluate(() => {
-      const gc = (window as { gameController?: any }).gameController;
-      const player = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller is unavailable');
+      }
+      const player = gc?.getPlayerManager()?.getLocalPlayer?.();
       const ship = player?.ship;
       const rocks = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
       const actors = (gc?.getNetworkManager?.().getAllPlayers?.() ?? [])
         .filter(
-          (actor: any) => actor.id !== player?.id && actor.ship?.health > 0 && !actor.ship.exploding
+          (actor) => actor.id !== player?.id && actor.ship?.health > 0 && !actor.ship.exploding
         )
-        .map((actor: any) => actor.ship.position);
+        .map((actor) => actor.ship.position);
       const satellites = (gc?.getSatellites?.() ?? [])
-        .filter((satellite: any) => satellite.health > 0 && !satellite.exploding)
-        .map((satellite: any) => satellite.position);
+        .filter((satellite) => satellite.health > 0 && !satellite.exploding)
+        .map((satellite) => satellite.position);
       const hazards = [...actors, ...satellites];
       if (!ship || rocks.length === 0) {
         throw new Error('Hauler fixture requires the local ship and a live asteroid');
       }
       const rock = rocks
-        .filter((candidate: any) => candidate.health > 0)
-        .map((candidate: any) => ({
+        .filter((candidate) => candidate.health > 0)
+        .map((candidate) => ({
           candidate,
           clearance:
             hazards.length + rocks.length > 1
@@ -60,9 +63,9 @@ test(
                     Math.hypot(candidate.position.x - position.x, candidate.position.y - position.y)
                   ),
                   ...rocks
-                    .filter((other: any) => other.id !== candidate.id)
+                    .filter((other) => other.id !== candidate.id)
                     .map(
-                      (other: any) =>
+                      (other) =>
                         Math.hypot(
                           candidate.position.x - other.position.x,
                           candidate.position.y - other.position.y
@@ -73,7 +76,7 @@ test(
                 )
               : Number.POSITIVE_INFINITY,
         }))
-        .sort((left: any, right: any) => right.clearance - left.clearance)[0]?.candidate;
+        .sort((left, right) => right.clearance - left.clearance)[0]?.candidate;
       if (!rock) {
         throw new Error('Hauler fixture did not find a live asteroid clear of other actors');
       }
@@ -102,9 +105,12 @@ test(
     while (Date.now() < sampleDeadline) {
       const sample = await page.evaluate(
         ({ colors }: { colors: { cream: string; tip: string }; targetId: string }) => {
-          const gc = (window as { gameController?: any }).gameController;
+          const gc = window.gameController;
+          if (!gc) {
+            throw new Error('Game controller is unavailable');
+          }
           gc?.renderGame?.();
-          const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
+          const ship = gc?.getPlayerManager()?.getLocalPlayer?.()?.ship;
           const probe = gc?.diagnoseHarpoon?.();
           const canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
           const ctx = canvas?.getContext('2d');
@@ -166,10 +172,20 @@ test(
       path: screenshotManager.getScreenshotPath('hauler-live-tether.png'),
     });
     const flap = await page.evaluate(async () => {
-      const gc = (window as { gameController?: any }).gameController;
-      const connection = gc.getNetworkManager().connectionManager;
-      const ship = gc.playerManager.getLocalPlayer().ship;
-      const socket: WebSocket = connection.state.socket;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller is unavailable');
+      }
+      const connection = gc.getNetworkManager()['connectionManager'];
+      const player = gc.getPlayerManager().getLocalPlayer();
+      if (!player) {
+        throw new Error('Local pilot is unavailable');
+      }
+      const ship = player.ship;
+      const socket = connection.getSocket();
+      if (!socket) {
+        throw new Error('Gameplay socket is unavailable');
+      }
       const targetId = ship.harpoonTargetId;
       const startedAt = Date.now();
       const closed = new Promise<void>((resolve) =>
@@ -183,7 +199,7 @@ test(
         timer: ship.harpoonTimer,
         rocks: gc.getCurrRoidBelt().getRoids().length,
         health: ship.health,
-        lives: gc.playerManager.getLocalPlayer().lives,
+        lives: player.lives,
       };
     });
     expect(flap.timer).toBeGreaterThan(0);
@@ -191,9 +207,12 @@ test(
     const reconnectWaitStartedAt = Date.now();
     await page.waitForFunction(
       () => {
-        const gc = (window as { gameController?: any }).gameController;
-        const connection = gc?.getNetworkManager?.().connectionManager;
-        return connection?.state.isConnected && connection.hasInitializedAsteroidsForConnection;
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('Game controller is unavailable');
+        }
+        const connection = gc?.getNetworkManager?.()['connectionManager'];
+        return connection?.isConnected() && connection['hasInitializedAsteroidsForConnection'];
       },
       undefined,
       { timeout: 2500 }
@@ -202,8 +221,15 @@ test(
     // Let the newly joined connection receive authoritative game-state frames.
     await page.waitForTimeout(80);
     const resumed = await page.evaluate(() => {
-      const gc = (window as { gameController?: any }).gameController;
-      const ship = gc.playerManager.getLocalPlayer().ship;
+      const gc = window.gameController;
+      if (!gc) {
+        throw new Error('Game controller is unavailable');
+      }
+      const player = gc.getPlayerManager().getLocalPlayer();
+      if (!player) {
+        throw new Error('Local pilot is unavailable');
+      }
+      const ship = player.ship;
       const targetId = ship.harpoonTargetId;
       const rocks = gc.getCurrRoidBelt().getRoids();
       return {
@@ -212,11 +238,10 @@ test(
         rocks: rocks.map((rock: { id: string }) => rock.id).sort(),
         targetInField: rocks.some((rock: { id: string }) => rock.id === targetId),
         health: ship.health,
-        lives: gc.playerManager.getLocalPlayer().lives,
+        lives: player.lives,
         connected: Boolean(gc.getNetworkManager()?.isConnected),
       };
     });
-    // eslint-disable-next-line no-console
     console.log(
       '[hauler-reconnect]',
       JSON.stringify({

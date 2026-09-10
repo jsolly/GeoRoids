@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -10,8 +10,68 @@ import {
   SnapshotDecoder,
 } from '../../../shared/snapshotProtocol';
 
+type RecordedMessageData = Record<string, unknown> & {
+  kind?: string;
+  loot?: Array<{ id: string; kind: string }>;
+  serverReleaseId?: string;
+  snapshotVersion?: number;
+  asteroidInteractions?: number;
+  sequence?: number;
+};
+
+type RecordedMessage = {
+  type: string;
+  data: RecordedMessageData;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isRecordedLoot(value: unknown): value is { id: string; kind: string } {
+  return isRecord(value) && typeof value['id'] === 'string' && typeof value['kind'] === 'string';
+}
+
+function isRecordedMessageData(value: Record<string, unknown>): value is RecordedMessageData {
+  const loot = value['loot'];
+  return (
+    (value['kind'] === undefined || typeof value['kind'] === 'string') &&
+    (value['serverReleaseId'] === undefined || typeof value['serverReleaseId'] === 'string') &&
+    (value['snapshotVersion'] === undefined || typeof value['snapshotVersion'] === 'number') &&
+    (value['asteroidInteractions'] === undefined ||
+      typeof value['asteroidInteractions'] === 'number') &&
+    (value['sequence'] === undefined || typeof value['sequence'] === 'number') &&
+    (loot === undefined || (Array.isArray(loot) && loot.every(isRecordedLoot)))
+  );
+}
+
+function parseRecordedMessage(text: string): RecordedMessage {
+  const value: unknown = JSON.parse(text);
+  if (
+    !isRecord(value) ||
+    typeof value['type'] !== 'string' ||
+    !isRecord(value['data']) ||
+    !isRecordedMessageData(value['data'])
+  ) {
+    throw new Error('Expected a structured server message');
+  }
+  return { ...value, type: value['type'], data: value['data'] };
+}
+
+function findMessage(messages: RecordedMessage[], type: string): RecordedMessage {
+  const message = messages.find((candidate) => candidate.type === type);
+  assert.exists(message);
+  return message;
+}
+
+function lastMessage(messages: RecordedMessage[]): RecordedMessage {
+  const message = messages.at(-1);
+  assert.exists(message);
+  return message;
+}
+
 function socket() {
-  const messages: any[] = [];
+  const messages: RecordedMessage[] = [];
   const pending: Array<(error?: Error) => void> = [];
   const fake = {
     readyState: WebSocket.OPEN,
@@ -22,7 +82,7 @@ function socket() {
       if (fake.fail) {
         throw new Error('closed during send');
       }
-      messages.push(JSON.parse(text));
+      messages.push(parseRecordedMessage(text));
       if (done) {
         if (fake.defer) {
           pending.push(done);
@@ -71,16 +131,13 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     join(handler, modern.ws, 'modern', 1);
     join(handler, unsupported.ws, 'unsupported', 200);
     broadcaster.broadcastGameState();
-    expect(old.messages.find((m) => m.type === 'joined').data).not.toHaveProperty(
-      'snapshotVersion'
-    );
-    expect(unsupported.messages.find((m) => m.type === 'joined').data).not.toHaveProperty(
-      'snapshotVersion'
-    );
+    expect(findMessage(old.messages, 'joined').data).not.toHaveProperty('snapshotVersion');
+    expect(findMessage(unsupported.messages, 'joined').data).not.toHaveProperty('snapshotVersion');
     expect(old.messages.some((m) => m.type === 'snapshot')).toBe(false);
     expect(modern.messages[0]).toMatchObject({ type: 'joined', data: { snapshotVersion: 1 } });
-    expect(modern.messages[0].data.serverReleaseId).toEqual(expect.any(String));
+    expect(modern.messages[0]?.data.serverReleaseId).toEqual(expect.any(String));
     const legacy = old.messages.filter((m) => m.type === 'gameState').at(-1);
+    assert.exists(legacy);
     expect(legacy.data).toEqual(JSON.parse(JSON.stringify(engine.getGameState())));
     expect(Object.keys(legacy).sort()).toEqual(['data', 'timestamp', 'type']);
     const decoder = new SnapshotDecoder();
@@ -122,7 +179,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     join(handler, a.ws, 'a', 1);
     const b = socket();
     join(handler, b.ws, 'b', 1);
-    expect(b.messages.find((m) => m.type === 'snapshot').data.kind).toBe('keyframe');
+    expect(findMessage(b.messages, 'snapshot').data.kind).toBe('keyframe');
     const count = a.messages.length;
     broadcaster.broadcastGameState('a');
     expect(a.messages).toHaveLength(count);
@@ -131,13 +188,13 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     expect(a.messages).toHaveLength(count);
     a.fake.bufferedAmount = 0;
     broadcaster.broadcastGameState();
-    expect(a.messages.at(-1).data.kind).toBe('keyframe');
+    expect(lastMessage(a.messages).data.kind).toBe('keyframe');
     join(handler, a.ws, 'a', 1);
-    expect(a.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
+    expect(lastMessage(a.messages).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
     engine.removePlayer('a');
     const reconnected = socket();
     join(handler, reconnected.ws, 'a', 1);
-    expect(reconnected.messages.at(-1).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
+    expect(lastMessage(reconnected.messages).data).toMatchObject({ sequence: 1, kind: 'keyframe' });
   });
 
   test('a laser core stays collectible while older pilots decode both keyframes and deltas', () => {
@@ -177,8 +234,8 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     for (let hit = 0; hit < 3; hit++) {
       engine.handleAsteroidHit('core-rock', 'enhanced');
     }
-    const core = engine.getLoot().find((loot) => loot.kind === 'laserCore')!;
-    expect(core).toBeDefined();
+    const core = engine.getLoot().find((loot) => loot.kind === 'laserCore');
+    assert.exists(core);
     broadcaster.broadcastGameState();
     broadcaster.requestSnapshotKeyframe(recovery.ws);
     broadcaster.broadcastGameState();
@@ -192,25 +249,27 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     // additive fields are safe, but a new loot enum rejects the whole world.
     const deployedLootKinds = ['shard', 'wreckage', 'fuel'];
     for (const state of decodeAll(recovery)) {
-      expect(state.loot.every((loot) => deployedLootKinds.includes(loot.kind!))).toBe(true);
+      expect(state.loot.every((loot) => deployedLootKinds.includes(loot.kind))).toBe(true);
     }
     expect(
       decodeAll(recovery)
         .at(-1)
         ?.loot.find((loot) => loot.id === core.id)?.kind
     ).toBe('shard');
-    expect(
-      legacy.messages
-        .filter((message) => message.type === 'gameState')
-        .at(-1)
-        .data.loot.find((loot: { id: string }) => loot.id === core.id).kind
-    ).toBe('shard');
+    const legacyGameState = lastMessage(
+      legacy.messages.filter((message) => message.type === 'gameState')
+    );
+    assert.exists(legacyGameState.data.loot);
+    const legacyCore = legacyGameState.data.loot.find((loot) => loot.id === core.id);
+    assert.exists(legacyCore);
+    expect(legacyCore.kind).toBe('shard');
     expect(
       decodeAll(enhanced)
         .at(-1)
         ?.loot.find((loot) => loot.id === core.id)?.kind
     ).toBe('laserCore');
-    const collector = engine.getPlayer('recovery')!;
+    const collector = engine.getPlayer('recovery');
+    assert.exists(collector);
     collector.position = { ...core.position };
     const score = collector.score;
     engine.collectLoot();
@@ -238,17 +297,19 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     a.fake.defer = true;
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
-    a.pending.shift()!(new Error('write failed'));
+    const failedSend = a.pending.shift();
+    assert.exists(failedSend);
+    failedSend(new Error('write failed'));
     a.fake.defer = false;
     broadcaster.broadcastGameState();
-    expect(a.messages.at(-1).data).toMatchObject({ sequence: 2, kind: 'keyframe' });
+    expect(lastMessage(a.messages).data).toMatchObject({ sequence: 2, kind: 'keyframe' });
     for (let i = 0; i <= SNAPSHOT_KEYFRAME_INTERVAL; i++) {
       broadcaster.broadcastGameState();
     }
     expect(a.messages.slice(-2).some((m) => m.data.kind === 'keyframe')).toBe(true);
     handler.handleMessage({ type: 'snapshotResync' }, a.ws);
     broadcaster.broadcastGameState();
-    expect(a.messages.at(-1).data.kind).toBe('keyframe');
+    expect(lastMessage(a.messages).data.kind).toBe('keyframe');
     a.fake.fail = true;
     broadcaster.broadcastGameState();
     expect(a.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');

@@ -8,7 +8,7 @@ import {
   waitForLaserCleanup,
 } from './laser-observation';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'two pilots exchange matching laser state and remove each expired shot',

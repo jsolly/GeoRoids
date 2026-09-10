@@ -2,6 +2,7 @@ import { PALETTE } from '../../constants';
 import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import type { Player } from '../../entities/player/Player';
 import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
+import type { PlayfieldSize } from '../playfieldCamera';
 import { hudLayoutForCanvas } from './hudLayout';
 
 interface LeaderboardEntry {
@@ -81,7 +82,7 @@ export function uniquePlayersForLeaderboard<
 
 export function drawLeaderboard(
   ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
+  viewport: PlayfieldSize,
   players: Player[],
   currentPlayerId: string
 ): void {
@@ -100,7 +101,7 @@ export function drawLeaderboard(
     }))
     .sort((a, b) => b.score - a.score);
 
-  const layout = hudLayoutForCanvas(canvas);
+  const layout = hudLayoutForCanvas(viewport);
   const { x: boardX, y: boardY, width: boardWidth, rowHeight, maxRows } = layout.leaderboard;
   const visible = entries.slice(0, maxRows);
 

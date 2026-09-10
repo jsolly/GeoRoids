@@ -8,8 +8,8 @@ async function httpGet(url: string): Promise<{ ok: boolean; body: string }> {
   return { ok: response.status === 200, body: await response.text() };
 }
 
-export class HealthChecker {
-  static async checkWebSocketServer(): Promise<boolean> {
+export const HealthChecker = {
+  async checkWebSocketServer(): Promise<boolean> {
     try {
       const { ok, body } = await httpGet(`${TestConfig.SERVER_URL}/health`);
       if (!ok) {
@@ -24,9 +24,9 @@ export class HealthChecker {
       console.error('❌ WebSocket server health check failed:', error);
       return false;
     }
-  }
+  },
 
-  static async checkViteServer(): Promise<boolean> {
+  async checkViteServer(): Promise<boolean> {
     try {
       const { ok, body } = await httpGet(TestConfig.GAME_URL);
       if (!ok) {
@@ -49,11 +49,11 @@ export class HealthChecker {
       console.error('❌ Vite dev server health check failed:', error);
       return false;
     }
-  }
+  },
 
-  static async checkWebSocketGameplayEndpoint(): Promise<boolean> {
+  async checkWebSocketGameplayEndpoint(): Promise<boolean> {
     return new Promise((resolve) => {
-      const wsUrl = TestConfig.SERVER_URL.replace(/^http/, 'ws') + '/ws';
+      const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/, 'ws')}/ws`;
       const ws = new WebSocket(wsUrl);
       const timeout = setTimeout(() => {
         ws.close();
@@ -74,9 +74,9 @@ export class HealthChecker {
         resolve(false);
       });
     });
-  }
+  },
 
-  static async checkAllServers(): Promise<void> {
+  async checkAllServers(): Promise<void> {
     console.log('🔍 Checking server health...');
 
     const deadline = Date.now() + 30_000;
@@ -118,5 +118,5 @@ export class HealthChecker {
           `Errors: ${errors.join(', ')}`
       );
     }
-  }
-}
+  },
+};

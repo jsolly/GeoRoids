@@ -1,14 +1,15 @@
 import { TOUCH, VISUAL } from '../../constants';
 import { queryViewport, shouldUseTouchControls } from '../../ui/viewportChrome';
+import type { PlayfieldSize } from '../playfieldCamera';
 
-export type SafeAreaInsets = {
+type SafeAreaInsets = {
   top: number;
   right: number;
   bottom: number;
   left: number;
 };
 
-export type HudLayout = {
+type HudLayout = {
   padTop: number;
   padLeft: number;
   padRight: number;
@@ -45,7 +46,7 @@ export function scaleHudFont(font: string, scale: number): string {
 const ZERO_SAFE: SafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DESKTOP_EDGE = VISUAL.HUD_INSET;
 
-export function readSafeAreaInsets(): SafeAreaInsets {
+function readSafeAreaInsets(): SafeAreaInsets {
   if (typeof document === 'undefined') {
     return { ...ZERO_SAFE };
   }
@@ -63,7 +64,7 @@ export function readSafeAreaInsets(): SafeAreaInsets {
 }
 
 export function computeHudLayout(
-  canvas: { width: number; height: number },
+  viewport: PlayfieldSize,
   options?: {
     touchControls?: boolean;
     safeArea?: SafeAreaInsets;
@@ -74,12 +75,12 @@ export function computeHudLayout(
     options?.touchControls ??
     shouldUseTouchControls({
       ...queryViewport(),
-      width: canvas.width,
-      height: canvas.height,
+      width: viewport.width,
+      height: viewport.height,
     });
 
-  const overlayFontScale = canvas.width < 480 ? 0.72 : canvas.width < 700 ? 0.85 : 1;
-  const hudTypeScale = touch ? (canvas.width < 480 ? 1.18 : 1.1) : 1;
+  const overlayFontScale = viewport.width < 480 ? 0.72 : viewport.width < 700 ? 0.85 : 1;
+  const hudTypeScale = touch ? (viewport.width < 480 ? 1.18 : 1.1) : 1;
 
   if (!touch) {
     const lives = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
@@ -93,15 +94,15 @@ export function computeHudLayout(
       score: { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET },
       killMessageY: 12,
       leaderboard: {
-        x: canvas.width - 180 - DESKTOP_EDGE,
+        x: viewport.width - 180 - DESKTOP_EDGE,
         y: DESKTOP_EDGE,
         width: 180,
         rowHeight: 16,
         maxRows: 10,
       },
       miniMap: {
-        x: canvas.width - DESKTOP_EDGE - VISUAL.MINIMAP_SIZE,
-        y: canvas.height - DESKTOP_EDGE - VISUAL.MINIMAP_SIZE,
+        x: viewport.width - DESKTOP_EDGE - VISUAL.MINIMAP_SIZE,
+        y: viewport.height - DESKTOP_EDGE - VISUAL.MINIMAP_SIZE,
         size: VISUAL.MINIMAP_SIZE,
       },
       overlayFontScale,
@@ -121,8 +122,8 @@ export function computeHudLayout(
   const padRight = Math.max(12, safe.right + 8);
   const padTop = Math.max(12, safe.top + 8);
   const padBottom = Math.max(12, safe.bottom + 8);
-  const compactHeight = canvas.height < 500;
-  const boardWidth = canvas.width < 400 ? 148 : 168;
+  const compactHeight = viewport.height < 500;
+  const boardWidth = viewport.width < 400 ? 148 : 168;
   const miniMapSize = compactHeight ? 64 : 80;
   const lives = { x: padLeft, y: padTop };
   const factionY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
@@ -143,8 +144,8 @@ export function computeHudLayout(
         size: miniMapSize,
       }
     : {
-        x: canvas.width - padRight - miniMapSize,
-        y: canvas.height - padBottom - TOUCH.FIRE_RESERVE - miniMapSize,
+        x: viewport.width - padRight - miniMapSize,
+        y: viewport.height - padBottom - TOUCH.FIRE_RESERVE - miniMapSize,
         size: miniMapSize,
       };
 
@@ -157,7 +158,7 @@ export function computeHudLayout(
     score: { x: padLeft, y: padTop },
     killMessageY: padTop,
     leaderboard: {
-      x: canvas.width - boardWidth - padRight,
+      x: viewport.width - boardWidth - padRight,
       y: padTop,
       width: boardWidth,
       rowHeight: compactHeight ? 16 : 18,
@@ -172,6 +173,6 @@ export function computeHudLayout(
   };
 }
 
-export function hudLayoutForCanvas(canvas: { width: number; height: number }): HudLayout {
-  return computeHudLayout(canvas, { safeArea: readSafeAreaInsets() });
+export function hudLayoutForCanvas(viewport: PlayfieldSize): HudLayout {
+  return computeHudLayout(viewport, { safeArea: readSafeAreaInsets() });
 }

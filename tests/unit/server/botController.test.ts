@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 import {
   BOT_AI,
   type Combatant,
@@ -80,9 +80,9 @@ describe('bot aim math', () => {
     const relVel = { x: 0, y: 2 };
     const speed = laserSpeedPerFrame();
     const t = interceptTime(relPos, relVel, speed);
-    expect(t).not.toBeNull();
-    const range = Math.hypot(relPos.x + relVel.x * t!, relPos.y + relVel.y * t!);
-    expect(range).toBeCloseTo(speed * t!, 5);
+    assert.isNotNull(t);
+    const range = Math.hypot(relPos.x + relVel.x * t, relPos.y + relVel.y * t);
+    expect(range).toBeCloseTo(speed * t, 5);
   });
 
   test('fire cone tightens with range', () => {

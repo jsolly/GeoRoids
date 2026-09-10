@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -70,8 +70,9 @@ describe('server-authoritative combat', () => {
 
   test('player and bot share the same asteroid ram path', () => {
     const bots = engine.createBots(1);
-    expect(bots).not.toBeNull();
-    const bot = bots![0]!;
+    assert.isNotNull(bots);
+    const bot = bots[0];
+    assert.exists(bot);
     engine.entityManager.updateEntity(bot.id, {
       position: { x: 10, y: 0 },
       spawnProtectionTimer: 0,
@@ -447,20 +448,22 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid(normal.id)?.health).toBe(normal.health);
 
     const bot = engine.createBots(1)?.[0];
-    expect(bot).toBeDefined();
-    report(bot!.id, DAMAGE.LASER_HIT, 999);
+    assert.exists(bot);
+    report(bot.id, DAMAGE.LASER_HIT, 999);
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
 
-    engine.spawnLaser(bot!.id, asteroid.position, { x: 0, y: 0 });
-    report(bot!.id, DAMAGE.LASER_HIT, 999);
-    report(bot!.id, DAMAGE.LASER_HIT, 999, asteroid.id, otherWs);
-    report(bot!.id, DAMAGE.LASER_HIT, 999, asteroid.id, unjoinedWs);
+    engine.spawnLaser(bot.id, asteroid.position, { x: 0, y: 0 });
+    report(bot.id, DAMAGE.LASER_HIT, 999);
+    report(bot.id, DAMAGE.LASER_HIT, 999, asteroid.id, otherWs);
+    report(bot.id, DAMAGE.LASER_HIT, 999, asteroid.id, unjoinedWs);
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT * 2);
     expect(engine.getServerLasers()[0]?.hasExploded).toBe(true);
 
-    engine.getAsteroid(asteroid.id)!.health = DAMAGE.LASER_HIT;
-    const lethalShot = engine.spawnLaser(bot!.id, asteroid.position, { x: 0, y: 0 });
-    report(bot!.id, DAMAGE.LASER_HIT, 999);
+    const liveAsteroid = engine.getAsteroid(asteroid.id);
+    assert.exists(liveAsteroid);
+    liveAsteroid.health = DAMAGE.LASER_HIT;
+    const lethalShot = engine.spawnLaser(bot.id, asteroid.position, { x: 0, y: 0 });
+    report(bot.id, DAMAGE.LASER_HIT, 999);
     expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
     expect(lethalShot?.hasExploded).toBe(true);
   });

@@ -145,8 +145,6 @@ export const VISUAL = {
   LOOT_MIN_SCREEN_PX: 3.25,
   FUEL_BAR_WIDTH: 72,
   FUEL_BAR_HEIGHT: 2,
-  // Title void uses the same 1px #8BA3C7 points; density matches play (~48 / 1080p).
-  TITLE_STARS_PER_1080P: 48,
   MINIMAP_SIZE: 96,
   MINIMAP_DOT: 5,
   MINIMAP_LOCAL_SIZE: 6,
@@ -454,7 +452,7 @@ export const DEBUG = {
 // ============================================================================
 // USER PREFERENCES
 // ============================================================================
-export const PREFERENCES = {
+const PREFERENCES = {
   LOCAL_STORAGE_KEYS: {
     SOUND_ON: 'soundOn',
   } as const,
@@ -479,7 +477,7 @@ export const LOGGING = {
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-export const isSoundEnabled = (): boolean =>
+const isSoundEnabled = (): boolean =>
   getStoredItem(PREFERENCES.LOCAL_STORAGE_KEYS.SOUND_ON) === 'true';
 
 // Initialize sound preference checkbox after DOM is ready

@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, assert, expect, test, vi } from 'vitest';
 import type { AsteroidToolsState } from '../../../src/asteroidTools/AsteroidToolsController';
 import {
   AsteroidToolsOverlay,
@@ -62,10 +62,10 @@ test('overlay callbacks receive open, close, target, and motion actions', () => 
 
   document.querySelector<HTMLButtonElement>('[data-asteroid-tools-action="open"]')?.click();
   root.querySelector<HTMLButtonElement>('[data-asteroid-tools-action="close"]')?.click();
-  root.querySelector<HTMLSelectElement>('[data-asteroid-tools-target]')!.value = 'roid-2';
-  root
-    .querySelector<HTMLSelectElement>('[data-asteroid-tools-target]')!
-    .dispatchEvent(new Event('change'));
+  const target = root.querySelector<HTMLSelectElement>('[data-asteroid-tools-target]');
+  assert.exists(target);
+  target.value = 'roid-2';
+  target.dispatchEvent(new Event('change'));
   root.querySelector<HTMLButtonElement>('[data-asteroid-tools-motion="release"]')?.click();
 
   expect(callbacks.onSelectTarget).toHaveBeenCalledWith('roid-2');

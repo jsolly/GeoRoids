@@ -4,9 +4,9 @@ import { soundIsOn } from '../constants/user-preferences';
 import { getDistance } from '../utils/mathUtils';
 import { playSound, type Sound } from './Sound';
 
-export type ViewportSize = { width: number; height: number };
+type ViewportSize = { width: number; height: number };
 
-export interface PlaybackPlan {
+interface PlaybackPlan {
   shouldPlay: boolean;
   volumeScale: number;
 }
@@ -63,7 +63,7 @@ export function volumeScaleForDistance(distance: number, maxDistance: number): n
   return t * t * (3 - 2 * t);
 }
 
-export function maxAudibleDistance(viewport?: ViewportSize): number {
+function maxAudibleDistance(viewport?: ViewportSize): number {
   if (!viewport) {
     return AUDIO.FALLBACK_MAX_DISTANCE;
   }

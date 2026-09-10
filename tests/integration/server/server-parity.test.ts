@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, assert, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -158,8 +158,8 @@ describe('Server Message Parity', () => {
     // Verify error was sent
     expect(sentMessages).toHaveLength(1);
     const rawMessage = sentMessages[0];
-    expect(rawMessage).toBeDefined();
-    const errorMessage = JSON.parse(rawMessage!);
+    assert.exists(rawMessage);
+    const errorMessage = JSON.parse(rawMessage);
     expect(errorMessage.type).toBe('error');
     expect(errorMessage.data).toBe('Missing player ID');
     expect(errorMessage.timestamp).toBeDefined();
@@ -225,7 +225,8 @@ describe('Server Message Parity', () => {
       .map((message) => JSON.parse(message))
       .filter((message) => message.type === 'playerShoot');
     expect(shots).toHaveLength(1);
-    const broadcastMessage = shots[0]!;
+    const broadcastMessage = shots[0];
+    assert.exists(broadcastMessage);
     expect(broadcastMessage.type).toBe('playerShoot');
     expect(broadcastMessage.data.id).toBe('shoot-test-id');
     expect(broadcastMessage.data.laserStart).toEqual({ x: 10, y: 20 });

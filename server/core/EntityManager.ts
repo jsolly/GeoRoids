@@ -40,9 +40,9 @@ import { BOT_AI, BotBrain, type BotShot, makeBotShot } from '../ai/botController
 import { applyShipMotionSteps, containShipInArena } from '../ai/shipMotion';
 import type { RNGService } from './RNGService';
 
-export const RESPAWN_ANCHOR_ACK_DISTANCE = 100;
+const RESPAWN_ANCHOR_ACK_DISTANCE = 100;
 /** Keep lives/score after a dropped socket so the same id can rejoin. */
-export const HUMAN_REJOIN_STASH_TTL_MS = 5 * 60 * 1000;
+const HUMAN_REJOIN_STASH_TTL_MS = 5 * 60 * 1000;
 
 interface HumanRejoinStash {
   lives: number;
@@ -106,6 +106,7 @@ export function isStaleDeathPose(
 export class EntityManager {
   private entities = new Map<string, GameEntity>();
   private rng: RNGService;
+  private readonly now: () => number;
   private isCreatingBots = false;
   private humanRejoinStash = new Map<string, HumanRejoinStash>();
   private humanRejoinByName = new Map<string, HumanRejoinStash>();
@@ -113,8 +114,9 @@ export class EntityManager {
   /** Old human id remapped by same-name takeover — consume after addHumanPlayer. */
   private replacedHumanId: string | undefined;
 
-  constructor(rngService: RNGService) {
+  constructor(rngService: RNGService, now: () => number = () => Date.now()) {
     this.rng = rngService;
+    this.now = now;
   }
 
   // Entity management
@@ -150,10 +152,6 @@ export class EntityManager {
 
   public getHumanBySocket(ws: WebSocket): GameEntity | undefined {
     return this.getHumanPlayers().find((entity) => entity.ws === ws);
-  }
-
-  public getEntityCount(): number {
-    return this.entities.size;
   }
 
   public getHumanPlayerCount(): number {
@@ -231,7 +229,7 @@ export class EntityManager {
     Object.assign(entity, otherUpdates);
 
     // Update lastUpdate timestamp
-    entity.lastUpdate = Date.now();
+    entity.lastUpdate = this.now();
 
     return entity;
   }
@@ -297,7 +295,7 @@ export class EntityManager {
       healthRegenTimer: 0,
       ...createFuelTank(FUEL.START, FUEL.MAX),
       mass: GROWTH.BASE_MASS,
-      lastUpdate: Date.now(),
+      lastUpdate: this.now(),
       spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
       ...createShieldState(),
       ws,
@@ -354,7 +352,7 @@ export class EntityManager {
     }
     existing.ws = ws;
     existing.name = name;
-    existing.lastUpdate = Date.now();
+    existing.lastUpdate = this.now();
     if (!existing.factionId) {
       existing.factionId = this.nextFaction();
     }
@@ -365,8 +363,12 @@ export class EntityManager {
     if (oldWs && oldWs !== ws) {
       try {
         oldWs.close();
-      } catch {
-        // Old tab or zombie socket; the close handler must not see this ws.
+      } catch (error) {
+        logger.error('ENTITY_REBIND_SOCKET_CLOSE_FAILED', {
+          oldPlayerId: oldId,
+          newPlayerId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
     return existing;
@@ -380,7 +382,7 @@ export class EntityManager {
       lives: entity.lives,
       score: entity.score,
       name: entity.name,
-      savedAt: Date.now(),
+      savedAt: this.now(),
     };
     this.humanRejoinStash.set(entity.id, stash);
     this.humanRejoinByName.set(entity.name, stash);
@@ -401,7 +403,7 @@ export class EntityManager {
     if (name) {
       this.humanRejoinByName.delete(name);
     }
-    if (Date.now() - stash.savedAt > HUMAN_REJOIN_STASH_TTL_MS) {
+    if (this.now() - stash.savedAt > HUMAN_REJOIN_STASH_TTL_MS) {
       return undefined;
     }
     return stash;
@@ -469,7 +471,7 @@ export class EntityManager {
         healthRegenTimer: 0,
         ...createFuelTank(FUEL.START, FUEL.MAX),
         mass: GROWTH.BASE_MASS,
-        lastUpdate: Date.now(),
+        lastUpdate: this.now(),
         spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
         kitId: DEFAULT_SHIP_KIT_ID,
         factionId: this.nextFaction(),
@@ -519,13 +521,13 @@ export class EntityManager {
       if (source === 'laser') {
         noteReadableShieldLaserHit(entity);
       }
-      entity.lastUpdate = Date.now();
+      entity.lastUpdate = this.now();
       return entity;
     }
 
     if (shouldBlockDamage(entity, source)) {
       noteReadableShieldLaserHit(entity);
-      entity.lastUpdate = Date.now();
+      entity.lastUpdate = this.now();
       return null;
     }
 
@@ -544,7 +546,7 @@ export class EntityManager {
       clearShield(entity);
     }
 
-    entity.lastUpdate = Date.now();
+    entity.lastUpdate = this.now();
     return entity;
   }
 
@@ -669,7 +671,7 @@ export class EntityManager {
         continue;
       }
       entity.health = nextHealth;
-      entity.lastUpdate = Date.now();
+      entity.lastUpdate = this.now();
       healedEntities++;
     }
 
@@ -736,7 +738,7 @@ export class EntityManager {
 
       applyShipMotionSteps(bot, BOT_AI.MOTION_STEPS);
       containShipInArena(bot);
-      bot.lastUpdate = Date.now();
+      bot.lastUpdate = this.now();
     }
 
     return shots;
@@ -744,7 +746,7 @@ export class EntityManager {
 
   // Cleanup
   public cleanupStaleEntities(): string[] {
-    const now = Date.now();
+    const now = this.now();
     const removedEntities: string[] = [];
 
     for (const [entityId, entity] of this.entities) {
@@ -777,10 +779,6 @@ export class EntityManager {
     } finally {
       this.isCreatingBots = false;
     }
-  }
-
-  public isCreating(): boolean {
-    return this.isCreatingBots;
   }
 
   public tickAbilityState(): void {

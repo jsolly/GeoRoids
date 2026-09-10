@@ -4,7 +4,7 @@ import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
 import type { AsteroidData, Position, ShipKitId, SoftFactionId } from '../../../../shared-types';
-import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
+import { DAMAGE, SHIP } from '../../../../src/constants';
 
 function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
   return {
@@ -23,8 +23,6 @@ function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
   };
 }
 
-/** One server tick is one frame at GAME.FPS. */
-export const FRAMES_PER_SECOND = GAME.FPS;
 export const EXPLOSION_FRAMES = SHIP.EXPLODE_DURATION_FRAMES;
 /** GameEngine schedules this at death; the explosion runs in parallel. */
 export const RESPAWN_COUNTDOWN_FRAMES = SHIP.RESPAWN_DELAY_FRAMES;
@@ -32,7 +30,7 @@ export const SPAWN_PROTECTION_FRAMES = SHIP.INVINCIBILITY_DURATION_FRAMES;
 /** Circular arena used by the server (`getGameBoundary()` / EntityManager). */
 export const ARENA_RADIUS = 3100;
 
-export interface ServerMessage {
+interface ServerMessage {
   type: string;
   data?: Record<string, unknown> & { id?: string };
   timestamp?: number;
@@ -184,7 +182,7 @@ export class GameServerWorld {
       })
     );
     const before = ship.health;
-    this.engine.resolveAuthoritativeCombat(Date.now());
+    this.engine.resolveAuthoritativeCombat();
     const applied = Math.max(0, before - this.entity(pilot).health);
     const remaining = damage - applied;
     if (remaining > 0 && this.entity(pilot).health > 0) {

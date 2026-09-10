@@ -60,13 +60,13 @@ test('a broken forwarder emits one local failure even when ordinary console logg
   forwarding.send.mockImplementation(() => {
     throw new Error('forwarder unavailable');
   });
-  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const failure = vi.spyOn(console, 'error').mockImplementation(() => {});
   logger.warn('TEST', 'first event');
-  await vi.waitFor(() => expect(warning).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(failure).toHaveBeenCalledOnce());
   logger.warn('TEST', 'second event');
   await vi.waitFor(() => expect(forwarding.send).toHaveBeenCalledTimes(2));
-  expect(warning).toHaveBeenCalledOnce();
-  expect(warning).toHaveBeenCalledWith(expect.stringContaining('forwarder unavailable'));
+  expect(failure).toHaveBeenCalledOnce();
+  expect(failure).toHaveBeenCalledWith(expect.stringContaining('forwarder unavailable'));
   forwarding.send.mockImplementation(() => {});
   logger.warn('TEST', 'recovered event');
   await vi.waitFor(() => expect(forwarding.send).toHaveBeenCalledTimes(3));
@@ -76,8 +76,8 @@ test('a broken forwarder emits one local failure even when ordinary console logg
     throw new Error('second outage');
   });
   logger.warn('TEST', 'failure after recovery');
-  await vi.waitFor(() => expect(warning).toHaveBeenCalledTimes(2));
-  expect(warning).toHaveBeenNthCalledWith(2, expect.stringContaining('second outage'));
+  await vi.waitFor(() => expect(failure).toHaveBeenCalledTimes(2));
+  expect(failure).toHaveBeenNthCalledWith(2, expect.stringContaining('second outage'));
 
   forwarding.send.mockImplementation(() => {});
   logger.warn('TEST', 'final recovery');

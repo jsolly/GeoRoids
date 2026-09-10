@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
 import { GAME, SHIP } from '../../../../src/constants';
 import {
   EXPLOSION_FRAMES,
@@ -65,15 +65,15 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
     if (!bot) {
       bot = world.engine.entityManager.createBots(1)[0];
     }
-    expect(bot).toBeDefined();
-    world.engine.entityManager.updateEntity(bot!.id, { spawnProtectionTimer: 0 });
+    assert.exists(bot);
+    world.engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
 
-    world.engine.handleBotDamage(bot!.id, 'asteroid', bot!.health);
-    expect(world.ship(bot!.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
+    world.engine.handleBotDamage(bot.id, 'asteroid', bot.health);
+    expect(world.ship(bot.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
 
     world.tick(EXPLOSION_FRAMES);
 
-    const respawned = world.ship(bot!.id);
+    const respawned = world.ship(bot.id);
     expect(respawned.health).toBe(respawned.maxHealth);
     expect(respawned.respawnTimer).toBeUndefined();
     expect(respawned.spawnProtectionTimer).toBeGreaterThan(0);

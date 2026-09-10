@@ -9,10 +9,6 @@ export function addPositionAndVelocity(pos: Position, vel: Velocity): Position {
   return { x: pos.x + vel.x, y: pos.y + vel.y };
 }
 
-export function multiplyVelocity(vel: Velocity, scalar: number): Velocity {
-  return { x: vel.x * scalar, y: vel.y * scalar };
-}
-
 export function getVelocityMagnitude(vel: Velocity): number {
   return Math.sqrt(vel.x ** 2 + vel.y ** 2);
 }

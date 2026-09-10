@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { WebSocket } from 'ws';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -6,10 +7,10 @@ import { RNGService } from '../../../server/core/RNGService';
 import { SHIP } from '../../../src/constants';
 
 function firstBot(bots: GameEntity[] | null): GameEntity {
-  expect(bots).not.toBeNull();
-  const bot = bots![0];
-  expect(bot).toBeDefined();
-  return bot!;
+  assert.exists(bots);
+  const bot = bots[0];
+  assert.exists(bot);
+  return bot;
 }
 
 // Mock logger
@@ -58,9 +59,9 @@ describe('Bot-Asteroid Collision System', () => {
 
       expect(damagedBot).toBe(false); // Bot was damaged but not destroyed
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot).not.toBeNull();
-      expect(updatedBot!.health).toBe(initialHealth - damage);
-      expect(updatedBot!.exploding).toBe(false); // Not destroyed yet
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBe(initialHealth - damage);
+      expect(updatedBot.exploding).toBe(false); // Not destroyed yet
     });
 
     test('bot explodes when health reaches zero', () => {
@@ -75,11 +76,11 @@ describe('Bot-Asteroid Collision System', () => {
 
       expect(damagedBot).toBe(true); // Damage was applied
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot).not.toBeNull();
-      expect(updatedBot!.health).toBe(0);
-      expect(updatedBot!.exploding).toBe(true);
-      expect(updatedBot!.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
-      expect(updatedBot!.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBe(0);
+      expect(updatedBot.exploding).toBe(true);
+      expect(updatedBot.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
+      expect(updatedBot.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
     });
 
     test('bot cannot take damage while exploding', () => {
@@ -122,7 +123,8 @@ describe('Bot-Asteroid Collision System', () => {
       // So the bot will take damage even with spawn protection
       expect(damagedBot).toBe(false); // Bot was damaged but not destroyed
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.health).toBe(75); // 100 - 25
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBe(75); // 100 - 25
     });
   });
 
@@ -135,15 +137,17 @@ describe('Bot-Asteroid Collision System', () => {
       gameEngine.handleBotDamage(bot.id, 'test-attacker', bot.health); // Destroy the bot
 
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.exploding).toBe(true);
-      expect(updatedBot!.explodeTime).toBe(18);
+      assert.exists(updatedBot);
+      expect(updatedBot.exploding).toBe(true);
+      expect(updatedBot.explodeTime).toBe(18);
 
       const finishedExploding = gameEngine.entityManager.updateExplosions();
       expect(finishedExploding).toHaveLength(0); // Not finished yet
 
       // Check that timer decreased
       const botAfterUpdate = gameEngine.getBot(bot.id);
-      expect(botAfterUpdate!.explodeTime).toBe(17); // 18 - 1
+      assert.exists(botAfterUpdate);
+      expect(botAfterUpdate.explodeTime).toBe(17); // 18 - 1
     });
 
     test('bot respawns after explosion completes', () => {
@@ -155,7 +159,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check initial explosion timer
       const initialBot = gameEngine.getBot(bot.id);
-      expect(initialBot!.explodeTime).toBe(18);
+      assert.exists(initialBot);
+      expect(initialBot.explodeTime).toBe(18);
 
       // Update explosion timer once
       const finishedExploding = gameEngine.entityManager.updateExplosions();
@@ -163,7 +168,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check that timer decreased
       const botAfterUpdate = gameEngine.getBot(bot.id);
-      expect(botAfterUpdate!.explodeTime).toBe(17); // 18 - 1
+      assert.exists(botAfterUpdate);
+      expect(botAfterUpdate.explodeTime).toBe(17); // 18 - 1
 
       // Fast-forward explosion timer
       for (let i = 1; i < SHIP.EXPLODE_DURATION_FRAMES; i++) {
@@ -172,10 +178,10 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Explosion finished; shared ship lifecycle waits for respawn to restore health
       const respawnedBot = gameEngine.getBot(bot.id);
-      expect(respawnedBot).not.toBeNull();
-      expect(respawnedBot!.exploding).toBe(false);
-      expect(respawnedBot!.health).toBe(0);
-      expect(respawnedBot!.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
+      assert.exists(respawnedBot);
+      expect(respawnedBot.exploding).toBe(false);
+      expect(respawnedBot.health).toBe(0);
+      expect(respawnedBot.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
     });
 
     test('bot respawn timer counts down correctly', () => {
@@ -187,7 +193,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check initial explosion timer
       const initialBot = gameEngine.getBot(bot.id);
-      expect(initialBot!.explodeTime).toBe(18);
+      assert.exists(initialBot);
+      expect(initialBot.explodeTime).toBe(18);
 
       // Update explosion timer once
       const finishedExploding = gameEngine.entityManager.updateExplosions();
@@ -195,7 +202,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check that timer decreased
       const botAfterUpdate = gameEngine.getBot(bot.id);
-      expect(botAfterUpdate!.explodeTime).toBe(17); // 18 - 1
+      assert.exists(botAfterUpdate);
+      expect(botAfterUpdate.explodeTime).toBe(17); // 18 - 1
 
       // Complete explosion
       for (let i = 1; i < SHIP.EXPLODE_DURATION_FRAMES; i++) {
@@ -208,7 +216,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check that timer decreased
       const botAfterRespawnUpdate = gameEngine.getBot(bot.id);
-      expect(botAfterRespawnUpdate!.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES - 1);
+      assert.exists(botAfterRespawnUpdate);
+      expect(botAfterRespawnUpdate.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES - 1);
     });
 
     test('bot completes respawn after timer expires', () => {
@@ -220,7 +229,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check initial explosion timer
       const initialBot = gameEngine.getBot(bot.id);
-      expect(initialBot!.explodeTime).toBe(18);
+      assert.exists(initialBot);
+      expect(initialBot.explodeTime).toBe(18);
 
       // Update explosion timer once
       const finishedExploding = gameEngine.entityManager.updateExplosions();
@@ -228,7 +238,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check that timer decreased
       const botAfterUpdate = gameEngine.getBot(bot.id);
-      expect(botAfterUpdate!.explodeTime).toBe(17); // 18 - 1
+      assert.exists(botAfterUpdate);
+      expect(botAfterUpdate.explodeTime).toBe(17); // 18 - 1
 
       // Complete explosion
       for (let i = 1; i < SHIP.EXPLODE_DURATION_FRAMES; i++) {
@@ -241,12 +252,12 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Bot should be fully respawned
       const respawnedBot = gameEngine.getBot(bot.id);
-      expect(respawnedBot).not.toBeNull();
-      expect(respawnedBot!.respawnTimer).toBeUndefined();
-      expect(respawnedBot!.exploding).toBe(false);
-      expect(respawnedBot!.health).toBe(respawnedBot!.maxHealth);
-      expect(respawnedBot!.spawnProtectionTimer).toBe(180);
-      expect(respawnedBot!.respawnAnchor).toEqual(respawnedBot!.position);
+      assert.exists(respawnedBot);
+      expect(respawnedBot.respawnTimer).toBeUndefined();
+      expect(respawnedBot.exploding).toBe(false);
+      expect(respawnedBot.health).toBe(respawnedBot.maxHealth);
+      expect(respawnedBot.spawnProtectionTimer).toBe(180);
+      expect(respawnedBot.respawnAnchor).toEqual(respawnedBot.position);
     });
   });
 
@@ -264,12 +275,13 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check bot was damaged
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.health).toBe(75); // 100 - 25
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBe(75); // 100 - 25
     });
 
     test('game engine awards points for bot destruction', () => {
       // Create a player to receive points
-      const mockWs = {} as any; // Mock WebSocket
+      const mockWs = {} as WebSocket;
       gameEngine.addPlayer('test-player', 'Test Player', mockWs);
 
       // Create and destroy a bot (DEBUG.BOT_PLAYER.COUNT=2, so we get 2 bots)
@@ -282,7 +294,8 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Check player received points
       const updatedPlayer = gameEngine.getPlayer('test-player');
-      expect(updatedPlayer!.score).toBe(50); // Points for bot kill
+      assert.exists(updatedPlayer);
+      expect(updatedPlayer.score).toBe(50); // Points for bot kill
     });
 
     test('game engine handles multiple bot damages', () => {
@@ -291,15 +304,17 @@ describe('Bot-Asteroid Collision System', () => {
       expect(bots).toHaveLength(2); // DEBUG.BOT_PLAYER.COUNT limits to 2
 
       // Damage each bot
-      for (const bot of bots!) {
+      assert.exists(bots);
+      for (const bot of bots) {
         const isDestroyed = gameEngine.handleBotDamage(bot.id, 'test-attacker', 30);
         expect(isDestroyed).toBe(false); // Not destroyed yet
       }
 
       // Check all bots were damaged (kits have different max health)
-      for (const bot of bots!) {
+      for (const bot of bots) {
         const updatedBot = gameEngine.getBot(bot.id);
-        expect(updatedBot!.health).toBe(updatedBot!.maxHealth - 30);
+        assert.exists(updatedBot);
+        expect(updatedBot.health).toBe(updatedBot.maxHealth - 30);
       }
     });
   });
@@ -325,7 +340,8 @@ describe('Bot-Asteroid Collision System', () => {
       // Check that health has regenerated
       const updatedBot = gameEngine.getBot(bot.id);
       // Health regeneration might not work in test environment, so just check it's not less than 70
-      expect(updatedBot!.health).toBeGreaterThanOrEqual(70); // Should have regenerated some health or stayed the same
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBeGreaterThanOrEqual(70); // Should have regenerated some health or stayed the same
 
       // Clean up
       gameEngine.stopGameLoop();
@@ -348,8 +364,9 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Bot should still be exploding and not regenerating
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.exploding).toBe(true);
-      expect(updatedBot!.health).toBe(0); // Should not have regenerated
+      assert.exists(updatedBot);
+      expect(updatedBot.exploding).toBe(true);
+      expect(updatedBot.health).toBe(0); // Should not have regenerated
 
       // Clean up
       gameEngine.stopGameLoop();
@@ -371,13 +388,14 @@ describe('Bot-Asteroid Collision System', () => {
 
       // Simulate movement
       for (let i = 0; i < 60; i++) {
-        (gameEngine as any).updateBotMovement();
+        gameEngine.updateBotMovement();
       }
 
       // Bot should not have moved while exploding
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.exploding).toBe(true);
-      expect(updatedBot!.position).toEqual(initialPosition);
+      assert.exists(updatedBot);
+      expect(updatedBot.exploding).toBe(true);
+      expect(updatedBot.position).toEqual(initialPosition);
 
       // Clean up
       gameEngine.stopGameLoop();
@@ -399,7 +417,8 @@ describe('Bot-Asteroid Collision System', () => {
       expect(isDestroyed).toBe(false);
 
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.health).toBe(initialHealth);
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBe(initialHealth);
     });
 
     test('handles negative damage (healing)', () => {
@@ -410,14 +429,16 @@ describe('Bot-Asteroid Collision System', () => {
       // Damage the bot first
       gameEngine.handleBotDamage(bot.id, 'test-attacker', 30);
       const damagedBot = gameEngine.getBot(bot.id);
-      expect(damagedBot!.health).toBe(70);
+      assert.exists(damagedBot);
+      expect(damagedBot.health).toBe(70);
 
       // Heal the bot
       const isDestroyed = gameEngine.handleBotDamage(bot.id, 'test-attacker', -20);
       expect(isDestroyed).toBe(false);
 
       const healedBot = gameEngine.getBot(bot.id);
-      expect(healedBot!.health).toBe(90); // 70 + 20
+      assert.exists(healedBot);
+      expect(healedBot.health).toBe(90); // 70 + 20
     });
 
     test('handles excessive damage', () => {
@@ -429,8 +450,9 @@ describe('Bot-Asteroid Collision System', () => {
       expect(isDestroyed).toBe(true);
 
       const updatedBot = gameEngine.getBot(bot.id);
-      expect(updatedBot!.health).toBe(0);
-      expect(updatedBot!.exploding).toBe(true);
+      assert.exists(updatedBot);
+      expect(updatedBot.health).toBe(0);
+      expect(updatedBot.exploding).toBe(true);
     });
   });
 });

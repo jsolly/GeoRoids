@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
@@ -9,16 +9,18 @@ export default defineConfig(() => {
   // Inject build time
   define['import.meta.env.VITE_BUILD_TIME'] = JSON.stringify(new Date().toISOString());
 
-  // Get the current git commit hash
-  let commitHash = 'unknown';
-  try {
-    commitHash = execSync('git rev-parse --short HEAD', {
+  // Hosted builds may omit .git; release polling still needs the deployed identity.
+  const commitHash =
+    process.env['VERCEL_GIT_COMMIT_SHA'] ??
+    process.env['RAILWAY_GIT_COMMIT_SHA'] ??
+    execFileSync('git', ['rev-parse', 'HEAD'], {
       encoding: 'utf8',
+      timeout: 5000,
     }).trim();
-  } catch (error) {
-    console.warn('Could not get git commit hash:', error);
+  if (!/^[a-f0-9]{40}$/i.test(commitHash)) {
+    throw new Error('Cannot build client without a valid Git commit SHA');
   }
-  define['import.meta.env.VITE_COMMIT_HASH'] = JSON.stringify(commitHash);
+  define['import.meta.env.VITE_COMMIT_HASH'] = JSON.stringify(commitHash.slice(0, 7));
 
   // VITE_WEBSOCKET_URL comes from .env.local (dev) or Vercel env (production).
   // Do not define it here — vite `define` overrides env and breaks production builds.
@@ -26,10 +28,6 @@ export default defineConfig(() => {
   return {
     resolve: {
       extensions: ['.ts'],
-    },
-    build: {
-      target: 'esnext',
-      modulePreload: false,
     },
     server: {
       port: testVitePort,

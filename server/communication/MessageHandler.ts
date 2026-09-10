@@ -24,10 +24,13 @@ export class MessageHandler {
   private gameEngine: GameEngine;
   private broadcaster: GameStateBroadcaster;
   private joinAttempts = new WeakMap<WebSocket, { startedAt: number; count: number }>();
-  private motionRejections = new WeakMap<WebSocket, { lastLoggedAt: number; suppressed: number }>();
+  private motionRejections = new WeakMap<
+    WebSocket,
+    { lastThrottleAt: number; suppressed: number }
+  >();
   private snapshotResyncLogs = new WeakMap<
     WebSocket,
-    { lastLoggedAt: number; suppressed: number }
+    { lastThrottleAt: number; suppressed: number }
   >();
 
   constructor(
@@ -75,11 +78,12 @@ export class MessageHandler {
 
         case 'asteroidTool': {
           const receivedAt = Date.now();
+          const motionNow = this.gameEngine.getServerTime();
           const outcome = this.gameEngine.asteroidMotion.latch(
             ws,
             command.action,
             this.gameEngine.getAllAsteroids(),
-            receivedAt
+            motionNow
           );
           this.logMotionRejection(
             ws,
@@ -87,7 +91,8 @@ export class MessageHandler {
             outcome,
             receivedAt,
             undefined,
-            command.action.sequence
+            command.action.sequence,
+            motionNow
           );
           if (outcome.ok) {
             this.logMotionTransition(ws, 'motion_latched', receivedAt, command.action.sequence);
@@ -98,11 +103,12 @@ export class MessageHandler {
 
         case 'asteroidInput': {
           const receivedAt = Date.now();
+          const motionNow = this.gameEngine.getServerTime();
           const outcome = this.gameEngine.asteroidMotion.input(
             ws,
             command.input,
             this.gameEngine.getAllAsteroids(),
-            receivedAt
+            motionNow
           );
           this.logMotionRejection(
             ws,
@@ -110,7 +116,8 @@ export class MessageHandler {
             outcome,
             receivedAt,
             command.input.epoch,
-            command.input.sequence
+            command.input.sequence,
+            motionNow
           );
           if (outcome.ok && command.input.action) {
             this.logMotionTransition(
@@ -126,7 +133,7 @@ export class MessageHandler {
 
         case 'snapshotResync':
           if (this.gameEngine.getPlayerBySocket(ws)?.type === 'human') {
-            this.logSnapshotResync(ws, Date.now());
+            this.logSnapshotResync(ws, Date.now(), this.gameEngine.getServerTime());
             this.broadcaster.requestSnapshotKeyframe(ws);
           }
           break;
@@ -258,7 +265,7 @@ export class MessageHandler {
       const resumed = this.gameEngine.asteroidMotion.resume(
         command.resumeToken ?? '',
         ws,
-        Date.now()
+        this.gameEngine.getServerTime()
       );
       if (!resumed.ok) {
         this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
@@ -309,7 +316,12 @@ export class MessageHandler {
       );
       if (command.enhancedOffer && command.snapshotVersion === 1) {
         player.asteroidInteractions = 1;
-        const registered = this.gameEngine.asteroidMotion.register(player, ws, 1, Date.now());
+        const registered = this.gameEngine.asteroidMotion.register(
+          player,
+          ws,
+          1,
+          this.gameEngine.getServerTime()
+        );
         if (!registered.ok) {
           this.gameEngine.removePlayer(player.id);
           this.broadcaster.sendError(ws, registered.error);
@@ -401,6 +413,7 @@ export class MessageHandler {
       }
       const beforeMode = socketPlayer.asteroidMotion?.mode;
       const receivedAt = Date.now();
+      const motionNow = this.gameEngine.getServerTime();
       const outcome = this.gameEngine.asteroidMotion.acceptFreePose(
         ws,
         {
@@ -411,7 +424,7 @@ export class MessageHandler {
           angle: update.angle,
           thrusting: update.thrusting,
         },
-        receivedAt
+        motionNow
       );
       this.logMotionRejection(
         ws,
@@ -419,7 +432,8 @@ export class MessageHandler {
         outcome,
         receivedAt,
         command.motionEpoch,
-        command.motionSequence
+        command.motionSequence,
+        motionNow
       );
       if (outcome.ok && beforeMode === 'handoff') {
         this.logMotionTransition(
@@ -1013,13 +1027,14 @@ export class MessageHandler {
     outcome: MotionOutcome,
     receivedAt: number,
     receivedEpoch?: number,
-    receivedSequence?: number
+    receivedSequence?: number,
+    throttleAt = this.gameEngine.getServerTime()
   ): void {
     if (outcome.ok) {
       return;
     }
     const previous = this.motionRejections.get(ws);
-    if (previous && receivedAt - previous.lastLoggedAt < 5000) {
+    if (previous && throttleAt - previous.lastThrottleAt < 5000) {
       previous.suppressed += 1;
       return;
     }
@@ -1039,12 +1054,12 @@ export class MessageHandler {
         : {}),
       ...(previous?.suppressed ? { suppressed: previous.suppressed } : {}),
     });
-    this.motionRejections.set(ws, { lastLoggedAt: receivedAt, suppressed: 0 });
+    this.motionRejections.set(ws, { lastThrottleAt: throttleAt, suppressed: 0 });
   }
 
-  private logSnapshotResync(ws: WebSocket, receivedAt: number): void {
+  private logSnapshotResync(ws: WebSocket, receivedAt: number, throttleAt: number): void {
     const previous = this.snapshotResyncLogs.get(ws);
-    if (previous && receivedAt - previous.lastLoggedAt < 5000) {
+    if (previous && throttleAt - previous.lastThrottleAt < 5000) {
       previous.suppressed += 1;
       return;
     }
@@ -1056,7 +1071,7 @@ export class MessageHandler {
       gameTime: this.gameEngine.getDiagnostics().gameTime,
       ...(previous?.suppressed ? { suppressed: previous.suppressed } : {}),
     });
-    this.snapshotResyncLogs.set(ws, { lastLoggedAt: receivedAt, suppressed: 0 });
+    this.snapshotResyncLogs.set(ws, { lastThrottleAt: throttleAt, suppressed: 0 });
   }
 
   private logMotionTransition(

@@ -21,7 +21,7 @@ import {
 import type { RNGService } from './RNGService';
 
 /** Targets are copied from authoritative server entities for one simulation step. */
-export interface SatelliteTarget {
+interface SatelliteTarget {
   id: string;
   position: Position;
   radius: number;

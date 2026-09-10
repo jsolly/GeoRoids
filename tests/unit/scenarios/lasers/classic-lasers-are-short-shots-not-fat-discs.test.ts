@@ -64,6 +64,7 @@ vi.mock('../../../../src/rendering/canvas', () => ({
   canvasManager: {
     getContext: () => recorder.ctx,
     getCanvas: () => ({ width: 800, height: 600 }),
+    getViewportSize: () => ({ width: 800, height: 600 }),
   },
 }));
 

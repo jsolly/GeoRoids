@@ -27,16 +27,8 @@ export class WebSocketCore {
     this.messageHandler.handleMessage(message, ws);
   }
 
-  public sendToWebSocket(ws: WebSocket, message: unknown): void {
-    this.broadcaster.sendToWebSocket(ws, message);
-  }
-
   public sendError(ws: WebSocket, message: string): void {
     this.broadcaster.sendError(ws, message);
-  }
-
-  public broadcastToAll(message: unknown, excludeId?: string): void {
-    this.broadcaster.broadcastToAll(message, excludeId);
   }
 
   public getPlayerCount(): number {
@@ -53,11 +45,6 @@ export class WebSocketCore {
       this.broadcaster.broadcastPlayerLeft(id);
     }
     return removed;
-  }
-
-  // Convenience methods for external access
-  public getGameEngine(): GameEngine {
-    return this.gameEngine;
   }
 
   public getBroadcaster(): GameStateBroadcaster {

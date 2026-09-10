@@ -1,9 +1,9 @@
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { bootTwoClientGames } from '../../utils/multi-client-setup';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'remote player ship is visible to other clients',
@@ -15,7 +15,8 @@ test(
       remoteIdsOnClient1.length,
       'client 1 should see client 2 as a remote human'
     ).toBeGreaterThan(0);
-    const targetId = remoteIdsOnClient1[0]!;
+    const targetId = remoteIdsOnClient1[0];
+    assert.exists(targetId);
 
     const startPosOnClient1 = await game1.getNetworkPlayerPosition(targetId);
     expect(

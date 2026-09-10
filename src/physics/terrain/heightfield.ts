@@ -1,6 +1,6 @@
 import { TERRAIN } from './terrainConfig';
 
-export interface Landmark {
+interface Landmark {
   x: number;
   y: number;
   amp: number;
@@ -15,7 +15,7 @@ export interface Heightfield {
   landmarks: Landmark[];
 }
 
-export interface HeightfieldBounds {
+interface HeightfieldBounds {
   cx?: number;
   cy?: number;
   radius: number;

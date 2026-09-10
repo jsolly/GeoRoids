@@ -1,10 +1,26 @@
 import { expect, test } from 'vitest';
 import { segmentCircleContact } from '../../../../shared/asteroidPhenomena';
+import type { AsteroidData, Position } from '../../../../shared-types';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+declare global {
+  interface Window {
+    __collabFieldSamples?: string[][];
+  }
+}
+
+interface ObservedAsteroidMessage {
+  type: string;
+  data?: {
+    asteroidId?: string;
+    collabSplit?: boolean;
+    origin?: Position;
+    asteroids?: AsteroidData[];
+  };
+}
+const { browserManager } = createBrowserScenarioHooks();
 
 // Scenario: two players shoot an ordinary large ice asteroid within
 // 1s → the server removes it and broadcasts the same fragments to both pilots.
@@ -15,12 +31,12 @@ test(
     if (!page1) {
       throw new Error('First page unavailable');
     }
-    const page2 = await browserManager.createAdditionalPage();
+    const page2 = await browserManager.createPage();
     const game1 = new GameInteractions(page1);
     const game2 = new GameInteractions(page2);
-    const received1: any[] = [];
-    const received2: any[] = [];
-    const sent: any[] = [];
+    const received1: ObservedAsteroidMessage[] = [];
+    const received2: ObservedAsteroidMessage[] = [];
+    const sent: unknown[] = [];
     for (const [page, messages] of [
       [page1, received1],
       [page2, received2],
@@ -182,10 +198,10 @@ test(
       [page1, page2].map((page) =>
         page.evaluate(() => {
           const samples: string[][] = [];
-          (window as any).__collabFieldSamples = samples;
+          window.__collabFieldSamples = samples;
           const observe = () => {
-            const gc = (window as any).gameController;
-            samples.push((gc?.getCurrRoidBelt?.()?.getRoids?.() ?? []).map((roid: any) => roid.id));
+            const gc = window.gameController;
+            samples.push((gc?.getCurrRoidBelt?.()?.getRoids?.() ?? []).map((roid) => roid.id));
             if (samples.length > 600) {
               samples.shift();
             }
@@ -201,7 +217,7 @@ test(
       game2.fireLaserToward(current2.x, current2.y),
     ]);
 
-    const splitFor = (messages: any[]) =>
+    const splitFor = (messages: ObservedAsteroidMessage[]) =>
       messages.find(
         (message) =>
           message.type === 'asteroidDestroy' &&
@@ -226,7 +242,7 @@ test(
       throw error;
     }
 
-    const fragmentIds = (messages: any[]): string[] => {
+    const fragmentIds = (messages: ObservedAsteroidMessage[]): string[] => {
       const destroyIndex = messages.findIndex(
         (message) =>
           message.type === 'asteroidDestroy' && message.data?.asteroidId === collaborative.id
@@ -234,7 +250,10 @@ test(
       if (destroyIndex < 0) {
         return [];
       }
-      const origin = messages[destroyIndex].data.origin;
+      const origin = messages[destroyIndex]?.data?.origin;
+      if (!origin) {
+        throw new Error('Split event omitted its impact origin');
+      }
       const subsequent = messages.slice(destroyIndex + 1);
       const nextState = subsequent.findIndex(
         (message) => message.type === 'gameState' || message.type === 'snapshot'
@@ -245,16 +264,16 @@ test(
       return subsequent
         .slice(0, nextState)
         .flatMap((message) =>
-          message.type === 'asteroidCreateBatch' ? message.data.asteroids : []
+          message.type === 'asteroidCreateBatch' ? (message.data?.asteroids ?? []) : []
         )
         .filter(
-          (asteroid: any) =>
+          (asteroid) =>
             asteroid.material === 'ice' &&
             asteroid.size < collaborative.radius &&
             Math.hypot(asteroid.position.x - origin.x, asteroid.position.y - origin.y) <=
               collaborative.radius
         )
-        .map((asteroid: any) => asteroid.id)
+        .map((asteroid) => asteroid.id)
         .sort();
     };
 
@@ -280,7 +299,7 @@ test(
             [page1, page2].map((page) =>
               page.evaluate(
                 ({ original, fragments }) =>
-                  ((window as any).__collabFieldSamples as string[][]).some(
+                  window.__collabFieldSamples?.some(
                     (field) =>
                       !field.includes(original) && fragments.every((id) => field.includes(id))
                   ),

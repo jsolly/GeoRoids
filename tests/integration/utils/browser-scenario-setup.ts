@@ -5,12 +5,12 @@ import { ScreenshotManager } from './screenshot-manager';
 import { TestServerControl } from './test-server-control';
 
 /** Shared browser lifecycle hooks for scenario integration tests. */
-export function createBrowserScenarioHooks(testDir: string): {
+export function createBrowserScenarioHooks(): {
   browserManager: BrowserManager;
   screenshotManager: ScreenshotManager;
 } {
   const browserManager = new BrowserManager();
-  const screenshotManager = new ScreenshotManager(testDir);
+  const screenshotManager = new ScreenshotManager();
 
   beforeAll(async () => {
     await HealthChecker.checkAllServers();

@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -172,16 +172,16 @@ describe('Server laser↔asteroid authority', () => {
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     const bots = engine.createBots(1);
     const bot = bots?.[0];
-    expect(bot).toBeDefined();
+    assert.exists(bot);
 
     engine.addAsteroid(mediumAsteroid('roid-bot'));
-    const botHit = engine.applyLaserAsteroidHit('roid-bot', bot!.id);
+    const botHit = engine.applyLaserAsteroidHit('roid-bot', bot.id);
     const playerHit = engine.applyLaserAsteroidHit('roid-bot', 'p1');
 
     expect(botHit.applied).toBe(true);
     expect(botHit.points).toBe(ROID.POINTS_MEDIUM);
     expect(playerHit.applied).toBe(false);
-    expect(engine.getBot(bot!.id)?.score).toBe(ROID.POINTS_MEDIUM);
+    expect(engine.getBot(bot.id)?.score).toBe(ROID.POINTS_MEDIUM);
     expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 });
@@ -228,8 +228,8 @@ describe('Client asteroid reports consume one tracked projectile', () => {
 
   function spawnAtTarget(engine: GameEngine, asteroid: AsteroidData) {
     const shot = engine.spawnHumanLaser('pilot', asteroid.position, { x: 0, y: 0 });
-    expect(shot).toBeDefined();
-    return shot!;
+    assert.exists(shot);
+    return shot;
   }
 
   test('applies exactly one canonical hit regardless of client/server arrival order', () => {
@@ -426,11 +426,12 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
     server.gameEngine.addAsteroid(medium);
 
     const received: unknown[] = [];
+    let parseError: unknown;
     ws.on('message', (raw) => {
       try {
         received.push(JSON.parse(String(raw)));
-      } catch {
-        // ignore
+      } catch (error) {
+        parseError ??= error;
       }
     });
 
@@ -453,6 +454,7 @@ describe('Two clients cannot double-apply the same asteroidDestroyed', () => {
         (msg as { data?: { asteroidId?: string } }).data?.asteroidId === medium.id
     );
     expect(destroyed).toBe(true);
+    expect(parseError).toBeUndefined();
 
     ws.close();
   });

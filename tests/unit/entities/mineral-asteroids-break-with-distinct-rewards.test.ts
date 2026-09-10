@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
@@ -45,7 +45,8 @@ describe('mineral asteroids break with distinct rewards', () => {
       applyAsteroidKinematics(local, rock);
       expect(local.material).toBe(rock.material);
       expect(local.maxHealth).toBe(rock.maxHealth);
-      expect(rock.vertices).toBe(MATERIAL_OUTLINES[rock.material!].length);
+      assert.exists(rock.material);
+      expect(rock.vertices).toBe(MATERIAL_OUTLINES[rock.material].length);
       expect(rock.offsets.every(Number.isFinite)).toBe(true);
     }
   });

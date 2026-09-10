@@ -2,7 +2,7 @@ import { hexToRgba } from '../utils/colorUtils';
 
 export type Vec2 = { x: number; y: number };
 
-export function clamp01(t: number): number {
+function clamp01(t: number): number {
   return Math.min(Math.max(t, 0), 1);
 }
 

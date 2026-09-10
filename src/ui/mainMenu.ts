@@ -1,6 +1,6 @@
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
-import { initTitleStarfield } from '../rendering/starfield';
+import { initTitleTerrain } from '../rendering/titleTerrain';
 import { getBuildInfoString } from '../utils/buildInfo';
 import { applyLockedPaletteCss } from '../utils/colorUtils';
 import { attachEventListener, getElementById } from '../utils/dom';
@@ -208,7 +208,7 @@ function displayBuildInfo(): void {
 // Initialize build info display
 displayBuildInfo();
 applyLockedPaletteCss();
-initTitleStarfield();
+initTitleTerrain();
 mountShipKitSelect();
 
 function syncControlsHint(): void {

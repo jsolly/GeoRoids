@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, describe, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
@@ -7,7 +7,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE } from '../../../src/constants';
 
-function mockWs(sent?: unknown[]): WebSocket {
+function mockWs(sent?: unknown[], parseErrors: unknown[] = []): WebSocket {
   return {
     readyState: WebSocket.OPEN,
     send: (raw: string) => {
@@ -16,8 +16,8 @@ function mockWs(sent?: unknown[]): WebSocket {
       }
       try {
         sent.push(JSON.parse(raw));
-      } catch {
-        sent.push(raw);
+      } catch (error) {
+        parseErrors.push(error);
       }
     },
   } as unknown as WebSocket;
@@ -81,35 +81,35 @@ describe('server authority boundaries', () => {
       attackerWs
     );
     const bot = engine.createBots(1)?.[0];
-    expect(bot).toBeDefined();
-    bot!.position = { x: 0, y: 0 };
-    delete bot!.spawnProtectionTimer;
+    assert.exists(bot);
+    bot.position = { x: 0, y: 0 };
+    delete bot.spawnProtectionTimer;
 
     addDropAsteroid(engine, 'drop-source');
     expect(engine.handleAsteroidHit('drop-source', 'owner', 'laser').outcome).toBe('destroyed');
     const shard = engine.getLoot()[0];
-    expect(shard).toBeDefined();
-    const botHealth = bot!.health;
+    assert.exists(shard);
+    const botHealth = bot.health;
 
     core.handleClientMessage(
       {
         type: 'lootExplode',
         id: 'attacker',
-        data: { lootId: shard!.id, playerId: bot!.id },
+        data: { lootId: shard.id, playerId: bot.id },
       },
       attackerWs
     );
 
     expect(engine.getLoot()).toHaveLength(1);
-    expect(bot!.health).toBe(botHealth);
+    expect(bot.health).toBe(botHealth);
 
-    const botShot = engine.spawnLaser(bot!.id, shard!.position, { x: 0, y: 0 });
-    expect(botShot).toBeDefined();
+    const botShot = engine.spawnLaser(bot.id, shard.position, { x: 0, y: 0 });
+    assert.exists(botShot);
     core.handleClientMessage(
       {
         type: 'lootExplode',
         id: 'attacker',
-        data: { lootId: shard!.id, playerId: bot!.id },
+        data: { lootId: shard.id, playerId: bot.id },
       },
       attackerWs
     );
@@ -121,14 +121,14 @@ describe('server authority boundaries', () => {
       'destroyed'
     );
     const secondShard = engine.getLoot()[0];
-    expect(secondShard).toBeDefined();
+    assert.exists(secondShard);
 
     // A second client cannot replay the consumed bot shot against a new drop.
     core.handleClientMessage(
       {
         type: 'lootExplode',
         id: 'owner',
-        data: { lootId: secondShard!.id, playerId: bot!.id },
+        data: { lootId: secondShard.id, playerId: bot.id },
       },
       ownerWs
     );
@@ -136,7 +136,7 @@ describe('server authority boundaries', () => {
 
     // The server-owned engine path remains available for bot AI; only the
     // client resolver requires a tracked projectile.
-    const internal = engine.handleLootExplode(bot!.id, secondShard!.id);
+    const internal = engine.handleLootExplode(bot.id, secondShard.id);
     expect(internal.success).toBe(true);
     expect(engine.getLoot()).toHaveLength(0);
   });
@@ -146,8 +146,10 @@ describe('server authority boundaries', () => {
     const core = new WebSocketCore(engine);
     const observerAMessages: unknown[] = [];
     const observerBMessages: unknown[] = [];
-    const observerAWs = mockWs(observerAMessages);
-    const observerBWs = mockWs(observerBMessages);
+    const observerAParseErrors: unknown[] = [];
+    const observerBParseErrors: unknown[] = [];
+    const observerAWs = mockWs(observerAMessages, observerAParseErrors);
+    const observerBWs = mockWs(observerBMessages, observerBParseErrors);
 
     core.handleClientMessage(
       { type: 'join', data: { id: 'observer-a', name: 'Observer A', position: { x: 0, y: 0 } } },
@@ -159,28 +161,28 @@ describe('server authority boundaries', () => {
     );
 
     const bot = engine.createBots(1)?.[0];
-    expect(bot).toBeDefined();
-    bot!.position = { x: 0, y: 0 };
-    delete bot!.spawnProtectionTimer;
+    assert.exists(bot);
+    bot.position = { x: 0, y: 0 };
+    delete bot.spawnProtectionTimer;
 
     addDropAsteroid(engine, 'observer-drop-source');
     expect(engine.handleAsteroidHit('observer-drop-source', 'observer-a', 'laser').outcome).toBe(
       'destroyed'
     );
     const shard = engine.getLoot()[0];
-    expect(shard).toBeDefined();
+    assert.exists(shard);
 
-    const botShot = engine.spawnLaser(bot!.id, shard!.position, { x: 0, y: 0 });
-    expect(botShot).toBeDefined();
+    const botShot = engine.spawnLaser(bot.id, shard.position, { x: 0, y: 0 });
+    assert.exists(botShot);
     const report = {
       type: 'lootExplode',
-      data: { lootId: shard!.id, playerId: bot!.id },
+      data: { lootId: shard.id, playerId: bot.id },
     };
     core.handleClientMessage(report, observerAWs);
     core.handleClientMessage(report, observerBWs);
 
     expect(engine.getLoot()).toHaveLength(0);
-    expect(botShot!.hasExploded).toBe(true);
+    expect(botShot.hasExploded).toBe(true);
     const duplicateErrors = [...observerAMessages, ...observerBMessages].filter(
       (message) => (message as { type?: string }).type === 'error'
     );
@@ -193,11 +195,11 @@ describe('server authority boundaries', () => {
       'destroyed'
     );
     const forgedTarget = engine.getLoot()[0];
-    expect(forgedTarget).toBeDefined();
+    assert.exists(forgedTarget);
     core.handleClientMessage(
       {
         type: 'lootExplode',
-        data: { lootId: forgedTarget!.id, playerId: bot!.id },
+        data: { lootId: forgedTarget.id, playerId: bot.id },
       },
       observerAWs
     );
@@ -205,6 +207,8 @@ describe('server authority boundaries', () => {
     expect(
       observerAMessages.filter((message) => (message as { type?: string }).type === 'error')
     ).toHaveLength(1);
+    expect(observerAParseErrors).toEqual([]);
+    expect(observerBParseErrors).toEqual([]);
   });
 
   test('an ability request cannot switch the kit selected at join', () => {
@@ -220,8 +224,8 @@ describe('server authority boundaries', () => {
     );
 
     const pilot = engine.getPlayer('pilot');
-    expect(pilot).toBeDefined();
-    const maxHealth = pilot!.maxHealth;
+    assert.exists(pilot);
+    const maxHealth = pilot.maxHealth;
 
     core.handleClientMessage(
       {
@@ -232,10 +236,10 @@ describe('server authority boundaries', () => {
       ws
     );
 
-    expect(pilot!.kitId).toBe('dart');
-    expect(pilot!.maxHealth).toBe(maxHealth);
+    expect(pilot.kitId).toBe('dart');
+    expect(pilot.maxHealth).toBe(maxHealth);
     expect(engine.useAbility('pilot', 'hauler')).toBe(false);
-    expect(pilot!.abilityCooldownFrames).toBe(0);
+    expect(pilot.abilityCooldownFrames).toBe(0);
 
     core.handleClientMessage(
       {
@@ -245,8 +249,8 @@ describe('server authority boundaries', () => {
       },
       ws
     );
-    expect(pilot!.kitId).toBe('dart');
-    expect(pilot!.abilityCooldownFrames).toBeGreaterThan(0);
+    expect(pilot.kitId).toBe('dart');
+    expect(pilot.abilityCooldownFrames).toBeGreaterThan(0);
   });
 
   test('bot damage needs one joined owner shot and applies canonical damage once', () => {
@@ -268,21 +272,21 @@ describe('server authority boundaries', () => {
     }
 
     const bot = engine.createBots(1)?.[0];
-    expect(bot).toBeDefined();
+    assert.exists(bot);
     engine.updatePlayer('pilot', {
       factionId: 'ion',
       spawnProtectionTimer: 0,
       position: { x: 0, y: 0 },
     });
-    engine.updateBot(bot!.id, {
+    engine.updateBot(bot.id, {
       factionId: 'ember',
       spawnProtectionTimer: 0,
       position: { x: 0, y: 0 },
     });
-    const healthBefore = bot!.health;
+    const healthBefore = bot.health;
     const report = {
       type: 'botDamage',
-      data: { botId: bot!.id, attackerId: 'pilot', damage: 999_999 },
+      data: { botId: bot.id, attackerId: 'pilot', damage: 999_999 },
     };
 
     // A forged/oversized report, including from another or unjoined socket,
@@ -293,11 +297,11 @@ describe('server authority boundaries', () => {
     core.handleClientMessage(
       {
         type: 'laserDamage',
-        data: { targetPlayerId: bot!.id, attackerId: 'pilot', damage: 999_999 },
+        data: { targetPlayerId: bot.id, attackerId: 'pilot', damage: 999_999 },
       },
       pilotWs
     );
-    expect(bot!.health).toBe(healthBefore);
+    expect(bot.health).toBe(healthBefore);
 
     core.handleClientMessage(
       {
@@ -308,15 +312,15 @@ describe('server authority boundaries', () => {
       pilotWs
     );
     const shot = engine.getServerLasers()[0];
-    expect(shot).toBeDefined();
+    assert.exists(shot);
 
     core.handleClientMessage(report, pilotWs);
-    expect(bot!.health).toBe(healthBefore - DAMAGE.LASER_HIT);
-    expect(shot!.hasExploded).toBe(true);
+    expect(bot.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(shot.hasExploded).toBe(true);
 
     // The consumed shot cannot be replayed for another damage tick.
     core.handleClientMessage(report, pilotWs);
-    expect(bot!.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(bot.health).toBe(healthBefore - DAMAGE.LASER_HIT);
 
     // The legacy laserDamage envelope uses the same one-use evidence gate.
     core.handleClientMessage(
@@ -330,11 +334,11 @@ describe('server authority boundaries', () => {
     core.handleClientMessage(
       {
         type: 'laserDamage',
-        data: { targetPlayerId: bot!.id, attackerId: 'pilot', damage: 999_999 },
+        data: { targetPlayerId: bot.id, attackerId: 'pilot', damage: 999_999 },
       },
       pilotWs
     );
-    expect(bot!.health).toBe(healthBefore - DAMAGE.LASER_HIT * 2);
+    expect(bot.health).toBe(healthBefore - DAMAGE.LASER_HIT * 2);
   });
 
   test('initAsteroids only serves the joined socket owner', () => {

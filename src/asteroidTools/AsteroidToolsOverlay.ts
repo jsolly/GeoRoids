@@ -8,7 +8,7 @@ export interface AsteroidToolsOverlayCallbacks {
   onMotion: (action: AsteroidToolsMotionAction) => void;
 }
 
-export interface AsteroidToolsOverlayOptions {
+interface AsteroidToolsOverlayOptions {
   container?: HTMLElement;
   callbacks?: Partial<AsteroidToolsOverlayCallbacks>;
 }
@@ -464,16 +464,6 @@ export class AsteroidToolsOverlay {
     } else if (becameInactive && !this.launcher.hidden) {
       this.launcher.focus();
     }
-  }
-
-  destroy(): void {
-    this.launcher.remove();
-    this.root.remove();
-    this.targetOptions.clear();
-    delete this.previousSelectedTargetId;
-    this.previousSelectedTargetPresent = false;
-    this.wasActive = false;
-    this.mounted = false;
   }
 
   getElement(): HTMLElement {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 import type { BotShot } from '../../../server/ai/botController';
 import { ARENA_RADIUS, CONTAIN_RADIUS } from '../../../server/ai/shipMotion';
@@ -16,10 +16,10 @@ vi.mock('../../../setup/serverLogger', () => ({
 }));
 
 function firstBot(bots: GameEntity[] | null): GameEntity {
-  expect(bots).not.toBeNull();
-  const bot = bots![0];
-  expect(bot).toBeDefined();
-  return bot!;
+  assert.isNotNull(bots);
+  const bot = bots[0];
+  assert.exists(bot);
+  return bot;
 }
 
 function parkHumanInFront(engine: GameEngine, bot: GameEntity, range = 220): GameEntity {

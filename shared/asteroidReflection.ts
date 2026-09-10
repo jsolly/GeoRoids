@@ -17,7 +17,7 @@ export const REFLECTION_LIMITS = {
 const EPSILON = 1e-7;
 const CORNER_PROBE = EPSILON * 32;
 
-export interface AsteroidImpact {
+interface AsteroidImpact {
   asteroidId: string;
   point: Position;
   /** Unit outward normal; an exact vertex uses the adjacent-face bisector. */
@@ -34,7 +34,7 @@ export interface ReflectionPreview {
   termination: 'distance' | 'bounce-limit' | 'blocked' | 'stationary';
 }
 
-export interface ReflectionPreviewOptions {
+interface ReflectionPreviewOptions {
   maxDistance: number;
   /** Maximum reflections, not hits: the following hit ends the preview. */
   maxBounces: number;

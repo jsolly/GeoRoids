@@ -29,8 +29,8 @@ type Payload = {
 };
 type Quota = { startedAt: number; messages: number; bytes: number };
 type QueuedLine = { value: string; bytes: number };
-export type ClientLogIngressResult = 'accepted' | 'invalid' | 'rate-limited' | 'queue-full';
-export type ClientLogDiagnostics = {
+type ClientLogIngressResult = 'accepted' | 'invalid' | 'rate-limited' | 'queue-full';
+type ClientLogDiagnostics = {
   accepted: number;
   invalid: number;
   rateLimited: number;
@@ -54,8 +54,8 @@ let clientReportedDroppedRecords = 0;
 let writeErrors = 0;
 let lastWriteErrorAt: string | undefined;
 let writeFailureSinceFlush = false;
-let lastQueueWarningAt = 0;
-let lastWriteWarningAt = 0;
+let lastQueueErrorAt = 0;
+let lastWriteErrorReportedAt = 0;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -187,11 +187,11 @@ function reportWriteFailure(error: unknown, recordDropped = false): void {
     droppedRecords++;
   }
   lastWriteErrorAt = new Date().toISOString();
-  if (Date.now() - lastWriteWarningAt < WINDOW_MS) {
+  if (Date.now() - lastWriteErrorReportedAt < WINDOW_MS) {
     return;
   }
-  lastWriteWarningAt = Date.now();
-  logger.warn('LOGGING', 'Failed to write forwarded client log', { error });
+  lastWriteErrorReportedAt = Date.now();
+  logger.error('LOGGING', 'Failed to write forwarded client log', { error });
 }
 
 async function drain(): Promise<void> {
@@ -295,9 +295,9 @@ function logClientMessage(data: unknown, source: object): ClientLogIngressResult
   }
   if (queuedBytes + bytes > QUEUE_MAX_BYTES) {
     droppedRecords++;
-    if (Date.now() - lastQueueWarningAt >= WINDOW_MS) {
-      lastQueueWarningAt = Date.now();
-      logger.warn('LOGGING', 'Client log queue full; dropping forwarded logs', { droppedRecords });
+    if (Date.now() - lastQueueErrorAt >= WINDOW_MS) {
+      lastQueueErrorAt = Date.now();
+      logger.error('LOGGING', 'Client log queue full; dropping forwarded logs', { droppedRecords });
     }
     return 'queue-full';
   }

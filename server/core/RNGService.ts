@@ -1,7 +1,7 @@
 // Mulberry32 seeded PRNG for deterministic asteroid/bot generation
 export class RNGService {
   private rngState: number;
-  private initialSeed: number;
+  private readonly initialSeed: number;
 
   constructor(serverSeed?: number) {
     // Store the initial seed for reset functionality
@@ -31,26 +31,17 @@ export class RNGService {
     this.rngState = this.initialSeed;
   }
 
-  // Get random position within bounds (supports both rectangular and circular)
-  public randomPosition(bounds: { width?: number; height?: number; radius?: number }): {
+  // Get a random position within a circular boundary.
+  public randomPosition(bounds: { radius: number }): {
     x: number;
     y: number;
   } {
-    if (bounds.radius) {
-      // Circular boundary
-      const angle = this.random() * Math.PI * 2;
-      const radius = this.random() * bounds.radius * 0.8; // Stay within 80% of boundary
-      return {
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
-      };
-    } else {
-      // Rectangular boundary (legacy support)
-      return {
-        x: this.random() * bounds.width! - bounds.width! / 2,
-        y: this.random() * bounds.height! - bounds.height! / 2,
-      };
-    }
+    const angle = this.random() * Math.PI * 2;
+    const radius = this.random() * bounds.radius * 0.8; // Stay within 80% of boundary
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    };
   }
 
   // Get random velocity
@@ -69,21 +60,5 @@ export class RNGService {
   // Set RNG state
   public setState(state: number): void {
     this.rngState = RNGService.toUint32(state); // Ensure unsigned 32-bit with validation
-  }
-
-  // Set a new seed and reset the generator
-  public setSeed(seed: number): void {
-    const normalizedSeed = RNGService.toUint32(seed);
-    if (normalizedSeed === 0) {
-      throw new Error('Seed cannot be 0');
-    }
-    this.initialSeed = normalizedSeed;
-    this.rngState = this.initialSeed;
-  }
-
-  // Create a new RNGService instance with the provided seed or derived from current state
-  public fork(seed?: number): RNGService {
-    const newSeed = seed !== undefined ? seed : this.random() * 0xffffffff;
-    return new RNGService(RNGService.toUint32(newSeed));
   }
 }

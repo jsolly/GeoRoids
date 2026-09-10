@@ -6,7 +6,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 const KITS = [
   { kitId: 'dart' as const, label: 'DASH', name: 'Boost dash' },
@@ -17,6 +17,14 @@ const KITS = [
 ];
 
 type TouchPoint = { x: number; y: number; id: number };
+const TOUCH_IDS = {
+  stick: 11,
+  fire: 12,
+  ability: 13,
+  shield: 14,
+  rotationStick: 21,
+  rotationFire: 22,
+} as const;
 
 async function centerOf(page: Page, selector: string): Promise<{ x: number; y: number }> {
   const box = await page.locator(selector).boundingBox();
@@ -36,6 +44,20 @@ async function dispatchTouch(
     touchPoints,
     modifiers: 0,
   });
+}
+
+async function tapTouchPoint(
+  session: CDPSession,
+  heldPoints: TouchPoint[],
+  touchPoint: TouchPoint
+): Promise<void> {
+  // Keep the two continuous contacts in the sequence before and after the
+  // third finger. Chromium expands the changed point with those active
+  // contacts when it creates the browser touch event.
+  await dispatchTouch(session, 'touchMove', heldPoints);
+  await dispatchTouch(session, 'touchStart', [touchPoint]);
+  await dispatchTouch(session, 'touchEnd', [touchPoint]);
+  await dispatchTouch(session, 'touchMove', heldPoints);
 }
 
 function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
@@ -66,8 +88,8 @@ async function readLocalTouchState(page: Page): Promise<{
   shieldFlashTime: number;
 }> {
   return page.evaluate(() => {
-    const gc = (window as { gameController?: any }).gameController;
-    const ship = gc?.playerManager?.getLocalPlayer?.()?.ship;
+    const gc = window.gameController;
+    const ship = gc?.getPlayerManager().getLocalPlayer()?.ship;
     if (!ship) {
       throw new Error('Local ship unavailable');
     }
@@ -104,6 +126,7 @@ test.each(KITS)(
       () =>
         document.body.classList.contains('touch-play') &&
         !document.getElementById('touch-controls')?.hidden,
+      undefined,
       { timeout: 5000 }
     );
 
@@ -118,15 +141,16 @@ test.each(KITS)(
     const session = await page.context().newCDPSession(page);
 
     const beforeMove = await readLocalTouchState(page);
+    const heldTouchPoints: TouchPoint[] = [
+      { x: stick.x + 42, y: stick.y - 4, id: TOUCH_IDS.stick },
+      { x: fire.x, y: fire.y, id: TOUCH_IDS.fire },
+    ];
     await dispatchTouch(session, 'touchStart', [
-      { x: stick.x + 34, y: stick.y, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { x: stick.x + 34, y: stick.y, id: TOUCH_IDS.stick },
+      { x: fire.x, y: fire.y, id: TOUCH_IDS.fire },
     ]);
     await game.runGameFrames(8);
-    await dispatchTouch(session, 'touchMove', [
-      { x: stick.x + 42, y: stick.y - 4, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
-    ]);
+    await dispatchTouch(session, 'touchMove', heldTouchPoints);
     await game.runGameFrames(8);
 
     const duringTouch = await readLocalTouchState(page);
@@ -139,7 +163,11 @@ test.each(KITS)(
 
     // E and F must remain usable while the two continuous touch sources are
     // held. The E action is kit-specific; the F bubble is shared.
-    await page.touchscreen.tap(ability.x, ability.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: ability.x,
+      y: ability.y,
+      id: TOUCH_IDS.ability,
+    });
     await game.runGameFrames(2);
     const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
@@ -147,7 +175,11 @@ test.each(KITS)(
     expect(
       await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
     ).toBe(true);
-    await page.touchscreen.tap(ability.x, ability.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: ability.x,
+      y: ability.y,
+      id: TOUCH_IDS.ability,
+    });
     await game.runGameFrames(1);
     const abilityAfterCoolingTap = await readLocalTouchState(page);
     expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeLessThanOrEqual(
@@ -156,7 +188,11 @@ test.each(KITS)(
     expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeGreaterThan(0);
     expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('true');
 
-    await page.touchscreen.tap(shield.x, shield.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: shield.x,
+      y: shield.y,
+      id: TOUCH_IDS.shield,
+    });
     await game.runGameFrames(2);
     const shieldWhileHeld = await readLocalTouchState(page);
     expect(shieldWhileHeld.shieldActive).toBe(true);
@@ -165,7 +201,11 @@ test.each(KITS)(
       await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-active'))
     ).toBe(true);
 
-    await page.touchscreen.tap(shield.x, shield.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: shield.x,
+      y: shield.y,
+      id: TOUCH_IDS.shield,
+    });
     await game.runGameFrames(1);
     const shieldDownWhileHeld = await readLocalTouchState(page);
     expect(shieldDownWhileHeld.shieldActive).toBe(false);
@@ -185,12 +225,13 @@ test.each(KITS)(
     expect(
       await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
     ).toBe(false);
+    await dispatchTouch(session, 'touchCancel', []);
 
     // A real orientation change also drops stale pointer ownership before the
     // controls are laid out for the new viewport.
     await dispatchTouch(session, 'touchStart', [
-      { x: stick.x + 34, y: stick.y, id: 21 },
-      { x: fire.x, y: fire.y, id: 22 },
+      { x: stick.x + 34, y: stick.y, id: TOUCH_IDS.rotationStick },
+      { x: fire.x, y: fire.y, id: TOUCH_IDS.rotationFire },
     ]);
     await game.runGameFrames(2);
     await page.setViewportSize({ width: 844, height: 390 });
@@ -220,29 +261,38 @@ test.each(KITS)(
 
     // Drive the real lifecycle path while both touch sources are held. The
     // next game tick must release every source and mark both actions dead.
-    await page.evaluate(() => {
-      const gc = (window as { gameController?: any }).gameController;
-      const player = gc?.playerManager?.getLocalPlayer?.();
-      if (!gc || !player) {
-        throw new Error('Game controller or local player unavailable');
+    await dispatchTouch(session, 'touchStart', heldTouchPoints);
+    await game.runGameFrames(2);
+    expect((await readLocalTouchState(page)).thrusting).toBe(true);
+    expect(
+      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
+    ).toBe(true);
+    const afterDeath = await page.evaluate(() => {
+      const gc = window.gameController;
+      const player = gc?.getPlayerManager().getLocalPlayer();
+      const ability = document.getElementById('touch-ability');
+      const shield = document.getElementById('touch-shield');
+      if (!gc || !player || !ability || !shield) {
+        throw new Error('Game controller, local player, or touch action unavailable');
       }
       player.ship.health = 0;
       player.ship.exploding = true;
-      player.ship.thrusting = true;
-      player.ship.canShoot = false;
       gc.updateGame();
+      return {
+        thrusting: player.ship.thrusting,
+        canShoot: player.ship.canShoot,
+        abilityDisabled: ability.getAttribute('aria-disabled'),
+        shieldDisabled: shield.getAttribute('aria-disabled'),
+        abilityUnavailable: ability.classList.contains('is-unavailable'),
+        shieldUnavailable: shield.classList.contains('is-unavailable'),
+      };
     });
-    const afterDeath = await readLocalTouchState(page);
     expect(afterDeath.thrusting).toBe(false);
     expect(afterDeath.canShoot).toBe(true);
-    expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('true');
-    expect(await page.locator('#touch-shield').getAttribute('aria-disabled')).toBe('true');
-    expect(
-      await page.locator('#touch-ability').evaluate((el) => el.classList.contains('is-unavailable'))
-    ).toBe(true);
-    expect(
-      await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-unavailable'))
-    ).toBe(true);
+    expect(afterDeath.abilityDisabled).toBe('true');
+    expect(afterDeath.shieldDisabled).toBe('true');
+    expect(afterDeath.abilityUnavailable).toBe(true);
+    expect(afterDeath.shieldUnavailable).toBe(true);
 
     const mobileScreenshot = screenshotManager.getScreenshotPath(`wave2-touch-${kitId}-mobile.png`);
     await page.screenshot({ path: mobileScreenshot });
@@ -297,6 +347,7 @@ test(
       () =>
         document.body.classList.contains('touch-play') &&
         !document.getElementById('touch-controls')?.hidden,
+      undefined,
       { timeout: 5000 }
     );
 
@@ -308,9 +359,7 @@ test(
     expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
 
     await page.evaluate(() => {
-      const ship = (
-        window as { gameController?: any }
-      ).gameController?.playerManager?.getLocalPlayer?.()?.ship;
+      const ship = window.gameController?.getPlayerManager().getLocalPlayer()?.ship;
       if (!ship) {
         throw new Error('Local ship unavailable');
       }

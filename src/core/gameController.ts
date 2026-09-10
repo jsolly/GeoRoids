@@ -63,13 +63,6 @@ import {
   type LaserTarget,
 } from '../physics/collision/CollisionManager';
 import { applyShockwaveToBody, type ShockwaveWaveSpec } from '../physics/shockwave';
-import { contourSegmentCount } from '../physics/terrain/contours';
-import { sampleGradient, sampleHeight } from '../physics/terrain/heightfield';
-import {
-  getTerrainContours,
-  getTerrainField,
-  getTerrainSeed,
-} from '../physics/terrain/terrainSession';
 import { canvasManager } from '../rendering/canvas';
 import { PLAYFIELD_CLOSE_SCALE } from '../rendering/playfieldCamera';
 import { showNetworkBanner } from '../ui/networkStatus';
@@ -143,7 +136,8 @@ export class GameController {
         if (!canvas) {
           return undefined;
         }
-        return { width: canvas.width, height: canvas.height };
+        const viewport = canvasManager.getViewportSize();
+        return { width: viewport.width, height: viewport.height };
       },
     });
 
@@ -346,28 +340,22 @@ export class GameController {
       y: ship.position.y + direction.y * ship.r,
     };
     const canvas = canvasManager.getCanvas();
-    const scale = canvasManager.getPlayfieldScale();
+    const scale = PLAYFIELD_CLOSE_SCALE;
+    const viewport = canvasManager.getViewportSize();
     const maxDistance = canvas
-      ? Math.max(1, (Math.hypot(canvas.width, canvas.height) * 0.8) / Math.max(scale, 0.001))
+      ? Math.max(1, (Math.hypot(viewport.width, viewport.height) * 0.8) / Math.max(scale, 0.001))
       : 1000;
     const laserUpgrade = state.pilot?.laserUpgrade;
     const initialEnergy =
       laserUpgrade && laserUpgrade.charges > 0 && laserUpgrade.expiresAt > Date.now() ? 2 : 1;
-    try {
-      const preview = previewChargedReflections(
-        start,
-        direction,
-        this.reflectionRocks,
-        maxDistance,
-        initialEnergy
-      );
-      this.asteroidToolsController.setReflectionPreview(preview);
-    } catch (error) {
-      logger.warn('ASTEROID_TOOLS', 'Unable to compute bounce preview', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      this.asteroidToolsController.setReflectionPreview(undefined);
-    }
+    const preview = previewChargedReflections(
+      start,
+      direction,
+      this.reflectionRocks,
+      maxDistance,
+      initialEnergy
+    );
+    this.asteroidToolsController.setReflectionPreview(preview);
   }
 
   // Game lifecycle methods
@@ -414,13 +402,11 @@ export class GameController {
       this.setupServerAsteroidListeners();
       this.networkManager.initializeAsteroidSync();
 
-      // Initialize listeners
-      if (this.playerManager.getLocalPlayer()) {
-        logger.debug('GAME_CONTROLLER', 'Initializing input listeners');
-        this.inputManager.initializeListeners();
-      } else {
-        logger.warn('GAME_CONTROLLER', 'No local player found, cannot initialize input listeners');
+      if (!this.playerManager.getLocalPlayer()) {
+        throw new Error('Cannot initialize input listeners without a local player');
       }
+      logger.debug('GAME_CONTROLLER', 'Initializing input listeners');
+      this.inputManager.initializeListeners();
 
       // Begin sending continuous local player updates to server
       PlayerNetwork.getInstance().startNetworkUpdates();
@@ -622,14 +608,6 @@ export class GameController {
     }
   }
 
-  getActiveShockwaves(): ReturnType<typeof shockwaveManager.getActive> {
-    return shockwaveManager.getActive();
-  }
-
-  getShockwaveDebug(): ReturnType<typeof shockwaveManager.getDebugState> {
-    return shockwaveManager.getDebugState();
-  }
-
   private applyServerAsteroidTagged = (event: { asteroidId: string; expiresAt: number }): void => {
     const { asteroidId, expiresAt } = event;
     const roid = this.currRoidBelt?.roids.find((r) => r.id === asteroidId);
@@ -824,11 +802,6 @@ export class GameController {
     });
   }
 
-  // Getters for current game state
-  getCurrShip() {
-    return this.playerManager.getLocalShip();
-  }
-
   getCurrPlayer() {
     return this.playerManager.getLocalPlayer();
   }
@@ -887,19 +860,6 @@ export class GameController {
     return this.playerManager.getLocalPlayer()?.score ?? 0;
   }
 
-  // Text display methods
-  updateTextProperties(text: string, alpha: number): void {
-    this.gameStateManager.updateTextProperties(text, alpha);
-  }
-
-  updateTextAlpha(alpha: number): void {
-    this.gameStateManager.updateTextAlpha(alpha);
-  }
-
-  getTextAlpha(): number {
-    return this.gameStateManager.getTextAlpha();
-  }
-
   getText(): string {
     return this.gameStateManager.getText();
   }
@@ -907,10 +867,6 @@ export class GameController {
   // Kill message methods
   setKillMessage(playerName: string): void {
     this.gameStateManager.setKillMessage(playerName);
-  }
-
-  updateKillMessageTimer(): void {
-    this.gameStateManager.updateKillMessageTimer();
   }
 
   getIsGameRunning(): boolean {
@@ -923,15 +879,6 @@ export class GameController {
     PlayerNetwork.getInstance().stopNetworkUpdates();
   }
 
-  toggleIsGameRunning(): void {
-    this.gameStateManager.toggleIsGameRunning();
-  }
-
-  // Network methods
-  setPlayerName(name: string): void {
-    this.playerManager.setPlayerName(name);
-  }
-
   updateNetworkPlayerState(): void {
     this.playerManager.updateNetworkState();
   }
@@ -940,30 +887,12 @@ export class GameController {
     return this.networkManager;
   }
 
-  // Getters for service access (for backward compatibility and testing)
   getGameStateManager(): GameStateManager {
     return this.gameStateManager;
   }
 
   getPlayerManager(): PlayerManager {
     return this.playerManager;
-  }
-
-  /** Probe the shared heightfield — used by tests to read elevation / slope. */
-  getTerrainProbe(position?: { x: number; y: number }): {
-    seed: number;
-    height: number;
-    gradient: { x: number; y: number };
-    contourCount: number;
-  } {
-    const field = getTerrainField();
-    const at = position ?? this.playerManager.getLocalShip()?.position ?? { x: 0, y: 0 };
-    return {
-      seed: getTerrainSeed(),
-      height: sampleHeight(field, at.x, at.y),
-      gradient: sampleGradient(field, at.x, at.y),
-      contourCount: contourSegmentCount(getTerrainContours()),
-    };
   }
 
   // Connection error handling methods
@@ -1091,8 +1020,7 @@ export class GameController {
     currPlayer.ship.update(lifecycleFrames);
     shockwaveManager.update();
 
-    // Bots predict locally; remotes share the same 60 Hz explode/blink clock
-    // so a hitch does not freeze their corpse or latch blink forever.
+    // Server-driven bots and remote pilots share the 60 Hz explode/blink clock.
     const allPlayers = this.networkManager.getAllPlayers();
     for (const player of allPlayers) {
       if (player.type === 'bot' && player.ship) {
@@ -1148,13 +1076,14 @@ export class GameController {
       );
     const rocks = harpoonBodiesFromRocks(this.currRoidBelt?.roids ?? []);
     const canvas = canvasManager.getCanvas();
+    const viewport = canvasManager.getViewportSize();
     // KeyE runs outside the render loop. Keep latch range at the same fixed
     // close/play scale as the renderer, even before the first frame publishes.
     const playfieldScale = PLAYFIELD_CLOSE_SCALE;
     return {
       bodies: collectPlayHarpoonField(rocks, ships),
       playfieldScale,
-      ...(canvas ? { canvas: { width: canvas.width, height: canvas.height } } : {}),
+      ...(canvas ? { canvas: { width: viewport.width, height: viewport.height } } : {}),
     };
   }
 

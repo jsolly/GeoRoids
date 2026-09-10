@@ -89,7 +89,7 @@ export function tickTouchControls(player: Player): void {
   }
 }
 
-export function isTouchChromeVisible(): boolean {
+function isTouchChromeVisible(): boolean {
   return typeof document !== 'undefined' && document.body.classList.contains('touch-play');
 }
 
@@ -246,16 +246,7 @@ function resetTouchInteraction(player: Player | null): void {
 }
 
 function requireLocalPlayer(): Player | null {
-  try {
-    return PlayerManager.getInstance().getLocalPlayer();
-  } catch (error: unknown) {
-    logger.debug(
-      'INPUT',
-      'Touch controls ignored — no local player',
-      error instanceof Error ? { message: error.message } : {}
-    );
-    return null;
-  }
+  return PlayerManager.getInstance().getLocalPlayer();
 }
 
 function ensureTouchDom(): {
@@ -278,10 +269,9 @@ function ensureTouchDom(): {
 
   let stick = document.getElementById(STICK_ID);
   if (!stick) {
-    stick = document.createElement('div');
+    stick = document.createElement('fieldset');
     stick.id = STICK_ID;
     stick.className = 'touch-stick';
-    stick.setAttribute('role', 'slider');
     stick.setAttribute('aria-label', 'Steer and thrust');
     root.appendChild(stick);
   }

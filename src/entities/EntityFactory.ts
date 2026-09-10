@@ -8,7 +8,7 @@ import { Laser } from './laser/Laser';
 import { Player } from './player/Player';
 import { Roid, RoidBelt } from './roid/Roid';
 
-export interface PlayerConfig {
+interface PlayerConfig {
   id?: string;
   name: string;
   type: 'local' | 'remote' | 'bot';
@@ -19,7 +19,7 @@ export interface PlayerConfig {
   factionId?: SoftFactionId;
 }
 
-export interface RoidConfig {
+interface RoidConfig {
   position?: Position;
   size?: number;
   id?: string;
@@ -29,7 +29,7 @@ export interface RoidConfig {
  * Unified factory for players (local, remote, bot) and world entities.
  * Bots are the same Player type as humans; the server owns spawn/AI.
  */
-export class EntityFactory {
+class EntityFactory {
   private static instance: EntityFactory;
 
   private constructor() {}
@@ -78,13 +78,13 @@ export class EntityFactory {
 
   // Roid creation methods
   createRoid(config: RoidConfig = {}): Roid {
-    const position = config.position || this.generateRandomRoidPosition();
+    const position = config.position || getRandomPositionInAsteroidField();
     const size = config.size || 15; // Default medium size
     return new Roid(position, size, config.id);
   }
 
   createEmptyRoidBelt(): RoidBelt {
-    return new RoidBelt(false);
+    return new RoidBelt();
   }
 
   // Laser creation method
@@ -163,16 +163,11 @@ export class EntityFactory {
       player.color = config.color;
       player.ship.color = config.color;
     } else {
-      // Fallback to random color if no color provided (shouldn't happen with proper server sync)
+      // Use the remote-player palette when the snapshot omits a color.
       player.color = getFactionColor('remote');
       player.ship.color = player.color;
     }
   }
-
-  private generateRandomRoidPosition(): Position {
-    return getRandomPositionInAsteroidField();
-  }
 }
 
-// Export singleton instance for backward compatibility
 export const entityFactory = EntityFactory.getInstance();

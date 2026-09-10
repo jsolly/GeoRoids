@@ -4,7 +4,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 type ReceivedMessage = {
   type?: string;
@@ -31,6 +31,8 @@ test(
     );
     await game.bootGame();
     await game.waitForCombatReady();
+    // Keep ambient satellite encounters out of the score baseline while choosing a target.
+    await game.placeShipAt(-1800, -1800);
     await game.waitForAsteroids(1);
 
     const initialScore = await game.getScore();

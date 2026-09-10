@@ -1,10 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 
 describe('Server pause functionality', () => {
   let wss: WebSocketServer;
   let gameEngine: GameEngine;
+
+  function emptySocket(): WebSocket {
+    return {} as unknown as WebSocket;
+  }
 
   beforeAll(async () => {
     // Create a test server
@@ -42,7 +47,7 @@ describe('Server pause functionality', () => {
 
   it('should resume game when players join', () => {
     // Simulate adding a player
-    const mockWs = {} as any;
+    const mockWs = emptySocket();
     const player = gameEngine.addPlayer('test-player', 'TestPlayer', mockWs);
 
     expect(player).toBeDefined();

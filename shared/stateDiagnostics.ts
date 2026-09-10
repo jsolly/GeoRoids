@@ -1,9 +1,9 @@
 import type { Position, Velocity } from '../shared-types';
 
-export const STATE_SNAPSHOT_SAMPLE_INTERVAL = 450;
+const STATE_SNAPSHOT_SAMPLE_INTERVAL = 450;
 const MAX_ERROR_TEXT = 2048;
 
-export interface DiagnosticActorState {
+interface DiagnosticActorState {
   position: Position;
   velocity: Velocity;
   angle: number;

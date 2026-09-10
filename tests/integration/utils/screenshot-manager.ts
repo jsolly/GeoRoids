@@ -1,10 +1,10 @@
-import { mkdirSync } from 'fs';
-import { join } from 'path';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 export class ScreenshotManager {
   private readonly screenshotsDir: string;
 
-  constructor(_testDir: string) {
+  constructor() {
     // Use centralized screenshots directory under browser tests
     this.screenshotsDir = join(process.cwd(), 'tests', 'integration', 'browser', 'screenshots');
   }
@@ -29,12 +29,5 @@ export class ScreenshotManager {
    */
   getScreenshotPath(filename: string): string {
     return join(this.screenshotsDir, filename);
-  }
-
-  /**
-   * Get the screenshots directory path
-   */
-  getScreenshotsDir(): string {
-    return this.screenshotsDir;
   }
 }

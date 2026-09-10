@@ -293,6 +293,9 @@ async function measureBoundaryCulling(
       >('/src/physics/boundary.ts');
       const { PALETTE, VISUAL } =
         await importBrowserModule<typeof import('../src/constants')>('/src/constants/index.ts');
+      const { PLAYFIELD_CLOSE_SCALE } = await importBrowserModule<
+        typeof import('../src/rendering/playfieldCamera')
+      >('/src/rendering/playfieldCamera.ts');
 
       const canvas = canvasManager.requireCanvas();
       const context = canvasManager.requireContext();
@@ -314,13 +317,7 @@ async function measureBoundaryCulling(
         context.strokeStyle = PALETTE.HUD_MUTED;
         context.lineWidth = VISUAL.BOUNDARY_STROKE_WIDTH;
         context.beginPath();
-        context.arc(
-          center.x,
-          center.y,
-          boundary.radius * canvasManager.getPlayfieldScale(),
-          0,
-          Math.PI * 2
-        );
+        context.arc(center.x, center.y, boundary.radius * PLAYFIELD_CLOSE_SCALE, 0, Math.PI * 2);
         context.stroke();
         context.restore();
       };
@@ -491,7 +488,6 @@ async function main(): Promise<void> {
     server: { host: '127.0.0.1', port: 0, strictPort: false },
   });
   let browser: Browser | undefined;
-  let page: Page | undefined;
   const clientFailures: unknown[] = [];
   try {
     await vite.listen();
@@ -500,7 +496,7 @@ async function main(): Promise<void> {
       throw new Error('Vite did not expose a local benchmark URL');
     }
     browser = await chromium.launch({ headless: true });
-    page = await browser.newPage({ viewport: VIEWPORT });
+    const page = await browser.newPage({ viewport: VIEWPORT });
     await page.addInitScript(() => {
       // tsx preserves local helper names with this esbuild hook. Playwright
       // serializes evaluated functions without the module-level helper.
@@ -529,7 +525,6 @@ async function main(): Promise<void> {
     clientFailures.push(error);
   }
   const cleanupTasks = [
-    ...(page ? [{ label: 'page', promise: page.close() }] : []),
     ...(browser ? [{ label: 'browser', promise: browser.close() }] : []),
     { label: 'Vite server', promise: vite.close() },
   ];

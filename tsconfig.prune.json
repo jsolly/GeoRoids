@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  // These modules export configuration consumed by their tool, not by imports.
+  "files": ["vite.config.ts", "vitest.config.ts", "vitest.browser.config.ts"]
+}

@@ -3,7 +3,7 @@ import { ROID } from '../../../../src/constants';
 import type { BrowserManager } from '../../utils/browser-manager';
 import { GameInteractions } from '../../utils/game-interactions';
 
-export interface ObservedLaser {
+interface ObservedLaser {
   ownerId: string;
   x: number;
   y: number;
@@ -17,8 +17,7 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
   const pages: Page[] = [];
   const games: GameInteractions[] = [];
   for (let index = 0; index < count; index++) {
-    const page =
-      index === 0 ? browserManager.getCurrentPage() : await browserManager.createAdditionalPage();
+    const page = index === 0 ? browserManager.getCurrentPage() : await browserManager.createPage();
     if (!page) {
       throw new Error('Browser page is not available');
     }
@@ -52,7 +51,7 @@ export async function parkLaserClient(game: GameInteractions, index = 0): Promis
 
 export async function localPlayerId(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const id = (window as any).gameController?.playerManager?.getLocalPlayer()?.id;
+    const id = window.gameController?.getPlayerManager()?.getLocalPlayer()?.id;
     if (!id) {
       throw new Error('Local player has not joined');
     }
@@ -69,13 +68,13 @@ export async function observeLaser(
 ): Promise<ObservedLaser> {
   const handle = await page.waitForFunction(
     ({ ownerId, remote, requireOnCanvas }) => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer();
+      const gc = window.gameController;
+      const local = gc?.getPlayerManager()?.getLocalPlayer();
       const owner = remote
         ? gc
             ?.getNetworkManager()
             ?.getAllPlayers()
-            .find((player: any) => player.id === ownerId && player.type === 'remote')
+            .find((player) => player.id === ownerId && player.type === 'remote')
         : local?.id === ownerId
           ? local
           : undefined;
@@ -83,7 +82,7 @@ export async function observeLaser(
       if (!owner || !local || !canvas) {
         return false;
       }
-      const laser = owner.ship.lasers.find((shot: any) => {
+      const laser = owner.ship.lasers.find((shot) => {
         const values = [shot.position.x, shot.position.y, shot.velocity.x, shot.velocity.y];
         return (
           !shot.hasExploded &&
@@ -95,9 +94,10 @@ export async function observeLaser(
         return false;
       }
       // The playfield uses fixed zoom 1 and is centered on the viewer's ship.
+      const viewport = canvas.getBoundingClientRect();
       const onCanvas =
-        Math.abs(laser.position.x - local.ship.position.x) < canvas.width / 2 &&
-        Math.abs(laser.position.y - local.ship.position.y) < canvas.height / 2;
+        Math.abs(laser.position.x - local.ship.position.x) < viewport.width / 2 &&
+        Math.abs(laser.position.y - local.ship.position.y) < viewport.height / 2;
       if (requireOnCanvas && !onCanvas) {
         return false;
       }
@@ -127,13 +127,13 @@ export async function waitForLaserCleanup(
 ): Promise<void> {
   const handle = await page.waitForFunction(
     ({ id, remote }) => {
-      const gc = (window as any).gameController;
-      const local = gc?.playerManager?.getLocalPlayer?.();
+      const gc = window.gameController;
+      const local = gc?.getPlayerManager()?.getLocalPlayer?.();
       const owner = remote
         ? gc
             ?.getNetworkManager()
             ?.getAllPlayers()
-            .find((player: any) => player.id === id && player.type === 'remote')
+            .find((player) => player.id === id && player.type === 'remote')
         : local?.id === id
           ? local
           : undefined;

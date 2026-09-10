@@ -1,7 +1,5 @@
-import type { PlayerProjectileState, Position } from '../../../shared-types';
-import { PALETTE } from '../../constants';
+import type { PlayerProjectileState } from '../../../shared-types';
 import type { Ship } from '../ship/Ship';
-import { drawLaserBolts } from '../ship/shipRenderer';
 import { Laser } from './Laser';
 
 /** Complete keyed server projectile list. Events never append duplicate bolts. */
@@ -54,15 +52,5 @@ export class AuthoritativeProjectileField {
   clear(): void {
     this.rows = [];
     this.enabled = false;
-  }
-  draw(viewer: Position): void {
-    const ordinary = this.rows
-      .filter((row) => row.energy < 2)
-      .map((row) => ({ ...row, explodeTime: 0 }));
-    const charged = this.rows
-      .filter((row) => row.energy >= 2)
-      .map((row) => ({ ...row, explodeTime: 0 }));
-    drawLaserBolts(ordinary, PALETTE.LASER_LOCAL, viewer);
-    drawLaserBolts(charged, PALETTE.LASER_LOCAL, viewer);
   }
 }

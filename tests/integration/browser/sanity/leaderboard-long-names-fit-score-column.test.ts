@@ -5,7 +5,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 const LONG_NAME = 'QA7skirmisherportrait';
 const WIDE_SCORE = 987654321;
@@ -45,10 +45,10 @@ async function captureLeaderboardRow(page: import('playwright').Page): Promise<R
         win.__leaderboardFillTextInstalled = true;
       }
 
-      const gameController = (window as { gameController?: any }).gameController;
-      const local = gameController?.playerManager?.getLocalPlayer?.();
+      const gameController = window.gameController;
+      const local = gameController?.getPlayerManager()?.getLocalPlayer?.();
       const players = gameController?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      if (!local || players.length < 2) {
+      if (!gameController || !local || players.length < 2) {
         throw new Error('Leaderboard fixture requires a local player and at least one bot');
       }
 
@@ -77,7 +77,8 @@ async function verifyViewport(
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
       const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
-      return canvas?.width === expectedWidth && canvas.height === expectedHeight;
+      const viewport = canvas?.getBoundingClientRect();
+      return viewport?.width === expectedWidth && viewport.height === expectedHeight;
     },
     { expectedWidth: width, expectedHeight: height },
     { timeout: 5000 }

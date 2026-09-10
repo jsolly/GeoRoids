@@ -3,12 +3,21 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { createRailwayContext, project, type ServiceNode } from 'railway/iac';
 import { afterEach, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
+import railwayConfig from '../../../.railway/railway';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
+const railwayProject = await railwayConfig(createRailwayContext({ command: 'test' }), project);
+const railwayService = railwayProject.resources
+  ?.flat()
+  .find(
+    (resource): resource is ServiceNode =>
+      resource.type === 'service' && resource.name === 'geoasteroids'
+  );
 let child: ChildProcess | undefined;
 let output = '';
 const sockets: WebSocket[] = [];
@@ -29,9 +38,16 @@ async function waitFor<T>(read: () => T | undefined, label: string, timeout = 50
 }
 
 async function start(gated: boolean, port = 0): Promise<number> {
+  const railwayStartCommand = railwayService?.deploy?.startCommand;
+  if (!railwayStartCommand) {
+    throw new Error('Railway IaC service start command is missing');
+  }
   output = '';
-  // Execute the actual Railway entry under tsx, without importing the test factory.
-  child = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
+  const [command, ...args] = railwayStartCommand.split(/\s+/);
+  if (!command) {
+    throw new Error('Railway start command is empty');
+  }
+  child = spawn(command, args, {
     cwd: repo,
     env: {
       ...process.env,
@@ -66,24 +82,31 @@ function connect(port: number, path: string): WebSocket {
   return ws;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 class Pilot {
-  readonly packets: Array<{ type: string; data: Record<string, unknown> }> = [];
+  readonly packets: Array<{ type: string; data?: unknown }> = [];
   readonly states: ServerGameSnapshot[] = [];
-  readonly failures: Error[] = [];
+  readonly failures: unknown[] = [];
   private readonly decoder = new SnapshotDecoder();
   constructor(readonly ws: WebSocket) {
     ws.on('message', (raw) => {
       try {
-        const packet = JSON.parse(String(raw));
-        this.packets.push(packet);
-        if (packet.type === 'joined') {
+        const packet: unknown = JSON.parse(String(raw));
+        if (!isRecord(packet) || typeof packet['type'] !== 'string') {
+          throw new Error('Server packet is missing its type');
+        }
+        this.packets.push({ ...packet, type: packet['type'] });
+        if (packet['type'] === 'joined') {
           this.decoder.reset();
         }
-        if (packet.type === 'snapshot') {
-          this.states.push(this.decoder.decode(packet.data));
+        if (packet['type'] === 'snapshot') {
+          this.states.push(this.decoder.decode(packet['data']));
         }
       } catch (error) {
-        this.failures.push(error as Error);
+        this.failures.push(error);
       }
     });
   }
@@ -101,10 +124,14 @@ class Pilot {
       asteroidInteractions: 1,
       ...(resumeToken ? { resumeToken } : {}),
     });
-    return waitFor(
+    const data = await waitFor(
       () => this.packets.find((packet) => packet.type === 'joined')?.data,
       `join ${id}`
     );
+    if (!isRecord(data)) {
+      throw new Error('Joined packet is missing its data object');
+    }
+    return data;
   }
   async state(): Promise<ServerGameSnapshot> {
     const pong = once(this.ws, 'pong');
@@ -195,7 +222,12 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
   expect(
     observer.packets
       .slice(packetStart)
-      .some((packet) => packet.type === 'playerLeft' && packet.data['id'] === 'entry-pilot')
+      .some(
+        (packet) =>
+          packet.type === 'playerLeft' &&
+          isRecord(packet.data) &&
+          packet.data['id'] === 'entry-pilot'
+      )
   ).toBe(false);
   const resumed = await pilot(port);
   expect(await resumed.join('forged-new-id', joined['resumeToken'])).toMatchObject({
@@ -237,6 +269,9 @@ test('the actual support entry admits ordinary clients before the cutover flag i
     () => ordinary.packets.find((packet) => packet.type === 'joined')?.data,
     'ordinary production join'
   );
+  if (!isRecord(joined)) {
+    throw new Error('Joined packet is missing its data object');
+  }
   expect(joined['id']).toBe('legacy-entry');
   expect(joined['resumeToken']).toBeUndefined();
   expect(joined['asteroidInteractions']).toBeUndefined();

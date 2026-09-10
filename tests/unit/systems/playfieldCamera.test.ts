@@ -7,17 +7,14 @@ import {
   countRocksOnCanvas,
   drawingOffsets,
   PLAYFIELD_CLOSE_SCALE,
-  playfieldZoom,
   radarBeltVisibleOnPlayfield,
 } from '../../../src/rendering/playfieldCamera';
 
 const SMALL = { width: 800, height: 600 };
-const HD = { width: 1920, height: 1080 };
 
 /** Live www poses captured after #444 (c29e9f9): humans outside / on the rim of the 1200 belt. */
 const TAB_A_IN_BELT = { x: 0, y: 0 };
 const TAB_B_OUTSIDE = { x: -1392, y: -487 };
-const RIM_1080P_MISS = { x: 326, y: -1098 };
 
 function beltAfterTicks(seed: number, count: number, ticks: number) {
   const manager = new AsteroidManager(new RNGService(seed));
@@ -34,14 +31,6 @@ function beltAfterTicks(seed: number, count: number, ticks: number) {
 }
 
 describe('close playfield camera and wide minimap', () => {
-  test('keeps one close scale at every camera pose and viewport', () => {
-    const field = beltAfterTicks(11, 20, 70 * 60);
-    for (const ship of [TAB_A_IN_BELT, TAB_B_OUTSIDE, RIM_1080P_MISS, { x: 2000, y: 1500 }]) {
-      expect(playfieldZoom(field, ship, SMALL)).toBe(PLAYFIELD_CLOSE_SCALE);
-      expect(playfieldZoom(field, ship, HD)).toBe(PLAYFIELD_CLOSE_SCALE);
-    }
-  });
-
   test('close scale keeps nearby rocks legible while the minimap remains the wide view', () => {
     const field = beltAfterTicks(11, 20, 70 * 60);
     expect(field.length).toBeGreaterThan(0);

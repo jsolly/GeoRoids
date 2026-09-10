@@ -3,6 +3,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { getGameBoundary } from '../physics/boundary';
 import { logger } from '../utils/Logger';
 import { canvasManager } from './canvas';
+import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 
 export function drawFieryBoundary(shipPosition: Position): void {
   const ctx = canvasManager.getContext();
@@ -17,15 +18,16 @@ export function drawFieryBoundary(shipPosition: Position): void {
   const center = canvasManager.worldToScreen({ x: boundary.cx, y: boundary.cy }, shipPosition);
   const centerX = center.x;
   const centerY = center.y;
-  const radius = boundary.radius * canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
+  const radius = boundary.radius * PLAYFIELD_CLOSE_SCALE;
 
   // Skip the expensive glowing circle only when its edge is outside the whole
   // viewport. A circumscribed view radius plus glow padding keeps this conservative.
   const viewRadius =
-    Math.hypot(cvs.width, cvs.height) / 2 +
+    Math.hypot(viewport.width, viewport.height) / 2 +
     VISUAL.BOUNDARY_GLOW * 3 +
     VISUAL.BOUNDARY_STROKE_WIDTH / 2;
-  const centerDistance = Math.hypot(centerX - cvs.width / 2, centerY - cvs.height / 2);
+  const centerDistance = Math.hypot(centerX - viewport.width / 2, centerY - viewport.height / 2);
   if (radius > 0 && Math.abs(centerDistance - radius) > viewRadius) {
     return;
   }

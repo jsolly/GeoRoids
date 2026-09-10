@@ -1,6 +1,83 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, assert, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
+import type { AsteroidData } from '../../../shared-types';
+
+type ObservedAsteroid = Pick<AsteroidData, 'id' | 'position' | 'velocity'>;
+type MessageEnvelope = Record<string, unknown> & { type: string; data?: unknown };
+type IdentifiedData = Record<string, unknown> & { id: string };
+type JoinedMessage = MessageEnvelope & { type: 'joined'; data: IdentifiedData };
+type AsteroidBatchMessage = MessageEnvelope & {
+  type: 'asteroidCreateBatch';
+  data: Record<string, unknown> & { asteroids: ObservedAsteroid[] };
+};
+type PlayerLeftMessage = MessageEnvelope & { type: 'playerLeft'; data: IdentifiedData };
+type OtherMessage = MessageEnvelope;
+type ObservedMessage = JoinedMessage | AsteroidBatchMessage | PlayerLeftMessage | OtherMessage;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isMessageEnvelope(value: unknown): value is MessageEnvelope {
+  return isRecord(value) && typeof value['type'] === 'string';
+}
+
+function isIdentifiedData(value: unknown): value is IdentifiedData {
+  return isRecord(value) && typeof value['id'] === 'string';
+}
+
+function isPosition(value: unknown): value is { x: number; y: number } {
+  return isRecord(value) && typeof value['x'] === 'number' && typeof value['y'] === 'number';
+}
+
+function isObservedAsteroid(value: unknown): value is ObservedAsteroid {
+  return (
+    isRecord(value) &&
+    typeof value['id'] === 'string' &&
+    isPosition(value['position']) &&
+    isPosition(value['velocity'])
+  );
+}
+
+function isAsteroidBatchData(
+  value: unknown
+): value is Record<string, unknown> & { asteroids: ObservedAsteroid[] } {
+  return (
+    isRecord(value) &&
+    Array.isArray(value['asteroids']) &&
+    value['asteroids'].every(isObservedAsteroid)
+  );
+}
+
+function parseObservedMessage(raw: WebSocket.RawData): ObservedMessage {
+  const parsed: unknown = JSON.parse(String(raw));
+  if (!isMessageEnvelope(parsed)) {
+    throw new Error('Server message is missing its type');
+  }
+
+  const type = parsed['type'];
+  const data = parsed['data'];
+  if (type === 'joined') {
+    if (isIdentifiedData(data)) {
+      return { ...parsed, type: 'joined', data };
+    }
+    throw new Error('Joined message is missing its player ID');
+  }
+  if (type === 'asteroidCreateBatch') {
+    if (isAsteroidBatchData(data)) {
+      return { ...parsed, type: 'asteroidCreateBatch', data };
+    }
+    throw new Error('Malformed asteroidCreateBatch message');
+  }
+  if (type === 'playerLeft') {
+    if (isIdentifiedData(data)) {
+      return { ...parsed, type: 'playerLeft', data };
+    }
+    throw new Error(`Malformed ${type} message`);
+  }
+  return parsed;
+}
 
 function openGameSocket(url: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
@@ -10,12 +87,38 @@ function openGameSocket(url: string): Promise<WebSocket> {
   });
 }
 
-function waitForMessage(ws: WebSocket, type: string, timeoutMs = 5000): Promise<any> {
+function waitForMessage(ws: WebSocket, type: 'joined', timeoutMs?: number): Promise<JoinedMessage>;
+function waitForMessage(
+  ws: WebSocket,
+  type: 'asteroidCreateBatch',
+  timeoutMs?: number
+): Promise<AsteroidBatchMessage>;
+function waitForMessage(
+  ws: WebSocket,
+  type: 'playerLeft',
+  timeoutMs?: number
+): Promise<PlayerLeftMessage>;
+function waitForMessage(
+  ws: WebSocket,
+  type: ObservedMessage['type'],
+  timeoutMs = 5000
+): Promise<ObservedMessage> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timed out waiting for ${type}`)), timeoutMs);
+    const timer = setTimeout(() => {
+      ws.off('message', onMessage);
+      reject(new Error(`Timed out waiting for ${type}`));
+    }, timeoutMs);
 
-    const onMessage = (raw: WebSocket.RawData) => {
-      const message = JSON.parse(String(raw));
+    const onMessage = (raw: WebSocket.RawData): void => {
+      let message: ObservedMessage;
+      try {
+        message = parseObservedMessage(raw);
+      } catch (error) {
+        clearTimeout(timer);
+        ws.off('message', onMessage);
+        reject(error);
+        return;
+      }
       if (message.type === type) {
         clearTimeout(timer);
         ws.off('message', onMessage);
@@ -65,6 +168,7 @@ describe('Server initAsteroids sync', () => {
         })
       );
       const firstBatch = await waitForMessage(playerOne, 'asteroidCreateBatch');
+      expect(firstBatch['timestamp']).toEqual(expect.any(Number));
       expect(firstBatch.data?.asteroids?.length).toBeGreaterThan(0);
 
       playerTwo.send(
@@ -86,8 +190,10 @@ describe('Server initAsteroids sync', () => {
         })
       );
       const secondBatch = await waitForMessage(playerTwo, 'asteroidCreateBatch');
+      const firstAsteroid = firstBatch.data.asteroids[0];
+      assert.exists(firstAsteroid);
       expect(secondBatch.data?.asteroids?.length).toBe(firstBatch.data.asteroids.length);
-      expect(secondBatch.data?.asteroids?.[0]?.id).toBe(firstBatch.data.asteroids[0].id);
+      expect(secondBatch.data.asteroids[0]?.id).toBe(firstAsteroid.id);
     } finally {
       playerOne.close();
       playerTwo.close();
@@ -118,14 +224,11 @@ describe('Server initAsteroids sync', () => {
         })
       );
       const firstBatch = await waitForMessage(playerOne, 'asteroidCreateBatch');
-      const initial = (firstBatch.data?.asteroids ?? []) as Array<{
-        id: string;
-        position: { x: number; y: number };
-        velocity: { x: number; y: number };
-      }>;
+      const initial = firstBatch.data.asteroids;
       expect(initial.length).toBeGreaterThan(0);
 
-      const tracked = initial[0]!;
+      const tracked = initial[0];
+      assert.exists(tracked);
       server.gameEngine.updateAsteroid(tracked.id, {
         position: { x: 0, y: 0 },
         velocity: { x: 2, y: 0 },
@@ -134,8 +237,8 @@ describe('Server initAsteroids sync', () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       const liveBeforeJoin = server.gameEngine.getAsteroid(tracked.id);
-      expect(liveBeforeJoin).toBeDefined();
-      expect(liveBeforeJoin!.position.x).toBeGreaterThan(2);
+      assert.exists(liveBeforeJoin);
+      expect(liveBeforeJoin.position.x).toBeGreaterThan(2);
 
       playerTwo.send(
         JSON.stringify({
@@ -156,24 +259,20 @@ describe('Server initAsteroids sync', () => {
         })
       );
       const lateBatch = await waitForMessage(playerTwo, 'asteroidCreateBatch');
-      const lateField = (lateBatch.data?.asteroids ?? []) as Array<{
-        id: string;
-        position: { x: number; y: number };
-        velocity: { x: number; y: number };
-      }>;
+      const lateField = lateBatch.data.asteroids;
 
       const lateTracked = lateField.find((asteroid) => asteroid.id === tracked.id);
       const liveAfterJoin = server.gameEngine.getAsteroid(tracked.id);
-      expect(lateTracked).toBeDefined();
-      expect(liveAfterJoin).toBeDefined();
-      expect(lateTracked!.velocity).toEqual(liveAfterJoin!.velocity);
-      expect(Math.abs(lateTracked!.position.x - liveAfterJoin!.position.x)).toBeLessThan(12);
-      expect(Math.abs(lateTracked!.position.y - liveAfterJoin!.position.y)).toBeLessThan(12);
+      assert.exists(lateTracked);
+      assert.exists(liveAfterJoin);
+      expect(lateTracked.velocity).toEqual(liveAfterJoin.velocity);
+      expect(Math.abs(lateTracked.position.x - liveAfterJoin.position.x)).toBeLessThan(12);
+      expect(Math.abs(lateTracked.position.y - liveAfterJoin.position.y)).toBeLessThan(12);
       expect(
-        lateTracked!.position.x !== tracked.position.x ||
-          lateTracked!.position.y !== tracked.position.y
+        lateTracked.position.x !== tracked.position.x ||
+          lateTracked.position.y !== tracked.position.y
       ).toBe(true);
-      expect(Math.hypot(lateTracked!.position.x, lateTracked!.position.y)).toBeLessThan(1300);
+      expect(Math.hypot(lateTracked.position.x, lateTracked.position.y)).toBeLessThan(1300);
     } finally {
       playerOne.close();
       playerTwo.close();

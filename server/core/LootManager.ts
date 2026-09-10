@@ -31,7 +31,10 @@ export class LootManager {
     return this.toPublic(drop);
   }
 
-  public spawnFromKill(entity: GameEntity, gameTime: number): LootData[] {
+  public spawnFromKill(
+    entity: Pick<GameEntity, 'position' | 'mass'>,
+    gameTime: number
+  ): LootData[] {
     return this.spawnFromPosition(entity.position, entity.mass ?? GROWTH.BASE_MASS, gameTime);
   }
 

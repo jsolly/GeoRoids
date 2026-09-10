@@ -116,7 +116,7 @@ export function shouldBlockDamage(state: ShieldState, source: CombatDamageSource
   return source === 'laser' && isShieldBlockingLasers(state);
 }
 
-export function isEnvironmentalAttacker(attackerId: string): boolean {
+function isEnvironmentalAttacker(attackerId: string): boolean {
   return attackerId === 'asteroid' || attackerId === 'boundary';
 }
 

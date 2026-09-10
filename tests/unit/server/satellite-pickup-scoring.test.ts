@@ -43,8 +43,9 @@ describe('Server scoring via satellitePickupCollected', () => {
             clearTimeout(timeout);
             resolve({ id: list[0].id, x: list[0].position.x, y: list[0].position.y });
           }
-        } catch {
-          // ignore parse errors from unrelated frames
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
         }
       });
     });
@@ -81,8 +82,9 @@ describe('Server scoring via satellitePickupCollected', () => {
                 pickupName: msg.data.pickupName,
               });
             }
-          } catch {
-            // ignore parse errors from unrelated frames
+          } catch (error) {
+            clearTimeout(timeout);
+            reject(error);
           }
         });
       }

@@ -1,4 +1,4 @@
-export type ControlSources = {
+type ControlSources = {
   mouseThrust: boolean;
   touchThrust: boolean;
   touchHeading: number | null;

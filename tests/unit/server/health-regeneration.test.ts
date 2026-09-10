@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
 import type { WebSocket } from 'ws';
 
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
@@ -91,16 +91,16 @@ describe('server-authoritative health regeneration', () => {
   test('bots use the same delay and rate as humans', () => {
     engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
     const bot = engine.createBots(1)?.[0];
-    expect(bot).toBeDefined();
-    delete bot!.spawnProtectionTimer;
+    assert.exists(bot);
+    delete bot.spawnProtectionTimer;
 
-    engine.handleBotDamage(bot!.id, 'asteroid', DAMAGE.LASER_HIT);
-    const damagedHealth = bot!.health;
+    engine.handleBotDamage(bot.id, 'asteroid', DAMAGE.LASER_HIT);
+    const damagedHealth = bot.health;
     tick(engine, calculateHealthRegenDelayFrames());
-    expect(bot!.health).toBe(damagedHealth);
+    expect(bot.health).toBe(damagedHealth);
 
     tick(engine, 1);
-    expect(bot!.health).toBeGreaterThan(damagedHealth);
-    expect(bot!.health).toBeLessThanOrEqual(bot!.maxHealth);
+    expect(bot.health).toBeGreaterThan(damagedHealth);
+    expect(bot.health).toBeLessThanOrEqual(bot.maxHealth);
   });
 });

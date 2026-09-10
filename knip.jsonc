@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  // These files are invoked by Railway/Vite/Vitest or discovered dynamically by
+  // the shell runners, so package.json alone cannot describe every entrypoint.
+  "entry": [
+    "server.ts",
+    ".railway/**/*.ts",
+    "vitest.browser.config.ts",
+    "scripts/**/*.ts",
+    "tests/integration/utils/reflection-observer.ts",
+    "tests/**/*.test.ts"
+  ],
+  "project": [
+    "middleware.ts",
+    "src/**/*.{ts,tsx}",
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "shared-types.ts",
+    "setup/**/*.ts",
+    ".railway/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest*.config.ts"
+  ],
+  // These dependencies are executed by shell scripts, CI, or deployment
+  // tooling; Knip cannot infer those non-TypeScript consumers.
+  "ignoreBinaries": ["uvx"],
+  "ignoreDependencies": ["concurrently", "markdownlint-cli2"]
+}

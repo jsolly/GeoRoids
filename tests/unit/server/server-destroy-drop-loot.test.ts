@@ -18,6 +18,11 @@ type ServerMsg = {
   };
 };
 
+type MessageCollection = {
+  messages: ServerMsg[];
+  parseErrors: unknown[];
+};
+
 function waitForOpen(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
     ws.once('open', () => resolve());
@@ -25,16 +30,17 @@ function waitForOpen(ws: WebSocket): Promise<void> {
   });
 }
 
-function collectMessages(ws: WebSocket): ServerMsg[] {
+function collectMessages(ws: WebSocket): MessageCollection {
   const messages: ServerMsg[] = [];
+  const parseErrors: unknown[] = [];
   ws.on('message', (raw) => {
     try {
       messages.push(JSON.parse(String(raw)) as ServerMsg);
-    } catch {
-      // ignore
+    } catch (error) {
+      parseErrors.push(error);
     }
   });
-  return messages;
+  return { messages, parseErrors };
 }
 
 async function waitFor(
@@ -89,8 +95,8 @@ describe('shared destroy-drop shards over WebSocket', () => {
     b.send(
       JSON.stringify({ type: 'join', id: 'pilot-b', name: 'B', position: { x: 800, y: 800 } })
     );
-    await waitFor(fromA, (msg) => msg.type === 'joined');
-    await waitFor(fromB, (msg) => msg.type === 'joined');
+    await waitFor(fromA.messages, (msg) => msg.type === 'joined');
+    await waitFor(fromB.messages, (msg) => msg.type === 'joined');
     a.send(JSON.stringify({ type: 'update', id: 'pilot-a', position: { x: 350, y: -450 } }));
     b.send(JSON.stringify({ type: 'update', id: 'pilot-b', position: { x: 800, y: 800 } }));
     await new Promise((resolve) => setTimeout(resolve, 40));
@@ -131,12 +137,12 @@ describe('shared destroy-drop shards over WebSocket', () => {
     );
 
     const stateA = await waitFor(
-      fromA,
+      fromA.messages,
       (msg) =>
         msg.type === 'gameState' && (msg.data?.loot ?? []).some((drop) => drop.kind === 'shard')
     );
     const stateB = await waitFor(
-      fromB,
+      fromB.messages,
       (msg) =>
         msg.type === 'gameState' && (msg.data?.loot ?? []).some((drop) => drop.kind === 'shard')
     );
@@ -153,8 +159,16 @@ describe('shared destroy-drop shards over WebSocket', () => {
       })
     );
 
-    await waitFor(fromA, (msg) => msg.type === 'lootExploded' && msg.data?.lootId === shardA?.id);
-    await waitFor(fromB, (msg) => msg.type === 'lootExploded' && msg.data?.lootId === shardA?.id);
+    await waitFor(
+      fromA.messages,
+      (msg) => msg.type === 'lootExploded' && msg.data?.lootId === shardA?.id
+    );
+    await waitFor(
+      fromB.messages,
+      (msg) => msg.type === 'lootExploded' && msg.data?.lootId === shardA?.id
+    );
+    expect(fromA.parseErrors).toEqual([]);
+    expect(fromB.parseErrors).toEqual([]);
     expect(server.gameEngine.getLoot()).toHaveLength(0);
     expect(server.gameEngine.getPlayer('pilot-a')?.score).toBe(ROID.POINTS_SMALL);
     expect(GROWTH.SHARD_MASS).toBeGreaterThan(0);

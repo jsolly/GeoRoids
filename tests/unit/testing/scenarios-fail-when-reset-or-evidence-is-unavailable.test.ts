@@ -50,12 +50,9 @@ test('successful reset waits for verified empty world diagnostics', async () => 
   expect(fetchSpy).toHaveBeenCalledTimes(2);
 });
 
-test.each([
-  'bots',
-  'asteroids',
-  'loot',
-  'satellites',
-  'satellitePickups',
-] as const)('remaining %s prevents a clean-world verdict', (field) => {
-  expect(TestServerControl.isWorldClean({ ...cleanWorld, [field]: 1 })).toBe(false);
-});
+test.each(['bots', 'asteroids', 'loot', 'satellites', 'satellitePickups'] as const)(
+  'remaining %s prevents a clean-world verdict',
+  (field) => {
+    expect(TestServerControl.isWorldClean({ ...cleanWorld, [field]: 1 })).toBe(false);
+  }
+);

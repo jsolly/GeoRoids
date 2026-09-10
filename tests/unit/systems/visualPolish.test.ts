@@ -142,20 +142,20 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
   expect(lootScreenRadius(Number.POSITIVE_INFINITY, 1)).toBeNull();
 });
 
-test('mouse input is attached to the game canvas while the title starfield stays passive', () => {
+test('mouse input is attached to the game canvas while the title terrain stays passive', () => {
   InputManager.getInstance().initializeListeners();
   const gameCanvas = document.getElementById('gameCanvas');
-  const titleStarfield = document.getElementById('title-starfield');
+  const titleTerrain = document.getElementById('title-terrain');
   expect(gameCanvas?.tagName).toBe('CANVAS');
-  expect(titleStarfield?.tagName).toBe('CANVAS');
-  if (!gameCanvas || !titleStarfield) {
+  expect(titleTerrain?.tagName).toBe('CANVAS');
+  if (!gameCanvas || !titleTerrain) {
     throw new Error('expected both canvases in the play shell');
   }
 
   const gameTouch = new Event('touchstart', { cancelable: true });
   const titleTouch = new Event('touchstart', { cancelable: true });
   gameCanvas.dispatchEvent(gameTouch);
-  titleStarfield.dispatchEvent(titleTouch);
+  titleTerrain.dispatchEvent(titleTouch);
 
   expect(gameTouch.defaultPrevented).toBe(true);
   expect(titleTouch.defaultPrevented).toBe(false);

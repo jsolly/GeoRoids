@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { assert, describe, expect, test } from 'vitest';
 import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
 import { Ship } from '../../../../src/entities/ship/Ship';
 import {
@@ -94,7 +94,8 @@ describe('Server view: the killing shot', () => {
     const alice = world.join('Alice');
     const bots = world.engine.createBots(1);
     expect(bots && bots.length > 0).toBe(true);
-    const bot = bots![0]!;
+    const bot = bots?.[0];
+    assert.exists(bot);
     bot.health = LOW_HEALTH;
 
     world.shootBot(alice, bot.id);

@@ -29,7 +29,7 @@ import { checkBoundaryCollision } from '../../src/physics/collision/collisionDet
 import type { GameEntity } from './EntityManager';
 
 export type MotionOutcome = { ok: true } | { ok: false; error: string };
-export type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
+type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
   epoch: number;
   sequence: number;
 };
@@ -382,8 +382,7 @@ export class AsteroidMotionService {
       return { ok: false, error: 'Enhanced latch requires the live free Hauler owner' };
     }
     if (
-      !action ||
-      action.action !== 'latch' ||
+      action?.action !== 'latch' ||
       !Number.isSafeInteger(action.sequence) ||
       action.sequence <= session.toolSequence ||
       typeof action.targetId !== 'string' ||

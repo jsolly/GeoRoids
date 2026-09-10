@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, describe, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -38,81 +38,84 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     engine?.stopGameLoop();
   });
 
-  test.each(
-    invalidMovements
-  )('$label is rejected before respawn acknowledgment or peer broadcast', ({ movement }) => {
-    engine = new GameEngine(482);
-    const core = new WebSocketCore(engine);
-    const ownerMessages: RecordedMessage[] = [];
-    const peerMessages: RecordedMessage[] = [];
-    const owner = recordingSocket(ownerMessages);
-    const peer = recordingSocket(peerMessages);
-    core.handleClientMessage({ type: 'join', data: { id: 'pilot', name: 'Pilot' } }, owner);
-    core.handleClientMessage({ type: 'join', data: { id: 'peer', name: 'Peer' } }, peer);
-    const pilot = engine.getPlayer('pilot')!;
-    delete pilot.spawnProtectionTimer;
-    expect(engine.handlePlayerDamage(pilot.id, 'boundary', pilot.maxHealth)).toBe(true);
-    for (let frame = 0; frame <= SHIP.RESPAWN_DELAY_FRAMES && pilot.health <= 0; frame++) {
-      engine.advanceCombatFrame();
-    }
-    expect(pilot.health).toBe(pilot.maxHealth);
-    expect(pilot.respawnAnchor).toBeDefined();
-    const position = { ...pilot.position };
-    const velocity = { ...pilot.velocity };
-    const anchor = { ...pilot.respawnAnchor! };
-    const angle = pilot.angle;
-    ownerMessages.length = 0;
-    peerMessages.length = 0;
+  test.each(invalidMovements)(
+    '$label is rejected before respawn acknowledgment or peer broadcast',
+    ({ movement }) => {
+      engine = new GameEngine(482);
+      const core = new WebSocketCore(engine);
+      const ownerMessages: RecordedMessage[] = [];
+      const peerMessages: RecordedMessage[] = [];
+      const owner = recordingSocket(ownerMessages);
+      const peer = recordingSocket(peerMessages);
+      core.handleClientMessage({ type: 'join', data: { id: 'pilot', name: 'Pilot' } }, owner);
+      core.handleClientMessage({ type: 'join', data: { id: 'peer', name: 'Peer' } }, peer);
+      const pilot = engine.getPlayer('pilot');
+      assert.exists(pilot);
+      delete pilot.spawnProtectionTimer;
+      expect(engine.handlePlayerDamage(pilot.id, 'boundary', pilot.maxHealth)).toBe(true);
+      for (let frame = 0; frame <= SHIP.RESPAWN_DELAY_FRAMES && pilot.health <= 0; frame++) {
+        engine.advanceCombatFrame();
+      }
+      expect(pilot.health).toBe(pilot.maxHealth);
+      expect(pilot.respawnAnchor).toBeDefined();
+      const position = { ...pilot.position };
+      const velocity = { ...pilot.velocity };
+      const anchor = { ...pilot.respawnAnchor };
+      const angle = pilot.angle;
+      ownerMessages.length = 0;
+      peerMessages.length = 0;
 
-    core.handleClientMessage(
-      {
-        type: 'update',
-        id: pilot.id,
-        data: { position, velocity: { x: 3, y: 4 }, angle: 0.75, thrusting: true, ...movement },
-      },
-      owner
-    );
-
-    expect(ownerMessages.some((message) => message.type === 'error')).toBe(true);
-    expect(peerMessages.some((message) => message.type === 'playerUpdate')).toBe(false);
-    expect(pilot.position).toEqual(position);
-    expect(pilot.velocity).toEqual(velocity);
-    expect(pilot.angle).toBe(angle);
-    expect(pilot.respawnAnchor).toEqual(anchor);
-    expect(() => engine!.advanceOneFrame()).not.toThrow();
-
-    // Rejection is atomic and does not break the socket's next legitimate
-    // pose acknowledgment or input. Legacy angular-velocity alias stays valid.
-    const nextPosition = { x: position.x + 5, y: position.y + 5 };
-    core.handleClientMessage(
-      {
-        type: 'update',
-        id: pilot.id,
-        data: {
-          position: nextPosition,
-          velocity: { x: 1, y: 2 },
-          angle: 0.25,
-          a: 0.5,
-          thrusting: true,
+      core.handleClientMessage(
+        {
+          type: 'update',
+          id: pilot.id,
+          data: { position, velocity: { x: 3, y: 4 }, angle: 0.75, thrusting: true, ...movement },
         },
-      },
-      owner
-    );
-    expect(pilot.position).toEqual(nextPosition);
-    expect(pilot.velocity).toEqual({ x: 1, y: 2 });
-    expect(pilot.angle).toBe(0.25);
-    expect(pilot.thrusting).toBe(true);
-    expect(pilot.respawnAnchor).toBeUndefined();
-    const accepted = peerMessages.find((message) => message.type === 'playerUpdate');
-    expect(accepted?.data).toMatchObject({
-      position: nextPosition,
-      angularVelocity: 0.5,
-      thrusting: true,
-    });
-    expect(
-      engine.getGameState().entities.find((entity) => entity.id === pilot.id)?.position
-    ).toEqual(nextPosition);
-  });
+        owner
+      );
+
+      expect(ownerMessages.some((message) => message.type === 'error')).toBe(true);
+      expect(peerMessages.some((message) => message.type === 'playerUpdate')).toBe(false);
+      expect(pilot.position).toEqual(position);
+      expect(pilot.velocity).toEqual(velocity);
+      expect(pilot.angle).toBe(angle);
+      expect(pilot.respawnAnchor).toEqual(anchor);
+      const activeEngine = engine;
+      expect(() => activeEngine.advanceOneFrame()).not.toThrow();
+
+      // Rejection is atomic and does not break the socket's next legitimate
+      // pose acknowledgment or input. Legacy angular-velocity alias stays valid.
+      const nextPosition = { x: position.x + 5, y: position.y + 5 };
+      core.handleClientMessage(
+        {
+          type: 'update',
+          id: pilot.id,
+          data: {
+            position: nextPosition,
+            velocity: { x: 1, y: 2 },
+            angle: 0.25,
+            a: 0.5,
+            thrusting: true,
+          },
+        },
+        owner
+      );
+      expect(pilot.position).toEqual(nextPosition);
+      expect(pilot.velocity).toEqual({ x: 1, y: 2 });
+      expect(pilot.angle).toBe(0.25);
+      expect(pilot.thrusting).toBe(true);
+      expect(pilot.respawnAnchor).toBeUndefined();
+      const accepted = peerMessages.find((message) => message.type === 'playerUpdate');
+      expect(accepted?.data).toMatchObject({
+        position: nextPosition,
+        angularVelocity: 0.5,
+        thrusting: true,
+      });
+      expect(
+        engine.getGameState().entities.find((entity) => entity.id === pilot.id)?.position
+      ).toEqual(nextPosition);
+    }
+  );
 
   test('movement cannot overwrite an active latch, socket, or inject unknown snapshot keys', () => {
     engine = new GameEngine(483);
@@ -126,8 +129,10 @@ describe('invalid client movement cannot corrupt the shared world', () => {
       owner
     );
     core.handleClientMessage({ type: 'join', data: { id: 'peer', name: 'Peer' } }, peer);
-    const pilot = engine.getPlayer('pilot')!;
-    const rock = engine.getAllAsteroids()[0]!;
+    const pilot = engine.getPlayer('pilot');
+    assert.exists(pilot);
+    const rock = engine.getAllAsteroids()[0];
+    assert.exists(rock);
     // The trusted entity API remains available to the authoritative ability
     // owner; the untrusted movement route may not rewrite its active endpoint.
     const latch = { ...rock.position };

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import type { WebSocket } from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { DAMAGE } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
@@ -17,7 +18,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
   });
 
   test('two snapshots agree when a human raises a shield', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     engine.addPlayer('a', 'Alpha', ws, { x: 0, y: 0 });
     engine.addPlayer('b', 'Bravo', ws, { x: 10, y: 0 });
 
@@ -32,7 +33,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
   });
 
   test('enemy laser does not change shielded player health on the server', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     const target = engine.addPlayer('target', 'Target', ws, { x: 0, y: 0 });
     engine.addPlayer('attacker', 'Attacker', ws, { x: 20, y: 0 });
     engine.entityManager.updateEntity('target', { spawnProtectionTimer: 0 });
@@ -49,7 +50,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
   });
 
   test('asteroid and ship collisions still damage a shielded player', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     engine.addPlayer('target', 'Target', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('target', { spawnProtectionTimer: 0 });
     expect(engine.requestShield('target', true)).toBe(true);
@@ -107,7 +108,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
   });
 
   test('client cannot clobber shield state through a movement update', () => {
-    const ws = {} as any;
+    const ws = {} as WebSocket;
     engine.addPlayer('a', 'Alpha', ws, { x: 0, y: 0 });
     expect(engine.requestShield('a', true)).toBe(true);
 
@@ -115,7 +116,7 @@ describe('authoritative shield: lasers blocked, collisions still hurt', () => {
       shieldActive: false,
       shieldTime: 0,
       position: { x: 5, y: 5 },
-    } as any);
+    });
 
     const after = engine.getPlayer('a');
     expect(after?.shieldActive).toBe(true);

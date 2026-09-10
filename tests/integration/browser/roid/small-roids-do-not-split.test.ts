@@ -3,10 +3,11 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
-// Scenario: a solo laser finish of a biggest asteroid removes it and does not
-// produce smaller pieces. Smaller classes never split either.
+const SMALL_ROID_MAX_RADIUS = 20;
+
+// Scenario: a solo laser finish of a small asteroid removes exactly that rock.
 test(
   'small roids do not split',
   async () => {
@@ -23,21 +24,29 @@ test(
     await game.waitForAsteroids(1);
 
     const before = await game.getAsteroidPositions();
-    const large = before.find((a) => a.radius >= 40 && !a.isCollabTarget && a.material === 'ice');
-    expect(large).toBeTruthy();
-    if (!large) {
-      return;
+    const small = before.find(
+      (asteroid) => asteroid.radius < SMALL_ROID_MAX_RADIUS && !asteroid.isCollabTarget
+    );
+    expect(small, 'expected at least one small asteroid in the field').toBeDefined();
+    if (!small) {
+      throw new Error('Small asteroid missing');
     }
 
     const countBefore = before.length;
-    await game.destroyAsteroidWithLaser(large);
+    await game.destroyAsteroidWithLaser(small);
 
     await expect
       .poll(() => game.getAsteroidCount(), {
         timeout: 8000,
-        message: 'destroying a large asteroid solo should reduce the count (no split)',
+        message: 'destroying a small asteroid should remove exactly one rock (no split)',
       })
-      .toBeLessThan(countBefore);
+      .toBe(countBefore - 1);
+
+    const remaining = await game.getAsteroidPositions();
+    expect(
+      remaining.some((asteroid) => asteroid.id === small.id),
+      'the original small asteroid should be gone'
+    ).toBe(false);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

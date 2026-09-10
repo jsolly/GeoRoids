@@ -10,7 +10,7 @@ import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import type { AsteroidData, SatelliteData } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
 
-export function toCombatCircle(entity: GameEntity): CombatCircle {
+function toCombatCircle(entity: GameEntity): CombatCircle {
   return {
     id: entity.id,
     position: entity.position,
@@ -19,7 +19,7 @@ export function toCombatCircle(entity: GameEntity): CombatCircle {
   };
 }
 
-export function asteroidCollisionRadius(asteroid: AsteroidData): number {
+function asteroidCollisionRadius(asteroid: AsteroidData): number {
   return asteroid.size;
 }
 

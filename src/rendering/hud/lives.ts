@@ -1,6 +1,7 @@
 import { PALETTE, VISUAL } from '../../constants';
 import { DEFAULT_SHIP_KIT_ID, type ShipKitId } from '../../entities/ship/shipKits';
 import { strokeKitHullOutline } from '../../entities/ship/shipRenderer';
+import type { PlayfieldSize } from '../playfieldCamera';
 
 import { layoutHudCluster } from './cluster';
 import { hudLayoutForCanvas } from './hudLayout';
@@ -9,9 +10,10 @@ export function drawLivesIndicator(
   ctx: CanvasRenderingContext2D,
   lives: number,
   shipColor: string,
+  viewport: PlayfieldSize,
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID
 ): void {
-  const layout = hudLayoutForCanvas(ctx.canvas);
+  const layout = hudLayoutForCanvas(viewport);
   const { lifeCenters } = layoutHudCluster(lives);
   const dx = layout.lives.x - VISUAL.HUD_INSET;
   const dy = layout.lives.y - VISUAL.HUD_INSET;

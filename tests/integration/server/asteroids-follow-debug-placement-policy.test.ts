@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { WebSocket } from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { DEBUG } from '../../../src/constants';
 
@@ -9,17 +10,20 @@ describe('Roid Placement Integration Tests', () => {
     gameEngine = new GameEngine();
   });
 
-  afterEach(() => {
-    // Clean up
-    gameEngine = null as any;
-  });
+  function setLocalPlayerPlacement(enabled: boolean): void {
+    Object.assign(DEBUG.ROIDS, { PLACE_ON_LOCAL_PLAYER: enabled });
+  }
+
+  function emptySocket(): WebSocket {
+    return {} as unknown as WebSocket;
+  }
 
   describe('PLACE_ROID_ON_LOCAL_PLAYER functionality', () => {
     it('should place roids on player positions when PLACE_ROID_ON_LOCAL_PLAYER is true', () => {
       // Enable the debug feature locally for this test (production default is off
       // because spawning roids on the player makes the live game unplayable).
       const originalSetting = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
-      (DEBUG as any).ROIDS.PLACE_ON_LOCAL_PLAYER = true;
+      setLocalPlayerPlacement(true);
 
       try {
         // Create a player at a specific position
@@ -28,7 +32,7 @@ describe('Roid Placement Integration Tests', () => {
         const playerPosition = { x: 100, y: 200 };
 
         // Mock WebSocket for player creation
-        const mockWs = {} as any;
+        const mockWs = emptySocket();
         gameEngine.addPlayer(playerId, playerName, mockWs, playerPosition);
 
         // Get player positions
@@ -68,21 +72,21 @@ describe('Roid Placement Integration Tests', () => {
         // With PLACE_ROID_ON_LOCAL_PLAYER enabled, we should have at least one asteroid on the player
         expect(asteroidsOnPlayer.length).toBeGreaterThan(0);
       } finally {
-        (DEBUG as any).ROIDS.PLACE_ON_LOCAL_PLAYER = originalSetting;
+        setLocalPlayerPlacement(originalSetting);
       }
     });
 
     it('should not place roids on player positions when PLACE_ROID_ON_LOCAL_PLAYER is false', () => {
       // Temporarily disable the setting
       const originalSetting = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
-      (DEBUG as any).ROIDS.PLACE_ON_LOCAL_PLAYER = false;
+      setLocalPlayerPlacement(false);
 
       try {
         const playerId = 'test-player-2';
         const playerName = 'TestPlayer2';
         const playerPosition = { x: 150, y: 250 };
 
-        const mockWs = {} as any;
+        const mockWs = emptySocket();
         gameEngine.addPlayer(playerId, playerName, mockWs, playerPosition);
 
         const players = gameEngine.getAllPlayers();
@@ -101,7 +105,7 @@ describe('Roid Placement Integration Tests', () => {
         expect(asteroidsOnPlayer.length).toBe(0);
       } finally {
         // Restore original setting
-        (DEBUG as any).ROIDS.PLACE_ON_LOCAL_PLAYER = originalSetting;
+        setLocalPlayerPlacement(originalSetting);
       }
     });
 

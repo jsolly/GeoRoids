@@ -1,6 +1,7 @@
+---
 name: CI
 
-on:
+'on':
   workflow_dispatch:
   pull_request:
   push:
@@ -23,7 +24,11 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: npm ci
       - run: npm run check:actions
+      - run: npm run check:lint-policy
       - run: npm run lint
+      - run: npm run check:knip
+      - run: npm run check:ts-prune
+      - run: npm run check:md
       - run: npm run check:yaml
       - run: npm run check:ts
       - run: npm run check:test-runner

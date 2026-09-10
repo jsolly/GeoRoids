@@ -7,9 +7,6 @@ import type {
 import { playHitSound as playHitSoundAt } from '../../audio/gameSounds';
 import { DEBUG, GAME, ROID } from '../../constants';
 import { stepAsteroidMotionInto } from '../../physics/asteroidMotion';
-import { isDebugMode } from '../../utils/debugUtils';
-import { getRandomPositionInAsteroidField } from '../../utils/spawnPosition';
-import { pointsForRoidSize } from './roidScore';
 
 class Roid {
   id: string;
@@ -71,60 +68,10 @@ class Roid {
       this.offsets.push(Math.random() * this._jaggedness * 2 + 1 - this._jaggedness);
     }
   }
-
-  // Regenerate shape (public method for external use)
-  regenerateShape(): void {
-    this.generateShape();
-  }
-
-  // Move the roid based on its velocity
-  move(): void {
-    this.position = {
-      x: this.position.x + this.velocity.x,
-      y: this.position.y + this.velocity.y,
-    };
-
-    // Update rotation
-    this.angle += this.angularVelocity;
-  }
 }
 
 class RoidBelt {
-  roidNum: number = isDebugMode() ? DEBUG.ROIDS.INITIAL_COUNT : ROID.INITIAL_ROID_COUNT;
   roids: Roid[] = [];
-  minCount: number = ROID.MIN_COUNT;
-  maxCount: number = ROID.MAX_COUNT;
-  spawnTimer = 0; // Timer for spawning roids
-
-  constructor(createInitialRoids = true) {
-    if (createInitialRoids) {
-      // Create the base number of roids
-      for (let i = 0; i < this.roidNum; i++) {
-        this.addRoid();
-      }
-    }
-  }
-
-  addRoid(): void {
-    // Generate random position within boundary since roidSpawn was removed
-    const roidPosition = getRandomPositionInAsteroidField();
-    const size = DEBUG.ROIDS.ALL_LARGE ? ROID.SIZE : Math.ceil(ROID.SIZE / 2);
-    this.roids.push(new Roid(roidPosition, size));
-  }
-
-  destroyRoid(i: number): { score: number; newRoids: Roid[] } {
-    const roids = this.roids;
-    const r = roids[i];
-    if (r === undefined) {
-      return { score: 0, newRoids: [] };
-    }
-    let score = 0;
-
-    score += pointsForRoidSize(r.r);
-
-    // Client never creates new roids - server handles all splitting via network messages
-    return { score, newRoids: [] };
-  }
 
   getRoids(): Roid[] {
     return this.roids;
@@ -142,34 +89,6 @@ class RoidBelt {
       stepAsteroidMotionInto(roid.position, roid.velocity, tickScale, roid.position, roid.velocity);
     }
   }
-
-  spawnRoids(): void {
-    // Update spawn timer
-    this.spawnTimer++;
-
-    // Only spawn if we're below minimum count, under maximum limit, and timer has elapsed
-    if (
-      this.roids.length < this.minCount &&
-      this.roids.length < this.maxCount &&
-      this.spawnTimer >= ROID.SPAWN_TIME_FRAMES
-    ) {
-      // Spawn roids until we reach minCount or maxCount
-      while (this.roids.length < this.minCount && this.roids.length < this.maxCount) {
-        this.addRoid();
-      }
-      this.spawnTimer = 0; // Reset timer after spawning
-    }
-  }
-
-  // Method to set custom min/max counts (useful for debug mode)
-  setRoidLimits(minCount: number, maxCount: number): void {
-    this.minCount = Math.max(0, minCount);
-    this.maxCount = Math.max(this.minCount, maxCount);
-  }
 }
 
 export { Roid, RoidBelt };
-
-export function createRoidBelt(): RoidBelt {
-  return new RoidBelt();
-}

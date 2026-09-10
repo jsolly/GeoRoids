@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GAME } from '../../../../src/constants';
 import { GameController } from '../../../../src/core/gameController';
 import { GameStateManager } from '../../../../src/core/services/GameStateManager';
@@ -67,11 +67,11 @@ describe('Game-over returns to the menu', () => {
     const controller = GameController.getInstance();
     controller.newGame('Ace');
     const local = PlayerManager.getInstance().getLocalPlayer();
-    expect(local).toBeTruthy();
+    assert.isOk(local);
 
     window.dispatchEvent(
       new CustomEvent('playerDied', {
-        detail: { playerId: local!.id, deathCause: 'boundary', isGameOver: true },
+        detail: { playerId: local.id, deathCause: 'boundary', isGameOver: true },
       })
     );
 
@@ -84,13 +84,13 @@ describe('Game-over returns to the menu', () => {
     const controller = GameController.getInstance();
     controller.newGame('Ace');
     const local = PlayerManager.getInstance().getLocalPlayer();
-    expect(local).toBeTruthy();
-    local!.deathCause = 'boundary';
-    local!.ship.lastExplodeCause = 'boundary';
+    assert.isOk(local);
+    local.deathCause = 'boundary';
+    local.ship.lastExplodeCause = 'boundary';
 
     window.dispatchEvent(
       new CustomEvent('playerDied', {
-        detail: { playerId: local!.id, deathCause: 'unknown', isGameOver: true },
+        detail: { playerId: local.id, deathCause: 'unknown', isGameOver: true },
       })
     );
 
@@ -178,11 +178,11 @@ describe('Last life on the server', () => {
     if (!bot) {
       bot = world.engine.entityManager.createBots(1)[0];
     }
-    expect(bot).toBeDefined();
-    world.engine.handlePlayerDamage(ace.id, bot!.id, world.entity(ace).health);
-    expect(world.entity(ace).deathCause).toBe(bot!.id);
+    assert.exists(bot);
+    world.engine.handlePlayerDamage(ace.id, bot.id, world.entity(ace).health);
+    expect(world.entity(ace).deathCause).toBe(bot.id);
     expect(
       world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause
-    ).toBe(bot!.id);
+    ).toBe(bot.id);
   });
 });

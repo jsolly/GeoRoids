@@ -55,13 +55,18 @@ describe('Integration: Local player roid collisions', () => {
     vi.clearAllMocks();
   });
 
-  test('does not apply local asteroid damage or send client reports', () => {
-    const localPlayer = { ship: localShip, id: 'local-player-123', type: 'local' as const };
-    const initialHealth = localShip.health;
+  test.each([25, 12.5, 6.25])(
+    'a collision with a radius-%s asteroid waits for server authority',
+    (radius) => {
+      const localPlayer = { ship: localShip, id: 'local-player-123', type: 'local' as const };
+      const initialHealth = localShip.health;
+      roid.r = radius;
 
-    collisionManager.checkPlayerAsteroidCollisions(localPlayer, [roid]);
+      collisionManager.checkPlayerAsteroidCollisions(localPlayer, [roid]);
 
-    expect(localShip.health).toBe(initialHealth);
-    expect(mockSendMessage).not.toHaveBeenCalled();
-  });
+      expect(localShip.health).toBe(initialHealth);
+      expect(roid.pendingDestruction).toBeFalsy();
+      expect(mockSendMessage).not.toHaveBeenCalled();
+    }
+  );
 });

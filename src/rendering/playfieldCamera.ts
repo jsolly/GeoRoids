@@ -1,6 +1,6 @@
 import type { Position } from '../../shared-types';
 
-export type PlayfieldSize = { width: number; height: number };
+export type PlayfieldSize = Readonly<{ width: number; height: number }>;
 export type PlayfieldRock = {
   position: Position;
   r?: number;
@@ -18,41 +18,31 @@ export function projectWorldToScreenInto(
   out: { x: number; y: number },
   world: Position,
   ship: Position,
-  canvas: PlayfieldSize,
-  scale = 1
+  viewport: PlayfieldSize,
+  scale = PLAYFIELD_CLOSE_SCALE
 ): { x: number; y: number } {
-  out.x = canvas.width / 2 + (world.x - ship.x) * scale;
-  out.y = canvas.height / 2 + (world.y - ship.y) * scale;
+  out.x = viewport.width / 2 + (world.x - ship.x) * scale;
+  out.y = viewport.height / 2 + (world.y - ship.y) * scale;
   return out;
 }
 
-export function projectWorldToScreen(
+function isRockOnCanvas(
   world: Position,
   ship: Position,
-  canvas: PlayfieldSize,
-  scale = 1
-): { x: number; y: number } {
-  const projected = projectWorldToScreenInto(projectScratch, world, ship, canvas, scale);
-  return { x: projected.x, y: projected.y };
-}
-
-export function isRockOnCanvas(
-  world: Position,
-  ship: Position,
-  canvas: PlayfieldSize,
-  scale = 1,
+  viewport: PlayfieldSize,
+  scale = PLAYFIELD_CLOSE_SCALE,
   margin = 0
 ): boolean {
-  const screen = projectWorldToScreenInto(projectScratch, world, ship, canvas, scale);
+  const screen = projectWorldToScreenInto(projectScratch, world, ship, viewport, scale);
   return (
     screen.x >= -margin &&
-    screen.x <= canvas.width + margin &&
+    screen.x <= viewport.width + margin &&
     screen.y >= -margin &&
-    screen.y <= canvas.height + margin
+    screen.y <= viewport.height + margin
   );
 }
 
-export function isDrawablePlayfieldRock(roid: PlayfieldRock): boolean {
+function isDrawablePlayfieldRock(roid: PlayfieldRock): boolean {
   if (roid.pendingDestruction) {
     return false;
   }
@@ -71,33 +61,24 @@ export function isDrawablePlayfieldRock(roid: PlayfieldRock): boolean {
 export function countRocksOnCanvas(
   roids: readonly PlayfieldRock[],
   ship: Position,
-  canvas: PlayfieldSize,
-  scale = 1,
+  viewport: PlayfieldSize,
+  scale = PLAYFIELD_CLOSE_SCALE,
   margin = 0
 ): number {
   let count = 0;
   for (const roid of roids) {
-    if (isRockOnCanvas(roid.position, ship, canvas, scale, margin)) {
+    if (isRockOnCanvas(roid.position, ship, viewport, scale, margin)) {
       count += 1;
     }
   }
   return count;
 }
 
-/** Compatibility helper: gameplay is always rendered at the fixed close scale. */
-export function playfieldZoom(
-  _roids: readonly PlayfieldRock[],
-  _ship: Position,
-  _canvas: PlayfieldSize
-): number {
-  return PLAYFIELD_CLOSE_SCALE;
-}
-
 /** PO / QA bar: if radar has dots, the playfield must show at least one rock. */
 export function radarBeltVisibleOnPlayfield(
   roids: readonly PlayfieldRock[],
   ship: Position,
-  canvas: PlayfieldSize
+  viewport: PlayfieldSize
 ): boolean {
   let drawable = 0;
   for (const roid of roids) {
@@ -110,7 +91,7 @@ export function radarBeltVisibleOnPlayfield(
   }
   const scale = PLAYFIELD_CLOSE_SCALE;
   for (const roid of roids) {
-    if (isDrawablePlayfieldRock(roid) && isRockOnCanvas(roid.position, ship, canvas, scale)) {
+    if (isDrawablePlayfieldRock(roid) && isRockOnCanvas(roid.position, ship, viewport, scale)) {
       return true;
     }
   }

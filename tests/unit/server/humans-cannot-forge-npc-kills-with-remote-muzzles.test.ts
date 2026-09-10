@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import {
@@ -41,8 +41,11 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
   }
 
   test('a joined distant or dead attacker cannot manufacture satellite hit evidence', () => {
-    const satellite = engine.getAllSatellites()[0]!;
-    engine.getSatellite(satellite.id)!.position = { x: 1500, y: 0 };
+    const satellite = engine.getAllSatellites()[0];
+    assert.exists(satellite);
+    const liveSatellite = engine.getSatellite(satellite.id);
+    assert.exists(liveSatellite);
+    liveSatellite.position = { x: 1500, y: 0 };
     const remoteOrigin = { x: 1500, y: 0 };
     for (let i = 0; i < 2; i++) {
       shoot(remoteOrigin);
@@ -58,14 +61,19 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
     expect(engine.getSatellite(satellite.id)?.health).toBe(satellite.health);
     expect(engine.getPlayer('pilot')?.score).toBe(0);
     expect(engine.getLoot()).toEqual([]);
-    engine.getPlayer('pilot')!.health = 0;
+    const pilot = engine.getPlayer('pilot');
+    assert.exists(pilot);
+    pilot.health = 0;
     shoot();
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
   test('a nearby real shot damages the EO hull once and cannot be replayed', () => {
-    const satellite = engine.getAllSatellites()[0]!;
-    engine.getSatellite(satellite.id)!.position = { x: 40, y: 0 };
+    const satellite = engine.getAllSatellites()[0];
+    assert.exists(satellite);
+    const liveSatellite = engine.getSatellite(satellite.id);
+    assert.exists(liveSatellite);
+    liveSatellite.position = { x: 40, y: 0 };
     shoot();
     const report = {
       type: 'satelliteDamage',
@@ -82,13 +90,16 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
     shoot({ x: Number.POSITIVE_INFINITY, y: 0 });
     shoot({ x: 20, y: 0 }, { x: 1e10, y: 0 });
     shoot({ x: 20, y: 0 }, { x: Number.NaN, y: 0 });
-    engine.getPlayer('pilot')!.respawnTimer = 2;
+    const pilot = engine.getPlayer('pilot');
+    assert.exists(pilot);
+    pilot.respawnTimer = 2;
     shoot();
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
   test('a legitimate muzzle from a 250 ms delayed pose is accepted with inherited ship speed', () => {
-    const player = engine.getPlayer('pilot')!;
+    const player = engine.getPlayer('pilot');
+    assert.exists(player);
     const kit = getShipKit(player.kitId);
     player.velocity = { x: kit.maxVelocity, y: 0 };
     const delayedPosition = {
@@ -101,24 +112,27 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
   });
 
   test('normal cadence and bunched skirmisher E rounds work but unbounded bursts do not', () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
-    const player = engine.getPlayer('pilot')!;
+    const startedAt = engine.getServerTime();
+    const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(startedAt);
+    const player = engine.getPlayer('pilot');
+    assert.exists(player);
     player.kitId = 'skirmisher';
     for (let i = 0; i < SHIP.MAX_LASERS; i++) {
       shoot();
     }
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS);
-    clock.mockReturnValue(1000 + getShipKit('skirmisher').shotCooldown);
+    clock.mockReturnValue(startedAt + getShipKit('skirmisher').shotCooldown);
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS + 1);
   });
 
   test('counter-thrust stationary shots have a finite server lifetime', () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const startedAt = engine.getServerTime();
+    const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(startedAt);
     shoot({ x: 20, y: 0 }, { x: 0, y: 0 });
     expect(engine.getServerLasers()).toHaveLength(1);
-    clock.mockReturnValue(1000 + HUMAN_LASER_MAX_LIFETIME_MS);
+    clock.mockReturnValue(startedAt + HUMAN_LASER_MAX_LIFETIME_MS);
     engine.advanceLasersAndResolveHits();
     expect(engine.getServerLasers()).toHaveLength(0);
   });

@@ -65,7 +65,6 @@ test('cream loot uses a restrained stroke and a stronger void separation layer',
 test('dense metal shards get a second readable inner outline', () => {
   const ctx = traceContext();
   vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
-  vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
   vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
     (position) => new Point(position.x, position.y)
   );

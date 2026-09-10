@@ -33,15 +33,11 @@ export function isFuelLoot(drop: Pick<LootData, 'kind'>): boolean {
   return drop.kind === 'fuel';
 }
 
-export function calculateFuelAfterPickup(
-  currentFuel: number,
-  amount: number,
-  maxFuel: number
-): number {
+function calculateFuelAfterPickup(currentFuel: number, amount: number, maxFuel: number): number {
   return Math.min(maxFuel, Math.max(0, currentFuel + amount));
 }
 
-export function calculateFuelAfterSpend(currentFuel: number, amount: number): number {
+function calculateFuelAfterSpend(currentFuel: number, amount: number): number {
   return Math.max(0, currentFuel - amount);
 }
 

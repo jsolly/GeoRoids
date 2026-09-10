@@ -1,6 +1,7 @@
 import type { Position } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
+import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { SatellitePickup } from './SatellitePickup';
 
@@ -10,14 +11,14 @@ export function drawSatellitePickups(pickups: SatellitePickup[], viewer: Positio
   }
 }
 
-export function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
+function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
     return;
   }
 
   const screen = canvasManager.worldToScreen(pickup.position, viewer);
-  const radius = Math.max(4, pickup.radius * canvasManager.getPlayfieldScale());
+  const radius = Math.max(4, pickup.radius * PLAYFIELD_CLOSE_SCALE);
   const color = pickup.color || PALETTE.SATELLITE_PICKUP;
   ctx.save();
   ctx.translate(screen.x, screen.y);

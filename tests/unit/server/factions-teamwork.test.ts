@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
 
 import { GameEngine } from '../../../server/core/GameEngine';
 
@@ -35,16 +35,16 @@ describe('soft factions for humans and bots', () => {
     });
     const bots = engine.createBots(2) ?? [];
     const allyBot = bots[0];
-    expect(allyBot).toBeDefined();
-    engine.entityManager.updateEntity(allyBot!.id, {
+    assert.exists(allyBot);
+    engine.entityManager.updateEntity(allyBot.id, {
       spawnProtectionTimer: 0,
       factionId: 'ion',
     });
 
-    const healthBefore = allyBot!.health;
-    const destroyed = engine.handleBotDamage(allyBot!.id, human.id, 25);
+    const healthBefore = allyBot.health;
+    const destroyed = engine.handleBotDamage(allyBot.id, human.id, 25);
     expect(destroyed).toBe(false);
-    expect(engine.getBot(allyBot!.id)?.health).toBe(healthBefore);
+    expect(engine.getBot(allyBot.id)?.health).toBe(healthBefore);
   });
 
   test('same-faction humans do not take laser damage from each other', () => {
@@ -84,14 +84,14 @@ describe('soft factions for humans and bots', () => {
 
     const bots = engine.createBots(2) ?? [];
     const emberBot = bots.find((bot) => bot.factionId === 'ember') ?? bots[0];
-    expect(emberBot).toBeDefined();
-    engine.entityManager.updateEntity(emberBot!.id, {
+    assert.exists(emberBot);
+    engine.entityManager.updateEntity(emberBot.id, {
       spawnProtectionTimer: 0,
       factionId: 'ember',
     });
-    const botHealth = emberBot!.health;
-    engine.handleBotDamage(emberBot!.id, attacker.id, 25);
-    expect(engine.getBot(emberBot!.id)?.health).toBe(botHealth - 25);
+    const botHealth = emberBot.health;
+    engine.handleBotDamage(emberBot.id, attacker.id, 25);
+    expect(engine.getBot(emberBot.id)?.health).toBe(botHealth - 25);
   });
 
   test('asteroid and boundary hits still damage teammates', () => {

@@ -1,11 +1,7 @@
 import type { Position } from '../shared-types';
-import { DAMAGE, DEBUG, SHIP } from '../src/constants';
-import { pointsForRoidSize } from '../src/entities/roid/roidScore';
+import { DAMAGE, DEBUG } from '../src/constants';
 
-/** Collision radius shared by human and bot ships. */
-export const SHIP_COLLISION_RADIUS = SHIP.SIZE / 2;
-
-export interface CombatantState {
+interface CombatantState {
   exploding: boolean;
   health: number;
   blinkCount?: number;
@@ -38,12 +34,7 @@ export function isCombatantImmune(state: CombatantState): boolean {
   return false;
 }
 
-export function circlesOverlap(
-  a: Position,
-  radiusA: number,
-  b: Position,
-  radiusB: number
-): boolean {
+function circlesOverlap(a: Position, radiusA: number, b: Position, radiusB: number): boolean {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   const minDist = radiusA + radiusB;
@@ -59,10 +50,6 @@ export function shipShipTickDamage(): number {
     1,
     Math.round(DAMAGE.PLAYER_COLLISION_PER_SECOND * (DAMAGE.PLAYER_COLLISION_INTERVAL_MS / 1000))
   );
-}
-
-export function asteroidDestroyPoints(radius: number): number {
-  return pointsForRoidSize(radius);
 }
 
 export function findShipAsteroidOverlaps(

@@ -2,19 +2,19 @@ import type { ShipKitId } from '../../../shared-types';
 import { AD_V2_HULL_SHEET, type AD_V2_HULL_TOPOLOGY, parseShipKitId } from './shipKits';
 
 /** Local hull space: +f is forward, +p matches the classic triangle's rearLeft axis. */
-export interface HullLocalPoint {
+interface HullLocalPoint {
   f: number;
   p: number;
 }
 
-export interface HullPolyline {
+interface HullPolyline {
   points: readonly HullLocalPoint[];
   closed: boolean;
 }
 
-export type HullTopology = (typeof AD_V2_HULL_TOPOLOGY)[ShipKitId];
+type HullTopology = (typeof AD_V2_HULL_TOPOLOGY)[ShipKitId];
 
-export interface HullOutline {
+interface HullOutline {
   kitId: ShipKitId;
   topology: HullTopology;
   hull: HullPolyline;
@@ -22,9 +22,9 @@ export interface HullOutline {
   thruster: HullLocalPoint;
 }
 
-export const HULL_SVG_VIEWBOX = 64;
-export const HULL_SVG_CENTER = { x: 32, y: 34 } as const;
-export const HULL_SVG_SCALE = 20;
+const HULL_SVG_VIEWBOX = 64;
+const HULL_SVG_CENTER = { x: 32, y: 34 } as const;
+const HULL_SVG_SCALE = 20;
 export const HULL_SVG_PACK_DIR = 'georoids-art/ships-v2';
 
 /** Traced from the recovered 1100×720 AD v2 contact sheet; 80 source pixels per hull unit. */
@@ -187,7 +187,7 @@ export function projectHullPolyline(
   return line.points.map((point) => projectHullPoint(centerX, centerY, radius, angle, point));
 }
 
-export function hullPolylineEdges(
+function hullPolylineEdges(
   points: readonly { x: number; y: number }[],
   closed: boolean
 ): [{ x: number; y: number }, { x: number; y: number }][] {
@@ -230,18 +230,18 @@ export function projectKitHullEdges(
   return edges;
 }
 
-export function roundSvgCoord(value: number): number {
+function roundSvgCoord(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-export function hullLocalToSvg(point: HullLocalPoint): { x: number; y: number } {
+function hullLocalToSvg(point: HullLocalPoint): { x: number; y: number } {
   return {
     x: roundSvgCoord(HULL_SVG_CENTER.x + point.p * HULL_SVG_SCALE),
     y: roundSvgCoord(HULL_SVG_CENTER.y - point.f * HULL_SVG_SCALE),
   };
 }
 
-export function hullPolylineToSvgPath(line: HullPolyline): string {
+function hullPolylineToSvgPath(line: HullPolyline): string {
   const projected = line.points.map(hullLocalToSvg);
   const first = projected[0];
   if (!first) {
@@ -260,7 +260,7 @@ export function hullPolylineToSvgPath(line: HullPolyline): string {
   return d;
 }
 
-export interface HullSvgOptions {
+interface HullSvgOptions {
   background?: boolean;
   title?: boolean;
   width?: number;

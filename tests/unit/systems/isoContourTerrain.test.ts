@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { applyShipMotionFrame } from '../../../server/ai/shipMotion';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { GAME, PALETTE, VISUAL } from '../../../src/constants';
-import { applyVelocity } from '../../../src/entities/ship/ShipMovementManager';
+import { PALETTE, VISUAL } from '../../../src/constants';
+import { Ship } from '../../../src/entities/ship/Ship';
 import { Point } from '../../../src/physics/Point';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import {
@@ -177,31 +177,36 @@ describe('ships feel the slope', () => {
     expect(velocity.y).toBeCloseTo(1, 6);
   });
 
-  test('player and bot movement both apply the shared slope helper', () => {
-    const peak = steepestSample(TERRAIN.DEFAULT_SEED);
-    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const player = {
-      position: { x: peak.x, y: peak.y },
-      velocity: { x: 0, y: 0 },
-      angle: 0,
-      angularVelocity: 0,
-      thrusting: false,
-      thrusterActive: false,
-      frictionCoefficient: GAME.FRICTION,
-    };
+  test('a coasting pilot and authoritative bot drift equally downhill', () => {
+    const field = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+    const start = { x: BOUNDS.radius / 2, y: 0 };
+    const player = new Ship({ position: { ...start }, isLocalPlayer: true });
+    player.mass = 1;
+    player.velocity = { x: 0, y: 0 };
+    player.thrusting = false;
+    player.blinkCount = 0;
+    player.spawnProtectionTimer = 0;
     const bot = {
-      position: { x: peak.x, y: peak.y },
+      position: { ...start },
       velocity: { x: 0, y: 0 },
-      angle: 0,
+      angle: player.angle,
       thrusting: false,
+      mass: player.mass,
     };
 
-    applyVelocity(player);
-    applyShipMotionFrame(bot);
+    for (let frame = 0; frame < 60; frame++) {
+      player.update();
+      applyShipMotionFrame(bot);
+    }
 
+    expect(sampleHeight(field, player.position.x, player.position.y)).toBeLessThan(
+      sampleHeight(field, start.x, start.y)
+    );
+    expect(Math.hypot(player.velocity.x, player.velocity.y)).toBeGreaterThan(0);
+    expect(bot.position.x).toBeCloseTo(player.position.x, 10);
+    expect(bot.position.y).toBeCloseTo(player.position.y, 10);
     expect(bot.velocity.x).toBeCloseTo(player.velocity.x, 10);
     expect(bot.velocity.y).toBeCloseTo(player.velocity.y, 10);
-    expect(Math.hypot(player.velocity.x, player.velocity.y)).toBeGreaterThan(0);
   });
 });
 
@@ -221,6 +226,7 @@ describe('muted contour chrome', () => {
     const canvas = { width: 800, height: 600 } as HTMLCanvasElement;
     vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+    vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 800, height: 600 });
     vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
       (world) => new Point(world.x + 400, world.y + 300)
     );

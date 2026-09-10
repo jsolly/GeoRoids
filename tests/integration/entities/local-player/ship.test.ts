@@ -20,7 +20,7 @@ test('Ship Creation', () => {
 
 test('Move Ship', () => {
   mockShip.velocity = { x: 1, y: 1 };
-  mockShip.move();
+  mockShip.update();
   expect(mockShip.position.x).toBeGreaterThan(0);
   expect(mockShip.position.y).toBeGreaterThan(0);
 });
@@ -28,7 +28,7 @@ test('Move Ship', () => {
 test('Ship Slows Down (Friction)', () => {
   mockShip.velocity = { x: 1, y: 1 };
   mockShip.thrusting = false;
-  mockShip.move();
+  mockShip.update();
   expect(mockShip.velocity.x).toBeLessThan(1);
   expect(mockShip.velocity.y).toBeLessThan(1);
 });

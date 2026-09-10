@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { Sound, setSound } from '../../../src/audio/Sound';
+import { playSound, Sound, setSound } from '../../../src/audio/Sound';
 import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
+import { logger } from '../../../src/utils/Logger';
 
 let testSound: Sound;
 const mockPlay = vi.fn();
@@ -12,8 +13,11 @@ beforeEach(() => {
   testSound = new Sound('../public/sounds/thrust.m4a', 1);
   const stream = testSound.streams[0];
   expect(stream).toBeDefined();
-  stream!.play = mockPlay;
-  stream!.pause = mockPause;
+  if (!stream) {
+    throw new Error('test sound stream was not created');
+  }
+  stream.play = mockPlay;
+  stream.pause = mockPause;
 });
 
 afterEach(() => {
@@ -46,8 +50,15 @@ test('Sound play skips when Sound is off', async () => {
 test('setSound(false) stops every stream that is already playing', () => {
   setSound(true);
   const extra = new Sound('../public/sounds/laser.m4a', 2);
-  extra.streams[0]!.pause = mockPause;
-  extra.streams[1]!.pause = mockPause;
+  const first = extra.streams[0];
+  const second = extra.streams[1];
+  expect(first).toBeDefined();
+  expect(second).toBeDefined();
+  if (!first || !second) {
+    throw new Error('multi-stream sound was not created');
+  }
+  first.pause = mockPause;
+  second.pause = mockPause;
   extra.playing = true;
   testSound.playing = true;
 
@@ -77,6 +88,17 @@ test('Sound play skips when volume scale is zero', async () => {
   expect(testSound.streamNum).toBe(initialStreamNum);
 });
 
+test('playSound reports an unexpected rejected playback promise', async () => {
+  const cause = new Error('unexpected');
+  vi.spyOn(testSound, 'play').mockRejectedValue(cause);
+  const log = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+  playSound(testSound);
+  await Promise.resolve();
+
+  expect(log).toHaveBeenCalledWith('SOUND', 'Unexpected sound playback failure', cause);
+});
+
 test('Sound stop functionality', () => {
   testSound.stop();
   expect(mockPause).toHaveBeenCalled();
@@ -99,18 +121,18 @@ test('Sound isPlaying check', () => {
   expect(testSound.isPlaying()).toBe(false);
 });
 
-test('Sound with multiple streams', () => {
+test('successive shots rotate through the available audio streams', async () => {
   const multiSound = new Sound('../public/sounds/thrust.m4a', 3);
-  expect(multiSound.streams.length).toBe(3);
-  expect(multiSound.streamNum).toBe(0);
+  const playback = multiSound.streams.map((stream) => {
+    const play = vi.fn().mockResolvedValue(undefined);
+    stream.play = play;
+    return play;
+  });
 
-  // Test stream cycling without calling play (which fails in jsdom)
-  multiSound.streamNum = 1;
-  expect(multiSound.streamNum).toBe(1);
-
-  multiSound.streamNum = 2;
-  expect(multiSound.streamNum).toBe(2);
-
-  multiSound.streamNum = 0; // Should wrap around
-  expect(multiSound.streamNum).toBe(0);
+  for (const index of [1, 2, 0]) {
+    await multiSound.play();
+    expect(multiSound.streamNum).toBe(index);
+    expect(playback[index]).toHaveBeenCalledOnce();
+  }
+  expect(playback.every((play) => play.mock.calls.length === 1)).toBe(true);
 });

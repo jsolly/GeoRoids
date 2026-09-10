@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import type { GameEntity } from '../../../server/core/EntityManager';
+import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
+import type { WebSocket } from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { EO_SATELLITE_HULL_COLOR, SATELLITE_PROFILES } from '../../../shared/eoSatellites';
 import { SATELLITE } from '../../../src/constants';
@@ -10,9 +10,11 @@ const DAMAGE_HALF = SATELLITE.HEALTH / 2;
 
 function firstSatellite(engine: GameEngine) {
   const satellites = engine.createSatellites(1);
-  expect(satellites).not.toBeNull();
-  expect(satellites!.length).toBeGreaterThan(0);
-  return satellites![0]!;
+  assert.exists(satellites);
+  expect(satellites.length).toBeGreaterThan(0);
+  const satellite = satellites[0];
+  assert.exists(satellite);
+  return satellite;
 }
 
 describe('Ambient hostile EO satellites', () => {
@@ -45,8 +47,8 @@ describe('Ambient hostile EO satellites', () => {
   });
 
   test('joining a live game seeds ambient NPCs without a call-in ability', () => {
-    const mockWs = {} as GameEntity['ws'];
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, { x: 0, y: 0 });
+    const mockWs = {} as WebSocket;
+    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
 
     expect(gameEngine.getSatelliteCount()).toBeGreaterThanOrEqual(SATELLITE.AMBIENT_COUNT);
     expect(gameEngine.getGameState().satellites.map((satellite) => satellite.typeId)).toEqual(
@@ -58,8 +60,8 @@ describe('Ambient hostile EO satellites', () => {
 
   test('a satellite dies when shot enough times and awards score plus loot', () => {
     const satellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, { x: 0, y: 0 });
+    const mockWs = {} as WebSocket;
+    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
 
     const wounded = gameEngine.handleSatelliteDamage(satellite.id, 'pilot', DAMAGE_HALF);
     expect(wounded).toBe(false);
@@ -75,8 +77,8 @@ describe('Ambient hostile EO satellites', () => {
 
   test('ramming a satellite on the server damages the ship and drops wreckage', () => {
     const satellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
-    const pilot = gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, {
+    const mockWs = {} as WebSocket;
+    const pilot = gameEngine.addPlayer('pilot', 'Pilot', mockWs, {
       x: satellite.position.x,
       y: satellite.position.y,
     });
@@ -94,8 +96,8 @@ describe('Ambient hostile EO satellites', () => {
 
   test('a second killing shot does not award points again', () => {
     const satellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, { x: 0, y: 0 });
+    const mockWs = {} as WebSocket;
+    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
     gameEngine.handleSatelliteDamage(satellite.id, 'pilot', SATELLITE.HEALTH);
     gameEngine.handleSatelliteDamage(satellite.id, 'pilot', SATELLITE.HEALTH);
     expect(gameEngine.getPlayer('pilot')?.score).toBe(SATELLITE.POINTS);
@@ -110,21 +112,21 @@ describe('Ambient hostile EO satellites', () => {
     }
 
     const later = gameEngine.getSatellite(satellite.id);
-    expect(later).toBeDefined();
-    const moved = Math.hypot(later!.position.x - start.x, later!.position.y - start.y);
+    assert.exists(later);
+    const moved = Math.hypot(later.position.x - start.x, later.position.y - start.y);
     expect(moved).toBeGreaterThan(5);
-    expect(Math.hypot(later!.position.x, later!.position.y)).toBeLessThan(
+    expect(Math.hypot(later.position.x, later.position.y)).toBeLessThan(
       SATELLITE.BOUNDARY_RADIUS + 1
     );
   });
 
   test('satellites shoot toward the nearest living ship regardless of faction', () => {
     const satellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
+    const mockWs = {} as WebSocket;
     gameEngine.addPlayer(
       'near',
       'Near',
-      mockWs as never,
+      mockWs,
       {
         x: satellite.position.x + 180,
         y: satellite.position.y,
@@ -136,7 +138,7 @@ describe('Ambient hostile EO satellites', () => {
     gameEngine.addPlayer(
       'far',
       'Far',
-      mockWs as never,
+      mockWs,
       {
         x: satellite.position.x + 1800,
         y: satellite.position.y,
@@ -152,10 +154,13 @@ describe('Ambient hostile EO satellites', () => {
     }
 
     expect(shots.length).toBeGreaterThan(0);
-    const first = shots[0]!;
+    const first = shots[0];
+    assert.exists(first);
     expect(Math.hypot(first.laserDirection.x, first.laserDirection.y)).toBeGreaterThan(0);
-    const firingSatellite = gameEngine.getSatellite(satellite.id)!;
-    const near = gameEngine.getPlayer('near')!;
+    const firingSatellite = gameEngine.getSatellite(satellite.id);
+    assert.exists(firingSatellite);
+    const near = gameEngine.getPlayer('near');
+    assert.exists(near);
     const dx = near.position.x - firingSatellite.position.x;
     const dy = near.position.y - firingSatellite.position.y;
     const vx = first.laserDirection.x - firingSatellite.velocity.x;
@@ -199,8 +204,8 @@ describe('Ambient hostile EO satellites', () => {
 
   test('the authoritative projectile snapshot returns a defensive copy', () => {
     const serverSatellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, {
+    const mockWs = {} as WebSocket;
+    gameEngine.addPlayer('pilot', 'Pilot', mockWs, {
       x: serverSatellite.position.x + 180,
       y: serverSatellite.position.y,
     });
@@ -213,9 +218,9 @@ describe('Ambient hostile EO satellites', () => {
 
     const snapshot = gameEngine.getActiveSatelliteProjectiles();
     const projectile = snapshot.find((row) => row.shotId === shotId);
-    expect(projectile).toBeDefined();
-    const originalX = projectile!.position.x;
-    projectile!.position.x += 1000;
+    assert.exists(projectile);
+    const originalX = projectile.position.x;
+    projectile.position.x += 1000;
     expect(
       gameEngine.getActiveSatelliteProjectiles().find((row) => row.shotId === shotId)?.position.x
     ).toBe(originalX);
@@ -223,11 +228,11 @@ describe('Ambient hostile EO satellites', () => {
 
   test('NPCs remain hostile to every soft faction', () => {
     const satellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
+    const mockWs = {} as WebSocket;
     const ion = gameEngine.addPlayer(
       'ion',
       'Ion',
-      mockWs as never,
+      mockWs,
       { x: 0, y: 0 },
       undefined,
       'dart',
@@ -236,7 +241,7 @@ describe('Ambient hostile EO satellites', () => {
     const ember = gameEngine.addPlayer(
       'ember',
       'Ember',
-      mockWs as never,
+      mockWs,
       { x: 10, y: 0 },
       undefined,
       'dart',
@@ -253,8 +258,8 @@ describe('Ambient hostile EO satellites', () => {
 
   test('a destroyed NPC leaves the snapshot until it re-enters', () => {
     const satellite = firstSatellite(gameEngine);
-    const mockWs = {} as GameEntity['ws'];
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs as never, { x: 0, y: 0 });
+    const mockWs = {} as WebSocket;
+    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
     gameEngine.handleSatelliteDamage(satellite.id, 'pilot', SATELLITE.HEALTH);
 
     expect(

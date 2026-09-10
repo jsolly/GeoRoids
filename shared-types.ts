@@ -64,6 +64,8 @@ export interface PlayerJoin {
   /** Required current-protocol acknowledgement. */
   snapshotVersion: 1;
   asteroidInteractions: 1;
+  /** The server accepts correlated shoot requests and emits per-shot acknowledgements. */
+  shotAcknowledgements?: boolean;
   /** Private to the joined socket; never included in world snapshots. */
   resumeToken: string;
   /** Private server build identifier for correlating client and server diagnostics. */
@@ -133,6 +135,12 @@ export interface PlayerProjectileState {
   energy: number;
   bounces: number;
   age: number;
+}
+
+/** Correlates a client-side predicted laser with its authoritative server entity. */
+export interface PlayerShotAcknowledgement {
+  requestId: string;
+  projectileId: string | null;
 }
 
 export interface AsteroidData {

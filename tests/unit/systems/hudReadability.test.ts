@@ -28,16 +28,24 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     height: number;
     style: typeof ctx.fillStyle;
   }> = [];
+  const filledPaths: Array<{
+    rectangles: Array<{ x: number; y: number; width: number; height: number }>;
+    style: typeof ctx.fillStyle;
+  }> = [];
+  let pathRectangles: Array<{ x: number; y: number; width: number; height: number }> = [];
   const beginPath = ctx.beginPath.bind(ctx);
   const moveTo = ctx.moveTo.bind(ctx);
   const lineTo = ctx.lineTo.bind(ctx);
   const closePath = ctx.closePath.bind(ctx);
   const stroke = ctx.stroke.bind(ctx);
+  const fill = ctx.fill.bind(ctx);
+  const rect = ctx.rect.bind(ctx);
   const fillText = ctx.fillText.bind(ctx);
   const fillRect = ctx.fillRect.bind(ctx);
   vi.spyOn(ctx, 'beginPath').mockImplementation(() => {
     points = [];
     closed = false;
+    pathRectangles = [];
     beginPath();
   });
   vi.spyOn(ctx, 'moveTo').mockImplementation((x, y) => {
@@ -56,6 +64,14 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     strokes.push({ points: [...points], closed, style: ctx.strokeStyle, width: ctx.lineWidth });
     stroke();
   });
+  vi.spyOn(ctx, 'rect').mockImplementation((x, y, width, height) => {
+    pathRectangles.push({ x, y, width, height });
+    rect(x, y, width, height);
+  });
+  vi.spyOn(ctx, 'fill').mockImplementation((...args) => {
+    filledPaths.push({ rectangles: [...pathRectangles], style: ctx.fillStyle });
+    fill(...args);
+  });
   vi.spyOn(ctx, 'fillText').mockImplementation((...args) => {
     const [text, x, y] = args;
     texts.push({ text, x, y, style: ctx.fillStyle, font: ctx.font, align: ctx.textAlign });
@@ -65,7 +81,7 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     rectangles.push({ x, y, width, height, style: ctx.fillStyle });
     fillRect(x, y, width, height);
   });
-  return { strokes, texts, rectangles };
+  return { strokes, texts, rectangles, filledPaths };
 }
 
 function canvasContext(): CanvasRenderingContext2D {
@@ -207,7 +223,7 @@ describe('painted HUD composition', () => {
     ]);
   });
 
-  test('radar shows only local, human and bot pilots while preserving their headings', async () => {
+  test('radar paints moving world marks and keeps pilots above live objects', async () => {
     expect(VISUAL.MINIMAP_SIZE).toBe(96);
     expect(VISUAL.MINIMAP_VOID_ALPHA).toBeLessThanOrEqual(0.5);
     expect(VISUAL.MINIMAP_VOID_ALPHA).toBeGreaterThan(0);
@@ -215,10 +231,10 @@ describe('painted HUD composition', () => {
     expect(VISUAL.MINIMAP_DOT).toBeGreaterThanOrEqual(4);
     expect(VISUAL.MINIMAP_LOCAL_SIZE).toBeGreaterThan(VISUAL.MINIMAP_DOT / 2);
 
-    const { GameController } = await import('../../../src/core/gameController');
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { entityFactory } = await import('../../../src/entities/EntityFactory');
     const { NetworkManager } = await import('../../../src/network/networkManager');
+    const { LootField } = await import('../../../src/entities/loot/LootField');
     const { Roid } = await import('../../../src/entities/roid/Roid');
     const { SatelliteManager } = await import('../../../src/entities/satellite/SatelliteManager');
     const { SatellitePickupManager } = await import(
@@ -232,6 +248,9 @@ describe('painted HUD composition', () => {
     player.ship.angle = Math.PI / 2;
     const boundary = getGameBoundary();
     const visible = new Roid({ x: boundary.radius / 2, y: 0 }, 20, 'radar-visible');
+    const dead = new Roid({ x: 0, y: boundary.radius / 4 }, 20, 'radar-dead');
+    dead.health = 0;
+    const roids = [visible, dead];
     const remote = entityFactory.createRemotePlayer('radar-remote', 'Radar Rival', {
       x: -boundary.radius / 2,
       y: 0,
@@ -243,7 +262,6 @@ describe('painted HUD composition', () => {
     });
     bot.ship.angle = 0;
     vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, bot]);
-    GameController.getInstance().getCurrRoidBelt().roids.push(visible);
     SatelliteManager.getInstance().syncFromServer([
       {
         id: 'radar-satellite',
@@ -255,6 +273,21 @@ describe('painted HUD composition', () => {
         velocity: { x: 0, y: 0 },
         angle: 0,
         exploding: false,
+        color: '#C4B5FD',
+        health: 100,
+        maxHealth: 100,
+        radius: 22,
+      },
+      {
+        id: 'radar-dead-satellite',
+        name: 'Terra',
+        typeId: 'terra',
+        assetKey: 'eo/terra',
+        shotManner: 'wide-modis-sweep',
+        position: { x: boundary.radius / 4, y: 0 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        exploding: true,
         color: '#C4B5FD',
         health: 100,
         maxHealth: 100,
@@ -276,15 +309,67 @@ describe('painted HUD composition', () => {
         ownerId: null,
         shieldFramesRemaining: 0,
       },
+      {
+        id: 'radar-pickup-secondary',
+        name: 'Echo',
+        typeId: 'echo',
+        assetKey: 'pickup/echo',
+        position: { x: boundary.radius / 4, y: boundary.radius / 2 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        radius: 15,
+        color: '#FBBF24',
+        state: 'loose',
+        ownerId: null,
+        shieldFramesRemaining: 0,
+      },
+      {
+        id: 'radar-orbiter',
+        name: 'Relay',
+        typeId: 'relay',
+        assetKey: 'pickup/relay',
+        position: { x: -boundary.radius / 2, y: 0 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        radius: 15,
+        color: '#FBBF24',
+        state: 'orbiting',
+        ownerId: 'radar-remote',
+        shieldFramesRemaining: 120,
+      },
+    ]);
+    LootField.getInstance().applySnapshot([
+      {
+        id: 'radar-shard',
+        position: { x: 0, y: -boundary.radius / 4 },
+        mass: 0.25,
+        radius: 8,
+        kind: 'shard',
+      },
     ]);
     const ctx = canvasContext();
-    const { strokes, rectangles } = recordCanvas(ctx);
+    const { strokes, rectangles, filledPaths } = recordCanvas(ctx);
     const arc = vi.spyOn(ctx, 'arc');
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
+    const draw = (): void => {
+      drawMiniMap(
+        ctx,
+        layout,
+        player.ship,
+        roids,
+        LootField.getInstance().getAll(),
+        SatelliteManager.getInstance().getAll(),
+        SatellitePickupManager.getInstance().getAll()
+      );
+    };
 
-    drawMiniMap(ctx, layout, player.ship);
+    draw();
 
-    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
+    expect(arc.mock.calls).toEqual([
+      [736, 536, 48, 0, Math.PI * 2],
+      [736, 560, 2.5, 0, Math.PI * 2],
+      [748, 560, 2.5, 0, Math.PI * 2],
+    ]);
     expect(strokes[0]).toEqual({
       points: [],
       closed: true,
@@ -292,8 +377,57 @@ describe('painted HUD composition', () => {
       width: 1,
     });
     expect(rectangles).toEqual([]);
-    // One arena ring plus three two-pass pilot hulls; non-player managers add no marks.
-    expect(strokes).toHaveLength(7);
+    expect(filledPaths).toHaveLength(2);
+    expect(filledPaths[1]).toEqual({
+      rectangles: [{ x: 759.25, y: 535.25, width: 1.5, height: 1.5 }],
+      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
+    });
+    expect(strokes.slice(1, 5)).toEqual([
+      {
+        points: [
+          [736, 522],
+          [738, 524],
+          [736, 526],
+          [734, 524],
+        ],
+        closed: true,
+        style: normalizedCanvasColor(ctx, '#E8D5A3'),
+        width: 1,
+      },
+      {
+        points: [
+          [734, 512],
+          [738, 512],
+          [736, 510],
+          [736, 514],
+        ],
+        closed: false,
+        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.9)'),
+        width: 1,
+      },
+      {
+        points: [
+          [738.5, 560],
+          [750.5, 560],
+        ],
+        closed: false,
+        style: normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'),
+        width: 1,
+      },
+      {
+        points: [
+          [712, 533],
+          [715, 536],
+          [712, 539],
+          [709, 536],
+        ],
+        closed: true,
+        style: normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'),
+        width: 1,
+      },
+    ]);
+    // One arena ring, four batched world marks, then three two-pass pilot hulls.
+    expect(strokes).toHaveLength(11);
     const botHeading = strokes.filter(
       (call) => call.style === normalizedCanvasColor(ctx, '#FB923C')
     );
@@ -324,6 +458,64 @@ describe('painted HUD composition', () => {
       [708, 538.5],
       [708, 533.5],
     ]);
+
+    strokes.length = 0;
+    filledPaths.length = 0;
+    arc.mockClear();
+    visible.position = { x: -boundary.radius / 4, y: 0 };
+    const orbiter = SatellitePickupManager.getInstance().get('radar-orbiter');
+    if (!orbiter) {
+      throw new Error('Radar orbiter fixture was not created');
+    }
+    orbiter.position = { x: boundary.radius / 4, y: 0 };
+    draw();
+
+    expect(filledPaths[1]).toEqual({
+      rectangles: [{ x: 723.25, y: 535.25, width: 1.5, height: 1.5 }],
+      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
+    });
+    const movedOrbiter = strokes.find(
+      (call) => call.style === normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)') && call.closed
+    );
+    expect(movedOrbiter?.points).toEqual([
+      [748, 533],
+      [751, 536],
+      [748, 539],
+      [745, 536],
+    ]);
+
+    strokes.length = 0;
+    filledPaths.length = 0;
+    arc.mockClear();
+    SatellitePickupManager.getInstance().syncFromServer([
+      {
+        id: 'radar-orbiter',
+        name: 'Relay',
+        typeId: 'relay',
+        assetKey: 'pickup/relay',
+        position: { x: boundary.radius / 4, y: 0 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        radius: 15,
+        color: '#FBBF24',
+        state: 'orbiting',
+        ownerId: 'radar-remote',
+        shieldFramesRemaining: 120,
+      },
+    ]);
+    SatelliteManager.getInstance().syncFromServer([]);
+    LootField.getInstance().clear();
+    roids.length = 0;
+    draw();
+
+    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
+    expect(filledPaths).toHaveLength(1);
+    expect(strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#E8D5A3'))).toEqual(
+      []
+    );
+    expect(
+      strokes.filter((call) => call.style === normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'))
+    ).toHaveLength(1);
   });
 });
 

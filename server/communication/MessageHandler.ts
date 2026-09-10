@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import type { PlayerShotAcknowledgement } from '../../shared-types';
 import { DAMAGE, SATELLITE_PICKUP } from '../../src/constants';
 import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
 import type { MotionOutcome } from '../core/AsteroidMotionService';
@@ -289,6 +290,7 @@ export class MessageHandler {
         position: player.position,
         resumeToken,
         asteroidInteractions: 1,
+        shotAcknowledgements: true,
         color: player.color,
         kitId: player.kitId,
         ...(player.factionId !== undefined ? { factionId: player.factionId } : {}),
@@ -388,7 +390,7 @@ export class MessageHandler {
   }
 
   private handlePlayerShoot(ws: WebSocket, command: CommandOf<'shoot'>): void {
-    const { id, laserStart, laserDirection } = command;
+    const { id, laserStart, laserDirection, requestId } = command;
     logger.debug('DEBUG: Server received shoot message', { id, laserStart, laserDirection });
 
     const shooter = this.gameEngine.getPlayerBySocket(ws);
@@ -397,6 +399,17 @@ export class MessageHandler {
     }
 
     const laser = this.gameEngine.spawnHumanLaser(shooter.id, laserStart, laserDirection);
+    if (requestId !== undefined) {
+      const acknowledgement: PlayerShotAcknowledgement = {
+        requestId,
+        projectileId: laser?.id ?? null,
+      };
+      this.broadcaster.sendToWebSocket(ws, {
+        type: 'shotAcknowledged',
+        data: acknowledgement,
+        timestamp: Date.now(),
+      });
+    }
     if (!laser) {
       return;
     }

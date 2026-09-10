@@ -19,10 +19,12 @@ vi.mock('../../../setup/serverLogger', () => ({
 describe('server-authoritative human shooting', () => {
   let engine: GameEngine;
   let handler: MessageHandler;
+  let broadcaster: GameStateBroadcaster;
   let socket: RecordingSocket;
   beforeEach(() => {
     engine = new GameEngine(921);
-    handler = new MessageHandler(engine, new GameStateBroadcaster(engine));
+    broadcaster = new GameStateBroadcaster(engine);
+    handler = new MessageHandler(engine, broadcaster);
     socket = new RecordingSocket();
     engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, undefined, 'dart');
     for (const asteroid of engine.getAllAsteroids()) {
@@ -34,12 +36,84 @@ describe('server-authoritative human shooting', () => {
     vi.restoreAllMocks();
   });
 
-  function shoot(position = { x: 20, y: 0 }, velocity = { x: LASER.SPEED / GAME.FPS, y: 0 }) {
+  function shoot(
+    position = { x: 20, y: 0 },
+    velocity = { x: LASER.SPEED / GAME.FPS, y: 0 },
+    requestId?: string
+  ) {
     handler.handleMessage(
-      { type: 'shoot', id: 'pilot', data: { laserStart: position, laserDirection: velocity } },
+      {
+        type: 'shoot',
+        id: 'pilot',
+        data: {
+          laserStart: position,
+          laserDirection: velocity,
+          ...(requestId !== undefined ? { requestId } : {}),
+        },
+      },
       socket
     );
   }
+
+  test('acknowledgement precedes immediate hit resolution and its broadcast', () => {
+    const order: string[] = [];
+    vi.spyOn(broadcaster, 'sendToWebSocket').mockImplementation(() => {
+      order.push('acknowledgement');
+    });
+    const originalResolve = engine.resolveSpawnedLaserHits.bind(engine);
+    vi.spyOn(engine, 'resolveSpawnedLaserHits').mockImplementation((...args) => {
+      order.push('resolve');
+      return originalResolve(...args);
+    });
+    const originalBroadcast = handler.broadcastAppliedAsteroidHits.bind(handler);
+    vi.spyOn(handler, 'broadcastAppliedAsteroidHits').mockImplementation((hits) => {
+      order.push('broadcast');
+      originalBroadcast(hits);
+    });
+
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'ordered-shot');
+
+    expect(order).toEqual(['acknowledgement', 'resolve', 'broadcast']);
+  });
+
+  test('acknowledgement stays ahead of the next authoritative snapshot on the same socket', () => {
+    broadcaster.negotiateSnapshot(socket);
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'snapshot-order');
+    broadcaster.broadcastGameState();
+
+    const acknowledgementIndex = socket.inbox.findIndex(
+      (message) => message.type === 'shotAcknowledged'
+    );
+    const snapshotIndex = socket.inbox.findIndex((message) => message.type === 'snapshot');
+    expect(acknowledgementIndex).toBeGreaterThanOrEqual(0);
+    expect(snapshotIndex).toBeGreaterThan(acknowledgementIndex);
+  });
+
+  test('accepted burst shots acknowledge their distinct authoritative projectile IDs', () => {
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'burst-1');
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'burst-2');
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'burst-3');
+
+    const acknowledgements = socket.received('shotAcknowledged');
+    expect(acknowledgements).toHaveLength(3);
+    expect(acknowledgements.map((message) => message.data)).toEqual([
+      { requestId: 'burst-1', projectileId: engine.getServerLasers()[0]?.id },
+      { requestId: 'burst-2', projectileId: engine.getServerLasers()[1]?.id },
+      { requestId: 'burst-3', projectileId: engine.getServerLasers()[2]?.id },
+    ]);
+    expect(new Set(engine.getServerLasers().map((laser) => laser.id)).size).toBe(3);
+  });
+
+  test('accepted and rejected owned shots acknowledge the authoritative outcome', () => {
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'accepted');
+    shoot({ x: 1000, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'rejected');
+
+    expect(socket.received('shotAcknowledged').map((message) => message.data)).toEqual([
+      { requestId: 'accepted', projectileId: engine.getServerLasers()[0]?.id },
+      { requestId: 'rejected', projectileId: null },
+    ]);
+    expect(engine.getServerLasers()).toHaveLength(1);
+  });
 
   test('finite speed bounds and live ownership reject malformed, unjoined and respawning shots', () => {
     expect(engine.spawnHumanLaser('missing', { x: 20, y: 0 }, { x: 5, y: 0 })).toBeNull();
@@ -86,6 +160,7 @@ describe('server-authoritative human shooting', () => {
     const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     shoot({ x: 20, y: 0 }, { x: 0, y: 0 });
     expect(engine.getServerLasers()).toHaveLength(1);
+    expect(socket.received('shotAcknowledged')).toHaveLength(0);
     clock.mockReturnValue(1000 + HUMAN_LASER_MAX_LIFETIME_MS);
     engine.advanceLasersAndResolveHits();
     expect(engine.getServerLasers()).toHaveLength(0);

@@ -9,10 +9,12 @@ test('legacy top-level fields override nested command fields once', () => {
       id: 'top-level-pilot',
       laserStart: { x: 10, y: 20 },
       laserDirection: { x: 3, y: 4 },
+      requestId: 'top-level-shot',
       data: {
         id: 'nested-pilot',
         laserStart: { x: 100, y: 200 },
         laserDirection: { x: 30, y: 40 },
+        requestId: 'nested-shot',
       },
     })
   ).toEqual({
@@ -22,8 +24,66 @@ test('legacy top-level fields override nested command fields once', () => {
       id: 'top-level-pilot',
       laserStart: { x: 10, y: 20 },
       laserDirection: { x: 3, y: 4 },
+      requestId: 'top-level-shot',
     },
   });
+});
+
+test('shoot request IDs remain optional while malformed correlation values stop at the wire boundary', () => {
+  expect(
+    decodeClientCommand({
+      type: 'shoot',
+      id: 'pilot',
+      data: {
+        laserStart: { x: 10, y: 20 },
+        laserDirection: { x: 3, y: 4 },
+        requestId: 'shot_01-abc',
+      },
+    })
+  ).toEqual({
+    ok: true,
+    command: {
+      type: 'shoot',
+      id: 'pilot',
+      laserStart: { x: 10, y: 20 },
+      laserDirection: { x: 3, y: 4 },
+      requestId: 'shot_01-abc',
+    },
+  });
+
+  expect(
+    decodeClientCommand({
+      type: 'shoot',
+      id: 'pilot',
+      data: { laserStart: { x: 10, y: 20 }, laserDirection: { x: 3, y: 4 } },
+    })
+  ).toEqual({
+    ok: true,
+    command: {
+      type: 'shoot',
+      id: 'pilot',
+      laserStart: { x: 10, y: 20 },
+      laserDirection: { x: 3, y: 4 },
+    },
+  });
+
+  for (const requestId of ['', 'a'.repeat(65), 'shot.id', 'shot id', 7, null]) {
+    expect(
+      decodeClientCommand({
+        type: 'shoot',
+        id: 'pilot',
+        data: {
+          laserStart: { x: 10, y: 20 },
+          laserDirection: { x: 3, y: 4 },
+          requestId,
+        },
+      })
+    ).toEqual({
+      ok: false,
+      messageType: 'shoot',
+      error: 'Invalid shoot request ID',
+    });
+  }
 });
 
 test('nested current joins keep numeric-string positions and capability offers', () => {

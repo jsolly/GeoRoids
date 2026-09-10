@@ -1,10 +1,11 @@
-# Player-only minimap work comparison
+# Historical player-only minimap work comparison
 
-The player-only minimap does less measured work on every frame of the fixed
-portrait fixture. Two independent observations per arm matched exactly across
-all 120 measured frames. Both arms used seed 42 and 30 warmup frames. The only
-changes between arms restored or removed the original satellite and pickup
-minimap rendering. The contour index and all other current changes stayed fixed.
+This is a historical comparison of the player-only minimap candidate. It does
+not describe the current product policy. Two independent observations per arm
+matched exactly across all 120 measured frames. Both arms used seed 42 and 30
+warmup frames. The only changes between arms restored or removed the then-current
+satellite and pickup minimap rendering. The contour index and all other changes
+in that comparison stayed fixed.
 
 | Operation per frame | Original minimap | Player-only minimap | Difference |
 | --- | ---: | ---: | ---: |
@@ -18,15 +19,38 @@ minimap rendering. The contour index and all other current changes stayed fixed.
 | `render.pickup.positionReads` | 9 | 3 | -6 |
 | `render.satellite.positionReads` | 9 | 3 | -6 |
 
-That removes six Canvas strokes and twelve satellite/pickup position reads per
-frame in this fixture. Other measured work, including asteroid reads, contour
-reads and update calls, stayed equal. The original minimap already omitted
-asteroids; its removed rendering traversed satellites and pickups.
+The player-only candidate removed six Canvas strokes and twelve satellite/pickup
+position reads per frame in this fixture. Other measured work, including asteroid
+reads, contour reads and update calls, stayed equal. The compared original
+minimap already omitted asteroids and loot; its removed rendering traversed
+satellites and pickups.
 
-Gameplay outcomes matched. Final pixels intentionally differ because the unwanted
-markers are gone. This is a permanent product choice, not a temporary graphics
-reduction. Work counts do not prove a frame-time or FPS improvement. Canvas method
-counts describe API calls, not GPU draw calls, and are not weighted CPU costs.
+Gameplay outcomes matched. Final pixels intentionally differ because those
+markers were removed in the candidate. This result is retained as historical
+evidence and does not establish a current graphics policy. Work counts do not
+prove a frame-time or FPS improvement. Canvas method counts describe API calls,
+not GPU draw calls, and are not weighted CPU costs.
+
+## Current product policy
+
+The current minimap restores compact marks for live asteroids, loot drops,
+hostile satellites, loose satellite pickups, and orbiting pickups. It reads each
+entity’s current position on every draw, skips dead or exploding entities, and
+lets authoritative removal clear collected or expired objects. World marks are
+batched by category and pilots are drawn on top. A new matched timing comparison
+would be required before making a current frame-rate claim from this policy.
+
+A September 10, 2026 observation of the restored marks used the same seed 42,
+30 warmup frames, and 120 measured touch-portrait frames. The fixture contains
+24 asteroids, six wreckage drops, three satellites, and three loose pickups.
+Every measured frame used 110 Canvas strokes, compared with the historical
+player-only reference of 107. Satellite and pickup position reads were six each,
+compared with three each; contour endpoint reads stayed at 1,388. This is a
+single deterministic work observation, not a matched timing or phone FPS result.
+Other loot kinds and attached orbiters are covered by rendering tests.
+
+The report is `.performance/projectiles-minimap/frame-work.json`, SHA-256
+`38c1c1946b2f5925c87ab5f4e03253edd2c579d2e2b18c728adc39d6151f46b7`.
 
 ## Artifact receipt
 

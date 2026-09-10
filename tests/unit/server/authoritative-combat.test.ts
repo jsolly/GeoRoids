@@ -280,12 +280,17 @@ describe('server-authoritative combat', () => {
     join(wsCore, pilotWs, { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } });
     join(wsCore, otherWs, { id: 'other', name: 'Other', position: { x: 200, y: 0 } });
     clearAsteroidField(engine);
+    expect(pilotWs.received('joined')[0]?.data).toMatchObject({ shotAcknowledgements: true });
 
     wsCore.handleClientMessage(
       {
         type: 'shoot',
         id: 'other',
-        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 1, y: 0 } },
+        data: {
+          laserStart: { x: 0, y: 0 },
+          laserDirection: { x: 1, y: 0 },
+          requestId: 'forged-other',
+        },
       },
       pilotWs
     );
@@ -293,23 +298,35 @@ describe('server-authoritative combat', () => {
       {
         type: 'shoot',
         id: 'server-bot-0',
-        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 1, y: 0 } },
+        data: {
+          laserStart: { x: 0, y: 0 },
+          laserDirection: { x: 1, y: 0 },
+          requestId: 'forged-bot',
+        },
       },
       pilotWs
     );
 
     expect(engine.getServerLasers()).toHaveLength(0);
+    expect(pilotWs.received('shotAcknowledged')).toHaveLength(0);
 
     wsCore.handleClientMessage(
       {
         type: 'shoot',
         id: 'pilot',
-        data: { laserStart: { x: 0, y: 0 }, laserDirection: { x: 1, y: 0 } },
+        data: {
+          laserStart: { x: 0, y: 0 },
+          laserDirection: { x: 1, y: 0 },
+          requestId: 'owned-pilot',
+        },
       },
       pilotWs
     );
     expect(engine.getServerLasers()).toHaveLength(1);
     expect(engine.getServerLasers()[0]?.ownerId).toBe('pilot');
+    expect(pilotWs.received('shotAcknowledged').map((message) => message.data)).toEqual([
+      { requestId: 'owned-pilot', projectileId: engine.getServerLasers()[0]?.id },
+    ]);
   });
 
   test('boundary collisionDamage still applies when the reporter is the target', () => {

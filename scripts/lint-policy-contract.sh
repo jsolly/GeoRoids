@@ -247,7 +247,7 @@ if "$BIOME" lint --error-on-warnings --config-path "$warning_config" "$warning_s
   echo "✗ Biome accepted the warning fixture; --error-on-warnings is not enforcing the policy" >&2
   exit 1
 fi
-if ! rg -q 'warning|error' "$warning_output"; then
+if ! grep -Eq 'warning|error' "$warning_output"; then
   echo "✗ Biome rejected the warning fixture without an actionable diagnostic" >&2
   cat "$warning_output" >&2
   exit 1

@@ -170,7 +170,7 @@ test('tether VFX still resolves a server asteroid id suffix', () => {
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
   expect(strokes).toContain('#FDE68A');
-  expect(fills).toEqual([]);
+  expect(fills).toContain('#FDE68A');
   expect(strokeWidths.every((width) => width <= 2)).toBe(true);
   expect(arcRadii).toEqual([3.5]);
 });
@@ -185,7 +185,7 @@ test('timer-only Hauler still paints cream from the nearest field rock', () => {
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
   expect(strokes).toContain('#FDE68A');
-  expect(fills).toEqual([]);
+  expect(fills).toContain('#FDE68A');
   expect(strokeWidths.every((width) => width <= 2)).toBe(true);
   expect(arcRadii).toEqual([3.5]);
   expect(hauler.harpoonLatchPos?.x).toBe(40);
@@ -271,9 +271,22 @@ test('tether VFX still paints from a stored latch pose when the field id is stal
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
   expect(strokes).toContain('#FDE68A');
-  expect(fills).toEqual([]);
+  expect(fills).toContain('#FDE68A');
   expect(strokeWidths.every((width) => width <= 2)).toBe(true);
   expect(arcRadii).toEqual([3.5]);
+});
+
+test('cream cable still paints while the Hauler hull is exploding', () => {
+  publishHarpoonField([{ id: 'rock-1', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
+  const hauler = new Ship({ kitId: 'hauler' });
+  hauler.harpoonTimer = 40;
+  hauler.harpoonTargetId = 'rock-1';
+  hauler.exploding = true;
+  hauler.health = 0;
+  const { ctx, strokes, fills } = paintRecorder();
+  drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
+  expect(strokes).toContain('#E8D5A3');
+  expect(fills).toContain('#FDE68A');
 });
 
 test('Hauler latch paints opaque cream line and amber tip', () => {
@@ -285,7 +298,7 @@ test('Hauler latch paints opaque cream line and amber tip', () => {
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
   expect(strokes).toContain('#FDE68A');
-  expect(fills).toEqual([]);
+  expect(fills).toContain('#FDE68A');
 });
 
 test('non-Hauler draw is a no-op even if a latch is spoofed', () => {

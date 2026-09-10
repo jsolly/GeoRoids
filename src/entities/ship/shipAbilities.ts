@@ -6,6 +6,7 @@ import {
   getHarpoonField,
   getHarpoonFieldCanvas,
   getHarpoonFieldScale,
+  harpoonTargetIdsMatch,
   syncHarpoonFieldFromPlay,
 } from './harpoonField';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId, type ShipKitId } from './shipKits';
@@ -63,7 +64,7 @@ interface HarpoonLatchSnapshot {
 }
 
 /** Used when KeyE fires before the first render publishes a canvas. */
-const DEFAULT_LATCH_CANVAS = { width: 1280, height: 720 };
+const DEFAULT_LATCH_CANVAS = { width: 1920, height: 1080 };
 
 function rememberLatchPos(
   host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>,
@@ -117,6 +118,9 @@ function listHarpoonCandidates(world?: AbilityWorld): AbilityBody[] {
 
 /** Rocks are environment. Ship combat filters must not reject a visible belt row. */
 export function isEnvironmentLatchBody(body: AbilityBody): boolean {
+  if (body.kind === 'asteroid') {
+    return !body.exploding;
+  }
   if (body.kind === 'ship' || body.factionId !== undefined) {
     return false;
   }
@@ -289,19 +293,16 @@ export function harpoonLatchRange(
 
 const NEAREST_GAP_TIE_WU = 24;
 
-export function findHarpoonTarget(
-  host: Pick<AbilityHost, 'id' | 'factionId' | 'position' | 'angle' | 'r'>,
+function pickNearestHarpoonBody(
+  host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
   bodies: AbilityBody[],
-  range: number = SHIP_ABILITY.HARPOON_RANGE
+  range: number
 ): AbilityBody | undefined {
   const hx = Math.cos(host.angle);
   const hy = -Math.sin(host.angle);
   let best: { body: AbilityBody; gap: number; facing: number } | undefined;
 
   for (const body of bodies) {
-    if (!isHarpoonableBody(host, body)) {
-      continue;
-    }
     const dx = body.position.x - host.position.x;
     const dy = body.position.y - host.position.y;
     const dist = Math.hypot(dx, dy);
@@ -323,6 +324,28 @@ export function findHarpoonTarget(
   }
 
   return best?.body;
+}
+
+export function findHarpoonTarget(
+  host: Pick<AbilityHost, 'id' | 'factionId' | 'position' | 'angle' | 'r'>,
+  bodies: AbilityBody[],
+  range: number = SHIP_ABILITY.HARPOON_RANGE
+): AbilityBody | undefined {
+  const valid = bodies.filter((body) => isHarpoonableBody(host, body));
+  // A rock on this canvas is the product target. Hostile ships stay valid
+  // when no environment body is in reach — same-side mates never do.
+  return (
+    pickNearestHarpoonBody(
+      host,
+      valid.filter((body) => isEnvironmentLatchBody(body)),
+      range
+    ) ??
+    pickNearestHarpoonBody(
+      host,
+      valid.filter((body) => !isEnvironmentLatchBody(body)),
+      range
+    )
+  );
 }
 
 interface HarpoonDiagnosis {
@@ -386,7 +409,7 @@ function bodyMatchesLatchId(body: AbilityBody, id: string): boolean {
   if (!body.id) {
     return false;
   }
-  return body.id === id || body.id.endsWith(id) || id.endsWith(body.id);
+  return harpoonTargetIdsMatch(body.id, id);
 }
 
 /** Hauler-only: haul the latched rock or ship. Other kits never pull. */

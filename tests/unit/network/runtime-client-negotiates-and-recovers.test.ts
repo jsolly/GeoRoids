@@ -10,6 +10,7 @@ import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { Roid } from '../../../src/entities/roid/Roid';
 import { SatelliteManager } from '../../../src/entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
+import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { tickAbilityHost } from '../../../src/entities/ship/shipAbilities';
 import { resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp } from '../../../src/input/keybindings';
@@ -639,6 +640,38 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     ws.receive('snapshot', new SnapshotEncoder(zero).encode(6));
     expect(player.ship.harpoonTimer).toBe(0);
+  });
+
+  test('unacked Hauler cream survives an empty-belt snapshot while the held rock remains', async () => {
+    setSelectedShipKitId('hauler');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    const zero = captureSnapshot(snapshotFixture());
+    const zeroEntity = zero.entities[0];
+    assert.ok(zeroEntity, 'zero snapshot entity');
+    zeroEntity.id = manager.getClientId();
+    zeroEntity.kitId = 'hauler';
+    ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
+    publishHarpoonField([
+      { id: 'asteroid-1', position: { x: 1, y: 2 }, velocity: { x: 0, y: 0 }, kind: 'asteroid' },
+    ]);
+    Object.assign(player.ship, {
+      harpoonTimer: 30,
+      harpoonTargetId: 'asteroid-1',
+      harpoonLatchPos: { x: 1, y: 2 },
+      abilityActiveFrames: 30,
+      abilityCooldownFrames: 80,
+    });
+    manager.sendMessage({ type: 'useAbility', data: { abilityId: 'harpoon' } });
+    const emptyBelt = captureSnapshot(zero);
+    emptyBelt.asteroids = [];
+    emptyBelt.collabTags = [];
+    ws.receive('snapshot', new SnapshotEncoder(emptyBelt).encode(2));
+    expect(player.ship.harpoonTimer).toBe(30);
+    expect(player.ship.harpoonTargetId).toBe('asteroid-1');
+    expect(player.ship.harpoonLatchPos).toEqual({ x: 1, y: 2 });
   });
 
   test('socket-flap Hauler visuals keep only their remaining timer and end on expiry or target removal', async () => {

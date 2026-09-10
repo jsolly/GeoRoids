@@ -31,7 +31,11 @@ import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
-import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
+import {
+  findHarpoonFieldBody,
+  harpoonTargetIdsMatch,
+  setHoldEmptyHarpoonField,
+} from '../../entities/ship/harpoonField';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
@@ -1254,6 +1258,16 @@ export class ConnectionManager {
         // server ability state or extend the timer. Once acknowledged, a zero
         // is authoritative expiry; a missing target also ends warm prediction.
         const targetId = entity.ship.harpoonTargetId;
+        const targetInSnapshot =
+          typeof targetId === 'string' &&
+          (data.asteroids.some((rock) => harpoonTargetIdsMatch(rock.id, targetId)) ||
+            data.entities.some((player) => harpoonTargetIdsMatch(player.id, targetId)));
+        // An empty belt tick during a flap still contains remotes. Keep the
+        // unacked cream prediction while the held field still has that rock.
+        const targetHeldOnEmptyBelt =
+          typeof targetId === 'string' &&
+          data.asteroids.length === 0 &&
+          Boolean(findHarpoonFieldBody(targetId));
         const preservePredictedLatch =
           isLocalPlayer &&
           entity.type === 'local' &&
@@ -1262,8 +1276,7 @@ export class ConnectionManager {
           entity.ship.harpoonTimer > 0 &&
           !entityData.exploding &&
           entityData.health > 0 &&
-          (data.asteroids.some((rock) => rock.id === targetId) ||
-            data.entities.some((player) => player.id === targetId));
+          (targetInSnapshot || targetHeldOnEmptyBelt);
         if (!preservePredictedLatch) {
           entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
           entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;

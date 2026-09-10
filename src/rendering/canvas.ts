@@ -10,6 +10,7 @@ import { drawSatellites } from '../entities/satellite/satelliteRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
 import {
+  drawHaulerHarpoonRelative,
   drawLasers,
   drawShipAtPosition,
   drawShipExplosion,
@@ -311,6 +312,13 @@ class CanvasManager {
 
     const localLaserColor = getLaserColor(true);
     const enemyLaserColor = getLaserColor(false);
+
+    // Cable first — a dying or blinking hull must not hide the cream tether.
+    for (const player of allPlayers) {
+      const isLocal = player.id === localId;
+      const ship = isLocal ? currShip : player.ship;
+      drawHaulerHarpoonRelative(ship, currShip.position);
+    }
 
     for (const player of allPlayers) {
       const factionColor = getFactionColor(player.type);

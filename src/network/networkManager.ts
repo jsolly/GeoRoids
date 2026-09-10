@@ -1,4 +1,5 @@
-import type { PlayerUpdate, Position, Velocity } from '../../shared-types';
+import type { PlayerUpdate } from '../../shared-types';
+import type { Laser } from '../entities/laser/Laser';
 import type { Player } from '../entities/player/Player';
 import { logger } from '../utils/Logger';
 import { ConnectionManager } from './services/ConnectionManager';
@@ -79,8 +80,8 @@ export class NetworkManager {
     return this.connectionManager.dispatchAsteroidMotionAction(action, targetId);
   }
 
-  sendShootEvent(laserPosition: Position, laserVelocity: Velocity): void {
-    this.connectionManager.sendShootEvent(laserPosition, laserVelocity);
+  sendShootEvent(laser: Laser): void {
+    this.connectionManager.sendShootEvent(laser);
   }
 
   // Initialize asteroid sync - server is authoritative

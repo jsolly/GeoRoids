@@ -10,6 +10,7 @@ interface GameServerMessage {
     | 'playerKilled'
     | 'scoreUpdate'
     | 'snapshot'
+    | 'shotAcknowledged'
     | 'error'
     | 'joined'
     | 'sessionExpired'

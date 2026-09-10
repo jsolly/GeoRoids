@@ -16,9 +16,12 @@ DPR and glow candidates are implemented as diagnostic overrides. Normal desktop 
 2. Measure three A/A pairs. Keep at least 300 seconds of foreground samples and
    300 distinct input observations per session; allow extra wall time for rejoins.
    Record all failed attempts. Compare session-level results to establish noise.
-3. Run three alternating A/B pairs for each independent change: the player-only
-   minimap, DPR cap 2, DPR cap 1.5, and glow off. Check workload equivalence and
-   source provenance rather than relying on identical command-line arguments.
+3. Run three alternating A/B pairs for each independent change: the historical
+   player-only minimap candidate, DPR cap 2, DPR cap 1.5, and glow off. Check
+   workload equivalence and source provenance rather than relying on identical
+   command-line arguments. The current minimap includes live asteroid, loot,
+   satellite, loose-pickup, and orbiting-pickup marks; any performance claim for
+   that policy needs a fresh matched comparison.
 4. Use phase timings and browser profiles to select general optimizations. Isolate
    rendering, client processing and network delivery; keep gameplay and visual
    behavior intact unless a documented quality experiment explicitly changes it.

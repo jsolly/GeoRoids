@@ -6,5 +6,5 @@
     "render.satellite.positionReads": 3,
     "render.pickup.positionReads": 3
   },
-  "evidence": "Two exact 120-frame repetitions per arm, seed 42, 30 warmup frames, native DPR 1. Baseline 101416 reads/frame; indexed candidate 1388 with matching draw calls, outcomes and final pixels. Player-only minimap: two exact 120-frame observations per arm, matching outcomes; 113 to 107 strokes and 9 to 3 reads each for satellites and pickups. Reference values are report-only."
+  "evidence": "Historical evidence only: two exact 120-frame repetitions per arm, seed 42, 30 warmup frames, native DPR 1. Baseline 101416 reads/frame; indexed candidate 1388 with matching draw calls, outcomes and final pixels. The then-current player-only minimap had two exact 120-frame observations per arm, matching outcomes; 113 to 107 strokes and 9 to 3 reads each for satellites and pickups. Reference values are report-only and do not describe the current restored world-mark minimap."
 }

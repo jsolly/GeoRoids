@@ -325,9 +325,12 @@ class CanvasManager {
       drawRoidsRelative(currShip, roids);
     }
 
-    drawLootRelative(currShip, LootField.getInstance().getAll());
-    drawSatellites(SatelliteManager.getInstance().getAll(), currShip.position);
-    drawSatellitePickups(SatellitePickupManager.getInstance().getAll(), currShip.position);
+    const loot = LootField.getInstance().getAll();
+    const satellites = SatelliteManager.getInstance().getAll();
+    const satellitePickups = SatellitePickupManager.getInstance().getAll();
+    drawLootRelative(currShip, loot);
+    drawSatellites(satellites, currShip.position);
+    drawSatellitePickups(satellitePickups, currShip.position);
 
     const localLaserColor = getLaserColor(true);
     const enemyLaserColor = getLaserColor(false);
@@ -387,7 +390,7 @@ class CanvasManager {
     }
 
     const hudLayout = hudLayoutForCanvas(viewport);
-    drawMiniMap(ctx, hudLayout, currShip);
+    drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellites, satellitePickups);
 
     drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
 

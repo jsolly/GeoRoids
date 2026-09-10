@@ -6,8 +6,11 @@ The [contour timing comparison](contour-timing-results.md) completed three A/A
 pairs and three A/B pairs. Frame smoothness was inconclusive: 0.88 percentage
 points of median improvement versus 17.99 points of baseline variation. The
 separate deterministic fixture proves 98.63% fewer contour endpoint reads.
-The [isolated minimap comparison](minimap-work-results.md) proves six fewer
-Canvas strokes and twelve fewer satellite/pickup position reads per frame.
+The [isolated minimap comparison](minimap-work-results.md) is historical evidence
+from a player-only candidate: it measured six fewer Canvas strokes and twelve
+fewer satellite/pickup position reads per frame. The current product restores
+compact live marks for asteroids, loot, satellites, loose pickups, and orbiting
+pickups; no current frame-rate gain is claimed from that restoration.
 Performance results are report-only, with no numeric-overrun CI warnings or
 failures. Fixture recovery now checks live participants before resetting the world
 and retries departures during baseline observation. The full repository gate and
@@ -48,13 +51,16 @@ improvement is claimed.
 The contour candidate has completed three A/A and three alternating A/B pairs.
 Resolution and glow controls have short correctness runs only. Paired timing and
 fifteen-minute instrumented/uninstrumented acceptance remain outstanding before
-adopting a visual reduction. The minimap has an isolated work-count comparison;
-a matched timing comparison remains necessary for any frame-rate claim.
+adopting a visual reduction. The minimap has an isolated historical work-count
+comparison; a matched timing comparison remains necessary for any current
+frame-rate claim.
 
 ## Implemented behavior
 
-- The minimap renders local, human and bot pilots, retaining headings, faction
-  marks and the arena ring. It no longer visits satellite or pickup managers.
+- The minimap renders local, human and bot pilots with headings and faction marks,
+  plus compact live marks for asteroids, loot, hostile satellites, loose pickups,
+  and orbiting pickups. World marks follow their current positions and disappear
+  when the authoritative state removes them; pilots are drawn on top.
 - Diagnostic sessions can independently cap DPR at 2 or 1.5 and disable canvas
   glow. Default desktop and touch rendering stays native/full. Gameplay geometry,
   physics and the network world remain unchanged by these controls.
@@ -70,8 +76,9 @@ a matched timing comparison remains necessary for any frame-rate claim.
   Session comparisons ingest raw artifacts and retain their checksums.
 
 The [decision ledger](mobile-quality-decisions.md) records each candidate's visual
-tradeoff and removal comparison. The minimap simplification is a permanent product
-choice, separate from temporary graphics reductions.
+tradeoff and removal comparison. The historical minimap simplification remains in
+the ledger as a measured candidate; the current world-mark policy is separate from
+temporary graphics reductions.
 
 ## Verification receipts
 

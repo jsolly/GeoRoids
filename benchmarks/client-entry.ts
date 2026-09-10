@@ -455,7 +455,15 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         if (JSON.stringify(layout) !== JSON.stringify(expectedLayout)) {
           throw new Error('HUD ignored viewport or safe area');
         }
-        drawMiniMap(ctx, layout, local.ship);
+        drawMiniMap(
+          ctx,
+          layout,
+          local.ship,
+          belt.getRoids(),
+          LootField.getInstance().getAll(),
+          SatelliteManager.getInstance().getAll(),
+          SatellitePickupManager.getInstance().getAll()
+        );
         drawScoreOverlay(ctx, layout, canvas, local.score, local.lives, local.factionId);
         drawLivesIndicator(ctx, layout, local.lives, PALETTE.LOCAL, local.ship.kitId);
         drawTextOverlay(ctx, layout, canvas, 'Game Over: killed by Benchmark Rival', 1);

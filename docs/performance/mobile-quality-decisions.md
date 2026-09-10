@@ -70,14 +70,17 @@ supported cohorts. A faster new phone alone does not retire protection for an
 older phone that remains supported. Delete obsolete branches, migrate tests,
 update the Wiki and source review, and record the retirement evidence here.
 
-## Permanent minimap decision
+## Current minimap policy
 
-The minimap shows the local ship, other human pilots and bots. It retains the
-arena ring, headings and faction marks. Satellites, satellite pickups and
-orbiters, asteroids, loot and projectiles are absent from the minimap; their
-world rendering and gameplay remain intact.
+The minimap shows the local ship, other human pilots and bots, plus compact marks
+for live asteroids, loot drops, hostile satellites, loose satellite pickups, and
+orbiting pickups. Marks use current entity positions, skip dead or exploding
+objects, and disappear when authoritative state removes a collected or expired
+object. World marks are batched by category and pilots remain on top. This policy
+is part of the product HUD and is independent of the temporary DPR and glow
+experiments above.
 
-This is a requested product simplification, not a temporary quality degradation.
-Do not restore non-player minimap objects when graphics settings improve. Record
-its isolated comparison before using this revision as the common baseline for
-the resolution/glow experiments.
+The player-only minimap comparison in
+[minimap-work-results.md](minimap-work-results.md) is retained as historical
+evidence from an earlier candidate. Its lower work counts do not define the
+current product policy or establish a frame-rate improvement.

@@ -43,7 +43,7 @@ Do not run `vercel deploy` from `/ship` unless Git integration is broken.
 
 ## Project
 
-GeoAsteroids — a 2D multiplayer spaceship/asteroids game. Vite + TypeScript client (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `>=24`.
+GeoAsteroids — a 2D multiplayer spaceship/asteroids game. Vite + TypeScript client (`src/`) talking to a Node WebSocket server (`server.ts` + `server/`) over `ws://`. Play the client at <https://www.georoids.com>; the authoritative server runs on Railway (see Deploy). Node `^24.15.0`.
 
 ## Deploy
 
@@ -216,7 +216,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 - **Integration deadline:** `GEOROIDS_TEST_MAX_DURATION_SECONDS` defaults to 1200; a timeout exits 124 and stops owned processes.
 - **Integration tests:** always `./scripts/test-runner.sh`, never raw `npx vitest` on `tests/integration/`.
-- **Node:** `package.json` requires `>=24`; `.nvmrc` is `24`.
+- **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
 - **Playwright browsers** (browser E2E): `npx --no-install playwright install chromium`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.

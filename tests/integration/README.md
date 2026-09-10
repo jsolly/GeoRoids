@@ -40,7 +40,7 @@ is not an assertion that the scenario succeeded.
 
 ## Run tests
 
-Use Node 24 or newer and run commands from the GeoRoids checkout. Install the
+Use Node 24.15 or newer within major 24 and run commands from the GeoRoids checkout. Install the
 pinned Chromium browser once with `npx --no-install playwright install chromium`.
 
 ```sh

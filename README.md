@@ -6,7 +6,7 @@ The Vite + TypeScript client renders and predicts the local ship. A Node WebSock
 
 ## Local development
 
-Use Node 24 or newer. On macOS, the native `canvas` dependency requires Cairo, Pango, libjpeg, giflib and librsvg.
+Use Node 24.15 or newer within major 24 (`nvm use`). The jsdom test environment requires this patch-level floor. On macOS, the native `canvas` dependency requires Cairo, Pango, libjpeg, giflib and librsvg.
 
 ```sh
 git clone git@github.com:jsolly/GeoRoids.git

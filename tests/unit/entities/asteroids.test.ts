@@ -1,5 +1,10 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
+
+vi.mock('../../../src/constants', async (importOriginal) => {
+  const constants = await importOriginal<typeof import('../../../src/constants')>();
+  return { ...constants, DEBUG: { ...constants.DEBUG, ENABLED: false } };
+});
 
 test('a server-supplied asteroid advances by the elapsed client frames', () => {
   const belt = new RoidBelt();

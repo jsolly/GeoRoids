@@ -12,7 +12,7 @@ interface ObservedLaser {
   onCanvas: boolean;
 }
 
-/** Park each pilot before waiting through the next pilot's join countdown. */
+/** Initially park each pilot, then re-park all of them after every client joins. */
 export async function bootLaserClients(browserManager: BrowserManager, count: 2 | 3 = 2) {
   const pages: Page[] = [];
   const games: GameInteractions[] = [];
@@ -29,6 +29,7 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
   }
   await Promise.all(games.map((game) => game.waitForCombatReady()));
   await Promise.all(games.map((game) => game.waitForRemoteHumanPlayers(count - 1)));
+  await parkLaserClients(games);
   const [page1, page2, page3] = pages;
   const [game1, game2, game3] = games;
   if (!page1 || !page2 || !game1 || !game2) {
@@ -49,9 +50,15 @@ export async function parkLaserClient(game: GameInteractions, index = 0): Promis
   await game.placeShipAt(ROID.FIELD_RADIUS + 500, index * 100);
 }
 
+/** Re-establish every participant's clear firing lane after all clients join. */
+export async function parkLaserClients(games: readonly GameInteractions[]): Promise<void> {
+  await Promise.all(games.map((game, index) => parkLaserClient(game, index)));
+  await Promise.all(games.map((game) => game.waitForCombatReady()));
+}
+
 export async function localPlayerId(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const id = window.gameController?.getPlayerManager()?.getLocalPlayer()?.id;
+    const id = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.id;
     if (!id) {
       throw new Error('Local player has not joined');
     }
@@ -69,7 +76,7 @@ export async function observeLaser(
   const handle = await page.waitForFunction(
     ({ ownerId, remote, requireOnCanvas }) => {
       const gc = window.gameController;
-      const local = gc?.getPlayerManager()?.getLocalPlayer();
+      const local = gc?.getPlayerManager()?.getLocalPlayer?.();
       const owner = remote
         ? gc
             ?.getNetworkManager()
@@ -94,10 +101,9 @@ export async function observeLaser(
         return false;
       }
       // The playfield uses fixed zoom 1 and is centered on the viewer's ship.
-      const viewport = canvas.getBoundingClientRect();
       const onCanvas =
-        Math.abs(laser.position.x - local.ship.position.x) < viewport.width / 2 &&
-        Math.abs(laser.position.y - local.ship.position.y) < viewport.height / 2;
+        Math.abs(laser.position.x - local.ship.position.x) < canvas.width / 2 &&
+        Math.abs(laser.position.y - local.ship.position.y) < canvas.height / 2;
       if (requireOnCanvas && !onCanvas) {
         return false;
       }
@@ -114,7 +120,11 @@ export async function observeLaser(
     { timeout: 15000, polling: 'raf' }
   );
   try {
-    return (await handle.jsonValue()) as ObservedLaser;
+    const laser = await handle.jsonValue();
+    if (!laser) {
+      throw new Error('Laser observation missing');
+    }
+    return laser;
   } finally {
     await handle.dispose();
   }

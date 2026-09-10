@@ -124,7 +124,9 @@ export function sampleHeight(field: Heightfield, x: number, y: number): number {
   }
 
   const flatten = 1 - Math.exp(-r2 / (2 * TERRAIN.FLATTEN_SIGMA * TERRAIN.FLATTEN_SIGMA));
-  return h * flatten;
+  // Blend the outer ring to zero so finite differences never see a height cliff at the rim.
+  const rim = Math.min(1, Math.max(0, (radius - Math.sqrt(r2)) / TERRAIN.RIM_FADE_WIDTH));
+  return h * flatten * fade(rim);
 }
 
 export function sampleGradientInto(
@@ -133,6 +135,11 @@ export function sampleGradientInto(
   x: number,
   y: number
 ): { x: number; y: number } {
+  if (Math.hypot(x - field.cx, y - field.cy) >= field.radius) {
+    out.x = 0;
+    out.y = 0;
+    return out;
+  }
   const e = TERRAIN.GRADIENT_EPS;
   out.x = (sampleHeight(field, x + e, y) - sampleHeight(field, x - e, y)) / (2 * e);
   out.y = (sampleHeight(field, x, y + e) - sampleHeight(field, x, y - e)) / (2 * e);

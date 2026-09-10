@@ -1,5 +1,5 @@
-import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
-import type { WebSocket } from 'ws';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   KILL_SCORE,
   killScoreFor,
@@ -7,12 +7,12 @@ import {
 } from '../../../server/core/combatScoring';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 function firstBot(engine: GameEngine) {
   const bots = engine.createBots(1);
-  assert.exists(bots);
   const bot = bots?.[0];
-  assert.exists(bot);
+  assert.ok(bot);
   return bot;
 }
 
@@ -44,7 +44,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
   });
 
   test('handlePlayerDamage does not damage bots; handleBotDamage does not damage humans', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     const bot = firstBot(engine);
@@ -58,7 +58,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
   });
 
   test('destroying a human awards 200, spends a life, and schedules respawn', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.addPlayer('p2', 'Rival', ws, { x: 10, y: 10 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
@@ -71,7 +71,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
   });
 
   test('boundary / self kills do not award human kill points', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
@@ -80,7 +80,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
   });
 
   test('destroying a bot awards 50 and leaves bot lives unchanged', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     const bot = firstBot(engine);
     engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
@@ -94,7 +94,7 @@ describe('GameEngine player vs bot damage wrappers', () => {
   });
 
   test('ignored hits during respawn keep health and score unchanged', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.addPlayer('p2', 'Rival', ws, { x: 10, y: 10 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });

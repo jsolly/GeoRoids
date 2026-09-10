@@ -7,10 +7,18 @@
     ".railway/**/*.ts",
     "vitest.browser.config.ts",
     "scripts/**/*.ts",
-    "tests/integration/utils/reflection-observer.ts",
+    "src/wiki/main.ts",
+    "benchmarks/client.html",
+    "benchmarks/collision-experiment.ts",
+    "benchmarks/protocol-experiment.ts",
+    "benchmarks/realtime-server.ts",
+    "benchmarks/sample.ts",
+    "benchmarks/realtime-client.ts",
+    "benchmarks/load.ts",
     "tests/**/*.test.ts"
   ],
   "project": [
+    "benchmarks/**/*.ts",
     "middleware.ts",
     "src/**/*.{ts,tsx}",
     "server/**/*.ts",
@@ -25,5 +33,5 @@
   // These dependencies are executed by shell scripts, CI, or deployment
   // tooling; Knip cannot infer those non-TypeScript consumers.
   "ignoreBinaries": ["uvx"],
-  "ignoreDependencies": ["concurrently", "markdownlint-cli2"]
+  "ignoreDependencies": ["concurrently", "markdownlint-cli2", "jsonc-parser"]
 }

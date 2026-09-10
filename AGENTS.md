@@ -11,6 +11,12 @@ Verify the active branch immediately before committing and pushing. The
 `main` updates. Only an explicitly authorized emergency may set
 `GEOROIDS_BREAK_GLASS_PUSH=1`; routine `/ship` runs must use a feature branch.
 
+GitHub protects `main`, including administrators: changes require a PR, an
+up-to-date branch, and the GitHub Actions `ci` check. Force pushes and branch
+deletion are blocked. Human approval and conversation resolution are optional so
+CI-gated auto-merge can run unattended. The local break-glass variable does not
+override these GitHub protections.
+
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
 Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.
@@ -97,7 +103,19 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 
 ## CI (local pre-commit gate)
 
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+
+### Actions helper exception
+
+`scripts/check-actions.sh` intentionally differs from dotagents'
+`templates/github/check-actions.sh`. GeoRoids downloads official Actionlint
+v1.7.12 and ShellCheck v0.11.0 archives, verifies platform-specific SHA-256
+checksums before extraction, and uses 10-second connect / 120-second total
+download limits. The canonical helper instead obtains Actionlint through the
+`github-actionlint` npm package; GeoRoids no longer depends on that wrapper.
+Preserve this repo-local implementation and its verified archive cache. The
+fleet doctor's comparison warning calls for review, not a byte-for-byte copy.
+Run `npm run check:actions` when changing it.
 
 ## Commands
 
@@ -108,7 +126,7 @@ npm run dev:check          # status of dev servers
  npm run dev:kill           # stop only this checkout's owned dev session
 
 # Build / typecheck / lint
-npm run build              # tsc -p tsconfig.build.json && vite build
+npm run build              # wiki checks + tsc -p tsconfig.build.json + vite build
 npm run check:ts           # tsc --noEmit
 npm run check:lint         # biome check --error-on-warnings .
 npm run check:lint-policy  # reject inherited warn/info Biome severities
@@ -166,7 +184,7 @@ Debug behavior is **constants, not env vars**. To enable debug mode, edit `src/c
 1. `LOGGING.GLOBAL_LOG_LEVEL = 'debug'`
 2. `DEBUG.ENABLED = true`
 
-Notable flags under `DEBUG.*`: `LOCAL_PLAYER.INVINCIBLE`, `BOT_PLAYER.{COUNT,MOVEMENT,LASERS,SPAWN_PROTECTION}`, `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_BOT}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
+Notable flags under `DEBUG.*`: `BOT_PLAYER.{COUNT,MOVEMENT,LASERS,SPAWN_PROTECTION}`, `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_BOT}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
 
 - `logs/client.log` — client-side (forwarded over WS)
 - `logs/server.log` — server-side
@@ -183,6 +201,8 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 Integration tests start their own dev servers through `scripts/test-runner.sh` on unused configured ports. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
 
 ## Project conventions
+
+- **Keep the Wiki current when features change.** When adding, changing, or removing a feature, review the in-game Wiki at `/wiki/` and update affected controls, behavior, setup, and troubleshooting pages in the same work. Follow [manual maintenance](docs/wiki-maintenance.md), including its source-review gate. Remove obsolete instructions and verify links. If no Wiki page is affected, record that explicitly in the change verification.
 
 - **No barrel files / re-exports** — import from the defining module.
 - **Relative paths only** — no `@`-style aliases.

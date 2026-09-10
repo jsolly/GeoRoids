@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import type { WebSocket } from 'ws';
 import { isStaleDeathPose } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
@@ -19,6 +18,7 @@ import {
   shouldDrawShipHull,
 } from '../../../src/entities/ship/shipUtils';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import { RecordingSocket } from '../../support/recordingSocket';
 import { SHIP_KINDS } from '../scenarios/support/shipKinds';
 
 describe('client explode ticks follow the 60 Hz clock', () => {
@@ -113,6 +113,21 @@ describe('shared ship collision immunity', () => {
     expect(isShipCollisionImmune({ exploding: false, health: 0, blinkCount: 0 })).toBe(true);
     expect(isShipCollisionImmune({ exploding: false, health: 100, blinkCount: 3 })).toBe(true);
     expect(isShipCollisionImmune({ exploding: false, health: 100, blinkCount: 0 })).toBe(false);
+  });
+
+  test('a local pilot starts protected while a remote hull waits for server protection', () => {
+    const local = new Ship({ isLocalPlayer: true });
+    const remote = new Ship();
+
+    expect(local.blinkCount).toBe(
+      Math.ceil(SHIP.INVINCIBILITY_DURATION_FRAMES / SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES)
+    );
+    expect(local.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_BLINK_DURATION_FRAMES);
+    expect(local.blinkOn).toBe(true);
+    expect(isShipCollisionImmune(local)).toBe(true);
+    expect(remote.blinkCount).toBe(0);
+    expect(remote.spawnProtectionTimer).toBe(0);
+    expect(isShipCollisionImmune(remote)).toBe(false);
   });
 
   test('applyShipSpawnProtection arms the same blink window for any ship', () => {
@@ -331,7 +346,7 @@ describe('server ship respawn lifecycle', () => {
   });
 
   test('human explosion end does not reset an already-scheduled respawn timer', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 
@@ -353,7 +368,7 @@ describe('server ship respawn lifecycle', () => {
   });
 
   test('wall kill respawns as soon as the explode window ends — no corpse freeze', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'boundary', player.health);
@@ -370,7 +385,7 @@ describe('server ship respawn lifecycle', () => {
   });
 
   test('respawn grants a full protection window and holds an anchor', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 3100, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.handlePlayerDamage('p1', 'asteroid', player.health);
@@ -391,7 +406,7 @@ describe('server ship respawn lifecycle', () => {
 
   test('gameTime keeps advancing after the last player leaves', async () => {
     engine.startGameLoop();
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws);
     await new Promise((resolve) => setTimeout(resolve, 40));
     const beforeLeave = engine.getDiagnostics().gameTime;

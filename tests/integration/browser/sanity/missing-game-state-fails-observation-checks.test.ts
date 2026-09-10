@@ -43,6 +43,6 @@ test('an unavailable game cannot look healthy, empty, or successfully arranged',
   }
 
   await expect(game.waitForNetworkAsteroids(1, 50)).rejects.toThrow(
-    'Timed out waiting for 1 synced asteroid(s): client=unavailable'
+    'gameController is not available'
   );
 });

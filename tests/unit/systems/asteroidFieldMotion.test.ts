@@ -1,4 +1,5 @@
-import { afterEach, assert, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { afterEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
@@ -23,7 +24,7 @@ describe('authoritative asteroid motion', () => {
     const manager = new AsteroidManager(new RNGService(1));
     manager.createAsteroids(3);
     const asteroid = manager.getAllAsteroids()[0];
-    assert.exists(asteroid);
+    assert.ok(asteroid);
     const id = asteroid.id;
 
     manager.updateAsteroid(id, {
@@ -46,7 +47,7 @@ describe('authoritative asteroid motion', () => {
     engine.createAsteroids(5);
 
     const tracked = engine.getAllAsteroids()[0];
-    assert.exists(tracked);
+    assert.ok(tracked);
     engine.updateAsteroid(tracked.id, {
       position: { x: 0, y: 0 },
       velocity: { x: 2, y: 0 },
@@ -55,7 +56,7 @@ describe('authoritative asteroid motion', () => {
     await new Promise((resolve) => setTimeout(resolve, 120));
 
     const after = engine.getAsteroid(tracked.id);
-    assert.exists(after);
+    assert.ok(after);
     expect(after.position.x).toBeGreaterThan(2);
   });
 
@@ -71,14 +72,14 @@ describe('authoritative asteroid motion', () => {
     const manager = new AsteroidManager(new RNGService(1));
     manager.createAsteroids(1);
     const asteroid = manager.getAllAsteroids()[0];
-    assert.exists(asteroid);
+    assert.ok(asteroid);
     manager.updateAsteroid(asteroid.id, {
       position: { x: 12000, y: 0 },
       velocity: { x: 2, y: 0 },
     });
     manager.updateMotion();
     const after = manager.getAsteroid(asteroid.id);
-    assert.exists(after);
+    assert.ok(after);
     const fieldRadius = getAsteroidFieldRadius();
     expect(Math.hypot(after.position.x, after.position.y)).toBeLessThanOrEqual(fieldRadius);
     expect(after.position.x).toBeGreaterThan(0);

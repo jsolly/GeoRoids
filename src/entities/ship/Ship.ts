@@ -3,7 +3,7 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
-import { createFuelTank, trySpendEmpFuel } from '../../../shared/fuel';
+import { createFuelTank } from '../../../shared/fuel';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
   AsteroidMotionState,
@@ -15,7 +15,7 @@ import type {
 import { playExplosionSound } from '../../audio/explosionSound';
 import { getThrustSound } from '../../audio/gameSounds';
 import type { Sound } from '../../audio/Sound';
-import { DAMAGE, EMP, FUEL, GAME, PALETTE, SHIP } from '../../constants';
+import { DAMAGE, FUEL, GAME, PALETTE, SHIP } from '../../constants';
 import { NetworkManager } from '../../network/networkManager';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { isGenericDeathCause } from '../../utils/deathCause';
@@ -70,8 +70,6 @@ class Ship {
   explodeTime = 0;
   angularVelocity = 0;
   thrusting = false;
-  empPulseActive = false;
-  empPulseTime = 0;
   shieldActive = false;
   shieldTime = 0;
   shieldCooldown = 0;
@@ -188,6 +186,8 @@ class Ship {
 
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
+    this.thrusting = false;
+    this.angularVelocity = 0;
     clearShield(this);
     playExplosionSound(this.position);
 
@@ -333,40 +333,6 @@ class Ship {
       }
     } else {
       logger.debug('SHIP', 'Bot ship, not sending shoot event');
-    }
-  }
-
-  empPulse(): boolean {
-    if (this.exploding || this.empPulseActive) {
-      return false;
-    }
-    if (!trySpendEmpFuel(this)) {
-      return false;
-    }
-    this.lastLocalFuelWriteMs = Date.now();
-
-    this.empPulseActive = true;
-    this.empPulseTime = Math.ceil(EMP.DURATION * GAME.FPS);
-    playExplosionSound(this.position);
-
-    const empEvent = new CustomEvent('empPulse', {
-      detail: {
-        shipPosition: this.position,
-        shipRadius: this.r,
-      },
-    });
-
-    window.dispatchEvent(empEvent);
-    return true;
-  }
-
-  updateEmpPulse(): void {
-    if (this.empPulseActive) {
-      this.empPulseTime--;
-      if (this.empPulseTime <= 0) {
-        this.empPulseActive = false;
-        this.empPulseTime = 0;
-      }
     }
   }
 
@@ -589,7 +555,6 @@ class Ship {
     if (!this.serverOwnsMotion) {
       this.updateMovement();
     }
-    this.updateEmpPulse();
     updateShield(this);
     this.updateShootCooldown();
     this.moveLasers();

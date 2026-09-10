@@ -1,19 +1,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { BrowserManager } from './browser-manager';
-import { HealthChecker } from './health-checker';
+import { checkAllServers } from './health-checker';
 import { ScreenshotManager } from './screenshot-manager';
-import { TestServerControl } from './test-server-control';
+import { resetWorld, waitForWorldReset } from './test-server-control';
 
 /** Shared browser lifecycle hooks for scenario integration tests. */
-export function createBrowserScenarioHooks(): {
+export function createBrowserScenarioHooks(testDir?: string): {
   browserManager: BrowserManager;
   screenshotManager: ScreenshotManager;
 } {
   const browserManager = new BrowserManager();
-  const screenshotManager = new ScreenshotManager();
+  const screenshotManager = new ScreenshotManager(testDir);
 
   beforeAll(async () => {
-    await HealthChecker.checkAllServers();
+    await checkAllServers();
     screenshotManager.ensureScreenshotsDirectory();
     await browserManager.initialize();
   });
@@ -23,13 +23,13 @@ export function createBrowserScenarioHooks(): {
   });
 
   beforeEach(async () => {
-    await TestServerControl.resetWorld();
+    await resetWorld();
     await browserManager.createPage();
   });
 
   afterEach(async () => {
     await browserManager.closeAllPages();
-    await TestServerControl.waitForWorldReset();
+    await waitForWorldReset();
   });
 
   return { browserManager, screenshotManager };

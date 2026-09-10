@@ -1,4 +1,5 @@
-import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE } from '../../../../src/constants';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
@@ -21,7 +22,7 @@ describe('Two pilots chip the same collab asteroid', () => {
 
   test('each laser subtracts from the shared rock and it stays up', () => {
     const [roid] = world.engine.createAsteroids(1);
-    assert.exists(roid);
+    assert.ok(roid);
     expect(roid.isCollabTarget).toBe(true);
     const startHealth = roid.health;
     expect(startHealth).toBe(100);

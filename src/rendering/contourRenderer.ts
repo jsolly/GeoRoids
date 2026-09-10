@@ -3,7 +3,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvas';
-import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
+import { drawContourLabels } from './contourLabels';
 
 /**
  * Muted topo lines in world space. Tight spacing is steep; keep alpha low so
@@ -22,8 +22,8 @@ export function drawIsoContours(shipPosition: Position): void {
   }
 
   const pad = 32;
+  const scale = canvasManager.getPlayfieldScale();
   const viewport = canvasManager.getViewportSize();
-  const scale = PLAYFIELD_CLOSE_SCALE;
   const centerX = viewport.width / 2;
   const centerY = viewport.height / 2;
   ctx.save();
@@ -60,5 +60,14 @@ export function drawIsoContours(shipPosition: Position): void {
     ctx.stroke();
   }
 
+  drawContourLabels(ctx, levels, {
+    width: viewport.width,
+    height: viewport.height,
+    x: shipPosition.x,
+    y: shipPosition.y,
+    scale,
+    alpha: VISUAL.CONTOUR_LABEL_ALPHA,
+    spacing: VISUAL.CONTOUR_LABEL_SPACING,
+  });
   ctx.restore();
 }

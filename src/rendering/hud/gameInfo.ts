@@ -9,10 +9,11 @@ import { hexToRgba } from '../../utils/colorUtils';
 import type { PlayfieldSize } from '../playfieldCamera';
 import { layoutHudCluster } from './cluster';
 import { drawFuelGauge } from './fuel';
-import { hudLayoutForCanvas, scaleHudFont } from './hudLayout';
+import { type HudLayout, scaleHudFont } from './hudLayout';
 
 export function drawScoreOverlay(
   ctx: CanvasRenderingContext2D,
+  layout: HudLayout,
   viewport: PlayfieldSize,
   score: number,
   lives: number,
@@ -20,7 +21,7 @@ export function drawScoreOverlay(
 ): void {
   ctx.save();
   ctx.fillStyle = PALETTE.HUD;
-  const layout = hudLayoutForCanvas(viewport);
+  const viewportWidth = viewport.width;
   ctx.font = scaleHudFont(VISUAL.SCORE_FONT, layout.hudTypeScale);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -60,7 +61,7 @@ export function drawScoreOverlay(
     ctx.font = scaleHudFont('bold 14px Arial', layout.hudTypeScale);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(gameStateManager.getKillMessage(), viewport.width / 2, layout.killMessageY);
+    ctx.fillText(gameStateManager.getKillMessage(), viewportWidth / 2, layout.killMessageY);
   }
   if (gameStateManager.hasPickupMessage()) {
     ctx.fillStyle = PALETTE.SATELLITE_PICKUP;
@@ -70,7 +71,7 @@ export function drawScoreOverlay(
     const pickupY = gameStateManager.hasKillMessage()
       ? layout.killMessageY + 18
       : layout.killMessageY;
-    ctx.fillText(gameStateManager.getPickupMessage(), viewport.width / 2, pickupY);
+    ctx.fillText(gameStateManager.getPickupMessage(), viewportWidth / 2, pickupY);
   }
 
   ctx.restore();
@@ -117,6 +118,7 @@ function drawMultiLineText(
 
 export function drawTextOverlay(
   ctx: CanvasRenderingContext2D,
+  layout: HudLayout,
   viewport: PlayfieldSize,
   text: string,
   alpha: number
@@ -125,13 +127,15 @@ export function drawTextOverlay(
 
   const isDeathMessage = text.toLowerCase().includes('killed by');
   const isGameOver = text.toLowerCase().includes('game over');
-  const centerX = viewport.width / 2;
-  const centerY = viewport.height / 2;
-  const scale = hudLayoutForCanvas(viewport).overlayFontScale;
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
+  const centerX = viewportWidth / 2;
+  const centerY = viewportHeight / 2;
+  const scale = layout.overlayFontScale;
 
   if (isGameOver) {
     ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.8);
-    ctx.fillRect(0, 0, viewport.width, viewport.height);
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
     ctx.fillStyle = hexToRgba(PALETTE.DANGER, alpha);
     ctx.font = `bold ${Math.round(48 * scale)}px Arial`;
@@ -146,7 +150,7 @@ export function drawTextOverlay(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      const maxWidth = viewport.width * 0.8;
+      const maxWidth = viewportWidth * 0.8;
       drawMultiLineText(
         ctx,
         deathCause,
@@ -163,14 +167,14 @@ export function drawTextOverlay(
     ctx.fillText('Returning to main menu...', centerX, centerY + 120 * scale);
   } else if (isDeathMessage) {
     ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.7);
-    ctx.fillRect(0, 0, viewport.width, viewport.height);
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD, alpha);
     ctx.font = `bold ${Math.round(28 * scale)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const maxWidth = viewport.width * 0.8;
+    const maxWidth = viewportWidth * 0.8;
     drawMultiLineText(ctx, text, centerX, centerY, maxWidth, 36 * scale, alpha);
   } else {
     ctx.fillStyle = hexToRgba(PALETTE.HUD, alpha);
@@ -178,12 +182,12 @@ export function drawTextOverlay(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const maxWidth = viewport.width * 0.8;
+    const maxWidth = viewportWidth * 0.8;
     drawMultiLineText(
       ctx,
       text,
-      viewport.width / 2,
-      viewport.height / 2,
+      viewportWidth / 2,
+      viewportHeight / 2,
       maxWidth,
       40 * scale,
       alpha

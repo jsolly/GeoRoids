@@ -29,7 +29,7 @@ async function waitFor<T>(read: () => T | undefined, label: string, timeout = 50
     if (value !== undefined) {
       return value;
     }
-    if (child && child.exitCode !== null) {
+    if (child && (child.exitCode !== null || child.signalCode !== null)) {
       throw new Error(`Production entry exited: ${output}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -134,7 +134,7 @@ class Pilot {
     return data;
   }
   async state(): Promise<ServerGameSnapshot> {
-    const pong = once(this.ws, 'pong');
+    const pong = once(this.ws, 'pong', { signal: AbortSignal.timeout(5000) });
     this.ws.ping();
     await pong;
     const after = this.states.length;
@@ -147,12 +147,12 @@ class Pilot {
 
 async function pilot(port: number): Promise<Pilot> {
   const client = new Pilot(connect(port, '/ws?other=kept&asteroidInteractions=1'));
-  await once(client.ws, 'open');
+  await once(client.ws, 'open', { signal: AbortSignal.timeout(5000) });
   return client;
 }
 
 async function disconnect(ws: WebSocket): Promise<void> {
-  const closed = once(ws, 'close');
+  const closed = once(ws, 'close', { signal: AbortSignal.timeout(5000) });
   ws.close();
   await closed;
 }
@@ -165,10 +165,10 @@ afterEach(async () => {
   }
   const processToStop = child;
   child = undefined;
-  if (!processToStop || processToStop.exitCode !== null) {
+  if (!processToStop || processToStop.exitCode !== null || processToStop.signalCode !== null) {
     return;
   }
-  const exited = once(processToStop, 'exit');
+  const exited = once(processToStop, 'exit', { signal: AbortSignal.timeout(6000) });
   processToStop.kill('SIGTERM');
   const force = setTimeout(() => processToStop.kill('SIGKILL'), 3000);
   try {
@@ -181,15 +181,24 @@ afterEach(async () => {
 test('the actual production entry gates stale upgrades, keeps HTTP/logs, and resumes enhanced pilots through transport grace', async () => {
   const port = await start(true);
   const base = `http://127.0.0.1:${port}`;
-  const health = await fetch(`${base}/health`);
+  const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
   expect(health.status).toBe(200);
   expect(health.headers.get('x-release-id')).toBeTruthy();
   expect(await health.json()).toHaveProperty('status', 'healthy');
-  const status = await fetch(`${base}/status`, { headers: { Accept: 'application/json' } });
+  const status = await fetch(`${base}/status`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(5000),
+  });
   expect(await status.json()).toHaveProperty('server.nodeEnv', 'production');
-  expect(await (await fetch(`${base}/status`)).text()).toContain('connectGame()');
-  expect(await (await fetch(base)).text()).toContain('GeoRoids Game Server');
-  expect((await fetch(base, { method: 'OPTIONS' })).status).toBe(200);
+  expect(
+    await (await fetch(`${base}/status`, { signal: AbortSignal.timeout(5000) })).text()
+  ).toContain('connectGame()');
+  expect(await (await fetch(base, { signal: AbortSignal.timeout(5000) })).text()).toContain(
+    'GeoRoids Game Server'
+  );
+  expect((await fetch(base, { method: 'OPTIONS', signal: AbortSignal.timeout(5000) })).status).toBe(
+    200
+  );
 
   for (const path of ['/ws', '/ws?asteroidInteractions=0']) {
     const stale = connect(port, path);
@@ -197,11 +206,11 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
     stale.on('open', () => {
       opened = true;
     });
-    await expect(once(stale, 'open')).rejects.toThrow('426');
+    await expect(once(stale, 'open', { signal: AbortSignal.timeout(5000) })).rejects.toThrow('426');
     expect(opened).toBe(false);
   }
   const logs = connect(port, '/logs?source=entry-test');
-  await once(logs, 'open');
+  await once(logs, 'open', { signal: AbortSignal.timeout(5000) });
   expect(logs.readyState).toBe(WebSocket.OPEN);
 
   const observer = await pilot(port);
@@ -263,7 +272,7 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
 test('the actual support entry admits ordinary clients before the cutover flag is enabled', async () => {
   const port = await start(false);
   const ordinary = new Pilot(connect(port, '/ws'));
-  await once(ordinary.ws, 'open');
+  await once(ordinary.ws, 'open', { signal: AbortSignal.timeout(5000) });
   ordinary.send('join', { id: 'legacy-entry', name: 'Legacy entry' });
   const joined = await waitFor(
     () => ordinary.packets.find((packet) => packet.type === 'joined')?.data,
@@ -280,7 +289,7 @@ test('the actual support entry admits ordinary clients before the cutover flag i
 test('the production entry completes SIGTERM shutdown and exits successfully', async () => {
   const port = await start(true);
   const client = connect(port, '/logs');
-  await once(client, 'open');
+  await once(client, 'open', { signal: AbortSignal.timeout(5000) });
   if (!child) {
     throw new Error('Production child missing');
   }
@@ -295,7 +304,7 @@ test('the production entry completes SIGTERM shutdown and exits successfully', a
 test('an occupied production listener fails promptly with a nonzero exit and the cause', async () => {
   const occupied = createServer();
   occupied.listen(0);
-  await once(occupied, 'listening');
+  await once(occupied, 'listening', { signal: AbortSignal.timeout(5000) });
   try {
     const address = occupied.address();
     if (!address || typeof address === 'string') {

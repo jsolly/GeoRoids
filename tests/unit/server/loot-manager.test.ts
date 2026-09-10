@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
+import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { GROWTH } from '../../../shared/shipGrowth';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('LootManager destroy-drop shards', () => {
   test('spawnShard drops a shard at the break site', () => {
@@ -19,17 +21,19 @@ describe('LootManager destroy-drop shards', () => {
 
   test('kill pellets stay wreckage and share the same field', () => {
     const manager = new LootManager(new RNGService(7));
-    const entity = {
-      position: { x: 0, y: 0 },
-      mass: GROWTH.BASE_MASS,
-    };
-    const pellets = manager.spawnFromKill(entity, 1);
-    expect(pellets.length).toBeGreaterThan(0);
-    expect(pellets.every((drop) => drop.kind === 'wreckage')).toBe(true);
+    const engine = new GameEngine(7);
+    try {
+      const entity = engine.addPlayer('kill-pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
+      const pellets = manager.spawnFromKill(entity, 1);
+      expect(pellets.length).toBeGreaterThan(0);
+      expect(pellets.every((drop) => drop.kind === 'wreckage')).toBe(true);
 
-    manager.spawnShard({ x: 8, y: 8 }, 2);
-    expect(manager.getAll().some((drop) => drop.kind === 'shard')).toBe(true);
-    expect(manager.getAll().some((drop) => drop.kind === 'wreckage')).toBe(true);
+      manager.spawnShard({ x: 8, y: 8 }, 2);
+      expect(manager.getAll().some((drop) => drop.kind === 'shard')).toBe(true);
+      expect(manager.getAll().some((drop) => drop.kind === 'wreckage')).toBe(true);
+    } finally {
+      engine.stopGameLoop();
+    }
   });
 
   test('remove is first-wins', () => {

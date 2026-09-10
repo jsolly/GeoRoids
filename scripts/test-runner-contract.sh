@@ -14,12 +14,6 @@ MOCK_TEST_PID_FILE="$TEMP_DIR/mock-test.pid"
 MOCK_DEV_CHILD_PID_FILE="$TEMP_DIR/mock-dev-child.pid"
 MOCK_TEST_CHILD_PID_FILE="$TEMP_DIR/mock-test-child.pid"
 MOCK_FAILURE_MARKER_FILE="$TEMP_DIR/process-tree-failure-seen"
-GIT_COMMON_DIR="$(git -C "$ROOT" rev-parse --git-common-dir)"
-case "$GIT_COMMON_DIR" in
-    /*) ;;
-    *) GIT_COMMON_DIR="$ROOT/$GIT_COMMON_DIR" ;;
-esac
-LOCK_DIR="$GIT_COMMON_DIR/georoids-test-runner.lock"
 REAL_RMDIR="$(command -v rmdir)"
 REAL_PGREP="$(command -v pgrep)"
 
@@ -48,6 +42,26 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+# Exercise the real runner in an owned repository. Contract checks must never
+# acquire, remove, or assert on another checkout's integration-runner lock.
+CONTRACT_ROOT="$TEMP_DIR/repository"
+GIT_LOCAL_ENV_VARS="$(git -C "$ROOT" rev-parse --local-env-vars)"
+while IFS= read -r git_variable; do
+    unset "$git_variable"
+done <<< "$GIT_LOCAL_ENV_VARS"
+mkdir -p "$CONTRACT_ROOT/scripts"
+cp "$ROOT/scripts/process-tree.sh" "$CONTRACT_ROOT/scripts/process-tree.sh"
+cp "$ROOT/.env.example" "$CONTRACT_ROOT/.env.example"
+git -C "$CONTRACT_ROOT" init -q
+cd "$CONTRACT_ROOT"
+CONTRACT_ROOT="$(git rev-parse --show-toplevel)"
+CONTRACT_GIT_DIR="$(git rev-parse --git-common-dir)"
+case "$CONTRACT_GIT_DIR" in
+    /*) ;;
+    *) CONTRACT_GIT_DIR="$CONTRACT_ROOT/$CONTRACT_GIT_DIR" ;;
+esac
+LOCK_DIR="$CONTRACT_GIT_DIR/georoids-test-runner.lock"
 
 fail() {
     echo "❌ $*" >&2
@@ -204,7 +218,8 @@ case " $* " in
             wait $! || true
         done
         ;;
-    *" vitest run "*)
+    *" vitest run "*|*" tsx benchmarks/realtime-client.ts "*|*" tsx benchmarks/load.ts "*)
+        printf '%s\n' "$*" > "$GEOROIDS_CONTRACT_TEST_PID_FILE.command"
         printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_TEST_PID_FILE"
         if [ "$GEOROIDS_CONTRACT_MODE" = timeout ]; then
             trap '' TERM
@@ -226,7 +241,13 @@ echo "unexpected mock package-runner invocation: $*" >&2
 esac
 EOF
 
-cat > "$MOCK_BIN/ps" <<'EOF'
+    cat > "$MOCK_BIN/npm" <<'EOF'
+#!/usr/bin/env bash
+[ "$*" = "run build" ] || exit 70
+printf '%s\n' "$VITE_WEBSOCKET_URL" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.build"
+EOF
+
+    cat > "$MOCK_BIN/ps" <<'EOF'
 #!/usr/bin/env bash
 if [ "$GEOROIDS_CONTRACT_MODE" = process-tree-ps-status-one ] && [ ! -e "$GEOROIDS_CONTRACT_FAILURE_MARKER" ]; then
     : > "$GEOROIDS_CONTRACT_FAILURE_MARKER"
@@ -283,7 +304,7 @@ fi
 exec "$GEOROIDS_CONTRACT_REAL_RMDIR" "$@"
 EOF
 
-    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir"
+    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir" "$MOCK_BIN/npm"
 }
 
 run_mock_runner() {
@@ -420,6 +441,32 @@ assert_cleanup_failure_preserves_test_failure() {
     assert_lock_released
 }
 
+assert_live_benchmark_mode() {
+    local mode="$1"
+    local entry="$2"
+    local output_file="$TEMP_DIR/$mode.txt"
+    if ! run_mock_runner success 10 "$output_file" "--$mode" --seconds 1; then
+        cat "$output_file" >&2
+        fail "$mode failed"
+    fi
+    grep -Fxq -- "--no-install tsx benchmarks/$entry.ts --seconds 1" "$MOCK_TEST_PID_FILE.command" || fail "$mode selected wrong entry point"
+    grep -Fxq 'ws://localhost:59994/ws' "$MOCK_DEV_PID_FILE.build" || fail "$mode did not build for its owned server"
+    assert_pid_stopped "$MOCK_TEST_PID_FILE" "$mode driver"
+    assert_pid_stopped "$MOCK_DEV_PID_FILE" "$mode server"
+    assert_lock_released
+}
+
+assert_invalid_build_rejected() {
+    local exit_code
+    if GEOROIDS_TEST_BUILD=invalid "$RUNNER" > "$TEMP_DIR/invalid-build.txt" 2>&1; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 64 ] || fail "invalid build mode was not rejected"
+    assert_lock_released
+}
+
 assert_port_inspection_failure_is_not_success() {
     local mode="$1"
     local expected_exit="$2"
@@ -516,6 +563,7 @@ assert_rejected "no-file-parallelism" --no-file-parallelism
 assert_rejected "sequence" --sequence.concurrent=true
 assert_rejected "sequence-shuffle" --sequence.shuffle=true
 assert_invalid_duration_rejected
+assert_invalid_build_rejected
 assert_occupied_port_rejected
 setup_mock_tools
 assert_port_inspection_failure_is_not_success \
@@ -532,6 +580,8 @@ assert_vitest_config "server-only" vitest.config.ts tests/integration/server/
 assert_vitest_config "entities-only" vitest.config.ts tests/integration/entities/
 assert_vitest_config "server-and-entities" vitest.config.ts \
     tests/integration/server/ tests/integration/entities/
+assert_live_benchmark_mode benchmark-client realtime-client
+assert_live_benchmark_mode benchmark-load load
 assert_test_timeout_cleans_owned_processes
 assert_cleanup_failure_is_not_success
 assert_cleanup_failure_preserves_test_failure

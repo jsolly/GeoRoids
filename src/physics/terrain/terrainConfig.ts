@@ -5,11 +5,11 @@
 export const TERRAIN = {
   DEFAULT_SEED: 0x7ec01d,
   /** Height samples across the arena diameter for marching squares. */
-  GRID_SIZE: 56,
+  GRID_SIZE: 224,
   /** Evenly spaced iso levels (tight lines = steep). */
-  LEVELS: 9,
-  /** World units per noise cell — a few broad hills across the 3100r arena. */
-  FEATURE_SCALE: 1400,
+  LEVELS: 18,
+  /** World units per noise cell — varied hills within the close gameplay view. */
+  FEATURE_SCALE: 650,
   OCTAVES: 4,
   LACUNARITY: 2,
   PERSISTENCE: 0.48,
@@ -21,7 +21,9 @@ export const TERRAIN = {
   LANDMARK_SIGMA_MIN: 220,
   LANDMARK_SIGMA_MAX: 500,
   /** Fade height to a flat saddle at the origin so spawn stays stable. */
-  FLATTEN_SIGMA: 260,
+  FLATTEN_SIGMA: 140,
+  /** Smoothly meet the flat exterior instead of introducing a rim cliff. */
+  RIM_FADE_WIDTH: 260,
   /**
    * Downslope acceleration in the same units as SHIP.THRUST (px/s² as applied
    * via `/ FPS` each tick). About half of thrust so ships can still climb.

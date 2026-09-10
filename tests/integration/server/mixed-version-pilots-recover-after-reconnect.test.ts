@@ -1,45 +1,28 @@
-import { afterEach, assert, expect, test } from 'vitest';
+import { strict as assert } from 'node:assert';
+import { once } from 'node:events';
+import { afterEach, expect, test, vi } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { captureSnapshot, SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID, SATELLITE } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
 
-type ReceivedMessage = Record<string, unknown> & { type: string; data?: unknown };
-
-interface PilotResult<TState> {
-  socket: WebSocket;
-  messages: ReceivedMessage[];
-  errors: unknown[];
-  state: () => TState | undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isReceivedMessage(value: unknown): value is ReceivedMessage {
-  return isRecord(value) && typeof value['type'] === 'string';
-}
-
-function parseReceivedMessage(raw: WebSocket.RawData): ReceivedMessage {
-  const parsed: unknown = JSON.parse(raw.toString());
-  if (!isReceivedMessage(parsed)) {
-    throw new Error('Server message is missing its type');
-  }
-  return parsed;
-}
-
 let cleanup: (() => Promise<void>) | undefined;
 afterEach(async () => {
-  await cleanup?.();
-  cleanup = undefined;
+  try {
+    await cleanup?.();
+  } finally {
+    cleanup = undefined;
+    vi.restoreAllMocks();
+  }
 });
 
 test('real legacy and negotiated sockets render matching worlds across late join and reconnect', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  const failures: unknown[] = [];
   const engine = new GameEngine(731);
   const broadcaster = new GameStateBroadcaster(engine);
   const handler = new MessageHandler(engine, broadcaster);
@@ -57,11 +40,17 @@ test('real legacy and negotiated sockets render matching worlds across late join
     await new Promise<void>((resolve, reject) =>
       wss.close((error) => (error ? reject(error) : resolve()))
     );
+    expect(failures).toEqual([]);
   };
   wss.on('connection', (socket) => {
+    socket.on('error', (error) => failures.push(error));
     socket.on('message', (text) => {
-      const message: unknown = JSON.parse(text.toString());
-      handler.handleMessage(message, socket);
+      try {
+        const message: unknown = JSON.parse(text.toString());
+        handler.handleMessage(message, socket);
+      } catch (error) {
+        failures.push(error);
+      }
     });
     socket.on('close', () => {
       const player = engine.getPlayerBySocket(socket);
@@ -70,44 +59,39 @@ test('real legacy and negotiated sockets render matching worlds across late join
       }
     });
   });
-  await new Promise<void>((resolve) => wss.on('listening', resolve));
+  await once(wss, 'listening', { signal: AbortSignal.timeout(2_000) });
   const address = wss.address();
   if (!address || typeof address === 'string') {
     throw new Error('No test port');
   }
   const port = address.port;
-
-  async function pilot(id: string, negotiate: true): Promise<PilotResult<ServerGameSnapshot>>;
-  async function pilot(id: string, negotiate: false): Promise<PilotResult<unknown>>;
-  async function pilot(
-    id: string,
-    negotiate: boolean
-  ): Promise<PilotResult<ServerGameSnapshot> | PilotResult<unknown>> {
+  async function pilot(id: string, negotiate: boolean) {
     const socket = new WebSocket(`ws://127.0.0.1:${port}`);
     clients.push(socket);
     const decoder = new SnapshotDecoder();
-    const messages: ReceivedMessage[] = [];
-    let modernState: ServerGameSnapshot | undefined;
-    let legacyState: unknown;
-    const errors: unknown[] = [];
+    const messages: Array<{ type: string; data: unknown }> = [];
+    let state: unknown;
+    let snapshot: ServerGameSnapshot | undefined;
+    socket.on('error', (error) => failures.push(error));
     socket.on('message', (text) => {
       try {
-        const message = parseReceivedMessage(text);
+        const raw: unknown = JSON.parse(text.toString());
+        assert.ok(raw && typeof raw === 'object' && 'type' in raw && typeof raw.type === 'string');
+        assert.ok('data' in raw, 'Expected server message data');
+        const message = { type: raw.type, data: raw.data };
         messages.push(message);
         if (message.type === 'snapshot') {
-          modernState = decoder.decode(message.data);
+          snapshot = decoder.decode(message.data);
+          state = snapshot;
         }
         if (message.type === 'gameState') {
-          legacyState = message.data;
+          state = message.data;
         }
       } catch (error) {
-        errors.push(error);
+        failures.push(error);
       }
     });
-    await new Promise<void>((resolve, reject) => {
-      socket.once('open', resolve);
-      socket.once('error', reject);
-    });
+    await once(socket, 'open', { signal: AbortSignal.timeout(2_000) });
     socket.send(
       JSON.stringify({
         type: 'join',
@@ -119,31 +103,26 @@ test('real legacy and negotiated sockets render matching worlds across late join
         },
       })
     );
-    if (negotiate) {
-      await expect.poll(() => modernState).toBeDefined();
-      return { socket, messages, errors, state: () => modernState };
-    }
-    await expect.poll(() => legacyState).toBeDefined();
-    return { socket, messages, errors, state: () => legacyState };
+    await expect.poll(() => state).toBeDefined();
+    return { socket, messages, state: () => state, snapshot: () => snapshot };
   }
-
   const old = await pilot('legacy', false);
   const modern = await pilot('new', true);
   // Seed a real active shot and a normal large ice rock's cooperative window.
   // These must survive reconnect even when the one-shot event was missed.
   const satellite = engine.getAllSatellites()[0];
-  assert.exists(satellite);
   const legacyPlayer = engine.getPlayer('legacy');
-  assert.exists(legacyPlayer);
+  const modernPlayer = engine.getPlayer('new');
+  assert.ok(satellite && legacyPlayer && modernPlayer);
   legacyPlayer.position = { x: satellite.position.x + 180, y: satellite.position.y };
   for (let frame = 0; frame < 240 && engine.getActiveSatelliteProjectiles().length === 0; frame++) {
     engine.tickSatellites();
   }
   expect(engine.getActiveSatelliteProjectiles().length).toBeGreaterThan(0);
-  const fixtureAsteroid = snapshotFixture().asteroids[0];
-  assert.exists(fixtureAsteroid);
+  const rockFixture = snapshotFixture().asteroids[0];
+  assert.ok(rockFixture);
   const rock = {
-    ...fixtureAsteroid,
+    ...rockFixture,
     id: 'recoverable-ice',
     material: 'ice' as const,
     size: ROID.COLLAB_SPLIT_MIN_SIZE,
@@ -152,38 +131,35 @@ test('real legacy and negotiated sockets render matching worlds across late join
   engine.addAsteroid(rock);
   expect(engine.handleAsteroidHit(rock.id, 'legacy').outcome).toBe('tagged');
   expect(engine.getActiveCollabTags().map((tag) => tag.asteroidId)).toContain(rock.id);
-  const newPlayer = engine.getPlayer('new');
-  assert.exists(newPlayer);
   for (let tick = 0; tick < 8; tick++) {
-    newPlayer.position.x += 4;
+    modernPlayer.position.x += 4;
     broadcaster.broadcastGameState();
     const expected: unknown = JSON.parse(JSON.stringify(engine.getGameState()));
-    const complete: ServerGameSnapshot = {
+    const complete = captureSnapshot({
       ...engine.getGameState(),
       playerProjectiles: engine.getPlayerProjectiles(),
       satelliteProjectiles: engine
         .getActiveSatelliteProjectiles()
         .map((shot) => ({ id: shot.shotId, ...shot })),
       collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
-    };
+    });
     await expect.poll(() => modern.state()).toEqual(complete);
     await expect.poll(() => old.state()).toEqual(expected);
   }
   expect(old.messages.some((message) => message.type === 'snapshot')).toBe(false);
   expect(old.state()).not.toHaveProperty('satelliteProjectiles');
   expect(old.state()).not.toHaveProperty('collabTags');
-  expect(modern.errors).toEqual([]);
+  expect(failures).toEqual([]);
   modern.socket.close();
   await expect.poll(() => engine.getPlayer('new')).toBeUndefined();
   const reconnected = await pilot('new', true);
-  const recovered = reconnected.state();
-  assert.exists(recovered);
+  const recovered = reconnected.snapshot();
+  assert.ok(recovered, 'Expected a decoded reconnect snapshot');
   expect(recovered.satelliteProjectiles.length).toBeGreaterThan(0);
   expect(recovered.collabTags.map((tag) => tag.asteroidId)).toContain(rock.id);
-  const initialSnapshot = reconnected.messages.find((message) => message.type === 'snapshot');
-  assert.exists(initialSnapshot);
-  expect(initialSnapshot['timestamp']).toEqual(expect.any(Number));
-  expect(initialSnapshot.data).toMatchObject({
+  const firstFrame = reconnected.messages.find((message) => message.type === 'snapshot');
+  assert.ok(firstFrame);
+  expect(firstFrame.data).toMatchObject({
     kind: 'keyframe',
     sequence: 1,
   });
@@ -192,23 +168,19 @@ test('real legacy and negotiated sockets render matching worlds across late join
   }
   engine.removeAsteroid(rock.id);
   reconnected.socket.send(JSON.stringify({ type: 'snapshotResync' }));
-  await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  const pong = once(reconnected.socket, 'pong', { signal: AbortSignal.timeout(2_000) });
+  reconnected.socket.ping();
+  await pong;
   broadcaster.broadcastGameState();
   await expect
     .poll(() => reconnected.messages.filter((message) => message.type === 'snapshot').length)
     .toBeGreaterThan(1);
-  const latestSnapshot = reconnected.messages
-    .filter((message) => message.type === 'snapshot')
-    .at(-1);
-  assert.exists(latestSnapshot);
-  assert.exists(latestSnapshot.data);
-  if (!isRecord(latestSnapshot.data)) {
-    throw new Error('Snapshot envelope is missing its frame object');
-  }
-  expect(latestSnapshot.data['kind']).toBe('keyframe');
-  const recoveredAfterResync = reconnected.state();
-  assert.exists(recoveredAfterResync);
-  expect(recoveredAfterResync.satelliteProjectiles).toEqual([]);
-  expect(recoveredAfterResync.collabTags).toEqual([]);
-  expect(reconnected.errors).toEqual([]);
+  expect(
+    reconnected.messages.filter((message) => message.type === 'snapshot').at(-1)?.data
+  ).toMatchObject({ kind: 'keyframe' });
+  const resynced = reconnected.snapshot();
+  assert.ok(resynced);
+  expect(resynced.satelliteProjectiles).toEqual([]);
+  expect(resynced.collabTags).toEqual([]);
+  expect(failures).toEqual([]);
 });

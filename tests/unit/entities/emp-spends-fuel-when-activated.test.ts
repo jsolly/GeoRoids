@@ -22,13 +22,12 @@ function host(kitId: AbilityHost['kitId'], fuel: number = FUEL.START): AbilityHo
   };
 }
 
-describe('EMP spends fuel when activated', () => {
+describe('Quake abilities spend the shared fuel tank', () => {
   let ship: Ship;
 
   beforeEach(() => {
     ship = new Ship({ position: { x: 100, y: 100 } });
     ship.exploding = false;
-    ship.empPulseActive = false;
   });
 
   test('player and bot ships start with the same tank', () => {
@@ -39,25 +38,7 @@ describe('EMP spends fuel when activated', () => {
     expect(bot.maxFuel).toBe(FUEL.MAX);
   });
 
-  test('leftover EMP spends fuel and arms the pulse', () => {
-    const fired = ship.empPulse();
-
-    expect(fired).toBe(true);
-    expect(ship.empPulseActive).toBe(true);
-    expect(ship.fuel).toBe(FUEL.START - FUEL.EMP_COST);
-  });
-
-  test('EMP does nothing when the tank cannot cover the cost', () => {
-    ship.fuel = FUEL.EMP_COST - 1;
-
-    const fired = ship.empPulse();
-
-    expect(fired).toBe(false);
-    expect(ship.empPulseActive).toBe(false);
-    expect(ship.fuel).toBe(FUEL.EMP_COST - 1);
-  });
-
-  test('Quake shock pulse is the kit EMP and spends the shared tank', () => {
+  test('Quake shock pulse spends fuel and pushes a nearby rock', () => {
     const quake = host('quake');
     const rock = { position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } };
     const result = activateAbilityOnHost(quake, { asteroids: [rock], entities: [] });

@@ -1,7 +1,7 @@
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
-import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
+import type { DrawingContext } from '../../rendering/drawingContext';
 import {
   driftSegment,
   easeOutCubic,
@@ -70,7 +70,7 @@ export function calculateShipTrianglePoints(
 
 /** Shared phosphor stroke for v2 kit outlines (and the leftover 3-point helper). */
 export function strokePhosphorPolyline(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   points: readonly { x: number; y: number }[],
   color: string,
   closed = true
@@ -111,7 +111,7 @@ export function strokePhosphorPolyline(
 }
 
 export function strokePhosphorHull(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   hull: {
     nose: { x: number; y: number };
     rearLeft: { x: number; y: number };
@@ -123,7 +123,7 @@ export function strokePhosphorHull(
 }
 
 export function strokeKitHullOutline(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   centerX: number,
   centerY: number,
   radius: number,
@@ -149,7 +149,7 @@ export function strokeKitHullOutline(
 }
 
 export function strokePhosphorSegment(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   x1: number,
   y1: number,
   x2: number,
@@ -260,7 +260,7 @@ export function drawThrusterAtPosition(
 
   if (!ship.exploding && ship.thrusting) {
     const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
-    const scale = PLAYFIELD_CLOSE_SCALE;
+    const scale = canvasManager.getPlayfieldScale();
     const viewport = canvasManager.getViewportSize();
     const cull = ship.r * 3 * scale;
     if (
@@ -312,7 +312,7 @@ export function drawPlayerName(
 
 // Vector break-up: hull edges pop, then drift; ring + ticks — no filled fireball.
 function drawVectorExplosion(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   x: number,
   y: number,
   radius: number,
@@ -404,7 +404,7 @@ export function drawShipExplosion(ship: Ship, color?: string): void {
     ctx,
     viewport.width / 2,
     viewport.height / 2,
-    ship.r * PLAYFIELD_CLOSE_SCALE,
+    ship.r * canvasManager.getPlayfieldScale(),
     ship.angle,
     explosionProgress(ship),
     color || ship.color || PALETTE.LOCAL,
@@ -424,7 +424,7 @@ export function drawShipExplosionAtPosition(
   }
 
   const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
-  const scale = PLAYFIELD_CLOSE_SCALE;
+  const scale = canvasManager.getPlayfieldScale();
   drawVectorExplosion(
     ctx,
     screen.x,
@@ -451,7 +451,8 @@ export function drawLaserBolts(
   const viewport = cvs ? canvasManager.getViewportSize() : undefined;
   const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
   const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
-  const cullPad = (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * PLAYFIELD_CLOSE_SCALE;
+  const cullPad =
+    (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * canvasManager.getPlayfieldScale();
 
   for (const laser of lasers) {
     const screenPos = canvasManager.worldToScreenInto(laserScreen, laser.position, viewerPosition);
@@ -465,7 +466,7 @@ export function drawLaserBolts(
     }
 
     if (laser.explodeTime === 0) {
-      const scale = PLAYFIELD_CLOSE_SCALE;
+      const scale = canvasManager.getPlayfieldScale();
       const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
       const { halfX, halfY, trailX, trailY } = laserBoltOffsets(
         laser.velocity.x,
@@ -532,50 +533,6 @@ export function drawLasers(
   drawLaserBolts(ship.lasers, color || PALETTE.LASER_LOCAL, viewerShipPosition || ship.position);
 }
 
-export function drawEmpPulse(ship: Ship, empRadius: number, empAlpha: number): void {
-  const ctx = canvasManager.getContext();
-  const cvs = canvasManager.getCanvas();
-  if (!ctx || !cvs) {
-    return;
-  }
-
-  const viewport = canvasManager.getViewportSize();
-  const centerX = viewport.width / 2;
-  const centerY = viewport.height / 2;
-
-  // Create a radial gradient for the EMP effect
-  const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, empRadius);
-
-  // Electric blue to transparent effect
-  gradient.addColorStop(0, `rgba(0, 255, 255, ${empAlpha * 0.8})`); // Cyan center
-  gradient.addColorStop(0.3, `rgba(0, 150, 255, ${empAlpha * 0.6})`); // Blue
-  gradient.addColorStop(0.7, `rgba(0, 100, 255, ${empAlpha * 0.4})`); // Darker blue
-  gradient.addColorStop(1, `rgba(0, 50, 255, ${empAlpha * 0.1})`); // Very faint blue
-
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, empRadius, 0, Math.PI * 2, false);
-  ctx.fill();
-
-  // Add electric arc effects
-  ctx.strokeStyle = `rgba(0, 255, 255, ${empAlpha})`;
-  ctx.lineWidth = 2;
-
-  // Draw some random electric arcs
-  for (let i = 0; i < 8; i++) {
-    const angle = (Math.PI * 2 * i) / 8;
-    const startX = centerX + Math.cos(angle) * ship.r;
-    const startY = centerY + Math.sin(angle) * ship.r;
-    const endX = centerX + Math.cos(angle) * empRadius;
-    const endY = centerY + Math.sin(angle) * empRadius;
-
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-  }
-}
-
 // Ship rendering with world coordinates (for other players)
 export function drawShipAtPosition(
   ship: Ship,
@@ -591,9 +548,9 @@ export function drawShipAtPosition(
     return;
   }
 
-  const viewport = canvasManager.getViewportSize();
   const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
-  const scale = PLAYFIELD_CLOSE_SCALE;
+  const scale = canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
   const screenX = screen.x;
   const screenY = screen.y;
   const shipR = ship.r * scale;
@@ -675,7 +632,7 @@ export function harpoonTetherStyle(): { dash: number[]; lineWidth: number; tipRa
 
 /** Tether + amber tip. Hauler only — other kits never draw this. */
 export function drawHaulerHarpoonVfx(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -739,7 +696,7 @@ export function drawHaulerHarpoonVfx(
 
 /** Ability rings only. Kit hulls come from the v2 outline bake. */
 function drawAbilityFx(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -756,7 +713,7 @@ function drawAbilityFx(
 }
 
 export function drawShipShield(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -797,7 +754,7 @@ export function drawShipShield(
 }
 
 function drawShipImpactFlash(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,
@@ -835,7 +792,7 @@ function drawShipImpactFlash(
 }
 
 function drawFloatingHealthCapsule(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   ship: Ship,
   screenX: number,
   screenY: number,

@@ -1,10 +1,11 @@
-import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { WebSocket } from 'ws';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { BotShot } from '../../../server/ai/botController';
 import { ARENA_RADIUS, CONTAIN_RADIUS } from '../../../server/ai/shipMotion';
 import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: {
@@ -16,14 +17,14 @@ vi.mock('../../../setup/serverLogger', () => ({
 }));
 
 function firstBot(bots: GameEntity[] | null): GameEntity {
-  assert.isNotNull(bots);
+  assert.ok(bots, 'created bot list');
   const bot = bots[0];
-  assert.exists(bot);
+  assert.ok(bot, 'created bot');
   return bot;
 }
 
 function parkHumanInFront(engine: GameEngine, bot: GameEntity, range = 220): GameEntity {
-  const human = engine.entityManager.addHumanPlayer('human-pilot', 'Pilot', {} as WebSocket, {
+  const human = engine.entityManager.addHumanPlayer('human-pilot', 'Pilot', new RecordingSocket(), {
     x: bot.position.x + Math.cos(bot.angle) * range,
     y: bot.position.y - Math.sin(bot.angle) * range,
   });

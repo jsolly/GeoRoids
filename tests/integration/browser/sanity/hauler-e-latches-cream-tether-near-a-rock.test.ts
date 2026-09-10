@@ -1,9 +1,10 @@
 import { expect, test } from 'vitest';
+import type { ConnectionManager } from '../../../../src/network/services/ConnectionManager';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const CREAM = '#E8D5A3';
 const TIP = '#FDE68A';
@@ -26,7 +27,7 @@ test(
     page.on('pageerror', (error) => consoleErrors.push(error.message));
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
-    const peerPage = await browserManager.createPage();
+    const peerPage = await browserManager.createAdditionalPage();
     const peer = new GameInteractions(peerPage);
     await peer.bootGame({ waitForCombatReady: false });
     await page.bringToFront();
@@ -34,10 +35,7 @@ test(
     await game.waitForAsteroids(1);
     const fixture = await page.evaluate(() => {
       const gc = window.gameController;
-      if (!gc) {
-        throw new Error('Game controller is unavailable');
-      }
-      const player = gc?.getPlayerManager()?.getLocalPlayer?.();
+      const player = gc?.getCurrPlayer();
       const ship = player?.ship;
       const rocks = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
       const actors = (gc?.getNetworkManager?.().getAllPlayers?.() ?? [])
@@ -106,11 +104,8 @@ test(
       const sample = await page.evaluate(
         ({ colors }: { colors: { cream: string; tip: string }; targetId: string }) => {
           const gc = window.gameController;
-          if (!gc) {
-            throw new Error('Game controller is unavailable');
-          }
           gc?.renderGame?.();
-          const ship = gc?.getPlayerManager()?.getLocalPlayer?.()?.ship;
+          const ship = gc?.getCurrPlayer()?.ship;
           const probe = gc?.diagnoseHarpoon?.();
           const canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
           const ctx = canvas?.getContext('2d');
@@ -153,7 +148,7 @@ test(
         { colors: { cream: CREAM, tip: TIP }, targetId: fixture.targetId }
       );
       frames.push(sample);
-      if (sample.cream && sample.tip && (sample.harpoonTimer as number) > 0) {
+      if (sample.cream && sample.tip && sample.harpoonTimer > 0) {
         break;
       }
       await page.waitForTimeout(16);
@@ -171,63 +166,92 @@ test(
     await page.screenshot({
       path: screenshotManager.getScreenshotPath('hauler-live-tether.png'),
     });
-    const flap = await page.evaluate(async () => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('Game controller is unavailable');
-      }
-      const connection = gc.getNetworkManager()['connectionManager'];
-      const player = gc.getPlayerManager().getLocalPlayer();
-      if (!player) {
-        throw new Error('Local pilot is unavailable');
-      }
-      const ship = player.ship;
-      const socket = connection.getSocket();
-      if (!socket) {
-        throw new Error('Gameplay socket is unavailable');
-      }
-      const targetId = ship.harpoonTargetId;
-      const startedAt = Date.now();
-      const closed = new Promise<void>((resolve) =>
-        socket.addEventListener('close', () => resolve(), { once: true })
-      );
-      socket.close(4000, 'Browser regression: brief connection flap');
-      await closed;
-      return {
-        startedAt,
-        targetId,
-        timer: ship.harpoonTimer,
-        rocks: gc.getCurrRoidBelt().getRoids().length,
-        health: ship.health,
-        lives: player.lives,
-      };
-    });
+    let rejoined = false;
+    let freshWorld = false;
+    // Only sockets opened after the initial join can satisfy this barrier.
+    page.on('websocket', (socket) =>
+      socket.on('framereceived', ({ payload }) => {
+        const message: unknown = JSON.parse(String(payload));
+        if (!message || typeof message !== 'object' || !('type' in message)) {
+          return;
+        }
+        if (message.type === 'joined') {
+          rejoined = true;
+        }
+        if (rejoined && (message.type === 'snapshot' || message.type === 'gameState')) {
+          freshWorld = true;
+        }
+      })
+    );
+    const connection = await page.evaluateHandle<ConnectionManager>(
+      "import('/src/network/services/ConnectionManager.ts').then(({ ConnectionManager }) => ConnectionManager.getInstance())"
+    );
+    const flap = await page
+      .evaluate(async (connection) => {
+        const gc = window.gameController;
+        if (!gc) {
+          throw new Error('Game controller unavailable');
+        }
+        const player = gc.getCurrPlayer();
+        if (!player) {
+          throw new Error('Local player unavailable');
+        }
+        const ship = player.ship;
+        const socket = connection.getSocket();
+        if (!socket) {
+          throw new Error('Gameplay socket unavailable');
+        }
+        const targetId = ship.harpoonTargetId;
+        const startedAt = Date.now();
+        const closed = new Promise<void>((resolve, reject) => {
+          const timer = window.setTimeout(
+            () => reject(new Error('Gameplay socket did not close')),
+            2500
+          );
+          socket.addEventListener(
+            'close',
+            () => {
+              window.clearTimeout(timer);
+              resolve();
+            },
+            { once: true }
+          );
+        });
+        socket.close(4000, 'Browser regression: brief connection flap');
+        await closed;
+        return {
+          startedAt,
+          targetId,
+          timer: ship.harpoonTimer,
+          rocks: gc.getCurrRoidBelt().getRoids().length,
+          health: ship.health,
+          lives: player.lives,
+        };
+      }, connection)
+      .finally(() => connection.dispose());
     expect(flap.timer).toBeGreaterThan(0);
     expect(flap.rocks).toBeGreaterThan(0);
     const reconnectWaitStartedAt = Date.now();
     await page.waitForFunction(
       () => {
         const gc = window.gameController;
-        if (!gc) {
-          throw new Error('Game controller is unavailable');
-        }
-        const connection = gc?.getNetworkManager?.()['connectionManager'];
-        return connection?.isConnected() && connection['hasInitializedAsteroidsForConnection'];
+        return gc?.getNetworkManager().isConnected === true;
       },
       undefined,
       { timeout: 2500 }
     );
     const reconnectedAt = Date.now();
-    // Let the newly joined connection receive authoritative game-state frames.
-    await page.waitForTimeout(80);
+    await expect
+      .poll(() => freshWorld, {
+        timeout: 2500,
+        message: 'Rejoined socket must receive a fresh authoritative world',
+      })
+      .toBe(true);
     const resumed = await page.evaluate(() => {
       const gc = window.gameController;
-      if (!gc) {
-        throw new Error('Game controller is unavailable');
-      }
-      const player = gc.getPlayerManager().getLocalPlayer();
-      if (!player) {
-        throw new Error('Local pilot is unavailable');
+      const player = gc?.getCurrPlayer();
+      if (!gc || !player) {
+        throw new Error('Reconnected pilot unavailable');
       }
       const ship = player.ship;
       const targetId = ship.harpoonTargetId;

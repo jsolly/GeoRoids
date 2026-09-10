@@ -1,31 +1,33 @@
 /* @vitest-environment node */
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;
 let core: WebSocketCore;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 beforeEach(() => {
   engine = new GameEngine(17);
   core = new WebSocketCore(engine);
 });
 afterEach(() => engine.stopGameLoop());
 function transport() {
-  const replies: Array<{ type: string; data?: Record<string, unknown> }> = [];
-  const socket = {
-    readyState: WebSocket.OPEN,
-    close: vi.fn(),
-    send: (raw: string) => {
-      const message = JSON.parse(raw);
-      if (message.type === 'joined' || message.type === 'error') {
-        replies.push(message);
-      }
+  const socket = new RecordingSocket();
+  vi.spyOn(socket, 'close');
+  return {
+    socket,
+    replies() {
+      return socket.inbox.filter(
+        (message) => message.type === 'joined' || message.type === 'error'
+      );
     },
-  } as unknown as WebSocket;
-  return { socket, replies };
+  };
 }
-function join(socket: WebSocket, id: string, name = id) {
+function join(socket: RecordingSocket, id: string, name = id) {
   core.handleClientMessage({ type: 'join', data: { id, name } }, socket);
 }
 
@@ -41,7 +43,7 @@ test('a socket cannot create a second pilot and repeat flooding closes the trans
       .filter((player) => player.type === 'human')
       .map((p) => p.id)
   ).toEqual(['pilot']);
-  expect(replies.filter((reply) => reply.type === 'joined')).toHaveLength(1);
+  expect(replies().filter((reply) => reply.type === 'joined')).toHaveLength(1);
   expect(socket.close).toHaveBeenCalledWith(1008, 'Too many join requests');
 });
 
@@ -53,7 +55,7 @@ test.each([
   const { socket, replies } = transport();
   join(socket, id, name);
   expect(engine.getPlayerCount()).toBe(0);
-  expect(replies.map((reply) => reply.type)).toEqual(['error']);
+  expect(replies().map((reply) => reply.type)).toEqual(['error']);
 });
 
 test('a full server refuses a new pilot without disturbing the existing population', () => {
@@ -64,7 +66,7 @@ test('a full server refuses a new pilot without disturbing the existing populati
   join(socket, 'overflow');
   expect(engine.getPlayerCount()).toBe(100);
   expect(engine.getPlayer('overflow')).toBeUndefined();
-  expect(replies.map((reply) => reply.type)).toEqual(['error']);
+  expect(replies().map((reply) => reply.type)).toEqual(['error']);
 });
 
 test('a case-variant name cannot bypass the full-server player cap', () => {
@@ -80,7 +82,7 @@ test('a case-variant name cannot bypass the full-server player cap', () => {
 
   expect(engine.getPlayerCount()).toBe(100);
   expect(engine.getPlayer('attacker')).toBeUndefined();
-  expect(replies.map((reply) => reply.type)).toEqual(['error']);
+  expect(replies().map((reply) => reply.type)).toEqual(['error']);
 });
 
 test('production admission cannot be bypassed by upgrading a socket then joining as a legacy pilot', () => {
@@ -88,19 +90,23 @@ test('production admission cannot be bypassed by upgrading a socket then joining
   const legacy = transport();
   join(legacy.socket, 'legacy');
   expect(engine.getPlayerCount()).toBe(0);
-  expect(legacy.replies.map((reply) => reply.type)).toEqual(['error']);
+  expect(legacy.replies().map((reply) => reply.type)).toEqual(['error']);
   const owner = transport();
   const data = { id: 'owner', name: 'Owner', asteroidInteractions: 1, snapshotVersion: 1 };
   core.handleClientMessage({ type: 'join', data }, owner.socket);
-  const token = owner.replies.find((reply) => reply.type === 'joined')?.data?.['resumeToken'];
+  const joined = owner.replies().find((reply) => reply.type === 'joined');
+  if (!joined || !isRecord(joined.data) || typeof joined.data['resumeToken'] !== 'string') {
+    throw new Error('Expected a joined reply with a resume token');
+  }
+  const token = joined.data['resumeToken'];
   expect(token).toEqual(expect.any(String));
   const attacker = transport();
   core.handleClientMessage({ type: 'join', data: { ...data, id: 'attacker' } }, attacker.socket);
-  expect(attacker.replies.map((reply) => reply.type)).toEqual(['error']);
+  expect(attacker.replies().map((reply) => reply.type)).toEqual(['error']);
   expect(engine.getPlayer('owner')?.ws).toBe(owner.socket);
   expect(owner.socket.close).not.toHaveBeenCalled();
   const resumed = transport();
   core.handleClientMessage({ type: 'join', data: { ...data, resumeToken: token } }, resumed.socket);
   expect(engine.getPlayer('owner')?.ws).toBe(resumed.socket);
-  expect(resumed.replies.map((reply) => reply.type)).toEqual(['joined']);
+  expect(resumed.replies().map((reply) => reply.type)).toEqual(['joined']);
 });

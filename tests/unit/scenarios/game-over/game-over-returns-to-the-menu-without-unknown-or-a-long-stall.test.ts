@@ -1,5 +1,6 @@
-import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
-import { GAME } from '../../../../src/constants';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { DAMAGE, GAME } from '../../../../src/constants';
 import { GameController } from '../../../../src/core/gameController';
 import { GameStateManager } from '../../../../src/core/services/GameStateManager';
 import { PlayerManager } from '../../../../src/entities/player/PlayerManager';
@@ -67,7 +68,7 @@ describe('Game-over returns to the menu', () => {
     const controller = GameController.getInstance();
     controller.newGame('Ace');
     const local = PlayerManager.getInstance().getLocalPlayer();
-    assert.isOk(local);
+    assert.ok(local, 'Expected the local player after newGame');
 
     window.dispatchEvent(
       new CustomEvent('playerDied', {
@@ -84,7 +85,7 @@ describe('Game-over returns to the menu', () => {
     const controller = GameController.getInstance();
     controller.newGame('Ace');
     const local = PlayerManager.getInstance().getLocalPlayer();
-    assert.isOk(local);
+    assert.ok(local, 'Expected the local player after newGame');
     local.deathCause = 'boundary';
     local.ship.lastExplodeCause = 'boundary';
 
@@ -160,9 +161,10 @@ describe('Last life on the server', () => {
     expect(GAME.START_LIVES).toBe(3);
   });
 
-  test('asteroid, ship, and bot killers stay on the snapshot until respawn', () => {
+  test('an asteroid kill stays on the snapshot until respawn', () => {
     world.entity(ace).lives = 2;
-    world.hitAsteroid(ace, world.entity(ace).health);
+    world.entity(ace).health = DAMAGE.LASER_HIT;
+    world.hitAsteroid(ace);
     expect(world.entity(ace).deathCause).toBe('asteroid');
     expect(
       world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause
@@ -174,11 +176,8 @@ describe('Last life on the server', () => {
   });
 
   test('a bot kill stores the bot id on the snapshot', () => {
-    let bot = world.engine.getAllBots()[0];
-    if (!bot) {
-      bot = world.engine.entityManager.createBots(1)[0];
-    }
-    assert.exists(bot);
+    const bot = world.engine.createBots(1)?.[0];
+    assert.ok(bot, 'Expected the newly created bot');
     world.engine.handlePlayerDamage(ace.id, bot.id, world.entity(ace).health);
     expect(world.entity(ace).deathCause).toBe(bot.id);
     expect(

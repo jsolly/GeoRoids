@@ -1,30 +1,25 @@
 /* @vitest-environment node */
-import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
-import type { WebSocket } from 'ws';
-
-import { WebSocketCore } from '../../../server/communication/WebSocketCore';
-import { GameEngine } from '../../../server/core/GameEngine';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
 import { DAMAGE, GAME, SHIP } from '../../../src/constants';
-
-function tick(engine: GameEngine, frames: number): void {
-  for (let frame = 0; frame < frames; frame++) {
-    engine.advanceCombatFrame();
-  }
-}
+import { GameServerWorld, type Pilot } from '../scenarios/support/gameServerWorld';
 
 describe('server-authoritative health regeneration', () => {
-  let engine: GameEngine;
+  let world: GameServerWorld;
+  let pilot: Pilot;
 
   beforeEach(() => {
-    engine = new GameEngine(90210);
+    world = new GameServerWorld(90210);
+    pilot = world.join('Pilot', { x: 0, y: 0 });
+    world.wearOffJoinInvulnerability();
   });
 
   afterEach(() => {
-    engine.stopGameLoop();
+    world.dispose();
   });
 
   test('uses the ship tuning for one-frame rate and post-damage delay', () => {
@@ -32,75 +27,73 @@ describe('server-authoritative health regeneration', () => {
     expect(calculateHealthRegenDelayFrames()).toBe(Math.ceil(SHIP.HEALTH_REGEN_DELAY * GAME.FPS));
   });
 
-  test('human damage waits for the delay and then heals without exceeding max health', () => {
-    const pilot = engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
-    delete pilot.spawnProtectionTimer;
+  test('human damage waits for the delay, then heals and caps at max health', () => {
+    const ship = world.entity(pilot);
+    world.engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    expect(ship.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
+    expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
-    engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
-    expect(pilot.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
-    expect(pilot.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
+    world.tick(calculateHealthRegenDelayFrames());
+    expect(ship.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
 
-    tick(engine, calculateHealthRegenDelayFrames());
-    expect(pilot.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
+    world.tick(1);
+    expect(ship.health).toBeCloseTo(
+      SHIP.MAX_HEALTH - DAMAGE.LASER_HIT + calculateHealthRegenPerFrame()
+    );
 
-    tick(engine, 1);
-    expect(pilot.health).toBeGreaterThan(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
-
-    pilot.health = pilot.maxHealth - calculateHealthRegenPerFrame() / 2;
-    pilot.healthRegenTimer = 0;
-    tick(engine, 1);
-    expect(pilot.health).toBe(pilot.maxHealth);
+    ship.health = ship.maxHealth - calculateHealthRegenPerFrame() / 2;
+    ship.healthRegenTimer = 0;
+    world.tick(1);
+    expect(ship.health).toBe(ship.maxHealth);
   });
 
   test('a repeated hit resets the same regeneration timer', () => {
-    const pilot = engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
-    delete pilot.spawnProtectionTimer;
+    const ship = world.entity(pilot);
+    world.engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.tick(calculateHealthRegenDelayFrames() - 1);
+    const healthBeforeSecondHit = ship.health;
 
-    engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
-    tick(engine, calculateHealthRegenDelayFrames() - 1);
-    const healthAfterFirstDelay = pilot.health;
+    world.engine.handlePlayerDamage(pilot.id, 'asteroid', 1);
+    expect(ship.health).toBe(healthBeforeSecondHit - 1);
+    expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
-    engine.handlePlayerDamage(pilot.id, 'asteroid', 1);
-    expect(pilot.health).toBe(healthAfterFirstDelay - 1);
-    expect(pilot.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
-
-    tick(engine, calculateHealthRegenDelayFrames());
-    expect(pilot.health).toBe(healthAfterFirstDelay - 1);
-    tick(engine, 1);
-    expect(pilot.health).toBeGreaterThan(healthAfterFirstDelay - 1);
+    world.tick(calculateHealthRegenDelayFrames());
+    expect(ship.health).toBe(healthBeforeSecondHit - 1);
+    world.tick(1);
+    expect(ship.health).toBeCloseTo(healthBeforeSecondHit - 1 + calculateHealthRegenPerFrame());
   });
 
-  test('dead ships never regenerate, and clients cannot clear the server timer', () => {
-    const ws = {} as WebSocket;
-    const core = new WebSocketCore(engine);
-    const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: 0, y: 0 });
-    delete pilot.spawnProtectionTimer;
-    engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
-    const delay = pilot.healthRegenTimer;
+  test('a client update cannot clear the server timer and a last-life ship stays dead', () => {
+    const ship = world.entity(pilot);
+    world.engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    const delay = ship.healthRegenTimer;
 
-    core.handleClientMessage({ type: 'update', id: pilot.id, data: { healthRegenTimer: 0 } }, ws);
-    expect(pilot.healthRegenTimer).toBe(delay);
+    world.send(pilot, {
+      type: 'update',
+      id: pilot.id,
+      data: { healthRegenTimer: 0 },
+    });
+    expect(ship.healthRegenTimer).toBe(delay);
 
-    pilot.lives = 0;
-    engine.handlePlayerDamage(pilot.id, 'asteroid', pilot.health);
-    expect(pilot.health).toBe(0);
-    tick(engine, calculateHealthRegenDelayFrames() + SHIP.EXPLODE_DURATION_FRAMES + 1);
-    expect(pilot.health).toBe(0);
+    ship.lives = 0;
+    world.engine.handlePlayerDamage(pilot.id, 'asteroid', ship.health);
+    expect(ship.health).toBe(0);
+    world.tick(SHIP.EXPLODE_DURATION_FRAMES + SHIP.RESPAWN_DELAY_FRAMES + 1);
+    expect(ship.health).toBe(0);
+    expect(ship.respawnTimer).toBeUndefined();
   });
 
   test('bots use the same delay and rate as humans', () => {
-    engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
-    const bot = engine.createBots(1)?.[0];
-    assert.exists(bot);
+    const bot = world.engine.createBots(1)?.[0];
+    assert.ok(bot, 'Expected the newly created bot');
     delete bot.spawnProtectionTimer;
-
-    engine.handleBotDamage(bot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.handleBotDamage(bot.id, 'asteroid', DAMAGE.LASER_HIT);
     const damagedHealth = bot.health;
-    tick(engine, calculateHealthRegenDelayFrames());
+
+    world.tick(calculateHealthRegenDelayFrames());
     expect(bot.health).toBe(damagedHealth);
 
-    tick(engine, 1);
-    expect(bot.health).toBeGreaterThan(damagedHealth);
-    expect(bot.health).toBeLessThanOrEqual(bot.maxHealth);
+    world.tick(1);
+    expect(bot.health).toBeCloseTo(damagedHealth + calculateHealthRegenPerFrame());
   });
 });

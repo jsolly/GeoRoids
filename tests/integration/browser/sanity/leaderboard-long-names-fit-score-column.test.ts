@@ -5,7 +5,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const LONG_NAME = 'QA7skirmisherportrait';
 const WIDE_SCORE = 987654321;
@@ -13,7 +13,11 @@ const WIDE_SCORE = 987654321;
 type RenderedText = {
   text: string;
   x: number;
+  y: number;
   width: number;
+  textAlign: CanvasTextAlign;
+  fillStyle: string;
+  font: string;
 };
 
 async function captureLeaderboardRow(page: import('playwright').Page): Promise<RenderedText[]> {
@@ -21,47 +25,54 @@ async function captureLeaderboardRow(page: import('playwright').Page): Promise<R
     ({ longName, wideScore }) => {
       const win = window as typeof window & {
         __leaderboardFillTextCalls?: RenderedText[];
-        __leaderboardFillTextInstalled?: boolean;
       };
       win.__leaderboardFillTextCalls = [];
 
-      if (!win.__leaderboardFillTextInstalled) {
-        const originalFillText = CanvasRenderingContext2D.prototype.fillText;
-        CanvasRenderingContext2D.prototype.fillText = function (
-          text: string,
-          x: number,
-          y: number,
-          maxWidth?: number
-        ): void {
-          if (typeof text === 'string' && (text.includes('…') || text === String(wideScore))) {
-            win.__leaderboardFillTextCalls?.push({
-              text,
-              x,
-              width: this.measureText(text).width,
-            });
-          }
-          originalFillText.call(this, text, x, y, maxWidth);
-        };
-        win.__leaderboardFillTextInstalled = true;
-      }
-
-      const gameController = window.gameController;
-      const local = gameController?.getPlayerManager()?.getLocalPlayer?.();
-      const players = gameController?.getNetworkManager?.().getAllPlayers?.() ?? [];
-      if (!gameController || !local || players.length < 2) {
-        throw new Error('Leaderboard fixture requires a local player and at least one bot');
-      }
-
-      local.name = longName;
-      local.score = wideScore;
-      for (const player of players) {
-        if (player.id === local.id) {
-          player.name = longName;
-          player.score = wideScore;
+      const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (
+        text: string,
+        x: number,
+        y: number,
+        maxWidth?: number
+      ): void {
+        if (typeof text === 'string' && (text.includes('…') || text === String(wideScore))) {
+          win.__leaderboardFillTextCalls?.push({
+            text,
+            x,
+            y,
+            width: this.measureText(text).width,
+            textAlign: this.textAlign,
+            fillStyle: String(this.fillStyle),
+            font: this.font,
+          });
         }
+        originalFillText.call(this, text, x, y, maxWidth);
+      };
+
+      try {
+        const gameController = window.gameController;
+        if (!gameController) {
+          throw new Error('Leaderboard fixture requires a game controller');
+        }
+        const local = gameController.getCurrPlayer();
+        const players = gameController.getNetworkManager().getAllPlayers();
+        if (!local || players.length < 2) {
+          throw new Error('Leaderboard fixture requires a local player and at least one bot');
+        }
+
+        local.name = longName;
+        local.score = wideScore;
+        for (const player of players) {
+          if (player.id === local.id) {
+            player.name = longName;
+            player.score = wideScore;
+          }
+        }
+        gameController.renderGame();
+        return win.__leaderboardFillTextCalls ?? [];
+      } finally {
+        CanvasRenderingContext2D.prototype.fillText = originalFillText;
       }
-      gameController.renderGame();
-      return win.__leaderboardFillTextCalls ?? [];
     },
     { longName: LONG_NAME, wideScore: WIDE_SCORE }
   );
@@ -76,9 +87,12 @@ async function verifyViewport(
   await page.setViewportSize({ width, height });
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
-      const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
-      const viewport = canvas?.getBoundingClientRect();
-      return viewport?.width === expectedWidth && viewport.height === expectedHeight;
+      const canvas = document.getElementById('gameCanvas');
+      return (
+        canvas instanceof HTMLCanvasElement &&
+        canvas.width === expectedWidth &&
+        canvas.height === expectedHeight
+      );
     },
     { expectedWidth: width, expectedHeight: height },
     { timeout: 5000 }
@@ -86,8 +100,20 @@ async function verifyViewport(
   const calls = await captureLeaderboardRow(page);
   const name = calls.find((call) => call.text.includes('…') && call.x > width / 2);
   const score = calls.find((call) => call.text === String(WIDE_SCORE) && call.x > width / 2);
+  const touch = width <= 500 || height <= 430;
+  const boardWidth = touch ? (width < 400 ? 148 : 168) : 180;
+  const boardEdge = touch ? 12 : 16;
+  const boardX = width - boardWidth - boardEdge;
   expect(name, `ellipsis name should render at ${width}x${height}`).toBeDefined();
   expect(score, `wide score should render at ${width}x${height}`).toBeDefined();
+  expect(name?.x).toBe(boardX + 28);
+  expect(score?.x).toBe(boardX + boardWidth - 4);
+  expect(name?.y).toBe(score?.y);
+  expect(name?.textAlign).toBe('left');
+  expect(score?.textAlign).toBe('right');
+  expect(name?.font).toBe('11px Arial');
+  expect(name?.fillStyle).toContain('94, 234, 212');
+  expect(score?.fillStyle).toContain('100, 116, 139');
   expect(name?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
     (score?.x ?? 0) - (name?.x ?? 0) - (score?.width ?? 0) - 6
   );
@@ -97,9 +123,8 @@ async function verifyViewport(
 }
 
 test(
-  'long leaderboard names stay separated from scores on portrait and landscape play views',
+  'long leaderboard names stay aligned with scores across desktop, portrait, and landscape play views',
   async () => {
-    await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
     if (!page) {
       throw new Error('Page not available');
@@ -117,20 +142,47 @@ test(
     await game.bootGame({ waitForCombatReady: false });
     await game.waitForBots(1);
 
-    await verifyViewport(
-      page,
-      390,
-      844,
-      screenshotManager.getScreenshotPath('leaderboard-long-name-mobile.png')
-    );
-    await verifyViewport(
-      page,
-      844,
-      390,
-      screenshotManager.getScreenshotPath('leaderboard-long-name-landscape.png')
-    );
+    const wasRunning = await page.evaluate(() => {
+      const gameController = window.gameController;
+      if (!gameController) {
+        throw new Error('Leaderboard fixture requires a game controller');
+      }
+      const state = gameController.getGameStateManager();
+      const running = state.getIsGameRunning();
+      state.setIsGameRunning(false);
+      return running;
+    });
 
-    expect(consoleErrors).toEqual([]);
+    try {
+      await verifyViewport(
+        page,
+        1280,
+        900,
+        screenshotManager.getScreenshotPath('leaderboard-long-name-desktop.png')
+      );
+      await verifyViewport(
+        page,
+        390,
+        844,
+        screenshotManager.getScreenshotPath('leaderboard-long-name-mobile.png')
+      );
+      await verifyViewport(
+        page,
+        844,
+        390,
+        screenshotManager.getScreenshotPath('leaderboard-long-name-landscape.png')
+      );
+
+      expect(consoleErrors).toEqual([]);
+    } finally {
+      await page.evaluate((running) => {
+        const gameController = window.gameController;
+        if (!gameController) {
+          throw new Error('Leaderboard fixture lost its game controller during cleanup');
+        }
+        gameController.getGameStateManager().setIsGameRunning(running);
+      }, wasRunning);
+    }
   },
   TestConfig.DEFAULT_TIMEOUT
 );

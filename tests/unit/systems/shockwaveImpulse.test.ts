@@ -1,4 +1,5 @@
-import { assert, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, expect, test } from 'vitest';
 import { SHOCKWAVE } from '../../../src/constants';
 import {
   applyShockwaveToBody,
@@ -29,7 +30,7 @@ describe('collab-split shockwave impulse', () => {
       radius: 150,
       impulse: 4,
     });
-    assert.exists(impulse);
+    assert.ok(impulse);
     expect(impulse.x).toBeGreaterThan(0);
     expect(impulse.y).toBeCloseTo(0);
   });
@@ -56,8 +57,8 @@ describe('collab-split shockwave impulse', () => {
       origin,
       wave
     );
-    assert.exists(crumb);
-    assert.exists(giant);
+    assert.ok(crumb);
+    assert.ok(giant);
     expect(Math.abs(crumb.x)).toBeGreaterThan(Math.abs(giant.x));
   });
 
@@ -65,8 +66,8 @@ describe('collab-split shockwave impulse', () => {
     const body = { position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 }, size: 12 };
     const fast = applyShockwaveToBody(body, { x: 0, y: 0 }, SHOCKWAVE.FAST);
     const heavy = applyShockwaveToBody(body, { x: 0, y: 0 }, SHOCKWAVE.HEAVY);
-    assert.exists(fast);
-    assert.exists(heavy);
+    assert.ok(fast);
+    assert.ok(heavy);
     expect(Math.abs(heavy.x)).toBeGreaterThan(Math.abs(fast.x));
   });
 });

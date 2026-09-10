@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import type { Page } from 'playwright';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { BrowserManager } from '../../utils/browser-manager';
-import { HealthChecker } from '../../utils/health-checker';
+import { checkViteServer } from '../../utils/health-checker';
 import { ScreenshotManager } from '../../utils/screenshot-manager';
 import { TestConfig } from '../../utils/test-config';
 
@@ -12,7 +12,7 @@ const current = 'a9755405dcfd546ace3e92b4dc8c3ff53d9bb598';
 const next = 'b'.repeat(40);
 
 beforeAll(async () => {
-  if (!(await HealthChecker.checkViteServer())) {
+  if (!(await checkViteServer())) {
     throw new Error('Runner Vite origin is unavailable');
   }
   screenshots.ensureScreenshotsDirectory();

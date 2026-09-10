@@ -1,4 +1,5 @@
-import { assert, describe, expect, test } from 'vitest';
+import { strict as assert } from 'node:assert';
+import { describe, expect, test } from 'vitest';
 import {
   BOT_AI,
   type Combatant,
@@ -80,7 +81,7 @@ describe('bot aim math', () => {
     const relVel = { x: 0, y: 2 };
     const speed = laserSpeedPerFrame();
     const t = interceptTime(relPos, relVel, speed);
-    assert.isNotNull(t);
+    assert.ok(t !== null && t !== undefined, 'intercept time');
     const range = Math.hypot(relPos.x + relVel.x * t, relPos.y + relVel.y * t);
     expect(range).toBeCloseTo(speed * t, 5);
   });

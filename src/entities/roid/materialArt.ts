@@ -1,6 +1,7 @@
 import { isAsteroidMaterial, MATERIAL_OUTLINES } from '../../../shared/asteroidMaterials';
 import type { AsteroidMaterial } from '../../../shared-types';
 import { PALETTE } from '../../constants';
+import type { DrawingContext } from '../../rendering/drawingContext';
 
 type Point = readonly [number, number];
 const DETAILS: Record<AsteroidMaterial, readonly (readonly Point[])[]> = {
@@ -45,7 +46,7 @@ const DETAILS: Record<AsteroidMaterial, readonly (readonly Point[])[]> = {
 };
 
 export function drawAsteroidMaterialDetails(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   material: AsteroidMaterial,
   x: number,
   y: number,

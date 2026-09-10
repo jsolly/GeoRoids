@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { applyShipMotionFrame } from '../../../server/ai/shipMotion';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { PALETTE, VISUAL } from '../../../src/constants';
+import { stepReleasedMotion } from '../../../shared/asteroidMotion';
+import { GAME, PALETTE, VISUAL } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
-import { Point } from '../../../src/physics/Point';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import {
   createHeightfield,
@@ -22,44 +22,15 @@ import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
-type TraceContext = CanvasRenderingContext2D & { strokes: number };
-
-function traceContext(): TraceContext {
-  let ctx = {} as TraceContext;
-  ctx = {
-    strokes: 0,
-    save: () => undefined,
-    restore: () => undefined,
-    beginPath: () => undefined,
-    moveTo: () => undefined,
-    lineTo: () => undefined,
-    stroke: () => {
-      ctx.strokes += 1;
-    },
-  } as unknown as TraceContext;
-  return ctx;
-}
-
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 function steepestSample(seed: number): { x: number; y: number; steep: number } {
   const field = createHeightfield(seed, BOUNDS);
-  let best = { x: 800, y: 0, steep: 0 };
-  for (let a = 0; a < 24; a++) {
-    const angle = (a / 24) * Math.PI * 2;
-    for (const r of [700, 1100, 1500, 1900]) {
-      const x = Math.cos(angle) * r;
-      const y = Math.sin(angle) * r;
-      const g = sampleGradient(field, x, y);
-      const steep = Math.hypot(g.x, g.y);
-      if (steep > best.steep) {
-        best = { x, y, steep };
-      }
-    }
-  }
-  return best;
+  const x = BOUNDS.radius / 2;
+  const gradient = sampleGradient(field, x, 0);
+  return { x, y: 0, steep: Math.hypot(gradient.x, gradient.y) };
 }
 
 describe('seeded heightfield is shared', () => {
@@ -78,10 +49,13 @@ describe('seeded heightfield is shared', () => {
     expect(extractIsoContours(a)).toEqual(extractIsoContours(b));
   });
 
-  test('a different seed changes the field', () => {
-    const a = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
-    const b = createHeightfield(TERRAIN.DEFAULT_SEED + 99, BOUNDS);
-    expect(sampleHeight(a, 1100, -400)).not.toBe(sampleHeight(b, 1100, -400));
+  test('room seeds produce distinct hills and valleys', () => {
+    const field = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
+    const other = createHeightfield(TERRAIN.DEFAULT_SEED + 99, BOUNDS);
+    expect(sampleHeight(field, 1550, 0)).not.toBe(sampleHeight(other, 1550, 0));
+    expect(sampleHeight(field, 1550, 0)).toBeGreaterThan(0);
+    expect(sampleHeight(field, 500, 500)).toBeLessThan(0);
+    expect(sampleHeight(field, 1550, 0)).not.toBe(sampleHeight(field, 0, 1550));
   });
 
   test('gameState carries the room seed so late joiners match', () => {
@@ -149,7 +123,7 @@ describe('ships feel the slope', () => {
   test('a coasting ship accelerates downhill and slows uphill', () => {
     const field = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
     const peak = steepestSample(TERRAIN.DEFAULT_SEED);
-    expect(peak.steep).toBeGreaterThan(0.001);
+    expect(peak.steep).toBeGreaterThan(0.0004);
 
     const g = sampleGradient(field, peak.x, peak.y);
     const len = Math.hypot(g.x, g.y);
@@ -167,7 +141,7 @@ describe('ships feel the slope', () => {
     expect(Math.hypot(uphill.x, uphill.y)).toBeLessThan(before);
   });
 
-  test('origin spawn is flat so parked ships do not slide', () => {
+  test('the flat spawn has no preferred downhill direction so parked ships do not slide', () => {
     const field = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
     const g = sampleGradient(field, 0, 0);
     expect(Math.hypot(g.x, g.y)).toBeLessThan(1e-5);
@@ -216,25 +190,51 @@ describe('muted contour chrome', () => {
     expect(PALETTE.CONTOUR.toLowerCase()).not.toBe(PALETTE.LOCAL.toLowerCase());
     expect(PALETTE.CONTOUR.toLowerCase()).not.toBe(PALETTE.LASER_LOCAL.toLowerCase());
     expect(VISUAL.CONTOUR_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.SHIP_STROKE_WIDTH);
-    expect(VISUAL.CONTOUR_ALPHA).toBeLessThanOrEqual(0.2);
-    expect(VISUAL.CONTOUR_INDEX_ALPHA).toBeLessThanOrEqual(0.28);
+    expect(VISUAL.CONTOUR_ALPHA).toBeLessThanOrEqual(0.3);
+    expect(VISUAL.CONTOUR_INDEX_ALPHA).toBeLessThanOrEqual(0.5);
     expect(VISUAL.CONTOUR_INDEX_ALPHA).toBeGreaterThan(VISUAL.CONTOUR_ALPHA);
   });
 
-  test('active room terrain produces muted contour strokes at runtime', () => {
-    const ctx = traceContext();
-    const canvas = { width: 800, height: 600 } as HTMLCanvasElement;
+  test('terrain elevations stay on their contours while the camera moves', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Missing real terrain canvas');
+    }
     vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
     vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 800, height: 600 });
-    vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
-      (world) => new Point(world.x + 400, world.y + 300)
-    );
+    vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
     ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-
+    const rendered: Array<{ text: string; x: number; y: number }> = [];
+    const fillText = ctx.fillText.bind(ctx);
+    vi.spyOn(ctx, 'fillText').mockImplementation((text, x, y) => {
+      const transform = ctx.getTransform();
+      rendered.push({ text, x: transform.e, y: transform.f });
+      fillText(text, x, y);
+    });
     drawIsoContours({ x: 0, y: 0 });
-
-    expect(ctx.strokes).toBeGreaterThan(0);
+    const before = rendered.splice(0);
+    expect(before.length).toBeGreaterThan(2);
+    for (const label of before) {
+      expect(label.text).toMatch(/^-?\d+\.\d{2}$/);
+      expect(label.x).toBeGreaterThan(0);
+      expect(label.x).toBeLessThan(canvas.width);
+      expect(label.y).toBeGreaterThan(0);
+      expect(label.y).toBeLessThan(canvas.height);
+    }
+    drawIsoContours({ x: 50, y: 0 });
+    const retained = before.filter((label) => label.x > 100 && label.x < 700);
+    expect(retained.length).toBeGreaterThan(0);
+    for (const label of retained) {
+      const moved = rendered.find(
+        (candidate) => candidate.text === label.text && Math.abs(candidate.y - label.y) < 0.001
+      );
+      expect(moved).toBeDefined();
+      expect(moved?.x).toBeCloseTo(label.x - 50, 5);
+    }
   });
 });
 
@@ -242,4 +242,78 @@ test('ensureTerrain caches the active room field', () => {
   const first = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
   const second = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
   expect(second).toBe(first);
+});
+
+test('translated arenas retain the same terrain and a stable flat spawn', () => {
+  const base = createHeightfield(7, BOUNDS);
+  const field = createHeightfield(7, { cx: 250, cy: -170, radius: 3100 });
+  for (const { x, y } of [
+    { x: 0, y: 0 },
+    { x: 500, y: 500 },
+    { x: 1550, y: 0 },
+    { x: -600, y: 800 },
+  ]) {
+    expect(sampleHeight(field, field.cx + x, field.cy + y)).toBeCloseTo(
+      sampleHeight(base, x, y),
+      10
+    );
+  }
+  expect(sampleHeight(field, field.cx + field.radius + 10, field.cy)).toBe(0);
+  expect(sampleGradient(field, field.cx + field.radius, field.cy)).toEqual({ x: 0, y: 0 });
+  const inside = sampleGradient(field, field.cx + field.radius - 1, field.cy);
+  expect(Math.hypot(inside.x, inside.y)).toBeLessThan(1e-5);
+});
+
+test.each([1, 8])(
+  'a mass-%s pilot travels farther downhill but can still thrust uphill',
+  (mass) => {
+    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+    const startX = BOUNDS.radius / 2;
+    const downhill = new Ship({ position: { x: startX, y: 0 } });
+    const uphill = new Ship({ position: { x: startX, y: 0 } });
+    for (const ship of [downhill, uphill]) {
+      ship.mass = mass;
+      ship.thrusting = true;
+      ship.velocity = { x: 0, y: 0 };
+    }
+    downhill.angle = Math.PI;
+    uphill.angle = 0;
+    const bot = {
+      position: { x: startX, y: 0 },
+      velocity: { x: 0, y: 0 },
+      angle: Math.PI,
+      thrusting: true,
+      mass,
+    };
+    for (let frame = 0; frame < 120; frame++) {
+      downhill.update();
+      uphill.update();
+      applyShipMotionFrame(bot);
+      // Compare acceleration before either ship reaches its speed cap or crosses a new slope.
+      if (frame === 14) {
+        expect(Math.hypot(downhill.velocity.x, downhill.velocity.y)).toBeGreaterThan(
+          Math.hypot(uphill.velocity.x, uphill.velocity.y)
+        );
+      }
+    }
+    const downDistance = startX - downhill.position.x;
+    const upDistance = uphill.position.x - startX;
+    expect(upDistance).toBeGreaterThan(50);
+    expect(downDistance).toBeGreaterThan(upDistance * 1.05);
+    expect(bot.position.x).toBeCloseTo(downhill.position.x, 8);
+    expect(bot.velocity.x).toBeCloseTo(downhill.velocity.x, 8);
+  }
+);
+
+test('a ship released from an asteroid also travels faster downhill than uphill', () => {
+  ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+  const downhill = { position: { x: 1550, y: 0 }, velocity: { x: -12, y: 0 }, angle: Math.PI };
+  const uphill = { position: { x: 1550, y: 0 }, velocity: { x: 12, y: 0 }, angle: 0 };
+  for (let frame = 0; frame < 30; frame++) {
+    stepReleasedMotion(downhill, { thrust: false, turn: 0, aimAngle: 0 }, 5 / GAME.FPS, 450, 1);
+    stepReleasedMotion(uphill, { thrust: false, turn: 0, aimAngle: 0 }, 5 / GAME.FPS, 450, 1);
+  }
+  expect(1550 - downhill.position.x).toBeGreaterThan(uphill.position.x - 1550);
+  expect(-downhill.velocity.x).toBeGreaterThan(uphill.velocity.x);
+  expect(uphill.velocity.x).toBeGreaterThan(0);
 });

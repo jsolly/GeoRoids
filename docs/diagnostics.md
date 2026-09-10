@@ -124,17 +124,72 @@ for reading log contents. Test-only diagnostic routes stay disabled there.
 The live client frame path is `eventLoop` → `GameController.updateGame` /
 `renderGame` → `canvasManager.drawGame`. Measure that path when investigating
 frame cost. Separate simulation, render and transport measurements, warm up the
-fixture, and state its entity/projectile load. Synchronous frame batches measure
-CPU cost; they do not measure display FPS or real animation-frame scheduling.
+fixture, and state its entity/projectile load. Synchronous render batches measure
+canvas command submission, including any flush work paid inside those calls;
+they do not measure display FPS, GPU completion or animation-frame scheduling.
 
-Run `npm run benchmark:game-loop` from `/Users/johnsolly/code/GeoRoids` for a
-repeatable Chromium client and Node server sample with production log settings.
-It warms both paths and reports entity counts before and after measurement.
-The loaded fixture adds pilots and asteroids; the authoritative world still
-evolves during the run. Compare repeated samples on the same machine and browser,
-and use a browser performance trace when investigating missed display frames.
-The benchmark also checks that skipping a fully offscreen arena wall preserves
-the rendered pixels. Pixel readback runs after timing.
+The supported entry point is `npm run benchmark -- measure <kind> --revision REV`.
+The [benchmark framework guide](../benchmarks/README.md) defines the four runners,
+comparison protocol and retained artifacts. The harness must be clean and
+committed. The runner archives each product revision, overlays the same benchmark
+code, verifies dependencies, and checks source and dependency hashes before and
+after the run.
+
+Run these examples from `/Users/johnsolly/code/GeoRoids`:
+
+```sh
+npm run benchmark -- measure client --revision HEAD --seed 42 --viewport desktop
+npm run benchmark -- measure client --revision HEAD --seed 42 --viewport touch-portrait
+npm run benchmark -- measure server --revision HEAD --seed 42
+npm run benchmark -- measure codec --revision HEAD --seed 42
+npm run benchmark -- measure transport --revision HEAD --seed 42
+```
+
+Each invocation prints a unique `/tmp/georoids-benchmarks/run-*` directory. Keep
+its raw JSON, command logs, setup records and failure artifacts when investigating
+a result. A completed report means owned browser, socket, server and child process
+cleanup also completed.
+
+The client runner compiles the diagnostic fixture and runs Chromium at desktop
+1920x1080, touch portrait 390x844, or touch landscape 844x390. The timing context
+and observation context are fresh and separate. Timing uses real
+`requestAnimationFrame` timestamps plus native `performance.now()`. `updateMs` and
+`renderMs` measure synchronous update and Canvas2D submission CPU work. They do not
+measure presented frames or GPU completion. The observation context wraps native
+`CanvasRenderingContext2D` and `Path2D` methods and counts actual API calls,
+including HUD and environment probes. Those counts describe API submissions, not
+GPU draws, and remain outside the timed context.
+
+The server runner directly advances `GameEngine` with two real loopback human
+connections and two bots created by the seeded engine. It fixes `Date.now()` and
+seeds `Math.random()` while using native `performance.now()` for tick samples.
+Natural authoritative simulation remains active, so asteroid, loot, satellite and
+pickup counts before and after the measured ticks are recorded. This direct runner
+does not establish production server capacity.
+
+The codec runner uses the original seeded snapshot fixtures. It decodes every
+keyframe and delta and checks equality with the original fixture, including
+staggered recipient baselines. Encode/serialize and decode timings are separate.
+Byte counts are UTF-8 application payload bytes from the JSON snapshot envelope;
+they exclude WebSocket transport framing.
+
+The transport runner starts an owned child server and connects two loopback
+clients. It measures realtime ping RTT, snapshot delivery intervals, packet and
+UTF-8 payload counts, client buffering and child-server event-loop delay. Native
+scheduling is nondeterministic. The sample seed selects client IDs and requested
+poses; the server seed belongs to the server factory. Transport accepts one
+revision and is not a paired comparison.
+
+For client, server and codec comparisons, the runner performs three baseline A/A
+calibration pairs and twelve A/B pairs, alternating pair order. Workload
+parameters and canonical outcome witnesses must match. Work counts must repeat
+within each revision; differences between revisions are reported separately. A
+changed outcome or nonrepeatable count rejects a comparison even if timing is lower. The
+report's interval is a fixed-seed descriptive interval for these samples and
+machine conditions. Read timing and `work` counts separately; the framework does
+not label a generic performance win. `inconclusive` and calibration drift are
+valid outcomes. Use a browser performance trace or device observation when a
+presented-frame or compositor question remains.
 
 Vite's profiling tools diagnose development startup, transforms and build work.
 They complement runtime game profiling. See the

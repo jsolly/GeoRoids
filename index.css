@@ -41,13 +41,6 @@ body {
   background-color: var(--palette-bg, #000011);
 }
 
-#start-screen {
-  font-size: 1rem;
-  background: rgba(8, 15, 25, 0.84);
-  border-color: color-mix(in srgb, var(--palette-hud-muted, #64748b) 55%, transparent);
-  backdrop-filter: none;
-}
-
 .terrain-eyebrow {
   margin: 0 0 1rem;
   color: #a5b6c7;
@@ -55,6 +48,13 @@ body {
   font-size: 0.65rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+#start-screen {
+  font-size: 1rem;
+  background: rgba(8, 15, 25, 0.84);
+  border-color: color-mix(in srgb, var(--palette-hud-muted, #64748b) 55%, transparent);
+  backdrop-filter: none;
 }
 
 /* Ensure the game wrapper doesn't create black areas */
@@ -170,6 +170,10 @@ a {
   position: relative;
 }
 
+#start-screen h1 {
+  margin-bottom: 0.6em;
+}
+
 .screen h1::after {
   content: "";
   position: absolute;
@@ -206,6 +210,16 @@ a {
   color: var(--palette-accent, #a78bfa);
   text-shadow: 0 0 8px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
   opacity: 0.82;
+}
+
+body.in-play #title-terrain,
+body.in-play #attribution,
+body.in-play .controls-hint {
+  display: none;
+}
+
+body.in-play {
+  touch-action: none;
 }
 
 .ship-kit-select {
@@ -783,20 +797,6 @@ body.touch-play .touch-controls:not([hidden]) {
   }
 }
 
-#start-screen h1 {
-  margin-bottom: 0.6em;
-}
-
-body.in-play #title-terrain,
-body.in-play #attribution,
-body.in-play .controls-hint {
-  display: none;
-}
-
-body.in-play {
-  touch-action: none;
-}
-
 /* Style for default nickname */
 .game-modes .form-control.default-nickname {
   border-color: rgba(79, 195, 247, 0.6);
@@ -817,4 +817,49 @@ body.in-play {
   color: rgba(79, 195, 247, 0.8);
   pointer-events: none;
   opacity: 0.7;
+}
+
+/* Companion reference, reachable before joining a game. */
+.manual-entry {
+  margin: 0;
+}
+.manual-entry a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #5eead4;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Direct controls report state without covering or intercepting the playfield. */
+#flight-feedback {
+  position: absolute;
+  top: 112px;
+  left: 16px;
+  max-width: min(260px, 60vw);
+  color: var(--palette-hud-muted, #94a3b8);
+  font: 11px / 1.5 var(--font-mono, monospace);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+#flight-upgrade {
+  color: var(--palette-laser, #fde68a);
+}
+@media (max-height: 500px) {
+  #flight-feedback {
+    top: 76px;
+    font-size: 10px;
+  }
+}
+
+#flight-selection-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

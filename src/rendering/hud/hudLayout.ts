@@ -2,14 +2,14 @@ import { TOUCH, VISUAL } from '../../constants';
 import { queryViewport, shouldUseTouchControls } from '../../ui/viewportChrome';
 import type { PlayfieldSize } from '../playfieldCamera';
 
-type SafeAreaInsets = {
+export type SafeAreaInsets = {
   top: number;
   right: number;
   bottom: number;
   left: number;
 };
 
-type HudLayout = {
+export type HudLayout = {
   padTop: number;
   padLeft: number;
   padRight: number;

@@ -9,7 +9,6 @@ import { SatelliteManager } from '../entities/satellite/SatelliteManager';
 import { drawSatellites } from '../entities/satellite/satelliteRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
-import type { Ship } from '../entities/ship/Ship';
 import {
   drawLasers,
   drawShipAtPosition,
@@ -32,6 +31,7 @@ import {
 import { drawIsoContours } from './contourRenderer';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
+import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
@@ -48,6 +48,7 @@ class CanvasManager {
   private canvas: HTMLCanvasElement | null = null;
   private context: CanvasRenderingContext2D | null = null;
   private resizeHandler: (() => void) | null = null;
+  private resizeFrame: number | null = null;
   private stopDevicePixelRatioWatcher: (() => void) | null = null;
   private readonly viewport = { width: 1, height: 1 };
   private devicePixelRatio = 1;
@@ -62,10 +63,23 @@ class CanvasManager {
 
     if (this.canvas && this.context) {
       // Add resize handler to maintain full-screen coverage
-      this.resizeHandler = this.handleCanvasResize.bind(this);
+      this.resizeHandler = () => {
+        if (this.resizeFrame !== null) {
+          return;
+        }
+        if (typeof window.requestAnimationFrame !== 'function') {
+          this.handleCanvasResize();
+          return;
+        }
+        this.resizeFrame = window.requestAnimationFrame(() => {
+          this.resizeFrame = null;
+          this.handleCanvasResize();
+        });
+      };
       window.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('scroll', this.resizeHandler);
+
       this.stopDevicePixelRatioWatcher = watchDevicePixelRatio(() => {
         this.handleCanvasResize();
       });
@@ -143,6 +157,10 @@ class CanvasManager {
   destroy(): void {
     this.stopDevicePixelRatioWatcher?.();
     this.stopDevicePixelRatioWatcher = null;
+    if (this.resizeFrame !== null) {
+      window.cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = null;
+    }
     if (this.resizeHandler) {
       window.removeEventListener('resize', this.resizeHandler);
       window.visualViewport?.removeEventListener('resize', this.resizeHandler);
@@ -191,6 +209,10 @@ class CanvasManager {
       throw new Error('Canvas context not initialized');
     }
     return this.context;
+  }
+
+  getPlayfieldScale(): number {
+    return PLAYFIELD_CLOSE_SCALE;
   }
 
   worldToScreenInto(
@@ -337,34 +359,23 @@ class CanvasManager {
       drawLasers(player.ship, enemyLaserColor, currShip.position);
     }
 
-    this.drawMiniMapWithPlayers(currShip, viewport);
+    const hudLayout = hudLayoutForCanvas(viewport);
+    drawMiniMap(ctx, hudLayout, currShip);
 
-    drawScoreOverlay(ctx, viewport, currScore, lives, currPlayer.factionId);
+    drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
 
-    drawLivesIndicator(ctx, lives, PALETTE.LOCAL, viewport, currShip.kitId);
+    drawLivesIndicator(ctx, hudLayout, lives, PALETTE.LOCAL, currShip.kitId);
 
     if (text && textAlpha > 0) {
-      drawTextOverlay(ctx, viewport, text, textAlpha);
+      drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);
     }
 
     if (allPlayers.length > 1) {
-      drawLeaderboard(ctx, viewport, allPlayers, currPlayer.id);
+      drawLeaderboard(ctx, hudLayout, allPlayers, currPlayer.id);
     }
 
     const roidCount = currRoidBelt.roids.length;
     drawDebugInfo(ctx, viewport, roidCount, isDebugMode());
-  }
-
-  // Helper method to draw mini map with all players
-  private drawMiniMapWithPlayers(ship: Ship, viewport: PlayfieldSize): void {
-    // Draw the base mini map
-    const ctx = this.getContext();
-    const canvas = this.getCanvas();
-    if (ctx && canvas) {
-      drawMiniMap(ctx, viewport, ship);
-    }
-
-    // The mini map module will handle drawing all players internally
   }
 }
 

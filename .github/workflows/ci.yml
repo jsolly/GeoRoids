@@ -7,16 +7,84 @@ name: CI
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  behavioral-smoke:
+    name: behavioral-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Prepare behavioral artifacts
+        run: |
+          mkdir -p behavioral-artifacts/logs behavioral-artifacts/screenshots
+          echo "Runner has not started; inspect job setup steps if no test log follows." > behavioral-artifacts/README.txt
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Playwright Chromium and OS dependencies
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Run serialized critical behavioral scenarios
+        run: |
+          set +e
+          set -o pipefail
+          GEOROIDS_TEST_MAX_DURATION_SECONDS=300 ./scripts/test-runner.sh \
+            tests/integration/browser/sanity/critical-gameplay-smoke.test.ts \
+            tests/integration/browser/sanity/sustained-mobile-controls.test.ts \
+            tests/integration/browser/sanity/rejected-joins-return-to-menu-and-can-retry.test.ts \
+            tests/integration/server/mixed-version-pilots-recover-after-reconnect.test.ts \
+            --reporter=verbose 2>&1 | tee behavioral-artifacts/test-run.log
+          pipeline_statuses=("${PIPESTATUS[@]}")
+          status=${pipeline_statuses[0]}
+          tee_status=${pipeline_statuses[1]}
+          if [[ "$tee_status" != 0 ]]; then
+            echo "Failed to retain the behavioral test log (tee exit $tee_status)" >&2
+            if [[ "$status" == 0 ]]; then status=1; fi
+          fi
+          for source in logs tests/integration/browser/screenshots; do
+            destination=behavioral-artifacts/logs
+            if [[ "$source" == tests/integration/browser/screenshots ]]; then
+              destination=behavioral-artifacts/screenshots
+            fi
+            if [[ -d "$source" ]]; then
+              if ! cp -a "$source"/. "$destination"/; then
+                echo "Failed to copy $source" >&2
+                if [[ "$status" == 0 ]]; then status=1; fi
+              fi
+            else
+              echo "Artifact directory unavailable: $source (runner exit $status)" | tee -a behavioral-artifacts/README.txt
+              if [[ "$status" == 0 ]]; then status=1; fi
+            fi
+          done
+          exit "$status"
+      - name: Upload behavioral artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: behavioral-smoke-${{ github.run_id }}
+          path: behavioral-artifacts
+          if-no-files-found: error
+          retention-days: 14
+
   ci:
     name: ci
+    needs: behavioral-smoke
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -31,7 +99,18 @@ jobs:
       - run: npm run check:md
       - run: npm run check:yaml
       - run: npm run check:ts
+      - run: npm run check:benchmarks
       - run: npm run check:test-runner
       - run: npm run check:dev-server
       - run: npm test
       - run: npm run build
+      - name: Require behavioral smoke lane to pass
+        if: ${{ always() }}
+        env:
+          BEHAVIORAL_RESULT: ${{ needs.behavioral-smoke.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$BEHAVIORAL_RESULT" != "success" ]]; then
+            echo "Critical behavioral lane result: $BEHAVIORAL_RESULT" >&2
+            exit 1
+          fi

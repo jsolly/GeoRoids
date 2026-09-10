@@ -19,11 +19,11 @@ test(
     const startPos = await game.getShipPosition();
     const startAngle = await game.getShipAngle();
 
-    await game.moveShip('up', 800);
+    await game.holdMovementKey('ArrowUp', 800);
     const afterThrust = await game.getShipPosition();
     expect(Math.hypot(afterThrust.x - startPos.x, afterThrust.y - startPos.y)).toBeGreaterThan(5);
 
-    await game.moveShip('right', 400);
+    await game.holdMovementKey('ArrowRight', 400);
     const afterTurn = await game.getShipAngle();
     expect(Math.abs(afterTurn - startAngle)).toBeGreaterThan(0.05);
   },

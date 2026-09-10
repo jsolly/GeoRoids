@@ -1,16 +1,24 @@
 /* @vitest-environment node */
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const browserApi = vi.hoisted(() => {
-  const page = {
+const browserApi = await vi.hoisted(async () => {
+  const { EventEmitter } = await import('node:events');
+  const state = { connected: true };
+  const page = Object.assign(new EventEmitter(), {
     close: vi.fn(),
     setViewportSize: vi.fn(),
     setExtraHTTPHeaders: vi.fn(),
     bringToFront: vi.fn(),
+  });
+  const context = { newPage: vi.fn(async () => page), close: vi.fn() };
+  const browser = {
+    newContext: vi.fn(async () => context),
+    isConnected: () => state.connected,
+    close: vi.fn(async () => {
+      state.connected = false;
+    }),
   };
-  const context = { newPage: vi.fn(async () => page) };
-  const browser = { newContext: vi.fn(async () => context), close: vi.fn() };
-  return { page, browser };
+  return { page, browser, state };
 });
 
 vi.mock('playwright', () => ({
@@ -21,6 +29,7 @@ import { BrowserManager } from '../../integration/utils/browser-manager';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  browserApi.state.connected = true;
 });
 
 test('a failed page close rejects scenario cleanup and keeps the page available for retry', async () => {
@@ -30,7 +39,7 @@ test('a failed page close rejects scenario cleanup and keeps the page available 
   const failure = new Error('page transport failed');
   browserApi.page.close.mockRejectedValueOnce(failure);
 
-  await expect(manager.closeAllPages()).rejects.toBe(failure);
+  await expect(manager.closeAllPages()).rejects.toMatchObject({ errors: [failure] });
   expect(manager.getCurrentPage()).toBe(browserApi.page);
   await manager.closeAllPages();
   expect(browserApi.page.close).toHaveBeenCalledTimes(2);
@@ -39,15 +48,16 @@ test('a failed page close rejects scenario cleanup and keeps the page available 
   expect(browserApi.browser.close).toHaveBeenCalledOnce();
 });
 
-test('failed final browser cleanup rejects and retains ownership until a successful retry', async () => {
+test('failed final browser cleanup rejects and retains browser ownership until a successful retry', async () => {
   const manager = new BrowserManager();
   await manager.initialize();
   await manager.createPage({ hasTouch: true });
   const failure = new Error('browser transport failed');
   browserApi.browser.close.mockRejectedValueOnce(failure);
 
-  await expect(manager.cleanup()).rejects.toBe(failure);
-  expect(manager.getCurrentPage()).toBe(browserApi.page);
+  await expect(manager.cleanup()).rejects.toMatchObject({ errors: [failure] });
+  expect(browserApi.state.connected).toBe(true);
+  expect(manager.getCurrentPage()).toBeNull();
   await manager.cleanup();
   expect(browserApi.browser.close).toHaveBeenCalledTimes(2);
   expect(manager.getCurrentPage()).toBeNull();

@@ -51,6 +51,11 @@ operation and its assertion; cleanup must also complete.
 - Reuse existing geometry or simulation functions when arranging a scene. Do
   not implement a second physics engine in test helpers.
 
+Browser scenarios use the running game's animation clock. Use
+`waitForAnimationFrames` or wait for the expected state; never call `updateGame`
+alongside the active loop. Hold real keyboard, mouse, or touch input to test
+controls, and release held input in cleanup.
+
 Begin observing transient banners, shots, and events before triggering them.
 Use bounded waits for the actual condition. An immediate destruction event can
 precede the next loot snapshot. A socket receive log can precede validation.
@@ -70,6 +75,13 @@ Mocks should control external boundaries or failure conditions. A mock should
 not return the exact gameplay outcome the test claims to verify. Model state
 can prove synchronization; it cannot alone prove that a HUD element was drawn.
 Use rendered evidence for a test named after UI behavior.
+Matching tokens in renderer source cannot prove drawing behavior; observe the
+executed canvas calls or rendered output instead.
+
+When expected rendering uses a production geometry helper, retain independent
+checks on the captured output, such as known positions, vertex counts, or scale
+ratios. Otherwise a helper that ignores a scale argument can change both the
+rendering and its expected result while the test still passes.
 
 Keep important negative scenarios: invalid ownership, malformed commands,
 production-disabled controls, resource limits, failed writes, deadlines, and
@@ -82,6 +94,10 @@ state transition or write/transport failure, then inspect its correlated record
 and outcome. A hand-authored log envelope cannot prove that the runtime logger
 retains player IDs or event-time values. Control clocks and mutate the source
 after logging when proving that recorded state is a detached observation.
+
+Shared transport fixtures used across test levels live in `tests/support/`.
+`RecordingSocket` models an in-process transport boundary; `WireClient` owns a
+real loopback connection and its bounded lifecycle. Keep their use explicit.
 
 ## Consolidate instead of accumulating
 
@@ -110,4 +126,20 @@ they share logging or other process resources.
 A failed reset, fixture operation, evidence read, or cleanup must fail the run.
 Report the commands and results actually run, including any skipped or removed
 tests. Screenshots are diagnostics, not a success criterion. The repository's
-full pre-push gate remains `npm run gate`.
+full pre-push gate remains `npm run gate`. All lint findings are errors, and
+the CLI also rejects warnings. Fix the code or simplify the scenario; do not
+add suppressions, downgrade rules, or weaken an assertion to pass the gate.
+
+## Performance measurement
+
+Keep measurement fixtures and instrumentation under `benchmarks/`; production
+modules must not import them. Benchmark contract tests belong in
+`tests/unit/performance/` and prove rejected changed workloads, invalid results,
+or cleanup failures. Timed benchmark runs stay outside the test gate because
+machine scheduling is not a deterministic correctness assertion.
+
+Compare equivalent scenarios with the same pinned harness. Preserve raw timing
+samples, declared participants, final game state, and exact work counts. A faster
+run that lost a player or skipped work is invalid. Canvas API calls and payload
+bytes are structural counts; elapsed time and frame pacing need calibrated
+repeated measurements. Follow `benchmarks/README.md` for the supported commands.

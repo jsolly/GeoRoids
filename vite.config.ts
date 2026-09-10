@@ -1,5 +1,15 @@
 import { execFileSync } from 'node:child_process';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { defineConfig } from 'vite';
+
+/** Match the production wiki rewrite in development and build previews. */
+function wikiEntry(request: IncomingMessage, _response: ServerResponse, next: () => void): void {
+  const url = new URL(request.url ?? '/', 'http://vite.local');
+  if (url.pathname === '/wiki' || url.pathname === '/wiki/') {
+    request.url = `/wiki/index.html${url.search}`;
+  }
+  next();
+}
 
 export default defineConfig(() => {
   const define: Record<string, string> = {};
@@ -26,8 +36,24 @@ export default defineConfig(() => {
   // Do not define it here — vite `define` overrides env and breaks production builds.
 
   return {
+    plugins: [
+      {
+        name: 'wiki-entry',
+        configureServer(server) {
+          server.middlewares.use(wikiEntry);
+        },
+        configurePreviewServer(server) {
+          server.middlewares.use(wikiEntry);
+        },
+      },
+    ],
     resolve: {
       extensions: ['.ts'],
+    },
+    build: {
+      rolldownOptions: {
+        input: { game: 'index.html', wiki: 'wiki/index.html' },
+      },
     },
     server: {
       port: testVitePort,

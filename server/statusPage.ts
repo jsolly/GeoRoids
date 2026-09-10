@@ -127,6 +127,8 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
         // Compute endpoints from current page location
         const wsBase = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host;
 
+        const STATUS_SOCKET_CONNECT_TIMEOUT_MS = 5000;
+        const socketDeadlines = new WeakMap();
         let gameWs = null;
         let logWs = null;
         let messageCount = 0;
@@ -145,6 +147,70 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
                 );
                 messageCount--;
             }
+        }
+
+        function socketErrorMessage(error) {
+            return error && typeof error.message === 'string' && error.message ? error.message : 'unknown WebSocket error';
+        }
+
+        function closeStatusSocket(socket, label) {
+            if (!socket) return;
+            clearSocketDeadline(socket);
+            if (socket.readyState === WebSocket.CLOSED) return;
+            try {
+                socket.close();
+            } catch (error) {
+                addLog(\`\${label} WebSocket could not close after failure: \${socketErrorMessage(error)}\`, 'error');
+            }
+        }
+
+        function clearSocketDeadline(socket) {
+            window.clearTimeout(socketDeadlines.get(socket));
+            socketDeadlines.delete(socket);
+        }
+
+        function createStatusSocket(url, label, handlers) {
+            let socket;
+            try {
+                socket = new WebSocket(url);
+            } catch (error) {
+                handlers.onFailure(null, \`could not create connection: \${socketErrorMessage(error)}\`);
+                return null;
+            }
+
+            let opened = false;
+            const deadline = window.setTimeout(function() {
+                if (socket.readyState !== WebSocket.CONNECTING) return;
+                clearSocketDeadline(socket);
+                try {
+                    handlers.onFailure(socket, 'connection timed out after 5 seconds; retry is available');
+                } finally {
+                    closeStatusSocket(socket, label);
+                }
+            }, STATUS_SOCKET_CONNECT_TIMEOUT_MS);
+            socketDeadlines.set(socket, deadline);
+
+            socket.onopen = function(event) {
+                clearSocketDeadline(socket);
+                opened = true;
+                if (handlers.onopen) handlers.onopen(socket, event);
+            };
+
+            socket.onclose = function(event) {
+                clearSocketDeadline(socket);
+                if (handlers.onclose) handlers.onclose(socket, event, opened);
+            };
+
+            socket.onerror = function(error) {
+                clearSocketDeadline(socket);
+                if (handlers.onerror) handlers.onerror(socket, error);
+            };
+
+            socket.onmessage = function(event) {
+                if (handlers.onmessage) handlers.onmessage(socket, event);
+            };
+
+            return socket;
         }
 
         function updateConnectionDetails() {
@@ -185,10 +251,12 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
             \`;
 
             // Update button states
-            document.getElementById('connectGameBtn').disabled = gameStatus === WebSocket.OPEN;
-            document.getElementById('disconnectGameBtn').disabled = gameStatus !== WebSocket.OPEN;
-            document.getElementById('connectLogsBtn').disabled = logStatus === WebSocket.OPEN;
-            document.getElementById('disconnectLogsBtn').disabled = logStatus !== WebSocket.OPEN;
+            const gameActive = gameStatus === WebSocket.OPEN || gameStatus === WebSocket.CONNECTING;
+            const logActive = logStatus === WebSocket.OPEN || logStatus === WebSocket.CONNECTING;
+            document.getElementById('connectGameBtn').disabled = gameActive;
+            document.getElementById('disconnectGameBtn').disabled = !gameActive;
+            document.getElementById('connectLogsBtn').disabled = logActive;
+            document.getElementById('disconnectLogsBtn').disabled = !logActive;
             document.getElementById('testLogBtn').disabled = logStatus !== WebSocket.OPEN;
 
             // Update connection details
@@ -203,92 +271,147 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
         }
 
         function connectGame() {
-            if (gameWs && gameWs.readyState === WebSocket.OPEN) {
-                addLog('Game WebSocket already connected', 'warn');
+            if (gameWs && (gameWs.readyState === WebSocket.OPEN || gameWs.readyState === WebSocket.CONNECTING)) {
+                addLog(\`Game WebSocket \${gameWs.readyState === WebSocket.OPEN ? 'already connected' : 'is already connecting'}\`, 'warn');
                 return;
+            }
+            if (gameWs) {
+                const previous = gameWs;
+                gameWs = null;
+                closeStatusSocket(previous, 'Game');
             }
 
             addLog('Connecting to game WebSocket...', 'info');
-            gameWs = new WebSocket(\`\${wsBase}/ws?asteroidInteractions=1\`);
-
-            gameWs.onopen = function() {
-                addLog('Game WebSocket connected', 'info');
-                updateConnectionDetails();
-            };
-
-            gameWs.onclose = function(event) {
-                addLog(\`Game WebSocket disconnected: \${event.code} - \${event.reason}\`, 'warn');
-                gameWs = null;
-                updateConnectionDetails();
-            };
-
-            gameWs.onerror = function(error) {
-                addLog(\`Game WebSocket error: \${error}\`, 'error');
-            };
-
-            gameWs.onmessage = function(event) {
-                addLog(\`Game message received: \${event.data}\`, 'info');
-            };
+            gameWs = createStatusSocket(\`\${wsBase}/ws?asteroidInteractions=1\`, 'Game', {
+                onopen: function(socket) {
+                    if (gameWs !== socket) return;
+                    addLog('Game WebSocket connected', 'info');
+                    updateConnectionDetails();
+                },
+                onclose: function(socket, event, opened) {
+                    if (gameWs !== socket) return;
+                    gameWs = null;
+                    if (!opened) {
+                        addLog(\`Game WebSocket failed: closed before opening (\${event.code} - \${event.reason || 'no reason provided'}); retry is available\`, 'error');
+                    } else {
+                        addLog(\`Game WebSocket disconnected: \${event.code} - \${event.reason}\`, 'warn');
+                    }
+                    updateConnectionDetails();
+                },
+                onerror: function(socket, error) {
+                    if (gameWs !== socket) return;
+                    gameWs = null;
+                    addLog(\`Game WebSocket failed: connection failed: \${socketErrorMessage(error)}; retry is available\`, 'error');
+                    updateConnectionDetails();
+                    closeStatusSocket(socket, 'Game');
+                },
+                onmessage: function(socket, event) {
+                    if (gameWs === socket) addLog(\`Game message received: \${event.data}\`, 'info');
+                },
+                onFailure: function(socket, reason) {
+                    if (socket !== null && gameWs !== socket) return;
+                    gameWs = null;
+                    addLog(\`Game WebSocket failed: \${reason}\`, 'error');
+                    updateConnectionDetails();
+                }
+            });
+            updateConnectionDetails();
         }
 
         function disconnectGame() {
-            if (gameWs) {
-                gameWs.close();
+            const socket = gameWs;
+            gameWs = null;
+            updateConnectionDetails();
+            if (socket) {
+                addLog('Game WebSocket disconnected by operator', 'info');
+                closeStatusSocket(socket, 'Game');
             }
         }
 
         function connectLogs() {
-            if (logWs && logWs.readyState === WebSocket.OPEN) {
-                addLog('Log WebSocket already connected', 'warn');
+            if (logWs && (logWs.readyState === WebSocket.OPEN || logWs.readyState === WebSocket.CONNECTING)) {
+                addLog(\`Log WebSocket \${logWs.readyState === WebSocket.OPEN ? 'already connected' : 'is already connecting'}\`, 'warn');
                 return;
+            }
+            if (logWs) {
+                const previous = logWs;
+                logWs = null;
+                closeStatusSocket(previous, 'Log');
             }
 
             addLog('Connecting to log WebSocket...', 'info');
-            logWs = new WebSocket(\`\${wsBase}/logs\`);
-
-            logWs.onopen = function() {
-                addLog('Log WebSocket connected', 'info');
-                updateConnectionDetails();
-            };
-
-            logWs.onclose = function(event) {
-                addLog(\`Log WebSocket disconnected: \${event.code} - \${event.reason}\`, 'warn');
-                logWs = null;
-                updateConnectionDetails();
-            };
-
-            logWs.onerror = function(error) {
-                addLog(\`Log WebSocket error: \${error}\`, 'error');
-            };
-
-            logWs.onmessage = function(event) {
-                addLog(\`Log message received: \${event.data}\`, 'info');
-            };
+            logWs = createStatusSocket(\`\${wsBase}/logs\`, 'Log', {
+                onopen: function(socket) {
+                    if (logWs !== socket) return;
+                    addLog('Log WebSocket connected', 'info');
+                    updateConnectionDetails();
+                },
+                onclose: function(socket, event, opened) {
+                    if (logWs !== socket) return;
+                    logWs = null;
+                    if (!opened) {
+                        addLog(\`Log WebSocket failed: closed before opening (\${event.code} - \${event.reason || 'no reason provided'}); retry is available\`, 'error');
+                    } else {
+                        addLog(\`Log WebSocket disconnected: \${event.code} - \${event.reason}\`, 'warn');
+                    }
+                    updateConnectionDetails();
+                },
+                onerror: function(socket, error) {
+                    if (logWs !== socket) return;
+                    logWs = null;
+                    addLog(\`Log WebSocket failed: connection failed: \${socketErrorMessage(error)}; retry is available\`, 'error');
+                    updateConnectionDetails();
+                    closeStatusSocket(socket, 'Log');
+                },
+                onmessage: function(socket, event) {
+                    if (logWs === socket) addLog(\`Log message received: \${event.data}\`, 'info');
+                },
+                onFailure: function(socket, reason) {
+                    if (socket !== null && logWs !== socket) return;
+                    logWs = null;
+                    addLog(\`Log WebSocket failed: \${reason}\`, 'error');
+                    updateConnectionDetails();
+                }
+            });
+            updateConnectionDetails();
         }
 
         function disconnectLogs() {
-            if (logWs) {
-                logWs.close();
+            const socket = logWs;
+            logWs = null;
+            updateConnectionDetails();
+            if (socket) {
+                addLog('Log WebSocket disconnected by operator', 'info');
+                closeStatusSocket(socket, 'Log');
             }
         }
 
         function testLogMessage() {
-            if (logWs && logWs.readyState === WebSocket.OPEN) {
-                const testMessage = {
-                    type: 'clientLog',
-                    timestamp: Date.now(),
-                    data: {
-                        sessionId: 'debug-session-' + Date.now(),
-                        level: 'INFO',
-                        line: \`[\${new Date().toISOString()}] INFO Test message from debug console\`,
-                        message: 'Test message from debug console',
-                        userAgent: navigator.userAgent,
-                        pageUrl: location.href
-                    }
-                };
+            const socket = logWs;
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
-                logWs.send(JSON.stringify(testMessage));
+            const testMessage = {
+                type: 'clientLog',
+                timestamp: Date.now(),
+                data: {
+                    sessionId: 'debug-session-' + Date.now(),
+                    level: 'INFO',
+                    line: \`[\${new Date().toISOString()}] INFO Test message from debug console\`,
+                    message: 'Test message from debug console',
+                    userAgent: navigator.userAgent,
+                    pageUrl: location.href
+                }
+            };
+
+            try {
+                socket.send(JSON.stringify(testMessage));
                 addLog(\`Test log message sent: \${JSON.stringify(testMessage)}\`, 'info');
+            } catch (error) {
+                if (logWs !== socket) return;
+                logWs = null;
+                addLog(\`Log WebSocket failed: failed to send test log message: \${socketErrorMessage(error)}; retry is available\`, 'error');
+                updateConnectionDetails();
+                closeStatusSocket(socket, 'Log');
             }
         }
 
@@ -297,13 +420,16 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
 
             // Disconnect existing connections first
             if (gameWs) {
-                gameWs.close();
+                const socket = gameWs;
                 gameWs = null;
+                closeStatusSocket(socket, 'Game');
             }
             if (logWs) {
-                logWs.close();
+                const socket = logWs;
                 logWs = null;
+                closeStatusSocket(socket, 'Log');
             }
+            updateConnectionDetails();
 
             // Wait a moment, then connect both
             setTimeout(() => {
@@ -429,72 +555,69 @@ export function renderStatusPage(diagnosticsEnabled: boolean): string {
 
         function sendClientLog() {
             const button = document.getElementById('clientLogBtn');
-            const originalText = button.textContent;
+            const originalText = button.textContent || 'Send Client Log';
+            let finished = false;
+
+            function failClientLog(reason) {
+                if (finished) return false;
+                finished = true;
+                addLog(\`Failed to send log message: \${reason}\`, 'error');
+                button.textContent = originalText;
+                button.disabled = false;
+                return true;
+            }
+
             button.textContent = 'Sending...';
             button.disabled = true;
 
-            try {
-                // Create a WebSocket connection to send a test log message directly to the server
-                const ws = new WebSocket(\`\${wsBase}/logs\`);
+            createStatusSocket(\`\${wsBase}/logs\`, 'Client log', {
+                onopen: function(socket) {
+                    if (finished) return;
+                    const testMessage = {
+                        type: 'clientLog',
+                        timestamp: Date.now(),
+                        data: {
+                            sessionId: 'status-page-test',
+                            level: 'INFO',
+                            line: '[Status Page Test] INFO Test client log from /status page',
+                            message: 'Test client log from /status page - this should appear in client.log',
+                            userAgent: navigator.userAgent,
+                            pageUrl: location.href
+                        }
+                    };
 
-                ws.onopen = function() {
                     try {
-                        const testMessage = {
-                            type: 'clientLog',
-                            timestamp: Date.now(),
-                            data: {
-                                sessionId: 'status-page-test',
-                                level: 'INFO',
-                                line: '[Status Page Test] INFO Test client log from /status page',
-                                message: 'Test client log from /status page - this should appear in client.log',
-                                userAgent: navigator.userAgent,
-                                pageUrl: location.href
-                            }
-                        };
-
-                        ws.send(JSON.stringify(testMessage));
-                        addLog('Client log sent directly to server via WebSocket', 'info');
-
-                        button.textContent = 'Sent!';
-                        setTimeout(() => {
-                            button.textContent = originalText;
-                            button.disabled = false;
-                        }, 2000);
-
-                        // Close the WebSocket after sending
-                        setTimeout(() => ws.close(), 100);
+                        socket.send(JSON.stringify(testMessage));
                     } catch (error) {
-                        addLog(\`Failed to send log message: \${error.message}\`, 'error');
-                        button.textContent = 'Failed';
-                        setTimeout(() => {
-                            button.textContent = originalText;
-                            button.disabled = false;
-                        }, 2000);
-                        ws.close();
+                        if (failClientLog(\`send failed: \${socketErrorMessage(error)}; retry is available\`)) {
+                            closeStatusSocket(socket, 'Client log');
+                        }
+                        return;
                     }
-                };
 
-                ws.onerror = function(error) {
-                    addLog(\`WebSocket connection failed: \${error}\`, 'error');
-                    button.textContent = 'Failed';
+                    finished = true;
+                    addLog('Client log sent directly to server via WebSocket', 'info');
+                    button.textContent = 'Sent!';
                     setTimeout(() => {
                         button.textContent = originalText;
                         button.disabled = false;
                     }, 2000);
-                };
-
-                ws.onclose = function() {
-                    // Connection closed, nothing to do here
-                };
-
-            } catch (error) {
-                addLog(\`Failed to create WebSocket: \${error.message}\`, 'error');
-                button.textContent = 'Failed';
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.disabled = false;
-                }, 2000);
-            }
+                    setTimeout(() => closeStatusSocket(socket, 'Client log'), 100);
+                },
+                onerror: function(socket, error) {
+                    if (failClientLog(\`connection failed: \${socketErrorMessage(error)}; retry is available\`)) {
+                        closeStatusSocket(socket, 'Client log');
+                    }
+                },
+                onclose: function(socket, event, opened) {
+                    if (!opened) {
+                        failClientLog(\`closed before opening (\${event.code} - \${event.reason || 'no reason provided'}); retry is available\`);
+                    }
+                },
+                onFailure: function(socket, reason) {
+                    failClientLog(reason);
+                }
+            });
         }
 
         // Check server health every 5 seconds

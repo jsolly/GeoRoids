@@ -1,6 +1,8 @@
-import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import { GameEngine } from '../../../server/core/GameEngine';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('soft factions for humans and bots', () => {
   let engine: GameEngine;
@@ -14,7 +16,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('join auto-balances humans and bots onto two sides', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     const a = engine.addPlayer('human-a', 'A', ws);
     const bots = engine.createBots(2) ?? [];
     const b = engine.addPlayer('human-b', 'B', ws);
@@ -27,7 +29,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('humans and bots on the same side skip laser damage', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     const human = engine.addPlayer('human-1', 'Pilot', ws);
     engine.entityManager.updateEntity(human.id, {
       spawnProtectionTimer: 0,
@@ -35,7 +37,7 @@ describe('soft factions for humans and bots', () => {
     });
     const bots = engine.createBots(2) ?? [];
     const allyBot = bots[0];
-    assert.exists(allyBot);
+    assert.ok(allyBot, 'same-faction ally bot');
     engine.entityManager.updateEntity(allyBot.id, {
       spawnProtectionTimer: 0,
       factionId: 'ion',
@@ -48,7 +50,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('same-faction humans do not take laser damage from each other', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     const shooter = engine.addPlayer('human-ff-a', 'A', ws);
     const teammate = engine.addPlayer('human-ff-b', 'B', ws);
     engine.entityManager.updateEntity(shooter.id, {
@@ -66,7 +68,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('opposite-faction lasers still damage humans and bots', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     const attacker = engine.addPlayer('human-atk', 'Atk', ws);
     const target = engine.addPlayer('human-tgt', 'Tgt', ws);
     engine.entityManager.updateEntity(attacker.id, {
@@ -84,7 +86,7 @@ describe('soft factions for humans and bots', () => {
 
     const bots = engine.createBots(2) ?? [];
     const emberBot = bots.find((bot) => bot.factionId === 'ember') ?? bots[0];
-    assert.exists(emberBot);
+    assert.ok(emberBot, 'opposite-faction ember bot');
     engine.entityManager.updateEntity(emberBot.id, {
       spawnProtectionTimer: 0,
       factionId: 'ember',
@@ -95,7 +97,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('asteroid and boundary hits still damage teammates', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     const player = engine.addPlayer('human-env', 'Env', ws);
     engine.entityManager.updateEntity(player.id, { spawnProtectionTimer: 0 });
     const health = player.health;
@@ -106,7 +108,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('kills award personal score only — no team score on gameState', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     const attacker = engine.addPlayer('human-scorer', 'Scorer', ws);
     const ally = engine.addPlayer('human-ally', 'Ally', ws);
     const target = engine.addPlayer('human-victim', 'Victim', ws);
@@ -138,7 +140,7 @@ describe('soft factions for humans and bots', () => {
   });
 
   test('gameState includes faction for every ship', () => {
-    const ws = {} as never;
+    const ws = new RecordingSocket();
     engine.addPlayer('human-state', 'State', ws);
     engine.createBots(2);
     const state = engine.getGameState();

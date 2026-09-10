@@ -1,4 +1,5 @@
-import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { SATELLITE } from '../../../../src/constants';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
@@ -40,7 +41,7 @@ describe('Hostile NPCs are shared across two clients', () => {
 
   test('one pilot destroying an NPC updates score, loot, and the other client', () => {
     const target = latestSatellites(alice)[0];
-    assert.exists(target);
+    assert.ok(target);
 
     world.shootSatellite(alice, target.id, SATELLITE.HEALTH);
     world.broadcastGameState();

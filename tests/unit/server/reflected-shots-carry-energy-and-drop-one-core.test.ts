@@ -1,6 +1,6 @@
 /* @vitest-environment node */
-import { assert, describe, expect, test } from 'vitest';
-import WebSocket from 'ws';
+import { strict as assert } from 'node:assert';
+import { describe, expect, test } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
@@ -10,10 +10,11 @@ import {
 } from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 function arena() {
   const engine = new GameEngine(419);
-  const ws = { readyState: WebSocket.OPEN, send: () => undefined } as unknown as WebSocket;
+  const ws = new RecordingSocket();
   const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, undefined, 'dart', 'ion');
   delete pilot.spawnProtectionTimer;
   engine.enableAsteroidInteractions(pilot);
@@ -52,7 +53,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
   test('a flat face reverses one shot and fractional energy survives the actual snapshot validator', () => {
     const { engine, reflector } = arena();
     const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
-    assert.exists(shot);
+    assert.ok(shot, 'initial reflected shot');
     engine.advanceLasersAndResolveHits();
     expect(shot.velocity.x).toBeCloseTo(-40);
     expect(shot.velocity.y).toBeCloseTo(0);
@@ -60,7 +61,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(shot.energy).toBe(1.5);
     expect(snapshot(engine).playerProjectiles?.[0]?.energy).toBe(1.5);
     const next = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
-    assert.exists(next);
+    assert.ok(next, 'second reflected shot');
     next.energy = 1.5;
     engine.advanceLasersAndResolveHits();
     expect(reflector.phenomenon?.kind === 'reflective' && reflector.phenomenon.energy).toBe(2.5);
@@ -72,7 +73,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
   test('another shot never replays the chord of an already resolved ricochet', () => {
     const { engine, pilot, ws, reflector } = arena();
     const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 20 });
-    assert.exists(shot);
+    assert.ok(shot, 'chord test shot');
     engine.advanceLasersAndResolveHits();
     expect(shot.bounces).toBe(1);
     const blocker: AsteroidData = {
@@ -121,7 +122,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
     engine.handleAsteroidHit(reflector.id, pilot.id);
     expect(pilot.score).toBe(score);
     const core = cores[0];
-    assert.exists(core);
+    assert.ok(core, 'laser core');
     pilot.position = { ...core.position };
     engine.collectLoot();
     const after = pilot.score;
@@ -141,12 +142,12 @@ describe('reflected shots remain authoritative across snapshots and resource col
     pilot.position = { x: -100, y: 0 };
     const initial = pilot.health;
     const direct = engine.spawnLaser(pilot.id, pilot.position, { x: 10, y: 0 });
-    assert.exists(direct);
+    assert.ok(direct, 'direct self shot');
     engine.advanceLasersAndResolveHits();
     expect(pilot.health).toBe(initial);
     direct.hasExploded = true;
     const reflected = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
-    assert.exists(reflected);
+    assert.ok(reflected, 'reflected self shot');
     for (let index = 0; index < 4; index++) {
       engine.advanceLasersAndResolveHits();
     }
@@ -171,9 +172,9 @@ describe('reflected shots remain authoritative across snapshots and resource col
     const allyHealth = ally.health;
     const enemyHealth = enemy.health;
     const returning = engine.spawnLaser(pilot.id, { x: -150, y: 0 }, { x: 40, y: 0 });
-    assert.exists(returning);
+    assert.ok(returning, 'returning direct shot');
     const hostile = engine.spawnLaser(pilot.id, { x: -150, y: 200 }, { x: 40, y: 0 });
-    assert.exists(hostile);
+    assert.ok(hostile, 'hostile direct shot');
     engine.removePlayer(pilot.id);
     engine.advanceLasersAndResolveHits();
     expect(ally.health).toBe(allyHealth);
@@ -211,7 +212,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(upgraded.segments).toHaveLength(1);
     expect(upgraded.termination).toBe('blocked');
     const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
-    assert.exists(shot);
+    assert.ok(shot, 'threshold shot');
     shot.energy = 2;
     engine.advanceLasersAndResolveHits();
     expect(shot.hasExploded).toBe(true);
@@ -232,13 +233,16 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test('projectile identities never repeat across world reset or a new server instance', () => {
     const { engine } = arena();
-    const before = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    const beforeShot = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    assert.ok(beforeShot, 'pre-reset shot');
+    const before = beforeShot.id;
     engine.removePlayer('pilot');
-    const after = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
-    const restarted = new GameEngine().spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
-    assert.exists(before);
-    assert.exists(after);
-    assert.exists(restarted);
-    expect(new Set([before.id, after.id, restarted.id]).size).toBe(3);
+    const afterShot = engine.spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    assert.ok(afterShot, 'post-reset shot');
+    const after = afterShot.id;
+    const restartedShot = new GameEngine().spawnLaser('pilot', { x: 500, y: 0 }, { x: 1, y: 0 });
+    assert.ok(restartedShot, 'restarted server shot');
+    const restarted = restartedShot.id;
+    expect(new Set([before, after, restarted]).size).toBe(3);
   });
 });

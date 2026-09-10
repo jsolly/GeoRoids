@@ -1,4 +1,5 @@
 import { hexToRgba } from '../utils/colorUtils';
+import type { DrawingContext } from './drawingContext';
 
 export type Vec2 = { x: number; y: number };
 
@@ -147,7 +148,7 @@ export function laserBoltOffsets(
 }
 
 export function strokePhosphorPolyline(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   points: readonly Vec2[],
   color: string,
   width: number,
@@ -191,7 +192,7 @@ export function strokePhosphorPolyline(
 }
 
 export function strokeBurstTicks(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   x: number,
   y: number,
   count: number,

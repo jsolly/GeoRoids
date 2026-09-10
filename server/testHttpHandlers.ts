@@ -7,6 +7,7 @@ import { canDealCombatDamage } from '../src/entities/player/softFactions';
 import type { WebSocketCore } from './communication/WebSocketCore';
 import type { GameEntity } from './core/EntityManager';
 import type { GameEngine } from './core/GameEngine';
+import type { ServerPerformanceSummary } from './performanceMetrics';
 import { SERVER_RELEASE_ID } from './release';
 
 const TEST_FIXTURE_MAX_BYTES = 1024;
@@ -188,7 +189,8 @@ export function areTestHttpEndpointsEnabled(nodeEnv: string): boolean {
 export function buildHealthPayload(
   wsCore: WebSocketCore,
   gameEngine: GameEngine,
-  logging?: Record<string, unknown>
+  logging?: Record<string, unknown>,
+  metrics?: ServerPerformanceSummary
 ): Record<string, unknown> {
   const diagnostics = gameEngine.getDiagnostics();
   return {
@@ -199,6 +201,7 @@ export function buildHealthPayload(
     uptime: process.uptime(),
     world: diagnostics,
     ...(logging ? { logging } : {}),
+    ...(metrics ? { metrics } : {}),
   };
 }
 

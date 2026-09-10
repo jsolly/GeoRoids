@@ -79,7 +79,7 @@ test(
     await expect
       .poll(
         async () => {
-          await game.runGameFrames(8);
+          await game.waitForAnimationFrames(8);
           return game.getScore();
         },
         { timeout: 12000, message: 'destroying an asteroid should award points' }

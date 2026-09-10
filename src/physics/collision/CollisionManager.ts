@@ -4,7 +4,6 @@ import type { Laser } from '../../entities/laser/Laser';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
-import type { Combatant } from '../../entities/player/playerKinds';
 import { canDealCombatDamage } from '../../entities/player/softFactions';
 import type { Roid } from '../../entities/roid/Roid';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../entities/roid/roidScore';
@@ -43,8 +42,6 @@ export interface LaserCollisionOptions {
   reportAsteroidHits?: boolean;
   attackerFaction?: FactionId;
 }
-
-type CollisionPlayer = Combatant & { ship: Ship };
 
 export class CollisionManager {
   private static instance: CollisionManager;
@@ -102,51 +99,6 @@ export class CollisionManager {
         damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
-  }
-
-  /**
-   * Check player collisions with asteroids (unified for all player types)
-   */
-  checkPlayerAsteroidCollisions(player: CollisionPlayer, asteroids: Roid[]): void {
-    const ship = player.ship;
-
-    // Skip if ship is exploding, has no health, or is under spawn protection (blinking)
-    if (isShipCollisionImmune(ship)) {
-      if (ship.blinkCount > 0) {
-        logger.debug('COLLISION', 'Skipping collision check - ship under spawn protection', {
-          shipId: ship.id,
-          blinkCount: ship.blinkCount,
-          spawnProtectionTimer: ship.spawnProtectionTimer,
-          position: ship.position,
-        });
-      }
-      return;
-    }
-
-    if (!ship.canTakeCollisionDamage()) {
-      return;
-    }
-
-    // Check collisions with asteroids
-    for (const asteroid of asteroids) {
-      if (isAsteroidPending(asteroid)) {
-        continue;
-      }
-      if (checkShipCollision(ship.position, ship.r, asteroid.position, asteroid.r)) {
-        logger.debug('COLLISION', 'Player-asteroid collision detected', {
-          shipPos: ship.position,
-          shipRadius: ship.r,
-          asteroidPos: asteroid.position,
-          asteroidRadius: asteroid.r,
-          playerId: player.id,
-          playerType: player.type,
-          shipHealth: ship.health,
-          shipExploding: ship.exploding,
-        });
-        this.handlePlayerAsteroidCollision(player, asteroid);
-        break; // Player can only collide with one asteroid per frame
-      }
-    }
   }
 
   /**
@@ -373,25 +325,6 @@ export class CollisionManager {
         noteReadableShieldLaserHit(ship);
       }
     }
-  }
-
-  /**
-   * Handle player hitting an asteroid (unified for all player types)
-   */
-  private handlePlayerAsteroidCollision(player: CollisionPlayer, asteroid: Roid): void {
-    const ship = player.ship;
-
-    logger.debug('COLLISION', 'Player hit asteroid', {
-      shipPos: ship.position,
-      asteroidPos: asteroid.position,
-      shipId: ship.id,
-      asteroidId: asteroid.id,
-      playerId: player.id,
-      playerType: player.type,
-    });
-
-    // Ship↔asteroid health and splitting are server-owned. The client only
-    // predicts motion; leftover every-tab reports would desync health.
   }
 
   private reportAsteroidDamage(asteroid: Roid, playerId: string): void {

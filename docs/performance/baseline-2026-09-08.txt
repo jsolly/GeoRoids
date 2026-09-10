@@ -1,0 +1,178 @@
+Exploratory local sample; not a release baseline or phone FPS result.
+Commit: 54d8c18d4ce25b3ea6af731582bd615666761a85
+Node: v24.16.0
+Command: npm run benchmark:game-loop
+Execution: macOS, headless bundled Chromium, Vite development server.
+One invocation; competing host workloads and thermal state uncontrolled.
+Structured server diagnostic rows omitted; all benchmark summaries retained.
+
+
+> georoids@1.0.0 benchmark:game-loop
+> NODE_ENV=production SERVER_LOG_LEVEL=info tsx scripts/benchmark-game-loop.ts
+
+GeoRoids game-loop benchmark
+Chromium Canvas2D + Node simulation; 180 warmup frames, 7 x 120 measured synchronous frames.
+Client timings measure synchronous canvas submission, not FPS or GPU completion.
+Compare arithmetic means across all equal-sized batches: periodic canvas flushes can make median batch timings misleading when batches are bimodal.
+
+client production desktop @ 1920x1080
+  updateGame fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  updateGame fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  updateGame batch-means-ms=[0.022499999900658926,0.018333333482344946,0.01999999980131785,0.019166666766007742,0.0125,0.014166666567325592,0.0125]
+  updateGame: arithmetic mean=0.0170, median=0.0183 ms/sync-frame (batch median=2.20 ms, p95 of batch means=0.0225 ms/sync-frame)
+  renderGame fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGame fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGame untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGame batch-means-ms=[0.20583333348234495,0.8991666667163372,0.9258333332836628,0.9099999999006589,0.20666666676600773,0.9158333333830039,0.9074999998013179]
+  renderGame: arithmetic mean=0.7101, median=0.9075 ms/sync-frame (batch median=108.90 ms, p95 of batch means=0.9258 ms/sync-frame)
+  hud fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hud fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hud untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hud batch-means-ms=[1.0066666665176551,0.030833333482344946,0.032499999801317854,0.029166666666666667,1.1983333334326745,0.03166666676600774,0.029999999950329464]
+  hud: arithmetic mean=0.3370, median=0.0317 ms/sync-frame (batch median=3.80 ms, p95 of batch means=1.1983 ms/sync-frame)
+  renderGameOverlay fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGameOverlay fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGameOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGameOverlay batch-means-ms=[1.3641666668156782,1.3466666666169962,1.2608333331843218,0.20583333348234495,1.2633333332836627,1.2625,1.2799999999503295]
+  renderGameOverlay: arithmetic mean=1.1405, median=1.2633 ms/sync-frame (batch median=151.60 ms, p95 of batch means=1.3642 ms/sync-frame)
+  hudOverlay fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hudOverlay fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hudOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hudOverlay batch-means-ms=[0.03916666656732559,1.975,0.04250000019868215,0.03666666646798452,0.036666666716337205,2.15,0.03500000014901161]
+  hudOverlay: arithmetic mean=0.6164, median=0.0392 ms/sync-frame (batch median=4.70 ms, p95 of batch means=2.1500 ms/sync-frame)
+
+client centered boundary subpath @ 1920x1080
+  currentCulled fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  currentCulled fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  currentCulled batch-means-ms=[0.0008333332836627961,0,0,0.0008333335320154826,0,0,0]
+  currentCulled: arithmetic mean=0.0002, median=0.0000 ms/sync-frame (batch median=0.00 ms, p95 of batch means=0.0008 ms/sync-frame)
+  legacyReference fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  legacyReference fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  legacyReference batch-means-ms=[0.0008333335320154826,0,0.0008333332836627961,0.0016666665673255921,0.0008333332836627961,0,0.0008333335320154826]
+  legacyReference: arithmetic mean=0.0007, median=0.0008 ms/sync-frame (batch median=0.10 ms, p95 of batch means=0.0017 ms/sync-frame)
+
+client loaded desktop @ 1920x1080
+  updateGame fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  updateGame fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  updateGame batch-means-ms=[0.041666666666666664,0.030833333233992257,0.03333333333333333,0.03250000004967054,0.031666666517655054,0.029166666666666667,0.030833333482344946]
+  updateGame: arithmetic mean=0.0329, median=0.0317 ms/sync-frame (batch median=3.80 ms, p95 of batch means=0.0417 ms/sync-frame)
+  renderGame fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGame fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGame untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGame batch-means-ms=[1.8033333331346513,1.0708333333333333,1.0600000001490115,1.825,1.0391666665673256,1.0791666666666666,1.7766666668156783]
+  renderGame: arithmetic mean=1.3792, median=1.0792 ms/sync-frame (batch median=129.50 ms, p95 of batch means=1.8250 ms/sync-frame)
+  hud fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hud fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hud untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hud batch-means-ms=[0.056666666517655055,0.7825000000496706,0.05583333348234495,0.7841666666169961,0.057500000049670534,0.7683333332339922,0.05166666656732559]
+  hud: arithmetic mean=0.3652, median=0.0575 ms/sync-frame (batch median=6.90 ms, p95 of batch means=0.7842 ms/sync-frame)
+  renderGameOverlay fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGameOverlay fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGameOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGameOverlay batch-means-ms=[2.191666666666667,1.2625,1.2566666665176551,2.2691666667660075,1.2958333333333334,1.284999999900659,2.3674999999503297]
+  renderGameOverlay: arithmetic mean=1.7040, median=1.2958 ms/sync-frame (batch median=155.50 ms, p95 of batch means=2.3675 ms/sync-frame)
+  hudOverlay fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hudOverlay fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hudOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hudOverlay batch-means-ms=[1.2641666665673257,1.2799999999503295,0.06833333348234495,1.244999999801318,0.06166666671633721,1.2799999999503295,0.06333333353201548]
+  hudOverlay: arithmetic mean=0.7518, median=1.2450 ms/sync-frame (batch median=149.40 ms, p95 of batch means=1.2800 ms/sync-frame)
+
+client production touch-portrait @ 390x844
+  renderGame fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGame fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGame untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGame batch-means-ms=[0.17083333333333334,0.6516666665673256,0.16333333353201548,0.1625,0.6366666664679845,0.15666666676600774,0.15750000004967055]
+  renderGame: arithmetic mean=0.2999, median=0.1633 ms/sync-frame (batch median=19.60 ms, p95 of batch means=0.6517 ms/sync-frame)
+  hud fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hud fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hud untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hud batch-means-ms=[0.03333333333333333,0.03333333333333333,0.5875,0.03250000004967054,0.03250000004967054,0.03250000004967054,0.03333333333333333]
+  hud: arithmetic mean=0.1121, median=0.0333 ms/sync-frame (batch median=4.00 ms, p95 of batch means=0.5875 ms/sync-frame)
+  renderGameOverlay fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGameOverlay fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGameOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGameOverlay batch-means-ms=[0.17166666686534882,0.756666666517655,0.16333333328366278,0.7308333334823449,0.1641666665673256,0.22916666666666666,0.7325000000496705]
+  renderGameOverlay: arithmetic mean=0.4212, median=0.2292 ms/sync-frame (batch median=27.50 ms, p95 of batch means=0.7567 ms/sync-frame)
+  hudOverlay fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hudOverlay fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hudOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hudOverlay batch-means-ms=[0.03666666646798452,0.6733333334326744,0.035833333432674405,0.042499999950329465,0.03583333318432172,0.6550000001986821,0.034166666616996126]
+  hudOverlay: arithmetic mean=0.2162, median=0.0367 ms/sync-frame (batch median=4.40 ms, p95 of batch means=0.6733 ms/sync-frame)
+
+client loaded touch-portrait @ 390x844
+  renderGame fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGame fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGame untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGame batch-means-ms=[0.6299999999503295,0.18250000004967054,0.5949999998013179,0.17916666666666667,0.5725000001490116,0.5608333331843217,0.17166666686534882]
+  renderGame: arithmetic mean=0.4131, median=0.5608 ms/sync-frame (batch median=67.30 ms, p95 of batch means=0.6300 ms/sync-frame)
+  hud fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hud fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hud untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hud batch-means-ms=[0.05166666656732559,0.5166666666666667,0.05166666656732559,0.05,0.4925000001986822,0.04499999980131785,0.5]
+  hud: arithmetic mean=0.2439, median=0.0517 ms/sync-frame (batch median=6.20 ms, p95 of batch means=0.5167 ms/sync-frame)
+  renderGameOverlay fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGameOverlay fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGameOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGameOverlay batch-means-ms=[0.18499999990065893,0.6208333333333333,0.17750000009934108,0.6208333333333333,0.16999999980131786,0.6175000001986821,0.6558333332339923]
+  renderGameOverlay: arithmetic mean=0.4354, median=0.6175 ms/sync-frame (batch median=74.10 ms, p95 of batch means=0.6558 ms/sync-frame)
+  hudOverlay fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hudOverlay fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hudOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hudOverlay batch-means-ms=[0.5975000001490116,0.050833333283662796,0.5691666667660077,0.05499999995032946,0.5783333333830039,0.050833333283662796,0.5733333331843217]
+  hudOverlay: arithmetic mean=0.3536, median=0.5692 ms/sync-frame (batch median=68.30 ms, p95 of batch means=0.5975 ms/sync-frame)
+
+client production touch-landscape @ 844x390
+  renderGame fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGame fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGame untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGame batch-means-ms=[0.16333333328366278,0.6,0.16583333338300388,0.1600000001490116,0.5875,0.1533333331346512,0.15083333353201547]
+  renderGame: arithmetic mean=0.2830, median=0.1633 ms/sync-frame (batch median=19.60 ms, p95 of batch means=0.6000 ms/sync-frame)
+  hud fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hud fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hud untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hud batch-means-ms=[0.03250000004967054,0.031666666517655054,0.5225000001490117,0.031666666517655054,0.03166666676600774,0.029999999950329464,0.5283333333830039]
+  hud: arithmetic mean=0.1726, median=0.0317 ms/sync-frame (batch median=3.80 ms, p95 of batch means=0.5283 ms/sync-frame)
+  renderGameOverlay fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGameOverlay fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  renderGameOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGameOverlay batch-means-ms=[0.15833333333333333,0.7,0.1591666668653488,0.7125,0.16833333323399227,0.23166666676600775,0.7091666666169961]
+  renderGameOverlay: arithmetic mean=0.4056, median=0.2317 ms/sync-frame (batch median=27.80 ms, p95 of batch means=0.7125 ms/sync-frame)
+  hudOverlay fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hudOverlay fixture-after={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  hudOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hudOverlay batch-means-ms=[0.03583333318432172,0.655833333482345,0.03583333318432172,0.036666666716337205,0.6958333333333333,0.04000000009934108,0.0383333332836628]
+  hudOverlay: arithmetic mean=0.2198, median=0.0383 ms/sync-frame (batch median=4.60 ms, p95 of batch means=0.6958 ms/sync-frame)
+
+client loaded touch-landscape @ 844x390
+  renderGame fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGame fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGame untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGame batch-means-ms=[0.8,0.20999999990065893,0.7,0.20416666666666666,0.7150000000993411,0.23166666676600775,0.7391666665673255]
+  renderGame: arithmetic mean=0.5143, median=0.7000 ms/sync-frame (batch median=84.00 ms, p95 of batch means=0.8000 ms/sync-frame)
+  hud fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hud fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hud untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hud batch-means-ms=[0.6016666668156783,0.050833333283662796,0.058333333333333334,0.6416666666666667,0.05,0.6291666666666667,0.050833333283662796]
+  hud: arithmetic mean=0.2975, median=0.0583 ms/sync-frame (batch median=7.00 ms, p95 of batch means=0.6417 ms/sync-frame)
+  renderGameOverlay fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGameOverlay fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  renderGameOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  renderGameOverlay batch-means-ms=[0.21749999995032945,0.7983333334326744,0.1991666667163372,0.7958333333333333,0.20916666661699612,0.7983333334326744,0.8199999998013179]
+  renderGameOverlay: arithmetic mean=0.5483, median=0.7958 ms/sync-frame (batch median=95.50 ms, p95 of batch means=0.8200 ms/sync-frame)
+  hudOverlay fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hudOverlay fixture-after={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  hudOverlay untimed-reads={"safeAreaStyles":1,"pointerMediaQueries":2}
+  hudOverlay batch-means-ms=[0.8041666666666667,0.058333333333333334,0.05499999995032946,0.7366666667163372,0.058333333333333334,0.7341666666169961,0.05499999995032946]
+  hudOverlay: arithmetic mean=0.3574, median=0.0583 ms/sync-frame (batch median=7.00 ms, p95 of batch means=0.8042 ms/sync-frame)
+
+server production
+  advanceOneFrame fixture-before={"humans":1,"bots":2,"asteroids":20,"loot":0,"satellites":6,"satellitePickups":2}
+  advanceOneFrame fixture-after={"humans":1,"bots":2,"asteroids":16,"loot":8,"satellites":6,"satellitePickups":2}
+  advanceOneFrame batch-means-ms=[0.0415513916666896,0.03787534999998267,0.054093058333334436,0.04775902499998968,0.035005208333344244,0.036758333333333816,0.037696175000019136]
+  advanceOneFrame: arithmetic mean=0.0415, median=0.0379 ms/sync-frame (batch median=4.55 ms, p95 of batch means=0.0541 ms/sync-frame)
+
+server loaded
+  advanceOneFrame fixture-before={"humans":10,"bots":2,"asteroids":80,"loot":15,"satellites":6,"satellitePickups":2}
+  advanceOneFrame fixture-after={"humans":10,"bots":2,"asteroids":69,"loot":34,"satellites":6,"satellitePickups":2}
+  advanceOneFrame batch-means-ms=[0.09560867500000919,0.09707916666666279,0.08557152500000788,0.08555242499999925,0.07156006666667357,0.07241874999999709,0.09129374999999224]
+  advanceOneFrame: arithmetic mean=0.0856, median=0.0856 ms/sync-frame (batch median=10.27 ms, p95 of batch means=0.0971 ms/sync-frame)

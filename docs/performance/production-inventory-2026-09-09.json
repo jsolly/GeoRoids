@@ -1,0 +1,114 @@
+{
+  "capturedAt": "2026-09-09T09:18:41Z",
+  "scope": "Read-only production inventory; no offered load. Health reported zero human players, paused world.",
+  "metrics": {
+    "service": {
+      "id": "4e2cb2a2-c1e2-41a8-a970-3f60659c2524",
+      "name": "geoasteroids"
+    },
+    "environment": {
+      "id": "94d3de2f-4bb0-4051-8975-a30190c2fffa",
+      "name": "production"
+    },
+    "metrics": [
+      {
+        "measurement": "CPU_USAGE",
+        "current": 0.0013227333333333334,
+        "average": 0.0037658806010928956,
+        "min": 0.0012138166666666667,
+        "max": 0.04406263333333333,
+        "sampleCount": 61
+      },
+      {
+        "measurement": "CPU_LIMIT",
+        "current": 24,
+        "average": 24,
+        "min": 24,
+        "max": 24,
+        "sampleCount": 61
+      },
+      {
+        "measurement": "MEMORY_USAGE_GB",
+        "current": 0.16287744,
+        "average": 0.15065739331147546,
+        "min": 0.148795392,
+        "max": 0.163334144,
+        "sampleCount": 61
+      },
+      {
+        "measurement": "MEMORY_LIMIT_GB",
+        "current": 24,
+        "average": 24,
+        "min": 24,
+        "max": 24,
+        "sampleCount": 61
+      },
+      {
+        "measurement": "NETWORK_RX_GB",
+        "current": 0,
+        "average": 3.898513114754098e-5,
+        "min": 0,
+        "max": 0.001458397,
+        "sampleCount": 61
+      },
+      {
+        "measurement": "NETWORK_TX_GB",
+        "current": 0,
+        "average": 0.00046115126229508195,
+        "min": 0,
+        "max": 0.017419955,
+        "sampleCount": 61
+      }
+    ]
+  },
+  "deployments": {
+    "deployments": [
+      {
+        "id": "37455568-3055-46cb-8457-2ad34c5afd3b",
+        "status": "SUCCESS",
+        "createdAt": "2026-09-09T04:06:05.802Z",
+        "updatedAt": "2026-09-09T04:07:30.661Z",
+        "serviceId": "4e2cb2a2-c1e2-41a8-a970-3f60659c2524",
+        "environmentId": "94d3de2f-4bb0-4051-8975-a30190c2fffa",
+        "url": null,
+        "snapshotId": "f0a8c958-ca36-47d5-a687-d6f52e69f6b2",
+        "meta": {
+          "reason": "deploy",
+          "commitMessage": "refactor(game): remove unused paths and make scenario waits deterministic (#529)",
+          "commitHash": "75995f58b4de340e16db94d9439bbfb57c6f8ea0",
+          "branch": "main"
+        }
+      },
+      {
+        "id": "5f55dfbc-0d7d-4a83-be2f-30b0f1156a39",
+        "status": "REMOVED",
+        "createdAt": "2026-09-09T03:07:39.735Z",
+        "updatedAt": "2026-09-09T04:07:33.149Z",
+        "serviceId": "4e2cb2a2-c1e2-41a8-a970-3f60659c2524",
+        "environmentId": "94d3de2f-4bb0-4051-8975-a30190c2fffa",
+        "url": null,
+        "snapshotId": "fa034fac-c93e-4c3e-a184-f412bda6fd20",
+        "meta": {
+          "reason": "deploy",
+          "commitMessage": "feat(terrain): restore varied isolines and faint elevation labels (#527)",
+          "commitHash": "36d1cff41565e8d08d937108e415a1038d25416c",
+          "branch": "main"
+        }
+      }
+    ]
+  },
+  "configuration": {
+    "capturedAt": "2026-09-09T10:02:00Z",
+    "source": "Railway get-service-config read-only response",
+    "builder": "RAILPACK",
+    "runtime": "V2",
+    "region": "iad",
+    "numReplicas": 1,
+    "startCommand": "node_modules/.bin/tsx server.ts",
+    "healthcheckPath": "/health",
+    "healthcheckTimeoutSeconds": 300,
+    "stagedPatchId": "9712b883-7eda-4818-a364-66ada15833d9",
+    "stagedChangeCount": 4,
+    "changesApplied": false
+  }
+}

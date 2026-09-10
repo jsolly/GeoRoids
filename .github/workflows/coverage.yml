@@ -1,0 +1,36 @@
+---
+name: Coverage report
+
+'on':
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Collect coverage separately from performance measurements
+        run: |
+          set -o pipefail
+          npm run test:coverage 2>&1 | tee "$RUNNER_TEMP/coverage-test-output.txt"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: coverage-${{ github.run_id }}
+          path: |
+            coverage
+            ${{ runner.temp }}/coverage-test-output.txt
+          if-no-files-found: error
+          retention-days: 14

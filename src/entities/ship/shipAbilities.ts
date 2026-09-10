@@ -1,5 +1,5 @@
 import { areAllied } from '../../../shared/factions';
-import { trySpendTrackedEmpFuel } from '../../../shared/fuel';
+import { type FuelTank, trySpendEmpFuel } from '../../../shared/fuel';
 import type { AsteroidMotionState, Position, SoftFactionId, Velocity } from '../../../shared-types';
 import {
   findHarpoonFieldBody,
@@ -10,7 +10,7 @@ import {
 } from './harpoonField';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId, type ShipKitId } from './shipKits';
 
-export interface AbilityHost {
+export interface AbilityHost extends FuelTank {
   id?: string;
   kitId: ShipKitId;
   factionId?: SoftFactionId;
@@ -27,11 +27,9 @@ export interface AbilityHost {
   harpoonLatchPos?: Position;
   asteroidMotion?: AsteroidMotionState;
   r?: number;
-  fuel?: number;
-  maxFuel?: number;
 }
 
-interface AbilityBody {
+export interface AbilityBody {
   id?: string;
   position: Position;
   velocity: Velocity;
@@ -403,7 +401,8 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: AbilityBody[]): voi
 
   const targetId = host.harpoonTargetId;
   const target =
-    bodies.find((body) => bodyMatchesLatchId(body, targetId)) ?? findHarpoonFieldBody(targetId);
+    bodies.find((body) => body !== host && bodyMatchesLatchId(body, targetId)) ??
+    findHarpoonFieldBody(targetId);
   // Keep cream VFX (timer + latchPos) if the field id is mid-sync. #481
   // cleared here and left abilityActiveFrames — activation ring, no tether.
   if (!target || !latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE_MAX)) {
@@ -476,7 +475,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
   const resolved = resolveAbilityWorld(world);
 
   // Quake shock is the live EMP. Empty tank refuses; other kits stay free.
-  if (kit.abilityId === 'shockPulse' && !trySpendTrackedEmpFuel(host)) {
+  if (kit.abilityId === 'shockPulse' && !trySpendEmpFuel(host)) {
     return { activated: false };
   }
 

@@ -24,5 +24,19 @@ rules:
     level: error
   truthy:
     level: error
+  braces:
+    level: error
+  brackets:
+    level: error
+  colons:
+    level: error
+  commas:
+    level: error
+  empty-lines:
+    level: error
+  hyphens:
+    level: error
+  indentation:
+    level: error
   # 80-char max is too tight for YAML carrying URLs, ARNs, and inline scripts.
   line-length: disable

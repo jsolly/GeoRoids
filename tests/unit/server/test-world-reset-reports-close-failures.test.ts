@@ -66,15 +66,18 @@ describe('test-world reset lifecycle failures', () => {
     const res = new ServerResponse(req);
     const logError = vi.spyOn(serverLogging.logger, 'error').mockImplementation(() => undefined);
 
-    handleTestResetWorld(req, res, 'development', engine);
+    try {
+      handleTestResetWorld(req, res, 'development', engine);
 
-    expect(res.statusCode).toBe(500);
-    expect(res.writableEnded).toBe(true);
-    expect(engine.getPlayer('pilot')).toBeDefined();
-    expect(logError).toHaveBeenCalledWith(
-      'TEST_RESET_FAILED',
-      expect.objectContaining({ operation: 'reset test world' })
-    );
-    peer.destroy();
+      expect(res.statusCode).toBe(500);
+      expect(res.writableEnded).toBe(true);
+      expect(engine.getPlayer('pilot')).toBeDefined();
+      expect(logError).toHaveBeenCalledWith(
+        'TEST_RESET_FAILED',
+        expect.objectContaining({ operation: 'reset test world' })
+      );
+    } finally {
+      peer.destroy();
+    }
   });
 });

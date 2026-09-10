@@ -259,6 +259,11 @@ export function calculateLaserStartPosition(
   return addPositions(shipPosition, noseOffset);
 }
 
+/** Friction used by the standalone wiki motion demonstrations. */
+export function moveFrictionForShip(isBot: boolean): number {
+  return isBot ? SHIP.BOT_FRICTION : GAME.FRICTION;
+}
+
 /**
  * Shared thrust / friction step for local ships, remotes, and bots.
  * Callers pass their own friction so local and server-owned policies stay explicit.

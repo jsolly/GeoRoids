@@ -1,8 +1,9 @@
 /* @vitest-environment node */
+import { strict as assert } from 'node:assert';
 import { once } from 'node:events';
 import { type ClientRequest, IncomingMessage, request, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
-import { afterEach, assert, expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import {
@@ -288,7 +289,7 @@ test.each([false, true])(
     expect(player.health).toBe(health);
     const epoch = player.asteroidMotion?.epoch;
     if (enhanced) {
-      assert.exists(previousEpoch);
+      assert.ok(previousEpoch !== undefined, 'previous asteroid motion epoch');
       expect(epoch).toBeGreaterThan(previousEpoch);
     }
 

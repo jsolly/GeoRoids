@@ -3,11 +3,8 @@ import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
 import { isAsteroidPending, pendingElapsedMs } from '../../physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../rendering/canvas';
-import {
-  drawingOffsets,
-  PLAYFIELD_CLOSE_SCALE,
-  type PlayfieldRock,
-} from '../../rendering/playfieldCamera';
+import type { DrawingContext } from '../../rendering/drawingContext';
+import { drawingOffsets } from '../../rendering/playfieldCamera';
 import {
   driftSegment,
   polygonPoints,
@@ -18,7 +15,6 @@ import {
 import { drawAsteroidMaterialDetails } from './materialArt';
 import type { Roid } from './Roid';
 
-const zoomRockScratch: PlayfieldRock[] = [];
 const roidScreen = { x: 0, y: 0 };
 const shatterBursts: Array<{ roid: Roid; startedAt: number }> = [];
 
@@ -34,20 +30,6 @@ export function clearAsteroidShatters(): void {
   shatterBursts.length = 0;
 }
 
-/** Zoom from rocks the playfield will actually stroke — not pending or NaN poses. */
-export function rocksForPlayfieldZoom(roids: readonly Roid[]): PlayfieldRock[] {
-  let count = 0;
-  for (const roid of roids) {
-    if (isAsteroidPending(roid) || !canDrawAsteroid(roid)) {
-      continue;
-    }
-    zoomRockScratch[count] = roid;
-    count += 1;
-  }
-  zoomRockScratch.length = count;
-  return zoomRockScratch;
-}
-
 export function getRoidStrokeWidth(radius: number): number {
   if (radius >= ROID.SIZE * 0.8) {
     return VISUAL.ROID_STROKE_LARGE;
@@ -59,7 +41,7 @@ export function getRoidStrokeWidth(radius: number): number {
 }
 
 /** Classic Asteroids inner facet on large rocks only — medium/small stay one outline. */
-export function shouldDrawRoidInnerFacet(radius: number): boolean {
+function shouldDrawRoidInnerFacet(radius: number): boolean {
   return radius >= ROID.SIZE * 0.8;
 }
 
@@ -92,14 +74,14 @@ function roidOutline(
 }
 
 function drawRoidSilhouette(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   points: readonly Vec2[],
   radius: number,
-  inner: readonly Vec2[]
+  inner: readonly Vec2[] | null
 ): void {
   const width = getRoidStrokeWidth(radius);
   strokePhosphorPolyline(ctx, points, PALETTE.ROID, width, VISUAL.ROID_GLOW, true);
-  if (inner.length > 2) {
+  if (inner && inner.length > 2) {
     strokePhosphorPolyline(
       ctx,
       inner,
@@ -121,7 +103,7 @@ export function reflectiveFacetCueCount(energy: number, maxEnergy: number): numb
 }
 
 function drawReflectiveCue(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   radius: number,
   energy: number,
   maxEnergy: number
@@ -142,7 +124,7 @@ function drawReflectiveCue(
   }
 }
 
-function drawSpinCue(ctx: CanvasRenderingContext2D, radius: number, charged: boolean): void {
+function drawSpinCue(ctx: DrawingContext, radius: number, charged: boolean): void {
   const ring = radius * 1.18;
   const arc = charged ? Math.PI * 0.68 : Math.PI * 0.42;
   ctx.globalAlpha = charged ? 0.88 : 0.56;
@@ -160,7 +142,7 @@ function drawSpinCue(ctx: CanvasRenderingContext2D, radius: number, charged: boo
 
 /** Draw only sparse, screen-readable metadata cues; the rock remains an outline. */
 export function drawRoidInteractionCues(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   roid: Pick<Roid, 'phenomenon' | 'spinClass'>,
   radius: number,
   centerX = 0,
@@ -187,7 +169,7 @@ export function drawRoidInteractionCues(
 }
 
 function drawRoidShatter(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   origin: Vec2,
   points: readonly Vec2[],
   radius: number,
@@ -244,7 +226,7 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     return;
   }
 
-  const scale = PLAYFIELD_CLOSE_SCALE;
+  const scale = canvasManager.getPlayfieldScale();
   const viewport = cvs ? canvasManager.getViewportSize() : undefined;
   const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
   const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
@@ -264,29 +246,34 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     ) {
       continue;
     }
+    let pendingElapsed: number | null = null;
+    if (isAsteroidPending(roid)) {
+      pendingElapsed = pendingElapsedMs(roid);
+      if (pendingElapsed === null || !(pendingElapsed < VISUAL.ROID_SHATTER_MS)) {
+        continue;
+      }
+    }
+
     const offsets = drawingOffsets(roid.offsets);
     const vertices = Math.max(roid.vertices, 1);
     const outline = roidOutline(screenPos, r, roid.angle, vertices, offsets);
 
-    if (isAsteroidPending(roid)) {
-      const elapsed = pendingElapsedMs(roid);
-      if (elapsed !== null && elapsed < VISUAL.ROID_SHATTER_MS) {
-        drawRoidShatter(
-          ctx,
-          screenPos,
-          outline,
-          r,
-          elapsed / VISUAL.ROID_SHATTER_MS,
-          roid.material
-        );
-      }
+    if (pendingElapsed !== null) {
+      drawRoidShatter(
+        ctx,
+        screenPos,
+        outline,
+        r,
+        pendingElapsed / VISUAL.ROID_SHATTER_MS,
+        roid.material
+      );
       continue;
     }
 
     const inner =
       !roid.material && shouldDrawRoidInnerFacet(roid.r)
         ? roidOutline(screenPos, r, roid.angle, vertices, offsets, VISUAL.ROID_INNER_SCALE)
-        : [];
+        : null;
     drawRoidSilhouette(ctx, outline, roid.r, inner);
     if (roid.material) {
       drawAsteroidMaterialDetails(

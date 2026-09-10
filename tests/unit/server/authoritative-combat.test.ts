@@ -1,17 +1,12 @@
-import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE, SHIP } from '../../../src/constants';
-
-function mockWs(): WebSocket {
-  return {
-    readyState: WebSocket.OPEN,
-    send: () => undefined,
-  } as unknown as WebSocket;
-}
+import { RecordingSocket } from '../../support/recordingSocket';
 
 function testAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
   return {
@@ -54,7 +49,7 @@ describe('server-authoritative combat', () => {
   });
 
   test('overlapping human and asteroid apply one ram and destroy the roid', () => {
-    engine.addPlayer('p1', 'Pilot', mockWs(), { x: 0, y: 0 });
+    engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     clearProtection(engine, 'p1');
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid());
@@ -70,9 +65,9 @@ describe('server-authoritative combat', () => {
 
   test('player and bot share the same asteroid ram path', () => {
     const bots = engine.createBots(1);
-    assert.isNotNull(bots);
+    assert.ok(bots, 'created bot list');
     const bot = bots[0];
-    assert.exists(bot);
+    assert.ok(bot, 'created bot');
     engine.entityManager.updateEntity(bot.id, {
       position: { x: 10, y: 0 },
       spawnProtectionTimer: 0,
@@ -85,8 +80,8 @@ describe('server-authoritative combat', () => {
   });
 
   test('two overlapping humans take the same ship-ship tick', () => {
-    engine.addPlayer('nova', 'Nova', mockWs(), { x: 0, y: 0 });
-    engine.addPlayer('retro', 'Retro', mockWs(), { x: 4, y: 0 });
+    engine.addPlayer('nova', 'Nova', new RecordingSocket(), { x: 0, y: 0 });
+    engine.addPlayer('retro', 'Retro', new RecordingSocket(), { x: 4, y: 0 });
     clearProtection(engine, 'nova');
     clearProtection(engine, 'retro');
     clearAsteroidField(engine);
@@ -106,7 +101,7 @@ describe('server-authoritative combat', () => {
   });
 
   test('spawn protection blocks server ram for humans', () => {
-    engine.addPlayer('p1', 'Pilot', mockWs(), { x: 0, y: 0 });
+    engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.addAsteroid(testAsteroid());
 
     engine.resolveAuthoritativeCombat(3_000);
@@ -118,7 +113,7 @@ describe('server-authoritative combat', () => {
     vi.useFakeTimers();
     vi.setSystemTime(10_000);
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    engine.addPlayer('p1', 'Pilot', mockWs(), { x: 0, y: 0 });
+    engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     clearProtection(engine, 'p1');
 
     for (let hit = 0; hit < 4; hit++) {
@@ -151,8 +146,8 @@ describe('server-authoritative combat', () => {
 
   test('client asteroid and ship-ship reports are ignored', () => {
     const wsCore = new WebSocketCore(engine);
-    const novaWs = mockWs();
-    const retroWs = mockWs();
+    const novaWs = new RecordingSocket();
+    const retroWs = new RecordingSocket();
     wsCore.handleClientMessage(
       { type: 'join', data: { id: 'nova', name: 'Nova', position: { x: 80, y: 80 } } },
       novaWs
@@ -190,6 +185,8 @@ describe('server-authoritative combat', () => {
       id: 'server-owned-roid',
       isCollabTarget: true,
     });
+    const expectedServerOwnedHealth = serverOwnedAsteroid.health;
+    const expectedServerOwnedPosition = { ...serverOwnedAsteroid.position };
     engine.addAsteroid(serverOwnedAsteroid);
     wsCore.handleClientMessage(
       {
@@ -212,16 +209,16 @@ describe('server-authoritative combat', () => {
     expect(engine.getPlayer('nova')?.health).toBe(SHIP.MAX_HEALTH);
     expect(engine.getPlayer('retro')?.health).toBe(SHIP.MAX_HEALTH);
     expect(engine.getAsteroid(serverOwnedAsteroid.id)).toMatchObject({
-      health: serverOwnedAsteroid.health,
-      position: serverOwnedAsteroid.position,
+      health: expectedServerOwnedHealth,
+      position: expectedServerOwnedPosition,
     });
   });
 
   test('human state mutations stay bound to their joined sockets', () => {
     const wsCore = new WebSocketCore(engine);
-    const alphaWs = mockWs();
-    const betaWs = mockWs();
-    const unjoinedWs = mockWs();
+    const alphaWs = new RecordingSocket();
+    const betaWs = new RecordingSocket();
+    const unjoinedWs = new RecordingSocket();
     wsCore.handleClientMessage(
       {
         type: 'join',
@@ -280,8 +277,8 @@ describe('server-authoritative combat', () => {
 
   test('shoot reports bind to the socket before creating a server laser', () => {
     const wsCore = new WebSocketCore(engine);
-    const pilotWs = mockWs();
-    const otherWs = mockWs();
+    const pilotWs = new RecordingSocket();
+    const otherWs = new RecordingSocket();
     wsCore.handleClientMessage(
       { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
       pilotWs
@@ -325,8 +322,8 @@ describe('server-authoritative combat', () => {
 
   test('asteroid laser reports require a finite position, laser cause, and socket owner', () => {
     const wsCore = new WebSocketCore(engine);
-    const pilotWs = mockWs();
-    const otherWs = mockWs();
+    const pilotWs = new RecordingSocket();
+    const otherWs = new RecordingSocket();
     wsCore.handleClientMessage(
       { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
       pilotWs
@@ -378,9 +375,9 @@ describe('server-authoritative combat', () => {
 
   test('collab asteroid reports use fixed damage and consume human and bot projectiles once', () => {
     const wsCore = new WebSocketCore(engine);
-    const pilotWs = mockWs();
-    const otherWs = mockWs();
-    const unjoinedWs = mockWs();
+    const pilotWs = new RecordingSocket();
+    const otherWs = new RecordingSocket();
+    const unjoinedWs = new RecordingSocket();
     wsCore.handleClientMessage(
       { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
       pilotWs
@@ -398,6 +395,7 @@ describe('server-authoritative combat', () => {
       isCollabTarget: true,
     });
     const normal = testAsteroid({ id: 'normal-report-roid' });
+    const normalHealthBefore = normal.health;
     engine.addAsteroid(asteroid);
     engine.addAsteroid(normal);
 
@@ -445,10 +443,10 @@ describe('server-authoritative combat', () => {
     report('pilot', 0, 999);
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
     report('pilot', 25, 999, normal.id);
-    expect(engine.getAsteroid(normal.id)?.health).toBe(normal.health);
+    expect(engine.getAsteroid(normal.id)?.health).toBe(normalHealthBefore);
 
     const bot = engine.createBots(1)?.[0];
-    assert.exists(bot);
+    assert.ok(bot, 'collab report bot');
     report(bot.id, DAMAGE.LASER_HIT, 999);
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
 
@@ -459,9 +457,9 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT * 2);
     expect(engine.getServerLasers()[0]?.hasExploded).toBe(true);
 
-    const liveAsteroid = engine.getAsteroid(asteroid.id);
-    assert.exists(liveAsteroid);
-    liveAsteroid.health = DAMAGE.LASER_HIT;
+    const lethalAsteroid = engine.getAsteroid(asteroid.id);
+    assert.ok(lethalAsteroid, 'collab lethal asteroid');
+    lethalAsteroid.health = DAMAGE.LASER_HIT;
     const lethalShot = engine.spawnLaser(bot.id, asteroid.position, { x: 0, y: 0 });
     report(bot.id, DAMAGE.LASER_HIT, 999);
     expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
@@ -470,8 +468,8 @@ describe('server-authoritative combat', () => {
 
   test('validated laserDamage is the only client path that chips a remote human', () => {
     const wsCore = new WebSocketCore(engine);
-    const novaWs = mockWs();
-    const retroWs = mockWs();
+    const novaWs = new RecordingSocket();
+    const retroWs = new RecordingSocket();
     wsCore.handleClientMessage(
       { type: 'join', data: { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } } },
       novaWs
@@ -504,7 +502,7 @@ describe('server-authoritative combat', () => {
 
   test('boundary collisionDamage still applies when the reporter is the target', () => {
     const wsCore = new WebSocketCore(engine);
-    const novaWs = mockWs();
+    const novaWs = new RecordingSocket();
     wsCore.handleClientMessage(
       { type: 'join', data: { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } } },
       novaWs

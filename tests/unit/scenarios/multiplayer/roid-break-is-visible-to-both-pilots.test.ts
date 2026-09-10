@@ -1,4 +1,5 @@
-import { afterEach, assert, beforeEach, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { ROID } from '../../../../src/constants';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
@@ -23,7 +24,7 @@ describe('A roid break is visible to both pilots', () => {
     const roid = world.engine
       .createAsteroids(20)
       .find((asteroid) => !asteroid.isCollabTarget && asteroid.material === 'ice');
-    assert.isOk(roid);
+    assert.ok(roid);
 
     alice.socket.clear();
     bob.socket.clear();

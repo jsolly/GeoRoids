@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 
-import { HealthChecker } from '../tests/integration/utils/health-checker';
+import { checkAllServers } from '../tests/integration/utils/health-checker';
 
 async function main() {
   try {
     console.log('🔍 Checking server health...\n');
-    await HealthChecker.checkAllServers();
+    await checkAllServers();
     console.log('\n🎯 All servers are healthy and ready for testing!');
     process.exit(0);
   } catch (error) {

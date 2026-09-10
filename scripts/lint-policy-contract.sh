@@ -26,7 +26,7 @@ check_config() {
   node - "$config_path" <<'NODE'
 const fs = require('node:fs');
 const path = process.argv[2];
-const ts = require('typescript');
+const { parse, printParseErrorCode } = require('jsonc-parser');
 
 let source;
 try {
@@ -36,15 +36,15 @@ try {
   process.exit(1);
 }
 
-const parsed = ts.parseConfigFileTextToJson(path, source);
-if (parsed.error || !parsed.config || typeof parsed.config !== 'object') {
-  const details = parsed.error
-    ? ts.flattenDiagnosticMessageText(parsed.error.messageText, ' ')
-    : 'configuration is empty';
+const errors = [];
+const config = parse(source, errors, { allowTrailingComma: true });
+if (errors.length || !config || typeof config !== 'object' || Array.isArray(config)) {
+  const details = errors.length
+    ? errors.map(error => printParseErrorCode(error.error)).join(', ')
+    : 'configuration must be an object';
   console.error(`✗ Biome policy config is not valid JSONC: ${path} (${details})`);
   process.exit(1);
 }
-const config = parsed.config;
 
 const failures = [];
 if (Object.hasOwn(config, 'extends')) {
@@ -172,13 +172,13 @@ if (rules.length === 0) {
 }
 
 const configSource = fs.readFileSync(configPath, 'utf8');
-const ts = require('typescript');
-const parsed = ts.parseConfigFileTextToJson(configPath, configSource);
-if (parsed.error || !parsed.config || typeof parsed.config !== 'object') {
+const { parse } = require('jsonc-parser');
+const errors = [];
+const config = parse(configSource, errors, { allowTrailingComma: true });
+if (errors.length || !config || typeof config !== 'object' || Array.isArray(config)) {
   console.error(`✗ Biome policy config could not be parsed: ${configPath}`);
   process.exit(1);
 }
-const config = parsed.config;
 function isExplicitError(group, rule) {
   const value = config?.linter?.rules?.[group]?.[rule];
   return value === 'error' || (value && typeof value === 'object' && value.level === 'error');

@@ -1,4 +1,6 @@
-import { assert, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
+import { FUEL } from '../../../src/constants';
 import {
   bindHarpoonFieldSource,
   harpoonBodyFromRock,
@@ -34,6 +36,8 @@ function host(kitId: AbilityHost['kitId']): AbilityHost {
     abilityActiveFrames: 0,
     shieldTimer: 0,
     harpoonTimer: 0,
+    fuel: FUEL.START,
+    maxFuel: FUEL.MAX,
   };
 }
 
@@ -229,7 +233,7 @@ test('harpoonBodyFromRock tags belt rows as asteroid so ship filters cannot reje
     r: 50,
     health: 0,
   });
-  assert.exists(body);
+  assert.ok(body);
   expect(body.kind).toBe('asteroid');
   expect(body.id).toMatch(/^rock:/);
   expect(isEnvironmentLatchBody(body)).toBe(true);

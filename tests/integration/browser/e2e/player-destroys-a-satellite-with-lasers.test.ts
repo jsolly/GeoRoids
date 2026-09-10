@@ -1,10 +1,11 @@
-import { assert, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { SATELLITE } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks();
+const { browserManager } = createBrowserScenarioHooks(__dirname);
 
 test(
   'a player destroys a satellite with lasers and is awarded the kill',
@@ -21,7 +22,7 @@ test(
     const satellites = await game.getSatellites();
     expect(satellites.length).toBeGreaterThan(0);
     const target = satellites[0];
-    assert.exists(target);
+    assert.ok(target, 'Satellite target missing');
     const scoreBefore = await game.getScore();
 
     const result = await game.attackSatelliteWithLasers(target.id, 10);

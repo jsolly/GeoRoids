@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: {
@@ -25,7 +26,7 @@ describe('human game-over stay-dead', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     gameEngine = new GameEngine(12345);
-    player = gameEngine.addPlayer('pilot-1', 'Pilot', {} as never);
+    player = gameEngine.addPlayer('pilot-1', 'Pilot', new RecordingSocket());
     delete player.spawnProtectionTimer;
   });
 

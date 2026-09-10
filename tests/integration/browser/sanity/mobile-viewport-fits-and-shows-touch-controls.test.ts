@@ -52,7 +52,16 @@ test('title and gameplay stay sharp through density changes without a viewport r
     }
     await game.startGame();
     await game.waitForServerJoin();
-    expect(await game.getCanvasSize()).toEqual({ width: 800, height: 600 });
+    expect(
+      await page.evaluate(() => {
+        const canvas = document.getElementById('gameCanvas');
+        if (!(canvas instanceof HTMLCanvasElement)) {
+          throw new Error('Game canvas unavailable');
+        }
+        const rect = canvas.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      })
+    ).toEqual({ width: 800, height: 600 });
     await setDensity(1.25);
     await page.waitForFunction(
       () => {
@@ -62,7 +71,16 @@ test('title and gameplay stay sharp through density changes without a viewport r
       undefined,
       { timeout: 5000 }
     );
-    expect(await game.getCanvasSize()).toEqual({ width: 800, height: 600 });
+    expect(
+      await page.evaluate(() => {
+        const canvas = document.getElementById('gameCanvas');
+        if (!(canvas instanceof HTMLCanvasElement)) {
+          throw new Error('Game canvas unavailable');
+        }
+        const rect = canvas.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      })
+    ).toEqual({ width: 800, height: 600 });
     expect(await resizeCount.evaluate((count) => count.value)).toBe(0);
   } finally {
     await session.send('Emulation.clearDeviceMetricsOverride');

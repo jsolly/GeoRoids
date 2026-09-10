@@ -1,3 +1,5 @@
+import type { DrawingContext } from '../../rendering/drawingContext';
+
 /** Authored EO hardware outlines, shared by the canvas renderer and exported SVG pack. */
 interface EoOutline {
   readonly name: string;
@@ -120,7 +122,7 @@ const EO_HULL_COLOR = '#C4B5FD';
 const EO_SHOT_COLOR = '#E9D5FF';
 
 export function drawEoSatelliteOutline(
-  ctx: CanvasRenderingContext2D,
+  ctx: DrawingContext,
   typeId: EoOutlineId,
   radius: number,
   angle: number,

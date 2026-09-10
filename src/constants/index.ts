@@ -39,13 +39,6 @@ export const SPAWN = {
 // ============================================================================
 export const CANVAS = {
   INTERNAL_WIDTH: 800,
-  INTERNAL_HEIGHT: 600,
-  DEFAULT_CENTER_X: 400,
-  DEFAULT_CENTER_Y: 300,
-
-  // Text rendering
-  TEXT_SIZE: 40,
-  TEXT_FADE_TIME: 2.5,
 } as const;
 
 // ============================================================================
@@ -148,7 +141,6 @@ export const VISUAL = {
   MINIMAP_SIZE: 96,
   MINIMAP_DOT: 5,
   MINIMAP_LOCAL_SIZE: 6,
-  MINIMAP_ROID: 1.5,
   MINIMAP_VOID_ALPHA: 0.5,
   MINIMAP_RING_ALPHA: 0.85,
   HUD_INSET: 16,
@@ -164,6 +156,23 @@ export const VISUAL = {
   CONTOUR_ALPHA: 0.16,
   CONTOUR_INDEX_ALPHA: 0.24,
   CONTOUR_INDEX_EVERY: 3,
+  // Static title map: crop, line weights, and sparse elevation labels.
+  TITLE_TERRAIN_GRID_SIZE: 320,
+  TITLE_TERRAIN_VIEW_SPAN: 3000,
+  TITLE_CONTOUR_ALPHA: 0.28,
+  TITLE_CONTOUR_INDEX_ALPHA: 0.52,
+  TITLE_CONTOUR_WIDTH: 0.65,
+  TITLE_CONTOUR_INDEX_WIDTH: 1.1,
+  TITLE_LABEL_ALPHA: 0.5,
+  TITLE_LABEL_SPACING: 520,
+  TITLE_TERRAIN_LEVELS: 28,
+  CONTOUR_LABEL_FONT: '10px "Courier New", monospace',
+  CONTOUR_LABEL_ALPHA: 0.4,
+  CONTOUR_LABEL_SPACING: 170,
+  CONTOUR_LABEL_PADDING: 4,
+  CONTOUR_LABEL_HEIGHT: 12,
+  CONTOUR_LABEL_MARGIN_X: 28,
+  CONTOUR_LABEL_MARGIN_Y: 18,
   // Cream iso-tangent under each live shot. Terrain answers; shots stay amber on top.
   CONTOUR_LASER_LENGTH: 28,
   CONTOUR_LASER_STROKE_WIDTH: 1.25,
@@ -256,13 +265,10 @@ export const ROID = {
   // Production density; DEBUG.ROIDS.INITIAL_COUNT may override this only
   // when debug mode is explicitly enabled.
   INITIAL_ROID_COUNT: 20,
-  MIN_COUNT: 5,
-  MAX_COUNT: 20,
-  SPAWN_TIME_FRAMES: 180, // 3 seconds at 60 FPS
 
   // Shared moving belt. The ship-kill wall is ~3100px; a 1080p camera around a
   // center-spawned ship only sees ~960×540. Opposite-side wrap at the wall
-  // parked every roid at ~3000px (minimap dots, empty canvas). Keep the belt
+  // parked every roid at ~3000px, leaving the canvas empty. Keep the belt
   // inside the same "nearby" radius the audio/network layer already uses.
   FIELD_RADIUS: 1200,
   FIELD_INNER_SCALE: 0.96,
@@ -309,14 +315,6 @@ export const SATELLITE_PICKUP = {
 } as const;
 
 // ============================================================================
-// EMP PULSE CONFIGURATION
-// ============================================================================
-export const EMP = {
-  RADIUS: 250, // pixels
-  DURATION: 0.5, // seconds
-} as const;
-
-// ============================================================================
 // COLLAB SPLIT SHOCKWAVE
 // ============================================================================
 // Double phosphor ring + radial impulse when a biggest asteroid splits.
@@ -347,8 +345,8 @@ export const SHOCKWAVE = {
 // ============================================================================
 // FUEL CONFIGURATION
 // ============================================================================
-// Shared tank on every kit. Biggest rocks drop fuel; Quake shock / leftover
-// EMP spends it. Reuses PALETTE.LOOT (locked cream) — do not add a sixth kit.
+// Shared tank on every kit. Biggest rocks drop fuel; Quake shock spends it.
+// Reuses PALETTE.LOOT (locked cream) — do not add a sixth kit.
 export const FUEL = {
   MAX: 100,
   START: 50,
@@ -404,17 +402,6 @@ export const DEBUG = {
   // Master switch for debug features. Off in the default play path so yellow
   // DEBUG MODE chrome does not paint in production builds.
   ENABLED: false,
-
-  // Local player settings
-  LOCAL_PLAYER: {
-    INVINCIBLE: false,
-    SPAWN_PROTECTION: true,
-  },
-
-  // Remote player settings
-  REMOTE_PLAYER: {
-    // Add remote player specific settings here as needed
-  },
 
   // Bot player settings
   BOT_PLAYER: {

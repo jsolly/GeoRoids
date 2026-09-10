@@ -2,17 +2,7 @@ import { PALETTE } from '../../constants';
 import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import type { Player } from '../../entities/player/Player';
 import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
-import type { PlayfieldSize } from '../playfieldCamera';
-import { hudLayoutForCanvas } from './hudLayout';
-
-interface LeaderboardEntry {
-  name: string;
-  score: number;
-  type: 'local' | 'remote' | 'bot';
-  factionId?: Player['factionId'];
-  color?: string;
-  isCurrentPlayer?: boolean;
-}
+import type { HudLayout } from './hudLayout';
 
 const LEADERBOARD_FONT = '11px Arial';
 const LEADERBOARD_RANK_X_OFFSET = 4;
@@ -59,7 +49,7 @@ export function fitLeaderboardName(ctx: TextMeasurer, name: string, maxWidth: nu
 }
 
 /** One row per name so a drop-then-rejoin clone does not list PilotB three times. */
-export function uniquePlayersForLeaderboard<
+function uniquePlayersForLeaderboard<
   T extends { id: string; name: string; type: string; score: number },
 >(players: readonly T[], currentPlayerId: string): T[] {
   const byName = new Map<string, T>();
@@ -82,7 +72,7 @@ export function uniquePlayersForLeaderboard<
 
 export function drawLeaderboard(
   ctx: CanvasRenderingContext2D,
-  viewport: PlayfieldSize,
+  layout: HudLayout,
   players: Player[],
   currentPlayerId: string
 ): void {
@@ -90,18 +80,10 @@ export function drawLeaderboard(
     return;
   }
 
-  const entries: LeaderboardEntry[] = uniquePlayersForLeaderboard(players, currentPlayerId)
-    .map((player) => ({
-      name: player.name,
-      score: player.score,
-      type: player.type,
-      factionId: player.factionId,
-      color: player.color,
-      isCurrentPlayer: player.id === currentPlayerId,
-    }))
-    .sort((a, b) => b.score - a.score);
+  const entries = uniquePlayersForLeaderboard(players, currentPlayerId).sort(
+    (a, b) => b.score - a.score
+  );
 
-  const layout = hudLayoutForCanvas(viewport);
   const { x: boardX, y: boardY, width: boardWidth, rowHeight, maxRows } = layout.leaderboard;
   const visible = entries.slice(0, maxRows);
 
@@ -110,7 +92,7 @@ export function drawLeaderboard(
   visible.forEach((entry, index) => {
     const y = boardY + 6 + index * rowHeight;
     const nameColor = getFactionColor(entry.type);
-    const alpha = entry.isCurrentPlayer ? 0.92 : 0.78;
+    const alpha = entry.id === currentPlayerId ? 0.92 : 0.78;
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.4);
     ctx.font = LEADERBOARD_FONT;

@@ -47,7 +47,8 @@ function addSegment(
  */
 export function extractIsoContours(
   field: Heightfield,
-  gridSize: number = TERRAIN.GRID_SIZE
+  gridSize: number = TERRAIN.GRID_SIZE,
+  levelCount: number = TERRAIN.LEVELS
 ): ContourLevel[] {
   const n = gridSize;
   const cell = (2 * field.radius) / n;
@@ -78,8 +79,8 @@ export function extractIsoContours(
 
   const pad = span * 0.04;
   const levels: ContourLevel[] = [];
-  for (let li = 0; li < TERRAIN.LEVELS; li++) {
-    const height = minH + pad + ((span - 2 * pad) * (li + 0.5)) / TERRAIN.LEVELS;
+  for (let li = 0; li < levelCount; li++) {
+    const height = minH + pad + ((span - 2 * pad) * (li + 0.5)) / levelCount;
     const segments: ContourSegment[] = [];
 
     for (let j = 0; j < n; j++) {

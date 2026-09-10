@@ -25,6 +25,7 @@ run_step "actionlint" npm run check:actions
 run_step "test runner contract" npm run check:test-runner
 run_step "dev server contract" npm run check:dev-server
 run_step "tsc"    npm run check:ts
+run_step "benchmark tsc" npm run check:benchmarks
 run_step "vitest" npm test
 
 run_step "build" npm run build

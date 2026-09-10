@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import {
-  FakeSocket,
-  GameServerWorld,
-  type Pilot,
-  useQuietServerConsole,
-} from '../support/gameServerWorld';
+import { RecordingSocket } from '../../../support/recordingSocket';
+import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
 
@@ -29,7 +25,7 @@ describe('Rejoin after a dropped socket', () => {
     world.disconnect(ace);
     expect(world.isOnServer(ace)).toBe(false);
 
-    const socket = new FakeSocket();
+    const socket = new RecordingSocket();
     world.send(
       { id: ace.id, name: ace.name, socket },
       {
@@ -47,7 +43,7 @@ describe('Rejoin after a dropped socket', () => {
   });
 
   test('a new client id with the same name does not leave a second Ace at 3/0', () => {
-    const cloneSocket = new FakeSocket();
+    const cloneSocket = new RecordingSocket();
     world.send(
       { id: 'ace-clone', name: ace.name, socket: cloneSocket },
       {

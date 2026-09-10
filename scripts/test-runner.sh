@@ -45,6 +45,16 @@ valid_positive_integer() {
 TEST_VITE_PORT="${GEOROIDS_TEST_VITE_PORT:-5173}"
 TEST_SERVER_PORT="${GEOROIDS_TEST_SERVER_PORT:-3001}"
 MAX_TEST_DURATION_SECONDS="${GEOROIDS_TEST_MAX_DURATION_SECONDS:-1200}"
+RUN_MODE=tests
+BUILD_MODE="${GEOROIDS_TEST_BUILD:-development}"
+case "${1:-}" in
+    --benchmark-client) RUN_MODE=benchmark-client; BUILD_MODE=production; shift ;;
+    --benchmark-load) RUN_MODE=benchmark-load; BUILD_MODE=production; shift ;;
+esac
+case "$BUILD_MODE" in
+    development|production) ;;
+    *) echo "GEOROIDS_TEST_BUILD must be development or production" >&2; exit 64 ;;
+esac
 if ! valid_port "$TEST_VITE_PORT" || ! valid_port "$TEST_SERVER_PORT"; then
     echo "❌ GEOROIDS_TEST_VITE_PORT and GEOROIDS_TEST_SERVER_PORT must be valid TCP ports" >&2
     exit 1
@@ -328,19 +338,33 @@ start_dev_servers() {
         return 1
     }
 
-    echo "🚀 Starting dev servers owned by this runner..."
+    local client_command="vite --port $TEST_VITE_PORT --strictPort"
+    local server_entry=server.ts
+    if [ "$RUN_MODE" != tests ]; then
+        server_entry=benchmarks/realtime-server.ts
+    fi
+    if [ "$BUILD_MODE" = production ]; then
+        echo "Building production client for the owned session..."
+        VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws" npm run build || return 1
+        client_command="vite preview --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
+    fi
+    echo "🚀 Starting servers owned by this runner..."
     (
-        export NODE_ENV=development
+        export NODE_ENV="$BUILD_MODE"
         export VITEST=false
         export PORT="$TEST_SERVER_PORT"
+        if [ "$RUN_MODE" != tests ]; then
+            export GEOROIDS_PERFORMANCE=1
+            export GEOROIDS_BENCHMARK_SEED=42
+        fi
         export VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws"
         exec npx --no-install concurrently \
             --kill-others \
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
             --names "vite,network" \
-            "vite --port $TEST_VITE_PORT --strictPort" \
-            "tsx --env-file=.env.local server.ts"
+            "$client_command" \
+            "tsx --env-file=.env.local $server_entry"
     ) &
     DEV_PID=$!
 
@@ -405,7 +429,13 @@ run_tests() {
         --fileParallelism=false
     )
 
-    echo "🧪 Running tests with repository-scoped single-instance protection..."
+    if [ "$RUN_MODE" != tests ]; then
+        case "$RUN_MODE" in
+            benchmark-client) vitest_command=(npx --no-install tsx benchmarks/realtime-client.ts) ;;
+            benchmark-load) vitest_command=(npx --no-install tsx benchmarks/load.ts) ;;
+        esac
+    fi
+    echo "🧪 Running $RUN_MODE with repository-scoped single-instance protection..."
     printf '%s' "📝 Test arguments:"
     if [ "${#test_args[@]}" -gt 0 ]; then
         printf ' %q' "${test_args[@]}"

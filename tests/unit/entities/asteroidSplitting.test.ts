@@ -1,4 +1,5 @@
-import { assert, beforeEach, describe, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { RNGService } from '../../../server/core/RNGService';
 import type { AsteroidData } from '../../../shared-types';
@@ -145,11 +146,11 @@ describe('Collaborative asteroid split', () => {
 
   test('a depleted field generation cannot be targeted after a fresh field is seeded', () => {
     const first = asteroidManager.createAsteroids(1)[0];
-    assert.exists(first);
+    assert.ok(first);
 
     asteroidManager.clearAsteroids();
     const second = asteroidManager.createAsteroids(1)[0];
-    assert.exists(second);
+    assert.ok(second);
     expect(new Set([first.id, second.id]).size).toBe(2);
 
     const delayedOldHit = asteroidManager.destroyFromCollision(first.id);
@@ -162,8 +163,8 @@ describe('Collaborative asteroid split', () => {
     const restartedManager = new AsteroidManager(new RNGService());
     const afterRestart = restartedManager.createAsteroids(1)[0];
 
-    assert.exists(first);
-    assert.exists(afterRestart);
+    assert.ok(first);
+    assert.ok(afterRestart);
     expect(new Set([first.id, afterRestart.id]).size).toBe(2);
   });
 

@@ -90,7 +90,10 @@ export function asteroidTickScale(dtMs: number): number {
   return Math.min(Math.max(dtMs, 0), 50) / frameMs;
 }
 
-/** 1:1 visibility helper for geometry assertions; rendering uses its fixed close scale. */
+/**
+ * Test whether a world point falls inside the ship-centered 1:1 viewport.
+ * Draw culling also needs the object's radius and stroke margin.
+ */
 export function isOnPlayfieldCanvas(
   world: { x: number; y: number },
   ship: { x: number; y: number },

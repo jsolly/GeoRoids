@@ -34,7 +34,12 @@ export function isCombatantImmune(state: CombatantState): boolean {
   return false;
 }
 
-function circlesOverlap(a: Position, radiusA: number, b: Position, radiusB: number): boolean {
+export function circlesOverlap(
+  a: Position,
+  radiusA: number,
+  b: Position,
+  radiusB: number
+): boolean {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   const minDist = radiusA + radiusB;

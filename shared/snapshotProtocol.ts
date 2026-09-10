@@ -7,6 +7,19 @@ export const SNAPSHOT_BACKPRESSURE_BYTES = 256 * 1024;
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type Row = { [key: string]: Json };
+type ImmutableJson =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly ImmutableJson[]
+  | { readonly [key: string]: ImmutableJson };
+type Immutable<Value> = Json extends Value
+  ? ImmutableJson
+  : Value extends object
+    ? { readonly [Key in keyof Value]: Immutable<Value[Key]> }
+    : Value;
+type SnapshotState = Immutable<ServerGameSnapshot>;
 /** Field absence means unchanged; clear deletes a field. Nested values replace atomically. */
 interface SnapshotPatch {
   set: Row;
@@ -22,11 +35,17 @@ interface SnapshotPatch {
   >;
 }
 export type SnapshotFrame =
-  | { version: 1; sequence: number; kind: 'keyframe'; state: ServerGameSnapshot }
-  | { version: 1; sequence: number; kind: 'delta'; baseline: number; patch: SnapshotPatch };
+  | { version: 1; sequence: number; kind: 'keyframe'; state: SnapshotState }
+  | {
+      version: 1;
+      sequence: number;
+      kind: 'delta';
+      baseline: number;
+      patch: Immutable<SnapshotPatch>;
+    };
 export interface SnapshotBaseline {
   sequence: number;
-  state: ServerGameSnapshot;
+  state: SnapshotState;
 }
 
 function object(value: unknown): value is Row {
@@ -63,7 +82,7 @@ function copyJson(value: unknown, depth = 0): Json {
   }
   throw new Error('Non-JSON value in snapshot');
 }
-export function captureSnapshot(state: ServerGameSnapshot): ServerGameSnapshot {
+export function captureSnapshot(state: SnapshotState): ServerGameSnapshot {
   const copy = copyJson(state);
   validateSnapshot(copy);
   return copy;
@@ -111,15 +130,8 @@ function fields(before: Row, after: Row): [Row, string[]] {
   }
   return [set, clear];
 }
-export function encodeSnapshot(
-  state: ServerGameSnapshot,
-  sequence: number,
-  baseline?: SnapshotBaseline
-): SnapshotFrame {
-  if (!baseline) {
-    return { version: SNAPSHOT_VERSION, sequence, kind: 'keyframe', state };
-  }
-  const before = baseline.state as unknown as Row;
+function createSnapshotPatch(state: SnapshotState, baseline: SnapshotState): SnapshotPatch {
+  const before = baseline as unknown as Row;
   const after = state as unknown as Row;
   const [set, clear] = fields(before, after);
   const collections: SnapshotPatch['collections'] = {};
@@ -155,15 +167,50 @@ export function encodeSnapshot(
       delete set[name];
     }
   }
-  const delta: SnapshotFrame = {
-    version: SNAPSHOT_VERSION,
-    sequence,
-    kind: 'delta',
-    baseline: baseline.sequence,
-    patch: { set, clear, collections },
-  };
-  const full: SnapshotFrame = { version: SNAPSHOT_VERSION, sequence, kind: 'keyframe', state };
-  return JSON.stringify(delta).length < JSON.stringify(full).length ? delta : full;
+  return { set, clear, collections };
+}
+
+/** One detached world per broadcast; each socket keeps its own sequence and baseline. */
+export class SnapshotEncoder {
+  readonly state: SnapshotState;
+  private fullStateLength?: number;
+  private readonly patches = new Map<SnapshotState, { patch: SnapshotPatch; length: number }>();
+
+  constructor(state: SnapshotState) {
+    this.state = captureSnapshot(state);
+  }
+
+  encode(sequence: number, baseline?: SnapshotBaseline): SnapshotFrame {
+    const full: SnapshotFrame = {
+      version: SNAPSHOT_VERSION,
+      sequence,
+      kind: 'keyframe',
+      state: this.state,
+    };
+    if (!baseline) {
+      return full;
+    }
+
+    let change = this.patches.get(baseline.state);
+    if (!change) {
+      const patch = createSnapshotPatch(this.state, baseline.state);
+      change = { patch, length: JSON.stringify(patch).length };
+      this.patches.set(baseline.state, change);
+    }
+    const delta: SnapshotFrame = {
+      version: SNAPSHOT_VERSION,
+      sequence,
+      kind: 'delta',
+      baseline: baseline.sequence,
+      patch: change.patch,
+    };
+    this.fullStateLength ??= JSON.stringify(this.state).length;
+    // Null stands in for the shared payload while JSON.stringify counts each
+    // recipient's metadata, including sequence-number digit changes.
+    const deltaLength = JSON.stringify({ ...delta, patch: null }).length - 4 + change.length;
+    const fullLength = JSON.stringify({ ...full, state: null }).length - 4 + this.fullStateLength;
+    return deltaLength < fullLength ? delta : full;
+  }
 }
 function stringList(value: unknown): value is string[] {
   return (
@@ -190,7 +237,7 @@ function applyFields(base: Row, set: unknown, clear: unknown): Row {
   }
   return result;
 }
-function applyPatch(base: ServerGameSnapshot, patch: unknown): ServerGameSnapshot {
+function applyPatch(base: SnapshotState, patch: unknown): ServerGameSnapshot {
   if (!object(patch) || !object(patch['collections'])) {
     throw new Error('Invalid snapshot patch');
   }

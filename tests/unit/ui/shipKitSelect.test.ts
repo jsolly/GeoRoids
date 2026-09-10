@@ -1,4 +1,5 @@
-import { assert, beforeEach, expect, test } from 'vitest';
+import assert from 'node:assert/strict';
+import { beforeEach, expect, test } from 'vitest';
 import { listShipKits } from '../../../src/entities/ship/shipKits';
 import {
   getSelectedShipKitId,
@@ -23,7 +24,7 @@ test('kit picker lists the five kits and selects Dart by default', () => {
 
 test('clicking Quake stores that kit for join', () => {
   const quake = document.querySelector<HTMLButtonElement>('[data-kit-id="quake"]');
-  assert.exists(quake);
+  assert.ok(quake);
   quake.click();
   expect(getSelectedShipKitId()).toBe('quake');
   expect(quake.getAttribute('aria-pressed')).toBe('true');
@@ -31,7 +32,7 @@ test('clicking Quake stores that kit for join', () => {
 
 test('Hauler selection survives a remount so join is not stuck on Dart', () => {
   const hauler = document.querySelector<HTMLButtonElement>('[data-kit-id="hauler"]');
-  assert.exists(hauler);
+  assert.ok(hauler);
   hauler.click();
   expect(getSelectedShipKitId()).toBe('hauler');
   mountShipKitSelect();

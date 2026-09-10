@@ -86,7 +86,7 @@ describe('contour lasers stay a terrain blush, not a new authority path', () => 
     expect(Object.values(tick).every(Number.isFinite)).toBe(true);
   });
 
-  test('invalid poses and the flat spawn saddle do not light a tick', () => {
+  test('invalid poses and the flat spawn do not light a tick', () => {
     const field = createHeightfield(TERRAIN.DEFAULT_SEED, BOUNDS);
     expect(contourLaserTick(field, 0, 0)).toBeNull();
     expect(contourLaserTick(field, Number.NaN, 5)).toBeNull();

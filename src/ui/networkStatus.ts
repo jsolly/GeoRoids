@@ -41,7 +41,8 @@ function getOrCreateBanner(): HTMLElement | null {
   return el;
 }
 
-export const DISCONNECT_BANNER_TEXT = 'Disconnected from game server. Refresh the page to rejoin.';
+export const DISCONNECT_BANNER_TEXT =
+  'Disconnected from game server. Select Enter Game to try again.';
 export const RECONNECTING_BANNER_TEXT = 'Reconnecting to game server…';
 
 export function showNetworkBanner(message: string, tone: 'error' | 'reconnect' = 'error'): void {

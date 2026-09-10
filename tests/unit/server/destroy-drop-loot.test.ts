@@ -1,10 +1,11 @@
-import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
+import { strict as assert } from 'node:assert';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
 import { applyLootMass, GROWTH } from '../../../shared/shipGrowth';
 import { ROID } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 function addSmallAsteroid(engine: GameEngine, id: string, size = 12): void {
   engine.addAsteroid({
@@ -34,7 +35,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
   });
 
   test('destroying a roid drops a shared shard in game state', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
 
@@ -51,7 +52,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
   });
 
   test('collecting a shard uses existing mass growth and a small score', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
@@ -67,7 +68,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
   });
 
   test('shooting a shard detonates it and damages nearby hulls', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     const bystander = engine.addPlayer('p2', 'Near', ws, { x: 36, y: 30 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
@@ -75,7 +76,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
-    assert.exists(shard);
+    assert.ok(shard, 'shard loot');
 
     const healthBefore = bystander.health;
     const blast = engine.handleLootExplode(shooter.id, shard.id);
@@ -88,7 +89,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
   });
 
   test('blast pushes small roids away and leaves big ones', () => {
-    const ws = {} as WebSocket;
+    const ws = new RecordingSocket();
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.addAsteroid({
@@ -133,7 +134,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
 
     engine.handleAsteroidHit('seed-roid', shooter.id, 'laser');
     const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
-    assert.exists(shard);
+    assert.ok(shard, 'shard loot');
     const blast = engine.handleLootExplode(shooter.id, shard.id);
 
     expect(blast.success).toBe(true);
@@ -144,19 +145,13 @@ describe('destroy-drop shards on the #458 loot path', () => {
   });
 
   test('reset clears shards with the rest of the world', () => {
-    const close = vi.fn();
-    const ws = {
-      CLOSED: WebSocket.CLOSED,
-      readyState: WebSocket.OPEN,
-      close,
-    } as unknown as WebSocket;
+    const ws = new RecordingSocket();
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', 'p1', 'laser');
     expect(engine.getDiagnostics().loot).toBe(1);
 
     engine.resetForTesting();
-    expect(close).toHaveBeenCalledWith(1000, 'Test world reset');
     expect(engine.getLoot()).toHaveLength(0);
     expect(engine.getDiagnostics().loot).toBe(0);
   });

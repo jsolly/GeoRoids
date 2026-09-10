@@ -48,7 +48,8 @@ The remaining results were the same 70 supporting type exports and one tool entr
 
 The override keeps ts-prune's analyzer while supplying a parser that understands
 `satisfies` and bundler module resolution. ts-morph 28 uses TypeScript 6.0; the
-application still uses TypeScript 5.9. The installed CLI contract tests exercise
+measured application used TypeScript 5.9. The application compiler has since
+advanced to TypeScript 7.0, and the parser override remains separately pinned. The installed CLI contract tests exercise
 namespace imports and `satisfies`, then prove that adding an unused export causes
 each tool to exit with an error. This is a repository-tested dependency override,
 not an upstream ts-prune release. [ts-morph release notes](https://github.com/dsherret/ts-morph/releases/tag/28.0.0)
@@ -65,8 +66,9 @@ has no `.git` directory, both commands received the actual commit through
 Knip's entry points include shell-invoked scripts and browser tests. The benchmark
 restricted its report to exports and types for the symbol comparison; the active
 gate checks all categories and treats configuration and tag hints as errors.
-Its two dependency exceptions identify `concurrently` and `markdownlint-cli2`,
-whose consumers are shell scripts. ts-prune uses `--error`; its default exit status
+Its dependency exceptions identify `concurrently`, `markdownlint-cli2`, and
+`jsonc-parser`, whose consumers are shell scripts. The current analysis also
+includes the benchmark modules added after this measurement. ts-prune uses `--error`; its default exit status
 would otherwise permit findings. [ts-prune CLI](https://github.com/nadeesha/ts-prune)
 
 Run both gates from the repository:

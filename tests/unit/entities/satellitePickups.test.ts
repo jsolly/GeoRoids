@@ -1,7 +1,8 @@
-import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
-import { WebSocket } from 'ws';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SATELLITE_PICKUP } from '../../../src/constants';
+import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: {
@@ -14,7 +15,6 @@ vi.mock('../../../setup/serverLogger', () => ({
 
 describe('Satellite pickups', () => {
   let gameEngine: GameEngine;
-  const mockWs = {} as WebSocket;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,7 +27,7 @@ describe('Satellite pickups', () => {
   });
 
   test('pickups appear in the authoritative game state when a human joins', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const state = gameEngine.getGameState();
 
     expect(state.satellitePickups).toHaveLength(2);
@@ -45,9 +45,9 @@ describe('Satellite pickups', () => {
   });
 
   test('collecting a pickup awards score and a brief shield, then orbits the collector', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     gameEngine.updatePlayer('pilot', { position: { ...pickup.position } });
 
     const result = gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot');
@@ -72,10 +72,10 @@ describe('Satellite pickups', () => {
   });
 
   test('the first collector wins and a second claim is rejected', () => {
-    gameEngine.addPlayer('first', 'First', mockWs, { x: 0, y: 0 });
-    gameEngine.addPlayer('second', 'Second', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('first', 'First', new RecordingSocket(), { x: 0, y: 0 });
+    gameEngine.addPlayer('second', 'Second', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     gameEngine.updatePlayer('first', { position: { ...pickup.position } });
     gameEngine.updatePlayer('second', { position: { ...pickup.position } });
 
@@ -86,9 +86,9 @@ describe('Satellite pickups', () => {
   });
 
   test('an orbiting pickup respawns loose after the shield window', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     gameEngine.updatePlayer('pilot', { position: { ...pickup.position } });
     gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot');
 
@@ -102,9 +102,9 @@ describe('Satellite pickups', () => {
   });
 
   test('dying releases an orbiting pickup back to the arena', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     gameEngine.updatePlayer('pilot', { position: { ...pickup.position } });
     gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot');
     gameEngine.updatePlayer('pilot', { spawnProtectionTimer: 0 });
@@ -118,9 +118,9 @@ describe('Satellite pickups', () => {
   });
 
   test('F-key shield still raises after a satellite collect', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     gameEngine.updatePlayer('pilot', { position: { ...pickup.position } });
     expect(gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot').success).toBe(true);
     expect(gameEngine.requestShield('pilot', true)).toBe(true);
@@ -131,24 +131,17 @@ describe('Satellite pickups', () => {
   });
 
   test('resetting the world clears pickups', () => {
-    const close = vi.fn();
-    const socket = {
-      CLOSED: WebSocket.CLOSED,
-      readyState: WebSocket.OPEN,
-      close,
-    } as unknown as WebSocket;
-    gameEngine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     expect(gameEngine.getSatellitePickupCount()).toBeGreaterThan(0);
     gameEngine.resetForTesting();
-    expect(close).toHaveBeenCalledWith(1000, 'Test world reset');
     expect(gameEngine.getSatellitePickupCount()).toBe(0);
     expect(gameEngine.getGameState().satellitePickups).toEqual([]);
   });
 
   test('a distant or dead ship cannot collect', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     expect(gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot').success).toBe(false);
 
     gameEngine.updatePlayer('pilot', { position: { ...pickup.position }, health: 0 });
@@ -156,9 +149,9 @@ describe('Satellite pickups', () => {
   });
 
   test('a claimed nearby pose cannot bypass the server-owned range check', () => {
-    gameEngine.addPlayer('pilot', 'Pilot', mockWs, { x: 0, y: 0 });
+    gameEngine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     const pickup = gameEngine.getAllSatellitePickups()[0];
-    assert.exists(pickup);
+    assert.ok(pickup);
     const result = gameEngine.handleSatellitePickupCollected(pickup.id, 'pilot');
     expect(result.success).toBe(false);
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');

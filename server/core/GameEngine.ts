@@ -86,8 +86,9 @@ import { RNGService } from './RNGService';
 import type { SatelliteHit } from './SatelliteManager';
 import { SatelliteManager } from './SatelliteManager';
 import { SatellitePickupManager } from './SatellitePickupManager';
+import { ServerClock } from './ServerClock';
 
-export interface ServerLaser {
+interface ServerLaser {
   id: string;
   ownerId: string;
   /** Firing allegiance survives owner departure; never serialized to clients. */
@@ -132,7 +133,7 @@ export interface CombatBroadcast {
   origin?: { x: number; y: number };
 }
 
-export type CombatSink = (result: CombatBroadcast) => void;
+type CombatSink = (result: CombatBroadcast) => void;
 
 /** Matches client Laser.isExpired when the canvas is the internal playfield. */
 const SERVER_LASER_MAX_DISTANCE = LASER.TRAVEL_DISTANCE_RATIO + CANVAS.INTERNAL_WIDTH;
@@ -166,6 +167,7 @@ export class GameEngine {
   private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
   private clockPrimed = false;
+  private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
   private laserSeq = 0;
@@ -195,9 +197,12 @@ export class GameEngine {
   private readonly humanLaserExpiry = new WeakMap<ServerLaser, number>();
   private readonly damageStateLogs = new WeakMap<GameEntity, number>();
 
-  constructor(rngSeed?: number) {
+  constructor(
+    rngSeed?: number,
+    private readonly serverClock = new ServerClock()
+  ) {
     this.rngService = new RNGService(rngSeed);
-    this.entityManager = new EntityManager(this.rngService);
+    this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
     this.asteroidManager = new AsteroidManager(this.rngService);
     this.asteroidManager.setOnRemove((asteroid) => {
       this.asteroidMotion.beforeRemove(asteroid.id);
@@ -214,18 +219,36 @@ export class GameEngine {
     this.combatSink = sink;
   }
 
+  /** Return epoch milliseconds from the process-monotonic server clock. */
+  public getServerTime(): number {
+    return this.serverClock.now();
+  }
+
+  private simulationNow(nowMs?: number): number {
+    const serverNow = nowMs ?? this.getServerTime();
+    if (!Number.isFinite(serverNow) || serverNow < 0) {
+      throw new RangeError('Game clock requires finite non-negative server time');
+    }
+    if (this.lastSimulationAtMs !== undefined && serverNow < this.lastSimulationAtMs) {
+      throw new RangeError('Game clock moved backwards');
+    }
+    this.lastSimulationAtMs = serverNow;
+    return serverNow;
+  }
+
   // Game loop management
   public startGameLoop(): void {
     if (this.gameLoopInterval) {
       return; // Already running
     }
 
-    this.lastTickAtMs = globalThis.performance.now();
+    this.lastTickAtMs = this.getServerTime();
+    this.lastSimulationAtMs = this.lastTickAtMs;
     this.nextTickDueAtMs = this.lastTickAtMs + GAME_TICK_MS;
     this.tickAccumulatorMs = 0;
     this.clockPrimed = true;
     this.gameLoopInterval = setInterval(() => {
-      this.stepClock(globalThis.performance.now());
+      this.stepClock();
     }, GAME_TICK_MS);
   }
 
@@ -234,45 +257,20 @@ export class GameEngine {
    * A blocked event loop used to increment gameTime once per late interval
    * fire, which froze explode/respawn and made /health.world.gameTime look stuck.
    */
-  public stepClock(nowMs: number = globalThis.performance.now()): number {
-    if (!Number.isFinite(nowMs)) {
-      if (serverPerformanceMetrics.enabled) {
-        serverPerformanceMetrics.recordClock({
-          timerLatenessMs: 0,
-          catchupTicks: 0,
-          debtMs: this.tickAccumulatorMs,
-          discardedDebtMs: 0,
-          invalid: true,
-        });
-      }
-      return 0;
-    }
+  public stepClock(nowMs?: number): number {
+    const serverNow = this.simulationNow(nowMs);
     if (!this.clockPrimed) {
-      this.lastTickAtMs = nowMs;
-      this.nextTickDueAtMs = nowMs + GAME_TICK_MS;
+      this.lastTickAtMs = serverNow;
+      this.nextTickDueAtMs = serverNow + GAME_TICK_MS;
       this.clockPrimed = true;
       return 0;
     }
-    if (nowMs < this.lastTickAtMs) {
-      if (serverPerformanceMetrics.enabled) {
-        serverPerformanceMetrics.recordClock({
-          timerLatenessMs: 0,
-          catchupTicks: 0,
-          debtMs: this.tickAccumulatorMs,
-          discardedDebtMs: 0,
-          backwards: true,
-        });
-      }
-      return 0;
-    }
-    const elapsed = nowMs - this.lastTickAtMs;
-    this.lastTickAtMs = nowMs;
-    const timerLatenessMs = Math.max(0, nowMs - this.nextTickDueAtMs);
-    this.nextTickDueAtMs = nowMs + GAME_TICK_MS;
+    const elapsed = serverNow - this.lastTickAtMs;
+    this.lastTickAtMs = serverNow;
     if (elapsed <= 0) {
       if (serverPerformanceMetrics.enabled) {
         serverPerformanceMetrics.recordClock({
-          timerLatenessMs,
+          timerLatenessMs: Math.max(0, serverNow - this.nextTickDueAtMs),
           catchupTicks: 0,
           debtMs: this.tickAccumulatorMs,
           discardedDebtMs: 0,
@@ -280,6 +278,8 @@ export class GameEngine {
       }
       return 0;
     }
+    const timerLatenessMs = Math.max(0, serverNow - this.nextTickDueAtMs);
+    this.nextTickDueAtMs = serverNow + GAME_TICK_MS;
     this.tickAccumulatorMs += elapsed;
     const { frames, remainingMs, discardedMs } = consumeTickAccumulator(this.tickAccumulatorMs);
     if (serverPerformanceMetrics.enabled) {
@@ -292,26 +292,27 @@ export class GameEngine {
     }
     this.tickAccumulatorMs = remainingMs;
     for (let i = 0; i < frames; i++) {
-      this.advanceOneFrame();
+      this.advanceOneFrame(serverNow);
     }
     return frames;
   }
 
   /** One 60 Hz frame: clock always ticks; combat/field only while a human is in. */
-  public advanceOneFrame(): void {
+  public advanceOneFrame(nowMs?: number): void {
+    const serverNow = this.simulationNow(nowMs);
     if (!serverPerformanceMetrics.enabled) {
-      this.advanceOneFrameInternal();
+      this.advanceOneFrameInternal(serverNow);
       return;
     }
     const startedAt = globalThis.performance.now();
     try {
-      this.advanceOneFrameInternal();
+      this.advanceOneFrameInternal(serverNow);
     } finally {
       serverPerformanceMetrics.recordTickDuration(globalThis.performance.now() - startedAt);
     }
   }
 
-  private advanceOneFrameInternal(): void {
+  private advanceOneFrameInternal(serverNow: number): void {
     this.gameTime++;
     if (this.isPaused) {
       return;
@@ -319,27 +320,27 @@ export class GameEngine {
     this.entityManager.cleanupStaleEntities();
     this.entityManager.updateExplosions();
     this.logRespawns(this.entityManager.updateRespawns());
-    for (const id of this.asteroidMotion.step(Date.now(), this.getAllAsteroids(), 1)) {
+    for (const id of this.asteroidMotion.step(serverNow, this.getAllAsteroids())) {
       this.removePlayer(id);
       this.departedPlayers.push(id);
     }
-    this.tickAbilities();
+    this.tickAbilities(serverNow);
     this.entityManager.updateShields();
     this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime);
-    this.collectLoot();
+    this.collectLoot(serverNow);
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion((id) => this.asteroidMotion.ownsAsteroidMotion(id));
     if (this.phenomenaEnabled && this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
     }
-    this.emitAsteroidHits(this.advanceLasersAndResolveHits());
-    this.flushDueShockwaves();
-    this.flushExpiredCollabHits();
+    this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
+    this.flushDueShockwaves(serverNow);
+    this.flushExpiredCollabHits(serverNow);
     if (this.gameTime % 2 === 0) {
       this.queueBotShots(this.entityManager.updateBotMovement());
     }
-    this.resolveAuthoritativeCombat();
+    this.resolveAuthoritativeCombat(serverNow);
     // Destruction can remove the last row during this frame. Refill before
     // the next snapshot so active players never wait for a reconnect.
     this.ensureAsteroidField();
@@ -372,6 +373,7 @@ export class GameEngine {
     this.nextTickDueAtMs = 0;
     this.tickAccumulatorMs = 0;
     this.clockPrimed = false;
+    this.lastSimulationAtMs = undefined;
   }
 
   // Pause/resume functionality
@@ -539,7 +541,7 @@ export class GameEngine {
   }
 
   public transportClosed(ws: WebSocket): boolean {
-    return this.asteroidMotion.transportClosed(ws, Date.now());
+    return this.asteroidMotion.transportClosed(ws, this.getServerTime());
   }
 
   public drainDepartedPlayers(): string[] {
@@ -703,10 +705,6 @@ export class GameEngine {
     return this.entityManager.getBots();
   }
 
-  public getBotCount(): number {
-    return this.entityManager.getBotCount();
-  }
-
   public createSatellites(count: number): SatelliteData[] | null {
     return this.satelliteManager.createSatellitesSafely(count);
   }
@@ -729,12 +727,8 @@ export class GameEngine {
   }
 
   /** Snapshot source for the server-owned collaborative hit window. */
-  public getActiveCollabTags(now = Date.now()): ActiveCollabTag[] {
+  public getActiveCollabTags(now = this.getServerTime()): ActiveCollabTag[] {
     return this.asteroidManager.getActiveCollabTags(now);
-  }
-
-  public createSatellitePickups(count: number = SATELLITE_PICKUP.MAX_COUNT): SatellitePickupData[] {
-    return this.satellitePickupManager.createPickups(count);
   }
 
   public getSatellitePickup(pickupId: string): SatellitePickupData | undefined {
@@ -784,7 +778,8 @@ export class GameEngine {
     const collector = this.entityManager.getEntity(playerId);
     if (
       pickup?.state !== 'loose' ||
-      collector?.type !== 'human' ||
+      !collector ||
+      collector.type !== 'human' ||
       collector.health <= 0 ||
       collector.exploding ||
       collector.respawnTimer !== undefined
@@ -818,7 +813,7 @@ export class GameEngine {
       collector.spawnProtectionTimer ?? 0,
       SATELLITE_PICKUP.SHIELD_FRAMES
     );
-    collector.lastUpdate = Date.now();
+    collector.lastUpdate = this.getServerTime();
     return { success: true, pickup: collected };
   }
 
@@ -892,7 +887,7 @@ export class GameEngine {
     }
     const changed = requestShield(entity, active, entity.exploding);
     if (changed) {
-      entity.lastUpdate = Date.now();
+      entity.lastUpdate = this.getServerTime();
     }
     return changed;
   }
@@ -967,11 +962,12 @@ export class GameEngine {
     destroyed: boolean
   ): void {
     const observedAt = Date.now();
-    const lastLoggedAt = this.damageStateLogs.get(entity) ?? -Infinity;
-    if (!destroyed && observedAt - lastLoggedAt < 1000) {
+    const throttleAt = this.getServerTime();
+    const lastThrottleAt = this.damageStateLogs.get(entity) ?? -Infinity;
+    if (!destroyed && throttleAt - lastThrottleAt < 1000) {
       return;
     }
-    this.damageStateLogs.set(entity, observedAt);
+    this.damageStateLogs.set(entity, throttleAt);
     logger.info('STATE', destroyed ? 'player_died' : 'damage_applied', {
       releaseId: SERVER_RELEASE_ID,
       playerId: entity.id,
@@ -1036,7 +1032,7 @@ export class GameEngine {
    * motion already ran in the game loop (`updateMotion`); this only applies
    * health. Ram uses the tip collision destroy path so laser collab stays intact.
    */
-  public resolveAuthoritativeCombat(now: number = Date.now()): CombatBroadcast[] {
+  public resolveAuthoritativeCombat(now: number = this.getServerTime()): CombatBroadcast[] {
     if (this.isPaused) {
       return [];
     }
@@ -1150,7 +1146,7 @@ export class GameEngine {
     if (attackerId) {
       entity.deathCause = attackerId;
     }
-    this.asteroidMotion.invalidateLife(entity.id, Date.now());
+    this.asteroidMotion.invalidateLife(entity.id, this.getServerTime());
     delete entity.laserUpgrade;
     this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
@@ -1175,7 +1171,7 @@ export class GameEngine {
     asteroidId: string,
     playerId: string,
     cause: AsteroidHitCause = 'laser',
-    now = Date.now()
+    now = this.getServerTime()
   ): AsteroidHitOutcome {
     const target = this.getAsteroid(asteroidId);
     const coreSource = target?.phenomenon?.kind === 'reflective';
@@ -1208,7 +1204,7 @@ export class GameEngine {
     playerId: string,
     laserPosition?: Position,
     cause: AsteroidHitCause = 'laser',
-    now = Date.now()
+    now = this.getServerTime()
   ): AppliedAsteroidHit {
     const empty: AppliedAsteroidHit = {
       applied: false,
@@ -1255,7 +1251,7 @@ export class GameEngine {
     };
   }
 
-  public flushExpiredCollabHits(now = Date.now()): ExpiredCollabHit[] {
+  public flushExpiredCollabHits(now = this.getServerTime()): ExpiredCollabHit[] {
     const expired = this.asteroidManager.expireStaleHits(now);
     for (const item of expired) {
       this.awardPoints(item.playerId, item.points);
@@ -1270,18 +1266,6 @@ export class GameEngine {
     const items = this.resolvedCollabHits;
     this.resolvedCollabHits = [];
     return items;
-  }
-
-  public handleAsteroidDestruction(
-    asteroidId: string,
-    playerId: string,
-    _points?: number
-  ): { success: boolean; newAsteroids: AsteroidData[] } {
-    const result = this.applyLaserAsteroidHit(asteroidId, playerId);
-    return {
-      success: result.outcome === 'destroyed',
-      newAsteroids: result.newAsteroids,
-    };
   }
 
   public setOnAsteroidHits(listener: (hits: AppliedAsteroidHit[]) => void): void {
@@ -1299,7 +1283,7 @@ export class GameEngine {
     ownerId: string,
     start: Position,
     velocity: Velocity,
-    now = Date.now()
+    now = this.getServerTime()
   ): ServerLaser | null {
     const shooter = this.entityManager.getEntity(ownerId);
     if (
@@ -1348,7 +1332,7 @@ export class GameEngine {
     if (available < 1) {
       return null;
     }
-    const laser = this.spawnLaser(ownerId, start, velocity);
+    const laser = this.spawnLaser(ownerId, start, velocity, now);
     if (!laser) {
       return null;
     }
@@ -1358,7 +1342,12 @@ export class GameEngine {
   }
 
   /** Spawn a simulated shot. Used for human `shoot` and the same helper can take a bot id. */
-  public spawnLaser(ownerId: string, start: Position, velocity: Velocity): ServerLaser | null {
+  public spawnLaser(
+    ownerId: string,
+    start: Position,
+    velocity: Velocity,
+    now = this.getServerTime()
+  ): ServerLaser | null {
     const position = this.validatePosition(start);
     const vx = typeof velocity?.x === 'number' && Number.isFinite(velocity.x) ? velocity.x : NaN;
     const vy = typeof velocity?.y === 'number' && Number.isFinite(velocity.y) ? velocity.y : NaN;
@@ -1381,12 +1370,12 @@ export class GameEngine {
       bounces: 0,
       age: 0,
     };
-    if (owner?.laserUpgrade && owner.laserUpgrade.expiresAt <= Date.now()) {
+    if (owner?.laserUpgrade && owner.laserUpgrade.expiresAt <= now) {
       delete owner.laserUpgrade;
     }
     if (
       owner?.laserUpgrade &&
-      owner.laserUpgrade.expiresAt > Date.now() &&
+      owner.laserUpgrade.expiresAt > now &&
       owner.laserUpgrade.charges > 0
     ) {
       laser.energy = 2;
@@ -1547,7 +1536,7 @@ export class GameEngine {
   }
 
   /** Move live lasers and apply at most one break per asteroid / laser. */
-  public advanceLasersAndResolveHits(): AppliedAsteroidHit[] {
+  public advanceLasersAndResolveHits(now = this.getServerTime()): AppliedAsteroidHit[] {
     const hits: AppliedAsteroidHit[] = [];
 
     for (let i = this.lasers.length - 1; i >= 0; i--) {
@@ -1555,7 +1544,7 @@ export class GameEngine {
       if (laser === undefined) {
         continue;
       }
-      if (laser.hasExploded || Date.now() >= (this.humanLaserExpiry.get(laser) ?? Infinity)) {
+      if (laser.hasExploded || now >= (this.humanLaserExpiry.get(laser) ?? Infinity)) {
         this.lasers.splice(i, 1);
         continue;
       }
@@ -1577,7 +1566,7 @@ export class GameEngine {
         continue;
       }
 
-      const hit = this.resolveLaserAgainstAsteroids(laser);
+      const hit = this.resolveLaserAgainstAsteroids(laser, now);
       if (hit) {
         hits.push(hit);
       }
@@ -1591,22 +1580,25 @@ export class GameEngine {
 
   /** Resolve only the new muzzle overlap, never replay an older shot's swept
    * path. After a reflection, its start/end chord is not its traveled path. */
-  public resolveSpawnedLaserHits(laserId: string): AppliedAsteroidHit[] {
+  public resolveSpawnedLaserHits(
+    laserId: string,
+    now = this.getServerTime()
+  ): AppliedAsteroidHit[] {
     const index = this.lasers.findIndex((laser) => laser.id === laserId);
     const laser = this.lasers[index];
     if (!laser || laser.hasExploded || laser.age !== 0) {
       return [];
     }
-    const hit = this.resolveLaserAgainstAsteroids(laser);
+    const hit = this.resolveLaserAgainstAsteroids(laser, now);
     if (laser.hasExploded) {
       this.lasers.splice(index, 1);
     }
     return hit ? [hit] : [];
   }
 
-  private resolveLaserAgainstAsteroids(laser: ServerLaser): AppliedAsteroidHit | null {
+  private resolveLaserAgainstAsteroids(laser: ServerLaser, now: number): AppliedAsteroidHit | null {
     if (this.phenomenaEnabled) {
-      return this.resolveEnhancedLaser(laser);
+      return this.resolveEnhancedLaser(laser, now);
     }
     for (const asteroid of this.asteroidManager.getAllAsteroids()) {
       if (asteroid.isCollabTarget) {
@@ -1622,7 +1614,13 @@ export class GameEngine {
       ) {
         continue;
       }
-      const hit = this.applyLaserAsteroidHit(asteroid.id, laser.ownerId, laser.position);
+      const hit = this.applyLaserAsteroidHit(
+        asteroid.id,
+        laser.ownerId,
+        laser.position,
+        'laser',
+        now
+      );
       laser.hasExploded = true;
       return hit.applied ? hit : null;
     }
@@ -1631,7 +1629,7 @@ export class GameEngine {
 
   /** Full swept path for the enhanced world. Every bounce consumes distance and
    * shares the preview's nearest polygon geometry; ship contact can occur first. */
-  private resolveEnhancedLaser(laser: ServerLaser): AppliedAsteroidHit | null {
+  private resolveEnhancedLaser(laser: ServerLaser, now: number): AppliedAsteroidHit | null {
     let start = { ...laser.prevPosition };
     let end = { ...laser.position };
     for (let work = 0; work <= ASTEROID_INTERACTIONS.maxBounces; work++) {
@@ -1795,9 +1793,9 @@ export class GameEngine {
       }
       // Core charges double one physical shot's metal chip; each logical shot
       // is still consumed once and terminal drops/score happen only once.
-      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, impact.point);
+      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, impact.point, 'laser', now);
       if (laser.energy >= 2 && rock.material === 'metal' && this.getAsteroid(rock.id)) {
-        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, impact.point);
+        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, impact.point, 'laser', now);
       }
       return hit.applied ? hit : null;
     }
@@ -1817,7 +1815,7 @@ export class GameEngine {
     this.pendingAsteroidHits.push(...applied);
   }
 
-  public queueCollabShockwave(origin: Position, now = Date.now()): void {
+  public queueCollabShockwave(origin: Position, now = this.getServerTime()): void {
     const source = { x: origin.x, y: origin.y };
     for (const wave of SHOCKWAVE_WAVES) {
       if (wave.delayFrames <= 0) {
@@ -1833,7 +1831,7 @@ export class GameEngine {
     }
   }
 
-  public flushDueShockwaves(now = Date.now()): number {
+  public flushDueShockwaves(now = this.getServerTime()): number {
     let applied = 0;
     const remaining: PendingShockwave[] = [];
     for (const pending of this.pendingShockwaves) {
@@ -1965,14 +1963,14 @@ export class GameEngine {
     return activateAbilityOnHost(entity, world).activated;
   }
 
-  public tickAbilities(): void {
+  public tickAbilities(now = this.getServerTime()): void {
     this.entityManager.tickAbilityState();
     const asteroids = this.asteroidManager.getAllAsteroids();
     const entities = this.entityManager.getAllEntities();
     const emptyCandidates: Array<AsteroidData | GameEntity> = [];
     let sharedCandidates: Array<AsteroidData | GameEntity> | undefined;
     for (const entity of entities) {
-      if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= Date.now()) {
+      if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= now) {
         delete entity.laserUpgrade;
       }
       if (this.asteroidMotion.ownsActorMotion(entity.id)) {
@@ -2027,14 +2025,16 @@ export class GameEngine {
   }
 
   /** Server-authoritative pickup: first overlapping live ship wins. */
-  public collectLoot(): Array<{ collectorId: string; lootId: string; mass: number }> {
+  public collectLoot(
+    now = this.getServerTime()
+  ): Array<{ collectorId: string; lootId: string; mass: number }> {
     const collected = this.lootManager.collectOverlaps(this.entityManager.getAllEntities());
     const results: Array<{ collectorId: string; lootId: string; mass: number }> = [];
     for (const { collector, loot } of collected) {
       if (loot.kind === 'laserCore') {
         collector.laserUpgrade = {
           charges: ASTEROID_INTERACTIONS.coreCharges,
-          expiresAt: Date.now() + ASTEROID_INTERACTIONS.coreLifetimeMs,
+          expiresAt: now + ASTEROID_INTERACTIONS.coreLifetimeMs,
         };
         this.awardPoints(collector.id, ASTEROID_INTERACTIONS.coreScore);
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
@@ -2042,7 +2042,7 @@ export class GameEngine {
       }
       if (isFuelLoot(loot)) {
         applyFuelPickup(ensureFuelTank(collector), loot.fuel ?? 0);
-        collector.lastUpdate = Date.now();
+        collector.lastUpdate = this.getServerTime();
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
         logger.debug('LOOT', 'Collected fuel drop', {
           collectorId: collector.id,
@@ -2055,7 +2055,7 @@ export class GameEngine {
       if (loot.kind === 'shard') {
         this.awardPoints(collector.id, GROWTH.SHARD_SCORE);
       }
-      collector.lastUpdate = Date.now();
+      collector.lastUpdate = this.getServerTime();
       results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
       logger.debug('LOOT', 'Collected loot', {
         collectorId: collector.id,
@@ -2143,7 +2143,7 @@ export class GameEngine {
     if (entity.health < previousHealth) {
       entity.healthRegenTimer = calculateHealthRegenDelayFrames();
     }
-    entity.lastUpdate = Date.now();
+    entity.lastUpdate = this.getServerTime();
     if (entity.health <= 0) {
       this.applyShipDeath(entity, 'loot', 0);
       return 'killed';
@@ -2163,7 +2163,7 @@ export class GameEngine {
     const entity = this.entityManager.getEntity(entityId);
     if (entity) {
       entity.score += points;
-      entity.lastUpdate = Date.now();
+      entity.lastUpdate = this.getServerTime();
     }
   }
 

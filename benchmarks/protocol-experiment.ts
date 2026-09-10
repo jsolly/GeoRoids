@@ -10,7 +10,7 @@ import { type Measurement, validateMeasurement } from './results';
 
 type Variant = 'legacy' | 'keyframe' | 'delta';
 type Payloads = Record<Variant, string>;
-export interface ProtocolExperimentOptions {
+interface ProtocolExperimentOptions {
   readonly seed: number;
   readonly warmupTicks: number;
   readonly measuredTicks: number;
@@ -110,7 +110,7 @@ function playerProjectileFixture(tick: number): PlayerProjectileState[] {
   });
 }
 
-export function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Measurement {
+function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Measurement {
   const totalTicks = input.warmupTicks + input.measuredTicks;
   const worlds = Array.from({ length: totalTicks }, (_, tick) => {
     const world = snapshotFixture(input.seed + tick);

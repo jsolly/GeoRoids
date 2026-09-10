@@ -439,7 +439,7 @@ export const DEBUG = {
 // ============================================================================
 // USER PREFERENCES
 // ============================================================================
-export const PREFERENCES = {
+const PREFERENCES = {
   LOCAL_STORAGE_KEYS: {
     SOUND_ON: 'soundOn',
   } as const,
@@ -464,7 +464,7 @@ export const LOGGING = {
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-export const isSoundEnabled = (): boolean =>
+const isSoundEnabled = (): boolean =>
   getStoredItem(PREFERENCES.LOCAL_STORAGE_KEYS.SOUND_ON) === 'true';
 
 // Initialize sound preference checkbox after DOM is ready

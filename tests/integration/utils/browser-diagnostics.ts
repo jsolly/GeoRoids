@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 
-export type BrowserDiagnostics = {
+type BrowserDiagnostics = {
   readonly errors: string[];
   readonly warnings: string[];
 };

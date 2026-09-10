@@ -4,7 +4,90 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+
+test('title and gameplay stay sharp through density changes without a viewport resize', async () => {
+  const page = await browserManager.recreatePage();
+  await page.setViewportSize({ width: 800, height: 600 });
+  const game = new GameInteractions(page);
+  await game.navigateToGame();
+  const resizeCount = await page.evaluateHandle(() => {
+    const count = { value: 0 };
+    window.addEventListener('resize', () => count.value++);
+    return count;
+  });
+  const session = await page.context().newCDPSession(page);
+  const setDensity = async (ratio: number): Promise<void> => {
+    await session.send('Emulation.setDeviceMetricsOverride', {
+      width: 800,
+      height: 600,
+      deviceScaleFactor: ratio,
+      mobile: false,
+    });
+    // DPR overrides alone do not invalidate Chromium's resolution media queries.
+    // Reevaluate native queries without resizing or dispatching application events.
+    await session.send('Emulation.setEmulatedMedia', { media: 'screen' });
+    await session.send('Emulation.setEmulatedMedia', { media: '' });
+  };
+  try {
+    for (const ratio of [2, 1.5, 2.25]) {
+      await setDensity(ratio);
+      await page.waitForFunction(
+        (dpr) => {
+          const title = document.querySelector<HTMLCanvasElement>('#title-terrain');
+          const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+          return (
+            window.devicePixelRatio === dpr &&
+            window.innerWidth === 800 &&
+            window.innerHeight === 600 &&
+            title?.width === 800 * Math.min(dpr, 2) &&
+            title?.height === 600 * Math.min(dpr, 2) &&
+            canvas?.width === 800 * dpr &&
+            canvas?.height === 600 * dpr
+          );
+        },
+        ratio,
+        { timeout: 5000 }
+      );
+    }
+    await game.startGame();
+    await game.waitForServerJoin();
+    expect(
+      await page.evaluate(() => {
+        const canvas = document.getElementById('gameCanvas');
+        if (!(canvas instanceof HTMLCanvasElement)) {
+          throw new Error('Game canvas unavailable');
+        }
+        const rect = canvas.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      })
+    ).toEqual({ width: 800, height: 600 });
+    await setDensity(1.25);
+    await page.waitForFunction(
+      () => {
+        const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+        return canvas?.width === 1000 && canvas?.height === 750;
+      },
+      undefined,
+      { timeout: 5000 }
+    );
+    expect(
+      await page.evaluate(() => {
+        const canvas = document.getElementById('gameCanvas');
+        if (!(canvas instanceof HTMLCanvasElement)) {
+          throw new Error('Game canvas unavailable');
+        }
+        const rect = canvas.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      })
+    ).toEqual({ width: 800, height: 600 });
+    expect(await resizeCount.evaluate((count) => count.value)).toBe(0);
+  } finally {
+    await session.send('Emulation.clearDeviceMetricsOverride');
+    await session.detach();
+    await resizeCount.dispose();
+  }
+});
 
 test(
   'mobile viewport fits chrome and exposes stick, fire, ability, and shield',
@@ -41,8 +124,11 @@ test(
         overflow,
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
+        dpr: window.devicePixelRatio,
         canvas: canvas
           ? {
+              cssWidth: canvas.getBoundingClientRect().width,
+              cssHeight: canvas.getBoundingClientRect().height,
               width: (canvas as HTMLCanvasElement).width,
               height: (canvas as HTMLCanvasElement).height,
             }
@@ -60,8 +146,11 @@ test(
     expect(chrome.touchPlay).toBe(true);
     expect(chrome.hidden).toBe(false);
     expect(chrome.overflow).toBe(false);
-    expect(chrome.canvas?.width).toBeGreaterThan(0);
-    expect(chrome.canvas?.height).toBeGreaterThan(0);
+    expect(chrome.dpr).toBe(2);
+    expect(chrome.canvas?.cssWidth).toBe(chrome.innerWidth);
+    expect(chrome.canvas?.cssHeight).toBe(chrome.innerHeight);
+    expect(chrome.canvas?.width).toBe(chrome.innerWidth * chrome.dpr);
+    expect(chrome.canvas?.height).toBe(chrome.innerHeight * chrome.dpr);
     expect(chrome.stick).toBeTruthy();
     expect(chrome.fire).toBeTruthy();
     expect(chrome.ability).toBeTruthy();

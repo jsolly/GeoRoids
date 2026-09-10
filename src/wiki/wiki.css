@@ -40,6 +40,9 @@ button {
 a:hover {
   color: var(--mint);
 }
+.breadcrumb a {
+  color: var(--mint);
+}
 :focus-visible {
   outline: 2px solid var(--mint);
   outline-offset: 5px;
@@ -68,12 +71,30 @@ h2 {
   font-size: 1.7rem;
   font-weight: 600;
 }
+.article-body h2 {
+  font-size: 23px;
+  margin-bottom: 16px;
+}
+.related h2 {
+  font-size: 22px;
+  margin-bottom: 18px;
+}
 h3 {
   font-size: 1.13rem;
   font-weight: 600;
 }
+.demo-heading > span {
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+}
 p {
   color: var(--muted);
+}
+.empty-state p {
+  margin-top: 12px;
 }
 .site-header {
   height: 82px;
@@ -459,9 +480,6 @@ tbody th {
   color: var(--muted);
   margin-bottom: 32px;
 }
-.breadcrumb a {
-  color: var(--mint);
-}
 .article-header {
   max-width: 780px;
   margin-bottom: 30px;
@@ -488,10 +506,6 @@ tbody th {
 .article-body section {
   margin-top: 32px;
 }
-.article-body h2 {
-  font-size: 23px;
-  margin-bottom: 16px;
-}
 .article-body p {
   margin-top: 12px;
   font-size: 15px;
@@ -513,13 +527,6 @@ tbody th {
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--line);
-}
-.demo-heading > span {
-  font:
-    10px ui-monospace,
-    monospace;
-  letter-spacing: 0.12em;
-  color: var(--amber);
 }
 .media-toggle {
   background: #142b2a;
@@ -554,10 +561,6 @@ tbody th {
   padding-top: 25px;
   max-width: 760px;
 }
-.related h2 {
-  font-size: 22px;
-  margin-bottom: 18px;
-}
 .related > div {
   display: flex;
   flex-wrap: wrap;
@@ -583,9 +586,6 @@ tbody th {
   padding: 32px;
   border: 1px solid var(--line);
   margin-top: 24px;
-}
-.empty-state p {
-  margin-top: 12px;
 }
 .empty-state button {
   margin-top: 20px;

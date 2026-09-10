@@ -132,7 +132,7 @@ async function captureHudFrame(
       }
 
       if (capture.overlay) {
-        gameController.updateTextProperties(capture.overlay, 1);
+        gameController.getGameStateManager().updateTextProperties(capture.overlay, 1);
       } else {
         gameController.getGameStateManager().clearOverlay();
       }

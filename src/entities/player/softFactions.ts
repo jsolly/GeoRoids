@@ -1,5 +1,5 @@
 /** Soft sides assigned on join by the factions stream. Kits only store and honor them. */
-export const SOFT_FACTION_IDS = ['ion', 'ember'] as const;
+const SOFT_FACTION_IDS = ['ion', 'ember'] as const;
 
 export type SoftFactionId = (typeof SOFT_FACTION_IDS)[number];
 
@@ -9,7 +9,7 @@ export const SOFT_FACTION_NAMES = {
   ember: 'EMBER',
 } as const;
 
-export function isSoftFactionId(value: unknown): value is SoftFactionId {
+function isSoftFactionId(value: unknown): value is SoftFactionId {
   return value === 'ion' || value === 'ember';
 }
 

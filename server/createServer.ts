@@ -23,7 +23,7 @@ import {
   handleTestResetWorld,
 } from './testHttpHandlers';
 
-export type CreateServerOptions = {
+type CreateServerOptions = {
   port?: number;
   nodeEnv?: string;
   requireEnhancedClient?: boolean;

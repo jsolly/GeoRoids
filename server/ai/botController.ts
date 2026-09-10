@@ -53,13 +53,13 @@ export interface BotShot {
   laserDirection: Velocity;
 }
 
-export interface BotDecision {
+interface BotDecision {
   angle: number;
   thrusting: boolean;
   fire: boolean;
 }
 
-export interface BotMemory {
+interface BotMemory {
   ticks: number;
   lastShotTick: number;
   burstShots: number;
@@ -71,11 +71,11 @@ export interface BotMemory {
   wanderAngle: number;
 }
 
-export function isCombatantAlive(entity: Combatant): boolean {
+function isCombatantAlive(entity: Combatant): boolean {
   return !entity.exploding && entity.health > 0;
 }
 
-export function isSpawnProtected(entity: Combatant): boolean {
+function isSpawnProtected(entity: Combatant): boolean {
   return (entity.spawnProtectionTimer ?? 0) > 0;
 }
 

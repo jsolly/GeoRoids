@@ -8,7 +8,7 @@
 
 export const ASTEROID_PENDING_MS = 800;
 
-export interface PendingAsteroid {
+interface PendingAsteroid {
   pendingDestruction: boolean;
   pendingUntilMs: number;
 }

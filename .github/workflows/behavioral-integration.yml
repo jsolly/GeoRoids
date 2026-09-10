@@ -1,6 +1,7 @@
+---
 name: Extended behavioral integration
 
-on:
+'on':
   workflow_dispatch:
   schedule:
     - cron: '17 5 * * 1'

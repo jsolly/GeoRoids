@@ -22,17 +22,18 @@ import { RecordingSocket } from '../../support/recordingSocket';
 import { SHIP_KINDS } from '../scenarios/support/shipKinds';
 
 describe('client explode ticks follow the 60 Hz clock', () => {
-  test.each(SHIP_KINDS)('$kind hitch-drains explodeTime without dropping the exploding flag', ({
-    options,
-  }) => {
-    const ship = new Ship(options);
-    ship.takeDamage(100);
-    expect(ship.exploding).toBe(true);
-    expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
-    ship.updateLifecycle(SHIP.EXPLODE_DURATION_FRAMES);
-    expect(ship.explodeTime).toBe(0);
-    expect(ship.exploding).toBe(true);
-  });
+  test.each(SHIP_KINDS)(
+    '$kind hitch-drains explodeTime without dropping the exploding flag',
+    ({ options }) => {
+      const ship = new Ship(options);
+      ship.takeDamage(100);
+      expect(ship.exploding).toBe(true);
+      expect(ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
+      ship.updateLifecycle(SHIP.EXPLODE_DURATION_FRAMES);
+      expect(ship.explodeTime).toBe(0);
+      expect(ship.exploding).toBe(true);
+    }
+  );
 
   test('a sub-frame update does not burn explode frames', () => {
     const ship = new Ship({ isLocalPlayer: true });

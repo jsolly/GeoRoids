@@ -1,6 +1,7 @@
 import type { Position } from '../../../shared-types';
 import { PALETTE, SATELLITE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
+import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
 import { hexToRgba } from '../../utils/colorUtils';
 import { drawLaserBolts } from '../ship/shipRenderer';
 import { drawEoSatelliteOutline } from './eoOutlines';
@@ -13,14 +14,14 @@ export function drawSatellites(satellites: Satellite[], viewer: Position): void 
   }
 }
 
-export function drawSatellite(satellite: Satellite, viewer: Position): void {
+function drawSatellite(satellite: Satellite, viewer: Position): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
     return;
   }
 
   const screen = canvasManager.worldToScreen(satellite.position, viewer);
-  const screenRadius = Math.max(5, satellite.radius * canvasManager.getPlayfieldScale());
+  const screenRadius = Math.max(5, satellite.radius * PLAYFIELD_CLOSE_SCALE);
   const color = satellite.color || PALETTE.SATELLITE;
 
   if (satellite.exploding) {

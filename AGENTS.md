@@ -32,7 +32,7 @@ Local gate before push: `npm run gate` (full working-tree checks, including an e
 
 Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDOMAIN). The live client is **georoids.com**.
 
-**Server changes** (`server.ts`, `server/**`, or server-facing changes in `shared-types.ts`):
+**Server changes** (`server.ts`, `server/**`, `.railway/**`, or server-facing changes in `shared-types.ts`):
 
 1. Complete client verification above if the push also touched client files.
 2. Deploy manually on [Railway](https://railway.app) (linked GitHub repo or Railway CLI).
@@ -65,7 +65,7 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://geoasteroids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
 
-`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel.
+`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit comes from `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, or local Git. A missing or invalid commit stops the build because automatic client refresh needs that identity.
 
 Local dev: `VITE_WEBSOCKET_URL=ws://localhost:3001/ws` in `.env.local` (see `.env.example`). Vite dev proxies `/ws` to `:3001` when unset; `ConnectionManager` falls back to same-origin `/ws`.
 
@@ -73,13 +73,29 @@ Local dev: `VITE_WEBSOCKET_URL=ws://localhost:3001/ws` in `.env.local` (see `.en
 
 | | |
 | --- | --- |
-| **Config owner** | Railway service settings (Railpack build). Keep the server start and health/restart settings below aligned with the service. |
-| **Start command** | `node_modules/.bin/tsx server.ts` |
-| **Healthcheck** | Path `/health`, timeout `300` seconds |
-| **Restart policy** | `ON_FAILURE`, maximum retries `10` |
+| **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
 | **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
 | **Deploy** | Manual / separate from the Git push flow — Railway dashboard or CLI |
-| **When required** | Changes under `server.ts`, `server/**`, or server protocol changes in `shared-types.ts`; service-setting changes require a separate Railway update |
+| **When required** | Changes under `server.ts`, `server/**`, `.railway/**`, or server protocol changes in `shared-types.ts` |
+
+Railpack installs dependencies and runs `npm run build` during the build. The
+tracked [`.railway/railway.ts`](.railway/railway.ts) keeps the explicit
+`startCommand` on Node with the installed `tsx` loader so the server owns
+shutdown signals; restarts do not install packages or start the Vite client.
+The IaC package is a development-only dependency and the CLI must be at least
+5.42.1.
+
+Railway stops reading legacy `railway.json` files on **2026-12-01**. The
+[IaC migration](https://docs.railway.com/infrastructure-as-code) is now prepared
+in `.railway/railway.ts`: it preserves the three existing service variables and
+leaves generated Railway domains platform-managed. Before the first production
+apply, link the exact GeoRoids production project/environment/service, run
+`railway config plan --json`, and review the existing staged platform patch.
+Apply only the reviewed plan; do not include variable values in source or plan
+output. Authenticated pull/plan and service readback validate this definition;
+the start-command update takes effect on the next deployment. Railway's verified
+restart defaults are `ON_FAILURE` with 10 retries and are omitted from the IaC
+because the platform importer omits these default values.
 
 Smoke: `curl -i https://geoasteroids-production-2403.up.railway.app/health`. The server exposes `RAILWAY_GIT_COMMIT_SHA` as `x-release-id` and health JSON `releaseId`; `dev` is local-only and never production proof.
 
@@ -87,7 +103,7 @@ The older `geoasteroids-production.up.railway.app` domain has no target port and
 
 ## CI (local pre-commit gate)
 
-- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → lint → yaml → actionlint → runner/dev process contracts → tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
+- `.git-hooks/pre-commit` (wired via `core.hooksPath=.git-hooks`) runs dep grounding → Biome policy → Biome → Knip → ts-prune → Markdownlint → Yamllint → actionlint/ShellCheck → runner/dev process contracts → tsc + benchmark tsc → vitest → build. It does **not** deploy. After the push lands, babysit the Vercel GitHub deployment in the dashboard.
 
 ### Actions helper exception
 
@@ -110,10 +126,16 @@ npm run dev:check          # status of dev servers
  npm run dev:kill           # stop only this checkout's owned dev session
 
 # Build / typecheck / lint
-npm run build              # tsc -p tsconfig.build.json && vite build
+npm run build              # wiki checks + tsc -p tsconfig.build.json + vite build
 npm run check:ts           # tsc --noEmit
-npm run check:lint         # biome check .
-npm run check:fix          # biome check --write .
+npm run check:lint         # biome check --error-on-warnings .
+npm run check:lint-policy  # reject inherited warn/info Biome severities
+npm run check:knip         # fail on unused files/exports/dependencies and config hints
+npm run check:ts-prune     # fail on unconsumed TypeScript exports
+npm run check:md           # markdownlint-cli2
+npm run check:yaml         # yamllint --strict
+npm run check:actions      # actionlint + ShellCheck
+npm run check:fix          # biome check --write --error-on-warnings .
 npm run fix                # biome write + tsc + unit tests
 
 # Tests
@@ -148,7 +170,7 @@ Asteroids and bots live on the server; clients render snapshots. Clients still s
 
 - `src/core/gameController.ts` — top-level lifecycle (`newGame`, `startGame`, `setupNetworkDisconnectionHandler`).
 - `src/core/eventLoop.ts` — render/update loop.
-- `src/entities/{player,ship,roid,laser,bot}/` — entity classes + per-entity managers/renderers. `Ship` owns client movement using `shipUtils`; server bots advance through `server/ai/shipMotion.ts`. `shipAbilities` and `shipShield` own abilities and shield behavior.
+- `src/entities/{player,ship,roid,laser,satellite,satellitePickup,loot}/` — entity classes and their managers/renderers. Ship motion and combat live in `Ship.ts` and its ship helpers; bots run on the server.
 - `src/physics/collision/{CollisionManager,collisionDetection}.ts` — collision system.
 - `src/network/networkManager.ts` + `services/ConnectionManager.ts` — WS lifecycle, reconnection, message dispatch.
 - `src/rendering/{canvas,boundaryRenderer,hud/}` — canvas + HUD; `GameController.renderGame` calls `canvasManager.drawGame`.
@@ -174,7 +196,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - `tests/unit/` — pure, fast. Run via `npm run test`.
 - `tests/integration/server/` — vitest against server modules directly.
 - `tests/integration/entities/` — vitest against entity interactions and input behavior.
-- `tests/integration/browser/` — Selenium/Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `bots-explode-and-respawn-after-asteroid-collision.test.ts` (what happens) over `test-bot-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
+- `tests/integration/browser/` — Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`, `e2e/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `bots-explode-and-respawn-after-asteroid-collision.test.ts` (what happens) over `test-bot-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
 
 Integration tests start their own dev servers through `scripts/test-runner.sh` on unused configured ports. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
 
@@ -184,7 +206,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 - **No barrel files / re-exports** — import from the defining module.
 - **Relative paths only** — no `@`-style aliases.
-- **Biome** is the only linter/formatter (`biome.jsonc`); ESLint is gone.
+- **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`biome.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. ESLint is gone. Knip and ts-prune check unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
 - **Singletons via `getInstance()`** for the top-level managers (`GameController`, `PlayerManager`, `CollisionManager`, etc.) — wire through these, don't `new` them.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.
 - **Conventional Commits** (`feat`, `fix`, `chore`, `refactor`, `test`, `perf`, `docs`) with a scope (e.g. `feat(network): ...`).
@@ -225,8 +247,13 @@ For a manual smoke, open `http://localhost:5173`, click Play, thrust (arrow keys
 ### Quick verification checklist
 
 ```bash
-npm run check:lint   # biome check — should pass cleanly
-npm run check:ts     # tsc --noEmit — should pass cleanly
+npm run check:lint         # biome check --error-on-warnings — should pass cleanly
+npm run check:lint-policy  # fail closed if Biome defaults/overrides become warn/info
+npm run check:knip         # unused files/exports/dependencies and config hints
+npm run check:md           # markdownlint-cli2
+npm run check:yaml         # yamllint --strict
+npm run check:actions      # actionlint + ShellCheck
+npm run check:ts           # tsc --noEmit — should pass cleanly
 npm run test         # unit tests (~3s)
 npm run build        # tsc -p tsconfig.build.json && vite build — produces dist/
 ```

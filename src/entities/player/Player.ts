@@ -488,26 +488,6 @@ export class Player {
   }
 
   /**
-   * Update player state using unified input system
-   */
-  updateFromInput(): void {
-    // Update thrusting state
-    this.ship.thrusting = this.input.getThrusting();
-
-    // Update angular velocity
-    this.ship.angularVelocity = this.input.getAngularVelocity();
-
-    // Update shooting state
-    if (this.input.getShooting()) {
-      this.ship.shoot();
-    }
-
-    if (this.input.getEmpPulse()) {
-      this.ship.activateAbility();
-    }
-  }
-
-  /**
    * Get friction coefficient based on player type
    */
   getFrictionCoefficient(): number {

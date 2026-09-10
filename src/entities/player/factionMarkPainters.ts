@@ -14,7 +14,7 @@ export const OWNERSHIP_HULL_COLORS = {
 
 export const FACTION_MARK_RADIUS_RATIO = 0.26;
 
-export type FactionMarkContext = 'hull' | 'label' | 'hud' | 'minimap';
+type FactionMarkContext = 'hull' | 'label' | 'hud' | 'minimap';
 
 const FACTION_MARK_SIZE_LIMITS: Record<FactionMarkContext, { min: number; max: number }> = {
   hull: { min: 2.4, max: 4.5 },
@@ -23,7 +23,7 @@ const FACTION_MARK_SIZE_LIMITS: Record<FactionMarkContext, { min: number; max: n
   minimap: { min: 1.4, max: 2.6 },
 };
 
-export interface FactionMarkTarget {
+interface FactionMarkTarget {
   x: number;
   y: number;
   radius: number;
@@ -32,7 +32,7 @@ export interface FactionMarkTarget {
   context?: FactionMarkContext;
 }
 
-export type FactionMarkPainter = (ctx: CanvasRenderingContext2D, mark: FactionMarkTarget) => void;
+type FactionMarkPainter = (ctx: CanvasRenderingContext2D, mark: FactionMarkTarget) => void;
 
 function heading(angle: number): { x: number; y: number } {
   const safeAngle = Number.isFinite(angle) ? angle : 0;

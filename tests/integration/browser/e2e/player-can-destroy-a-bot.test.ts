@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'a player destroys a bot and sees the kill banner, score, and leaderboard update',
@@ -28,17 +28,9 @@ test(
     }
     const initialHealth = target.health;
     const names = await page.evaluate((targetId) => {
-      const testWindow = window as unknown as {
-        gameController?: {
-          playerManager?: { getLocalPlayer?: () => { name: string } };
-          getNetworkManager?: () => {
-            getAllPlayers?: () => Array<{ id: string; name: string }>;
-          };
-        };
-      };
-      const players = testWindow.gameController?.getNetworkManager?.().getAllPlayers?.() ?? [];
+      const players = window.gameController?.getNetworkManager?.().getAllPlayers?.() ?? [];
       return {
-        local: testWindow.gameController?.playerManager?.getLocalPlayer?.()?.name ?? '',
+        local: window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.name ?? '',
         target: players.find((player) => player.id === targetId)?.name ?? '',
       };
     }, target.id);
@@ -62,7 +54,7 @@ test(
         maxWidth?: number
       ): void {
         const canvas = this.canvas;
-        if (x > canvas.width / 2 || text.startsWith('You killed ')) {
+        if (x > canvas.getBoundingClientRect().width / 2 || text.startsWith('You killed ')) {
           testWindow.__combatHudDraws?.push({ text, x, y });
           if ((testWindow.__combatHudDraws?.length ?? 0) > 1000) {
             testWindow.__combatHudDraws?.splice(0, 500);

@@ -11,7 +11,7 @@ export function drawSatellitePickups(pickups: SatellitePickup[], viewer: Positio
   }
 }
 
-export function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
+function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
     return;

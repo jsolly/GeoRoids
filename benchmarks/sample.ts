@@ -24,7 +24,7 @@ export function sampleOptions(kind: string | undefined, seedText = '42', viewpor
   return { kind, seed, viewport } as const;
 }
 
-export function parseSampleArguments(argv: readonly string[]) {
+function parseSampleArguments(argv: readonly string[]) {
   const { values } = parseArgs({
     args: [...argv],
     options: {
@@ -98,7 +98,7 @@ async function executeSample(options: ReturnType<typeof sampleOptions>) {
   }
 }
 
-export async function main(argv: readonly string[] = process.argv.slice(2)) {
+async function main(argv: readonly string[] = process.argv.slice(2)) {
   const options = parseSampleArguments(argv);
   try {
     const result: unknown = await executeSample(options);

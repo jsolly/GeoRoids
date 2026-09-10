@@ -23,8 +23,9 @@ export function drawIsoContours(shipPosition: Position): void {
 
   const pad = 32;
   const scale = canvasManager.getPlayfieldScale();
-  const centerX = cvs.width / 2;
-  const centerY = cvs.height / 2;
+  const viewport = canvasManager.getViewportSize();
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -46,9 +47,9 @@ export function drawIsoContours(shipPosition: Position): void {
       const by = centerY + (segment.by - shipPosition.y) * scale;
       if (
         (ax < -pad && bx < -pad) ||
-        (ax > cvs.width + pad && bx > cvs.width + pad) ||
+        (ax > viewport.width + pad && bx > viewport.width + pad) ||
         (ay < -pad && by < -pad) ||
-        (ay > cvs.height + pad && by > cvs.height + pad)
+        (ay > viewport.height + pad && by > viewport.height + pad)
       ) {
         continue;
       }
@@ -60,8 +61,8 @@ export function drawIsoContours(shipPosition: Position): void {
   }
 
   drawContourLabels(ctx, levels, {
-    width: cvs.width,
-    height: cvs.height,
+    width: viewport.width,
+    height: viewport.height,
     x: shipPosition.x,
     y: shipPosition.y,
     scale,

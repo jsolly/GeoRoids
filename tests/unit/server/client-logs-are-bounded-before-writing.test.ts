@@ -10,12 +10,12 @@ const state = vi.hoisted(() => ({
   appendError: null as Error | null,
 }));
 const serverLogging = vi.hoisted(() => ({
-  warn: vi.fn(),
+  error: vi.fn(),
   emitExternal: vi.fn(),
 }));
 
 vi.mock('../../../setup/serverLogger', () => ({
-  logger: { warn: serverLogging.warn },
+  logger: { error: serverLogging.error },
   emitExternalLogRecord: serverLogging.emitExternal,
 }));
 
@@ -45,7 +45,7 @@ beforeEach(() => {
   state.rm.mockClear();
   state.rename.mockClear();
   state.appendError = null;
-  serverLogging.warn.mockClear();
+  serverLogging.error.mockClear();
   serverLogging.emitExternal.mockClear();
 });
 
@@ -97,6 +97,11 @@ test('a rejected client-log append makes the completed flush fail', async () => 
     'accepted'
   );
   await expect(ClientLogger.flushPending()).resolves.toBe(false);
+  expect(serverLogging.error).toHaveBeenCalledExactlyOnceWith(
+    'LOGGING',
+    'Failed to write forwarded client log',
+    { error: state.appendError }
+  );
   expect(ClientLogger.getDiagnostics()).toMatchObject({
     writeErrors: 1,
     droppedRecords: 1,
@@ -122,7 +127,7 @@ test('a flush deadline records an actionable failure before returning false', as
     droppedRecords: 0,
     lastWriteErrorAt: expect.any(String),
   });
-  expect(serverLogging.warn).toHaveBeenCalledWith(
+  expect(serverLogging.error).toHaveBeenCalledWith(
     'LOGGING',
     'Failed to write forwarded client log',
     {
@@ -171,6 +176,11 @@ test('a stalled disk writer cannot grow the shared queue without bound', async (
 
   expect(outcomes).toContain('accepted');
   expect(outcomes).toContain('queue-full');
+  expect(serverLogging.error).toHaveBeenCalledExactlyOnceWith(
+    'LOGGING',
+    'Client log queue full; dropping forwarded logs',
+    { droppedRecords: 1 }
+  );
   const mirrorCount = vi.mocked(emitExternalLogRecord).mock.calls.length;
   expect(
     ClientLogger.logClientMessage({ level: 'ERROR', line: largeStructuredLine('error') }, {})

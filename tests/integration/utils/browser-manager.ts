@@ -40,7 +40,7 @@ export class BrowserManager {
 
     let context = this.context;
     if (options.hasTouch) {
-      this.touchContext ??= await this.browser.newContext({ hasTouch: true });
+      this.touchContext ??= await this.browser.newContext({ hasTouch: true, deviceScaleFactor: 2 });
       context = this.touchContext;
     }
     const page = await context.newPage();

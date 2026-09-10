@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { WebSocket } from 'ws';
 
-export interface RecordedMessage {
+interface RecordedMessage {
   type: string;
   data?: unknown;
   timestamp?: number;

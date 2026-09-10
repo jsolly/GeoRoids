@@ -10,7 +10,7 @@ import { GAME, LASER } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import { getVelocityMagnitude } from '../../utils/mathUtils';
 
-export interface LaserData {
+interface LaserData {
   position: Position;
   prevPosition: Position;
   serverId?: string;
@@ -63,7 +63,7 @@ export class Laser implements LaserData {
     if (!cvs) {
       return true; // Expire immediately if canvas is unavailable
     }
-    return this.distTraveled >= LASER.TRAVEL_DISTANCE_RATIO + cvs.width;
+    return this.distTraveled >= LASER.TRAVEL_DISTANCE_RATIO + canvasManager.getViewportSize().width;
   }
 
   shouldBeRemoved(): boolean {

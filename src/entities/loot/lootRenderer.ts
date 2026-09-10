@@ -1,6 +1,7 @@
 import type { LootData, LootKind } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
+import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { Ship } from '../ship/Ship';
 import { LootField } from './LootField';
@@ -42,7 +43,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     return;
   }
 
-  const scale = canvasManager.getPlayfieldScale();
+  const scale = PLAYFIELD_CLOSE_SCALE;
   const blast = LootField.getInstance().getBlast();
   if (blast) {
     const screen = canvasManager.worldToScreen(blast.position, ship.position);

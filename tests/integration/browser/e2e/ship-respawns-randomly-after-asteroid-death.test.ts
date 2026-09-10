@@ -4,7 +4,7 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { expectRandomRespawnPlacement } from '../../utils/respawn-assertions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'ship respawns at a random location after asteroid collision death',

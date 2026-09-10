@@ -1,8 +1,13 @@
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { EntityManager } from '../../../server/core/EntityManager';
 import { RNGService } from '../../../server/core/RNGService';
+import * as serverLogging from '../../../setup/serverLogger';
 import { PALETTE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 test('rejoin and same-name takeover apply the requested Hauler kit', () => {
   const manager = new EntityManager(new RNGService(1));
@@ -79,6 +84,30 @@ test('a new client id with the same name takes over the live ship instead of clo
   expect(taken.score).toBe(450);
   expect(manager.getHumanPlayerCount()).toBe(1);
   expect(manager.getEntity('pilot-old')).toBeUndefined();
+});
+
+test('same-name takeover reports a stale socket close failure without losing the new owner', () => {
+  const manager = new EntityManager(new RNGService(1));
+  const close = vi.fn(() => {
+    throw new Error('stale socket close failed');
+  });
+  const oldSocket = { close } as never;
+  const newSocket = { sent: 2 } as never;
+  const logError = vi.spyOn(serverLogging.logger, 'error').mockImplementation(() => undefined);
+  manager.addHumanPlayer('pilot-old', 'PilotB', oldSocket, { x: 8, y: 9 });
+
+  const taken = manager.addHumanPlayer('pilot-new', 'PilotB', newSocket, {
+    x: 3000,
+    y: 0,
+  });
+
+  expect(taken.ws).toBe(newSocket);
+  expect(manager.getEntity('pilot-old')).toBeUndefined();
+  expect(logError).toHaveBeenCalledWith('ENTITY_REBIND_SOCKET_CLOSE_FAILED', {
+    oldPlayerId: 'pilot-old',
+    newPlayerId: 'pilot-new',
+    error: 'stale socket close failed',
+  });
 });
 
 test('drop then rejoin under a new id restores lives and score by name', () => {

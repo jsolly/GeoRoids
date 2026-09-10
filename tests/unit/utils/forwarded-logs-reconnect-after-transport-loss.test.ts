@@ -20,6 +20,7 @@ class FakeWebSocket {
   bufferedAmount = 0;
   sent: string[] = [];
   failNextSend = false;
+  failClose = false;
   onopen: (() => void) | null = null;
   onclose: ((event: { code: number; reason: string }) => void) | null = null;
   onerror: ((event: unknown) => void) | null = null;
@@ -38,6 +39,9 @@ class FakeWebSocket {
   }
 
   close(): void {
+    if (this.failClose) {
+      throw new Error('close failed');
+    }
     this.readyState = FakeWebSocket.CLOSED;
     this.onclose?.({ code: 1006, reason: 'test disconnect' });
   }
@@ -120,6 +124,57 @@ test('stopping before a log socket opens permits a fresh start', async () => {
   }
 });
 
+test.each([false, true])(
+  'an error-only socket failure reports once and preserves queued records when close throws: %s',
+  async (closeThrows) => {
+    vi.useFakeTimers();
+    FakeWebSocket.instances = [];
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { forwardLogToServer, startClientLogForwarder, stopClientLogForwarder } = await import(
+      '../../../src/utils/logForwarder'
+    );
+    try {
+      startClientLogForwarder();
+      const first = FakeWebSocket.instances[0];
+      if (!first) {
+        throw new Error('Expected first log socket');
+      }
+      first.readyState = FakeWebSocket.OPEN;
+      first.onopen?.();
+      first.readyState = FakeWebSocket.CONNECTING;
+      first.failClose = closeThrows;
+      forwardLogToServer('queued before socket error');
+      first.onerror?.(new Event('error'));
+      expect(failure).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining('socket error; retaining queued records'),
+        {}
+      );
+      await vi.advanceTimersByTimeAsync(5000);
+      const replacement = FakeWebSocket.instances[1];
+      if (!replacement) {
+        throw new Error('Expected replacement log socket');
+      }
+      replacement.readyState = FakeWebSocket.OPEN;
+      replacement.onopen?.();
+      expect(replacement.sent).toHaveLength(1);
+      expect(replacement.sent[0]).toContain('queued before socket error');
+      replacement.failClose = true;
+      stopClientLogForwarder();
+      expect(failure).toHaveBeenLastCalledWith(
+        expect.stringContaining('Failed to close log transport during stop'),
+        { error: 'close failed' }
+      );
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(FakeWebSocket.instances).toHaveLength(2);
+    } finally {
+      stopClientLogForwarder();
+      failure.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
 test('a synchronous send failure retains the record for the reconnected socket', async () => {
   vi.useFakeTimers();
   FakeWebSocket.instances = [];
@@ -133,7 +188,7 @@ test('a synchronous send failure retains the record for the reconnected socket',
     writable: true,
     value: FakeWebSocket,
   });
-  const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   const { forwardLogToServer, startClientLogForwarder, stopClientLogForwarder } = await import(
     '../../../src/utils/logForwarder'
   );
@@ -158,14 +213,14 @@ test('a synchronous send failure retains the record for the reconnected socket',
     second.onopen?.();
     expect(second.sent).toHaveLength(1);
     expect(second.sent[0]).toContain('retained');
-    expect(warning).toHaveBeenCalledTimes(1);
-    expect(warning).toHaveBeenCalledWith(
+    expect(failure).toHaveBeenCalledTimes(1);
+    expect(failure).toHaveBeenCalledWith(
       expect.stringContaining('Failed to send client log'),
       expect.any(Object)
     );
   } finally {
     stopClientLogForwarder();
-    warning.mockRestore();
+    failure.mockRestore();
   }
 });
 
@@ -182,7 +237,7 @@ test('a stalled handshake reconnects and delivers the original queued record', a
     writable: true,
     value: FakeWebSocket,
   });
-  const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   const { forwardLogToServer, startClientLogForwarder, stopClientLogForwarder } = await import(
     '../../../src/utils/logForwarder'
   );
@@ -200,13 +255,13 @@ test('a stalled handshake reconnects and delivers the original queued record', a
     replacement.onopen?.();
     expect(replacement.sent).toHaveLength(1);
     expect(replacement.sent[0]).toContain('queued during handshake');
-    expect(warning).toHaveBeenCalledWith(
+    expect(failure).toHaveBeenCalledWith(
       expect.stringContaining('handshake timed out'),
       expect.any(Object)
     );
   } finally {
     stopClientLogForwarder();
-    warning.mockRestore();
+    failure.mockRestore();
   }
 });
 
@@ -222,7 +277,7 @@ test('browser queue overflow is bounded and reported before retained records', a
     writable: true,
     value: FakeWebSocket,
   });
-  const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const failure = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   const { forwardLogToServer, startClientLogForwarder, stopClientLogForwarder } = await import(
     '../../../src/utils/logForwarder'
   );
@@ -251,7 +306,7 @@ test('browser queue overflow is bounded and reported before retained records', a
     const lossRecord = JSON.parse(firstWireMessage.data?.line ?? '{}');
     expect(lossRecord).toMatchObject({
       source: 'client',
-      level: 'warn',
+      level: 'error',
       category: 'STATE',
       message: 'Client log records dropped before delivery',
     });
@@ -259,6 +314,6 @@ test('browser queue overflow is bounded and reported before retained records', a
     expect(socket.sent.length).toBeLessThan(200);
   } finally {
     stopClientLogForwarder();
-    warning.mockRestore();
+    failure.mockRestore();
   }
 });

@@ -1,12 +1,11 @@
-import assert from 'node:assert/strict';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { GROWTH } from '../../../../shared/shipGrowth';
 import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 test(
   'two clients see the same kill-loot drops',
@@ -15,7 +14,7 @@ test(
     if (!page1) {
       throw new Error('Page 1 not available');
     }
-    const page2 = await browserManager.createAdditionalPage();
+    const page2 = await browserManager.createPage();
     const game1 = new GameInteractions(page1);
     const game2 = new GameInteractions(page2);
     const decoder = new SnapshotDecoder();
@@ -109,8 +108,7 @@ test(
     const loot2 = (await game2.getLoot()).filter(isVictimLoot);
     for (const drop of loot1) {
       const peer = loot2.find((other) => other.id === drop.id);
-      expect(peer).toBeDefined();
-      assert.ok(peer, 'Peer did not observe the identified drop');
+      assert.exists(peer);
       expect(Math.abs(peer.x - drop.x)).toBeLessThan(8);
       expect(Math.abs(peer.y - drop.y)).toBeLessThan(8);
     }
@@ -123,8 +121,7 @@ test(
     });
 
     const pellet = loot1[0];
-    expect(pellet).toBeDefined();
-    assert.ok(pellet, 'Fuel pellet missing from this kill');
+    assert.exists(pellet);
     const startMass = await game1.getShipMass();
     const startRadius = await game1.getShipRadius();
     const startMaxHealth = await game1.getShipMaxHealth();

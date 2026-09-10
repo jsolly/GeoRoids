@@ -1,6 +1,6 @@
 import { VISUAL } from '../../constants';
 
-export type HudClusterLayout = {
+type HudClusterLayout = {
   lifeCenters: { x: number; y: number }[];
   score: { x: number; y: number };
 };

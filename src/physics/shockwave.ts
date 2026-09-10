@@ -12,7 +12,7 @@ export type ShockwaveWaveSpec = {
   strokeWidth: number;
 };
 
-export type ShockwaveBody = {
+type ShockwaveBody = {
   position: Position;
   velocity: Velocity;
   size: number;
@@ -27,7 +27,7 @@ export function framesToMs(frames: number): number {
   return (frames * 1000) / GAME.FPS;
 }
 
-export function clamp(value: number, min: number, max: number): number {
+function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
@@ -90,7 +90,7 @@ export function computeRadialImpulse(
   return { x: nx * magnitude, y: ny * magnitude };
 }
 
-export function applyImpulseToVelocity(velocity: Velocity, impulse: Velocity): Velocity {
+function applyImpulseToVelocity(velocity: Velocity, impulse: Velocity): Velocity {
   return { x: velocity.x + impulse.x, y: velocity.y + impulse.y };
 }
 

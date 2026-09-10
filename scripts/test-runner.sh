@@ -190,12 +190,16 @@ release_lock() {
     if [ "$(read_lock_pid)" != "$$" ]; then
         echo "⚠️  Test-runner lock ownership changed; leaving the current lock untouched: $LOCK_DIR" >&2
         LOCK_HELD=false
-        return 0
+        return 1
     fi
 
-    rm -f "$LOCK_PID_FILE" "$LOCK_WORKTREE_FILE" "$LOCK_COMMAND_FILE"
+    if ! rm -f "$LOCK_PID_FILE" "$LOCK_WORKTREE_FILE" "$LOCK_COMMAND_FILE"; then
+        echo "❌ Could not remove test-runner lock metadata: $LOCK_DIR" >&2
+        return 1
+    fi
     if ! rmdir "$LOCK_DIR" 2>/dev/null; then
-        echo "⚠️  Could not remove test-runner lock directory: $LOCK_DIR" >&2
+        echo "❌ Could not remove test-runner lock directory: $LOCK_DIR" >&2
+        return 1
     fi
     LOCK_HELD=false
 }
@@ -236,7 +240,9 @@ cleanup() {
         fi
         DEV_PID=""
     fi
-    release_lock
+    if ! release_lock && [ "$exit_code" -eq 0 ]; then
+        exit_code=1
+    fi
     exit "$exit_code"
 }
 
@@ -251,7 +257,17 @@ servers_ready() {
 }
 
 port_in_use() {
-    lsof -nP -iTCP:"$1" -sTCP:LISTEN > /dev/null 2>&1
+    local port="$1"
+    local lsof_status
+    if process_inspect lsof -nP -iTCP:"$port" -sTCP:LISTEN; then
+        return 0
+    else
+        lsof_status=$?
+    fi
+    if [ "$lsof_status" -gt 1 ]; then
+        report_process_inspection_failure "test port" lsof "$port"
+    fi
+    return "$lsof_status"
 }
 
 wait_for_servers() {
@@ -298,12 +314,17 @@ start_dev_servers() {
     done
 
     local occupied_ports=()
-    if port_in_use "$TEST_VITE_PORT"; then
-        occupied_ports+=("$TEST_VITE_PORT")
-    fi
-    if port_in_use "$TEST_SERVER_PORT"; then
-        occupied_ports+=("$TEST_SERVER_PORT")
-    fi
+    local port
+    local port_status
+    for port in "$TEST_VITE_PORT" "$TEST_SERVER_PORT"; do
+        port_status=0
+        port_in_use "$port" || port_status=$?
+        case "$port_status" in
+            0) occupied_ports+=("$port") ;;
+            1) ;;
+            *) return "$port_status" ;;
+        esac
+    done
     if [ "${#occupied_ports[@]}" -gt 0 ]; then
         echo "❌ Test port(s) ${occupied_ports[*]} are already in use; refusing to attach to unowned services." >&2
         echo "   Stop the owning process after confirming it is safe, or choose unused ports with:" >&2
@@ -470,8 +491,10 @@ main() {
         exit 1
     fi
 
-    if ! start_dev_servers; then
-        exit 1
+    local startup_status=0
+    start_dev_servers || startup_status=$?
+    if [ "$startup_status" -ne 0 ]; then
+        exit "$startup_status"
     fi
 
     run_tests "${test_args[@]}"

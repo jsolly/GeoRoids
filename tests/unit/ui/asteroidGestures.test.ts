@@ -97,28 +97,25 @@ test.each([
   expect(tool).not.toHaveBeenCalled();
 });
 
-test.each([
-  'pointercancel',
-  'lostpointercapture',
-  'blur',
-  'stop',
-  'death',
-])('%s between press and release discards the pending action', (reason) => {
-  const { pointer, tool, motion, stop, controller } = setup();
-  pointer('pointerdown');
-  if (reason === 'blur') {
-    window.dispatchEvent(new Event('blur'));
-  } else if (reason === 'stop') {
-    stop();
-  } else if (reason === 'death') {
-    controller.setPilot({ alive: false, kitId: 'hauler' });
-  } else {
-    pointer(reason);
+test.each(['pointercancel', 'lostpointercapture', 'blur', 'stop', 'death'])(
+  '%s between press and release discards the pending action',
+  (reason) => {
+    const { pointer, tool, motion, stop, controller } = setup();
+    pointer('pointerdown');
+    if (reason === 'blur') {
+      window.dispatchEvent(new Event('blur'));
+    } else if (reason === 'stop') {
+      stop();
+    } else if (reason === 'death') {
+      controller.setPilot({ alive: false, kitId: 'hauler' });
+    } else {
+      pointer(reason);
+    }
+    pointer('pointerup');
+    expect(tool).not.toHaveBeenCalled();
+    expect(motion).not.toHaveBeenCalled();
   }
-  pointer('pointerup');
-  expect(tool).not.toHaveBeenCalled();
-  expect(motion).not.toHaveBeenCalled();
-});
+);
 
 test('left and right mouse clicks keep their gameplay roles; middle click performs the tool action', () => {
   const { pointer, tool } = setup();

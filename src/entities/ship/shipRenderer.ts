@@ -236,7 +236,15 @@ export function drawThruster(ship: Ship, color: string = ship.color): void {
   }
 
   if (!ship.exploding && ship.thrusting) {
-    drawGenericThruster(cvs.width / 2, cvs.height / 2, ship.angle, ship.r, color, ship.kitId);
+    const viewport = canvasManager.getViewportSize();
+    drawGenericThruster(
+      viewport.width / 2,
+      viewport.height / 2,
+      ship.angle,
+      ship.r,
+      color,
+      ship.kitId
+    );
   }
 }
 
@@ -253,12 +261,13 @@ export function drawThrusterAtPosition(
   if (!ship.exploding && ship.thrusting) {
     const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
     const scale = canvasManager.getPlayfieldScale();
+    const viewport = canvasManager.getViewportSize();
     const cull = ship.r * 3 * scale;
     if (
       screen.x < -cull ||
       screen.y < -cull ||
-      screen.x > cvs.width + cull ||
-      screen.y > cvs.height + cull
+      screen.x > viewport.width + cull ||
+      screen.y > viewport.height + cull
     ) {
       return;
     }
@@ -390,10 +399,11 @@ export function drawShipExplosion(ship: Ship, color?: string): void {
     return;
   }
 
+  const viewport = canvasManager.getViewportSize();
   drawVectorExplosion(
     ctx,
-    cvs.width / 2,
-    cvs.height / 2,
+    viewport.width / 2,
+    viewport.height / 2,
     ship.r * canvasManager.getPlayfieldScale(),
     ship.angle,
     explosionProgress(ship),
@@ -438,8 +448,9 @@ export function drawLaserBolts(
   }
 
   const cvs = canvasManager.getCanvas();
-  const viewW = cvs?.width ?? Number.POSITIVE_INFINITY;
-  const viewH = cvs?.height ?? Number.POSITIVE_INFINITY;
+  const viewport = cvs ? canvasManager.getViewportSize() : undefined;
+  const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
+  const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
   const cullPad =
     (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * canvasManager.getPlayfieldScale();
 
@@ -539,6 +550,7 @@ export function drawShipAtPosition(
 
   const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, shipPosition);
   const scale = canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
   const screenX = screen.x;
   const screenY = screen.y;
   const shipR = ship.r * scale;
@@ -548,8 +560,8 @@ export function drawShipAtPosition(
   if (
     screenX < -cull ||
     screenY < -cull ||
-    screenX > cvs.width + cull ||
-    screenY > cvs.height + cull
+    screenX > viewport.width + cull ||
+    screenY > viewport.height + cull
   ) {
     return;
   }

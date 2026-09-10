@@ -44,14 +44,14 @@ export class Sound {
 
       // Defensive guard against empty streams array
       if (this.streams.length === 0) {
-        logger.warn('SOUND', 'Sound.play() called but no audio streams available');
+        logger.error('SOUND', 'Sound.play() called but no audio streams available');
         return;
       }
 
       this.streamNum = (this.streamNum + 1) % this.streams.length;
       const audio = this.streams[this.streamNum];
       if (audio === undefined) {
-        logger.warn('SOUND', 'Sound.play() called but stream index is out of range');
+        logger.error('SOUND', 'Sound.play() called but stream index is out of range');
         return;
       }
 
@@ -83,7 +83,7 @@ export class Sound {
   stop(): void {
     // Defensive guard against empty streams array
     if (this.streams.length === 0) {
-      logger.warn('SOUND', 'Sound.stop() called but no audio streams available');
+      logger.error('SOUND', 'Sound.stop() called but no audio streams available');
       return;
     }
 
@@ -107,7 +107,7 @@ export class Sound {
   }
 }
 
-export function stopAllSounds(): void {
+function stopAllSounds(): void {
   for (const sound of registeredSounds) {
     sound.stop();
   }
@@ -121,12 +121,15 @@ export function setSound(pref: boolean): void {
 }
 
 /**
- * Clean utility for playing sounds with explicit error suppression.
- * Use this instead of void sound.play() for cleaner code.
+ * Fire-and-forget sound playback with reporting for unexpected failures.
  * volumeScale is 1 for local/full volume; 0 skips playback.
  */
 export function playSound(sound: Sound, volumeScale = 1): void {
-  sound.play(volumeScale).catch(() => {
-    // Sound play failed - silently ignore to avoid console spam
+  sound.play(volumeScale).catch((error: unknown) => {
+    logger.error(
+      'SOUND',
+      'Unexpected sound playback failure',
+      error instanceof Error ? error : new Error(String(error))
+    );
   });
 }

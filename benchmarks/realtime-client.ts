@@ -177,7 +177,7 @@ try {
       await page.waitForFunction(
         () =>
           window.gameController?.getNetworkManager().isConnected &&
-          window.gameController.getCurrShip() &&
+          window.gameController.getCurrPlayer()?.ship &&
           window.georoidsPerformance &&
           !window.georoidsPerformance.read().pendingJoin,
         undefined,

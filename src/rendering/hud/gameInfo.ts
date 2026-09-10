@@ -6,6 +6,7 @@ import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { getShipKit } from '../../entities/ship/shipKits';
 import { hexToRgba } from '../../utils/colorUtils';
+import type { PlayfieldSize } from '../playfieldCamera';
 import { layoutHudCluster } from './cluster';
 import { drawFuelGauge } from './fuel';
 import { type HudLayout, scaleHudFont } from './hudLayout';
@@ -13,13 +14,14 @@ import { type HudLayout, scaleHudFont } from './hudLayout';
 export function drawScoreOverlay(
   ctx: CanvasRenderingContext2D,
   layout: HudLayout,
-  canvas: HTMLCanvasElement,
+  viewport: PlayfieldSize,
   score: number,
   lives: number,
   faction?: FactionId
 ): void {
   ctx.save();
   ctx.fillStyle = PALETTE.HUD;
+  const viewportWidth = viewport.width;
   ctx.font = scaleHudFont(VISUAL.SCORE_FONT, layout.hudTypeScale);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
@@ -59,7 +61,7 @@ export function drawScoreOverlay(
     ctx.font = scaleHudFont('bold 14px Arial', layout.hudTypeScale);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(gameStateManager.getKillMessage(), canvas.width / 2, layout.killMessageY);
+    ctx.fillText(gameStateManager.getKillMessage(), viewportWidth / 2, layout.killMessageY);
   }
   if (gameStateManager.hasPickupMessage()) {
     ctx.fillStyle = PALETTE.SATELLITE_PICKUP;
@@ -69,7 +71,7 @@ export function drawScoreOverlay(
     const pickupY = gameStateManager.hasKillMessage()
       ? layout.killMessageY + 18
       : layout.killMessageY;
-    ctx.fillText(gameStateManager.getPickupMessage(), canvas.width / 2, pickupY);
+    ctx.fillText(gameStateManager.getPickupMessage(), viewportWidth / 2, pickupY);
   }
 
   ctx.restore();
@@ -117,7 +119,7 @@ function drawMultiLineText(
 export function drawTextOverlay(
   ctx: CanvasRenderingContext2D,
   layout: HudLayout,
-  canvas: HTMLCanvasElement,
+  viewport: PlayfieldSize,
   text: string,
   alpha: number
 ): void {
@@ -125,13 +127,15 @@ export function drawTextOverlay(
 
   const isDeathMessage = text.toLowerCase().includes('killed by');
   const isGameOver = text.toLowerCase().includes('game over');
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
+  const viewportWidth = viewport.width;
+  const viewportHeight = viewport.height;
+  const centerX = viewportWidth / 2;
+  const centerY = viewportHeight / 2;
   const scale = layout.overlayFontScale;
 
   if (isGameOver) {
     ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.8);
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
     ctx.fillStyle = hexToRgba(PALETTE.DANGER, alpha);
     ctx.font = `bold ${Math.round(48 * scale)}px Arial`;
@@ -146,7 +150,7 @@ export function drawTextOverlay(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      const maxWidth = canvas.width * 0.8;
+      const maxWidth = viewportWidth * 0.8;
       drawMultiLineText(
         ctx,
         deathCause,
@@ -163,14 +167,14 @@ export function drawTextOverlay(
     ctx.fillText('Returning to main menu...', centerX, centerY + 120 * scale);
   } else if (isDeathMessage) {
     ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.7);
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD, alpha);
     ctx.font = `bold ${Math.round(28 * scale)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const maxWidth = canvas.width * 0.8;
+    const maxWidth = viewportWidth * 0.8;
     drawMultiLineText(ctx, text, centerX, centerY, maxWidth, 36 * scale, alpha);
   } else {
     ctx.fillStyle = hexToRgba(PALETTE.HUD, alpha);
@@ -178,8 +182,16 @@ export function drawTextOverlay(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    const maxWidth = canvas.width * 0.8;
-    drawMultiLineText(ctx, text, canvas.width / 2, canvas.height / 2, maxWidth, 40 * scale, alpha);
+    const maxWidth = viewportWidth * 0.8;
+    drawMultiLineText(
+      ctx,
+      text,
+      viewportWidth / 2,
+      viewportHeight / 2,
+      maxWidth,
+      40 * scale,
+      alpha
+    );
   }
 
   ctx.restore();
@@ -187,7 +199,7 @@ export function drawTextOverlay(
 
 export function drawDebugInfo(
   ctx: CanvasRenderingContext2D,
-  _canvas: HTMLCanvasElement,
+  viewport: PlayfieldSize,
   roidCount: number,
   debugMode: boolean
 ): void {
@@ -201,7 +213,7 @@ export function drawDebugInfo(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  const canvasHeight = _canvas.height;
+  const canvasHeight = viewport.height;
   ctx.fillText(`debug  asteroids ${roidCount}`, 10, canvasHeight - 28);
 
   ctx.restore();

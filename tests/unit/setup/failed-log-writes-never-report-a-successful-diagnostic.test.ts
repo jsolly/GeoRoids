@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 import type { Writable } from 'node:stream';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   callbacks: [] as Array<(error?: Error | null) => void>,
@@ -181,6 +181,60 @@ test('a failed stdout fallback cannot recurse when the server log is also unavai
   ).toHaveLength(1);
   expect(process.stdout.write).toHaveBeenCalledOnce();
   expect(getServerLogDiagnostics().stdoutWriteErrors).toBe(stdoutErrorsBefore + 1);
+});
+
+test('stdout pressure preserves file logs and reports each outage once through the surviving sink', async () => {
+  const { flushServerLogs, getServerLogDiagnostics, logger } = await import(
+    '../../../setup/serverLogger'
+  );
+  logger.info('stdout initially writable');
+  await expect(flushServerLogs()).resolves.toBe(true);
+  state.chunks = [];
+  vi.mocked(process.stdout.write).mockClear();
+  const droppedBefore = getServerLogDiagnostics().stdoutDroppedRecords;
+  const originalLength = Object.getOwnPropertyDescriptor(process.stdout, 'writableLength');
+  let bufferedBytes = 300_000;
+  Object.defineProperty(process.stdout, 'writableLength', {
+    configurable: true,
+    get: () => bufferedBytes,
+  });
+  onTestFinished(() => {
+    if (originalLength) {
+      Object.defineProperty(process.stdout, 'writableLength', originalLength);
+    } else {
+      Reflect.deleteProperty(process.stdout, 'writableLength');
+    }
+  });
+
+  logger.info('first pressured record');
+  logger.info('second pressured record');
+  await expect(flushServerLogs()).resolves.toBe(true);
+
+  const records = state.chunks.map((chunk) => JSON.parse(chunk));
+  expect(records.map((record) => record.message)).toEqual([
+    'stdout_write_failed',
+    'first pressured record',
+    'second pressured record',
+  ]);
+  expect(records[0]).toMatchObject({
+    level: 'error',
+    context: {
+      operation: 'write structured server log to stdout',
+      cause: { message: 'stdout buffer limit exceeded; dropped log record' },
+    },
+  });
+  expect(process.stdout.write).not.toHaveBeenCalled();
+  expect(getServerLogDiagnostics().stdoutDroppedRecords).toBe(droppedBefore + 2);
+
+  bufferedBytes = 0;
+  logger.info('stdout recovered');
+  await expect(flushServerLogs()).resolves.toBe(true);
+  bufferedBytes = 300_000;
+  logger.info('later stdout outage');
+  await expect(flushServerLogs()).resolves.toBe(true);
+  expect(
+    state.chunks.filter((chunk) => JSON.parse(chunk).message === 'stdout_write_failed')
+  ).toHaveLength(2);
 });
 
 test('a stalled file cannot leave a diagnostic request or shutdown flush pending forever', async () => {

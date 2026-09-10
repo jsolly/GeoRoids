@@ -23,6 +23,7 @@
     "types": ["node"]
   },
   "include": [
+    ".railway",
     "middleware.ts",
     "src",
     "tests",

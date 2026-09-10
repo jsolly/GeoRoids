@@ -1,6 +1,6 @@
 import { PALETTE, TITLE } from '../constants';
 
-export type FactionType = 'local' | 'remote' | 'bot';
+type FactionType = 'local' | 'remote' | 'bot';
 
 export function getFactionColor(type: FactionType): string {
   switch (type) {

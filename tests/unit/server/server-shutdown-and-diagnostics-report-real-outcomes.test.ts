@@ -26,19 +26,19 @@ async function start(nodeEnv = 'test') {
   return { server, origin: `http://127.0.0.1:${port}`, socketUrl: `ws://127.0.0.1:${port}/ws` };
 }
 
-test.each([
-  true,
-  false,
-])('the diagnostic route reflects the completed file write (%s)', async (written) => {
-  vi.spyOn(serverLogging, 'writeServerDiagnostic').mockResolvedValue(written);
-  const { origin } = await start();
-  const response = await fetch(`${origin}/test-server-log`, {
-    method: 'POST',
-    signal: AbortSignal.timeout(3000),
-  });
-  expect(response.status).toBe(written ? 200 : 503);
-  expect(await response.json()).toMatchObject({ status: written ? 'success' : 'error' });
-});
+test.each([true, false])(
+  'the diagnostic route reflects the completed file write (%s)',
+  async (written) => {
+    vi.spyOn(serverLogging, 'writeServerDiagnostic').mockResolvedValue(written);
+    const { origin } = await start();
+    const response = await fetch(`${origin}/test-server-log`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(3000),
+    });
+    expect(response.status).toBe(written ? 200 : 503);
+    expect(await response.json()).toMatchObject({ status: written ? 'success' : 'error' });
+  }
+);
 
 test('repeated shutdown requests close live gameplay sockets and stop the game once', async () => {
   const { server, socketUrl } = await start();

@@ -26,7 +26,7 @@ const FULL_FIXTURE_KEYS = [
 const BASELINE_PATTERNS: readonly BaselinePattern[] = ['shared', 'staggered'];
 const MAX_RECIPIENTS = 25;
 
-export type BaselinePattern = 'shared' | 'staggered';
+type BaselinePattern = 'shared' | 'staggered';
 
 export interface CodecSampleOptions {
   readonly seed: number;

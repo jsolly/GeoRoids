@@ -21,7 +21,7 @@ export type SatelliteShotManner =
   | 'sharp-vhr-stab';
 
 /** Projectile geometry behind each mission's human-readable firing manner. */
-export type SatelliteShotPattern =
+type SatelliteShotPattern =
   | 'steady'
   | 'wide-sweep'
   | 'spin-burst'

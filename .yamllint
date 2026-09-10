@@ -1,4 +1,5 @@
-extends: relaxed
+---
+extends: default
 
 ignore: |
   node_modules/
@@ -14,6 +15,15 @@ ignore: |
   .npm-cache/
 
 rules:
+  # Default warning rules must be errors even without the CLI --strict flag.
+  comments:
+    level: error
+  comments-indentation:
+    level: error
+  document-start:
+    level: error
+  truthy:
+    level: error
   braces:
     level: error
   brackets:

@@ -17,30 +17,30 @@ export function formatDeathCauseForOverlay(
 }
 
 /** Minimal ship shape shared by local players, remotes, and bots. */
-export interface ShipCollisionState {
+interface ShipCollisionState {
   exploding: boolean;
   health: number;
   blinkCount: number;
 }
 
-export interface ShipSpawnProtectionState {
+interface ShipSpawnProtectionState {
   blinkCount: number;
   spawnProtectionTimer: number;
   setBlinkOn(): void;
 }
 
-export interface SharedShipCombatVisuals extends ShipSpawnProtectionState {
+interface SharedShipCombatVisuals extends ShipSpawnProtectionState {
   exploding: boolean;
   explodeTime: number;
   health: number;
   explode(cause?: string, killerName?: string): void;
 }
 
-export interface ShipImpactFlashState {
+interface ShipImpactFlashState {
   impactFlashFrames: number;
 }
 
-export interface ShipLethalHitState extends ShipImpactFlashState {
+interface ShipLethalHitState extends ShipImpactFlashState {
   health: number;
   exploding: boolean;
   takeDamage(amount: number, cause?: string, killerName?: string): void;
@@ -259,14 +259,14 @@ export function calculateLaserStartPosition(
   return addPositions(shipPosition, noseOffset);
 }
 
-/** Friction used by the test-only `Ship.move()` path (live tick uses frictionCoefficient). */
+/** Friction used by the standalone wiki motion demonstrations. */
 export function moveFrictionForShip(isBot: boolean): number {
   return isBot ? SHIP.BOT_FRICTION : GAME.FRICTION;
 }
 
 /**
  * Shared thrust / friction step for local ships, remotes, and bots.
- * Callers pass their own friction so move() and update() keep their policies.
+ * Callers pass their own friction so local and server-owned policies stay explicit.
  * Scalar mass/kit arguments keep loot growth and Hauler thrust on the same
  * formula without allocating an options object on every frame.
  */

@@ -9,7 +9,7 @@ import { type Measurement, validateMeasurement } from './results';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
-export interface LiveReportMetadata {
+interface LiveReportMetadata {
   readonly benchmarkVersion: 1;
   readonly git: {
     readonly commit: string;
@@ -34,7 +34,7 @@ export interface LiveReportMetadata {
   };
 }
 
-export interface LiveReport<TDetails extends object = Record<string, unknown>> {
+interface LiveReport<TDetails extends object = Record<string, unknown>> {
   readonly schemaVersion: 1;
   readonly kind: 'realtime-client' | 'websocket-load';
   readonly status: 'passed' | 'failed';
@@ -65,7 +65,7 @@ function lockfileSha256(root: string): string {
   }
 }
 
-export function liveInputHashes(root = ROOT) {
+function liveInputHashes(root = ROOT) {
   const paths = execFileSync(
     'git',
     [

@@ -29,12 +29,17 @@ import {
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
+import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
-import { PLAYFIELD_CLOSE_SCALE, projectWorldToScreenInto } from './playfieldCamera';
+import {
+  PLAYFIELD_CLOSE_SCALE,
+  type PlayfieldSize,
+  projectWorldToScreenInto,
+} from './playfieldCamera';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawStarfield } from './starfield';
 
@@ -44,6 +49,9 @@ class CanvasManager {
   private context: CanvasRenderingContext2D | null = null;
   private resizeHandler: (() => void) | null = null;
   private resizeFrame: number | null = null;
+  private stopDevicePixelRatioWatcher: (() => void) | null = null;
+  private readonly viewport = { width: 1, height: 1 };
+  private devicePixelRatio = 1;
   private readonly screenPos = { x: 0, y: 0 };
   private readonly laserHosts: LiveLaserSource[] = [{ lasers: [] }];
   private readonly liveLaserPositions: Position[] = [];
@@ -54,15 +62,13 @@ class CanvasManager {
     this.context = this.canvas?.getContext('2d', { alpha: false }) || null;
 
     if (this.canvas && this.context) {
-      this.applyViewportSize();
-
-      // Enable crisp pixel rendering
-      this.context.imageSmoothingEnabled = true;
-      this.context.imageSmoothingQuality = 'high';
-
       // Add resize handler to maintain full-screen coverage
       this.resizeHandler = () => {
         if (this.resizeFrame !== null) {
+          return;
+        }
+        if (typeof window.requestAnimationFrame !== 'function') {
+          this.handleCanvasResize();
           return;
         }
         this.resizeFrame = window.requestAnimationFrame(() => {
@@ -73,6 +79,13 @@ class CanvasManager {
       window.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('resize', this.resizeHandler);
       window.visualViewport?.addEventListener('scroll', this.resizeHandler);
+
+      this.stopDevicePixelRatioWatcher = watchDevicePixelRatio(() => {
+        this.handleCanvasResize();
+      });
+
+      // Run the same boundary used for later resizes once at startup.
+      this.handleCanvasResize();
     }
   }
 
@@ -84,39 +97,66 @@ class CanvasManager {
     };
   }
 
-  private applyViewportSize(): void {
+  private currentDevicePixelRatio(): number {
+    const dpr = window.devicePixelRatio;
+    return Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  }
+
+  private applyViewportSize(): boolean {
     if (!this.canvas) {
-      return;
+      return false;
     }
     const { width, height } = this.viewportSize();
-    // Assigning an unchanged backing dimension still clears pixels and context state.
-    if (this.canvas.width !== width) {
-      this.canvas.width = width;
+    const dpr = this.currentDevicePixelRatio();
+    const backingWidth = Math.max(1, Math.round(width * dpr));
+    const backingHeight = Math.max(1, Math.round(height * dpr));
+    const backingSizeChanged =
+      this.canvas.width !== backingWidth || this.canvas.height !== backingHeight;
+    const devicePixelRatioChanged = this.devicePixelRatio !== dpr;
+
+    this.viewport.width = width;
+    this.viewport.height = height;
+
+    if (this.canvas.width !== backingWidth) {
+      this.canvas.width = backingWidth;
     }
-    if (this.canvas.height !== height) {
-      this.canvas.height = height;
+    if (this.canvas.height !== backingHeight) {
+      this.canvas.height = backingHeight;
     }
-    if (this.canvas.style.width !== `${width}px`) {
-      this.canvas.style.width = `${width}px`;
+
+    const cssWidth = `${width}px`;
+    const cssHeight = `${height}px`;
+    if (this.canvas.style.width !== cssWidth) {
+      this.canvas.style.width = cssWidth;
     }
-    if (this.canvas.style.height !== `${height}px`) {
-      this.canvas.style.height = `${height}px`;
+    if (this.canvas.style.height !== cssHeight) {
+      this.canvas.style.height = cssHeight;
     }
+
+    if (backingSizeChanged || devicePixelRatioChanged) {
+      this.context?.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    this.devicePixelRatio = dpr;
+    return backingSizeChanged || devicePixelRatioChanged;
   }
 
   // Handle canvas resizing to maintain full-screen coverage
   private handleCanvasResize(): void {
     if (this.canvas && this.context) {
-      this.applyViewportSize();
+      const changed = this.applyViewportSize();
 
       // Re-enable crisp rendering after resize
-      this.context.imageSmoothingEnabled = true;
-      this.context.imageSmoothingQuality = 'high';
+      if (changed) {
+        this.context.imageSmoothingEnabled = true;
+        this.context.imageSmoothingQuality = 'high';
+      }
     }
   }
 
   // Cleanup method
   destroy(): void {
+    this.stopDevicePixelRatioWatcher?.();
+    this.stopDevicePixelRatioWatcher = null;
     if (this.resizeFrame !== null) {
       window.cancelAnimationFrame(this.resizeFrame);
       this.resizeFrame = null;
@@ -129,6 +169,9 @@ class CanvasManager {
     }
     this.canvas = null;
     this.context = null;
+    this.viewport.width = 1;
+    this.viewport.height = 1;
+    this.devicePixelRatio = 1;
   }
 
   // Safe accessor methods for canvas and context
@@ -140,6 +183,10 @@ class CanvasManager {
     return this.context;
   }
 
+  getViewportSize(): Readonly<PlayfieldSize> {
+    return this.viewport;
+  }
+
   clearPlayfield(): void {
     const ctx = this.context;
     const canvas = this.canvas;
@@ -147,7 +194,7 @@ class CanvasManager {
       return;
     }
     ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
   }
 
   requireCanvas(): HTMLCanvasElement {
@@ -179,7 +226,7 @@ class CanvasManager {
       out.y = (worldPos.y - shipPos.y) * scale;
       return out;
     }
-    return projectWorldToScreenInto(out, worldPos, shipPos, this.canvas, scale);
+    return projectWorldToScreenInto(out, worldPos, shipPos, this.viewport, scale);
   }
 
   // Viewport transformation methods
@@ -195,8 +242,8 @@ class CanvasManager {
     }
 
     return {
-      x: (screenPos.x - this.canvas.width / 2) / scale + shipPos.x,
-      y: (screenPos.y - this.canvas.height / 2) / scale + shipPos.y,
+      x: (screenPos.x - this.viewport.width / 2) / scale + shipPos.x,
+      y: (screenPos.y - this.viewport.height / 2) / scale + shipPos.y,
     };
   }
 
@@ -220,10 +267,10 @@ class CanvasManager {
 
     // Clear the canvas
     ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
 
-    // Draw roids
     const roids = currRoidBelt.getRoids();
+    const viewport = this.getViewportSize();
 
     drawStarfield(currShip.position);
     drawIsoContours(currShip.position);
@@ -312,15 +359,15 @@ class CanvasManager {
       drawLasers(player.ship, enemyLaserColor, currShip.position);
     }
 
-    const hudLayout = hudLayoutForCanvas(canvas);
+    const hudLayout = hudLayoutForCanvas(viewport);
     drawMiniMap(ctx, hudLayout, currShip);
 
-    drawScoreOverlay(ctx, hudLayout, canvas, currScore, lives, currPlayer.factionId);
+    drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
 
     drawLivesIndicator(ctx, hudLayout, lives, PALETTE.LOCAL, currShip.kitId);
 
     if (text && textAlpha > 0) {
-      drawTextOverlay(ctx, hudLayout, canvas, text, textAlpha);
+      drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);
     }
 
     if (allPlayers.length > 1) {
@@ -328,7 +375,7 @@ class CanvasManager {
     }
 
     const roidCount = currRoidBelt.roids.length;
-    drawDebugInfo(ctx, canvas, roidCount, isDebugMode());
+    drawDebugInfo(ctx, viewport, roidCount, isDebugMode());
   }
 }
 

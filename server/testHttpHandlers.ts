@@ -307,7 +307,11 @@ export function handleTestPlacePlayer(
     const position = { x, y };
     const placed =
       player.asteroidInteractions === 1
-        ? gameEngine.asteroidMotion.placeActorForTesting(player.id, position, Date.now())
+        ? gameEngine.asteroidMotion.placeActorForTesting(
+            player.id,
+            position,
+            gameEngine.getServerTime()
+          )
         : gameEngine.updatePlayer(player.id, {
             position,
             velocity: { x: 0, y: 0 },
@@ -384,7 +388,11 @@ export function handleTestArrangeBotShot(
     }
     const playerPlaced =
       player.asteroidInteractions === 1
-        ? gameEngine.asteroidMotion.placeActorForTesting(player.id, lane.playerPosition, Date.now())
+        ? gameEngine.asteroidMotion.placeActorForTesting(
+            player.id,
+            lane.playerPosition,
+            gameEngine.getServerTime()
+          )
         : gameEngine.updatePlayer(player.id, {
             position: lane.playerPosition,
             velocity: { x: 0, y: 0 },

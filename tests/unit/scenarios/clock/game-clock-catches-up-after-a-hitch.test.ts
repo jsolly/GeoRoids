@@ -141,9 +141,9 @@ describe('Game clock catch-up after a hitch', () => {
     expect(engine.getDiagnostics().gameTime).toBe(61);
   });
 
-  test('a backward monotonic sample is ignored without moving the clock origin', () => {
+  test('a backward simulation sample fails without moving the clock origin', () => {
     engine.stepClock(1000);
-    expect(engine.stepClock(900)).toBe(0);
+    expect(() => engine.stepClock(900)).toThrow(/moved backwards/);
     expect(engine.getDiagnostics().gameTime).toBe(0);
     expect(engine.stepClock(1000 + GAME_TICK_MS)).toBe(1);
     expect(engine.getDiagnostics().gameTime).toBe(1);

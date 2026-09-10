@@ -1,10 +1,7 @@
 import type { Position } from '../shared-types';
-import { DAMAGE, DEBUG, SHIP } from '../src/constants';
+import { DAMAGE, DEBUG } from '../src/constants';
 
-/** Collision radius shared by human and bot ships. */
-export const SHIP_COLLISION_RADIUS = SHIP.SIZE / 2;
-
-export interface CombatantState {
+interface CombatantState {
   exploding: boolean;
   health: number;
   blinkCount?: number;

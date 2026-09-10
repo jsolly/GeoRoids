@@ -41,7 +41,7 @@ export function getRoidStrokeWidth(radius: number): number {
 }
 
 /** Classic Asteroids inner facet on large rocks only — medium/small stay one outline. */
-export function shouldDrawRoidInnerFacet(radius: number): boolean {
+function shouldDrawRoidInnerFacet(radius: number): boolean {
   return radius >= ROID.SIZE * 0.8;
 }
 
@@ -227,8 +227,9 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
   }
 
   const scale = canvasManager.getPlayfieldScale();
-  const viewW = cvs?.width ?? Number.POSITIVE_INFINITY;
-  const viewH = cvs?.height ?? Number.POSITIVE_INFINITY;
+  const viewport = cvs ? canvasManager.getViewportSize() : undefined;
+  const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
+  const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
 
   for (const roid of roids) {
     if (!canDrawAsteroid(roid)) {

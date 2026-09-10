@@ -1,5 +1,3 @@
-import type { PlayerJoin, PlayerLeave, PlayerShoot, PlayerUpdate } from '../../shared-types';
-
 export interface ServerMessage {
   type:
     | 'playerJoined'
@@ -27,13 +25,7 @@ export interface ServerMessage {
     | 'lootExploded'
     | 'satelliteShoot'
     | 'satellitePickupCollected';
-  // Prefer `data`; accept `payload` temporarily during transition
-  data?: PlayerJoin | PlayerLeave | PlayerUpdate | PlayerShoot | string | unknown;
-  payload?: PlayerJoin | PlayerLeave | PlayerUpdate | PlayerShoot | string | unknown;
-  // Some messages historically included top-level fields (id/name/position). Keep them optional to avoid type errors during migration.
-  id?: string;
-  name?: string;
-  position?: unknown;
+  data?: unknown;
   timestamp: number;
 }
 
@@ -60,6 +52,6 @@ export interface ClientMessage {
     | 'satelliteDamage'
     | 'satellitePickupCollected';
   id?: string; // Optional ID field for messages that need it
-  data: PlayerJoin | PlayerLeave | PlayerUpdate | PlayerShoot | unknown; // Flexible payload for custom messages
+  data: unknown;
   timestamp: number;
 }

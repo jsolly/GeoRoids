@@ -1,9 +1,9 @@
 import { once } from 'node:events';
 import { type RawData, WebSocket } from 'ws';
 
-export const WIRE_TIMEOUT_MS = 2_000;
+const WIRE_TIMEOUT_MS = 2_000;
 
-export type WirePayload = Record<string, unknown>;
+type WirePayload = Record<string, unknown>;
 
 export type WireMessage = {
   type: string;

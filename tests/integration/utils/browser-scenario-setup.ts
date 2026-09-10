@@ -5,7 +5,7 @@ import { ScreenshotManager } from './screenshot-manager';
 import { resetWorld, waitForWorldReset } from './test-server-control';
 
 /** Shared browser lifecycle hooks for scenario integration tests. */
-export function createBrowserScenarioHooks(testDir: string): {
+export function createBrowserScenarioHooks(testDir?: string): {
   browserManager: BrowserManager;
   screenshotManager: ScreenshotManager;
 } {

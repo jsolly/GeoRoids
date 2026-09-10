@@ -4,6 +4,7 @@ import { type ContourLaserTick, contourLaserTickInto } from '../physics/terrain/
 import { getTerrainField } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvas';
+import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 
 const viewPad = 40;
 const contourColor = hexToRgba(PALETTE.LOOT, VISUAL.CONTOUR_LASER_ALPHA);
@@ -42,7 +43,8 @@ export function drawContourLaserTicks(shipPosition: Position, shots: readonly Po
     return;
   }
 
-  const scale = canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
+  const scale = PLAYFIELD_CLOSE_SCALE;
   const halfLen = VISUAL.CONTOUR_LASER_LENGTH / 2;
   if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(halfLen)) {
     return;
@@ -70,7 +72,7 @@ export function drawContourLaserTicks(shipPosition: Position, shots: readonly Po
     if (
       !Number.isFinite(centerScreen.x) ||
       !Number.isFinite(centerScreen.y) ||
-      !centerIsVisible(centerScreen, cvs.width, cvs.height, projectedHalfLength)
+      !centerIsVisible(centerScreen, viewport.width, viewport.height, projectedHalfLength)
     ) {
       continue;
     }

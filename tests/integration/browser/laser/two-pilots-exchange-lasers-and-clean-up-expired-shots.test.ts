@@ -10,7 +10,7 @@ import {
   waitForLaserCleanup,
 } from './laser-observation';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 async function expectPilotsAliveWithUnchangedLives(
   game1: GameInteractions,

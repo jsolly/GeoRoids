@@ -1,3 +1,4 @@
+import { performance as nodePerformance } from 'node:perf_hooks';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { DAMAGE, SHIP } from '../../../../src/constants';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
@@ -9,7 +10,10 @@ describe('The game clock keeps ticking', () => {
   let ace: Pilot;
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({
+      toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'],
+    });
+    vi.spyOn(nodePerformance, 'now').mockImplementation(() => performance.now());
     world = new GameServerWorld();
     ace = world.join('Ace');
     world.wearOffJoinInvulnerability();
@@ -17,6 +21,7 @@ describe('The game clock keeps ticking', () => {
 
   afterEach(() => {
     world.dispose();
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 

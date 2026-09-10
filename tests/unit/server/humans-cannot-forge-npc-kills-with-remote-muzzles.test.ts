@@ -119,7 +119,7 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
   });
 
   test('normal cadence and bunched skirmisher E rounds work but unbounded bursts do not', () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     const player = engine.getPlayer('pilot');
     assert.ok(player, 'skirmisher pilot');
     player.kitId = 'skirmisher';
@@ -134,7 +134,7 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
   });
 
   test('counter-thrust stationary shots have a finite server lifetime', () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     shoot({ x: 20, y: 0 }, { x: 0, y: 0 });
     expect(engine.getServerLasers()).toHaveLength(1);
     clock.mockReturnValue(1000 + HUMAN_LASER_MAX_LIFETIME_MS);

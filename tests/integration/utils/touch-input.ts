@@ -1,7 +1,7 @@
 import type { CDPSession, Page } from 'playwright';
 
 export type TouchPoint = { x: number; y: number; id: number };
-export type TouchEventType = 'touchStart' | 'touchMove' | 'touchCancel' | 'touchEnd';
+type TouchEventType = 'touchStart' | 'touchMove' | 'touchCancel' | 'touchEnd';
 
 export async function centerOf(page: Page, selector: string): Promise<{ x: number; y: number }> {
   const box = await page.locator(selector).boundingBox();
@@ -24,7 +24,7 @@ export async function dispatchTouch(
   });
 }
 
-export type TouchControlState = {
+type TouchControlState = {
   position: { x: number; y: number };
   thrusting: boolean;
   canShoot: boolean;
@@ -33,12 +33,14 @@ export type TouchControlState = {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
   shieldActive: boolean;
+  shieldTimer: number;
   shieldCooldown: number;
+  shieldFlashTime: number;
 };
 
 export async function readTouchControlState(page: Page): Promise<TouchControlState> {
   return page.evaluate(() => {
-    const ship = window.gameController?.getCurrPlayer()?.ship;
+    const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
     if (!ship) {
       throw new Error('Local ship unavailable');
     }
@@ -51,19 +53,21 @@ export async function readTouchControlState(page: Page): Promise<TouchControlSta
       abilityCooldownFrames: ship.abilityCooldownFrames,
       abilityActiveFrames: ship.abilityActiveFrames,
       shieldActive: ship.shieldActive,
+      shieldTimer: ship.shieldTimer,
       shieldCooldown: ship.shieldCooldown,
+      shieldFlashTime: ship.shieldFlashTime,
     };
   });
 }
 
-export type TouchControlBox = {
+type TouchControlBox = {
   left: number;
   right: number;
   top: number;
   bottom: number;
 };
 
-export type TouchControlLayout = {
+type TouchControlLayout = {
   viewport: { width: number; height: number };
   overflow: boolean;
   canvas: { width: number; height: number } | null;

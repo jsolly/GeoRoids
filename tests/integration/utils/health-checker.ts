@@ -8,7 +8,7 @@ async function httpGet(url: string): Promise<{ ok: boolean; body: string }> {
   return { ok: response.status === 200, body: await response.text() };
 }
 
-export async function checkWebSocketServer(): Promise<boolean> {
+async function checkWebSocketServer(): Promise<boolean> {
   try {
     const { ok, body } = await httpGet(`${TestConfig.SERVER_URL}/health`);
     if (!ok) {
@@ -50,7 +50,7 @@ export async function checkViteServer(): Promise<boolean> {
   }
 }
 
-export async function checkWebSocketGameplayEndpoint(): Promise<boolean> {
+async function checkWebSocketGameplayEndpoint(): Promise<boolean> {
   return new Promise((resolve) => {
     const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/, 'ws')}/ws`;
     const ws = new WebSocket(wsUrl);

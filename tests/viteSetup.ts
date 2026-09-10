@@ -1,6 +1,7 @@
 import jsdom from 'jsdom';
 
 const { JSDOM } = jsdom;
+
 import '../src/utils/logLevel';
 
 const dom = new JSDOM(
@@ -25,7 +26,7 @@ const dom = new JSDOM(
           </div>
           <fieldset class="ship-kit-select">
             <legend>Ship kit</legend>
-            <div id="ship-kit-grid" class="ship-kit-grid" role="group" aria-label="Ship kit"></div>
+            <div id="ship-kit-grid" class="ship-kit-grid"></div>
             <p class="ship-kit-placeholder-note">AD v2 silhouettes</p>
           </fieldset>
           <ul class="nav flex-column">
@@ -54,9 +55,9 @@ const dom = new JSDOM(
       <div id="gameArea" style="display: none">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
-          <div id="touch-stick" class="touch-stick">
+          <fieldset id="touch-stick" class="touch-stick" aria-label="Steer and thrust">
             <div id="touch-stick-knob" class="touch-stick-knob"></div>
-          </div>
+          </fieldset>
           <button id="touch-fire" type="button" class="touch-fire">FIRE</button>
         </div>
       </div>
@@ -70,6 +71,18 @@ const dom = new JSDOM(
 );
 global.document = dom.window.document;
 global.window = global.document.defaultView as unknown as Window & typeof globalThis;
+
+if (typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => true,
+    }) as unknown as MediaQueryList;
+}
 
 // Mock localStorage for tests with the same backing store for global/window access.
 const storage = new Map<string, string>();

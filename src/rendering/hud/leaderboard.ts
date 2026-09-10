@@ -49,7 +49,7 @@ export function fitLeaderboardName(ctx: TextMeasurer, name: string, maxWidth: nu
 }
 
 /** One row per name so a drop-then-rejoin clone does not list PilotB three times. */
-export function uniquePlayersForLeaderboard<
+function uniquePlayersForLeaderboard<
   T extends { id: string; name: string; type: string; score: number },
 >(players: readonly T[], currentPlayerId: string): T[] {
   const byName = new Map<string, T>();

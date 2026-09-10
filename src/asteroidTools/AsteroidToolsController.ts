@@ -18,7 +18,7 @@ export interface AsteroidToolsTarget {
   phenomenon?: AsteroidPhenomenon;
 }
 
-export interface AsteroidToolsPilotState {
+interface AsteroidToolsPilotState {
   id?: string;
   position?: Position;
   kitId?: ShipKitId;
@@ -40,7 +40,7 @@ export interface AsteroidToolsState {
 export type AsteroidToolsMotionAction = 'latch' | 'release' | 'anchor' | 'brake' | 'spin';
 type ConstrainedMotionAction = Exclude<AsteroidToolsMotionAction, 'latch'>;
 
-export interface AsteroidToolsControllerOptions {
+interface AsteroidToolsControllerOptions {
   /** Send the server-authoritative latch command. */
   dispatchTool?: (action: AsteroidToolAction) => boolean;
   /** Root adapter that owns the negotiated motion sequence/prediction. */
@@ -56,8 +56,6 @@ export interface AsteroidToolsControllerUpdate {
   targets?: readonly AsteroidToolsTarget[];
   reflectionPreview?: ReflectionPreview | undefined;
 }
-
-type StateListener = (state: AsteroidToolsState) => void;
 
 const UI_ACTION_DEBOUNCE_MS = 250;
 const MOTION_KEYS: Readonly<Record<string, AsteroidToolsMotionAction | undefined>> = {
@@ -77,7 +75,7 @@ export class AsteroidToolsController {
   private readonly dispatchTool: AsteroidToolsControllerOptions['dispatchTool'];
   private readonly dispatchMotionAction: AsteroidToolsControllerOptions['dispatchMotionAction'];
   private readonly now: () => number;
-  private readonly listeners = new Set<StateListener>();
+  private readonly onChange: AsteroidToolsControllerOptions['onChange'];
   private readonly targetsById = new Map<string, AsteroidToolsTarget>();
   private state: AsteroidToolsState = {
     targets: [],
@@ -91,20 +89,7 @@ export class AsteroidToolsController {
     this.dispatchTool = options.dispatchTool;
     this.dispatchMotionAction = options.dispatchMotionAction;
     this.now = options.now ?? (() => Date.now());
-    if (options.onChange) {
-      this.listeners.add(options.onChange);
-    }
-  }
-
-  subscribe(listener: StateListener): () => void {
-    this.listeners.add(listener);
-    listener(this.getState());
-    return () => this.listeners.delete(listener);
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-    this.targetsById.clear();
+    this.onChange = options.onChange;
   }
 
   getState(): AsteroidToolsState {
@@ -343,9 +328,6 @@ export class AsteroidToolsController {
   }
 
   private publish(): void {
-    const state = this.getState();
-    for (const listener of this.listeners) {
-      listener(state);
-    }
+    this.onChange?.(this.getState());
   }
 }

@@ -85,25 +85,46 @@ test('blocked get/set does not throw and keeps values in memory for the tab', ()
   expect(getStoredItem('currScore')).toBe('50');
 });
 
-test('blocked storage reports a bounded warning without exposing keys or values', () => {
+test('blocked storage reports a bounded error without exposing keys or values', () => {
   installStorage(throwingStorage());
   resetSafeStorage();
-  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
   try {
     setStoredItem('private-session-token', 'secret-value');
     getStoredItem('private-session-token');
     removeStoredItem('private-session-token');
 
-    expect(warning).toHaveBeenCalledTimes(1);
-    const output = warning.mock.calls.flat().join(' ');
+    expect(error).toHaveBeenCalledTimes(1);
+    const output = error.mock.calls.flat().join(' ');
     expect(output).not.toContain('private-session-token');
     expect(output).not.toContain('secret-value');
     expect(output).toContain('[STORAGE]');
     expect(output).toContain('SecurityError');
   } finally {
-    warning.mockRestore();
+    error.mockRestore();
   }
+});
+
+test('uses the storage object that passed the probe for the same operation', () => {
+  const storage = originalLocalStorage;
+  let accesses = 0;
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    get: () => {
+      accesses += 1;
+      if (accesses > 1) {
+        throw new DOMException('Access is denied for this document.', 'SecurityError');
+      }
+      return storage;
+    },
+  });
+  resetSafeStorage();
+
+  setStoredItem('transient-storage', 'present');
+
+  expect(storage.getItem('transient-storage')).toBe('present');
+  expect(accesses).toBe(1);
 });
 
 test('accessing localStorage itself throwing is treated as a fresh in-memory session', () => {

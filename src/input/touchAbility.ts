@@ -20,7 +20,7 @@ const ABILITY_LABEL: Record<ShipAbilityId, string> = {
   shockPulse: 'PULSE',
 };
 
-export type AbilityChromeHost = {
+type AbilityChromeHost = {
   kitId: ShipKitId | string;
   exploding: boolean;
   health: number;
@@ -29,7 +29,7 @@ export type AbilityChromeHost = {
   fuel?: number;
 };
 
-export type AbilityChromeState = {
+type AbilityChromeState = {
   label: string;
   name: string;
   ready: boolean;
@@ -39,12 +39,12 @@ export type AbilityChromeState = {
   cooldownRatio: number;
 };
 
-export type ShieldChromeHost = ShieldState & {
+type ShieldChromeHost = ShieldState & {
   exploding: boolean;
   health: number;
 };
 
-export type ShieldChromeState = {
+type ShieldChromeState = {
   label: 'SHIELD';
   name: 'Shield bubble';
   ready: boolean;

@@ -69,7 +69,11 @@ window.addEventListener('gameStart', () => {
       const observing = clientPerformance.enabled;
       if (observing) {
         clientPerformance.setPhase(
-          document.hidden ? 'hidden' : gameController.getCurrShip()?.exploding ? 'respawn' : 'play'
+          document.hidden
+            ? 'hidden'
+            : gameController.getCurrPlayer()?.ship.exploding
+              ? 'respawn'
+              : 'play'
         );
         clientPerformance.record('frameIntervalMs', dtMs);
       }

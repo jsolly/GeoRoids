@@ -87,7 +87,7 @@ function reportTransportFailure(message: string, context?: Record<string, unknow
   }
   transportFailureReported = true;
   try {
-    console.warn(`[LOG_FORWARD] ${message}`, context ?? {});
+    console.error(`[LOG_FORWARD] ${message}`, context ?? {});
   } catch {
     // A broken console must not interrupt gameplay.
   }
@@ -129,8 +129,10 @@ function retireSocket(socket: WebSocket): void {
   socket.onclose = null;
   try {
     socket.close();
-  } catch {
-    // The reconnect below preserves queued evidence.
+  } catch (error) {
+    reportTransportFailure('Failed to close retired log transport; reconnecting', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
   scheduleReconnect();
 }
@@ -181,7 +183,7 @@ function sendLossTelemetry(socket: WebSocket): boolean {
       createLogRecord({
         timestamp: new Date().toISOString(),
         source: 'client',
-        level: 'warn',
+        level: 'error',
         releaseId: import.meta.env['VITE_COMMIT_HASH'] ?? 'dev',
         category: 'STATE',
         message: 'Client log records dropped before delivery',
@@ -251,6 +253,9 @@ function connectWebSocket(): void {
     };
     socket.onerror = () => {
       if (ws === socket) {
+        reportTransportFailure(
+          'Log transport socket error; retaining queued records for reconnect'
+        );
         retireSocket(socket);
       }
     };
@@ -287,8 +292,13 @@ export function stopClientLogForwarder(): void {
     socket.onclose = null;
     try {
       socket.close();
-    } catch {
-      // Stop is best effort and discards the in-memory queue below.
+    } catch (error) {
+      reportTransportFailure(
+        'Failed to close log transport during stop; discarding queued records',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
     }
   }
   messageQueue = [];

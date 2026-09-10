@@ -247,32 +247,35 @@ test.each([
     status: 'gameStatus',
   },
   { kind: 'Log', connect: 'connectLogsBtn', disconnect: 'disconnectLogsBtn', status: 'logStatus' },
-])('canceling a pending $kind connection clears its deadline and immediately permits retry', async (controls) => {
-  StatusPageSocket.reset();
-  const status = createStatusDocument();
-  try {
-    await settleMicrotasks();
-    const timersBefore = status.pendingTimers();
-    const connect = button(status.window, controls.connect);
-    connect.click();
-    expect(status.pendingTimers()).toBe(timersBefore + 1);
-    button(status.window, controls.disconnect).click();
-    expect(connect.disabled).toBe(false);
-    expect(button(status.window, controls.disconnect).disabled).toBe(true);
-    expect(text(status.window, controls.status)).toBe('Disconnected');
-    expect(status.pendingTimers()).toBe(timersBefore);
-    await settleMicrotasks();
-    status.advanceTimers(5000);
-    expect(text(status.window, 'messageLog')).toContain(
-      `${controls.kind} WebSocket disconnected by operator`
-    );
-    expect(text(status.window, 'messageLog')).not.toContain('WebSocket failed');
-    const timersBeforeRetry = status.pendingTimers();
-    connect.click();
-    await settleMicrotasks();
-    expect(text(status.window, controls.status)).toBe('Connected');
-    expect(status.pendingTimers()).toBe(timersBeforeRetry);
-  } finally {
-    status.dispose();
+])(
+  'canceling a pending $kind connection clears its deadline and immediately permits retry',
+  async (controls) => {
+    StatusPageSocket.reset();
+    const status = createStatusDocument();
+    try {
+      await settleMicrotasks();
+      const timersBefore = status.pendingTimers();
+      const connect = button(status.window, controls.connect);
+      connect.click();
+      expect(status.pendingTimers()).toBe(timersBefore + 1);
+      button(status.window, controls.disconnect).click();
+      expect(connect.disabled).toBe(false);
+      expect(button(status.window, controls.disconnect).disabled).toBe(true);
+      expect(text(status.window, controls.status)).toBe('Disconnected');
+      expect(status.pendingTimers()).toBe(timersBefore);
+      await settleMicrotasks();
+      status.advanceTimers(5000);
+      expect(text(status.window, 'messageLog')).toContain(
+        `${controls.kind} WebSocket disconnected by operator`
+      );
+      expect(text(status.window, 'messageLog')).not.toContain('WebSocket failed');
+      const timersBeforeRetry = status.pendingTimers();
+      connect.click();
+      await settleMicrotasks();
+      expect(text(status.window, controls.status)).toBe('Connected');
+      expect(status.pendingTimers()).toBe(timersBeforeRetry);
+    } finally {
+      status.dispose();
+    }
   }
-});
+);

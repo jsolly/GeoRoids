@@ -22,17 +22,17 @@ describe('deployed client release identity', () => {
 });
 
 describe('published field manual routing', () => {
-  it.each([
-    '/wiki',
-    '/wiki/',
-  ])('serves the manual at %s without dropping release identity or query parameters', (path) => {
-    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'wiki-release');
-    const response = middleware(new Request(`https://www.georoids.com${path}?source=game`));
-    expect(response.headers.get('x-middleware-rewrite')).toBe(
-      'https://www.georoids.com/wiki/index.html?source=game'
-    );
-    expect(response.headers.get('x-release-id')).toBe('wiki-release');
-  });
+  it.each(['/wiki', '/wiki/'])(
+    'serves the manual at %s without dropping release identity or query parameters',
+    (path) => {
+      vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'wiki-release');
+      const response = middleware(new Request(`https://www.georoids.com${path}?source=game`));
+      expect(response.headers.get('x-middleware-rewrite')).toBe(
+        'https://www.georoids.com/wiki/index.html?source=game'
+      );
+      expect(response.headers.get('x-release-id')).toBe('wiki-release');
+    }
+  );
 
   it('leaves demonstration assets on their ordinary static path', () => {
     const response = middleware(new Request('https://www.georoids.com/wiki/media/dart.gif'));

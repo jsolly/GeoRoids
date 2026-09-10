@@ -114,72 +114,126 @@ describe('actual ConnectionManager WebSocket message path', () => {
       press: (player: Player) => applyStickSample(player, readStickSample(80, 0, 0, 0)),
       release: (player: Player) => applyStickSample(player, null),
     },
-  ])('late Hauler snapshots preserve held and released $source thrust', async ({
-    press,
-    release,
-  }) => {
-    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
-    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-    vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
-    const ws = await connect(true);
-    ws.receive('joined', {
-      id: manager.getClientId(),
-      name: player.name,
-      position: player.ship.position,
-      snapshotVersion: 1,
-      asteroidInteractions: 1,
-      resumeToken: 'a'.repeat(64),
-    });
-    const state = captureSnapshot(snapshotFixture());
-    const [local] = state.entities;
-    const [rock] = state.asteroids;
-    assert.ok(local && rock);
-    Object.assign(local, {
-      id: player.id,
-      kitId: 'hauler',
-      thrusting: false,
-      asteroidMotion: { epoch: 3, mode: 'latched', ack: 0, asteroidId: rock.id, latchAngle: 0 },
-    });
-    state.entities = [local];
-    state.playerProjectiles = [];
-    state.satelliteProjectiles = [];
-    state.collabTags = [];
-    state.satellites = [];
-    state.satellitePickups = [];
-    state.loot = [];
-    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
-    press(player);
-    expect(player.ship.thrusting).toBe(true);
-    // An older echo arrives before the newly held input has been sent.
-    clock.mockReturnValue(10_017);
-    ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
-    manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
-    expect(
-      ws.sent.filter((message) => message.type === 'asteroidInput').at(-1)?.data
-    ).toMatchObject({ thrust: true });
+  ])(
+    'late Hauler snapshots preserve held and released $source thrust',
+    async ({ press, release }) => {
+      vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+      const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
+      vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+      vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
+      const ws = await connect(true);
+      ws.receive('joined', {
+        id: manager.getClientId(),
+        name: player.name,
+        position: player.ship.position,
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+        resumeToken: 'a'.repeat(64),
+      });
+      const state = captureSnapshot(snapshotFixture());
+      const [local] = state.entities;
+      const [rock] = state.asteroids;
+      assert.ok(local && rock);
+      Object.assign(local, {
+        id: player.id,
+        kitId: 'hauler',
+        thrusting: false,
+        asteroidMotion: { epoch: 3, mode: 'latched', ack: 0, asteroidId: rock.id, latchAngle: 0 },
+      });
+      state.entities = [local];
+      state.playerProjectiles = [];
+      state.satelliteProjectiles = [];
+      state.collabTags = [];
+      state.satellites = [];
+      state.satellitePickups = [];
+      state.loot = [];
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+      press(player);
+      expect(player.ship.thrusting).toBe(true);
+      // An older echo arrives before the newly held input has been sent.
+      clock.mockReturnValue(10_017);
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
+      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      expect(
+        ws.sent.filter((message) => message.type === 'asteroidInput').at(-1)?.data
+      ).toMatchObject({ thrust: true });
 
-    release(player);
-    local.thrusting = true;
-    clock.mockReturnValue(10_034);
-    ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
-    manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
-    expect(
-      ws.sent.filter((message) => message.type === 'asteroidInput').at(-1)?.data
-    ).toMatchObject({ thrust: false });
+      release(player);
+      local.thrusting = true;
+      clock.mockReturnValue(10_034);
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
+      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      expect(
+        ws.sent.filter((message) => message.type === 'asteroidInput').at(-1)?.data
+      ).toMatchObject({ thrust: false });
 
-    press(player);
-    const sentBeforeDeath = ws.sent.filter((message) => message.type === 'asteroidInput').length;
-    Object.assign(local, { health: 0, exploding: true, thrusting: false });
-    clock.mockReturnValue(10_051);
-    ws.receive('snapshot', new SnapshotEncoder(state).encode(4));
-    manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
-    expect(player.ship.thrusting).toBe(false);
-    expect(ws.sent.filter((message) => message.type === 'asteroidInput')).toHaveLength(
-      sentBeforeDeath
-    );
-  });
+      press(player);
+      const sentBeforeDeath = ws.sent.filter((message) => message.type === 'asteroidInput').length;
+      Object.assign(local, { health: 0, exploding: true, thrusting: false });
+      clock.mockReturnValue(10_051);
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(4));
+      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      expect(player.ship.thrusting).toBe(false);
+      expect(ws.sent.filter((message) => message.type === 'asteroidInput')).toHaveLength(
+        sentBeforeDeath
+      );
+    }
+  );
+
+  test.each([false, true])(
+    'held thrust and turn resume after authoritative respawn (negotiated: %s)',
+    async (negotiated) => {
+      vi.stubEnv('VITE_ASTEROID_INTERACTIONS', negotiated ? '1' : '0');
+      const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
+      vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+      const ws = await connect(negotiated);
+      ws.receive('joined', {
+        id: manager.getClientId(),
+        name: player.name,
+        position: player.ship.position,
+        ...(negotiated
+          ? { snapshotVersion: 1, asteroidInteractions: 1, resumeToken: 'b'.repeat(64) }
+          : {}),
+      });
+      const state = captureSnapshot(snapshotFixture());
+      const [local] = state.entities;
+      assert.ok(local);
+      Object.assign(local, { id: player.id, kitId: 'dart', thrusting: false });
+      state.entities = [local];
+      const receive = (sequence: number) =>
+        negotiated
+          ? ws.receive('snapshot', new SnapshotEncoder(state).encode(sequence))
+          : ws.receive('gameState', state);
+      receive(1);
+      keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player);
+      keyDown(new KeyboardEvent('keydown', { code: 'KeyA' }), player);
+      expect(player.ship.thrusting).toBe(true);
+      expect(player.ship.angularVelocity).toBeGreaterThan(0);
+
+      Object.assign(local, { health: 0, exploding: true, respawnTimer: 18 });
+      receive(2);
+      expect(player.ship.thrusting).toBe(false);
+      expect(player.ship.angularVelocity).toBe(0);
+
+      Object.assign(local, {
+        health: local.maxHealth,
+        exploding: false,
+        respawnTimer: 0,
+        spawnProtectionTimer: 180,
+        position: { x: 400, y: 400 },
+      });
+      receive(3);
+      expect(player.ship.exploding).toBe(false);
+      expect(player.ship.thrusting).toBe(true);
+      expect(player.ship.angularVelocity).toBeGreaterThan(0);
+      keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
+      keyUp(new KeyboardEvent('keyup', { code: 'KeyA' }), player);
+      receive(4);
+      expect(player.ship.thrusting).toBe(false);
+      expect(player.ship.angularVelocity).toBe(0);
+    }
+  );
 
   test('sampled snapshots correlate predicted and authoritative local state', async () => {
     vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');

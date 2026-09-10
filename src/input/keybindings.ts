@@ -35,13 +35,16 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 
 // Helper function to update thrust state based on aggregate input.
 // Thrust sources: ArrowUp / KeyW, right-mouse, and the left virtual stick.
-export function updateThrustFromKeys(player: Player): void {
+function updateThrustFromKeys(player: Player): void {
   const pressed = getPressedKeysForPlayer(player);
   const shouldThrust =
-    pressed.has('ArrowUp') ||
-    pressed.has('KeyW') ||
-    controlSources.mouseThrust ||
-    controlSources.touchThrust;
+    player.lives > 0 &&
+    player.ship.health > 0 &&
+    !player.ship.exploding &&
+    (pressed.has('ArrowUp') ||
+      pressed.has('KeyW') ||
+      controlSources.mouseThrust ||
+      controlSources.touchThrust);
   const currentlyThrusting = player.ship.thrusting;
 
   logger.debug('KEYBINDINGS', 'updateThrustFromKeys', {
@@ -79,11 +82,15 @@ export function updateThrustFromKeys(player: Player): void {
 // both arrow keys (ArrowLeft/ArrowRight) and WASD (KeyA/KeyD); opposing keys
 // held together cancel out. Using the per-player pressed set (rather than the
 // global `keys` map) keeps combinations correct across arrow/WASD mixes.
-export function turnSpeedForShip(player: Player): number {
+function turnSpeedForShip(player: Player): number {
   return (player.ship.turnSpeed * Math.PI) / (180 * GAME.FPS);
 }
 
-export function updateTurnFromKeys(player: Player): void {
+function updateTurnFromKeys(player: Player): void {
+  if (player.lives <= 0 || player.ship.health <= 0 || player.ship.exploding) {
+    player.ship.angularVelocity = 0;
+    return;
+  }
   const pressed = getPressedKeysForPlayer(player);
   const turningLeft = pressed.has('ArrowLeft') || pressed.has('KeyA');
   const turningRight = pressed.has('ArrowRight') || pressed.has('KeyD');

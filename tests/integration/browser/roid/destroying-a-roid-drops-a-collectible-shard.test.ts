@@ -4,7 +4,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'destroying a roid drops a collectible shard that uses grow/loot collect',

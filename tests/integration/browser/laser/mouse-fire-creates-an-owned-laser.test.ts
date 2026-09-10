@@ -4,7 +4,7 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { localPlayerId, observeLaser, parkLaserClient } from './laser-observation';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'a mouse click fires a laser owned by the local pilot',
@@ -17,7 +17,7 @@ test(
     await game.bootGame({ waitForCombatReady: false });
     await parkLaserClient(game);
     await game.waitForCombatReady();
-    expect(await game.getLocalLaserCount()).toBe(0);
+    expect(await game.getLaserCount()).toBe(0);
     const shooterId = await localPlayerId(page);
     const [shot] = await Promise.all([
       observeLaser(page, shooterId, false),

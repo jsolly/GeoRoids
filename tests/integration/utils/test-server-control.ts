@@ -1,7 +1,7 @@
 import type { GameEngine } from '../../../server/core/GameEngine';
 import { TestConfig } from './test-config';
 
-export type ServerWorldDiagnostics = ReturnType<GameEngine['getDiagnostics']>;
+type ServerWorldDiagnostics = ReturnType<GameEngine['getDiagnostics']>;
 export type BotShotArrangement = {
   playerPosition: { x: number; y: number };
   botPosition: { x: number; y: number };

@@ -25,25 +25,6 @@ class PlayerManager {
     return allPlayers.filter((p) => p.type !== 'local');
   }
 
-  public getAllPlayersIncludingLocal(local: Player): Player[] {
-    return [local, ...this.getNonLocalPlayers()];
-  }
-
-  public getRemotePlayers(): Player[] {
-    return this.networkManager.getRemotePlayers();
-  }
-
-  public getPlayerById(id: string): Player | undefined {
-    return this.networkManager.getPlayer(id);
-  }
-
-  public getCounts(): { total: number; remoteHumans: number; bots: number } {
-    const allPlayers = this.networkManager.getAllPlayers();
-    const remoteHumans = allPlayers.filter((p) => p.type === 'remote').length;
-    const bots = allPlayers.filter((p) => p.type === 'bot').length;
-    return { total: allPlayers.length, remoteHumans, bots };
-  }
-
   // Local player management
   private localPlayer: Player | null = null;
 

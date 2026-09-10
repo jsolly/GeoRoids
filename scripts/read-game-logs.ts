@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { parseLogRecord } from '../shared/logRecords';
 import type { DiagnosticLogRecord } from '../shared-types';
 
-export interface LogQuery {
+interface LogQuery {
   playerId?: string;
   sessionId?: string;
   source?: 'client' | 'server';

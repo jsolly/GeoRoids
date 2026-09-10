@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'spawn protection prevents damage',
@@ -13,7 +13,7 @@ test(
       throw new Error('Page not available');
     }
 
-    const attacker = new GameInteractions(await browserManager.createAdditionalPage());
+    const attacker = new GameInteractions(await browserManager.createPage());
     await attacker.bootGame({ waitForCombatReady: false });
     await attacker.placeShipAt(-1800, 0);
     await attacker.waitForCombatReady();

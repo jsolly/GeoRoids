@@ -16,11 +16,6 @@
       integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx"
       crossorigin="anonymous"
     />
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa"
-      crossorigin="anonymous"
-    ></script>
 
     <title>GeoRoids</title>
     <meta name="description" content="Play GeoRoids, a free multiplayer space game in your browser. Choose your ship, dodge asteroids, and battle other pilots in a live arena." />
@@ -59,12 +54,12 @@
           </div>
           <fieldset class="ship-kit-select">
             <legend>Ship kit</legend>
-            <div id="ship-kit-grid" class="ship-kit-grid" role="group" aria-label="Ship kit"></div>
+            <div id="ship-kit-grid" class="ship-kit-grid"></div>
             <p class="ship-kit-placeholder-note">AD v2 silhouettes</p>
           </fieldset>
           <ul class="nav flex-column">
             <li class="nav-item">
-              <button id="start-game" class="btn btn-lg btn-phosphor">
+              <button id="start-game" type="button" class="btn btn-lg btn-phosphor">
                 Enter Game
               </button>
             </li>
@@ -97,14 +92,13 @@
       <div id="gameArea" style="display: none">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
-          <div
+          <fieldset
             id="touch-stick"
             class="touch-stick"
-            role="slider"
             aria-label="Steer and thrust"
           >
             <div id="touch-stick-knob" class="touch-stick-knob"></div>
-          </div>
+          </fieldset>
           <button
             id="touch-shield"
             type="button"

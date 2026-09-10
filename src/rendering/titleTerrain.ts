@@ -5,9 +5,18 @@ import { createHeightfield } from '../physics/terrain/heightfield';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 import { hexToRgba } from '../utils/colorUtils';
 import { drawContourLabels } from './contourLabels';
+import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
+
+let stopDevicePixelRatioWatcher: (() => void) | null = null;
+let stopResizeListener: (() => void) | null = null;
 
 /** A fixed terrain preview, independent of the live room's terrain cache. */
 export function initTitleTerrain(): void {
+  stopDevicePixelRatioWatcher?.();
+  stopDevicePixelRatioWatcher = null;
+  stopResizeListener?.();
+  stopResizeListener = null;
+
   const canvas = document.getElementById('title-terrain');
   if (!(canvas instanceof HTMLCanvasElement)) {
     return;
@@ -70,4 +79,8 @@ export function initTitleTerrain(): void {
 
   resize();
   window.addEventListener('resize', resize);
+  stopResizeListener = (): void => {
+    window.removeEventListener('resize', resize);
+  };
+  stopDevicePixelRatioWatcher = watchDevicePixelRatio(resize);
 }

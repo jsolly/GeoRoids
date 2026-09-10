@@ -124,7 +124,7 @@ class Logger {
         }
         Logger.forwardingFailureReported = true;
         try {
-          console.warn(
+          console.error(
             `[LOG_FORWARD] Client log forwarding unavailable: ${describeForwardingFailure(error)}`
           );
         } catch {

@@ -14,7 +14,7 @@ import type { RNGService } from './RNGService';
 
 const PICKUP_NAMES = ['Echo', 'Relay'] as const;
 
-export interface PickupOwnerPose {
+interface PickupOwnerPose {
   id: string;
   position: Position;
   health: number;

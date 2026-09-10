@@ -1,7 +1,7 @@
 import type { Position, Velocity } from '../../../shared-types';
 import { GAME, LASER } from '../../constants';
 
-export interface AimTarget {
+interface AimTarget {
   id: string;
   position: Position;
   health: number;

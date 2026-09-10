@@ -1,4 +1,4 @@
-export interface WikiMediaEntry {
+interface WikiMediaEntry {
   title: string;
   alt: string;
   caption: string;

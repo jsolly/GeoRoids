@@ -169,7 +169,7 @@ describe('ships feel the slope', () => {
     };
 
     for (let frame = 0; frame < 60; frame++) {
-      player.move();
+      player.update();
       applyShipMotionFrame(bot);
     }
 
@@ -205,6 +205,7 @@ describe('muted contour chrome', () => {
     }
     vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+    vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 800, height: 600 });
     vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
     ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
     const rendered: Array<{ text: string; x: number; y: number }> = [];
@@ -263,45 +264,46 @@ test('translated arenas retain the same terrain and a stable flat spawn', () => 
   expect(Math.hypot(inside.x, inside.y)).toBeLessThan(1e-5);
 });
 
-test.each([
-  1, 8,
-])('a mass-%s pilot travels farther downhill but can still thrust uphill', (mass) => {
-  ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-  const startX = BOUNDS.radius / 2;
-  const downhill = new Ship({ position: { x: startX, y: 0 } });
-  const uphill = new Ship({ position: { x: startX, y: 0 } });
-  for (const ship of [downhill, uphill]) {
-    ship.mass = mass;
-    ship.thrusting = true;
-    ship.velocity = { x: 0, y: 0 };
-  }
-  downhill.angle = Math.PI;
-  uphill.angle = 0;
-  const bot = {
-    position: { x: startX, y: 0 },
-    velocity: { x: 0, y: 0 },
-    angle: Math.PI,
-    thrusting: true,
-    mass,
-  };
-  for (let frame = 0; frame < 120; frame++) {
-    downhill.move();
-    uphill.move();
-    applyShipMotionFrame(bot);
-    // Compare acceleration before either ship reaches its speed cap or crosses a new slope.
-    if (frame === 14) {
-      expect(Math.hypot(downhill.velocity.x, downhill.velocity.y)).toBeGreaterThan(
-        Math.hypot(uphill.velocity.x, uphill.velocity.y)
-      );
+test.each([1, 8])(
+  'a mass-%s pilot travels farther downhill but can still thrust uphill',
+  (mass) => {
+    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+    const startX = BOUNDS.radius / 2;
+    const downhill = new Ship({ position: { x: startX, y: 0 } });
+    const uphill = new Ship({ position: { x: startX, y: 0 } });
+    for (const ship of [downhill, uphill]) {
+      ship.mass = mass;
+      ship.thrusting = true;
+      ship.velocity = { x: 0, y: 0 };
     }
+    downhill.angle = Math.PI;
+    uphill.angle = 0;
+    const bot = {
+      position: { x: startX, y: 0 },
+      velocity: { x: 0, y: 0 },
+      angle: Math.PI,
+      thrusting: true,
+      mass,
+    };
+    for (let frame = 0; frame < 120; frame++) {
+      downhill.update();
+      uphill.update();
+      applyShipMotionFrame(bot);
+      // Compare acceleration before either ship reaches its speed cap or crosses a new slope.
+      if (frame === 14) {
+        expect(Math.hypot(downhill.velocity.x, downhill.velocity.y)).toBeGreaterThan(
+          Math.hypot(uphill.velocity.x, uphill.velocity.y)
+        );
+      }
+    }
+    const downDistance = startX - downhill.position.x;
+    const upDistance = uphill.position.x - startX;
+    expect(upDistance).toBeGreaterThan(50);
+    expect(downDistance).toBeGreaterThan(upDistance * 1.05);
+    expect(bot.position.x).toBeCloseTo(downhill.position.x, 8);
+    expect(bot.velocity.x).toBeCloseTo(downhill.velocity.x, 8);
   }
-  const downDistance = startX - downhill.position.x;
-  const upDistance = uphill.position.x - startX;
-  expect(upDistance).toBeGreaterThan(50);
-  expect(downDistance).toBeGreaterThan(upDistance * 1.05);
-  expect(bot.position.x).toBeCloseTo(downhill.position.x, 8);
-  expect(bot.velocity.x).toBeCloseTo(downhill.velocity.x, 8);
-});
+);
 
 test('a ship released from an asteroid also travels faster downhill than uphill', () => {
   ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);

@@ -68,22 +68,6 @@ class Roid {
       this.offsets.push(Math.random() * this._jaggedness * 2 + 1 - this._jaggedness);
     }
   }
-
-  // Regenerate shape (public method for external use)
-  regenerateShape(): void {
-    this.generateShape();
-  }
-
-  // Move the roid based on its velocity
-  move(): void {
-    this.position = {
-      x: this.position.x + this.velocity.x,
-      y: this.position.y + this.velocity.y,
-    };
-
-    // Update rotation
-    this.angle += this.angularVelocity;
-  }
 }
 
 class RoidBelt {

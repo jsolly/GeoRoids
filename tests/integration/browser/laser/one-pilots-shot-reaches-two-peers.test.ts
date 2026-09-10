@@ -3,7 +3,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { TestConfig } from '../../utils/test-config';
 import { bootLaserClients, localPlayerId, observeLaser } from './laser-observation';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'one player laser reaches every connected peer with the same trajectory',

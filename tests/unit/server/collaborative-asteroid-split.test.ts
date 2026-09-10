@@ -169,7 +169,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     playerB.resetMessages();
 
     const now = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const clock = vi.spyOn(server.gameEngine, 'getServerTime').mockReturnValue(now);
     try {
       const firstAStart = playerA.mark();
       const firstBStart = playerB.mark();
@@ -277,7 +277,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     client.resetMessages();
 
     const now = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const clock = vi.spyOn(server.gameEngine, 'getServerTime').mockReturnValue(now);
     try {
       const firstStart = client.mark();
       const firstShot = await sendTrackedReport(server, client, 'solo-player', target.id);

@@ -32,7 +32,7 @@ function reportStorageFallback(
   error?: unknown
 ): void {
   // Keep the signal bounded and never include the caller's key or value. Keys
-  // can contain account/session identifiers, while one warning per operation
+  // can contain account/session identifiers, while one error per operation
   // is enough to explain why this tab is using memory-only storage.
   if (reportedFailures.has(operation)) {
     return;
@@ -40,7 +40,7 @@ function reportStorageFallback(
   reportedFailures.add(operation);
   const cause = error === undefined ? 'unavailable' : normalizeFailureCause(error);
   try {
-    console.warn(
+    console.error(
       `[STORAGE] localStorage unavailable during ${operation} (${cause}); using in-memory fallback`
     );
   } catch {
@@ -58,36 +58,37 @@ function getLocalStorage(): Storage | null {
   }
 }
 
-function canPersist(): boolean {
+function getPersistentStorage(): Storage | null {
   if (persistAvailable === false) {
-    return false;
+    return null;
   }
   const storage = getLocalStorage();
   if (!storage) {
     persistAvailable = false;
     reportStorageFallback('probe');
-    return false;
+    return null;
   }
   if (persistAvailable === true) {
-    return true;
+    return storage;
   }
   try {
     const probeKey = '__georoids_storage_probe__';
     storage.setItem(probeKey, '1');
     storage.removeItem(probeKey);
     persistAvailable = true;
-    return true;
+    return storage;
   } catch (error) {
     persistAvailable = false;
     reportStorageFallback('probe', error);
-    return false;
+    return null;
   }
 }
 
 export function getStoredItem(key: string): string | null {
-  if (canPersist()) {
+  const storage = getPersistentStorage();
+  if (storage) {
     try {
-      return getLocalStorage()?.getItem(key) ?? null;
+      return storage.getItem(key) ?? null;
     } catch (error) {
       persistAvailable = false;
       reportStorageFallback('read', error);
@@ -97,9 +98,10 @@ export function getStoredItem(key: string): string | null {
 }
 
 export function setStoredItem(key: string, value: string): void {
-  if (canPersist()) {
+  const storage = getPersistentStorage();
+  if (storage) {
     try {
-      getLocalStorage()?.setItem(key, value);
+      storage.setItem(key, value);
       return;
     } catch (error) {
       persistAvailable = false;
@@ -110,9 +112,10 @@ export function setStoredItem(key: string, value: string): void {
 }
 
 export function removeStoredItem(key: string): void {
-  if (canPersist()) {
+  const storage = getPersistentStorage();
+  if (storage) {
     try {
-      getLocalStorage()?.removeItem(key);
+      storage.removeItem(key);
       return;
     } catch (error) {
       persistAvailable = false;

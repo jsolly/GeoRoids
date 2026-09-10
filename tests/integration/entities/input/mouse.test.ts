@@ -82,8 +82,9 @@ test('mouse move sets ship angle toward cursor', () => {
     return;
   }
 
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
+  const viewport = canvasManager.getViewportSize();
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
 
   // Move to the right of center => angle ~ 0
   const evRight = new MouseEvent('mousemove', { clientX: centerX + 50, clientY: centerY });

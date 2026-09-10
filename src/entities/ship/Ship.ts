@@ -3,7 +3,7 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
-import { applyFuelSnapshot, createFuelTank } from '../../../shared/fuel';
+import { createFuelTank } from '../../../shared/fuel';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
   AsteroidMotionState,
@@ -31,11 +31,9 @@ import {
   tickAbilityHost,
 } from './shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
-import { drawThruster } from './shipRenderer';
 
 import {
   activateShield,
-  applyShieldSnapshot,
   clearShield,
   deactivateShield,
   isShieldBlockingLasers,
@@ -44,14 +42,11 @@ import {
   updateShield,
 } from './shipShield';
 import {
-  applySharedShipExplodingFlag,
-  applySharedShipRespawnCue,
   applyShipSpawnProtection,
   applyThrustOrFriction,
   calculateHealthAfterDamage,
   calculateHealthAfterHeal,
   canTakeCollisionDamage,
-  moveFrictionForShip,
   shouldStartHealthRegeneration,
   tickShipImpactFlash,
 } from './shipUtils';
@@ -91,10 +86,6 @@ class Ship {
   blinkOn: boolean; // Will be set in constructor based on blinkCount
   lastShotTime: number = 0;
   shotCooldown: number = 250;
-  thrusterActive: boolean = false;
-  lastPosition?: Position; // Track previous position for movement analysis
-  lastRotation?: number; // Track previous rotation for movement analysis
-  lastThrusting?: boolean; // Track previous thruster state for network updates
   color: string = PALETTE.LOCAL;
   factionId?: SoftFactionId;
   isBot: boolean = false; // Flag to identify if this ship belongs to a bot
@@ -110,16 +101,6 @@ class Ship {
   harpoonTimer: number = 0;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
-
-  // Server-authoritative smoothing targets (for remote/bot ships)
-  targetPosition?: Position;
-  targetVelocity?: Velocity;
-  targetAngle?: number;
-  lastServerUpdateMs: number = 0;
-  interpolationT: number = 0; // 0..1 blend factor toward target
-  // Smoothing controls
-  private static readonly INTERPOLATION_RATE = 0.15; // higher => faster catch-up
-  private static readonly ANGLE_INTERPOLATION_RATE = 0.2;
 
   // Player collision damage-over-time tracking
   isCollidingWithPlayer: boolean = false;
@@ -205,6 +186,8 @@ class Ship {
 
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
+    this.thrusting = false;
+    this.angularVelocity = 0;
     clearShield(this);
     playExplosionSound(this.position);
 
@@ -219,50 +202,6 @@ class Ship {
         },
       })
     );
-  }
-
-  setExploding(): void {
-    this.exploding = this.explodeTime > 0;
-  }
-
-  applyVelocity(): void {
-    logger.debug('SHIP', 'applyVelocity called', {
-      thrusting: this.thrusting,
-      shipId: this.id,
-      isBot: this.isBot,
-    });
-
-    // Check if thruster state changed and send network update
-    if (this.lastThrusting !== this.thrusting) {
-      this.sendThrusterEvent();
-      this.lastThrusting = this.thrusting;
-    }
-
-    this.velocity = applyThrustOrFriction(
-      this.velocity,
-      this.angle,
-      this.thrusting,
-      moveFrictionForShip(this.isBot),
-      this.thrust,
-      this.mass,
-      this.maxVelocity
-    );
-    if (this.thrusting) {
-      drawThruster(this);
-    }
-
-    applySharedShipSlope(this.velocity, this.position);
-    this.capVelocity();
-  }
-
-  move(): void {
-    this.angle += this.angularVelocity;
-    this.applyVelocity();
-
-    const newPosition = addPositionAndVelocity(this.position, this.velocity);
-    this.position = newPosition;
-
-    this.updateHealth();
   }
 
   canShootAgain(): boolean {
@@ -377,14 +316,6 @@ class Ship {
     }
   }
 
-  updateLaserExplodeTime(i: number): void {
-    const laser = this.lasers[i];
-    if (laser === undefined) {
-      return;
-    }
-    laser.updateExplodeTime();
-  }
-
   generateLaser(): Laser {
     return createLaser(this);
   }
@@ -403,136 +334,6 @@ class Ship {
     } else {
       logger.debug('SHIP', 'Bot ship, not sending shoot event');
     }
-  }
-
-  private sendThrusterEvent(): void {
-    // Only send thruster events for non-bot ships
-    if (!this.isBot) {
-      const networkManager = NetworkManager.getInstance();
-      if (networkManager.isConnected) {
-        // Send thruster state to server
-        networkManager.updatePlayerState({
-          position: this.position,
-          velocity: this.velocity,
-          r: this.r,
-          angle: this.angle,
-          exploding: this.exploding,
-          thrusting: this.thrusting,
-        });
-      }
-    }
-  }
-
-  updateFromNetwork(data: {
-    position?: Position;
-    velocity?: Velocity;
-    r?: number;
-    angle?: number;
-    lives?: number;
-    exploding?: boolean;
-    thrusting?: boolean;
-    health?: number;
-    maxHealth?: number;
-    fuel?: number;
-    maxFuel?: number;
-    mass?: number;
-    shieldActive?: boolean;
-    shieldTime?: number;
-    shieldCooldown?: number;
-    shieldFlashTime?: number;
-  }): void {
-    // Local player uses immediate state; bots/remote ships use smoothing targets
-    if (this.isBot) {
-      // Bots: set targets and smooth toward them
-      if (data.position) {
-        this.targetPosition = { x: data.position.x, y: data.position.y };
-      }
-      if (data.velocity) {
-        this.targetVelocity = { x: data.velocity.x, y: data.velocity.y };
-      }
-      if (data.angle !== undefined) {
-        this.targetAngle = data.angle;
-      }
-      if (data.r !== undefined) {
-        this.r = data.r;
-      }
-      if (data.thrusting !== undefined) {
-        this.thrusting = data.thrusting;
-      }
-      this.applyNetworkCombatFields(data);
-      this.lastServerUpdateMs = performance.now ? performance.now() : Date.now();
-      return;
-    }
-
-    // Non-bot ships: assign immediately (existing behavior)
-    if (data.position) {
-      this.position = data.position;
-    }
-    if (data.velocity) {
-      this.velocity = data.velocity;
-    }
-    if (data.r !== undefined) {
-      this.r = data.r;
-    }
-    if (data.angle !== undefined) {
-      this.angle = data.angle;
-    }
-    if (data.thrusting !== undefined) {
-      this.thrusting = data.thrusting;
-    }
-    this.applyNetworkCombatFields(data);
-  }
-
-  /** Apply health/explode fields; blink only on death → alive (player and bot). */
-  private applyNetworkCombatFields(data: {
-    exploding?: boolean;
-    health?: number;
-    maxHealth?: number;
-    fuel?: number;
-    maxFuel?: number;
-    mass?: number;
-    spawnProtectionTimer?: number;
-    shieldActive?: boolean;
-    shieldTime?: number;
-    shieldCooldown?: number;
-    shieldFlashTime?: number;
-  }): void {
-    if (data.mass !== undefined) {
-      this.mass = data.mass;
-      this.r = radiusFromMass(data.mass);
-    }
-    const wasDeadOrExploding = this.health <= 0 || this.exploding;
-    applySharedShipExplodingFlag(this, data.exploding);
-    if (data.health !== undefined) {
-      this.health = data.health;
-    }
-    if (data.maxHealth !== undefined) {
-      this.maxHealth = data.maxHealth;
-    }
-    applyFuelSnapshot(this, data);
-    applyShieldSnapshot(this, data);
-    applySharedShipRespawnCue(this, wasDeadOrExploding, data.spawnProtectionTimer);
-    if (wasDeadOrExploding && this.health > 0) {
-      clearShield(this);
-    }
-  }
-
-  getNetworkData(): {
-    position: { x: number; y: number };
-    velocity: { x: number; y: number };
-    r: number;
-    angle: number;
-    exploding: boolean;
-    thrusting: boolean;
-  } {
-    return {
-      position: { x: this.position.x, y: this.position.y },
-      velocity: { x: this.velocity.x, y: this.velocity.y },
-      r: this.r,
-      angle: this.angle,
-      exploding: this.exploding,
-      thrusting: this.thrusting,
-    };
   }
 
   requestShieldToggle(): boolean {
@@ -758,9 +559,8 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
-    // For bots, blend client position toward server target (client-side smoothing)
+    // Bot poses are supplied by the server.
     if (this.isBot) {
-      this.stepInterpolation();
       return;
     }
 
@@ -785,36 +585,6 @@ class Ship {
       const scale = this.maxVelocity / currentSpeed;
       this.velocity.x *= scale;
       this.velocity.y *= scale;
-    }
-  }
-
-  // Smoothly approach target state for non-local ships
-  private stepInterpolation(): void {
-    if (this.targetPosition) {
-      const rate = Ship.INTERPOLATION_RATE;
-      const dx = this.targetPosition.x - this.position.x;
-      const dy = this.targetPosition.y - this.position.y;
-      this.position = { x: this.position.x + dx * rate, y: this.position.y + dy * rate };
-    }
-
-    if (this.targetVelocity) {
-      const rate = Ship.INTERPOLATION_RATE;
-      const dvx = this.targetVelocity.x - this.velocity.x;
-      const dvy = this.targetVelocity.y - this.velocity.y;
-      this.velocity = { x: this.velocity.x + dvx * rate, y: this.velocity.y + dvy * rate };
-    }
-
-    if (this.targetAngle !== undefined) {
-      const rate = Ship.ANGLE_INTERPOLATION_RATE;
-      // Shortest angle interpolation
-      let delta = this.targetAngle - this.angle;
-      while (delta > Math.PI) {
-        delta -= 2 * Math.PI;
-      }
-      while (delta < -Math.PI) {
-        delta += 2 * Math.PI;
-      }
-      this.angle += delta * rate;
     }
   }
 }

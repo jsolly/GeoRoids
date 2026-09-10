@@ -3,7 +3,7 @@ import { ROID } from '../../../../src/constants';
 import type { BrowserManager } from '../../utils/browser-manager';
 import { GameInteractions } from '../../utils/game-interactions';
 
-export interface ObservedLaser {
+interface ObservedLaser {
   ownerId: string;
   x: number;
   y: number;
@@ -17,8 +17,7 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
   const pages: Page[] = [];
   const games: GameInteractions[] = [];
   for (let index = 0; index < count; index++) {
-    const page =
-      index === 0 ? browserManager.getCurrentPage() : await browserManager.createAdditionalPage();
+    const page = index === 0 ? browserManager.getCurrentPage() : await browserManager.createPage();
     if (!page) {
       throw new Error('Browser page is not available');
     }
@@ -59,7 +58,7 @@ export async function parkLaserClients(games: readonly GameInteractions[]): Prom
 
 export async function localPlayerId(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const id = window.gameController?.getCurrPlayer()?.id;
+    const id = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.id;
     if (!id) {
       throw new Error('Local player has not joined');
     }
@@ -77,7 +76,7 @@ export async function observeLaser(
   const handle = await page.waitForFunction(
     ({ ownerId, remote, requireOnCanvas }) => {
       const gc = window.gameController;
-      const local = gc?.getCurrPlayer();
+      const local = gc?.getPlayerManager()?.getLocalPlayer?.();
       const owner = remote
         ? gc
             ?.getNetworkManager()
@@ -139,7 +138,7 @@ export async function waitForLaserCleanup(
   const handle = await page.waitForFunction(
     ({ id, remote }) => {
       const gc = window.gameController;
-      const local = gc?.getCurrPlayer();
+      const local = gc?.getPlayerManager()?.getLocalPlayer?.();
       const owner = remote
         ? gc
             ?.getNetworkManager()

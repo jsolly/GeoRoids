@@ -5,6 +5,12 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import {
+  centerOf,
+  dispatchTouch,
+  readTouchControlState as readLocalTouchState,
+  type TouchPoint,
+} from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
@@ -16,26 +22,17 @@ const KITS = [
   { kitId: 'quake' as const, label: 'PULSE', name: 'Shock pulse' },
 ];
 
-type TouchPoint = { x: number; y: number; id: number };
-
-async function centerOf(page: Page, selector: string): Promise<{ x: number; y: number }> {
-  const box = await page.locator(selector).boundingBox();
-  if (!box) {
-    throw new Error(`Missing touch target ${selector}`);
-  }
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-async function dispatchTouch(
+async function tapTouchPoint(
   session: CDPSession,
-  type: 'touchStart' | 'touchMove' | 'touchCancel' | 'touchEnd',
-  touchPoints: TouchPoint[]
+  heldPoints: TouchPoint[],
+  touchPoint: TouchPoint
 ): Promise<void> {
-  await session.send('Input.dispatchTouchEvent', {
-    type,
-    touchPoints,
-    modifiers: 0,
-  });
+  // Preserve the active stick/fire contacts while Chromium delivers the
+  // changed third contact. This keeps the continuous controls under test.
+  await dispatchTouch(session, 'touchMove', heldPoints);
+  await dispatchTouch(session, 'touchStart', [touchPoint]);
+  await dispatchTouch(session, 'touchEnd', [touchPoint]);
+  await dispatchTouch(session, 'touchMove', heldPoints);
 }
 
 function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
@@ -50,41 +47,6 @@ function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
   });
   page.on('pageerror', (error) => errors.push(error.message));
   return { errors, warnings };
-}
-
-async function readLocalTouchState(page: Page): Promise<{
-  position: { x: number; y: number };
-  thrusting: boolean;
-  canShoot: boolean;
-  lastShotTime: number;
-  lasers: number;
-  abilityCooldownFrames: number;
-  abilityActiveFrames: number;
-  shieldActive: boolean;
-  shieldTimer: number;
-  shieldCooldown: number;
-  shieldFlashTime: number;
-}> {
-  return page.evaluate(() => {
-    const gc = window.gameController;
-    const ship = gc?.getCurrPlayer()?.ship;
-    if (!ship) {
-      throw new Error('Local ship unavailable');
-    }
-    return {
-      position: { x: ship.position.x, y: ship.position.y },
-      thrusting: ship.thrusting,
-      canShoot: ship.canShoot,
-      lastShotTime: ship.lastShotTime,
-      lasers: ship.lasers.length,
-      abilityCooldownFrames: ship.abilityCooldownFrames,
-      abilityActiveFrames: ship.abilityActiveFrames,
-      shieldActive: ship.shieldActive,
-      shieldTimer: ship.shieldTimer,
-      shieldCooldown: ship.shieldCooldown,
-      shieldFlashTime: ship.shieldFlashTime,
-    };
-  });
 }
 
 test.each(KITS)(
@@ -116,6 +78,10 @@ test.each(KITS)(
     const ability = await centerOf(page, '#touch-ability');
     const shield = await centerOf(page, '#touch-shield');
     const session = await page.context().newCDPSession(page);
+    const heldTouchPoints: TouchPoint[] = [
+      { x: stick.x + 42, y: stick.y - 4, id: 11 },
+      { x: fire.x, y: fire.y, id: 12 },
+    ];
 
     const beforeMove = await readLocalTouchState(page);
     await dispatchTouch(session, 'touchStart', [
@@ -139,7 +105,11 @@ test.each(KITS)(
 
     // E and F must remain usable while the two continuous touch sources are
     // held. The E action is kit-specific; the F bubble is shared.
-    await page.touchscreen.tap(ability.x, ability.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: ability.x,
+      y: ability.y,
+      id: 13,
+    });
     await game.waitForAnimationFrames(2);
     const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
@@ -147,7 +117,11 @@ test.each(KITS)(
     expect(
       await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
     ).toBe(true);
-    await page.touchscreen.tap(ability.x, ability.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: ability.x,
+      y: ability.y,
+      id: 13,
+    });
     await game.waitForAnimationFrames(1);
     const abilityAfterCoolingTap = await readLocalTouchState(page);
     expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeLessThanOrEqual(
@@ -156,7 +130,11 @@ test.each(KITS)(
     expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeGreaterThan(0);
     expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('true');
 
-    await page.touchscreen.tap(shield.x, shield.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: shield.x,
+      y: shield.y,
+      id: 14,
+    });
     await game.waitForAnimationFrames(2);
     const shieldWhileHeld = await readLocalTouchState(page);
     expect(shieldWhileHeld.shieldActive).toBe(true);
@@ -165,7 +143,11 @@ test.each(KITS)(
       await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-active'))
     ).toBe(true);
 
-    await page.touchscreen.tap(shield.x, shield.y);
+    await tapTouchPoint(session, heldTouchPoints, {
+      x: shield.x,
+      y: shield.y,
+      id: 14,
+    });
     await game.waitForAnimationFrames(1);
     const shieldDownWhileHeld = await readLocalTouchState(page);
     expect(shieldDownWhileHeld.shieldActive).toBe(false);

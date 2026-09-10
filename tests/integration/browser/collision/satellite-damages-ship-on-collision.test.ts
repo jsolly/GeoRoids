@@ -1,10 +1,9 @@
-import assert from 'node:assert/strict';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
-const { browserManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks();
 
 test(
   'ramming a satellite damages the player ship',
@@ -20,7 +19,7 @@ test(
     await game.waitForSatellites(1);
 
     const satellite = (await game.getSatellites())[0];
-    assert.ok(satellite, 'Satellite collision target missing');
+    assert.exists(satellite);
     const startHealth = await game.getShipHealth();
 
     await game.pinShipOnSatellite(satellite.id, 3000);

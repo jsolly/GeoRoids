@@ -1,7 +1,7 @@
 import { type Heightfield, sampleHeight } from './heightfield';
 import { TERRAIN } from './terrainConfig';
 
-export interface ContourSegment {
+interface ContourSegment {
   ax: number;
   ay: number;
   bx: number;

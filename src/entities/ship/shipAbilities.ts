@@ -51,12 +51,12 @@ export interface AbilityWorld {
   canvas?: { width: number; height: number };
 }
 
-export interface AbilityActivation {
+interface AbilityActivation {
   activated: boolean;
   abilityId?: ShipAbilityId;
 }
 
-export interface HarpoonLatchSnapshot {
+interface HarpoonLatchSnapshot {
   harpoonTimer?: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
@@ -99,7 +99,7 @@ export function absorbDamageWithShield(host: { shieldTimer: number }): boolean {
   return host.shieldTimer > 0;
 }
 
-export function clearHarpoonLatch(
+function clearHarpoonLatch(
   host: Pick<AbilityHost, 'harpoonTimer' | 'harpoonTargetId' | 'harpoonLatchPos'>
 ): void {
   host.harpoonTimer = 0;
@@ -108,7 +108,7 @@ export function clearHarpoonLatch(
 }
 
 /** Rocks + ships share one latch list. Server and client use the same helper. */
-export function listHarpoonCandidates(world?: AbilityWorld): AbilityBody[] {
+function listHarpoonCandidates(world?: AbilityWorld): AbilityBody[] {
   if (world) {
     return [...world.asteroids, ...world.entities];
   }
@@ -126,7 +126,7 @@ export function isEnvironmentLatchBody(body: AbilityBody): boolean {
   return true;
 }
 
-export function isHarpoonableBody(
+function isHarpoonableBody(
   host: Pick<AbilityHost, 'id' | 'factionId'>,
   body: AbilityBody
 ): boolean {
@@ -253,7 +253,7 @@ function pullBody(body: AbilityBody, toward: Position, force: number): void {
   body.velocity.y += (dy / dist) * force;
 }
 
-export function bodyRadius(body: Pick<AbilityBody, 'r' | 'size'>): number {
+function bodyRadius(body: Pick<AbilityBody, 'r' | 'size'>): number {
   const value = body.r ?? body.size;
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
@@ -325,7 +325,7 @@ export function findHarpoonTarget(
   return best?.body;
 }
 
-export interface HarpoonDiagnosis {
+interface HarpoonDiagnosis {
   kitId: ShipKitId;
   canActivate: boolean;
   fieldCount: number;
@@ -439,7 +439,7 @@ export function applyShockPulse(host: AbilityHost, world: AbilityWorld): void {
   }
 }
 
-export function resolveAbilityWorld(world?: AbilityWorld): AbilityWorld | undefined {
+function resolveAbilityWorld(world?: AbilityWorld): AbilityWorld | undefined {
   if (world) {
     return world;
   }

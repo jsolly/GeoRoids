@@ -29,7 +29,7 @@ import { checkBoundaryCollision } from '../../src/physics/collision/collisionDet
 import type { GameEntity } from './EntityManager';
 
 export type MotionOutcome = { ok: true } | { ok: false; error: string };
-export type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
+type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
   epoch: number;
   sequence: number;
 };

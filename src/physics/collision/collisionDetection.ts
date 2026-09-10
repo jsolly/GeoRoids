@@ -8,18 +8,18 @@ function flooredDistance(ax: number, ay: number, bx: number, by: number): number
 }
 
 /** Discrete laser radius used by point and swept laser tests. */
-export const LASER_HIT_RADIUS = 2;
+const LASER_HIT_RADIUS = 2;
 
 /**
  * Extra slack when the server validates a client-reported laser↔roid hit.
  * Covers one-way latency while still rejecting far-away phantom reports.
  */
-export const LASER_ROID_AUTHORITY_SLOP = 64;
+const LASER_ROID_AUTHORITY_SLOP = 64;
 
 /**
  * Check if two circular objects are colliding
  */
-export function checkCircularCollision(
+function checkCircularCollision(
   pos1: Position,
   radius1: number,
   pos2: Position,

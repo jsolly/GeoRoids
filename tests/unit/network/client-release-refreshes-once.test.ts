@@ -197,3 +197,22 @@ test('an offline release check keeps the loaded client and logs one error during
     cause
   );
 });
+
+test('an invalid release response logs once until a valid response restores the check', async () => {
+  const f = fixture();
+  await start(f);
+  f.fetch.mockResolvedValue(response(NEXT, 503));
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(logger.error).toHaveBeenCalledExactlyOnceWith(
+    'CLIENT_RELEASE',
+    'Release check failed; keeping the current client',
+    expect.objectContaining({ message: 'Invalid release response (status=503)' })
+  );
+
+  f.fetch.mockResolvedValue(response(CURRENT));
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  f.fetch.mockResolvedValue(response(NEXT, 503));
+  await vi.advanceTimersByTimeAsync(CLIENT_RELEASE_POLL_MS);
+  expect(logger.error).toHaveBeenCalledTimes(2);
+});

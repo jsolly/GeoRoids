@@ -9,7 +9,6 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
   height: 100dvh;
   overflow: hidden; /* Prevent any scrollbars */
   overscroll-behavior: none;
@@ -17,7 +16,6 @@ body {
 
 body {
   background-color: var(--palette-bg, #000011);
-  min-height: 100vh;
   min-height: 100dvh;
   position: relative;
   -webkit-tap-highlight-color: transparent;
@@ -43,14 +41,13 @@ body {
   background-color: var(--palette-bg, #000011);
 }
 
-body.in-play #title-terrain,
-body.in-play #attribution,
-body.in-play .controls-hint {
-  display: none;
-}
-
-body.in-play {
-  touch-action: none;
+.terrain-eyebrow {
+  margin: 0 0 1rem;
+  color: #a5b6c7;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 #start-screen {
@@ -60,27 +57,12 @@ body.in-play {
   backdrop-filter: none;
 }
 
-#start-screen h1 {
-  margin-bottom: 0.6em;
-}
-
-.terrain-eyebrow {
-  margin: 0 0 1rem;
-  color: #a5b6c7;
-  font-family: 'Courier New', ui-monospace, monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 /* Ensure the game wrapper doesn't create black areas */
 #gameWrapper {
   padding: 0;
   margin: 0;
   display: block;
-  width: 100vw;
   width: 100dvw;
-  height: 100vh;
   height: 100dvh;
   position: absolute;
   top: 0;
@@ -93,9 +75,7 @@ body.in-play {
 /* Game area styling */
 #gameArea {
   display: none; /* Hidden by default */
-  width: 100vw;
   width: 100dvw;
-  height: 100vh;
   height: 100dvh;
   background: transparent;
   position: absolute;
@@ -107,9 +87,7 @@ body.in-play {
 #gameCanvas {
   background: #000011;
   display: block;
-  width: 100vw;
   width: 100dvw;
-  height: 100vh;
   height: 100dvh;
   touch-action: none;
 }
@@ -150,12 +128,7 @@ a {
   max-height: 90vh;
   overflow-y: auto; /* Enable scrolling when needed */
   padding: 40px;
-  background-color: rgba(
-    20,
-    20,
-    30,
-    0.95
-  ); /* Lighter, more visible background */
+  background-color: rgba(20, 20, 30, 0.95); /* Lighter, more visible background */
   border-radius: 20px;
   border: 2px solid rgba(255, 255, 255, 0.25); /* More visible border */
   box-shadow:
@@ -184,8 +157,6 @@ a {
   background: rgba(255, 255, 255, 0.5);
 }
 
-
-
 /* Enhanced title with better contrast */
 .screen h1 {
   font-size: 3.2em;
@@ -199,8 +170,12 @@ a {
   position: relative;
 }
 
+#start-screen h1 {
+  margin-bottom: 0.6em;
+}
+
 .screen h1::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -10px;
   left: 50%;
@@ -227,7 +202,7 @@ a {
 
 .controls-hint {
   margin: 0.35em 0 1.15em;
-  font-family: 'Courier New', ui-monospace, monospace;
+  font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -237,6 +212,16 @@ a {
   opacity: 0.82;
 }
 
+body.in-play #title-terrain,
+body.in-play #attribution,
+body.in-play .controls-hint {
+  display: none;
+}
+
+body.in-play {
+  touch-action: none;
+}
+
 .ship-kit-select {
   border: 0;
   margin: 0 0 1.1em;
@@ -244,7 +229,7 @@ a {
 }
 
 .ship-kit-select legend {
-  font-family: 'Courier New', ui-monospace, monospace;
+  font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.62rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -353,18 +338,13 @@ a {
 }
 
 .game-modes .btn::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   transition: left 0.5s;
 }
 
@@ -377,23 +357,10 @@ a {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
-
-
 /* Settings section */
 .settings {
   margin-bottom: 1.5em; /* Further reduced margin */
   text-align: left;
-}
-
-/* Improved section headings */
-.settings h3 {
-  color: #f0f0f0;
-  font-size: 1.1em;
-  margin-bottom: 1em;
-  text-align: center;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
 .settings .nav {
@@ -452,16 +419,12 @@ a {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
-
-
 /* Active start-button state */
 .btn.active-mode {
   transform: scale(1.02);
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
   border-width: 3px;
 }
-
-
 
 #start-game.active-mode {
   background-color: color-mix(in srgb, var(--palette-accent, #a78bfa) 16%, transparent);
@@ -494,8 +457,6 @@ a {
   .settings {
     margin-bottom: 1.5em;
   }
-
-
 
   .game-modes .btn {
     padding: 0.6em 1em;
@@ -577,46 +538,6 @@ a {
   background-color: rgba(255, 255, 255, 0.12);
 }
 
-/* Modal styling */
-.modal {
-  background-color: rgba(0, 0, 0, 0.9);
-  border-radius: 15px;
-  text-align: center;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-/* Player Name Modal specific styling */
-#playerNameModal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1000;
-  padding: 2em;
-  width: min(400px, 90vw);
-  min-width: 280px;
-}
-
-#playerNameModal .modal-content {
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border-radius: 15px;
-  padding: 2em;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-
-#playerNameModal h3 {
-  color: #4fc3f7;
-  margin-bottom: 1em;
-  font-size: 1.5em;
-}
-
-#playerNameModal p {
-  color: #ffffff;
-  margin-bottom: 1.5em;
-  font-size: 1.1em;
-}
-
 #playerNameInput {
   width: 100%;
   padding: 0.8em;
@@ -639,59 +560,12 @@ a {
   color: rgba(255, 255, 255, 0.6);
 }
 
-.modal-buttons {
-  display: flex;
-  gap: 1em;
-  justify-content: center;
-}
-
-.modal-buttons .btn {
-  padding: 0.8em 1.5em;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  border: none;
-  cursor: pointer;
-}
-
-.modal-buttons .btn-primary {
-  background: linear-gradient(135deg, #4fc3f7, #29b6f6);
-  color: white;
-}
-
-.modal-buttons .btn-primary:hover {
-  background: linear-gradient(135deg, #29b6f6, #0288d1);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(79, 195, 247, 0.4);
-}
-
-.modal-buttons .btn-secondary {
-  background: linear-gradient(135deg, #6c757d, #5a6268);
-  color: white;
-}
-
-.modal-buttons .btn-secondary:hover {
-  background: linear-gradient(135deg, #5a6268, #495057);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
-}
-
-
-
-
-
-
-
 /* Additional visual enhancements */
 .screen::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.1),
-    rgba(255, 255, 255, 0.05)
-  );
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
   border-radius: 22px;
   z-index: -1;
   opacity: 0.6;
@@ -704,7 +578,7 @@ a {
   margin-left: 1em;
   font-size: 0.75em;
   color: rgba(255, 255, 255, 0.4);
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   opacity: 0.6;
   transition: opacity 0.3s ease;
 }
@@ -723,7 +597,7 @@ a {
 }
 
 .touch-controls[hidden] {
-  display: none !important;
+  display: none;
 }
 
 body.touch-play .touch-controls:not([hidden]) {
@@ -742,6 +616,9 @@ body.touch-play .touch-controls:not([hidden]) {
 
 .touch-stick {
   position: absolute;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
   left: max(16px, env(safe-area-inset-left, 0px));
   bottom: max(20px, env(safe-area-inset-bottom, 0px));
   width: 112px;
@@ -773,7 +650,7 @@ body.touch-play .touch-controls:not([hidden]) {
   height: 72px;
   border-radius: 50%;
   padding: 0;
-  font-family: 'Courier New', ui-monospace, monospace;
+  font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -798,7 +675,7 @@ body.touch-play .touch-controls:not([hidden]) {
   height: 56px;
   border-radius: 50%;
   padding: 0;
-  font-family: 'Courier New', ui-monospace, monospace;
+  font-family: "Courier New", ui-monospace, monospace;
   font-size: 0.56rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -833,8 +710,7 @@ body.touch-play .touch-controls:not([hidden]) {
 .touch-shield.is-cooling {
   opacity: 0.58;
   background: conic-gradient(
-    color-mix(in srgb, currentColor 45%, transparent)
-      calc(var(--action-cool) * 360deg),
+    color-mix(in srgb, currentColor 45%, transparent) calc(var(--action-cool) * 360deg),
     color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent) 0
   );
 }
@@ -921,8 +797,6 @@ body.touch-play .touch-controls:not([hidden]) {
   }
 }
 
-
-
 /* Style for default nickname */
 .game-modes .form-control.default-nickname {
   border-color: rgba(79, 195, 247, 0.6);
@@ -934,7 +808,7 @@ body.touch-play .touch-controls:not([hidden]) {
 }
 
 .game-modes .form-control.default-nickname::after {
-  content: '✨ Generated';
+  content: "✨ Generated";
   position: absolute;
   right: 10px;
   top: 50%;
@@ -967,13 +841,18 @@ body.touch-play .touch-controls:not([hidden]) {
   left: 16px;
   max-width: min(260px, 60vw);
   color: var(--palette-hud-muted, #94a3b8);
-  font: 11px/1.5 var(--font-mono, monospace);
+  font: 11px / 1.5 var(--font-mono, monospace);
   pointer-events: none;
   overflow-wrap: anywhere;
 }
-#flight-upgrade { color: var(--palette-laser, #fde68a); }
+#flight-upgrade {
+  color: var(--palette-laser, #fde68a);
+}
 @media (max-height: 500px) {
-  #flight-feedback { top: 76px; font-size: 10px; }
+  #flight-feedback {
+    top: 76px;
+    font-size: 10px;
+  }
 }
 
 #flight-selection-announcement {

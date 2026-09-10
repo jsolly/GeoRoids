@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { stepReleasedMotion } from '../../../shared/asteroidMotion';
 import type { ServerEntityData } from '../../../shared-types';
+import { Player } from '../../../src/entities/player/Player';
 import { Ship } from '../../../src/entities/ship/Ship';
+import { keyDown, keyUp } from '../../../src/input/keybindings';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { AsteroidMotionPrediction } from '../../../src/network/services/AsteroidMotionPrediction';
 
 function row(overrides: Partial<ServerEntityData> = {}): ServerEntityData {
@@ -140,6 +143,108 @@ describe('the local Hauler reconciles pending commands against its server motion
     prediction.buildInput(ship, 34);
     prediction.predictFrame(ship, 34, []);
     expect(ship.position).toEqual(held);
+  });
+
+  it('keeps a held KeyW intent when a latched snapshot clears the echoed thrust flag before outbound input', () => {
+    const player = new Player({
+      id: 'pilot',
+      name: 'Pilot',
+      type: 'local',
+      input: new MockPlayerInput(),
+      kitId: 'hauler',
+      factionId: 'ion',
+    });
+    const ship = player.ship;
+    const prediction = new AsteroidMotionPrediction();
+    const rock = {
+      id: 'spinner',
+      position: { x: 0, y: 0 },
+      velocity: { x: 0, y: 0 },
+      rotation: 0,
+      angularVelocity: 0,
+    };
+    prediction.rebase(
+      row({
+        position: { x: 80, y: 0 },
+        velocity: { x: 0, y: 0 },
+        asteroidMotion: { epoch: 3, mode: 'latched', ack: 0, asteroidId: rock.id, latchAngle: 0 },
+      }),
+      ship,
+      0,
+      [rock]
+    );
+    keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player);
+    try {
+      expect(ship.thrusting).toBe(true);
+
+      prediction.rebase(
+        row({
+          position: { x: 80, y: 0 },
+          velocity: { x: 0, y: 0 },
+          thrusting: false,
+          asteroidMotion: {
+            epoch: 3,
+            mode: 'latched',
+            ack: 0,
+            asteroidId: rock.id,
+            latchAngle: 0,
+          },
+        }),
+        ship,
+        17,
+        [rock]
+      );
+
+      expect(prediction.buildInput(ship, 17)?.thrust).toBe(true);
+    } finally {
+      keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
+    }
+  });
+
+  it('does not resurrect a released KeyW from a pending latched prediction replay', () => {
+    const player = new Player({
+      id: 'pilot',
+      name: 'Pilot',
+      type: 'local',
+      input: new MockPlayerInput(),
+      kitId: 'hauler',
+      factionId: 'ion',
+    });
+    const ship = player.ship;
+    const prediction = new AsteroidMotionPrediction();
+    const rock = {
+      id: 'spinner',
+      position: { x: 0, y: 0 },
+      velocity: { x: 0, y: 0 },
+      rotation: 0,
+      angularVelocity: 0,
+    };
+    const latchedRow = {
+      position: { x: 80, y: 0 },
+      velocity: { x: 0, y: 0 },
+      thrusting: false,
+      asteroidMotion: {
+        epoch: 3,
+        mode: 'latched' as const,
+        ack: 0,
+        asteroidId: rock.id,
+        latchAngle: 0,
+      },
+    };
+    prediction.rebase(row(latchedRow), ship, 0, [rock]);
+    keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player);
+    try {
+      expect(prediction.buildInput(ship, 17)?.thrust).toBe(true);
+      keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
+      expect(ship.thrusting).toBe(false);
+
+      prediction.rebase(row(latchedRow), ship, 34, [rock]);
+
+      expect(ship.thrusting).toBe(false);
+      expect(prediction.buildInput(ship, 34)?.thrust).toBe(false);
+    } finally {
+      keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
+    }
   });
 
   it('keeps handoff movement suppressed until a free-mode snapshot confirms the anchored acknowledgment', () => {

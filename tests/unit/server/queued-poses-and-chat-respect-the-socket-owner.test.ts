@@ -1,4 +1,6 @@
 /* @vitest-environment node */
+
+import { performance as nodePerformance } from 'node:perf_hooks';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -7,7 +9,12 @@ import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;
 let core: WebSocketCore;
+let monotonicNowMs = 0;
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(10_000);
+  monotonicNowMs = 1_000;
+  vi.spyOn(nodePerformance, 'now').mockImplementation(() => monotonicNowMs);
   engine = new GameEngine(17);
   core = new WebSocketCore(engine);
 });
@@ -17,9 +24,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function advanceElapsed(ms: number): void {
+  monotonicNowMs += ms;
+  vi.advanceTimersByTime(ms);
+}
+
 test('alternating enhanced-motion rejects stay within one bounded socket summary', () => {
-  vi.useFakeTimers();
-  vi.setSystemTime(10_000);
   const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
   const { socket } = join('enhanced-pilot', true);
   const rejectedPose = {
@@ -36,7 +46,7 @@ test('alternating enhanced-motion rejects stay within one bounded socket summary
   };
 
   core.handleClientMessage(rejectedPose, socket);
-  vi.setSystemTime(11_000);
+  advanceElapsed(1_000);
   core.handleClientMessage(
     {
       type: 'asteroidInput',
@@ -44,16 +54,19 @@ test('alternating enhanced-motion rejects stay within one bounded socket summary
     },
     socket
   );
-  vi.setSystemTime(12_000);
+  advanceElapsed(1_000);
   core.handleClientMessage(rejectedPose, socket);
-  vi.setSystemTime(16_000);
+  advanceElapsed(4_000);
+  vi.setSystemTime(9_000);
   core.handleClientMessage(rejectedPose, socket);
 
   const rejected = warn.mock.calls.filter(
     ([category, event]) => category === 'STATE' && event === 'motion_command_rejected'
   );
   expect(rejected).toHaveLength(2);
+  expect(rejected[0]?.[2]).toMatchObject({ receivedAt: 10_000 });
   expect(rejected[1]?.[2]).toMatchObject({
+    receivedAt: 9_000,
     playerId: 'enhanced-pilot',
     commandType: 'update',
     reason: 'Invalid or stale enhanced movement pose',

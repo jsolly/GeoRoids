@@ -38,21 +38,4 @@ export class MockPlayerInput implements PlayerInput {
   getEmpPulse(): boolean {
     return this.empPulse;
   }
-
-  // Helper methods for testing
-  setThrusting(thrusting: boolean): void {
-    this.thrusting = thrusting;
-  }
-
-  setAngularVelocity(angularVelocity: number): void {
-    this.angularVelocity = angularVelocity;
-  }
-
-  setShooting(shooting: boolean): void {
-    this.shooting = shooting;
-  }
-
-  setEmpPulse(empPulse: boolean): void {
-    this.empPulse = empPulse;
-  }
 }

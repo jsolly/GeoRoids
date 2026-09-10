@@ -89,13 +89,6 @@ export interface PlayerLeave {
   id: string;
 }
 
-export interface PlayerShoot {
-  id: string;
-  shotId?: string;
-  laserStart: Position;
-  laserDirection: Velocity;
-}
-
 // Game state types that might be shared
 export type AsteroidMaterial = 'ice' | 'metal' | 'rubble';
 

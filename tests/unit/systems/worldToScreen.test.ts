@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
-
 import { canvasManager } from '../../../src/rendering/canvas';
 import { projectWorldToScreenInto } from '../../../src/rendering/playfieldCamera';
+import { setWindowViewport } from '../../support/viewport';
 
+let restoreViewport = () => {};
 let canvas: HTMLCanvasElement | undefined;
 let previousCanvas: HTMLElement | null = null;
 
@@ -16,39 +17,37 @@ afterEach(() => {
   }
   canvas = undefined;
   previousCanvas = null;
+  restoreViewport();
 });
 
 test.each([
   { width: 1920, height: 1080, center: { x: 960, y: 540 }, target: { x: 1030, y: 500 } },
   { width: 390, height: 844, center: { x: 195, y: 422 }, target: { x: 265, y: 382 } },
-])('a $width × $height playfield centers the ship and reverses its world projection', ({
-  width,
-  height,
-  center,
-  target,
-}) => {
-  canvas = document.createElement('canvas');
-  canvas.id = 'gameCanvas';
-  previousCanvas = document.getElementById('gameCanvas');
-  if (previousCanvas) {
-    previousCanvas.replaceWith(canvas);
-  } else {
-    document.body.append(canvas);
-  }
-  canvasManager.initialize();
-  canvas.width = width;
-  canvas.height = height;
-  const ship = { x: -200, y: 300 };
-  const world = { x: -130, y: 260 };
-  const out = { x: 0, y: 0 };
+])(
+  'a $width × $height playfield centers the ship and reverses its world projection',
+  ({ width, height, center, target }) => {
+    canvas = document.createElement('canvas');
+    canvas.id = 'gameCanvas';
+    previousCanvas = document.getElementById('gameCanvas');
+    if (previousCanvas) {
+      previousCanvas.replaceWith(canvas);
+    } else {
+      document.body.append(canvas);
+    }
+    restoreViewport = setWindowViewport(width, height);
+    canvasManager.initialize();
+    const ship = { x: -200, y: 300 };
+    const world = { x: -130, y: 260 };
+    const out = { x: 0, y: 0 };
 
-  expect(canvasManager.worldToScreen(ship, ship)).toMatchObject(center);
-  expect(canvasManager.worldToScreenInto(out, world, ship)).toBe(out);
-  expect(out).toEqual(target);
-  const screen = canvasManager.worldToScreen(world, ship);
-  expect(screen).toMatchObject(target);
-  expect(canvasManager.screenToWorld(screen, ship)).toEqual(world);
-});
+    expect(canvasManager.worldToScreen(ship, ship)).toMatchObject(center);
+    expect(canvasManager.worldToScreenInto(out, world, ship)).toBe(out);
+    expect(out).toEqual(target);
+    const screen = canvasManager.worldToScreen(world, ship);
+    expect(screen).toMatchObject(target);
+    expect(canvasManager.screenToWorld(screen, ship)).toEqual(world);
+  }
+);
 
 test('before canvas initialization, ship-relative coordinates still round-trip without a viewport offset', () => {
   const world = { x: 10, y: 20 };

@@ -1,10 +1,10 @@
 import type { DiagnosticLogRecord } from '../shared-types';
 
-export const LOG_ENVELOPE_VERSION = 1 as const;
+const LOG_ENVELOPE_VERSION = 1 as const;
 export const LOG_LINE_MAX_BYTES = 8192;
 
-export type StructuredLogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type StructuredLogSource = 'client' | 'server';
+type StructuredLogLevel = 'debug' | 'info' | 'warn' | 'error';
+type StructuredLogSource = 'client' | 'server';
 
 const SECRET_KEYS = new Set([
   'auth',
@@ -126,7 +126,7 @@ function safeValue(
   return result;
 }
 
-export function detachLogContext(value: unknown): Record<string, unknown> | undefined {
+function detachLogContext(value: unknown): Record<string, unknown> | undefined {
   if (value === undefined) {
     return undefined;
   }

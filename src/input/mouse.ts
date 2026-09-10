@@ -30,15 +30,17 @@ export function handleMouseMove(ev: MouseEvent, player: Player): void {
 
   const rect = canvas.getBoundingClientRect();
 
-  // Convert mouse coordinates from CSS pixels to canvas (device) pixels
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
+  // Keep input in the same CSS-logical coordinate space as the renderer. The
+  // canvas backing store may be larger on high-DPI displays.
+  const viewport = canvasManager.getViewportSize();
+  const scaleX = viewport.width / rect.width;
+  const scaleY = viewport.height / rect.height;
   const mouseX = (ev.clientX - rect.left) * scaleX;
   const mouseY = (ev.clientY - rect.top) * scaleY;
 
   // Ship is rendered at screen center; compute angle from center to mouse.
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
 
   // Game uses angle 0 = +x axis, positive angles rotate counter-clockwise,
   // and ship forward vector is (cos(angle), -sin(angle)). Therefore use atan2 of -(dy).

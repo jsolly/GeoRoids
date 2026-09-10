@@ -537,7 +537,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Lives and respawn',
         paragraphs: [
-          'A human starts with 3 lives and a score of 0. A death decrements one life; the last life reaching zero enters game over. The explosion lasts 18 frames and the respawn delay is 18 frames. A respawn restores the kit’s health, starts with 50 fuel, resets mass growth, clears shield and upgrade state, and grants 180 frames, or 3 seconds, of spawn protection. Human respawns are placed randomly within 80 percent of the asteroid field radius, which is 1,200 units; bots always respawn.',
+          'A human starts with 3 lives and a score of 0. A death decrements one life; the last life reaching zero enters game over. Explosion stops active thrust and turning; held controls resume when the server confirms your respawn. The explosion lasts 18 frames and the respawn delay is 18 frames. A respawn restores the kit’s health, starts with 50 fuel, resets mass growth, clears shield and upgrade state, and grants 180 frames, or 3 seconds, of spawn protection. Human respawns are placed randomly within 80 percent of the asteroid field radius, which is 1,200 units; bots always respawn.',
           'Health regenerates at 1 point per second after a 5 second real-damage delay. Score survives a respawn. Kill loot is emitted from the destroyed ship. The visible death message includes the recorded death cause, and the final-life state shows the game-over overlay.',
         ],
       },

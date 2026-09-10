@@ -24,7 +24,7 @@ type Command =
 const HARNESS_PATHS = ['benchmarks', 'tests/unit/network/snapshotFixture.ts'];
 const GENERATED = new Set(['.git', 'node_modules', 'logs', 'dist', 'coverage', '.cache', '.vite']);
 
-export function parseArguments(argv: readonly string[]) {
+function parseArguments(argv: readonly string[]) {
   const { positionals, values } = parseArgs({
     args: [...argv],
     allowPositionals: true,
@@ -349,7 +349,7 @@ async function measure(
   return result;
 }
 
-export async function main(argv: readonly string[] = process.argv.slice(2)) {
+async function main(argv: readonly string[] = process.argv.slice(2)) {
   await mkdir('/tmp/georoids-benchmarks', { recursive: true });
   const directory = await mkdtemp('/tmp/georoids-benchmarks/run-');
   const interruption = new AbortController();

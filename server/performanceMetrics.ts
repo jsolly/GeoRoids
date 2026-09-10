@@ -3,9 +3,9 @@ import { logger } from '../setup/serverLogger';
 import { SERVER_RELEASE_ID } from './release';
 
 export const PERFORMANCE_EXPORT_INTERVAL_MS = 15_000;
-export const PERFORMANCE_EVENT_LOOP_RESOLUTION_MS = 20;
+const PERFORMANCE_EVENT_LOOP_RESOLUTION_MS = 20;
 
-export type PerformanceHistogramName =
+type PerformanceHistogramName =
   | 'tickDurationMs'
   | 'timerLatenessMs'
   | 'catchupTicks'
@@ -57,11 +57,11 @@ const BOUNDS: Record<PerformanceHistogramName, readonly number[]> = {
   outboundPayloadBytes: [0, 1_024, 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304],
 };
 
-export interface PerformanceHistogramBucket {
+interface PerformanceHistogramBucket {
   upperBound: number;
   count: number;
 }
-export interface PerformanceHistogramSummary {
+interface PerformanceHistogramSummary {
   count: number;
   sum: number;
   min: number | null;
@@ -73,14 +73,14 @@ export interface PerformanceHistogramSummary {
   buckets: readonly PerformanceHistogramBucket[];
   overflow: number;
 }
-export type OutboundKind = 'snapshot' | 'event' | 'control';
+type OutboundKind = 'snapshot' | 'event' | 'control';
 export type OutboundOutcome =
   | 'accepted'
   | 'failed'
   | 'pressure-skipped'
   | 'pressure-closed'
   | 'not-open';
-export interface OutboundKindCounters {
+interface OutboundKindCounters {
   attempted: number;
   accepted: number;
   failed: number;
@@ -89,7 +89,7 @@ export interface OutboundKindCounters {
   notOpen: number;
   acceptedBytes: number;
 }
-export interface OutboundCounters {
+interface OutboundCounters {
   attempted: number;
   accepted: number;
   failed: number;
@@ -99,7 +99,7 @@ export interface OutboundCounters {
   acceptedBytes: number;
   byKind: Record<OutboundKind, OutboundKindCounters>;
 }
-export interface PerformanceCounters {
+interface PerformanceCounters {
   scheduledCallbacks: number;
   tickSamples: number;
   invalidMetricSamples: number;
@@ -112,7 +112,7 @@ export interface PerformanceCounters {
   broadcastSamples: number;
   outbound: OutboundCounters;
 }
-export interface EventLoopDelaySummary {
+interface EventLoopDelaySummary {
   count: number;
   minMs: number | null;
   maxMs: number | null;
@@ -122,13 +122,13 @@ export interface EventLoopDelaySummary {
   p99Ms: number | null;
   exceeds: number;
 }
-export interface EventLoopSummary {
+interface EventLoopSummary {
   delay: EventLoopDelaySummary;
   utilization: number;
   activeMs: number;
   idleMs: number;
 }
-export interface MemorySample {
+interface MemorySample {
   rssBytes: number;
   heapTotalBytes: number;
   heapUsedBytes: number;
@@ -165,7 +165,7 @@ export type GcPerformanceObserverFactory = (
 ) => GcPerformanceObserver;
 type EventLoopUtilization = ReturnType<typeof performance.eventLoopUtilization>;
 type EventLoopUtilizationReader = (previous?: EventLoopUtilization) => EventLoopUtilization;
-export interface ServerPerformanceMetricsOptions {
+interface ServerPerformanceMetricsOptions {
   enabled?: boolean;
   autoStart?: boolean;
   now?: () => number;

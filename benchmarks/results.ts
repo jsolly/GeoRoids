@@ -83,7 +83,7 @@ export function validateMeasurement(result: unknown): asserts result is Measurem
   canonicalJson(result);
 }
 
-export function mean(values: readonly number[]): number {
+function mean(values: readonly number[]): number {
   assert(values.length > 0, 'Cannot average an empty sample');
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }

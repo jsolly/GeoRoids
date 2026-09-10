@@ -48,7 +48,7 @@ function card(article: WikiArticle): string {
 }
 
 function renderNavigation(active = ''): void {
-  nav.innerHTML = `<a class="index-link" href="#" ${active === '' ? 'aria-current="page"' : ''}>Overview</a>${categories
+  nav.innerHTML = `<a class="index-link" href="#content" ${active === '' ? 'aria-current="page"' : ''}>Overview</a>${categories
     .map(
       (category) =>
         `<section><h2>${escapeHtml(category)}</h2>${articles
@@ -82,7 +82,7 @@ function figure(id: string): string {
 }
 
 function renderArticle(article: WikiArticle): void {
-  content.innerHTML = `<div class="breadcrumb"><a href="#">Field manual</a><span aria-hidden="true">/</span><span>${escapeHtml(article.category)}</span></div><article><header class="article-header"><p class="eyebrow">${escapeHtml(article.category)}</p><div class="article-title">${hull(article.id, 80)}<h1>${escapeHtml(article.title)}</h1></div><p class="article-summary">${escapeHtml(article.summary)}</p></header>${article.media.slice(0, 1).map(figure).join('')}<div class="article-body">${article.sections.map((section) => `<section><h2>${escapeHtml(section.heading)}</h2>${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}</section>`).join('')}</div>${article.media.slice(1).map(figure).join('')}<aside class="related"><p class="eyebrow">KEEP EXPLORING</p><h2>Related entries</h2><div>${article.related
+  content.innerHTML = `<div class="breadcrumb"><a href="#content">Field manual</a><span aria-hidden="true">/</span><span>${escapeHtml(article.category)}</span></div><article><header class="article-header"><p class="eyebrow">${escapeHtml(article.category)}</p><div class="article-title">${hull(article.id, 80)}<h1>${escapeHtml(article.title)}</h1></div><p class="article-summary">${escapeHtml(article.summary)}</p></header>${article.media.slice(0, 1).map(figure).join('')}<div class="article-body">${article.sections.map((section) => `<section><h2>${escapeHtml(section.heading)}</h2>${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}</section>`).join('')}</div>${article.media.slice(1).map(figure).join('')}<aside class="related"><p class="eyebrow">KEEP EXPLORING</p><h2>Related entries</h2><div>${article.related
     .map((id) => articles.find((item) => item.id === id))
     .filter((item): item is WikiArticle => item !== undefined)
     .map((item) => articleLink(item, 'related-link'))
@@ -159,14 +159,15 @@ function renderRoute(moveFocus = true): void {
     id = 'invalid-link';
   }
   const article = articles.find((item) => item.id === id);
-  renderNavigation(article?.id ?? id);
+  const isIndex = !id || id === 'ships' || id === 'content';
+  renderNavigation(isIndex ? '' : id);
   if (article) {
     renderArticle(article);
-  } else if (!id || id === 'ships' || id === 'content') {
+  } else if (isIndex) {
     renderIndex();
   } else {
     content.innerHTML =
-      '<section class="search-results"><p class="eyebrow">UNKNOWN ENTRY</p><h1>That entry is not in the manual.</h1><p>Browse the index or search for a mechanic.</p><a href="#" class="primary-link">Back to the field manual →</a></section>';
+      '<section class="search-results"><p class="eyebrow">UNKNOWN ENTRY</p><h1>That entry is not in the manual.</h1><p>Browse the index or search for a mechanic.</p><a href="#content" class="primary-link">Back to the field manual →</a></section>';
     document.title = 'Entry not found | GeoRoids field manual';
   }
   if (moveFocus) {

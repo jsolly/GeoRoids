@@ -6,7 +6,7 @@ import { canvasManager } from './canvas';
 
 const starScreen = { x: 0, y: 0 };
 
-export interface Star {
+interface Star {
   x: number;
   y: number;
   alpha: number;
@@ -75,6 +75,7 @@ export function drawStarfield(shipPosition: Position): void {
     return;
   }
 
+  const viewport = canvasManager.getViewportSize();
   const size = VISUAL.STAR_SIZE;
 
   const screen = starScreen;
@@ -82,7 +83,7 @@ export function drawStarfield(shipPosition: Position): void {
     canvasManager.worldToScreenInto(screen, star, shipPosition);
     const sx = screen.x;
     const sy = screen.y;
-    if (sx < -size || sy < -size || sx > cvs.width + size || sy > cvs.height + size) {
+    if (sx < -size || sy < -size || sx > viewport.width + size || sy > viewport.height + size) {
       continue;
     }
     ctx.fillStyle = star.fillStyle;

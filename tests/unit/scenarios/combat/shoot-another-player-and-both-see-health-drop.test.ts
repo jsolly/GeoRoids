@@ -41,18 +41,12 @@ describe('A player can shoot another player', () => {
     }
 
     world.broadcastGameState();
-    const bobFromAlice = (
-      alice.socket.lastReceived('gameState')?.data as {
-        entities: Array<{ id: string; health: number }>;
-      }
-    ).entities.find((entity) => entity.id === bob.id);
-    const bobFromBob = (
-      bob.socket.lastReceived('gameState')?.data as {
-        entities: Array<{ id: string; health: number }>;
-      }
-    ).entities.find((entity) => entity.id === bob.id);
-
-    expect(bobFromAlice?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
-    expect(bobFromBob?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
+    for (const socket of [alice.socket, bob.socket]) {
+      expect(socket.lastReceived('gameState')?.data).toMatchObject({
+        entities: expect.arrayContaining([
+          expect.objectContaining({ id: bob.id, health: SHIP.MAX_HEALTH - DAMAGE.LASER_HIT }),
+        ]),
+      });
+    }
   });
 });

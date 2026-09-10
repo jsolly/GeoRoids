@@ -138,7 +138,7 @@ describe('contour lasers stay a terrain blush, not a new authority path', () => 
     const canvas = { width: 800, height: 600 } as HTMLCanvasElement;
     vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
-    vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
+    vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue({ width: 800, height: 600 });
     vi.spyOn(canvasManager, 'worldToScreenInto').mockImplementation((out, world) => {
       out.x = Math.abs(world.x) > 5000 ? 10000 : 400;
       out.y = 300;

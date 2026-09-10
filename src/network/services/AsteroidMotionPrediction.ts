@@ -28,7 +28,7 @@ interface PendingInput {
   predicted: boolean;
 }
 
-export interface EnhancedPlayerPose {
+interface EnhancedPlayerPose {
   motionEpoch: number;
   motionSequence: number;
   position: Position;
@@ -41,7 +41,7 @@ const MAX_PENDING = 32;
 
 /** One instance per local player. Call rebase after ordinary entity updates,
  * buildInput only for commands actually sent, and predictFrame after input polling
- * instead of Ship.move while shouldSuppressShipMove() is true. UI motion actions
+ * instead of the normal Ship.update movement while shouldSuppressShipMove() is true. UI motion actions
  * must use this same allocator; a second sequence stream causes rejected controls.
  */
 export class AsteroidMotionPrediction {
@@ -163,7 +163,8 @@ export class AsteroidMotionPrediction {
       this.pending = [];
     }
     // Never write health or resurrect a local predicted death. Lifecycle belongs
-    // to Player.updateFromServer; only motion/resources are reconciled here.
+    // to Player.updateFromServer; motion/resources are reconciled here, while
+    // ship.thrusting remains owned by local keyboard, mouse, and touch intent.
     if (state.mode !== 'free' || newEpoch || resumed || wasConstrained) {
       ship.fuel = snapshot.fuel;
       ship.maxFuel = snapshot.maxFuel;
@@ -171,10 +172,6 @@ export class AsteroidMotionPrediction {
       ship.position = { ...snapshot.position };
       ship.velocity = { ...snapshot.velocity };
       ship.angle = snapshot.angle;
-      ship.thrusting = snapshot.thrusting;
-      delete ship.targetPosition;
-      delete ship.targetVelocity;
-      delete ship.targetAngle;
       ship.mass = snapshot.mass;
     }
     if (state.mode === 'latched') {
@@ -297,7 +294,6 @@ export class AsteroidMotionPrediction {
         );
       }
     }
-    ship.thrusting = entry.input.thrust;
   }
 
   /** Safe to call repeatedly per render: each queued 60Hz step is applied once. */
@@ -315,7 +311,7 @@ export class AsteroidMotionPrediction {
   }
 
   /** Handoff is a dedicated acknowledgment, not a normal unsuppressed pose.
-   * Keep Ship.move suppressed until a free-mode server snapshot confirms it.
+   * Keep Ship.update movement suppressed until a free-mode server snapshot confirms it.
    * Also use this allocator to decorate ordinary enhanced free poses.
    */
   public buildHandoffPose(ship: Ship): EnhancedPlayerPose | null {

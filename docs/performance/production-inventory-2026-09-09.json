@@ -46,7 +46,7 @@
       {
         "measurement": "NETWORK_RX_GB",
         "current": 0,
-        "average": 3.898513114754098e-05,
+        "average": 3.898513114754098e-5,
         "min": 0,
         "max": 0.001458397,
         "sampleCount": 61

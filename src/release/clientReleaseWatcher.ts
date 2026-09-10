@@ -67,7 +67,14 @@ export function watchClientRelease(
       const published = response.headers.get('x-release-id')?.toLowerCase();
       if (!response.ok || response.redirected || !published || !/^[a-f0-9]{40}$/.test(published)) {
         candidate = undefined;
-        return;
+        const reason = !response.ok
+          ? `status=${response.status}`
+          : response.redirected
+            ? 'redirected=true'
+            : !published
+              ? 'release-header=missing'
+              : 'release-header=invalid';
+        throw new Error(`Invalid release response (${reason})`);
       }
       failureReported = false;
       // The first same-build response is the normal baseline. A page already

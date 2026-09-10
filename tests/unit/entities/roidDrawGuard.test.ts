@@ -14,7 +14,9 @@ import {
 } from '../../../src/physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../../src/rendering/canvas';
 import * as vectorJuice from '../../../src/rendering/vectorJuice';
+import { setWindowViewport } from '../../support/viewport';
 
+let restoreViewport = () => {};
 let canvas: HTMLCanvasElement | undefined;
 let previousCanvas: HTMLElement | null = null;
 
@@ -29,6 +31,7 @@ afterEach(() => {
   canvas = undefined;
   previousCanvas = null;
   vi.restoreAllMocks();
+  restoreViewport();
 });
 
 test('finite asteroid poses, including empty outlines, remain drawable while NaN poses are rejected', () => {
@@ -50,9 +53,8 @@ function asteroidScene() {
   } else {
     document.body.append(canvas);
   }
+  restoreViewport = setWindowViewport(800, 600);
   canvasManager.initialize();
-  canvas.width = 800;
-  canvas.height = 600;
   const ctx = canvasManager.requireContext();
   const pilot = entityFactory.createPlayer({
     id: 'observer',

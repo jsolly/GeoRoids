@@ -104,7 +104,7 @@ Client ingress limits each socket to 120 messages and 256 KiB per minute. Inspec
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
 The writer reports `stdoutDroppedRecords` and `stdoutWriteErrors` separately;
 standard-output and file failures must not mask one another.
-An stdout failure writes a bounded `stdout_write_failed` error, including its
+An stdout failure or buffer-limit drop writes a bounded `stdout_write_failed` error, including its
 safe cause and error code, directly to the file queue. That fallback never
 re-enters stdout; if both sinks fail, the health counters still show degradation.
 `clientReportedDroppedRecords` records browser-reported queue loss after a

@@ -26,7 +26,9 @@ import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRender
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { burstTick, driftSegment, easeOutCubic } from '../../../src/rendering/vectorJuice';
 import { hexToRgba } from '../../../src/utils/colorUtils';
+import { setWindowViewport } from '../../support/viewport';
 
+let restoreViewport = () => {};
 let canvas: HTMLCanvasElement | undefined;
 let previousCanvas: HTMLElement | null = null;
 
@@ -40,6 +42,7 @@ afterEach(() => {
   canvas = undefined;
   previousCanvas = null;
   vi.restoreAllMocks();
+  restoreViewport();
 });
 
 function recordingContext() {
@@ -52,9 +55,8 @@ function recordingContext() {
   } else {
     document.body.append(canvas);
   }
+  restoreViewport = setWindowViewport(800, 600);
   canvasManager.initialize();
-  canvas.width = 800;
-  canvas.height = 600;
   const ctx = canvasManager.requireContext();
   let points: Array<{ x: number; y: number }> = [];
   let arcs: Array<Parameters<CanvasRenderingContext2D['arc']>> = [];

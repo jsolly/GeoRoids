@@ -1,9 +1,10 @@
-import type { CDPSession, Page } from 'playwright';
+import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 
 import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
+import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
@@ -15,7 +16,6 @@ type Viewport = {
 };
 
 type Position = { x: number; y: number };
-type TouchPoint = { x: number; y: number; id: number };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -61,26 +61,6 @@ function observeAuthoritativePositions(page: Page): {
 
 function angleDistance(left: number, right: number): number {
   return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
-}
-
-async function centerOf(page: Page, selector: string): Promise<Position> {
-  const box = await page.locator(selector).boundingBox();
-  if (!box) {
-    throw new Error(`Missing touch target ${selector}`);
-  }
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-async function dispatchTouch(
-  session: CDPSession,
-  type: 'touchStart' | 'touchMove' | 'touchEnd',
-  touchPoints: TouchPoint[]
-): Promise<void> {
-  await session.send('Input.dispatchTouchEvent', {
-    type,
-    touchPoints,
-    modifiers: 0,
-  });
 }
 
 async function readTerrain(page: Page): Promise<{
@@ -144,7 +124,7 @@ for (const viewport of [
       await game.placeShipAt(1550, 0);
       await game.armSpawnProtection();
       await page.evaluate((heading) => {
-        const ship = window.gameController?.getCurrShip();
+        const ship = window.gameController?.getCurrPlayer()?.ship;
         if (!ship) {
           throw new Error('Local ship missing');
         }
@@ -184,7 +164,9 @@ for (const viewport of [
         const direction = angle === 0 ? 1 : -1;
         const touchPoint = { x: stick.x + direction * 42, y: stick.y, id: 1 };
         await dispatchTouch(session, 'touchStart', [touchPoint]);
-        await page.waitForFunction(() => window.gameController?.getCurrShip()?.thrusting === true);
+        await page.waitForFunction(
+          () => window.gameController?.getCurrPlayer()?.ship?.thrusting === true
+        );
         expect(await page.locator('#touch-stick-knob').getAttribute('style')).toContain(
           'translate'
         );
@@ -198,7 +180,7 @@ for (const viewport of [
 
       const afterLocal = await game.getShipPosition();
       const afterLocalState = await page.evaluate(() => {
-        const ship = window.gameController?.getCurrShip();
+        const ship = window.gameController?.getCurrPlayer()?.ship;
         if (!ship) {
           throw new Error('Local ship disappeared');
         }

@@ -1,58 +1,126 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
-    "useIgnoreFile": false,
+    "useIgnoreFile": true,
     "defaultBranch": "main"
   },
   "files": {
     "ignoreUnknown": true,
     "includes": [
-      "src/**/*.{ts,tsx,json,css,html,md}",
-      "shared/**/*.{ts,tsx,json}",
-      "shared-types.ts",
-      "middleware.ts",
-      "server/**/*.ts",
-      "server.ts",
-      "tests/**/*.{ts,tsx,json}",
-      "scripts/*.ts",
-      "benchmarks/**/*.{ts,html,json}",
-      "setup/**/*.{ts,tsx,json}",
-      "{package.json,tsconfig*.json,biome.jsonc,vitest*.config.ts,vite.config.ts,*.md}",
-      "!tests/integration/browser/screenshots",
-      "!**/node_modules/**/*"
+      "**",
+      // npm owns the generated lockfile. All authored formats Biome supports
+      // are included, regardless of their directory or extension.
+      "!package-lock.json",
+      "!!**/node_modules"
     ]
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "complexity": {
+        "noAdjacentSpacesInRegex": "error",
+        "noArguments": "error",
+        "noBannedTypes": "error",
+        "noCommaOperator": "error",
+        "noEmptyTypeParameters": "error",
+        "noExtraBooleanCast": "error",
+        "noFlatMapIdentity": "error",
+        "noImportantStyles": "error",
         "noStaticOnlyClass": "error",
-        "useOptionalChain": "error",
+        "noThisInStatic": "error",
+        "noUselessCatch": "error",
+        "noUselessConstructor": "error",
+        "noUselessContinue": "error",
+        "noUselessEmptyExport": "error",
+        "noUselessEscapeInRegex": "error",
+        "noUselessFragments": "error",
+        "noUselessLabel": "error",
+        "noUselessLoneBlockStatements": "error",
+        "noUselessRename": "error",
+        "noUselessStringRaw": "error",
+        "noUselessSwitchCase": "error",
+        "noUselessTernary": "error",
+        "noUselessThisAlias": "error",
+        "noUselessTypeConstraint": "error",
+        "noUselessUndefinedInitialization": "error",
+        "useArrowFunction": "error",
+        "useDateNow": "error",
+        "useFlatMap": "error",
+        "useIndexOf": "error",
+        "useNumericLiterals": "error",
         // TypeScript requires bracket access for index signatures.
-        "useLiteralKeys": "off"
+        "useLiteralKeys": "off",
+        "useOptionalChain": "error",
+        "useRegexLiterals": "error",
+        "useSimpleNumberKeys": "error"
       },
       "correctness": {
-        "noUnusedVariables": "error"
+        "noUnusedFunctionParameters": "error",
+        "noUnusedImports": "error",
+        "noUnusedLabels": "error",
+        "noUnusedPrivateClassMembers": "error",
+        "noUnusedVariables": "error",
+        "useParseIntRadix": "error"
+      },
+      "performance": {
+        "noAccumulatingSpread": "error",
+        "noDynamicNamespaceImportAccess": "error"
       },
       "suspicious": {
-        "useBiomeIgnoreFolder": "error",
+        "noApproximativeNumericConstant": "error",
+        "noCatchAssign": "error",
+        "noConfusingLabels": "error",
+        "noConfusingVoidType": "error",
         "noExplicitAny": "error",
         "noConsole": {
           "level": "error",
           "options": {
             "allow": ["debug", "info", "warn", "error"]
           }
-        }
+        },
+        "noConstEnum": "error",
+        "noDeprecatedMediaType": "error",
+        "noDocumentCookie": "error",
+        "noDuplicateEnumValues": "error",
+        "noDuplicateFields": "error",
+        "noEmptyBlock": "error",
+        "noExtraNonNullAssertion": "error",
+        "noGlobalIsFinite": "error",
+        "noGlobalIsNan": "error",
+        "noIrregularWhitespace": "error",
+        "noOctalEscape": "error",
+        "noProto": "error",
+        "noPrototypeBuiltins": "error",
+        "noQuickfixBiome": "error",
+        "noRedundantUseStrict": "error",
+        "noSuspiciousSemicolonInJsx": "error",
+        "noTemplateCurlyInString": "error",
+        "noTsIgnore": "error",
+        "noUselessEscapeInString": "error",
+        "noUselessRegexBackrefs": "error",
+        "useAdjacentOverloadSignatures": "error",
+        "useBiomeIgnoreFolder": "error",
+        "useDefaultSwitchClauseLast": "error",
+        "useGoogleFontDisplay": "error",
+        "useIsArray": "error"
       },
       "style": {
+        "noDescendingSpecificity": "error",
         "noNonNullAssertion": "error",
-        "useNodejsImportProtocol": "error",
-        "useTemplate": "error",
+        "useArrayLiterals": "error",
         "useConst": "error",
-        "useBlockStatements": "error"
+        "useBlockStatements": "error",
+        "useDeprecatedReason": "error",
+        "useExponentiationOperator": "error",
+        "useExportType": "error",
+        "useImportType": "error",
+        "useLiteralEnumMembers": "error",
+        "useNodejsImportProtocol": "error",
+        "useShorthandFunctionType": "error",
+        "useTemplate": "error"
       }
     }
   },
@@ -62,6 +130,7 @@
       "linter": {
         "rules": {
           "suspicious": {
+            "noExplicitAny": "error",
             "noConsole": {
               "level": "error",
               "options": { "allow": ["log", "debug", "info", "warn", "error"] }

@@ -15,15 +15,17 @@
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="site-header">
       <a class="brand" href="/" aria-label="GeoRoids game"><span class="brand-mark" aria-hidden="true">△</span> GEOROIDS</a>
-      <a class="manual-home" href="#">Field manual</a>
+      <a class="manual-home" href="#content">Field manual</a>
       <a class="play-link" href="/">Play GeoRoids <span aria-hidden="true">↗</span></a>
     </header>
     <div class="layout">
       <aside class="sidebar" aria-label="Manual navigation">
-        <form role="search" id="search-form">
+        <search>
+        <form id="search-form">
           <label for="wiki-search">Find a mechanic</label>
           <div class="search-box"><input id="wiki-search" type="search" placeholder="Ship, skill, interaction…" autocomplete="off" aria-controls="content" /><button type="button" id="clear-search" aria-label="Clear search" hidden>×</button></div>
         </form>
+        </search>
         <details id="navigation" open>
           <summary>Browse the manual</summary>
           <nav id="article-nav" aria-label="Topics"></nav>
@@ -32,7 +34,7 @@
       </aside>
       <main id="content" tabindex="-1"></main>
     </div>
-    <footer class="site-footer"><span>GeoRoids / Field manual</span><span>Controlled demonstrations · Real game rules</span><a href="#">Back to index ↑</a></footer>
+    <footer class="site-footer"><span>GeoRoids / Field manual</span><span>Controlled demonstrations · Real game rules</span><a href="#content">Back to index ↑</a></footer>
     <p id="search-status" class="sr-only" role="status" aria-live="polite"></p>
     <noscript><p class="noscript">The field manual needs JavaScript to show articles and search. Enable JavaScript and reload this page. <a href="/">Return to GeoRoids</a>.</p></noscript>
   </body>

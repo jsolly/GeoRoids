@@ -21,7 +21,7 @@ type Immutable<Value> = Json extends Value
     : Value;
 type SnapshotState = Immutable<ServerGameSnapshot>;
 /** Field absence means unchanged; clear deletes a field. Nested values replace atomically. */
-export interface SnapshotPatch {
+interface SnapshotPatch {
   set: Row;
   clear: string[];
   collections: Record<

@@ -8,6 +8,7 @@ function isClosed(socket: WebSocket): boolean {
 }
 
 import { GameEngine } from '../server/core/GameEngine';
+import { ServerClock } from '../server/core/ServerClock';
 import { GAME_TICK_MS } from '../shared/gameClock';
 import type { Position, SatelliteData, ServerGameState } from '../shared-types';
 import type { Measurement } from './results';
@@ -334,7 +335,13 @@ export async function runServerSample(
       throw failures[0];
     }
 
-    engine = new GameEngine(options.seed);
+    engine = new GameEngine(
+      options.seed,
+      new ServerClock({
+        wallNow: () => clock.nowMs,
+        monotonicNow: () => clock.nowMs - SERVER_CLOCK_START_MS,
+      })
+    );
     // Match the production lifecycle: an empty engine first enters its paused
     // state, then the first public addPlayer call resumes and seeds the scene.
     engine.updatePauseState();
@@ -378,6 +385,11 @@ export async function runServerSample(
     if (failures.length > 0) {
       throw failures[0];
     }
+    assert.equal(
+      engine.getServerTime(),
+      Math.floor(clock.nowMs),
+      'Server fixture must follow its controlled simulation clock'
+    );
     const after = structuredClone(engine.getDiagnostics());
     validateDiagnostics(after, options.humanPlayers, before.bots);
     validateParticipantPresence(engine, peers, participantIds);
@@ -425,7 +437,8 @@ export async function runServerSample(
         ...options,
         initialLoot: 0,
         lootPolicy: 'Natural authoritative drops remain in the scene',
-        clocks: 'Seeded Math.random and fixed Date.now; native performance.now',
+        clocks:
+          'Seeded Math.random; controlled epoch and monotonic simulation clock; native timing clock',
       },
       cleanup: 'complete',
     };

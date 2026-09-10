@@ -28,13 +28,13 @@ export const GROWTH = {
   MASS_GAIN_K: 0.45,
 } as const;
 
-export interface GrowableShip {
+interface GrowableShip {
   mass: number;
   health: number;
   maxHealth: number;
 }
 
-export function clampMass(mass: number): number {
+function clampMass(mass: number): number {
   if (!Number.isFinite(mass)) {
     return GROWTH.BASE_MASS;
   }

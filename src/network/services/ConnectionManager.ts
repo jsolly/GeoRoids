@@ -38,7 +38,7 @@ import { SatellitePickupManager } from '../../entities/satellitePickup/Satellite
 import { setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
-import { updateThrustFromKeys } from '../../input/keybindings';
+import { reconcilePlayerInput } from '../../input/keybindings';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { setClientLogContext } from '../../utils/clientLogContext';
@@ -75,7 +75,7 @@ import {
   pruneStaleRemotePlayers,
 } from './playerPresence';
 
-export interface ConnectionState {
+interface ConnectionState {
   isConnected: boolean;
   socket: WebSocket | null;
 }
@@ -870,8 +870,7 @@ export class ConnectionManager {
   }
 
   private handleServerMessage(message: ServerMessage): void {
-    // Prefer message.data, fallback to message.payload for backward compatibility
-    const data = (message.data ?? message.payload) as unknown;
+    const data = message.data;
     switch (message.type) {
       case 'snapshot':
         this.handleSnapshot(data);
@@ -1346,15 +1345,6 @@ export class ConnectionManager {
         entity.updateFromServer(entityData);
         if (isLocalPlayer && this.asteroidInteractions) {
           this.motionPrediction.rebase(entityData, entity.ship, Date.now(), data.asteroids);
-          if (
-            entity.type === 'local' &&
-            entity.ship.health > 0 &&
-            !entity.ship.exploding &&
-            entity.lives > 0
-          ) {
-            // The snapshot echoes older input; keep the pilot's current held controls.
-            updateThrustFromKeys(entity);
-          }
           entity.ship.serverOwnsMotion = this.motionPrediction.shouldSuppressShipMove();
           window.dispatchEvent(
             new CustomEvent('asteroidToolsSnapshot', {
@@ -1365,6 +1355,12 @@ export class ConnectionManager {
               },
             })
           );
+        }
+
+        if (isLocalPlayer && entity.type === 'local') {
+          // Snapshots echo older input. Reconcile every live control source after
+          // authority and prediction, including death and respawn in either protocol.
+          reconcilePlayerInput(entity);
         }
 
         if (isLocalPlayer && localPlayer && localPlayer !== entity) {

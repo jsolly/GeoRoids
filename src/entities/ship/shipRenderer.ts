@@ -22,13 +22,7 @@ import {
 } from './hullOutlines';
 import type { Ship } from './Ship';
 import { findHarpoonTarget } from './shipAbilities';
-import {
-  CLASSIC_HULL,
-  HAULER_TETHER_COLOR,
-  HAULER_TETHER_TIP_COLOR,
-  type HullProfile,
-  type ShipKitId,
-} from './shipKits';
+import { CLASSIC_HULL, type HullProfile, type ShipKitId } from './shipKits';
 import { isReadableShieldUp, shieldCooldownFrames } from './shipShield';
 
 const shipTriangle = {
@@ -675,7 +669,10 @@ export function drawHaulerHarpoonVfx(
   const latch = canvasManager.worldToScreen(latchWorld, cameraShipPosition);
   const style = harpoonTetherStyle();
   ctx.save();
-  ctx.strokeStyle = HAULER_TETHER_COLOR;
+  // Literals stay in this module. Imported HAULER_TETHER_* hexes were
+  // Rolldown-renamed across the asteroidPhenomena split: cream became
+  // strokeStyle=_e (no binding) and tip became fillStyle=t (the ship param).
+  ctx.strokeStyle = '#E8D5A3';
   ctx.lineWidth = style.lineWidth;
   ctx.setLineDash(style.dash);
   ctx.beginPath();
@@ -696,8 +693,8 @@ export function drawHaulerHarpoonVfx(
     }
   }
   ctx.setLineDash([]);
-  ctx.fillStyle = HAULER_TETHER_TIP_COLOR;
-  ctx.strokeStyle = HAULER_TETHER_TIP_COLOR;
+  ctx.fillStyle = '#FDE68A';
+  ctx.strokeStyle = '#FDE68A';
   ctx.beginPath();
   ctx.arc(latch.x, latch.y, style.tipRadius, 0, Math.PI * 2);
   ctx.fill();

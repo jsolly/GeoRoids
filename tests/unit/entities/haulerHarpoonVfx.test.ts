@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { Roid } from '../../../src/entities/roid/Roid';
 import {
@@ -56,6 +59,19 @@ test('Hauler never paints the generic activation ring', () => {
 test('PASS bar cream line and amber tip are exact hex', () => {
   expect(HAULER_TETHER_COLOR).toBe('#E8D5A3');
   expect(HAULER_TETHER_TIP_COLOR).toBe('#FDE68A');
+});
+
+test('drawHaulerHarpoonVfx paints cream and tip as same-module hex literals', () => {
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../../../src/entities/ship/shipRenderer.ts'),
+    'utf8'
+  );
+  const paint = source.slice(source.indexOf('export function drawHaulerHarpoonVfx'));
+  expect(paint).toContain("ctx.strokeStyle = '#E8D5A3'");
+  expect(paint).toContain("ctx.fillStyle = '#FDE68A'");
+  expect(paint).toContain("ctx.strokeStyle = '#FDE68A'");
+  expect(paint).not.toContain('HAULER_TETHER_COLOR');
+  expect(paint).not.toContain('HAULER_TETHER_TIP_COLOR');
 });
 
 test('tethers stay solid and hairline in screen space at every zoom', () => {

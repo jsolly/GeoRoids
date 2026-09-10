@@ -254,12 +254,14 @@ export class GameStateBroadcaster {
     return SNAPSHOT_VERSION;
   }
 
-  public requestSnapshotKeyframe(ws: WebSocket): void {
+  public requestSnapshotKeyframe(ws: WebSocket): number | undefined {
     const recipient = this.snapshotRecipients.get(ws);
     if (recipient) {
       // Coalesce requests; the periodic broadcast supplies the keyframe.
       recipient.needsKeyframe = true;
+      return recipient.sequence + (recipient.pending ? 2 : 1);
     }
+    return undefined;
   }
 
   public broadcastPlayerLeft(playerId: string): void {
@@ -572,7 +574,13 @@ export class GameStateBroadcaster {
 
     try {
       if (onComplete) {
+        const submittedAt = globalThis.performance.now();
         ws.send(message, (error) => {
+          if (!error) {
+            serverPerformanceMetrics.recordTransportAcceptance(
+              globalThis.performance.now() - submittedAt
+            );
+          }
           recordOutbound(kind, error ? 'failed' : 'accepted', payloadBytes, bufferedBytes(ws));
           onComplete(error);
         });

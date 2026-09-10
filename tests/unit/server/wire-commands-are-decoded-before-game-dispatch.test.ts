@@ -72,3 +72,14 @@ test('client telemetry reaches ingress validation even when its payload is malfo
     command: { type: 'clientLog', payload: {} },
   });
 });
+
+test('heartbeat probe identities are echoed only after integer validation while bare pings work', () => {
+  expect(decodeClientCommand({ type: 'ping' })).toEqual({ ok: true, command: { type: 'ping' } });
+  expect(decodeClientCommand({ type: 'ping', probeId: 12 })).toEqual({
+    ok: true,
+    command: { type: 'ping', probeId: 12 },
+  });
+  for (const probeId of [0, -1, 1.5, '12', null, Number.MAX_SAFE_INTEGER + 1]) {
+    expect(decodeClientCommand({ type: 'ping', probeId }).ok).toBe(false);
+  }
+});

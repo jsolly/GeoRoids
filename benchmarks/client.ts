@@ -132,6 +132,8 @@ export async function runClientSample(options: ClientOptions) {
         primaryMetric: string;
         samples: ClientFixtureResult['samples'];
         counts: ClientFixtureResult['counts'];
+        frameWork: ClientFixtureResult['frameWork'];
+        frameImageSha256: ClientFixtureResult['frameImageSha256'];
         witness: ClientFixtureResult['witness'];
         parameters: object;
         cleanup: 'complete';
@@ -245,6 +247,8 @@ export async function runClientSample(options: ClientOptions) {
       primaryMetric: 'renderMs',
       samples: timed.samples,
       counts: observed.counts,
+      frameWork: observed.frameWork,
+      frameImageSha256: observed.frameImageSha256,
       witness: { ...timed.witness, untimed: observed.witness.untimed },
       parameters: {
         ...options,

@@ -12,6 +12,7 @@ import type {
   AsteroidDestroyEvent,
   AsteroidMotionInput,
   AsteroidTaggedEvent,
+  PingMessage,
   PlayerJoin,
   PlayerLeave,
   PlayerUpdate,
@@ -153,7 +154,7 @@ export class ConnectionManager {
   private readonly snapshotEntityIds = new Set<string>();
   private readonly taggedAsteroidIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
-  private readonly pingPayload = { type: 'ping', timestamp: 0 };
+  private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
   private readonly updateEnvelope: ClientMessage = {
     type: 'update',
     data: {} as PlayerUpdate,
@@ -311,7 +312,8 @@ export class ConnectionManager {
           try {
             const message: ServerMessage = JSON.parse(event.data);
             if (clientPerformance.enabled) {
-              const payload: unknown = message.data;
+              clientPerformance.message(message.type, event.data, started);
+              const payload: unknown = 'data' in message ? message.data : undefined;
               if (
                 message.type === 'snapshot' &&
                 payload &&
@@ -532,6 +534,7 @@ export class ConnectionManager {
   }
 
   private stopHeartbeat(): void {
+    clientPerformance.clearProbes();
     if (this.heartbeatTimer !== null) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -590,6 +593,7 @@ export class ConnectionManager {
     }
 
     this.pingPayload.timestamp = Date.now();
+    this.pingPayload.probeId = clientPerformance.probe(performance.now());
     if (!this.sendPayload(this.pingPayload)) {
       return;
     }
@@ -859,8 +863,11 @@ export class ConnectionManager {
   }
 
   private handleServerMessage(message: ServerMessage): void {
-    const data = message.data;
+    const data = 'data' in message ? message.data : undefined;
     switch (message.type) {
+      case 'pong':
+        clientPerformance.pong(message.probeId, performance.now());
+        return;
       case 'snapshot':
         this.handleSnapshot(data);
         break;
@@ -974,6 +981,7 @@ export class ConnectionManager {
     this.clearJoinCompletionTimer();
     this.joinAcknowledged = false;
     this.snapshotDecoder.reset();
+    clientPerformance.resetSnapshotWitness();
     this.currentProtocolReady = false;
     this.snapshotResyncPending = false;
     this.localHarpoonAcknowledged = false;
@@ -1064,6 +1072,14 @@ export class ConnectionManager {
       this.applyReceivedSnapshot(state);
       if (sequence !== undefined) {
         this.lastAcceptedSnapshotSequence = sequence;
+        clientPerformance.snapshotApplied({
+          sequence,
+          kind:
+            data && typeof data === 'object' && 'kind' in data && data.kind === 'keyframe'
+              ? 'keyframe'
+              : 'delta',
+          gameTime: state.gameTime,
+        });
       }
       if (sampled && metadata) {
         const authoritative = state.entities.find(
@@ -1390,6 +1406,7 @@ export class ConnectionManager {
 
   private handleJoined(data: PlayerJoin): void {
     this.snapshotDecoder.reset();
+    clientPerformance.resetSnapshotWitness();
     this.snapshotResyncPending = false;
     if (
       data.snapshotVersion !== SNAPSHOT_VERSION ||

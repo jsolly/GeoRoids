@@ -4,6 +4,7 @@ import type { Ship } from '../../entities/ship/Ship';
 import { canvasManager } from '../../rendering/canvas';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import { drawingOffsets } from '../../rendering/playfieldCamera';
+import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
   polygonPoints,
@@ -183,7 +184,7 @@ function drawRoidShatter(
   ctx.save();
   ctx.strokeStyle = PALETTE.ROID;
   ctx.shadowColor = PALETTE.ROID;
-  ctx.shadowBlur = VISUAL.ROID_GLOW;
+  ctx.shadowBlur = resolveGlow(VISUAL.ROID_GLOW);
   ctx.lineWidth = VISUAL.ROID_STROKE_SMALL;
   ctx.globalAlpha = alpha;
   ctx.lineCap = 'round';

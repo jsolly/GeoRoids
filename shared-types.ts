@@ -323,3 +323,15 @@ export interface ServerEntityData {
   asteroidMotion?: AsteroidMotionState;
   laserUpgrade?: LaserUpgrade;
 }
+
+/** Optional monotonic probe identity; bare heartbeat messages remain supported. */
+export interface PingMessage {
+  type: 'ping';
+  timestamp?: number;
+  probeId?: number;
+}
+export interface PongMessage {
+  type: 'pong';
+  timestamp: number;
+  probeId?: number;
+}

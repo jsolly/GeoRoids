@@ -1,4 +1,8 @@
-export interface ServerMessage {
+import type { PongMessage } from '../../shared-types';
+
+export type ServerMessage = PongMessage | GameServerMessage;
+
+interface GameServerMessage {
   type:
     | 'playerJoined'
     | 'playerLeft'

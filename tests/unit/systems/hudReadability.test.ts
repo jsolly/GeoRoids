@@ -207,7 +207,7 @@ describe('painted HUD composition', () => {
     ]);
   });
 
-  test('radar retains pilot headings, satellites and pickups without asteroid dots', async () => {
+  test('radar shows only local, human and bot pilots while preserving their headings', async () => {
     expect(VISUAL.MINIMAP_SIZE).toBe(96);
     expect(VISUAL.MINIMAP_VOID_ALPHA).toBeLessThanOrEqual(0.5);
     expect(VISUAL.MINIMAP_VOID_ALPHA).toBeGreaterThan(0);
@@ -237,7 +237,12 @@ describe('painted HUD composition', () => {
       y: 0,
     });
     remote.ship.angle = 0;
-    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote]);
+    const bot = entityFactory.createBotPlayer('Radar Bot', {
+      x: boundary.radius / 2,
+      y: 0,
+    });
+    bot.ship.angle = 0;
+    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, bot]);
     GameController.getInstance().getCurrRoidBelt().roids.push(visible);
     SatelliteManager.getInstance().syncFromServer([
       {
@@ -279,10 +284,7 @@ describe('painted HUD composition', () => {
 
     drawMiniMap(ctx, layout, player.ship);
 
-    expect(arc.mock.calls).toEqual([
-      [736, 536, 48, 0, Math.PI * 2],
-      [736, 560, 2.5, 0, Math.PI * 2],
-    ]);
+    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
     expect(strokes[0]).toEqual({
       points: [],
       closed: true,
@@ -290,30 +292,16 @@ describe('painted HUD composition', () => {
       width: 1,
     });
     expect(rectangles).toEqual([]);
-    expect(
-      strokes.filter((call) => call.style === normalizedCanvasColor(ctx, 'rgba(196,181,253,0.9)'))
-    ).toEqual([
-      {
-        points: [
-          [734, 512],
-          [738, 512],
-          [736, 510],
-          [736, 514],
-        ],
-        closed: false,
-        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.9)'),
-        width: 1,
-      },
-    ]);
-    expect(
-      strokes.filter((call) => call.style === normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'))
-    ).toEqual([
-      {
-        points: [],
-        closed: false,
-        style: normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'),
-        width: 1,
-      },
+    // One arena ring plus three two-pass pilot hulls; non-player managers add no marks.
+    expect(strokes).toHaveLength(7);
+    const botHeading = strokes.filter(
+      (call) => call.style === normalizedCanvasColor(ctx, '#FB923C')
+    );
+    expect(botHeading).toHaveLength(1);
+    expect(botHeading[0]?.points).toEqual([
+      [765, 536],
+      [756, 538.5],
+      [756, 533.5],
     ]);
     const heading = strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#5EEAD4'));
     expect(heading).toHaveLength(1);

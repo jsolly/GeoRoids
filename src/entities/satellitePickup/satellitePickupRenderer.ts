@@ -2,7 +2,7 @@ import type { Position } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import type { DrawingContext } from '../../rendering/drawingContext';
-import { hexToRgba } from '../../utils/colorUtils';
+import { resolveGlow } from '../../rendering/renderQuality';
 import type { SatellitePickup } from './SatellitePickup';
 
 export function drawSatellitePickups(pickups: SatellitePickup[], viewer: Position): void {
@@ -25,7 +25,7 @@ function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
   ctx.rotate(-pickup.angle);
   ctx.strokeStyle = color;
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.SHIP_GLOW;
+  ctx.shadowBlur = resolveGlow(VISUAL.SHIP_GLOW);
   ctx.lineWidth = VISUAL.SHIP_STROKE_WIDTH;
   ctx.lineCap = 'butt';
   ctx.lineJoin = 'miter';
@@ -72,14 +72,4 @@ function drawRelayHardware(ctx: DrawingContext, radius: number): void {
   ctx.moveTo(-radius * 0.9, -radius * 0.48);
   ctx.lineTo(radius * 0.9, radius * 0.48);
   ctx.stroke();
-}
-
-export function drawSatellitePickupMiniMapDot(ctx: DrawingContext, x: number, y: number): void {
-  ctx.save();
-  ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE_PICKUP, 0.95);
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(x, y, VISUAL.MINIMAP_DOT / 2, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
 }

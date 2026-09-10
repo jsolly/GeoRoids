@@ -48,7 +48,7 @@ npm run test:integration
 npm run test:integration:browser
 npm run test:integration:server
 npm run test:integration:entities
-./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose
+./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose
 ```
 
 Always use `scripts/test-runner.sh` for integration tests. It owns one Vite/server

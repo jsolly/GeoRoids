@@ -243,7 +243,7 @@ See **Commands** above. Browser E2E must use `./scripts/test-runner.sh` (never r
 
 ### Hello-world smoke
 
-For a manual smoke, open `http://localhost:5173`, click Play, thrust (arrow keys) and fire (Space). Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose`; the runner starts the required services on unused configured ports and asserts canvas, HUD, and asteroids.
+For a manual smoke, open `http://localhost:5173`, click Play, thrust (arrow keys) and fire (Space). Or run `./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose`; the runner starts the required services on unused configured ports and asserts canvas, starting player state, and asteroids.
 
 ### Logs
 

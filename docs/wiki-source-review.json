@@ -1,5 +1,5 @@
 {
-  "note": "Retired legacy multiplayer transport, damage reports, protocol switches, optimistic asteroid hiding, and ignored per-entity bot events. Reviewed authoritative snapshot projectile, collision, shield, scoring, respawn and private-token recovery behavior; existing manual rules and GIF demonstrations remain accurate. The low-health killing-shot fixture now starts with the normal shield cooldown to isolate an unshielded hit, matching documented shield protection. Added stale-client reload guidance. Verified manual routes and interactions on desktop/mobile with inspected connection-guidance captures, 67 browser tests, and targeted snapshot combat, reconnect and renderer scenarios.",
+  "note": "Reviewed the field-manual article and source diff: its cited browser smoke test was renamed to describe arena and starting-state assertions. Article prose, gameplay sources, and media are unchanged; no illustration regeneration is needed.",
   "hashes": {
     "docs/asteroid-interactions.md": "sha256:3ad1ad530584fcb003b3b73f5ba90d32536c057bccf86c2054363ecf9d80f3c3",
     "docs/protocol/snapshot-v1.md": "sha256:b23ead8eeaa54c52b18ab778b60b296a0e21c707035fea0ea62f673b4f057d51",
@@ -196,7 +196,7 @@
     "src/utils/positionUtils.ts": "sha256:91ea034cc9b11b7e8157d987ec08637a4e85ac8f2e9103f22e8fde6b618d64a6",
     "src/utils/safeStorage.ts": "sha256:c4a0ba04fd0a25b30ef1ef2647b4d4b42459e1922d344ab0407e04b0781e1a30",
     "src/utils/spawnPosition.ts": "sha256:21ef7d819d9ca05b94235e8200e8d7bb59975ecb4f3d8d220a6e2fc3b28c226e",
-    "src/wiki/content.ts": "sha256:e399aa0da77bbd5dddb73090d1f342ef80e64cd5d02e2f9cfcf0eccffe3e7377",
+    "src/wiki/content.ts": "sha256:45815d71cb7175a89e5bd2d6347a3f44fe417d7e5f996113974a1ed4f956d7eb",
     "src/wiki/main.ts": "sha256:004fc9b7bbef88a08804023d161cf5e9faf7f0256d20a798a473417c8e0d776d",
     "src/wiki/media.ts": "sha256:a83dfcdd9123c19fe9b513034699885fafd7acd4716c6f96667639e1b5104c51",
     "src/wiki/search.ts": "sha256:24a1d55001b4b8ed025eb177cfdff51b9a21e5d6b70f3c08b083486fcfbbb099",
@@ -208,7 +208,7 @@
     "tests/integration/browser/e2e/ship-respawns-randomly-after-asteroid-death.test.ts": "sha256:831979f9508965327885e45284f401e439ea113231eb3bb446e9879eb7b04998",
     "tests/integration/browser/e2e/ship-respawns-randomly-after-boundary-death.test.ts": "sha256:94aa14421f0c3f4f0692c8b46793d30dae8cc6f25868c21e1a8773bf6345ae28",
     "tests/integration/browser/sanity/asteroid-interactions-playable-flows.test.ts": "sha256:543b9206525e105a7a20f190639f157ba7bf60dcdc88f3bab199698b224b616a",
-    "tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts": "sha256:74b744da1e7cf124e8bed0298b5b5c0a0eea5c2bef6e64d29a918a1b0895d14b",
+    "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:c0f53f94eb42d7b4c7ad361806913839b2e6a1b146fbb5a66c2bfacd6377db54",
     "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts": "sha256:16506cfa65932e31870afa119be7bd2cf58c0b83075ec202c55a4cca1f130a39",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:6a17742bbf0cdece46fc2bd5756393c282c6bbd91da5e6086bc18fc49f44ef07",
     "tests/integration/entities/input/mouse.test.ts": "sha256:e7e2060565f5850517a3b7c6226090cc44326a9a8eb66d0a040b00dd39752a8a",

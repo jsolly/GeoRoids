@@ -575,7 +575,7 @@ assert_vitest_config "default-with-options" vitest.browser.config.ts --reporter=
 assert_vitest_config "integration-parent" vitest.browser.config.ts tests/integration/
 assert_vitest_config "tests-parent" vitest.browser.config.ts tests/
 assert_vitest_config "browser-file" vitest.browser.config.ts \
-    tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts
+    tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts
 assert_vitest_config "server-only" vitest.config.ts tests/integration/server/
 assert_vitest_config "entities-only" vitest.config.ts tests/integration/entities/
 assert_vitest_config "server-and-entities" vitest.config.ts \

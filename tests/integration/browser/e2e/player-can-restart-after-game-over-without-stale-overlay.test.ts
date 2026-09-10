@@ -20,6 +20,13 @@ test(
     await game.dieUntilGameOver();
 
     await expect
+      .poll(() => game.isGameRunning(), {
+        timeout: 12000,
+        message: 'game loop should stop after final death',
+      })
+      .toBe(false);
+
+    await expect
       .poll(async () => (await game.getHudText()).toLowerCase(), {
         timeout: 5000,
         message: 'game over overlay should appear after the final life',

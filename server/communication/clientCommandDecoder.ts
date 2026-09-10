@@ -1,6 +1,7 @@
 import type {
   AsteroidMotionInput,
   AsteroidToolAction,
+  PingMessage,
   Position,
   ShipKitId,
   SoftFactionId,
@@ -57,7 +58,7 @@ export type ClientCommand =
   | { type: 'satellitePickupCollected'; pickupId: string; claimedPlayerId?: string }
   | { type: 'initAsteroids'; id: string }
   | { type: 'clientLog'; payload: WireRecord }
-  | { type: 'ping' };
+  | PingMessage;
 
 type ClientCommandDecodeResult =
   | { ok: true; command: ClientCommand }
@@ -322,8 +323,17 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
     }
     case 'leave':
     case 'snapshotResync':
-    case 'ping':
       return { ok: true, command: { type } };
+    case 'ping': {
+      const probeId = message['probeId'];
+      if (
+        probeId !== undefined &&
+        (typeof probeId !== 'number' || !Number.isSafeInteger(probeId) || probeId < 1)
+      ) {
+        return { ok: false, error: 'Invalid ping probeId' };
+      }
+      return { ok: true, command: { type, ...(typeof probeId === 'number' ? { probeId } : {}) } };
+    }
     case 'asteroidTool':
       return decodeAsteroidTool(payload);
     case 'asteroidInput':

@@ -2,9 +2,6 @@ import { PALETTE, VISUAL } from '../../constants';
 import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import { PlayerNetwork } from '../../entities/player/playerNetwork';
 import type { SoftFactionId } from '../../entities/player/softFactions';
-import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
-import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
-import { drawSatellitePickupMiniMapDot } from '../../entities/satellitePickup/satellitePickupRenderer';
 import type { Ship } from '../../entities/ship/Ship';
 import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
 import type { CircleBoundary } from '../../physics/boundary';
@@ -22,9 +19,7 @@ type RadarMark =
       heading: number;
       color: string;
       factionId?: SoftFactionId;
-    }
-  | { kind: 'satellite'; x: number; y: number; color: string }
-  | { kind: 'pickup'; x: number; y: number };
+    };
 
 export function projectWorldToMiniMap(
   boundary: CircleBoundary,
@@ -108,23 +103,6 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
       });
       return;
     }
-    case 'satellite': {
-      ctx.save();
-      ctx.strokeStyle = hexToRgba(mark.color, 0.9);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(mark.x - 2, mark.y);
-      ctx.lineTo(mark.x + 2, mark.y);
-      ctx.moveTo(mark.x, mark.y - 2);
-      ctx.lineTo(mark.x, mark.y + 2);
-      ctx.stroke();
-      ctx.restore();
-      return;
-    }
-    case 'pickup': {
-      drawSatellitePickupMiniMapDot(ctx, mark.x, mark.y);
-      return;
-    }
   }
 }
 
@@ -149,39 +127,6 @@ export function drawMiniMap(ctx: CanvasRenderingContext2D, layout: HudLayout, sh
   try {
     const playerNetwork = PlayerNetwork.getInstance();
     const otherPlayers = playerNetwork.getOtherPlayers();
-
-    for (const satellite of SatelliteManager.getInstance().getAll()) {
-      if (satellite.exploding) {
-        continue;
-      }
-      const sat = projectWorldToMiniMapInto(
-        projection,
-        boundary,
-        miniMapX,
-        miniMapY,
-        miniMapSize,
-        satellite.position.x,
-        satellite.position.y
-      );
-      if (sat) {
-        drawRadarMark(ctx, { kind: 'satellite', x: sat.x, y: sat.y, color: satellite.color });
-      }
-    }
-
-    for (const pickup of SatellitePickupManager.getInstance().getAll()) {
-      const p = projectWorldToMiniMapInto(
-        projection,
-        boundary,
-        miniMapX,
-        miniMapY,
-        miniMapSize,
-        pickup.position.x,
-        pickup.position.y
-      );
-      if (p) {
-        drawRadarMark(ctx, { kind: 'pickup', x: p.x, y: p.y });
-      }
-    }
 
     for (const player of otherPlayers) {
       if (player.ship.exploding) {

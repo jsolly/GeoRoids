@@ -51,6 +51,7 @@ case "${1:-}" in
     --benchmark-client) RUN_MODE=benchmark-client; BUILD_MODE=production; shift ;;
     --benchmark-load) RUN_MODE=benchmark-load; BUILD_MODE=production; shift ;;
 esac
+RUNNER_ARGS=("$@")
 case "$BUILD_MODE" in
     development|production) ;;
     *) echo "GEOROIDS_TEST_BUILD must be development or production" >&2; exit 64 ;;
@@ -78,6 +79,9 @@ LOCK_HELD=false
 DEV_PID=""
 TEST_PID=""
 WATCHDOG_PID=""
+PROXY_PID=""
+BENCHMARK_SESSION=""
+BENCHMARK_ARTIFACT_DIR=""
 TEST_TIMED_OUT=false
 CLEANUP_RUNNING=false
 
@@ -240,6 +244,18 @@ cleanup() {
         fi
         DEV_PID=""
     fi
+    if [ -n "$PROXY_PID" ]; then
+        if ! terminate_process_tree "$PROXY_PID" && [ "$exit_code" -eq 0 ]; then exit_code=1; fi
+    fi
+    if [ -n "$BENCHMARK_SESSION" ]; then
+        if [ -n "$BENCHMARK_ARTIFACT_DIR" ]; then
+            if [ -f "$BENCHMARK_SESSION/proxy-stats.json" ]; then
+                cp "$BENCHMARK_SESSION/proxy-stats.json" "$BENCHMARK_ARTIFACT_DIR/proxy-stats.json" || exit_code=1
+            fi
+            printf '{"exitCode":%s,"timedOut":%s}\n' "$exit_code" "$TEST_TIMED_OUT" > "$BENCHMARK_ARTIFACT_DIR/runner.json" || exit_code=1
+        fi
+        rm -rf -- "$BENCHMARK_SESSION" || exit_code=1
+    fi
     if ! release_lock && [ "$exit_code" -eq 0 ]; then
         exit_code=1
     fi
@@ -338,6 +354,47 @@ start_dev_servers() {
         return 1
     }
 
+    local benchmark_seed=42
+    local benchmark_network=clean
+    local previous=""
+    local argument
+    for argument in "${RUNNER_ARGS[@]}"; do
+        case "$previous" in
+            --seed) benchmark_seed="$argument" ;;
+            --network) benchmark_network="$argument" ;;
+        esac
+        case "$argument" in
+            --seed=*) benchmark_seed="${argument#*=}" ;;
+            --network=*) benchmark_network="${argument#*=}" ;;
+        esac
+        previous="$argument"
+    done
+    local gameplay_port="$TEST_SERVER_PORT"
+    if [ "$RUN_MODE" != tests ]; then
+        valid_positive_integer "$benchmark_seed" || return 64
+        case "$benchmark_network" in clean|normal|degraded) ;; *) return 64 ;; esac
+        BENCHMARK_SESSION=$(mktemp -d "${TMPDIR:-/tmp}/geo-bench.XXXXXX") || return 1
+        BENCHMARK_ARTIFACT_DIR="$REPO_ROOT/.performance/runner-${BENCHMARK_SESSION##*/}"
+        mkdir -p "$BENCHMARK_ARTIFACT_DIR" || return 1
+        export GEOROIDS_BENCHMARK_SESSION="$BENCHMARK_SESSION"
+        export GEOROIDS_BENCHMARK_SEED="$benchmark_seed"
+    fi
+    if [ "$RUN_MODE" = benchmark-client ] && [ "$benchmark_network" != clean ]; then
+        npx --no-install tsx scripts/benchmark-proxy.ts --target "$TEST_SERVER_PORT" \
+            --network "$benchmark_network" --seed "$benchmark_seed" \
+            --ready "$BENCHMARK_SESSION/proxy-port" --stats "$BENCHMARK_SESSION/proxy-stats.json" > "$BENCHMARK_ARTIFACT_DIR/proxy.log" 2>&1 &
+        PROXY_PID=$!
+        local attempts=0
+        until [ -s "$BENCHMARK_SESSION/proxy-port" ]; do
+            kill -0 "$PROXY_PID" 2>/dev/null || return 1
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge 100 ]; then return 1; fi
+            sleep 0.1
+        done
+        gameplay_port=$(cat "$BENCHMARK_SESSION/proxy-port")
+        valid_port "$gameplay_port" || return 1
+    fi
+    export GEOROIDS_BENCHMARK_WS_URL="ws://localhost:$gameplay_port/ws"
     local client_command="vite --port $TEST_VITE_PORT --strictPort"
     local server_entry=server.ts
     if [ "$RUN_MODE" != tests ]; then
@@ -345,7 +402,7 @@ start_dev_servers() {
     fi
     if [ "$BUILD_MODE" = production ]; then
         echo "Building production client for the owned session..."
-        VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws" npm run build || return 1
+        VITE_WEBSOCKET_URL="ws://localhost:$gameplay_port/ws" npm run build || return 1
         client_command="vite preview --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
     fi
     echo "🚀 Starting servers owned by this runner..."
@@ -355,7 +412,6 @@ start_dev_servers() {
         export PORT="$TEST_SERVER_PORT"
         if [ "$RUN_MODE" != tests ]; then
             export GEOROIDS_PERFORMANCE=1
-            export GEOROIDS_BENCHMARK_SEED=42
         fi
         export VITE_WEBSOCKET_URL="ws://localhost:$TEST_SERVER_PORT/ws"
         exec npx --no-install concurrently \

@@ -158,7 +158,7 @@ export class MessageHandler {
           break;
 
         case 'ping':
-          this.handlePing(ws);
+          this.handlePing(ws, command.probeId);
           break;
       }
     } catch (error) {
@@ -631,8 +631,12 @@ export class MessageHandler {
     });
   }
 
-  private handlePing(ws: WebSocket): void {
-    this.broadcaster.sendToWebSocket(ws, { type: 'pong', timestamp: Date.now() });
+  private handlePing(ws: WebSocket, probeId: number | undefined): void {
+    this.broadcaster.sendToWebSocket(ws, {
+      type: 'pong',
+      timestamp: Date.now(),
+      ...(probeId === undefined ? {} : { probeId }),
+    });
   }
 
   private logMotionRejection(

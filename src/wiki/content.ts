@@ -624,7 +624,7 @@ export const articles: WikiArticle[] = [
         heading: 'What the HUD shows',
         paragraphs: [
           'Before entering a game, set your pilot name, choose a kit, and use the Sound checkbox on the title screen to enable or mute audio.',
-          'The HUD shows lives as kit hull icons, score, faction label and mark, kit name, and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a minimap; touch layouts use a compact leaderboard and an adaptive minimap. The minimap shows ships, hostile satellites, and satellite pickups inside the arena ring. Kill and pickup messages appear in the center for 120 frames, or 2 seconds. A health capsule appears above a damaged ship; use its remaining fill to judge hull health. Your own hull is mint, other human pilots are sky blue, and bots are orange. Faction marks identify allies separately from those colors.',
+          'The HUD shows lives as kit hull icons, score, faction label and mark, kit name, and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a minimap; touch layouts use a compact leaderboard and an adaptive minimap. The minimap shows only your ship, other human pilots, and bot pilots inside the arena ring. Ship headings and faction marks help identify pilots; asteroids, satellites, pickups, orbiters, loot, and projectiles do not appear. Kill and pickup messages appear in the center for 120 frames, or 2 seconds. A health capsule appears above a damaged ship; use its remaining fill to judge hull health. Your own hull is mint, other human pilots are sky blue, and bots are orange. Faction marks identify allies separately from those colors.',
         ],
       },
       {

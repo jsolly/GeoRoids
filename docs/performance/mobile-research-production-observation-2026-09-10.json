@@ -1,0 +1,52 @@
+{
+  "capturedAt": "2026-09-10T14:21:17.933682+00:00",
+  "scope": "Single read-only HTTP observations from development Mac; not mobile latency or capacity evidence.",
+  "observations": [
+    {
+      "url": "https://www.georoids.com",
+      "status": 200,
+      "releaseId": "b4aec298e72840d026a2492902c5a4251d8d4e3c"
+    },
+    {
+      "url": "https://geoasteroids-production-2403.up.railway.app/health",
+      "status": 200,
+      "releaseId": "3929da5874e65e4cb78b519221fbbb7f98fc2419",
+      "health": {
+        "status": "healthy",
+        "releaseId": "3929da5874e65e4cb78b519221fbbb7f98fc2419",
+        "timestamp": "2026-09-10T14:21:18.531Z",
+        "players": 0,
+        "uptime": 4836.096325567,
+        "world": {
+          "isPaused": true,
+          "gameTime": 290142,
+          "humanPlayers": 0,
+          "bots": 0,
+          "asteroids": 0,
+          "loot": 0,
+          "satellites": 0,
+          "satellitePickups": 0
+        },
+        "logging": {
+          "activeLogClients": 1,
+          "clientIngress": {
+            "accepted": 55,
+            "invalid": 0,
+            "rateLimited": 0,
+            "droppedRecords": 0,
+            "clientReportedDroppedRecords": 0,
+            "queuedBytes": 0,
+            "writeErrors": 0
+          },
+          "serverWriter": {
+            "queuedBytes": 0,
+            "droppedRecords": 0,
+            "writeErrors": 0,
+            "stdoutDroppedRecords": 0,
+            "stdoutWriteErrors": 0
+          }
+        }
+      }
+    }
+  ]
+}

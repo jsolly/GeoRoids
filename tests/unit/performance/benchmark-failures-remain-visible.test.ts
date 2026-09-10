@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, vi } from 'vitest';
@@ -52,6 +52,16 @@ test('live sessions require a readable lockfile and a real committed revision', 
     expect(metadata.git.dirty).toBe(true);
     expect(metadata.git.lockfileSha256).toBe(createHash('sha256').update(lockfile).digest('hex'));
 
+    await mkdir(join(root, 'src'));
+    await mkdir(join(root, 'benchmarks'));
+    await writeFile(join(root, 'src', 'game.ts'), 'product');
+    const productChanged = collectLiveReportMetadata({ root });
+    expect(productChanged.git.productSha256).not.toBe(metadata.git.productSha256);
+    expect(productChanged.git.harnessSha256).toBe(metadata.git.harnessSha256);
+    await writeFile(join(root, 'benchmarks', 'runner.ts'), 'harness');
+    const harnessChanged = collectLiveReportMetadata({ root });
+    expect(harnessChanged.git.productSha256).toBe(productChanged.git.productSha256);
+    expect(harnessChanged.git.harnessSha256).not.toBe(productChanged.git.harnessSha256);
     await rm(join(root, 'package-lock.json'));
     expect(() => collectLiveReportMetadata({ root })).toThrow(/ENOENT.*package-lock.json/);
     await rm(join(root, '.git'), { recursive: true });

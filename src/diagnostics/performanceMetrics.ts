@@ -1,7 +1,12 @@
 import { logger } from '../utils/Logger';
+import { installPhoneCollector } from './phoneCollector';
 
 const SAMPLE_LIMIT = 4096;
+const encoder = new TextEncoder();
 type Metric =
+  | 'rttMs'
+  | 'messageGapMs'
+  | 'collectionGapMs'
   | 'frameIntervalMs'
   | 'updateMs'
   | 'renderMs'
@@ -24,18 +29,135 @@ type Samples = { values: number[]; count: number; sum: number; max: number; over
 export class ClientPerformanceMetrics {
   private readonly series = new Map<string, Samples>();
   private readonly counters: Record<string, number> = {};
+  private lastSnapshot:
+    | { sequence: number; kind: 'keyframe' | 'delta'; gameTime: number }
+    | undefined;
+  private lastKeyframeSequence = 0;
+
+  /** Snapshot sequence numbers belong to one transport/join session. */
+  resetSnapshotWitness(): void {
+    this.lastSnapshot = undefined;
+    this.lastKeyframeSequence = 0;
+  }
+
+  snapshotApplied(snapshot: {
+    sequence: number;
+    kind: 'keyframe' | 'delta';
+    gameTime: number;
+  }): void {
+    this.lastSnapshot = snapshot;
+    if (snapshot.kind === 'keyframe') {
+      this.lastKeyframeSequence = snapshot.sequence;
+    }
+  }
+
   private phase: Phase = 'menu';
+  private phaseStartedAt = performance.now();
+  private drainOwner: string | undefined;
+
+  claimDrain(owner: string): void {
+    if (this.drainOwner !== undefined && this.drainOwner !== owner) {
+      throw new Error(`Performance drain owned by ${this.drainOwner}`);
+    }
+    this.drainOwner = owner;
+  }
+
+  releaseDrain(owner: string): void {
+    if (this.drainOwner === owner) {
+      this.drainOwner = undefined;
+    }
+  }
+  private readonly phaseDurations: Record<Phase, number> = {
+    menu: 0,
+    play: 0,
+    respawn: 0,
+    hidden: 0,
+  };
+  private readonly messageBytes: Record<string, number> = {};
+  private readonly messageCounts: Record<string, number> = {};
+  private lastMessageAt: number | undefined;
+  private probeSequence = 0;
+  private readonly pendingProbes = new Map<number, number>();
+  private readonly completedProbes = new Set<number>();
+  private graphicsSettings: Record<string, string | number | boolean> = {};
+
+  setGraphicsSettings(settings: Record<string, string | number | boolean>): void {
+    this.graphicsSettings = { ...settings };
+  }
+
+  message(kind: string, payload: string, now: number): void {
+    if (!this.enabled) {
+      return;
+    }
+    this.messageBytes[kind] = (this.messageBytes[kind] ?? 0) + encoder.encode(payload).byteLength;
+    this.messageCounts[kind] = (this.messageCounts[kind] ?? 0) + 1;
+    if (this.lastMessageAt !== undefined) {
+      this.record('messageGapMs', now - this.lastMessageAt);
+    }
+    this.lastMessageAt = now;
+  }
+
+  probe(now: number): number {
+    for (const _id of this.pendingProbes.keys()) {
+      this.count('unansweredProbes');
+    }
+    this.pendingProbes.clear();
+    const id = ++this.probeSequence;
+    if (this.enabled) {
+      this.pendingProbes.set(id, now);
+    }
+    return id;
+  }
+
+  pong(id: unknown, now: number): void {
+    if (!this.enabled) {
+      return;
+    }
+    if (id === undefined) {
+      this.count('barePongs');
+      return;
+    }
+    if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+      this.count('invalidPongs');
+      return;
+    }
+    const started = this.pendingProbes.get(id);
+    if (started === undefined) {
+      this.count(this.completedProbes.has(id) ? 'duplicatePongs' : 'stalePongs');
+      return;
+    }
+    this.pendingProbes.delete(id);
+    this.completedProbes.add(id);
+    if (this.completedProbes.size > 64) {
+      this.completedProbes.delete(this.completedProbes.values().next().value ?? id);
+    }
+    this.record('rttMs', now - started);
+  }
+
+  clearProbes(): void {
+    for (const _id of this.pendingProbes.keys()) {
+      this.count('unansweredProbes');
+    }
+    this.pendingProbes.clear();
+    this.lastMessageAt = undefined;
+  }
+
   private pendingInputAt: number | undefined;
   private authoritativeStateReady = false;
   private joinStartedAt: number | undefined;
   private recoveryStartedAt: number | undefined;
-  private startedAt = performance.now();
+  private startedAt = this.phaseStartedAt;
   private nextExportAt = this.startedAt + 15_000;
   public serverReleaseId: string | undefined;
 
   constructor(public readonly enabled: boolean) {}
 
   setPhase(phase: Phase): void {
+    const now = performance.now();
+    if (this.enabled) {
+      this.phaseDurations[this.phase] += now - this.phaseStartedAt;
+    }
+    this.phaseStartedAt = now;
     this.phase = phase;
     if (phase !== 'play' && phase !== 'respawn') {
       this.pendingInputAt = undefined;
@@ -69,6 +191,14 @@ export class ClientPerformanceMetrics {
 
   count(
     name:
+      | 'inputEvents'
+      | 'inputReleases'
+      | 'inputCancellations'
+      | 'unansweredProbes'
+      | 'barePongs'
+      | 'invalidPongs'
+      | 'duplicatePongs'
+      | 'stalePongs'
       | 'joinAttempts'
       | 'joinFailures'
       | 'messageFailures'
@@ -85,8 +215,17 @@ export class ClientPerformanceMetrics {
     }
   }
 
-  input(now: number): void {
+  input(now: number, kind: 'event' | 'release' | 'cancel' = 'event'): void {
     if (this.enabled && (this.phase === 'play' || this.phase === 'respawn')) {
+      this.count('inputEvents');
+      if (kind === 'release') {
+        this.count('inputReleases');
+      }
+      if (kind === 'cancel') {
+        this.count('inputCancellations');
+        this.pendingInputAt = undefined;
+        return;
+      }
       this.pendingInputAt ??= now;
     }
   }
@@ -163,10 +302,23 @@ export class ClientPerformanceMetrics {
     }
   }
 
-  read(reset = false) {
+  read(reset = false, owner?: string) {
+    if (reset && this.drainOwner !== undefined && owner !== this.drainOwner) {
+      throw new Error(`Performance drain owned by ${this.drainOwner}`);
+    }
     const now = performance.now();
     const result = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      lastSnapshot: this.lastSnapshot,
+      lastKeyframeSequence: this.lastKeyframeSequence,
+      phaseDurationsMs: {
+        ...this.phaseDurations,
+        [this.phase]:
+          this.phaseDurations[this.phase] + (this.enabled ? now - this.phaseStartedAt : 0),
+      },
+      messageBytes: { ...this.messageBytes },
+      messageCounts: { ...this.messageCounts },
+      graphicsSettings: { ...this.graphicsSettings },
       clientReleaseId: import.meta.env['VITE_COMMIT_HASH'] ?? 'unknown',
       serverReleaseId: this.serverReleaseId ?? 'unknown',
       durationMs: now - this.startedAt,
@@ -187,6 +339,16 @@ export class ClientPerformanceMetrics {
     };
     if (reset) {
       this.series.clear();
+      for (const phase of Object.keys(this.phaseDurations) as Phase[]) {
+        this.phaseDurations[phase] = 0;
+      }
+      this.phaseStartedAt = now;
+      for (const key of Object.keys(this.messageBytes)) {
+        delete this.messageBytes[key];
+      }
+      for (const key of Object.keys(this.messageCounts)) {
+        delete this.messageCounts[key];
+      }
       for (const key of Object.keys(this.counters)) {
         delete this.counters[key];
       }
@@ -235,11 +397,30 @@ export const clientPerformance = new ClientPerformanceMetrics(
 
 if (clientPerformance.enabled) {
   window.georoidsPerformance = clientPerformance;
-  for (const event of ['pointerdown', 'pointermove', 'keydown', 'keyup']) {
-    window.addEventListener(event, () => clientPerformance.input(performance.now()), {
-      capture: true,
-      passive: true,
-    });
+  for (const event of [
+    'pointerdown',
+    'pointermove',
+    'pointerup',
+    'pointercancel',
+    'keydown',
+    'keyup',
+  ]) {
+    window.addEventListener(
+      event,
+      () =>
+        clientPerformance.input(
+          performance.now(),
+          event === 'pointercancel'
+            ? 'cancel'
+            : event === 'pointerup' || event === 'keyup'
+              ? 'release'
+              : 'event'
+        ),
+      {
+        capture: true,
+        passive: true,
+      }
+    );
   }
   window.addEventListener('networkReconnecting', () => {
     if (!clientPerformance.read().pendingRecovery) {
@@ -251,4 +432,16 @@ if (clientPerformance.enabled) {
     clientPerformance.joinFailed();
     clientPerformance.recoveryFailed();
   });
+}
+
+if (
+  clientPerformance.enabled &&
+  new URLSearchParams(window.location.search).get('performance') === 'collect'
+) {
+  const install = () => installPhoneCollector(clientPerformance);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', install, { once: true });
+  } else {
+    install();
+  }
 }

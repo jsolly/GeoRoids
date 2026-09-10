@@ -297,3 +297,19 @@ describe('bounded server performance metrics', () => {
     expect(instance.read().counters.tickSamples).toBe(0);
   });
 });
+
+test('health polls expose the same finalized window without counting its observations twice', () => {
+  const metrics = new ServerPerformanceMetrics({ enabled: true, autoStart: false });
+  metrics.recordTransportAcceptance(4);
+  const finalized = metrics.drain();
+  const first = metrics.read();
+  const second = metrics.read();
+  expect(finalized.window.finalized).toBe(true);
+  expect(first.window.finalized).toBe(false);
+  expect(first.window.id).not.toBe(finalized.window.id);
+  expect(first.closedWindows?.[0]?.window.id).toBe(second.closedWindows?.[0]?.window.id);
+  expect(finalized.histograms.transportAcceptanceMs.count).toBe(1);
+  expect(second.histograms.transportAcceptanceMs.count).toBe(0);
+  metrics.stop();
+  expect(metrics.read().closedWindows).toEqual([]);
+});

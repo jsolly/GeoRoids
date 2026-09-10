@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
 import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
+import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { LootField } from '../../../src/entities/loot/LootField';
 import type { Player } from '../../../src/entities/player/Player';
@@ -99,6 +100,22 @@ describe('actual ConnectionManager WebSocket message path', () => {
       resumeToken,
     });
   }
+
+  test('a new socket and join cannot reuse a departed session snapshot witness', async () => {
+    clientPerformance.snapshotApplied({ sequence: 900, kind: 'keyframe', gameTime: 4000 });
+    const ws = await connect();
+    expect(clientPerformance.read()).toMatchObject({ lastKeyframeSequence: 0 });
+    expect(clientPerformance.read().lastSnapshot).toBeUndefined();
+    clientPerformance.snapshotApplied({ sequence: 901, kind: 'keyframe', gameTime: 4000 });
+    acknowledge(ws);
+    expect(clientPerformance.read().lastSnapshot).toBeUndefined();
+    expect(clientPerformance.read().lastKeyframeSequence).toBe(0);
+    clientPerformance.snapshotApplied({ sequence: 1, kind: 'keyframe', gameTime: 4000 });
+    expect(clientPerformance.read().lastKeyframeSequence).toBe(1);
+    manager.disconnect();
+    expect(clientPerformance.read().lastSnapshot).toBeUndefined();
+    expect(clientPerformance.read().lastKeyframeSequence).toBe(0);
+  });
 
   test.each([
     {

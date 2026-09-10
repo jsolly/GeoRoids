@@ -20,9 +20,9 @@ test('ticks lifecycle and lasers only for remote players', () => {
   const localLife = vi.spyOn(local.ship, 'updateLifecycle');
   const botLife = vi.spyOn(bot.ship, 'updateLifecycle');
 
-  advanceRemotePlayerShips([remote, local, bot], 3);
+  advanceRemotePlayerShips([remote, local, bot]);
 
-  expect(remoteLife).toHaveBeenCalledWith(3);
+  expect(remoteLife).toHaveBeenCalledOnce();
   expect(remoteLasers).toHaveBeenCalledTimes(1);
   expect(localLife).not.toHaveBeenCalled();
   expect(botLife).not.toHaveBeenCalled();
@@ -42,7 +42,7 @@ test("a remote player's laser travels instead of freezing at the muzzle", () => 
   const remote = makePlayer('remote');
   remote.ship.lasers.push(new Laser({ x: 0, y: 0 }, { x: 5, y: 0 }, 0, 0, false));
 
-  advanceRemotePlayerShips([remote], 0);
+  advanceRemotePlayerShips([remote]);
 
   expect(remote.ship.lasers.length).toBe(1);
   expect(remote.ship.lasers[0]?.position.x).toBeCloseTo(5, 5);
@@ -53,7 +53,9 @@ test('a hitch drains a remote explode window so the corpse does not freeze', () 
   remote.ship.takeDamage(100);
   expect(remote.ship.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
 
-  advanceRemotePlayerShips([remote], SHIP.EXPLODE_DURATION_FRAMES);
+  for (let frame = 0; frame < SHIP.EXPLODE_DURATION_FRAMES; frame++) {
+    advanceRemotePlayerShips([remote]);
+  }
 
   expect(remote.ship.explodeTime).toBe(0);
   expect(remote.ship.exploding).toBe(true);

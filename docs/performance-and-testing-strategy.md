@@ -202,7 +202,7 @@ OffscreenCanvas can transfer rendering to a worker.[^11] It is a later experimen
 
 ### Clock recovery and tick cost
 
-`startGameLoop` currently passes `Date.now()` into `stepClock`, despite a comment describing a monotonic clock. `consumeTickAccumulator` caps frames per call at 60 but retains all unconsumed debt. A long stall can therefore produce repeated large catch-up bursts. This is a code-level risk to test, not evidence of a measured production incident.
+At the archived `54d8c18` baseline, `startGameLoop` passed `Date.now()` into `stepClock`, despite a comment describing a monotonic clock. `consumeTickAccumulator` capped frames per call at 60 but retained all unconsumed debt, allowing repeated large catch-up bursts after a stall. The current [shared clock](../shared/gameClock.ts) bounds catch-up to one second and discards excess debt; [display-rate scenarios](../tests/unit/scenarios/clock/pilots-simulate-equally-across-display-rates.test.ts) also cover the client's fixed simulation steps and timing resets. The historical behavior was a code-level risk, not evidence of a measured production incident.
 
 Use a monotonic elapsed-time source for scheduling while keeping wall time where domain semantics require it. Specify a bounded debt policy for long suspension: either keep limited debt and expose temporary slowdown, or discard excess simulation debt with an explicit recovery rule. Preserve respawn, invulnerability, projectile lifetime, and resume-token expiration semantics. Validate 100 ms, one-second, and multi-second stalls before choosing the cap; do not simply lower it and shorten timers accidentally.
 

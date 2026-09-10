@@ -726,7 +726,7 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     ship.velocity = { x: downslope.x * ship.maxVelocity, y: downslope.y * ship.maxVelocity };
     ship.mass = f.actor.mass;
     ship.thrusting = false;
-    ship.update(1);
+    ship.update();
     const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
     expect(speed).toBeGreaterThan(5);
     expect(speed).toBeLessThanOrEqual(ship.maxVelocity + 1e-9);
@@ -760,7 +760,7 @@ describe('Haulers own a physical slingshot through delayed messages and transpor
     // after thrust and terrain force, rather than merely reading the kit.
     ship.velocity = { x: ship.maxVelocity, y: 0 };
     ship.thrusting = true;
-    ship.update(1);
+    ship.update();
     const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
     expect(speed).toBeGreaterThan(8);
     expect(speed).toBeLessThanOrEqual(ship.maxVelocity + 1e-9);

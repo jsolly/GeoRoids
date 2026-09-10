@@ -10,6 +10,7 @@ import {
 } from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
+import { DAMAGE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function arena() {
@@ -50,6 +51,62 @@ function snapshot(engine: GameEngine) {
 }
 
 describe('reflected shots remain authoritative across snapshots and resource collection', () => {
+  test('an enhanced shot damages the nearest tied ship by stable id order', () => {
+    const { engine, pilot } = arena();
+    engine.removeAsteroid('reflector');
+    for (const bot of engine.getAllBots()) {
+      engine.removeBot(bot.id);
+    }
+    const beta = engine.addPlayer(
+      'beta',
+      'Beta',
+      new RecordingSocket(),
+      { x: 10, y: 0 },
+      undefined,
+      'dart',
+      'ember'
+    );
+    const alpha = engine.addPlayer(
+      'alpha',
+      'Alpha',
+      new RecordingSocket(),
+      { x: 10, y: 0 },
+      undefined,
+      'dart',
+      'ember'
+    );
+    const zeta = engine.addPlayer(
+      'zeta',
+      'Zeta',
+      new RecordingSocket(),
+      { x: 30, y: 0 },
+      undefined,
+      'dart',
+      'ember'
+    );
+    for (const player of [alpha, beta, zeta]) {
+      delete player.spawnProtectionTimer;
+    }
+    for (const satellite of engine.getAllSatellites()) {
+      const internal = engine.getSatellite(satellite.id);
+      if (internal) {
+        internal.position = { x: 20_000, y: 20_000 };
+      }
+    }
+
+    const alphaHealth = alpha.health;
+    const betaHealth = beta.health;
+    const zetaHealth = zeta.health;
+    const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 100, y: 0 });
+    assert.ok(shot, 'nearest-contact shot');
+    engine.advanceLasersAndResolveHits();
+
+    expect(alpha.health).toBe(alphaHealth - DAMAGE.LASER_HIT);
+    expect(beta.health).toBe(betaHealth);
+    expect(zeta.health).toBe(zetaHealth);
+    expect(shot.hasExploded).toBe(true);
+  });
+
   test('a flat face reverses one shot and fractional energy survives the actual snapshot validator', () => {
     const { engine, reflector } = arena();
     const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });

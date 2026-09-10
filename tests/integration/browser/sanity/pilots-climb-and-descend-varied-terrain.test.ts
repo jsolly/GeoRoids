@@ -24,10 +24,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function observeAuthoritativePositions(page: Page): {
   getPosition: (playerId: string) => Position | undefined;
   getAngle: (playerId: string) => number | undefined;
+  isThrusting: (playerId: string) => boolean | undefined;
 } {
   const decoder = new SnapshotDecoder();
   const positions = new Map<string, Position>();
   const angles = new Map<string, number>();
+  const thrusting = new Map<string, boolean>();
 
   page.on('websocket', (socket) => {
     socket.on('framereceived', ({ payload }) => {
@@ -39,6 +41,7 @@ function observeAuthoritativePositions(page: Page): {
         decoder.reset();
         positions.clear();
         angles.clear();
+        thrusting.clear();
         return;
       }
       if (parsed['type'] !== 'snapshot') {
@@ -49,6 +52,7 @@ function observeAuthoritativePositions(page: Page): {
       for (const entity of snapshot.entities) {
         positions.set(entity.id, { ...entity.position });
         angles.set(entity.id, entity.angle);
+        thrusting.set(entity.id, entity.thrusting);
       }
     });
   });
@@ -56,6 +60,7 @@ function observeAuthoritativePositions(page: Page): {
   return {
     getPosition: (playerId) => positions.get(playerId),
     getAngle: (playerId) => angles.get(playerId),
+    isThrusting: (playerId) => thrusting.get(playerId),
   };
 }
 
@@ -196,11 +201,19 @@ for (const viewport of [
         .poll(
           () => {
             const position = authoritative.getPosition(localPlayerId);
-            return position ? direction * (position.x - beforeAuthoritative.x) : 0;
+            return (
+              position !== undefined &&
+              direction * (position.x - beforeAuthoritative.x) > 10 &&
+              authoritative.isThrusting(localPlayerId) === false
+            );
           },
-          { timeout: 5000, interval: 50 }
+          {
+            timeout: 5000,
+            interval: 50,
+            message: 'measure a server snapshot acknowledging release of the movement control',
+          }
         )
-        .toBeGreaterThan(10);
+        .toBe(true);
       const afterAuthoritative = authoritative.getPosition(localPlayerId);
       if (!afterAuthoritative) {
         throw new Error('Authoritative position missing after movement');

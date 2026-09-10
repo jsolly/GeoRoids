@@ -11,7 +11,6 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  Reflect.deleteProperty(window, 'requestAnimationFrame');
   canvasManager.destroy();
   document.body.replaceChildren();
 });
@@ -20,12 +19,9 @@ test('an actual game-loop frame failure stops work and offers one restart notice
   vi.useFakeTimers();
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const scheduled: FrameRequestCallback[] = [];
-  Object.defineProperty(window, 'requestAnimationFrame', {
-    configurable: true,
-    value: vi.fn((callback: FrameRequestCallback) => {
-      scheduled.push(callback);
-      return scheduled.length;
-    }),
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    scheduled.push(callback);
+    return scheduled.length;
   });
 
   const canvas = document.createElement('canvas');

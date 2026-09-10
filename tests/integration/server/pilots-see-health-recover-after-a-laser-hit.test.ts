@@ -23,7 +23,9 @@ test('both pilots see the same delayed health recovery after a hostile laser hit
       ['target', 'ion'],
       ['attacker', 'ember'],
     ]) {
-      const peer = new WireClient(new WebSocket(`ws://127.0.0.1:${port}/ws`));
+      const peer = new WireClient(
+        new WebSocket(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`)
+      );
       peers.push(peer);
       await peer.open();
       peer.send({

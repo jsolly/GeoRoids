@@ -9,12 +9,14 @@ import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
-for (const viewport of [
+for (const { viewport, failure } of [
   { name: 'desktop', width: 1280, height: 900 },
   { name: 'mobile', width: 390, height: 844 },
-]) {
+].flatMap((viewport) =>
+  (['rejected', 'unsupported'] as const).map((failure) => ({ viewport, failure }))
+)) {
   test(
-    `a rejected join returns to the menu and a pilot can retry on ${viewport.name}`,
+    `${failure === 'unsupported' ? 'An' : 'A'} ${failure} join returns to the menu and a pilot can retry on ${viewport.name}`,
     async () => {
       const page = browserManager.getCurrentPage();
       if (!page) {
@@ -33,7 +35,21 @@ for (const viewport of [
             const message = JSON.parse(String(raw));
             if (message.type === 'join') {
               rejected = true;
-              socket.send(JSON.stringify({ type: 'error', data: 'Scenario rejected join' }));
+              socket.send(
+                JSON.stringify(
+                  failure === 'rejected'
+                    ? { type: 'error', data: 'Scenario rejected join' }
+                    : {
+                        type: 'joined',
+                        data: {
+                          id: message.id,
+                          name: 'Old server',
+                          position: { x: 0, y: 0 },
+                          color: '#ffffff',
+                        },
+                      }
+                )
+              );
             }
           });
         }
@@ -56,17 +72,25 @@ for (const viewport of [
       expect(failedJoin?.pendingRecovery).toBe(false);
       expect(pageErrors).toEqual([]);
       expect(
-        diagnostics.errors.some((message) => message.includes('Failed to complete server join'))
+        diagnostics.errors.some((message) =>
+          message.includes(
+            failure === 'rejected'
+              ? 'Failed to complete server join'
+              : 'Current multiplayer protocol is required'
+          )
+        )
       ).toBe(true);
       const expectedFailure =
-        /Failed to complete server join|Permanently disconnected|Displayed permanent disconnect banner|WebSocket connection closed/;
+        /Failed to complete server join|Current multiplayer protocol is required|Permanently disconnected|Displayed permanent disconnect banner|WebSocket connection closed/;
       expect(
         [...diagnostics.errors, ...diagnostics.warnings].filter(
           (message) => !expectedFailure.test(message)
         )
       ).toEqual([]);
       await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`performance-join-failure-${viewport.name}.png`),
+        path: screenshotManager.getScreenshotPath(
+          `performance-${failure}-join-${viewport.name}.png`
+        ),
       });
 
       diagnostics.errors.length = 0;

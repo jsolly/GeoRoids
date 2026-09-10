@@ -18,11 +18,17 @@ describe('supported gameplay message envelopes', () => {
   });
 
   test.each(['nested', 'top-level'] as const)(
-    'a %s join receives its identity, moves without forging score, and shares a shot with its peer',
+    'a %s join receives its identity, rejects forged score, and owns a server projectile',
     (shape) => {
       const owner = new RecordingSocket();
       const peer = new RecordingSocket();
-      const identity = { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } };
+      const identity = {
+        id: 'pilot',
+        name: 'Pilot',
+        position: { x: 0, y: 0 },
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+      };
       core.handleClientMessage(
         shape === 'nested' ? { type: 'join', data: identity } : { type: 'join', ...identity },
         owner
@@ -34,14 +40,35 @@ describe('supported gameplay message envelopes', () => {
       expect(pilot.name).toBe(identity.name);
 
       core.handleClientMessage(
-        { type: 'update', data: { id: pilot.id, position: { x: 100, y: 200 }, score: 150 } },
+        {
+          type: 'update',
+          id: pilot.id,
+          data: {
+            position: { x: 1, y: 2 },
+            velocity: { x: 0, y: 0 },
+            angle: 0,
+            thrusting: false,
+            motionEpoch: pilot.asteroidMotion?.epoch,
+            motionSequence: 0,
+            score: 150,
+          },
+        },
         owner
       );
-      expect(pilot.position).toEqual({ x: 100, y: 200 });
+      expect(pilot.position).toEqual({ x: 1, y: 2 });
       expect(pilot.score).toBe(0);
 
       core.handleClientMessage(
-        { type: 'join', data: { id: 'peer', name: 'Peer', position: { x: 1000, y: 1000 } } },
+        {
+          type: 'join',
+          data: {
+            id: 'peer',
+            name: 'Peer',
+            position: { x: 1000, y: 1000 },
+            snapshotVersion: 1,
+            asteroidInteractions: 1,
+          },
+        },
         peer
       );
       for (const rock of engine.getAllAsteroids()) {
@@ -49,19 +76,14 @@ describe('supported gameplay message envelopes', () => {
       }
       owner.clear();
       peer.clear();
-      const shot = { laserStart: { x: 110, y: 200 }, laserDirection: { x: 1, y: 0 } };
+      const shot = { laserStart: { x: 11, y: 2 }, laserDirection: { x: 1, y: 0 } };
       core.handleClientMessage({ type: 'shoot', id: pilot.id, data: shot }, owner);
 
       const [trackedShot] = engine.getPlayerProjectiles();
       assert.ok(trackedShot);
+      expect(trackedShot.ownerId).toBe(pilot.id);
       expect(owner.received('playerShoot')).toEqual([]);
-      expect(peer.received('playerShoot')).toEqual([
-        {
-          type: 'playerShoot',
-          data: { id: pilot.id, shotId: trackedShot.id, ...shot },
-          timestamp: expect.any(Number),
-        },
-      ]);
+      expect(peer.received('playerShoot')).toEqual([]);
     }
   );
 

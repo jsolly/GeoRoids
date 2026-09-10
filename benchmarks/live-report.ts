@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { type Measurement, validateMeasurement } from './results';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const GIT_TIMEOUT_MS = 10_000;
 
 interface LiveReportMetadata {
   readonly benchmarkVersion: 1;
@@ -44,25 +45,19 @@ interface LiveReport<TDetails extends object = Record<string, unknown>> {
 }
 
 function command(root: string, args: readonly string[]): string {
-  try {
-    return execFileSync('git', [...args], {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    return 'unknown';
-  }
+  return execFileSync('git', [...args], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: GIT_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+  }).trim();
 }
 
 function lockfileSha256(root: string): string {
-  try {
-    return createHash('sha256')
-      .update(readFileSync(join(root, 'package-lock.json')))
-      .digest('hex');
-  } catch {
-    return 'unknown';
-  }
+  return createHash('sha256')
+    .update(readFileSync(join(root, 'package-lock.json')))
+    .digest('hex');
 }
 
 function liveInputHashes(root = ROOT) {
@@ -90,7 +85,7 @@ function liveInputHashes(root = ROOT) {
       'package-lock.json',
       'tests/unit/network/snapshotFixture.ts',
     ],
-    { cwd: root, encoding: 'utf8' }
+    { cwd: root, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: 'SIGKILL' }
   )
     .split('\0')
     .filter(Boolean);

@@ -42,7 +42,7 @@ jobs:
             tests/integration/browser/sanity/critical-gameplay-smoke.test.ts \
             tests/integration/browser/sanity/sustained-mobile-controls.test.ts \
             tests/integration/browser/sanity/rejected-joins-return-to-menu-and-can-retry.test.ts \
-            tests/integration/server/mixed-version-pilots-recover-after-reconnect.test.ts \
+            tests/integration/server/current-pilots-recover-after-reconnect.test.ts \
             --reporter=verbose 2>&1 | tee behavioral-artifacts/test-run.log
           pipeline_statuses=("${PIPESTATUS[@]}")
           status=${pipeline_statuses[0]}

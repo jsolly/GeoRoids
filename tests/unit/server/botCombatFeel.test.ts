@@ -74,7 +74,7 @@ describe('bot combat feel on the shared ship hull', () => {
     });
   });
 
-  test('queued shots drain once for the playerShoot broadcast path', () => {
+  test('bot shots enter the authoritative projectile field once', () => {
     const bots = engine.createBots(1);
     const bot = firstBot(bots);
     bot.position = { x: 0, y: 0 };
@@ -83,10 +83,7 @@ describe('bot combat feel on the shared ship hull', () => {
     for (let i = 0; i < 20; i++) {
       engine.updateBotMovement();
     }
-    const first = engine.consumeBotShots();
-    const second = engine.consumeBotShots();
-    expect(first.length).toBeGreaterThan(0);
-    expect(second).toEqual([]);
+    expect(engine.getServerLasers().length).toBeGreaterThan(0);
   });
 
   test('exploding bots do not move or shoot', () => {

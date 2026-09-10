@@ -36,10 +36,14 @@ async function start(nodeEnv = 'test') {
   const server = createServerInstance({ port: 0, nodeEnv });
   servers.push(server);
   const port = await server.listening;
-  return { server, origin: `http://127.0.0.1:${port}`, socketUrl: `ws://127.0.0.1:${port}/ws` };
+  return {
+    server,
+    origin: `http://127.0.0.1:${port}`,
+    socketUrl: `ws://127.0.0.1:${port}/ws?asteroidInteractions=1`,
+  };
 }
 
-async function pilot(enhanced: boolean) {
+async function pilot() {
   const fixture = await start();
   const socket = new WebSocket(fixture.socketUrl);
   sockets.push(socket);
@@ -51,7 +55,8 @@ async function pilot(enhanced: boolean) {
         id: 'fixture-pilot',
         name: 'Fixture Pilot',
         position: { x: 1700, y: 0 },
-        ...(enhanced ? { asteroidInteractions: 1, snapshotVersion: 1 } : {}),
+        asteroidInteractions: 1,
+        snapshotVersion: 1,
       },
     })
   );
@@ -115,7 +120,7 @@ test('development fixture controls reject a non-loopback peer', async () => {
 });
 
 test('bot arrangement rejects invalid ownership without moving either actor', async () => {
-  const { server, origin, player } = await pilot(false);
+  const { server, origin, player } = await pilot();
   const bots = server.gameEngine.getAllBots();
   const hostile = bots.find((bot) => bot.factionId !== player.factionId);
   const friendly = bots.find((bot) => bot.factionId === player.factionId);
@@ -137,7 +142,7 @@ test('bot arrangement rejects invalid ownership without moving either actor', as
 });
 
 test('bot arrangement changes only poses before a real authoritative laser hit', async () => {
-  const { server, origin, player, socket } = await pilot(true);
+  const { server, origin, player, socket } = await pilot();
   const bot = server.gameEngine
     .getAllBots()
     .find((candidate) => candidate.factionId !== player.factionId);
@@ -224,7 +229,7 @@ test('bot arrangement changes only poses before a real authoritative laser hit',
 });
 
 test('invalid or oversized placement cannot change a connected pilot', async () => {
-  const { origin, player } = await pilot(false);
+  const { origin, player } = await pilot();
   const position = { ...player.position };
   const valid = { playerId: player.id, position: { x: 1600, y: 0 } };
   for (const body of [
@@ -271,63 +276,54 @@ test.each([
   }
 );
 
-test.each([false, true])(
-  'placement preserves health and allows subsequent legal movement (enhanced=%s)',
-  async (enhanced) => {
-    const { server, origin, socket, player } = await pilot(enhanced);
-    const previousEpoch = player.asteroidMotion?.epoch;
-    const health = player.health;
-    const position = { x: -1700, y: 0 };
-    const response = await post(origin, { playerId: player.id, position });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      status: 'placed',
-      playerId: player.id,
-      position,
-    });
-    expect(player.position).toEqual(position);
-    expect(player.health).toBe(health);
-    const epoch = player.asteroidMotion?.epoch;
-    if (enhanced) {
-      assert.ok(previousEpoch !== undefined, 'previous asteroid motion epoch');
-      expect(epoch).toBeGreaterThan(previousEpoch);
-    }
+test('placement preserves health and allows subsequent legal movement', async () => {
+  const { server, origin, socket, player } = await pilot();
+  const previousEpoch = player.asteroidMotion?.epoch;
+  const health = player.health;
+  const position = { x: -1700, y: 0 };
+  const response = await post(origin, { playerId: player.id, position });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    status: 'placed',
+    playerId: player.id,
+    position,
+  });
+  expect(player.position).toEqual(position);
+  expect(player.health).toBe(health);
+  const epoch = player.asteroidMotion?.epoch;
+  assert.ok(previousEpoch !== undefined, 'previous asteroid motion epoch');
+  expect(epoch).toBeGreaterThan(previousEpoch);
 
-    const sendPose = async (x: number, motionEpoch: number | undefined, sequence: number) => {
-      socket.send(
-        JSON.stringify({
-          type: 'update',
-          data: {
-            id: player.id,
-            position: { x, y: 0 },
-            velocity: { x: 0, y: 0 },
-            angle: 0,
-            thrusting: false,
-            motionEpoch,
-            motionSequence: sequence,
-          },
-        })
-      );
-      const pong = once(socket, 'pong');
-      socket.ping();
-      await pong;
-    };
-    if (enhanced) {
-      await sendPose(1700, previousEpoch, 99);
-      expect(player.position).toEqual(position);
-    }
-    await sendPose(-1699, epoch, 1);
-    expect(player.position).toEqual({ x: -1699, y: 0 });
-    if (enhanced) {
-      await sendPose(9000, epoch, 2);
-      expect(player.position).toEqual({ x: -1699, y: 0 });
-    }
-    expect(server.gameEngine.getPlayerCount()).toBe(1);
-  }
-);
+  const sendPose = async (x: number, motionEpoch: number | undefined, sequence: number) => {
+    socket.send(
+      JSON.stringify({
+        type: 'update',
+        data: {
+          id: player.id,
+          position: { x, y: 0 },
+          velocity: { x: 0, y: 0 },
+          angle: 0,
+          thrusting: false,
+          motionEpoch,
+          motionSequence: sequence,
+        },
+      })
+    );
+    const pong = once(socket, 'pong');
+    socket.ping();
+    await pong;
+  };
+  await sendPose(1700, previousEpoch, 99);
+  expect(player.position).toEqual(position);
+  await sendPose(-1699, epoch, 1);
+  expect(player.position).toEqual({ x: -1699, y: 0 });
+  await sendPose(9000, epoch, 2);
+  expect(player.position).toEqual({ x: -1699, y: 0 });
+  expect(server.gameEngine.getPlayerCount()).toBe(1);
+});
 
 test('an enhanced pilot with no motion session cannot report successful placement', async () => {
-  const { server, origin, player } = await pilot(true);
+  const { server, origin, player } = await pilot();
   const position = { ...player.position };
   server.gameEngine.asteroidMotion.forgetActor(player.id);
   const response = await post(origin, { playerId: player.id, position: { x: -1700, y: 0 } });

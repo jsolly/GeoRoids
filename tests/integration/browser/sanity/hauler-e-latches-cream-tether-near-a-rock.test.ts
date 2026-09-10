@@ -178,7 +178,7 @@ test(
         if (message.type === 'joined') {
           rejoined = true;
         }
-        if (rejoined && (message.type === 'snapshot' || message.type === 'gameState')) {
+        if (rejoined && message.type === 'snapshot') {
           freshWorld = true;
         }
       })

@@ -127,7 +127,7 @@ async function join(socket: WireClient, id: string, position: Position): Promise
   socket.send({
     type: 'join',
     id,
-    data: { name: id, position },
+    data: { name: id, position, snapshotVersion: 1, asteroidInteractions: 1 },
   });
   await socket.barrier();
   const joined = messageAt(socket.messages, start, 'joined');
@@ -150,7 +150,7 @@ beforeEach(async () => {
   const port = await server.listening;
   server.gameEngine.stopGameLoop();
   server.wsCore.stopPeriodicGameStateBroadcast();
-  wsUrl = `ws://127.0.0.1:${port}/ws`;
+  wsUrl = `ws://127.0.0.1:${port}/ws?asteroidInteractions=1`;
 });
 
 afterEach(async () => {
@@ -226,7 +226,7 @@ describe('Server initAsteroids sync', () => {
     playerTwo.assertHealthy();
   });
 
-  it('keeps the live field and tells the remaining player when a peer disconnects', async () => {
+  it('keeps the live field and tells the remaining player when a peer leaves', async () => {
     const current = requireServer();
     const playerOne = await openGameSocket();
     await join(playerOne, 'stay-one', { x: 0, y: 0 });
@@ -237,6 +237,8 @@ describe('Server initAsteroids sync', () => {
     const playerTwo = await openGameSocket();
     await join(playerTwo, 'leave-two', { x: 20, y: 20 });
     const leftStart = playerOne.mark();
+    playerTwo.send({ type: 'leave', data: {} });
+    await playerTwo.barrier();
     await playerTwo.close();
     await playerOne.barrier();
 

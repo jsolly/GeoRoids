@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, expect, test } from 'vitest';
-import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
+import { DAMAGE, GAME, SHIELD, SHIP } from '../../../../src/constants';
 import { Ship } from '../../../../src/entities/ship/Ship';
 import {
   EXPLOSION_FRAMES,
@@ -61,8 +61,8 @@ describe.each(SHIP_KINDS)('A laser hits a $kind', ({ options }) => {
 describe('Server view: the killing shot', () => {
   test('destroys the target, costs a life, and tells the attacker in one go', () => {
     const world = new GameServerWorld();
-    const alice = world.join('Alice');
-    const bob = world.join('Bob');
+    const alice = world.join('Alice', { x: -20, y: 0 });
+    const bob = world.join('Bob', { x: 20, y: 0 });
     world.tick(SPAWN_PROTECTION_FRAMES);
 
     world.shoot(alice, bob);
@@ -98,6 +98,9 @@ describe('Server view: the killing shot', () => {
     const bot = bots[0];
     assert.ok(bot);
     bot.health = LOW_HEALTH;
+    bot.shieldActive = false;
+    bot.shieldTime = 0;
+    bot.shieldCooldown = SHIELD.COOLDOWN_SECONDS * GAME.FPS;
 
     world.shootBot(alice, bot.id);
 

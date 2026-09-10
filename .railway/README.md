@@ -2,8 +2,9 @@
 
 `.railway/railway.ts` is the single tracked Railway project definition. It
 describes the `geoasteroids` service, its GitHub source, Railpack build, server
-start command, healthcheck, replica placement, and the three
-existing service variables through `preserve()`.
+start command, healthcheck, replica placement, and the two
+existing service variables through `preserve()`. Client admission is always
+current-protocol-only in server code; no service variable controls it.
 
 The definition has been compared with an authenticated full-project pull and
 plan. Railway's documented restart defaults are `ON_FAILURE` with 10 retries;

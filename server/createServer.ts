@@ -26,7 +26,6 @@ import {
 type CreateServerOptions = {
   port?: number;
   nodeEnv?: string;
-  requireEnhancedClient?: boolean;
   seed?: number;
 };
 
@@ -34,8 +33,6 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const configuration = readServerConfiguration();
   const PORT = options.port ?? configuration.port;
   const NODE_ENV = options.nodeEnv ?? configuration.nodeEnv;
-  const requireEnhancedClient =
-    options.requireEnhancedClient ?? configuration.requireEnhancedClient;
   const logClients = new Set<WebSocket>();
   const loggingDiagnostics = () => ({
     activeLogClients: logClients.size,
@@ -211,13 +208,9 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         done(false, 400, 'Invalid WebSocket URL');
         return;
       }
-      if (
-        requireEnhancedClient &&
-        url.pathname === '/ws' &&
-        url.searchParams.get('asteroidInteractions') !== '1'
-      ) {
-        // Reject before open: old clients otherwise reset their retry counter
-        // on every successful upgrade and reconnect forever after a close.
+      if (url.pathname === '/ws' && url.searchParams.get('asteroidInteractions') !== '1') {
+        // Reject before open: clients without the supported capability otherwise
+        // reset their retry counter on every successful upgrade and reconnect forever.
         done(false, 426, 'Client update required; refresh GeoRoids');
         return;
       }
@@ -292,7 +285,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   // Ensure server-side game loop (including bot regen) runs
   gameEngine.startGameLoop();
   gameEngine.updatePauseState();
-  const wsCore = new WebSocketCore(gameEngine, requireEnhancedClient);
+  const wsCore = new WebSocketCore(gameEngine);
   gameEngine.setOnAsteroidHits((hits) => {
     wsCore.getMessageHandler().broadcastAppliedAsteroidHits(hits);
   });

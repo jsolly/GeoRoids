@@ -40,7 +40,6 @@ import { BOT_AI, BotBrain, type BotShot, makeBotShot } from '../ai/botController
 import { applyShipMotionSteps, containShipInArena } from '../ai/shipMotion';
 import type { RNGService } from './RNGService';
 
-const RESPAWN_ANCHOR_ACK_DISTANCE = 100;
 /** Keep lives/score after a dropped socket so the same id can rejoin. */
 const HUMAN_REJOIN_STASH_TTL_MS = 5 * 60 * 1000;
 
@@ -73,8 +72,6 @@ export interface GameEntity extends ShieldState {
   lastUpdate: number;
   respawnTimer?: number;
   spawnProtectionTimer?: number;
-  /** Server spawn point held until the client echoes a nearby transform. */
-  respawnAnchor?: Position;
   ws?: WebSocket; // Only for human players
   explodeTime?: number; // For bot explosion handling
   kitId: ShipKitId;
@@ -90,17 +87,6 @@ export interface GameEntity extends ShieldState {
   asteroidInteractions?: 1;
   asteroidMotion?: AsteroidMotionState;
   laserUpgrade?: LaserUpgrade;
-}
-
-/** True when a client update is still the death pose, not the new spawn. */
-export function isStaleDeathPose(
-  anchor: Position | undefined,
-  position: Position | undefined
-): boolean {
-  if (!anchor || !position) {
-    return false;
-  }
-  return Math.hypot(position.x - anchor.x, position.y - anchor.y) > RESPAWN_ANCHOR_ACK_DISTANCE;
 }
 
 export class EntityManager {
@@ -629,7 +615,6 @@ export class EntityManager {
 
         if (entity.spawnProtectionTimer === 0) {
           delete entity.spawnProtectionTimer;
-          delete entity.respawnAnchor;
         }
       }
     }
@@ -692,7 +677,6 @@ export class EntityManager {
     clearShield(entity);
     this.placeEntityInArena(entity);
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
-    entity.respawnAnchor = { x: entity.position.x, y: entity.position.y };
   }
 
   private placeEntityInArena(entity: GameEntity, boundsRadius = getAsteroidFieldRadius()): void {

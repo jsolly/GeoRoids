@@ -216,7 +216,7 @@ const collabTag = shape<SnapshotCollabTag>({
     shape<SnapshotCollabTag['hits'][number]>({ shooterId: string, at: number, points: number })
   ),
 });
-const legacyRules = {
+const worldRules = {
   entities: array(entity),
   asteroids: array(asteroid),
   loot: array(loot),
@@ -227,10 +227,10 @@ const legacyRules = {
   terrainSeed: optional(number),
 } satisfies Shape<ServerGameState>;
 const world = shape<ServerGameSnapshot>({
-  ...legacyRules,
+  ...worldRules,
   satelliteProjectiles: array(projectile),
   collabTags: array(collabTag),
-  playerProjectiles: optional(array(playerProjectile)),
+  playerProjectiles: array(playerProjectile),
 });
 /** Unknown JSON fields are preserved by the codec, never discarded by this validation. */
 export function validateSnapshotDto(value: unknown): asserts value is ServerGameSnapshot {

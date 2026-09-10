@@ -171,6 +171,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       satellites: [],
       satellitePickups: [],
       satelliteProjectiles: [],
+      playerProjectiles: [],
       collabTags: [],
       gameTime: 1,
       isPaused: false,

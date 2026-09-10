@@ -1,68 +1,111 @@
-import { once } from 'node:events';
+import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
-import type { AsteroidData } from '../../../shared-types';
+import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import { ROID } from '../../../src/constants';
-
-type Message = {
-  type: string;
-  data: { asteroids?: AsteroidData[]; id?: string };
-};
+import { WireClient, type WireMessage } from '../../support/wireClient';
 
 let server: ReturnType<typeof createServerInstance>;
 let url: string;
-const sockets: WebSocket[] = [];
+const clients: WireClient[] = [];
+const streams = new WeakMap<WireClient, { decoder: SnapshotDecoder; cursor: number }>();
+const resumeTokens = new WeakMap<WireClient, string>();
 
 beforeEach(async () => {
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
-  url = `ws://127.0.0.1:${await server.listening}/ws`;
+  url = `ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`;
 });
 
 afterEach(async () => {
-  for (const socket of sockets.splice(0)) {
-    socket.terminate();
+  for (const client of clients) {
+    client.ws.terminate();
   }
   await server.close();
+  for (const client of clients.splice(0)) {
+    client.assertHealthy();
+  }
 });
 
-function waitForMessage(
-  socket: WebSocket,
-  matches: (message: Message) => boolean
-): Promise<Message> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      socket.off('message', onMessage);
-      reject(new Error('Expected authoritative server message did not arrive'));
-    }, 5000);
-    function onMessage(raw: WebSocket.RawData): void {
-      const message = JSON.parse(String(raw)) as Message;
-      if (!matches(message)) {
-        return;
-      }
-      clearTimeout(timeout);
-      socket.off('message', onMessage);
-      resolve(message);
-    }
-    socket.on('message', onMessage);
-  });
+function dataOf(message: WireMessage): Record<string, unknown> {
+  assert(message.data && typeof message.data === 'object' && !Array.isArray(message.data));
+  return message.data as Record<string, unknown>;
+}
+function asteroidIds(message: WireMessage): string[] {
+  const asteroids = dataOf(message)['asteroids'];
+  assert(Array.isArray(asteroids));
+  return asteroids
+    .map((rock: unknown) => {
+      assert(rock && typeof rock === 'object' && 'id' in rock && typeof rock.id === 'string');
+      return rock.id;
+    })
+    .sort();
 }
 
-async function join(id: string): Promise<WebSocket> {
-  const socket = new WebSocket(url);
-  sockets.push(socket);
-  await once(socket, 'open');
-  const joined = waitForMessage(socket, (message) => message.type === 'joined');
-  socket.send(
-    JSON.stringify({
-      type: 'join',
-      id,
-      data: { name: id, position: { x: 0, y: 0 } },
-      timestamp: Date.now(),
-    })
-  );
-  await joined;
-  return socket;
+async function waitForMessage(
+  client: WireClient,
+  matches: (message: WireMessage) => boolean
+): Promise<WireMessage> {
+  const stream = streams.get(client);
+  assert(stream);
+  const start = client.mark();
+  let found: WireMessage | undefined;
+  await expect
+    .poll(
+      () => {
+        client.assertHealthy();
+        while (stream.cursor < client.messages.length) {
+          const index = stream.cursor++;
+          const packet = client.messages[index];
+          assert(packet);
+          assert.notEqual(packet.type, 'error', String(packet.data));
+          if (packet.type === 'joined') {
+            stream.decoder.reset();
+          }
+          // Consume every recorded snapshot, even between waits, to preserve its baseline.
+          const message =
+            packet.type === 'snapshot'
+              ? { type: packet.type, data: stream.decoder.decode(packet.data) }
+              : packet;
+          if (index >= start && matches(message)) {
+            found = message;
+            return true;
+          }
+        }
+        return false;
+      },
+      { timeout: 5000 }
+    )
+    .toBe(true);
+  assert(found);
+  return found;
+}
+
+async function join(id: string, resumeToken?: string): Promise<WireClient> {
+  const client = new WireClient(new WebSocket(url));
+  clients.push(client);
+  streams.set(client, { decoder: new SnapshotDecoder(), cursor: 0 });
+  await client.open();
+  const joined = waitForMessage(client, (message) => message.type === 'joined');
+  client.send({
+    type: 'join',
+    id,
+    data: { name: id, position: { x: 0, y: 0 } },
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+    ...(resumeToken ? { resumeToken } : {}),
+  });
+  const ack = dataOf(await joined);
+  expect(ack['id']).toBe(id);
+  expect(ack['snapshotVersion']).toBe(1);
+  expect(ack['asteroidInteractions']).toBe(1);
+  const token = ack['resumeToken'];
+  assert(typeof token === 'string' && /^[a-f0-9]{64}$/.test(token));
+  if (resumeToken) {
+    expect(token).toBe(resumeToken);
+  }
+  resumeTokens.set(client, token);
+  return client;
 }
 
 test('two pilots receive a new belt after depletion without sending asteroid initialization', async () => {
@@ -71,50 +114,40 @@ test('two pilots receive a new belt after depletion without sending asteroid ini
   const initial = server.gameEngine.getAllAsteroids();
   expect(initial).toHaveLength(ROID.INITIAL_ROID_COUNT);
   const oldIds = new Set(initial.map((asteroid) => asteroid.id));
-  const replacement = (message: Message): boolean =>
-    message.type === 'gameState' &&
-    message.data.asteroids?.length === ROID.INITIAL_ROID_COUNT &&
-    message.data.asteroids.every((asteroid) => !oldIds.has(asteroid.id));
+  const replacement = (message: WireMessage): boolean => {
+    if (message.type !== 'snapshot') {
+      return false;
+    }
+    const ids = asteroidIds(message);
+    return ids.length === ROID.INITIAL_ROID_COUNT && ids.every((id) => !oldIds.has(id));
+  };
   const firstView = waitForMessage(first, replacement);
   const secondView = waitForMessage(second, replacement);
-
-  // Simulate depletion at the internal world seam; clients cannot manufacture
-  // this state with an init request. The normal running loop must refill it.
+  // Only the running server loop rebuilds a depleted field.
   for (const asteroid of initial) {
     server.gameEngine.removeAsteroid(asteroid.id);
   }
   const [a, b] = await Promise.all([firstView, secondView]);
-  expect(a.data.asteroids?.map((asteroid) => asteroid.id).sort()).toEqual(
-    b.data.asteroids?.map((asteroid) => asteroid.id).sort()
-  );
+  expect(asteroidIds(a)).toEqual(asteroidIds(b));
   expect(server.gameEngine.getPlayerCount()).toBe(2);
 });
 
-test('a pilot briefly disconnects and rejoins the same live field while its peer keeps playing', async () => {
+test('a pilot briefly disconnects and resumes the same live field while its peer keeps playing', async () => {
   const first = await join('rejoin-pilot-a');
-  const second = await join('rejoin-pilot-b');
+  await join('rejoin-pilot-b');
   const ids = server.gameEngine
     .getAllAsteroids()
     .map((asteroid) => asteroid.id)
     .sort();
-  const peerLeft = waitForMessage(
-    second,
-    (message) => message.type === 'playerLeft' && message.data.id === 'rejoin-pilot-a'
-  );
-  first.close();
-  await peerLeft;
-  const rejoined = await join('rejoin-pilot-a');
+  const token = resumeTokens.get(first);
+  assert(token);
+  await first.close();
+  await expect.poll(() => server.gameEngine.getPlayer('rejoin-pilot-a')?.ws).toBeUndefined();
+  expect(server.gameEngine.getPlayer('rejoin-pilot-a')).toBeDefined();
+  const rejoined = await join('rejoin-pilot-a', token);
   const response = waitForMessage(rejoined, (message) => message.type === 'asteroidCreateBatch');
-  rejoined.send(
-    JSON.stringify({
-      type: 'initAsteroids',
-      id: 'rejoin-pilot-a',
-      data: { asteroidCount: 999999 },
-      timestamp: Date.now(),
-    })
-  );
-  const batch = await response;
-  expect(batch.data.asteroids?.map((asteroid) => asteroid.id).sort()).toEqual(ids);
+  rejoined.send({ type: 'initAsteroids', id: 'rejoin-pilot-a', data: { asteroidCount: 999999 } });
+  expect(asteroidIds(await response)).toEqual(ids);
   expect(server.gameEngine.isGamePaused()).toBe(false);
   expect(server.gameEngine.getPlayerCount()).toBe(2);
 });

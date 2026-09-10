@@ -11,8 +11,8 @@ describe('A player can shoot another player', () => {
 
   beforeEach(() => {
     world = new GameServerWorld();
-    alice = world.join('Alice', { x: -80, y: 0 });
-    bob = world.join('Bob', { x: 80, y: 0 });
+    alice = world.join('Alice', { x: -40, y: 0 });
+    bob = world.join('Bob', { x: 40, y: 0 });
     world.wearOffJoinInvulnerability();
   });
 
@@ -41,12 +41,12 @@ describe('A player can shoot another player', () => {
     }
 
     world.broadcastGameState();
-    for (const socket of [alice.socket, bob.socket]) {
-      expect(socket.lastReceived('gameState')?.data).toMatchObject({
-        entities: expect.arrayContaining([
+    for (const pilot of [alice, bob]) {
+      expect(world.snapshot(pilot).entities).toEqual(
+        expect.arrayContaining([
           expect.objectContaining({ id: bob.id, health: SHIP.MAX_HEALTH - DAMAGE.LASER_HIT }),
-        ]),
-      });
+        ])
+      );
     }
   });
 });

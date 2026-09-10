@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE } from '../../../../src/constants';
-import { RecordingSocket } from '../../../support/recordingSocket';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -21,7 +20,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     world.dispose();
   });
 
-  test('rejoining the same id mid-explosion comes back alive with spawn protection', () => {
+  test('resuming after a death keeps the authoritative respawn lifecycle', () => {
     world.send(ace, {
       type: 'collisionDamage',
       data: {
@@ -33,16 +32,8 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     expect(world.entity(ace).exploding).toBe(true);
     expect(world.entity(ace).health).toBe(0);
 
-    const socket = new RecordingSocket();
-    world.send(
-      { id: ace.id, name: ace.name, socket },
-      {
-        type: 'join',
-        id: ace.id,
-        name: ace.name,
-        data: { name: ace.name, position: { x: 0, y: 0 } },
-      }
-    );
+    world.tickThroughRespawn();
+    ace = world.resume(ace);
 
     const ship = world.entity(ace);
     expect(ship.health).toBe(ship.maxHealth);
@@ -73,7 +64,7 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     expect(world.isOnServer(bo)).toBe(true);
   });
 
-  test('a new tab with the same name mid-death takes over a live ship and tells peers the old id left', () => {
+  test('a new tab with the same name cannot take over without the private resume token', () => {
     world.send(ace, {
       type: 'collisionDamage',
       data: {
@@ -85,15 +76,13 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
     expect(world.entity(ace).exploding).toBe(true);
 
     bo.socket.clear();
-    const clone = world.join('Ace', { x: 40, y: 0 });
+    const cloneSocket = world.attemptJoin('ace-clone', 'Ace', { x: 40, y: 0 });
 
-    expect(world.engine.getPlayer(ace.id)).toBeUndefined();
-    const ship = world.engine.getPlayer(clone.id);
-    expect(ship?.health).toBe(ship?.maxHealth);
-    expect(ship?.exploding).toBe(false);
-    expect(ship?.respawnTimer).toBeUndefined();
+    expect(cloneSocket.received('joined')).toHaveLength(0);
+    expect(cloneSocket.received('error')).toHaveLength(1);
+    expect(world.engine.getPlayer(ace.id)).toBeDefined();
     expect(world.engine.getPlayerCount()).toBe(2);
-    expect(bo.socket.lastReceived('playerLeft')?.data).toMatchObject({ id: ace.id });
+    expect(bo.socket.received('playerLeft')).toHaveLength(0);
   });
 
   test('drop then rejoin after death is a live ship, not a frozen hull', () => {
@@ -106,18 +95,9 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
       },
     });
     const livesAfterDeath = world.entity(ace).lives;
-    world.disconnect(ace);
-
-    const socket = new RecordingSocket();
-    world.send(
-      { id: ace.id, name: ace.name, socket },
-      {
-        type: 'join',
-        id: ace.id,
-        name: ace.name,
-        data: { name: ace.name, position: { x: 0, y: 0 } },
-      }
-    );
+    world.dropTransport(ace);
+    world.tickThroughRespawn();
+    ace = world.resume(ace);
 
     const ship = world.entity(ace);
     expect(ship.lives).toBe(livesAfterDeath);

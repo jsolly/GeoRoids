@@ -3,7 +3,7 @@ import type { Laser } from '../../../src/entities/laser/Laser';
 import type { Roid } from '../../../src/entities/roid/Roid';
 import type { Ship } from '../../../src/entities/ship/Ship';
 import {
-  checkLaserAsteroidCollision,
+  checkLaserHit,
   checkLaserShipCollision,
 } from '../../../src/physics/collision/collisionDetection';
 
@@ -47,21 +47,13 @@ describe('Laser Collision Detection', () => {
 
   describe('Laser vs Asteroid Collisions', () => {
     test('laser hits asteroid when positions overlap', () => {
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(true);
     });
 
     test('laser misses asteroid when positions are far apart', () => {
       mockLaser.position = { x: 200, y: 200 };
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(false);
     });
 
@@ -69,22 +61,14 @@ describe('Laser Collision Detection', () => {
       // Position laser at the edge of asteroid (radius 20 + laser radius 2 = 22)
       // Use 21.9 to be just inside the collision boundary
       mockLaser.position = { x: 100 + 21.9, y: 100 };
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(true);
     });
 
     test('laser misses asteroid when just outside edge', () => {
       // Position laser just outside asteroid edge
       mockLaser.position = { x: 100 + 22.1, y: 100 };
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(false);
     });
 
@@ -92,16 +76,12 @@ describe('Laser Collision Detection', () => {
       // Test with large asteroid
       mockAsteroid.r = 40;
       mockLaser.position = { x: 100 + 41.9, y: 100 }; // Just inside collision boundary
-      expect(
-        checkLaserAsteroidCollision(mockLaser.position, mockAsteroid.position, mockAsteroid.r)
-      ).toBe(true);
+      expect(checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r)).toBe(true);
 
       // Test with small asteroid
       mockAsteroid.r = 10;
       mockLaser.position = { x: 100 + 11.9, y: 100 }; // Just inside collision boundary
-      expect(
-        checkLaserAsteroidCollision(mockLaser.position, mockAsteroid.position, mockAsteroid.r)
-      ).toBe(true);
+      expect(checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r)).toBe(true);
     });
   });
 
@@ -149,33 +129,21 @@ describe('Laser Collision Detection', () => {
     test('laser collision works with zero radius objects', () => {
       mockAsteroid.r = 0;
       mockLaser.position = { x: 100, y: 100 }; // Exact same position
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(true); // Laser radius (2) should still hit
     });
 
     test('laser collision works with negative coordinates', () => {
       mockLaser.position = { x: -100, y: -100 };
       mockAsteroid.position = { x: -100, y: -100 };
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(true);
     });
 
     test('laser collision works with very large coordinates', () => {
       mockLaser.position = { x: 10000, y: 10000 };
       mockAsteroid.position = { x: 10000, y: 10000 };
-      const result = checkLaserAsteroidCollision(
-        mockLaser.position,
-        mockAsteroid.position,
-        mockAsteroid.r
-      );
+      const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(true);
     });
   });

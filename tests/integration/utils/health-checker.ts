@@ -52,7 +52,7 @@ export async function checkViteServer(): Promise<boolean> {
 
 async function checkWebSocketGameplayEndpoint(): Promise<boolean> {
   return new Promise((resolve) => {
-    const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/, 'ws')}/ws`;
+    const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/, 'ws')}/ws?asteroidInteractions=1`;
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
       ws.close();

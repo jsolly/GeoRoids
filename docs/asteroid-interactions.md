@@ -20,14 +20,20 @@ While latched, select a second nearby rock and use **Anchor** or **Brake** to co
 
 The cream cable and amber endpoints show the physical connection. A socket interruption shorter than two seconds preserves the attachment with neutral input; a longer interruption, explicit exit, death or missing rock detaches it. Rejoining cannot duplicate the boost or spend fuel while disconnected.
 
-## Compatible rollout
+## Multiplayer protocol
 
-The server accepts `asteroidInteractions:1` only together with snapshot v1 and acknowledges it with a private resume token. Clients offer these tools by default after the matching Railway support release. Set `VITE_ASTEROID_INTERACTIONS=0` for legacy-client verification or rollback; disable the Railway admission gate before publishing a rollback. Unsupported servers keep the ordinary client path.
-
-Existing clients can continue ordinary play. New phenomena first seed when an enhanced pilot enters an active world; they remain until that world ends. The authoritative server then owns every projectile collision. Enhanced clients render keyed projectile snapshots; older clients use the existing shot and reflection events. Resume tokens are private to the joined socket and never placed in the common public world.
+Every pilot uses snapshot v1 with `asteroidInteractions:1`, acknowledged by the
+server with a private resume token. Unsupported clients cannot join. The server
+owns projectile collisions, and clients render keyed projectile snapshots.
+Reflective phenomena seed when a pilot enters an active world and remain until
+that world ends. Resume tokens are private to the joined socket and never appear
+in the common public world.
 
 ## Updating open clients
 
 Published client releases automatically refresh open tabs after two matching release checks, about 30–60 seconds for active tabs. The check uses the client origin's `x-release-id`; the independently deployed Railway server does not trigger reloads. A per-tab guard prevents repeated reloads if the edge still serves a cached bundle. Tabs opened before this watcher was shipped need one manual refresh.
 
-For a release cutover, deploy server support first with `REQUIRE_ASTEROID_CLIENT` unset. After the enhanced Vercel client is READY, set Railway `REQUIRE_ASTEROID_CLIENT=1`. The updated client supplies `asteroidInteractions=1` on its WebSocket URL. Stale clients receive HTTP426 before the WebSocket opens and must refresh; their reconnect attempts cannot repeatedly reset on successful upgrades. `/logs` is unaffected. During the support transition, older clients see laser cores using their existing mineral-pickup visual with the same authoritative pickup identity and reward.
+Gameplay WebSocket URLs include `asteroidInteractions=1`. Older clients receive
+HTTP 426 before the WebSocket opens and must refresh. The join message must also
+contain both current capabilities. `/logs` is unaffected. Client and server are
+deployed independently; verify each release ID and current multiplayer behavior.

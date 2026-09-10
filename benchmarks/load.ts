@@ -4,7 +4,6 @@ import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { WebSocket } from 'ws';
-import { validateSnapshotDto } from '../shared/snapshotDto';
 import { SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../shared-types';
 import {
@@ -30,7 +29,6 @@ const { values } = parseArgs({
     url: { type: 'string' },
     output: { type: 'string', default: '.performance/load.json' },
     'allow-remote': { type: 'boolean', default: false },
-    legacy: { type: 'string', default: '0' },
     network: { type: 'string', default: 'clean' },
   },
 });
@@ -50,14 +48,9 @@ const pilots = Number(values.pilots);
 const seconds = Number(values.seconds);
 const warmup = Number(values.warmup);
 const admissionMs = Number(values['admission-ms']);
-const legacyCount = Number(values.legacy);
 assert(Number.isInteger(pilots) && pilots >= 1 && pilots <= 50, 'pilots must be 1..50');
 assert(Number.isFinite(seconds) && seconds >= 1 && seconds <= 1800, 'seconds must be 1..1800');
 assert(Number.isFinite(warmup) && warmup >= 0 && warmup <= 300, 'warmup must be 0..300');
-assert(
-  Number.isInteger(legacyCount) && legacyCount >= 0 && legacyCount <= pilots,
-  'legacy must be 0..pilots'
-);
 assert(
   Number.isFinite(admissionMs) && admissionMs >= 1250,
   'admission-ms must be at least 1250 to respect connection admission limits'
@@ -65,6 +58,8 @@ assert(
 const url = new URL(
   values.url ?? `ws://127.0.0.1:${process.env['GEOROIDS_TEST_SERVER_PORT'] ?? 3001}/ws`
 );
+url.searchParams.set('snapshotVersion', '1');
+url.searchParams.set('asteroidInteractions', '1');
 assert(['ws:', 'wss:'].includes(url.protocol), 'Expected ws or wss URL');
 assert(!url.username && !url.password, 'Credentials must not appear in benchmark URLs');
 assert(
@@ -144,10 +139,7 @@ class Pilot {
   completedScenario = false;
   private measuredPings = 0;
 
-  constructor(
-    private readonly index: number,
-    readonly legacy: boolean
-  ) {
+  constructor(private readonly index: number) {
     this.id = `benchmark-${index}`;
     this.socket = new WebSocket(url, { perMessageDeflate: false });
     this.socket.on('error', fail);
@@ -184,7 +176,17 @@ class Pilot {
         }
         if (message.type === 'joined') {
           assert(
-            data && typeof data === 'object' && 'id' in data && data.id === this.id,
+            data &&
+              typeof data === 'object' &&
+              'id' in data &&
+              data.id === this.id &&
+              'snapshotVersion' in data &&
+              data.snapshotVersion === 1 &&
+              'asteroidInteractions' in data &&
+              data.asteroidInteractions === 1 &&
+              'resumeToken' in data &&
+              typeof data.resumeToken === 'string' &&
+              data.resumeToken.length > 0,
             'Invalid joined acknowledgment'
           );
           this.joined = true;
@@ -195,11 +197,11 @@ class Pilot {
             this.releaseId = data.serverReleaseId;
           }
         }
-        if ((message.type === 'snapshot' || message.type === 'gameState') && !this.joined) {
+        if (message.type === 'snapshot' && !this.joined) {
           return;
         }
         if (message.type === 'snapshot') {
-          assert(this.joined && !legacy, 'Snapshot without negotiated acknowledgment');
+          assert(this.joined, 'Snapshot without join acknowledgment');
           this.state = this.decoder.decode(data);
           assert(
             data && typeof data === 'object' && 'sequence' in data,
@@ -214,11 +216,6 @@ class Pilot {
           if (data && typeof data === 'object' && 'kind' in data && data.kind === 'keyframe') {
             this.keyframes++;
           }
-        } else if (message.type === 'gameState') {
-          assert(legacy && data && typeof data === 'object', 'Unexpected legacy state');
-          const state = { satelliteProjectiles: [], collabTags: [], ...data };
-          validateSnapshotDto(state);
-          this.state = state;
         } else {
           return;
         }
@@ -241,7 +238,7 @@ class Pilot {
           this.measuredServerTick ??= this.state.gameTime;
         }
         if (measuring && this.measuredServerTick !== undefined) {
-          for (const shot of this.state.playerProjectiles ?? []) {
+          for (const shot of this.state.playerProjectiles) {
             if (
               shot.ownerId === this.id &&
               this.state.gameTime - shot.age > this.measuredServerTick
@@ -295,7 +292,8 @@ class Pilot {
         name: `測試-${this.index}`,
         position: { x: 100 + this.index * 70, y: 100 },
         kitId: 'dart',
-        ...(this.legacy ? {} : { snapshotVersion: 1, asteroidInteractions: 1 }),
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
       },
     });
   }
@@ -320,7 +318,7 @@ class Pilot {
     }
     this.sequence++;
     const angle = Math.atan2(Math.sin(tick * 0.04), Math.cos(tick * 0.04));
-    const motion = !this.legacy ? entity.asteroidMotion : undefined;
+    const motion = entity.asteroidMotion;
     const alive = !entity.exploding && entity.health > 0;
     if (alive && motion && ['latched', 'released'].includes(motion.mode)) {
       this.send({
@@ -384,7 +382,7 @@ class Pilot {
       this.pingMeasured = measuring;
       this.socket.ping();
     }
-    if (tick > 0 && tick % 600 === 0 && !this.legacy) {
+    if (tick > 0 && tick % 600 === 0) {
       this.send({ type: 'snapshotResync', data: {} });
       this.resyncs++;
     }
@@ -427,13 +425,11 @@ class Pilot {
     assert(this.measuredPings > 0, 'Pilot had no measured RTT probe');
     assert.equal(this.unansweredMeasuredPings, 0, 'Measured RTT probe was unanswered');
     assert.equal(this.rttMs.length, this.measuredPings, 'Measured RTT probes were omitted');
-    if (!this.legacy) {
-      assert(this.measuredShotsOffered > 0, 'Pilot offered no measured shots');
-      assert(
-        this.observedServerShots.size > 0,
-        'No authoritative projectile born after measured motion acknowledgment'
-      );
-    }
+    assert(this.measuredShotsOffered > 0, 'Pilot offered no measured shots');
+    assert(
+      this.observedServerShots.size > 0,
+      'No authoritative projectile born after measured motion acknowledgment'
+    );
     assert(
       this.measuredStates >= (this.measuredWallMs * MIN_STATE_HZ) / 1000 - 2,
       `Authoritative delivery below ${MIN_STATE_HZ}Hz: ${this.measuredStates} states in ${this.measuredWallMs.toFixed(0)}ms`
@@ -471,7 +467,6 @@ class Pilot {
   }
   report() {
     return {
-      legacy: this.legacy,
       releaseId: this.releaseId,
       joined: this.joined,
       gameJoins: this.gameJoins,
@@ -491,7 +486,7 @@ class Pilot {
       keyframes: this.keyframes,
       shotsOffered: this.shots,
       measuredShotsOffered: this.measuredShotsOffered,
-      observedMeasuredServerProjectiles: this.legacy ? null : this.observedServerShots.size,
+      observedMeasuredServerProjectiles: this.observedServerShots.size,
       resyncs: this.resyncs,
       decodeMs: this.decodeMs,
       omittedDecodeSamples: this.measuredStates - this.decodeMs.length,
@@ -521,7 +516,7 @@ try {
     if (i) {
       await delay(admissionMs);
     }
-    const client = new Pilot(i, i < legacyCount);
+    const client = new Pilot(i);
     clients.push(client);
     const deadline = performance.now() + 10000;
     while (client.firstStateAt === undefined && performance.now() < deadline && !totalFailures) {
@@ -587,10 +582,8 @@ try {
   for (const client of clients) {
     client.validateCompletion();
     assert(client.measuredStates > 0, 'Pilot did not receive measured states');
-    if (!client.legacy) {
-      assert(client.measuredMotionCommands > 0, 'No measured enhanced poses offered');
-      assert(client.acknowledgedMotionStates > 0, 'Server did not acknowledge enhanced poses');
-    }
+    assert(client.measuredMotionCommands > 0, 'No measured poses offered');
+    assert(client.acknowledgedMotionStates > 0, 'Server did not acknowledge poses');
     assert.equal(client.measuredStates, client.decodeMs.length, 'Raw decode samples omitted');
     client.completedScenario = true;
   }
@@ -657,7 +650,6 @@ try {
           },
           parameters: {
             pilots,
-            legacyCount,
             warmupSeconds: warmup,
             measuredSeconds: seconds,
             admissionMs,
@@ -694,7 +686,6 @@ try {
       },
       configuration: {
         pilots,
-        legacyCount,
         warmup,
         seconds,
         admissionMs,

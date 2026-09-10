@@ -60,10 +60,6 @@ import {
   shieldSnapshot,
 } from '../../src/entities/ship/shipShield';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
-import {
-  checkLaserAsteroidCollisionSwept,
-  isLaserNearAsteroid,
-} from '../../src/physics/collision/collisionDetection';
 import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/physics/shockwave';
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../src/physics/terrain/terrainSession';
@@ -174,14 +170,7 @@ export class GameEngine {
   private readonly laserNonce = randomUUID();
   public readonly asteroidMotion = new AsteroidMotionService();
   private departedPlayers: string[] = [];
-  private phenomenaEnabled = false;
   private decoratedFieldId?: string | undefined;
-  private pendingReflections: Array<{
-    id: string;
-    shotId: string;
-    laserStart: Position;
-    laserDirection: Velocity;
-  }> = [];
   private pendingLootBlasts: Array<{
     lootId: string;
     position: Position;
@@ -191,7 +180,6 @@ export class GameEngine {
   private onAsteroidHits?: (hits: AppliedAsteroidHit[]) => void;
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private pendingShockwaves: PendingShockwave[] = [];
-  private pendingBotShots: BotShot[] = [];
   private pendingSatelliteShots: SatelliteShoot[] = [];
   private readonly humanShootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly humanLaserExpiry = new WeakMap<ServerLaser, number>();
@@ -331,7 +319,7 @@ export class GameEngine {
     this.collectLoot(serverNow);
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion((id) => this.asteroidMotion.ownsAsteroidMotion(id));
-    if (this.phenomenaEnabled && this.gameTime % 60 === 0) {
+    if (this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
     }
     this.emitAsteroidHits(this.advanceLasersAndResolveHits(serverNow));
@@ -481,11 +469,9 @@ export class GameEngine {
     this.pendingShockwaves = [];
     this.lootManager.clear();
     this.lasers = [];
-    this.phenomenaEnabled = false;
     this.asteroidMotion.reset();
     this.departedPlayers = [];
     this.decoratedFieldId = undefined;
-    this.pendingReflections = [];
     this.pendingLootBlasts = [];
     this.pendingAsteroidHits = [];
     this.satelliteManager.clearSatellites();
@@ -495,7 +481,6 @@ export class GameEngine {
     // Clear all entities (bots, players, etc.)
     this.entityManager.clearAll();
     this.collisionAuthority.reset();
-    this.pendingBotShots = [];
 
     // Keep gameTime monotonic for the process lifetime. Zeroing it when the
     // last player leaves makes /health.world.gameTime look frozen on prod
@@ -592,10 +577,9 @@ export class GameEngine {
     return this.asteroidManager.getAllAsteroids();
   }
 
-  /** Activated only by the negotiated enhanced client; legacy joins do not seed new mechanics. */
+  /** Seed the always-on asteroid interaction field for the active arena. */
   public enableAsteroidInteractions(player: GameEntity): void {
     player.asteroidInteractions = 1;
-    this.phenomenaEnabled = true;
     this.seedAsteroidInteractions();
   }
 
@@ -611,10 +595,6 @@ export class GameEngine {
     }
   }
 
-  public usesAuthoritativeProjectiles(): boolean {
-    return this.phenomenaEnabled;
-  }
-
   public getPlayerProjectiles(): PlayerProjectileState[] {
     return this.lasers
       .filter((laser) => !laser.hasExploded)
@@ -628,10 +608,6 @@ export class GameEngine {
         bounces: laser.bounces,
         age: laser.age,
       }));
-  }
-
-  public drainReflections() {
-    return this.pendingReflections.splice(0);
   }
 
   public drainLootBlasts() {
@@ -671,9 +647,7 @@ export class GameEngine {
       botPositions,
       playerPositions
     );
-    if (this.phenomenaEnabled) {
-      this.seedAsteroidInteractions();
-    }
+    this.seedAsteroidInteractions();
     logger.info('ASTEROID', 'Seeded active asteroid field', {
       asteroidCount: asteroids.length,
       humanPlayers: playerPositions.length,
@@ -1192,17 +1166,10 @@ export class GameEngine {
     return result;
   }
 
-  /**
-   * Sole apply path for laser/ram reports and the server laser tick.
-   * Collab tag/split stays in handleAsteroidHit; callers that accept a client
-   * report consume its tracked projectile before entering this method. The
-   * authoritative laser tick marks its own exact laser after this apply path,
-   * so applying a client hint cannot consume a second coincident shot.
-   */
+  /** Sole apply path for authoritative laser and ram outcomes. */
   public applyLaserAsteroidHit(
     asteroidId: string,
     playerId: string,
-    laserPosition?: Position,
     cause: AsteroidHitCause = 'laser',
     now = this.getServerTime()
   ): AppliedAsteroidHit {
@@ -1218,14 +1185,6 @@ export class GameEngine {
 
     const asteroid = this.asteroidManager.getAsteroid(asteroidId);
     if (!asteroid) {
-      return empty;
-    }
-
-    if (
-      cause === 'laser' &&
-      laserPosition &&
-      !isLaserNearAsteroid(laserPosition, asteroid.position, asteroid.size)
-    ) {
       return empty;
     }
 
@@ -1392,149 +1351,6 @@ export class GameEngine {
     return this.lasers;
   }
 
-  /**
-   * Bot asteroid reports are only accepted while the server still has the
-   * corresponding bot projectile in flight near that same server asteroid.
-   * This keeps the existing bot-shot wire shape while rejecting forged bot
-   * identities and reports after a shot has already been consumed.
-   */
-  public hasActiveBotLaserNearAsteroid(botId: string, asteroidId: string): boolean {
-    const bot = this.entityManager.getEntity(botId);
-    const asteroid = this.asteroidManager.getAsteroid(asteroidId);
-    if (bot?.type !== 'bot' || !asteroid) {
-      return false;
-    }
-
-    return this.lasers.some(
-      (laser) =>
-        !laser.hasExploded &&
-        laser.ownerId === botId &&
-        isLaserNearAsteroid(laser.position, asteroid.position, asteroid.size)
-    );
-  }
-
-  /** Consume one validated bot projectile so duplicate client reports cannot replay it. */
-  public consumeActiveBotLaserNearAsteroid(
-    botId: string,
-    asteroidId: string,
-    reportedPosition?: Position
-  ): boolean {
-    const bot = this.entityManager.getEntity(botId);
-    const asteroid = this.asteroidManager.getAsteroid(asteroidId);
-    if (
-      bot?.type !== 'bot' ||
-      !asteroid ||
-      (reportedPosition !== undefined &&
-        (!this.validatePosition(reportedPosition) ||
-          !isLaserNearAsteroid(reportedPosition, asteroid.position, asteroid.size)))
-    ) {
-      return false;
-    }
-
-    const laser = this.lasers.find(
-      (candidate) =>
-        !candidate.hasExploded &&
-        candidate.ownerId === botId &&
-        isLaserNearAsteroid(candidate.position, asteroid.position, asteroid.size)
-    );
-    if (!laser) {
-      return false;
-    }
-
-    laser.hasExploded = true;
-    return true;
-  }
-
-  /**
-   * Bot loot reports use the same one-use server projectile evidence as bot
-   * asteroid reports. The client may report where it saw the bot laser, but
-   * it cannot create or replay the shot itself.
-   */
-  public consumeActiveBotLaserNearLoot(botId: string, lootId: string): boolean {
-    const bot = this.entityManager.getEntity(botId);
-    const loot = this.lootManager.get(lootId);
-    if (bot?.type !== 'bot' || !loot) {
-      return false;
-    }
-
-    const laser = this.lasers.find(
-      (candidate) =>
-        !candidate.hasExploded &&
-        candidate.ownerId === botId &&
-        isLaserNearAsteroid(candidate.position, loot.position, loot.radius)
-    );
-    if (!laser) {
-      return false;
-    }
-
-    laser.hasExploded = true;
-    return true;
-  }
-
-  /**
-   * Consume one server-tracked human shot when its live geometry is near a
-   * target. A report may omit its hit position for legacy clients; the server
-   * still requires the tracked laser itself to be near the authoritative
-   * target before consuming it.
-   */
-  public consumeHumanLaserNearTarget(
-    attackerId: string,
-    targetPosition: Position,
-    targetRadius: number,
-    reportedPosition?: Position
-  ): boolean {
-    if (
-      !this.validatePosition(targetPosition) ||
-      !Number.isFinite(targetRadius) ||
-      targetRadius < 0 ||
-      (reportedPosition !== undefined && !this.validatePosition(reportedPosition))
-    ) {
-      return false;
-    }
-
-    const shooter = this.entityManager.getEntity(attackerId);
-    if (shooter?.type !== 'human') {
-      return false;
-    }
-
-    const laser = this.lasers.find(
-      (candidate) =>
-        !candidate.hasExploded &&
-        candidate.ownerId === attackerId &&
-        (isLaserNearAsteroid(candidate.position, targetPosition, targetRadius) ||
-          isLaserNearAsteroid(candidate.prevPosition, targetPosition, targetRadius)) &&
-        (reportedPosition === undefined ||
-          isLaserNearAsteroid(reportedPosition, targetPosition, targetRadius))
-    );
-    if (!laser) {
-      return false;
-    }
-    laser.hasExploded = true;
-    return true;
-  }
-
-  /** Consume one server-tracked human shot when its client hit report is near an EO hull. */
-  public consumeHumanLaserNearSatellite(
-    attackerId: string,
-    satelliteId: string,
-    reportedPosition: Position
-  ): boolean {
-    if (!this.validatePosition(reportedPosition)) {
-      return false;
-    }
-    const satellite = this.satelliteManager.getSatellite(satelliteId);
-    if (!satellite || satellite.exploding || satellite.respawnTimer > 0 || satellite.health <= 0) {
-      return false;
-    }
-
-    return this.consumeHumanLaserNearTarget(
-      attackerId,
-      satellite.position,
-      satellite.radius,
-      reportedPosition
-    );
-  }
-
   /** Move live lasers and apply at most one break per asteroid / laser. */
   public advanceLasersAndResolveHits(now = this.getServerTime()): AppliedAsteroidHit[] {
     const hits: AppliedAsteroidHit[] = [];
@@ -1597,34 +1413,7 @@ export class GameEngine {
   }
 
   private resolveLaserAgainstAsteroids(laser: ServerLaser, now: number): AppliedAsteroidHit | null {
-    if (this.phenomenaEnabled) {
-      return this.resolveEnhancedLaser(laser, now);
-    }
-    for (const asteroid of this.asteroidManager.getAllAsteroids()) {
-      if (asteroid.isCollabTarget) {
-        continue;
-      }
-      if (
-        !checkLaserAsteroidCollisionSwept(
-          laser.prevPosition,
-          laser.position,
-          asteroid.position,
-          asteroid.size
-        )
-      ) {
-        continue;
-      }
-      const hit = this.applyLaserAsteroidHit(
-        asteroid.id,
-        laser.ownerId,
-        laser.position,
-        'laser',
-        now
-      );
-      laser.hasExploded = true;
-      return hit.applied ? hit : null;
-    }
-    return null;
+    return this.resolveEnhancedLaser(laser, now);
   }
 
   /** Full swept path for the enhanced world. Every bounce consumes distance and
@@ -1766,12 +1555,6 @@ export class GameEngine {
         const direction = { x: laser.velocity.x / speed, y: laser.velocity.y / speed };
         start = { x: impact.point.x + direction.x * 1e-5, y: impact.point.y + direction.y * 1e-5 };
         end = { x: start.x + direction.x * remaining, y: start.y + direction.y * remaining };
-        this.pendingReflections.push({
-          id: laser.ownerId,
-          shotId: laser.id,
-          laserStart: { ...start },
-          laserDirection: { ...laser.velocity },
-        });
         continue;
       }
       laser.hasExploded = true;
@@ -1793,9 +1576,9 @@ export class GameEngine {
       }
       // Core charges double one physical shot's metal chip; each logical shot
       // is still consumed once and terminal drops/score happen only once.
-      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, impact.point, 'laser', now);
+      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now);
       if (laser.energy >= 2 && rock.material === 'metal' && this.getAsteroid(rock.id)) {
-        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, impact.point, 'laser', now);
+        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now);
       }
       return hit.applied ? hit : null;
     }
@@ -2175,21 +1958,13 @@ export class GameEngine {
     return shots;
   }
 
-  public consumeBotShots(): BotShot[] {
-    const shots = this.pendingBotShots;
-    this.pendingBotShots = [];
-    return shots;
-  }
-
   private queueBotShots(shots: BotShot[]): void {
     for (const shot of shots) {
       const bot = this.entityManager.getEntity(shot.botId);
       if (bot?.type !== 'bot') {
         continue;
       }
-      if (this.spawnLaser(shot.botId, shot.laserStart, shot.laserDirection)) {
-        this.pendingBotShots.push(shot);
-      }
+      this.spawnLaser(shot.botId, shot.laserStart, shot.laserDirection);
     }
   }
 

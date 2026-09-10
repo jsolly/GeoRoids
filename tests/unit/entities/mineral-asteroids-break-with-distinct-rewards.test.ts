@@ -104,7 +104,7 @@ describe('mineral asteroids break with distinct rewards', () => {
   test('one pilot breaking rubble creates fragments without a cooperative shockwave', () => {
     const engine = new GameEngine(42);
     engine.addAsteroid(mineral('rubble'));
-    const result = engine.applyLaserAsteroidHit('rubble', 'pilot', { x: 400, y: 300 });
+    const result = engine.applyLaserAsteroidHit('rubble', 'pilot');
     expect(result.applied).toBe(true);
     expect(result.newAsteroids).toHaveLength(3);
     expect(result.split).toBe(false);

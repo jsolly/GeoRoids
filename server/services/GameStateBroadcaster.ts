@@ -8,7 +8,7 @@ import {
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
-import type { AsteroidData, Position, Velocity } from '../../shared-types';
+import type { AsteroidData } from '../../shared-types';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
@@ -19,16 +19,6 @@ interface SnapshotRecipient {
   sinceKeyframe: number;
   pending: boolean;
   needsKeyframe: boolean;
-}
-
-interface PlayerUpdateData {
-  position?: Position;
-  velocity?: Velocity;
-  angle?: number;
-  thrusting?: boolean;
-  rotation?: number;
-  angularVelocity?: number;
-  a?: number;
 }
 
 type AsteroidUpdateData = Partial<AsteroidData>;
@@ -50,7 +40,6 @@ const OUTBOUND_FRAME_HEADER_RESERVE_BYTES = 10;
 
 function outboundClass(message: unknown): OutboundClass {
   switch (messageType(message)) {
-    case 'gameState':
     case 'snapshot':
     case 'asteroidCreateBatch':
       return 'snapshot';
@@ -107,17 +96,8 @@ export class GameStateBroadcaster {
           this.broadcastSatelliteShoot(shot);
         }
         this.broadcastGameState();
-        this.broadcastPendingBotShots();
       }
     }, 1000 / 30); // 30 FPS (33.33ms) for smooth bot movement
-  }
-
-  private broadcastPendingBotShots(): void {
-    for (const shot of this.gameEngine.consumeBotShots()) {
-      // Bot ids never match a human socket, so every client receives the shot
-      // on the same playerShoot path used by remote humans.
-      this.broadcastPlayerShoot(shot.botId, shot.laserStart, shot.laserDirection);
-    }
   }
 
   public stopPeriodicBroadcast(): void {
@@ -148,28 +128,13 @@ export class GameStateBroadcaster {
       this.broadcastPlayerLeft(id);
     }
     const gameState = this.gameEngine.getGameState();
-    // The deployed snapshot-v1 client validates a closed loot-kind enum.
-    // Preserve each core's identity/position/reward for old pilots using its
-    // existing mineral pickup visual; never send an undecodable new enum.
-    const compatibleLoot = gameState.loot.map((loot) =>
-      loot.kind === 'laserCore' ? { ...loot, kind: 'shard' as const } : loot
-    );
-    const message = {
-      type: 'gameState',
-      data: gameState,
-      timestamp: Date.now(),
-    };
+    const timestamp = Date.now();
 
     for (const blast of this.gameEngine.drainLootBlasts()) {
       this.broadcastLootExploded(blast);
     }
-    for (const bounce of this.gameEngine.drainReflections()) {
-      this.broadcastToAll({ type: 'playerShoot', data: bounce, timestamp: Date.now() });
-    }
     const players = this.gameEngine.entityManager.getHumanPlayers();
     let canonical: SnapshotEncoder | undefined;
-    let compatible: SnapshotEncoder | undefined;
-    let legacy: string | undefined;
     for (const player of players) {
       const ws = player.ws;
       if (!ws || (excludeId && player.id === excludeId)) {
@@ -177,15 +142,10 @@ export class GameStateBroadcaster {
       }
       const recipient = this.snapshotRecipients.get(ws);
       if (!recipient) {
-        if (ws.readyState === WebSocket.OPEN) {
-          try {
-            legacy ??= JSON.stringify({ ...message, data: { ...gameState, loot: compatibleLoot } });
-            this.sendSerialized(ws, legacy, 'snapshot');
-          } catch (error) {
-            logger.error('Failed to send legacy game state', error);
-            this.closeFailedSnapshotSocket(ws);
-          }
-        }
+        logger.warn('Closing gameplay socket without a negotiated snapshot recipient', {
+          playerId: player.id,
+        });
+        this.closeSocketForRecovery(ws, 1002, 'Snapshot negotiation required');
         continue;
       }
       if (ws.readyState !== WebSocket.OPEN || recipient.pending) {
@@ -208,23 +168,18 @@ export class GameStateBroadcaster {
             .getActiveCollabTags()
             .map((tag) => ({ id: tag.asteroidId, ...tag })),
         });
-        let encoder = canonical;
-        if (player.asteroidInteractions !== 1) {
-          compatible ??= new SnapshotEncoder({ ...canonical.state, loot: compatibleLoot });
-          encoder = compatible;
-        }
         const sequence = recipient.sequence + 1;
         const full =
           recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
-        const frame = encoder.encode(sequence, full ? undefined : recipient.baseline);
+        const frame = canonical.encode(sequence, full ? undefined : recipient.baseline);
         recipient.pending = true;
         recipient.needsKeyframe = false;
-        const deliveredState = encoder.state;
+        const deliveredState = canonical.state;
         const recipientPlayerId = player.id;
         const serialized = JSON.stringify({
           type: 'snapshot',
           data: frame,
-          timestamp: message.timestamp,
+          timestamp,
         });
         const result = this.sendSerialized(ws, serialized, 'snapshot', (error) => {
           recipient.pending = false;
@@ -247,7 +202,7 @@ export class GameStateBroadcaster {
             logger.info('STATE', 'snapshot_sent_to_transport', {
               releaseId: SERVER_RELEASE_ID,
               playerId: recipientPlayerId,
-              sentAt: message.timestamp,
+              sentAt: timestamp,
               gameTime: deliveredState.gameTime,
               snapshotSequence: sequence,
               snapshotKind: frame.kind,
@@ -287,12 +242,9 @@ export class GameStateBroadcaster {
     }
   }
 
-  /** Called before joined; absent/unsupported offers preserve the exact legacy wire. */
-  public negotiateSnapshot(ws: WebSocket, offer: unknown): 1 | undefined {
+  /** Register the current snapshot-v1 recipient before the join acknowledgment. */
+  public negotiateSnapshot(ws: WebSocket): 1 {
     this.snapshotRecipients.delete(ws);
-    if (offer !== SNAPSHOT_VERSION) {
-      return undefined;
-    }
     this.snapshotRecipients.set(ws, {
       sequence: 0,
       sinceKeyframe: 0,
@@ -340,16 +292,6 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message, playerId);
   }
 
-  public broadcastPlayerUpdate(playerId: string, updateData: PlayerUpdateData): void {
-    const message = {
-      type: 'playerUpdate',
-      data: { id: playerId, ...updateData },
-      timestamp: Date.now(),
-    };
-
-    this.broadcastToAll(message, playerId);
-  }
-
   public broadcastSatelliteShoot(shot: {
     id: string;
     shotId: string;
@@ -363,31 +305,8 @@ export class GameStateBroadcaster {
     });
   }
 
-  public broadcastPlayerShoot(
-    playerId: string,
-    laserStart: Position,
-    laserDirection: Velocity,
-    shotId?: string
-  ): void {
-    const timestamp = Date.now();
-    const message = {
-      type: 'playerShoot',
-      data: {
-        id: playerId,
-        laserStart,
-        laserDirection,
-        ...(shotId ? { shotId } : {}),
-      },
-      timestamp,
-    };
-
-    this.broadcastToAll(message, playerId);
-  }
-
   public broadcastCombatResult(result: CombatBroadcast): void {
-    if (result.targetType === 'bot') {
-      this.broadcastBotUpdate(result.targetId);
-    } else {
+    if (result.targetType !== 'bot') {
       this.broadcastPlayerDamaged(
         result.targetId,
         result.attackerId,
@@ -593,47 +512,6 @@ export class GameStateBroadcaster {
     };
 
     this.broadcastToAll(message);
-  }
-
-  public broadcastBotUpdate(botId: string): void {
-    const bot = this.gameEngine.getBot(botId);
-    if (bot) {
-      const data = {
-        botId: bot.id,
-        playerId: 'server',
-        position: bot.position,
-        velocity: bot.velocity,
-        angle: bot.angle,
-        exploding: bot.exploding,
-        thrusting: bot.thrusting,
-        color: bot.color,
-        lives: bot.lives,
-        health: bot.health,
-        maxHealth: bot.maxHealth,
-        fuel: bot.fuel,
-        maxFuel: bot.maxFuel,
-        mass: bot.mass,
-        kitId: bot.kitId,
-        ...(bot.factionId !== undefined ? { factionId: bot.factionId } : {}),
-        abilityCooldownFrames: bot.abilityCooldownFrames,
-        abilityActiveFrames: bot.abilityActiveFrames,
-        shieldTimer: bot.shieldTimer,
-        harpoonTimer: bot.harpoonTimer,
-        ...(bot.harpoonTargetId !== undefined ? { harpoonTargetId: bot.harpoonTargetId } : {}),
-        ...(bot.harpoonLatchPos !== undefined ? { harpoonLatchPos: bot.harpoonLatchPos } : {}),
-        shieldActive: bot.shieldActive,
-        shieldTime: bot.shieldTime,
-        shieldCooldown: bot.shieldCooldown,
-        shieldFlashTime: bot.shieldFlashTime,
-      };
-      const message = {
-        type: 'botUpdate',
-        data,
-        timestamp: Date.now(),
-      };
-
-      this.broadcastToAll(message);
-    }
   }
 
   public broadcastChatMessage(playerId: string, playerName: string, message: string): void {

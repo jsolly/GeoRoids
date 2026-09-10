@@ -5,12 +5,8 @@ import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/g
 
 useQuietServerConsole();
 
-function latestSatellites(pilot: Pilot) {
-  const state = pilot.socket.lastReceived('gameState');
-  const data = state?.data as {
-    satellites?: Array<{ id: string; health: number; position: { x: number; y: number } }>;
-  };
-  return data?.satellites ?? [];
+function latestSatellites(world: GameServerWorld, pilot: Pilot) {
+  return world.snapshot(pilot).satellites;
 }
 
 describe('Hostile NPCs are shared across two clients', () => {
@@ -31,8 +27,8 @@ describe('Hostile NPCs are shared across two clients', () => {
   });
 
   test('both pilots receive the same ambient NPC snapshot', () => {
-    const aliceSats = latestSatellites(alice);
-    const bobSats = latestSatellites(bob);
+    const aliceSats = latestSatellites(world, alice);
+    const bobSats = latestSatellites(world, bob);
 
     expect(aliceSats.length).toBeGreaterThanOrEqual(SATELLITE.AMBIENT_COUNT);
     expect(bobSats.map((sat) => sat.id).sort()).toEqual(aliceSats.map((sat) => sat.id).sort());
@@ -40,7 +36,7 @@ describe('Hostile NPCs are shared across two clients', () => {
   });
 
   test('one pilot destroying an NPC updates score, loot, and the other client', () => {
-    const target = latestSatellites(alice)[0];
+    const target = latestSatellites(world, alice)[0];
     assert.ok(target);
 
     world.shootSatellite(alice, target.id, SATELLITE.HEALTH);
@@ -49,8 +45,8 @@ describe('Hostile NPCs are shared across two clients', () => {
     expect(world.entity(alice).score).toBe(SATELLITE.POINTS);
     expect(world.engine.getLoot().length).toBeGreaterThan(0);
 
-    const aliceAfter = latestSatellites(alice).find((sat) => sat.id === target.id);
-    const bobAfter = latestSatellites(bob).find((sat) => sat.id === target.id);
+    const aliceAfter = latestSatellites(world, alice).find((sat) => sat.id === target.id);
+    const bobAfter = latestSatellites(world, bob).find((sat) => sat.id === target.id);
     expect(aliceAfter?.health).toBe(0);
     expect(bobAfter?.health).toBe(0);
   });

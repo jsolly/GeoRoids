@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
+import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { WireClient, type WireMessage } from '../../support/wireClient';
@@ -28,9 +29,9 @@ function messageData(message: WireMessage): Record<string, unknown> {
 }
 
 function readLootRows(message: WireMessage): LootRow[] {
-  assert.equal(message.type, 'gameState');
+  assert.equal(message.type, 'snapshot');
   const rawLoot = messageData(message)['loot'];
-  assert.ok(Array.isArray(rawLoot), 'gameState loot must be an array');
+  assert.ok(Array.isArray(rawLoot), 'snapshot loot must be an array');
   return rawLoot.map((rawDrop, index) => {
     assert.ok(isRecord(rawDrop), `loot row ${index} must be an object`);
     const id = rawDrop['id'];
@@ -69,7 +70,14 @@ async function join(
   position: { x: number; y: number }
 ): Promise<void> {
   const start = client.mark();
-  client.send({ type: 'join', id, name: id, position });
+  client.send({
+    type: 'join',
+    id,
+    name: id,
+    position,
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+  });
   await client.barrier();
   const joined = messageAt(client, 'joined', start);
   expect(messageData(joined)['id']).toBe(id);
@@ -79,7 +87,9 @@ let activeServer: TestServer | undefined;
 const activeClients: WireClient[] = [];
 
 async function connect(server: TestServer): Promise<WireClient> {
-  const client = new WireClient(new WebSocket(`ws://127.0.0.1:${await server.listening}/ws`));
+  const client = new WireClient(
+    new WebSocket(`ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`)
+  );
   activeClients.push(client);
   await client.open();
   return client;
@@ -89,6 +99,8 @@ async function startWorld(): Promise<{
   server: TestServer;
   playerA: WireClient;
   playerB: WireClient;
+  decoderA: SnapshotDecoder;
+  decoderB: SnapshotDecoder;
 }> {
   const server = createServerInstance({ port: 0, nodeEnv: 'test' });
   activeServer = server;
@@ -101,6 +113,10 @@ async function startWorld(): Promise<{
   const playerB = await connect(server);
   await join(playerB, 'pilot-b', { x: 1_000, y: 1_000 });
   await Promise.all([playerA.barrier(), playerB.barrier()]);
+  const decoderA = new SnapshotDecoder();
+  const decoderB = new SnapshotDecoder();
+  decodeLatestSnapshot(playerA, decoderA);
+  decodeLatestSnapshot(playerB, decoderB);
 
   for (const bot of server.gameEngine.getAllBots()) {
     server.gameEngine.removeBot(bot.id);
@@ -116,7 +132,18 @@ async function startWorld(): Promise<{
   expect(server.gameEngine.getLoot()).toEqual([]);
   expect(server.gameEngine.getActiveSatelliteProjectiles()).toEqual([]);
 
-  return { server, playerA, playerB };
+  return { server, playerA, playerB, decoderA, decoderB };
+}
+
+function decodeLatestSnapshot(client: WireClient, decoder: SnapshotDecoder): WireMessage {
+  let latest: WireMessage | undefined;
+  for (const message of client.messages) {
+    if (message.type === 'snapshot') {
+      latest = { ...message, data: decoder.decode(message.data) };
+    }
+  }
+  assert.ok(latest, 'expected a snapshot frame');
+  return latest;
 }
 
 function smallIceAsteroid(id: string, position: { x: number; y: number }): AsteroidData {
@@ -136,28 +163,68 @@ function smallIceAsteroid(id: string, position: { x: number; y: number }): Aster
   };
 }
 
-async function sendTrackedReport(
+async function sendCurrentShot(
   server: TestServer,
   client: WireClient,
   playerId: string,
   asteroidId: string
-): Promise<{ hasExploded: boolean }> {
+): Promise<void> {
   const asteroid = server.gameEngine.getAsteroid(asteroidId);
   assert.ok(asteroid, `asteroid ${asteroidId}`);
-  const laserPosition = { ...asteroid.position };
-  const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
-  assert.ok(shot, `tracked laser for ${playerId}`);
+  const shooter = server.gameEngine.getPlayer(playerId);
+  assert.ok(shooter, `shooter ${playerId}`);
+  const delta = {
+    x: asteroid.position.x - shooter.position.x,
+    y: asteroid.position.y - shooter.position.y,
+  };
+  const distance = Math.hypot(delta.x, delta.y);
+  const direction =
+    distance > 0 ? { x: delta.x / distance, y: delta.y / distance } : { x: 1, y: 0 };
+  const laserStart = {
+    x: shooter.position.x - direction.x * 10,
+    y: shooter.position.y - direction.y * 10,
+  };
   client.send({
-    type: 'asteroidDestroyed',
+    type: 'shoot',
+    id: playerId,
     data: {
-      asteroidId,
-      playerId,
-      cause: 'laser',
-      laserPosition,
+      laserStart,
+      laserDirection: { x: direction.x * 5, y: direction.y * 5 },
     },
   });
   await client.barrier();
-  return shot;
+  for (let frame = 0; frame < 200 && server.gameEngine.getServerLasers().length > 0; frame++) {
+    server.gameEngine.advanceOneFrame();
+  }
+  await client.barrier();
+  expect(server.gameEngine.getServerLasers()).toHaveLength(0);
+}
+
+async function sendLootShot(
+  server: TestServer,
+  client: WireClient,
+  playerId: string,
+  target: { x: number; y: number }
+): Promise<void> {
+  const shooter = server.gameEngine.getPlayer(playerId);
+  assert.ok(shooter, `shooter ${playerId}`);
+  const delta = { x: target.x - shooter.position.x, y: target.y - shooter.position.y };
+  const distance = Math.hypot(delta.x, delta.y);
+  const direction =
+    distance > 0 ? { x: delta.x / distance, y: delta.y / distance } : { x: 1, y: 0 };
+  client.send({
+    type: 'shoot',
+    id: playerId,
+    data: {
+      laserStart: { ...shooter.position },
+      laserDirection: { x: direction.x * 5, y: direction.y * 5 },
+    },
+  });
+  await client.barrier();
+  for (let frame = 0; frame < 200 && server.gameEngine.getServerLasers().length > 0; frame++) {
+    server.gameEngine.advanceOneFrame();
+  }
+  await client.barrier();
 }
 
 function countType(client: WireClient, type: string): number {
@@ -178,8 +245,8 @@ afterEach(async () => {
 
 describe('shared destroy-drop shards over WebSocket', () => {
   test('two clients see one shard and explode removes it for both', async () => {
-    const { server, playerA, playerB } = await startWorld();
-    const target = smallIceAsteroid('wire-shard-target', { x: 0, y: 0 });
+    const { server, playerA, playerB, decoderA, decoderB } = await startWorld();
+    const target = smallIceAsteroid('wire-shard-target', { x: 100, y: 0 });
     const untouched = smallIceAsteroid('wire-untouched-roid', { x: -1_200, y: 0 });
     server.gameEngine.addAsteroid(target);
     server.gameEngine.addAsteroid(untouched);
@@ -187,7 +254,7 @@ describe('shared destroy-drop shards over WebSocket', () => {
     playerB.resetMessages();
 
     const reportStart = playerA.mark();
-    const trackedShot = await sendTrackedReport(server, playerA, 'pilot-a', target.id);
+    await sendCurrentShot(server, playerA, 'pilot-a', target.id);
     const destroy = messageAt(playerA, 'asteroidDestroy', reportStart);
     const score = messageAt(playerA, 'scoreUpdate', reportStart);
     expect(destroy.data).toEqual({
@@ -196,7 +263,6 @@ describe('shared destroy-drop shards over WebSocket', () => {
       origin: target.position,
     });
     expect(score.data).toEqual({ playerId: 'pilot-a', score: ROID.POINTS_SMALL });
-    expect(trackedShot.hasExploded).toBe(true);
     expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
     expect(server.gameEngine.getLoot()).toHaveLength(1);
 
@@ -204,8 +270,8 @@ describe('shared destroy-drop shards over WebSocket', () => {
     playerB.resetMessages();
     server.wsCore.getBroadcaster().broadcastGameState();
     await Promise.all([playerA.barrier(), playerB.barrier()]);
-    const stateA = messageAt(playerA, 'gameState');
-    const stateB = messageAt(playerB, 'gameState');
+    const stateA = decodeLatestSnapshot(playerA, decoderA);
+    const stateB = decodeLatestSnapshot(playerB, decoderB);
     const lootA = readLootRows(stateA);
     const lootB = readLootRows(stateB);
     expect(lootA).toHaveLength(1);
@@ -217,11 +283,8 @@ describe('shared destroy-drop shards over WebSocket', () => {
 
     playerA.resetMessages();
     playerB.resetMessages();
-    playerA.send({
-      type: 'lootExplode',
-      id: 'pilot-a',
-      data: { lootId: shard.id, playerId: 'pilot-a' },
-    });
+    await sendLootShot(server, playerA, 'pilot-a', shard.position);
+    server.wsCore.getBroadcaster().broadcastGameState();
     await Promise.all([playerA.barrier(), playerB.barrier()]);
     const explodedA = messageAt(playerA, 'lootExploded');
     const explodedB = messageAt(playerB, 'lootExploded');

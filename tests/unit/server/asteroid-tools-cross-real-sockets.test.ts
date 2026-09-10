@@ -92,19 +92,6 @@ class PilotSocket {
     );
   }
 
-  async joinLegacy(id: string, x: number): Promise<Record<string, unknown>> {
-    const after = this.messages.length;
-    this.send('join', {
-      id,
-      name: id,
-      position: { x, y: 0 },
-    });
-    return this.waitFor(
-      () => this.messages.slice(after).find((message) => message.type === 'joined')?.data,
-      `legacy join ${id}`
-    );
-  }
-
   async close(): Promise<void> {
     if (this.ws.readyState === WebSocket.CLOSED) {
       return;
@@ -122,7 +109,9 @@ async function connect(): Promise<PilotSocket> {
   if (!server) {
     throw new Error('Server missing');
   }
-  const client = new PilotSocket(new WebSocket(`ws://127.0.0.1:${await server.listening}/ws`));
+  const client = new PilotSocket(
+    new WebSocket(`ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`)
+  );
   clients.push(client);
   await once(client.ws, 'open');
   return client;
@@ -224,20 +213,20 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
     expect(engine.getPlayerCount()).toBe(2);
   });
 
-  it('rejects a valid enhanced resume token on a socket already bound to a legacy pilot', async () => {
+  it('rejects a valid resume token on a socket already bound to another current pilot', async () => {
     const { joined, engine } = await world();
-    const legacy = await connect();
-    await legacy.joinLegacy('legacy', -900);
-    // `pilot.ws`/`legacy.ws` are the client-side WebSocket wrappers. The
+    const other = await connect();
+    await other.join('other', -900, 'ember');
+    // `pilot.ws`/`other.ws` are the client-side WebSocket wrappers. The
     // server stores the accepted connection object separately, so preserve
     // those server-side references before attempting the forged resume.
-    const legacyServerSocket = engine.getPlayer('legacy')?.ws;
+    const otherServerSocket = engine.getPlayer('other')?.ws;
     const haulerServerSocket = engine.getPlayer('hauler')?.ws;
-    expect(legacyServerSocket).toBeDefined();
+    expect(otherServerSocket).toBeDefined();
     expect(haulerServerSocket).toBeDefined();
 
-    const after = legacy.messages.length;
-    legacy.send('join', {
+    const after = other.messages.length;
+    other.send('join', {
       id: 'forged-id',
       name: 'forged-id',
       position: { x: 800, y: 0 },
@@ -245,19 +234,19 @@ describe('Enhanced asteroid tools cross real gameplay WebSockets', () => {
       asteroidInteractions: 1,
       resumeToken: joined['resumeToken'],
     });
-    const error = await legacy.waitFor(
+    const error = await other.waitFor(
       () =>
-        legacy.messages
+        other.messages
           .slice(after)
           .find(
             (message) =>
               message.type === 'error' && String(message.data).includes('dedicated gameplay socket')
           ),
-      'legacy socket resume rejection'
+      'current socket resume rejection'
     );
     expect(error.type).toBe('error');
-    expect(legacy.messages.slice(after).some((message) => message.type === 'joined')).toBe(false);
-    expect(engine.getPlayer('legacy')?.ws).toBe(legacyServerSocket);
+    expect(other.messages.slice(after).some((message) => message.type === 'joined')).toBe(false);
+    expect(engine.getPlayer('other')?.ws).toBe(otherServerSocket);
     expect(engine.getPlayer('hauler')?.ws).toBe(haulerServerSocket);
   });
 

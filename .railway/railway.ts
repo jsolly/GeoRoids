@@ -23,7 +23,6 @@ export default defineRailway(() => {
     env: {
       DEPLOY_TRIGGER: preserve(),
       NODE_ENV: preserve(),
-      REQUIRE_ASTEROID_CLIENT: preserve(),
     },
     // Generated *.up.railway.app domains remain platform-managed. The
     // importer intentionally omits them; there are no custom domains here.

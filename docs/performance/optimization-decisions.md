@@ -1,5 +1,9 @@
 # Performance plan relevance and optimization decisions
 
+The recorded benchmark receipts below predate legacy-client retirement. Current
+load sessions use the required snapshot protocol for every pilot; old mixed-client
+measurements remain historical evidence only.
+
 The complete [performance strategy](../performance-and-testing-strategy.md) has
 been checked against the current code, its historical source revision, the local
 experiments, and independent client and server reviews. The current implementation
@@ -32,7 +36,7 @@ pool, renderer rewrite or protocol change.
 | Monotonic clock and bounded debt | Implemented. Scheduling uses a monotonic clock, excess simulation debt beyond one second is counted and discarded, and attached-object motion receives the actual simulation-frame delta. Wall-clock reconnect grace retains its meaning. Controlled defects confirmed that repeated debt replay fails the regression tests. |
 | Collision index | Reject the tested grid. All 800 seeded worlds preserved outcomes, but the grid was 12.9–342.5 times slower. The [circle experiment](collision-experiment.md) excludes swept projectiles; no projectile-index claim is made. |
 | AI searches and tick-local views | Retain current ownership. Repeated entity arrays and snapshot views in `GameEngine`, `EntityManager` and the broadcaster are potential allocation sites, not demonstrated dominant costs. A loaded CPU/allocation profile is the prerequisite for changing them. |
-| Outbound pressure | Implemented a bounded policy for every gameplay class, including legacy state and events. Snapshot pressure requires recoverable keyframes; nonrecoverable or permanently oversized writes close explicitly. Enhanced resume tokens survive pressure closure and event-write failure. Metrics distinguish queued acceptance from delivery, which the real clients validate separately. |
+| Outbound pressure | Implemented a bounded policy for every gameplay class, including snapshots and gameplay events. Snapshot pressure requires recoverable keyframes; nonrecoverable or permanently oversized writes close explicitly. Enhanced resume tokens survive pressure closure and event-write failure. Metrics distinguish queued acceptance from delivery, which the real clients validate separately. |
 | Existing JSON deltas | Retain them. The [Unicode protocol experiment](protocol-experiment.md) validates round trips and shows 75.04% fewer application bytes than full legacy JSON in its fixture. Shared canonical preparation and negotiated recovery already exist. |
 | Lower snapshot cadence | Reject adoption without correction-distance, interpolation and response measurements. A lower rate changes visible motion and recovery; a smaller byte count alone cannot validate it. Simulation stays at 60 Hz and snapshots at 30 Hz. |
 | Compression | Keep production compression disabled. The isolated gzip/deflate experiment reports bytes and CPU but does not establish concurrent WebSocket memory or end-to-end latency. Its smaller payloads are insufficient evidence to enable the feature. |
@@ -42,7 +46,7 @@ pool, renderer rewrite or protocol change.
 | Aggregate diagnostics | Implemented bounded opt-in client samples and server histograms, GC, event-loop, memory and outbound observations. Keep them opt-in until overhead is calibrated. Coalesced pending snapshots and send-completion latency are not separately attributed; actual state gaps remain in load reports. |
 | Developer/test performance | Retain the repository-owned serialized integration runner and existing static gate. Required smoke dependency, scheduled full integration and separate coverage are implemented. Do not add integration workers or migrate test runners without measured maintenance benefit and isolation proof. |
 | Baseline calibration and regression gating | Keep raw samples, failures, workload witnesses and input hashes. No numeric performance CI threshold or supported-device claim is enabled without unchanged-control noise measurements and target-device calibration. |
-| Field dashboards, soaks and rollout | Not accepted by local tests. Physical-device runs, remote workload staircases, 30-minute boundary soaks, two-player deployment and rollback remain release-acceptance work. No deployment or remote load was performed. |
+| Field dashboards, soaks and rollout | Not accepted by local tests. Physical-device runs, remote workload staircases, 30-minute boundary soaks, two-player deployment verification remain release-acceptance work. No deployment or remote load was performed. |
 
 ## Evidence and limits
 

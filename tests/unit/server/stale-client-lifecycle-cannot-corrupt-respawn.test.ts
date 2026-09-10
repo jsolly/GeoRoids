@@ -6,10 +6,6 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 describe('late client death updates after authoritative respawn', () => {
   let engine: GameEngine | undefined;
 
@@ -33,11 +29,29 @@ describe('late client death updates after authoritative respawn', () => {
     const owner = new RecordingSocket();
     const peer = new RecordingSocket();
     core.handleClientMessage(
-      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
+      {
+        type: 'join',
+        data: {
+          id: 'pilot',
+          name: 'Pilot',
+          position: { x: 0, y: 0 },
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+        },
+      },
       owner
     );
     core.handleClientMessage(
-      { type: 'join', data: { id: 'peer', name: 'Peer', position: { x: 1000, y: 0 } } },
+      {
+        type: 'join',
+        data: {
+          id: 'peer',
+          name: 'Peer',
+          position: { x: 1000, y: 0 },
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+        },
+      },
       peer
     );
     const pilot = engine.getPlayer('pilot');
@@ -53,7 +67,7 @@ describe('late client death updates after authoritative respawn', () => {
     // Drive the real authoritative lifecycle, without resetting its fields in
     // the fixture. The late packet arrives after respawn and pose adoption.
     for (let frame = 0; frame <= SHIP.RESPAWN_DELAY_FRAMES && pilot.health <= 0; frame++) {
-      engine.advanceCombatFrame();
+      engine.advanceOneFrame();
     }
     expect(pilot.health).toBe(pilot.maxHealth);
     expect(pilot.exploding).toBe(false);
@@ -70,6 +84,10 @@ describe('late client death updates after authoritative respawn', () => {
         data: {
           position: spawnPosition,
           velocity: { x: 0, y: 0 },
+          angle: 0,
+          thrusting: false,
+          motionEpoch: pilot.asteroidMotion?.epoch,
+          motionSequence: 1,
           exploding: true,
           health: 0,
           score: 0,
@@ -83,32 +101,28 @@ describe('late client death updates after authoritative respawn', () => {
     expect(pilot.exploding).toBe(false);
     expect(pilot.explodeTime).toBeUndefined();
     expect(pilot.deathCause).toBeUndefined();
-    expect(pilot.respawnAnchor).toBeUndefined();
+    expect(pilot).not.toHaveProperty('respawnAnchor');
+    expect(pilot.asteroidMotion).toMatchObject({ mode: 'free', ack: 1 });
     expect(pilot.score).toBe(17);
-    const update = peer.inbox.find((message) => message.type === 'playerUpdate');
-    assert.ok(update, 'player update');
-    assert.ok(isRecord(update.data), 'player update data');
-    expect(update.data['position']).toEqual(spawnPosition);
-    for (const field of [
-      'exploding',
-      'explodeTime',
-      'deathCause',
-      'respawnAnchor',
-      'health',
-      'score',
-    ]) {
-      expect(update.data).not.toHaveProperty(field);
-    }
+    expect(peer.inbox.some((message) => message.type === 'playerUpdate')).toBe(false);
 
     for (let frame = 0; frame <= SHIP.EXPLODE_DURATION_FRAMES; frame++) {
-      engine.advanceCombatFrame();
+      engine.advanceOneFrame();
     }
     const nextPosition = { x: spawnPosition.x + 25, y: spawnPosition.y };
     core.handleClientMessage(
       {
         type: 'update',
         id: pilot.id,
-        data: { position: nextPosition, velocity: { x: 0, y: 0 }, exploding: false },
+        data: {
+          position: nextPosition,
+          velocity: { x: 0, y: 0 },
+          angle: 0,
+          thrusting: false,
+          motionEpoch: pilot.asteroidMotion?.epoch,
+          motionSequence: 2,
+          exploding: false,
+        },
       },
       owner
     );

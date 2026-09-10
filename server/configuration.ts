@@ -1,7 +1,6 @@
 export function readServerConfiguration(env: NodeJS.ProcessEnv = process.env): {
   port: number;
   nodeEnv: string;
-  requireEnhancedClient: boolean;
 } {
   const rawPort = env['PORT'];
   const port = rawPort === undefined || rawPort === '' ? 3001 : Number(rawPort);
@@ -11,6 +10,5 @@ export function readServerConfiguration(env: NodeJS.ProcessEnv = process.env): {
   return {
     port,
     nodeEnv: env['NODE_ENV'] || 'production',
-    requireEnhancedClient: env['REQUIRE_ASTEROID_CLIENT'] === '1',
   };
 }

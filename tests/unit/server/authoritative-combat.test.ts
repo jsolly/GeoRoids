@@ -1,6 +1,5 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { WebSocket } from 'ws';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
@@ -33,6 +32,13 @@ function clearAsteroidField(engine: GameEngine): void {
   for (const asteroid of engine.getAllAsteroids()) {
     engine.removeAsteroid(asteroid.id);
   }
+}
+
+function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {
+  core.handleClientMessage(
+    { type: 'join', data: { ...data, snapshotVersion: 1, asteroidInteractions: 1 } },
+    socket
+  );
 }
 
 describe('server-authoritative combat', () => {
@@ -148,14 +154,8 @@ describe('server-authoritative combat', () => {
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
     const retroWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'nova', name: 'Nova', position: { x: 80, y: 80 } } },
-      novaWs
-    );
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'retro', name: 'Retro', position: { x: 200, y: 200 } } },
-      retroWs
-    );
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: { x: 80, y: 80 } });
+    join(wsCore, retroWs, { id: 'retro', name: 'Retro', position: { x: 200, y: 200 } });
     clearProtection(engine, 'nova');
     clearProtection(engine, 'retro');
 
@@ -219,20 +219,18 @@ describe('server-authoritative combat', () => {
     const alphaWs = new RecordingSocket();
     const betaWs = new RecordingSocket();
     const unjoinedWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      {
-        type: 'join',
-        data: { id: 'alpha', name: 'Alpha', kitId: 'dart', position: { x: 0, y: 0 } },
-      },
-      alphaWs
-    );
-    wsCore.handleClientMessage(
-      {
-        type: 'join',
-        data: { id: 'beta', name: 'Beta', kitId: 'dart', position: { x: 100, y: 0 } },
-      },
-      betaWs
-    );
+    join(wsCore, alphaWs, {
+      id: 'alpha',
+      name: 'Alpha',
+      kitId: 'dart',
+      position: { x: 0, y: 0 },
+    });
+    join(wsCore, betaWs, {
+      id: 'beta',
+      name: 'Beta',
+      kitId: 'dart',
+      position: { x: 100, y: 0 },
+    });
 
     const alpha = engine.getPlayer('alpha');
     const beta = engine.getPlayer('beta');
@@ -279,14 +277,8 @@ describe('server-authoritative combat', () => {
     const wsCore = new WebSocketCore(engine);
     const pilotWs = new RecordingSocket();
     const otherWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
-      pilotWs
-    );
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 10, y: 0 } } },
-      otherWs
-    );
+    join(wsCore, pilotWs, { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } });
+    join(wsCore, otherWs, { id: 'other', name: 'Other', position: { x: 200, y: 0 } });
     clearAsteroidField(engine);
 
     wsCore.handleClientMessage(
@@ -320,193 +312,10 @@ describe('server-authoritative combat', () => {
     expect(engine.getServerLasers()[0]?.ownerId).toBe('pilot');
   });
 
-  test('asteroid laser reports require a finite position, laser cause, and socket owner', () => {
-    const wsCore = new WebSocketCore(engine);
-    const pilotWs = new RecordingSocket();
-    const otherWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
-      pilotWs
-    );
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 10, y: 0 } } },
-      otherWs
-    );
-    clearAsteroidField(engine);
-    const asteroid = testAsteroid({ id: 'reported-roid', size: 25, health: 25, maxHealth: 25 });
-    engine.addAsteroid(asteroid);
-
-    const report = (data: Record<string, unknown>) =>
-      wsCore.handleClientMessage({ type: 'asteroidDestroyed', data }, pilotWs);
-
-    report({ asteroidId: asteroid.id, playerId: 'pilot', cause: 'laser' });
-    expect(engine.getAsteroid(asteroid.id)).toBeDefined();
-
-    report({
-      asteroidId: asteroid.id,
-      playerId: 'pilot',
-      cause: 'collision',
-      laserPosition: { x: 0, y: 0 },
-    });
-    expect(engine.getAsteroid(asteroid.id)).toBeDefined();
-
-    report({
-      asteroidId: asteroid.id,
-      playerId: 'other',
-      cause: 'laser',
-      laserPosition: { x: 0, y: 0 },
-    });
-    expect(engine.getAsteroid(asteroid.id)).toBeDefined();
-
-    // The valid client report must correspond to a projectile the server
-    // already tracks. The malformed, collision, and cross-socket reports
-    // above intentionally did not spend one.
-    const trackedShot = engine.spawnLaser('pilot', asteroid.position, { x: 0, y: 0 });
-    expect(trackedShot).toBeDefined();
-    report({
-      asteroidId: asteroid.id,
-      playerId: 'pilot',
-      cause: 'laser',
-      laserPosition: { x: 0, y: 0 },
-    });
-    expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
-    expect(engine.getPlayer('pilot')?.score).toBeGreaterThan(0);
-  });
-
-  test('collab asteroid reports use fixed damage and consume human and bot projectiles once', () => {
-    const wsCore = new WebSocketCore(engine);
-    const pilotWs = new RecordingSocket();
-    const otherWs = new RecordingSocket();
-    const unjoinedWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } } },
-      pilotWs
-    );
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'other', name: 'Other', position: { x: 10, y: 0 } } },
-      otherWs
-    );
-    clearAsteroidField(engine);
-    const asteroid = testAsteroid({
-      id: 'collab-report-roid',
-      size: 50,
-      health: 100,
-      maxHealth: 100,
-      isCollabTarget: true,
-    });
-    const normal = testAsteroid({ id: 'normal-report-roid' });
-    const normalHealthBefore = normal.health;
-    engine.addAsteroid(asteroid);
-    engine.addAsteroid(normal);
-
-    const report = (
-      playerId: string,
-      damage: unknown,
-      points: unknown,
-      asteroidId = asteroid.id,
-      ws: WebSocket = pilotWs
-    ) =>
-      wsCore.handleClientMessage(
-        {
-          type: 'asteroidDamage',
-          data: { asteroidId, playerId, damage, points },
-        },
-        ws
-      );
-
-    wsCore.handleClientMessage(
-      {
-        type: 'asteroidDestroyed',
-        data: {
-          asteroidId: asteroid.id,
-          playerId: 'pilot',
-          cause: 'laser',
-          laserPosition: asteroid.position,
-        },
-      },
-      pilotWs
-    );
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
-
-    report('pilot', 999, 999);
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
-    const humanShot = engine.spawnLaser('pilot', asteroid.position, { x: 0, y: 0 });
-    report('pilot', 999, 999, asteroid.id, otherWs);
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100);
-    expect(humanShot?.hasExploded).toBe(false);
-    report('pilot', 999, 999);
-    report('pilot', 999, 999);
-    expect(humanShot?.hasExploded).toBe(true);
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
-    expect(engine.getPlayer('pilot')?.score).toBe(0);
-
-    report('pilot', 0, 999);
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
-    report('pilot', 25, 999, normal.id);
-    expect(engine.getAsteroid(normal.id)?.health).toBe(normalHealthBefore);
-
-    const bot = engine.createBots(1)?.[0];
-    assert.ok(bot, 'collab report bot');
-    report(bot.id, DAMAGE.LASER_HIT, 999);
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT);
-
-    engine.spawnLaser(bot.id, asteroid.position, { x: 0, y: 0 });
-    report(bot.id, DAMAGE.LASER_HIT, 999);
-    report(bot.id, DAMAGE.LASER_HIT, 999, asteroid.id, otherWs);
-    report(bot.id, DAMAGE.LASER_HIT, 999, asteroid.id, unjoinedWs);
-    expect(engine.getAsteroid(asteroid.id)?.health).toBe(100 - DAMAGE.LASER_HIT * 2);
-    expect(engine.getServerLasers()[0]?.hasExploded).toBe(true);
-
-    const lethalAsteroid = engine.getAsteroid(asteroid.id);
-    assert.ok(lethalAsteroid, 'collab lethal asteroid');
-    lethalAsteroid.health = DAMAGE.LASER_HIT;
-    const lethalShot = engine.spawnLaser(bot.id, asteroid.position, { x: 0, y: 0 });
-    report(bot.id, DAMAGE.LASER_HIT, 999);
-    expect(engine.getAsteroid(asteroid.id)).toBeUndefined();
-    expect(lethalShot?.hasExploded).toBe(true);
-  });
-
-  test('validated laserDamage is the only client path that chips a remote human', () => {
-    const wsCore = new WebSocketCore(engine);
-    const novaWs = new RecordingSocket();
-    const retroWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } } },
-      novaWs
-    );
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'retro', name: 'Retro', position: { x: 30, y: 0 } } },
-      retroWs
-    );
-    clearProtection(engine, 'nova');
-    clearProtection(engine, 'retro');
-
-    wsCore.handleClientMessage(
-      {
-        type: 'laserDamage',
-        data: { targetPlayerId: 'retro', attackerId: 'nova', damage: 1000 },
-      },
-      novaWs
-    );
-    expect(engine.getPlayer('retro')?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
-
-    wsCore.handleClientMessage(
-      {
-        type: 'laserDamage',
-        data: { targetPlayerId: 'nova', attackerId: 'nova', damage: 25 },
-      },
-      retroWs
-    );
-    expect(engine.getPlayer('nova')?.health).toBe(SHIP.MAX_HEALTH);
-  });
-
   test('boundary collisionDamage still applies when the reporter is the target', () => {
     const wsCore = new WebSocketCore(engine);
     const novaWs = new RecordingSocket();
-    wsCore.handleClientMessage(
-      { type: 'join', data: { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } } },
-      novaWs
-    );
+    join(wsCore, novaWs, { id: 'nova', name: 'Nova', position: { x: 0, y: 0 } });
     clearProtection(engine, 'nova');
 
     wsCore.handleClientMessage(

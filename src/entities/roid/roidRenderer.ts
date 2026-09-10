@@ -1,7 +1,6 @@
 import type { AsteroidMaterial } from '../../../shared-types';
 import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
-import { isAsteroidPending, pendingElapsedMs } from '../../physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../rendering/canvas';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import { drawingOffsets } from '../../rendering/playfieldCamera';
@@ -246,29 +245,9 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     ) {
       continue;
     }
-    let pendingElapsed: number | null = null;
-    if (isAsteroidPending(roid)) {
-      pendingElapsed = pendingElapsedMs(roid);
-      if (pendingElapsed === null || !(pendingElapsed < VISUAL.ROID_SHATTER_MS)) {
-        continue;
-      }
-    }
-
     const offsets = drawingOffsets(roid.offsets);
     const vertices = Math.max(roid.vertices, 1);
     const outline = roidOutline(screenPos, r, roid.angle, vertices, offsets);
-
-    if (pendingElapsed !== null) {
-      drawRoidShatter(
-        ctx,
-        screenPos,
-        outline,
-        r,
-        pendingElapsed / VISUAL.ROID_SHATTER_MS,
-        roid.material
-      );
-      continue;
-    }
 
     const inner =
       !roid.material && shouldDrawRoidInnerFacet(roid.r)

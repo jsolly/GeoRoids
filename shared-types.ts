@@ -58,21 +58,14 @@ export interface PlayerUpdate {
   /** Acknowledges the server's current movement ownership epoch. */
   motionEpoch?: number;
   motionSequence?: number;
-  lasers?: Array<{
-    position: Position;
-    velocity: Velocity;
-    distTraveled: number;
-    explodeTime: number;
-    hasExploded: boolean;
-  }>;
 }
 
 export interface PlayerJoin {
-  /** Present only after an explicit supported join offer. */
-  snapshotVersion?: 1;
-  asteroidInteractions?: 1;
+  /** Required current-protocol acknowledgement. */
+  snapshotVersion: 1;
+  asteroidInteractions: 1;
   /** Private to the joined socket; never included in world snapshots. */
-  resumeToken?: string;
+  resumeToken: string;
   /** Private server build identifier for correlating client and server diagnostics. */
   serverReleaseId?: string;
   id: string;
@@ -154,7 +147,7 @@ export interface AsteroidData {
   maxHealth: number;
   vertices: number;
   offsets: number[];
-  /** Absent on legacy rocks; current fields carry a mineral composition. */
+  /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
@@ -287,11 +280,11 @@ export interface SnapshotCollabTag extends ActiveCollabTag {
   id: string;
 }
 
-/** Negotiated-only recovery state. Never add these fields to legacy gameState. */
+/** Complete authoritative snapshot, including recovery state. */
 export interface ServerGameSnapshot extends ServerGameState {
   satelliteProjectiles: SnapshotSatelliteProjectile[];
   collabTags: SnapshotCollabTag[];
-  playerProjectiles?: PlayerProjectileState[];
+  playerProjectiles: PlayerProjectileState[];
 }
 
 export interface ServerEntityData {

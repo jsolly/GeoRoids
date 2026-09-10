@@ -16,16 +16,14 @@ export class AuthoritativeProjectileField {
   isEnabled(): boolean {
     return this.enabled;
   }
-  sync(projectiles: readonly PlayerProjectileState[], enabled: boolean): void {
-    this.enabled = enabled;
-    this.rows = enabled
-      ? projectiles.map((row) => ({
-          ...row,
-          position: { ...row.position },
-          prevPosition: { ...row.prevPosition },
-          velocity: { ...row.velocity },
-        }))
-      : [];
+  sync(projectiles: readonly PlayerProjectileState[]): void {
+    this.enabled = true;
+    this.rows = projectiles.map((row) => ({
+      ...row,
+      position: { ...row.position },
+      prevPosition: { ...row.prevPosition },
+      velocity: { ...row.velocity },
+    }));
   }
   getProjectiles(): readonly PlayerProjectileState[] {
     return this.rows;

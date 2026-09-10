@@ -18,16 +18,16 @@ describe('Soft-faction compose leaves same-side shots harmless', () => {
   });
 
   test('auto-balanced opposite sides still take laser damage', () => {
-    alice = world.join('Alice', { x: -80, y: 0 });
-    bob = world.join('Bob', { x: 80, y: 0 });
+    alice = world.join('Alice', { x: -40, y: 0 });
+    bob = world.join('Bob', { x: 40, y: 0 });
     world.wearOffJoinInvulnerability();
     world.shoot(alice, bob);
     expect(world.entity(bob).health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
   });
 
   test('same-side pilots do not damage each other once sides are set', () => {
-    alice = world.join('Alice', { x: -80, y: 0 }, { factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { factionId: 'ion' });
+    alice = world.join('Alice', { x: -40, y: 0 }, { factionId: 'ion' });
+    bob = world.join('Bob', { x: 40, y: 0 }, { factionId: 'ion' });
     world.wearOffJoinInvulnerability();
     world.shoot(alice, bob);
     expect(world.entity(bob).health).toBe(SHIP.MAX_HEALTH);
@@ -35,8 +35,8 @@ describe('Soft-faction compose leaves same-side shots harmless', () => {
   });
 
   test('opposite sides still take laser damage', () => {
-    alice = world.join('Alice', { x: -80, y: 0 }, { factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { factionId: 'ember' });
+    alice = world.join('Alice', { x: -40, y: 0 }, { factionId: 'ion' });
+    bob = world.join('Bob', { x: 40, y: 0 }, { factionId: 'ember' });
     world.wearOffJoinInvulnerability();
     world.shoot(alice, bob);
     expect(world.entity(bob).health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);

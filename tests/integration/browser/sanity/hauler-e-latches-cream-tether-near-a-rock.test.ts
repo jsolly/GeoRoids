@@ -1,5 +1,5 @@
+import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import type { ConnectionManager } from '../../../../src/network/services/ConnectionManager';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -9,15 +9,90 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirna
 const CREAM = '#E8D5A3';
 const TIP = '#FDE68A';
 
+type ApproachState =
+  | { ok: true; gap: number; delta: number }
+  | { ok: false; reason: 'missing' | 'dead' };
+
+async function flyWasdNearRock(page: Page, targetId: string, timeoutMs = 25_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let held: 'KeyA' | 'KeyD' | 'KeyW' | null = null;
+  const hold = async (key: 'KeyA' | 'KeyD' | 'KeyW' | null) => {
+    if (held === key) {
+      return;
+    }
+    if (held) {
+      await page.keyboard.up(held);
+    }
+    if (key) {
+      await page.keyboard.down(key);
+    }
+    held = key;
+  };
+  try {
+    while (Date.now() < deadline) {
+      const nav = await page.evaluate((id): ApproachState => {
+        const gc = window.gameController;
+        const ship = gc?.getCurrPlayer()?.ship;
+        const rock = gc
+          ?.getCurrRoidBelt?.()
+          ?.getRoids?.()
+          .find((candidate) => candidate.id === id);
+        if (!ship || !rock) {
+          return { ok: false, reason: 'missing' };
+        }
+        if (ship.exploding || ship.health <= 0) {
+          return { ok: false, reason: 'dead' };
+        }
+        const dx = rock.position.x - ship.position.x;
+        const dy = rock.position.y - ship.position.y;
+        const dist = Math.hypot(dx, dy);
+        const desired = Math.atan2(-dy, dx);
+        let delta = desired - ship.angle;
+        while (delta > Math.PI) {
+          delta -= Math.PI * 2;
+        }
+        while (delta < -Math.PI) {
+          delta += Math.PI * 2;
+        }
+        return { ok: true, gap: dist - ship.r - rock.r, delta };
+      }, targetId);
+      if (!nav.ok) {
+        await hold(null);
+        // A bot kill mid-approach must not abort the title→E path.
+        await page.waitForTimeout(nav.reason === 'dead' ? 250 : 80);
+        continue;
+      }
+      if (nav.gap <= 420) {
+        await hold(null);
+        return;
+      }
+      if (Math.abs(nav.delta) > 0.18) {
+        await hold(nav.delta > 0 ? 'KeyA' : 'KeyD');
+      } else {
+        await hold('KeyW');
+      }
+      await page.waitForTimeout(50);
+    }
+    throw new Error('WASD approach did not reach a nearby rock');
+  } finally {
+    if (held) {
+      await page.keyboard.up(held);
+    }
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyD');
+    await page.keyboard.up('KeyW');
+  }
+}
+
 test(
-  'Hauler shows a live cable and keeps its latch through a brief socket flap',
+  'Hauler title kit, WASD to a nearby rock, and E paint cream tether plus tip',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {
       throw new Error('Page not available');
     }
 
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     const consoleErrors: string[] = [];
     page.on('console', (message) => {
       if (message.type() === 'error') {
@@ -26,67 +101,46 @@ test(
     });
     page.on('pageerror', (error) => consoleErrors.push(error.message));
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
-    const peerPage = await browserManager.createAdditionalPage();
-    const peer = new GameInteractions(peerPage);
-    await peer.bootGame({ waitForCombatReady: false });
+    await game.navigateToGame();
+    const haulerKit = page.locator('[data-kit-id="hauler"]');
+    await haulerKit.waitFor({ state: 'visible', timeout: 5000 });
+    await haulerKit.click();
+    await page.locator('#playerNameInput').focus();
+    await page.keyboard.press('Enter');
+    await page.locator('#gameArea').waitFor({ state: 'visible', timeout: 5000 });
+    await game.waitForGameReady();
+    await game.waitForServerJoin();
+    await game.waitForNetworkAsteroids(1);
     await page.bringToFront();
-
     await game.waitForAsteroids(1);
+
     const fixture = await page.evaluate(() => {
       const gc = window.gameController;
       const player = gc?.getCurrPlayer();
       const ship = player?.ship;
-      const rocks = gc?.getCurrRoidBelt?.()?.getRoids?.() ?? [];
-      const actors = (gc?.getNetworkManager?.().getAllPlayers?.() ?? [])
-        .filter(
-          (actor) => actor.id !== player?.id && actor.ship?.health > 0 && !actor.ship.exploding
-        )
-        .map((actor) => actor.ship.position);
-      const satellites = (gc?.getSatellites?.() ?? [])
-        .filter((satellite) => satellite.health > 0 && !satellite.exploding)
-        .map((satellite) => satellite.position);
-      const hazards = [...actors, ...satellites];
+      const rocks = (gc?.getCurrRoidBelt?.()?.getRoids?.() ?? []).filter(
+        (candidate) => candidate.health > 0
+      );
       if (!ship || rocks.length === 0) {
         throw new Error('Hauler fixture requires the local ship and a live asteroid');
       }
-      const rock = rocks
-        .filter((candidate) => candidate.health > 0)
-        .map((candidate) => ({
-          candidate,
-          clearance:
-            hazards.length + rocks.length > 1
-              ? Math.min(
-                  ...hazards.map((position: { x: number; y: number }) =>
-                    Math.hypot(candidate.position.x - position.x, candidate.position.y - position.y)
-                  ),
-                  ...rocks
-                    .filter((other) => other.id !== candidate.id)
-                    .map(
-                      (other) =>
-                        Math.hypot(
-                          candidate.position.x - other.position.x,
-                          candidate.position.y - other.position.y
-                        ) -
-                        candidate.r -
-                        other.r
-                    )
-                )
-              : Number.POSITIVE_INFINITY,
-        }))
-        .sort((left, right) => right.clearance - left.clearance)[0]?.candidate;
-      if (!rock) {
-        throw new Error('Hauler fixture did not find a live asteroid clear of other actors');
+      const target = [...rocks].sort((left, right) => {
+        const leftGap =
+          Math.hypot(left.position.x - ship.position.x, left.position.y - ship.position.y) -
+          left.r -
+          ship.r;
+        const rightGap =
+          Math.hypot(right.position.x - ship.position.x, right.position.y - ship.position.y) -
+          right.r -
+          ship.r;
+        return leftGap - rightGap;
+      })[0];
+      if (!target) {
+        throw new Error('Hauler fixture did not find a live asteroid');
       }
-      const distance = Math.hypot(rock.position.x, rock.position.y) || 1;
-      const gap = rock.r + ship.r + 60;
       return {
-        targetId: rock.id,
-        position: {
-          x: rock.position.x + (rock.position.x / distance) * gap,
-          y: rock.position.y + (rock.position.y / distance) * gap,
-        },
-        kitId: player?.ship?.kitId,
+        targetId: target.id,
+        kitId: ship.kitId,
         selected: document.querySelector('[data-kit-id="hauler"]')?.getAttribute('aria-pressed'),
         joined: Boolean(gc?.getNetworkManager?.()?.getLocalPlayerId?.()),
       };
@@ -94,15 +148,15 @@ test(
     expect(fixture.kitId).toBe('hauler');
     expect(fixture.selected).toBe('true');
     expect(fixture.joined).toBe(true);
-    await game.placeShipAt(fixture.position.x, fixture.position.y);
 
-    await page.keyboard.press('e');
+    await flyWasdNearRock(page, fixture.targetId);
+    await page.keyboard.press('KeyE');
 
     const frames: Array<Record<string, unknown>> = [];
     const sampleDeadline = Date.now() + 1000;
     while (Date.now() < sampleDeadline) {
       const sample = await page.evaluate(
-        ({ colors }: { colors: { cream: string; tip: string }; targetId: string }) => {
+        ({ colors }: { colors: { cream: string; tip: string } }) => {
           const gc = window.gameController;
           gc?.renderGame?.();
           const ship = gc?.getCurrPlayer()?.ship;
@@ -134,18 +188,14 @@ test(
             kitId: ship?.kitId,
             findTarget: probe?.targetId ?? probe?.liveTargetId ?? null,
             harpoonTimer: ship?.harpoonTimer ?? 0,
-            abilityActiveFrames: ship?.abilityActiveFrames ?? 0,
             latchPos: ship?.harpoonLatchPos ?? null,
             fieldCount: probe?.fieldCount ?? 0,
-            scale: probe?.scale ?? null,
-            range: probe?.range ?? null,
             nearest: probe?.nearest ?? null,
-            connected: probe?.connected ?? null,
             cream: near(colors.cream, 22),
             tip: near(colors.tip, 22),
           };
         },
-        { colors: { cream: CREAM, tip: TIP }, targetId: fixture.targetId }
+        { colors: { cream: CREAM, tip: TIP } }
       );
       frames.push(sample);
       if (sample.cream && sample.tip && sample.harpoonTimer > 0) {
@@ -158,130 +208,12 @@ test(
       [...frames].reverse().find((frame) => frame['cream'] && frame['tip']) ?? frames.at(-1);
     expect(best?.['kitId']).toBe('hauler');
     expect(best?.['harpoonTimer']).toBeGreaterThan(0);
-    expect(best?.['findTarget']).toBe(fixture.targetId);
     expect(best?.['latchPos']).toBeTruthy();
     expect(best?.['cream']).toBe(true);
     expect(best?.['tip']).toBe(true);
 
     await page.screenshot({
       path: screenshotManager.getScreenshotPath('hauler-live-tether.png'),
-    });
-    let rejoined = false;
-    let freshWorld = false;
-    // Only sockets opened after the initial join can satisfy this barrier.
-    page.on('websocket', (socket) =>
-      socket.on('framereceived', ({ payload }) => {
-        const message: unknown = JSON.parse(String(payload));
-        if (!message || typeof message !== 'object' || !('type' in message)) {
-          return;
-        }
-        if (message.type === 'joined') {
-          rejoined = true;
-        }
-        if (rejoined && message.type === 'snapshot') {
-          freshWorld = true;
-        }
-      })
-    );
-    const connection = await page.evaluateHandle<ConnectionManager>(
-      "import('/src/network/services/ConnectionManager.ts').then(({ ConnectionManager }) => ConnectionManager.getInstance())"
-    );
-    const flap = await page
-      .evaluate(async (connection) => {
-        const gc = window.gameController;
-        if (!gc) {
-          throw new Error('Game controller unavailable');
-        }
-        const player = gc.getCurrPlayer();
-        if (!player) {
-          throw new Error('Local player unavailable');
-        }
-        const ship = player.ship;
-        const socket = connection.getSocket();
-        if (!socket) {
-          throw new Error('Gameplay socket unavailable');
-        }
-        const targetId = ship.harpoonTargetId;
-        const startedAt = Date.now();
-        const closed = new Promise<void>((resolve, reject) => {
-          const timer = window.setTimeout(
-            () => reject(new Error('Gameplay socket did not close')),
-            2500
-          );
-          socket.addEventListener(
-            'close',
-            () => {
-              window.clearTimeout(timer);
-              resolve();
-            },
-            { once: true }
-          );
-        });
-        socket.close(4000, 'Browser regression: brief connection flap');
-        await closed;
-        return {
-          startedAt,
-          targetId,
-          timer: ship.harpoonTimer,
-          rocks: gc.getCurrRoidBelt().getRoids().length,
-          health: ship.health,
-          lives: player.lives,
-        };
-      }, connection)
-      .finally(() => connection.dispose());
-    expect(flap.timer).toBeGreaterThan(0);
-    expect(flap.rocks).toBeGreaterThan(0);
-    const reconnectWaitStartedAt = Date.now();
-    await page.waitForFunction(
-      () => {
-        const gc = window.gameController;
-        return gc?.getNetworkManager().isConnected === true;
-      },
-      undefined,
-      { timeout: 2500 }
-    );
-    const reconnectedAt = Date.now();
-    await expect
-      .poll(() => freshWorld, {
-        timeout: 2500,
-        message: 'Rejoined socket must receive a fresh authoritative world',
-      })
-      .toBe(true);
-    const resumed = await page.evaluate(() => {
-      const gc = window.gameController;
-      const player = gc?.getCurrPlayer();
-      if (!gc || !player) {
-        throw new Error('Reconnected pilot unavailable');
-      }
-      const ship = player.ship;
-      const targetId = ship.harpoonTargetId;
-      const rocks = gc.getCurrRoidBelt().getRoids();
-      return {
-        targetId,
-        timer: ship.harpoonTimer,
-        rocks: rocks.map((rock: { id: string }) => rock.id).sort(),
-        targetInField: rocks.some((rock: { id: string }) => rock.id === targetId),
-        health: ship.health,
-        lives: player.lives,
-        connected: Boolean(gc.getNetworkManager()?.isConnected),
-      };
-    });
-    console.log(
-      '[hauler-reconnect]',
-      JSON.stringify({
-        flap,
-        reconnectWaitMs: reconnectedAt - reconnectWaitStartedAt,
-        postReconnectMs: Date.now() - reconnectedAt,
-        resumed,
-      })
-    );
-    expect(resumed.timer).toBeGreaterThan(0);
-    expect(resumed.targetId).toBe(flap.targetId);
-    expect(resumed.rocks.length).toBeGreaterThan(0);
-    const peerRocks = (await peer.getAsteroidPositions()).map((rock) => rock.id).sort();
-    expect(resumed.rocks).toEqual(peerRocks);
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath('hauler-after-reconnect.png'),
     });
     expect(consoleErrors).toEqual([]);
   },

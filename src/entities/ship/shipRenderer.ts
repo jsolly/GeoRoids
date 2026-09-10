@@ -554,8 +554,6 @@ export function drawShipAtPosition(
   const screenX = screen.x;
   const screenY = screen.y;
   const shipR = ship.r * scale;
-  // Cable first — a barely-off-screen hull must not hide the cream tether.
-  drawHaulerHarpoonVfx(ctx, ship, screenX, screenY, shipPosition);
   const cull = shipR * 3;
   if (
     screenX < -cull ||
@@ -630,6 +628,20 @@ export function harpoonTetherStyle(): { dash: number[]; lineWidth: number; tipRa
   };
 }
 
+/** World-space cable. Drawn even when the hull is exploding or culled. */
+export function drawHaulerHarpoonRelative(
+  ship: Ship,
+  cameraShipPosition: { x: number; y: number }
+): void {
+  const ctx = canvasManager.getContext();
+  const cvs = canvasManager.getCanvas();
+  if (!ctx || !cvs) {
+    return;
+  }
+  const screen = canvasManager.worldToScreenInto(shipScreen, ship.position, cameraShipPosition);
+  drawHaulerHarpoonVfx(ctx, ship, screen.x, screen.y, cameraShipPosition);
+}
+
 /** Tether + amber tip. Hauler only — other kits never draw this. */
 export function drawHaulerHarpoonVfx(
   ctx: DrawingContext,
@@ -664,8 +676,6 @@ export function drawHaulerHarpoonVfx(
   const style = harpoonTetherStyle();
   ctx.save();
   ctx.strokeStyle = HAULER_TETHER_COLOR;
-  ctx.shadowColor = HAULER_TETHER_COLOR;
-  ctx.shadowBlur = 2.5;
   ctx.lineWidth = style.lineWidth;
   ctx.setLineDash(style.dash);
   ctx.beginPath();
@@ -686,10 +696,11 @@ export function drawHaulerHarpoonVfx(
     }
   }
   ctx.setLineDash([]);
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = HAULER_TETHER_TIP_COLOR;
   ctx.strokeStyle = HAULER_TETHER_TIP_COLOR;
   ctx.beginPath();
   ctx.arc(latch.x, latch.y, style.tipRadius, 0, Math.PI * 2);
+  ctx.fill();
   ctx.stroke();
   ctx.restore();
 }

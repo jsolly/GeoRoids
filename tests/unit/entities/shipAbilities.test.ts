@@ -105,6 +105,10 @@ test('non-Hauler kits never latch or haul', () => {
   expect(dart.harpoonTimer).toBe(0);
 });
 
+test('unpublished canvas still reaches a 1080p-near rock', () => {
+  expect(harpoonLatchRange()).toBeGreaterThanOrEqual(900);
+});
+
 test('zoomed playfields widen local latch range so a visually-near rock hooks', () => {
   expect(harpoonLatchRange(1)).toBeGreaterThanOrEqual(SHIP_ABILITY.HARPOON_RANGE);
   expect(harpoonLatchRange(0.25)).toBeGreaterThan(1000);
@@ -209,6 +213,39 @@ test('Hauler harpoon latches a nearby ship and hauls only that ship', () => {
   pullHarpoonTarget(hauler, [near, far]);
   expect(near.velocity.x).toBeLessThan(0);
   expect(far.velocity.x).toBe(0);
+});
+
+test('a rock in reach wins over a closer hostile ship', () => {
+  const hauler = host('hauler');
+  hauler.id = 'hauler-1';
+  const rock = {
+    id: 'rock',
+    position: { x: 220, y: 0 },
+    velocity: { x: 0, y: 0 },
+    kind: 'asteroid' as const,
+  };
+  const foe = {
+    id: 'falcon',
+    position: { x: 50, y: 0 },
+    velocity: { x: 0, y: 0 },
+    health: 100,
+    kind: 'ship' as const,
+  };
+  expect(findHarpoonTarget(hauler, [foe, rock], 280)?.id).toBe('rock');
+});
+
+test('an asteroid-tagged rock still latches when a faction field leaked onto it', () => {
+  const hauler = host('hauler');
+  hauler.factionId = 'ion';
+  const rock = {
+    id: 'leaky-rock',
+    position: { x: 80, y: 0 },
+    velocity: { x: 0, y: 0 },
+    kind: 'asteroid' as const,
+    factionId: 'ion' as const,
+  };
+  expect(isEnvironmentLatchBody(rock)).toBe(true);
+  expect(findHarpoonTarget(hauler, [rock])?.id).toBe('leaky-rock');
 });
 
 test('harpoon latches a touching rock instead of a distant forward ship', () => {

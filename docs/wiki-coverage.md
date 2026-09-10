@@ -68,9 +68,10 @@ are also recorded on each article in src/wiki/content.ts.
 
 ## Known rule discrepancies and maintenance notes
 
-- The ordinary Hauler E uses a view-aware latch range with a 280-unit minimum.
-  The enhanced Q tool uses its separate 280-unit physical latch range. They
-  must not be collapsed into one rule.
+- The ordinary Hauler E uses a view-aware latch range with a 280-unit minimum
+  and prefers a valid asteroid in reach over a hostile ship. The enhanced Q
+  tool uses its separate 280-unit physical latch range. They must not be
+  collapsed into one rule.
 - Warden E is a 3-second normal damage shield. F is a separate 2-second laser
   shield with a 6-second cooldown. A shoot-a-drop environmental blast bypasses
   both; spawn protection blocks that blast.

@@ -178,7 +178,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Harpoon E',
         paragraphs: [
-          `E searches for the nearest valid target with a view-aware reach of at least ${SHIP_ABILITY.HARPOON_RANGE} units. Its reach expands with the visible area. A target can be a neutral asteroid or a hostile ship; a same-faction ship, shielded ship, exploding ship, or dead entity is rejected. A successful harpoon runs for up to ${SHIP_ABILITY.HARPOON_FRAMES} frames, or ${seconds(SHIP_ABILITY.HARPOON_FRAMES)}, and applies the shared pull force with a strength of ${SHIP_ABILITY.HARPOON_PULL} and distance falloff. A miss does not spend the cooldown.`,
+          `E latches the nearest valid asteroid in reach, or a hostile ship if no rock is in reach. Reach is view-aware and at least ${SHIP_ABILITY.HARPOON_RANGE} units; it expands with the visible area. A same-faction ship, shielded ship, exploding ship, or dead entity is rejected. A successful harpoon runs for up to ${SHIP_ABILITY.HARPOON_FRAMES} frames, or ${seconds(SHIP_ABILITY.HARPOON_FRAMES)}, and applies the shared pull force with a strength of ${SHIP_ABILITY.HARPOON_PULL} and distance falloff. The cream cable stays visible while the latch is active, including if the hull is exploding. A miss does not spend the cooldown.`,
         ],
       },
       {
@@ -192,6 +192,7 @@ export const articles: WikiArticle[] = [
     sources: [
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipAbilities.ts',
+      'src/entities/ship/shipRenderer.ts',
       'src/entities/ship/harpoonField.ts',
       'shared/asteroidMotion.ts',
       'server/core/AsteroidMotionService.ts',

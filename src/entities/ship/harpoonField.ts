@@ -114,7 +114,7 @@ export function getHarpoonFieldCanvas(): { width: number; height: number } | und
   return fieldCanvas;
 }
 
-function idsMatch(left: string, right: string): boolean {
+export function harpoonTargetIdsMatch(left: string, right: string): boolean {
   return left === right || left.endsWith(right) || right.endsWith(left);
 }
 
@@ -126,12 +126,12 @@ export function findHarpoonFieldBody(id: string | undefined): HarpoonFieldBody |
   if (exact) {
     return exact;
   }
-  const loose = field.find((body) => idsMatch(body.id, id));
+  const loose = field.find((body) => harpoonTargetIdsMatch(body.id, id));
   if (loose) {
     return loose;
   }
   for (const [knownId, body] of lastKnown) {
-    if (idsMatch(knownId, id)) {
+    if (harpoonTargetIdsMatch(knownId, id)) {
       return body;
     }
   }

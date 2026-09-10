@@ -1736,6 +1736,7 @@ export class GameEngine {
       asteroids: this.asteroidManager.getAllAsteroids().map((asteroid) => ({
         ...asteroid,
         r: asteroid.size,
+        kind: 'asteroid' as const,
       })),
       entities: this.entityManager.getAllEntities().filter((other) => other.id !== entityId),
       ...(latchView?.playfieldScale !== undefined

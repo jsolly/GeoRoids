@@ -108,6 +108,7 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
             age: tick % 120,
           }))
         : [],
+    playerProjectiles: [],
     collabTags:
       tick < 40
         ? [

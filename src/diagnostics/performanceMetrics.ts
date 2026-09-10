@@ -9,7 +9,6 @@ type Metric =
   | 'messageMs'
   | 'keyframeMessageMs'
   | 'deltaMessageMs'
-  | 'legacyMessageMs'
   | 'hiddenDurationMs'
   | 'parseMs'
   | 'keyframeDecodeMs'

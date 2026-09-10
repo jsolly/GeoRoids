@@ -26,11 +26,6 @@ vi.mock('../../../src/utils/Logger', () => ({
 
 vi.mock('../../../src/physics/collision/collisionDetection', () => ({
   checkBoundaryCollision: vi.fn(() => true),
-  checkLaserAsteroidCollision: vi.fn(),
-  checkLaserAsteroidCollisionSwept: vi.fn(),
-  checkLaserShipCollision: vi.fn(),
-  checkShipCollision: vi.fn(),
-  asteroidPointsForRadius: vi.fn(() => 50),
 }));
 
 describe('Boundary collision immunity', () => {

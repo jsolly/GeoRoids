@@ -23,7 +23,11 @@ async function start(nodeEnv = 'test') {
   const server = createServerInstance({ port: 0, nodeEnv });
   servers.push(server);
   const port = await server.listening;
-  return { server, origin: `http://127.0.0.1:${port}`, socketUrl: `ws://127.0.0.1:${port}/ws` };
+  return {
+    server,
+    origin: `http://127.0.0.1:${port}`,
+    socketUrl: `ws://127.0.0.1:${port}/ws?asteroidInteractions=1`,
+  };
 }
 
 test.each([true, false])(

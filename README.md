@@ -75,4 +75,4 @@ Contributions use topic branches and pull requests with green `CI / ci`; direct 
 
 [MIT license](LICENSE)
 
-Production disables test and diagnostic-write HTTP routes. When `REQUIRE_ASTEROID_CLIENT=1`, both WebSocket admission and join negotiation require the current client; reconnects use the private resume token.
+Production disables test and diagnostic-write HTTP routes. WebSocket admission and joins always require the current snapshot protocol; reconnects use the private resume token.

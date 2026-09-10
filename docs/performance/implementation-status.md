@@ -1,7 +1,11 @@
 # Performance implementation status
 
+The recorded benchmark receipts below predate legacy-client retirement. Current
+load sessions use the required snapshot protocol for every pilot; old mixed-client
+measurements remain historical evidence only.
+
 Physical Android/iPhone runs, calibrated mobile budgets,
-instrumentation overhead, deployed capacity/soaks, and release/rollback acceptance
+instrumentation overhead, deployed capacity/soaks, and release acceptance
 have not been established. No supported player count or mobile frame-rate claim
 follows from these local checks.
 
@@ -33,7 +37,7 @@ pinned-revision benchmark framework and direct controls. The work stays in
 | 4. Client | Coalesced resize notifications; unchanged backing dimensions preserve canvas pixels; hidden pages release input and reset presentation debt on return; opt-in update/render/decode/apply observations. | Phone CPU/allocation/raster profiles before contour/HUD caching, pools or quality changes. No evidence currently justifies worker rendering or WebGL. |
 | 5. Server | Monotonic scheduling; one-second maximum simulation debt with discarded time reported; outbound pressure audit and bounded diagnostics; differential grid experiment. | Deployed tick-deadline/GC/queue distributions, tick-local allocation profiles and capacity soak. Grid candidate rejected in [the experiment](collision-experiment.md). |
 | 6. Protocol | Existing enhanced keyframe/delta path retained; Unicode byte accounting and an isolated compression experiment. | End-to-end cadence/interpolation/correction and real WebSocket compression under load. Binary and interest management remain unjustified without these results. |
-| 7. Operations | Opt-in 15-second aggregate exports, release-correlated health metrics, read-only Railway inventory. | Dashboard/cohorts, measured region suitability and admission reserve, physical-device and deployed-load soaks, two-player deployment and rollback rehearsal. |
+| 7. Operations | Opt-in 15-second aggregate exports, release-correlated health metrics, read-only Railway inventory. | Dashboard/cohorts, measured region suitability and admission reserve, physical-device and deployed-load soaks, two-player deployment verification. |
 
 ## Runtime behavior
 

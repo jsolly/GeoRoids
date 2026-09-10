@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, gunzipSync, gzipSync, inflateSync } from 'node:zlib';
-import { validateSnapshotDto } from '../shared/snapshotDto';
 import { SnapshotDecoder, SnapshotEncoder, type SnapshotFrame } from '../shared/snapshotProtocol';
 import type { PlayerProjectileState, ServerGameSnapshot } from '../shared-types';
 import { snapshotFixture } from '../tests/unit/network/snapshotFixture';
 import { type Measurement, validateMeasurement } from './results';
 
-type Variant = 'legacy' | 'keyframe' | 'delta';
+type Variant = 'keyframe' | 'delta';
 type Payloads = Record<Variant, string>;
 interface ProtocolExperimentOptions {
   readonly seed: number;
@@ -17,7 +16,7 @@ interface ProtocolExperimentOptions {
 }
 
 const DEFAULTS: ProtocolExperimentOptions = { seed: 42, warmupTicks: 30, measuredTicks: 120 };
-const variants: readonly Variant[] = ['legacy', 'keyframe', 'delta'];
+const variants: readonly Variant[] = ['keyframe', 'delta'];
 
 function argument(name: string, fallback: number): number {
   const index = process.argv.indexOf(`--${name}`);
@@ -58,7 +57,6 @@ function payloads(
     : keyframe;
   return {
     encoder,
-    legacy: envelope('gameState', world),
     keyframe: envelope('snapshot', keyframe),
     delta: envelope('snapshot', delta),
   };
@@ -74,12 +72,6 @@ function parsedData(text: string): unknown {
   const parsed: unknown = JSON.parse(text);
   assert(parsed && typeof parsed === 'object' && 'data' in parsed);
   return parsed.data;
-}
-
-function decodeLegacy(text: string): ServerGameSnapshot {
-  const state = parsedData(text);
-  validateSnapshotDto(state);
-  return state;
 }
 
 function decodeSnapshot(text: string, decoder: SnapshotDecoder): ServerGameSnapshot {
@@ -155,7 +147,6 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     if (tick > 0) {
       assert(previousState);
     }
-    assert.deepEqual(decodeLegacy(current.legacy), world);
     assert.deepEqual(decodeSnapshot(current.keyframe, decoders.keyframe), world);
     assert.deepEqual(decodeSnapshot(current.delta, decoders.delta), world);
     for (const variant of variants) {
@@ -166,27 +157,19 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
       const deflateSamples = samplesFor(`${variant}-deflate-ms`);
       encodeSerializeSamples.push(
         timed(() => {
-          if (variant === 'legacy') {
-            envelope('gameState', world);
-          } else {
-            const encoder = new SnapshotEncoder(world);
-            const frame = encoder.encode(
-              tick + 1,
-              variant === 'delta' && previousState
-                ? { sequence: tick, state: previousState }
-                : undefined
-            );
-            envelope('snapshot', frame);
-          }
+          const encoder = new SnapshotEncoder(world);
+          const frame = encoder.encode(
+            tick + 1,
+            variant === 'delta' && previousState
+              ? { sequence: tick, state: previousState }
+              : undefined
+          );
+          envelope('snapshot', frame);
         })
       );
       decodeSamples.push(
         timed(() => {
-          if (variant === 'legacy') {
-            decodeLegacy(text);
-          } else {
-            decodeSnapshot(text, timedDecoders[variant]);
-          }
+          decodeSnapshot(text, timedDecoders[variant]);
         })
       );
       gzipSamples.push(timed(() => gzipSync(Buffer.from(text, 'utf8'))));
@@ -230,7 +213,6 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     witness: {
       fixture: 'tests/unit/network/snapshotFixture.ts',
       variants: {
-        legacy: 'gameState full JSON',
         keyframe: 'snapshot-v1 keyframe',
         delta: 'snapshot-v1 delta',
       },

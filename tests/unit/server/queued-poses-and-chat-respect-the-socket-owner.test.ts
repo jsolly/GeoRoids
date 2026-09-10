@@ -31,7 +31,7 @@ function advanceElapsed(ms: number): void {
 
 test('alternating enhanced-motion rejects stay within one bounded socket summary', () => {
   const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-  const { socket } = join('enhanced-pilot', true);
+  const { socket } = join('enhanced-pilot');
   const rejectedPose = {
     type: 'update',
     id: 'enhanced-pilot',
@@ -76,12 +76,12 @@ test('alternating enhanced-motion rejects stay within one bounded socket summary
     suppressed: 2,
   });
 });
-function join(id: string, enhanced = false) {
+function join(id: string) {
   const socket = new RecordingSocket();
   core.handleClientMessage(
     {
       type: 'join',
-      data: { id, name: id, ...(enhanced ? { snapshotVersion: 1, asteroidInteractions: 1 } : {}) },
+      data: { id, name: id, snapshotVersion: 1, asteroidInteractions: 1 },
     },
     socket
   );
@@ -90,7 +90,7 @@ function join(id: string, enhanced = false) {
 }
 
 test('a pre-acknowledgment pose is ignored without a spurious enhanced-movement warning', () => {
-  const { socket, messages } = join('enhanced-pilot', true);
+  const { socket, messages } = join('enhanced-pilot');
   const pilot = engine.getPlayer('enhanced-pilot');
   if (!pilot) {
     throw new Error('Expected the enhanced pilot to join');

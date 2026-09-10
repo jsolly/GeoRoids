@@ -29,7 +29,6 @@ import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { entityFactory } from '../entities/EntityFactory';
-import { AuthoritativeProjectileField } from '../entities/laser/AuthoritativeProjectileField';
 import { LootField } from '../entities/loot/LootField';
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
@@ -57,12 +56,7 @@ import {
   bindAsteroidFieldApply,
   unbindAsteroidFieldApply,
 } from '../network/services/asteroidFieldSync';
-import { shouldReportLaserAsteroidHit } from '../physics/collision/asteroidHitFeel';
-import {
-  CollisionManager,
-  type LaserCollisionOptions,
-  type LaserTarget,
-} from '../physics/collision/CollisionManager';
+import { CollisionManager } from '../physics/collision/CollisionManager';
 import { applyShockwaveToBody, type ShockwaveWaveSpec } from '../physics/shockwave';
 import { contourSegmentCount } from '../physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../physics/terrain/heightfield';
@@ -102,11 +96,7 @@ export class GameController {
   private currRoidBelt: RoidBelt;
   private recentShockwaveKeys = new Set<string>();
   private readonly otherShips: { ship: Ship; id: string }[] = [];
-  private readonly laserTargets: LaserTarget[] = [];
-  private readonly incomingLocalTarget: LaserTarget[] = [];
   private readonly localFirstPlayers: Player[] = [];
-  private readonly laserOwnerSeen = new Set<string>();
-  private readonly laserHitOptions: LaserCollisionOptions = { reportAsteroidHits: true };
   private gameOverInProgress = false;
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
@@ -433,7 +423,7 @@ export class GameController {
 
       logger.debug('NETWORK', 'Connected to server, using server-authoritative game state');
       // Empty belt + listeners must be ready before join so the first
-      // asteroidCreateBatch / gameState cannot land on a static local set.
+      // asteroidCreateBatch / snapshot cannot land on a static local set.
       this.currRoidBelt = entityFactory.createEmptyRoidBelt();
       shockwaveManager.clear();
       this.setupServerAsteroidListeners();
@@ -579,9 +569,6 @@ export class GameController {
       }
       recordAsteroidShatter(roid);
     }
-    // Clear pending destruction state before removing the local row.
-    roid.pendingDestruction = false;
-    roid.pendingUntilMs = 0;
     delete roid.taggedUntil;
     this.currRoidBelt.roids.splice(index, 1);
   };
@@ -893,7 +880,7 @@ export class GameController {
   }
 
   // Score management — the server is authoritative; the local player's entity
-  // score is synced from the server's gameState broadcast.
+  // score is synced from the server's authoritative snapshot.
   getCurrScore(): number {
     return this.playerManager.getLocalPlayer()?.score ?? 0;
   }
@@ -1110,9 +1097,6 @@ export class GameController {
 
     SatelliteManager.getInstance().update();
 
-    // Check laser collisions with asteroids and bots
-    this.checkLaserCollisions(allPlayers);
-    this.checkLaserSatelliteCollisions();
     this.checkSatelliteLaserCollisions();
     this.checkSatellitePickupCollisions();
 
@@ -1165,142 +1149,6 @@ export class GameController {
       this.localFirstPlayers.push(player);
     }
     return this.localFirstPlayers;
-  }
-
-  private fillLaserTargets(allPlayers: Player[]): void {
-    let count = 0;
-    for (const player of allPlayers) {
-      if (player.type !== 'bot' && player.type !== 'remote') {
-        continue;
-      }
-      const existing = this.laserTargets[count];
-      if (existing) {
-        existing.ship = player.ship;
-        existing.id = player.id;
-        existing.type = player.type;
-        if (player.factionId !== undefined) {
-          existing.faction = player.factionId;
-        } else {
-          delete existing.faction;
-        }
-      } else {
-        this.laserTargets[count] = {
-          ship: player.ship,
-          id: player.id,
-          type: player.type,
-          ...(player.factionId !== undefined ? { faction: player.factionId } : {}),
-        };
-      }
-      count += 1;
-    }
-    this.laserTargets.length = count;
-  }
-
-  // Check laser collisions with asteroids and bots
-  private checkLaserCollisions(allPlayers: Player[]): void {
-    if (AuthoritativeProjectileField.getInstance().isEnabled()) {
-      // The server's keyed projectile snapshot owns every player laser hit.
-      // Running the client pass too would report duplicate asteroid/bot hits
-      // and could consume a local visual bolt before its authoritative row
-      // arrives. Ship↔ship ramming remains in its separate collision pass.
-      return;
-    }
-    const currPlayer = this.playerManager.getLocalPlayer();
-    if (!currPlayer || !this.currRoidBelt) {
-      return;
-    }
-
-    this.fillLaserTargets(allPlayers);
-
-    // Attribute kills to the server-assigned player id (set at join time), not
-    // currPlayer.id which only becomes the server id once the first gameState
-    // reconciles the local player — asteroids can arrive before that.
-    const attackerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
-
-    const incoming = this.incomingLocalTarget[0];
-    if (incoming) {
-      incoming.ship = currPlayer.ship;
-      incoming.id = attackerId;
-      incoming.type = 'local';
-      if (currPlayer.factionId !== undefined) {
-        incoming.faction = currPlayer.factionId;
-      } else {
-        delete incoming.faction;
-      }
-    } else {
-      this.incomingLocalTarget[0] = {
-        ship: currPlayer.ship,
-        id: attackerId,
-        type: 'local',
-        ...(currPlayer.factionId !== undefined ? { faction: currPlayer.factionId } : {}),
-      };
-    }
-
-    this.laserOwnerSeen.clear();
-    const ships = allPlayers.includes(currPlayer)
-      ? allPlayers
-      : this.playersWithLocal(currPlayer, allPlayers);
-    for (const player of ships) {
-      if (this.laserOwnerSeen.has(player.id)) {
-        continue;
-      }
-      this.laserOwnerSeen.add(player.id);
-      if (!player.ship?.lasers.length) {
-        continue;
-      }
-      const ownerType = player.type;
-      this.laserHitOptions.reportAsteroidHits = shouldReportLaserAsteroidHit(ownerType);
-      if (player.factionId !== undefined) {
-        this.laserHitOptions.attackerFaction = player.factionId;
-      } else {
-        delete this.laserHitOptions.attackerFaction;
-      }
-      const ownerAttackerId = ownerType === 'local' ? attackerId : player.id;
-      // Human shooters report their own hits. Bots have no shooter client, so
-      // incoming bot lasers use the same hull check against the local ship.
-      const targets =
-        ownerType === 'local'
-          ? this.laserTargets
-          : ownerType === 'bot'
-            ? this.incomingLocalTarget
-            : [];
-      this.collisionManager.checkLaserCollisions(
-        player.ship.lasers,
-        this.currRoidBelt.roids,
-        targets,
-        ownerAttackerId,
-        this.laserHitOptions
-      );
-    }
-
-    for (const other of allPlayers) {
-      if (other.type === 'local') {
-        continue;
-      }
-      this.collisionManager.explodeIncomingLasersOnShieldedShip(
-        other.ship.lasers,
-        currPlayer.ship,
-        areAllied(other.factionId, currPlayer.factionId)
-      );
-    }
-  }
-
-  private checkLaserSatelliteCollisions(): void {
-    if (AuthoritativeProjectileField.getInstance().isEnabled()) {
-      // Satellite damage from player projectiles is server-authoritative in
-      // the enhanced snapshot protocol, just like asteroid and bot damage.
-      return;
-    }
-    const currPlayer = this.playerManager.getLocalPlayer();
-    if (!currPlayer) {
-      return;
-    }
-    const attackerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
-    this.collisionManager.checkLaserSatelliteCollisions(
-      currPlayer.ship.lasers,
-      SatelliteManager.getInstance().getAll(),
-      attackerId
-    );
   }
 
   private checkSatelliteLaserCollisions(): void {

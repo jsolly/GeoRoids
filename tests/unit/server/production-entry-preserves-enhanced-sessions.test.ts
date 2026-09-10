@@ -37,7 +37,7 @@ async function waitFor<T>(read: () => T | undefined, label: string, timeout = 50
   throw new Error(`Timed out waiting for ${label}: ${output.slice(-6000)}`);
 }
 
-async function start(gated: boolean, port = 0): Promise<number> {
+async function start(port = 0): Promise<number> {
   const railwayStartCommand = railwayService?.deploy?.startCommand;
   if (!railwayStartCommand) {
     throw new Error('Railway IaC service start command is missing');
@@ -54,7 +54,6 @@ async function start(gated: boolean, port = 0): Promise<number> {
       NODE_ENV: 'production',
       VITEST: 'false',
       PORT: String(port),
-      REQUIRE_ASTEROID_CLIENT: gated ? '1' : '0',
       SERVER_LOG_LEVEL: 'info',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -178,8 +177,8 @@ afterEach(async () => {
   }
 });
 
-test('the actual production entry gates stale upgrades, keeps HTTP/logs, and resumes enhanced pilots through transport grace', async () => {
-  const port = await start(true);
+test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and resumes pilots through transport grace', async () => {
+  const port = await start();
   const base = `http://127.0.0.1:${port}`;
   const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
   expect(health.status).toBe(200);
@@ -269,25 +268,8 @@ test('the actual production entry gates stale upgrades, keeps HTTP/logs, and res
   expect(expired.packets.some((packet) => packet.type === 'joined')).toBe(false);
 }, 25_000);
 
-test('the actual support entry admits ordinary clients before the cutover flag is enabled', async () => {
-  const port = await start(false);
-  const ordinary = new Pilot(connect(port, '/ws'));
-  await once(ordinary.ws, 'open', { signal: AbortSignal.timeout(5000) });
-  ordinary.send('join', { id: 'legacy-entry', name: 'Legacy entry' });
-  const joined = await waitFor(
-    () => ordinary.packets.find((packet) => packet.type === 'joined')?.data,
-    'ordinary production join'
-  );
-  if (!isRecord(joined)) {
-    throw new Error('Joined packet is missing its data object');
-  }
-  expect(joined['id']).toBe('legacy-entry');
-  expect(joined['resumeToken']).toBeUndefined();
-  expect(joined['asteroidInteractions']).toBeUndefined();
-}, 20_000);
-
 test('the production entry completes SIGTERM shutdown and exits successfully', async () => {
-  const port = await start(true);
+  const port = await start();
   const client = connect(port, '/logs');
   await once(client, 'open', { signal: AbortSignal.timeout(5000) });
   if (!child) {
@@ -310,7 +292,7 @@ test('an occupied production listener fails promptly with a nonzero exit and the
     if (!address || typeof address === 'string') {
       throw new Error('Expected an ephemeral TCP listener');
     }
-    await expect(start(true, address.port)).rejects.toThrow('Production entry exited');
+    await expect(start(address.port)).rejects.toThrow('Production entry exited');
     expect(child?.exitCode).toBe(1);
     expect(output).toContain('Failed to start server listener');
     expect(output).toContain('EADDRINUSE');

@@ -24,8 +24,8 @@ afterEach(async () => {
   server = undefined;
 });
 
-test('a release cutover rejects stale clients before open while updated gameplay and logs connect', async () => {
-  server = createServerInstance({ port: 0, nodeEnv: 'test', requireEnhancedClient: true });
+test('the server rejects stale gameplay clients before open and accepts the current handshake', async () => {
+  server = createServerInstance({ port: 0, nodeEnv: 'test' });
   const port = await server.listening;
   const stale = connect(port, '/ws');
   let opened = false;
@@ -63,9 +63,28 @@ test('a release cutover rejects stale clients before open while updated gameplay
   expect(logs.readyState).toBe(WebSocket.OPEN);
 });
 
-test('the support release keeps ordinary clients connected before cutover is enabled', async () => {
-  server = createServerInstance({ port: 0, nodeEnv: 'test', requireEnhancedClient: false });
-  const socket = connect(await server.listening, '/ws');
+test('a current gameplay socket still requires the snapshot capability in its join offer', async () => {
+  server = createServerInstance({ port: 0, nodeEnv: 'test' });
+  const socket = connect(await server.listening, '/ws?asteroidInteractions=1');
   await once(socket, 'open');
   expect(socket.readyState).toBe(WebSocket.OPEN);
+  const error = new Promise<Record<string, unknown>>((resolve) =>
+    socket.on('message', (raw) => {
+      const packet = JSON.parse(String(raw));
+      if (packet.type === 'error') {
+        resolve(packet);
+      }
+    })
+  );
+  socket.send(
+    JSON.stringify({
+      type: 'join',
+      data: { id: 'stale-pilot', name: 'Stale pilot', asteroidInteractions: 1 },
+    })
+  );
+  await expect(error).resolves.toMatchObject({
+    type: 'error',
+    data: 'Client update required; refresh GeoRoids',
+  });
+  expect(server.gameEngine.getPlayerCount()).toBe(0);
 });

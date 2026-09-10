@@ -8,10 +8,10 @@ export class WebSocketCore {
   private messageHandler: MessageHandler;
   private broadcaster: GameStateBroadcaster;
 
-  constructor(gameEngine: GameEngine, requireEnhancedClient = false) {
+  constructor(gameEngine: GameEngine) {
     this.gameEngine = gameEngine;
     this.broadcaster = new GameStateBroadcaster(gameEngine);
-    this.messageHandler = new MessageHandler(gameEngine, this.broadcaster, requireEnhancedClient);
+    this.messageHandler = new MessageHandler(gameEngine, this.broadcaster);
     this.gameEngine.setCombatSink((result) => this.broadcaster.broadcastCombatResult(result));
   }
 

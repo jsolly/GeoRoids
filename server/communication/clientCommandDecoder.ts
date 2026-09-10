@@ -16,9 +16,7 @@ interface PlayerMovementUpdate {
   velocity?: Velocity;
   angle?: number;
   thrusting?: boolean;
-  rotation?: number;
   angularVelocity?: number;
-  a?: number;
 }
 
 export type ClientCommand =
@@ -29,8 +27,8 @@ export type ClientCommand =
       position: Position;
       kitId?: ShipKitId;
       factionId?: SoftFactionId;
-      enhancedOffer: boolean;
-      snapshotVersion?: 1;
+      snapshotVersion: 1;
+      asteroidInteractions: 1;
       resumeRequested: boolean;
       resumeToken?: string;
     }
@@ -45,7 +43,6 @@ export type ClientCommand =
       abilityId?: string;
       latchView: { playfieldScale?: number; canvas?: { width: number; height: number } };
     }
-  | { type: 'asteroidDamage'; asteroidId: string; playerId: string }
   | {
       type: 'update';
       id: string;
@@ -56,31 +53,9 @@ export type ClientCommand =
   | { type: 'shoot'; id: string; laserStart: Position; laserDirection: Velocity }
   | { type: 'shield'; id: string; active: boolean }
   | { type: 'chat'; id: string; message: string }
-  | { type: 'laserDamage'; targetPlayerId: string; attackerId: string; damage: number }
   | { type: 'collisionDamage'; targetPlayerId: string; attackerId: string }
-  | { type: 'botDamage'; botId: string; attackerId: string }
-  | {
-      type: 'satelliteDamage';
-      satelliteId: string;
-      attackerId: string;
-      laserPosition: Position;
-    }
   | { type: 'satellitePickupCollected'; pickupId: string; claimedPlayerId?: string }
-  | {
-      type: 'asteroidDestroyed';
-      asteroidId: string;
-      playerId: string;
-      laserPosition: Position;
-    }
-  | {
-      type: 'lootExplode';
-      id: string;
-      lootId: string;
-      claimedPlayerId?: string;
-      invalidPlayerClaim: boolean;
-    }
   | { type: 'initAsteroids'; id: string }
-  | { type: 'botUpdate'; botId: string; playerId: string }
   | { type: 'clientLog'; payload: WireRecord }
   | { type: 'ping' };
 
@@ -91,7 +66,6 @@ type ClientCommandDecodeResult =
       messageType?: string;
       error?: string;
       logUnknown?: boolean;
-      suppressWhenAuthoritativeProjectiles?: boolean;
     };
 
 function isRecord(value: unknown): value is WireRecord {
@@ -127,7 +101,6 @@ function readFinitePosition(value: unknown): Position | undefined {
   return x === undefined || y === undefined ? undefined : { x, y };
 }
 
-/** Join coordinates historically accepted numeric strings; keep that compatibility at the wire. */
 function readJoinPosition(value: unknown): Position {
   if (!isRecord(value)) {
     return { x: 0, y: 0 };
@@ -139,16 +112,11 @@ function readJoinPosition(value: unknown): Position {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : { x: 0, y: 0 };
 }
 
-function invalid(
-  messageType: string,
-  error?: string,
-  suppressWhenAuthoritativeProjectiles = false
-): ClientCommandDecodeResult {
+function invalid(messageType: string, error?: string): ClientCommandDecodeResult {
   return {
     ok: false,
     messageType,
     ...(error !== undefined ? { error } : {}),
-    ...(suppressWhenAuthoritativeProjectiles ? { suppressWhenAuthoritativeProjectiles } : {}),
   };
 }
 
@@ -223,18 +191,12 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawVelocity = fields['velocity'];
   const rawAngle = fields['angle'];
   const rawAngularVelocity = fields['angularVelocity'];
-  const rawRotation = fields['rotation'];
-  const rawLegacyAngle = fields['a'];
   const rawThrusting = fields['thrusting'];
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
   const angularVelocity = readFiniteNumber(rawAngularVelocity);
-  const rotation = readFiniteNumber(rawRotation);
-  const legacyAngle = readFiniteNumber(rawLegacyAngle);
   const thrusting = typeof rawThrusting === 'boolean' ? rawThrusting : undefined;
-  const canonicalRotation = rotation ?? angle;
-  const canonicalAngularVelocity = angularVelocity ?? legacyAngle;
 
   if (
     !id ||
@@ -242,8 +204,6 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     (rawVelocity !== undefined && velocity === undefined) ||
     (rawAngle !== undefined && angle === undefined) ||
     (rawAngularVelocity !== undefined && angularVelocity === undefined) ||
-    (rawRotation !== undefined && rotation === undefined) ||
-    (rawLegacyAngle !== undefined && legacyAngle === undefined) ||
     (rawThrusting !== undefined && thrusting === undefined)
   ) {
     return invalid('update', !id ? 'Missing player ID' : 'Invalid player movement update');
@@ -254,11 +214,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(velocity !== undefined ? { velocity } : {}),
     ...(angle !== undefined ? { angle } : {}),
     ...(thrusting !== undefined ? { thrusting } : {}),
-    ...(canonicalRotation !== undefined ? { rotation: canonicalRotation } : {}),
-    ...(legacyAngle !== undefined ? { a: legacyAngle } : {}),
-    ...(canonicalAngularVelocity !== undefined
-      ? { angularVelocity: canonicalAngularVelocity }
-      : {}),
+    ...(angularVelocity !== undefined ? { angularVelocity } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);
   const motionSequence = readSafeInteger(fields['motionSequence']);
@@ -338,9 +294,13 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       }
       const kitOffer = message['kitId'] ?? payload['kitId'];
       const factionOffer = message['factionId'] ?? payload['factionId'];
-      const enhancedOffer = message['asteroidInteractions'] ?? payload['asteroidInteractions'];
       const snapshotOffer = message['snapshotVersion'] ?? payload['snapshotVersion'];
+      const asteroidInteractionsOffer =
+        message['asteroidInteractions'] ?? payload['asteroidInteractions'];
       const rawToken = message['resumeToken'] ?? payload['resumeToken'];
+      if (snapshotOffer !== 1 || asteroidInteractionsOffer !== 1) {
+        return invalid(type, 'Client update required; refresh GeoRoids');
+      }
       return {
         ok: true,
         command: {
@@ -353,8 +313,8 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
             const factionId = parseSoftFactionId(factionOffer);
             return factionId === undefined ? {} : { factionId };
           })(),
-          enhancedOffer: enhancedOffer === 1,
-          ...(snapshotOffer === 1 ? { snapshotVersion: 1 as const } : {}),
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
           resumeRequested: rawToken !== undefined,
           ...(typeof rawToken === 'string' ? { resumeToken: rawToken } : {}),
         },
@@ -400,14 +360,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         ? { ok: true, command: { type, id, message: chatMessage } }
         : invalid(type, 'Chat message must be between 1 and 500 characters');
     }
-    case 'laserDamage': {
-      const targetPlayerId = readNonEmptyString(fields['targetPlayerId']);
-      const attackerId = readNonEmptyString(fields['attackerId']);
-      const damage = readFiniteNumber(fields['damage']);
-      return targetPlayerId && attackerId && damage !== undefined
-        ? { ok: true, command: { type, targetPlayerId, attackerId, damage } }
-        : invalid(type, 'Missing required fields for laserDamage', true);
-    }
     case 'collisionDamage': {
       const targetPlayerId = readNonEmptyString(fields['targetPlayerId']);
       const attackerId = readNonEmptyString(fields['attackerId']);
@@ -415,25 +367,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return targetPlayerId && attackerId && damage !== undefined
         ? { ok: true, command: { type, targetPlayerId, attackerId } }
         : invalid(type, 'Missing required fields for collisionDamage');
-    }
-    case 'botDamage': {
-      const botId = readNonEmptyString(fields['botId']);
-      const attackerId = readNonEmptyString(fields['attackerId']);
-      const damage = readFiniteNumber(fields['damage']);
-      return botId && attackerId && damage !== undefined
-        ? { ok: true, command: { type, botId, attackerId } }
-        : invalid(type, 'Missing required fields for botDamage', true);
-    }
-    case 'satelliteDamage': {
-      const satelliteId = readNonEmptyString(fields['satelliteId']);
-      const attackerId = readNonEmptyString(fields['attackerId']);
-      if (!satelliteId || !attackerId) {
-        return invalid(type, 'Missing required fields for satelliteDamage', true);
-      }
-      const laserPosition = readFinitePosition(fields['laserPosition']);
-      return laserPosition
-        ? { ok: true, command: { type, satelliteId, attackerId, laserPosition } }
-        : invalid(type, undefined, true);
     }
     case 'satellitePickupCollected': {
       const pickupId = readNonEmptyString(fields['pickupId']);
@@ -452,60 +385,10 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
           }
         : invalid(type);
     }
-    case 'asteroidDamage': {
-      const asteroidId = readNonEmptyString(fields['asteroidId']);
-      const playerId = readNonEmptyString(fields['playerId']);
-      const damage = readFiniteNumber(fields['damage']);
-      return asteroidId && playerId && damage !== undefined && damage > 0
-        ? { ok: true, command: { type, asteroidId, playerId } }
-        : invalid(type, 'Missing required fields for asteroidDamage', true);
-    }
-    case 'asteroidDestroyed': {
-      const asteroidId = readNonEmptyString(fields['asteroidId']);
-      const playerId = readNonEmptyString(fields['playerId']);
-      if (!asteroidId || !playerId) {
-        return invalid(type, 'Missing required fields for asteroidDestroyed', true);
-      }
-      if (fields['cause'] === 'collision') {
-        return invalid(type, 'Server owns asteroid collision reports', true);
-      }
-      if (fields['cause'] !== undefined && fields['cause'] !== 'laser') {
-        return invalid(type, 'Invalid cause for asteroidDestroyed', true);
-      }
-      const laserPosition = readFinitePosition(fields['laserPosition']);
-      return laserPosition
-        ? { ok: true, command: { type, asteroidId, playerId, laserPosition } }
-        : invalid(type, 'Missing finite laserPosition for asteroidDestroyed', true);
-    }
-    case 'lootExplode': {
-      const lootId = readNonEmptyString(fields['lootId']);
-      if (!lootId) {
-        return invalid(type, 'Missing loot ID for lootExplode', true);
-      }
-      const claimed = fields['playerId'];
-      return {
-        ok: true,
-        command: {
-          type,
-          id,
-          lootId,
-          ...(typeof claimed === 'string' ? { claimedPlayerId: claimed } : {}),
-          invalidPlayerClaim:
-            claimed !== undefined && claimed !== null && typeof claimed !== 'string',
-        },
-      };
-    }
     case 'initAsteroids':
       return id
         ? { ok: true, command: { type, id } }
         : invalid(type, 'Missing player ID for initAsteroids');
-    case 'botUpdate': {
-      const botId = readNonEmptyString(fields['botId']);
-      const playerId = readNonEmptyString(fields['playerId']);
-      return botId && playerId
-        ? { ok: true, command: { type, botId, playerId } }
-        : invalid(type, 'Missing bot ID or player ID for botUpdate');
-    }
     default:
       return {
         ok: false,

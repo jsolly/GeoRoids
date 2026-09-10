@@ -131,24 +131,25 @@ test('a long hitch simulates the bounded second once and discards older movement
 });
 
 test.each([
-  { step: 'first', rockX: -50, impactX: 0 },
-  { step: 'second', rockX: 50, impactX: 100 },
-])(
-  'catch-up checks a shot crossing a rock during the $step simulated step',
-  ({ rockX, impactX }) => {
-    const ship = arrangeFlight();
-    ship.position = { x: -1000, y: -1000 };
-    ship.thrusting = false;
-    const laser = new Laser({ x: -100, y: 0 }, { x: 100, y: 0 }, 0, 0);
-    ship.lasers = [laser];
-    const asteroid = new Roid({ x: rockX, y: 0 }, 10, 'crossed-rock');
-    asteroid.velocity = { x: 0, y: 0 };
-    game.getCurrRoidBelt().roids = [asteroid];
+  { step: 'first', rockX: -50 },
+  { step: 'second', rockX: 50 },
+])('catch-up advances a shot across a rock during the $step simulated step', ({ rockX }) => {
+  const ship = arrangeFlight();
+  ship.position = { x: -1000, y: -1000 };
+  ship.thrusting = false;
+  const laser = new Laser({ x: -100, y: 0 }, { x: 100, y: 0 }, 0, 0);
+  ship.lasers = [laser];
+  const asteroid = new Roid({ x: rockX, y: 0 }, 10, 'crossed-rock');
+  asteroid.velocity = { x: 0, y: 0 };
+  game.getCurrRoidBelt().roids = [asteroid];
 
-    game.updateGame(GAME_TICK_MS * 2);
+  game.updateGame(GAME_TICK_MS * 2);
 
-    expect(laser.hasExploded).toBe(true);
-    expect(laser.position).toEqual({ x: impactX, y: 0 });
-    expect(asteroid.pendingDestruction).toBe(true);
-  }
-);
+  // The current multiplayer protocol leaves asteroid impact resolution to the
+  // server. The client still advances visual projectiles on the same fixed
+  // clock, but crossing a local rock does not destroy it optimistically.
+  expect(laser.hasExploded).toBe(false);
+  expect(laser.position).toEqual({ x: 100, y: 0 });
+  expect(laser.distTraveled).toBe(200);
+  expect(game.getCurrRoidBelt().getRoids()).toContain(asteroid);
+});

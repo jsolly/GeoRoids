@@ -20,7 +20,7 @@ afterEach(async () => {
   }
 });
 
-test('real legacy and negotiated sockets render matching worlds across late join and reconnect', async () => {
+test('current sockets render matching worlds across late join and reconnect', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(10_000);
   const failures: unknown[] = [];
   const engine = new GameEngine(731);
@@ -53,10 +53,7 @@ test('real legacy and negotiated sockets render matching worlds across late join
       }
     });
     socket.on('close', () => {
-      const player = engine.getPlayerBySocket(socket);
-      if (player) {
-        engine.removePlayer(player.id);
-      }
+      engine.transportClosed(socket);
     });
   });
   await once(wss, 'listening', { signal: AbortSignal.timeout(2_000) });
@@ -65,8 +62,10 @@ test('real legacy and negotiated sockets render matching worlds across late join
     throw new Error('No test port');
   }
   const port = address.port;
-  async function pilot(id: string, negotiate: boolean) {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}`);
+  async function pilot(id: string, resumeToken?: string) {
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=1&asteroidInteractions=1`
+    );
     clients.push(socket);
     const decoder = new SnapshotDecoder();
     const messages: Array<{ type: string; data: unknown }> = [];
@@ -84,9 +83,6 @@ test('real legacy and negotiated sockets render matching worlds across late join
           snapshot = decoder.decode(message.data);
           state = snapshot;
         }
-        if (message.type === 'gameState') {
-          state = message.data;
-        }
       } catch (error) {
         failures.push(error);
       }
@@ -99,22 +95,24 @@ test('real legacy and negotiated sockets render matching worlds across late join
           id,
           name: id,
           position: { x: 100, y: 100 },
-          ...(negotiate ? { snapshotVersion: 1 } : {}),
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+          ...(resumeToken ? { resumeToken } : {}),
         },
       })
     );
     await expect.poll(() => state).toBeDefined();
     return { socket, messages, state: () => state, snapshot: () => snapshot };
   }
-  const old = await pilot('legacy', false);
-  const modern = await pilot('new', true);
+  const first = await pilot('first');
+  const second = await pilot('second');
   // Seed a real active shot and a normal large ice rock's cooperative window.
   // These must survive reconnect even when the one-shot event was missed.
   const satellite = engine.getAllSatellites()[0];
-  const legacyPlayer = engine.getPlayer('legacy');
-  const modernPlayer = engine.getPlayer('new');
-  assert.ok(satellite && legacyPlayer && modernPlayer);
-  legacyPlayer.position = { x: satellite.position.x + 180, y: satellite.position.y };
+  const firstPlayer = engine.getPlayer('first');
+  const secondPlayer = engine.getPlayer('second');
+  assert.ok(satellite && firstPlayer && secondPlayer);
+  firstPlayer.position = { x: satellite.position.x + 180, y: satellite.position.y };
   for (let frame = 0; frame < 240 && engine.getActiveSatelliteProjectiles().length === 0; frame++) {
     engine.tickSatellites();
   }
@@ -129,12 +127,11 @@ test('real legacy and negotiated sockets render matching worlds across late join
     isCollabTarget: false,
   };
   engine.addAsteroid(rock);
-  expect(engine.handleAsteroidHit(rock.id, 'legacy').outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit(rock.id, 'first').outcome).toBe('tagged');
   expect(engine.getActiveCollabTags().map((tag) => tag.asteroidId)).toContain(rock.id);
   for (let tick = 0; tick < 8; tick++) {
-    modernPlayer.position.x += 4;
+    secondPlayer.position.x += 4;
     broadcaster.broadcastGameState();
-    const expected: unknown = JSON.parse(JSON.stringify(engine.getGameState()));
     const complete = captureSnapshot({
       ...engine.getGameState(),
       playerProjectiles: engine.getPlayerProjectiles(),
@@ -143,16 +140,31 @@ test('real legacy and negotiated sockets render matching worlds across late join
         .map((shot) => ({ id: shot.shotId, ...shot })),
       collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
     });
-    await expect.poll(() => modern.state()).toEqual(complete);
-    await expect.poll(() => old.state()).toEqual(expected);
+    await expect.poll(() => first.state()).toEqual(complete);
+    await expect.poll(() => second.state()).toEqual(complete);
   }
-  expect(old.messages.some((message) => message.type === 'snapshot')).toBe(false);
-  expect(old.state()).not.toHaveProperty('satelliteProjectiles');
-  expect(old.state()).not.toHaveProperty('collabTags');
+  expect(first.messages.some((message) => message.type === 'snapshot')).toBe(true);
+  expect(first.state()).toHaveProperty('satelliteProjectiles');
+  expect(first.state()).toHaveProperty('collabTags');
   expect(failures).toEqual([]);
-  modern.socket.close();
-  await expect.poll(() => engine.getPlayer('new')).toBeUndefined();
-  const reconnected = await pilot('new', true);
+  const joined = second.messages.find((message) => message.type === 'joined')?.data;
+  assert.ok(joined && typeof joined === 'object' && 'resumeToken' in joined);
+  assert.equal(typeof joined.resumeToken, 'string');
+  const token = joined.resumeToken as string;
+  expect(token).toMatch(/^[a-f0-9]{64}$/);
+  const preservedPosition = { ...secondPlayer.position };
+  const closed = once(second.socket, 'close', { signal: AbortSignal.timeout(2_000) });
+  second.socket.close();
+  await closed;
+  expect(engine.getPlayer('second')).toBe(secondPlayer);
+  const reconnected = await pilot('untrusted-replacement-id', token);
+  expect(reconnected.messages.find((message) => message.type === 'joined')?.data).toMatchObject({
+    id: 'second',
+    resumeToken: token,
+  });
+  expect(engine.getPlayer('second')).toBe(secondPlayer);
+  expect(secondPlayer.position).toEqual(preservedPosition);
+  expect(engine.getPlayer('untrusted-replacement-id')).toBeUndefined();
   const recovered = reconnected.snapshot();
   assert.ok(recovered, 'Expected a decoded reconnect snapshot');
   expect(recovered.satelliteProjectiles.length).toBeGreaterThan(0);
@@ -164,7 +176,7 @@ test('real legacy and negotiated sockets render matching worlds across late join
     sequence: 1,
   });
   for (const eo of engine.getAllSatellites()) {
-    engine.handleSatelliteDamage(eo.id, 'legacy', SATELLITE.HEALTH);
+    engine.handleSatelliteDamage(eo.id, 'first', SATELLITE.HEALTH);
   }
   engine.removeAsteroid(rock.id);
   reconnected.socket.send(JSON.stringify({ type: 'snapshotResync' }));

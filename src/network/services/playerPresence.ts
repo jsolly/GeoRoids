@@ -2,7 +2,7 @@
  * Remote-player presence helpers.
  *
  * The server removes a human on socket close and now also broadcasts
- * `playerLeft`. `handleGameState` still updates entities in place (clearing
+ * `playerLeft`. `handleSnapshotState` still updates entities in place (clearing
  * the map used to make bots flicker), so snapshot pruning remains the
  * fallback if a `playerLeft` is dropped.
  *
@@ -68,7 +68,7 @@ export function fillSnapshotEntityIds(
 
 /**
  * Drop remotes missing from the snapshot. Mutates `players` in place so
- * `handleGameState` does not allocate an id array every broadcast.
+ * `handleSnapshotState` does not allocate an id array every broadcast.
  * Returns how many remotes were removed.
  */
 export function pruneStaleRemotePlayers<T extends { type: string }>(

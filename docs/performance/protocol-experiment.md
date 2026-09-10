@@ -1,11 +1,14 @@
 # Protocol and compression experiment
 
+The current script compares snapshot keyframes and deltas only. The local
+evidence table below predates legacy transport retirement.
+
 This is a diagnostic benchmark for the existing snapshot protocol. It compares
-the full legacy `gameState` JSON envelope with a snapshot-v1 keyframe and the
-actual snapshot-v1 delta selected by `SnapshotEncoder`. It does not change a
+a snapshot-v1 keyframe with the actual snapshot-v1 delta selected by
+`SnapshotEncoder`. It does not change a
 wire default or enable compression in production.
 
-Run it from `/Users/johnsolly/.codex/worktrees/georoids-performance` with:
+Run it from `/Users/johnsolly/code/GeoRoids` with:
 
 ```sh
 npx tsx benchmarks/protocol-experiment.ts --seed 42 --warmup 30 --ticks 120
@@ -16,7 +19,7 @@ The executable returns the shared `Measurement` shape as JSON. It reuses
 satellites, pickups, and collaboration tags) and adds a representative
 four-row active `playerProjectiles` collection, then warms up 30 evolving
 worlds and measures 120 worlds. Every decoded payload is compared with its
-source world, including DTO validation for legacy packets. All encode, decode and
+source world. All encode, decode and
 compression paths execute during warmup; gzip/deflate round trips are checked
 outside the timing intervals. The delta path is required to produce a real delta after the
 initial keyframe.
@@ -27,7 +30,7 @@ excluding WebSocket framing. The benchmark also records synchronous
 compression samples describe codec work only; they are not measurements of
 `ws` per-message-deflate latency, memory, negotiation, or network behavior.
 
-## Local evidence
+## Archived local evidence
 
 Evidence below came from one run on 2026-09-09 in the dirty implementation worktree based on `10baef5`, using Node
 `v24.16.0` on Darwin arm64. Means are per measured payload; timings are

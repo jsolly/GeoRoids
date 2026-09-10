@@ -11,12 +11,6 @@ function flooredDistance(ax: number, ay: number, bx: number, by: number): number
 const LASER_HIT_RADIUS = 2;
 
 /**
- * Extra slack when the server validates a client-reported laser↔roid hit.
- * Covers one-way latency while still rejecting far-away phantom reports.
- */
-const LASER_ROID_AUTHORITY_SLOP = 64;
-
-/**
  * Check if two circular objects are colliding
  */
 function checkCircularCollision(
@@ -40,9 +34,7 @@ export function checkBoundaryCollision(shipPos: Position, shipRadius: number): b
   );
 }
 
-/**
- * Check if a laser hits a circular target (asteroid, player, or bot).
- */
+/** Check if a projectile hits a circular target. */
 export function checkLaserHit(
   laserPos: Position,
   targetPos: Position,
@@ -51,66 +43,12 @@ export function checkLaserHit(
   return checkCircularCollision(laserPos, LASER_HIT_RADIUS, targetPos, targetRadius);
 }
 
-/**
- * Check if a laser hits an asteroid
- */
-export function checkLaserAsteroidCollision(
-  laserPos: Position,
-  asteroidPos: Position,
-  asteroidRadius: number
-): boolean {
-  return checkLaserHit(laserPos, asteroidPos, asteroidRadius);
-}
-
-/**
- * Segment-vs-circle test so a 5px laser step cannot tunnel through a
- * moving roid that a point sample would miss on a glancing frame.
- */
-export function checkLaserAsteroidCollisionSwept(
-  from: Position,
-  to: Position,
-  asteroidPos: Position,
-  asteroidRadius: number
-): boolean {
-  const hitRadius = asteroidRadius + LASER_HIT_RADIUS;
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const lengthSq = dx * dx + dy * dy;
-  if (lengthSq === 0) {
-    return checkLaserAsteroidCollision(to, asteroidPos, asteroidRadius);
-  }
-
-  const t = Math.max(
-    0,
-    Math.min(1, ((asteroidPos.x - from.x) * dx + (asteroidPos.y - from.y) * dy) / lengthSq)
-  );
-  const closestX = from.x + dx * t;
-  const closestY = from.y + dy * t;
-  const distSq = (closestX - asteroidPos.x) ** 2 + (closestY - asteroidPos.y) ** 2;
-  return distSq < hitRadius * hitRadius;
-}
-
-/** True when a reported laser is close enough to the server asteroid to count. */
-export function isLaserNearAsteroid(
-  laserPos: Position,
-  asteroidPos: Position,
-  asteroidRadius: number,
-  slop: number = LASER_ROID_AUTHORITY_SLOP
-): boolean {
-  const dx = laserPos.x - asteroidPos.x;
-  const dy = laserPos.y - asteroidPos.y;
-  const limit = asteroidRadius + LASER_HIT_RADIUS + slop;
-  return dx * dx + dy * dy <= limit * limit;
-}
-
 /** Server-authoritative score for a destroyed roid. Do not trust client points. */
 export function asteroidPointsForRadius(radius: number): number {
   return pointsForRoidSize(radius);
 }
 
-/**
- * Check if a laser hits a ship/bot
- */
+/** Check if a satellite projectile hits a ship/bot. */
 export function checkLaserShipCollision(
   laserPos: Position,
   shipPos: Position,

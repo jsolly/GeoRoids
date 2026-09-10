@@ -254,10 +254,10 @@ test('payload cables follow the actual rotating faceted rock contours through th
 
   // Ordinary E remains a single cable to the moving target center.
   delete hauler.asteroidMotion;
-  const legacy = paintRecorder();
-  drawHaulerHarpoonVfx(legacy.ctx, hauler, 0, 0, camera);
+  const ordinary = paintRecorder();
+  drawHaulerHarpoonVfx(ordinary.ctx, hauler, 0, 0, camera);
   const center = canvasManager.worldToScreen(primary.position, camera);
-  expect(legacy.lines).toEqual([[0, 0, center.x, center.y]]);
+  expect(ordinary.lines).toEqual([[0, 0, center.x, center.y]]);
   expect(hauler.harpoonLatchPos).toEqual(primary.position);
 });
 

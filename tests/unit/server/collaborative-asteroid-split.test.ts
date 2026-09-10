@@ -47,7 +47,14 @@ async function join(
   position: { x: number; y: number }
 ): Promise<void> {
   const start = client.mark();
-  client.send({ type: 'join', id, name: id, position });
+  client.send({
+    type: 'join',
+    id,
+    name: id,
+    position,
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+  });
   await client.barrier();
   const joined = messageAt(client, 'joined', start);
   expect(messageData(joined)['id']).toBe(id);
@@ -57,7 +64,9 @@ let activeServer: TestServer | undefined;
 const activeClients: WireClient[] = [];
 
 async function connect(server: TestServer): Promise<WireClient> {
-  const client = new WireClient(new WebSocket(`ws://127.0.0.1:${await server.listening}/ws`));
+  const client = new WireClient(
+    new WebSocket(`ws://127.0.0.1:${await server.listening}/ws?asteroidInteractions=1`)
+  );
   activeClients.push(client);
   await client.open();
   return client;
@@ -114,28 +123,41 @@ function largeIceAsteroid(id: string, position: { x: number; y: number }): Aster
   };
 }
 
-async function sendTrackedReport(
+async function sendCurrentShot(
   server: TestServer,
   client: WireClient,
   playerId: string,
   asteroidId: string
-): Promise<{ hasExploded: boolean }> {
+): Promise<void> {
   const asteroid = server.gameEngine.getAsteroid(asteroidId);
   assert.ok(asteroid, `asteroid ${asteroidId}`);
-  const laserPosition = { ...asteroid.position };
-  const shot = server.gameEngine.spawnLaser(playerId, laserPosition, { x: 0, y: 0 });
-  assert.ok(shot, `tracked laser for ${playerId}`);
+  const shooter = server.gameEngine.getPlayer(playerId);
+  assert.ok(shooter, `shooter ${playerId}`);
+  const delta = {
+    x: asteroid.position.x - shooter.position.x,
+    y: asteroid.position.y - shooter.position.y,
+  };
+  const distance = Math.hypot(delta.x, delta.y);
+  const direction =
+    distance > 0 ? { x: delta.x / distance, y: delta.y / distance } : { x: 1, y: 0 };
+  const laserStart = {
+    x: shooter.position.x - direction.x * 10,
+    y: shooter.position.y - direction.y * 10,
+  };
   client.send({
-    type: 'asteroidDestroyed',
+    type: 'shoot',
+    id: playerId,
     data: {
-      asteroidId,
-      playerId,
-      cause: 'laser',
-      laserPosition,
+      laserStart,
+      laserDirection: { x: direction.x * 5, y: direction.y * 5 },
     },
   });
   await client.barrier();
-  return shot;
+  for (let frame = 0; frame < 200 && server.gameEngine.getServerLasers().length > 0; frame++) {
+    server.gameEngine.advanceOneFrame();
+  }
+  await client.barrier();
+  expect(server.gameEngine.getServerLasers()).toHaveLength(0);
 }
 
 function countType(client: WireClient, type: string): number {
@@ -158,12 +180,12 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
   test('real owners tag then split one large ice roid and broadcast one shockwave', async () => {
     const { server, clients } = await startWorld([
       { id: 'player-a', position: { x: 0, y: 0 } },
-      { id: 'player-b', position: { x: 100, y: 0 } },
+      { id: 'player-b', position: { x: 200, y: 0 } },
     ]);
     const [playerA, playerB] = clients;
     assert.ok(playerA, 'player A socket');
     assert.ok(playerB, 'player B socket');
-    const target = largeIceAsteroid('wire-collab-target', { x: 0, y: 0 });
+    const target = largeIceAsteroid('wire-collab-target', { x: 100, y: 0 });
     server.gameEngine.addAsteroid(target);
     playerA.resetMessages();
     playerB.resetMessages();
@@ -173,7 +195,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     try {
       const firstAStart = playerA.mark();
       const firstBStart = playerB.mark();
-      const firstShot = await sendTrackedReport(server, playerA, 'player-a', target.id);
+      await sendCurrentShot(server, playerA, 'player-a', target.id);
       await playerB.barrier();
       const firstTagA = messageAt(playerA, 'asteroidTagged', firstAStart);
       const firstTagB = messageAt(playerB, 'asteroidTagged', firstBStart);
@@ -191,7 +213,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
 
       const secondAStart = playerA.mark();
       const secondBStart = playerB.mark();
-      const secondShot = await sendTrackedReport(server, playerB, 'player-b', target.id);
+      await sendCurrentShot(server, playerB, 'player-b', target.id);
       await playerA.barrier();
       const destroyA = messageAt(playerA, 'asteroidDestroy', secondAStart);
       const destroyB = messageAt(playerB, 'asteroidDestroy', secondBStart);
@@ -223,8 +245,6 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       expect(countType(playerA, 'scoreUpdate')).toBe(1);
       expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
       expect(server.gameEngine.getPlayer('player-b')?.score).toBe(ROID.POINTS_LARGE);
-      expect(firstShot.hasExploded).toBe(true);
-      expect(secondShot.hasExploded).toBe(true);
       expect(playerA.failures).toEqual([]);
       expect(playerB.failures).toEqual([]);
     } finally {
@@ -238,23 +258,22 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     ]);
     const [client] = clients;
     assert.ok(client, 'owner socket');
-    const target = largeIceAsteroid('wire-forged-target', { x: 0, y: 0 });
+    const target = largeIceAsteroid('wire-forged-target', { x: 100, y: 0 });
     server.gameEngine.addAsteroid(target);
     client.resetMessages();
 
     const validStart = client.mark();
-    await sendTrackedReport(server, client, 'socket-owner', target.id);
+    await sendCurrentShot(server, client, 'socket-owner', target.id);
     const validTag = messageAt(client, 'asteroidTagged', validStart);
     expect(messageData(validTag)['asteroidId']).toBe(target.id);
     client.resetMessages();
 
     client.send({
-      type: 'asteroidDestroyed',
+      type: 'shoot',
+      id: 'forged-partner',
       data: {
-        asteroidId: target.id,
-        playerId: 'forged-partner',
-        cause: 'laser',
-        laserPosition: { ...target.position },
+        laserStart: { ...target.position },
+        laserDirection: { x: 0, y: 0 },
       },
     });
     await client.barrier();
@@ -272,7 +291,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const { server, clients } = await startWorld([{ id: 'solo-player', position: { x: 0, y: 0 } }]);
     const [client] = clients;
     assert.ok(client, 'solo socket');
-    const target = largeIceAsteroid('wire-solo-target', { x: 0, y: 0 });
+    const target = largeIceAsteroid('wire-solo-target', { x: 100, y: 0 });
     server.gameEngine.addAsteroid(target);
     client.resetMessages();
 
@@ -280,7 +299,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
     const clock = vi.spyOn(server.gameEngine, 'getServerTime').mockReturnValue(now);
     try {
       const firstStart = client.mark();
-      const firstShot = await sendTrackedReport(server, client, 'solo-player', target.id);
+      await sendCurrentShot(server, client, 'solo-player', target.id);
       const tag = messageAt(client, 'asteroidTagged', firstStart);
       expect(tag.data).toEqual({
         asteroidId: target.id,
@@ -292,7 +311,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       clock.mockReturnValue(now + ROID.COLLAB_HIT_DEDUPE_MS + 1);
 
       const secondStart = client.mark();
-      const secondShot = await sendTrackedReport(server, client, 'solo-player', target.id);
+      await sendCurrentShot(server, client, 'solo-player', target.id);
       const destroy = messageAt(client, 'asteroidDestroy', secondStart);
       const score = messageAt(client, 'scoreUpdate', secondStart);
       expect(destroy.data).toEqual({
@@ -307,8 +326,6 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       expect(countType(client, 'scoreUpdate')).toBe(1);
       expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
       expect(server.gameEngine.getPlayer('solo-player')?.score).toBe(ROID.POINTS_LARGE);
-      expect(firstShot.hasExploded).toBe(true);
-      expect(secondShot.hasExploded).toBe(true);
       expect(client.failures).toEqual([]);
     } finally {
       clock.mockRestore();

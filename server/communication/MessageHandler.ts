@@ -1,17 +1,10 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
-import {
-  clampLaserDamage,
-  isAllowedLaserReporter,
-  isClientOwnedCollisionAttacker,
-  isServerOwnedRamAttacker,
-} from '../../shared/combat';
-import { LOOT_BLAST } from '../../shared/lootBlast';
-import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
+import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { DAMAGE, SATELLITE_PICKUP } from '../../src/constants';
 import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
 import type { MotionOutcome } from '../core/AsteroidMotionService';
-import { type GameEntity, isStaleDeathPose } from '../core/EntityManager';
+import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
 import { SERVER_RELEASE_ID } from '../release';
 import { ClientLogger } from '../services/ClientLogger';
@@ -33,11 +26,7 @@ export class MessageHandler {
     { lastThrottleAt: number; suppressed: number }
   >();
 
-  constructor(
-    gameEngine: GameEngine,
-    broadcaster: GameStateBroadcaster,
-    private requireEnhancedClient = false
-  ) {
+  constructor(gameEngine: GameEngine, broadcaster: GameStateBroadcaster) {
     this.gameEngine = gameEngine;
     this.broadcaster = broadcaster;
   }
@@ -48,13 +37,7 @@ export class MessageHandler {
       if (decoded.logUnknown) {
         logger.warn(`Unknown message type: ${decoded.messageType}`);
       }
-      if (
-        decoded.error &&
-        !(
-          decoded.suppressWhenAuthoritativeProjectiles &&
-          this.gameEngine.usesAuthoritativeProjectiles()
-        )
-      ) {
+      if (decoded.error) {
         this.broadcaster.sendError(ws, decoded.error);
       }
       return;
@@ -142,10 +125,6 @@ export class MessageHandler {
           this.handleUseAbility(ws, command);
           break;
 
-        case 'asteroidDamage':
-          this.handleAsteroidDamage(ws, command);
-          break;
-
         case 'update':
           this.handlePlayerUpdate(ws, command);
           break;
@@ -162,40 +141,16 @@ export class MessageHandler {
           this.handleChat(ws, command);
           break;
 
-        case 'laserDamage':
-          this.handleLaserDamage(ws, command);
-          break;
-
         case 'collisionDamage':
           this.handleCollisionDamage(ws, command);
-          break;
-
-        case 'botDamage':
-          this.handleBotDamage(ws, command);
-          break;
-
-        case 'satelliteDamage':
-          this.handleSatelliteDamage(ws, command);
           break;
 
         case 'satellitePickupCollected':
           this.handleSatellitePickupCollected(ws, command);
           break;
 
-        case 'asteroidDestroyed':
-          this.handleAsteroidDestroyed(ws, command);
-          break;
-
-        case 'lootExplode':
-          this.handleLootExplode(ws, command);
-          break;
-
         case 'initAsteroids':
           this.handleInitAsteroids(ws, command);
-          break;
-
-        case 'botUpdate':
-          this.handleBotUpdate(ws, command);
           break;
 
         case 'clientLog':
@@ -240,25 +195,14 @@ export class MessageHandler {
       factionId: command.factionId,
     });
 
-    if (this.requireEnhancedClient && (!command.enhancedOffer || command.snapshotVersion !== 1)) {
-      this.broadcaster.sendError(ws, 'Client update required; refresh GeoRoids');
-      return;
-    }
     let resumeToken: string | undefined;
     let player: GameEntity;
     let resumedSession = false;
     if (command.resumeRequested) {
-      if (!command.enhancedOffer || command.snapshotVersion !== 1) {
-        this.broadcaster.sendError(ws, 'Resume requires the enhanced snapshot capability');
-        return;
-      }
-      // A bearer token may move an enhanced session between sockets, but it
-      // must never merge that session into a socket which is already carrying
-      // a legacy human. EntityManager resolves socket ownership by scanning
-      // entity rows, so allowing both bindings would make later updates
-      // ambiguous and could strand the resumed pilot.
+      // A bearer token may move a session between sockets, but it must never
+      // merge that session into a socket already carrying another pilot.
       const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-      if (socketPlayer && socketPlayer.asteroidInteractions !== 1) {
+      if (socketPlayer && socketPlayer.id !== id) {
         this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
         return;
       }
@@ -314,29 +258,27 @@ export class MessageHandler {
         command.kitId,
         command.factionId
       );
-      if (command.enhancedOffer && command.snapshotVersion === 1) {
-        player.asteroidInteractions = 1;
-        const registered = this.gameEngine.asteroidMotion.register(
-          player,
-          ws,
-          1,
-          this.gameEngine.getServerTime()
-        );
-        if (!registered.ok) {
-          this.gameEngine.removePlayer(player.id);
-          this.broadcaster.sendError(ws, registered.error);
-          return;
-        }
-        resumeToken = registered.resumeToken;
-        this.gameEngine.enableAsteroidInteractions(player);
+      player.asteroidInteractions = 1;
+      const registered = this.gameEngine.asteroidMotion.register(
+        player,
+        ws,
+        1,
+        this.gameEngine.getServerTime()
+      );
+      if (!registered.ok) {
+        this.gameEngine.removePlayer(player.id);
+        this.broadcaster.sendError(ws, registered.error);
+        return;
       }
+      resumeToken = registered.resumeToken;
+      this.gameEngine.enableAsteroidInteractions(player);
     }
     const replacedId = this.gameEngine.consumeReplacedHumanId();
     if (replacedId) {
       this.broadcaster.broadcastPlayerLeft(replacedId);
     }
 
-    const snapshotVersion = this.broadcaster.negotiateSnapshot(ws, command.snapshotVersion);
+    const snapshotVersion = this.broadcaster.negotiateSnapshot(ws);
 
     // Send confirmation to the joining player
     this.broadcaster.sendToWebSocket(ws, {
@@ -345,13 +287,14 @@ export class MessageHandler {
         id,
         name,
         position: player.position,
-        ...(resumeToken ? { resumeToken, asteroidInteractions: 1 } : {}),
+        resumeToken,
+        asteroidInteractions: 1,
         color: player.color,
         kitId: player.kitId,
         ...(player.factionId !== undefined ? { factionId: player.factionId } : {}),
         terrainSeed: this.gameEngine.getTerrainSeed(),
         serverReleaseId: SERVER_RELEASE_ID,
-        ...(snapshotVersion ? { snapshotVersion } : {}),
+        snapshotVersion,
       },
       timestamp: Date.now(),
     });
@@ -362,7 +305,7 @@ export class MessageHandler {
       gameTime: this.gameEngine.getDiagnostics().gameTime,
       resumed: resumedSession,
       enhanced: player.asteroidInteractions === 1,
-      ...(snapshotVersion !== undefined ? { snapshotVersion } : {}),
+      snapshotVersion,
       ...(player.asteroidMotion
         ? {
             motionEpoch: player.asteroidMotion.epoch,
@@ -398,72 +341,50 @@ export class MessageHandler {
       return;
     }
 
-    if (socketPlayer.asteroidInteractions === 1) {
-      if (
-        command.motionEpoch === undefined ||
-        command.motionSequence === undefined ||
-        update.position === undefined ||
-        update.velocity === undefined ||
-        update.angle === undefined ||
-        update.thrusting === undefined
-      ) {
-        // A pose queued before join acknowledgment has no motion epoch yet.
-        // Ignore it without changing authoritative state or reporting a false failure.
-        return;
-      }
-      const beforeMode = socketPlayer.asteroidMotion?.mode;
-      const receivedAt = Date.now();
-      const motionNow = this.gameEngine.getServerTime();
-      const outcome = this.gameEngine.asteroidMotion.acceptFreePose(
+    if (
+      command.motionEpoch === undefined ||
+      command.motionSequence === undefined ||
+      update.position === undefined ||
+      update.velocity === undefined ||
+      update.angle === undefined ||
+      update.thrusting === undefined
+    ) {
+      // A pose queued before join acknowledgment has no motion epoch yet.
+      // Ignore it without changing authoritative state or reporting a false failure.
+      return;
+    }
+    const beforeMode = socketPlayer.asteroidMotion?.mode;
+    const receivedAt = Date.now();
+    const motionNow = this.gameEngine.getServerTime();
+    const outcome = this.gameEngine.asteroidMotion.acceptFreePose(
+      ws,
+      {
+        epoch: command.motionEpoch,
+        sequence: command.motionSequence,
+        position: update.position,
+        velocity: update.velocity,
+        angle: update.angle,
+        thrusting: update.thrusting,
+      },
+      motionNow
+    );
+    this.logMotionRejection(
+      ws,
+      'update',
+      outcome,
+      receivedAt,
+      command.motionEpoch,
+      command.motionSequence,
+      motionNow
+    );
+    if (outcome.ok && beforeMode === 'handoff') {
+      this.logMotionTransition(
         ws,
-        {
-          epoch: command.motionEpoch,
-          sequence: command.motionSequence,
-          position: update.position,
-          velocity: update.velocity,
-          angle: update.angle,
-          thrusting: update.thrusting,
-        },
-        motionNow
-      );
-      this.logMotionRejection(
-        ws,
-        'update',
-        outcome,
+        'motion_handoff_acknowledged',
         receivedAt,
-        command.motionEpoch,
-        command.motionSequence,
-        motionNow
+        command.motionSequence
       );
-      if (outcome.ok && beforeMode === 'handoff') {
-        this.logMotionTransition(
-          ws,
-          'motion_handoff_acknowledged',
-          receivedAt,
-          command.motionSequence
-        );
-      }
-      return;
     }
-
-    // Hold the server spawn point until the client echoes a nearby transform.
-    // The instant respawn clears dead/exploding flags, a stale death-pose
-    // update would otherwise teleport the ship back onto the wall/roid.
-    if (existing && isStaleDeathPose(existing.respawnAnchor, update.position)) {
-      return;
-    }
-    if (existing?.respawnAnchor && update.position) {
-      delete existing.respawnAnchor;
-    }
-
-    const player = this.gameEngine.updatePlayer(id, update);
-    if (!player) {
-      return; // Player not found
-    }
-
-    // Projectiles travel through the validated shoot path; no production
-    // receiver consumes a movement packet's legacy lasers array.
-    this.broadcaster.broadcastPlayerUpdate(id, update);
   }
 
   private handlePlayerShoot(ws: WebSocket, command: CommandOf<'shoot'>): void {
@@ -480,7 +401,6 @@ export class MessageHandler {
       return;
     }
 
-    this.broadcaster.broadcastPlayerShoot(shooter.id, laserStart, laserDirection, laser.id);
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
@@ -544,48 +464,12 @@ export class MessageHandler {
     });
   }
 
-  private handleLaserDamage(ws: WebSocket, command: CommandOf<'laserDamage'>): void {
-    if (this.gameEngine.usesAuthoritativeProjectiles()) {
-      return;
-    }
-    const { targetPlayerId, attackerId } = command;
-
-    const reporterId = this.getReporterId(ws);
-    if (!reporterId || !isAllowedLaserReporter(reporterId, attackerId, targetPlayerId)) {
-      return;
-    }
-
-    const bot = this.gameEngine.getBot(targetPlayerId);
-    if (bot?.type === 'bot') {
-      if (
-        reporterId !== attackerId ||
-        !this.gameEngine.consumeHumanLaserNearTarget(
-          reporterId,
-          bot.position,
-          radiusFromMass(bot.mass ?? GROWTH.BASE_MASS)
-        )
-      ) {
-        return;
-      }
-      this.emitShipDamage(bot.id, reporterId, DAMAGE.LASER_HIT, bot.health, 'laser');
-      return;
-    }
-
-    const damage = clampLaserDamage(command.damage);
-    if (damage <= 0) {
-      return;
-    }
-
-    const before = this.gameEngine.entityManager.getEntity(targetPlayerId);
-    this.emitShipDamage(targetPlayerId, attackerId, damage, before?.health, 'laser');
-  }
-
   private handleCollisionDamage(ws: WebSocket, command: CommandOf<'collisionDamage'>): void {
     const { targetPlayerId, attackerId } = command;
     logger.debug('handleCollisionDamage', { targetPlayerId });
 
-    // Ship↔asteroid and ship↔ship are resolved in the server game loop.
-    // Satellite hull damage stays on satelliteDamage, not this leftover path.
+    // Ship↔asteroid, ship↔ship, and satellite hull damage are resolved in the
+    // server game loop. This path is reserved for the client's boundary hit.
     if (!isClientOwnedCollisionAttacker(attackerId)) {
       return;
     }
@@ -597,35 +481,6 @@ export class MessageHandler {
 
     const before = this.gameEngine.getPlayer(targetPlayerId);
     this.emitShipDamage(targetPlayerId, 'boundary', DAMAGE.BOUNDARY_COLLISION, before?.health);
-  }
-
-  private handleSatelliteDamage(ws: WebSocket, command: CommandOf<'satelliteDamage'>): void {
-    if (this.gameEngine.usesAuthoritativeProjectiles()) {
-      return;
-    }
-    const { satelliteId, attackerId, laserPosition } = command;
-
-    const reporterId = this.getReporterId(ws);
-    if (!reporterId || reporterId !== attackerId) {
-      return;
-    }
-    if (!this.gameEngine.consumeHumanLaserNearSatellite(reporterId, satelliteId, laserPosition)) {
-      return;
-    }
-
-    const isDestroyed = this.gameEngine.handleSatelliteDamage(
-      satelliteId,
-      reporterId,
-      DAMAGE.LASER_HIT
-    );
-    this.broadcaster.broadcastGameState();
-
-    if (isDestroyed) {
-      const attacker = this.gameEngine.getPlayer(reporterId);
-      if (attacker) {
-        this.broadcaster.broadcastScoreUpdate(reporterId, attacker.score);
-      }
-    }
   }
 
   private handleSatellitePickupCollected(
@@ -657,36 +512,6 @@ export class MessageHandler {
       shieldFrames: SATELLITE_PICKUP.SHIELD_FRAMES,
     });
     this.broadcaster.broadcastGameState();
-  }
-
-  private handleBotDamage(ws: WebSocket, command: CommandOf<'botDamage'>): void {
-    if (this.gameEngine.usesAuthoritativeProjectiles()) {
-      return;
-    }
-    const { botId, attackerId } = command;
-
-    if (isServerOwnedRamAttacker(attackerId)) {
-      return;
-    }
-
-    const reporterId = this.getReporterId(ws);
-    if (!reporterId || reporterId !== attackerId) {
-      return;
-    }
-
-    const bot = this.gameEngine.getBot(botId);
-    if (
-      !bot ||
-      !this.gameEngine.consumeHumanLaserNearTarget(
-        reporterId,
-        bot.position,
-        radiusFromMass(bot.mass ?? GROWTH.BASE_MASS)
-      )
-    ) {
-      return;
-    }
-
-    this.emitShipDamage(bot.id, reporterId, DAMAGE.LASER_HIT, bot.health, 'laser');
   }
 
   private handleUseAbility(ws: WebSocket, command: CommandOf<'useAbility'>): void {
@@ -726,100 +551,6 @@ export class MessageHandler {
       timestamp: Date.now(),
     });
     this.broadcaster.broadcastGameState();
-  }
-
-  private handleAsteroidDamage(ws: WebSocket, command: CommandOf<'asteroidDamage'>): void {
-    if (this.gameEngine.usesAuthoritativeProjectiles()) {
-      return;
-    }
-    const { asteroidId, playerId } = command;
-
-    const asteroid = this.gameEngine.getAsteroid(asteroidId);
-    if (!asteroid?.isCollabTarget) {
-      return;
-    }
-
-    const shooterId = this.resolveAsteroidShooter(ws, playerId, asteroid.id);
-    if (!shooterId) {
-      return;
-    }
-
-    const shooter = this.gameEngine.getPlayer(shooterId);
-    const consumed =
-      shooter?.type === 'bot'
-        ? this.gameEngine.consumeActiveBotLaserNearAsteroid(shooterId, asteroid.id)
-        : shooter?.type === 'human' &&
-          this.gameEngine.consumeHumanLaserNearTarget(shooterId, asteroid.position, asteroid.size);
-    if (!consumed) {
-      return;
-    }
-
-    // Consume before applying the validated chip: a lethal hit removes the
-    // asteroid needed to match this projectile to its target.
-    const result = this.gameEngine.handleAsteroidDamage(asteroid.id, shooterId);
-
-    if (result.destroyed) {
-      const player = this.gameEngine.getPlayer(shooterId);
-      if (player) {
-        this.broadcaster.broadcastScoreUpdate(shooterId, player.score);
-      }
-      this.broadcaster.broadcastAsteroidDestruction(asteroid.id);
-      if (result.newAsteroids.length > 0) {
-        this.broadcaster.broadcastAsteroidCreation(result.newAsteroids);
-      }
-      return;
-    }
-
-    if (result.asteroid) {
-      this.broadcaster.broadcastAsteroidUpdate(asteroid.id, {
-        health: result.asteroid.health,
-        maxHealth: result.asteroid.maxHealth,
-      });
-    }
-  }
-
-  private handleAsteroidDestroyed(ws: WebSocket, command: CommandOf<'asteroidDestroyed'>): void {
-    if (this.gameEngine.usesAuthoritativeProjectiles()) {
-      return;
-    }
-    const { asteroidId, playerId, laserPosition } = command;
-
-    const asteroid = this.gameEngine.getAsteroid(asteroidId);
-    if (!asteroid) {
-      return;
-    }
-    if (asteroid.isCollabTarget || asteroid.phenomenon) {
-      return;
-    }
-
-    const shooterId = this.resolveAsteroidShooter(ws, playerId, asteroid.id);
-    if (!shooterId) {
-      return;
-    }
-
-    // Client reports are hints about a shot that the server already tracks.
-    // Consume exactly the owning projectile before applying the hit. The
-    // server laser tick marks its own laser in resolveLaserAgainstAsteroids;
-    // applying this report must never search for and consume another shot.
-    const shooter = this.gameEngine.getPlayer(shooterId);
-    const projectileConsumed =
-      shooter?.type === 'bot'
-        ? this.gameEngine.consumeActiveBotLaserNearAsteroid(shooter.id, asteroid.id, laserPosition)
-        : shooter?.type === 'human'
-          ? this.gameEngine.consumeHumanLaserNearTarget(
-              shooter.id,
-              asteroid.position,
-              asteroid.size,
-              laserPosition
-            )
-          : false;
-    if (!projectileConsumed) {
-      return;
-    }
-
-    this.broadcastAppliedAsteroidHits([
-      this.gameEngine.applyLaserAsteroidHit(asteroid.id, shooterId, laserPosition, 'laser'),
-    ]);
   }
 
   public broadcastAppliedAsteroidHits(hits: AppliedAsteroidHit[]): void {
@@ -867,109 +598,6 @@ export class MessageHandler {
     }
   }
 
-  private handleLootExplode(ws: WebSocket, command: CommandOf<'lootExplode'>): void {
-    if (this.gameEngine.usesAuthoritativeProjectiles()) {
-      return;
-    }
-    const { id, lootId, claimedPlayerId, invalidPlayerClaim } = command;
-
-    // Every observer can report the same bot laser/drop collision. Once the
-    // first valid report removes the authoritative drop, later reports are
-    // harmless duplicate acknowledgements. Check the live target before
-    // resolving shooter identity so a consumed drop does not produce a false
-    // "Unknown shooter" error, while live forged claims still go through the
-    // normal ownership/projectile proof below.
-    if (!this.gameEngine.getLoot().some((loot) => loot.id === lootId)) {
-      return;
-    }
-
-    if (invalidPlayerClaim) {
-      this.broadcaster.sendError(ws, 'Unknown shooter for lootExplode');
-      return;
-    }
-
-    const shooterId = this.resolveAuxiliaryShooter(ws, claimedPlayerId ?? id, lootId);
-    if (!shooterId) {
-      this.broadcaster.sendError(ws, 'Unknown shooter for lootExplode');
-      return;
-    }
-
-    const result = this.gameEngine.handleLootExplode(shooterId, lootId);
-    if (!result.success || !result.origin) {
-      return;
-    }
-
-    this.broadcaster.broadcastLootExploded({
-      lootId,
-      position: result.origin,
-      radius: LOOT_BLAST.RADIUS,
-      shooterId,
-    });
-
-    for (const asteroidId of result.pushedAsteroidIds) {
-      const asteroid = this.gameEngine.getAsteroid(asteroidId);
-      if (asteroid) {
-        this.broadcaster.broadcastAsteroidUpdate(asteroidId, { velocity: asteroid.velocity });
-      }
-    }
-  }
-
-  /**
-   * Human asteroid reports bind to their socket. Bot reports are accepted only
-   * when the server has the claimed bot's projectile in flight near the same
-   * asteroid; no client-provided bot identity is authoritative by itself.
-   */
-  private resolveAsteroidShooter(
-    ws: WebSocket,
-    claimedId: string,
-    asteroidId: string
-  ): string | null {
-    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type !== 'human') {
-      return null;
-    }
-    if (socketPlayer.id === claimedId) {
-      return socketPlayer.id;
-    }
-
-    const claimed = this.gameEngine.getPlayer(claimedId);
-    if (
-      claimed?.type === 'bot' &&
-      this.gameEngine.hasActiveBotLaserNearAsteroid(claimed.id, asteroidId)
-    ) {
-      return claimed.id;
-    }
-
-    return null;
-  }
-
-  /**
-   * Human claims bind to this socket. A bot claim additionally requires a
-   * live server projectile at this specific drop, consumed exactly once.
-   */
-  private resolveAuxiliaryShooter(
-    ws: WebSocket,
-    claimedId: string | undefined,
-    lootId: string
-  ): string | null {
-    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type !== 'human') {
-      return null;
-    }
-    if (claimedId === undefined || claimedId === socketPlayer.id) {
-      return socketPlayer.id;
-    }
-
-    const claimed = this.gameEngine.getPlayer(claimedId ?? '');
-    if (
-      claimed?.type === 'bot' &&
-      this.gameEngine.consumeActiveBotLaserNearLoot(claimed.id, lootId)
-    ) {
-      return claimed.id;
-    }
-    return null;
-  }
-
   private handleInitAsteroids(ws: WebSocket, command: CommandOf<'initAsteroids'>): void {
     const { id } = command;
     logger.debug('Handling initAsteroids message', { id });
@@ -1001,20 +629,6 @@ export class MessageHandler {
       playerId: id,
       asteroidCount: existingAsteroids.length,
     });
-  }
-
-  private handleBotUpdate(ws: WebSocket, command: CommandOf<'botUpdate'>): void {
-    const { botId, playerId } = command;
-
-    // For now, only server-owned bots can be updated through this message
-    // Client-owned bots should be handled differently
-    if (playerId !== 'server') {
-      this.broadcaster.sendError(ws, 'Only server-owned bots can be updated through this endpoint');
-      return;
-    }
-
-    // Update bot through broadcaster (for client-owned bots)
-    this.broadcaster.broadcastBotUpdate(botId);
   }
 
   private handlePing(ws: WebSocket): void {

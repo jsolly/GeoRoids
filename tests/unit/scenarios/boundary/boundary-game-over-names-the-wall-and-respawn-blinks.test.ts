@@ -61,7 +61,7 @@ describe('Boundary game-over and respawn cues', () => {
     expect(deaths).toEqual([{ playerId: 'local', deathCause: 'boundary', isGameOver: true }]);
   });
 
-  test('a gameState life loss at the wall without a cause field is still the wall', () => {
+  test('a snapshot life loss at the wall without a cause field is still the wall', () => {
     const player = localPilot();
     player.lives = 1;
     player.ship.position = { x: 4000, y: 0 };

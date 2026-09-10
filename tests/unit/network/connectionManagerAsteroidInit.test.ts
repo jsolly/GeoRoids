@@ -37,6 +37,9 @@ test('rejoining after a server restart requests asteroids despite a cached belt'
     name: 'Pilot',
     position: { x: 0, y: 0 },
     color: '#fff',
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+    resumeToken: 'a'.repeat(64),
   });
 
   expect(sent).toEqual([

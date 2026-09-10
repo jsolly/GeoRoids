@@ -47,7 +47,7 @@ export class Player {
   private respawnLatchOrigin: Position | null = null;
 
   // Server-authoritative spawn-protection countdown (frames). While > 0 the
-  // server ignores all incoming damage. Mirrored from the gameState so callers
+  // server ignores all incoming damage. Mirrored from the authoritative snapshot so callers
   // (notably tests) can tell exactly when the player becomes vulnerable.
   serverSpawnProtectionTimer = 0;
 
@@ -377,7 +377,7 @@ export class Player {
     if (data.respawnTimer !== undefined) {
       // When respawnTimer is 0, the server has finished the countdown. Remote
       // entities still need local visual reset; the local player must wait for
-      // authoritative health + position in gameState (calling respawn() here
+      // authoritative health + position in the snapshot (calling respawn() here
       // would mark the ship alive at the death location before reposition).
       if (data.respawnTimer === 0 && this.ship.health <= 0 && !isLocal) {
         logger.debug('RESPAWN', 'Player respawned by server', {

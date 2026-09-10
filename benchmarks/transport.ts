@@ -86,7 +86,9 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
 
   const ids = [0, 1].map((index) => `benchmark-transport-${seed.toString(36)}-${index}`);
   function connect(id: string, port: number) {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`);
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${port}/ws?snapshotVersion=1&asteroidInteractions=1`
+    );
     const decoder = new SnapshotDecoder();
     const state = {
       id,

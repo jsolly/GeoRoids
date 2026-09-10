@@ -65,7 +65,6 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
 
   beforeEach(() => {
     vi.stubGlobal('WebSocket', Transport);
-    vi.stubEnv('VITE_SNAPSHOT_PROTOCOL', '1');
     manager = ConnectionManager.getInstance();
     manager.disconnect();
   });
@@ -76,28 +75,29 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     vi.unstubAllEnvs();
   });
 
-  function acknowledge(ws: Transport, enhanced: boolean): void {
+  function acknowledge(ws: Transport): void {
     ws.receive('joined', {
       id: manager.getClientId(),
       name: 'Projectile observer',
       position: { x: 0, y: 0 },
       snapshotVersion: 1,
-      ...(enhanced ? { asteroidInteractions: 1, resumeToken: 'a'.repeat(64) } : {}),
+      asteroidInteractions: 1,
+      resumeToken: 'a'.repeat(64),
     });
   }
 
-  async function connect(enhanced = true): Promise<Transport> {
-    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', enhanced ? '1' : '0');
+  async function connect(): Promise<Transport> {
     const pending = manager.connect();
     const ws = Transport.latest;
     ws.onopen?.();
     await pending;
     manager.setLocalPlayerName('Projectile observer');
     manager.initializeAsteroidSync();
+    expect(ws.sent.find((packet) => packet.type === 'join')?.data?.['snapshotVersion']).toBe(1);
     expect(ws.sent.find((packet) => packet.type === 'join')?.data?.['asteroidInteractions']).toBe(
-      enhanced ? 1 : undefined
+      1
     );
-    acknowledge(ws, enhanced);
+    acknowledge(ws);
     return ws;
   }
 
@@ -109,7 +109,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     return player.ship;
   }
 
-  test('new snapshots update one existing bolt while repeated shoot events and client predictions cannot duplicate it', async () => {
+  test('new snapshots update one existing bolt while provisional client shots cannot duplicate it', async () => {
     const ws = await connect();
     const first = frame([bolt('stable-shot')]);
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
@@ -125,14 +125,6 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     expect(ship().lasers[0]).toBe(original);
     expect(original?.position).toEqual({ x: 620, y: 150 });
     expect(field.getProjectiles()).toEqual(moved.playerProjectiles);
-    for (let repeat = 0; repeat < 3; repeat++) {
-      ws.receive('playerShoot', {
-        id: 'pilot-1',
-        shotId: 'stable-shot',
-        laserStart: { x: 1, y: 2 },
-        laserDirection: { x: -5, y: 0 },
-      });
-    }
     ws.receive('snapshot', new SnapshotEncoder(moved).encode(3, { sequence: 2, state: moved }));
     expect(ship().lasers).toEqual([original]);
     expect(field.getProjectiles()).toHaveLength(1);
@@ -173,15 +165,8 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     expect(recovered?.serverId).toBe('new-shot');
     expect(ship().lasers).toHaveLength(1);
     expect(field.getProjectiles()).toEqual(advanced.playerProjectiles);
-    ws.receive('playerShoot', {
-      id: 'pilot-1',
-      shotId: 'old-shot',
-      laserStart: { x: 1, y: 2 },
-      laserDirection: { x: 5, y: 0 },
-    });
-    expect(ship().lasers).toEqual([recovered]);
     manager.initializeAsteroidSync();
-    acknowledge(ws, true);
+    acknowledge(ws);
     ws.receive('snapshot', new SnapshotEncoder(advanced).encode(1));
     expect(ship().lasers).toEqual([recovered]);
     expect(field.getProjectiles()).toHaveLength(1);
@@ -189,27 +174,5 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     expect(ship().lasers).toEqual([]);
     expect(field.getProjectiles()).toEqual([]);
     expect(ws.close).not.toHaveBeenCalled();
-  });
-
-  test('without enhancement negotiation legacy shoot events still create bolts and snapshot rows never replace them', async () => {
-    const ws = await connect(false);
-    const state = frame([bolt('server-only-shot')]);
-    ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
-    expect(field.isEnabled()).toBe(false);
-    expect(field.getProjectiles()).toEqual([]);
-    expect(ship().lasers).toEqual([]);
-    ws.receive('playerShoot', {
-      id: 'pilot-1',
-      laserStart: { x: 600, y: 150 },
-      laserDirection: { x: 5, y: 0 },
-    });
-    expect(ship().lasers).toHaveLength(1);
-    const legacy = ship().lasers[0];
-    expect(legacy?.serverId).toBeUndefined();
-    expect(legacy?.position).toEqual({ x: 600, y: 150 });
-    ws.receive('snapshot', new SnapshotEncoder(frame([])).encode(2, { sequence: 1, state }));
-    expect(ship().lasers).toEqual([legacy]);
-    expect(field.isEnabled()).toBe(false);
-    expect(field.getProjectiles()).toEqual([]);
   });
 });

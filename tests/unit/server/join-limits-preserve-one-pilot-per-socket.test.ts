@@ -28,7 +28,13 @@ function transport() {
   };
 }
 function join(socket: RecordingSocket, id: string, name = id) {
-  core.handleClientMessage({ type: 'join', data: { id, name } }, socket);
+  core.handleClientMessage(
+    {
+      type: 'join',
+      data: { id, name, snapshotVersion: 1, asteroidInteractions: 1 },
+    },
+    socket
+  );
 }
 
 test('a socket cannot create a second pilot and repeat flooding closes the transport', () => {
@@ -85,12 +91,7 @@ test('a case-variant name cannot bypass the full-server player cap', () => {
   expect(replies().map((reply) => reply.type)).toEqual(['error']);
 });
 
-test('production admission cannot be bypassed by upgrading a socket then joining as a legacy pilot', () => {
-  core = new WebSocketCore(engine, true);
-  const legacy = transport();
-  join(legacy.socket, 'legacy');
-  expect(engine.getPlayerCount()).toBe(0);
-  expect(legacy.replies().map((reply) => reply.type)).toEqual(['error']);
+test('a current pilot cannot be claimed without its private resume token', () => {
   const owner = transport();
   const data = { id: 'owner', name: 'Owner', asteroidInteractions: 1, snapshotVersion: 1 };
   core.handleClientMessage({ type: 'join', data }, owner.socket);

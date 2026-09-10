@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -107,6 +108,15 @@ test('leaving while connecting settles the promise and ignores a late open callb
 
 test('a thrown gameplay send reports failure and reconnects without replaying the command', async () => {
   const socket = await open();
+  socket.receive('joined', {
+    id: manager.getClientId(),
+    name: 'Runtime pilot',
+    position: { x: 0, y: 0 },
+    color: '#fff',
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+    resumeToken: 'a'.repeat(64),
+  });
   const cause = new Error('transport write failed');
   socket.send.mockImplementation(() => {
     throw cause;
@@ -257,6 +267,9 @@ test('a pre-join server error fails the attempt while a post-join error leaves t
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
+      snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken: 'a'.repeat(64),
     });
     postJoin.receive('error', 'Ability unavailable');
     expect(postJoinPermanentDisconnect).not.toHaveBeenCalled();
@@ -281,6 +294,9 @@ test('the first local authoritative state clears the join completion deadline', 
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
+      snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken: 'a'.repeat(64),
     });
     const state = snapshotFixture();
     const local = state.entities[0];
@@ -289,7 +305,7 @@ test('the first local authoritative state clears the join completion deadline', 
     }
     local.id = manager.getClientId();
     local.name = 'Runtime pilot';
-    socket.receive('gameState', state);
+    socket.receive('snapshot', new SnapshotEncoder(state).encode(1));
 
     await vi.advanceTimersByTimeAsync(JOIN_COMPLETION_TIMEOUT_MS);
     expect(permanentDisconnect).not.toHaveBeenCalled();
@@ -311,6 +327,8 @@ test('resync diagnostics count successful sends only', async () => {
       position: { x: 0, y: 0 },
       color: '#fff',
       snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken: 'a'.repeat(64),
     });
   };
 

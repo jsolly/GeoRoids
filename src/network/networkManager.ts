@@ -1,4 +1,4 @@
-import type { Position, Velocity } from '../../shared-types';
+import type { PlayerUpdate, Position, Velocity } from '../../shared-types';
 import type { Player } from '../entities/player/Player';
 import { logger } from '../utils/Logger';
 import { ConnectionManager } from './services/ConnectionManager';
@@ -63,31 +63,10 @@ export class NetworkManager {
   }
 
   // Player state synchronization - just send input to server
-  updatePlayerState(playerState: {
-    position: Position;
-    velocity: Velocity;
-    r: number;
-    angle: number;
-    lives?: number;
-    score?: number;
-    exploding: boolean;
-    thrusting?: boolean;
-    health?: number;
-    maxHealth?: number;
-    lasers?: Array<{
-      position: Position;
-      velocity: Velocity;
-      distTraveled: number;
-      explodeTime: number;
-      hasExploded: boolean;
-    }>;
-  }): void {
-    // Add required fields for PlayerUpdate
+  updatePlayerState(playerState: Omit<PlayerUpdate, 'id' | 'name'>): void {
     const fullPlayerState = {
       id: this.getLocalPlayerId() || this.connectionManager.getClientId(),
       name: this.getLocalPlayerName(),
-      health: playerState.health ?? 100, // Default to 100 if not provided
-      maxHealth: playerState.maxHealth ?? 100, // Default to 100 if not provided
       ...playerState,
     };
     this.connectionManager.sendPlayerState(fullPlayerState);

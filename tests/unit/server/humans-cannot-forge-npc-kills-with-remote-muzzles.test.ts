@@ -7,7 +7,7 @@ import {
   HUMAN_SHOOT_POSE_ALLOWANCE_MS,
 } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { DAMAGE, GAME, LASER, SHIP } from '../../../src/constants';
+import { GAME, LASER, SHIP } from '../../../src/constants';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -16,7 +16,7 @@ vi.mock('../../../setup/serverLogger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-describe('human shoot evidence is grounded before an EO damage report', () => {
+describe('server-authoritative human shooting', () => {
   let engine: GameEngine;
   let handler: MessageHandler;
   let socket: RecordingSocket;
@@ -40,57 +40,6 @@ describe('human shoot evidence is grounded before an EO damage report', () => {
       socket
     );
   }
-
-  test('a joined distant or dead attacker cannot manufacture satellite hit evidence', () => {
-    const satellite = engine.getAllSatellites()[0];
-    assert.ok(satellite, 'distant satellite');
-    const distantSatellite = engine.getSatellite(satellite.id);
-    assert.ok(distantSatellite, 'distant satellite state');
-    distantSatellite.position = {
-      x: 1500,
-      y: 0,
-    };
-    const remoteOrigin = { x: 1500, y: 0 };
-    for (let i = 0; i < 2; i++) {
-      shoot(remoteOrigin);
-      handler.handleMessage(
-        {
-          type: 'satelliteDamage',
-          data: { satelliteId: satellite.id, attackerId: 'pilot', laserPosition: remoteOrigin },
-        },
-        socket
-      );
-    }
-    expect(engine.getServerLasers()).toHaveLength(0);
-    expect(engine.getSatellite(satellite.id)?.health).toBe(satellite.health);
-    expect(engine.getPlayer('pilot')?.score).toBe(0);
-    expect(engine.getLoot()).toEqual([]);
-    const pilot = engine.getPlayer('pilot');
-    assert.ok(pilot, 'pilot state');
-    pilot.health = 0;
-    shoot();
-    expect(engine.getServerLasers()).toHaveLength(0);
-  });
-
-  test('a nearby real shot damages the EO hull once and cannot be replayed', () => {
-    const satellite = engine.getAllSatellites()[0];
-    assert.ok(satellite, 'nearby satellite');
-    const nearbySatellite = engine.getSatellite(satellite.id);
-    assert.ok(nearbySatellite, 'nearby satellite state');
-    nearbySatellite.position = {
-      x: 40,
-      y: 0,
-    };
-    shoot();
-    const report = {
-      type: 'satelliteDamage',
-      data: { satelliteId: satellite.id, attackerId: 'pilot', laserPosition: { x: 40, y: 0 } },
-    };
-    handler.handleMessage(report, socket);
-    handler.handleMessage(report, socket);
-    expect(engine.getSatellite(satellite.id)?.health).toBe(satellite.health - DAMAGE.LASER_HIT);
-    expect(engine.getPlayer('pilot')?.score).toBe(0);
-  });
 
   test('finite speed bounds and live ownership reject malformed, unjoined and respawning shots', () => {
     expect(engine.spawnHumanLaser('missing', { x: 20, y: 0 }, { x: 5, y: 0 })).toBeNull();

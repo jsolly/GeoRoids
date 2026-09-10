@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { isStaleDeathPose } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { SHIP } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
@@ -384,7 +383,7 @@ describe('server ship respawn lifecycle', () => {
     expect(afterExplosion?.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
   });
 
-  test('respawn grants a full protection window and holds an anchor', () => {
+  test('respawn grants a full protection window at a new arena position', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 3100, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
@@ -399,9 +398,7 @@ describe('server ship respawn lifecycle', () => {
     expect(respawned?.health).toBe(respawned?.maxHealth);
     expect(respawned?.respawnTimer).toBeUndefined();
     expect(respawned?.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
-    expect(respawned?.respawnAnchor).toEqual(respawned?.position);
-    expect(isStaleDeathPose(respawned?.respawnAnchor, { x: 3100, y: 0 })).toBe(true);
-    expect(isStaleDeathPose(respawned?.respawnAnchor, respawned?.position)).toBe(false);
+    expect(respawned?.position).not.toEqual({ x: 3100, y: 0 });
   });
 
   test('gameTime keeps advancing after the last player leaves', async () => {

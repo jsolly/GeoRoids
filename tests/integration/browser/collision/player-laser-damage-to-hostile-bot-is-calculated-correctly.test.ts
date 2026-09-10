@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -9,6 +10,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+type BotHealthSnapshot = {
+  id: string;
+  exploding: boolean;
+  health: number;
+};
+
 test(
   'a player laser deals canonical damage to a hostile bot',
   async () => {
@@ -18,14 +25,14 @@ test(
     }
 
     const game = new GameInteractions(page);
-    const botUpdates: Array<{
-      botId: string | undefined;
-      health: number | undefined;
-      ownerId: string | undefined;
-      timestamp: number | undefined;
-    }> = [];
     const shotOwners: unknown[] = [];
     const malformedFrames: string[] = [];
+    const snapshotErrors: string[] = [];
+    const currentBotSnapshots = new Map<string, BotHealthSnapshot>();
+    const botSnapshots: BotHealthSnapshot[] = [];
+    let trackedBotId: string | undefined;
+    let healthBeforeFirstShot: number | undefined;
+    let firstShotSampleIndex = 0;
     const parseFrame = (payload: unknown, direction: 'sent' | 'received'): unknown => {
       try {
         return JSON.parse(String(payload));
@@ -37,25 +44,60 @@ test(
       }
     };
     page.on('websocket', (socket) => {
+      if (!/\/ws(?:\?|$)/.test(socket.url())) {
+        return;
+      }
+      const decoder = new SnapshotDecoder();
       socket.on('framesent', ({ payload }) => {
         const message = parseFrame(payload, 'sent');
         if (isRecord(message) && message['type'] === 'shoot') {
           shotOwners.push(message['id']);
+          if (healthBeforeFirstShot === undefined && trackedBotId) {
+            const bot = currentBotSnapshots.get(trackedBotId);
+            if (bot) {
+              healthBeforeFirstShot = bot.health;
+              firstShotSampleIndex = botSnapshots.length;
+            }
+          }
         }
       });
       socket.on('framereceived', ({ payload }) => {
         const message = parseFrame(payload, 'received');
-        if (!isRecord(message) || message['type'] !== 'botUpdate') {
+        if (!isRecord(message)) {
           return;
         }
-        const data = message['data'];
-        if (isRecord(data)) {
-          botUpdates.push({
-            botId: typeof data['botId'] === 'string' ? data['botId'] : undefined,
-            health: typeof data['health'] === 'number' ? data['health'] : undefined,
-            ownerId: typeof data['playerId'] === 'string' ? data['playerId'] : undefined,
-            timestamp: typeof message['timestamp'] === 'number' ? message['timestamp'] : undefined,
-          });
+        if (message['type'] === 'joined') {
+          decoder.reset();
+          currentBotSnapshots.clear();
+          botSnapshots.length = 0;
+          healthBeforeFirstShot = undefined;
+          firstShotSampleIndex = 0;
+          return;
+        }
+        if (message['type'] !== 'snapshot') {
+          return;
+        }
+        try {
+          const snapshot = decoder.decode(message['data']);
+          currentBotSnapshots.clear();
+          for (const entity of snapshot.entities) {
+            if (entity.type !== 'bot') {
+              continue;
+            }
+            const bot: BotHealthSnapshot = {
+              id: entity.id,
+              exploding: entity.exploding,
+              health: entity.health,
+            };
+            currentBotSnapshots.set(bot.id, bot);
+            if (bot.id === trackedBotId) {
+              botSnapshots.push(bot);
+            }
+          }
+        } catch (error) {
+          snapshotErrors.push(
+            `authoritative snapshot could not be decoded: ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       });
     });
@@ -68,56 +110,68 @@ test(
     if (!bot) {
       return;
     }
+    trackedBotId = bot.id;
+    await expect
+      .poll(() => currentBotSnapshots.get(bot.id), {
+        timeout: 5000,
+        message: 'the authoritative snapshot should contain the hostile bot',
+      })
+      .toBeDefined();
     const localPlayerId = await page.evaluate(() => {
       const gc = window.gameController;
       return gc?.getNetworkManager?.().getLocalPlayerId?.();
     });
     expect(localPlayerId, 'the local player must be joined before firing').toBeTruthy();
-    const updateCountBeforeShot = botUpdates.length;
 
-    // This helper creates a real local laser, waits for the authoritative pose
-    // acknowledgement, and reports the observed hit. The server's existing
-    // botUpdate broadcast is the accepted-hit evidence; it carries the raw
-    // post-damage health before the browser's prediction can regenerate it.
-    const result = await game.attackBotWithLasers(bot.id, 1);
-    const healthBeforeShot = result.firstShotHealthBefore;
+    // This helper creates a real local laser and waits for the authoritative
+    // pose acknowledgement. The decoded snapshot stream below is the accepted
+    // hit evidence and carries the server-owned post-damage health.
+    await game.attackBotWithLasers(bot.id, 1);
+    const healthBeforeShot = healthBeforeFirstShot;
+    expect(healthBeforeShot, 'the first shot should have an authoritative health baseline').toEqual(
+      expect.any(Number)
+    );
+    if (healthBeforeShot === undefined) {
+      return;
+    }
 
     await expect
       .poll(
         () =>
-          botUpdates
-            .slice(updateCountBeforeShot)
+          botSnapshots
+            .slice(firstShotSampleIndex)
             .find(
-              (update) =>
-                update.botId === bot.id &&
-                update.ownerId === 'server' &&
-                update.health !== undefined &&
-                update.health < healthBeforeShot
+              (snapshot) =>
+                snapshot.id === bot.id &&
+                !snapshot.exploding &&
+                snapshot.health > 0 &&
+                snapshot.health < healthBeforeShot
             ),
-        { timeout: 5000, message: 'server should broadcast the accepted hostile bot laser hit' }
+        { timeout: 5000, message: 'decoded snapshots should show the accepted hostile bot hit' }
       )
       .toBeDefined();
-    const damageUpdate = botUpdates
-      .slice(updateCountBeforeShot)
+    const damageSnapshot = botSnapshots
+      .slice(firstShotSampleIndex)
       .find(
-        (update) =>
-          update.botId === bot.id &&
-          update.ownerId === 'server' &&
-          update.health !== undefined &&
-          update.health < healthBeforeShot
+        (snapshot) =>
+          snapshot.id === bot.id &&
+          !snapshot.exploding &&
+          snapshot.health > 0 &&
+          snapshot.health < healthBeforeShot
       );
-    expect(damageUpdate?.ownerId, 'the accepted bot update should come from the server owner').toBe(
-      'server'
-    );
-    expect(healthBeforeShot - (damageUpdate?.health ?? healthBeforeShot)).toBeCloseTo(25, 0);
+    expect(
+      damageSnapshot,
+      'an authoritative decoded snapshot should show bot damage'
+    ).toBeDefined();
+    if (!damageSnapshot) {
+      return;
+    }
+    expect(healthBeforeShot - damageSnapshot.health).toBeCloseTo(25, 0);
     expect(shotOwners, 'the wire shot should retain the local player as its owner').toEqual([
       localPlayerId,
     ]);
-    expect(
-      result.minHealthObserved,
-      'the live bot view should show the health reduction'
-    ).toBeLessThan(healthBeforeShot);
     expect(malformedFrames, 'all observed WebSocket frames must be valid JSON').toEqual([]);
+    expect(snapshotErrors, 'all authoritative snapshots must decode').toEqual([]);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

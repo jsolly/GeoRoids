@@ -63,7 +63,7 @@ function socket() {
   return { fake, close, ws: fake, messages: fake.inbox, pending };
 }
 
-describe('old and new pilots coexist on the production handler and broadcaster', () => {
+describe('current pilots share the production handler and broadcaster', () => {
   let engine: GameEngine;
   let broadcaster: GameStateBroadcaster;
   let handler: MessageHandler;
@@ -76,7 +76,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     engine.stopGameLoop();
     broadcaster.stopPeriodicBroadcast();
   });
-  const join = (handler: MessageHandler, ws: WebSocket, id: string, version?: number) =>
+  const join = (handler: MessageHandler, ws: WebSocket, id: string, resumeToken?: string) =>
     handler.handleMessage(
       {
         type: 'join',
@@ -84,49 +84,44 @@ describe('old and new pilots coexist on the production handler and broadcaster',
           id,
           name: id,
           position: { x: 100, y: 100 },
-          ...(version === undefined ? {} : { snapshotVersion: version }),
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+          ...(resumeToken ? { resumeToken } : {}),
         },
       },
       ws
     );
 
-  test('legacy and unsupported offers retain exact gameState; supported offer is acknowledged first', () => {
-    const old = socket();
-    const modern = socket();
-    const unsupported = socket();
-    join(handler, old.ws, 'old');
-    join(handler, modern.ws, 'modern', 1);
-    join(handler, unsupported.ws, 'unsupported', 200);
+  test('current offers receive a joined acknowledgment before snapshot-v1 frames', () => {
+    const pilot = socket();
+    join(handler, pilot.ws, 'pilot');
     broadcaster.broadcastGameState();
-    const legacyJoined = old.messages.find((m) => m.type === 'joined');
-    assert.ok(legacyJoined, 'legacy joined message');
-    expect(legacyJoined).not.toMatchObject({ data: { snapshotVersion: expect.anything() } });
-    const unsupportedJoined = unsupported.messages.find((m) => m.type === 'joined');
-    assert.ok(unsupportedJoined, 'unsupported joined message');
-    expect(unsupportedJoined).not.toMatchObject({ data: { snapshotVersion: expect.anything() } });
-    expect(old.messages.some((m) => m.type === 'snapshot')).toBe(false);
-    const modernJoined = modern.messages[0];
-    assert.ok(modernJoined, 'modern joined message');
-    expect(modernJoined).toMatchObject({
+    const joined = pilot.messages.find((m) => m.type === 'joined');
+    assert.ok(joined, 'joined message');
+    expect(joined).toMatchObject({
       type: 'joined',
-      data: { snapshotVersion: 1, serverReleaseId: expect.any(String) },
+      data: {
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+        resumeToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+        serverReleaseId: expect.any(String),
+      },
     });
-    const legacy = old.messages.filter((m) => m.type === 'gameState').at(-1);
-    assert.ok(legacy, 'legacy gameState message');
-    expect(legacy.data).toEqual(JSON.parse(JSON.stringify(engine.getGameState())));
-    expect(Object.keys(legacy).sort()).toEqual(['data', 'timestamp', 'type']);
+    expect(pilot.messages[0]?.type).toBe('joined');
     const decoder = new SnapshotDecoder();
-    for (const message of modern.messages.filter((m) => m.type === 'snapshot')) {
-      decoder.decode(message.data);
-    }
-    expect(modern.messages.some((m) => m.type === 'gameState')).toBe(false);
+    const snapshot = pilot.messages.find((m) => m.type === 'snapshot');
+    assert.ok(snapshot, 'snapshot-v1 frame');
+    expect(decoder.decode(snapshot.data)).toMatchObject({
+      entities: expect.any(Array),
+      playerProjectiles: expect.any(Array),
+    });
   });
 
   test('a sampled snapshot is logged only after its transport callback succeeds', () => {
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const pilot = socket();
     pilot.fake.defer = true;
-    join(handler, pilot.ws, 'sampled-pilot', 1);
+    join(handler, pilot.ws, 'sampled-pilot');
     expect(
       info.mock.calls.some(
         ([category, event]) => category === 'STATE' && event === 'snapshot_sent_to_transport'
@@ -151,9 +146,13 @@ describe('old and new pilots coexist on the production handler and broadcaster',
 
   test('late joins, exclusions, backpressure, rejoin and reconnect have independent baselines', () => {
     const a = socket();
-    join(handler, a.ws, 'a', 1);
+    join(handler, a.ws, 'a');
+    const joinedA = a.messages.find((message) => message.type === 'joined');
+    assert.ok(joinedA?.data && typeof joinedA.data === 'object' && !Array.isArray(joinedA.data));
+    const resumeTokenA = (joinedA.data as Record<string, unknown>)['resumeToken'];
+    assert.equal(typeof resumeTokenA, 'string');
     const b = socket();
-    join(handler, b.ws, 'b', 1);
+    join(handler, b.ws, 'b');
     const pilotBSnapshot = b.messages.find((m) => m.type === 'snapshot');
     assert.ok(pilotBSnapshot, 'pilot b snapshot');
     expect(pilotBSnapshot).toMatchObject({ data: { kind: 'keyframe' } });
@@ -182,7 +181,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     expect(pilotAKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
     expect(reconstruct(a)).toMatchObject(JSON.parse(JSON.stringify(engine.getGameState())));
     expect(reconstruct(b)).toEqual(reconstruct(a));
-    join(handler, a.ws, 'a', 1);
+    join(handler, a.ws, 'a', resumeTokenA as string);
     const rejoinedKeyframe = a.messages.at(-1);
     assert.ok(rejoinedKeyframe, 'rejoined pilot a keyframe');
     expect(rejoinedKeyframe.data).toMatchObject({
@@ -191,7 +190,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     });
     engine.removePlayer('a');
     const reconnected = socket();
-    join(handler, reconnected.ws, 'a', 1);
+    join(handler, reconnected.ws, 'a');
     const reconnectedKeyframe = reconnected.messages.at(-1);
     assert.ok(reconnectedKeyframe, 'reconnected keyframe');
     expect(reconnectedKeyframe.data).toMatchObject({
@@ -203,25 +202,11 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     );
   });
 
-  test('a laser core stays collectible while older pilots decode both keyframes and deltas', () => {
-    const legacy = socket();
+  test('a laser core stays collectible while current pilots decode keyframes and deltas', () => {
     const recovery = socket();
-    const enhanced = socket();
-    join(handler, legacy.ws, 'legacy');
-    join(handler, recovery.ws, 'recovery', 1);
-    handler.handleMessage(
-      {
-        type: 'join',
-        data: {
-          id: 'enhanced',
-          name: 'enhanced',
-          position: { x: 100, y: 100 },
-          snapshotVersion: 1,
-          asteroidInteractions: 1,
-        },
-      },
-      enhanced.ws
-    );
+    const peer = socket();
+    join(handler, recovery.ws, 'recovery');
+    join(handler, peer.ws, 'peer');
     engine.addAsteroid({
       id: 'core-rock',
       position: { x: 5000, y: 5000 },
@@ -238,7 +223,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
       phenomenon: { kind: 'reflective', clusterId: 'test', energy: 0, maxEnergy: 6 },
     });
     for (let hit = 0; hit < 3; hit++) {
-      engine.handleAsteroidHit('core-rock', 'enhanced');
+      engine.handleAsteroidHit('core-rock', 'peer');
     }
     const core = engine.getLoot().find((loot) => loot.kind === 'laserCore');
     assert.ok(core, 'laser core loot');
@@ -251,26 +236,13 @@ describe('old and new pilots coexist on the production handler and broadcaster',
         .filter((message) => message.type === 'snapshot')
         .map((message) => decoder.decode(message.data));
     };
-    // The deployed a975 client accepts exactly these enum values. Unknown
-    // additive fields are safe, but a new loot enum rejects the whole world.
-    const deployedLootKinds = ['shard', 'wreckage', 'fuel'];
-    for (const state of decodeAll(recovery)) {
-      expect(state.loot.every((loot) => deployedLootKinds.includes(loot.kind))).toBe(true);
-    }
     expect(
       decodeAll(recovery)
         .at(-1)
         ?.loot.find((loot) => loot.id === core.id)?.kind
-    ).toBe('shard');
-    const legacyState = legacy.messages.filter((message) => message.type === 'gameState').at(-1);
-    assert.ok(legacyState, 'legacy game state');
-    expect(legacyState).toMatchObject({
-      data: {
-        loot: expect.arrayContaining([expect.objectContaining({ id: core.id, kind: 'shard' })]),
-      },
-    });
+    ).toBe('laserCore');
     expect(
-      decodeAll(enhanced)
+      decodeAll(peer)
         .at(-1)
         ?.loot.find((loot) => loot.id === core.id)?.kind
     ).toBe('laserCore');
@@ -291,7 +263,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
         ?.loot.some((loot) => loot.id === core.id)
     ).toBe(false);
     expect(
-      decodeAll(enhanced)
+      decodeAll(peer)
         .at(-1)
         ?.loot.some((loot) => loot.id === core.id)
     ).toBe(false);
@@ -299,7 +271,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
 
   test('pending and failed sends do not advance baseline; periodic/resync keyframes heal state', () => {
     const a = socket();
-    join(handler, a.ws, 'a', 1);
+    join(handler, a.ws, 'a');
     a.fake.defer = true;
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
@@ -334,7 +306,7 @@ describe('old and new pilots coexist on the production handler and broadcaster',
 
   test('a callback send records one terminal outbound outcome', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'callback-pilot', 1);
+    join(handler, pilot.ws, 'callback-pilot');
     pilot.fake.clear();
     pilot.fake.defer = true;
     const enabled = vi.spyOn(serverPerformanceMetrics, 'enabled', 'get').mockReturnValue(true);
@@ -357,9 +329,9 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     enabled.mockRestore();
   });
 
-  test('legacy snapshots skip a pressured socket and recover on the next full state', () => {
+  test('current snapshots skip a pressured socket and recover on the next keyframe', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'legacy');
+    join(handler, pilot.ws, 'pressured-snapshot');
     pilot.fake.clear();
     pilot.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
 
@@ -368,7 +340,10 @@ describe('old and new pilots coexist on the production handler and broadcaster',
 
     pilot.fake.bufferedAmount = 0;
     broadcaster.broadcastGameState();
-    expect(pilot.messages.at(-1)).toMatchObject({ type: 'gameState' });
+    expect(pilot.messages.at(-1)).toMatchObject({
+      type: 'snapshot',
+      data: { kind: 'keyframe' },
+    });
   });
 
   test('pressured event recipients reconnect for state recovery instead of growing queues', () => {
@@ -387,8 +362,10 @@ describe('old and new pilots coexist on the production handler and broadcaster',
       'Backpressure; reconnect for state recovery'
     );
     expect(pressured.messages.some((message) => message.type === 'chat')).toBe(false);
-    expect(engine.getPlayer('pressured')).toBeUndefined();
-    expect(peer.messages.some((message) => message.type === 'playerLeft')).toBe(true);
+    const pressuredPlayer = engine.getPlayer('pressured');
+    assert.ok(pressuredPlayer, 'pressured pilot retained for recovery');
+    expect(pressuredPlayer.ws).toBeUndefined();
+    expect(peer.messages.some((message) => message.type === 'playerLeft')).toBe(false);
   });
 
   test.each([
@@ -402,22 +379,10 @@ describe('old and new pilots coexist on the production handler and broadcaster',
       code: 1011,
       reason: 'Transport failure; reconnect for state recovery',
     },
-  ])('enhanced recipients retain their pilot and resume after $cause', ({ code, reason }) => {
+  ])('current recipients retain their pilot and resume after $cause', ({ code, reason }) => {
     const pressured = socket();
     const peer = socket();
-    handler.handleMessage(
-      {
-        type: 'join',
-        data: {
-          id: 'enhanced-pressured',
-          name: 'enhanced-pressured',
-          position: { x: 100, y: 100 },
-          snapshotVersion: 1,
-          asteroidInteractions: 1,
-        },
-      },
-      pressured.ws
-    );
+    join(handler, pressured.ws, 'current-pressured');
     const joined = pressured.messages.find((message) => message.type === 'joined');
     assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
     const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
@@ -434,8 +399,8 @@ describe('old and new pilots coexist on the production handler and broadcaster',
 
     broadcaster.broadcastChatMessage('peer', 'peer', 'hello');
 
-    expect(engine.getPlayer('enhanced-pressured')).toBeDefined();
-    expect(engine.getPlayer('enhanced-pressured')?.ws).toBeUndefined();
+    expect(engine.getPlayer('current-pressured')).toBeDefined();
+    expect(engine.getPlayer('current-pressured')?.ws).toBeUndefined();
     expect(peer.messages.some((message) => message.type === 'playerLeft')).toBe(false);
     expect(pressured.close).toHaveBeenCalledWith(code, reason);
 
@@ -455,9 +420,9 @@ describe('old and new pilots coexist on the production handler and broadcaster',
       replacement.ws
     );
     expect(replacement.messages.find((message) => message.type === 'joined')).toMatchObject({
-      data: { id: 'enhanced-pressured', resumeToken },
+      data: { id: 'current-pressured', resumeToken },
     });
-    expect(engine.getPlayer('enhanced-pressured')?.ws).toBe(replacement.ws);
+    expect(engine.getPlayer('current-pressured')?.ws).toBe(replacement.ws);
   });
 
   test('projected outbound pressure bounds snapshot, event, and control classes', () => {
@@ -477,14 +442,18 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     expect(snapshot.close).not.toHaveBeenCalled();
 
     event.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES - 1;
-    broadcaster.sendToWebSocket(event.ws, { type: 'playerUpdate', data: { x: 1 } });
+    broadcaster.sendToWebSocket(event.ws, { type: 'chat', data: { message: 'hello' } });
     expect(event.close).toHaveBeenCalledWith(1013, 'Backpressure; reconnect for state recovery');
-    expect(engine.getPlayer('projected-event')).toBeUndefined();
+    const pressuredEventPlayer = engine.getPlayer('projected-event');
+    assert.ok(pressuredEventPlayer, 'event pilot retained for recovery');
+    expect(pressuredEventPlayer.ws).toBeUndefined();
 
     control.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES - 1;
     broadcaster.sendToWebSocket(control.ws, { type: 'error', data: 'control' });
     expect(control.close).toHaveBeenCalledWith(1013, 'Backpressure; reconnect for state recovery');
-    expect(engine.getPlayer('projected-control')).toBeUndefined();
+    const pressuredControlPlayer = engine.getPlayer('projected-control');
+    assert.ok(pressuredControlPlayer, 'control pilot retained for recovery');
+    expect(pressuredControlPlayer.ws).toBeUndefined();
   });
 
   test('an oversized snapshot closes explicitly instead of retrying forever', () => {
@@ -498,22 +467,24 @@ describe('old and new pilots coexist on the production handler and broadcaster',
     });
 
     expect(pilot.close).toHaveBeenCalledWith(1013, 'Backpressure; reconnect for state recovery');
-    expect(engine.getPlayer('oversized-snapshot')).toBeUndefined();
+    const oversizedPlayer = engine.getPlayer('oversized-snapshot');
+    assert.ok(oversizedPlayer, 'oversized pilot retained for recovery');
+    expect(oversizedPlayer.ws).toBeUndefined();
   });
 
   test('serialization and socket-close failures stay contained to recipients', () => {
-    const old = socket();
-    const modern = socket();
-    join(handler, old.ws, 'old');
-    join(handler, modern.ws, 'modern', 1);
+    const first = socket();
+    const second = socket();
+    join(handler, first.ws, 'first');
+    join(handler, second.ws, 'second');
     const broken = engine.getGameState();
     Object.assign(broken, { badField: broken });
     vi.spyOn(engine, 'getGameState').mockReturnValue(broken);
-    old.close.mockImplementation(() => {
+    first.close.mockImplementation(() => {
       throw new Error('close failure');
     });
     expect(() => broadcaster.broadcastGameState()).not.toThrow();
-    expect(old.fake.close).toHaveBeenCalled();
-    expect(modern.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
+    expect(first.fake.close).toHaveBeenCalled();
+    expect(second.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
   });
 });

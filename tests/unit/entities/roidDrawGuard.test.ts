@@ -6,12 +6,8 @@ import {
   canDrawAsteroid,
   clearAsteroidShatters,
   drawRoidsRelative,
+  recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
-import {
-  ASTEROID_PENDING_MS,
-  lockAsteroidPending,
-  pendingElapsedMs,
-} from '../../../src/physics/collision/asteroidHitFeel';
 import { canvasManager } from '../../../src/rendering/canvas';
 import * as vectorJuice from '../../../src/rendering/vectorJuice';
 import { setWindowViewport } from '../../support/viewport';
@@ -114,8 +110,7 @@ function recordStrokes(ctx: CanvasRenderingContext2D) {
   return strokes;
 }
 
-test('a pending asteroid shatters without its silhouette while a nearby empty-offset rock keeps its outline', () => {
-  const now = vi.spyOn(Date, 'now').mockReturnValue(2000);
+test('a destroyed asteroid shatters without its silhouette while a nearby empty-offset rock keeps its outline', () => {
   const performanceNow = vi.spyOn(performance, 'now').mockReturnValue(2000);
   const { ctx, pilot } = asteroidScene();
   const outlines = vi.spyOn(vectorJuice, 'polygonPoints');
@@ -123,15 +118,15 @@ test('a pending asteroid shatters without its silhouette while a nearby empty-of
   normal.angle = 0;
   normal.vertices = 4;
   normal.offsets = [];
-  const pending = new Roid({ x: 100, y: 60 }, 14, 'pending-shatter');
+  const pending = new Roid({ x: 100, y: 60 }, 14, 'destroyed-shatter');
   pending.angle = 0;
   pending.vertices = 4;
   pending.offsets = [1, 1, 1, 1];
-  lockAsteroidPending(pending, 2000);
+  recordAsteroidShatter(pending, 2000);
 
   const strokes = recordStrokes(ctx);
 
-  drawRoidsRelative(pilot.ship, [normal, pending]);
+  drawRoidsRelative(pilot.ship, [normal]);
 
   const silhouettes = strokes.filter((path) => path.closed);
   expect(silhouettes).toHaveLength(2); // Glow and crisp passes of the identified normal rock.
@@ -144,7 +139,7 @@ test('a pending asteroid shatters without its silhouette while a nearby empty-of
     ]);
   }
   const shatter = strokes.filter((path) => !path.closed);
-  expect(shatter).toHaveLength(8); // Four separated edges and four impact ticks at the pending rock.
+  expect(shatter).toHaveLength(8); // Four separated edges and four impact ticks at the destroyed rock.
   expect(shatter.slice(0, 4).map((path) => path.points)).toEqual([
     [
       [494, 330],
@@ -174,42 +169,13 @@ test('a pending asteroid shatters without its silhouette while a nearby empty-of
     }
   }
 
-  // The shatter expires before the pending lock; no ghost silhouette should return.
-  now.mockReturnValue(2300);
+  // Authoritative destruction leaves a brief break effect, never a returning silhouette.
   performanceNow.mockReturnValue(2300);
   outlines.mockClear();
   strokes.length = 0;
-  drawRoidsRelative(pilot.ship, [normal, pending]);
-  expect(pending.pendingDestruction).toBe(true);
+  drawRoidsRelative(pilot.ship, [normal]);
   expect(strokes).toEqual(silhouettes);
   expect(outlines.mock.calls.map(([x, y]) => [x, y])).toEqual([[280, 210]]);
-
-  now.mockReturnValue(2800);
-  performanceNow.mockReturnValue(2800);
-  outlines.mockClear();
-  strokes.length = 0;
-  drawRoidsRelative(pilot.ship, [normal, pending]);
-
-  expect(pending.pendingDestruction).toBe(false);
-  expect(pending.pendingUntilMs).toBe(0);
-  expect(outlines.mock.calls.map(([x, y]) => [x, y])).toEqual([
-    [280, 210],
-    [480, 330],
-  ]);
-  expect(strokes).toHaveLength(4);
-  expect(strokes.slice(0, 2)).toEqual(silhouettes);
-  for (const path of strokes.slice(2)) {
-    expect(path.closed).toBe(true);
-    expect(path.points).toEqual([
-      [494, 330],
-      [480, 344],
-      [466, 330],
-      [480, 316],
-    ]);
-  }
-  expect(
-    strokes.slice(2).map(({ style, width, alpha, glow }) => ({ style, width, alpha, glow }))
-  ).toEqual(silhouettes.map(({ style, width, alpha, glow }) => ({ style, width, alpha, glow })));
 });
 
 test('large plain asteroids keep a jagged inner facet while medium, pebble and material rocks omit it', () => {
@@ -303,15 +269,4 @@ test('large plain asteroids keep a jagged inner facet while medium, pebble and m
     { style: solid, alpha: ctx.globalAlpha },
   ]);
   expect(fill).not.toHaveBeenCalled();
-});
-
-test('roid shatter occupies only the first slice of the pending lock', () => {
-  const roid = { pendingDestruction: false, pendingUntilMs: 0 };
-  lockAsteroidPending(roid, 1_000);
-  expect(pendingElapsedMs(roid, 1_000)).toBe(0);
-  expect(pendingElapsedMs(roid, 1_000 + VISUAL.ROID_SHATTER_MS - 1)).toBe(
-    VISUAL.ROID_SHATTER_MS - 1
-  );
-  expect(VISUAL.ROID_SHATTER_MS).toBeLessThan(ASTEROID_PENDING_MS);
-  expect(pendingElapsedMs({ pendingDestruction: false, pendingUntilMs: 0 }, 1_000)).toBeNull();
 });

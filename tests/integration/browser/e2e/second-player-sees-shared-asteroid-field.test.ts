@@ -140,9 +140,6 @@ async function captureAsteroidDraw(
       if (!local || !roid) {
         throw new Error(`Asteroid field fixture lost target rock ${id}`);
       }
-      if (roid.pendingDestruction) {
-        throw new Error(`Asteroid field fixture target rock ${id} is pending destruction`);
-      }
       const styleProbe = document.createElement('canvas').getContext('2d');
       if (!styleProbe) {
         throw new Error('Asteroid field fixture requires a style probe context');

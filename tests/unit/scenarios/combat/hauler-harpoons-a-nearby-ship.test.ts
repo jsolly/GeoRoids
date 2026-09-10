@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { RecordingSocket } from '../../../support/recordingSocket';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -38,31 +37,27 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
   });
 
   test('a target whose id contains the Hauler id is still pulled by the server tick', () => {
-    const host = world.engine.entityManager.addHumanPlayer(
+    const host = world.joinWithId(
       'host',
       'Host',
-      new RecordingSocket(),
       { x: 0, y: 0 },
-      undefined,
-      'hauler',
-      'ion'
+      { kitId: 'hauler', factionId: 'ion' }
     );
-    const target = world.engine.entityManager.addHumanPlayer(
+    const target = world.joinWithId(
       'target-host',
       'Target',
-      new RecordingSocket(),
       { x: 80, y: 0 },
-      undefined,
-      'dart',
-      'ember'
+      { kitId: 'dart', factionId: 'ember' }
     );
-    host.harpoonTimer = 2;
-    host.harpoonTargetId = target.id;
+    const hostEntity = world.entity(host);
+    const targetEntity = world.entity(target);
+    hostEntity.harpoonTimer = 2;
+    hostEntity.harpoonTargetId = target.id;
 
-    const before = target.velocity.x;
+    const before = targetEntity.velocity.x;
     world.tick();
 
-    expect(target.velocity.x).toBeLessThan(before);
+    expect(targetEntity.velocity.x).toBeLessThan(before);
   });
 
   test('same-side mates are never latched', () => {

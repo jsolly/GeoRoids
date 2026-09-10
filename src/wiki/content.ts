@@ -635,6 +635,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Connection interruptions',
         paragraphs: [
+          'Keep the game tab up to date. If the server asks you to update the client, reload the page before joining again. Older game versions cannot join.',
           'Switching away from the game releases held movement and fire controls. On return, the client requests current server state and resumes drawing without replaying the time the tab was hidden.',
           'The game automatically tries to reconnect after a lost connection. During an interruption, the local view may lag behind the shared world; wait for the connection to recover before relying on a pickup or hit result. If joining fails or reconnect attempts are exhausted, the game returns to the title screen. Select Enter Game to try again. A full reload can start a new session, so it is not a way to preserve a life or a tether.',
         ],

@@ -2,8 +2,15 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import { WebSocketCore } from '../../../../server/communication/WebSocketCore';
 import type { GameEntity } from '../../../../server/core/EntityManager';
 import { GameEngine } from '../../../../server/core/GameEngine';
-import type { AsteroidData, Position, ShipKitId, SoftFactionId } from '../../../../shared-types';
-import { DAMAGE, SHIP } from '../../../../src/constants';
+import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
+import type {
+  AsteroidData,
+  Position,
+  ServerGameSnapshot,
+  ShipKitId,
+  SoftFactionId,
+} from '../../../../shared-types';
+import { DAMAGE, GAME, LASER, SHIP } from '../../../../src/constants';
 import { RecordingSocket } from '../../../support/recordingSocket';
 
 function scenarioAsteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
@@ -35,6 +42,50 @@ export interface Pilot {
   id: string;
   name: string;
   socket: RecordingSocket;
+  resumeToken: string;
+}
+
+interface JoinOptions {
+  kitId?: ShipKitId;
+  factionId?: SoftFactionId;
+  resumeToken?: string;
+}
+
+interface JoinedAcknowledgment {
+  id: string;
+  name: string;
+  resumeToken: string;
+  snapshotVersion: 1;
+  asteroidInteractions: 1;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readJoinedAcknowledgment(socket: RecordingSocket): JoinedAcknowledgment {
+  const message = socket.lastReceived('joined');
+  if (!message || !isRecord(message.data)) {
+    throw new Error('Current join did not receive a joined acknowledgment');
+  }
+  const data = message.data;
+  if (
+    typeof data['id'] !== 'string' ||
+    typeof data['name'] !== 'string' ||
+    typeof data['resumeToken'] !== 'string' ||
+    data['resumeToken'].length !== 64 ||
+    data['snapshotVersion'] !== 1 ||
+    data['asteroidInteractions'] !== 1
+  ) {
+    throw new Error('Joined acknowledgment did not advertise the current protocol');
+  }
+  return {
+    id: data['id'],
+    name: data['name'],
+    resumeToken: data['resumeToken'],
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+  };
 }
 
 /**
@@ -49,26 +100,89 @@ export class GameServerWorld {
   constructor(seed = 42) {
     this.engine = new GameEngine(seed);
     this.core = new WebSocketCore(this.engine);
+    this.engine.setOnAsteroidHits((hits) => {
+      this.core.getMessageHandler().broadcastAppliedAsteroidHits(hits);
+    });
   }
 
-  join(
-    name: string,
-    position: Position = { x: 0, y: 0 },
-    options: { kitId?: ShipKitId; factionId?: SoftFactionId } = {}
-  ): Pilot {
+  join(name: string, position: Position = { x: 0, y: 0 }, options: JoinOptions = {}): Pilot {
     this.joinCount += 1;
     const id = `${name.toLowerCase()}-${this.joinCount}`;
     const socket = new RecordingSocket();
-    this.send(
-      { id, name, socket },
+    this.sendJoin(socket, id, name, position, options);
+    return this.pilotFromJoin(socket, id, name);
+  }
+
+  joinWithId(
+    id: string,
+    name: string,
+    position: Position = { x: 0, y: 0 },
+    options: JoinOptions = {}
+  ): Pilot {
+    const socket = new RecordingSocket();
+    this.sendJoin(socket, id, name, position, options);
+    return this.pilotFromJoin(socket, id, name);
+  }
+
+  /** Send a current join without requiring the request to succeed. */
+  attemptJoin(
+    id: string,
+    name: string,
+    position: Position = { x: 0, y: 0 },
+    options: JoinOptions = {}
+  ): RecordingSocket {
+    const socket = new RecordingSocket();
+    this.sendJoin(socket, id, name, position, options);
+    return socket;
+  }
+
+  /** Resume the current motion/session owner on a replacement gameplay socket. */
+  resume(pilot: Pilot, position: Position = this.entity(pilot).position): Pilot {
+    const socket = new RecordingSocket();
+    this.sendJoin(socket, pilot.id, pilot.name, position, {
+      resumeToken: pilot.resumeToken,
+    });
+    return this.pilotFromJoin(socket, pilot.id, pilot.name);
+  }
+
+  /** Model a transport close while retaining the private resume session. */
+  dropTransport(pilot: Pilot): void {
+    pilot.socket.close();
+    this.engine.transportClosed(pilot.socket);
+  }
+
+  private sendJoin(
+    socket: RecordingSocket,
+    id: string,
+    name: string,
+    position: Position,
+    options: JoinOptions
+  ): void {
+    this.core.handleClientMessage(
       {
         type: 'join',
         id,
         name,
-        data: { name, position, kitId: options.kitId, factionId: options.factionId },
-      }
+        data: {
+          name,
+          position,
+          kitId: options.kitId,
+          factionId: options.factionId,
+          snapshotVersion: 1,
+          asteroidInteractions: 1,
+          ...(options.resumeToken ? { resumeToken: options.resumeToken } : {}),
+        },
+      },
+      socket
     );
-    return { id, name, socket };
+  }
+
+  private pilotFromJoin(socket: RecordingSocket, id: string, name: string): Pilot {
+    const joined = readJoinedAcknowledgment(socket);
+    if (joined.id !== id || joined.name !== name) {
+      throw new Error(`Join returned ${joined.id}/${joined.name}, expected ${id}/${name}`);
+    }
+    return { id, name, socket, resumeToken: joined.resumeToken };
   }
 
   disconnect(pilot: Pilot): void {
@@ -81,10 +195,13 @@ export class GameServerWorld {
   }
 
   shoot(attacker: Pilot, target: Pilot, damage: number = DAMAGE.LASER_HIT): void {
-    this.send(attacker, {
-      type: 'laserDamage',
-      data: { targetPlayerId: target.id, attackerId: attacker.id, damage },
-    });
+    const targetEntity = this.entity(target);
+    this.clearAsteroids();
+    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
+    for (let i = 0; i < hitCount && targetEntity.health > 0; i++) {
+      const healthBefore = targetEntity.health;
+      this.fireAt(attacker, targetEntity.position, () => targetEntity.health < healthBefore);
+    }
   }
 
   shootSatellite(attacker: Pilot, satelliteId: string, damage: number = DAMAGE.LASER_HIT): void {
@@ -93,22 +210,18 @@ export class GameServerWorld {
       throw new Error(`No satellite with id ${satelliteId}`);
     }
 
-    // The server accepts a satelliteDamage report only when it can consume a
-    // matching server-owned human laser. Keep this test helper on that same
-    // wire path instead of bypassing the authoritative shot check.
     const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
-    for (let i = 0; i < hitCount; i++) {
-      const laserPosition = { ...satellite.position };
-      this.engine.spawnLaser(attacker.id, laserPosition, { x: 0, y: 0 });
-      this.send(attacker, {
-        type: 'satelliteDamage',
-        data: {
-          satelliteId,
-          attackerId: attacker.id,
-          damage: DAMAGE.LASER_HIT,
-          laserPosition,
-        },
-      });
+    this.clearAsteroids();
+    for (let i = 0; i < hitCount && satellite.health > 0; i++) {
+      const shooter = this.entity(attacker);
+      const target = { x: shooter.position.x + 40, y: shooter.position.y + 80 };
+      satellite.position = target;
+      satellite.orbitCenter = { ...target };
+      satellite.orbitPhase = 0;
+      satellite.orbitRadiusX = 0;
+      satellite.orbitRadiusY = 0;
+      satellite.driftAngle = Math.PI;
+      this.fireAt(attacker, satellite.position, () => satellite.health <= 0);
     }
   }
 
@@ -118,14 +231,62 @@ export class GameServerWorld {
       throw new Error(`No bot with id ${botId}`);
     }
 
-    // The wire message predates positional hit evidence. Seed the server's
-    // tracked human-shot list at the authoritative bot position so this
-    // helper exercises the same one-use evidence gate as a live client.
-    this.engine.spawnLaser(attacker.id, { ...bot.position }, { x: 0, y: 0 });
+    this.clearAsteroids();
+    const shooter = this.entity(attacker);
+    bot.position = { x: shooter.position.x + 40, y: shooter.position.y };
+    bot.velocity = { x: 0, y: 0 };
+    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
+    for (let i = 0; i < hitCount && bot.health > 0; i++) {
+      this.fireAt(attacker, bot.position, () => bot.health <= 0);
+    }
+  }
+
+  shootAsteroid(attacker: Pilot, asteroidId: string, damage: number = DAMAGE.LASER_HIT): void {
+    const asteroid = this.engine.getAsteroid(asteroidId);
+    if (!asteroid) {
+      throw new Error(`No asteroid with id ${asteroidId}`);
+    }
+    const shooter = this.entity(attacker);
+    for (const candidate of this.engine.getAllAsteroids()) {
+      if (candidate.id !== asteroidId) {
+        this.engine.removeAsteroid(candidate.id);
+      }
+    }
+    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
+    for (let i = 0; i < hitCount && asteroid.health > 0; i++) {
+      const healthBefore = asteroid.health;
+      asteroid.position = { x: shooter.position.x + 40, y: shooter.position.y };
+      asteroid.velocity = { x: 0, y: 0 };
+      this.fireAt(attacker, asteroid.position, () => asteroid.health < healthBefore);
+    }
+  }
+
+  private fireAt(attacker: Pilot, target: Position, settled: () => boolean): void {
+    const shooter = this.entity(attacker);
+    const delta = { x: target.x - shooter.position.x, y: target.y - shooter.position.y };
+    const distance = Math.hypot(delta.x, delta.y);
+    const direction =
+      distance > 0 ? { x: delta.x / distance, y: delta.y / distance } : { x: 1, y: 0 };
+    const laserStart = {
+      x: shooter.position.x,
+      y: shooter.position.y,
+    };
     this.send(attacker, {
-      type: 'botDamage',
-      data: { botId, attackerId: attacker.id, damage },
+      type: 'shoot',
+      id: attacker.id,
+      data: {
+        laserStart,
+        laserDirection: {
+          x: direction.x * (LASER.SPEED / GAME.FPS),
+          y: direction.y * (LASER.SPEED / GAME.FPS),
+        },
+      },
     });
+
+    const frames = Math.max(4, Math.ceil(Math.max(1, distance) / (LASER.SPEED / GAME.FPS)) + 4);
+    for (let frame = 0; frame < frames && !settled(); frame++) {
+      this.engine.advanceOneFrame();
+    }
   }
 
   hitBoundary(pilot: Pilot): void {
@@ -151,7 +312,23 @@ export class GameServerWorld {
   }
 
   move(pilot: Pilot, position: Position): void {
-    this.send(pilot, { type: 'update', id: pilot.id, position });
+    const entity = this.entity(pilot);
+    const motion = entity.asteroidMotion;
+    if (!motion) {
+      throw new Error(`${pilot.name} has no current motion session`);
+    }
+    this.send(pilot, {
+      type: 'update',
+      id: pilot.id,
+      data: {
+        position,
+        velocity: { x: 0, y: 0 },
+        angle: entity.angle,
+        thrusting: false,
+        motionEpoch: motion.epoch,
+        motionSequence: motion.ack + 1,
+      },
+    });
   }
 
   /**
@@ -189,6 +366,15 @@ export class GameServerWorld {
     for (const asteroid of this.engine.getAllAsteroids()) {
       this.engine.removeAsteroid(asteroid.id);
     }
+    this.engine.addAsteroid(
+      scenarioAsteroid({
+        id: 'scenario-combat-buffer',
+        position: { x: 2000, y: 2000 },
+        size: 10,
+        health: 40,
+        maxHealth: 40,
+      })
+    );
   }
 
   entity(pilot: Pilot): GameEntity {
@@ -221,6 +407,18 @@ export class GameServerWorld {
 
   broadcastGameState(): void {
     this.core.getBroadcaster().broadcastGameState();
+  }
+
+  snapshot(pilot: Pilot): ServerGameSnapshot {
+    const decoder = new SnapshotDecoder();
+    let state: ServerGameSnapshot | undefined;
+    for (const message of pilot.socket.received('snapshot')) {
+      state = decoder.decode(message.data);
+    }
+    if (!state) {
+      throw new Error(`${pilot.name} has not received a current snapshot`);
+    }
+    return state;
   }
 
   dispose(): void {

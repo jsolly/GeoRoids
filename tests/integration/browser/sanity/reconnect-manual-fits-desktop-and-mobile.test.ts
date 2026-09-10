@@ -20,7 +20,7 @@ for (const viewport of [
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize(viewport);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#hud-network`);
-    const instructions = page.getByText('Switching away from the game releases', { exact: false });
+    const instructions = page.getByText('Keep the game tab up to date.', { exact: false });
     await instructions.waitFor({ state: 'visible' });
     await instructions.scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

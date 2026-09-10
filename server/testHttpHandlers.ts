@@ -305,18 +305,11 @@ export function handleTestPlacePlayer(
     }
 
     const position = { x, y };
-    const placed =
-      player.asteroidInteractions === 1
-        ? gameEngine.asteroidMotion.placeActorForTesting(
-            player.id,
-            position,
-            gameEngine.getServerTime()
-          )
-        : gameEngine.updatePlayer(player.id, {
-            position,
-            velocity: { x: 0, y: 0 },
-            thrusting: false,
-          }) !== undefined;
+    const placed = gameEngine.asteroidMotion.placeActorForTesting(
+      player.id,
+      position,
+      gameEngine.getServerTime()
+    );
     if (!placed) {
       respond(409, { error: 'Fixture player motion state unavailable' });
       return;
@@ -386,18 +379,11 @@ export function handleTestArrangeBotShot(
       respond(409, { error: 'No clear fixture firing lane' });
       return;
     }
-    const playerPlaced =
-      player.asteroidInteractions === 1
-        ? gameEngine.asteroidMotion.placeActorForTesting(
-            player.id,
-            lane.playerPosition,
-            gameEngine.getServerTime()
-          )
-        : gameEngine.updatePlayer(player.id, {
-            position: lane.playerPosition,
-            velocity: { x: 0, y: 0 },
-            thrusting: false,
-          }) !== undefined;
+    const playerPlaced = gameEngine.asteroidMotion.placeActorForTesting(
+      player.id,
+      lane.playerPosition,
+      gameEngine.getServerTime()
+    );
     if (!playerPlaced) {
       respond(409, { error: 'Fixture player motion state unavailable' });
       return;

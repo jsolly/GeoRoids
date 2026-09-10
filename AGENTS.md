@@ -87,7 +87,7 @@ The IaC package is a development-only dependency and the CLI must be at least
 
 Railway stops reading legacy `railway.json` files on **2026-12-01**. The
 [IaC migration](https://docs.railway.com/infrastructure-as-code) is now prepared
-in `.railway/railway.ts`: it preserves the three existing service variables and
+in `.railway/railway.ts`: it preserves the two existing service variables and
 leaves generated Railway domains platform-managed. Before the first production
 apply, link the exact GeoRoids production project/environment/service, run
 `railway config plan --json`, and review the existing staged platform patch.
@@ -161,6 +161,11 @@ npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 - **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
 
 Vite dev proxies `/ws` to `ws://localhost:3001` so the client always connects via the Vite origin.
+
+Gameplay requires snapshot v1 and asteroid interactions. The client adds
+`asteroidInteractions=1` to the WebSocket URL and sends both capabilities at join.
+Unsupported clients receive HTTP 426 or an explicit join error; there are no
+protocol opt-out flags or rollback procedure. Reconnects use a private resume token.
 
 ### Server-authoritative model
 

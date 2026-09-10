@@ -26,7 +26,7 @@ test('legacy top-level fields override nested command fields once', () => {
   });
 });
 
-test('nested legacy joins keep numeric-string positions and enhanced offers', () => {
+test('nested current joins keep numeric-string positions and capability offers', () => {
   expect(
     decodeClientCommand({
       type: 'join',
@@ -47,14 +47,14 @@ test('nested legacy joins keep numeric-string positions and enhanced offers', ()
       name: 'Pilot',
       position: { x: 12.5, y: -4 },
       kitId: 'hauler',
-      enhancedOffer: true,
       snapshotVersion: 1,
+      asteroidInteractions: 1,
       resumeRequested: false,
     },
   });
 });
 
-test('malformed commands retain their action-specific error policy', () => {
+test('malformed current commands retain their action-specific error policy', () => {
   expect(decodeClientCommand({ type: 'asteroidInput', data: { epoch: 1, sequence: 2 } })).toEqual({
     ok: false,
     messageType: 'asteroidInput',
@@ -63,12 +63,6 @@ test('malformed commands retain their action-specific error policy', () => {
     ok: false,
     messageType: 'shoot',
     error: 'Missing finite laser coordinates for shoot',
-  });
-  expect(decodeClientCommand({ type: 'laserDamage', data: {} })).toEqual({
-    ok: false,
-    messageType: 'laserDamage',
-    error: 'Missing required fields for laserDamage',
-    suppressWhenAuthoritativeProjectiles: true,
   });
 });
 

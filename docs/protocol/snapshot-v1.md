@@ -1,31 +1,26 @@
-# Negotiated snapshots v1
+# Snapshots v1
 
-Replacement for reverted #450/#466. Legacy clients continue receiving the exact
-`{type:"gameState",data:<full public state>,timestamp}` envelope. There is no
-implicit version detection and no lean variant of `gameState`.
+Gameplay uses snapshot v1 with asteroid interactions. Every join must offer
+`snapshotVersion:1` and `asteroidInteractions:1`; the server acknowledges both
+and provides a private resume token before the client starts play. Missing or
+unsupported capabilities fail explicitly. There is no full-state `gameState`
+transport, disabled-offer build, or legacy-client mode.
 
-## Deployment and rollback
+## Deployment
 
-The client offer is **on by default**, after the supporting server deployment.
-An unset `VITE_SNAPSHOT_PROTOCOL` or explicit `1` includes `snapshotVersion:1` in
-the join data. Build with `VITE_SNAPSHOT_PROTOCOL=0` to disable the offer; changing
-the build setting requires a new client deployment.
-An old server ignores this extra join field: unless its `joined.data` explicitly
-confirms `snapshotVersion:1`, the new client continues the legacy path.
+Merge through the CI-gated PR flow. Vercel deploys the client through Git; deploy
+the server separately on Railway. Verify both release headers, two-player state,
+shooting and reconnect. The current capability fields remain the wire contract
+across these independent deployments.
 
-1. Merge supporting code with the offer disabled. Deploy the exact merged server
-   on Railway, verify `/health` and its `x-release-id` and exercise a legacy client.
-2. Enable the Vercel client offer in a separate change/deployment. Verify Vercel
-   READY, both release headers, real two-player state, reconnect and effect clears.
-3. For rollback, deploy a client with its offer disabled first. Legacy support
-   remains on the server; then roll back the server if necessary. Already open
-   negotiated clients must reload/reconnect before removing supporting servers.
-
-Never deploy a client that assumes support before the server confirms it.
+Gameplay WebSocket URLs must include `asteroidInteractions=1`. Unsupported clients
+receive HTTP 426 before upgrade and must refresh. The join message is validated
+again, so the URL parameter alone does not grant access. The client also rejects
+an unsupported server acknowledgment. No protocol rollout or rollback flags exist.
 
 ## Wire contract
 
-The new envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
+The envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
 `version:1`, positive integer `sequence`, and either:
 
 - `kind:"keyframe", state:<complete ServerGameSnapshot>`.
@@ -47,9 +42,8 @@ The codec preserves all public JSON fields recursively. It does not whitelist
 ship or asteroid fields; future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
 make additions to the shared world/entity/asteroid/loot/EO/pickup/projectile/tag DTOs
-require corresponding validation. `ServerGameSnapshot` extends the unchanged
-legacy `ServerGameState` with `satelliteProjectiles` and `collabTags`; these arrays
-appear only in negotiated snapshots. Projectile IDs equal their stable `shotId`,
+require corresponding validation. `ServerGameSnapshot` extends the core
+`ServerGameState` with `satelliteProjectiles`, `playerProjectiles` and `collabTags`. Projectile IDs equal their stable `shotId`,
 so an event and subsequent keyframe repair one shot instead of creating two.
 Tags include asteroid ID, shooter hit records and expiry. Keyframes restore active
 shots and cooperative windows after reconnect without replaying old events.
@@ -87,7 +81,7 @@ also repair a lost resync request. Unnegotiated snapshots close with protocol er
 Run from `/Users/johnsolly/code/GeoRoids` (or the integrated checkout):
 
 ```sh
-npx vitest run tests/unit/network/pilots-recover-complete-snapshots.test.ts tests/unit/network/old-and-new-pilots-share-a-server.test.ts tests/unit/network/runtime-client-negotiates-and-recovers.test.ts
+npx vitest run tests/unit/network/pilots-recover-complete-snapshots.test.ts tests/unit/network/current-pilots-share-a-server.test.ts tests/unit/network/runtime-client-negotiates-and-recovers.test.ts
 npm run benchmark -- measure codec --revision HEAD --seed 42
 npm run benchmark -- measure transport --revision HEAD --seed 42
 ```
@@ -101,12 +95,12 @@ or codec with `npm run benchmark -- compare KIND --baseline REV --candidate REV`
 
 The runtime tests enter through the actual WebSocket `onmessage` callback; they
 verify real entity/loot managers, malformed-frame preservation, asteroid removals,
-harpoon unlatch, legacy fallback, rejoin, EO shot dedupe/death, pickup ownership,
+harpoon unlatch, unsupported-client rejection, rejoin, EO shot dedupe/death, pickup ownership,
 and asteroid metadata/tag clearing. Run the real socket test through the serialized
 integration runner:
 
 ```sh
-./scripts/test-runner.sh tests/integration/server/mixed-version-pilots-recover-after-reconnect.test.ts
+./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts
 ```
 
 The current codec measurement uses the original seeded snapshot fixtures and
@@ -186,22 +180,20 @@ recreate this archived table.
 
 ## Enhanced asteroid capability
 
-An additive `asteroidInteractions:1` join offer requires snapshot v1 and an explicit
-matching acknowledgment. The joined socket alone receives its private resume token.
+The required `asteroidInteractions:1` join capability requires snapshot v1 and an
+explicit matching acknowledgment. The joined socket alone receives its private resume token.
 A physical gameplay socket close gives that token a two-second neutral-input grace;
 a same-socket rejoin is idempotent, a valid token can atomically supersede an old
-socket, and expiry/leave/reset invalidates it. Ordinary legacy joins cannot acquire
-constrained motion through an asteroid tool packet.
+socket, and expiry/leave/reset invalidates it. Unsupported joins are rejected before a pilot is created.
 
 Optional asteroid `phenomenon` and `spinClass` metadata is preserved on
 first creation and complete/delta updates. `playerProjectiles` carries stable
 process-unique shot IDs, geometry, bounded fractional energy, bounce count and age.
-The enhanced client reconciles keyed rows and ignores legacy shot events for bolt
-creation. Reflection energy uses finite numbers in [0,8]; sequences, epochs and
+The client reconciles keyed projectile rows for bolt creation. Reflection energy uses finite numbers in [0,8]; sequences, epochs and
 bounce counters remain integers. Core upgrades carry bounded charges and expiry.
 
 Enhanced Hauler poses use server motion epochs and monotonically increasing input
-sequences. During latch/release/handoff, legacy movement packets cannot overwrite
+sequences. During latch/release/handoff, ordinary movement packets cannot overwrite
 position, velocity, fuel or spin. The client rebases each authoritative frame and
 replays only its bounded unacknowledged input queue. A new handoff epoch/anchor and
 reachable-pose acknowledgment are required before free prediction resumes. Server

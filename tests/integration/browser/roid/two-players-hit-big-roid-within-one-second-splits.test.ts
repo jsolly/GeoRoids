@@ -21,7 +21,7 @@ type SplitEvidence =
       type: 'asteroidCreateBatch';
       data: { asteroids: Pick<AsteroidData, 'id' | 'material' | 'size' | 'position'>[] };
     }
-  | { type: 'gameState' | 'snapshot' }
+  | { type: 'snapshot' }
   | { type: 'error'; data: unknown };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -32,7 +32,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readSplitEvidence(value: unknown): SplitEvidence | undefined {
   assert.ok(isRecord(value), 'Expected a WebSocket message envelope');
   const type = value['type'];
-  if (type === 'gameState' || type === 'snapshot') {
+  if (type === 'snapshot') {
     return { type };
   }
   if (type === 'error') {
@@ -340,9 +340,7 @@ test(
       }
       const origin = destruction.data.origin;
       const subsequent = messages.slice(destroyIndex + 1);
-      const nextState = subsequent.findIndex(
-        (message) => message.type === 'gameState' || message.type === 'snapshot'
-      );
+      const nextState = subsequent.findIndex((message) => message.type === 'snapshot');
       if (nextState < 0) {
         return [];
       }

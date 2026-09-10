@@ -8,19 +8,15 @@ test('an unconfigured server uses production defaults and port 3001', () => {
   expect(readServerConfiguration({})).toEqual({
     port: 3001,
     nodeEnv: 'production',
-    requireEnhancedClient: false,
   });
 });
 
-test('configured server values select the listener, environment and supported clients', () => {
-  expect(
-    readServerConfiguration({ PORT: '8080', NODE_ENV: 'development', REQUIRE_ASTEROID_CLIENT: '1' })
-  ).toEqual({
+test('configured server values select the listener and environment', () => {
+  expect(readServerConfiguration({ PORT: '8080', NODE_ENV: 'development' })).toEqual({
     port: 8080,
     nodeEnv: 'development',
-    requireEnhancedClient: true,
   });
-  expect(readServerConfiguration({ PORT: '0', REQUIRE_ASTEROID_CLIENT: '0' }).port).toBe(0);
+  expect(readServerConfiguration({ PORT: '0' }).port).toBe(0);
   expect(readServerConfiguration({ PORT: '', NODE_ENV: '' })).toMatchObject({
     port: 3001,
     nodeEnv: 'production',

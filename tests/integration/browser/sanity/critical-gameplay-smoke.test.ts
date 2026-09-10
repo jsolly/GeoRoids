@@ -56,7 +56,7 @@ function observeAuthoritativeProjectiles(page: Page): {
       }
       try {
         const snapshot = decoder.decode(parsed['data']);
-        for (const projectile of snapshot.playerProjectiles ?? []) {
+        for (const projectile of snapshot.playerProjectiles) {
           projectiles.set(projectile.id, projectile);
         }
       } catch (error) {

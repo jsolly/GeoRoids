@@ -17,18 +17,3 @@ export function advanceRemotePlayerShips(players: Player[]): void {
     }
   }
 }
-
-/**
- * Local shots are already appended in `fireLaser`. Replays and unknown
- * players must not grow `ship.lasers` past the same cap the local gun uses.
- */
-export function shouldApplyRemoteShoot(
-  player: { id: string; type: string; ship: { lasers: readonly unknown[] } },
-  localPlayerId: string,
-  maxLasers: number
-): boolean {
-  if (player.type === 'local' || player.id === localPlayerId) {
-    return false;
-  }
-  return player.ship.lasers.length < maxLasers;
-}

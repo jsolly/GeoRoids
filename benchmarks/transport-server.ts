@@ -92,7 +92,7 @@ process.once('unhandledRejection', (error: unknown) => {
 });
 
 try {
-  server = createServerInstance({ port: 0, nodeEnv: 'test', requireEnhancedClient: true });
+  server = createServerInstance({ port: 0, nodeEnv: 'test' });
   void server.listening.then((port) => send({ type: 'ready', port })).catch(shutdown);
 } catch (error) {
   void shutdown(error);

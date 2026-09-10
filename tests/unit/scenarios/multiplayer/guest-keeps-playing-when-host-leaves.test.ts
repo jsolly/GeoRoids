@@ -27,7 +27,7 @@ describe('The guest keeps playing when the host leaves', () => {
     expect(world.engine.isGamePaused()).toBe(false);
     expect(world.entity(guest).health).toBeGreaterThan(0);
 
-    world.move(guest, { x: 160, y: 20 });
-    expect(world.entity(guest).position).toEqual({ x: 160, y: 20 });
+    world.move(guest, { x: 140, y: 20 });
+    expect(world.entity(guest).position).toEqual({ x: 140, y: 20 });
   });
 });

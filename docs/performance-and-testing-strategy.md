@@ -24,7 +24,7 @@ The historical repository baseline is [`54d8c18d4ce25b3ea6af731582bd615666761a85
 | CPU benchmark | [`benchmarks/README.md`](../benchmarks/README.md) documents the compiled Chromium client runner for desktop, touch portrait and touch landscape. It records synchronous update/render CPU samples and native `requestAnimationFrame` intervals in separate fields. | Useful for fixture comparisons, not presentation timing or GPU completion. |
 | Simulation | [GameEngine.ts](../server/core/GameEngine.ts) advances fixed simulation frames at 60 Hz and catches up using [gameClock.ts](../shared/gameClock.ts). | Measure scheduled deadlines and accumulated debt in addition to `advanceOneFrame` cost. |
 | Broadcasting | [GameStateBroadcaster.ts](../server/services/GameStateBroadcaster.ts) broadcasts at 30 Hz, shares canonical snapshot preparation, and manages per-socket baselines and backpressure. | A server frame benchmark alone excludes a major capacity boundary. |
-| Protocol | [snapshot-v1.md](protocol/snapshot-v1.md) documents negotiated deltas, keyframes, atomic validation, legacy fallback, resync, and enhanced capabilities. | Extend the existing codec and compatibility tests. Do not propose delta snapshots as new work. |
+| Protocol | [snapshot-v1.md](protocol/snapshot-v1.md) documents negotiated deltas, keyframes, atomic validation, unsupported-client rejection, resync, and required capabilities. | Extend the existing codec and compatibility tests. Do not propose delta snapshots as new work. |
 | Collision | [CollisionAuthority.ts](../server/core/CollisionAuthority.ts) maps entities into collision rows; [combat.ts](../shared/combat.ts) checks ship/asteroid combinations and ship pairs with nested loops. | Candidate growth and temporary allocations are plausible scaling costs, not measured bottlenecks yet. |
 | Mobile interaction | [touchControls.ts](../src/input/touchControls.ts) supports steering, firing, ability, and shield input with stateful pointer handling and cached button state. | Test sustained multitouch and lifecycle transitions, beyond button visibility. |
 | Test enforcement | [ci.yml](../.github/workflows/ci.yml) runs static checks, runner contracts, unit tests, and build. It does not run gameplay browser or server integration suites. | Add bounded behavioral integration coverage to CI without weakening the existing gate. |
@@ -158,7 +158,7 @@ Keep unit tests fast and focused on shared rules: fixed-step clock behavior, mov
 
 Add property-based or generated deterministic cases around the highest-risk algorithms. For snapshots, compare decoded output with canonical public state across add/update/remove/order/clear transitions, keyframes, invalid baselines, and capability mixtures. For collision acceleration, compare against the current brute-force implementation for seeded worlds, edge overlaps, large objects, and swept projectiles. For clocks, compare equal elapsed durations at 30/60/120/144 Hz and inject pauses or backward wall-clock changes.
 
-Use server integration tests for real join/shoot/damage/death/respawn sequences, mixed-version clients, resync, rate limits, delayed send callbacks, disconnect cleanup, and restart behavior. A transport benchmark should fail on invalid state, missed acknowledgments, or stalled gameplay even when socket throughput is high. Keep all integration entry points behind `scripts/test-runner.sh` and its repository-scoped ownership lock.
+Use server integration tests for real join/shoot/damage/death/respawn sequences, unsupported-client rejection, resync, rate limits, delayed send callbacks, disconnect cleanup, and restart behavior. A transport benchmark should fail on invalid state, missed acknowledgments, or stalled gameplay even when socket throughput is high. Keep all integration entry points behind `scripts/test-runner.sh` and its repository-scoped ownership lock.
 
 Browser tests should exercise the shipped UI and network lifecycle. Prioritize two-player visibility, simultaneous steer/fire/ability/shield input, pointer cancellation, orientation changes during input, browser chrome resizing, background/resume, death/respawn, and reconnection. For rendering changes, capture deterministic screenshots of dense combat, terrain, HUD, and projectiles on desktop and touch layouts. Pixel checks verify appearance; separate state assertions verify gameplay.
 
@@ -166,7 +166,7 @@ The repository uses Vitest to drive Playwright's browser API. Playwright Test's 
 
 ### CI and coverage
 
-Retain `npm run gate` and the required `CI / ci` status. Add a small serialized integration lane covering boot, move/fire, mobile controls, and mixed-version reconnect, with artifacts uploaded even on failure. Ensure the required CI result depends on that lane rather than allowing auto-merge before it finishes. Install the pinned Playwright browsers and OS dependencies in the runner. Full browser scenarios and load/soak work can run in scheduled or manually dispatched workflows, with owners and failure tracking.
+Retain `npm run gate` and the required `CI / ci` status. Add a small serialized integration lane covering boot, move/fire, mobile controls, and current-protocol reconnect, with artifacts uploaded even on failure. Ensure the required CI result depends on that lane rather than allowing auto-merge before it finishes. Install the pinned Playwright browsers and OS dependencies in the runner. Full browser scenarios and load/soak work can run in scheduled or manually dispatched workflows, with owners and failure tracking.
 
 Keep Vitest's one-worker integration settings and process ownership contracts. Unit-test sharding is a separate possible experiment only after proving isolation; increasing integration workers to shorten CI would reintroduce connection bursts and invalid measurements. New failures must fail the run. Any already skipped or quarantined scenario must appear explicitly in the report with a reason and a repair step, never count as a pass.
 
@@ -223,15 +223,15 @@ message and keyframe/delta counts, and UTF-8 application payload bytes. Those
 bytes exclude WebSocket transport framing. The current transport runner covers a
 single realtime loopback sample with two clients; its native scheduling and
 factory-owned server seed make it unsuitable for paired comparison. Extend these
-fixtures with non-ASCII names, keyframe bursts and legacy/negotiated mixtures when
+fixtures with non-ASCII names, keyframe bursts and staggered current-protocol sessions when
 the broader protocol experiments begin; average delta bytes alone hides recovery
 cost.
 
-The server already has pending-send and buffered-byte handling for negotiated snapshots. Audit every outbound class, including legacy state and gameplay events, for bounded queues and explicit loss/recovery semantics. WebSocket's browser API does not provide automatic receive backpressure, so bounded application work remains necessary.[^13] Do not discard arbitrary deltas to catch up: decode their required chain or request a keyframe through the existing resync mechanism.
+The server already has pending-send and buffered-byte handling for negotiated snapshots. Audit every outbound class, including keyframes, deltas and gameplay events, for bounded queues and explicit loss/recovery semantics. WebSocket's browser API does not provide automatic receive backpressure, so bounded application work remains necessary.[^13] Do not discard arbitrary deltas to catch up: decode their required chain or request a keyframe through the existing resync mechanism.
 
 Prefer reducing redundant application work and measuring existing snapshot cadence before another wire-format change. Compare 30 Hz with a proposed lower snapshot rate only alongside interpolation, correction-distance, and input-response measurements. Keep simulation at 60 Hz. If considering interest management, define enter/leave behavior, offscreen projectiles, minimap/leaderboard completeness, and keyframe recovery first; omission cannot masquerade as entity deletion.
 
-Compression is an experiment, not a default switch. The `ws` maintainers warn that per-message deflate adds CPU and memory overhead.[^14] Test compression on/off with realistic concurrency, payloads, phone decode time, RSS, and stalled recipients. A binary protocol must beat the existing negotiated JSON path on end-to-end latency or operating cost while preserving validation and legacy fallback; smaller packets alone are insufficient.
+Compression is an experiment, not a default switch. The `ws` maintainers warn that per-message deflate adds CPU and memory overhead.[^14] Test compression on/off with realistic concurrency, payloads, phone decode time, RSS, and stalled recipients. A binary protocol must beat the existing negotiated JSON path on end-to-end latency or operating cost while preserving validation and recovery; smaller packets alone are insufficient.
 
 ### Railway deployment and capacity
 
@@ -257,7 +257,7 @@ All phases belong to this plan. Conditional experiments close with a written ado
 | 4. Client improvements / rendering owner | Profile-led contour chunks, HUD invalidation, resize deduplication, bounded hot-path allocation, and optional quality tiers. | Phases 1–3. Same fixtures and visual checks pass; target phones meet budgets or show a reviewed quality-tier decision. Retain only measured wins. |
 | 5. Server improvements / simulation owner | Monotonic scheduling/debt policy, collision-index experiment, tick-local views, complete outbound-pressure audit. | Phases 1–3; independent of most phase 4 edits. Clock and collision differential tests pass; capacity/soak evidence shows savings without state divergence. |
 | 6. Protocol experiments / network owner | Current-capability encode/decode breakdown, cadence/interpolation experiment, compression comparison; evaluate binary and interest management only if earlier results justify them. | Phase 3 plus updated phase 4–5 baseline. Adopt/reject report includes CPU, bytes, memory, corrections, recovery, and compatibility. |
-| 7. Operational acceptance / release owner | Aggregate production metrics, release-correlated dashboard, region/capacity report, admission limits, deploy/rollback rehearsal. Evaluate room routing if one world misses demand. | All accepted changes. Physical-device soak, supported-load soak, two-player deployment checks, and explicit worker/WebGL/replica decisions close the plan. |
+| 7. Operational acceptance / release owner | Aggregate production metrics, release-correlated dashboard, region/capacity report, admission limits, deployment verification. Evaluate room routing if one world misses demand. | All accepted changes. Physical-device soak, supported-load soak, two-player deployment checks, and explicit worker/WebGL/replica decisions close the plan. |
 
 The first PR should implement phase 1 without optimization. Its deliverable is an honest baseline that can reject a bad change. Phases 2–3 then make that evidence repeatable in automation. Avoid combining instrumentation, a new collision algorithm, and a protocol redesign in one PR because the source of either a gain or regression becomes difficult to establish.
 
@@ -277,7 +277,7 @@ npm run benchmark -- measure transport --revision HEAD --seed 42
 npm run benchmark -- compare client --baseline REV --candidate REV --seed 42 --viewport desktop
 npm run benchmark -- compare server --baseline REV --candidate REV --seed 42
 npm run benchmark -- compare codec --baseline REV --candidate REV --seed 42
-./scripts/test-runner.sh tests/integration/server/mixed-version-pilots-recover-after-reconnect.test.ts
+./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts
 ./scripts/test-runner.sh tests/integration/browser/sanity/mobile-viewport-fits-and-shows-touch-controls.test.ts
 ```
 
@@ -295,9 +295,9 @@ Export bounded aggregate histograms every 15 seconds as an initial sampling poli
 
 Vercel Speed Insights can cover delivery and page responsiveness; custom gameplay measurements must cover sustained rendering and state application. Railway metrics and Node timing cover the server. Keep failed joins, disconnect reasons, resync counts, dropped diagnostics, and queue pressure alongside timings so a faster result cannot hide lost work.
 
-Roll out one accepted optimization at a time. Client-only changes follow the Vercel Git deployment path. Server changes require a separate Railway deployment. For protocol changes, deploy the compatible server first, then the client offer, following [snapshot-v1 deployment rules](protocol/snapshot-v1.md#deployment-and-rollback). Verify both release IDs and two real players, including reconnect, before accepting the release.
+Roll out one accepted optimization at a time. Client-only changes follow the Vercel Git deployment path. Server changes require a separate Railway deployment. For protocol changes, deploy the server and client that implement the required protocol, following [snapshot-v1 deployment rules](protocol/snapshot-v1.md#deployment). Verify both release IDs and two real players, including reconnect, before accepting the release.
 
-Roll back on correctness regressions immediately. For performance, compare equivalent cohorts and workloads against the calibrated thresholds; retain the old implementation or release until the acceptance window closes. A client rollback may require reload/reconnect for already-open sessions. Restore the prior client offer before removing server support that active clients still require.
+Fix correctness regressions before accepting a release. Compare performance using equivalent workloads and calibrated thresholds. This app has no rollback procedure or legacy-client support mode.
 
 The plan is complete when critical behavior runs in required CI, benchmark reports reproduce with known noise, actual phones pass the selected quality budgets, the declared Railway workload passes sustained testing, and every architectural experiment has an evidence-backed decision. Publish supported device/load conditions and remaining measured limitations explicitly. A green build, low average CPU time, or healthy HTTP endpoint alone does not meet that bar.
 

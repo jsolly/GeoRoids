@@ -98,7 +98,6 @@ describe('server bot damage and lifecycle scenarios', () => {
     expect(target.health).toBe(target.maxHealth);
     expect(target.exploding).toBe(false);
     expect(target.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
-    expect(target.respawnAnchor).toEqual(target.position);
   });
 
   test('a bot kill credits the named bot attacker and preserves the target life count', () => {

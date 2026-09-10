@@ -72,7 +72,7 @@ export class AsteroidMotionPrediction {
   }
 
   /** The caller requests a fresh snapshot and logs this reason; overflow never
-   * silently drops unacknowledged commands or enables legacy movement.
+   * silently drops unacknowledged commands or permits unconstrained movement.
    */
   public recoveryReason(): string | undefined {
     return this.overflow
@@ -95,8 +95,8 @@ export class AsteroidMotionPrediction {
     this.assertTime(now);
     const state = snapshot.asteroidMotion;
     if (!state) {
-      // Negotiated absence is terminal only when not awaiting a resumable
-      // keyframe. A pre-joined legacy row cannot turn constrained movement on.
+      // Absence is terminal only when not awaiting a resumable keyframe. A
+      // pre-acknowledgment row cannot turn constrained movement on.
       if (this.waitingForResume) {
         return false;
       }

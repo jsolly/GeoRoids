@@ -32,6 +32,7 @@ type TransportMessage = {
   data?: {
     snapshotVersion?: number;
     asteroidInteractions?: number;
+    resumeToken?: string;
     [key: string]: unknown;
   };
 };
@@ -78,8 +79,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     vi.unstubAllEnvs();
     resetControlSources();
   });
-  async function connect(offer?: boolean) {
-    vi.stubEnv('VITE_SNAPSHOT_PROTOCOL', offer === undefined ? undefined : offer ? '1' : '0');
+  async function connect() {
     const connecting = manager.connect();
     Transport.latest.onopen?.();
     await connecting;
@@ -87,13 +87,15 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager.initializeAsteroidSync();
     return Transport.latest;
   }
-  function acknowledge(ws: Transport, version?: number) {
+  function acknowledge(ws: Transport, resumeToken = 'a'.repeat(64)) {
     ws.receive('joined', {
       id: manager.getClientId(),
       name: 'Runtime pilot',
       position: { x: 0, y: 0 },
       color: '#fff',
-      ...(version ? { snapshotVersion: version } : {}),
+      snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken,
     });
   }
 
@@ -117,12 +119,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
   ])(
     'late Hauler snapshots preserve held and released $source thrust',
     async ({ press, release }) => {
-      vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');
       const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
       const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
       vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
       vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
-      const ws = await connect(true);
+      const ws = await connect();
       ws.receive('joined', {
         id: manager.getClientId(),
         name: player.name,
@@ -181,66 +182,59 @@ describe('actual ConnectionManager WebSocket message path', () => {
     }
   );
 
-  test.each([false, true])(
-    'held thrust and turn resume after authoritative respawn (negotiated: %s)',
-    async (negotiated) => {
-      vi.stubEnv('VITE_ASTEROID_INTERACTIONS', negotiated ? '1' : '0');
-      const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
-      vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-      const ws = await connect(negotiated);
-      ws.receive('joined', {
-        id: manager.getClientId(),
-        name: player.name,
-        position: player.ship.position,
-        ...(negotiated
-          ? { snapshotVersion: 1, asteroidInteractions: 1, resumeToken: 'b'.repeat(64) }
-          : {}),
-      });
-      const state = captureSnapshot(snapshotFixture());
-      const [local] = state.entities;
-      assert.ok(local);
-      Object.assign(local, { id: player.id, kitId: 'dart', thrusting: false });
-      state.entities = [local];
-      const receive = (sequence: number) =>
-        negotiated
-          ? ws.receive('snapshot', new SnapshotEncoder(state).encode(sequence))
-          : ws.receive('gameState', state);
-      receive(1);
-      keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player);
-      keyDown(new KeyboardEvent('keydown', { code: 'KeyA' }), player);
-      expect(player.ship.thrusting).toBe(true);
-      expect(player.ship.angularVelocity).toBeGreaterThan(0);
+  test('held thrust and turn resume after authoritative respawn', async () => {
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    ws.receive('joined', {
+      id: manager.getClientId(),
+      name: player.name,
+      position: player.ship.position,
+      snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken: 'b'.repeat(64),
+    });
+    const state = captureSnapshot(snapshotFixture());
+    const [local] = state.entities;
+    assert.ok(local);
+    Object.assign(local, { id: player.id, kitId: 'dart', thrusting: false });
+    state.entities = [local];
+    const receive = (sequence: number) =>
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(sequence));
+    receive(1);
+    keyDown(new KeyboardEvent('keydown', { code: 'KeyW' }), player);
+    keyDown(new KeyboardEvent('keydown', { code: 'KeyA' }), player);
+    expect(player.ship.thrusting).toBe(true);
+    expect(player.ship.angularVelocity).toBeGreaterThan(0);
 
-      Object.assign(local, { health: 0, exploding: true, respawnTimer: 18 });
-      receive(2);
-      expect(player.ship.thrusting).toBe(false);
-      expect(player.ship.angularVelocity).toBe(0);
+    Object.assign(local, { health: 0, exploding: true, respawnTimer: 18 });
+    receive(2);
+    expect(player.ship.thrusting).toBe(false);
+    expect(player.ship.angularVelocity).toBe(0);
 
-      Object.assign(local, {
-        health: local.maxHealth,
-        exploding: false,
-        respawnTimer: 0,
-        spawnProtectionTimer: 180,
-        position: { x: 400, y: 400 },
-      });
-      receive(3);
-      expect(player.ship.exploding).toBe(false);
-      expect(player.ship.thrusting).toBe(true);
-      expect(player.ship.angularVelocity).toBeGreaterThan(0);
-      keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
-      keyUp(new KeyboardEvent('keyup', { code: 'KeyA' }), player);
-      receive(4);
-      expect(player.ship.thrusting).toBe(false);
-      expect(player.ship.angularVelocity).toBe(0);
-    }
-  );
+    Object.assign(local, {
+      health: local.maxHealth,
+      exploding: false,
+      respawnTimer: 0,
+      spawnProtectionTimer: 180,
+      position: { x: 400, y: 400 },
+    });
+    receive(3);
+    expect(player.ship.exploding).toBe(false);
+    expect(player.ship.thrusting).toBe(true);
+    expect(player.ship.angularVelocity).toBeGreaterThan(0);
+    keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
+    keyUp(new KeyboardEvent('keyup', { code: 'KeyA' }), player);
+    receive(4);
+    expect(player.ship.thrusting).toBe(false);
+    expect(player.ship.angularVelocity).toBe(0);
+  });
 
   test('sampled snapshots correlate predicted and authoritative local state', async () => {
-    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'dart');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-    const ws = await connect(true);
+    const ws = await connect();
     ws.receive('joined', {
       id: manager.getClientId(),
       name: 'Runtime pilot',
@@ -304,8 +298,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
   test('applies authoritative local health damage and partial regeneration snapshots', async () => {
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'dart');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-    const ws = await connect(true);
-    acknowledge(ws, 1);
+    const ws = await connect();
+    acknowledge(ws);
 
     const baseline = captureSnapshot(snapshotFixture());
     const baselineEntity = baseline.entities[0];
@@ -365,10 +359,9 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('an expired enhanced session replaces its cached identity before a fresh join', async () => {
-    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '1');
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'dart');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-    const ws = await connect(true);
+    const ws = await connect();
     const oldId = manager.getClientId();
     ws.receive('joined', {
       id: oldId,
@@ -423,44 +416,24 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getLocalPlayerId()).toBe(freshId);
   });
 
-  test('an unset build setting offers snapshots, explicit 0 disables them, and an old server remains compatible', async () => {
-    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', undefined);
-    let ws = await connect();
+  test('the client always offers the current snapshot and asteroid interaction protocol', async () => {
+    const ws = await connect();
     const initialJoin = ws.sent.find((m) => m.type === 'join');
     assert.ok(initialJoin, 'initial join message');
     const initialJoinData = initialJoin.data;
     assert.ok(initialJoinData, 'initial join data');
     expect(initialJoinData.snapshotVersion).toBe(1);
     expect(initialJoinData.asteroidInteractions).toBe(1);
+    expect(new URL(ws.url).searchParams.get('snapshotVersion')).toBe('1');
     expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
-    manager.disconnect();
-    ws = await connect(false);
-    const legacyJoin = ws.sent.find((m) => m.type === 'join');
-    assert.ok(legacyJoin, 'legacy join message');
-    expect(legacyJoin.data).not.toHaveProperty('snapshotVersion');
-    expect(legacyJoin.data).not.toHaveProperty('asteroidInteractions');
-    vi.stubEnv('VITE_ASTEROID_INTERACTIONS', '0');
-    manager.disconnect();
-    ws = await connect(true);
-    const negotiatedJoin = ws.sent.find((m) => m.type === 'join');
-    assert.ok(negotiatedJoin, 'negotiated join message');
-    const negotiatedJoinData = negotiatedJoin.data;
-    assert.ok(negotiatedJoinData, 'negotiated join data');
-    expect(negotiatedJoinData.snapshotVersion).toBe(1);
-    expect(negotiatedJoin.data).not.toHaveProperty('asteroidInteractions');
-    expect(new URL(ws.url).searchParams.has('asteroidInteractions')).toBe(false);
+    expect(initialJoinData.resumeToken).toBeUndefined();
     acknowledge(ws);
-    const legacy = snapshotFixture();
-    ws.receive('gameState', legacy);
-    expect(manager.getAllPlayers()).toHaveLength(10);
-    expect(LootField.getInstance().getAll()).toEqual(legacy.loot);
-    expect(ws.close).not.toHaveBeenCalled();
   });
 
   test('real decoder applies keyframes/deltas, clears effects/empty worlds and survives malformed frames atomically', async () => {
     const errorLog = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-    const ws = await connect(true);
-    acknowledge(ws, 1);
+    const ws = await connect();
+    acknowledge(ws);
     const removed: string[] = [];
     bindAsteroidFieldApply({
       onCreated: () => {},
@@ -474,7 +447,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     firstPilot.harpoonTargetId = 'asteroid-1';
     firstPilot.harpoonLatchPos = { x: 1, y: 2 };
     firstPilot.harpoonTimer = 90;
-    firstPilot.name = 'Runtime pilot'; // Display names are not negotiated identities.
+    firstPilot.name = 'Runtime pilot'; // Display names are not session identities.
     firstPilot.kitId = 'hauler';
     firstPilot.shieldActive = true;
     firstPilot.shieldTime = 90;
@@ -526,8 +499,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('EO shots, pickup ownership, tag expiry and asteroid metadata reconcile in real managers', async () => {
-    const ws = await connect(true);
-    acknowledge(ws, 1);
+    const ws = await connect();
+    acknowledge(ws);
     const belt = new Map<string, Roid>();
     function create(row: AsteroidData) {
       const roid = new Roid({ ...row.position }, row.size, row.id);
@@ -601,7 +574,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     // A rejoin starts a new sequence and reconstructs shots even after local caches were lost.
     manager.initializeAsteroidSync();
-    acknowledge(ws, 1);
+    acknowledge(ws);
     satellites.clear();
     pickups.clear();
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
@@ -613,8 +586,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
     setSelectedShipKitId('hauler');
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-    const ws = await connect(true);
-    acknowledge(ws, 1);
+    const ws = await connect();
+    acknowledge(ws);
     const zero = captureSnapshot(snapshotFixture());
     const zeroEntity = zero.entities[0];
     assert.ok(zeroEntity, 'zero snapshot entity');
@@ -672,8 +645,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
     setSelectedShipKitId('hauler');
     const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
-    let ws = await connect(true);
-    acknowledge(ws, 1);
+    let ws = await connect();
+    acknowledge(ws);
     const active = captureSnapshot(snapshotFixture());
     const reconnectedActiveEntity = active.entities[0];
     assert.ok(reconnectedActiveEntity, 'reconnected active entity');
@@ -687,8 +660,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     ws.receive('snapshot', new SnapshotEncoder(active).encode(1));
     ws.close(); // Actual onclose resets the socket's authority acknowledgment.
-    ws = await connect(true);
-    acknowledge(ws, 1);
+    ws = await connect();
+    acknowledge(ws);
     const zero = captureSnapshot(active);
     const zeroActiveEntity = zero.entities[0];
     assert.ok(zeroActiveEntity, 'zero active entity');
@@ -722,8 +695,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('rejoin accepts in-flight old-session snapshots until its delayed acknowledgment resets sequence', async () => {
-    const ws = await connect(true);
-    acknowledge(ws, 1);
+    const ws = await connect();
+    acknowledge(ws);
     const state = captureSnapshot(snapshotFixture());
     ws.receive('snapshot', new SnapshotEncoder(state).encode(15));
     manager.initializeAsteroidSync();
@@ -736,20 +709,38 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(queued).encode(16, { sequence: 15, state }));
     expect(ws.close).not.toHaveBeenCalled();
     expect(manager.getPlayer('pilot-1')?.ship.fuel).toBe(23);
-    acknowledge(ws, 1);
+    acknowledge(ws);
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     const statePilot = state.entities[1];
     assert.ok(statePilot, 'state pilot entity');
     expect(manager.getPlayer('pilot-1')?.ship.fuel).toBe(statePilot.fuel);
     expect(ws.close).not.toHaveBeenCalled();
-    manager.disconnect();
-    const old = await connect(false);
-    acknowledge(old);
-    old.receive('snapshot', new SnapshotEncoder(state).encode(1));
-    expect(old.close).toHaveBeenCalledWith(1002, 'Snapshot was not negotiated');
-    manager.disconnect();
-    const unsupported = await connect(true);
-    acknowledge(unsupported, 2);
-    expect(unsupported.close).toHaveBeenCalledWith(1002, 'Unsupported snapshot negotiation');
+  });
+
+  test.each([
+    {
+      label: 'snapshot version',
+      snapshotVersion: 2,
+      asteroidInteractions: 1,
+      resumeToken: 'a'.repeat(64),
+    },
+    {
+      label: 'asteroid interaction capability',
+      snapshotVersion: 1,
+      asteroidInteractions: 2,
+      resumeToken: 'a'.repeat(64),
+    },
+    { label: 'resume token', snapshotVersion: 1, asteroidInteractions: 1, resumeToken: 'short' },
+  ])('fails closed when the joined acknowledgment omits a valid $label', async (ack) => {
+    const ws = await connect();
+    ws.receive('joined', {
+      id: manager.getClientId(),
+      name: 'Runtime pilot',
+      position: { x: 0, y: 0 },
+      color: '#fff',
+      ...ack,
+    });
+    expect(ws.close).toHaveBeenCalled();
+    expect(manager.isConnected()).toBe(false);
   });
 });

@@ -82,7 +82,7 @@ export const articles: WikiArticle[] = [
       'src/constants/index.ts',
       'server/core/GameEngine.ts',
       'shared-types.ts',
-      'tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts',
+      'tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts',
     ],
     media: [],
   },

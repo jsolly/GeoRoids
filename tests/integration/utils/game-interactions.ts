@@ -1395,23 +1395,6 @@ export class GameInteractions {
     );
   }
 
-  /** Number of active lasers on the local ship. */
-  async getLocalLaserCount(): Promise<number> {
-    return this.getLaserCount();
-  }
-
-  /** @deprecated Use waitForRandomRespawnPlacement when asserting respawn location. */
-  async waitForShipRespawn(
-    deathPosition?: { x: number; y: number },
-    timeoutMs = 60000
-  ): Promise<{ x: number; y: number }> {
-    if (deathPosition) {
-      return this.waitForRandomRespawnPlacement(deathPosition, timeoutMs);
-    }
-    await this.waitForShipAlive(timeoutMs);
-    return this.getShipPosition();
-  }
-
   /** Whether the main game loop is still running. */
   async isGameRunning(): Promise<boolean> {
     return await this.page.evaluate(() => {
@@ -1619,7 +1602,7 @@ export class GameInteractions {
       if ((await this.getLives()) < livesBefore) {
         await this.requireObservedDeathCause('boundary');
         if ((await this.getLives()) > 0 && (await this.isGameRunning())) {
-          await this.waitForShipRespawn(deathPosition, 25000);
+          await this.waitForRandomRespawnPlacement(deathPosition, 25000);
         }
         return { x: deathPosition.x, y: deathPosition.y };
       }

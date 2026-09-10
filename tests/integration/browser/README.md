@@ -11,7 +11,7 @@ From the GeoRoids checkout:
 
 ```sh
 npm run test:integration:browser
-./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-hud.test.ts --reporter=verbose
+./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose
 ```
 
 The runner requires unused configured ports and an installed Playwright Chromium

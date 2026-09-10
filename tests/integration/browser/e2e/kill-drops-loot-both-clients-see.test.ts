@@ -54,10 +54,15 @@ test(
     await game1.waitForCombatReady();
     await game2.waitForCombatReady();
     victimId = await game2.getLocalPlayerId();
+    expect(await game1.getRemoteHumanPlayerIds()).toContain(victimId);
     livesBefore = await game2.getLives();
+    const shooterLivesBefore = await game1.getLives();
     const previousLoot = new Set((await game1.getLoot()).map((drop) => drop.id));
     const scoreBefore = await game1.getScore();
     for (let shot = 0; shot < 8 && (await game2.getLives()) === livesBefore; shot++) {
+      expect(await game1.getLives(), 'the shooter must stay alive to receive kill credit').toBe(
+        shooterLivesBefore
+      );
       await game2.placeShipAt(1800, 1800);
       const target = await game2.getShipPosition();
       await game1.placeShipAt(target.x - 120, target.y);
@@ -68,6 +73,9 @@ test(
       await page2.waitForTimeout(350);
     }
     await expect.poll(() => game2.getLives(), { timeout: 5000 }).toBeLessThan(livesBefore);
+    expect(await game1.getLives(), 'the credited shooter should still be alive').toBe(
+      shooterLivesBefore
+    );
     await expect
       .poll(() => game1.getScore(), { timeout: 5000 })
       .toBeGreaterThanOrEqual(scoreBefore + 200);

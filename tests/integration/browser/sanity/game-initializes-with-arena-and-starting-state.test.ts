@@ -6,7 +6,7 @@ import { TestConfig } from '../../utils/test-config';
 const { browserManager } = createBrowserScenarioHooks();
 
 test(
-  'game initializes with arena and hud',
+  'game initializes with arena and starting player state',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {

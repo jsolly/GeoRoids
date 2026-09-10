@@ -1,5 +1,5 @@
 {
-  "note": "Hauler E prefers a reachable rock over a hostile ship, keeps the cream cable while the hull explodes, and holds an unacked latch across an empty-belt flap.",
+  "note": "Hauler cream #E8D5A3 and tip #FDE68A are painted as same-module literals in drawHaulerHarpoonVfx so Rolldown cannot rename them across the asteroidPhenomena split. Article rules unchanged; no GIF regeneration.",
   "hashes": {
     "docs/asteroid-interactions.md": "sha256:3ad1ad530584fcb003b3b73f5ba90d32536c057bccf86c2054363ecf9d80f3c3",
     "docs/protocol/snapshot-v1.md": "sha256:b23ead8eeaa54c52b18ab778b60b296a0e21c707035fea0ea62f673b4f057d51",
@@ -121,7 +121,7 @@
     "src/entities/ship/hullOutlines.ts": "sha256:92666382a9677c54d44560702c3e3c3f0d88066a6c2180b97ba281453e8480f3",
     "src/entities/ship/shipAbilities.ts": "sha256:e42d9a39fdd2afa3bd063e66cf67d5b6248fedb8075e49bd4e0999b39b2827a0",
     "src/entities/ship/shipKits.ts": "sha256:e6f22386ebde53e1dad999f2ce7a08d586de35768424d9f4913aea21fcdab610",
-    "src/entities/ship/shipRenderer.ts": "sha256:1684751f0d7d14a678f03411b4a22955635fe5b725620cdb10d866b3b3fc1c32",
+    "src/entities/ship/shipRenderer.ts": "sha256:ba8fa96f3efc8dffba1f8d453b32249c5de5d95f60c50c7219bda011dfdef0c6",
     "src/entities/ship/shipShield.ts": "sha256:1a04a285327bd227e93759ebc23bcd4c65e810134ca57a55b5a84d1669840c5a",
     "src/entities/ship/shipUtils.ts": "sha256:9c148326af2060ab11fd2bb3bc463baabaaccc057480a7c42eabcc83c685abc6",
     "src/fx/ShockwaveManager.ts": "sha256:b3f92e5bd77f34cce5a60b2a46b50290f6029dcf22c6bb352baa4beb6a35ae4e",
@@ -261,7 +261,7 @@
     "tests/unit/ui/asteroidToolsController.test.ts": "sha256:4903ad04fe59ea647934fd27328011ac2a38a1919c9935e7ba37554ec27d1f14",
     "tests/unit/ui/disconnecting-clears-direct-flight-controls.test.ts": "sha256:aa9a4d16e3f33cd652d5a9c42437d6e2017317cf4f9e70c880c9be2a2310bda1",
     "tests/unit/ui/flightFeedback.test.ts": "sha256:8580ed4dda47fb560e903b90a9dfb00bdffc4236ae6793b966d073a1aae9e3b3",
-    "vite.config.ts": "sha256:d3482f5aabe17fcfc1b11c090a796c076c65949d197eec0effa4d604d975e4b0",
+    "vite.config.ts": "sha256:14b4ad6221d77d0588f719c52d41ee0a47a8188ee798684bb97b939ecd90aa2b",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"
   }
 }

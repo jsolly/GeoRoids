@@ -1,6 +1,35 @@
 import { execFileSync } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
+
+const HAULER_TETHER_HEXES = ['#E8D5A3', '#FDE68A'] as const;
+
+/** Fail the client build if Rolldown drops or cross-chunk-aliases the cream/tip hexes. */
+function requireHaulerTetherHexes(): Plugin {
+  return {
+    name: 'require-hauler-tether-hexes',
+    generateBundle(_options, bundle) {
+      const gameChunks = Object.values(bundle).filter(
+        (item) => item.type === 'chunk' && item.fileName.startsWith('assets/game-')
+      );
+      if (gameChunks.length === 0) {
+        throw new Error('require-hauler-tether-hexes: no assets/game-*.js chunk emitted');
+      }
+      for (const chunk of gameChunks) {
+        if (chunk.type !== 'chunk') {
+          continue;
+        }
+        const missing = HAULER_TETHER_HEXES.filter((hex) => !chunk.code.includes(hex));
+        if (missing.length > 0) {
+          throw new Error(
+            `Hauler cream/tip hexes missing from ${chunk.fileName}: ${missing.join(', ')}`
+          );
+        }
+      }
+    },
+  };
+}
 
 /** Match the production wiki rewrite in development and build previews. */
 function wikiEntry(request: IncomingMessage, _response: ServerResponse, next: () => void): void {
@@ -37,6 +66,7 @@ export default defineConfig(() => {
 
   return {
     plugins: [
+      requireHaulerTetherHexes(),
       {
         name: 'wiki-entry',
         configureServer(server) {

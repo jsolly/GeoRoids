@@ -1,12 +1,12 @@
 {
-  "note": "Reviewed the reconciled cleanup against released 60 Hz simulation, held-control death/respawn behavior, logical viewport rendering, and current generated media. Verified desktop 1280x900 and mobile 390x844 wiki navigation, content and ships overview aria-current, survival copy, shield animation play/pause, image loading and no horizontal overflow; verified keyboard flight/fire and mobile fire/dash/shield with clean browser warnings/errors. Full integration covered 114 scenarios with two fixture corrections verified by four passing rerun scenarios.",
+  "note": "Reviewed ws 8.21.0 to 8.21.3 release changes (fragment limits and compression negotiation) against the 64 KiB server boundary and existing client protocol. No manual rules or demonstrations changed. Type/lint checks and 18 server plus desktop/mobile manual scenarios passed, including links, media controls and viewport layouts.",
   "hashes": {
     "docs/asteroid-interactions.md": "sha256:e194af03fd426535bba360412be47c94d1a59da3124f9c35be8522e83a8aa7d2",
     "docs/protocol/snapshot-v1.md": "sha256:287d7033809de09e2c1ede2103825d33481af4b8d8b7fe4a91c49c27b8c649f1",
     "index.css": "sha256:0ec592aad2130584ebc325081b98ddc35d5ef01433cd4c11c36bfb2558146e75",
     "index.html": "sha256:1e9a28f3bb2767ef827d1ad7f5122c2685c7abbe29e84e6fbcf1cbfb90d294f3",
     "middleware.ts": "sha256:c095e1d7e225b2725485b594f70882a24dfd5c1a54ba0bfa9838c6bab4398e50",
-    "package.json": "sha256:03a4317629e1fc86f84d287634ddc3762df115036ba9327a7373daaa77f7a8a2",
+    "package.json": "sha256:ae8dfeca9a7577bf5e652ce30ff8afa890ae7bc69cdb87fec90e12a899524735",
     "public/wiki/media/dart.gif": "sha256:b49901dbff98d9f6b4c8193aeb52a4b3c2a4c1359c7f5e6ac4a16c58329e18f8",
     "public/wiki/media/dart.png": "sha256:e39c08e1cd0d316f6a5c2ab078f844a37145cf4305aa1ea54ffef57ef50667a6",
     "public/wiki/media/hauler.gif": "sha256:094cb52f7b076b9a26e6870a8ed6afa27f1805aef4a02843154be9fe4f3678ac",

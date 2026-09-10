@@ -87,7 +87,7 @@ jobs:
             --output behavioral-artifacts/mobile-combat.json 2>&1 | tee behavioral-artifacts/mobile-combat.log
       - name: Upload behavioral artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: behavioral-smoke-${{ github.run_id }}
           path: behavioral-artifacts
@@ -107,7 +107,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.1.0
       - run: npm ci
       - run: npm run check:actions
       - run: npm run check:lint-policy

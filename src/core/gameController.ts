@@ -57,7 +57,6 @@ import {
   bindAsteroidFieldApply,
   unbindAsteroidFieldApply,
 } from '../network/services/asteroidFieldSync';
-import { asteroidTickScale } from '../physics/asteroidMotion';
 import { shouldReportLaserAsteroidHit } from '../physics/collision/asteroidHitFeel';
 import {
   CollisionManager,
@@ -111,7 +110,7 @@ export class GameController {
   private gameOverInProgress = false;
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
-  private lifecycleAccumulatorMs = 0;
+  private simulationAccumulatorMs = 0;
   private readonly asteroidToolsController: AsteroidToolsController;
   private flightFeedback: FlightFeedback | null = null;
   private asteroidGestures: AsteroidGestures | null = null;
@@ -402,7 +401,7 @@ export class GameController {
   // Game lifecycle methods
   newGame(playerName?: string, kitId?: ShipKitId): void {
     clearAsteroidShatters();
-    this.lifecycleAccumulatorMs = 0;
+    this.simulationAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
     this.asteroidToolsController.update({
@@ -1106,7 +1105,7 @@ export class GameController {
 
   /** Resume from current authoritative state instead of replaying hidden presentation time. */
   resetPresentationClock(): void {
-    this.lifecycleAccumulatorMs = 0;
+    this.simulationAccumulatorMs = 0;
   }
 
   // Update game state (movement, physics, etc.)
@@ -1117,25 +1116,30 @@ export class GameController {
     }
 
     const elapsed = Number.isFinite(dtMs) ? Math.max(0, dtMs) : 1000 / GAME.FPS;
-    this.lifecycleAccumulatorMs += elapsed;
-    const { frames: lifecycleFrames, remainingMs } = consumeTickAccumulator(
-      this.lifecycleAccumulatorMs
-    );
-    this.lifecycleAccumulatorMs = remainingMs;
+    this.simulationAccumulatorMs += elapsed;
+    const { frames, remainingMs } = consumeTickAccumulator(this.simulationAccumulatorMs);
+    this.simulationAccumulatorMs = remainingMs;
 
+    for (let frame = 0; frame < frames; frame++) {
+      this.advanceSimulationFrame(currPlayer);
+    }
+  }
+
+  /** Movement, timers, and swept collisions share one 60 Hz step. */
+  private advanceSimulationFrame(currPlayer: Player): void {
     tickTouchControls(currPlayer);
-    currPlayer.ship.update(lifecycleFrames);
+    currPlayer.ship.update();
     shockwaveManager.update();
 
-    // Bots predict locally; remotes share the same 60 Hz explode/blink clock
-    // so a hitch does not freeze their corpse or latch blink forever.
+    // Remote pose remains server-driven; their projectiles and lifecycle
+    // advance on the same simulation clock as the local ship.
     const allPlayers = this.networkManager.getAllPlayers();
     for (const player of allPlayers) {
       if (player.type === 'bot' && player.ship) {
-        player.ship.update(lifecycleFrames);
+        player.ship.update();
       }
     }
-    advanceRemotePlayerShips(allPlayers, lifecycleFrames);
+    advanceRemotePlayerShips(allPlayers);
 
     // One thrust loop for local + bot + remote ships; volume is the loudest in-range source.
     replaceThrustSources(
@@ -1146,7 +1150,7 @@ export class GameController {
 
     // Update asteroids
     if (this.currRoidBelt) {
-      this.currRoidBelt.moveRoids(asteroidTickScale(dtMs));
+      this.currRoidBelt.moveRoids();
       this.publishLiveHarpoonField(currPlayer);
     }
 

@@ -741,12 +741,9 @@ class Ship {
     }
   }
 
-  /**
-   * @param lifecycleFrames whole 60 Hz steps for explode / blink / regen.
-   * Movement still runs once per display frame so high-refresh stays smooth.
-   */
-  update(lifecycleFrames = 1): void {
-    this.updateLifecycle(lifecycleFrames);
+  /** Advance one 60 Hz simulation step, including movement and combat timers. */
+  update(): void {
+    this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
       return;
     }

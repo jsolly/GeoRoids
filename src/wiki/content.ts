@@ -627,6 +627,12 @@ export const articles: WikiArticle[] = [
         ],
       },
       {
+        heading: 'Display refresh rate',
+        paragraphs: [
+          'Flight, projectiles, shields, and HUD message timers advance at 60 simulation steps per second. A faster display does not increase ship speed or shorten cooldowns. After a visible stall, the client catches up at most one second of simulation; switching back from a hidden tab instead resumes from current server state.',
+        ],
+      },
+      {
         heading: 'Connection interruptions',
         paragraphs: [
           'Switching away from the game releases held movement and fire controls. On return, the client requests current server state and resumes drawing without replaying the time the tab was hidden.',
@@ -642,6 +648,9 @@ export const articles: WikiArticle[] = [
     ],
     related: ['field-manual', 'controls', 'asteroid-tools', 'combat-survival', 'factions'],
     sources: [
+      'shared/gameClock.ts',
+      'src/core/eventLoop.ts',
+      'src/core/gameController.ts',
       'src/rendering/hud/gameInfo.ts',
       'src/ui/mainMenu.ts',
       'src/entities/ship/shipRenderer.ts',

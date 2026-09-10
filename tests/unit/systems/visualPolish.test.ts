@@ -371,8 +371,8 @@ test('a destroyed dart breaks into drifting hull edges, an expanding ring and un
 test('remote ship lifecycle advances on the shared update clock', () => {
   const remote = pilot('remote-visual', 'remote');
   const updateLifecycle = vi.spyOn(remote.ship, 'updateLifecycle');
-  advanceRemotePlayerShips([remote], 3);
-  expect(updateLifecycle).toHaveBeenCalledWith(3);
+  advanceRemotePlayerShips([remote]);
+  expect(updateLifecycle).toHaveBeenCalledOnce();
 });
 
 test('terrain and contour laser renderers emit finite muted strokes at runtime', () => {

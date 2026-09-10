@@ -72,7 +72,7 @@
     "typescript": "^7.0.2",
     "uuid": "^14.0.2",
     "vite": "^8.2.2",
-    "ws": "^8.21.0"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",

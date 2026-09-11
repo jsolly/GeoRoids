@@ -1,5 +1,6 @@
 import type { Position } from '../../shared-types';
 import { PALETTE } from '../constants';
+import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
@@ -21,6 +22,7 @@ import {
 import { shouldDrawShipHull } from '../entities/ship/shipUtils';
 import { NetworkManager } from '../network/networkManager';
 import { Point } from '../physics/Point';
+import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { getFactionColor, getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
 import { drawFieryBoundary } from './boundaryRenderer';
@@ -41,6 +43,7 @@ import {
   type PlayfieldSize,
   projectWorldToScreenInto,
 } from './playfieldCamera';
+import { configureRenderQuality } from './renderQuality';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawStarfield } from './starfield';
 
@@ -108,7 +111,10 @@ class CanvasManager {
       return false;
     }
     const { width, height } = this.viewportSize();
-    const dpr = this.currentDevicePixelRatio();
+    const deviceDpr = this.currentDevicePixelRatio();
+    const touchControls = shouldUseTouchControls();
+    const quality = configureRenderQuality(window.location.search, touchControls);
+    const dpr = quality.maxDpr === 'native' ? deviceDpr : Math.min(deviceDpr, quality.maxDpr);
     const backingWidth = Math.max(1, Math.round(width * dpr));
     const backingHeight = Math.max(1, Math.round(height * dpr));
     const backingSizeChanged =
@@ -138,6 +144,18 @@ class CanvasManager {
       this.context?.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     this.devicePixelRatio = dpr;
+    clientPerformance.setGraphicsSettings({
+      deviceDpr,
+      effectiveDpr: dpr,
+      maxDpr: quality.maxDpr,
+      glow: quality.glow,
+      source: quality.source,
+      touchControls,
+      cssWidth: width,
+      cssHeight: height,
+      backingWidth,
+      backingHeight,
+    });
     return backingSizeChanged || devicePixelRatioChanged;
   }
 
@@ -173,6 +191,7 @@ class CanvasManager {
     this.viewport.width = 1;
     this.viewport.height = 1;
     this.devicePixelRatio = 1;
+    configureRenderQuality('', false);
   }
 
   // Safe accessor methods for canvas and context
@@ -306,9 +325,12 @@ class CanvasManager {
       drawRoidsRelative(currShip, roids);
     }
 
-    drawLootRelative(currShip, LootField.getInstance().getAll());
-    drawSatellites(SatelliteManager.getInstance().getAll(), currShip.position);
-    drawSatellitePickups(SatellitePickupManager.getInstance().getAll(), currShip.position);
+    const loot = LootField.getInstance().getAll();
+    const satellites = SatelliteManager.getInstance().getAll();
+    const satellitePickups = SatellitePickupManager.getInstance().getAll();
+    drawLootRelative(currShip, loot);
+    drawSatellites(satellites, currShip.position);
+    drawSatellitePickups(satellitePickups, currShip.position);
 
     const localLaserColor = getLaserColor(true);
     const enemyLaserColor = getLaserColor(false);
@@ -368,7 +390,7 @@ class CanvasManager {
     }
 
     const hudLayout = hudLayoutForCanvas(viewport);
-    drawMiniMap(ctx, hudLayout, currShip);
+    drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellites, satellitePickups);
 
     drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
 

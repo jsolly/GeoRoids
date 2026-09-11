@@ -21,6 +21,7 @@ import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
+import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileField';
 import type { Laser } from '../laser/Laser';
 import { createLaser, createLaserAtAngle } from '../laser/laserUtils';
 import { getHarpoonFieldCanvas, getHarpoonFieldScale } from './harpoonField';
@@ -244,7 +245,7 @@ class Ship {
     this.lastShotTime = Date.now();
 
     // Send shooting event to network system
-    this.sendShootEvent(laser.position, laser.velocity);
+    this.sendShootEvent(laser);
   }
 
   fireBurst(count: number, spread: number): void {
@@ -259,7 +260,7 @@ class Ship {
       if (i === 0) {
         laser.playLaserSound();
       }
-      this.sendShootEvent(laser.position, laser.velocity);
+      this.sendShootEvent(laser);
     }
     this.canShoot = false;
     this.lastShotTime = Date.now();
@@ -320,14 +321,17 @@ class Ship {
     return createLaser(this);
   }
 
-  private sendShootEvent(laserPosition: Position, laserVelocity: Velocity): void {
+  private sendShootEvent(laser: Laser): void {
     // Only send shooting events for non-bot ships
     if (!this.isBot) {
       const networkManager = NetworkManager.getInstance();
       if (networkManager.isConnected) {
         // Send dedicated shoot event to server
-        logger.debug('SHIP', 'Sending shoot event', { laserPosition, laserVelocity });
-        networkManager.sendShootEvent(laserPosition, laserVelocity);
+        logger.debug('SHIP', 'Sending shoot event', {
+          position: laser.position,
+          velocity: laser.velocity,
+        });
+        networkManager.sendShootEvent(laser);
       } else {
         logger.debug('SHIP', 'Network not connected, cannot send shoot event');
       }
@@ -544,6 +548,9 @@ class Ship {
 
   /** Advance one 60 Hz simulation step, including movement and combat timers. */
   update(): void {
+    if (this.isLocalPlayer) {
+      AuthoritativeProjectileField.getInstance().expirePendingShots();
+    }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {
       return;

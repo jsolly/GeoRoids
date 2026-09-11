@@ -1,12 +1,21 @@
-import type { PlayerProjectileState } from '../../../shared-types';
+import { v4 as uuidv4 } from 'uuid';
+import type { PlayerProjectileState, PlayerShotAcknowledgement } from '../../../shared-types';
+import { LASER } from '../../constants';
 import type { Ship } from '../ship/Ship';
 import { Laser } from './Laser';
 
-/** Complete keyed server projectile list. Events never append duplicate bolts. */
+interface PendingShot {
+  ship: Ship;
+  laser: Laser;
+  expiresAt: number;
+}
+
+/** Server-keyed bolts plus bounded local predictions awaiting their shot receipt. */
 export class AuthoritativeProjectileField {
   private static instance: AuthoritativeProjectileField;
   private rows: PlayerProjectileState[] = [];
   private enabled = false;
+  private pending = new Map<string, PendingShot>();
   static getInstance(): AuthoritativeProjectileField {
     if (!AuthoritativeProjectileField.instance) {
       AuthoritativeProjectileField.instance = new AuthoritativeProjectileField();
@@ -28,7 +37,53 @@ export class AuthoritativeProjectileField {
   getProjectiles(): readonly PlayerProjectileState[] {
     return this.rows;
   }
+  trackShot(ship: Ship, laser: Laser): string {
+    this.expirePendingShots();
+    const requestId = uuidv4();
+    this.pending.set(requestId, {
+      ship,
+      laser,
+      expiresAt: performance.now() + LASER.PREDICTION_TIMEOUT_MS,
+    });
+    return requestId;
+  }
+
+  acknowledgeShot(ack: PlayerShotAcknowledgement): void {
+    this.expirePendingShots();
+    const pending = this.pending.get(ack.requestId);
+    if (!pending) {
+      return;
+    }
+    this.pending.delete(ack.requestId);
+    if (ack.projectileId === null) {
+      this.removePrediction(pending);
+    } else {
+      pending.laser.serverId = ack.projectileId;
+    }
+  }
+
+  private removePrediction({ ship, laser }: PendingShot): void {
+    const index = ship.lasers.indexOf(laser);
+    if (index !== -1) {
+      ship.lasers.splice(index, 1);
+    }
+  }
+
+  expirePendingShots(): void {
+    if (this.pending.size === 0) {
+      return;
+    }
+    const now = performance.now();
+    for (const [id, pending] of this.pending) {
+      if (now >= pending.expiresAt || !pending.ship.lasers.includes(pending.laser)) {
+        this.removePrediction(pending);
+        this.pending.delete(id);
+      }
+    }
+  }
+
   reconcileShip(ship: Ship, ownerId: string): void {
+    this.expirePendingShots();
     const previous = new Map(
       ship.lasers.filter((laser) => laser.serverId).map((laser) => [laser.serverId, laser])
     );
@@ -46,8 +101,17 @@ export class AuthoritativeProjectileField {
         laser.explodeTime = 0;
         return laser;
       });
+    for (const pending of this.pending.values()) {
+      if (pending.ship === ship) {
+        ship.lasers.push(pending.laser);
+      }
+    }
   }
   clear(): void {
+    for (const pending of this.pending.values()) {
+      this.removePrediction(pending);
+    }
+    this.pending.clear();
     this.rows = [];
     this.enabled = false;
   }

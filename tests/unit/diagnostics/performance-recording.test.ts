@@ -37,7 +37,11 @@ test('input latency retains the earliest event and separates hidden recovery fro
   recorder.rendered(250);
   expect(recorder.read().metrics['play.recoveryMs']?.values).toEqual([50]);
   expect(recorder.read().metrics['play.joinMs']?.values).toEqual([110]);
-  expect(recorder.read().counters).toEqual({ joinAttempts: 1, recoveryAttempts: 1 });
+  expect(recorder.read().counters).toEqual({
+    inputEvents: 2,
+    joinAttempts: 1,
+    recoveryAttempts: 1,
+  });
 });
 
 test('ordinary sessions collect no performance observations', () => {
@@ -89,4 +93,56 @@ test('intentional teardown cancels recovery without reporting a failure', () => 
     counters: { recoveryAttempts: 1 },
   });
   expect(recorder.read().counters['recoveryFailures']).toBeUndefined();
+});
+
+test('heartbeat observations distinguish successful, repeated, missing and legacy replies', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  const first = recorder.probe(10);
+  recorder.pong(first, 40);
+  recorder.pong(first, 45);
+  recorder.probe(50);
+  recorder.clearProbes();
+  recorder.pong(999, 70);
+  recorder.pong(undefined, 80);
+  expect(recorder.read().metrics['menu.rttMs']?.values).toEqual([30]);
+  expect(recorder.read().counters).toMatchObject({
+    duplicatePongs: 1,
+    unansweredProbes: 1,
+    stalePongs: 1,
+    barePongs: 1,
+  });
+});
+
+test('UTF-8 payload sizes and release/cancel observations survive interval drains', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  recorder.setPhase('play');
+  recorder.message('snapshot', 'é', 10);
+  recorder.message('snapshot', 'x', 30);
+  recorder.input(10, 'release');
+  recorder.input(11, 'cancel');
+  recorder.rendered(20);
+  const interval = recorder.read(true);
+  expect(interval.schemaVersion).toBe(2);
+  expect(interval.messageBytes).toEqual({ snapshot: 3 });
+  expect(interval.metrics['play.messageGapMs']?.values).toEqual([20]);
+  expect(interval.metrics['play.inputToRenderMs']).toBeUndefined();
+  expect(interval.counters).toMatchObject({ inputReleases: 1, inputCancellations: 1 });
+  expect(
+    Object.values(interval.phaseDurationsMs).reduce((sum, duration) => sum + duration, 0)
+  ).toBeCloseTo(interval.durationMs, 0);
+  expect(recorder.read().messageBytes).toEqual({});
+});
+
+test('a phone recording owns destructive drains while inspection remains available', () => {
+  const recorder = new ClientPerformanceMetrics(true);
+  recorder.record('renderMs', 3);
+  recorder.claimDrain('phone');
+  expect(recorder.read().metrics['menu.renderMs']?.count).toBe(1);
+  expect(() => recorder.read(true)).toThrow('Performance drain owned by phone');
+  expect(() => recorder.claimDrain('benchmark')).toThrow('Performance drain owned by phone');
+  expect(recorder.read(true, 'phone').metrics['menu.renderMs']?.count).toBe(1);
+  recorder.releaseDrain('benchmark');
+  expect(() => recorder.read(true)).toThrow();
+  recorder.releaseDrain('phone');
+  expect(() => recorder.read(true)).not.toThrow();
 });

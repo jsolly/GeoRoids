@@ -1,6 +1,7 @@
 import type {
   AsteroidMotionInput,
   AsteroidToolAction,
+  PingMessage,
   Position,
   ShipKitId,
   SoftFactionId,
@@ -10,6 +11,8 @@ import { parseSoftFactionId } from '../../src/entities/player/softFactions';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
+
+const SHOT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 interface PlayerMovementUpdate {
   position?: Position;
@@ -50,14 +53,20 @@ export type ClientCommand =
       motionEpoch?: number;
       motionSequence?: number;
     }
-  | { type: 'shoot'; id: string; laserStart: Position; laserDirection: Velocity }
+  | {
+      type: 'shoot';
+      id: string;
+      laserStart: Position;
+      laserDirection: Velocity;
+      requestId?: string;
+    }
   | { type: 'shield'; id: string; active: boolean }
   | { type: 'chat'; id: string; message: string }
   | { type: 'collisionDamage'; targetPlayerId: string; attackerId: string }
   | { type: 'satellitePickupCollected'; pickupId: string; claimedPlayerId?: string }
   | { type: 'initAsteroids'; id: string }
   | { type: 'clientLog'; payload: WireRecord }
-  | { type: 'ping' };
+  | PingMessage;
 
 type ClientCommandDecodeResult =
   | { ok: true; command: ClientCommand }
@@ -322,8 +331,17 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
     }
     case 'leave':
     case 'snapshotResync':
-    case 'ping':
       return { ok: true, command: { type } };
+    case 'ping': {
+      const probeId = message['probeId'];
+      if (
+        probeId !== undefined &&
+        (typeof probeId !== 'number' || !Number.isSafeInteger(probeId) || probeId < 1)
+      ) {
+        return { ok: false, error: 'Invalid ping probeId' };
+      }
+      return { ok: true, command: { type, ...(typeof probeId === 'number' ? { probeId } : {}) } };
+    }
     case 'asteroidTool':
       return decodeAsteroidTool(payload);
     case 'asteroidInput':
@@ -338,10 +356,29 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       if (!id) {
         return invalid(type, 'Missing player ID for shoot');
       }
+      const rawRequestId = fields['requestId'];
+      if (
+        rawRequestId !== undefined &&
+        (typeof rawRequestId !== 'string' ||
+          rawRequestId.length < 1 ||
+          rawRequestId.length > 64 ||
+          !SHOT_REQUEST_ID_PATTERN.test(rawRequestId))
+      ) {
+        return invalid(type, 'Invalid shoot request ID');
+      }
       const laserStart = readFinitePosition(fields['laserStart']);
       const laserDirection = readFinitePosition(fields['laserDirection']);
       return laserStart && laserDirection
-        ? { ok: true, command: { type, id, laserStart, laserDirection } }
+        ? {
+            ok: true,
+            command: {
+              type,
+              id,
+              laserStart,
+              laserDirection,
+              ...(typeof rawRequestId === 'string' ? { requestId: rawRequestId } : {}),
+            },
+          }
         : invalid(type, 'Missing finite laser coordinates for shoot');
     }
     case 'shield':

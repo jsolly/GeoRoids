@@ -197,7 +197,7 @@ export class AsteroidMotionPrediction {
   }
 
   /** Build from the actual post-poll Ship input. Angular-velocity sign carries
-   * keyboard/touch turning; aimAngle is the actual current mouse/stick heading.
+   * keyboard/touch turning; aimAngle is the actual current mouse/touch heading.
    * Multiple action packets in one 60Hz frame receive zero additional motion dt.
    */
   public buildInput(

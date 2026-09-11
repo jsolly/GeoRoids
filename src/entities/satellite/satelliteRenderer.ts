@@ -2,6 +2,7 @@ import type { Position } from '../../../shared-types';
 import { PALETTE, SATELLITE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
+import { resolveGlow } from '../../rendering/renderQuality';
 import { hexToRgba } from '../../utils/colorUtils';
 import { drawLaserBolts } from '../ship/shipRenderer';
 import { drawEoSatelliteOutline } from './eoOutlines';
@@ -32,7 +33,7 @@ function drawSatellite(satellite: Satellite, viewer: Position): void {
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.SHIP_GLOW;
+  ctx.shadowBlur = resolveGlow(VISUAL.SHIP_GLOW);
   drawEoSatelliteOutline(
     ctx,
     satellite.typeId,
@@ -66,7 +67,7 @@ function drawSatelliteExplosion(
   ctx.save();
   ctx.strokeStyle = hexToRgba(color, alpha);
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.EXPLOSION_STROKE_WIDTH;
+  ctx.shadowBlur = resolveGlow(VISUAL.EXPLOSION_STROKE_WIDTH);
   ctx.lineWidth = VISUAL.EXPLOSION_STROKE_WIDTH;
   ctx.lineCap = 'butt';
 

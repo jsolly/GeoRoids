@@ -2,6 +2,7 @@ import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import type { DrawingContext } from '../../rendering/drawingContext';
+import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
   easeOutCubic,
@@ -93,7 +94,7 @@ export function strokePhosphorPolyline(
   ctx.lineCap = 'round';
   ctx.lineWidth = VISUAL.SHIP_STROKE_WIDTH;
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.SHIP_GLOW;
+  ctx.shadowBlur = resolveGlow(VISUAL.SHIP_GLOW);
   ctx.strokeStyle = hexToRgba(color, 0.4);
   trace();
   ctx.stroke();
@@ -163,7 +164,7 @@ export function strokePhosphorSegment(
   ctx.lineCap = 'round';
   ctx.lineWidth = width;
   ctx.shadowColor = color;
-  ctx.shadowBlur = glow;
+  ctx.shadowBlur = resolveGlow(glow);
   ctx.strokeStyle = hexToRgba(color, 0.5 * alpha);
   trace();
   ctx.stroke();
@@ -325,7 +326,7 @@ function drawVectorExplosion(
   ctx.save();
   ctx.strokeStyle = hexToRgba(color, alpha * 0.85);
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.EXPLOSION_STROKE_WIDTH + 1;
+  ctx.shadowBlur = resolveGlow(VISUAL.EXPLOSION_STROKE_WIDTH + 1);
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(x, y, radius * (0.55 + pop * VISUAL.EXPLOSION_RING_RATIO), 0, Math.PI * 2);
@@ -335,7 +336,7 @@ function drawVectorExplosion(
   ctx.save();
   ctx.strokeStyle = hexToRgba(color, alpha);
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.EXPLOSION_STROKE_WIDTH;
+  ctx.shadowBlur = resolveGlow(VISUAL.EXPLOSION_STROKE_WIDTH);
   ctx.lineWidth = VISUAL.EXPLOSION_STROKE_WIDTH;
   ctx.lineCap = 'round';
 
@@ -495,7 +496,7 @@ export function drawLaserBolts(
       const alpha = 1 - t * 0.7;
       ctx.save();
       ctx.shadowColor = color;
-      ctx.shadowBlur = VISUAL.LASER_GLOW;
+      ctx.shadowBlur = resolveGlow(VISUAL.LASER_GLOW);
       ctx.strokeStyle = hexToRgba(color, alpha);
       ctx.lineWidth = 1.25;
       ctx.beginPath();
@@ -739,7 +740,7 @@ export function drawShipShield(
     ctx.lineCap = 'round';
     ctx.lineWidth = flashing ? VISUAL.SHIELD_STROKE_WIDTH + 0.5 : VISUAL.SHIELD_STROKE_WIDTH;
     ctx.shadowColor = PALETTE.SHIELD;
-    ctx.shadowBlur = VISUAL.SHIELD_GLOW;
+    ctx.shadowBlur = resolveGlow(VISUAL.SHIELD_GLOW);
     ctx.strokeStyle = hexToRgba(PALETTE.SHIELD, flashing ? SHIELD.FLASH_ALPHA : SHIELD.IDLE_ALPHA);
     ctx.beginPath();
     ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
@@ -779,7 +780,7 @@ function drawShipImpactFlash(
   ctx.strokeStyle = hexToRgba(PALETTE.DANGER, alpha);
   ctx.lineWidth = 1.15;
   ctx.shadowColor = PALETTE.DANGER;
-  ctx.shadowBlur = VISUAL.SHIP_GLOW + 1;
+  ctx.shadowBlur = resolveGlow(VISUAL.SHIP_GLOW + 1);
   ctx.beginPath();
   ctx.arc(screenX, screenY, ring, 0, Math.PI * 2);
   ctx.stroke();

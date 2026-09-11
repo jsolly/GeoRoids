@@ -25,6 +25,7 @@ cleanup() {
         wait "$LISTENER_PID" 2>/dev/null || true
     fi
     for pid_file in \
+        "$MOCK_DEV_PID_FILE.proxy" \
         "$MOCK_TEST_CHILD_PID_FILE" \
         "$MOCK_TEST_PID_FILE" \
         "$MOCK_DEV_CHILD_PID_FILE" \
@@ -209,6 +210,16 @@ EOF
     cat > "$MOCK_BIN/npx" <<'EOF'
 #!/usr/bin/env bash
 case " $* " in
+    *" tsx scripts/benchmark-proxy.ts "*)
+        printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.proxy"
+        printf '%s\n' "$GEOROIDS_BENCHMARK_SESSION" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.session"
+        while [ "$#" -gt 0 ]; do
+            if [ "$1" = --ready ]; then shift; printf '59995' > "$1"; fi
+            shift
+        done
+        trap 'exit 0' TERM INT
+        while :; do sleep 30 & wait $! || true; done
+        ;;
     *" concurrently "*)
         printf '%s\n' "$$" > "$GEOROIDS_CONTRACT_DEV_PID_FILE"
         trap '' TERM
@@ -245,6 +256,7 @@ EOF
 #!/usr/bin/env bash
 [ "$*" = "run build" ] || exit 70
 printf '%s\n' "$VITE_WEBSOCKET_URL" > "$GEOROIDS_CONTRACT_DEV_PID_FILE.build"
+if [ "$GEOROIDS_CONTRACT_MODE" = build-failure ]; then exit 19; fi
 EOF
 
     cat > "$MOCK_BIN/ps" <<'EOF'
@@ -317,7 +329,7 @@ run_mock_runner() {
         "$MOCK_TEST_PID_FILE" \
         "$MOCK_DEV_CHILD_PID_FILE" \
         "$MOCK_TEST_CHILD_PID_FILE" \
-        "$MOCK_FAILURE_MARKER_FILE"
+        "$MOCK_FAILURE_MARKER_FILE" "$MOCK_DEV_PID_FILE.proxy" "$MOCK_DEV_PID_FILE.session"
     env \
         PATH="$MOCK_BIN:$PATH" \
         GEOROIDS_CONTRACT_MODE="$mode" \
@@ -438,6 +450,21 @@ assert_cleanup_failure_preserves_test_failure() {
     assert_pid_stopped "$MOCK_TEST_PID_FILE" "failed mock test"
     assert_pid_stopped "$MOCK_DEV_PID_FILE" "nonzero cleanup-failure dev server"
     assert_pid_stopped "$MOCK_DEV_CHILD_PID_FILE" "nonzero cleanup-failure dev-server child"
+    assert_lock_released
+}
+
+assert_impaired_benchmark_cleanup() {
+    local mode="$1"
+    local expected="$2"
+    local output_file="$TEMP_DIR/proxy-$mode.txt"
+    local status=0
+    local session
+    run_mock_runner "$mode" 1 "$output_file" --benchmark-client --network degraded --seconds 1 || status=$?
+    [ "$status" -eq "$expected" ] || { cat "$output_file" >&2; fail "proxy $mode exit $status, expected $expected"; }
+    grep -Fxq 'ws://localhost:59995/ws' "$MOCK_DEV_PID_FILE.build" || fail 'client build bypassed ready proxy'
+    assert_pid_stopped "$MOCK_DEV_PID_FILE.proxy" "proxy $mode"
+    IFS= read -r session < "$MOCK_DEV_PID_FILE.session"
+    [ ! -e "$session" ] || fail "proxy $mode leaked private session directory"
     assert_lock_released
 }
 
@@ -580,6 +607,9 @@ assert_vitest_config "server-only" vitest.config.ts tests/integration/server/
 assert_vitest_config "entities-only" vitest.config.ts tests/integration/entities/
 assert_vitest_config "server-and-entities" vitest.config.ts \
     tests/integration/server/ tests/integration/entities/
+assert_impaired_benchmark_cleanup success 0
+assert_impaired_benchmark_cleanup build-failure 1
+assert_impaired_benchmark_cleanup timeout 124
 assert_live_benchmark_mode benchmark-client realtime-client
 assert_live_benchmark_mode benchmark-load load
 assert_test_timeout_cleans_owned_processes

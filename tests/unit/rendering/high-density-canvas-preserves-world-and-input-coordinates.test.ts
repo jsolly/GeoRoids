@@ -80,7 +80,9 @@ function installControlledMatchMedia(): void {
       mediaQuery.dispatchEvent(new Event('change'));
     };
     mediaQuery.listenerCount = (): number => listeners.size;
-    mediaQueries.push(mediaQuery);
+    if (query.startsWith('(resolution:')) {
+      mediaQueries.push(mediaQuery);
+    }
     return mediaQuery;
   }) as typeof window.matchMedia;
 }

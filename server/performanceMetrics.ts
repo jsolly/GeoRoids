@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { monitorEventLoopDelay, PerformanceObserver, performance } from 'node:perf_hooks';
 import { logger } from '../setup/serverLogger';
 import { SERVER_RELEASE_ID } from './release';
@@ -6,6 +7,7 @@ export const PERFORMANCE_EXPORT_INTERVAL_MS = 15_000;
 const PERFORMANCE_EVENT_LOOP_RESOLUTION_MS = 20;
 
 type PerformanceHistogramName =
+  | 'transportAcceptanceMs'
   | 'tickDurationMs'
   | 'timerLatenessMs'
   | 'catchupTicks'
@@ -23,6 +25,7 @@ type PerformanceHistogramName =
   | 'outboundPayloadBytes';
 
 const METRICS = [
+  'transportAcceptanceMs',
   'tickDurationMs',
   'timerLatenessMs',
   'catchupTicks',
@@ -40,6 +43,7 @@ const METRICS = [
   'outboundPayloadBytes',
 ] as const satisfies readonly PerformanceHistogramName[];
 const BOUNDS: Record<PerformanceHistogramName, readonly number[]> = {
+  transportAcceptanceMs: [0, 1, 2, 4, 8, 16, 33, 50, 100, 250, 1000, 5000],
   tickDurationMs: [0.25, 0.5, 1, 2, 4, 8, 16.667, 33.333, 50, 100, 250, 500, 1000, 5000],
   timerLatenessMs: [0.25, 0.5, 1, 2, 4, 8, 16.667, 33.333, 50, 100, 250, 500, 1000, 5000],
   catchupTicks: [0, 1, 2, 4, 8, 16, 30, 60],
@@ -138,7 +142,14 @@ interface MemorySample {
 export interface ServerPerformanceSummary {
   version: 1;
   releaseId: string;
-  window: { startedAt: string; endedAt: string; durationMs: number };
+  window: {
+    startedAt: string;
+    endedAt: string;
+    durationMs: number;
+    id?: string;
+    finalized?: boolean;
+  };
+  closedWindows?: ServerPerformanceSummary[];
   counters: PerformanceCounters;
   histograms: Record<PerformanceHistogramName, PerformanceHistogramSummary>;
   eventLoop: EventLoopSummary;
@@ -323,6 +334,9 @@ const OUTCOME_COUNTER: Record<
 };
 
 export class ServerPerformanceMetrics {
+  private readonly processId = randomUUID();
+  private windowSequence = 0;
+  private readonly closedWindows: ServerPerformanceSummary[] = [];
   private readonly enabledFlag: boolean;
   private readonly now: () => number;
   private readonly wallNow: () => number;
@@ -385,6 +399,7 @@ export class ServerPerformanceMetrics {
     this.gcObserver?.disconnect();
     this.gcObserver = undefined;
     this.reset();
+    this.closedWindows.length = 0;
   }
   recordTickDuration(value: number): void {
     if (this.enabledFlag) {
@@ -506,8 +521,16 @@ export class ServerPerformanceMetrics {
       this.counters.invalidMetricSamples++;
     }
   }
+  recordTransportAcceptance(milliseconds: number): void {
+    if (this.enabledFlag && !this.hist.transportAcceptanceMs.record(milliseconds)) {
+      this.counters.invalidMetricSamples++;
+    }
+  }
+
   read(): ServerPerformanceSummary {
-    return this.enabledFlag ? this.summary(memory(this.memoryUsage)) : this.emptySummary();
+    return this.enabledFlag
+      ? { ...this.summary(memory(this.memoryUsage)), closedWindows: [...this.closedWindows] }
+      : this.emptySummary();
   }
   drain(): ServerPerformanceSummary {
     if (!this.enabledFlag) {
@@ -516,6 +539,12 @@ export class ServerPerformanceMetrics {
     const m = memory(this.memoryUsage);
     this.recordMemorySample(m);
     const result = this.summary(m);
+    result.window.finalized = true;
+    this.closedWindows.push(result);
+    if (this.closedWindows.length > 8) {
+      this.closedWindows.shift();
+    }
+    this.windowSequence++;
     this.reset();
     return result;
   }
@@ -550,6 +579,8 @@ export class ServerPerformanceMetrics {
       version: 1,
       releaseId: SERVER_RELEASE_ID,
       window: {
+        id: `${this.processId}:${this.windowSequence}`,
+        finalized: false,
         startedAt: new Date(this.startedWall).toISOString(),
         endedAt: new Date(endedWall).toISOString(),
         durationMs: Math.max(0, ended - this.startedAt),

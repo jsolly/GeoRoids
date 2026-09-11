@@ -65,7 +65,7 @@ jobs:
           exit "$status"
       - name: Upload extended behavioral artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: behavioral-integration-${{ github.run_id }}
           path: behavioral-artifacts

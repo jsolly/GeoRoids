@@ -3,7 +3,7 @@ type ControlSources = {
   touchThrust: boolean;
   touchHeading: number | null;
   touchFire: boolean;
-  touchStickActive: boolean;
+  touchSteeringActive: boolean;
 };
 
 export const controlSources: ControlSources = {
@@ -11,7 +11,7 @@ export const controlSources: ControlSources = {
   touchThrust: false,
   touchHeading: null,
   touchFire: false,
-  touchStickActive: false,
+  touchSteeringActive: false,
 };
 
 export function resetControlSources(): void {
@@ -23,5 +23,5 @@ export function resetTouchSources(): void {
   controlSources.touchThrust = false;
   controlSources.touchHeading = null;
   controlSources.touchFire = false;
-  controlSources.touchStickActive = false;
+  controlSources.touchSteeringActive = false;
 }

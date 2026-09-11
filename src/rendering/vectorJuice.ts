@@ -1,5 +1,6 @@
 import { hexToRgba } from '../utils/colorUtils';
 import type { DrawingContext } from './drawingContext';
+import { resolveGlow } from './renderQuality';
 
 export type Vec2 = { x: number; y: number };
 
@@ -180,7 +181,7 @@ export function strokePhosphorPolyline(
   ctx.lineCap = 'round';
   ctx.lineWidth = width;
   ctx.shadowColor = color;
-  ctx.shadowBlur = glow;
+  ctx.shadowBlur = resolveGlow(glow);
   ctx.strokeStyle = hexToRgba(color, 0.4 * alpha);
   trace();
   ctx.stroke();
@@ -207,7 +208,7 @@ export function strokeBurstTicks(
   ctx.save();
   ctx.strokeStyle = hexToRgba(color, alpha);
   ctx.shadowColor = color;
-  ctx.shadowBlur = glow;
+  ctx.shadowBlur = resolveGlow(glow);
   ctx.lineWidth = width;
   ctx.lineCap = 'round';
   for (let i = 0; i < count; i++) {

@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
+import { normalizeFixtureAsteroids } from '../../../benchmarks/fixture-control';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { serverPerformanceMetrics } from '../../../server/performanceMetrics';
@@ -486,5 +487,66 @@ describe('current pilots share the production handler and broadcaster', () => {
     expect(() => broadcaster.broadcastGameState()).not.toThrow();
     expect(first.fake.close).toHaveBeenCalled();
     expect(second.fake.close).toHaveBeenCalledWith(1011, 'Snapshot encoding failed');
+  });
+  test('heartbeat replies echo probe identity while legacy pings remain bare and invalid probes are rejected', () => {
+    const pilot = socket();
+    handler.handleMessage({ type: 'ping', probeId: 7 }, pilot.ws);
+    expect(JSON.parse(pilot.fake.sent.at(-1) ?? 'null')).toEqual({
+      type: 'pong',
+      timestamp: expect.any(Number),
+      probeId: 7,
+    });
+    handler.handleMessage({ type: 'ping' }, pilot.ws);
+    expect(JSON.parse(pilot.fake.sent.at(-1) ?? 'null')).toEqual({
+      type: 'pong',
+      timestamp: expect.any(Number),
+    });
+    handler.handleMessage({ type: 'ping', probeId: -1 }, pilot.ws);
+    expect(pilot.messages.filter((message) => message.type === 'pong')).toHaveLength(2);
+  });
+
+  test('fixture preparation preserves a pilot session while replacing the ambient world', () => {
+    const pilot = socket();
+    join(handler, pilot.ws, 'pilot');
+    const actor = engine.getPlayer('pilot');
+    assert.ok(actor);
+    const oldEpoch = actor.asteroidMotion?.epoch;
+    assert.ok(oldEpoch);
+    engine.prepareDiagnosticWorld('combat');
+    expect(engine.getPlayer('pilot')).toBe(actor);
+    expect(actor.ws).toBe(pilot.ws);
+    expect(
+      engine.asteroidMotion.placeActorForTesting('pilot', { x: 100, y: 0 }, engine.getServerTime())
+    ).toBe(true);
+    expect(actor.asteroidMotion?.epoch).toBe(oldEpoch + 1);
+    expect(engine.getDiagnostics()).toMatchObject({
+      humanPlayers: 1,
+      bots: 2,
+      asteroids: 80,
+      satellites: 6,
+      satellitePickups: 2,
+    });
+    expect(engine.getPlayerProjectiles()).toHaveLength(0);
+    const firstRocks = normalizeFixtureAsteroids(engine.getAllAsteroids());
+    engine.prepareDiagnosticWorld('combat');
+    expect(normalizeFixtureAsteroids(engine.getAllAsteroids())).toEqual(firstRocks);
+    expect(pilot.close).not.toHaveBeenCalled();
+  });
+
+  test('fixture readiness waits for a new keyframe after a pending transport send', () => {
+    const pilot = socket();
+    join(handler, pilot.ws, 'pilot');
+    pilot.fake.defer = true;
+    broadcaster.broadcastGameState();
+    const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
+    const complete = pilot.pending.shift();
+    assert.ok(complete);
+    complete();
+    broadcaster.broadcastGameState();
+    expect(pilot.messages.at(-1)).toMatchObject({
+      type: 'snapshot',
+      data: { kind: 'keyframe', sequence },
+    });
+    expect(sequence).toBeGreaterThan(1);
   });
 });

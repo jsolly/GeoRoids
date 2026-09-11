@@ -17,6 +17,8 @@ interface LiveReportMetadata {
     readonly dirty: boolean;
     readonly lockfileSha256: string;
     readonly sourceSha256: string;
+    readonly productSha256: string;
+    readonly harnessSha256: string;
     readonly buildSha256: string;
   };
   readonly environment: {
@@ -32,6 +34,7 @@ interface LiveReportMetadata {
     };
     readonly measurementSource: 'host' | 'emulated-touch' | 'physical-device';
     readonly physicalDevice: boolean;
+    readonly gpu?: object;
   };
 }
 
@@ -75,12 +78,22 @@ function liveInputHashes(root = ROOT) {
       'server',
       'setup',
       'benchmarks',
+      'scripts/test-runner.sh',
+      'scripts/benchmark-proxy.ts',
+      'scripts/compare-mobile-sessions.ts',
+      'scripts/measure-frame-work.ts',
+      'scripts/compare-frame-work.ts',
+      'scripts/process-tree.sh',
+      'scripts/test-runner-contract.sh',
       'public',
       'shared-types.ts',
       'server.ts',
       'index.html',
       'index.css',
       'vite.config.ts',
+      'tsconfig.build.json',
+      'tsconfig.json',
+      'tsconfig.benchmarks.json',
       'package.json',
       'package-lock.json',
       'tests/unit/network/snapshotFixture.ts',
@@ -105,7 +118,18 @@ function liveInputHashes(root = ROOT) {
           join(entry.parentPath, entry.name).slice(root.replace(/\/$/, '').length + 1)
         )
     : [];
-  return { sourceSha256: digest(paths), buildSha256: digest(buildPaths) };
+  const isHarness = (path: string) =>
+    path.startsWith('benchmarks/') ||
+    path.startsWith('scripts/') ||
+    path.startsWith('tests/') ||
+    path.startsWith('tsconfig') ||
+    ['vite.config.ts', 'package.json', 'package-lock.json'].includes(path);
+  return {
+    sourceSha256: digest(paths),
+    productSha256: digest(paths.filter((path) => !isHarness(path))),
+    harnessSha256: digest(paths.filter(isHarness)),
+    buildSha256: digest(buildPaths),
+  };
 }
 
 export function collectLiveReportMetadata(
@@ -113,6 +137,7 @@ export function collectLiveReportMetadata(
     root?: string;
     browser?: { name: string; version: string; launchFlags?: readonly string[] };
     measurementSource?: LiveReportMetadata['environment']['measurementSource'];
+    gpu?: object;
   } = {}
 ): LiveReportMetadata {
   const root = options.root ?? ROOT;
@@ -141,6 +166,7 @@ export function collectLiveReportMetadata(
       ...(browser ? { browser } : {}),
       measurementSource: options.measurementSource ?? 'host',
       physicalDevice: options.measurementSource === 'physical-device',
+      ...(options.gpu ? { gpu: options.gpu } : {}),
     },
   };
 }

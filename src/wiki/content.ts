@@ -13,7 +13,6 @@ import {
   SHIELD,
   SHIP,
   SHOCKWAVE,
-  TOUCH,
 } from '../constants';
 import { getShipKit, SHIP_ABILITY, type ShipKitId } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
@@ -109,8 +108,8 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Touch',
         paragraphs: [
-          `On touch screens, drag the left virtual stick to aim. The stick has a ${TOUCH.STICK_RADIUS} pixel radius and an ${TOUCH.STICK_DEADZONE * 100} percent deadzone; thrust starts at ${TOUCH.STICK_THRUST * 100} percent of the stick radius. Hold the right FIRE control to fire, and use the E and F touch buttons for the same kit ability and shield actions as keyboard controls. The touch control loop repeats firing while FIRE is held.`,
-          'Tap a rock to select it. A Hauler also latches it, or anchors it as a second rock while latched. Flick at least 40 pixels on the playfield: down releases, left brakes, right spins, and up anchors the rock where the gesture started. These gestures work independently of the stick and action buttons. Any ship can inspect a selected rock; only a Hauler can move it.',
+          'On touch screens, touch and hold the playfield to steer toward your finger and thrust. Drag to change direction; release to stop thrusting and coast. A touch directly on the ship keeps its current heading. Hold FIRE with another finger to fire, and use the ability and SHIELD buttons for the same actions as E and F. Action buttons do not steer the ship.',
+          'While holding one finger to steer, use a second finger to tap a rock and select it. A Hauler also latches it, or anchors it as a second rock while latched. Flick at least 40 pixels on the playfield: down releases, left brakes, right spins, and up anchors the rock where the gesture started. These gestures work independently of steering and action buttons. Any ship can inspect a selected rock; only a Hauler can move it.',
         ],
       },
     ],
@@ -118,7 +117,6 @@ export const articles: WikiArticle[] = [
     sources: [
       'src/input/keybindings.ts',
       'src/input/mouse.ts',
-      'src/input/touchStick.ts',
       'src/input/touchControls.ts',
       'src/input/touchAbility.ts',
       'src/input/controlSources.ts',
@@ -128,7 +126,6 @@ export const articles: WikiArticle[] = [
       'src/constants/index.ts',
       'tests/integration/entities/input/keybindings.test.ts',
       'tests/integration/entities/input/mouse.test.ts',
-      'tests/unit/input/touchStick.test.ts',
       'tests/unit/input/touchAbility.test.ts',
       'tests/unit/input/mouseDesktop.test.ts',
     ],
@@ -526,7 +523,7 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Firing while moving',
         paragraphs: [
-          `Shots leave the nose and inherit your ship’s velocity, so a moving ship changes their flight path. Hold fire to repeat shots at your kit’s interval. You can have up to ${SHIP.MAX_LASERS} local shots at once; reaching that limit temporarily prevents more shots, including extra rounds from a Skirmisher burst. A regular shot deals ${DAMAGE.LASER_HIT} damage; reflected or core-powered shots multiply that damage by their energy.`,
+          `Shots leave the nose and inherit your ship’s velocity, so a moving ship changes their flight path. Hold fire to repeat shots at your kit’s interval. You can have up to ${SHIP.MAX_LASERS} local shots at once; reaching that limit temporarily prevents more shots, including extra rounds from a Skirmisher burst. A regular shot deals ${DAMAGE.LASER_HIT} damage; reflected or core-powered shots multiply that damage by their energy. Local shots appear immediately and stay visible while the server confirms them; the server still controls hits and removal.`,
         ],
       },
       {
@@ -554,6 +551,7 @@ export const articles: WikiArticle[] = [
       'src/constants/index.ts',
       'src/entities/ship/Ship.ts',
       'src/entities/laser/laserUtils.ts',
+      'src/entities/laser/AuthoritativeProjectileField.ts',
       'src/entities/ship/shipShield.ts',
       'server/core/EntityManager.ts',
       'server/core/combatScoring.ts',
@@ -564,6 +562,7 @@ export const articles: WikiArticle[] = [
       'tests/unit/entities/shipDamage.test.ts',
       'tests/unit/entities/shipLifecycle.test.ts',
       'tests/unit/entities/combatDamage.test.ts',
+      'tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts',
       'tests/unit/scenarios/combat/wall-or-roid-hit-explodes-then-respawns-without-freeze.test.ts',
       'tests/unit/scenarios/combat/a-laser-hit-at-low-health-explodes-the-ship-immediately.test.ts',
       'tests/integration/browser/e2e/ship-respawns-randomly-after-boundary-death.test.ts',
@@ -624,7 +623,7 @@ export const articles: WikiArticle[] = [
         heading: 'What the HUD shows',
         paragraphs: [
           'Before entering a game, set your pilot name, choose a kit, and use the Sound checkbox on the title screen to enable or mute audio.',
-          'The HUD shows lives as kit hull icons, score, faction label and mark, kit name, and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a minimap; touch layouts use a compact leaderboard and an adaptive minimap. The minimap shows ships, hostile satellites, and satellite pickups inside the arena ring. Kill and pickup messages appear in the center for 120 frames, or 2 seconds. A health capsule appears above a damaged ship; use its remaining fill to judge hull health. Your own hull is mint, other human pilots are sky blue, and bots are orange. Faction marks identify allies separately from those colors.',
+          'The HUD shows lives as kit hull icons, score, faction label and mark, kit name, and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a minimap; touch layouts use a compact leaderboard and an adaptive minimap. The minimap shows your ship, other human pilots, bot pilots, asteroids, loot drops, hostile satellites, loose pickups, and orbiting pickups inside the arena ring. Compact marks follow each entity’s current position; destroyed or collected objects disappear when the shared state removes them. Slate squares mark asteroids; cream squares and diamonds mark wreckage and shards, green crosses mark fuel, yellow slashed diamonds mark laser cores, purple crosses mark satellites, and amber circles and diamonds mark loose and orbiting pickups. Ship headings and faction marks keep pilots identifiable above the world marks. Kill and pickup messages appear in the center for 120 frames, or 2 seconds. A health capsule appears above a damaged ship; use its remaining fill to judge hull health. Your own hull is mint, other human pilots are sky blue, and bots are orange. Faction marks identify allies separately from those colors.',
         ],
       },
       {

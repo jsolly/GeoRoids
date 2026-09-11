@@ -41,6 +41,8 @@ jobs:
           GEOROIDS_TEST_MAX_DURATION_SECONDS=300 ./scripts/test-runner.sh \
             tests/integration/browser/sanity/critical-gameplay-smoke.test.ts \
             tests/integration/browser/sanity/sustained-mobile-controls.test.ts \
+            tests/integration/browser/sanity/mobile-quality-and-phone-recording.test.ts \
+            tests/integration/browser/sanity/mobile-recovers-under-cpu-constraint.test.ts \
             tests/integration/browser/sanity/rejected-joins-return-to-menu-and-can-retry.test.ts \
             tests/integration/server/current-pilots-recover-after-reconnect.test.ts \
             --reporter=verbose 2>&1 | tee behavioral-artifacts/test-run.log
@@ -67,9 +69,25 @@ jobs:
             fi
           done
           exit "$status"
+      - name: Report deterministic frame work budget
+        run: >-
+          node --import tsx scripts/measure-frame-work.ts
+          --budget docs/performance/frame-work-budget.json
+          --output behavioral-artifacts/frame-work.json
+      - name: Run constrained production client correctness
+        run: |
+          set -euo pipefail
+          GEOROIDS_TEST_MAX_DURATION_SECONDS=240 ./scripts/test-runner.sh --benchmark-client \
+            --viewport touch-portrait --dpr 3 --cpu-slowdown 4 --network normal \
+            --scenario traversal --seed 42 --warmup 5 --seconds 15 \
+            --output behavioral-artifacts/mobile-combined.json 2>&1 | tee behavioral-artifacts/mobile-combined.log
+          GEOROIDS_TEST_MAX_DURATION_SECONDS=240 ./scripts/test-runner.sh --benchmark-client \
+            --viewport touch-portrait --dpr 3 --cpu-slowdown 1 --network clean \
+            --scenario combat --seed 42 --warmup 5 --seconds 15 \
+            --output behavioral-artifacts/mobile-combat.json 2>&1 | tee behavioral-artifacts/mobile-combat.log
       - name: Upload behavioral artifacts
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: behavioral-smoke-${{ github.run_id }}
           path: behavioral-artifacts
@@ -89,7 +107,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.1.0
       - run: npm ci
       - run: npm run check:actions
       - run: npm run check:lint-policy

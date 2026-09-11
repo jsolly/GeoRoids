@@ -461,15 +461,14 @@ export class GameEngine {
     this.rngService.reset();
   }
 
-  // Reset game state when no players are online
-  private resetGameState(): void {
+  // Clear ambient entities and pending combat without replacing human sessions.
+  private clearWorldObjects(): void {
     // Clear all asteroids and pending collab resolutions
     this.asteroidManager.clearAsteroids();
     this.resolvedCollabHits = [];
     this.pendingShockwaves = [];
     this.lootManager.clear();
     this.lasers = [];
-    this.asteroidMotion.reset();
     this.departedPlayers = [];
     this.decoratedFieldId = undefined;
     this.pendingLootBlasts = [];
@@ -478,9 +477,27 @@ export class GameEngine {
     this.pendingSatelliteShots = [];
     this.satellitePickupManager.clear();
 
-    // Clear all entities (bots, players, etc.)
-    this.entityManager.clearAll();
     this.collisionAuthority.reset();
+  }
+
+  /** Atomic between-tick arrangement for the benchmark process's private control socket. */
+  public prepareDiagnosticWorld(scenario: 'traversal' | 'combat'): void {
+    this.clearWorldObjects();
+    for (const bot of this.getAllBots()) {
+      this.removeBot(bot.id);
+    }
+    this.rngService.reset();
+    this.createAsteroids(scenario === 'combat' ? 80 : ROID.INITIAL_ROID_COUNT);
+    this.seedAsteroidInteractions();
+    this.createBots(scenario === 'combat' ? 2 : 3);
+    this.createSatellites(SATELLITE.AMBIENT_COUNT);
+    this.ensureSatellitePickups();
+  }
+
+  private resetGameState(): void {
+    this.clearWorldObjects();
+    this.asteroidMotion.reset();
+    this.entityManager.clearAll();
 
     // Keep gameTime monotonic for the process lifetime. Zeroing it when the
     // last player leaves makes /health.world.gameTime look frozen on prod

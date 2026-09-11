@@ -4,6 +4,7 @@ import { getGameBoundary } from '../physics/boundary';
 import { logger } from '../utils/Logger';
 import { canvasManager } from './canvas';
 import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
+import { resolveGlow } from './renderQuality';
 
 export function drawFieryBoundary(shipPosition: Position): void {
   const ctx = canvasManager.getContext();
@@ -34,7 +35,7 @@ export function drawFieryBoundary(shipPosition: Position): void {
 
   ctx.save();
   ctx.shadowColor = PALETTE.HUD_MUTED;
-  ctx.shadowBlur = VISUAL.BOUNDARY_GLOW;
+  ctx.shadowBlur = resolveGlow(VISUAL.BOUNDARY_GLOW);
   ctx.strokeStyle = PALETTE.HUD_MUTED;
   ctx.lineWidth = VISUAL.BOUNDARY_STROKE_WIDTH;
   ctx.beginPath();

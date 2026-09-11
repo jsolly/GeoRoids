@@ -4,6 +4,7 @@ import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvas';
 import { drawContourLabels } from './contourLabels';
+import { contourCandidates } from './contourSpatialIndex';
 
 /**
  * Muted topo lines in world space. Tight spacing is steep; keep alpha low so
@@ -31,7 +32,8 @@ export function drawIsoContours(shipPosition: Position): void {
   ctx.lineJoin = 'round';
   ctx.shadowBlur = 0;
 
-  for (const level of levels) {
+  const view = { ...shipPosition, ...viewport, scale, pad };
+  for (const [levelOrdinal, level] of levels.entries()) {
     const isIndex = level.index % VISUAL.CONTOUR_INDEX_EVERY === 0;
     ctx.strokeStyle = hexToRgba(
       PALETTE.CONTOUR,
@@ -40,7 +42,7 @@ export function drawIsoContours(shipPosition: Position): void {
     ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH;
     ctx.beginPath();
 
-    for (const segment of level.segments) {
+    for (const segment of contourCandidates(levels, levelOrdinal, view)) {
       const ax = centerX + (segment.ax - shipPosition.x) * scale;
       const ay = centerY + (segment.ay - shipPosition.y) * scale;
       const bx = centerX + (segment.bx - shipPosition.x) * scale;

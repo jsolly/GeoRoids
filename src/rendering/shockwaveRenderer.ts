@@ -9,6 +9,7 @@ import {
 } from '../physics/shockwave';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvas';
+import { resolveGlow } from './renderQuality';
 
 const WAVE_COLOR: Record<ShockwaveWaveId, string> = {
   fast: PALETTE.LASER_LOCAL,
@@ -57,7 +58,7 @@ export function drawShockwaves(
       ctx.strokeStyle = hexToRgba(color, alpha);
       ctx.lineWidth = wave.strokeWidth;
       ctx.shadowColor = color;
-      ctx.shadowBlur = glow;
+      ctx.shadowBlur = resolveGlow(glow);
       ctx.beginPath();
       ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
       ctx.stroke();

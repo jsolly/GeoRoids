@@ -62,7 +62,9 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         '../src/entities/satellitePickup/SatellitePickupManager'
       );
       const { satelliteProfileAt } = await import('../shared/eoSatellites');
-      const { ensureTerrain } = await import('../src/physics/terrain/terrainSession');
+      const { ensureTerrain, getTerrainContours } = await import(
+        '../src/physics/terrain/terrainSession'
+      );
       const { setPlayView } = await import('../src/ui/uiUtils');
       const { syncTouchChrome } = await import('../src/input/touchControls');
       const game = GameController.getInstance();
@@ -208,7 +210,54 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       let canvasCalls: Record<string, number> = {};
       const textCalls: string[] = [];
       let record = false;
+      let phase: 'update' | 'render' = 'update';
+      const frameWork: Array<Record<string, number>> = [];
+      function countWork(name: string) {
+        if (record) {
+          const key = `${phase}.${name}`;
+          canvasCalls[key] = (canvasCalls[key] ?? 0) + 1;
+        }
+      }
+      // Observation-only property probes count actual reads, not estimated work.
+      // Preserve writes so the fixture still exercises normal simulation.
+      function observeRead(target: object, key: string, name: string) {
+        const descriptor = Object.getOwnPropertyDescriptor(target, key);
+        if (!descriptor || !('value' in descriptor) || !descriptor.configurable) {
+          throw new Error(`Cannot observe ${name}`);
+        }
+        let value: unknown = descriptor.value;
+        Object.defineProperty(target, key, {
+          configurable: true,
+          enumerable: descriptor.enumerable ?? false,
+          get() {
+            countWork(name);
+            return value;
+          },
+          set(next: unknown) {
+            value = next;
+          },
+        });
+        restores.push(() => Object.defineProperty(target, key, { ...descriptor, value }));
+      }
       if (options.observe) {
+        for (const [kind, actors] of [
+          ['localShip', [local.ship]],
+          ['asteroid', belt.roids],
+          ['loot', loot.getAll()],
+          ['satellite', satellites.getAll()],
+          ['pickup', pickups.getAll()],
+        ] satisfies [string, readonly object[]][]) {
+          for (const actor of actors) {
+            observeRead(actor, 'position', `${kind}.positionReads`);
+          }
+        }
+        for (const level of getTerrainContours()) {
+          for (const segment of level.segments) {
+            for (const key of ['ax', 'ay', 'bx', 'by']) {
+              observeRead(segment, key, 'contour.endpointReads');
+            }
+          }
+        }
         for (const [prefix, prototype] of [
           ['canvas', CanvasRenderingContext2D.prototype],
           ['path', Path2D.prototype],
@@ -224,6 +273,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
               value: function (this: object, ...args: unknown[]) {
                 if (record) {
                   const name = `${prefix}.${key}`;
+                  countWork(name);
                   canvasCalls[name] = (canvasCalls[name] ?? 0) + 1;
                   if (key === 'fillText' && typeof args[0] === 'string') {
                     textCalls.push(args[0]);
@@ -247,10 +297,15 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           try {
             const measured = frame >= options.warmupFrames;
             record = options.observe && measured;
+            const beforeWork = record ? { ...canvasCalls } : undefined;
             frame++;
+            phase = 'update';
+            countWork('calls');
             const start = performance.now();
             game.updateGame(FRAME_MS);
             const updated = performance.now();
+            phase = 'render';
+            countWork('calls');
             game.renderGame();
             const rendered = performance.now();
             if (measured && !options.observe) {
@@ -260,6 +315,15 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
               samples.frameIntervalMs.push(timestamp - previousRaf);
               samples.updateMs.push(updated - start);
               samples.renderMs.push(rendered - updated);
+            }
+            if (beforeWork) {
+              frameWork.push(
+                Object.fromEntries(
+                  Object.entries(canvasCalls)
+                    .filter(([name]) => name.startsWith('update.') || name.startsWith('render.'))
+                    .map(([name, count]) => [name, count - (beforeWork[name] ?? 0)])
+                )
+              );
             }
             previousRaf = timestamp;
             if (frame < totalFrames) {
@@ -274,6 +338,17 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         requestAnimationFrame(step);
       });
       record = false;
+      const frameImageSha256 = options.observe
+        ? Array.from(
+            new Uint8Array(
+              await crypto.subtle.digest(
+                'SHA-256',
+                ctx.getImageData(0, 0, canvas.width, canvas.height).data
+              )
+            ),
+            (byte) => byte.toString(16).padStart(2, '0')
+          ).join('')
+        : null;
       const after = snapshot();
       if (
         after.local.health !== before.local.health ||
@@ -380,7 +455,15 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         if (JSON.stringify(layout) !== JSON.stringify(expectedLayout)) {
           throw new Error('HUD ignored viewport or safe area');
         }
-        drawMiniMap(ctx, layout, local.ship);
+        drawMiniMap(
+          ctx,
+          layout,
+          local.ship,
+          belt.getRoids(),
+          LootField.getInstance().getAll(),
+          SatelliteManager.getInstance().getAll(),
+          SatellitePickupManager.getInstance().getAll()
+        );
         drawScoreOverlay(ctx, layout, canvas, local.score, local.lives, local.factionId);
         drawLivesIndicator(ctx, layout, local.lives, PALETTE.LOCAL, local.ship.kitId);
         drawTextOverlay(ctx, layout, canvas, 'Game Over: killed by Benchmark Rival', 1);
@@ -465,6 +548,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           ...untimedCounts,
         },
         witness: { before, after, untimed },
+        frameWork,
+        frameImageSha256,
         canvasAttributes: ctx.getContextAttributes(),
       };
     } catch (error) {

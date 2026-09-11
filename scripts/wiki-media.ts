@@ -50,7 +50,6 @@ import { drawAsteroidMaterialDetails } from '../src/entities/roid/materialArt';
 import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
 import { laserVelocityFromAngle } from '../src/entities/satellite/satelliteMath';
-import { drawSatellitePickupMiniMapDot } from '../src/entities/satellitePickup/satellitePickupRenderer';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
 import {
   type AbilityBody,
@@ -210,10 +209,6 @@ function renderSatellite(
   firing: boolean
 ): void {
   drawEoSatelliteOutline(ctx, typeId, radius, angle, color, firing);
-}
-
-function renderPickupDot(ctx: RenderContext, x: number, y: number): void {
-  drawSatellitePickupMiniMapDot(ctx, x, y);
 }
 
 interface Demo {
@@ -2007,7 +2002,6 @@ function drawPickup(ctx: RenderContext, pickup: PickupView, scale = 1): void {
     ctx.stroke();
   }
   ctx.restore();
-  renderPickupDot(ctx, screen.x, screen.y);
 }
 
 function makePickupsDemo(): Demo {

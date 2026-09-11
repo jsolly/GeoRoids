@@ -45,9 +45,6 @@ export const CANVAS = {
 // TOUCH CONTROLS
 // ============================================================================
 export const TOUCH = {
-  STICK_RADIUS: 56,
-  STICK_DEADZONE: 0.18,
-  STICK_THRUST: 0.38,
   FIRE_SIZE: 72,
   // Canvas space reserved above the fire button so the radar stays readable.
   FIRE_RESERVE: 112,
@@ -236,6 +233,7 @@ export const LASER = {
   MAX_COUNT: 200, // limit of lasers that can exist
   TRAVEL_DISTANCE_RATIO: 0.6, // fraction of screen width
   EXPLODE_DURATION: 0.1, // seconds
+  PREDICTION_TIMEOUT_MS: 2000, // Bound unacknowledged local shots during connection loss
 } as const;
 
 // ============================================================================

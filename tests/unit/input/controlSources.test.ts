@@ -5,12 +5,7 @@ import { Player } from '../../../src/entities/player/Player';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp, reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import {
-  applyStickSample,
-  setTouchFire,
-  tickTouchControls,
-} from '../../../src/input/touchControls';
-import { readStickSample } from '../../../src/input/touchStick';
+import { setTouchFire, setTouchHeading, tickTouchControls } from '../../../src/input/touchControls';
 
 const TURN = ((SHIP.TURN_SPEED / 180) * Math.PI) / GAME.FPS;
 
@@ -39,21 +34,20 @@ function release(code: string): void {
   keyUp(new KeyboardEvent('keyup', { code }), player);
 }
 
-test('keyboard thrust is unchanged when the stick is idle', () => {
+test('keyboard thrust is unchanged when the touch is idle', () => {
   press('ArrowUp');
   expect(player.ship.thrusting).toBe(true);
   release('ArrowUp');
   expect(player.ship.thrusting).toBe(false);
 });
 
-test('releasing a thrust key keeps thrusting while the stick is held', () => {
-  const sample = readStickSample(80, 0, 0, 0);
-  applyStickSample(player, sample);
+test('releasing a thrust key keeps thrusting while the touch is held', () => {
+  setTouchHeading(player, 0);
   press('ArrowUp');
   expect(player.ship.thrusting).toBe(true);
   release('ArrowUp');
   expect(player.ship.thrusting).toBe(true);
-  applyStickSample(player, null);
+  setTouchHeading(player, null);
   expect(player.ship.thrusting).toBe(false);
 });
 
@@ -66,9 +60,8 @@ test('right-mouse thrust still composes with keys', () => {
   expect(player.ship.thrusting).toBe(false);
 });
 
-test('stick heading matches mouse-style aim and does not fight WASD turn', () => {
-  const sample = readStickSample(0, -80, 0, 0);
-  applyStickSample(player, sample);
+test('touch heading matches mouse-style aim and does not fight WASD turn', () => {
+  setTouchHeading(player, Math.PI / 2);
   expect(player.ship.angle).toBeCloseTo(Math.PI / 2, 8);
   expect(player.ship.angularVelocity).toBe(0);
 

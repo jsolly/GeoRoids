@@ -92,13 +92,70 @@ export async function asteroidScreenPoint(
       const rect = canvas.getBoundingClientRect();
       // Pointer events and the camera both use logical CSS pixels, independent
       // of the canvas's higher-density backing bitmap.
-      return {
+      const center = {
         x: rect.left + rect.width / 2 + (target.position.x - ship.position.x) * scale,
         y: rect.top + rect.height / 2 + (target.position.y - ship.position.y) * scale,
       };
+      // A partially visible rock can be tapped on its visible edge.
+      const point = {
+        x: Math.max(rect.left + 8, Math.min(rect.right - 8, center.x)),
+        y: Math.max(rect.top + 8, Math.min(rect.bottom - 8, center.y)),
+      };
+      if (Math.hypot(point.x - center.x, point.y - center.y) > Math.max(24, target.size * scale)) {
+        throw new Error(`Target ${targetId} is outside the playable viewport`);
+      }
+      return point;
     },
     { targetId: id, scale: PLAYFIELD_CLOSE_SCALE }
   );
+}
+
+/** Perform an asteroid gesture with a second finger while the first steers. */
+export async function touchPlayfieldGesture(
+  page: import('playwright').Page,
+  point: WorldPoint,
+  delta: WorldPoint = { x: 0, y: 0 }
+): Promise<void> {
+  const session = await page.context().newCDPSession(page);
+  let touchActive = false;
+  try {
+    const canvas = await page.locator('#gameCanvas').boundingBox();
+    if (!canvas) {
+      throw new Error('Canvas unavailable');
+    }
+    const steering = { x: canvas.x + canvas.width * 0.1, y: canvas.y + canvas.height / 2, id: 6 };
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [steering],
+    });
+    touchActive = true;
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [steering, { ...point, id: 7 }],
+    });
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.thrusting === true
+    );
+    if (delta.x !== 0 || delta.y !== 0) {
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [steering, { x: point.x + delta.x, y: point.y + delta.y, id: 7 }],
+      });
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    touchActive = false;
+    await page.waitForFunction(
+      () => window.gameController?.getCurrPlayer()?.ship.thrusting === false
+    );
+  } finally {
+    try {
+      if (touchActive) {
+        await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+      }
+    } finally {
+      await session.detach();
+    }
+  }
 }
 
 export async function flickPlayfield(
@@ -106,26 +163,15 @@ export async function flickPlayfield(
   dx: number,
   dy: number
 ): Promise<void> {
-  const session = await page.context().newCDPSession(page);
-  try {
-    const canvas = await page.locator('#gameCanvas').boundingBox();
-    if (!canvas) {
-      throw new Error('Canvas unavailable');
-    }
-    const x = canvas.x + canvas.width / 2;
-    const y = canvas.y + canvas.height / 2;
-    await session.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x, y, id: 7 }],
-    });
-    await session.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ x: x + dx, y: y + dy, id: 7 }],
-    });
-    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  } finally {
-    await session.detach();
+  const canvas = await page.locator('#gameCanvas').boundingBox();
+  if (!canvas) {
+    throw new Error('Canvas unavailable');
   }
+  await touchPlayfieldGesture(
+    page,
+    { x: canvas.x + canvas.width / 2, y: canvas.y + canvas.height / 2 },
+    { x: dx, y: dy }
+  );
 }
 
 export async function selectAsteroidWithKeyboard(

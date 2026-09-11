@@ -22,7 +22,6 @@ function assertLayoutFitsViewport(
   expect(layout.canvas?.width).toBeGreaterThan(0);
   expect(layout.canvas?.height).toBeGreaterThan(0);
   for (const [name, control] of [
-    ['stick', layout.stick],
     ['fire', layout.fire],
     ['ability', layout.ability],
     ['shield', layout.shield],
@@ -62,7 +61,7 @@ test(
       { timeout: 5000 }
     );
 
-    const stick = await centerOf(page, '#touch-stick');
+    const stick = await centerOf(page, '#gameCanvas');
     const fire = await centerOf(page, '#touch-fire');
     const ability = await centerOf(page, '#touch-ability');
     const shield = await centerOf(page, '#touch-shield');
@@ -138,7 +137,7 @@ test(
       path: screenshotManager.getScreenshotPath('performance-mobile-portrait.png'),
     });
 
-    const portraitStick = await centerOf(page, '#touch-stick');
+    const portraitStick = await centerOf(page, '#gameCanvas');
     const portraitFire = await centerOf(page, '#touch-fire');
     await dispatchTouch(session, 'touchStart', [
       { x: portraitStick.x + 42, y: portraitStick.y, id: 21 },
@@ -159,9 +158,7 @@ test(
         .locator('#touch-fire')
         .evaluate((element) => element.classList.contains('is-pressed'))
     ).toBe(false);
-    expect(await page.locator('#touch-stick-knob').getAttribute('style')).toBe(
-      'transform: translate(-50%, -50%);'
-    );
+    expect(await page.locator('#touch-stick').count()).toBe(0);
     assertLayoutFitsViewport(await readTouchControlLayout(page));
 
     await page.screenshot({

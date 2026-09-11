@@ -2,6 +2,7 @@ import type { LootData, LootKind } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
+import { resolveGlow } from '../../rendering/renderQuality';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { Ship } from '../ship/Ship';
 import { LootField } from './LootField';
@@ -53,7 +54,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
       ctx.lineWidth = VISUAL.LOOT_STROKE_WIDTH;
       ctx.strokeStyle = PALETTE.DANGER;
       ctx.shadowColor = PALETTE.DANGER;
-      ctx.shadowBlur = VISUAL.LOOT_GLOW;
+      ctx.shadowBlur = resolveGlow(VISUAL.LOOT_GLOW);
       ctx.beginPath();
       ctx.arc(screen.x, screen.y, r, 0, Math.PI * 2);
       ctx.stroke();
@@ -112,7 +113,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     ctx.stroke();
     ctx.lineWidth = VISUAL.LOOT_STROKE_WIDTH;
     ctx.shadowColor = color;
-    ctx.shadowBlur = VISUAL.LOOT_GLOW;
+    ctx.shadowBlur = resolveGlow(VISUAL.LOOT_GLOW);
     ctx.strokeStyle = hexToRgba(color, 0.55);
     trace();
     ctx.stroke();

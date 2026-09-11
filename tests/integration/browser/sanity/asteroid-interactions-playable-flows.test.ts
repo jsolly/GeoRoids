@@ -4,6 +4,7 @@ import {
   captureConsole,
   flickPlayfield,
   selectAsteroidWithKeyboard,
+  touchPlayfieldGesture,
   waitForEnhancedTargets,
 } from '../../utils/asteroid-tools-driver';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
@@ -33,7 +34,7 @@ test.each(['touch', 'keyboard', 'mouse'] as const)(
       if (input !== 'keyboard') {
         const point = await asteroidScreenPoint(page, id);
         if (input === 'touch') {
-          await page.touchscreen.tap(point.x, point.y);
+          await touchPlayfieldGesture(page, point);
         } else {
           await page.mouse.click(point.x, point.y, { button: 'middle' });
         }

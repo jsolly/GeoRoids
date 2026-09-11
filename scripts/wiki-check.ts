@@ -3,10 +3,11 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listShipKits } from '../src/entities/ship/shipKits';
-import { articles, mediaForArticle } from '../src/wiki/content';
 import { media } from '../src/wiki/media';
+import { readWikiArticles } from './wiki-content';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const articles = readWikiArticles(root);
 const baselinePath = resolve(root, 'docs/wiki-source-review.json');
 const failures: string[] = [];
 const ids = new Set(articles.map((article) => article.id));
@@ -17,7 +18,7 @@ for (const kit of listShipKits()) {
   const article = articles.find((entry) => entry.id === kit.id);
   if (!article) {
     failures.push(`Missing ship article: ${kit.id}`);
-  } else if (!mediaForArticle(article).includes(kit.id)) {
+  } else if (!article.media.includes(kit.id)) {
     failures.push(`Missing ship ability demonstration: ${kit.id}`);
   }
 }
@@ -25,7 +26,7 @@ for (const article of articles) {
   if (!/^[a-z0-9-]+$/.test(article.id)) {
     failures.push(`Invalid article ID: ${article.id}`);
   }
-  if (article.sections.length === 0 || article.sources.length === 0) {
+  if (!article.html.trim()) {
     failures.push(`Incomplete article: ${article.id}`);
   }
   for (const id of article.related) {
@@ -33,7 +34,7 @@ for (const article of articles) {
       failures.push(`${article.id}: broken related entry ${id}`);
     }
   }
-  for (const id of mediaForArticle(article)) {
+  for (const id of article.media) {
     if (!media[id]) {
       failures.push(`${article.id}: missing media definition ${id}`);
     }
@@ -45,7 +46,7 @@ for (const article of articles) {
   }
 }
 for (const [id, item] of Object.entries(media)) {
-  if (!articles.some((article) => mediaForArticle(article).includes(id))) {
+  if (!articles.some((article) => article.media.includes(id))) {
     failures.push(`Unreferenced demonstration: ${id}`);
   }
   if (!item.alt || !item.caption || !item.sources.length) {
@@ -115,6 +116,9 @@ const sourcePaths = new Set([
   'middleware.ts',
   'package.json',
   'scripts/wiki-check.ts',
+  'scripts/wiki-content.ts',
+  'scripts/wiki-vite.ts',
+  '.pages.yml',
   'scripts/wiki-satellite-demo.ts',
   'shared-types.ts',
   'server/configuration.ts',

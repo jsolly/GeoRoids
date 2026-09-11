@@ -395,7 +395,7 @@ start_dev_servers() {
         valid_port "$gameplay_port" || return 1
     fi
     export GEOROIDS_BENCHMARK_WS_URL="ws://localhost:$gameplay_port/ws"
-    local client_command="vite --port $TEST_VITE_PORT --strictPort"
+    local client_command="vite --configLoader runner --port $TEST_VITE_PORT --strictPort"
     local server_entry=server.ts
     if [ "$RUN_MODE" != tests ]; then
         server_entry=benchmarks/realtime-server.ts
@@ -403,7 +403,7 @@ start_dev_servers() {
     if [ "$BUILD_MODE" = production ]; then
         echo "Building production client for the owned session..."
         VITE_WEBSOCKET_URL="ws://localhost:$gameplay_port/ws" npm run build || return 1
-        client_command="vite preview --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
+        client_command="vite preview --configLoader runner --host 127.0.0.1 --port $TEST_VITE_PORT --strictPort"
     fi
     echo "🚀 Starting servers owned by this runner..."
     (

@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
+import { wikiContentPlugin } from './scripts/wiki-vite';
 
 const HAULER_TETHER_HEXES = ['#E8D5A3', '#FDE68A'] as const;
 
@@ -66,6 +67,7 @@ export default defineConfig(() => {
 
   return {
     plugins: [
+      wikiContentPlugin(),
       requireHaulerTetherHexes(),
       {
         name: 'wiki-entry',

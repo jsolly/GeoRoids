@@ -9,6 +9,21 @@ import { type Measurement, validateMeasurement } from './results';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const GIT_TIMEOUT_MS = 10_000;
+const GIT_PATH_ENVIRONMENT = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_COMMON_DIR',
+] as const;
+
+function gitEnvironment(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const name of GIT_PATH_ENVIRONMENT) {
+    delete environment[name];
+  }
+  return environment;
+}
 
 interface LiveReportMetadata {
   readonly benchmarkVersion: 1;
@@ -54,6 +69,7 @@ function command(root: string, args: readonly string[]): string {
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: GIT_TIMEOUT_MS,
     killSignal: 'SIGKILL',
+    env: gitEnvironment(),
   }).trim();
 }
 
@@ -98,7 +114,13 @@ function liveInputHashes(root = ROOT) {
       'package-lock.json',
       'tests/unit/network/snapshotFixture.ts',
     ],
-    { cwd: root, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, killSignal: 'SIGKILL' }
+    {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: GIT_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+      env: gitEnvironment(),
+    }
   )
     .split('\0')
     .filter(Boolean);

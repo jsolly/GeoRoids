@@ -1,4 +1,4 @@
-import type { WikiArticle } from './content';
+import type { WikiArticle } from './article';
 
 /** Match every query word, including words in rule details and linked topics. */
 export function searchArticles(articles: WikiArticle[], query: string): WikiArticle[] {
@@ -11,6 +11,7 @@ export function searchArticles(articles: WikiArticle[], query: string): WikiArti
       const title = `${article.title} ${article.category}`.toLocaleLowerCase();
       const body = [
         article.summary,
+        article.searchText,
         ...article.sections.flatMap((section) => [section.heading, ...section.paragraphs]),
       ]
         .join(' ')

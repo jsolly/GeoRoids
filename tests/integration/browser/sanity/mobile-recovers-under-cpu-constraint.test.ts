@@ -23,7 +23,7 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
-    const stick = await centerOf(page, '#touch-stick');
+    const stick = await centerOf(page, '#gameCanvas');
     const fire = await centerOf(page, '#touch-fire');
     await dispatchTouch(session, 'touchStart', [
       { x: stick.x + 40, y: stick.y, id: 1 },

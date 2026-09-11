@@ -21,7 +21,7 @@ test('desktop mouse viewport keeps keyboard chrome', () => {
   expect(controlsHintFor(desktop)).toBe(DESKTOP_CONTROLS_HINT);
 });
 
-test('phone portrait and landscape use the stick + fire hint', () => {
+test('phone portrait and landscape use the touch steering + fire hint', () => {
   const portrait = { ...desktop, width: 390, height: 844 };
   const landscape = { ...desktop, width: 844, height: 390 };
   expect(shouldUseTouchControls(portrait)).toBe(true);

@@ -34,7 +34,7 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 }
 
 // Helper function to update thrust state based on aggregate input.
-// Thrust sources: ArrowUp / KeyW, right-mouse, and the left virtual stick.
+// Thrust sources: ArrowUp / KeyW, right-mouse, and touch steering.
 function updateThrustFromKeys(player: Player): void {
   const pressed = getPressedKeysForPlayer(player);
   const shouldThrust =
@@ -105,7 +105,7 @@ function updateTurnFromKeys(player: Player): void {
     player.ship.angularVelocity = 0;
   }
 
-  // Stick aims like the mouse. A held turn key still wins so WASD on a
+  // Touch aims like the mouse. A held turn key still wins so WASD on a
   // touchscreen laptop is unchanged.
   if (controlSources.touchHeading !== null && !turningLeft && !turningRight) {
     player.ship.angle = controlSources.touchHeading;
@@ -113,7 +113,7 @@ function updateTurnFromKeys(player: Player): void {
   }
 }
 
-/** Re-apply thrust, turn, and stick heading from every live input source. */
+/** Re-apply thrust, turn, and touch heading from every live input source. */
 export function reconcilePlayerInput(player: Player): void {
   updateTurnFromKeys(player);
   updateThrustFromKeys(player);

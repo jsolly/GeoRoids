@@ -90,7 +90,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
 });
 
 test(
-  'mobile viewport fits chrome and exposes stick, fire, ability, and shield',
+  'mobile viewport fits chrome and exposes fire, ability, and shield without a movement pad',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -151,17 +151,15 @@ test(
     expect(chrome.canvas?.cssHeight).toBe(chrome.innerHeight);
     expect(chrome.canvas?.width).toBe(chrome.innerWidth * chrome.dpr);
     expect(chrome.canvas?.height).toBe(chrome.innerHeight * chrome.dpr);
-    expect(chrome.stick).toBeTruthy();
+    expect(chrome.stick).toBeNull();
     expect(chrome.fire).toBeTruthy();
     expect(chrome.ability).toBeTruthy();
     expect(chrome.shield).toBeTruthy();
     expect(chrome.abilityDisabled).toBe('false');
     expect(chrome.shieldDisabled).toBe('false');
-    expect(chrome.stick?.left).toBeGreaterThanOrEqual(-1);
     expect(chrome.fire?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.shield?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
-    expect(chrome.stick?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.fire?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.shield?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);

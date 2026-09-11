@@ -587,7 +587,7 @@ body.in-play {
   opacity: 1;
 }
 
-/* On-screen stick + fire + kit actions. Hidden unless body.touch-play. */
+/* Touch steering + fire + kit actions. Hidden unless body.touch-play. */
 .touch-controls {
   display: none;
   position: absolute;
@@ -604,7 +604,7 @@ body.touch-play .touch-controls:not([hidden]) {
   display: block;
 }
 
-.touch-stick,
+body.touch-play #gameCanvas,
 .touch-fire,
 .touch-ability,
 .touch-shield {
@@ -612,34 +612,6 @@ body.touch-play .touch-controls:not([hidden]) {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-}
-
-.touch-stick {
-  position: absolute;
-  margin: 0;
-  padding: 0;
-  min-inline-size: 0;
-  left: max(16px, env(safe-area-inset-left, 0px));
-  bottom: max(20px, env(safe-area-inset-bottom, 0px));
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 70%, transparent);
-  background: color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--palette-accent, #a78bfa) 22%, transparent);
-}
-
-.touch-stick-knob {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  border: 1.5px solid var(--palette-local, #5eead4);
-  background: color-mix(in srgb, var(--palette-local, #5eead4) 22%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--palette-local, #5eead4) 40%, transparent);
 }
 
 .touch-fire {
@@ -721,18 +693,6 @@ body.touch-play .touch-controls:not([hidden]) {
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
-  .touch-stick {
-    width: 96px;
-    height: 96px;
-    left: max(20px, env(safe-area-inset-left, 0px));
-    bottom: max(12px, env(safe-area-inset-bottom, 0px));
-  }
-
-  .touch-stick-knob {
-    width: 36px;
-    height: 36px;
-  }
-
   .touch-fire {
     width: 64px;
     height: 64px;

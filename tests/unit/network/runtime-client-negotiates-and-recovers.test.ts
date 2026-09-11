@@ -16,8 +16,7 @@ import { tickAbilityHost } from '../../../src/entities/ship/shipAbilities';
 import { resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp } from '../../../src/input/keybindings';
 import { handleMouseDown, handleMouseUp } from '../../../src/input/mouse';
-import { applyStickSample } from '../../../src/input/touchControls';
-import { readStickSample } from '../../../src/input/touchStick';
+import { setTouchHeading } from '../../../src/input/touchControls';
 import {
   applyAsteroidRowToBelt,
   bindAsteroidFieldApply,
@@ -130,9 +129,9 @@ describe('actual ConnectionManager WebSocket message path', () => {
       release: (player: Player) => handleMouseUp(new MouseEvent('mouseup', { button: 2 }), player),
     },
     {
-      source: 'touch stick',
-      press: (player: Player) => applyStickSample(player, readStickSample(80, 0, 0, 0)),
-      release: (player: Player) => applyStickSample(player, null),
+      source: 'touch steering',
+      press: (player: Player) => setTouchHeading(player, 0),
+      release: (player: Player) => setTouchHeading(player, null),
     },
   ])(
     'late Hauler snapshots preserve held and released $source thrust',

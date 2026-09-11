@@ -71,7 +71,6 @@ type TouchControlLayout = {
   viewport: { width: number; height: number };
   overflow: boolean;
   canvas: { width: number; height: number } | null;
-  stick: TouchControlBox | null;
   fire: TouchControlBox | null;
   ability: TouchControlBox | null;
   shield: TouchControlBox | null;
@@ -96,7 +95,6 @@ export async function readTouchControlLayout(page: Page): Promise<TouchControlLa
       viewport: { width: window.innerWidth, height: window.innerHeight },
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
       canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
-      stick: box(document.getElementById('touch-stick')),
       fire: box(document.getElementById('touch-fire')),
       ability: box(document.getElementById('touch-ability')),
       shield: box(document.getElementById('touch-shield')),

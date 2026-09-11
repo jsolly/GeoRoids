@@ -49,6 +49,56 @@ function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
   return { errors, warnings };
 }
 
+test(
+  'touching the playfield steers toward the finger and release stops thrust',
+  async () => {
+    const page = await browserManager.recreatePage({ hasTouch: true });
+    if (!page) {
+      throw new Error('Page not available');
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const diagnostics = collectConsole(page);
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
+    const center = await centerOf(page, '#gameCanvas');
+    const session = await page.context().newCDPSession(page);
+    let touchActive = false;
+    try {
+      const points = [
+        { x: center.x + 100, y: center.y, angle: 0 },
+        { x: center.x, y: center.y - 100, angle: Math.PI / 2 },
+        { x: center.x - 100, y: center.y, angle: -Math.PI },
+        { x: center.x, y: center.y + 100, angle: -Math.PI / 2 },
+      ];
+      for (const [index, point] of points.entries()) {
+        await dispatchTouch(session, index === 0 ? 'touchStart' : 'touchMove', [
+          { x: point.x, y: point.y, id: 1 },
+        ]);
+        touchActive = true;
+        await game.waitForAnimationFrames(2);
+        expect((await readLocalTouchState(page)).thrusting).toBe(true);
+        const angle = await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.angle);
+        expect(angle).toBeCloseTo(point.angle, 3);
+      }
+      await dispatchTouch(session, 'touchEnd', []);
+      touchActive = false;
+      await game.waitForAnimationFrames(2);
+      expect((await readLocalTouchState(page)).thrusting).toBe(false);
+      expect(await page.locator('#touch-stick').count()).toBe(0);
+      expect(diagnostics).toEqual({ errors: [], warnings: [] });
+    } finally {
+      try {
+        if (touchActive) {
+          await dispatchTouch(session, 'touchCancel', []);
+        }
+      } finally {
+        await session.detach();
+      }
+    }
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);
+
 test.each(KITS)(
   'touch E and F support movement, firing, cancellation, and cooldown for $kitId',
   async ({ kitId, label, name }) => {
@@ -73,7 +123,7 @@ test.each(KITS)(
     expect(await page.locator('#touch-ability').getAttribute('aria-label')).toBe(name);
     expect(await page.locator('#touch-shield').getAttribute('aria-label')).toBe('Shield bubble');
 
-    const stick = await centerOf(page, '#touch-stick');
+    const stick = await centerOf(page, '#gameCanvas');
     const fire = await centerOf(page, '#touch-fire');
     const ability = await centerOf(page, '#touch-ability');
     const shield = await centerOf(page, '#touch-shield');
@@ -101,7 +151,7 @@ test.each(KITS)(
     expect(
       await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
     ).toBe(true);
-    expect(await page.locator('#touch-stick-knob').getAttribute('style')).toContain('translate');
+    expect(await page.locator('#touch-stick').count()).toBe(0);
 
     // E and F must remain usable while the two continuous touch sources are
     // held. The E action is kit-specific; the F bubble is shared.
@@ -196,9 +246,7 @@ test.each(KITS)(
     expect(
       await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
     ).toBe(false);
-    expect(await page.locator('#touch-stick-knob').getAttribute('style')).toBe(
-      'transform: translate(-50%, -50%);'
-    );
+    expect(await page.locator('#touch-stick').count()).toBe(0);
 
     const mobileScreenshot = screenshotManager.getScreenshotPath(`wave2-touch-${kitId}-mobile.png`);
     await page.screenshot({ path: mobileScreenshot });
@@ -222,7 +270,7 @@ test(
     const game = new GameInteractions(page);
     await game.bootGame();
     const livesBefore = await game.getLives();
-    const stick = await centerOf(page, '#touch-stick');
+    const stick = await centerOf(page, '#gameCanvas');
     const fire = await centerOf(page, '#touch-fire');
     const session = await page.context().newCDPSession(page);
     try {

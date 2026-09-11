@@ -45,9 +45,6 @@ export const CANVAS = {
 // TOUCH CONTROLS
 // ============================================================================
 export const TOUCH = {
-  STICK_RADIUS: 56,
-  STICK_DEADZONE: 0.18,
-  STICK_THRUST: 0.38,
   FIRE_SIZE: 72,
   // Canvas space reserved above the fire button so the radar stays readable.
   FIRE_RESERVE: 112,

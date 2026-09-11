@@ -51,9 +51,6 @@ if (typeof window !== 'undefined') {
       <div id="gameArea" style="display: none">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
-          <fieldset id="touch-stick" class="touch-stick" aria-label="Steer and thrust">
-            <div id="touch-stick-knob" class="touch-stick-knob"></div>
-          </fieldset>
           <button id="touch-fire" type="button" class="touch-fire">FIRE</button>
         </div>
       </div>

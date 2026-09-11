@@ -13,7 +13,6 @@ import {
   SHIELD,
   SHIP,
   SHOCKWAVE,
-  TOUCH,
 } from '../constants';
 import { getShipKit, SHIP_ABILITY, type ShipKitId } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
@@ -109,8 +108,8 @@ export const articles: WikiArticle[] = [
       {
         heading: 'Touch',
         paragraphs: [
-          `On touch screens, drag the left virtual stick to aim. The stick has a ${TOUCH.STICK_RADIUS} pixel radius and an ${TOUCH.STICK_DEADZONE * 100} percent deadzone; thrust starts at ${TOUCH.STICK_THRUST * 100} percent of the stick radius. Hold the right FIRE control to fire, and use the E and F touch buttons for the same kit ability and shield actions as keyboard controls. The touch control loop repeats firing while FIRE is held.`,
-          'Tap a rock to select it. A Hauler also latches it, or anchors it as a second rock while latched. Flick at least 40 pixels on the playfield: down releases, left brakes, right spins, and up anchors the rock where the gesture started. These gestures work independently of the stick and action buttons. Any ship can inspect a selected rock; only a Hauler can move it.',
+          'On touch screens, touch and hold the playfield to steer toward your finger and thrust. Drag to change direction; release to stop thrusting and coast. A touch directly on the ship keeps its current heading. Hold FIRE with another finger to fire, and use the ability and SHIELD buttons for the same actions as E and F. Action buttons do not steer the ship.',
+          'While holding one finger to steer, use a second finger to tap a rock and select it. A Hauler also latches it, or anchors it as a second rock while latched. Flick at least 40 pixels on the playfield: down releases, left brakes, right spins, and up anchors the rock where the gesture started. These gestures work independently of steering and action buttons. Any ship can inspect a selected rock; only a Hauler can move it.',
         ],
       },
     ],
@@ -118,7 +117,6 @@ export const articles: WikiArticle[] = [
     sources: [
       'src/input/keybindings.ts',
       'src/input/mouse.ts',
-      'src/input/touchStick.ts',
       'src/input/touchControls.ts',
       'src/input/touchAbility.ts',
       'src/input/controlSources.ts',
@@ -128,7 +126,6 @@ export const articles: WikiArticle[] = [
       'src/constants/index.ts',
       'tests/integration/entities/input/keybindings.test.ts',
       'tests/integration/entities/input/mouse.test.ts',
-      'tests/unit/input/touchStick.test.ts',
       'tests/unit/input/touchAbility.test.ts',
       'tests/unit/input/mouseDesktop.test.ts',
     ],

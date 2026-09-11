@@ -449,13 +449,14 @@ try {
         );
       }
       const networkProbes: Array<{ route: string; milliseconds: number; bytes: number }> = [];
-      for (const route of [
+      const networkRoutes: string[] = [
         healthUrl,
         socketUrl.replace(/^ws:/, 'http:').replace(/\/ws$/, '/health'),
-      ]) {
+      ];
+      for (const route of networkRoutes) {
         for (let i = 0; i < 3; i++) {
           const start = performance.now();
-          const response = await fetch(route, { signal: AbortSignal.timeout(10_000) });
+          const response: Response = await fetch(route, { signal: AbortSignal.timeout(10_000) });
           assert(response.ok, 'Network calibration failed');
           const body = await response.arrayBuffer();
           networkProbes.push({

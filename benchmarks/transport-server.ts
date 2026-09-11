@@ -60,7 +60,7 @@ async function shutdown(failure?: unknown) {
     }
     eventLoopDelay.disable();
     if (process.connected) {
-      process.disconnect();
+      process.disconnect?.();
     }
   }
 }

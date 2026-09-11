@@ -55,8 +55,11 @@ async function waitForMessage(
       () => {
         client.assertHealthy();
         while (stream.cursor < client.messages.length) {
-          const index = stream.cursor++;
-          const packet = client.messages[index];
+          // @types/node 26 + noUncheckedIndexedAccess makes `arr[i++]` a circular
+          // inference (TS7022). Read the cursor, then advance it separately.
+          const index: number = stream.cursor;
+          const packet: WireMessage | undefined = client.messages.at(index);
+          stream.cursor += 1;
           assert(packet);
           assert.notEqual(packet.type, 'error', String(packet.data));
           if (packet.type === 'joined') {

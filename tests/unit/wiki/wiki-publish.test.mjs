@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { expect, test } from 'vitest';
 import {
+  assertWorkflowContext,
   isAllowedWikiPath,
   parseGitNameStatus,
   parseGitTree,
@@ -56,12 +57,12 @@ function commit(cwd, message) {
   return git(cwd, ['rev-parse', 'HEAD']).trim();
 }
 
-function materializeInFixture(cwd, parent, main, overlay) {
+function materializeInFixture(cwd, parent, main, overlay, options = {}) {
   const moduleUrl = pathToFileURL(resolve('scripts/wiki-publish.mjs')).href;
   const code = [
     `import { materializeCombinedTree } from ${JSON.stringify(moduleUrl)};`,
     `process.chdir(${JSON.stringify(cwd)});`,
-    `process.stdout.write(materializeCombinedTree(${JSON.stringify(parent)}, ${JSON.stringify(main)}, ${JSON.stringify(overlay)}));`,
+    `process.stdout.write(materializeCombinedTree(${JSON.stringify(parent)}, ${JSON.stringify(main)}, ${JSON.stringify(overlay)}, ${JSON.stringify(options)}));`,
   ].join('\n');
   try {
     return execFileSync(process.execPath, ['--input-type=module', '--eval', code], {
@@ -71,6 +72,19 @@ function materializeInFixture(cwd, parent, main, overlay) {
   } catch (error) {
     throw new Error(error.stderr?.toString() || error.message);
   }
+}
+
+function snapshotMatchesInFixture(cwd, snapshot, main, source) {
+  const moduleUrl = pathToFileURL(resolve('scripts/wiki-publish.mjs')).href;
+  const code = [
+    `import { existingSnapshotMatches } from ${JSON.stringify(moduleUrl)};`,
+    `process.chdir(${JSON.stringify(cwd)});`,
+    `process.stdout.write(String(existingSnapshotMatches(${JSON.stringify(snapshot)}, ${JSON.stringify(main)}, ${JSON.stringify(source)})));`,
+  ].join('\n');
+  return execFileSync(process.execPath, ['--input-type=module', '--eval', code], {
+    cwd,
+    encoding: 'utf8',
+  }).trim();
 }
 
 test('the Pages CMS payload validates the draft ref and workflow SHA', () => {
@@ -91,6 +105,18 @@ test('the Pages CMS payload validates the draft ref and workflow SHA', () => {
 
   expect(parsed.sourceRef).toBe('codex/wiki-drafts');
   expect(parsed.workflowSha).toBe(SOURCE_SHA);
+  expect(() =>
+    assertWorkflowContext(parsed, {
+      eventRef: 'refs/heads/main',
+      repositoryName: 'jsolly/georoids',
+    })
+  ).not.toThrow();
+  expect(() =>
+    assertWorkflowContext(parsed, {
+      eventRef: 'refs/heads/main',
+      repositoryName: 'other/georoids',
+    })
+  ).toThrow(/does not match this workflow repository/);
   expect(() =>
     parsePagesCmsPayload(
       JSON.stringify({
@@ -199,6 +225,68 @@ test('Git name-status parsing keeps paths with spaces intact', () => {
   expect(parseGitNameStatus('M\0content/wiki/a long title.md\0')).toEqual([
     { status: 'M', path: 'content/wiki/a long title.md' },
   ]);
+});
+
+test('the snapshot normalizes CMS Markdown that omits its final newline', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'georoids-wiki-publish-normalize-'));
+  try {
+    git(fixture, ['init', '--initial-branch', 'main']);
+    git(fixture, ['config', 'user.name', 'fixture']);
+    git(fixture, ['config', 'user.email', 'fixture@example.test']);
+    mkdirSync(join(fixture, 'content', 'wiki'), { recursive: true });
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'base\n');
+    commit(fixture, 'base');
+    git(fixture, ['switch', '--create', 'codex/wiki-drafts']);
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'saved from CMS');
+    const draft = commit(fixture, 'editor save');
+    git(fixture, ['switch', 'main']);
+    const main = git(fixture, ['rev-parse', 'HEAD']).trim();
+
+    const snapshot = materializeInFixture(fixture, draft, main, draft, {
+      normalizeMarkdown: true,
+    });
+    expect(git(fixture, ['show', `${snapshot}:content/wiki/article.md`])).toBe('saved from CMS\n');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('a later CMS save stays publishable after a normalized snapshot', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'georoids-wiki-publish-retry-'));
+  try {
+    git(fixture, ['init', '--initial-branch', 'main']);
+    git(fixture, ['config', 'user.name', 'fixture']);
+    git(fixture, ['config', 'user.email', 'fixture@example.test']);
+    mkdirSync(join(fixture, 'content', 'wiki'), { recursive: true });
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'base\n');
+    const base = commit(fixture, 'base');
+    git(fixture, ['switch', '--create', 'codex/wiki-drafts']);
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'saved from CMS');
+    const firstDraft = commit(fixture, 'editor save');
+    git(fixture, ['switch', 'main']);
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'saved from CMS\n');
+    const published = commit(
+      fixture,
+      `squash: publish first save\n\nGeoRoids wiki draft snapshot: ${firstDraft}`
+    );
+    git(fixture, ['switch', 'codex/wiki-drafts']);
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'second CMS save');
+    const secondDraft = commit(fixture, 'editor second save');
+
+    const firstSnapshot = materializeInFixture(fixture, firstDraft, published, firstDraft, {
+      normalizeMarkdown: true,
+    });
+    expect(snapshotMatchesInFixture(fixture, firstSnapshot, published, firstDraft)).toBe('true');
+    const secondSnapshot = materializeInFixture(fixture, secondDraft, published, secondDraft, {
+      normalizeMarkdown: true,
+    });
+    expect(git(fixture, ['show', `${secondSnapshot}:content/wiki/article.md`])).toBe(
+      'second CMS save\n'
+    );
+    expect(git(fixture, ['show', `${base}:content/wiki/article.md`])).toBe('base\n');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });
 
 test('an independent same-file main edit stops publication instead of being overwritten', () => {

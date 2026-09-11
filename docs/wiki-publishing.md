@@ -6,26 +6,28 @@ publication. Editors save Markdown articles and raster images on the persistent
 request from one checked snapshot, waits for `CI / ci`, and enables squash
 auto-merge into `main`.
 
-## Finish the live setup before inviting the email collaborator
+## Live setup status
+
+The Pages CMS GitHub App is installed and authorized for `jsolly/GeoRoids`, the
+`pagescms@jsolly.com` email account has repository access, and the persistent
+`codex/wiki-drafts` branch is initialized from `main`. Open the [draft editor](https://app.pagescms.org/jsolly/GeoRoids/codex%2Fwiki-drafts)
+directly so the CMS stays on the editor branch instead of defaulting to `main`.
+A real email-editor save roundtrip and the **Publish wiki** workflow dispatch
+have been exercised. Final publish success and production merge remain pending
+until a harmless saved change completes the full workflow.
 
 Pages CMS supports email-invited collaborators who do not have a GitHub account
-for day-to-day article and media editing. John plans to use
-`pagescms@jsolly.com` for email sign-in; that address must be added as a Pages
-CMS collaborator after the administrator completes the setup. The email collaborator path does not remove
-the setup requirement for the repository administrator: the initial repository
+for day-to-day article and media editing. The email collaborator path does not
+remove the setup requirement for the repository administrator: initial repository
 authorization and collaborator administration require a real GitHub identity,
-and the Pages CMS GitHub App must be installed and authorized for `jsolly/GeoRoids`.
-See the [Pages CMS authentication documentation](https://pagescms.org/docs/development/authentication/)
-for the token selection and the routes that require a GitHub user.
+and the Pages CMS GitHub App must be installed and authorized for
+`jsolly/GeoRoids`. See the [Pages CMS authentication documentation](https://pagescms.org/docs/development/authentication/)
+for the token selection and the routes that require a GitHub user. Additional
+collaborators require an explicit email address and administrator action.
 
-The GitHub App installation, repository authorization, and collaborator setup
-have not been verified in this checkout. Complete those steps in the hosted
-Pages CMS account, add the email collaborator, and run one end-to-end publish
-with a harmless article change before treating the live setup as complete.
-
-The first live run also needs a persistent `codex/wiki-drafts` branch. Create it
-from the current `main` branch before an editor opens the CMS. Do not recreate or
-force-push this branch. Pages CMS saves editor commits there.
+If the integration is reinstalled or transferred, complete those administrator
+steps before using the email editor. Do not recreate or force-push
+`codex/wiki-drafts`; Pages CMS saves editor commits there.
 
 ## Configure the Pages CMS action
 
@@ -128,6 +130,13 @@ The workflow accepts a Pages CMS payload only when all of these checks pass:
   `public/wiki/uploads/**/*.{png,jpg,jpeg,webp}`.
 - Every file in those two draft trees is a regular `100644` Git blob. Symlinks,
   submodules, executable files, SVG files, and other extensions are rejected.
+
+The compiler accepts the Markdown serialization Pages CMS produces for saved
+articles, including omitted optional empty `media` metadata, compact frontmatter
+delimiters, and a missing final newline. Before creating an immutable snapshot,
+the publisher normalizes changed Markdown to LF line endings and one trailing
+newline so the protected PR satisfies repository Markdown checks. The persistent
+draft branch keeps the CMS's saved tree for continued editing.
 
 The publisher refreshes the current draft branch with the `main` tree before it
 builds a snapshot. The refresh creates a merge commit whose tree keeps the

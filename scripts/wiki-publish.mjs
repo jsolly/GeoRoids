@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -334,11 +335,29 @@ function entryMap(ref) {
   return new Map(treeEntries(ref).map((entry) => [entry.path, entry]));
 }
 
+function normalizeWikiMarkdownText(source) {
+  return `${source.replace(/\r\n/g, '\n').replace(/\n+$/, '')}\n`;
+}
+
 function sameTreeEntry(left, right) {
   if (!left || !right) {
     return !left && !right;
   }
-  return left.mode === right.mode && left.type === right.type && left.sha === right.sha;
+  if (left.mode !== right.mode || left.type !== right.type) {
+    return false;
+  }
+  if (left.sha === right.sha) {
+    return true;
+  }
+  return (
+    left.type === 'blob' &&
+    left.mode === '100644' &&
+    isAllowedWikiPath(left.path) &&
+    isAllowedWikiPath(right.path) &&
+    left.path === right.path &&
+    normalizeWikiMarkdownText(git(['cat-file', 'blob', left.sha])) ===
+      normalizeWikiMarkdownText(git(['cat-file', 'blob', right.sha]))
+  );
 }
 
 function publishedSnapshotTrees(mainSha, overlaySha) {
@@ -374,7 +393,22 @@ function pathChangedAfterPublication(publicationSha, mainSha, path) {
   return git(['log', '--format=%H', `${publicationSha}..${mainSha}`, '--', path]).trim() !== '';
 }
 
-function stageCombinedWikiTree(mainSha, overlaySha) {
+function normalizeWikiMarkdownFiles(paths) {
+  for (const path of paths) {
+    if (!path.startsWith('content/wiki/') || !path.toLowerCase().endsWith('.md')) {
+      continue;
+    }
+    const source = readFileSync(path, 'utf8');
+    const normalized = normalizeWikiMarkdownText(source);
+    if (normalized === source) {
+      continue;
+    }
+    writeFileSync(path, normalized);
+    git(['add', '--', path]);
+  }
+}
+
+function stageCombinedWikiTree(mainSha, overlaySha, { normalizeMarkdown = false } = {}) {
   const mainEntries = validateWikiTree(treeEntries(mainSha));
   const overlayEntries = validateWikiTree(treeEntries(overlaySha));
   const baseSha = git(['merge-base', mainSha, overlaySha]).trim();
@@ -458,13 +492,16 @@ function stageCombinedWikiTree(mainSha, overlaySha) {
   for (const path of useOverlay) {
     git(['checkout', overlaySha, '--', path]);
   }
+  if (normalizeMarkdown) {
+    normalizeWikiMarkdownFiles(useOverlay);
+  }
   return git(['write-tree']).trim();
 }
 
-function combinedTreeCommit(parentSha, mainSha, overlaySha, message) {
+function combinedTreeCommit(parentSha, mainSha, overlaySha, message, options = {}) {
   switchToDetached(mainSha);
   try {
-    const treeSha = stageCombinedWikiTree(mainSha, overlaySha);
+    const treeSha = stageCombinedWikiTree(mainSha, overlaySha, options);
     const commitSha = commitTree(treeSha, [parentSha, mainSha], message);
     // The workflow checkout is disposable. Clear the temporary overlay before
     // the next branch operation so Git never treats it as an editor change.
@@ -476,12 +513,13 @@ function combinedTreeCommit(parentSha, mainSha, overlaySha, message) {
   }
 }
 
-export function materializeCombinedTree(parentSha, mainSha, overlaySha) {
+export function materializeCombinedTree(parentSha, mainSha, overlaySha, options = {}) {
   return combinedTreeCommit(
     parentSha,
     mainSha,
     overlaySha,
-    `chore(wiki): materialize ${overlaySha} on ${mainSha}`
+    `chore(wiki): materialize ${overlaySha} on ${mainSha}`,
+    options
   );
 }
 
@@ -567,10 +605,18 @@ function prepareSourceTree(mainSha, sourceSha) {
   );
 }
 
-function existingSnapshotMatches(snapshotSha, mainSha, sourceTreeSha) {
+function wikiTreesEquivalent(leftRef, rightRef) {
+  const left = entryMap(leftRef);
+  const right = entryMap(rightRef);
+  const paths = new Set([...left.keys(), ...right.keys()]);
+  return [...paths].every((path) => sameTreeEntry(left.get(path), right.get(path)));
+}
+
+export function existingSnapshotMatches(snapshotSha, mainSha, sourceTreeSha) {
   validateChangedPaths(changedPaths(mainSha, snapshotSha));
   validateWikiTree(treeEntries(snapshotSha));
-  return gitQuiet(['diff', '--quiet', sourceTreeSha, snapshotSha, '--', ...ALLOWED_ROOTS]);
+  validateWikiTree(treeEntries(sourceTreeSha));
+  return wikiTreesEquivalent(sourceTreeSha, snapshotSha);
 }
 
 function createSnapshotBranch(mainSha, sourceTreeSha, sourceSha) {
@@ -594,7 +640,7 @@ function createSnapshotBranch(mainSha, sourceTreeSha, sourceSha) {
     git(['branch', '--delete', '--force', branch]);
   }
   git(['switch', '--create', branch, mainSha]);
-  stageCombinedWikiTree(mainSha, sourceTreeSha);
+  stageCombinedWikiTree(mainSha, sourceTreeSha, { normalizeMarkdown: true });
   if (gitQuiet(['diff', '--cached', '--quiet', '--', ...ALLOWED_ROOTS])) {
     switchToDetached(mainSha);
     return { branch, sha: mainSha, changed: false };
@@ -860,16 +906,21 @@ async function enableAutoMergeAndWait(pullRequest, draftSha, snapshotSha) {
   throw new PublishError(`Timed out waiting for squash auto-merge of PR #${pullRequest.number}`);
 }
 
-function assertWorkflowContext(parsed) {
-  const eventRef = normalizeRef(process.env.GITHUB_REF || process.env.GITHUB_REF_NAME);
-  if (eventRef !== MAIN_BRANCH) {
+export function assertWorkflowContext(
+  parsed,
+  {
+    eventRef = process.env.GITHUB_REF || process.env.GITHUB_REF_NAME,
+    repositoryName = process.env.GITHUB_REPOSITORY,
+  } = {}
+) {
+  const normalizedEventRef = normalizeRef(eventRef);
+  if (normalizedEventRef !== MAIN_BRANCH) {
     throw new PublishError(
-      `wiki-publish.yml must run on ${MAIN_BRANCH}; received ${String(eventRef)}`
+      `wiki-publish.yml must run on ${MAIN_BRANCH}; received ${String(normalizedEventRef)}`
     );
   }
-  const repositoryName = process.env.GITHUB_REPOSITORY;
   const payloadName = `${parsed.repository.owner}/${parsed.repository.repo}`;
-  if (repositoryName && payloadName !== repositoryName) {
+  if (repositoryName && payloadName.toLowerCase() !== repositoryName.toLowerCase()) {
     throw new PublishError(
       `Pages CMS repository ${payloadName} does not match this workflow repository ${repositoryName}`
     );

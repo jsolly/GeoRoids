@@ -10,7 +10,7 @@ export const DEFAULT_SHIP_KIT_ID: ShipKitId = 'dart';
 /** Ability flavor — geo is optional spice, not a kit requirement. */
 type ShipAbilityFlavor = 'combat' | 'utility' | 'geo';
 
-export type ShipAbilityId = 'boostDash' | 'harpoon' | 'shieldFocus' | 'burstFire' | 'shockPulse';
+export type ShipAbilityId = 'boostDash' | 'harpoon' | 'shieldFocus' | 'ringFire' | 'shockPulse';
 
 export interface HullProfile {
   nose: number;
@@ -31,7 +31,6 @@ interface ShipKit {
   maxVelocity: number;
   turnSpeed: number;
   shotCooldown: number;
-  burstCount: number;
 }
 
 /** Classic triangle. Kept for the leftover 3-point helper; play hulls use v2 outlines. */
@@ -92,13 +91,19 @@ export const SHIP_ABILITY = {
   HARPOON_RANGE_MAX: 1_000_000,
   HARPOON_FRAMES: 90,
   HARPOON_PULL: 0.42,
+  HARPOON_SLING_SPEED: 12,
+  HARPOON_INTERCEPT_FRAMES: 120,
+  HARPOON_PATH_ALIGNMENT: Math.cos(Math.PI / 12),
+  HARPOON_REEL_SPEED: 16,
+  HARPOON_REEL_ACCELERATION: 1.2,
+  HARPOON_RELEASE_GAP: 16,
   HARPOON_SLACK: 1.25,
   /** Warden's projected E shield duration. F uses the longer regular bubble. */
   SHIELD_PROJECTION_FRAMES: 180,
   SHIELD_PROJECTION_RANGE: 600,
-  BURST_SPREAD: 0.12,
-  SHOCK_RADIUS: 200,
-  SHOCK_FORCE: 3.2,
+  SHOCK_RADIUS: 420,
+  SHOCK_FORCE: 24,
+  SHOCK_EDGE_FORCE_RATIO: 0.5,
   COOLDOWN_FRAMES: {
     dart: 90,
     hauler: 180,
@@ -122,14 +127,13 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxVelocity: SHIP.MAX_VELOCITY,
     turnSpeed: SHIP.TURN_SPEED,
     shotCooldown: 250,
-    burstCount: 1,
   },
   hauler: {
     id: 'hauler',
     name: 'Hauler',
     abilityId: 'harpoon',
     abilityName: 'Harpoon',
-    abilityHint: 'Latch and haul a nearby rock or ship',
+    abilityHint: 'Sling a rock at an enemy or haul a hostile ship',
     flavor: 'utility',
     maxHealth: 140,
     size: 38,
@@ -137,7 +141,6 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxVelocity: 6,
     turnSpeed: 380,
     shotCooldown: 280,
-    burstCount: 1,
   },
   warden: {
     id: 'warden',
@@ -152,14 +155,13 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxVelocity: 7,
     turnSpeed: SHIP.TURN_SPEED,
     shotCooldown: 260,
-    burstCount: 1,
   },
   skirmisher: {
     id: 'skirmisher',
     name: 'Skirmisher',
-    abilityId: 'burstFire',
-    abilityName: 'Burst fire',
-    abilityHint: 'Three-shot volley',
+    abilityId: 'ringFire',
+    abilityName: 'Ring fire',
+    abilityHint: 'Fire a full ring of bullets outward',
     flavor: 'combat',
     maxHealth: 80,
     size: 28,
@@ -167,14 +169,13 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxVelocity: 8.5,
     turnSpeed: 540,
     shotCooldown: 200,
-    burstCount: 3,
   },
   quake: {
     id: 'quake',
     name: 'Quake',
     abilityId: 'shockPulse',
     abilityName: 'Shock pulse',
-    abilityHint: 'Knock nearby rocks and ships',
+    abilityHint: 'Blast everything nearby violently outward',
     flavor: 'geo',
     maxHealth: 110,
     size: 34,
@@ -182,7 +183,6 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxVelocity: SHIP.MAX_VELOCITY,
     turnSpeed: SHIP.TURN_SPEED,
     shotCooldown: 270,
-    burstCount: 1,
   },
 };
 

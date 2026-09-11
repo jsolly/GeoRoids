@@ -8,6 +8,8 @@ export const PLAYER_MOTION = {
   /** Lead credit covers 150ms transport jitter once, not once per packet. */
   poseLeadFrames: 9,
   poseTolerance: 2,
+  /** External blast speed decays back to the normal flight cap each frame. */
+  knockbackRetention: 0.96,
 } as const;
 
 export function finiteMotionVector(vector: Position): boolean {

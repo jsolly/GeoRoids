@@ -145,7 +145,7 @@ export function computeHudLayout(
       }
     : {
         x: viewport.width - padRight - miniMapSize,
-        y: viewport.height - padBottom - TOUCH.FIRE_RESERVE - miniMapSize,
+        y: viewport.height - padBottom - TOUCH.ACTION_RESERVE - miniMapSize,
         size: miniMapSize,
       };
 

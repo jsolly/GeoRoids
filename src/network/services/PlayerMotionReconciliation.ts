@@ -103,6 +103,7 @@ export class PlayerMotionReconciliation {
       ship.lastLocalFuelWriteMs = 0;
       ship.position = { ...snapshot.position };
       ship.velocity = { ...snapshot.velocity };
+      ship.knockbackVelocityLimit = Math.hypot(snapshot.velocity.x, snapshot.velocity.y);
       ship.angle = snapshot.angle;
       ship.mass = snapshot.mass;
     }

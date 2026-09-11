@@ -1,3 +1,4 @@
+import { PLAYER_MOTION } from '../../shared/playerMotion';
 import { GROWTH, maxVelocityFromMass, thrustScaleFromMass } from '../../shared/shipGrowth';
 import type { Position, Velocity } from '../../shared-types';
 import { GAME, LASER, SHIP } from '../../src/constants';
@@ -18,6 +19,7 @@ interface MovableShip {
   angle: number;
   thrusting: boolean;
   mass?: number;
+  knockbackVelocityLimit?: number;
 }
 
 /**
@@ -28,7 +30,8 @@ interface MovableShip {
 export function applyShipMotionFrame(ship: MovableShip): void {
   const mass = ship.mass ?? GROWTH.BASE_MASS;
   const thrustScale = thrustScaleFromMass(mass);
-  const maxVelocity = maxVelocityFromMass(mass);
+  const blastLimit = ship.knockbackVelocityLimit ?? 0;
+  const maxVelocity = Math.max(maxVelocityFromMass(mass), blastLimit);
 
   if (ship.thrusting) {
     ship.velocity.x += (Math.cos(ship.angle) * SHIP.THRUST * thrustScale) / GAME.FPS;
@@ -47,12 +50,16 @@ export function applyShipMotionFrame(ship: MovableShip): void {
 
   applySharedShipSlope(ship.velocity, ship.position);
   const afterSlope = Math.hypot(ship.velocity.x, ship.velocity.y);
-  if (afterSlope > SHIP.MAX_VELOCITY) {
-    const scale = SHIP.MAX_VELOCITY / afterSlope;
+  const absoluteLimit = Math.max(SHIP.MAX_VELOCITY, blastLimit);
+  if (afterSlope > absoluteLimit) {
+    const scale = absoluteLimit / afterSlope;
     ship.velocity.x *= scale;
     ship.velocity.y *= scale;
   }
 
+  if (ship.knockbackVelocityLimit !== undefined) {
+    ship.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;
+  }
   ship.position.x += ship.velocity.x;
   ship.position.y += ship.velocity.y;
 }

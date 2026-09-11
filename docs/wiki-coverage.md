@@ -9,19 +9,19 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, five kits, starting a life |
-| controls | Start here | Keyboard, mouse, touch, and movement controls |
+| controls | Start here | Keyboard, mouse, touch steering, playfield tap-to-fire, and movement controls |
 | dart | Ships | Stats scorecard, boost dash |
-| hauler | Ships | Stats scorecard and combat harpoon |
+| hauler | Ships | Stats scorecard, combat harpoon reel, collision-course sling, and fallback bounce |
 | warden | Ships | Stats scorecard, automatic friendly E projection, reflective F shield |
-| skirmisher | Ships | Stats scorecard, normal fire, E three-shot burst |
-| quake | Ships | Stats scorecard, fuel-gated shock pulse |
+| skirmisher | Ships | Stats scorecard, normal fire, E full outward laser ring |
+| quake | Ships | Stats scorecard, fuel-gated physical-object shock pulse |
 | fuel-growth | Systems | Fuel tank, fuel drops, loot mass, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO profiles, hostile patrols, auto-collected Echo and Relay interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, shields, faction gate exceptions, lives, respawn, score |
-| factions | Combat | ION and EMBER assignment, direct fire, collisions, ricochets, bots |
-| hud-network | Systems | Health capsule, HUD values, minimap, settings, reconnect |
+| factions | Combat | ION and EMBER assignment, direct fire, collisions, ricochets, two opposite bots, faction colors, and bot labels |
+| hud-network | Systems | Health capsule, faction colors and bot labels, HUD values, minimap, settings, reconnect |
 
 ## Coverage matrix
 
@@ -33,11 +33,11 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | How do fuel, mass, shards, cores, and kill loot work? | fuel-growth | shared/fuel.ts, shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | fuel-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
-| How does a Hauler pull a nearby target? | hauler | src/entities/ship/harpoonField.ts, ship ability tests |
+| How does a Hauler pull, sling, or bounce a nearby target? | hauler | src/entities/ship/harpoonField.ts, harpoonSling.ts, ship ability tests |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, satellite managers, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
 | What hurts me, protects me, kills me, and resets on respawn? | combat-survival, factions | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
-| What do bots do? | combat-survival, factions | server/ai/botController.ts, authoritative combat tests |
+| What do bots do and how do I identify their side? | combat-survival, factions, hud-network | server/ai/botController.ts, shared/factions.ts, faction and authoritative combat tests |
 | How do I read the HUD and recover from a disconnect? | hud-network | src/rendering/hud/, ConnectionManager.ts, broadcaster, snapshot protocol |
 
 ## Maintenance rules
@@ -72,11 +72,14 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 - The ordinary Hauler E uses a view-aware reach with a 280-unit minimum and
   prefers a valid asteroid in reach over a hostile ship. Same-faction ships,
-  shielded ships, exploding ships, and dead entities are rejected. A miss does
-  not spend the cooldown. While an asteroid is actively harpooned, it passes
+  shielded ships, exploding ships, and dead entities are rejected. A clear
+  momentum collision course keeps its heading; other rocks reel toward the
+  Hauler and release near the hull toward a predicted enemy. A miss does not
+  spend the cooldown. While an asteroid is actively harpooned, it passes
   through that Hauler without collision damage; unrelated asteroids and other
   pilots keep normal collision damage, and the target collides normally again
-  after the timer or attachment ends.
+  after the tether expires. A rock with no eligible enemy at release bounces
+  away from the Hauler.
 - Warden E automatically projects a 3-second shield to the nearest living ally
   in reach, preferring the forward hemisphere and then the nearest fallback. It
   reflects hostile lasers but does not stop collisions. Warden F is a separate
@@ -95,8 +98,11 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
   lives, score, faction, kit, and fuel.
-- The current KeyE Quake path is the fuel-gated shock pulse. Legacy EMP helpers
-  remain in the source and should not be used to invent a second player action.
+- The current KeyE Quake path is the fuel-gated shock pulse. It applies a strong
+  outward impulse to nearby ships, rocks, loot, satellites, pickups, and shots;
+  the pulse itself deals no direct damage, though the resulting motion can still
+  cause ordinary collisions. Legacy EMP helpers remain in the source and should
+  not be used to invent a second player action.
 - A laser detonation of any loot kind reaches every nearby live hull, including
   the shooter and allies, and bypasses faction filtering and both shield lanes.
   It deals 40 damage within an 80-unit radius, while spawn protection is the
@@ -104,6 +110,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Normal ship-to-ship collision ticks use the faction damage gate. Satellites
   remain hostile to every faction, and reflected lasers are marked as ricochets
   so they can damage the originating or same-faction pilot.
+- The default match keeps two bots, one Ion and one Ember. Blue and orange
+  hull, name, and minimap colors identify those sides, while bot labels include
+  “(bot)”.
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.

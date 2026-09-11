@@ -16,7 +16,7 @@ const ABILITY_LABEL: Record<ShipAbilityId, string> = {
   boostDash: 'DASH',
   harpoon: 'HOOK',
   shieldFocus: 'GUARD',
-  burstFire: 'BURST',
+  ringFire: 'RING',
   shockPulse: 'PULSE',
 };
 

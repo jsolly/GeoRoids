@@ -188,7 +188,7 @@ describe('painted HUD composition', () => {
         text: 'ION',
         x: 27,
         y: 38,
-        style: normalizedCanvasColor(ctx, 'rgba(168,160,200,0.85)'),
+        style: normalizedCanvasColor(ctx, 'rgba(125,211,252,0.85)'),
         font: '11px Arial',
         align: 'left',
       },
@@ -432,7 +432,7 @@ describe('painted HUD composition', () => {
     // One arena ring, four batched world marks, then three two-pass pilot hulls.
     expect(strokes).toHaveLength(11);
     const botHeading = strokes.filter(
-      (call) => call.style === normalizedCanvasColor(ctx, '#FB923C')
+      (call) => call.style === normalizedCanvasColor(ctx, '#64748B') && call.points[0]?.[0] === 765
     );
     expect(botHeading).toHaveLength(1);
     expect(botHeading[0]?.points).toEqual([
@@ -440,7 +440,9 @@ describe('painted HUD composition', () => {
       [756, 538.5],
       [756, 533.5],
     ]);
-    const heading = strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#5EEAD4'));
+    const heading = strokes.filter(
+      (call) => call.style === normalizedCanvasColor(ctx, '#64748B') && call.points[0]?.[0] === 736
+    );
     expect(heading).toHaveLength(1);
     const hull = heading[0];
     if (!hull) {
@@ -453,7 +455,7 @@ describe('painted HUD composition', () => {
       [733, 540.8],
     ]);
     const rivalHeading = strokes.filter(
-      (call) => call.style === normalizedCanvasColor(ctx, '#7DD3FC')
+      (call) => call.style === normalizedCanvasColor(ctx, '#64748B') && call.points[0]?.[0] === 717
     );
     expect(rivalHeading).toHaveLength(1);
     expect(rivalHeading[0]?.points).toEqual([

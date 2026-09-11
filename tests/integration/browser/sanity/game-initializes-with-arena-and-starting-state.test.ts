@@ -25,6 +25,16 @@ test(
     const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);
     expect(health).toBe(maxHealth);
     expect(await game.getAsteroidCount()).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window.gameController?.getNetworkManager().getAllPlayers() ?? [])
+            .filter((player) => player.type === 'bot')
+            .map((player) => player.factionId ?? player.ship.factionId)
+            .sort()
+        )
+      )
+      .toEqual(['ember', 'ion']);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

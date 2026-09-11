@@ -19,6 +19,27 @@ function fixture() {
 }
 
 describe('player motion recovery', () => {
+  it('a server blast survives the flight cap and then decays back to normal control speed', () => {
+    const { ship, prediction } = fixture();
+    prediction.rebase(
+      row({
+        position: { x: 0, y: 0 },
+        velocity: { x: 24, y: 0 },
+        playerMotion: { epoch: 3, mode: 'free', ack: 0 },
+      }),
+      ship,
+      17
+    );
+    ship.thrusting = false;
+    ship.update();
+    expect(ship.position.x).toBeGreaterThan(20);
+    expect(ship.velocity.x).toBeGreaterThan(ship.maxVelocity * 2);
+    for (let frame = 0; frame < 90; frame++) {
+      ship.update();
+    }
+    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(ship.maxVelocity);
+  });
+
   it('keeps handoff movement suppressed until a free-mode snapshot confirms the anchored acknowledgment', () => {
     const { ship, prediction } = fixture();
     prediction.rebase(

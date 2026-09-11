@@ -22,6 +22,7 @@ import {
   SHOCKWAVE,
 } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS, type ShipKitId } from '../entities/ship/shipKits';
+import { SKIRMISHER_RING_COUNT } from '../entities/ship/skirmisherRing';
 import { getGameBoundary } from '../physics/boundary';
 
 function seconds(frames: number): string {
@@ -91,7 +92,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Harpoon values',
       paragraphs: [
-        `The combat harpoon has a minimum range of ${SHIP_ABILITY.HARPOON_RANGE} units, lasts ${frameValue(SHIP_ABILITY.HARPOON_FRAMES)}, and applies pull strength ${SHIP_ABILITY.HARPOON_PULL} with distance falloff.`,
+        `The combat harpoon has a minimum range of ${SHIP_ABILITY.HARPOON_RANGE} units, lasts ${frameValue(SHIP_ABILITY.HARPOON_FRAMES)} for nearby catches, and applies pull strength ${SHIP_ABILITY.HARPOON_PULL} with distance falloff.`,
+        `A clear momentum collision course is accepted within a ${Math.round((Math.acos(SHIP_ABILITY.HARPOON_PATH_ALIGNMENT) * 180) / Math.PI)}-degree path and keeps the rock's heading, boosting it to at least ${SHIP_ABILITY.HARPOON_SLING_SPEED} units per frame while preserving faster momentum. Other rocks reel toward the Hauler at a relative target of ${SHIP_ABILITY.HARPOON_REEL_SPEED} units per frame with ${SHIP_ABILITY.HARPOON_REEL_ACCELERATION} units per-frame acceleration, then release near the hull with a ${SHIP_ABILITY.HARPOON_RELEASE_GAP} unit safety gap toward a predicted enemy within ${frameValue(SHIP_ABILITY.HARPOON_INTERCEPT_FRAMES)}.`,
       ],
     },
   ],
@@ -113,9 +115,9 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [shipStats('skirmisher')],
     },
     {
-      heading: 'Burst values',
+      heading: 'Ring values',
       paragraphs: [
-        `E creates ${getShipKit('skirmisher').burstCount} shots with a ${SHIP_ABILITY.BURST_SPREAD} radian spread. The local laser cap is ${SHIP.MAX_LASERS}.`,
+        `E creates ${SKIRMISHER_RING_COUNT} evenly spaced shots around the hull. The local laser cap for regular Space shots is ${SHIP.MAX_LASERS}.`,
       ],
     },
   ],
@@ -127,7 +129,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Pulse and fuel values',
       paragraphs: [
-        `E costs ${FUEL.EMP_COST} fuel, reaches ${SHIP_ABILITY.SHOCK_RADIUS} units, and applies force ${SHIP_ABILITY.SHOCK_FORCE} with distance falloff. A life starts with ${FUEL.START} fuel and the tank maximum is ${FUEL.MAX}.`,
+        `E costs ${FUEL.EMP_COST} fuel, reaches ${SHIP_ABILITY.SHOCK_RADIUS} units, and applies force ${SHIP_ABILITY.SHOCK_FORCE} with distance falloff and an edge force ratio of ${SHIP_ABILITY.SHOCK_EDGE_FORCE_RATIO}. It pushes nearby physical objects without direct damage. A life starts with ${FUEL.START} fuel and the tank maximum is ${FUEL.MAX}.`,
       ],
     },
   ],

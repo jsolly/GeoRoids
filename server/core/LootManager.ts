@@ -1,12 +1,15 @@
 import { createFuelLootData, isFuelLoot, shouldReleaseFuel } from '../../shared/fuel';
 import { canCollectLoot, GROWTH, lootOverlap, planKillLoot } from '../../shared/shipGrowth';
-import type { AsteroidData, LootData, Position } from '../../shared-types';
+import type { AsteroidData, LootData, Position, Velocity } from '../../shared-types';
 import { FUEL } from '../../src/constants';
+import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';
 import type { GameEntity } from './EntityManager';
+import { QUAKE_KNOCKBACK_DECAY } from './quakeMotion';
 import type { RNGService } from './RNGService';
 
 interface TrackedLoot extends LootData {
   expiresAt: number;
+  velocity: Velocity;
 }
 
 export class LootManager {
@@ -25,6 +28,7 @@ export class LootManager {
     const drop: TrackedLoot = {
       ...createFuelLootData(`fuel-${this.nextId++}`, asteroid.position),
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+      velocity: { x: 0, y: 0 },
     };
     this.loot.set(drop.id, drop);
     this.enforceCap();
@@ -65,6 +69,7 @@ export class LootManager {
       radius: GROWTH.LOOT_RADIUS,
       kind: 'shard',
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+      velocity: { x: 0, y: 0 },
     };
     this.loot.set(drop.id, drop);
     this.enforceCap();
@@ -84,6 +89,7 @@ export class LootManager {
       radius: GROWTH.LOOT_RADIUS + 3,
       kind: 'laserCore',
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+      velocity: { x: 0, y: 0 },
     };
     this.loot.set(drop.id, drop);
     this.enforceCap();
@@ -130,10 +136,25 @@ export class LootManager {
 
   public expire(gameTime: number): void {
     for (const [id, drop] of this.loot) {
+      drop.position.x += drop.velocity.x;
+      drop.position.y += drop.velocity.y;
+      drop.velocity.x *= QUAKE_KNOCKBACK_DECAY;
+      drop.velocity.y *= QUAKE_KNOCKBACK_DECAY;
       if (gameTime >= drop.expiresAt) {
         this.loot.delete(id);
       }
     }
+  }
+
+  /** Apply a Quake kick to every live loot body; motion advances in expire(). */
+  public applyQuakePulse(origin: Position, fallbackAngle = 0): number {
+    let affected = 0;
+    for (const drop of this.loot.values()) {
+      if (applyQuakeImpulse(drop, origin, fallbackAngle)) {
+        affected += 1;
+      }
+    }
+    return affected;
   }
 
   public getAll(): LootData[] {
@@ -163,6 +184,7 @@ export class LootManager {
       radius: GROWTH.LOOT_RADIUS,
       kind: 'wreckage',
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+      velocity: { x: 0, y: 0 },
     };
   }
 

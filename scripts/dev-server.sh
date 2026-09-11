@@ -359,7 +359,9 @@ start() {
         export NODE_ENV=development
         export VITEST=false
         export PORT="$DEV_SERVER_PORT"
-        export VITE_WEBSOCKET_URL="ws://localhost:$DEV_SERVER_PORT/ws"
+        # Keep gameplay on the page origin so LAN clients and HTTPS tunnels work.
+        export VITE_WEBSOCKET_URL=""
+        export GEOROIDS_TEST_SERVER_PORT="$DEV_SERVER_PORT"
         exec npx --no-install concurrently \
             --kill-others \
             --prefix-colors "blue.bold,green.bold" \

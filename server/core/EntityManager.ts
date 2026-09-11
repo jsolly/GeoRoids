@@ -15,7 +15,7 @@ import type {
   SoftFactionId,
   Velocity,
 } from '../../shared-types';
-import { DEBUG, FUEL, PALETTE, SHIP } from '../../src/constants';
+import { DEBUG, FUEL, GAME, PALETTE, SHIP } from '../../src/constants';
 import { parseSoftFactionId } from '../../src/entities/player/softFactions';
 import { clearShieldProjection, tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import {
@@ -41,6 +41,13 @@ import type { RNGService } from './RNGService';
 /** Keep lives/score after a dropped socket so the same id can rejoin. */
 const HUMAN_REJOIN_STASH_TTL_MS = 5 * 60 * 1000;
 
+function factionForBotSlot(slot: number, firstFaction: SoftFactionId): SoftFactionId {
+  if (slot % 2 === 0) {
+    return firstFaction;
+  }
+  return firstFaction === 'ion' ? 'ember' : 'ion';
+}
+
 interface HumanRejoinStash {
   lives: number;
   score: number;
@@ -54,6 +61,7 @@ export interface GameEntity extends ShieldState {
   type: 'human' | 'bot';
   position: Position;
   velocity: Velocity;
+  knockbackVelocityLimit?: number;
   angle: number;
   exploding: boolean;
   thrusting: boolean;
@@ -428,7 +436,10 @@ export class EntityManager {
   }
 
   // Bot management
-  public createBots(count: number, bounds = { radius: getAsteroidFieldRadius() }): GameEntity[] {
+  public createBots(
+    count: number = GAME.BOT_COUNT,
+    bounds = { radius: getAsteroidFieldRadius() }
+  ): GameEntity[] {
     // Clear existing bots
     const existingBots = this.getBots();
     for (const bot of existingBots) {
@@ -448,14 +459,16 @@ export class EntityManager {
       'Meteor Striker',
     ];
 
-    // Use DEBUG bot count if available
-    const botCount = DEBUG.BOT_PLAYER.COUNT ?? count;
+    // Debug may override the default match size, but production callers retain
+    // the configured count so explicit tests and diagnostics remain predictable.
+    const botCount = DEBUG.ENABLED ? (DEBUG.BOT_PLAYER.COUNT ?? count) : count;
 
     // Use a separate seed sequence for bots to avoid interference with asteroids
     const originalState = this.rng.getState();
     this.rng.setState(0x9e3779b9 + 0x12345678); // Different seed for bots
 
     const newBots: GameEntity[] = [];
+    const firstFaction = this.nextFaction();
 
     for (let i = 0; i < Math.min(botCount, botNames.length); i++) {
       const botId = `server-bot-${i}`;
@@ -492,7 +505,7 @@ export class EntityManager {
         lastUpdate: this.now(),
         spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
         kitId: DEFAULT_SHIP_KIT_ID,
-        factionId: this.nextFaction(),
+        factionId: factionForBotSlot(i, firstFaction),
         abilityCooldownFrames: 0,
         abilityActiveFrames: 0,
         shieldTimer: 0,
@@ -710,6 +723,7 @@ export class EntityManager {
     };
     entity.angle = this.rng.random() * Math.PI * 2;
     entity.velocity = { x: 0, y: 0 };
+    delete entity.knockbackVelocityLimit;
   }
 
   // Controller-driven bot step. Same hull physics as players; only the brain is unique.
@@ -768,7 +782,7 @@ export class EntityManager {
 
   // Atomic bot creation to prevent race conditions
   public createBotsSafely(
-    count: number,
+    count: number = GAME.BOT_COUNT,
     bounds = { radius: getAsteroidFieldRadius() }
   ): GameEntity[] | null {
     if (this.isCreatingBots) {

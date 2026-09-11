@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { centerOf } from '../../utils/touch-input';
+import { canvasPoint } from '../../utils/touch-input';
 import { localPlayerId, observeLaser, parkLaserClient } from './laser-observation';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
@@ -91,7 +91,7 @@ async function paintedShotFrames(page: Page) {
 
 for (const touch of [false, true]) {
   test(
-    `${touch ? 'touch Fire' : 'a mouse click'} keeps one painted local bolt through delayed server acknowledgement`,
+    `${touch ? 'a canvas touch' : 'a mouse click'} keeps one painted local bolt through delayed server acknowledgement`,
     async () => {
       const page = touch
         ? await browserManager.recreatePage({ hasTouch: true })
@@ -139,8 +139,8 @@ for (const touch of [false, true]) {
       const observation = observeLaser(page, shooterId, false, true);
       try {
         if (touch) {
-          const fire = await centerOf(page, '#touch-fire');
-          await page.touchscreen.tap(fire.x, fire.y);
+          const firePoint = await canvasPoint(page, 0.75, 0.5);
+          await page.touchscreen.tap(firePoint.x, firePoint.y);
         } else {
           await page.mouse.click(640, 450);
         }

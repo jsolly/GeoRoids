@@ -7,6 +7,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import {
+  canvasPoint,
   centerOf,
   dispatchTouch,
   readTouchControlLayout,
@@ -19,10 +20,8 @@ function assertLayoutFitsViewport(
   layout: Awaited<ReturnType<typeof readTouchControlLayout>>
 ): void {
   expect(layout.overflow).toBe(false);
-  expect(layout.canvas?.width).toBeGreaterThan(0);
-  expect(layout.canvas?.height).toBeGreaterThan(0);
   for (const [name, control] of [
-    ['fire', layout.fire],
+    ['canvas', layout.canvas],
     ['ability', layout.ability],
     ['shield', layout.shield],
   ] as const) {
@@ -41,7 +40,7 @@ function assertLayoutFitsViewport(
 }
 
 test(
-  'a mobile pilot sustains steer and fire, uses ability and shield, then releases on resize and cancellation',
+  'a mobile pilot sustains steering and autofire, uses ability and shield, then releases on resize and cancellation',
   async () => {
     await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
@@ -61,21 +60,21 @@ test(
       { timeout: 5000 }
     );
 
-    const stick = await centerOf(page, '#gameCanvas');
-    const fire = await centerOf(page, '#touch-fire');
+    const steer = await centerOf(page, '#gameCanvas');
+    const firePoint = await canvasPoint(page, 0.75, 0.5);
     const ability = await centerOf(page, '#touch-ability');
     const shield = await centerOf(page, '#touch-shield');
     const session = await page.context().newCDPSession(page);
     const beforeHold = await readTouchControlState(page);
 
     await dispatchTouch(session, 'touchStart', [
-      { x: stick.x + 42, y: stick.y, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { x: steer.x + 42, y: steer.y, id: 11 },
+      { ...firePoint, id: 12 },
     ]);
     await game.waitForAnimationFrames(60);
     await dispatchTouch(session, 'touchMove', [
-      { x: stick.x + 48, y: stick.y - 6, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { x: steer.x + 48, y: steer.y - 6, id: 11 },
+      { ...firePoint, id: 12 },
     ]);
     await game.waitForAnimationFrames(60);
 
@@ -88,15 +87,10 @@ test(
         duringHold.position.y - beforeHold.position.y
       )
     ).toBeGreaterThan(5);
-    expect(
-      await page
-        .locator('#touch-fire')
-        .evaluate((element) => element.classList.contains('is-pressed'))
-    ).toBe(true);
 
     const held = [
-      { x: stick.x + 48, y: stick.y - 6, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { x: steer.x + 48, y: steer.y - 6, id: 11 },
+      { ...firePoint, id: 12 },
     ];
     await dispatchTouch(session, 'touchStart', [...held, { ...ability, id: 13 }]);
     await dispatchTouch(session, 'touchMove', held);
@@ -104,11 +98,6 @@ test(
     const afterAbility = await readTouchControlState(page);
     expect(afterAbility.abilityCooldownFrames).toBeGreaterThan(0);
     expect(afterAbility.thrusting).toBe(true);
-    expect(
-      await page
-        .locator('#touch-fire')
-        .evaluate((element) => element.classList.contains('is-pressed'))
-    ).toBe(true);
 
     await dispatchTouch(session, 'touchStart', [...held, { ...shield, id: 14 }]);
     await dispatchTouch(session, 'touchMove', held);
@@ -116,32 +105,22 @@ test(
     const afterShield = await readTouchControlState(page);
     expect(afterShield.shieldActive).toBe(true);
     expect(afterShield.thrusting).toBe(true);
-    expect(
-      await page
-        .locator('#touch-fire')
-        .evaluate((element) => element.classList.contains('is-pressed'))
-    ).toBe(true);
 
     await dispatchTouch(session, 'touchCancel', []);
     await game.waitForAnimationFrames(2);
     const afterCancel = await readTouchControlState(page);
     expect(afterCancel.thrusting).toBe(false);
     expect(afterCancel.canShoot).toBe(true);
-    expect(
-      await page
-        .locator('#touch-fire')
-        .evaluate((element) => element.classList.contains('is-pressed'))
-    ).toBe(false);
 
     await page.screenshot({
       path: screenshotManager.getScreenshotPath('performance-mobile-portrait.png'),
     });
 
-    const portraitStick = await centerOf(page, '#gameCanvas');
-    const portraitFire = await centerOf(page, '#touch-fire');
+    const portraitSteer = await centerOf(page, '#gameCanvas');
+    const portraitFire = await canvasPoint(page, 0.75, 0.5);
     await dispatchTouch(session, 'touchStart', [
-      { x: portraitStick.x + 42, y: portraitStick.y, id: 21 },
-      { x: portraitFire.x, y: portraitFire.y, id: 22 },
+      { x: portraitSteer.x + 42, y: portraitSteer.y, id: 21 },
+      { ...portraitFire, id: 22 },
     ]);
     await game.waitForAnimationFrames(6);
     expect((await readTouchControlState(page)).thrusting).toBe(true);
@@ -153,11 +132,6 @@ test(
     const afterResize = await readTouchControlState(page);
     expect(afterResize.thrusting).toBe(false);
     expect(afterResize.canShoot).toBe(true);
-    expect(
-      await page
-        .locator('#touch-fire')
-        .evaluate((element) => element.classList.contains('is-pressed'))
-    ).toBe(false);
     expect(await page.locator('#touch-stick').count()).toBe(0);
     assertLayoutFitsViewport(await readTouchControlLayout(page));
 

@@ -93,6 +93,7 @@ export class AuthoritativeProjectileField {
         const laser =
           previous.get(row.id) ?? new Laser({ ...row.position }, { ...row.velocity }, 0, 0);
         laser.serverId = row.id;
+        laser.abilityShot = row.abilityShot ?? false;
         laser.position = { ...row.position };
         laser.prevPosition = { ...row.prevPosition };
         laser.velocity = { ...row.velocity };

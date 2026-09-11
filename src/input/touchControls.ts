@@ -7,13 +7,16 @@ import { controlSources, resetTouchSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
 import { readAbilityChrome, readShieldChrome } from './touchAbility';
 
-const FIRE_ID = 'touch-fire';
 const ABILITY_ID = 'touch-ability';
 const SHIELD_ID = 'touch-shield';
 const ROOT_ID = 'touch-controls';
 
 let initialized = false;
+const TAP_MAX_MS = 220;
+const TAP_SLOP_PX = 12;
 let steerPointerId: number | null = null;
+let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
+let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
 let shieldPointerId: number | null = null;
@@ -114,10 +117,6 @@ export function syncTouchChrome(
   }
 }
 
-function setFirePressed(pressed: boolean): void {
-  document.getElementById(FIRE_ID)?.classList.toggle('is-pressed', pressed);
-}
-
 function setAbilityPressed(pressed: boolean): void {
   document.getElementById(ABILITY_ID)?.classList.toggle('is-pressed', pressed);
 }
@@ -196,10 +195,16 @@ function releasePointerCapture(element: HTMLElement | null, pointerId: number | 
   }
 }
 
+function clearSteerHoldTimer(): void {
+  if (steerHoldTimer !== null) {
+    clearTimeout(steerHoldTimer);
+    steerHoldTimer = null;
+  }
+}
+
 /** Clear every pointer source when the browser takes the gesture away. */
 function resetTouchInteraction(player: Player | null): void {
   const canvas = canvasManager.getCanvas();
-  const fire = document.getElementById(FIRE_ID);
   const ability = document.getElementById(ABILITY_ID);
   const shield = document.getElementById(SHIELD_ID);
   const activeSteerPointerId = steerPointerId;
@@ -207,13 +212,15 @@ function resetTouchInteraction(player: Player | null): void {
   const activeAbilityPointerId = abilityPointerId;
   const activeShieldPointerId = shieldPointerId;
   steerPointerId = null;
+  clearSteerHoldTimer();
+  steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
   shieldPointerId = null;
   abilityPointerClickPending = false;
   shieldPointerClickPending = false;
   releasePointerCapture(canvas, activeSteerPointerId);
-  releasePointerCapture(fire, activeFirePointerId);
+  releasePointerCapture(canvas, activeFirePointerId);
   releasePointerCapture(ability, activeAbilityPointerId);
   releasePointerCapture(shield, activeShieldPointerId);
   if (player) {
@@ -222,7 +229,6 @@ function resetTouchInteraction(player: Player | null): void {
   } else {
     resetTouchSources();
   }
-  setFirePressed(false);
   setAbilityPressed(false);
   setShieldPressed(false);
 }
@@ -233,7 +239,6 @@ function requireLocalPlayer(): Player | null {
 
 function ensureTouchDom(): {
   root: HTMLElement;
-  fire: HTMLElement;
   ability: HTMLElement;
   shield: HTMLElement;
 } {
@@ -279,33 +284,12 @@ function ensureTouchDom(): {
     shield.setAttribute('aria-label', 'Shield bubble');
   }
 
-  let fire = document.getElementById(FIRE_ID);
-  if (!fire) {
-    fire = document.createElement('button');
-    fire.id = FIRE_ID;
-    fire.className = 'touch-fire';
-    fire.setAttribute('type', 'button');
-    fire.setAttribute('aria-label', 'Fire');
-    fire.textContent = 'FIRE';
-    root.appendChild(fire);
-  }
-  fire.setAttribute('type', 'button');
-  if (!fire.getAttribute('aria-label')) {
-    fire.setAttribute('aria-label', 'Fire');
-  }
-
-  return { root, fire, ability, shield };
+  return { root, ability, shield };
 }
 
-function onSteerPointerDown(ev: PointerEvent): void {
+function onPlayfieldPointerDown(ev: PointerEvent): void {
   const canvas = canvasManager.getCanvas();
-  if (
-    !canvas ||
-    !isTouchChromeVisible() ||
-    ev.pointerType !== 'touch' ||
-    ev.target !== canvas ||
-    steerPointerId !== null
-  ) {
+  if (!canvas || !isTouchChromeVisible() || ev.pointerType !== 'touch' || ev.target !== canvas) {
     return;
   }
   const player = requireLocalPlayer();
@@ -313,9 +297,30 @@ function onSteerPointerDown(ev: PointerEvent): void {
     return;
   }
   ev.preventDefault();
+  if (steerPointerId !== null) {
+    if (steerTap) {
+      moveSteering({ clientX: steerTap.x, clientY: steerTap.y });
+    }
+    clearSteerHoldTimer();
+    steerTap = null;
+    onFirePointerDown(ev, canvas);
+    return;
+  }
   steerPointerId = ev.pointerId;
+  steerTap =
+    firePointerId === null
+      ? { x: ev.clientX, y: ev.clientY, startedAt: ev.timeStamp, canFire: true }
+      : null;
   canvas.setPointerCapture(ev.pointerId);
-  moveSteering(ev);
+  if (steerTap) {
+    steerHoldTimer = setTimeout(() => {
+      steerHoldTimer = null;
+      steerTap = null;
+      moveSteering(ev);
+    }, TAP_MAX_MS);
+  } else {
+    moveSteering(ev);
+  }
 }
 
 function onSteerPointerMove(ev: PointerEvent): void {
@@ -323,19 +328,40 @@ function onSteerPointerMove(ev: PointerEvent): void {
     return;
   }
   ev.preventDefault();
+  if (steerTap && Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX) {
+    return;
+  }
+  clearSteerHoldTimer();
+  steerTap = null;
   moveSteering(ev);
 }
 
-function onSteerPointerUp(ev: PointerEvent): void {
+function onPlayfieldPointerUp(ev: PointerEvent): void {
+  if (ev.pointerId === firePointerId) {
+    onFirePointerUp(ev);
+    return;
+  }
   if (ev.pointerId !== steerPointerId) {
     return;
   }
   ev.preventDefault();
+  const tap =
+    ev.type === 'pointerup' &&
+    steerTap !== null &&
+    steerTap.canFire &&
+    ev.timeStamp - steerTap.startedAt <= TAP_MAX_MS &&
+    Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX;
   steerPointerId = null;
+  clearSteerHoldTimer();
+  steerTap = null;
   releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
   const player = requireLocalPlayer();
   if (player) {
     setTouchHeading(player, null);
+    if (tap) {
+      setTouchFire(player, true);
+      setTouchFire(player, false);
+    }
   } else {
     controlSources.touchHeading = null;
     controlSources.touchThrust = false;
@@ -343,7 +369,7 @@ function onSteerPointerUp(ev: PointerEvent): void {
   }
 }
 
-function moveSteering(ev: PointerEvent): void {
+function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
   const player = requireLocalPlayer();
   const canvas = canvasManager.getCanvas();
   if (!player || !canvas) {
@@ -357,14 +383,13 @@ function moveSteering(ev: PointerEvent): void {
   setTouchHeading(player, dx === 0 && dy === 0 ? player.ship.angle : Math.atan2(-dy, dx));
 }
 
-function onFirePointerDown(ev: PointerEvent, fire: HTMLElement): void {
+function onFirePointerDown(ev: PointerEvent, canvas: HTMLCanvasElement): void {
   if (firePointerId !== null) {
     return;
   }
   ev.preventDefault();
   firePointerId = ev.pointerId;
-  fire.setPointerCapture(ev.pointerId);
-  setFirePressed(true);
+  canvas.setPointerCapture(ev.pointerId);
   const player = requireLocalPlayer();
   if (player) {
     setTouchFire(player, true);
@@ -373,14 +398,13 @@ function onFirePointerDown(ev: PointerEvent, fire: HTMLElement): void {
   }
 }
 
-function onFirePointerUp(ev: PointerEvent, fire: HTMLElement): void {
+function onFirePointerUp(ev: PointerEvent): void {
   if (ev.pointerId !== firePointerId) {
     return;
   }
   ev.preventDefault();
   firePointerId = null;
-  releasePointerCapture(fire, ev.pointerId);
-  setFirePressed(false);
+  releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
   const player = requireLocalPlayer();
   if (player) {
     setTouchFire(player, false);
@@ -396,6 +420,9 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
   ev.preventDefault();
   // Pointer activation already performs the action. Consume the follow-up
   // native click so a touch tap cannot activate E twice.
+  if (steerTap) {
+    steerTap.canFire = false;
+  }
   abilityPointerClickPending = true;
   abilityPointerId = ev.pointerId;
   ability.setPointerCapture(ev.pointerId);
@@ -447,6 +474,9 @@ function onShieldPointerDown(ev: PointerEvent, shield: HTMLElement): void {
   ev.preventDefault();
   // Pointer activation already performs the action. Consume the follow-up
   // native click so a touch tap cannot toggle F twice.
+  if (steerTap) {
+    steerTap.canFire = false;
+  }
   shieldPointerClickPending = true;
   shieldPointerId = ev.pointerId;
   shield.setPointerCapture(ev.pointerId);
@@ -499,24 +529,18 @@ export function initializeTouchControls(): void {
     return;
   }
 
-  const { fire, ability, shield } = ensureTouchDom();
+  const { ability, shield } = ensureTouchDom();
   abilityButton = ability;
   shieldButton = shield;
 
-  document.addEventListener('pointerdown', onSteerPointerDown, { passive: false, capture: true });
-  document.addEventListener('pointermove', onSteerPointerMove, { passive: false });
-  document.addEventListener('pointerup', onSteerPointerUp);
-  document.addEventListener('pointercancel', onSteerPointerUp);
-  document.addEventListener('lostpointercapture', onSteerPointerUp);
-
-  fire.addEventListener('pointerdown', (ev) => onFirePointerDown(ev, fire));
-  fire.addEventListener('pointerup', (ev) => onFirePointerUp(ev, fire));
-  fire.addEventListener('pointercancel', (ev) => onFirePointerUp(ev, fire));
-  fire.addEventListener('lostpointercapture', () => {
-    if (firePointerId !== null) {
-      resetTouchInteraction(requireLocalPlayer());
-    }
+  document.addEventListener('pointerdown', onPlayfieldPointerDown, {
+    passive: false,
+    capture: true,
   });
+  document.addEventListener('pointermove', onSteerPointerMove, { passive: false });
+  document.addEventListener('pointerup', onPlayfieldPointerUp);
+  document.addEventListener('pointercancel', onPlayfieldPointerUp);
+  document.addEventListener('lostpointercapture', onPlayfieldPointerUp);
 
   ability.addEventListener('pointerdown', (ev) => onAbilityPointerDown(ev, ability));
   ability.addEventListener('pointerup', (ev) => onAbilityPointerUp(ev, ability));

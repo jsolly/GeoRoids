@@ -96,7 +96,7 @@ test('rejoined pilots occupy one row while ties, current-player emphasis and com
     'Echo',
     '90',
     '2.',
-    'Relay',
+    'Relay (bot)',
     '90',
     '3.',
     'Pilot',
@@ -108,10 +108,10 @@ test('rejoined pilots occupy one row while ties, current-player emphasis and com
   const names = calls.filter((_, index) => index % 3 === 1);
   expect(names).toEqual(
     [
-      ['Echo', 18, 'rgba(125, 211, 252, 0.78)'],
-      ['Relay', 34, 'rgba(251, 146, 60, 0.78)'],
+      ['Echo', 18, 'rgba(251, 146, 60, 0.78)'],
+      ['Relay (bot)', 34, 'rgba(251, 146, 60, 0.78)'],
       ['Pilot', 50, 'rgba(125, 211, 252, 0.92)'],
-      ['Local', 66, 'rgba(94, 234, 212, 0.78)'],
+      ['Local', 66, 'rgba(125, 211, 252, 0.78)'],
     ].map(([text, y, color]) => ({
       text,
       x: 692,
@@ -124,7 +124,7 @@ test('rejoined pilots occupy one row while ties, current-player emphasis and com
   expect(
     calls.filter((_, index) => index % 3 === 2).map(({ x, textAlign }) => ({ x, textAlign }))
   ).toEqual(Array.from({ length: 4 }, () => ({ x: 828, textAlign: 'right' })));
-  expect(strokes).toEqual(['#d4b896', '#d4b896', '#a8a0c8', '#a8a0c8']);
+  expect(strokes).toEqual(['#fb923c', '#fb923c', '#7dd3fc', '#7dd3fc']);
   expect(ctx.textAlign).toBe('center');
   expect(ctx.font).toBe('18px serif');
   expect(ctx.fillStyle).toBe('#123456');
@@ -134,7 +134,7 @@ test('long mobile leaderboard names fit before a wide right-aligned score', () =
   const { calls, ctx } = recordingContext();
   const longName = 'QA7skirmisherportrait';
   const wideScore = 987654321;
-  const local = player('local', longName, 'local', wideScore, 'ion');
+  const local = player('local', longName, 'bot', wideScore, 'ion');
   const layout = computeHudLayout({ width: 390, height: 844 }, { touchControls: true });
   drawLeaderboard(ctx, layout, [local], local.id);
 
@@ -151,6 +151,7 @@ test('long mobile leaderboard names fit before a wide right-aligned score', () =
   const scoreWidth = ctx.measureText(score.text).width;
   expect(nameWidth).toBeLessThanOrEqual(score.x - name.x - scoreWidth - 6);
   expect(name.text.length).toBeLessThan(longName.length);
+  expect(name.text.endsWith(' (bot)')).toBe(true);
 });
 
 test('leaderboard name fitting preserves names and Unicode boundaries when there is room', () => {

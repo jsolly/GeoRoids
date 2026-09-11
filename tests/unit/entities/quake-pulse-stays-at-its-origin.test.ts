@@ -3,6 +3,7 @@ import {
   drawQuakePulseRelative,
   startQuakePulse,
 } from '../../../src/entities/ship/quakePulseRenderer';
+import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { Point } from '../../../src/physics/Point';
 import { canvasManager } from '../../../src/rendering/canvas';
 
@@ -56,7 +57,9 @@ test('a remote event preserves its origin and elapsed phase before the first ren
   ship.position.x = 1000;
   drawQuakePulseRelative(ship, { x: 0, y: 0 }, 1200);
   expect(arc.mock.calls[0]?.slice(0, 2)).toEqual([20, 30]);
-  expect(arc.mock.calls[0]?.[2]).toBeCloseTo(200 * (1 - (1 - 300 / 650) ** 2));
+  expect(arc.mock.calls[0]?.[2]).toBeCloseTo(
+    SHIP_ABILITY.SHOCK_RADIUS * (1 - (1 - 300 / 650) ** 2)
+  );
   // The server echo corrects a predicted origin without starting a second wave.
   startQuakePulse(ship, { x: 25, y: 35 }, 0, 1250);
   arc.mockClear();

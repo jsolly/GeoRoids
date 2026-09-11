@@ -305,7 +305,7 @@ export function handleTestPlacePlayer(
     }
 
     const position = { x, y };
-    const placed = gameEngine.asteroidMotion.placeActorForTesting(
+    const placed = gameEngine.playerMotion.placeActorForTesting(
       player.id,
       position,
       gameEngine.getServerTime()
@@ -319,7 +319,7 @@ export function handleTestPlacePlayer(
       status: 'placed',
       playerId: player.id,
       position,
-      ...(player.asteroidMotion ? { motionEpoch: player.asteroidMotion.epoch } : {}),
+      ...(player.playerMotion ? { motionEpoch: player.playerMotion.epoch } : {}),
     });
   });
 }
@@ -379,7 +379,7 @@ export function handleTestArrangeBotShot(
       respond(409, { error: 'No clear fixture firing lane' });
       return;
     }
-    const playerPlaced = gameEngine.asteroidMotion.placeActorForTesting(
+    const playerPlaced = gameEngine.playerMotion.placeActorForTesting(
       player.id,
       lane.playerPosition,
       gameEngine.getServerTime()
@@ -406,7 +406,7 @@ export function handleTestArrangeBotShot(
       playerPosition: lane.playerPosition,
       botPosition: lane.botPosition,
       botHealth: bot.health,
-      ...(player.asteroidMotion ? { motionEpoch: player.asteroidMotion.epoch } : {}),
+      ...(player.playerMotion ? { motionEpoch: player.playerMotion.epoch } : {}),
     });
   });
 }

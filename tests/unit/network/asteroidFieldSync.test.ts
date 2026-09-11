@@ -260,13 +260,11 @@ test('reflection and spin metadata reaches the local rock for live cues and prev
   const reflective = {
     ...roid('reflective-0', 10, 10),
     phenomenon: { kind: 'reflective' as const, clusterId: 'cluster-0', energy: 2, maxEnergy: 6 },
-    spinClass: 'charged' as const,
   };
 
   applyAsteroidKinematics(local, reflective);
 
   expect(local.phenomenon).toEqual(reflective.phenomenon);
-  expect(local.spinClass).toBe('charged');
 });
 
 test('partition scratch arrays and snapshot set stay the same identity', () => {

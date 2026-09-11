@@ -94,31 +94,11 @@ export interface AsteroidPhenomenon {
   maxEnergy: number;
 }
 
-export interface AsteroidMotionState {
+export interface PlayerMotionState {
   epoch: number;
-  mode: 'free' | 'latched' | 'released' | 'handoff';
+  mode: 'free' | 'handoff';
   ack: number;
-  asteroidId?: string;
-  payloadId?: string;
-  latchAngle?: number;
-  tetherMode?: 'spin' | 'anchor' | 'brake';
   anchor?: Position;
-}
-
-export interface AsteroidMotionInput {
-  epoch: number;
-  sequence: number;
-  thrust: boolean;
-  turn: -1 | 0 | 1;
-  aimAngle: number;
-  action?: 'release' | 'anchor' | 'brake' | 'spin';
-  targetId?: string;
-}
-
-export interface AsteroidToolAction {
-  action: 'latch';
-  sequence: number;
-  targetId?: string;
 }
 
 export interface LaserUpgrade {
@@ -160,7 +140,6 @@ export interface AsteroidData {
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
   phenomenon?: AsteroidPhenomenon;
-  spinClass?: 'natural' | 'charged';
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; fuel fills the EMP tank. */
@@ -203,7 +182,7 @@ export interface SatelliteShoot {
 }
 
 export type SatellitePickupTypeId = 'echo' | 'relay';
-export type SatellitePickupState = 'loose' | 'orbiting';
+export type SatellitePickupState = 'loose' | 'orbiting' | 'broken';
 
 /** Server-owned collectible EO communications hardware. */
 export interface SatellitePickupData {
@@ -219,7 +198,8 @@ export interface SatellitePickupData {
   color: string;
   state: SatellitePickupState;
   ownerId: string | null;
-  shieldFramesRemaining: number;
+  health: number;
+  maxHealth: number;
 }
 
 export interface SatellitePickupCollected {
@@ -228,7 +208,6 @@ export interface SatellitePickupCollected {
   playerName: string;
   pickupName: 'Echo' | 'Relay';
   scoreBonus: number;
-  shieldFrames: number;
 }
 
 /** Server-owned collab tag. Clients must not destroy the roid until asteroidDestroy. */
@@ -319,6 +298,10 @@ export interface ServerEntityData {
   abilityCooldownFrames?: number;
   abilityActiveFrames?: number;
   shieldTimer?: number;
+  /** Warden E caster's authoritative projected recipient. */
+  shieldTargetId?: string;
+  /** Authoritative Warden id that currently projects onto this ship. */
+  shieldSourceId?: string;
   harpoonTimer?: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
@@ -328,7 +311,7 @@ export interface ServerEntityData {
   shieldTime?: number;
   shieldCooldown?: number;
   shieldFlashTime?: number;
-  asteroidMotion?: AsteroidMotionState;
+  playerMotion?: PlayerMotionState;
   laserUpgrade?: LaserUpgrade;
 }
 

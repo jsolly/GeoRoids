@@ -153,7 +153,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           color: '#99ffaa',
           state: 'loose',
           ownerId: null,
-          shieldFramesRemaining: 0,
+          health: 50,
+          maxHealth: 50,
         }))
       );
       state.clearOverlay();

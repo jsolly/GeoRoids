@@ -95,7 +95,8 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
       color: '#FBBF24',
       state: tick < 60 ? 'orbiting' : 'loose',
       ownerId: tick < 60 ? 'pilot-0' : null,
-      shieldFramesRemaining: tick < 60 ? 60 - tick : 0,
+      health: 50,
+      maxHealth: 50,
     })),
     satelliteProjectiles:
       tick % 120 < 90

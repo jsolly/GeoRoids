@@ -19,11 +19,10 @@ function motionAsteroid(): AsteroidData {
     vertices: 4,
     offsets: [1, 1, 1, 1],
     material: 'metal',
-    spinClass: 'natural',
   };
 }
 
-function attachedMotionWorld() {
+function enhancedMotionWorld() {
   const world = new GameEngine(99);
   const socket = new RecordingSocket();
   const asteroid = motionAsteroid();
@@ -40,18 +39,9 @@ function attachedMotionWorld() {
   actor.asteroidInteractions = 1;
   actor.spawnProtectionTimer = 0;
   actor.abilityCooldownFrames = 0;
-  const registered = world.asteroidMotion.register(actor, socket, 1, 1000);
+  const registered = world.playerMotion.register(actor, socket, 1, 1000);
   if (!registered.ok) {
     throw new Error(registered.error);
-  }
-  const latched = world.asteroidMotion.latch(
-    socket,
-    { action: 'latch', targetId: asteroid.id, sequence: 0 },
-    [asteroid],
-    1000
-  );
-  if (!latched.ok) {
-    throw new Error(latched.error);
   }
   return { world, actor, asteroid };
 }
@@ -96,14 +86,14 @@ describe('Game clock catch-up after a hitch', () => {
     expect(engine.getDiagnostics().gameTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
   });
 
-  test('a one-second hitch advances attached enhanced motion like 60 normal ticks', () => {
+  test('a one-second hitch advances ordinary asteroids like 60 normal ticks', () => {
     let wallNow = 1000;
     const wallClock = vi.spyOn(Date, 'now').mockImplementation(() => wallNow);
-    let normal: ReturnType<typeof attachedMotionWorld> | undefined;
-    let hitch: ReturnType<typeof attachedMotionWorld> | undefined;
+    let normal: ReturnType<typeof enhancedMotionWorld> | undefined;
+    let hitch: ReturnType<typeof enhancedMotionWorld> | undefined;
     try {
-      normal = attachedMotionWorld();
-      hitch = attachedMotionWorld();
+      normal = enhancedMotionWorld();
+      hitch = enhancedMotionWorld();
       normal.world.stepClock(0);
       hitch.world.stepClock(0);
       const normalInitialRotation = normal.asteroid.rotation;
@@ -122,10 +112,9 @@ describe('Game clock catch-up after a hitch', () => {
       expect(normal.asteroid.rotation).toBeGreaterThan(normalInitialRotation);
       expect(hitch.asteroid.rotation).toBeGreaterThan(hitchInitialRotation);
       expect(hitch.asteroid.rotation).toBeCloseTo(normal.asteroid.rotation, 8);
-      expect(hitch.actor.position.x).toBeCloseTo(normal.actor.position.x, 8);
-      expect(hitch.actor.position.y).toBeCloseTo(normal.actor.position.y, 8);
-      expect(hitch.actor.asteroidMotion).toMatchObject({ mode: 'latched' });
-      expect(hitch.world.asteroidMotion.ownsAsteroidMotion(hitch.asteroid.id)).toBe(true);
+      expect(hitch.actor.position).toEqual({ x: 100, y: 0 });
+      expect(hitch.actor.playerMotion).toMatchObject({ mode: 'free', ack: 0 });
+      expect(hitch.world.playerMotion.ownsActorMotion(hitch.actor.id)).toBe(false);
     } finally {
       normal?.world.stopGameLoop();
       hitch?.world.stopGameLoop();

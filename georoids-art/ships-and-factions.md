@@ -51,9 +51,15 @@ tether VFX. It is not a sixth class and not “VFX-only until Hook.”
 - Latch one nearby rock (forward hemisphere preferred, else nearest in range)
 - While latched, haul that rock toward the Hauler
 - Tether VFX is Hauler only — cream line `#E8D5A3` + amber tip `#FDE68A`
-- Never draw the cable on Dart / Warden / Skirmisher / Quake
+- Never draw the cream harpoon cable on Dart / Warden / Skirmisher / Quake
 
 See `src/entities/ship/shipAbilities.ts` and `drawHaulerHarpoonVfx`.
+
+## Warden shield projection
+
+Warden links to a nearby friendly with a thin mint line (`#7DD3C8`). The recipient
+shows the same transparent shield ring as F. Keep the link distinct from the
+Hauler's cream cable and amber tip; never fill the shield disc.
 
 ## EO satellite NPCs
 

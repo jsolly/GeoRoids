@@ -37,7 +37,7 @@ for snapshots with deadlines instead of assuming an arbitrary delay is enough.
 
 ## Organization and evidence
 
-- `sanity/`: startup, controls, responsive UI, release changes, and asteroid tools.
+- `sanity/`: startup, controls, responsive UI, release changes, basic Hauler harpoons, and reflective asteroids.
 - `e2e/`: complete player and multiplayer scenarios.
 - `collision/`: browser-visible combat outcomes.
 - `laser/`: real firing input and shared projectile trajectories and cleanup.

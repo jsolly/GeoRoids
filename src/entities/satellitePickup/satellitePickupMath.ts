@@ -17,6 +17,14 @@ export function attachOrbitPosition(owner: Position, phase: number, radius: numb
   };
 }
 
+/** Keep an orbiting pickup outside the owner's current grown hull. */
+export function orbitRadiusForOwner(ownerRadius: number, pickupRadius: number): number {
+  return Math.max(
+    SATELLITE_PICKUP.ORBIT_RADIUS,
+    ownerRadius + pickupRadius + SATELLITE_PICKUP.ORBIT_GAP
+  );
+}
+
 export function clampToRadius(position: Position, maxRadius: number): Position {
   const dist = Math.hypot(position.x, position.y);
   if (dist <= maxRadius || dist === 0) {
@@ -59,7 +67,7 @@ export function isWithinCollectRange(
   pickup: Position,
   shipRadius: number,
   pickupRadius: number,
-  slack: number = SATELLITE_PICKUP.COLLECT_SLACK
+  slack = 0
 ): boolean {
   const limit = shipRadius + pickupRadius + slack;
   return Math.hypot(pickup.x - ship.x, pickup.y - ship.y) <= limit;

@@ -307,7 +307,8 @@ describe('painted HUD composition', () => {
         color: '#FBBF24',
         state: 'loose',
         ownerId: null,
-        shieldFramesRemaining: 0,
+        health: 50,
+        maxHealth: 50,
       },
       {
         id: 'radar-pickup-secondary',
@@ -321,7 +322,8 @@ describe('painted HUD composition', () => {
         color: '#FBBF24',
         state: 'loose',
         ownerId: null,
-        shieldFramesRemaining: 0,
+        health: 50,
+        maxHealth: 50,
       },
       {
         id: 'radar-orbiter',
@@ -335,7 +337,8 @@ describe('painted HUD composition', () => {
         color: '#FBBF24',
         state: 'orbiting',
         ownerId: 'radar-remote',
-        shieldFramesRemaining: 120,
+        health: 50,
+        maxHealth: 50,
       },
     ]);
     LootField.getInstance().applySnapshot([
@@ -500,7 +503,8 @@ describe('painted HUD composition', () => {
         color: '#FBBF24',
         state: 'orbiting',
         ownerId: 'radar-remote',
-        shieldFramesRemaining: 120,
+        health: 50,
+        maxHealth: 50,
       },
     ]);
     SatelliteManager.getInstance().syncFromServer([]);

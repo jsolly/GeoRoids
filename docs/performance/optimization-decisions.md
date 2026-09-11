@@ -7,8 +7,8 @@ measurements remain historical evidence only.
 The complete [performance strategy](../performance-and-testing-strategy.md) has
 been checked against the current code, its historical source revision, the local
 experiments, and independent client and server reviews. The current implementation
-includes main through `a83028a`, including the direct controls that replaced the
-Tools menu. [Implementation status](implementation-status.md) records validation
+includes main through `a83028a`, including the direct gameplay controls.
+[Implementation status](implementation-status.md) records validation
 and acceptance gaps separately.
 
 The engineering recommendation is to stop adding optimizations without a measured
@@ -33,7 +33,7 @@ pool, renderer rewrite or protocol change.
 | Hidden-page recovery | Implemented input release, presentation-clock reset and authoritative resync. Reconciliation preserves direct-control gesture cancellation and disabled-snapshot pilot clearing. Held-input and clock-mutation scenarios protect these rules. |
 | Client pools and harpoon-field reuse | Reject adoption without allocation evidence. The harpoon path creates temporary views, but movement replaces position objects; storing references or reusing rows changes ownership requirements. A pool is not justified by allocation syntax alone. |
 | OffscreenCanvas and WebGL | Reject adoption. The current renderer depends on managers, DOM layout and effects; a transfer boundary, fallback and new renderer would add substantial complexity without a demonstrated bottleneck. |
-| Monotonic clock and bounded debt | Implemented. Scheduling uses a monotonic clock, excess simulation debt beyond one second is counted and discarded, and attached-object motion receives the actual simulation-frame delta. Wall-clock reconnect grace retains its meaning. Controlled defects confirmed that repeated debt replay fails the regression tests. |
+| Monotonic clock and bounded debt | Implemented. Scheduling uses a monotonic clock, excess simulation debt beyond one second is counted and discarded, and simulated entity motion receives the actual simulation-frame delta. Wall-clock reconnect grace retains its meaning. Controlled defects confirmed that repeated debt replay fails the regression tests. |
 | Collision index | Reject the tested grid. All 800 seeded worlds preserved outcomes, but the grid was 12.9–342.5 times slower. The [circle experiment](collision-experiment.md) excludes swept projectiles; no projectile-index claim is made. |
 | AI searches and tick-local views | Retain current ownership. Repeated entity arrays and snapshot views in `GameEngine`, `EntityManager` and the broadcaster are potential allocation sites, not demonstrated dominant costs. A loaded CPU/allocation profile is the prerequisite for changing them. |
 | Outbound pressure | Implemented a bounded policy for every gameplay class, including snapshots and gameplay events. Snapshot pressure requires recoverable keyframes; nonrecoverable or permanently oversized writes close explicitly. Enhanced resume tokens survive pressure closure and event-write failure. Metrics distinguish queued acceptance from delivery, which the real clients validate separately. |

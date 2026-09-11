@@ -2,11 +2,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { expect, test } from 'vitest';
-import { articles } from '../../../../src/wiki/content';
+import { articles, mediaForArticle } from '../../../../src/wiki/content';
 import { media } from '../../../../src/wiki/media';
 import { TestConfig } from '../../utils/test-config';
 
-test('pilots find rules, follow related entries, and control demonstrations on desktop and mobile', async () => {
+test('pilots find rules and see autoplay demonstrations on desktop and mobile', async () => {
   const browser = await chromium.launch({ headless: true });
   const output = resolve('tests/integration/browser/screenshots');
   await mkdir(output, { recursive: true });
@@ -16,7 +16,7 @@ test('pilots find rules, follow related entries, and control demonstrations on d
   const failedResponses: string[] = [];
   const page = await browser.newPage({
     viewport: { width: 1280, height: 900 },
-    reducedMotion: 'reduce',
+    reducedMotion: 'no-preference',
   });
   page.on('console', (message) => {
     if (['warning', 'error'].includes(message.type())) {
@@ -62,26 +62,47 @@ test('pilots find rules, follow related entries, and control demonstrations on d
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Hauler');
     expect(await page.locator('#wiki-search').inputValue()).toBe('');
     expect(await page.locator('#search-status').textContent()).toBe('');
-    await page.locator('.media-toggle').first().click();
-    expect(await page.locator('.media-toggle').first().getAttribute('aria-pressed')).toBe('true');
+    expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
     await page.waitForFunction(() =>
       [...document.querySelectorAll<HTMLImageElement>('.demo img')].every(
         (image) => image.complete && image.naturalWidth > 0
       )
     );
-    await page.locator('.media-toggle').first().click();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect(await page.locator('.demo button').count()).toBe(0);
+    await expect
+      .poll(() => page.locator('.demo img').first().getAttribute('src'))
+      .toMatch(/\.png$/);
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#warden`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Warden');
+    expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.png$/);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.locator('.media-toggle').first().click();
-    expect(await page.locator('.media-toggle').first().getAttribute('aria-pressed')).toBe('true');
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Hauler');
+    expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
     await expect
-      .poll(() => page.locator('.media-toggle').first().getAttribute('aria-pressed'))
-      .toBe('false');
-    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.png$/);
-    expect(await page.locator('#content').textContent()).toContain('Q latches or releases');
+      .poll(() => page.locator('.demo img').first().getAttribute('src'))
+      .toMatch(/\.png$/);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect
+      .poll(() => page.locator('.demo img').first().getAttribute('src'))
+      .toMatch(/\.gif$/);
+    expect(await page.locator('#content').textContent()).toContain(
+      'E attaches to the nearest valid asteroid'
+    );
+    expect(await page.locator('#content').textContent()).not.toMatch(
+      /Q latches|winch|couple a second/
+    );
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');
@@ -93,21 +114,53 @@ test('pilots find rules, follow related entries, and control demonstrations on d
     for (const article of articles) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
       await expect.poll(() => page.locator('h1').textContent()).toBe(article.title);
-      expect(await page.locator('.article-body section').count()).toBe(article.sections.length);
+      const articleMedia = mediaForArticle(article);
       expect(
         await page
           .locator('.demo')
           .evaluateAll((figures) => figures.map((figure) => figure.getAttribute('data-media')))
-      ).toEqual(article.media);
-      for (const id of article.media) {
+      ).toEqual(articleMedia);
+      const scorecard = page.locator('.ship-scorecard');
+      if (article.category === 'Ships') {
+        expect(await scorecard.count()).toBe(1);
+        await scorecard.locator('.ship-radar svg').waitFor();
+        expect(await scorecard.locator('.ship-radar svg').count()).toBe(1);
+        expect(await scorecard.locator('.stat-bubbles').count()).toBe(7);
+        expect(await scorecard.locator('.stat-bubble').count()).toBe(35);
+        expect(await scorecard.locator('.stat-bubble.filled').count()).toBeGreaterThanOrEqual(7);
+        expect(await scorecard.getAttribute('aria-labelledby')).toBe(
+          `${article.id}-scorecard-title`
+        );
+        expect(await scorecard.locator('dt').allTextContents()).toEqual([
+          'Hull',
+          'Size',
+          'Thrust',
+          'Speed cap',
+          'Turn rate',
+          'Shot interval',
+          'E cooldown',
+        ]);
+        expect(await page.locator('.ability-card').count()).toBe(articleMedia.length);
+      } else {
+        expect(await scorecard.count()).toBe(0);
+        expect(await page.locator('.ability-card').count()).toBe(0);
+      }
+      expect(await page.locator('.topic-demo-card').count()).toBe(articleMedia.length);
+      for (const id of articleMedia) {
         const definition = media[id];
         if (!definition) {
           throw new Error(`Missing demonstration definition: ${id}`);
         }
         const figure = page.locator(`.demo[data-media="${id}"]`);
-        expect(await figure.locator('img').getAttribute('src')).toBe(`/wiki/media/${id}.png`);
+        expect(await figure.locator('img').getAttribute('src')).toBe(`/wiki/media/${id}.gif`);
+        expect(await figure.locator('button').count()).toBe(0);
         expect(await figure.locator('img').getAttribute('alt')).toBe(definition.alt);
-        expect(await figure.locator('figcaption').textContent()).toContain(definition.caption);
+        expect(await figure.locator('figcaption').count()).toBe(0);
+        expect(
+          await figure
+            .locator('img')
+            .evaluate((image) => image.closest('.topic-demo-card') !== null)
+        ).toBe(true);
       }
     }
     for (const id of Object.keys(media)) {
@@ -127,19 +180,42 @@ test('pilots find rules, follow related entries, and control demonstrations on d
     await page.locator('#article-nav a[href="#warden"]').click();
     await expect.poll(() => page.locator('h1').textContent()).toBe('Warden');
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
-    await page.locator('.media-toggle').first().click();
+    expect(await page.locator('.demo button').count()).toBe(0);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
     await page.waitForFunction(() =>
       [...document.querySelectorAll<HTMLImageElement>('.demo img')].every(
         (image) => image.complete && image.naturalWidth > 0
       )
     );
-    await page.locator('.media-toggle').first().click();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
     await page.screenshot({ path: resolve(output, 'wiki-warden-mobile.png'), fullPage: true });
+    await page.locator('.ship-rating-guide summary').click();
+    expect(await page.locator('.ship-rating-guide p').isVisible()).toBe(true);
+    expect(await page.locator('.ship-rating-guide p').textContent()).toContain('Smaller size');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect
+      .poll(() =>
+        page.locator('.ship-radar').evaluate((element) => {
+          const svg = element.querySelector('svg');
+          return svg ? Math.abs(svg.getBoundingClientRect().width - element.clientWidth) : 999;
+        })
+      )
+      .toBeLessThan(1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect
+      .poll(() =>
+        page.locator('.ship-radar').evaluate((element) => {
+          const svg = element.querySelector('svg');
+          return svg ? Math.abs(svg.getBoundingClientRect().width - element.clientWidth) : 999;
+        })
+      )
+      .toBeLessThan(1);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
-    expect(await page.locator('#content').textContent()).toContain('Flick at least 40 pixels');
+    expect(await page.locator('#content').textContent()).toContain(
+      'touch and hold the playfield to steer toward your finger and thrust'
+    );
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.locator('.breadcrumb a').click();
     await page.screenshot({ path: resolve(output, 'wiki-mobile.png'), fullPage: true });
@@ -194,8 +270,8 @@ test('pilots find rules, follow related entries, and control demonstrations on d
             'history',
             'deep links',
             'unknown entry',
-            'GIF play/pause',
-            'reduced-motion change stops active GIFs',
+            'GIF autoplay without playback controls',
+            'reduced-motion and hidden-tab changes stop active GIFs and visible return resumes them',
             'mobile navigation',
             'keyboard focus',
           ],

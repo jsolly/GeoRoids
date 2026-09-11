@@ -14,7 +14,7 @@ import {
 import { hexToRgba } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
 import { drawSoftFactionMark } from '../player/factionMarkPainters';
-import { findHarpoonFieldBody, getHarpoonField, harpoonSurfaceToward } from './harpoonField';
+import { findHarpoonFieldBody, getHarpoonField } from './harpoonField';
 import {
   getKitHullOutline,
   projectHullPoint,
@@ -607,6 +607,8 @@ export function canDrawGenericAbilityRing(ship: {
 }): boolean {
   return (
     ship.kitId !== 'hauler' &&
+    ship.kitId !== 'quake' &&
+    ship.kitId !== 'warden' &&
     ship.abilityActiveFrames > 0 &&
     ship.harpoonTimer <= 0 &&
     ship.shieldTimer <= 0
@@ -649,8 +651,7 @@ export function drawHaulerHarpoonVfx(
     return;
   }
   const target = findHarpoonFieldBody(ship.harpoonTargetId);
-  const surfaceLatch = ship.asteroidMotion?.mode === 'latched';
-  let latchWorld = surfaceLatch ? ship.harpoonLatchPos : (target?.position ?? ship.harpoonLatchPos);
+  let latchWorld = target?.position ?? ship.harpoonLatchPos;
   if (!latchWorld) {
     latchWorld = findHarpoonTarget(
       ship,
@@ -661,7 +662,7 @@ export function drawHaulerHarpoonVfx(
   if (!latchWorld) {
     return;
   }
-  if (target && !surfaceLatch) {
+  if (target) {
     ship.harpoonLatchPos = { x: target.position.x, y: target.position.y };
   } else if (!ship.harpoonLatchPos) {
     ship.harpoonLatchPos = { x: latchWorld.x, y: latchWorld.y };
@@ -680,19 +681,6 @@ export function drawHaulerHarpoonVfx(
   ctx.moveTo(screenX, screenY);
   ctx.lineTo(latch.x, latch.y);
   ctx.stroke();
-  const payload = surfaceLatch ? findHarpoonFieldBody(ship.asteroidMotion?.payloadId) : undefined;
-  if (payload && target) {
-    const primarySurface = harpoonSurfaceToward(target, payload.position);
-    const payloadSurface = harpoonSurfaceToward(payload, target.position);
-    if (primarySurface && payloadSurface) {
-      const primaryEnd = canvasManager.worldToScreen(primarySurface, cameraShipPosition);
-      const payloadEnd = canvasManager.worldToScreen(payloadSurface, cameraShipPosition);
-      ctx.beginPath();
-      ctx.moveTo(primaryEnd.x, primaryEnd.y);
-      ctx.lineTo(payloadEnd.x, payloadEnd.y);
-      ctx.stroke();
-    }
-  }
   ctx.setLineDash([]);
   ctx.fillStyle = '#FDE68A';
   ctx.strokeStyle = '#FDE68A';

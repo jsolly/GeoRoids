@@ -12,8 +12,6 @@ export const ASTEROID_INTERACTIONS = {
   coreCharges: 6,
   coreLifetimeMs: 60_000,
   coreScore: 150,
-  spinnerCount: 3,
-  naturalSpin: 0.035,
 } as const;
 
 /** The runtime and aim preview share the exact charge/terminal decision. */
@@ -101,12 +99,6 @@ export function seedAsteroidPhenomena(rocks: AsteroidData[]): void {
         maxEnergy: ASTEROID_INTERACTIONS.reflectiveEnergy,
       };
     }
-  }
-  for (const [index, rock] of candidates
-    .slice(6, 6 + ASTEROID_INTERACTIONS.spinnerCount)
-    .entries()) {
-    rock.angularVelocity = ASTEROID_INTERACTIONS.naturalSpin * (index % 2 ? -1 : 1);
-    rock.spinClass = 'natural';
   }
 }
 

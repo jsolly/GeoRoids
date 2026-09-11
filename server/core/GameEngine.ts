@@ -20,6 +20,7 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../../shared/lootBlast';
+import { findNearestShieldImpact, reflectProjectileVelocity } from '../../shared/shieldReflection';
 import { applyLootMass, applyShipMass, GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import { captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import type {
@@ -29,6 +30,7 @@ import type {
   PlayerProjectileState,
   Position,
   SatelliteData,
+  SatellitePickupCollected,
   SatellitePickupData,
   SatelliteProjectileState,
   SatelliteShoot,
@@ -50,11 +52,13 @@ import {
 } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
-import { isWithinCollectRange } from '../../src/entities/satellitePickup/satellitePickupMath';
 import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import {
   type CombatDamageSource,
+  isReadableShieldUp,
+  laserCollisionRadius,
+  noteReadableShieldLaserHit,
   requestShield,
   resolveCombatDamageSource,
   shieldSnapshot,
@@ -73,11 +77,11 @@ import {
   AsteroidManager,
   type ExpiredCollabHit,
 } from './AsteroidManager.ts';
-import { AsteroidMotionService } from './AsteroidMotionService';
 import { CollisionAuthority } from './CollisionAuthority';
 import { killScoreFor, shouldAwardHumanKillPoints } from './combatScoring';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { LootManager } from './LootManager';
+import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
 import type { SatelliteHit } from './SatelliteManager';
 import { SatelliteManager } from './SatelliteManager';
@@ -98,6 +102,7 @@ interface ServerLaser {
   bounces: number;
   age: number;
   lastAsteroidId?: string;
+  lastShieldId?: string;
 }
 
 export interface AppliedAsteroidHit {
@@ -139,6 +144,7 @@ export const HUMAN_SHOOT_POSE_ALLOWANCE_MS = 250;
 const HUMAN_SHOOT_MUZZLE_SLOP = 8;
 /** Stationary/counter-thrust shots must not remain in the authoritative list forever. */
 export const HUMAN_LASER_MAX_LIFETIME_MS = 5000;
+const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 
 type PendingShockwave = {
   origin: Position;
@@ -168,7 +174,7 @@ export class GameEngine {
   private lasers: ServerLaser[] = [];
   private laserSeq = 0;
   private readonly laserNonce = randomUUID();
-  public readonly asteroidMotion = new AsteroidMotionService();
+  public readonly playerMotion = new PlayerMotionService();
   private departedPlayers: string[] = [];
   private decoratedFieldId?: string | undefined;
   private pendingLootBlasts: Array<{
@@ -181,6 +187,7 @@ export class GameEngine {
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private pendingShockwaves: PendingShockwave[] = [];
   private pendingSatelliteShots: SatelliteShoot[] = [];
+  private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
   private readonly humanShootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly humanLaserExpiry = new WeakMap<ServerLaser, number>();
   private readonly damageStateLogs = new WeakMap<GameEntity, number>();
@@ -192,9 +199,6 @@ export class GameEngine {
     this.rngService = new RNGService(rngSeed);
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
     this.asteroidManager = new AsteroidManager(this.rngService);
-    this.asteroidManager.setOnRemove((asteroid) => {
-      this.asteroidMotion.beforeRemove(asteroid.id);
-    });
     this.lootManager = new LootManager(this.rngService);
     this.satelliteManager = new SatelliteManager(this.rngService);
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
@@ -308,7 +312,7 @@ export class GameEngine {
     this.entityManager.cleanupStaleEntities();
     this.entityManager.updateExplosions();
     this.logRespawns(this.entityManager.updateRespawns());
-    for (const id of this.asteroidMotion.step(serverNow, this.getAllAsteroids())) {
+    for (const id of this.playerMotion.step(serverNow)) {
       this.removePlayer(id);
       this.departedPlayers.push(id);
     }
@@ -318,7 +322,7 @@ export class GameEngine {
     this.lootManager.expire(this.gameTime);
     this.collectLoot(serverNow);
     this.tickSatellitePickups();
-    this.asteroidManager.updateMotion((id) => this.asteroidMotion.ownsAsteroidMotion(id));
+    this.asteroidManager.updateMotion();
     if (this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
     }
@@ -475,6 +479,7 @@ export class GameEngine {
     this.pendingAsteroidHits = [];
     this.satelliteManager.clearSatellites();
     this.pendingSatelliteShots = [];
+    this.pendingSatellitePickupCollections = [];
     this.satellitePickupManager.clear();
 
     this.collisionAuthority.reset();
@@ -496,7 +501,7 @@ export class GameEngine {
 
   private resetGameState(): void {
     this.clearWorldObjects();
-    this.asteroidMotion.reset();
+    this.playerMotion.reset();
     this.entityManager.clearAll();
 
     // Keep gameTime monotonic for the process lifetime. Zeroing it when the
@@ -535,7 +540,7 @@ export class GameEngine {
   }
 
   public removePlayer(id: string): GameEntity | undefined {
-    this.asteroidMotion.forgetActor(id);
+    this.playerMotion.forgetActor(id);
     this.satellitePickupManager.releaseOwner(id);
     const entity = this.entityManager.removeEntity(id);
     this.updatePauseState();
@@ -543,7 +548,7 @@ export class GameEngine {
   }
 
   public transportClosed(ws: WebSocket): boolean {
-    return this.asteroidMotion.transportClosed(ws, this.getServerTime());
+    return this.playerMotion.transportClosed(ws, this.getServerTime());
   }
 
   public drainDepartedPlayers(): string[] {
@@ -749,69 +754,97 @@ export class GameEngine {
     if (this.isPaused) {
       return this.getAllSatellitePickups();
     }
-    this.satellitePickupManager.update(
-      this.entityManager.getAllEntities().map((entity) => ({
-        id: entity.id,
-        position: entity.position,
-        health: entity.health,
-        exploding: entity.exploding,
-      }))
-    );
+    const owners = this.entityManager.getAllEntities().map((entity) => ({
+      id: entity.id,
+      position: entity.position,
+      radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
+      health: entity.health,
+      exploding: entity.exploding,
+    }));
+    this.satellitePickupManager.update(owners);
+    this.collectNearbySatellitePickups();
     return this.getAllSatellitePickups();
   }
 
-  /** First living server-positioned human overlapping a pickup wins. */
-  public handleSatellitePickupCollected(
-    pickupId: string,
-    playerId: string
-  ): { success: boolean; pickup?: SatellitePickupData } {
-    const pickup = this.satellitePickupManager.getPickup(pickupId);
-    const collector = this.entityManager.getEntity(playerId);
-    if (
-      pickup?.state !== 'loose' ||
-      !collector ||
-      collector.type !== 'human' ||
-      collector.health <= 0 ||
-      collector.exploding ||
-      collector.respawnTimer !== undefined
-    ) {
-      return { success: false };
-    }
-
-    if (
-      !isWithinCollectRange(
-        collector.position,
-        pickup.position,
-        radiusFromMass(collector.mass ?? GROWTH.BASE_MASS),
-        pickup.radius,
-        SATELLITE_PICKUP.COLLECT_SLACK
+  private collectNearbySatellitePickups(): void {
+    const humans = this.entityManager
+      .getHumanPlayers()
+      .filter(
+        (entity) => entity.health > 0 && !entity.exploding && entity.respawnTimer === undefined
       )
-    ) {
-      return { success: false };
-    }
+      .sort((a, b) => a.id.localeCompare(b.id));
 
-    const collected = this.satellitePickupManager.collect(
-      pickupId,
-      playerId,
-      this.satellitePickupManager.countOrbitingFor(playerId)
-    );
-    if (!collected) {
-      return { success: false };
-    }
+    const loosePickups = this.satellitePickupManager
+      .getAllPickups()
+      .filter((pickup) => pickup.state === 'loose' && pickup.health > 0)
+      .sort((a, b) => a.id.localeCompare(b.id));
 
-    collector.score += SATELLITE_PICKUP.SCORE_BONUS;
-    collector.spawnProtectionTimer = Math.max(
-      collector.spawnProtectionTimer ?? 0,
-      SATELLITE_PICKUP.SHIELD_FRAMES
-    );
-    collector.lastUpdate = this.getServerTime();
-    return { success: true, pickup: collected };
+    for (const pickup of loosePickups) {
+      const collector = humans
+        .map((entity) => ({
+          entity,
+          distance: Math.hypot(
+            pickup.position.x - entity.position.x,
+            pickup.position.y - entity.position.y
+          ),
+        }))
+        .filter(({ distance }) => distance <= SATELLITE_PICKUP.AUTO_COLLECT_RANGE)
+        .sort(
+          (a, b) => a.distance - b.distance || a.entity.id.localeCompare(b.entity.id)
+        )[0]?.entity;
+      if (!collector) {
+        continue;
+      }
+
+      const collected = this.satellitePickupManager.collect(
+        pickup.id,
+        {
+          id: collector.id,
+          position: collector.position,
+          radius: radiusFromMass(collector.mass ?? GROWTH.BASE_MASS),
+          health: collector.health,
+          exploding: collector.exploding,
+        },
+        this.satellitePickupManager.nextOrbitPhaseFor(collector.id)
+      );
+      if (!collected) {
+        continue;
+      }
+
+      collector.score += SATELLITE_PICKUP.SCORE_BONUS;
+      collector.lastUpdate = this.getServerTime();
+      this.queueSatellitePickupCollected({
+        pickupId: collected.id,
+        playerId: collector.id,
+        playerName: collector.name,
+        pickupName: collected.name,
+        scoreBonus: SATELLITE_PICKUP.SCORE_BONUS,
+      });
+    }
+  }
+
+  private queueSatellitePickupCollected(event: SatellitePickupCollected): void {
+    if (this.pendingSatellitePickupCollections.length >= MAX_PENDING_SATELLITE_PICKUP_EVENTS) {
+      this.pendingSatellitePickupCollections.shift();
+    }
+    this.pendingSatellitePickupCollections.push(event);
+  }
+
+  public drainSatellitePickupCollections(): SatellitePickupCollected[] {
+    const events = this.pendingSatellitePickupCollections;
+    this.pendingSatellitePickupCollections = [];
+    return events;
   }
 
   public drainSatelliteShots(): SatelliteShoot[] {
     const shots = this.pendingSatelliteShots;
     this.pendingSatelliteShots = [];
     return shots;
+  }
+
+  /** Apply one authoritative physical hit to a live satellite pickup. */
+  public handleSatellitePickupDamage(pickupId: string, damage: number): SatellitePickupData | null {
+    return this.satellitePickupManager.damage(pickupId, damage);
   }
 
   public handleSatelliteDamage(satelliteId: string, attackerId: string, damage: number): boolean {
@@ -842,19 +875,65 @@ export class GameEngine {
     radius: number;
     health: number;
     exploding: boolean;
+    respawnTimer?: number;
+    aimable?: boolean;
+    kind?: 'ship' | 'pickup' | 'satellite';
+    shieldActive?: boolean;
+    shieldTime?: number;
+    shieldTimer?: number;
+    onShieldHit?: () => void;
   }> {
-    return this.entityManager.getAllEntities().map((entity) => ({
-      id: entity.id,
-      position: entity.position,
-      radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
-      health: entity.health,
-      exploding: entity.exploding,
-      respawnTimer: entity.respawnTimer,
-    }));
+    return [
+      ...this.entityManager.getAllEntities().map((entity) => ({
+        id: entity.id,
+        position: entity.position,
+        radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
+        health: entity.health,
+        exploding: entity.exploding,
+        ...(entity.respawnTimer !== undefined ? { respawnTimer: entity.respawnTimer } : {}),
+        shieldActive: entity.shieldActive,
+        shieldTime: entity.shieldTime,
+        shieldTimer: entity.shieldTimer,
+        onShieldHit: () => noteReadableShieldLaserHit(entity),
+        kind: 'ship' as const,
+      })),
+      ...this.satellitePickupManager
+        .getAllPickups()
+        .filter((pickup) => pickup.state !== 'broken' && pickup.health > 0)
+        .map((pickup) => ({
+          id: pickup.id,
+          position: pickup.position,
+          radius: pickup.radius,
+          health: pickup.health,
+          exploding: false,
+          aimable: false,
+          kind: 'pickup' as const,
+        })),
+      ...this.satelliteManager
+        .getAllSatellites()
+        .filter((satellite) => !satellite.exploding && satellite.health > 0)
+        .map((satellite) => ({
+          id: satellite.id,
+          position: satellite.position,
+          radius: satellite.radius,
+          health: satellite.health,
+          exploding: satellite.exploding,
+          aimable: false,
+          kind: 'satellite' as const,
+        })),
+    ];
   }
 
   private applySatelliteHits(hits: SatelliteHit[]): void {
     for (const hit of hits) {
+      if (hit.targetKind === 'pickup') {
+        this.handleSatellitePickupDamage(hit.targetId, hit.damage);
+        continue;
+      }
+      if (hit.targetKind === 'satellite') {
+        this.satelliteManager.damageSatellite(hit.targetId, hit.damage);
+        continue;
+      }
       const result = this.applyDirectedHit(hit.targetId, hit.satelliteId, hit.damage, 'laser');
       if (result) {
         this.combatSink?.(result);
@@ -876,7 +955,7 @@ export class GameEngine {
     if (!entity || entity.exploding || entity.health <= 0 || entity.respawnTimer !== undefined) {
       return false;
     }
-    const changed = requestShield(entity, active, entity.exploding);
+    const changed = requestShield(entity, active, entity.exploding, entity.kitId);
     if (changed) {
       entity.lastUpdate = this.getServerTime();
     }
@@ -1031,16 +1110,22 @@ export class GameEngine {
     const results: CombatBroadcast[] = [];
     const entities = this.entityManager.getAllEntities();
 
+    const pickupBodyHits = this.collisionAuthority.collectAsteroidPickupHits(
+      this.asteroidManager.getAllAsteroids(),
+      this.satellitePickupManager.getAllPickups()
+    );
+    for (const hit of pickupBodyHits) {
+      this.handleSatellitePickupDamage(hit.pickupId, DAMAGE.LASER_HIT);
+    }
+
     const ramHits = this.collisionAuthority.collectShipAsteroidHits(
       entities,
-      this.asteroidManager.getAllAsteroids()
+      this.asteroidManager.getAllAsteroids(),
+      (shipId, asteroidId) => this.isActiveHarpoonTarget(shipId, asteroidId)
     );
     const destroyedAsteroids = new Set<string>();
     const ramDamage = asteroidRamDamage();
     for (const hit of ramHits) {
-      if (this.asteroidMotion.isAttachedTo(hit.shipId, hit.asteroidId)) {
-        continue;
-      }
       const result = this.applyDirectedHit(hit.shipId, 'asteroid', ramDamage, 'collision');
       if (!result) {
         continue;
@@ -1103,6 +1188,12 @@ export class GameEngine {
     return results;
   }
 
+  /** An active Hauler harpoon lets its owner pass through that exact rock. */
+  private isActiveHarpoonTarget(shipId: string, asteroidId: string): boolean {
+    const ship = this.entityManager.getEntity(shipId);
+    return ship?.kitId === 'hauler' && ship.harpoonTimer > 0 && ship.harpoonTargetId === asteroidId;
+  }
+
   private applyDirectedHit(
     targetId: string,
     attackerId: string,
@@ -1137,7 +1228,7 @@ export class GameEngine {
     if (attackerId) {
       entity.deathCause = attackerId;
     }
-    this.asteroidMotion.invalidateLife(entity.id, this.getServerTime());
+    this.playerMotion.invalidateLife(entity.id, this.getServerTime());
     delete entity.laserUpgrade;
     this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
@@ -1433,6 +1524,35 @@ export class GameEngine {
     return this.resolveEnhancedLaser(laser, now);
   }
 
+  /** Live laser-reflecting surfaces; spawn protection never becomes a shield. */
+  private getLaserShieldSurfaces(laser: ServerLaser): Array<{
+    id: string;
+    position: Position;
+    radius: number;
+  }> {
+    return this.entityManager
+      .getAllEntities()
+      .filter((entity) => {
+        if (
+          entity.id === laser.ownerId ||
+          entity.health <= 0 ||
+          entity.exploding ||
+          entity.respawnTimer !== undefined ||
+          !isReadableShieldUp(entity)
+        ) {
+          return false;
+        }
+        // A direct shot obeys the existing friendly-fire filter. Once it has
+        // bounced, the reflected shot may reach a same-faction shield too.
+        return laser.bounces > 0 || canDealCombatDamage(laser.ownerFaction, entity.factionId);
+      })
+      .map((entity) => ({
+        id: entity.id,
+        position: entity.position,
+        radius: laserCollisionRadius(radiusFromMass(entity.mass), entity),
+      }));
+  }
+
   /** Full swept path for the enhanced world. Every bounce consumes distance and
    * shares the preview's nearest polygon geometry; ship contact can occur first. */
   private resolveEnhancedLaser(laser: ServerLaser, now: number): AppliedAsteroidHit | null {
@@ -1442,6 +1562,23 @@ export class GameEngine {
       const rocks = this.getAllAsteroids();
       const impact = findNearestAsteroidImpact(start, end, rocks, laser.lastAsteroidId);
       const distance = Math.hypot(end.x - start.x, end.y - start.y);
+      const shieldSurfaces = this.getLaserShieldSurfaces(laser);
+      const shieldImpact = findNearestShieldImpact(start, end, shieldSurfaces, laser.lastShieldId);
+      const originShield = shieldSurfaces.find((shield) => {
+        const dx = start.x - shield.position.x;
+        const dy = start.y - shield.position.y;
+        return dx * dx + dy * dy < shield.radius * shield.radius;
+      });
+      const originRadial = originShield
+        ? {
+            x: start.x - originShield.position.x,
+            y: start.y - originShield.position.y,
+          }
+        : undefined;
+      const originMovingOutward =
+        originShield &&
+        originRadial &&
+        originRadial.x * (end.x - start.x) + originRadial.y * (end.y - start.y) >= 0;
       const owner = this.getPlayer(laser.ownerId);
       const contacts = this.entityManager
         .getAllEntities()
@@ -1474,7 +1611,18 @@ export class GameEngine {
             id: satellite.id,
             position: satellite.position,
             radius: satellite.radius,
+            ownerId: undefined,
             kind: 'satellite' as const,
+          })),
+        ...this.satellitePickupManager
+          .getAllPickups()
+          .filter((pickup) => pickup.state !== 'broken' && pickup.health > 0)
+          .map((pickup) => ({
+            id: pickup.id,
+            position: pickup.position,
+            radius: pickup.radius,
+            ownerId: pickup.ownerId,
+            kind: 'satellitePickup' as const,
           })),
         ...this.getLoot()
           .filter((loot) => owner && inLootArmRange(owner.position, loot.position))
@@ -1482,22 +1630,64 @@ export class GameEngine {
             id: loot.id,
             position: loot.position,
             radius: loot.radius,
+            ownerId: undefined,
             kind: 'loot' as const,
           })),
       ]
+        .filter((target) => {
+          if (target.kind !== 'satellitePickup' || laser.bounces > 0 || !target.ownerId) {
+            return true;
+          }
+          const pickupOwner = this.entityManager.getEntity(target.ownerId);
+          return (
+            pickupOwner === undefined ||
+            (pickupOwner.id !== laser.ownerId &&
+              canDealCombatDamage(laser.ownerFaction, pickupOwner.factionId))
+          );
+        })
         .flatMap((target) => {
           const fraction = segmentCircleContact(start, end, target.position, target.radius);
           return fraction === undefined ? [] : [{ ...target, distance: fraction * distance }];
         })
         .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id))[0];
+      // A muzzle can begin inside a larger shield while remaining outside the
+      // hull. If it is already moving out, carry it to the exit before
+      // considering hull/auxiliary contacts; the shield must not become a
+      // damageable gap just because the first authoritative segment started
+      // inside its bubble. An inward origin is handled below as an immediate
+      // radial reflection by the shared swept helper.
+      if (originMovingOutward && originShield && distance > 1e-7) {
+        if (!shieldImpact || shieldImpact.shieldId !== originShield.id) {
+          laser.position = end;
+          return null;
+        }
+        const remaining = Math.max(0, distance - shieldImpact.distance);
+        const speed = Math.hypot(laser.velocity.x, laser.velocity.y);
+        if (speed <= 1e-9) {
+          laser.position = end;
+          return null;
+        }
+        const direction = { x: laser.velocity.x / speed, y: laser.velocity.y / speed };
+        laser.position = { ...shieldImpact.point };
+        laser.lastShieldId = originShield.id;
+        start = {
+          x: shieldImpact.point.x + direction.x * 1e-5,
+          y: shieldImpact.point.y + direction.y * 1e-5,
+        };
+        end = { x: start.x + direction.x * remaining, y: start.y + direction.y * remaining };
+        continue;
+      }
       if (
         auxiliary &&
         (!impact || auxiliary.distance < impact.distance) &&
-        (!contact || auxiliary.distance < contact.distance)
+        (!contact || auxiliary.distance < contact.distance) &&
+        (!shieldImpact || auxiliary.distance < shieldImpact.distance)
       ) {
         laser.hasExploded = true;
         if (auxiliary.kind === 'satellite') {
           this.handleSatelliteDamage(auxiliary.id, laser.ownerId, DAMAGE.LASER_HIT * laser.energy);
+        } else if (auxiliary.kind === 'satellitePickup') {
+          this.handleSatellitePickupDamage(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         } else {
           const blast = this.handleLootExplode(laser.ownerId, auxiliary.id);
           if (blast.success && blast.origin) {
@@ -1511,7 +1701,44 @@ export class GameEngine {
         }
         return null;
       }
-      if (contact && (!impact || contact.distance < impact.distance)) {
+      if (
+        shieldImpact &&
+        (!impact || shieldImpact.distance < impact.distance) &&
+        (!contact || shieldImpact.distance <= contact.distance) &&
+        (!auxiliary || shieldImpact.distance <= auxiliary.distance)
+      ) {
+        if (laser.bounces >= ASTEROID_INTERACTIONS.maxBounces) {
+          laser.position = { ...shieldImpact.point };
+          laser.hasExploded = true;
+          return null;
+        }
+        const shieldedEntity = this.entityManager.getEntity(shieldImpact.shieldId);
+        if (shieldedEntity) {
+          noteReadableShieldLaserHit(shieldedEntity);
+        }
+        laser.position = { ...shieldImpact.point };
+        laser.velocity = reflectProjectileVelocity(laser.velocity, shieldImpact.normal);
+        laser.bounces += 1;
+        laser.lastShieldId = shieldImpact.shieldId;
+        const speed = Math.hypot(laser.velocity.x, laser.velocity.y);
+        if (speed <= 1e-9) {
+          laser.hasExploded = true;
+          return null;
+        }
+        const remaining = Math.max(0, distance - shieldImpact.distance);
+        const direction = { x: laser.velocity.x / speed, y: laser.velocity.y / speed };
+        start = {
+          x: shieldImpact.point.x + direction.x * 1e-5,
+          y: shieldImpact.point.y + direction.y * 1e-5,
+        };
+        end = { x: start.x + direction.x * remaining, y: start.y + direction.y * remaining };
+        continue;
+      }
+      if (
+        contact &&
+        (!impact || contact.distance < impact.distance) &&
+        (!shieldImpact || contact.distance < shieldImpact.distance)
+      ) {
         const friendly =
           contact.entity.id === laser.ownerId ||
           !canDealCombatDamage(laser.ownerFaction, contact.entity.factionId);
@@ -1690,6 +1917,12 @@ export class GameEngine {
             abilityCooldownFrames: entity.abilityCooldownFrames,
             abilityActiveFrames: entity.abilityActiveFrames,
             shieldTimer: entity.shieldTimer,
+            ...(entity.shieldTargetId !== undefined
+              ? { shieldTargetId: entity.shieldTargetId }
+              : {}),
+            ...(entity.shieldSourceId !== undefined
+              ? { shieldSourceId: entity.shieldSourceId }
+              : {}),
             harpoonTimer: entity.harpoonTimer,
             ...(entity.harpoonTargetId !== undefined
               ? { harpoonTargetId: entity.harpoonTargetId }
@@ -1697,9 +1930,7 @@ export class GameEngine {
             ...(entity.harpoonLatchPos !== undefined
               ? { harpoonLatchPos: entity.harpoonLatchPos }
               : {}),
-            ...(entity.asteroidMotion !== undefined
-              ? { asteroidMotion: entity.asteroidMotion }
-              : {}),
+            ...(entity.playerMotion !== undefined ? { playerMotion: entity.playerMotion } : {}),
             ...(entity.laserUpgrade !== undefined ? { laserUpgrade: entity.laserUpgrade } : {}),
             ...(entity.deathCause !== undefined ? { deathCause: entity.deathCause } : {}),
             ...shieldSnapshot(entity),
@@ -1774,7 +2005,7 @@ export class GameEngine {
       if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= now) {
         delete entity.laserUpgrade;
       }
-      if (this.asteroidMotion.ownsActorMotion(entity.id)) {
+      if (this.playerMotion.ownsActorMotion(entity.id)) {
         continue;
       }
       const targetId = entity.harpoonTargetId;

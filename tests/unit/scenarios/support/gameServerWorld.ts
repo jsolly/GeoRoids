@@ -313,7 +313,7 @@ export class GameServerWorld {
 
   move(pilot: Pilot, position: Position): void {
     const entity = this.entity(pilot);
-    const motion = entity.asteroidMotion;
+    const motion = entity.playerMotion;
     if (!motion) {
       throw new Error(`${pilot.name} has no current motion session`);
     }

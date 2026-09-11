@@ -1,11 +1,11 @@
 import type {
   AsteroidData,
   AsteroidMaterial,
-  AsteroidMotionState,
   AsteroidPhenomenon,
   LaserUpgrade,
   LootData,
   LootKind,
+  PlayerMotionState,
   PlayerProjectileState,
   SatelliteData,
   SatellitePickupData,
@@ -70,14 +70,10 @@ const shape =
 const position = shape<{ x: number; y: number }>({ x: number, y: number });
 const energy: Rule = (value) => number(value) && (value as number) >= 0 && (value as number) <= 8;
 const material = enumeration<AsteroidMaterial>({ ice: true, metal: true, rubble: true });
-const motion = shape<AsteroidMotionState>({
+const motion = shape<PlayerMotionState>({
   epoch: counter,
-  mode: choice('free', 'latched', 'released', 'handoff'),
+  mode: choice('free', 'handoff'),
   ack: counter,
-  tetherMode: optional(choice('spin', 'anchor', 'brake')),
-  asteroidId: optional(string),
-  payloadId: optional(string),
-  latchAngle: optional(number),
   anchor: optional(position),
 });
 const upgrade = shape<LaserUpgrade>({ charges: counter, expiresAt: number });
@@ -111,6 +107,8 @@ const entity = shape<ServerEntityData>({
   abilityCooldownFrames: optional(number),
   abilityActiveFrames: optional(number),
   shieldTimer: optional(number),
+  shieldTargetId: optional(string),
+  shieldSourceId: optional(string),
   harpoonTimer: optional(number),
   harpoonTargetId: optional(string),
   harpoonLatchPos: optional(position),
@@ -119,7 +117,7 @@ const entity = shape<ServerEntityData>({
   shieldTime: optional(number),
   shieldCooldown: optional(number),
   shieldFlashTime: optional(number),
-  asteroidMotion: optional(motion),
+  playerMotion: optional(motion),
   laserUpgrade: optional(upgrade),
 });
 const asteroid = shape<AsteroidData>({
@@ -137,7 +135,6 @@ const asteroid = shape<AsteroidData>({
   isCollabTarget: optional(boolean),
   material: optional(material),
   phenomenon: optional(reflective),
-  spinClass: optional(choice('natural', 'charged')),
 });
 const loot = shape<LootData>({
   id: string,
@@ -186,9 +183,10 @@ const pickup = shape<SatellitePickupData>({
   angle: number,
   radius: number,
   color: string,
-  state: enumeration<SatellitePickupState>({ loose: true, orbiting: true }),
+  state: enumeration<SatellitePickupState>({ loose: true, orbiting: true, broken: true }),
   ownerId: (value) => value === null || string(value),
-  shieldFramesRemaining: number,
+  health: number,
+  maxHealth: number,
 });
 const projectile = shape<SnapshotSatelliteProjectile>({
   id: string,

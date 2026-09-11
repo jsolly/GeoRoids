@@ -1,9 +1,13 @@
 import { GAME } from '../constants';
 import { serializeKitHullSvg } from '../entities/ship/hullOutlines';
 import { isShipKitId, listShipKits, SHIP_ABILITY } from '../entities/ship/shipKits';
-import { articles, type WikiArticle } from './content';
+import { articles, mediaForArticle, type WikiArticle, type WikiSection } from './content';
 import { media } from './media';
+import { setMediaSource, shouldAutoplayMedia } from './mediaPlayback';
 import { searchArticles } from './search';
+import { mountShipRadar, shipScorecard } from './shipScorecard';
+
+let disposeRadar = () => {};
 
 function requiredElement<T extends HTMLElement>(
   selector: string,
@@ -65,7 +69,7 @@ function renderNavigation(active = ''): void {
 function renderIndex(): void {
   const kits = listShipKits();
   content.innerHTML = `<section class="hero"><p class="eyebrow">THE PILOT'S REFERENCE</p><h1>Know your ship.<br /><span>Read the arena.</span></h1><p class="hero-copy">Five ships. A shared, unpredictable arena. Learn what everything does, see it in motion, then take it into flight.</p><div class="hero-links"><a href="#controls" class="primary-link">Start with the controls <span aria-hidden="true">→</span></a><a href="#ships">Compare ships ↓</a></div><div class="hero-orbit" aria-hidden="true">${hull('hauler', 120)}<span class="orbit-dot"></span></div></section>
-  <section class="section-block" id="ships"><div class="section-heading"><div><p class="eyebrow">01 / HANGAR</p><h2>Choose your ship</h2></div><span>One ability. A different way to fly.</span></div><div class="ship-grid">${kits.map((kit, index) => `<a class="ship-card" href="#${kit.id}"><span class="ship-number">0${index + 1}</span>${hull(kit.id, 82)}<h3>${escapeHtml(kit.name)}</h3><p>${escapeHtml(kit.abilityName)}</p><span class="ship-health">${kit.maxHealth} HULL <span aria-hidden="true">↗</span></span></a>`).join('')}</div><details class="comparison"><summary>Compare hull, handling, and ability cooldowns</summary><div class="table-scroll" role="region" aria-label="Ship comparison" tabindex="0"><table><caption>Starting ship values, before growth or upgrades</caption><thead><tr><th scope="col">Ship</th><th scope="col">Hull</th><th scope="col">Thrust</th><th scope="col">Speed cap</th><th scope="col">Turn °/s</th><th scope="col">Shot interval</th><th scope="col">E cooldown</th></tr></thead><tbody>${kits.map((kit) => `<tr><th scope="row"><a href="#${kit.id}">${kit.name}</a></th><td>${kit.maxHealth}</td><td>${kit.thrust}</td><td>${kit.maxVelocity}</td><td>${kit.turnSpeed}</td><td>${kit.shotCooldown} ms</td><td>${SHIP_ABILITY.COOLDOWN_FRAMES[kit.id] / GAME.FPS} s</td></tr>`).join('')}</tbody></table></div><p>Thrust and speed cap are game tuning values for comparison, not screen pixels per second. Abilities, terrain, and tether motion can alter movement.</p></details></section>
+  <section class="section-block" id="ships"><div class="section-heading"><div><p class="eyebrow">01 / HANGAR</p><h2>Choose your ship</h2></div><span>One ability. A different way to fly.</span></div><div class="ship-grid">${kits.map((kit, index) => `<a class="ship-card" href="#${kit.id}"><span class="ship-number">0${index + 1}</span>${hull(kit.id, 82)}<h3>${escapeHtml(kit.name)}</h3><p>${escapeHtml(kit.abilityName)}</p><span class="ship-health">${kit.maxHealth} HULL <span aria-hidden="true">↗</span></span></a>`).join('')}</div><details class="comparison"><summary>Compare hull, handling, and ability cooldowns</summary><div class="table-scroll" role="region" aria-label="Ship comparison" tabindex="0"><table><caption>Starting ship values, before growth or upgrades</caption><thead><tr><th scope="col">Ship</th><th scope="col">Hull</th><th scope="col">Thrust</th><th scope="col">Speed cap</th><th scope="col">Turn °/s</th><th scope="col">Shot interval</th><th scope="col">E cooldown</th></tr></thead><tbody>${kits.map((kit) => `<tr><th scope="row"><a href="#${kit.id}">${kit.name}</a></th><td>${kit.maxHealth}</td><td>${kit.thrust}</td><td>${kit.maxVelocity}</td><td>${kit.turnSpeed}</td><td>${kit.shotCooldown} ms</td><td>${SHIP_ABILITY.COOLDOWN_FRAMES[kit.id] / GAME.FPS} s</td></tr>`).join('')}</tbody></table></div><p>Thrust and speed cap are game tuning values for comparison, not screen pixels per second. Abilities and terrain can alter movement.</p></details></section>
   <section class="section-block"><div class="section-heading"><div><p class="eyebrow">02 / FIELD NOTES</p><h2>Understand the arena</h2></div><span>Rules, controls, and interactions.</span></div><div class="topic-grid">${articles
     .filter((article) => !isShipKitId(article.id))
     .map(card)
@@ -73,63 +77,92 @@ function renderIndex(): void {
   document.title = 'Field manual | GeoRoids';
 }
 
-function figure(id: string): string {
+function figure(id: string, showCaption = true, showHeading = true): string {
   const item = media[id];
   if (!item) {
     return '';
   }
-  return `<figure class="demo" data-media="${id}"><div class="demo-heading"><span>IN MOTION</span><button type="button" class="media-toggle" aria-pressed="false" aria-label="Play ${escapeHtml(item.title)} animation">Play animation <span aria-hidden="true">▷</span></button></div><img src="/wiki/media/${id}.png" width="640" height="360" loading="lazy" alt="${escapeHtml(item.alt)}" /><figcaption><strong>${escapeHtml(item.title)}</strong> ${escapeHtml(item.caption)}</figcaption></figure>`;
+  const caption = showCaption
+    ? `<figcaption><strong>${escapeHtml(item.title)}</strong> ${escapeHtml(item.caption)}</figcaption>`
+    : '';
+  const heading = showHeading ? '<div class="demo-heading"><span>IN MOTION</span></div>' : '';
+  return `<figure class="demo" data-media="${id}">${heading}<img src="/wiki/media/${id}.png" width="640" height="360" loading="lazy" alt="${escapeHtml(item.alt)}" />${caption}</figure>`;
+}
+
+function renderSection(article: WikiArticle, section: WikiSection, index: number): string {
+  const headingId = `${article.id}-section-${index}`;
+  const paragraphs = section.paragraphs
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join('');
+  if (section.media === undefined) {
+    return `<section aria-labelledby="${headingId}"><h2 id="${headingId}">${escapeHtml(section.heading)}</h2>${paragraphs}</section>`;
+  }
+  const cardClass = isShipKitId(article.id) ? 'topic-demo-card ability-card' : 'topic-demo-card';
+  const label = isShipKitId(article.id) ? 'ABILITY' : 'DEMONSTRATION';
+  return `<section class="${cardClass}" aria-labelledby="${headingId}"><div class="topic-demo-card-copy"><p class="eyebrow">${label}</p><h2 id="${headingId}">${escapeHtml(section.heading)}</h2>${paragraphs}</div>${figure(section.media, false, false)}</section>`;
 }
 
 function renderArticle(article: WikiArticle): void {
-  content.innerHTML = `<div class="breadcrumb"><a href="#content">Field manual</a><span aria-hidden="true">/</span><span>${escapeHtml(article.category)}</span></div><article><header class="article-header"><p class="eyebrow">${escapeHtml(article.category)}</p><div class="article-title">${hull(article.id, 80)}<h1>${escapeHtml(article.title)}</h1></div><p class="article-summary">${escapeHtml(article.summary)}</p></header>${article.media.slice(0, 1).map(figure).join('')}<div class="article-body">${article.sections.map((section) => `<section><h2>${escapeHtml(section.heading)}</h2>${section.paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}</section>`).join('')}</div>${article.media.slice(1).map(figure).join('')}<aside class="related"><p class="eyebrow">KEEP EXPLORING</p><h2>Related entries</h2><div>${article.related
+  const shipArticle = isShipKitId(article.id);
+  const articleMedia = mediaForArticle(article);
+  content.innerHTML = `<div class="breadcrumb"><a href="#content">Field manual</a><span aria-hidden="true">/</span><span>${escapeHtml(article.category)}</span></div><article><header class="article-header"><p class="eyebrow">${escapeHtml(article.category)}</p><div class="article-title">${hull(article.id, 80)}<h1>${escapeHtml(article.title)}</h1></div><p class="article-summary">${escapeHtml(article.summary)}</p></header>${shipArticle && isShipKitId(article.id) ? shipScorecard(article.id) : ''}<div class="article-body">${article.sections.map((section, index) => renderSection(article, section, index)).join('')}</div><aside class="related"><p class="eyebrow">KEEP EXPLORING</p><h2>Related entries</h2><div>${article.related
     .map((id) => articles.find((item) => item.id === id))
     .filter((item): item is WikiArticle => item !== undefined)
     .map((item) => articleLink(item, 'related-link'))
     .join('')}</div></aside></article>`;
+  if (articleMedia.length !== content.querySelectorAll('.demo').length) {
+    throw new Error(`Media mapping mismatch for ${article.id}`);
+  }
   document.title = `${article.title} | GeoRoids field manual`;
+  startAnimations();
+  const radar = content.querySelector<HTMLElement>('.ship-radar');
+  if (radar && isShipKitId(article.id)) {
+    disposeRadar = mountShipRadar(radar, article.id);
+  }
+}
+
+function setFigurePlayback(figureElement: HTMLElement, playing: boolean): void {
+  const image = figureElement.querySelector<HTMLImageElement>('img');
+  const id = figureElement.dataset['media'];
+  if (!image || !id) {
+    return;
+  }
+  setMediaSource(image, id, playing);
+}
+
+function startAnimations(): void {
+  if (!shouldAutoplayMedia(reduceMotion.matches, document.hidden)) {
+    return;
+  }
+  content.querySelectorAll<HTMLElement>('.demo').forEach((figureElement) => {
+    setFigurePlayback(figureElement, true);
+  });
 }
 
 function stopAnimations(): void {
-  content
-    .querySelectorAll<HTMLButtonElement>('.media-toggle[aria-pressed="true"]')
-    .forEach((button) => {
-      button.click();
-    });
+  content.querySelectorAll<HTMLElement>('.demo').forEach((figureElement) => {
+    setFigurePlayback(figureElement, false);
+  });
 }
 
-content.addEventListener('click', (event) => {
-  if (!(event.target instanceof Element)) {
-    return;
-  }
-  const button = event.target.closest('button.media-toggle');
-  const figureElement = button?.closest('figure');
-  const image = figureElement?.querySelector('img');
-  const id = figureElement?.dataset['media'];
-  if (!button || !image || !id) {
-    return;
-  }
-  const playing = button.getAttribute('aria-pressed') !== 'true';
-  image.src = `/wiki/media/${id}.${playing ? 'gif' : 'png'}`;
-  button.setAttribute('aria-pressed', String(playing));
-  button.setAttribute(
-    'aria-label',
-    `${playing ? 'Pause' : 'Play'} ${media[id]?.title ?? ''} animation`
-  );
-  button.textContent = playing ? 'Pause animation Ⅱ' : 'Play animation ▷';
-});
 reduceMotion.addEventListener('change', () => {
   if (reduceMotion.matches) {
     stopAnimations();
+  } else {
+    startAnimations();
   }
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     stopAnimations();
+  } else {
+    startAnimations();
   }
 });
 
 function renderSearch(): void {
+  disposeRadar();
+  disposeRadar = () => {};
   clearSearch.hidden = search.value.length === 0;
   const query = search.value.trim();
   if (!query) {
@@ -151,6 +184,8 @@ function resetSearch(): void {
 }
 
 function renderRoute(moveFocus = true): void {
+  disposeRadar();
+  disposeRadar = () => {};
   status.textContent = '';
   let id = '';
   try {

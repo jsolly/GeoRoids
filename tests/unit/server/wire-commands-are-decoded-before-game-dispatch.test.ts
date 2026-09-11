@@ -114,11 +114,18 @@ test('nested current joins keep numeric-string positions and capability offers',
   });
 });
 
+test('retired asteroid tool and pickup claim commands are rejected at the wire boundary', () => {
+  for (const type of ['asteroidTool', 'asteroidInput', 'satellitePickupCollected']) {
+    expect(decodeClientCommand({ type, data: {} })).toEqual({
+      ok: false,
+      messageType: type,
+      error: `Unknown message type: ${type}`,
+      logUnknown: true,
+    });
+  }
+});
+
 test('malformed current commands retain their action-specific error policy', () => {
-  expect(decodeClientCommand({ type: 'asteroidInput', data: { epoch: 1, sequence: 2 } })).toEqual({
-    ok: false,
-    messageType: 'asteroidInput',
-  });
   expect(decodeClientCommand({ type: 'shoot', id: 'pilot', data: { laserStart: null } })).toEqual({
     ok: false,
     messageType: 'shoot',

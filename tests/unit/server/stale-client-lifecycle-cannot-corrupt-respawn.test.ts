@@ -86,7 +86,7 @@ describe('late client death updates after authoritative respawn', () => {
           velocity: { x: 0, y: 0 },
           angle: 0,
           thrusting: false,
-          motionEpoch: pilot.asteroidMotion?.epoch,
+          motionEpoch: pilot.playerMotion?.epoch,
           motionSequence: 1,
           exploding: true,
           health: 0,
@@ -102,7 +102,7 @@ describe('late client death updates after authoritative respawn', () => {
     expect(pilot.explodeTime).toBeUndefined();
     expect(pilot.deathCause).toBeUndefined();
     expect(pilot).not.toHaveProperty('respawnAnchor');
-    expect(pilot.asteroidMotion).toMatchObject({ mode: 'free', ack: 1 });
+    expect(pilot.playerMotion).toMatchObject({ mode: 'free', ack: 1 });
     expect(pilot.score).toBe(17);
     expect(peer.inbox.some((message) => message.type === 'playerUpdate')).toBe(false);
 
@@ -119,7 +119,7 @@ describe('late client death updates after authoritative respawn', () => {
           velocity: { x: 0, y: 0 },
           angle: 0,
           thrusting: false,
-          motionEpoch: pilot.asteroidMotion?.epoch,
+          motionEpoch: pilot.playerMotion?.epoch,
           motionSequence: 2,
           exploding: false,
         },

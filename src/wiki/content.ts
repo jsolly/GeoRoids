@@ -1,4 +1,3 @@
-import { ASTEROID_MOTION } from '../../shared/asteroidMotion';
 import { ASTEROID_INTERACTIONS } from '../../shared/asteroidPhenomena';
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { LOOT_BLAST } from '../../shared/lootBlast';
@@ -14,7 +13,7 @@ import {
   SHIP,
   SHOCKWAVE,
 } from '../constants';
-import { getShipKit, SHIP_ABILITY, type ShipKitId } from '../entities/ship/shipKits';
+import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
 
 export interface WikiArticle {
@@ -22,20 +21,26 @@ export interface WikiArticle {
   title: string;
   category: string;
   summary: string;
-  sections: { heading: string; paragraphs: string[] }[];
+  sections: WikiSection[];
   related: string[];
   sources: string[];
-  media: string[];
+}
+
+export interface WikiSection {
+  heading: string;
+  paragraphs: string[];
+  media?: string;
+}
+
+/** Return demonstrations in the same order as their owning article sections. */
+export function mediaForArticle(article: WikiArticle): string[] {
+  return article.sections.flatMap((section) =>
+    section.media === undefined ? [] : [section.media]
+  );
 }
 
 function seconds(frames: number): string {
   return `${frames / GAME.FPS} seconds`;
-}
-
-function shipStats(id: ShipKitId): string {
-  const kit = getShipKit(id);
-  const cooldown = SHIP_ABILITY.COOLDOWN_FRAMES[id];
-  return `${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, and a ${kit.turnSpeed} degree per second turn rate. It fires one laser per trigger with a ${kit.shotCooldown} millisecond shot interval. Its E ability recharges in ${seconds(cooldown)}.`;
 }
 
 function satelliteProfiles(): string[] {
@@ -83,53 +88,48 @@ export const articles: WikiArticle[] = [
       'shared-types.ts',
       'tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts',
     ],
-    media: [],
   },
   {
     id: 'controls',
     title: 'Controls',
     category: 'Start here',
     summary:
-      'Keyboard, mouse, and touch all drive the same thrust, aim, fire, ability, shield, and asteroid-tool actions.',
+      'Keyboard, mouse, and touch all drive the same thrust, aim, fire, ability, and shield actions.',
     sections: [
       {
         heading: 'Keyboard',
+        media: 'movement',
         paragraphs: [
-          'Use ArrowUp or W to thrust. ArrowLeft or A and ArrowRight or D turn the ship; opposing turn inputs cancel. Space fires. E activates the selected kit ability, F toggles the regular laser shield, T cycles targets nearest-first, Q latches or releases a Hauler, R anchors, X brakes, and C spins. Q/R select the nearest rock when none is selected; Escape clears selection. E and F are edge-triggered so holding the key does not repeatedly activate them.',
+          'Use ArrowUp or W to thrust. ArrowLeft or A and ArrowRight or D turn the ship; opposing turn inputs cancel. Space fires. E activates the selected kit ability and F toggles the regular laser shield. E and F are edge-triggered so holding the key does not repeatedly activate them.',
           `The shared starting movement values are thrust ${SHIP.THRUST}, a maximum velocity of ${SHIP.MAX_VELOCITY}, and a turn rate of ${SHIP.TURN_SPEED} degrees per second. The movement step applies the shared friction value of ${GAME.FRICTION} while the ship is coasting. The kit pages list the handling values that replace these defaults for each hull.`,
         ],
       },
       {
         heading: 'Mouse',
         paragraphs: [
-          'On desktop, the ship aims from the canvas center toward the pointer. Hold the left mouse button to fire and the right mouse button to thrust. Keep the pointer in the direction you want the nose to face; thrust follows that heading. Middle-click a rock to select and latch it, or anchor a second rock while latched. Middle-button drags use the same flick directions as touch.',
+          'On desktop, the ship aims from the canvas center toward the pointer. Hold the left mouse button to fire and the right mouse button to thrust. Keep the pointer in the direction you want the nose to face; thrust follows that heading.',
         ],
       },
       {
         heading: 'Touch',
         paragraphs: [
           'On touch screens, touch and hold the playfield to steer toward your finger and thrust. Drag to change direction; release to stop thrusting and coast. A touch directly on the ship keeps its current heading. Hold FIRE with another finger to fire, and use the ability and SHIELD buttons for the same actions as E and F. Action buttons do not steer the ship.',
-          'While holding one finger to steer, use a second finger to tap a rock and select it. A Hauler also latches it, or anchors it as a second rock while latched. Flick at least 40 pixels on the playfield: down releases, left brakes, right spins, and up anchors the rock where the gesture started. These gestures work independently of steering and action buttons. Any ship can inspect a selected rock; only a Hauler can move it.',
         ],
       },
     ],
-    related: ['field-manual', 'dart', 'hauler', 'asteroid-tools'],
+    related: ['field-manual', 'dart', 'hauler'],
     sources: [
       'src/input/keybindings.ts',
       'src/input/mouse.ts',
       'src/input/touchControls.ts',
       'src/input/touchAbility.ts',
       'src/input/controlSources.ts',
-      'src/asteroidTools/AsteroidToolsController.ts',
-      'src/asteroidTools/AsteroidGestures.ts',
-      'tests/unit/ui/asteroidGestures.test.ts',
       'src/constants/index.ts',
       'tests/integration/entities/input/keybindings.test.ts',
       'tests/integration/entities/input/mouse.test.ts',
       'tests/unit/input/touchAbility.test.ts',
       'tests/unit/input/mouseDesktop.test.ts',
     ],
-    media: ['movement'],
   },
   {
     id: 'dart',
@@ -139,13 +139,10 @@ export const articles: WikiArticle[] = [
       'A balanced hull with the quickest kit ability: E adds a short forward dash to the ship’s current velocity.',
     sections: [
       {
-        heading: 'Starting values',
-        paragraphs: [`${shipStats('dart')}`],
-      },
-      {
         heading: 'Boost dash',
+        media: 'dart',
         paragraphs: [
-          `E adds a forward velocity burst of ${SHIP_ABILITY.DASH_BOOST} and keeps the ability active for 12 frames, or 0.2 seconds. The ability cannot activate while the ship is exploding, has no health, is on cooldown, or is latched into asteroid motion. The regular F shield remains a separate control: it lasts up to ${SHIELD.DURATION_SECONDS} seconds, has a ${SHIELD.COOLDOWN_SECONDS} second cooldown, and blocks laser damage while active.`,
+          `E adds a forward burst of ${SHIP_ABILITY.DASH_BOOST}; release the input and friction carries the ship into a short coast.`,
         ],
       },
     ],
@@ -153,67 +150,55 @@ export const articles: WikiArticle[] = [
     sources: [
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipAbilities.ts',
-      'src/entities/ship/shipShield.ts',
       'src/constants/index.ts',
       'tests/unit/entities/shipKits.test.ts',
       'tests/unit/entities/shipAbilities.test.ts',
-      'tests/unit/entities/shipShield.test.ts',
     ],
-    media: ['dart', 'movement'],
   },
   {
     id: 'hauler',
     title: 'Hauler',
     category: 'Ships',
-    summary:
-      'A heavy hull that pulls targets with E and uses asteroid tools to spin, couple, and launch rocks.',
+    summary: 'A heavy hull that pulls nearby targets with its combat harpoon E ability.',
     sections: [
       {
-        heading: 'Starting values',
-        paragraphs: [`${shipStats('hauler')}`],
-      },
-      {
         heading: 'Harpoon E',
+        media: 'hauler',
         paragraphs: [
-          `E latches the nearest valid asteroid in reach, or a hostile ship if no rock is in reach. Reach is view-aware and at least ${SHIP_ABILITY.HARPOON_RANGE} units; it expands with the visible area. A same-faction ship, shielded ship, exploding ship, or dead entity is rejected. A successful harpoon runs for up to ${SHIP_ABILITY.HARPOON_FRAMES} frames, or ${seconds(SHIP_ABILITY.HARPOON_FRAMES)}, and applies the shared pull force with a strength of ${SHIP_ABILITY.HARPOON_PULL} and distance falloff. The cream cable stays visible while the latch is active, including if the hull is exploding. A miss does not spend the cooldown.`,
-        ],
-      },
-      {
-        heading: 'Asteroid tools',
-        paragraphs: [
-          `Q latches or releases a Hauler without opening a menu. Use T to cycle targets, R to anchor, X to brake, and C to spin. The Hauler can latch an available rock within ${ASTEROID_MOTION.latchRange} units of its surface, then aim, turn, thrust, spin, brake, couple a second rock, and release it. This is a separate tool path from the short combat harpoon. Read the asteroid tools entry for ownership, fuel, tether, and reconnect rules.`,
+          `E attaches to the nearest valid asteroid in reach, or a hostile ship when no rock is in reach. Reach is view-aware, starts at ${SHIP_ABILITY.HARPOON_RANGE} units, and expands with the visible area. Same-faction, shielded, exploding, and dead targets are ignored. A successful harpoon pulls for up to ${seconds(SHIP_ABILITY.HARPOON_FRAMES)}. While an asteroid is attached, it can pass through the Hauler without collision damage; unrelated asteroids and other pilots keep normal collision damage. When the attachment ends, the asteroid collides normally again. A miss does not spend the cooldown.`,
         ],
       },
     ],
-    related: ['controls', 'asteroid-tools', 'fuel-growth', 'factions'],
+    related: ['controls', 'fuel-growth', 'factions'],
     sources: [
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipRenderer.ts',
       'src/entities/ship/harpoonField.ts',
-      'shared/asteroidMotion.ts',
-      'server/core/AsteroidMotionService.ts',
       'tests/unit/entities/shipKits.test.ts',
       'tests/unit/entities/shipAbilities.test.ts',
       'tests/unit/scenarios/combat/hauler-harpoons-a-nearby-ship.test.ts',
       'tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts',
     ],
-    media: ['hauler', 'slingshot', 'winch'],
   },
   {
     id: 'warden',
     title: 'Warden',
     category: 'Ships',
-    summary: 'A durable hull whose E shield absorbs incoming damage during its timed focus window.',
+    summary: 'A durable hull whose E projects a reflective shield to a nearby ally.',
     sections: [
       {
-        heading: 'Starting values',
-        paragraphs: [`${shipStats('warden')}`],
+        heading: 'Shield projection',
+        media: 'warden',
+        paragraphs: [
+          `E automatically projects a ${seconds(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES)} reflective laser shield to the nearest living allied ship within ${SHIP_ABILITY.SHIELD_PROJECTION_RANGE} world units between hull edges, preferring the forward hemisphere and then the nearest fallback. There is no precise aim; a miss does not spend the cooldown. The cyan link stays visible while the projection is active. The projected shield reflects hostile player, bot, and EO lasers back toward their source but does not stop collisions. An exploding loot drop bypasses both shields; spawn protection blocks that blast.`,
+        ],
       },
       {
-        heading: 'Shield focus',
+        heading: 'Reflective F shield',
+        media: 'shield',
         paragraphs: [
-          `E starts the Warden shield timer for ${SHIP_ABILITY.SHIELD_FRAMES} frames, or ${seconds(SHIP_ABILITY.SHIELD_FRAMES)}. The Warden timer protects against normal laser and collision damage before those sources are applied. An exploding loot drop bypasses both shields; spawn protection blocks that blast. The Warden timer is separate from the regular F shield, which lasts ${SHIELD.DURATION_SECONDS} seconds, has a ${SHIELD.COOLDOWN_SECONDS} second cooldown, and blocks laser damage only. The F cooldown starts when that shield turns off; the E cooldown starts when you activate it, so a ready E can refresh the Warden shield.`,
+          `F raises the Warden’s own reflective laser shield for ${SHIELD.WARDEN_DURATION_SECONDS} seconds and has a ${SHIELD.COOLDOWN_SECONDS} second cooldown. F reflects hostile lasers but does not stop environmental collisions. E and F are separate timers.`,
         ],
       },
     ],
@@ -222,14 +207,17 @@ export const articles: WikiArticle[] = [
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipShield.ts',
+      'src/entities/ship/shieldProjectionRenderer.ts',
       'src/entities/ship/Ship.ts',
+      'shared/shieldReflection.ts',
       'src/constants/index.ts',
       'tests/unit/entities/shipKits.test.ts',
       'tests/unit/entities/shipAbilities.test.ts',
       'tests/unit/entities/shipShield.test.ts',
       'tests/unit/entities/shipDamage.test.ts',
+      'tests/unit/shared/shieldReflection.test.ts',
+      'tests/integration/browser/sanity/shields-send-lasers-back-to-the-shooter.test.ts',
     ],
-    media: ['warden', 'shield'],
   },
   {
     id: 'skirmisher',
@@ -238,15 +226,10 @@ export const articles: WikiArticle[] = [
     summary: 'A light, fast hull whose E ability fires a three-shot burst in a narrow spread.',
     sections: [
       {
-        heading: 'Starting values',
-        paragraphs: [
-          `${shipStats('skirmisher')} Its E burst count is three; normal firing remains one laser per trigger.`,
-        ],
-      },
-      {
         heading: 'Burst fire',
+        media: 'skirmisher',
         paragraphs: [
-          `E fires a three-shot burst with a ${SHIP_ABILITY.BURST_SPREAD} radian spread and keeps the ability active for 8 frames. The shared laser cap still applies, so existing lasers can limit how many projectiles the burst creates. E follows the common ability guards for exploding, dead, cooldown, and asteroid-motion states.`,
+          'E fires three lasers in a tight burst. The volley can hit the same target, while the shared laser limit still applies.',
         ],
       },
     ],
@@ -259,7 +242,6 @@ export const articles: WikiArticle[] = [
       'tests/unit/entities/shipKits.test.ts',
       'tests/unit/entities/shipAbilities.test.ts',
     ],
-    media: ['skirmisher'],
   },
   {
     id: 'quake',
@@ -269,13 +251,10 @@ export const articles: WikiArticle[] = [
       'A medium hull whose E shock pulse spends fuel to push nearby ships and asteroids away.',
     sections: [
       {
-        heading: 'Starting values',
-        paragraphs: [`${shipStats('quake')}`],
-      },
-      {
         heading: 'Shock pulse',
+        media: 'quake',
         paragraphs: [
-          `E spends ${FUEL.EMP_COST} fuel and affects bodies within a ${SHIP_ABILITY.SHOCK_RADIUS} unit radius. The radial impulse has strength ${SHIP_ABILITY.SHOCK_FORCE} with distance falloff, and the ability stays active for 18 frames. The pulse pushes friendly ships too and deals no direct damage. E cannot activate when the tank has less than ${FUEL.EMP_COST} fuel, and the common exploding, dead, cooldown, and asteroid-motion guards still apply.`,
+          `E spends ${FUEL.EMP_COST} fuel to push ships and asteroids within ${SHIP_ABILITY.SHOCK_RADIUS} units. It pushes allies too and deals no direct damage; the tank must have enough fuel to fire. The blue expanding ring marks the activation area, briefly lingering at the point where the pulse began.`,
         ],
       },
     ],
@@ -283,25 +262,25 @@ export const articles: WikiArticle[] = [
     sources: [
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipAbilities.ts',
+      'src/entities/ship/quakePulseRenderer.ts',
       'src/constants/index.ts',
       'shared/fuel.ts',
       'tests/unit/entities/shipKits.test.ts',
       'tests/unit/entities/shipAbilities.test.ts',
       'tests/unit/entities/emp-spends-fuel-when-activated.test.ts',
     ],
-    media: ['quake', 'movement'],
   },
   {
     id: 'fuel-growth',
     title: 'Fuel, loot, and growth',
     category: 'Systems',
     summary:
-      'Fuel powers Quake and Hauler tools. Collect loot to grow, or shoot a drop to create a dangerous blast.',
+      'Fuel powers Quake’s shock pulse. Collect loot to grow, or shoot a drop to create a dangerous blast.',
     sections: [
       {
         heading: 'Fuel',
         paragraphs: [
-          `Every kit starts a life with ${FUEL.START} fuel and has a ${FUEL.MAX} fuel maximum. An asteroid at least ${FUEL.MIN_ROID_SIZE_TO_DROP} units in size can drop a ${FUEL.DROP_AMOUNT} fuel pickup. A pilot at full fuel cannot collect it. Quake E costs ${FUEL.EMP_COST} fuel and is refused below that cost. While a Hauler is thrusting with an asteroid latched, the motion rules spend ${ASTEROID_MOTION.fuelPerFrame} fuel per frame.`,
+          `Every kit starts a life with ${FUEL.START} fuel and has a ${FUEL.MAX} fuel maximum. An asteroid at least ${FUEL.MIN_ROID_SIZE_TO_DROP} units in size can drop a ${FUEL.DROP_AMOUNT} fuel pickup. A pilot at full fuel cannot collect it. Quake E costs ${FUEL.EMP_COST} fuel and is refused below that cost.`,
         ],
       },
       {
@@ -314,6 +293,7 @@ export const articles: WikiArticle[] = [
       },
       {
         heading: 'Shoot a drop',
+        media: 'loot',
         paragraphs: [
           `A laser can detonate a nearby loot drop when the shooter is within ${LOOT_BLAST.ARM_RANGE} units. The drop is removed and the blast reaches ${LOOT_BLAST.RADIUS} units, deals ${LOOT_BLAST.DAMAGE} damage to every nearby live hull, and includes the shooter and allies. It bypasses both E and F shields; spawn protection blocks it. It adds an outward velocity impulse of ${LOOT_BLAST.PUSH} to asteroids of size ${LOOT_BLAST.SMALL_ROID_MAX} or smaller. A hull or rock is affected when its edge reaches the blast radius.`,
         ],
@@ -336,7 +316,6 @@ export const articles: WikiArticle[] = [
       'tests/unit/server/fuel-pickup-and-emp-spend.test.ts',
       'tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts',
     ],
-    media: ['loot'],
   },
   {
     id: 'asteroids',
@@ -354,6 +333,7 @@ export const articles: WikiArticle[] = [
       },
       {
         heading: 'Cooperative splits and score',
+        media: 'split',
         paragraphs: [
           `A cooperative split sends two outward pushes through nearby ships and rocks: a fast wave reaches ${SHOCKWAVE.FAST.radius} units, followed by a heavier wave reaching ${SHOCKWAVE.HEAVY.radius}. The force weakens with distance and pushes smaller bodies harder. These waves change motion without dealing direct damage; an ally can still be shoved toward a hazard.`,
           `For ice and ordinary rocks, the large-rock collaboration rule begins at size ${ROID.COLLAB_SPLIT_MIN_SIZE} or larger. Two distinct shooter IDs that hit the same biggest-class rock within a ${ROID.COLLAB_SPLIT_WINDOW_MS} millisecond collaboration window produce two fragments at 60 percent of the original size and a radial collaboration shockwave. A second hit from the same shooter destroys the rock without a collaboration split; same-shooter echoes within ${ROID.COLLAB_HIT_DEDUPE_MS} milliseconds are deduplicated. If nobody lands a qualifying second hit before the window expires, the tagged rock breaks automatically without splitting. Metal instead takes three normal hits and does not break just from waiting; rubble uses its own fragment rule. Medium and small rocks do not use the collaboration rule.`,
@@ -361,14 +341,14 @@ export const articles: WikiArticle[] = [
         ],
       },
       {
-        heading: 'Spin and reflection',
+        heading: 'Reflection and charge',
+        media: 'reflection',
         paragraphs: [
-          'Some asteroids naturally spin. Curved marks around a rock identify spin, with a stronger cue for charged spin built by a tethered Hauler. Rotation changes the surface you can latch onto and the face a laser meets.',
           `Reflective metal clusters use the actual polygon faces for laser reflection. A cluster rock can absorb ${ASTEROID_INTERACTIONS.reflectiveEnergy} energy. Each hit adds the incoming shot energy to the rock’s charge; a reflected shot multiplies its own energy by ${ASTEROID_INTERACTIONS.laserEnergyGain}, up to ${ASTEROID_INTERACTIONS.maxLaserEnergy}. Reflection stops when the rock fills its charge, the laser reaches ${ASTEROID_INTERACTIONS.maxLaserEnergy} energy, or the shot reaches ${ASTEROID_INTERACTIONS.maxBounces} bounces; the laser lifetime cap is ${ASTEROID_INTERACTIONS.maxLaserFrames} frames. A rock that reaches its terminal reflection state breaks and can release the core reward. Reflected projectiles keep their speed magnitude and can damage the originating pilot or a same-faction pilot, while direct shots keep the friendly-fire faction filter.`,
         ],
       },
     ],
-    related: ['asteroid-tools', 'fuel-growth', 'factions', 'combat-survival'],
+    related: ['fuel-growth', 'factions', 'combat-survival'],
     sources: [
       'server/core/AsteroidManager.ts',
       'shared/asteroidMaterials.ts',
@@ -387,64 +367,17 @@ export const articles: WikiArticle[] = [
       'tests/unit/server/collaborative-asteroid-split.test.ts',
       'tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts',
     ],
-    media: ['reflection', 'split'],
-  },
-  {
-    id: 'asteroid-tools',
-    title: 'Asteroid tools',
-    category: 'Arena',
-    summary:
-      'Use a Hauler to latch a rock, build spin, attach another rock, and release the pair into the field.',
-    sections: [
-      {
-        heading: 'Select and latch',
-        paragraphs: [
-          'Select a rock with T, a tap, or a middle-click. The passive readout identifies its material and distance. Aim to see a predicted bounce path, including its impact count and stopping point. This preview uses the rocks where they are now; moving targets can change the path before a shot arrives. A collected core also shows its remaining laser charges and lifetime here.',
-          `Press T to select an asteroid, or tap/middle-click it directly. The passive readout identifies its material and shows the shot preview; a dashed ring marks your target. Q latches or releases, R anchors, X brakes, and C spins. A physical latch requires a living Hauler, an unowned rock, and a center distance no greater than the rock size plus the ${ASTEROID_MOTION.latchRange} unit latch range. The motion session lasts ${ASTEROID_MOTION.latchLifetimeMs / 1000} seconds unless the pilot releases, dies, or the rock disappears. Other pilots cannot claim an occupied rock.`,
-        ],
-      },
-      {
-        heading: 'Move, spin, and release',
-        paragraphs: [
-          `While latched, your ship and the rock move as a tethered pair. Thrust consumes ${ASTEROID_MOTION.fuelPerFrame} fuel per frame and adds torque and charged spin. Spin resumes the tether motion; Brake changes the motion mode. Release disconnects your ship and carries it away along the tangent of its orbit. The rock keeps its existing motion; a coupled second rock also continues with the velocity built during the tether. Release drag slows the ship back toward normal flight speed, even if you hold thrust, so extra spin cannot create unlimited speed.`,
-          `Anchor or Brake can attach a second nearby unowned rock as a payload. The payload range is ${ASTEROID_MOTION.payloadRange} units, and the rocks must be separated by the sum of their sizes plus 4 units. The pair turns around its shared center of mass. A brief connection interruption allows ${ASTEROID_MOTION.reconnectGraceMs / 1000} seconds of coasting before the tether is released.`,
-        ],
-      },
-      {
-        heading: 'Combat harpoon is separate',
-        paragraphs: [
-          'Hauler E is the short combat harpoon described on the Hauler page. The Q tools move a tethered rock and use different ranges, timers, fuel use, and release behavior.',
-        ],
-      },
-    ],
-    related: ['hauler', 'controls', 'fuel-growth', 'asteroids', 'hud-network'],
-    sources: [
-      'src/asteroidTools/AsteroidToolsController.ts',
-      'src/asteroidTools/AsteroidGestures.ts',
-      'src/asteroidTools/FlightFeedback.ts',
-      'shared/asteroidMotion.ts',
-      'server/core/AsteroidMotionService.ts',
-      'docs/asteroid-interactions.md',
-      'tests/unit/ui/asteroidGestures.test.ts',
-      'tests/unit/ui/asteroidToolsController.test.ts',
-      'tests/unit/ui/flightFeedback.test.ts',
-      'tests/unit/ui/disconnecting-clears-direct-flight-controls.test.ts',
-      'tests/unit/network/hauler-reconciles-only-unacknowledged-motion.test.ts',
-      'tests/unit/server/asteroid-tools-cross-real-sockets.test.ts',
-      'tests/unit/server/hauler-slings-surviving-payloads-with-owned-motion.test.ts',
-      'tests/integration/browser/sanity/asteroid-interactions-playable-flows.test.ts',
-    ],
-    media: ['slingshot', 'winch'],
   },
   {
     id: 'satellites',
     title: 'Satellites and pickups',
     category: 'Arena',
     summary:
-      'Six hostile satellite profiles patrol the shared field, while Echo and Relay pickups offer a separate temporary orbiting bonus.',
+      'Six hostile satellite profiles patrol the shared field, while Echo and Relay pickups become durable orbiting interceptors.',
     sections: [
       {
         heading: 'Six hostile profiles',
+        media: 'satellites',
         paragraphs: [...satelliteProfiles()],
       },
       {
@@ -455,8 +388,9 @@ export const articles: WikiArticle[] = [
       },
       {
         heading: 'Echo and Relay pickups',
+        media: 'pickups',
         paragraphs: [
-          `The field can hold ${SATELLITE_PICKUP.MAX_COUNT} loose satellite pickups: Echo and Relay are spawned separately from satellite destruction. They drift and orbit inside the ${SATELLITE_PICKUP.FIELD_RADIUS} unit pickup field. The first living human pilot to overlap a pickup gets ${SATELLITE_PICKUP.SCORE_BONUS} score and ${SATELLITE_PICKUP.SHIELD_FRAMES} frames, or ${seconds(SATELLITE_PICKUP.SHIELD_FRAMES)}, of spawn protection. The collected pickup orbits its owner at radius ${SATELLITE_PICKUP.ORBIT_RADIUS} for that timer, then returns as a loose pickup; death releases it early. Collection is shared, so two pilots cannot both claim one pickup.`,
+          `The field can hold ${SATELLITE_PICKUP.MAX_COUNT} loose satellite pickups: Echo and Relay are spawned separately from satellite destruction. They drift inside the ${SATELLITE_PICKUP.FIELD_RADIUS} unit pickup field. A nearest living human within ${SATELLITE_PICKUP.AUTO_COLLECT_RANGE} world units claims a loose pickup automatically and earns ${SATELLITE_PICKUP.SCORE_BONUS} score; collection does not grant a shield or spawn protection. The collected hardware orbits its owner indefinitely at least ${SATELLITE_PICKUP.ORBIT_RADIUS} units away and stays outside the hull by ${SATELLITE_PICKUP.ORBIT_GAP} units. It starts with ${SATELLITE_PICKUP.HEALTH} health and intercepts hostile player and bot shots, EO satellite lasers, and asteroid collisions. Damage reduces its health; at zero it becomes broken and respawns healthy as a loose pickup after ${SATELLITE_PICKUP.RESPAWN_FRAMES} frames, or ${seconds(SATELLITE_PICKUP.RESPAWN_FRAMES)}. Owner death or leave releases it at its current pose without restoring health.`,
         ],
       },
     ],
@@ -471,13 +405,13 @@ export const articles: WikiArticle[] = [
       'tests/unit/entities/satellitePickups.test.ts',
       'tests/unit/entities/satellitePickupMath.test.ts',
       'tests/unit/systems/satelliteCollisions.test.ts',
-      'tests/unit/systems/satellitePickupCollisions.test.ts',
+      'server/core/CollisionAuthority.ts',
+      'tests/unit/entities/satellite-pickups-follow-authoritative-health.test.ts',
       'tests/unit/server/satellite-pickup-scoring.test.ts',
       'tests/integration/browser/e2e/satellites-appear-and-patrol-the-arena.test.ts',
       'tests/integration/browser/e2e/player-destroys-a-satellite-with-lasers.test.ts',
       'tests/integration/browser/e2e/player-collects-orbiting-satellite-pickup.test.ts',
     ],
-    media: ['satellites', 'pickups'],
   },
   {
     id: 'terrain',
@@ -495,6 +429,7 @@ export const articles: WikiArticle[] = [
       },
       {
         heading: 'Slope and contours',
+        media: 'terrain',
         paragraphs: [
           'Contour lines are closest together on steep slopes and farther apart on gentle ground. Faint numbers mark relative elevations, including negative values in valleys. Watch the contours and your drift to tell uphill from downhill. Normal hull and mass speed limits still apply, and bots feel the same slope force. Lasers keep their normal motion; glints where shots cross contours are visual feedback, with no terrain reflection or extra damage.',
         ],
@@ -511,7 +446,6 @@ export const articles: WikiArticle[] = [
       'shared-types.ts',
       'tests/unit/systems/contourLaser.test.ts',
     ],
-    media: ['terrain'],
   },
   {
     id: 'combat-survival',
@@ -528,8 +462,9 @@ export const articles: WikiArticle[] = [
       },
       {
         heading: 'Damage and protection',
+        media: 'shield',
         paragraphs: [
-          'A normal laser hit deals 25 damage. The player collision rule deals 20 damage per second in 50 millisecond ticks. An asteroid impact deals 25 damage and destroys the rock. A boundary impact deals 100 damage; a hull with more health can survive the first hit. The regular F shield blocks laser damage only; it does not stop environmental collisions. Warden E blocks normal laser and collision damage for 3 seconds. Exploding loot deals 40 damage through both shields, including to allies and the shooter. Spawn protection blocks that blast too.',
+          `A normal laser hit deals 25 damage. The player collision rule deals 20 damage per second in 50 millisecond ticks. An asteroid impact deals 25 damage and destroys the rock. A boundary impact deals 100 damage; a hull with more health can survive the first hit. The regular F shield reflects hostile lasers for ${SHIELD.DURATION_SECONDS} seconds and does not stop environmental collisions. Warden’s F shield lasts ${SHIELD.WARDEN_DURATION_SECONDS} seconds; its E projection lasts ${seconds(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES)}, and both reflect hostile lasers without stopping collisions. Exploding loot deals 40 damage through both shields, including to allies and the shooter. Spawn protection blocks that blast too.`,
         ],
       },
       {
@@ -568,7 +503,6 @@ export const articles: WikiArticle[] = [
       'tests/integration/browser/e2e/ship-respawns-randomly-after-boundary-death.test.ts',
       'tests/integration/browser/e2e/ship-respawns-randomly-after-asteroid-death.test.ts',
     ],
-    media: ['shield'],
   },
   {
     id: 'factions',
@@ -610,7 +544,6 @@ export const articles: WikiArticle[] = [
       'tests/unit/server/factions-teamwork.test.ts',
       'tests/unit/scenarios/combat/same-side-shots-do-not-hurt-once-sides-are-set.test.ts',
     ],
-    media: [],
   },
   {
     id: 'hud-network',
@@ -637,17 +570,11 @@ export const articles: WikiArticle[] = [
         paragraphs: [
           'Keep the game tab up to date. If the server asks you to update the client, reload the page before joining again. Older game versions cannot join.',
           'Switching away from the game releases held movement and fire controls. On return, the client requests current server state and resumes drawing without replaying the time the tab was hidden.',
-          'The game automatically tries to reconnect after a lost connection. During an interruption, the local view may lag behind the shared world; wait for the connection to recover before relying on a pickup or hit result. If joining fails or reconnect attempts are exhausted, the game returns to the title screen. Select Enter Game to try again. A full reload can start a new session, so it is not a way to preserve a life or a tether.',
-        ],
-      },
-      {
-        heading: 'Tethers during a disconnect',
-        paragraphs: [
-          'An active Hauler tether coasts with neutral input during a brief interruption. It has a 2 second grace period; a longer interruption releases the tether. Check the passive tether status after reconnecting before trying another spin or release.',
+          'The game automatically tries to reconnect after a lost connection. During an interruption, the local view may lag behind the shared world; wait for the connection to recover before relying on a pickup or hit result. If joining fails or reconnect attempts are exhausted, the game returns to the title screen. Select Enter Game to try again. A full reload can start a new session.',
         ],
       },
     ],
-    related: ['field-manual', 'controls', 'asteroid-tools', 'combat-survival', 'factions'],
+    related: ['field-manual', 'controls', 'combat-survival', 'factions'],
     sources: [
       'shared/gameClock.ts',
       'src/core/eventLoop.ts',
@@ -668,6 +595,5 @@ export const articles: WikiArticle[] = [
       'tests/unit/network/pilots-recover-complete-snapshots.test.ts',
       'tests/unit/network/asteroidFieldSync.test.ts',
     ],
-    media: [],
   },
 ];

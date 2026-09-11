@@ -39,10 +39,7 @@ export interface ClientMessage {
     | 'initAsteroids'
     | 'shield'
     | 'clientLog'
-    | 'useAbility'
-    | 'asteroidTool'
-    | 'asteroidInput'
-    | 'satellitePickupCollected';
+    | 'useAbility';
   id?: string; // Optional ID field for messages that need it
   data: unknown;
   timestamp: number;

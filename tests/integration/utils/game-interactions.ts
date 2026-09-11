@@ -478,7 +478,7 @@ export class GameInteractions {
     await this.page.waitForFunction(
       (expectedEpoch) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-        return ship?.asteroidMotion?.epoch === expectedEpoch;
+        return ship?.playerMotion?.epoch === expectedEpoch;
       },
       motionEpoch,
       { timeout: 5000, polling: 25 }
@@ -1641,25 +1641,28 @@ export class GameInteractions {
    * Fire at a remote player's ship from client A (requires both clients in game).
    * Parks the shooter adjacent to the target and fires one laser.
    */
-  async fireLaserAtRemotePlayer(targetPlayerId: string): Promise<void> {
-    const firingPoint = await this.page.evaluate((targetId) => {
-      const gc = window.gameController;
-      const players = gc?.getNetworkManager().getAllPlayers() ?? [];
-      const target = players.find((p) => p.id === targetId);
-      const local = gc?.getPlayerManager()?.getLocalPlayer?.();
-      const ship = gc?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-      if (!target?.ship || !ship) {
-        throw new Error('Shooter or target ship unavailable');
-      }
-      const localFaction = local?.factionId ?? ship.factionId;
-      const targetFaction = target.factionId ?? target.ship.factionId;
-      if (!localFaction || !targetFaction || localFaction === targetFaction) {
-        throw new Error('Remote laser target must belong to the opposing faction');
-      }
-      const tx = target.ship.position.x;
-      const ty = target.ship.position.y;
-      return { x: tx - 45, y: ty };
-    }, targetPlayerId);
+  async fireLaserAtRemotePlayer(targetPlayerId: string, distance = 45): Promise<void> {
+    const firingPoint = await this.page.evaluate(
+      ({ targetId, distance }) => {
+        const gc = window.gameController;
+        const players = gc?.getNetworkManager().getAllPlayers() ?? [];
+        const target = players.find((p) => p.id === targetId);
+        const local = gc?.getPlayerManager()?.getLocalPlayer?.();
+        const ship = gc?.getPlayerManager()?.getLocalPlayer?.()?.ship;
+        if (!target?.ship || !ship) {
+          throw new Error('Shooter or target ship unavailable');
+        }
+        const localFaction = local?.factionId ?? ship.factionId;
+        const targetFaction = target.factionId ?? target.ship.factionId;
+        if (!localFaction || !targetFaction || localFaction === targetFaction) {
+          throw new Error('Remote laser target must belong to the opposing faction');
+        }
+        const tx = target.ship.position.x;
+        const ty = target.ship.position.y;
+        return { x: tx - distance, y: ty };
+      },
+      { targetId: targetPlayerId, distance }
+    );
     await this.placeShipAt(firingPoint.x, firingPoint.y);
     await this.page.evaluate((targetId) => {
       const gc = window.gameController;
@@ -1708,6 +1711,8 @@ export class GameInteractions {
       state: string;
       ownerId: string | null;
       r: number;
+      health: number;
+      maxHealth: number;
     }>
   > {
     return await this.page.evaluate(() => {
@@ -1724,6 +1729,8 @@ export class GameInteractions {
         state: pickup.state,
         ownerId: pickup.ownerId,
         r: pickup.radius,
+        health: pickup.health,
+        maxHealth: pickup.maxHealth,
       }));
     });
   }
@@ -1737,21 +1744,6 @@ export class GameInteractions {
       count,
       { timeout: timeoutMs }
     );
-  }
-
-  async pinShipOnSatellitePickup(pickupId: string, durationMs = 2000): Promise<void> {
-    const deadline = Date.now() + durationMs;
-    while (Date.now() < deadline) {
-      const position = await this.page.evaluate((id) => {
-        const pickup = window.gameController?.getSatellitePickups().find((item) => item.id === id);
-        return pickup ? { x: pickup.position.x, y: pickup.position.y } : null;
-      }, pickupId);
-      if (!position) {
-        return;
-      }
-      await this.placeShipAt(position.x, position.y);
-      await this.page.waitForTimeout(100);
-    }
   }
 
   /** Standard one-client boot against the multiplayer server. */

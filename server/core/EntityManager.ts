@@ -8,8 +8,8 @@ import { pickBalancedFactionFromShips } from '../../shared/factions';
 import { createFuelTank } from '../../shared/fuel';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
-  AsteroidMotionState,
   LaserUpgrade,
+  PlayerMotionState,
   Position,
   ShipKitId,
   SoftFactionId,
@@ -17,7 +17,7 @@ import type {
 } from '../../shared-types';
 import { DEBUG, FUEL, PALETTE, SHIP } from '../../src/constants';
 import { parseSoftFactionId } from '../../src/entities/player/softFactions';
-import { absorbDamageWithShield, tickAbilityHost } from '../../src/entities/ship/shipAbilities';
+import { clearShieldProjection, tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import {
   applyShipKitStats,
   DEFAULT_SHIP_KIT_ID,
@@ -29,9 +29,7 @@ import {
   clearShield,
   createShieldState,
   maybeActivateBotShield,
-  noteReadableShieldLaserHit,
   type ShieldState,
-  shouldBlockDamage,
   updateShield,
 } from '../../src/entities/ship/shipShield';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
@@ -79,13 +77,15 @@ export interface GameEntity extends ShieldState {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
   shieldTimer: number;
+  shieldTargetId?: string;
+  shieldSourceId?: string;
   harpoonTimer: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
   /** Killer of the current death (cleared on respawn). */
   deathCause?: string;
   asteroidInteractions?: 1;
-  asteroidMotion?: AsteroidMotionState;
+  playerMotion?: PlayerMotionState;
   laserUpgrade?: LaserUpgrade;
 }
 
@@ -224,6 +224,7 @@ export class EntityManager {
     const entity = this.entities.get(entityId);
     if (entity) {
       this.stashHumanForRejoin(entity);
+      this.clearShieldProjectionLinks(entityId);
       this.entities.delete(entityId);
       logger.debug('ENTITY', 'Entity removed', { entityId, entityType: entity.type });
     }
@@ -232,6 +233,34 @@ export class EntityManager {
 
   private nextFaction(): SoftFactionId {
     return pickBalancedFactionFromShips(this.getAllEntities());
+  }
+
+  /** Clear every projection link touching a caster, recipient, or leaving ship. */
+  private clearShieldProjectionLinks(entityId: string): void {
+    const entity = this.entities.get(entityId);
+    if (!entity) {
+      return;
+    }
+    if (entity.shieldSourceId) {
+      const source = this.entities.get(entity.shieldSourceId);
+      if (source?.shieldTargetId === entityId) {
+        delete source.shieldTargetId;
+        source.abilityActiveFrames = 0;
+      }
+    }
+    for (const candidate of this.entities.values()) {
+      if (candidate.id === entityId) {
+        continue;
+      }
+      if (candidate.shieldTargetId === entityId) {
+        delete candidate.shieldTargetId;
+        candidate.abilityActiveFrames = 0;
+      }
+      if (candidate.shieldSourceId === entityId) {
+        clearShieldProjection(candidate);
+      }
+    }
+    clearShieldProjection(entity);
   }
 
   // Human player management
@@ -252,6 +281,7 @@ export class EntityManager {
         return this.attachLiveHuman(existing, id, name, ws, kitId);
       }
       // Leftover 0-life ship after game-over — Start must not rejoin it.
+      this.clearShieldProjectionLinks(id);
       this.entities.delete(id);
     }
 
@@ -260,6 +290,7 @@ export class EntityManager {
       return this.attachLiveHuman(sameName, id, name, ws, kitId);
     }
     if (sameName && sameName.lives <= 0) {
+      this.clearShieldProjectionLinks(sameName.id);
       this.entities.delete(sameName.id);
     }
 
@@ -331,6 +362,7 @@ export class EntityManager {
     const oldWs = existing.ws;
     const oldId = existing.id;
     if (oldId !== id) {
+      this.clearShieldProjectionLinks(oldId);
       this.entities.delete(oldId);
       existing.id = id;
       this.entities.set(id, existing);
@@ -479,11 +511,12 @@ export class EntityManager {
     return newBots;
   }
 
-  // Damage system — laser hits honor the shared shield; collisions do not.
+  // Damage system — projectile resolution reflects at shields; direct
+  // collision/damage calls stay independent from visual shield state.
   public damageEntity(
     entityId: string,
     damage: number,
-    source: CombatDamageSource = 'collision'
+    _source: CombatDamageSource = 'collision'
   ): GameEntity | null {
     const entity = this.entities.get(entityId);
     if (!entity || entity.exploding || entity.health <= 0) {
@@ -503,20 +536,6 @@ export class EntityManager {
       }
     }
 
-    if (absorbDamageWithShield(entity)) {
-      if (source === 'laser') {
-        noteReadableShieldLaserHit(entity);
-      }
-      entity.lastUpdate = this.now();
-      return entity;
-    }
-
-    if (shouldBlockDamage(entity, source)) {
-      noteReadableShieldLaserHit(entity);
-      entity.lastUpdate = this.now();
-      return null;
-    }
-
     const previousHealth = entity.health;
     const wasAlive = previousHealth > 0;
     entity.health = Math.max(0, entity.health - damage);
@@ -529,6 +548,7 @@ export class EntityManager {
       entity.exploding = true;
       // Set explosion timer for all entity types
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
+      this.clearShieldProjectionLinks(entity.id);
       clearShield(entity);
     }
 
@@ -674,6 +694,7 @@ export class EntityManager {
     entity.exploding = false;
     delete entity.explodeTime;
     delete entity.deathCause;
+    this.clearShieldProjectionLinks(entity.id);
     clearShield(entity);
     this.placeEntityInArena(entity);
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;

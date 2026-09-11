@@ -69,6 +69,141 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid('server-asteroid-0')).toBeUndefined();
   });
 
+  test('an active Hauler harpoon protects its owner from the attached asteroid', () => {
+    engine.addPlayer(
+      'hauler',
+      'Hauler',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      undefined,
+      'hauler'
+    );
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    assert.ok(hauler, 'hauler');
+    expect(hauler?.harpoonTargetId).toBe('attached');
+    expect(hauler?.harpoonTimer).toBeGreaterThan(0);
+
+    const healthBefore = hauler.health;
+    engine.resolveAuthoritativeCombat(1_000);
+
+    expect(hauler.health).toBe(healthBefore);
+    expect(engine.getAsteroid('attached')).toBeDefined();
+  });
+
+  test('an active Hauler harpoon does not protect its owner from another asteroid', () => {
+    engine.addPlayer(
+      'hauler',
+      'Hauler',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      undefined,
+      'hauler'
+    );
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    assert.ok(hauler, 'hauler');
+    expect(hauler.harpoonTargetId).toBe('attached');
+    engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: 0, y: 0 } }));
+    const healthBefore = hauler.health;
+    engine.resolveAuthoritativeCombat(1_000);
+
+    expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(engine.getAsteroid('attached')).toBeDefined();
+    expect(engine.getAsteroid('unrelated')).toBeUndefined();
+  });
+
+  test('an attached overlapping rock does not mask a second overlapping rock', () => {
+    engine.addPlayer(
+      'hauler',
+      'Hauler',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      undefined,
+      'hauler'
+    );
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: 0, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    assert.ok(hauler, 'hauler');
+    const healthBefore = hauler.health;
+    engine.resolveAuthoritativeCombat(1_000);
+
+    expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(engine.getAsteroid('attached')).toBeDefined();
+    expect(engine.getAsteroid('unrelated')).toBeUndefined();
+  });
+
+  test('harpoon expiration restores the owner collision with its former target', () => {
+    engine.addPlayer(
+      'hauler',
+      'Hauler',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      undefined,
+      'hauler'
+    );
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    assert.ok(hauler, 'hauler');
+    hauler.harpoonTimer = 1;
+    const healthBefore = hauler.health;
+    engine.tickAbilities(1_000);
+
+    expect(hauler.harpoonTimer).toBe(0);
+    expect(hauler.harpoonTargetId).toBeUndefined();
+    engine.resolveAuthoritativeCombat(1_000);
+
+    expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(engine.getAsteroid('attached')).toBeUndefined();
+  });
+
+  test('an attached asteroid still damages and breaks for another overlapping pilot', () => {
+    engine.addPlayer(
+      'hauler',
+      'Hauler',
+      new RecordingSocket(),
+      { x: 0, y: 0 },
+      undefined,
+      'hauler'
+    );
+    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, undefined, 'dart');
+    clearProtection(engine, 'hauler');
+    clearProtection(engine, 'pilot');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    const pilot = engine.getPlayer('pilot');
+    assert.ok(hauler, 'hauler');
+    assert.ok(pilot, 'pilot');
+    const haulerHealth = hauler.health;
+    const pilotHealth = pilot.health;
+
+    engine.resolveAuthoritativeCombat(1_000);
+
+    expect(hauler.health).toBe(haulerHealth);
+    expect(pilot.health).toBe(pilotHealth - DAMAGE.LASER_HIT);
+    expect(engine.getAsteroid('attached')).toBeUndefined();
+  });
+
   test('player and bot share the same asteroid ram path', () => {
     const bots = engine.createBots(1);
     assert.ok(bots, 'created bot list');

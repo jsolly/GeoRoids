@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { applyShipMotionFrame } from '../../../server/ai/shipMotion';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { stepReleasedMotion } from '../../../shared/asteroidMotion';
-import { GAME, PALETTE, VISUAL } from '../../../src/constants';
+import { PALETTE, VISUAL } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
 import {
@@ -304,16 +303,3 @@ test.each([1, 8])(
     expect(bot.velocity.x).toBeCloseTo(downhill.velocity.x, 8);
   }
 );
-
-test('a ship released from an asteroid also travels faster downhill than uphill', () => {
-  ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
-  const downhill = { position: { x: 1550, y: 0 }, velocity: { x: -12, y: 0 }, angle: Math.PI };
-  const uphill = { position: { x: 1550, y: 0 }, velocity: { x: 12, y: 0 }, angle: 0 };
-  for (let frame = 0; frame < 30; frame++) {
-    stepReleasedMotion(downhill, { thrust: false, turn: 0, aimAngle: 0 }, 5 / GAME.FPS, 450, 1);
-    stepReleasedMotion(uphill, { thrust: false, turn: 0, aimAngle: 0 }, 5 / GAME.FPS, 450, 1);
-  }
-  expect(1550 - downhill.position.x).toBeGreaterThan(uphill.position.x - 1550);
-  expect(-downhill.velocity.x).toBeGreaterThan(uphill.velocity.x);
-  expect(uphill.velocity.x).toBeGreaterThan(0);
-});

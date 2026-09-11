@@ -1,5 +1,6 @@
 import {
   type CombatCircle,
+  circlesOverlap,
   findShipAsteroidOverlaps,
   findShipShipPairs,
   isCombatantImmune,
@@ -7,7 +8,7 @@ import {
   shouldApplyShipShipTick,
 } from '../../shared/combat';
 import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
-import type { AsteroidData, SatelliteData } from '../../shared-types';
+import type { AsteroidData, SatelliteData, SatellitePickupData } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
 
 function toCombatCircle(entity: GameEntity): CombatCircle {
@@ -32,7 +33,8 @@ export class CollisionAuthority {
 
   public collectShipAsteroidHits(
     entities: GameEntity[],
-    asteroids: AsteroidData[]
+    asteroids: AsteroidData[],
+    shouldSkip?: (shipId: string, asteroidId: string) => boolean
   ): Array<{ shipId: string; asteroidId: string }> {
     return findShipAsteroidOverlaps(
       entities.map(toCombatCircle),
@@ -40,7 +42,8 @@ export class CollisionAuthority {
         id: asteroid.id,
         position: asteroid.position,
         radius: asteroidCollisionRadius(asteroid),
-      }))
+      })),
+      shouldSkip
     );
   }
 
@@ -57,6 +60,28 @@ export class CollisionAuthority {
         radius: satellite.radius,
       }))
     ).map((hit) => ({ shipId: hit.shipId, satelliteId: hit.asteroidId }));
+  }
+
+  public collectAsteroidPickupHits(
+    asteroids: AsteroidData[],
+    pickups: SatellitePickupData[]
+  ): Array<{ asteroidId: string; pickupId: string }> {
+    const livePickups = pickups.filter((pickup) => pickup.state !== 'broken' && pickup.health > 0);
+    const hits: Array<{ asteroidId: string; pickupId: string }> = [];
+    for (const pickup of livePickups) {
+      const asteroid = asteroids.find((candidate) =>
+        circlesOverlap(
+          pickup.position,
+          pickup.radius,
+          candidate.position,
+          asteroidCollisionRadius(candidate)
+        )
+      );
+      if (asteroid) {
+        hits.push({ asteroidId: asteroid.id, pickupId: pickup.id });
+      }
+    }
+    return hits;
   }
 
   public collectShipShipTicks(

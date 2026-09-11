@@ -510,15 +510,15 @@ describe('current pilots share the production handler and broadcaster', () => {
     join(handler, pilot.ws, 'pilot');
     const actor = engine.getPlayer('pilot');
     assert.ok(actor);
-    const oldEpoch = actor.asteroidMotion?.epoch;
+    const oldEpoch = actor.playerMotion?.epoch;
     assert.ok(oldEpoch);
     engine.prepareDiagnosticWorld('combat');
     expect(engine.getPlayer('pilot')).toBe(actor);
     expect(actor.ws).toBe(pilot.ws);
     expect(
-      engine.asteroidMotion.placeActorForTesting('pilot', { x: 100, y: 0 }, engine.getServerTime())
+      engine.playerMotion.placeActorForTesting('pilot', { x: 100, y: 0 }, engine.getServerTime())
     ).toBe(true);
-    expect(actor.asteroidMotion?.epoch).toBe(oldEpoch + 1);
+    expect(actor.playerMotion?.epoch).toBe(oldEpoch + 1);
     expect(engine.getDiagnostics()).toMatchObject({
       humanPlayers: 1,
       bots: 2,

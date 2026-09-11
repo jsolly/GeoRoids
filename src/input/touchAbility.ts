@@ -15,7 +15,7 @@ import {
 const ABILITY_LABEL: Record<ShipAbilityId, string> = {
   boostDash: 'DASH',
   harpoon: 'HOOK',
-  shieldFocus: 'ABSORB',
+  shieldFocus: 'GUARD',
   burstFire: 'BURST',
   shockPulse: 'PULSE',
 };
@@ -61,7 +61,7 @@ export function touchAbilityLabel(kitId: unknown): string {
 
 export function touchAbilityName(kitId: unknown): string {
   const kit = getShipKit(kitId);
-  return kit.abilityId === 'shieldFocus' ? 'Timed absorb shield' : kit.abilityName;
+  return kit.abilityId === 'shieldFocus' ? 'Projected ally shield' : kit.abilityName;
 }
 
 export function abilityCooldownRatio(

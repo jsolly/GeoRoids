@@ -113,5 +113,46 @@ test('arena resets and independent worlds cannot reuse satellite or pickup ident
   const nextPickup = pickups.createPickups(1)[0];
   assert.ok(nextPickup);
   expect(nextPickup.id).not.toBe(oldPickup.id);
-  expect(pickups.collect(oldPickup.id, 'pilot', 0)).toBeNull();
+  expect(
+    pickups.collect(
+      oldPickup.id,
+      { id: 'pilot', position: { x: 0, y: 0 }, radius: 15, health: 100, exploding: false },
+      0
+    )
+  ).toBeNull();
+});
+
+test('fresh EO shots leave their own launch body before collision checks', () => {
+  const manager = new SatelliteManager(new RNGService(79));
+  const created = manager.createSatellites(1)[0];
+  assert.ok(created);
+  let shotCount = 0;
+  const sourceHits = [];
+  for (let frame = 0; frame < 350; frame += 1) {
+    const source = manager.getSatellite(created.id);
+    assert.ok(source);
+    const shots = manager.update([
+      {
+        id: source.id,
+        position: { ...source.position },
+        radius: source.radius,
+        health: source.health,
+        exploding: false,
+        aimable: false,
+        kind: 'satellite',
+      },
+      {
+        id: 'pilot',
+        position: { x: source.position.x + 300, y: source.position.y },
+        radius: 15,
+        health: 100,
+        exploding: false,
+        kind: 'ship',
+      },
+    ]);
+    shotCount += shots.length;
+    sourceHits.push(...manager.drainHits().filter((hit) => hit.targetId === source.id));
+  }
+  expect(shotCount).toBeGreaterThan(0);
+  expect(sourceHits).toEqual([]);
 });

@@ -1,4 +1,3 @@
-import { findNearestAsteroidImpact } from '../../../shared/asteroidReflection';
 import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 
 /** Asteroid or ship the Hauler harpoon can latch. Same shape on client and server. */
@@ -12,10 +11,9 @@ interface HarpoonFieldBody {
   health?: number;
   r?: number;
   size?: number;
-  rotation?: number;
-  vertices?: number;
-  offsets?: number[];
   shieldTimer?: number;
+  shieldSourceId?: string;
+  shieldTargetId?: string;
   shieldActive?: boolean;
 }
 
@@ -138,52 +136,14 @@ export function findHarpoonFieldBody(id: string | undefined): HarpoonFieldBody |
   return undefined;
 }
 
-/** Render-facing Roid attributes; converters retain the actual moving contour. */
+/** The basic harpoon needs the moving rock center and radius. */
 interface HarpoonRock {
   id?: string;
   position: Position;
   velocity: Velocity;
   r?: number;
-  angle?: number;
-  vertices?: number;
-  offsets?: number[];
   health?: number;
   exploding?: boolean;
-}
-
-/** Polygon exit toward another rock, using the laser/preview collision contour.
- * Older radius-only field rows retain their circular outline approximation.
- */
-export function harpoonSurfaceToward(
-  body: HarpoonFieldBody,
-  toward: Position
-): Position | undefined {
-  const radius = body.r ?? body.size;
-  if (radius === undefined || !Number.isFinite(radius) || radius <= 0) {
-    return undefined;
-  }
-  if (body.rotation !== undefined && body.vertices !== undefined && body.offsets !== undefined) {
-    return findNearestAsteroidImpact(body.position, toward, [
-      {
-        id: body.id,
-        position: body.position,
-        size: radius,
-        rotation: body.rotation,
-        vertices: body.vertices,
-        offsets: body.offsets,
-      },
-    ])?.point;
-  }
-  const dx = toward.x - body.position.x;
-  const dy = toward.y - body.position.y;
-  const distance = Math.hypot(dx, dy);
-  if (!Number.isFinite(distance) || distance <= radius) {
-    return undefined;
-  }
-  return {
-    x: body.position.x + (dx / distance) * radius,
-    y: body.position.y + (dy / distance) * radius,
-  };
 }
 
 /** Belt row → latch body. Forces `kind: 'asteroid'` so ship filters cannot reject it. */
@@ -203,9 +163,6 @@ export function harpoonBodyFromRock(roid: HarpoonRock): HarpoonFieldBody | undef
     ...(roid.exploding !== undefined ? { exploding: roid.exploding } : {}),
     ...(roid.health !== undefined ? { health: roid.health } : {}),
     ...(roid.r !== undefined ? { r: roid.r } : {}),
-    ...(roid.angle !== undefined ? { rotation: roid.angle } : {}),
-    ...(roid.vertices !== undefined ? { vertices: roid.vertices } : {}),
-    ...(roid.offsets !== undefined ? { offsets: roid.offsets } : {}),
   };
 }
 
@@ -219,6 +176,8 @@ export function harpoonBodyFromShip(
     health?: number;
     r?: number;
     shieldTimer?: number;
+    shieldSourceId?: string;
+    shieldTargetId?: string;
     shieldActive?: boolean;
   },
   factionId?: SoftFactionId
@@ -234,6 +193,8 @@ export function harpoonBodyFromShip(
     ...(ship.health !== undefined ? { health: ship.health } : {}),
     ...(ship.r !== undefined ? { r: ship.r } : {}),
     ...(ship.shieldTimer !== undefined ? { shieldTimer: ship.shieldTimer } : {}),
+    ...(ship.shieldSourceId !== undefined ? { shieldSourceId: ship.shieldSourceId } : {}),
+    ...(ship.shieldTargetId !== undefined ? { shieldTargetId: ship.shieldTargetId } : {}),
     ...(ship.shieldActive !== undefined ? { shieldActive: ship.shieldActive } : {}),
   };
 }

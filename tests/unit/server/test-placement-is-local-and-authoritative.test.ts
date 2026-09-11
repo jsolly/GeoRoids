@@ -278,7 +278,7 @@ test.each([
 
 test('placement preserves health and allows subsequent legal movement', async () => {
   const { server, origin, socket, player } = await pilot();
-  const previousEpoch = player.asteroidMotion?.epoch;
+  const previousEpoch = player.playerMotion?.epoch;
   const health = player.health;
   const position = { x: -1700, y: 0 };
   const response = await post(origin, { playerId: player.id, position });
@@ -290,7 +290,7 @@ test('placement preserves health and allows subsequent legal movement', async ()
   });
   expect(player.position).toEqual(position);
   expect(player.health).toBe(health);
-  const epoch = player.asteroidMotion?.epoch;
+  const epoch = player.playerMotion?.epoch;
   assert.ok(previousEpoch !== undefined, 'previous asteroid motion epoch');
   expect(epoch).toBeGreaterThan(previousEpoch);
 
@@ -325,7 +325,7 @@ test('placement preserves health and allows subsequent legal movement', async ()
 test('an enhanced pilot with no motion session cannot report successful placement', async () => {
   const { server, origin, player } = await pilot();
   const position = { ...player.position };
-  server.gameEngine.asteroidMotion.forgetActor(player.id);
+  server.gameEngine.playerMotion.forgetActor(player.id);
   const response = await post(origin, { playerId: player.id, position: { x: -1700, y: 0 } });
   expect(response.ok).toBe(false);
   expect(player.position).toEqual(position);

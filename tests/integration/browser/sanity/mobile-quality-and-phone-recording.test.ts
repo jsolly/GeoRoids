@@ -9,7 +9,12 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { centerOf, dispatchTouch } from '../../utils/touch-input';
+import {
+  canvasPoint,
+  centerOf,
+  dispatchTouch,
+  readTouchControlState,
+} from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
@@ -70,14 +75,18 @@ test.each([false, true])(
     ).toBe(true);
     if (touch) {
       const session = await page.context().newCDPSession(page);
-      const stick = await centerOf(page, '#gameCanvas');
-      const fire = await centerOf(page, '#touch-fire');
+      const steer = await centerOf(page, '#gameCanvas');
+      const firePoint = await canvasPoint(page, 0.75, 0.5);
+      const beforeTouch = await readTouchControlState(page);
       try {
         await dispatchTouch(session, 'touchStart', [
-          { x: stick.x + 35, y: stick.y, id: 1 },
-          { ...fire, id: 2 },
+          { x: steer.x + 35, y: steer.y, id: 1 },
+          { ...firePoint, id: 2 },
         ]);
         await game.waitForAnimationFrames(40);
+        expect((await readTouchControlState(page)).lastShotTime).toBeGreaterThan(
+          beforeTouch.lastShotTime
+        );
       } finally {
         await dispatchTouch(session, 'touchEnd', []);
         await session.detach();

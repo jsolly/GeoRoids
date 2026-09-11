@@ -59,7 +59,7 @@ test.each([1280, 390])(
 );
 
 test(
-  'another pilot sees Quake activate through the multiplayer event',
+  'another pilot sees Quake activate and is thrown outward by the multiplayer blast',
   async () => {
     const observerPage = browserManager.getCurrentPage();
     if (!observerPage) {
@@ -88,6 +88,21 @@ test(
       };
     });
     await quakePage.keyboard.press('KeyE');
+    await expect
+      .poll(
+        () =>
+          observerPage.evaluate(() => window.gameController?.getCurrPlayer()?.ship.velocity.x ?? 0),
+        { timeout: 3000, interval: 10 }
+      )
+      .toBeLessThan(-8);
+    await expect
+      .poll(
+        () =>
+          observerPage.evaluate(() => window.gameController?.getCurrPlayer()?.ship.position.x ?? 0),
+        { timeout: 3000, interval: 20 }
+      )
+      .toBeLessThan(-1760);
+
     await expect
       .poll(() => observerPage.evaluate(() => window.__quakeRadii?.length ?? 0), {
         interval: 20,

@@ -107,6 +107,8 @@ export interface LaserUpgrade {
 }
 
 export interface PlayerProjectileState {
+  /** Ability bolts do not consume the regular weapon limit. */
+  abilityShot?: boolean;
   id: string;
   ownerId: string;
   position: Position;

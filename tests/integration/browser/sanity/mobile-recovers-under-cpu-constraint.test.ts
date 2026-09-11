@@ -5,7 +5,12 @@ import type { ConnectionManager } from '../../../../src/network/services/Connect
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
-import { centerOf, dispatchTouch, readTouchControlState } from '../../utils/touch-input';
+import {
+  canvasPoint,
+  centerOf,
+  dispatchTouch,
+  readTouchControlState,
+} from '../../utils/touch-input';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
@@ -23,15 +28,18 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
-    const stick = await centerOf(page, '#gameCanvas');
-    const fire = await centerOf(page, '#touch-fire');
+    const steer = await centerOf(page, '#gameCanvas');
+    const firePoint = await canvasPoint(page, 0.75, 0.5);
+    const beforeTouch = await readTouchControlState(page);
     await dispatchTouch(session, 'touchStart', [
-      { x: stick.x + 40, y: stick.y, id: 1 },
-      { ...fire, id: 2 },
+      { x: steer.x + 40, y: steer.y, id: 1 },
+      { ...firePoint, id: 2 },
     ]);
     touching = true;
     await game.waitForAnimationFrames(10);
-    expect((await readTouchControlState(page)).thrusting).toBe(true);
+    const duringTouch = await readTouchControlState(page);
+    expect(duringTouch.thrusting).toBe(true);
+    expect(duringTouch.lastShotTime).toBeGreaterThan(beforeTouch.lastShotTime);
     await page.setViewportSize({ width: 844, height: 390 });
     // Playwright viewport changes do not emit a phone's orientation event.
     await page.evaluate(() => window.dispatchEvent(new Event('orientationchange')));

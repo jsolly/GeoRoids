@@ -19,11 +19,11 @@ media:
 
 Shots leave the nose and inherit your ship's velocity, so a moving ship
 changes their flight path. Hold fire to repeat shots at your kit's interval.
-The local shot field has a cap; reaching it temporarily prevents more shots,
-including extra rounds from a Skirmisher burst. A regular shot deals the
-configured laser damage; reflected or core-powered shots multiply that damage
-by their energy. Local shots appear immediately and stay visible while the
-server confirms them; the server still controls hits and removal.
+The local shot field has a cap for regular shots; the Skirmisher's E ring does
+not count against it. A regular shot deals the configured laser damage;
+reflected or core-powered shots multiply that damage by their energy. Local
+shots appear immediately and stay visible while the server confirms them; the
+server still controls hits and removal.
 
 ## Damage and protection
 

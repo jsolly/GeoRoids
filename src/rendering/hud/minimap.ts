@@ -120,7 +120,7 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
         VISUAL.MINIMAP_LOCAL_SIZE,
         mark.heading
       );
-      strokePhosphorHull(ctx, hull, PALETTE.LOCAL);
+      strokePhosphorHull(ctx, hull, getFactionColor(mark.factionId));
       drawSoftFactionMark(ctx, mark.factionId, {
         x: mark.x,
         y: mark.y,
@@ -423,7 +423,7 @@ export function drawMiniMap(
         x: geometry.projection.x,
         y: geometry.projection.y,
         heading: player.ship.angle,
-        color: getFactionColor(player.type),
+        color: getFactionColor(player.factionId),
         ...(player.ship.factionId !== undefined ? { factionId: player.ship.factionId } : {}),
       });
     }

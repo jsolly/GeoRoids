@@ -1,3 +1,4 @@
+import { FACTION_COLORS } from '../shared/factions';
 import './wiki-media-node-shim';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -54,8 +55,8 @@ import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRend
 import { drawAsteroidMaterialDetails } from '../src/entities/roid/materialArt';
 import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
-import { laserVelocityFromAngle } from '../src/entities/satellite/satelliteMath';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
+import { applyQuakeImpulse } from '../src/entities/ship/quakeImpulse';
 import { paintQuakePulse } from '../src/entities/ship/quakePulseRenderer';
 import {
   type AbilityBody,
@@ -74,6 +75,10 @@ import {
   updateShield,
 } from '../src/entities/ship/shipShield';
 import { applyThrustOrFriction, moveFrictionForShip } from '../src/entities/ship/shipUtils';
+import {
+  createSkirmisherRingShots,
+  SKIRMISHER_RING_COUNT,
+} from '../src/entities/ship/skirmisherRing';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
 import { getGameBoundary } from '../src/physics/boundary';
 import {
@@ -349,7 +354,7 @@ function drawShip(
   kitId: ShipKitId,
   position: Position,
   angle: number,
-  color: string = PALETTE.LOCAL,
+  color: string = FACTION_COLORS.ion,
   radius = getShipKit(kitId).size / 2,
   thrusting = false
 ): void {
@@ -621,13 +626,13 @@ function makeDartDemo(): Demo {
       const position = positions[frame] ?? positions[0] ?? start;
       const pathStart = screenPoint(positions[Math.max(0, frame - 8)] ?? start, displayScale);
       const pathEnd = screenPoint(position, displayScale);
-      renderSegment(ctx, pathStart.x, pathStart.y, pathEnd.x, pathEnd.y, PALETTE.LOCAL, 1, 2);
+      renderSegment(ctx, pathStart.x, pathStart.y, pathEnd.x, pathEnd.y, FACTION_COLORS.ion, 1, 2);
       drawShip(
         ctx,
         'dart',
         { x: position.x * displayScale, y: position.y * displayScale },
         0,
-        PALETTE.LOCAL,
+        FACTION_COLORS.ion,
         getShipKit('dart').size / 2,
         (activeFrames[frame] ?? 0) > 0
       );
@@ -636,7 +641,7 @@ function makeDartDemo(): Demo {
         (activeFrames[frame] ?? 0) > 0 ? 'E · boost active' : 'dash complete · coast',
         380,
         112,
-        PALETTE.LOCAL
+        FACTION_COLORS.ion
       );
       drawTag(ctx, `speed ${speeds[frame]?.toFixed(2) ?? '0.00'}`, 440, 286, PALETTE.HUD_MUTED);
     },
@@ -655,7 +660,7 @@ function makeHaulerDemo(): Demo {
   const victim: AbilityBody = {
     id: 'demo-victim',
     kind: 'ship',
-    position: { x: 400, y: 16 },
+    position: { x: -300, y: 16 },
     velocity: { x: 0, y: 0 },
     health: 100,
     r: getShipKit('dart').size / 2,
@@ -666,24 +671,36 @@ function makeHaulerDemo(): Demo {
     canvas: { width: WIDTH, height: HEIGHT },
     playfieldScale: 1,
   };
+  const bodies = [...world.asteroids, ...world.entities];
   const result = activateAbilityOnHost(host, world);
   invariant(
     result.activated && result.abilityId === 'harpoon',
     'Hauler E did not latch a nearby rock'
   );
   invariant(host.harpoonTargetId === target.id, 'Hauler selected the wrong target');
-  let pullTicks = 0;
-  let passedThroughHost = false;
+  let reelTicks = 0;
+  let sawRightwardReel = false;
+  let releasedFrame: number | undefined;
+  let releaseGap: number | undefined;
+  let sawLeftwardRelease = false;
   let targetRotation = 0;
   const targetAngularVelocity = 0.14;
   let targetDestroyed = false;
   let impactFrame: number | undefined;
   return {
     id: 'hauler',
-    posterFrame: 10,
+    posterFrame: 4,
     verify: () => {
-      invariant(pullTicks > 0, 'Hauler tether did not pull the target');
-      invariant(passedThroughHost, 'active Hauler target did not pass through its owner safely');
+      invariant(reelTicks > 0, 'Hauler rock did not reel toward its owner');
+      invariant(sawRightwardReel, 'Hauler rock did not show the rightward reel');
+      invariant(releasedFrame !== undefined, 'Hauler rock did not release near the hull');
+      invariant(sawLeftwardRelease, 'Hauler rock did not reverse toward the predicted enemy');
+      invariant(
+        releaseGap !== undefined &&
+          releaseGap <=
+            (host.r ?? 20) + (target.r ?? target.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP + 1,
+        'Hauler rock released outside the hull safety gap'
+      );
       invariant(
         impactFrame !== undefined && targetDestroyed,
         'released rock did not hit the second ship'
@@ -692,13 +709,13 @@ function makeHaulerDemo(): Demo {
         victim.health === 100 - asteroidRamDamage(),
         'rock impact did not apply collision damage'
       );
-      invariant(Math.abs(targetRotation) > 1, 'rock did not visibly spin during the pull');
+      invariant(Math.abs(targetRotation) > 1, 'rock did not visibly spin after launch');
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'HAULER · HARPOON',
-        'E trigger → pull through the hull → timer release',
+        'E trigger → reel toward hull → release → impact',
         frame,
         '#FDE68A'
       );
@@ -706,16 +723,32 @@ function makeHaulerDemo(): Demo {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
           const activeBeforeTick = host.harpoonTimer > 0;
           if (activeBeforeTick) {
-            pullHarpoonTarget(host, world.asteroids);
+            pullHarpoonTarget(host, bodies);
+            const gap = Math.hypot(
+              target.position.x - host.position.x,
+              target.position.y - host.position.y
+            );
+            const releaseRadius =
+              (host.r ?? 20) + (target.r ?? target.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP;
+            if (target.velocity.x > 0 && releasedFrame === undefined) {
+              sawRightwardReel = true;
+            }
+            if (
+              releasedFrame === undefined &&
+              gap <= releaseRadius + 1 &&
+              Math.hypot(target.velocity.x, target.velocity.y) >=
+                SHIP_ABILITY.HARPOON_SLING_SPEED - 0.01
+            ) {
+              releasedFrame = frame;
+              releaseGap = gap;
+              sawLeftwardRelease = target.velocity.x < 0;
+            }
           }
           target.position.x += target.velocity.x;
           target.position.y += target.velocity.y;
           targetRotation += targetAngularVelocity;
-          if (
-            activeBeforeTick &&
-            circlesOverlap(target.position, target.size ?? 0, host.position, host.r ?? 0)
-          ) {
-            passedThroughHost = true;
+          if (activeBeforeTick && releasedFrame === undefined) {
+            reelTicks += 1;
           }
           if (
             !targetDestroyed &&
@@ -726,9 +759,6 @@ function makeHaulerDemo(): Demo {
             victim.health = Math.max(0, (victim.health ?? 0) - asteroidRamDamage());
           }
           tickAbilityHost(host);
-          if (activeBeforeTick) {
-            pullTicks += 1;
-          }
         });
       }
       const displayScale = 0.62;
@@ -760,7 +790,7 @@ function makeHaulerDemo(): Demo {
           displayScale
         );
       }
-      if (host.harpoonTimer > 0) {
+      if (host.harpoonTimer > 0 && !targetDestroyed) {
         drawCable(ctx, displayHost, displayTarget);
       }
       drawShip(
@@ -768,12 +798,26 @@ function makeHaulerDemo(): Demo {
         'hauler',
         displayHost,
         0,
-        PALETTE.LOCAL,
+        FACTION_COLORS.ion,
         (getShipKit('hauler').size / 2) * displayScale
       );
-      drawShip(ctx, 'dart', displayVictim, Math.PI, PALETTE.REMOTE, (victim.r ?? 0) * displayScale);
-      if (passedThroughHost && host.harpoonTimer > 0) {
-        drawRing(ctx, displayHost, (host.r ?? 0) * displayScale + 23, PALETTE.SHIELD, 0.5);
+      drawShip(
+        ctx,
+        'dart',
+        displayVictim,
+        Math.PI,
+        FACTION_COLORS.ember,
+        (victim.r ?? 0) * displayScale
+      );
+      if (releasedFrame === undefined && host.harpoonTimer > 0) {
+        drawRing(
+          ctx,
+          displayHost,
+          ((host.r ?? 20) + (target.r ?? target.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP) *
+            displayScale,
+          PALETTE.SHIELD,
+          0.5
+        );
       }
       if (impactFrame !== undefined && frame >= impactFrame && frame < impactFrame + 8) {
         const impactAge = frame - impactFrame;
@@ -787,16 +831,18 @@ function makeHaulerDemo(): Demo {
       }
       drawTag(
         ctx,
-        host.harpoonTimer > 0
-          ? 'cable active · rock crosses Hauler safely'
-          : targetDestroyed
-            ? 'impact · target ship loses 25 hull'
-            : 'timer ended · rock coasts',
+        targetDestroyed
+          ? 'impact · target ship loses 25 hull'
+          : releasedFrame !== undefined
+            ? 'released at hull safety gap · bounce left'
+            : host.harpoonTimer > 0
+              ? 'cable active · reeling toward Hauler'
+              : 'timer ended · rock coasts',
         310,
         110,
         '#FDE68A'
       );
-      drawTag(ctx, 'E · 1.5 s pull → release → impact', 400, 286, PALETTE.HUD_MUTED);
+      drawTag(ctx, 'E · reel right → bounce left → impact', 400, 286, PALETTE.HUD_MUTED);
     },
   };
 }
@@ -925,9 +971,9 @@ function makeWardenDemo(): Demo {
           0.92
         );
       }
-      drawShip(ctx, 'warden', host.position, 0, PALETTE.LOCAL, getShipKit('warden').size / 2);
-      drawShip(ctx, 'dart', friendly.position, 0, PALETTE.REMOTE, friendly.r ?? 0);
-      drawShip(ctx, 'dart', attacker.position, Math.PI, PALETTE.BOT, attacker.r ?? 0);
+      drawShip(ctx, 'warden', host.position, 0, FACTION_COLORS.ion, getShipKit('warden').size / 2);
+      drawShip(ctx, 'dart', friendly.position, 0, FACTION_COLORS.ion, friendly.r ?? 0);
+      drawShip(ctx, 'dart', attacker.position, Math.PI, FACTION_COLORS.ember, attacker.r ?? 0);
       if (frame <= contactFrame) {
         const contactProgress = Math.min(1, frame / contactFrame);
         const laser = {
@@ -990,19 +1036,12 @@ function makeSkirmisherDemo(): Demo {
   };
   const result = activateAbilityOnHost(host);
   invariant(
-    result.activated && result.abilityId === 'burstFire',
-    'Skirmisher E did not activate burstFire'
+    result.activated && result.abilityId === 'ringFire',
+    'Skirmisher E did not activate ringFire'
   );
   const kit = getShipKit('skirmisher');
-  const shots = Array.from({ length: kit.burstCount }, (_, index) => {
-    const mid = (kit.burstCount - 1) / 2;
-    const angle = host.angle + (index - mid) * SHIP_ABILITY.BURST_SPREAD;
-    return {
-      position: { ...host.position },
-      velocity: laserVelocityFromAngle(angle, host.velocity),
-    };
-  });
-  invariant(shots.length === 3, 'Skirmisher burst count changed');
+  const shots = createSkirmisherRingShots(host.position, host.angle, kit.size / 2, host.velocity);
+  invariant(shots.length === SKIRMISHER_RING_COUNT, 'Skirmisher ring count changed');
   let targetHit = false;
   let targetHitFrame: number | undefined;
   return {
@@ -1010,7 +1049,7 @@ function makeSkirmisherDemo(): Demo {
     posterFrame: 8,
     verify: () => {
       invariant(host.abilityActiveFrames === 8, 'Skirmisher active window changed');
-      invariant(targetHit, 'Skirmisher burst did not hit the demonstration target');
+      invariant(targetHit, 'Skirmisher ring did not hit the demonstration target');
       invariant(
         target.health === 100 - DAMAGE.LASER_HIT,
         'Skirmisher target took the wrong hit damage'
@@ -1019,8 +1058,8 @@ function makeSkirmisherDemo(): Demo {
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'SKIRMISHER · BURST FIRE',
-        'E trigger → three-shot volley → target hit',
+        'SKIRMISHER · RING FIRE',
+        'E trigger → outward laser ring → target hit',
         frame,
         PALETTE.LASER_LOCAL
       );
@@ -1029,7 +1068,7 @@ function makeSkirmisherDemo(): Demo {
         'skirmisher',
         host.position,
         host.angle,
-        PALETTE.LOCAL,
+        FACTION_COLORS.ion,
         getShipKit('skirmisher').size / 2
       );
       for (const shot of shots) {
@@ -1044,20 +1083,22 @@ function makeSkirmisherDemo(): Demo {
         }
         drawLaser(ctx, position, shot.velocity);
       }
-      drawShip(ctx, 'dart', target.position, Math.PI, PALETTE.BOT, target.r ?? 0);
+      drawShip(ctx, 'dart', target.position, Math.PI, FACTION_COLORS.ember, target.r ?? 0);
       if (targetHitFrame !== undefined && frame < targetHitFrame + 7) {
         drawRing(ctx, target.position, (target.r ?? 0) + 16, PALETTE.LASER_LOCAL, 0.9);
       }
       drawTag(
         ctx,
-        targetHit ? `target hit · ${target.health} hull` : 'three lasers · narrow spread',
+        targetHit
+          ? `target hit · ${target.health} hull`
+          : `${SKIRMISHER_RING_COUNT} lasers · full ring`,
         340,
         112,
         PALETTE.LASER_LOCAL
       );
       drawTag(
         ctx,
-        targetHit ? 'burst reaches the target hull' : 'volley travels together',
+        targetHit ? 'ring reaches the target hull' : 'lasers fan out in every direction',
         394,
         286,
         PALETTE.HUD_MUTED
@@ -1093,6 +1134,49 @@ function makeQuakeDemo(): Demo {
       size: 36,
     },
   ];
+  const loot: AbilityBody = {
+    id: 'quake-loot',
+    position: { x: -150, y: 26 },
+    velocity: { x: -0.2, y: 0.15 },
+    r: 8,
+  };
+  const satellite: AbilityBody & {
+    angle: number;
+    color: string;
+    radius: number;
+  } = {
+    id: 'quake-satellite',
+    position: { x: 160, y: -58 },
+    velocity: { x: 0.1, y: 0.15 },
+    angle: 0.2,
+    color: PALETTE.SATELLITE,
+    radius: 15,
+  };
+  const pickup: AbilityBody & {
+    angle: number;
+    color: string;
+    health: number;
+    radius: number;
+    typeId: 'echo';
+    state: 'loose';
+    maxHealth: number;
+  } = {
+    id: 'quake-pickup',
+    position: { x: -164, y: -54 },
+    velocity: { x: -0.1, y: -0.18 },
+    angle: 0,
+    color: PALETTE.SATELLITE_PICKUP,
+    radius: 10,
+    typeId: 'echo',
+    state: 'loose',
+    health: 100,
+    maxHealth: 100,
+  };
+  const shot: AbilityBody = {
+    id: 'quake-shot',
+    position: { x: 102, y: 94 },
+    velocity: { x: -2.5, y: 0.5 },
+  };
   const world: AbilityWorld = {
     asteroids: rocks,
     entities: [target],
@@ -1108,7 +1192,12 @@ function makeQuakeDemo(): Demo {
     rocks.some((rock) => Math.hypot(rock.velocity.x, rock.velocity.y) > 0),
     'Quake did not push a nearby rock'
   );
-  const startingPositions = rocks.map((rock) => ({ ...rock.position }));
+  const extraBodies = [loot, satellite, pickup, shot];
+  for (const body of extraBodies) {
+    invariant(applyQuakeImpulse(body, host.position, host.angle), 'Quake missed a nearby object');
+  }
+  const physicalBodies = [...rocks, target, ...extraBodies];
+  const startingPositions = physicalBodies.map((body) => ({ ...body.position }));
   const targetStart = copyPosition(target.position);
   let targetPushed = false;
   let targetHitFrame: number | undefined;
@@ -1117,36 +1206,40 @@ function makeQuakeDemo(): Demo {
     posterFrame: 3,
     verify: () => {
       invariant(
-        rocks.some(
-          (rock, index) =>
+        physicalBodies.some(
+          (body, index) =>
             Math.hypot(
-              rock.position.x - (startingPositions[index]?.x ?? 0),
-              rock.position.y - (startingPositions[index]?.y ?? 0)
+              body.position.x - (startingPositions[index]?.x ?? 0),
+              body.position.y - (startingPositions[index]?.y ?? 0)
             ) > 0
         ),
-        'Quake rocks did not move after the pulse'
+        'Quake objects did not move after the pulse'
       );
       invariant(
         targetPushed && target.position.x > targetStart.x,
         'Quake pulse did not push the demonstration ship'
+      );
+      invariant(
+        extraBodies.every((body) => Math.hypot(body.velocity.x, body.velocity.y) > 0),
+        'Quake did not push every physical object in the demonstration'
       );
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'QUAKE · SHOCK PULSE',
-        'E trigger → blue pulse → target and rocks pushed',
+        'E trigger → blue pulse → nearby objects pushed',
         frame,
         '#60A5FA'
       );
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          for (const rock of rocks) {
-            rock.position.x += rock.velocity.x;
-            rock.position.y += rock.velocity.y;
+          // Keep the whole object set in the readable frame while retaining the
+          // direction and relative strength produced by the real impulse helper.
+          for (const body of physicalBodies) {
+            body.position.x += body.velocity.x * 0.04;
+            body.position.y += body.velocity.y * 0.04;
           }
-          target.position.x += target.velocity.x;
-          target.position.y += target.velocity.y;
           tickAbilityHost(host);
         });
       }
@@ -1188,12 +1281,53 @@ function makeQuakeDemo(): Demo {
           5
         );
       }
+      drawLootDiamond(ctx, loot.position, loot.r ?? 8, PALETTE.LOOT, 1, displayScale);
+      drawArrow(
+        ctx,
+        { x: loot.position.x * displayScale, y: loot.position.y * displayScale },
+        { x: loot.velocity.x * displayScale, y: loot.velocity.y * displayScale },
+        PALETTE.LOOT,
+        2
+      );
+      const satelliteScreen = screenPoint(satellite.position, displayScale);
+      ctx.save();
+      ctx.translate(satelliteScreen.x, satelliteScreen.y);
+      renderSatellite(
+        ctx,
+        'aqua',
+        satellite.radius * displayScale,
+        satellite.angle,
+        satellite.color,
+        false
+      );
+      ctx.restore();
+      drawArrow(
+        ctx,
+        { x: satellite.position.x * displayScale, y: satellite.position.y * displayScale },
+        { x: satellite.velocity.x * displayScale, y: satellite.velocity.y * displayScale },
+        PALETTE.SATELLITE,
+        2
+      );
+      drawPickup(ctx, pickup, displayScale);
+      drawArrow(
+        ctx,
+        { x: pickup.position.x * displayScale, y: pickup.position.y * displayScale },
+        { x: pickup.velocity.x * displayScale, y: pickup.velocity.y * displayScale },
+        PALETTE.SATELLITE_PICKUP,
+        2
+      );
+      drawLaser(
+        ctx,
+        { x: shot.position.x * displayScale, y: shot.position.y * displayScale },
+        { x: shot.velocity.x * displayScale, y: shot.velocity.y * displayScale },
+        PALETTE.LASER_ENEMY
+      );
       drawShip(
         ctx,
         'dart',
         { x: target.position.x * displayScale, y: target.position.y * displayScale },
         Math.PI,
-        PALETTE.BOT,
+        FACTION_COLORS.ember,
         (target.r ?? 0) * displayScale
       );
       if (targetHitFrame !== undefined && frame >= targetHitFrame && frame < targetHitFrame + 8) {
@@ -1205,11 +1339,13 @@ function makeQuakeDemo(): Demo {
           0.9
         );
       }
-      drawShip(ctx, 'quake', host.position, 0, PALETTE.LOCAL, getShipKit('quake').size / 2);
+      drawShip(ctx, 'quake', host.position, 0, FACTION_COLORS.ion, getShipKit('quake').size / 2);
       drawTag(ctx, `EMP · fuel ${host.fuel}/${host.maxFuel}`, 350, 112, '#60A5FA');
       drawTag(
         ctx,
-        targetPushed ? 'pulse reached target · ship pushed' : 'blue pulse expanding · rocks pushed',
+        targetPushed
+          ? 'pulse reached target · nearby objects pushed'
+          : 'blue pulse expanding · physical objects pushed',
         340,
         286,
         PALETTE.HUD_MUTED
@@ -1259,20 +1395,20 @@ function makeMovementDemo(): Demo {
         'MOVEMENT · THRUST + DRIFT',
         'hold thrust → accelerate · release → friction coasts',
         frame,
-        PALETTE.LOCAL
+        FACTION_COLORS.ion
       );
       const position = positions[frame + 1] ?? positions[0] ?? { x: 0, y: 0 };
       const trailStart = positions[Math.max(0, frame - 9)] ?? position;
       const displayScale = 0.4;
       const a = screenPoint(trailStart, displayScale);
       const b = screenPoint(position, displayScale);
-      renderSegment(ctx, a.x, a.y, b.x, b.y, PALETTE.LOCAL, 1, 2);
+      renderSegment(ctx, a.x, a.y, b.x, b.y, FACTION_COLORS.ion, 1, 2);
       drawShip(
         ctx,
         'dart',
         { x: position.x * displayScale, y: position.y * displayScale },
         0,
-        PALETTE.LOCAL,
+        FACTION_COLORS.ion,
         getShipKit('dart').size / 2,
         frame < 12
       );
@@ -1281,7 +1417,7 @@ function makeMovementDemo(): Demo {
         frame < 12 ? 'ArrowUp held · thrust' : 'released · friction',
         350,
         112,
-        PALETTE.LOCAL
+        FACTION_COLORS.ion
       );
       drawTag(ctx, `speed ${speeds[frame + 1]?.toFixed(2) ?? '0.00'}`, 470, 286, PALETTE.HUD_MUTED);
     },
@@ -1398,7 +1534,15 @@ function makeTerrainDemo(): Demo {
       const gradient = sampleGradient(field, state.position.x, state.position.y);
       const steepness = Math.hypot(gradient.x, gradient.y);
       const directionScale = steepness > 0 ? 64 / steepness : 0;
-      drawShip(ctx, 'dart', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('dart').size / 2, false);
+      drawShip(
+        ctx,
+        'dart',
+        { x: 0, y: 0 },
+        0,
+        FACTION_COLORS.ion,
+        getShipKit('dart').size / 2,
+        false
+      );
       drawArrow(
         ctx,
         { x: 0, y: 0 },
@@ -1603,7 +1747,7 @@ function makeLootDemo(): Demo {
         'dart',
         { x: shooter.x * displayScale, y: shooter.y * displayScale },
         0,
-        PALETTE.LOCAL,
+        FACTION_COLORS.ion,
         shipRadius,
         frame >= 8 && frame <= 12
       );
@@ -1847,11 +1991,32 @@ function makeShieldDemo(): Demo {
           0.9
         );
       }
-      drawShip(ctx, 'warden', warden.position, 0, PALETTE.LOCAL, getShipKit('warden').size / 2);
-      drawShip(ctx, 'dart', projected.position, 0, PALETTE.REMOTE, projected.r ?? 0);
-      drawShip(ctx, 'dart', regularPosition, 0, PALETTE.REMOTE, getShipKit('dart').size / 2);
-      drawShip(ctx, 'dart', projectedAttacker, Math.PI, PALETTE.BOT, getShipKit('dart').size / 2);
-      drawShip(ctx, 'dart', regularAttacker, Math.PI, PALETTE.BOT, getShipKit('dart').size / 2);
+      drawShip(
+        ctx,
+        'warden',
+        warden.position,
+        0,
+        FACTION_COLORS.ion,
+        getShipKit('warden').size / 2
+      );
+      drawShip(ctx, 'dart', projected.position, 0, FACTION_COLORS.ember, projected.r ?? 0);
+      drawShip(ctx, 'dart', regularPosition, 0, FACTION_COLORS.ember, getShipKit('dart').size / 2);
+      drawShip(
+        ctx,
+        'dart',
+        projectedAttacker,
+        Math.PI,
+        FACTION_COLORS.ember,
+        getShipKit('dart').size / 2
+      );
+      drawShip(
+        ctx,
+        'dart',
+        regularAttacker,
+        Math.PI,
+        FACTION_COLORS.ember,
+        getShipKit('dart').size / 2
+      );
       if (frame <= contactFrame) {
         const progress = Math.min(1, frame / contactFrame);
         drawLaser(
@@ -2066,7 +2231,7 @@ function makeSplitDemo(): Demo {
           if (progress === null) {
             continue;
           }
-          const color = wave.id === 'fast' ? PALETTE.LASER_LOCAL : PALETTE.LOCAL;
+          const color = wave.id === 'fast' ? PALETTE.LASER_LOCAL : FACTION_COLORS.ion;
           drawRing(
             ctx,
             { x: -center.x, y: -center.y },
@@ -2324,7 +2489,7 @@ function makePickupsDemo(): Demo {
       if (loose) {
         drawPickup(ctx, loose, 0.35);
       }
-      drawShip(ctx, 'dart', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('dart').size / 2);
+      drawShip(ctx, 'dart', { x: 0, y: 0 }, 0, FACTION_COLORS.ion, getShipKit('dart').size / 2);
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'

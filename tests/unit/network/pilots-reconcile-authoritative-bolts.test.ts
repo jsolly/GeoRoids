@@ -194,10 +194,12 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('rejected, timed-out and disconnected predictions leave no ghost and receipts cannot claim another shot', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('skirmisher');
+    const local = PlayerManager.getInstance().createLocalPlayer('dart');
     const ws = await connect();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
-    local.ship.fireBurst(3, 0.12);
+    local.ship.fireLaser();
+    local.ship.fireLaser();
+    local.ship.fireLaser();
     const originals = [...local.ship.lasers];
     expect(originals).toHaveLength(3);
     const requests = ws.sent
@@ -212,10 +214,10 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
     expect(local.ship.lasers).toEqual(originals);
     ws.receive('shotAcknowledged', { requestId: requests[1], projectileId: null });
     expect(local.ship.lasers).toEqual([originals[0], originals[2]]);
-    ws.receive('shotAcknowledged', { requestId: requests[2], projectileId: 'burst-third' });
-    expect(originals[2]?.serverId).toBe('burst-third');
+    ws.receive('shotAcknowledged', { requestId: requests[2], projectileId: 'shot-third' });
+    expect(originals[2]?.serverId).toBe('shot-third');
     expect(originals[0]?.serverId).toBeUndefined();
-    field.sync([{ ...bolt('burst-third'), ownerId: local.id }]);
+    field.sync([{ ...bolt('shot-third'), ownerId: local.id }]);
     clock.mockReturnValue(100 + LASER.PREDICTION_TIMEOUT_MS);
     field.reconcileShip(local.ship, local.id);
     expect(local.ship.lasers).toEqual([originals[2]]);

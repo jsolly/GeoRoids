@@ -15,6 +15,13 @@ describe('soft factions for humans and bots', () => {
     engine.stopGameLoop();
   });
 
+  test('the default bot pair starts with one bot on each faction', () => {
+    const bots = engine.entityManager.createBots();
+
+    expect(bots).toHaveLength(2);
+    expect(bots.map((bot) => bot.factionId)).toEqual(['ion', 'ember']);
+  });
+
   test('join auto-balances humans and bots onto two sides', () => {
     const ws = new RecordingSocket();
     const a = engine.addPlayer('human-a', 'A', ws);

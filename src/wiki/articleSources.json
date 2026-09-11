@@ -16,7 +16,9 @@
     "tests/integration/entities/input/keybindings.test.ts",
     "tests/integration/entities/input/mouse.test.ts",
     "tests/unit/input/touchAbility.test.ts",
-    "tests/unit/input/mouseDesktop.test.ts"
+    "tests/unit/input/mouseDesktop.test.ts",
+    "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts"
   ],
   "dart": [
     "src/entities/ship/shipKits.ts",
@@ -30,10 +32,12 @@
     "src/entities/ship/shipAbilities.ts",
     "src/entities/ship/shipRenderer.ts",
     "src/entities/ship/harpoonField.ts",
+    "src/entities/ship/harpoonSling.ts",
     "tests/unit/entities/shipKits.test.ts",
     "tests/unit/entities/shipAbilities.test.ts",
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-ship.test.ts",
-    "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts"
+    "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts",
+    "tests/integration/browser/sanity/hauler-e-latches-cream-tether-near-a-rock.test.ts"
   ],
   "warden": [
     "src/entities/ship/shipKits.ts",
@@ -54,19 +58,33 @@
     "src/entities/ship/shipKits.ts",
     "src/entities/ship/shipAbilities.ts",
     "src/entities/ship/Ship.ts",
+    "src/entities/ship/skirmisherRing.ts",
     "src/constants/index.ts",
     "tests/unit/entities/shipKits.test.ts",
-    "tests/unit/entities/shipAbilities.test.ts"
+    "tests/unit/entities/shipAbilities.test.ts",
+    "tests/unit/entities/skirmisher-ring.test.ts",
+    "tests/integration/browser/sanity/skirmisher-fires-a-full-outward-ring.test.ts"
   ],
   "quake": [
     "src/entities/ship/shipKits.ts",
     "src/entities/ship/shipAbilities.ts",
+    "src/entities/ship/quakeImpulse.ts",
     "src/entities/ship/quakePulseRenderer.ts",
+    "server/core/GameEngine.ts",
+    "server/core/LootManager.ts",
+    "server/core/SatelliteManager.ts",
+    "server/core/SatellitePickupManager.ts",
+    "server/core/PlayerMotionService.ts",
+    "shared/playerMotion.ts",
     "src/constants/index.ts",
     "shared/fuel.ts",
     "tests/unit/entities/shipKits.test.ts",
     "tests/unit/entities/shipAbilities.test.ts",
-    "tests/unit/entities/emp-spends-fuel-when-activated.test.ts"
+    "tests/unit/entities/emp-spends-fuel-when-activated.test.ts",
+    "tests/unit/entities/quake-blasts-incoming-and-edge-targets-outward.test.ts",
+    "tests/unit/scenarios/combat/quake-blast-survives-client-movement-updates.test.ts",
+    "tests/unit/server/quake-pulse-auxiliary-bodies.test.ts",
+    "tests/integration/browser/sanity/quake-shows-an-expanding-blue-pulse.test.ts"
   ],
   "fuel-growth": [
     "shared/fuel.ts",
@@ -145,6 +163,7 @@
     "tests/unit/entities/shipLifecycle.test.ts",
     "tests/unit/entities/combatDamage.test.ts",
     "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts",
+    "tests/unit/entities/skirmisher-ring.test.ts",
     "tests/unit/scenarios/combat/wall-or-roid-hit-explodes-then-respawns-without-freeze.test.ts",
     "tests/unit/scenarios/combat/a-laser-hit-at-low-health-explodes-the-ship-immediately.test.ts",
     "tests/integration/browser/e2e/ship-respawns-randomly-after-boundary-death.test.ts",
@@ -157,11 +176,17 @@
     "server/core/combatScoring.ts",
     "shared/combat.ts",
     "server/core/GameEngine.ts",
+    "server/core/EntityManager.ts",
     "shared/asteroidReflection.ts",
+    "src/constants/index.ts",
+    "src/entities/player/factionMarkPainters.ts",
+    "src/rendering/hud/leaderboard.ts",
+    "src/rendering/hud/minimap.ts",
     "tests/unit/shared/factions.test.ts",
     "tests/unit/shared/combat.test.ts",
     "tests/unit/server/factions-teamwork.test.ts",
-    "tests/unit/scenarios/combat/same-side-shots-do-not-hurt-once-sides-are-set.test.ts"
+    "tests/unit/scenarios/combat/same-side-shots-do-not-hurt-once-sides-are-set.test.ts",
+    "tests/integration/browser/sanity/faction-colors-identify-bots-and-allies.test.ts"
   ],
   "hud-network": [
     "shared/gameClock.ts",
@@ -174,6 +199,8 @@
     "src/rendering/hud/leaderboard.ts",
     "src/rendering/hud/minimap.ts",
     "src/rendering/hud/hudLayout.ts",
+    "src/entities/player/factionMarkPainters.ts",
+    "shared/factions.ts",
     "src/network/services/ConnectionManager.ts",
     "server/services/GameStateBroadcaster.ts",
     "shared-types.ts",
@@ -181,6 +208,7 @@
     "tests/unit/rendering/hudLayout.test.ts",
     "tests/unit/systems/hudReadability.test.ts",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
-    "tests/unit/network/asteroidFieldSync.test.ts"
+    "tests/unit/network/asteroidFieldSync.test.ts",
+    "tests/integration/browser/sanity/faction-colors-identify-bots-and-allies.test.ts"
   ]
 }

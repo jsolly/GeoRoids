@@ -6,6 +6,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import {
+  canvasPoint,
   centerOf,
   dispatchTouch,
   readTouchControlState as readLocalTouchState,
@@ -18,7 +19,7 @@ const KITS = [
   { kitId: 'dart' as const, label: 'DASH', name: 'Boost dash' },
   { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
   { kitId: 'warden' as const, label: 'GUARD', name: 'Projected ally shield' },
-  { kitId: 'skirmisher' as const, label: 'BURST', name: 'Burst fire' },
+  { kitId: 'skirmisher' as const, label: 'RING', name: 'Ring fire' },
   { kitId: 'quake' as const, label: 'PULSE', name: 'Shock pulse' },
 ];
 
@@ -27,7 +28,7 @@ async function tapTouchPoint(
   heldPoints: TouchPoint[],
   touchPoint: TouchPoint
 ): Promise<void> {
-  // Preserve the active stick/fire contacts while Chromium delivers the
+  // Preserve the active steering/fire contacts while Chromium delivers the
   // changed third contact. This keeps the continuous controls under test.
   await dispatchTouch(session, 'touchMove', heldPoints);
   await dispatchTouch(session, 'touchStart', [touchPoint]);
@@ -75,7 +76,7 @@ test(
           { x: point.x, y: point.y, id: 1 },
         ]);
         touchActive = true;
-        await game.waitForAnimationFrames(2);
+        await page.waitForFunction(() => window.gameController?.getCurrPlayer()?.ship.thrusting);
         expect((await readLocalTouchState(page)).thrusting).toBe(true);
         const angle = await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.angle);
         expect(angle).toBeCloseTo(point.angle, 3);
@@ -85,6 +86,157 @@ test(
       await game.waitForAnimationFrames(2);
       expect((await readLocalTouchState(page)).thrusting).toBe(false);
       expect(await page.locator('#touch-stick').count()).toBe(0);
+      expect(diagnostics).toEqual({ errors: [], warnings: [] });
+    } finally {
+      try {
+        if (touchActive) {
+          await dispatchTouch(session, 'touchCancel', []);
+        }
+      } finally {
+        await session.detach();
+      }
+    }
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);
+
+test(
+  'a quick one-finger canvas tap fires on release and then stops thrust',
+  async () => {
+    const page = await browserManager.recreatePage({ hasTouch: true });
+    if (!page) {
+      throw new Error('Page not available');
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const diagnostics = collectConsole(page);
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    const tapPoint = await canvasPoint(page, 0.75, 0.5);
+    const session = await page.context().newCDPSession(page);
+    let touchActive = false;
+    try {
+      const beforeTap = await readLocalTouchState(page);
+      await dispatchTouch(session, 'touchStart', [{ ...tapPoint, id: 1 }]);
+      touchActive = true;
+      await game.waitForAnimationFrames(2);
+      const duringTap = await readLocalTouchState(page);
+      expect(duringTap.thrusting).toBe(false);
+      expect(duringTap.lastShotTime).toBe(beforeTap.lastShotTime);
+
+      await dispatchTouch(session, 'touchEnd', []);
+      touchActive = false;
+      await game.waitForAnimationFrames(2);
+      const afterTap = await readLocalTouchState(page);
+      expect(afterTap.lastShotTime).toBeGreaterThan(beforeTap.lastShotTime);
+      expect(afterTap.thrusting).toBe(false);
+      expect(afterTap.canShoot).toBe(true);
+      expect(diagnostics).toEqual({ errors: [], warnings: [] });
+    } finally {
+      try {
+        if (touchActive) {
+          await dispatchTouch(session, 'touchCancel', []);
+        }
+      } finally {
+        await session.detach();
+      }
+    }
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);
+
+test.each(['ability', 'shield'] as const)(
+  'a %s button tap consumes a pending steering tap without firing',
+  async (action) => {
+    const page = await browserManager.recreatePage({ hasTouch: true });
+    if (!page) {
+      throw new Error('Page not available');
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const diagnostics = collectConsole(page);
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    const steerPoint = await canvasPoint(page, 0.75, 0.5);
+    const actionPoint = await centerOf(page, `#touch-${action}`);
+    const session = await page.context().newCDPSession(page);
+    let touchActive = false;
+    try {
+      const beforeAction = await readLocalTouchState(page);
+      await dispatchTouch(session, 'touchStart', [{ ...steerPoint, id: 21 }]);
+      touchActive = true;
+      await game.waitForAnimationFrames(1);
+      await dispatchTouch(session, 'touchStart', [{ ...actionPoint, id: 22 }]);
+      await dispatchTouch(session, 'touchEnd', [{ ...actionPoint, id: 22 }]);
+      await game.waitForAnimationFrames(2);
+      const duringAction = await readLocalTouchState(page);
+      expect(duringAction.lastShotTime).toBe(beforeAction.lastShotTime);
+      if (action === 'ability') {
+        expect(duringAction.abilityCooldownFrames).toBeGreaterThan(0);
+      } else {
+        expect(duringAction.shieldActive).toBe(true);
+      }
+
+      await dispatchTouch(session, 'touchEnd', []);
+      touchActive = false;
+      await game.waitForAnimationFrames(2);
+      const afterAction = await readLocalTouchState(page);
+      expect(afterAction.lastShotTime).toBe(beforeAction.lastShotTime);
+      expect(afterAction.thrusting).toBe(false);
+      expect(diagnostics).toEqual({ errors: [], warnings: [] });
+    } finally {
+      try {
+        if (touchActive) {
+          await dispatchTouch(session, 'touchCancel', []);
+        }
+      } finally {
+        await session.detach();
+      }
+    }
+  },
+  TestConfig.DEFAULT_TIMEOUT
+);
+
+test(
+  'a second held canvas touch autofires and releasing it keeps the steering touch thrusting',
+  async () => {
+    const page = await browserManager.recreatePage({ hasTouch: true });
+    if (!page) {
+      throw new Error('Page not available');
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const diagnostics = collectConsole(page);
+    const game = new GameInteractions(page);
+    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    const steer = await centerOf(page, '#gameCanvas');
+    const firePoint = await canvasPoint(page, 0.75, 0.5);
+    const session = await page.context().newCDPSession(page);
+    let touchActive = false;
+    try {
+      const beforeHold = await readLocalTouchState(page);
+      await dispatchTouch(session, 'touchStart', [
+        { x: steer.x + 42, y: steer.y, id: 11 },
+        { ...firePoint, id: 12 },
+      ]);
+      touchActive = true;
+      await game.waitForAnimationFrames(8);
+      const duringHold = await readLocalTouchState(page);
+      expect(duringHold.thrusting).toBe(true);
+      expect(duringHold.lastShotTime).toBeGreaterThan(beforeHold.lastShotTime);
+
+      await game.waitForAnimationFrames(20);
+      const afterAutofire = await readLocalTouchState(page);
+      expect(afterAutofire.lastShotTime).toBeGreaterThan(duringHold.lastShotTime);
+
+      await dispatchTouch(session, 'touchEnd', [{ ...firePoint, id: 12 }]);
+      await game.waitForAnimationFrames(2);
+      const afterFireRelease = await readLocalTouchState(page);
+      expect(afterFireRelease.thrusting).toBe(true);
+      expect(afterFireRelease.canShoot).toBe(true);
+      expect(afterFireRelease.lastShotTime).toBe(afterAutofire.lastShotTime);
+
+      await dispatchTouch(session, 'touchEnd', []);
+      touchActive = false;
+      await game.waitForAnimationFrames(2);
+      expect((await readLocalTouchState(page)).thrusting).toBe(false);
       expect(diagnostics).toEqual({ errors: [], warnings: [] });
     } finally {
       try {
@@ -161,38 +313,36 @@ test.each(KITS)(
     expect(await page.locator('#touch-ability').textContent()).toBe(label);
     expect(await page.locator('#touch-ability').getAttribute('aria-label')).toBe(name);
     expect(await page.locator('#touch-shield').getAttribute('aria-label')).toBe('Shield bubble');
+    expect(await page.locator('#touch-controls button').count()).toBe(2);
 
     const stick = await centerOf(page, '#gameCanvas');
-    const fire = await centerOf(page, '#touch-fire');
+    const firePoint = await canvasPoint(page, 0.75, 0.5);
     const ability = await centerOf(page, '#touch-ability');
     const shield = await centerOf(page, '#touch-shield');
     const session = await page.context().newCDPSession(page);
     const heldTouchPoints: TouchPoint[] = [
       { x: stick.x + 42, y: stick.y - 4, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { ...firePoint, id: 12 },
     ];
 
     const beforeMove = await readLocalTouchState(page);
     await dispatchTouch(session, 'touchStart', [
       { x: stick.x + 34, y: stick.y, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { ...firePoint, id: 12 },
     ]);
     await game.waitForAnimationFrames(8);
     await dispatchTouch(session, 'touchMove', [
       { x: stick.x + 42, y: stick.y - 4, id: 11 },
-      { x: fire.x, y: fire.y, id: 12 },
+      { ...firePoint, id: 12 },
     ]);
     await game.waitForAnimationFrames(8);
 
     const duringTouch = await readLocalTouchState(page);
     expect(duringTouch.thrusting).toBe(true);
     expect(duringTouch.lastShotTime).toBeGreaterThan(beforeMove.lastShotTime);
-    expect(
-      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
-    ).toBe(true);
     expect(await page.locator('#touch-stick').count()).toBe(0);
 
-    // E and F must remain usable while the two continuous touch sources are
+    // E and F must remain usable while the two continuous canvas touch sources are
     // held. The E action is kit-specific; the F bubble is shared.
     await tapTouchPoint(session, heldTouchPoints, {
       x: ability.x,
@@ -203,9 +353,6 @@ test.each(KITS)(
     const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
     expect(abilityWhileHeld.thrusting).toBe(true);
-    expect(
-      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
-    ).toBe(true);
     await tapTouchPoint(session, heldTouchPoints, {
       x: ability.x,
       y: ability.y,
@@ -253,15 +400,12 @@ test.each(KITS)(
     const afterBlur = await readLocalTouchState(page);
     expect(afterBlur.thrusting).toBe(false);
     expect(afterBlur.canShoot).toBe(true);
-    expect(
-      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
-    ).toBe(false);
 
     // A real orientation change also drops stale pointer ownership before the
     // controls are laid out for the new viewport.
     await dispatchTouch(session, 'touchStart', [
       { x: stick.x + 34, y: stick.y, id: 21 },
-      { x: fire.x, y: fire.y, id: 22 },
+      { ...firePoint, id: 22 },
     ]);
     await game.waitForAnimationFrames(2);
     await page.setViewportSize({ width: 844, height: 390 });
@@ -270,9 +414,6 @@ test.each(KITS)(
     const afterRotation = await readLocalTouchState(page);
     expect(afterRotation.thrusting).toBe(false);
     expect(afterRotation.canShoot).toBe(true);
-    expect(
-      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
-    ).toBe(false);
     expect(await page.locator('#touch-controls').isHidden()).toBe(false);
     await page.setViewportSize({ width: 390, height: 844 });
     await game.waitForAnimationFrames(1);
@@ -282,9 +423,6 @@ test.each(KITS)(
     const afterCancel = await readLocalTouchState(page);
     expect(afterCancel.thrusting).toBe(false);
     expect(afterCancel.canShoot).toBe(true);
-    expect(
-      await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
-    ).toBe(false);
     expect(await page.locator('#touch-stick').count()).toBe(0);
 
     const mobileScreenshot = screenshotManager.getScreenshotPath(`wave2-touch-${kitId}-mobile.png`);
@@ -310,18 +448,15 @@ test(
     await game.bootGame();
     const livesBefore = await game.getLives();
     const stick = await centerOf(page, '#gameCanvas');
-    const fire = await centerOf(page, '#touch-fire');
+    const firePoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
     try {
       await dispatchTouch(session, 'touchStart', [
         { x: stick.x + 34, y: stick.y, id: 31 },
-        { x: fire.x, y: fire.y, id: 32 },
+        { ...firePoint, id: 32 },
       ]);
       await game.waitForAnimationFrames(2);
       expect((await readLocalTouchState(page)).thrusting).toBe(true);
-      expect(
-        await page.locator('#touch-fire').evaluate((el) => el.classList.contains('is-pressed'))
-      ).toBe(true);
 
       // Capture the transient dead controls before the normal respawn restores them.
       const deadControls = page
@@ -341,7 +476,6 @@ test(
               lives: player.lives,
               thrusting: player.ship.thrusting,
               canShoot: player.ship.canShoot,
-              firePressed: document.getElementById('touch-fire')?.classList.contains('is-pressed'),
               abilityDisabled: ability.getAttribute('aria-disabled'),
               shieldDisabled: shield.getAttribute('aria-disabled'),
             };
@@ -361,7 +495,6 @@ test(
         lives: livesBefore - 1,
         thrusting: false,
         canShoot: true,
-        firePressed: false,
         abilityDisabled: 'true',
         shieldDisabled: 'true',
       });

@@ -724,7 +724,6 @@ try {
         if (scenario.hasTouch && values.browser === 'chromium') {
           touchSession ??= await context.newCDPSession(page);
           const playfield = await page.locator('#gameCanvas').boundingBox();
-          const fire = await page.locator('#touch-fire').boundingBox();
           const extra =
             inputSteps % 40 === 0
               ? '#touch-shield'
@@ -735,16 +734,15 @@ try {
             extra && (await page.locator(extra).getAttribute('aria-disabled')) !== 'true'
               ? await page.locator(extra).boundingBox()
               : null;
-          assert(playfield && fire, 'Playfield or fire control absent');
+          assert(playfield, 'Playfield absent');
+          const steerX = playfield.x + playfield.width * (inputSteps % 2 ? 0.8 : 0.2);
+          const fireX = playfield.x + playfield.width * (inputSteps % 2 ? 0.2 : 0.8);
+          const touchY = playfield.y + playfield.height * 0.5;
           await touchSession.send('Input.dispatchTouchEvent', {
             type: 'touchStart',
             touchPoints: [
-              {
-                x: playfield.x + playfield.width * (inputSteps % 2 ? 0.8 : 0.2),
-                y: playfield.y + playfield.height * 0.5,
-                id: 1,
-              },
-              { x: fire.x + fire.width / 2, y: fire.y + fire.height / 2, id: 2 },
+              { x: steerX, y: touchY, id: 1 },
+              { x: fireX, y: touchY, id: 2 },
               ...(extraBox
                 ? [
                     {

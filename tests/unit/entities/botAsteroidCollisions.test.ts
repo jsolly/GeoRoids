@@ -78,6 +78,7 @@ describe('server bot damage and lifecycle scenarios', () => {
   test('explicit explosion and respawn ticks restore the bot with protection and its anchor', () => {
     const [target] = createBotPair(engine);
     delete target.spawnProtectionTimer;
+    const factionBeforeDeath = target.factionId;
     expect(engine.handleBotDamage(target.id, 'asteroid', target.health)).toBe(true);
 
     expect(engine.entityManager.updateExplosions()).toEqual([]);
@@ -98,6 +99,7 @@ describe('server bot damage and lifecycle scenarios', () => {
     expect(target.health).toBe(target.maxHealth);
     expect(target.exploding).toBe(false);
     expect(target.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
+    expect(target.factionId).toBe(factionBeforeDeath);
   });
 
   test('a bot kill credits the named bot attacker and preserves the target life count', () => {

@@ -71,7 +71,7 @@ test('touch heading matches mouse-style aim and does not fight WASD turn', () =>
   expect(player.ship.angle).toBeCloseTo(Math.PI / 2, 8);
 });
 
-test('fire button shoots once and re-arms on release', () => {
+test('firing touch shoots once and re-arms on release', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
   setTouchFire(player, true);
   expect(shoot).toHaveBeenCalledTimes(1);
@@ -80,14 +80,14 @@ test('fire button shoots once and re-arms on release', () => {
   expect(player.ship.canShoot).toBe(true);
 });
 
-test('dead player cannot fire from the overlay', () => {
+test('dead player cannot fire from touch input', () => {
   player.lives = 0;
   const shoot = vi.spyOn(player.ship, 'shoot');
   setTouchFire(player, true);
   expect(shoot).not.toHaveBeenCalled();
 });
 
-test('hold-to-fire keeps calling shoot while the button is down', () => {
+test('hold-to-fire keeps calling shoot while the firing finger is down', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
   setTouchFire(player, true);
   tickTouchControls(player);

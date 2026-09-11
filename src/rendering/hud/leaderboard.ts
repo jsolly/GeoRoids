@@ -91,7 +91,7 @@ export function drawLeaderboard(
 
   visible.forEach((entry, index) => {
     const y = boardY + 6 + index * rowHeight;
-    const nameColor = getFactionColor(entry.type);
+    const nameColor = getFactionColor(entry.factionId);
     const alpha = entry.id === currentPlayerId ? 0.92 : 0.78;
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.4);
@@ -120,7 +120,13 @@ export function drawLeaderboard(
     }
 
     ctx.fillStyle = hexToRgba(nameColor, alpha);
-    ctx.fillText(fitLeaderboardName(ctx, entry.name, nameMaxWidth), nameX, y);
+    const suffix = entry.type === 'bot' ? ' (bot)' : '';
+    const fittedName = fitLeaderboardName(
+      ctx,
+      entry.name,
+      Math.max(0, nameMaxWidth - ctx.measureText(suffix).width)
+    );
+    ctx.fillText(fittedName + suffix, nameX, y);
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.55);
     ctx.textAlign = 'right';

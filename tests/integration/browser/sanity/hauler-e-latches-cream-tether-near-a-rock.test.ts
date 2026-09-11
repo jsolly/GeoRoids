@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
+import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -85,7 +86,7 @@ async function flyWasdNearRock(page: Page, targetId: string, timeoutMs = 25_000)
 }
 
 test(
-  'Hauler title kit, WASD to a nearby rock, and E paint cream tether plus tip',
+  'Hauler title kit, WASD to a nearby rock, and E shows a working sling tether',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -94,7 +95,11 @@ test(
 
     await page.setViewportSize({ width: 1280, height: 720 });
     const consoleErrors: string[] = [];
+    const consoleWarnings: string[] = [];
     page.on('console', (message) => {
+      if (message.type() === 'warning') {
+        consoleWarnings.push(message.text());
+      }
       if (message.type() === 'error') {
         consoleErrors.push(message.text());
       }
@@ -150,13 +155,42 @@ test(
     expect(fixture.joined).toBe(true);
 
     await flyWasdNearRock(page, fixture.targetId);
+    const before = await page.evaluate((id) => {
+      const gc = window.gameController;
+      const ship = gc?.getCurrPlayer()?.ship;
+      const rock = gc
+        ?.getCurrRoidBelt?.()
+        ?.getRoids?.()
+        .find((candidate) => candidate.id === id);
+      if (!ship || !rock) {
+        throw new Error('Hauler fixture lost the selected rock before E');
+      }
+      return {
+        speed: Math.hypot(rock.velocity.x, rock.velocity.y),
+        velocity: { x: rock.velocity.x, y: rock.velocity.y },
+        distance: Math.hypot(rock.position.x - ship.position.x, rock.position.y - ship.position.y),
+      };
+    }, fixture.targetId);
     await page.keyboard.press('KeyE');
+    await page.waitForFunction((targetId) => {
+      const gc = window.gameController;
+      const ship = gc?.getCurrPlayer()?.ship;
+      return ship && ship.harpoonTimer > 0 && ship.harpoonTargetId === targetId;
+    }, fixture.targetId);
 
     const frames: Array<Record<string, unknown>> = [];
-    const sampleDeadline = Date.now() + 1000;
+    const sampleDeadline = Date.now() + 1800;
     while (Date.now() < sampleDeadline) {
       const sample = await page.evaluate(
-        ({ colors }: { colors: { cream: string; tip: string } }) => {
+        ({
+          colors,
+          releaseGap,
+          readPixels,
+        }: {
+          colors: { cream: string; tip: string };
+          releaseGap: number;
+          readPixels: boolean;
+        }) => {
           const gc = window.gameController;
           gc?.renderGame?.();
           const ship = gc?.getCurrPlayer()?.ship;
@@ -164,7 +198,9 @@ test(
           const canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
           const ctx = canvas?.getContext('2d');
           const pixels =
-            ctx && canvas ? ctx.getImageData(0, 0, canvas.width, canvas.height).data : null;
+            readPixels && ctx && canvas
+              ? ctx.getImageData(0, 0, canvas.width, canvas.height).data
+              : null;
           const near = (hex: string, tolerance: number): boolean => {
             if (!pixels) {
               return false;
@@ -184,7 +220,24 @@ test(
             }
             return false;
           };
+          const latched = gc
+            ?.getCurrRoidBelt?.()
+            ?.getRoids?.()
+            .find((rock) => rock.id === ship?.harpoonTargetId);
+          const distance =
+            ship && latched
+              ? Math.hypot(
+                  latched.position.x - ship.position.x,
+                  latched.position.y - ship.position.y
+                )
+              : Number.POSITIVE_INFINITY;
           return {
+            active: Boolean(ship && latched && ship.harpoonTimer > 0),
+            speed: latched ? Math.hypot(latched.velocity.x, latched.velocity.y) : 0,
+            distance,
+            gap: latched && ship ? distance - ship.r - latched.r : Number.POSITIVE_INFINITY,
+            releaseRadius: releaseGap,
+            velocity: latched ? { x: latched.velocity.x, y: latched.velocity.y } : { x: 0, y: 0 },
             kitId: ship?.kitId,
             findTarget: probe?.targetId ?? probe?.liveTargetId ?? null,
             harpoonTimer: ship?.harpoonTimer ?? 0,
@@ -195,15 +248,65 @@ test(
             tip: near(colors.tip, 22),
           };
         },
-        { colors: { cream: CREAM, tip: TIP } }
+        {
+          colors: { cream: CREAM, tip: TIP },
+          releaseGap: SHIP_ABILITY.HARPOON_RELEASE_GAP,
+          readPixels: frames.length === 0,
+        }
       );
       frames.push(sample);
-      if (sample.cream && sample.tip && sample.harpoonTimer > 0) {
+      if (
+        frames.length > 1 &&
+        sample.active &&
+        sample.gap <= SHIP_ABILITY.HARPOON_RELEASE_GAP + 2 &&
+        sample.speed >= SHIP_ABILITY.HARPOON_SLING_SPEED - 0.1
+      ) {
         break;
       }
       await page.waitForTimeout(16);
     }
 
+    const activeFrames = frames.filter((frame) => frame['active'] === true);
+    const firstActive = activeFrames.at(0);
+    const minimumDistance = Math.min(
+      ...activeFrames.map((frame) => Number(frame['distance'] ?? Number.POSITIVE_INFINITY))
+    );
+    const reelObserved =
+      firstActive !== undefined && minimumDistance < Number(firstActive['distance']) - 12;
+    const firstVelocity = firstActive?.['velocity'] as { x?: number; y?: number } | undefined;
+    const firstSpeed = Number(firstActive?.['speed'] ?? 0);
+    const firstVelocityMagnitude = Math.hypot(
+      Number(firstVelocity?.x ?? 0),
+      Number(firstVelocity?.y ?? 0)
+    );
+    const initialVelocityMagnitude = Math.hypot(before.velocity.x, before.velocity.y);
+    const straightHeading =
+      initialVelocityMagnitude > 0 &&
+      firstVelocityMagnitude > 0 &&
+      (before.velocity.x * Number(firstVelocity?.x ?? 0) +
+        before.velocity.y * Number(firstVelocity?.y ?? 0)) /
+        (initialVelocityMagnitude * firstVelocityMagnitude) >=
+        SHIP_ABILITY.HARPOON_PATH_ALIGNMENT - 0.02;
+    const straightObserved =
+      straightHeading &&
+      firstSpeed >= Math.max(Number(before.speed), SHIP_ABILITY.HARPOON_SLING_SPEED) - 0.1;
+    const releaseObserved = activeFrames.some(
+      (frame) =>
+        Number(frame['gap']) <= Number(frame['releaseRadius']) + 2 &&
+        Number(frame['speed']) >= SHIP_ABILITY.HARPOON_SLING_SPEED - 0.1
+    );
+    const alreadyNearHull = Number(firstActive?.['gap']) <= SHIP_ABILITY.HARPOON_RELEASE_GAP;
+    const launched = activeFrames.some(
+      (frame) =>
+        Math.abs(
+          Number(frame['speed']) - Math.max(before.speed, SHIP_ABILITY.HARPOON_SLING_SPEED)
+        ) < 0.1
+    );
+    const evidence = JSON.stringify({ before, frames });
+    expect(reelObserved || straightObserved || alreadyNearHull, evidence).toBe(true);
+    expect(releaseObserved || straightObserved || (alreadyNearHull && launched), evidence).toBe(
+      true
+    );
     const best =
       [...frames].reverse().find((frame) => frame['cream'] && frame['tip']) ?? frames.at(-1);
     expect(best?.['kitId']).toBe('hauler');
@@ -215,7 +318,23 @@ test(
     await page.screenshot({
       path: screenshotManager.getScreenshotPath('hauler-live-tether.png'),
     });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: screenshotManager.getScreenshotPath('hauler-sling-mobile.png') });
+    await page.goto(new URL('/wiki/#hauler', page.url()).href);
+    await page
+      .getByText('Other latched asteroids reel toward the Hauler', { exact: false })
+      .waitFor();
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('hauler-wiki-mobile.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('hauler-wiki-desktop.png'),
+      fullPage: true,
+    });
     expect(consoleErrors).toEqual([]);
+    expect(consoleWarnings).toEqual([]);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

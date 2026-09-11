@@ -33,8 +33,11 @@ heading.
 
 ## Touch
 
-On touch screens, touch and hold the playfield to steer toward your finger and
-thrust. Drag to change direction; release to stop thrusting and coast. A touch
-directly on the ship keeps its current heading. Hold FIRE with another finger
-to fire, and use the ability and SHIELD buttons for the same actions as E and
-F. Action buttons do not steer the ship.
+On touch screens, there is no separate FIRE button. Touch and hold the
+playfield to steer toward your finger and thrust. Drag to change direction;
+release to stop thrusting and coast. A touch directly on the ship keeps its
+current heading. A quick one-finger tap fires once on release. While holding
+one finger to steer, tap anywhere on the playfield with another finger to fire
+immediately, or hold that second finger for continuous fire until it is lifted.
+Use the ability and SHIELD buttons for the same actions as E and F. Action
+buttons do not steer the ship or create a pending playfield tap shot.

@@ -67,7 +67,7 @@ Two separate deploy targets — client and server do not share a host.
 
 `VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit comes from `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, or local Git. A missing or invalid commit stops the build because automatic client refresh needs that identity.
 
-Local dev: `VITE_WEBSOCKET_URL=ws://localhost:3001/ws` in `.env.local` (see `.env.example`). Vite dev proxies `/ws` to `:3001` when unset; `ConnectionManager` falls back to same-origin `/ws`.
+Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManager` uses same-origin `/ws`. Vite proxies `/ws` and `/logs` to the configured local game-server port. This also supports phones using a public HTTPS tunnel to the Vite port. Direct Vite runs can override the endpoint in `.env.local` (see `.env.example`).
 
 ### Railway (game server)
 

@@ -24,6 +24,14 @@ import {
   laserStartFromAngle,
   laserVelocityFromAngle,
 } from '../../src/entities/satellite/satelliteMath';
+import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';
+import {
+  advanceQuakeMotion,
+  applyQuakeMotion,
+  clearQuakeMotion,
+  createQuakeMotion,
+  type QuakeMotion,
+} from './quakeMotion';
 import type { RNGService } from './RNGService';
 
 /** Targets are copied from authoritative server entities for one simulation step. */
@@ -71,6 +79,7 @@ interface SatelliteInternal extends SatelliteData {
   explodeTime: number;
   respawnTimer: number;
   driftAngle: number;
+  quakeMotion: QuakeMotion;
 }
 
 export class SatelliteManager {
@@ -92,6 +101,27 @@ export class SatelliteManager {
 
   public getSatellite(id: string): SatelliteInternal | undefined {
     return this.satellites.get(id);
+  }
+
+  /** Apply Quake to live NPC satellites and every active satellite projectile. */
+  public applyQuakePulse(origin: Position, fallbackAngle = 0): number {
+    let affected = 0;
+    for (const satellite of this.satellites.values()) {
+      if (
+        satellite.exploding ||
+        satellite.respawnTimer > 0 ||
+        !applyQuakeMotion(satellite, satellite.quakeMotion, origin, fallbackAngle)
+      ) {
+        continue;
+      }
+      affected += 1;
+    }
+    for (const projectile of this.projectiles) {
+      if (applyQuakeImpulse(projectile, origin, fallbackAngle)) {
+        affected += 1;
+      }
+    }
+    return affected;
   }
 
   public getAllSatellites(): SatelliteData[] {
@@ -523,10 +553,11 @@ export class SatelliteManager {
       satellite.orbitRadiusX,
       satellite.orbitRadiusY
     );
+    advanceQuakeMotion(satellite.quakeMotion);
     satellite.position = clampToRadius(
       {
-        x: satellite.orbitCenter.x + offset.x,
-        y: satellite.orbitCenter.y + offset.y,
+        x: satellite.orbitCenter.x + offset.x + satellite.quakeMotion.offset.x,
+        y: satellite.orbitCenter.y + offset.y + satellite.quakeMotion.offset.y,
       },
       SATELLITE.BOUNDARY_RADIUS
     );
@@ -570,6 +601,7 @@ export class SatelliteManager {
       SATELLITE.BOUNDARY_RADIUS
     );
     satellite.velocity = { x: 0, y: 0 };
+    clearQuakeMotion(satellite.quakeMotion);
     satellite.shootCooldown = satellite.profile.cadenceFrames;
     satellite.burstRemaining = 0;
     satellite.burstCooldown = 0;
@@ -617,6 +649,7 @@ export class SatelliteManager {
       explodeTime: 0,
       respawnTimer: 0,
       driftAngle: this.rng.random() * Math.PI * 2,
+      quakeMotion: createQuakeMotion(),
     };
   }
 

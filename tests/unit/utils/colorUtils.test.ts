@@ -36,20 +36,10 @@ test('locked palette hexes match the art-direction swatch', () => {
   expect(PALETTE.SATELLITE_PICKUP.toLowerCase()).not.toBe('#67e8f9');
 });
 
-test('faction colors map local mint, remote sky, bot amber', () => {
-  expect(getFactionColor('local')).toBe(PALETTE.LOCAL);
-  expect(getFactionColor('remote')).toBe(PALETTE.REMOTE);
-  expect(getFactionColor('bot')).toBe(PALETTE.BOT);
-  expect(getFactionColor('local')).toBe('#5EEAD4');
-  expect(getFactionColor('bot')).toBe('#FB923C');
-});
-
-test('hull display color stays ownership even when a side is assigned', () => {
-  expect(getFactionColor('local')).toBe(PALETTE.LOCAL);
-  expect(getFactionColor('bot')).toBe(PALETTE.BOT);
-  expect(getFactionColor('remote')).toBe(PALETTE.REMOTE);
-  expect(getFactionColor('local')).not.toBe(FACTION_COLORS.ember);
-  expect(getFactionColor('bot')).not.toBe(FACTION_COLORS.ion);
+test('faction colors identify sides and unassigned pilots remain neutral', () => {
+  expect(getFactionColor('ion')).toBe(FACTION_COLORS.ion);
+  expect(getFactionColor('ember')).toBe(FACTION_COLORS.ember);
+  expect(getFactionColor(undefined)).toBe(PALETTE.HUD_MUTED);
 });
 
 test('laser colors never use white', () => {
@@ -79,10 +69,10 @@ test('new players and ships default to faction colors instead of white', () => {
     input: new MockPlayerInput(),
   });
 
-  expect(local.color).toBe(PALETTE.LOCAL);
-  expect(local.ship.color).toBe(PALETTE.LOCAL);
-  expect(remote.color).toBe(PALETTE.REMOTE);
-  expect(bot.color).toBe(PALETTE.BOT);
+  expect(local.color).toBe(PALETTE.HUD_MUTED);
+  expect(local.ship.color).toBe(PALETTE.HUD_MUTED);
+  expect(remote.color).toBe(PALETTE.HUD_MUTED);
+  expect(bot.color).toBe(PALETTE.HUD_MUTED);
   expect(new Ship().color).toBe(PALETTE.LOCAL);
 });
 

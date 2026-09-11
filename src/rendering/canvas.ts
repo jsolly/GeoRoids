@@ -365,7 +365,7 @@ class CanvasManager {
     }
 
     for (const player of allPlayers) {
-      const factionColor = getFactionColor(player.type);
+      const factionColor = getFactionColor(player.factionId);
       const isLocal = player.id === localId;
       const ship = isLocal ? currShip : player.ship;
 
@@ -380,7 +380,7 @@ class CanvasManager {
           ship,
           currShip.position,
           factionColor,
-          isLocal ? currPlayer.name : player.name,
+          player.type === 'bot' ? `${player.name} (bot)` : isLocal ? currPlayer.name : player.name,
           player.factionId
         );
       }
@@ -392,7 +392,7 @@ class CanvasManager {
       if (!shouldDrawShipHull(ship) || !ship.thrusting) {
         continue;
       }
-      const factionColor = getFactionColor(player.type);
+      const factionColor = getFactionColor(player.factionId);
       if (isLocal) {
         drawThruster(currShip, factionColor);
       } else {
@@ -416,7 +416,13 @@ class CanvasManager {
 
     drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
 
-    drawLivesIndicator(ctx, hudLayout, lives, PALETTE.LOCAL, currShip.kitId);
+    drawLivesIndicator(
+      ctx,
+      hudLayout,
+      lives,
+      getFactionColor(currPlayer.factionId),
+      currShip.kitId
+    );
 
     if (text && textAlpha > 0) {
       drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);

@@ -23,12 +23,13 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   hauler: {
     title: 'Hauler harpoon',
-    alt: 'A spinning asteroid passes through a Hauler on a cream tether, then strikes a second ship after the tether timer ends.',
+    alt: 'A spinning asteroid reels toward a Hauler on a cream tether, then reverses near its hull and strikes an enemy ship.',
     caption:
-      'Controlled demonstration: press E to pull a spinning rock through the Hauler safely. The timed tether releases it toward a second ship, where the normal asteroid collision rule shows a visible impact.',
+      'Controlled demonstration: E reels the spinning rock toward the Hauler, then bounces it back toward the enemy. The released rock coasts freely until impact.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
+      'src/entities/ship/harpoonSling.ts',
       'src/entities/ship/shipRenderer.ts',
       'shared/combat.ts',
     ],
@@ -47,25 +48,31 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   skirmisher: {
-    title: 'Skirmisher burst fire',
-    alt: 'A Skirmisher fires three amber laser bolts in a narrow spread and hits a second ship.',
+    title: 'Skirmisher ring fire',
+    alt: 'A Skirmisher fires a full ring of amber laser bolts and hits a second ship.',
     caption:
-      'Controlled demonstration: press E to fire three shots in a tight spread; one bolt reaches the target hull.',
+      'Controlled demonstration: press E to fire an outward ring of twelve shots; one bolt reaches the target hull.',
     sources: [
       'src/entities/ship/Ship.ts',
+      'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipKits.ts',
-      'src/entities/satellite/satelliteMath.ts',
-      'shared/combat.ts',
+      'src/entities/ship/skirmisherRing.ts',
+      'server/core/GameEngine.ts',
     ],
   },
   quake: {
     title: 'Quake shock pulse',
-    alt: 'A Quake emits a blue expanding pulse that reaches and pushes a second ship while asteroids scatter.',
+    alt: 'A Quake emits a blue expanding pulse that reaches and pushes a second ship while rocks, loot, satellites, pickups, and shots scatter.',
     caption:
-      'Controlled demonstration: press E to spend fuel and push a nearby ship and rocks outward. The pulse reaches its target without dealing direct damage.',
+      'Controlled demonstration: press E to spend fuel and push nearby physical objects outward. The pulse reaches its target without dealing direct damage.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
+      'src/entities/ship/quakeImpulse.ts',
       'src/entities/ship/quakePulseRenderer.ts',
+      'server/core/GameEngine.ts',
+      'server/core/LootManager.ts',
+      'server/core/SatelliteManager.ts',
+      'server/core/SatellitePickupManager.ts',
       'src/constants/index.ts',
       'src/entities/ship/hullOutlines.ts',
     ],

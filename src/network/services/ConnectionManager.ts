@@ -1510,8 +1510,7 @@ export class ConnectionManager {
       }
     }
     if (data.factionId && localPlayer) {
-      localPlayer.factionId = data.factionId;
-      localPlayer.ship.factionId = data.factionId;
+      localPlayer.updateFromServer({ factionId: data.factionId });
     }
     this.initializeAsteroids();
   }

@@ -29,6 +29,7 @@ interface Session {
   poseAt: number;
   poseCredit: number;
   wasAlive: boolean;
+  knockback?: { speed: number; at: number };
 }
 
 /**
@@ -77,8 +78,18 @@ export class PlayerMotionService {
     );
   }
 
-  private legalSpeed(actor: GameEntity): number {
-    return getShipKit(actor.kitId).maxVelocity;
+  public legalSpeed(actor: GameEntity, now: number): number {
+    const normal = getShipKit(actor.kitId).maxVelocity;
+    const impulse = this.sessions.get(actor.id)?.knockback;
+    if (!impulse) {
+      return normal;
+    }
+    // Match the client's fixed-step decay, allowing the existing transport-jitter budget.
+    const elapsedFrames = Math.max(
+      0,
+      ((now - impulse.at) * GAME.FPS) / 1000 - PLAYER_MOTION.poseLeadFrames
+    );
+    return Math.max(normal, impulse.speed * PLAYER_MOTION.knockbackRetention ** elapsedFrames);
   }
 
   private owner(socket: WebSocket): Session | undefined {
@@ -126,10 +137,10 @@ export class PlayerMotionService {
       poseSequence: -1,
       anchorAt: now,
       poseAt: now,
-      poseCredit: this.legalSpeed(actor) * PLAYER_MOTION.poseLeadFrames,
+      poseCredit: this.legalSpeed(actor, now) * PLAYER_MOTION.poseLeadFrames,
       wasAlive: true,
     };
-    actor.velocity = capMotionVelocity(actor.velocity, this.legalSpeed(actor));
+    actor.velocity = capMotionVelocity(actor.velocity, this.legalSpeed(actor, now));
     this.sessions.set(actor.id, session);
     this.tokens.set(session.token, session);
     this.sockets.set(socket, session);
@@ -219,7 +230,7 @@ export class PlayerMotionService {
     session.anchor = { ...session.actor.position };
     session.anchorAt = now;
     session.poseAt = now;
-    session.poseCredit = this.legalSpeed(session.actor) * PLAYER_MOTION.poseLeadFrames;
+    session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
     session.actor.thrusting = false;
     this.publish(session);
   }
@@ -232,9 +243,10 @@ export class PlayerMotionService {
       return;
     }
     session.wasAlive = this.alive(session.actor);
+    delete session.knockback;
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
-      this.legalSpeed(session.actor)
+      this.legalSpeed(session.actor, now)
     );
     this.clearHarpoon(session.actor);
     this.handoff(session, now);
@@ -294,7 +306,7 @@ export class PlayerMotionService {
     ) {
       return { ok: false, error: 'Invalid or stale enhanced movement pose' };
     }
-    const speed = this.legalSpeed(session.actor);
+    const speed = this.legalSpeed(session.actor, now);
     const elapsedFrames = ((now - session.poseAt) * GAME.FPS) / 1000;
     const credit = Math.min(
       speed * PLAYER_MOTION.poseLeadFrames,
@@ -332,6 +344,27 @@ export class PlayerMotionService {
     return { ok: true };
   }
 
+  /** Publish a server impulse as a new epoch so in-flight client poses cannot erase it. */
+  public applyExternalImpulse(actorId: string, now: number): void {
+    this.assertTime(now);
+    const session = this.sessions.get(actorId);
+    if (!session || !this.alive(session.actor)) {
+      return;
+    }
+    const speed = Math.hypot(session.actor.velocity.x, session.actor.velocity.y);
+    const normal = getShipKit(session.actor.kitId).maxVelocity;
+    session.knockback = { speed, at: now };
+    session.epoch += 1;
+    session.mode = 'free';
+    session.ack = 0;
+    session.poseSequence = -1;
+    session.anchor = undefined;
+    session.poseAt = now;
+    session.anchorAt = now;
+    session.poseCredit = Math.max(normal, speed) * PLAYER_MOTION.poseLeadFrames;
+    this.publish(session);
+  }
+
   /** Keep test-only fixture placement coherent with enhanced motion ownership. */
   public placeActorForTesting(actorId: string, position: Position, now: number): boolean {
     this.assertTime(now);
@@ -350,7 +383,7 @@ export class PlayerMotionService {
     session.anchor = undefined;
     session.poseAt = now;
     session.anchorAt = now;
-    session.poseCredit = this.legalSpeed(session.actor) * PLAYER_MOTION.poseLeadFrames;
+    session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
     session.actor.position = { ...position };
     session.actor.velocity = { x: 0, y: 0 };
     session.actor.thrusting = false;

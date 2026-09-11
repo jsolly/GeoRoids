@@ -29,10 +29,11 @@ cream squares and diamonds mark wreckage and shards, green crosses mark fuel,
 yellow slashed diamonds mark laser cores, purple crosses mark satellites, and
 amber circles and diamonds mark loose and orbiting pickups. Ship headings and
 faction marks keep pilots identifiable above the world marks. Kill and pickup
-messages appear in the center for 120 frames, or 2 seconds. A health capsule appears
-above a damaged ship; use its remaining fill to judge hull health. Your own
-hull is mint, other human pilots are sky blue, and bots are orange. Faction
-marks identify allies separately from those colors.
+messages appear in the center for 120 frames, or 2 seconds. A health capsule
+appears above a damaged ship; use its remaining fill to judge hull health.
+Hull, name, and minimap colors indicate faction: Ion is blue and Ember is
+orange, including your own ship. Bot names include "(bot)"; faction marks also
+distinguish the sides.
 
 ## Display refresh rate
 
@@ -55,5 +56,4 @@ The game automatically tries to reconnect after a lost connection. During an
 interruption, the local view may lag behind the shared world; wait for the
 connection to recover before relying on a pickup or hit result. If joining
 fails or reconnect attempts are exhausted, the game returns to the title
-screen. Select Enter Game to try again. A full reload can start a new session,
-so it is not a way to preserve a life.
+screen. Select Enter Game to try again. A full reload can start a new session.

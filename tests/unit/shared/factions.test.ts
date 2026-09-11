@@ -9,13 +9,10 @@ import {
   pickBalancedFaction,
   pickBalancedFactionFromShips,
 } from '../../../shared/factions';
-import { PALETTE } from '../../../src/constants';
 
-test('side colors are muted mark hexes, not ownership mint or amber', () => {
-  expect(FACTION_COLORS.ion).toBe('#A8A0C8');
-  expect(FACTION_COLORS.ember).toBe('#D4B896');
-  expect(FACTION_COLORS.ion).not.toBe(PALETTE.LOCAL);
-  expect(FACTION_COLORS.ember).not.toBe(PALETTE.BOT);
+test('side colors are blue Ion and orange Ember', () => {
+  expect(FACTION_COLORS.ion).toBe('#7DD3FC');
+  expect(FACTION_COLORS.ember).toBe('#FB923C');
 });
 
 test('auto-balance fills the smaller faction and ties go to ion', () => {

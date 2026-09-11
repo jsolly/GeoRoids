@@ -7,9 +7,14 @@ import {
   HUMAN_SHOOT_POSE_ALLOWANCE_MS,
 } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
+import { radiusFromMass } from '../../../shared/shipGrowth';
 import { GAME, LASER, SHIP } from '../../../src/constants';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
+import {
+  createSkirmisherRingShots,
+  SKIRMISHER_RING_COUNT,
+} from '../../../src/entities/ship/skirmisherRing';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
@@ -89,17 +94,17 @@ describe('server-authoritative human shooting', () => {
     expect(snapshotIndex).toBeGreaterThan(acknowledgementIndex);
   });
 
-  test('accepted burst shots acknowledge their distinct authoritative projectile IDs', () => {
-    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'burst-1');
-    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'burst-2');
-    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'burst-3');
+  test('accepted shots acknowledge their distinct authoritative projectile IDs', () => {
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'shot-1');
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'shot-2');
+    shoot({ x: 20, y: 0 }, { x: LASER.SPEED / GAME.FPS, y: 0 }, 'shot-3');
 
     const acknowledgements = socket.received('shotAcknowledged');
     expect(acknowledgements).toHaveLength(3);
     expect(acknowledgements.map((message) => message.data)).toEqual([
-      { requestId: 'burst-1', projectileId: engine.getServerLasers()[0]?.id },
-      { requestId: 'burst-2', projectileId: engine.getServerLasers()[1]?.id },
-      { requestId: 'burst-3', projectileId: engine.getServerLasers()[2]?.id },
+      { requestId: 'shot-1', projectileId: engine.getServerLasers()[0]?.id },
+      { requestId: 'shot-2', projectileId: engine.getServerLasers()[1]?.id },
+      { requestId: 'shot-3', projectileId: engine.getServerLasers()[2]?.id },
     ]);
     expect(new Set(engine.getServerLasers().map((laser) => laser.id)).size).toBe(3);
   });
@@ -127,6 +132,12 @@ describe('server-authoritative human shooting', () => {
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
+  test('an unpulsed pilot cannot borrow Quake speed or distant muzzle allowance', () => {
+    shoot({ x: 20, y: 0 }, { x: 37, y: 0 });
+    shoot({ x: 400, y: 0 });
+    expect(engine.getServerLasers()).toHaveLength(0);
+  });
+
   test('a legitimate muzzle from a 250 ms delayed pose is accepted with inherited ship speed', () => {
     const player = engine.getPlayer('pilot');
     assert.ok(player, 'delayed pose pilot');
@@ -141,7 +152,7 @@ describe('server-authoritative human shooting', () => {
     expect(engine.getServerLasers()).toHaveLength(1);
   });
 
-  test('normal cadence and bunched skirmisher E rounds work but unbounded bursts do not', () => {
+  test('normal Skirmisher firing stays bounded by the regular shot cadence', () => {
     const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     const player = engine.getPlayer('pilot');
     assert.ok(player, 'skirmisher pilot');
@@ -154,6 +165,37 @@ describe('server-authoritative human shooting', () => {
     clock.mockReturnValue(1000 + getShipKit('skirmisher').shotCooldown);
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS + 1);
+  });
+
+  test('Skirmisher E creates one authoritative projectile for every ring heading', () => {
+    const pilot = engine.getPlayer('pilot');
+    assert.ok(pilot, 'skirmisher pilot');
+    pilot.kitId = 'skirmisher';
+    pilot.position = { x: 140, y: -90 };
+    pilot.angle = Math.PI / 5;
+    pilot.velocity = { x: 1.5, y: -0.75 };
+
+    expect(engine.useAbility('pilot', 'skirmisher')).toBe(true);
+    const actual = engine.getServerLasers();
+    const expected = createSkirmisherRingShots(
+      pilot.position,
+      pilot.angle,
+      radiusFromMass(pilot.mass),
+      pilot.velocity
+    );
+
+    expect(actual).toHaveLength(SKIRMISHER_RING_COUNT);
+    expect(new Set(actual.map((laser) => laser.velocity.x.toFixed(6))).size).toBeGreaterThan(1);
+    for (const [index, laser] of actual.entries()) {
+      const shot = expected[index];
+      expect(shot).toBeDefined();
+      if (shot) {
+        expect(laser.position.x).toBeCloseTo(shot.position.x, 8);
+        expect(laser.position.y).toBeCloseTo(shot.position.y, 8);
+        expect(laser.velocity.x).toBeCloseTo(shot.velocity.x, 8);
+        expect(laser.velocity.y).toBeCloseTo(shot.velocity.y, 8);
+      }
+    }
   });
 
   test('counter-thrust stationary shots have a finite server lifetime', () => {

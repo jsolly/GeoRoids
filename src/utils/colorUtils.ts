@@ -1,16 +1,9 @@
+import { getSideColor } from '../../shared/factions';
+import type { SoftFactionId } from '../../shared-types';
 import { PALETTE, TITLE } from '../constants';
 
-type FactionType = 'local' | 'remote' | 'bot';
-
-export function getFactionColor(type: FactionType): string {
-  switch (type) {
-    case 'local':
-      return PALETTE.LOCAL;
-    case 'remote':
-      return PALETTE.REMOTE;
-    case 'bot':
-      return PALETTE.BOT;
-  }
+export function getFactionColor(factionId: SoftFactionId | undefined): string {
+  return factionId ? getSideColor(factionId) : PALETTE.HUD_MUTED;
 }
 
 export function getLaserColor(isLocal: boolean): string {

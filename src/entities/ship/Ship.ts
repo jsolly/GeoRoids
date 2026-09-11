@@ -6,7 +6,8 @@ import {
 import { createFuelTank } from '../../../shared/fuel';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
-  AsteroidMotionState,
+  LaserUpgrade,
+  PlayerMotionState,
   Position,
   ShipKitId,
   SoftFactionId,
@@ -25,23 +26,17 @@ import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileFi
 import type { Laser } from '../laser/Laser';
 import { createLaser, createLaserAtAngle } from '../laser/laserUtils';
 import { getHarpoonFieldCanvas, getHarpoonFieldScale } from './harpoonField';
+import { startQuakePulse } from './quakePulseRenderer';
 import {
   type AbilityWorld,
   activateAbilityOnHost,
   canActivateAbility,
+  clearShieldProjection,
   tickAbilityHost,
 } from './shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
 
-import {
-  activateShield,
-  clearShield,
-  deactivateShield,
-  isShieldBlockingLasers,
-  noteReadableShieldLaserHit,
-  noteShieldLaserHit,
-  updateShield,
-} from './shipShield';
+import { activateShield, clearShield, deactivateShield, updateShield } from './shipShield';
 import {
   applyShipSpawnProtection,
   applyThrustOrFriction,
@@ -64,7 +59,8 @@ class Ship {
   canShoot = true;
   /** Constrained/released/handoff transforms are advanced by the negotiated predictor. */
   serverOwnsMotion = false;
-  asteroidMotion?: AsteroidMotionState;
+  playerMotion?: PlayerMotionState;
+  laserUpgrade?: LaserUpgrade;
 
   exploding = false;
   lasers: Laser[] = [];
@@ -99,6 +95,8 @@ class Ship {
   abilityCooldownFrames: number = 0;
   abilityActiveFrames: number = 0;
   shieldTimer: number = 0;
+  shieldTargetId?: string;
+  shieldSourceId?: string;
   harpoonTimer: number = 0;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
@@ -190,6 +188,7 @@ class Ship {
     this.thrusting = false;
     this.angularVelocity = 0;
     clearShield(this);
+    clearShieldProjection(this);
     playExplosionSound(this.position);
 
     // Dispatch event to notify that ship has exploded with cause information
@@ -275,6 +274,7 @@ class Ship {
     const result = activateAbilityOnHost(this, world);
     if (result.activated && result.abilityId === 'shockPulse') {
       this.lastLocalFuelWriteMs = Date.now();
+      startQuakePulse(this, { ...this.position });
     }
     if (result.abilityId === 'burstFire') {
       this.fireBurst(kit.burstCount, 0.12);
@@ -349,7 +349,7 @@ class Ship {
       this.sendShieldEvent(false);
       return true;
     }
-    if (!activateShield(this, this.exploding)) {
+    if (!activateShield(this, this.exploding, this.kitId)) {
       return false;
     }
     this.sendShieldEvent(true);
@@ -377,17 +377,6 @@ class Ship {
 
   takeDamage(amount: number, cause?: string, killerName?: string): void {
     if (this.exploding) {
-      return;
-    }
-    if (this.shieldTimer > 0) {
-      if (cause === 'laser') {
-        noteReadableShieldLaserHit(this);
-      }
-      return;
-    }
-
-    if (cause === 'laser' && isShieldBlockingLasers(this)) {
-      noteShieldLaserHit(this);
       return;
     }
 

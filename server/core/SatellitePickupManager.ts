@@ -7,6 +7,7 @@ import {
   attachOrbitPosition,
   clampToRadius,
   orbitOffset,
+  orbitRadiusForOwner,
   spawnRingPosition,
   velocityFromDelta,
 } from '../../src/entities/satellitePickup/satellitePickupMath';
@@ -17,6 +18,7 @@ const PICKUP_NAMES = ['Echo', 'Relay'] as const;
 interface PickupOwnerPose {
   id: string;
   position: Position;
+  radius: number;
   health: number;
   exploding: boolean;
 }
@@ -26,6 +28,7 @@ interface SatellitePickupInternal extends SatellitePickupData {
   orbitCenter: Position;
   orbitPhase: number;
   driftAngle: number;
+  respawnTimer: number;
 }
 
 export class SatellitePickupManager {
@@ -71,20 +74,53 @@ export class SatellitePickupManager {
     return created;
   }
 
+  /** Attach a loose pickup to one authoritative living human. */
   public collect(
     pickupId: string,
-    ownerId: string,
-    orbitingAlready: number
+    owner: PickupOwnerPose,
+    orbitPhase: number
   ): SatellitePickupData | null {
     const pickup = this.pickups.get(pickupId);
-    if (pickup?.state !== 'loose') {
+    if (pickup?.state !== 'loose' || pickup.health <= 0) {
       return null;
     }
 
     pickup.state = 'orbiting';
-    pickup.ownerId = ownerId;
-    pickup.shieldFramesRemaining = SATELLITE_PICKUP.SHIELD_FRAMES;
-    pickup.orbitPhase = orbitingAlready * Math.PI;
+    pickup.ownerId = owner.id;
+    pickup.orbitPhase = orbitPhase;
+    pickup.orbitCenter = { ...owner.position };
+    const prev = { ...pickup.position };
+    pickup.position = attachOrbitPosition(
+      owner.position,
+      pickup.orbitPhase,
+      orbitRadiusForOwner(owner.radius, pickup.radius)
+    );
+    pickup.velocity = velocityFromDelta(prev, pickup.position);
+    pickup.angle = pickup.orbitPhase;
+    return this.toPublic(pickup);
+  }
+
+  /** Apply one physical hit to a live pickup. */
+  public damage(pickupId: string, damage: number): SatellitePickupData | null {
+    const pickup = this.pickups.get(pickupId);
+    if (
+      !pickup ||
+      pickup.state === 'broken' ||
+      pickup.health <= 0 ||
+      !Number.isFinite(damage) ||
+      damage <= 0
+    ) {
+      return null;
+    }
+
+    pickup.health = Math.max(0, pickup.health - damage);
+    if (pickup.health <= 0) {
+      pickup.state = 'broken';
+      pickup.ownerId = null;
+      pickup.respawnTimer = SATELLITE_PICKUP.RESPAWN_FRAMES;
+      pickup.orbitCenter = { ...pickup.position };
+      pickup.velocity = { x: 0, y: 0 };
+    }
     return this.toPublic(pickup);
   }
 
@@ -96,6 +132,14 @@ export class SatellitePickupManager {
       }
     }
     return count;
+  }
+
+  /** Place a second pickup opposite the owner's current orbiting pickup. */
+  public nextOrbitPhaseFor(ownerId: string): number {
+    const existing = Array.from(this.pickups.values())
+      .filter((pickup) => pickup.state === 'orbiting' && pickup.ownerId === ownerId)
+      .sort((a, b) => a.id.localeCompare(b.id))[0];
+    return existing ? existing.orbitPhase + Math.PI : 0;
   }
 
   public releaseOwner(ownerId: string): void {
@@ -111,6 +155,8 @@ export class SatellitePickupManager {
     for (const pickup of this.pickups.values()) {
       if (pickup.state === 'orbiting') {
         this.updateOrbiting(pickup, byId.get(pickup.ownerId ?? ''));
+      } else if (pickup.state === 'broken') {
+        this.updateBroken(pickup);
       } else if (!DEBUG.ENABLED || DEBUG.SATELLITE_PICKUP.MOVEMENT) {
         this.updateLoose(pickup);
       }
@@ -131,13 +177,16 @@ export class SatellitePickupManager {
     pickup.position = attachOrbitPosition(
       owner.position,
       pickup.orbitPhase,
-      SATELLITE_PICKUP.ORBIT_RADIUS
+      orbitRadiusForOwner(owner.radius, pickup.radius)
     );
     pickup.velocity = velocityFromDelta(prev, pickup.position);
+    pickup.orbitCenter = { ...owner.position };
     pickup.angle = pickup.orbitPhase;
-    pickup.shieldFramesRemaining -= 1;
+  }
 
-    if (pickup.shieldFramesRemaining <= 0) {
+  private updateBroken(pickup: SatellitePickupInternal): void {
+    pickup.respawnTimer = Math.max(0, pickup.respawnTimer - 1);
+    if (pickup.respawnTimer === 0) {
       this.respawnLoose(pickup);
     }
   }
@@ -168,9 +217,9 @@ export class SatellitePickupManager {
   private makeLooseAtCurrentPose(pickup: SatellitePickupInternal): void {
     pickup.state = 'loose';
     pickup.ownerId = null;
-    pickup.shieldFramesRemaining = 0;
     pickup.orbitCenter = { ...pickup.position };
     pickup.velocity = { x: 0, y: 0 };
+    pickup.respawnTimer = 0;
   }
 
   private respawnLoose(pickup: SatellitePickupInternal): void {
@@ -214,11 +263,13 @@ export class SatellitePickupManager {
       color: PALETTE.SATELLITE_PICKUP,
       state: 'loose',
       ownerId: null,
-      shieldFramesRemaining: 0,
+      health: SATELLITE_PICKUP.HEALTH,
+      maxHealth: SATELLITE_PICKUP.HEALTH,
       orbitCenter,
       orbitPhase,
       driftAngle: this.rng.random() * Math.PI * 2,
       rosterIndex: index,
+      respawnTimer: 0,
     };
   }
 
@@ -235,7 +286,8 @@ export class SatellitePickupManager {
       color: pickup.color,
       state: pickup.state,
       ownerId: pickup.ownerId,
-      shieldFramesRemaining: pickup.shieldFramesRemaining,
+      health: pickup.health,
+      maxHealth: pickup.maxHealth,
     };
   }
 }

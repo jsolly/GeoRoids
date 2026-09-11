@@ -1,3 +1,4 @@
+import type { ShipKitId } from '../../../shared-types';
 import { GAME, SHIELD } from '../../constants';
 
 export type CombatDamageSource = 'laser' | 'collision';
@@ -18,8 +19,10 @@ export function createShieldState(): ShieldState {
   };
 }
 
-export function shieldDurationFrames(): number {
-  return Math.ceil(SHIELD.DURATION_SECONDS * GAME.FPS);
+export function shieldDurationFrames(kitId?: ShipKitId): number {
+  const durationSeconds =
+    kitId === 'warden' ? SHIELD.WARDEN_DURATION_SECONDS : SHIELD.DURATION_SECONDS;
+  return Math.ceil(durationSeconds * GAME.FPS);
 }
 
 export function shieldCooldownFrames(): number {
@@ -58,12 +61,12 @@ export function canActivateShield(state: ShieldState, exploding = false): boolea
   return !exploding && !state.shieldActive && state.shieldCooldown <= 0;
 }
 
-export function activateShield(state: ShieldState, exploding = false): boolean {
+export function activateShield(state: ShieldState, exploding = false, kitId?: ShipKitId): boolean {
   if (!canActivateShield(state, exploding)) {
     return false;
   }
   state.shieldActive = true;
-  state.shieldTime = shieldDurationFrames();
+  state.shieldTime = shieldDurationFrames(kitId);
   return true;
 }
 
@@ -76,9 +79,14 @@ export function deactivateShield(state: ShieldState): void {
   state.shieldCooldown = shieldCooldownFrames();
 }
 
-export function requestShield(state: ShieldState, active: boolean, exploding = false): boolean {
+export function requestShield(
+  state: ShieldState,
+  active: boolean,
+  exploding = false,
+  kitId?: ShipKitId
+): boolean {
   if (active) {
-    return activateShield(state, exploding);
+    return activateShield(state, exploding, kitId);
   }
   if (!state.shieldActive) {
     return false;
@@ -110,10 +118,6 @@ export function isShieldBlockingLasers(state: ShieldState): boolean {
 /** One visual predicate for the F bubble and Warden's independent E timer. */
 export function isReadableShieldUp(state: ShieldState & { shieldTimer?: number }): boolean {
   return isShieldBlockingLasers(state) || (state.shieldTimer ?? 0) > 0;
-}
-
-export function shouldBlockDamage(state: ShieldState, source: CombatDamageSource): boolean {
-  return source === 'laser' && isShieldBlockingLasers(state);
 }
 
 function isEnvironmentalAttacker(attackerId: string): boolean {
@@ -150,8 +154,11 @@ export function clearShield(state: ShieldState): void {
   state.shieldFlashTime = 0;
 }
 
-export function laserCollisionRadius(shipRadius: number, state: ShieldState): number {
-  if (isShieldBlockingLasers(state)) {
+export function laserCollisionRadius(
+  shipRadius: number,
+  state: ShieldState & { shieldTimer?: number }
+): number {
+  if (isReadableShieldUp(state)) {
     return shipRadius * SHIELD.RADIUS_RATIO;
   }
   return shipRadius;
@@ -162,7 +169,12 @@ export function laserCollisionRadius(shipRadius: number, state: ShieldState): nu
  * `rng` must return [0, 1); inject a stub in tests.
  */
 export function maybeActivateBotShield(
-  state: ShieldState & { health: number; maxHealth: number; exploding: boolean },
+  state: ShieldState & {
+    health: number;
+    maxHealth: number;
+    exploding: boolean;
+    kitId?: ShipKitId;
+  },
   rng: () => number
 ): boolean {
   if (state.exploding || state.health <= 0) {
@@ -174,5 +186,5 @@ export function maybeActivateBotShield(
   if (rng() >= SHIELD.BOT_ACTIVATE_CHANCE) {
     return false;
   }
-  return activateShield(state, state.exploding);
+  return activateShield(state, state.exploding, state.kitId);
 }

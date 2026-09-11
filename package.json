@@ -68,6 +68,7 @@
     "@types/node": "^26.5.0",
     "@types/ws": "^8.18.1",
     "@vercel/functions": "^3.9.5",
+    "echarts": "^6.1.0",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "uuid": "^14.0.2",

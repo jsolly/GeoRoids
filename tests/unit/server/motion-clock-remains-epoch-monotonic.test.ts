@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 import { GameEngine, HUMAN_LASER_MAX_LIFETIME_MS } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
-import { ASTEROID_MOTION } from '../../../shared/asteroidMotion';
+import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 
@@ -43,15 +43,15 @@ describe('server motion clock', () => {
       'ion'
     );
     player.asteroidInteractions = 1;
-    const registered = engine.asteroidMotion.register(player, socket, 1, Date.now());
+    const registered = engine.playerMotion.register(player, socket, 1, Date.now());
     expect(registered.ok).toBe(true);
 
     engine.advanceOneFrame();
     expect(engine.transportClosed(socket)).toBe(true);
 
     const beforeElapsed = engine.getServerTime();
-    advanceElapsed(ASTEROID_MOTION.reconnectGraceMs + 20);
-    expect(engine.getServerTime()).toBe(beforeElapsed + ASTEROID_MOTION.reconnectGraceMs + 20);
+    advanceElapsed(PLAYER_MOTION.reconnectGraceMs + 20);
+    expect(engine.getServerTime()).toBe(beforeElapsed + PLAYER_MOTION.reconnectGraceMs + 20);
     vi.setSystemTime(9_999);
     expect(() => engine.advanceOneFrame()).not.toThrow();
     expect(engine.getPlayer('pilot')).toBeUndefined();

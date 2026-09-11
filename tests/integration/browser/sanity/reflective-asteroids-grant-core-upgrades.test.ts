@@ -4,14 +4,13 @@ import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 import { GAME, LASER, SHIP } from '../../../../src/constants';
 import type { AuthoritativeProjectileField } from '../../../../src/entities/laser/AuthoritativeProjectileField';
+import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { GameInteractions } from '../../utils/game-interactions';
 import {
   captureConsole,
   safestReflectiveCluster,
-  selectAsteroidWithKeyboard,
-  waitForEnhancedTargets,
-} from '../../utils/asteroid-tools-driver';
-import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
-import { GameInteractions } from '../../utils/game-interactions';
+  waitForAsteroidField,
+} from '../../utils/reflective-asteroids-driver';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
@@ -32,16 +31,11 @@ async function defend(page: Page): Promise<void> {
       throw new Error('Pilot died during reflection flight');
     }
     return {
-      cooldown: ship.abilityCooldownFrames,
       shield: ship.shieldActive,
       shieldCooldown: ship.shieldCooldown,
     };
   });
-  // Warden E can refresh after its real cooldown, before the old absorb timer
-  // expires. F independently blocks lasers. Neither path writes health/timers.
-  if (state.cooldown <= 0) {
-    await page.keyboard.press('e');
-  }
+  // Use the real F shield during flight; no fixture writes health or timers.
   if (!state.shield && state.shieldCooldown <= 0) {
     await page.keyboard.press('f');
   }
@@ -233,7 +227,7 @@ test(
     const consoleState = captureConsole(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'warden' });
-    await waitForEnhancedTargets(page);
+    await waitForAsteroidField(page);
     await game.waitForBots(2);
     await defend(page);
     const reflective = await page.evaluate(() => {
@@ -241,16 +235,19 @@ test(
       if (!gc) {
         throw new Error('Game controller unavailable');
       }
-      const state = gc.getAsteroidToolsController().getState();
       const ship = gc.getCurrPlayer()?.ship;
       if (!ship) {
         throw new Error('Local ship unavailable');
       }
       const rocks = gc.getCurrRoidBelt().getRoids();
-      const targets = state.targets.filter((target: { id: string }) => {
-        const rock = rocks.find((candidate: { id: string }) => candidate.id === target.id);
-        return rock && rock.health === rock.maxHealth;
-      });
+      const targets = rocks
+        .filter((rock) => rock.health === rock.maxHealth)
+        .map((rock) => ({
+          id: rock.id,
+          position: rock.position,
+          size: rock.r,
+          ...(rock.phenomenon ? { phenomenon: rock.phenomenon } : {}),
+        }));
       const hazards = gc
         .getNetworkManager()
         .getAllPlayers()
@@ -315,22 +312,6 @@ test(
       await field.dispose();
     }
     try {
-      await selectAsteroidWithKeyboard(page, primary.id);
-      await page.evaluate((point) => {
-        const ship = window.gameController?.getCurrPlayer()?.ship;
-        if (!ship) {
-          throw new Error('Local ship unavailable');
-        }
-        ship.angle = Math.atan2(-(point.y - ship.position.y), point.x - ship.position.x);
-      }, primary.position);
-      await expect
-        .poll(() => page.locator('#flight-preview').isVisible(), { timeout: 5000 })
-        .toBe(true);
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath('reflective-aim-preview-desktop.png'),
-      });
-      await page.keyboard.press('Escape');
-
       for (let shot = 0; shot < 16; shot++) {
         const target = await page.evaluate((id) => {
           const gc = window.gameController;
@@ -403,7 +384,7 @@ test(
         .poll(
           () =>
             page.evaluate(() => {
-              const pilot = window.gameController?.getAsteroidToolsController().getState().pilot;
+              const pilot = window.gameController?.getCurrPlayer()?.ship;
               if (!pilot) {
                 throw new Error('Upgrade pilot unavailable');
               }
@@ -436,7 +417,7 @@ test(
           .poll(
             () =>
               page.evaluate(() => {
-                const pilot = window.gameController?.getAsteroidToolsController().getState().pilot;
+                const pilot = window.gameController?.getCurrPlayer()?.ship;
                 if (!pilot) {
                   throw new Error('Upgrade pilot unavailable');
                 }
@@ -479,7 +460,7 @@ test(
             health: ship.health,
             shieldTimer: ship.shieldTimer,
           },
-          serverPilot: gc.getAsteroidToolsController().getState().pilot,
+          laserUpgrade: ship.laserUpgrade,
           loot: gc.getLoot(),
           target: gc
             .getCurrRoidBelt()

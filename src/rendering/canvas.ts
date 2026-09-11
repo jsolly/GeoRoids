@@ -10,6 +10,8 @@ import { SatelliteManager } from '../entities/satellite/SatelliteManager';
 import { drawSatellites } from '../entities/satellite/satelliteRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
+import { drawQuakePulseRelative } from '../entities/ship/quakePulseRenderer';
+import { drawShieldProjectionLink } from '../entities/ship/shieldProjectionRenderer';
 import {
   drawHaulerHarpoonRelative,
   drawLasers,
@@ -340,6 +342,26 @@ class CanvasManager {
       const isLocal = player.id === localId;
       const ship = isLocal ? currShip : player.ship;
       drawHaulerHarpoonRelative(ship, currShip.position);
+      drawQuakePulseRelative(ship, currShip.position);
+      if (
+        ship.kitId === 'warden' &&
+        ship.abilityActiveFrames > 0 &&
+        ship.shieldTargetId &&
+        ship.health > 0 &&
+        !ship.exploding
+      ) {
+        const recipient = allPlayers.find((pilot) => pilot.id === ship.shieldTargetId);
+        const recipientShip = recipient?.id === localId ? currShip : recipient?.ship;
+        if (
+          recipientShip &&
+          recipientShip.shieldTimer > 0 &&
+          recipientShip.shieldSourceId === player.id &&
+          recipientShip.health > 0 &&
+          !recipientShip.exploding
+        ) {
+          drawShieldProjectionLink(ship.position, recipientShip.position, currShip.position);
+        }
+      }
     }
 
     for (const player of allPlayers) {

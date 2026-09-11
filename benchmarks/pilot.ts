@@ -151,7 +151,7 @@ export class Pilot {
           'Authoritative state lost pilot'
         );
         const ownState = this.state.entities.find((entity) => entity.id === this.id);
-        const motion = ownState?.asteroidMotion;
+        const motion = ownState?.playerMotion;
         if (
           this.options.measuring() &&
           this.measuredMotion &&
@@ -252,20 +252,9 @@ export class Pilot {
     }
     this.sequence++;
     const angle = Math.atan2(Math.sin(tick * 0.04), Math.cos(tick * 0.04));
-    const motion = entity.asteroidMotion;
+    const motion = entity.playerMotion;
     const alive = !entity.exploding && entity.health > 0;
-    if (alive && motion && ['latched', 'released'].includes(motion.mode)) {
-      this.send({
-        type: 'asteroidInput',
-        data: {
-          epoch: motion.epoch,
-          sequence: this.sequence,
-          thrust: true,
-          turn: tick % 80 < 40 ? 1 : -1,
-          aimAngle: angle,
-        },
-      });
-    } else if (alive) {
+    if (alive) {
       this.send({
         type: 'update',
         id: this.id,

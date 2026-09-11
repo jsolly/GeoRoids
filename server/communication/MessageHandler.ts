@@ -2,11 +2,11 @@ import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import type { PlayerShotAcknowledgement } from '../../shared-types';
-import { DAMAGE, SATELLITE_PICKUP } from '../../src/constants';
+import { DAMAGE } from '../../src/constants';
 import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
-import type { MotionOutcome } from '../core/AsteroidMotionService';
 import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
+import type { MotionOutcome } from '../core/PlayerMotionService';
 import { SERVER_RELEASE_ID } from '../release';
 import { ClientLogger } from '../services/ClientLogger';
 import type { GameStateBroadcaster } from '../services/GameStateBroadcaster';
@@ -60,61 +60,6 @@ export class MessageHandler {
           break;
         }
 
-        case 'asteroidTool': {
-          const receivedAt = Date.now();
-          const motionNow = this.gameEngine.getServerTime();
-          const outcome = this.gameEngine.asteroidMotion.latch(
-            ws,
-            command.action,
-            this.gameEngine.getAllAsteroids(),
-            motionNow
-          );
-          this.logMotionRejection(
-            ws,
-            'asteroidTool',
-            outcome,
-            receivedAt,
-            undefined,
-            command.action.sequence,
-            motionNow
-          );
-          if (outcome.ok) {
-            this.logMotionTransition(ws, 'motion_latched', receivedAt, command.action.sequence);
-            this.broadcaster.broadcastGameState();
-          }
-          break;
-        }
-
-        case 'asteroidInput': {
-          const receivedAt = Date.now();
-          const motionNow = this.gameEngine.getServerTime();
-          const outcome = this.gameEngine.asteroidMotion.input(
-            ws,
-            command.input,
-            this.gameEngine.getAllAsteroids(),
-            motionNow
-          );
-          this.logMotionRejection(
-            ws,
-            'asteroidInput',
-            outcome,
-            receivedAt,
-            command.input.epoch,
-            command.input.sequence,
-            motionNow
-          );
-          if (outcome.ok && command.input.action) {
-            this.logMotionTransition(
-              ws,
-              'motion_action_accepted',
-              receivedAt,
-              command.input.sequence,
-              command.input.action
-            );
-          }
-          break;
-        }
-
         case 'snapshotResync':
           if (this.gameEngine.getPlayerBySocket(ws)?.type === 'human') {
             this.logSnapshotResync(ws, Date.now(), this.gameEngine.getServerTime());
@@ -144,10 +89,6 @@ export class MessageHandler {
 
         case 'collisionDamage':
           this.handleCollisionDamage(ws, command);
-          break;
-
-        case 'satellitePickupCollected':
-          this.handleSatellitePickupCollected(ws, command);
           break;
 
         case 'initAsteroids':
@@ -207,7 +148,7 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
         return;
       }
-      const resumed = this.gameEngine.asteroidMotion.resume(
+      const resumed = this.gameEngine.playerMotion.resume(
         command.resumeToken ?? '',
         ws,
         this.gameEngine.getServerTime()
@@ -260,7 +201,7 @@ export class MessageHandler {
         command.factionId
       );
       player.asteroidInteractions = 1;
-      const registered = this.gameEngine.asteroidMotion.register(
+      const registered = this.gameEngine.playerMotion.register(
         player,
         ws,
         1,
@@ -308,11 +249,11 @@ export class MessageHandler {
       resumed: resumedSession,
       enhanced: player.asteroidInteractions === 1,
       snapshotVersion,
-      ...(player.asteroidMotion
+      ...(player.playerMotion
         ? {
-            motionEpoch: player.asteroidMotion.epoch,
-            motionAck: player.asteroidMotion.ack,
-            motionMode: player.asteroidMotion.mode,
+            motionEpoch: player.playerMotion.epoch,
+            motionAck: player.playerMotion.ack,
+            motionMode: player.playerMotion.mode,
           }
         : {}),
     });
@@ -355,10 +296,10 @@ export class MessageHandler {
       // Ignore it without changing authoritative state or reporting a false failure.
       return;
     }
-    const beforeMode = socketPlayer.asteroidMotion?.mode;
+    const beforeMode = socketPlayer.playerMotion?.mode;
     const receivedAt = Date.now();
     const motionNow = this.gameEngine.getServerTime();
-    const outcome = this.gameEngine.asteroidMotion.acceptFreePose(
+    const outcome = this.gameEngine.playerMotion.acceptFreePose(
       ws,
       {
         epoch: command.motionEpoch,
@@ -496,37 +437,6 @@ export class MessageHandler {
     this.emitShipDamage(targetPlayerId, 'boundary', DAMAGE.BOUNDARY_COLLISION, before?.health);
   }
 
-  private handleSatellitePickupCollected(
-    ws: WebSocket,
-    command: CommandOf<'satellitePickupCollected'>
-  ): void {
-    const { pickupId, claimedPlayerId } = command;
-
-    const reporterId = this.getReporterId(ws);
-    if (!reporterId || (claimedPlayerId !== undefined && claimedPlayerId !== reporterId)) {
-      return;
-    }
-    const result = this.gameEngine.handleSatellitePickupCollected(pickupId, reporterId);
-    if (!result.success || !result.pickup) {
-      return;
-    }
-
-    const player = this.gameEngine.getPlayer(reporterId);
-    if (!player) {
-      return;
-    }
-    this.broadcaster.broadcastScoreUpdate(reporterId, player.score);
-    this.broadcaster.broadcastSatellitePickupCollected({
-      pickupId: result.pickup.id,
-      playerId: reporterId,
-      playerName: player.name,
-      pickupName: result.pickup.name,
-      scoreBonus: SATELLITE_PICKUP.SCORE_BONUS,
-      shieldFrames: SATELLITE_PICKUP.SHIELD_FRAMES,
-    });
-    this.broadcaster.broadcastGameState();
-  }
-
   private handleUseAbility(ws: WebSocket, command: CommandOf<'useAbility'>): void {
     const playerId = command.id;
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
@@ -547,6 +457,9 @@ export class MessageHandler {
     if (!entity) {
       return;
     }
+    const sentAt = Date.now();
+    const quakePulse =
+      entity.kitId === 'quake' ? { origin: { ...entity.position }, startedAt: sentAt } : undefined;
     this.broadcaster.broadcastToAll({
       type: 'abilityUsed',
       data: {
@@ -560,8 +473,12 @@ export class MessageHandler {
         ...(entity.harpoonLatchPos !== undefined
           ? { harpoonLatchPos: entity.harpoonLatchPos }
           : {}),
+        ...(entity.shieldTargetId !== undefined ? { shieldTargetId: entity.shieldTargetId } : {}),
+        ...(entity.shieldSourceId !== undefined ? { shieldSourceId: entity.shieldSourceId } : {}),
+        abilityActiveFrames: entity.abilityActiveFrames,
+        ...(quakePulse !== undefined ? { quakePulse } : {}),
       },
-      timestamp: Date.now(),
+      timestamp: sentAt,
     });
     this.broadcaster.broadcastGameState();
   }
@@ -654,7 +571,7 @@ export class MessageHandler {
 
   private logMotionRejection(
     ws: WebSocket,
-    commandType: 'asteroidTool' | 'asteroidInput' | 'update',
+    commandType: 'update',
     outcome: MotionOutcome,
     receivedAt: number,
     receivedEpoch?: number,
@@ -670,7 +587,7 @@ export class MessageHandler {
       return;
     }
     const owner = this.gameEngine.getPlayerBySocket(ws);
-    const motion = owner ? this.gameEngine.asteroidMotion.getState(owner.id) : undefined;
+    const motion = owner ? this.gameEngine.playerMotion.getState(owner.id) : undefined;
     logger.warn('STATE', 'motion_command_rejected', {
       releaseId: SERVER_RELEASE_ID,
       playerId: owner?.id,
@@ -707,23 +624,21 @@ export class MessageHandler {
 
   private logMotionTransition(
     ws: WebSocket,
-    event: 'motion_latched' | 'motion_action_accepted' | 'motion_handoff_acknowledged',
+    event: 'motion_handoff_acknowledged',
     observedAt: number,
-    sequence: number,
-    action?: string
+    sequence: number
   ): void {
     const owner = this.gameEngine.getPlayerBySocket(ws);
     if (!owner) {
       return;
     }
-    const motion = this.gameEngine.asteroidMotion.getState(owner.id);
+    const motion = this.gameEngine.playerMotion.getState(owner.id);
     logger.info('STATE', event, {
       releaseId: SERVER_RELEASE_ID,
       playerId: owner.id,
       observedAt,
       gameTime: this.gameEngine.getDiagnostics().gameTime,
       sequence,
-      ...(action ? { action } : {}),
       ...(motion
         ? { motionEpoch: motion.epoch, motionAck: motion.ack, motionMode: motion.mode }
         : {}),

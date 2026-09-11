@@ -8,7 +8,7 @@ import {
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
-import type { AsteroidData } from '../../shared-types';
+import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
@@ -127,6 +127,7 @@ export class GameStateBroadcaster {
     for (const id of this.gameEngine.drainDepartedPlayers()) {
       this.broadcastPlayerLeft(id);
     }
+    this.flushSatellitePickupCollections();
     const gameState = this.gameEngine.getGameState();
     const timestamp = Date.now();
 
@@ -207,11 +208,11 @@ export class GameStateBroadcaster {
               snapshotSequence: sequence,
               snapshotKind: frame.kind,
               ...(frame.kind === 'delta' ? { snapshotBaseline: frame.baseline } : {}),
-              ...(authoritative?.asteroidMotion
+              ...(authoritative?.playerMotion
                 ? {
-                    motionEpoch: authoritative.asteroidMotion.epoch,
-                    motionAck: authoritative.asteroidMotion.ack,
-                    motionMode: authoritative.asteroidMotion.mode,
+                    motionEpoch: authoritative.playerMotion.epoch,
+                    motionAck: authoritative.playerMotion.ack,
+                    motionMode: authoritative.playerMotion.mode,
                   }
                 : {}),
               ...(authoritative
@@ -397,19 +398,22 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastSatellitePickupCollected(data: {
-    pickupId: string;
-    playerId: string;
-    playerName: string;
-    pickupName: 'Echo' | 'Relay';
-    scoreBonus: number;
-    shieldFrames: number;
-  }): void {
+  public broadcastSatellitePickupCollected(data: SatellitePickupCollected): void {
     this.broadcastToAll({
       type: 'satellitePickupCollected',
       data,
       timestamp: Date.now(),
     });
+  }
+
+  private flushSatellitePickupCollections(): void {
+    for (const event of this.gameEngine.drainSatellitePickupCollections()) {
+      this.broadcastScoreUpdate(
+        event.playerId,
+        this.gameEngine.getPlayer(event.playerId)?.score ?? 0
+      );
+      this.broadcastSatellitePickupCollected(event);
+    }
   }
 
   public broadcastAsteroidCreation(asteroids: readonly AsteroidData[]): void {

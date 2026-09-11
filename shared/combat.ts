@@ -59,7 +59,8 @@ export function shipShipTickDamage(): number {
 
 export function findShipAsteroidOverlaps(
   ships: CombatCircle[],
-  asteroids: Array<{ id: string; position: Position; radius: number }>
+  asteroids: Array<{ id: string; position: Position; radius: number }>,
+  shouldSkip?: (shipId: string, asteroidId: string) => boolean
 ): Array<{ shipId: string; asteroidId: string }> {
   const hits: Array<{ shipId: string; asteroidId: string }> = [];
   for (const ship of ships) {
@@ -67,6 +68,9 @@ export function findShipAsteroidOverlaps(
       continue;
     }
     for (const asteroid of asteroids) {
+      if (shouldSkip?.(ship.id, asteroid.id)) {
+        continue;
+      }
       if (circlesOverlap(ship.position, ship.radius, asteroid.position, asteroid.radius)) {
         hits.push({ shipId: ship.id, asteroidId: asteroid.id });
         break;

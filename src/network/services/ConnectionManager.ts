@@ -10,7 +10,6 @@ import {
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
-  AsteroidMotionInput,
   AsteroidTaggedEvent,
   PingMessage,
   PlayerJoin,
@@ -37,6 +36,7 @@ import {
   harpoonTargetIdsMatch,
   setHoldEmptyHarpoonField,
 } from '../../entities/ship/harpoonField';
+import { startQuakePulse } from '../../entities/ship/quakePulseRenderer';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
@@ -46,7 +46,6 @@ import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage, ServerMessage } from '../types';
-import { AsteroidMotionPrediction } from './AsteroidMotionPrediction';
 import {
   applyAsteroidFieldPartition,
   asteroidHasSpawnPose,
@@ -67,6 +66,7 @@ import {
   JOIN_COMPLETION_TIMEOUT_MS,
 } from './connectionHealth';
 import { nextReconnectDelayMs } from './connectionReconnect';
+import { PlayerMotionReconciliation } from './PlayerMotionReconciliation';
 import { PlayerListCache } from './playerListCache';
 import { bindPageHideDisconnect, fillSnapshotEntityIds, isLocalGameEntity } from './playerPresence';
 
@@ -139,8 +139,7 @@ export class ConnectionManager {
   // the prior acknowledgment without reopening compatibility fallback.
   private currentProtocolReady = false;
   private resumeToken?: string;
-  private readonly motionPrediction = new AsteroidMotionPrediction();
-  private motionRocks: AsteroidData[] = [];
+  private readonly motionReconciliation = new PlayerMotionReconciliation();
   private snapshotResyncPending = false;
   private localHarpoonAcknowledged = false;
 
@@ -359,7 +358,7 @@ export class ConnectionManager {
     const wasConnected = this.state.isConnected;
     const serverReleaseId = this.serverReleaseId;
     const lastAcceptedSnapshotSequence = this.lastAcceptedSnapshotSequence;
-    this.motionPrediction.transportClosed();
+    this.motionReconciliation.transportClosed();
     const localShip = PlayerManager.getInstance().getLocalShip();
     if (localShip) {
       localShip.serverOwnsMotion = true;
@@ -436,13 +435,6 @@ export class ConnectionManager {
       this.sendPayload({ type: 'leave', data: {} });
     }
     delete this.resumeToken;
-    this.motionPrediction.reset();
-    const localShip = PlayerManager.getInstance().getLocalShip();
-    if (localShip) {
-      localShip.serverOwnsMotion = false;
-      delete localShip.asteroidMotion;
-    }
-    window.dispatchEvent(new CustomEvent('asteroidToolsSnapshot', { detail: { enabled: false } }));
     this.clearReconnectTimer();
     this.reconnectAttempt = 0;
     this.stopHeartbeat();
@@ -450,6 +442,14 @@ export class ConnectionManager {
     if (socket) {
       this.retireSocket(socket);
     }
+    this.motionReconciliation.reset();
+    const localShip = PlayerManager.getInstance().getLocalShip();
+    if (localShip) {
+      localShip.serverOwnsMotion = false;
+      delete localShip.playerMotion;
+      delete localShip.laserUpgrade;
+    }
+
     this.resetSnapshotSession();
     this.state.isConnected = false;
     this.state.socket = null;
@@ -686,44 +686,16 @@ export class ConnectionManager {
     if (!ship) {
       return;
     }
-    const input = this.motionPrediction.buildInput(ship, Date.now());
-    if (input) {
-      this.sendMessage({ type: 'asteroidInput', data: input });
-    }
-    this.motionPrediction.predictFrame(ship, Date.now(), this.motionRocks);
-    const pose = this.motionPrediction.buildHandoffPose(ship);
+    const pose = this.motionReconciliation.buildHandoffPose(ship);
     if (pose) {
       Object.assign(playerState, pose);
     }
-    const reason = this.motionPrediction.recoveryReason();
-    if (reason && !this.snapshotResyncPending) {
-      logger.warn('NETWORK', reason);
-      this.sendSnapshotResync();
-    }
-    if (!pose && this.motionPrediction.shouldSuppressPose()) {
+    if (!pose && this.motionReconciliation.shouldSuppressPose()) {
       return;
     }
     this.updateEnvelope.data = playerState;
     this.updateEnvelope.timestamp = Date.now();
     this.sendPayload(this.updateEnvelope);
-  }
-
-  dispatchAsteroidMotionAction(
-    action: NonNullable<AsteroidMotionInput['action']>,
-    targetId?: string
-  ): boolean {
-    const ship = PlayerManager.getInstance().getLocalShip();
-    if (!ship || !this.joinAcknowledged) {
-      return false;
-    }
-    const input = this.motionPrediction.buildInput(ship, Date.now(), {
-      action,
-      ...(targetId ? { targetId } : {}),
-    });
-    if (!input) {
-      return false;
-    }
-    return this.sendMessage({ type: 'asteroidInput', data: input });
   }
 
   // Send shoot event to server
@@ -909,7 +881,7 @@ export class ConnectionManager {
         this.localPlayerId = '';
         setClientLogContext({ connectionId: this.connectionId });
         delete this.resumeToken;
-        this.motionPrediction.reset();
+        this.motionReconciliation.reset();
         this.joinAcknowledged = false;
         this.currentProtocolReady = false;
         this.clientId = replaceStoredClientId();
@@ -984,7 +956,12 @@ export class ConnectionManager {
             harpoonTimer?: number;
             harpoonTargetId?: string;
             harpoonLatchPos?: Position;
-          }
+            shieldTargetId?: string;
+            shieldSourceId?: string;
+            abilityActiveFrames?: number;
+            quakePulse?: { origin: Position; startedAt: number };
+          },
+          message.timestamp
         );
         break;
       case 'error':
@@ -1120,11 +1097,11 @@ export class ConnectionManager {
           snapshotKind: metadata.kind,
           ...(metadata.baseline !== undefined ? { snapshotBaseline: metadata.baseline } : {}),
           ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
-          ...(authoritative?.asteroidMotion
+          ...(authoritative?.playerMotion
             ? {
-                motionEpoch: authoritative.asteroidMotion.epoch,
-                motionAck: authoritative.asteroidMotion.ack,
-                motionMode: authoritative.asteroidMotion.mode,
+                motionEpoch: authoritative.playerMotion.epoch,
+                motionAck: authoritative.playerMotion.ack,
+                motionMode: authoritative.playerMotion.mode,
               }
             : {}),
           ...(clientBeforeApply ? { clientBeforeApply } : {}),
@@ -1180,12 +1157,19 @@ export class ConnectionManager {
     }
   }
 
-  private handleAbilityUsed(data: {
-    id?: string;
-    harpoonTimer?: number;
-    harpoonTargetId?: string;
-    harpoonLatchPos?: Position;
-  }): void {
+  private handleAbilityUsed(
+    data: {
+      id?: string;
+      harpoonTimer?: number;
+      harpoonTargetId?: string;
+      harpoonLatchPos?: Position;
+      shieldTargetId?: string;
+      shieldSourceId?: string;
+      abilityActiveFrames?: number;
+      quakePulse?: { origin: Position; startedAt: number };
+    },
+    sentAt: number
+  ): void {
     if (!data.id) {
       return;
     }
@@ -1199,11 +1183,30 @@ export class ConnectionManager {
       this.localHarpoonAcknowledged = true;
     }
     const latch = {
+      ...(data.abilityActiveFrames !== undefined
+        ? { abilityActiveFrames: data.abilityActiveFrames }
+        : {}),
       ...(data.harpoonTimer !== undefined ? { harpoonTimer: data.harpoonTimer } : {}),
       ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
       ...(data.harpoonLatchPos !== undefined ? { harpoonLatchPos: data.harpoonLatchPos } : {}),
+      ...(data.shieldTargetId !== undefined ? { shieldTargetId: data.shieldTargetId } : {}),
+      ...(data.shieldSourceId !== undefined ? { shieldSourceId: data.shieldSourceId } : {}),
     };
     entity.updateFromServer(latch);
+    const pulse = data.quakePulse;
+    if (
+      entity.ship.kitId === 'quake' &&
+      pulse &&
+      Number.isFinite(pulse.startedAt) &&
+      Number.isFinite(pulse.origin?.x) &&
+      Number.isFinite(pulse.origin?.y)
+    ) {
+      const elapsedMs = Number.isFinite(sentAt) ? Math.max(0, sentAt - pulse.startedAt) : 0;
+      startQuakePulse(entity.ship, pulse.origin, elapsedMs, performance.now());
+      if (localPlayer && localPlayer !== entity && localPlayer.id === data.id) {
+        startQuakePulse(localPlayer.ship, pulse.origin, elapsedMs, performance.now());
+      }
+    }
     if (localPlayer && localPlayer !== entity && localPlayer.id === data.id) {
       localPlayer.updateFromServer(latch);
     }
@@ -1277,10 +1280,10 @@ export class ConnectionManager {
         // Apply the parsed entity directly — no per-tick snapshot wrapper.
         // Kit / faction / ability / deathCause / mass / F-key shield stay on the row.
         entityData.spawnProtectionTimer ??= 0;
-        if (entityData.asteroidMotion !== undefined) {
-          entity.ship.asteroidMotion = entityData.asteroidMotion;
+        if (entityData.playerMotion !== undefined) {
+          entity.ship.playerMotion = entityData.playerMotion;
         } else {
-          delete entity.ship.asteroidMotion;
+          delete entity.ship.playerMotion;
         }
         entity.name = entityData.name;
         if (entityData.factionId !== undefined) {
@@ -1335,7 +1338,22 @@ export class ConnectionManager {
             delete entity.ship.harpoonLatchPos;
           }
         }
+        if (entityData.laserUpgrade) {
+          entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
+        } else {
+          delete entity.ship.laserUpgrade;
+        }
         entity.ship.shieldTimer = entityData.shieldTimer ?? 0;
+        if (entityData.shieldTargetId !== undefined) {
+          entity.ship.shieldTargetId = entityData.shieldTargetId;
+        } else {
+          delete entity.ship.shieldTargetId;
+        }
+        if (entityData.shieldSourceId !== undefined) {
+          entity.ship.shieldSourceId = entityData.shieldSourceId;
+        } else {
+          delete entity.ship.shieldSourceId;
+        }
         entity.ship.shieldActive = entityData.shieldActive ?? false;
         entity.ship.shieldTime = entityData.shieldTime ?? 0;
         entity.ship.shieldCooldown = entityData.shieldCooldown ?? 0;
@@ -1345,17 +1363,8 @@ export class ConnectionManager {
         }
         entity.updateFromServer(entityData);
         if (isLocalPlayer) {
-          this.motionPrediction.rebase(entityData, entity.ship, Date.now(), data.asteroids);
-          entity.ship.serverOwnsMotion = this.motionPrediction.shouldSuppressShipMove();
-          window.dispatchEvent(
-            new CustomEvent('asteroidToolsSnapshot', {
-              detail: {
-                entity: entityData,
-                asteroids: data.asteroids,
-                enabled: true,
-              },
-            })
-          );
+          this.motionReconciliation.rebase(entityData, entity.ship, Date.now());
+          entity.ship.serverOwnsMotion = this.motionReconciliation.shouldSuppressShipMove();
         }
 
         if (isLocalPlayer && entity.type === 'local') {
@@ -1385,7 +1394,6 @@ export class ConnectionManager {
     LootField.getInstance().applySnapshot(data.loot);
     SatelliteManager.getInstance().syncFromServer(data.satellites);
     SatellitePickupManager.getInstance().syncFromServer(data.satellitePickups);
-    this.motionRocks = data.asteroids;
     const projectileField = AuthoritativeProjectileField.getInstance();
     projectileField.sync(data.playerProjectiles);
     for (const player of this.allPlayers.values()) {

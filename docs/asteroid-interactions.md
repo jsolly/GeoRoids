@@ -1,24 +1,28 @@
-# Reflective asteroids and Hauler slingshots
+# Reflective asteroids and laser cores
 
-All actions work during flight, with no menu. **T** cycles asteroids nearest-first, **Q** latches the selected rock or releases a latched Hauler, **R** anchors, **X** brakes, and **C** resumes spin. With no selection, Q/R select the nearest rock. **Escape** clears the selection. The passive readout shows the selected rock, shot prediction and remaining laser-core charges.
+Reflective metal clusters are part of the shared asteroid field. Fire normally
+with **Space**; the ordinary controls remain available while a shot is in
+flight. The passive HUD keeps the laser-core charge count visible when a core
+upgrade is active. There is no asteroid selection or tool mode.
 
-On touch, hold one finger on the playfield to steer and thrust toward it. Use a second finger to **tap a rock** to select it and latch, or anchor it as a second rock while latched. Mouse users do the same with the **middle button**; left-click still fires and right-click still thrusts. Drag at least 40 pixels and release to flick: **down releases, left brakes, right spins, up anchors** the rock where the gesture started. Flicks can start on empty playfield when an action needs no new target. Steering and action-button touches remain independent of asteroid gestures, so you can steer while using a tether. Releasing the steering finger stops thrust without triggering a rock action.
-
-**E** and **F** activate the kit ability and shield; their touch buttons do the same. Laser cores equip automatically on pickup and enhance the next six shots. There is no weapon-selection menu.
+While a Hauler's combat harpoon is actively attached to an asteroid, that
+asteroid passes through its Hauler without causing collision damage. Unrelated
+asteroids and other pilots keep the normal collision rules. When the timer or
+attachment ends, the harpooned asteroid collides normally again.
 
 ## Reflective clusters and laser cores
 
-Flat, faceted metal clusters reflect shots from their actual faces. Each bounce increases the shot's energy and charges the rock it hits. A rock breaks when its stored energy fills, or when a shot reaches its energy or bounce limit. The preview includes those limits and the current laser upgrade, so a charged rock can end the preview instead of reflecting it.
+Flat, faceted metal clusters reflect shots from their actual polygon faces. Each
+bounce increases the shot's energy and charges the rock it hits. A rock breaks
+when its stored energy fills, or when a shot reaches its energy, bounce, or
+lifetime limit. Reflection follows the server's authoritative collision result;
+the client does not offer a selection-dependent path preview.
 
-Reflected shots can hurt their shooter and faction mates. Ordinary direct shots still respect friendly fire. A broken reflector leaves one laser core: collect it for 150 points and six stronger shots, usable for 60 seconds. The upgrade expires on death. Shots, damage, charge use and collection belong to the shared world, so reconnecting does not replay rewards.
-
-## Hauler spin and winch controls
-
-As a Hauler, select a physical rock and **Latch** to its surface. Fast spinners carry the ship around the rock. Aim tangentially and thrust to add spin, spending fuel; release to retain a bounded tangential boost. The server keeps control through the boost's decay and then returns the ship to ordinary movement.
-
-While latched, select a second nearby rock and use **Anchor** or **Brake** to couple its momentum through the winch. The second asteroid is the payload. Release leaves it moving with its resulting velocity. Other pilots cannot take over an occupied tether, and these controls cannot attach to faction mates.
-
-The cream cable and amber endpoints show the physical connection. A socket interruption shorter than two seconds preserves the attachment with neutral input; a longer interruption, explicit exit, death or missing rock detaches it. Rejoining cannot duplicate the boost or spend fuel while disconnected.
+Reflected shots can hurt their shooter and faction mates. Ordinary direct shots
+still respect friendly fire. A broken reflector leaves one laser core: collect
+it for 150 points and six stronger shots, usable for 60 seconds. The upgrade
+expires on death. Shots, damage, charge use, and collection belong to the shared
+world, so reconnecting does not replay rewards.
 
 ## Multiplayer protocol
 
@@ -31,7 +35,12 @@ in the common public world.
 
 ## Updating open clients
 
-Published client releases automatically refresh open tabs after two matching release checks, about 30–60 seconds for active tabs. The check uses the client origin's `x-release-id`; the independently deployed Railway server does not trigger reloads. A per-tab guard prevents repeated reloads if the edge still serves a cached bundle. Tabs opened before this watcher was shipped need one manual refresh.
+Published client releases automatically refresh open tabs after two matching
+release checks, about 30–60 seconds for active tabs. The check uses the client
+origin's `x-release-id`; the independently deployed Railway server does not
+trigger reloads. A per-tab guard prevents repeated reloads if the edge still
+serves a cached bundle. Tabs opened before this watcher was shipped need one
+manual refresh.
 
 Gameplay WebSocket URLs include `asteroidInteractions=1`. Older clients receive
 HTTP 426 before the WebSocket opens and must refresh. The join message must also

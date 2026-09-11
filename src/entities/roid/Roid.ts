@@ -20,7 +20,6 @@ class Roid {
   material?: AsteroidMaterial;
   /** Optional server-owned reflection metadata. */
   phenomenon?: AsteroidPhenomenon;
-  spinClass?: 'natural' | 'charged';
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
   isCollabTarget: boolean = false;
   taggedUntil?: number; // Server-owned collab window; do not destroy locally while set

@@ -29,7 +29,7 @@ function advanceElapsed(ms: number): void {
   vi.advanceTimersByTime(ms);
 }
 
-test('alternating enhanced-motion rejects stay within one bounded socket summary', () => {
+test('repeated enhanced-motion rejects stay within one bounded socket summary', () => {
   const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
   const { socket } = join('enhanced-pilot');
   const rejectedPose = {
@@ -46,14 +46,6 @@ test('alternating enhanced-motion rejects stay within one bounded socket summary
   };
 
   core.handleClientMessage(rejectedPose, socket);
-  advanceElapsed(1_000);
-  core.handleClientMessage(
-    {
-      type: 'asteroidInput',
-      data: { epoch: 1, sequence: 1, thrust: false, turn: 0, aimAngle: 0 },
-    },
-    socket
-  );
   advanceElapsed(1_000);
   core.handleClientMessage(rejectedPose, socket);
   advanceElapsed(4_000);
@@ -73,7 +65,7 @@ test('alternating enhanced-motion rejects stay within one bounded socket summary
     receivedEpoch: 99,
     receivedSequence: 1,
     motionEpoch: 1,
-    suppressed: 2,
+    suppressed: 1,
   });
 });
 function join(id: string) {

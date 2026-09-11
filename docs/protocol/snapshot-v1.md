@@ -1,6 +1,6 @@
 # Snapshots v1
 
-Gameplay uses snapshot v1 with asteroid interactions. Every join must offer
+Gameplay uses snapshot v1 with reflective asteroid support. Every join must offer
 `snapshotVersion:1` and `asteroidInteractions:1`; the server acknowledges both
 and provides a private resume token before the client starts play. Missing or
 unsupported capabilities fail explicitly. There is no full-state `gameState`
@@ -32,7 +32,7 @@ named optional fields. An omitted field is unchanged. Collection patches contain
 `order` (complete ID order when membership/order changes). Empty arrays are
 complete empty collections. Removed bots/remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
 Acknowledged harpoon expiry clears both target and cached latch position,
-including on the predicting local ship. An unacknowledged local Hauler prediction
+including on the predicting local ship. An unacknowledged local harpoon prediction
 may survive a brief reconnect only for its remaining, locally ticking lifetime
 while its target still exists. Acknowledged expiry, target removal, death or
 natural timer expiry clears it. Reconnect neither extends that timer nor replays
@@ -178,7 +178,7 @@ previous world. Clients stalled on different worlds need separate patches. The
 current codec runner covers shared and staggered baselines, but it does not
 recreate this archived table.
 
-## Enhanced asteroid capability
+## Reflective asteroid capability
 
 The required `asteroidInteractions:1` join capability requires snapshot v1 and an
 explicit matching acknowledgment. The joined socket alone receives its private resume token.
@@ -186,15 +186,16 @@ A physical gameplay socket close gives that token a two-second neutral-input gra
 a same-socket rejoin is idempotent, a valid token can atomically supersede an old
 socket, and expiry/leave/reset invalidates it. Unsupported joins are rejected before a pilot is created.
 
-Optional asteroid `phenomenon` and `spinClass` metadata is preserved on
-first creation and complete/delta updates. `playerProjectiles` carries stable
-process-unique shot IDs, geometry, bounded fractional energy, bounce count and age.
-The client reconciles keyed projectile rows for bolt creation. Reflection energy uses finite numbers in [0,8]; sequences, epochs and
-bounce counters remain integers. Core upgrades carry bounded charges and expiry.
+Optional asteroid `phenomenon` metadata is preserved on first creation and
+complete/delta updates. `playerProjectiles` carries stable process-unique shot
+IDs, geometry, bounded fractional energy, bounce count, and age. The client
+reconciles keyed projectile rows for bolt creation. Reflection energy uses finite
+numbers in [0,8]; sequences, epochs, and bounce counters remain integers. Core
+upgrades carry bounded charges and expiry.
 
-Enhanced Hauler poses use server motion epochs and monotonically increasing input
-sequences. During latch/release/handoff, ordinary movement packets cannot overwrite
-position, velocity, fuel or spin. The client rebases each authoritative frame and
-replays only its bounded unacknowledged input queue. A new handoff epoch/anchor and
-reachable-pose acknowledgment are required before free prediction resumes. Server
-time and kit speed bound all subsequent enhanced free poses.
+Player poses use server motion epochs and monotonically increasing input
+sequences. During reconnect handoff, ordinary movement packets cannot overwrite
+position, velocity, or other authoritative movement state. The client rebases
+each authoritative frame and replays only its bounded unacknowledged input queue.
+A new handoff epoch and reachable-pose acknowledgment are required before free
+prediction resumes. Server time and kit speed bound all subsequent free poses.

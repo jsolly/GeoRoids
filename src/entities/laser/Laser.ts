@@ -22,6 +22,9 @@ interface LaserData {
 
 export class Laser implements LaserData {
   serverId?: string;
+  /** Prevent a reflected visual bolt from immediately re-contacting the same ring. */
+  lastShieldId?: string;
+  bounceCount = 0;
   static get fxLaser(): Sound {
     return getLaserSound();
   }

@@ -219,7 +219,7 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   expect(joined).toMatchObject({ id: 'entry-pilot', snapshotVersion: 1, asteroidInteractions: 1 });
   expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
   const before = await observer.state();
-  const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.asteroidMotion?.epoch;
+  const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch;
   expect(epoch).toBeGreaterThan(0);
   expect(JSON.stringify(before)).not.toContain(String(joined['resumeToken']));
   const packetStart = observer.packets.length;
@@ -244,7 +244,7 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
     asteroidInteractions: 1,
   });
   expect(
-    (await observer.state()).entities.find((row) => row.id === 'entry-pilot')?.asteroidMotion?.epoch
+    (await observer.state()).entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch
   ).toBe(epoch);
   await disconnect(resumed.ws);
   await waitFor(

@@ -91,7 +91,7 @@ The following bars remain the product checks for the combined client/server rele
 
 - PASS only if live: cream tether `#E8D5A3` + tip `#FDE68A` both readable at play zoom
 - Latch rock/bot; hold across brief WS flap
-- Same-side mates / Warden E / F-shield must **not** latch
+- Same-side mates and ships protected by a projected E shield or F shield must **not** latch
 - #486 merged; live still FAIL as of last Pilot smoke — Codex owns fresh fix
 
 ### Empty belt after reconnect
@@ -129,7 +129,7 @@ Recovered art and gameplay landed in PRs #493/#499/#500, with final production f
 
 ## New asteroid interaction cues
 
-Reflective clusters use flat slate facets with small amber charge cues. Asteroid tools show a thin predicted shot path. Laser cores use an amber diamond/bolt mark and show bounded charges in the tools view. Fast spinners retain mineral outlines. The Hauler's primary and payload cables stay cream `#E8D5A3` with amber `#FDE68A` endpoints. No new hull, faction repaint or filled playfield entity is introduced.
+Reflective clusters use flat slate facets with small amber charge cues. Laser cores use an amber diamond/bolt mark and show remaining charges in a passive flight readout. Hauler's basic E harpoon uses one cream `#E8D5A3` cable with an amber `#FDE68A` endpoint. Its attached asteroid passes through the Hauler harmlessly until release. Extra asteroid selection, spin controls, and payload cables have been removed.
 
 ## Cloud agents
 

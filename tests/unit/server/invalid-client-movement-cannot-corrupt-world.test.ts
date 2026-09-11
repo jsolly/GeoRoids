@@ -49,10 +49,10 @@ describe('invalid client movement cannot corrupt the shared world', () => {
         engine.advanceOneFrame();
       }
       expect(pilot.health).toBe(pilot.maxHealth);
-      expect(pilot.asteroidMotion?.mode).toBe('handoff');
+      expect(pilot.playerMotion?.mode).toBe('handoff');
       const position = { ...pilot.position };
       const velocity = { ...pilot.velocity };
-      const motion = structuredClone(pilot.asteroidMotion);
+      const motion = structuredClone(pilot.playerMotion);
       assert.ok(motion, 'respawn motion state');
       const angle = pilot.angle;
       owner.clear();
@@ -72,7 +72,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
       expect(pilot.position).toEqual(position);
       expect(pilot.velocity).toEqual(velocity);
       expect(pilot.angle).toBe(angle);
-      expect(pilot.asteroidMotion).toEqual(motion);
+      expect(pilot.playerMotion).toEqual(motion);
       const activeEngine = engine;
       assert.ok(activeEngine, 'movement engine');
       expect(() => activeEngine.advanceOneFrame()).not.toThrow();
@@ -90,7 +90,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
             angle: 0.25,
             angularVelocity: 0.5,
             thrusting: true,
-            motionEpoch: pilot.asteroidMotion?.epoch,
+            motionEpoch: pilot.playerMotion?.epoch,
             motionSequence: 1,
           },
         },
@@ -100,7 +100,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
       expect(pilot.velocity).toEqual({ x: 1, y: 2 });
       expect(pilot.angle).toBe(0.25);
       expect(pilot.thrusting).toBe(true);
-      expect(pilot.asteroidMotion).toMatchObject({ mode: 'free', ack: 1 });
+      expect(pilot.playerMotion).toMatchObject({ mode: 'free', ack: 1 });
       expect(peer.inbox.some((message) => message.type === 'playerUpdate')).toBe(false);
       expect(
         engine.getGameState().entities.find((entity) => entity.id === pilot.id)?.position
@@ -141,7 +141,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
           velocity,
           angle: 0.5,
           thrusting: false,
-          motionEpoch: pilot.asteroidMotion?.epoch,
+          motionEpoch: pilot.playerMotion?.epoch,
           motionSequence: 1,
           ws: null,
           type: 'bot',

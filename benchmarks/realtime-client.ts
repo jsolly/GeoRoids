@@ -330,7 +330,7 @@ try {
           latestAuthoritativeState = state;
           const motion = state.entities.find(
             (entity) => entity.id === measuredPilotId
-          )?.asteroidMotion;
+          )?.playerMotion;
           if (!measuring) {
             warmupSnapshotBytes +=
               typeof payload === 'string' ? Buffer.byteLength(payload) : payload.length;

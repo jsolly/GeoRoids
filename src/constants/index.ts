@@ -304,12 +304,14 @@ export const SATELLITE_PICKUP = {
   DRIFT_SPEED: 0.28,
   LOOSE_ORBIT_RADIUS: 70,
   SCORE_BONUS: 50,
-  SHIELD_FRAMES: 180,
+  HEALTH: 50,
+  AUTO_COLLECT_RANGE: 140,
+  RESPAWN_FRAMES: 180,
+  ORBIT_GAP: 8,
   MAX_COUNT: 2,
   SPAWN_RING_MIN: 380,
   SPAWN_RING_MAX: 480,
   FIELD_RADIUS: 700,
-  COLLECT_SLACK: 18,
 } as const;
 
 // ============================================================================
@@ -357,10 +359,12 @@ export const FUEL = {
 // ============================================================================
 // SHIELD CONFIGURATION
 // ============================================================================
-// Timed bubble that blocks enemy lasers only. Duration is short and cooldown
-// is longer so camping the shield is never free. Shared by players and bots.
+// Timed bubble that reflects enemy lasers only. The active duration is long
+// enough to protect a pilot through a firing exchange; the cooldown keeps it
+// from being permanent. Shared by players and bots.
 export const SHIELD = {
   DURATION_SECONDS: 2,
+  WARDEN_DURATION_SECONDS: 4,
   COOLDOWN_SECONDS: 6,
   RADIUS_RATIO: 1.55,
   FLASH_SECONDS: 0.12,

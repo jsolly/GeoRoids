@@ -119,66 +119,7 @@ test('a reflective rock gains sparse unfilled facets as its stored energy rises'
   expect(fill).not.toHaveBeenCalled();
 });
 
-test('charged spin adds a longer opposing arc while retaining reflection facets', () => {
-  const { ctx, before, strokes, fill } = cueScene();
-  for (const spinClass of ['natural', 'charged'] as const) {
-    strokes.length = 0;
-    drawRoidInteractionCues(ctx, { spinClass }, 20, 125, 240);
-    expect(strokes).toHaveLength(spinClass === 'charged' ? 2 : 1);
-    for (const [index, path] of strokes.entries()) {
-      expect(path.commands).toHaveLength(1);
-      const arc = path.commands[0];
-      if (arc?.kind !== 'arc') {
-        throw new Error('Spinning rock did not draw an open arc');
-      }
-      const [x, y, radius, start, end] = arc.args;
-      expect(arc.args[5] ?? false).toBe(false);
-      expect([x, y]).toEqual([0, 0]);
-      expect(radius).toBeCloseTo(23.6);
-      expect(start).toBeCloseTo(index === 0 ? -Math.PI * 0.95 : Math.PI * 0.05);
-      expect(end - start).toBeCloseTo(Math.PI * (spinClass === 'charged' ? 0.68 : 0.42));
-      expect(path.state.transform).toEqual([1, 0, 0, 1, 132, 251]);
-      expect(path.state.color).toBe('#94a3b8');
-      expect(path.state.width).toBeCloseTo(0.9, 6);
-      expect(path.state.alpha).toBeCloseTo(spinClass === 'charged' ? 0.88 : 0.56, 6);
-    }
-    expect(paintState(ctx)).toEqual(before);
-  }
-
-  const chargedArcs = [...strokes];
-  const phenomenon = {
-    kind: 'reflective',
-    clusterId: 'charged-cluster',
-    energy: 4,
-    maxEnergy: 9,
-  } as const;
-  strokes.length = 0;
-  drawRoidInteractionCues(ctx, { phenomenon }, 20, 125, 240);
-  const reflectiveFacets = [...strokes];
-  strokes.length = 0;
-  drawRoidInteractionCues(ctx, { spinClass: 'charged', phenomenon }, 20, 125, 240);
-  // Spin arcs inherit the reflection's rounded cap within this saved context.
-  expect(strokes).toEqual([
-    ...reflectiveFacets,
-    ...chargedArcs.map((path) => ({ ...path, state: { ...path.state, cap: 'round' } })),
-  ]);
-  expect(strokes.map((path) => path.commands.map((command) => command.kind))).toEqual([
-    ['move', 'line'],
-    ['move', 'line'],
-    ['arc'],
-    ['arc'],
-  ]);
-  expect(strokes.map((path) => path.state.alpha)).toEqual([
-    expect.closeTo(0.72, 6),
-    expect.closeTo(0.72, 6),
-    expect.closeTo(0.88, 6),
-    expect.closeTo(0.88, 6),
-  ]);
-  expect(paintState(ctx)).toEqual(before);
-  expect(fill).not.toHaveBeenCalled();
-});
-
-test('rocks without reflection or spin metadata leave the Canvas untouched', () => {
+test('rocks without reflection metadata leave the Canvas untouched', () => {
   const { ctx, before, begin, strokes, fill } = cueScene();
   drawRoidInteractionCues(ctx, {}, 20, 125, 240);
   expect(begin).not.toHaveBeenCalled();

@@ -96,18 +96,13 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
     expect(world.entity(bob).shieldActive).toBe(true);
   });
 
-  test('Warden shield blocks a Hauler latch', () => {
+  test('an active F shield blocks a Hauler latch', () => {
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
     bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'warden', factionId: 'ember' });
     world.parkBots();
     world.clearAsteroids();
-    world.send(bob, {
-      type: 'useAbility',
-      id: bob.id,
-      data: { kitId: 'warden', abilityId: 'shieldFocus' },
-    });
-    expect(world.entity(bob).shieldTimer).toBeGreaterThan(0);
-    world.clearAsteroids();
+    expect(world.engine.requestShield(bob.id, true)).toBe(true);
+    expect(world.entity(bob).shieldActive).toBe(true);
 
     world.send(alice, {
       type: 'useAbility',
@@ -117,6 +112,6 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
 
     expect(world.entity(alice).harpoonTargetId).toBeUndefined();
     expect(world.entity(alice).harpoonTimer).toBe(0);
-    expect(world.entity(bob).shieldTimer).toBeGreaterThan(0);
+    expect(world.entity(bob).shieldActive).toBe(true);
   });
 });

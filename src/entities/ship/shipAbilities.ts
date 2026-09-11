@@ -1,6 +1,6 @@
 import { areAllied } from '../../../shared/factions';
 import { type FuelTank, trySpendEmpFuel } from '../../../shared/fuel';
-import type { AsteroidMotionState, Position, SoftFactionId, Velocity } from '../../../shared-types';
+import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
 import {
   findHarpoonFieldBody,
   getHarpoonField,
@@ -23,10 +23,13 @@ export interface AbilityHost extends FuelTank {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
   shieldTimer: number;
+  /** Warden E target while its projected shield is active. */
+  shieldTargetId?: string;
+  /** Caster id for a projected shield received from a Warden. */
+  shieldSourceId?: string;
   harpoonTimer: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
-  asteroidMotion?: AsteroidMotionState;
   r?: number;
 }
 
@@ -41,8 +44,10 @@ export interface AbilityBody {
   r?: number;
   size?: number;
   shieldTimer?: number;
-  /** Timed ship shield (#454). Separate from Warden kit `shieldTimer`. */
+  shieldSourceId?: string;
+  /** Timed ship shield (#454). Separate from Warden's projected E timer. */
   shieldActive?: boolean;
+  respawnTimer?: number;
 }
 
 export interface AbilityWorld {
@@ -88,16 +93,7 @@ function headingVelocity(angle: number, magnitude: number): Velocity {
 }
 
 export function canActivateAbility(host: AbilityHost): boolean {
-  return (
-    !host.exploding &&
-    host.health > 0 &&
-    host.abilityCooldownFrames <= 0 &&
-    host.asteroidMotion?.mode !== 'latched'
-  );
-}
-
-export function absorbDamageWithShield(host: { shieldTimer: number }): boolean {
-  return host.shieldTimer > 0;
+  return !host.exploding && host.health > 0 && host.abilityCooldownFrames <= 0;
 }
 
 function clearHarpoonLatch(
@@ -106,6 +102,15 @@ function clearHarpoonLatch(
   host.harpoonTimer = 0;
   delete host.harpoonTargetId;
   delete host.harpoonLatchPos;
+}
+
+/** Clear either side of a projected Warden E link during death/reset. */
+export function clearShieldProjection(
+  host: Pick<AbilityHost, 'shieldTimer' | 'shieldSourceId' | 'shieldTargetId'>
+): void {
+  host.shieldTimer = 0;
+  delete host.shieldSourceId;
+  delete host.shieldTargetId;
 }
 
 /** Rocks + ships share one latch list. Server and client use the same helper. */
@@ -164,20 +169,22 @@ export function tickAbilityHost(host: AbilityHost): void {
   }
   if (host.abilityActiveFrames > 0) {
     host.abilityActiveFrames -= 1;
+    if (host.abilityActiveFrames <= 0 && host.kitId === 'warden') {
+      delete host.shieldTargetId;
+    }
   }
   if (host.shieldTimer > 0) {
     host.shieldTimer -= 1;
+    if (host.shieldTimer <= 0) {
+      delete host.shieldSourceId;
+    }
+  } else if (host.shieldSourceId) {
+    delete host.shieldSourceId;
   }
-  if (
-    host.kitId === 'hauler' &&
-    host.asteroidMotion?.mode === 'latched' &&
-    !host.exploding &&
-    host.health > 0
-  ) {
-    // An asteroid latch lasts until its ownership state changes, across render
-    // frames and transport gaps. The ordinary E ability still expires below.
-    host.harpoonTimer = Math.max(1, host.harpoonTimer);
-  } else if (host.harpoonTimer > 0) {
+  if (host.kitId !== 'warden' && host.shieldTargetId) {
+    delete host.shieldTargetId;
+  }
+  if (host.harpoonTimer > 0) {
     host.harpoonTimer -= 1;
     if (host.harpoonTimer <= 0 || host.kitId !== 'hauler') {
       clearHarpoonLatch(host);
@@ -345,6 +352,90 @@ export function findHarpoonTarget(
       valid.filter((body) => !isEnvironmentLatchBody(body)),
       range
     )
+  );
+}
+
+const FRIENDLY_SHIELD_TIE_EPSILON = 1e-7;
+
+function isLiveFriendlyShieldBody(
+  host: Pick<AbilityHost, 'id' | 'factionId'>,
+  body: AbilityBody
+): boolean {
+  if (
+    !body.id ||
+    body.id === host.id ||
+    (body.kind !== 'ship' && body.factionId === undefined) ||
+    !areAllied(host.factionId, body.factionId) ||
+    body.exploding === true ||
+    (body.health !== undefined && body.health <= 0) ||
+    (body.respawnTimer !== undefined && body.respawnTimer > 0)
+  ) {
+    return false;
+  }
+  // Do not replace another active projection. F and E are independent, so a
+  // teammate with the regular F bubble remains a valid projected target.
+  if ((body.shieldTimer ?? 0) > 0 && body.shieldSourceId !== host.id) {
+    return false;
+  }
+  return true;
+}
+
+function targetFacing(host: Pick<AbilityHost, 'position' | 'angle'>, body: AbilityBody): number {
+  const dx = body.position.x - host.position.x;
+  const dy = body.position.y - host.position.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 1) {
+    return 1;
+  }
+  return (dx * Math.cos(host.angle) + dy * -Math.sin(host.angle)) / distance;
+}
+
+function pickNearestFriendlyShieldBody(
+  host: Pick<AbilityHost, 'position' | 'r'>,
+  bodies: readonly AbilityBody[],
+  range: number
+): AbilityBody | undefined {
+  let best: { body: AbilityBody; gap: number; distance: number } | undefined;
+  for (const body of bodies) {
+    const distance = Math.hypot(
+      body.position.x - host.position.x,
+      body.position.y - host.position.y
+    );
+    const gap = distance - bodyRadius(host) - bodyRadius(body);
+    if (gap > range) {
+      continue;
+    }
+    if (
+      !best ||
+      gap < best.gap - FRIENDLY_SHIELD_TIE_EPSILON ||
+      (Math.abs(gap - best.gap) <= FRIENDLY_SHIELD_TIE_EPSILON &&
+        (distance < best.distance - FRIENDLY_SHIELD_TIE_EPSILON ||
+          (Math.abs(distance - best.distance) <= FRIENDLY_SHIELD_TIE_EPSILON &&
+            (body.id ?? '').localeCompare(best.body.id ?? '') < 0)))
+    ) {
+      best = { body, gap, distance };
+    }
+  }
+  return best?.body;
+}
+
+/**
+ * Pick a Warden E recipient from the authoritative field. Any live same-side
+ * ship within the fixed projection range is valid. Ships in the forward
+ * hemisphere are preferred; if none are there, the nearest valid teammate is
+ * selected as a fallback. The server recomputes this list and never trusts a
+ * client-supplied target id.
+ */
+export function findFriendlyShieldTarget(
+  host: Pick<AbilityHost, 'id' | 'factionId' | 'position' | 'angle' | 'r'>,
+  bodies: readonly AbilityBody[]
+): AbilityBody | undefined {
+  const range = SHIP_ABILITY.SHIELD_PROJECTION_RANGE;
+  const valid = bodies.filter((body) => isLiveFriendlyShieldBody(host, body));
+  const forward = valid.filter((body) => targetFacing(host, body) >= 0);
+  return (
+    pickNearestFriendlyShieldBody(host, forward, range) ??
+    pickNearestFriendlyShieldBody(host, valid, range)
   );
 }
 
@@ -526,24 +617,33 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     return { activated: true, abilityId: 'harpoon' };
   }
 
-  host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
-
   switch (kit.abilityId) {
+    case 'shieldFocus': {
+      const target = findFriendlyShieldTarget(host, listHarpoonCandidates(resolved));
+      if (!target?.id || !host.id) {
+        return { activated: false };
+      }
+      host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
+      host.abilityActiveFrames = SHIP_ABILITY.SHIELD_PROJECTION_FRAMES;
+      host.shieldTargetId = target.id;
+      target.shieldTimer = SHIP_ABILITY.SHIELD_PROJECTION_FRAMES;
+      target.shieldSourceId = host.id;
+      return { activated: true, abilityId: 'shieldFocus' };
+    }
     case 'boostDash': {
+      host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
       const boost = headingVelocity(host.angle, SHIP_ABILITY.DASH_BOOST);
       host.velocity.x += boost.x;
       host.velocity.y += boost.y;
       host.abilityActiveFrames = 12;
       break;
     }
-    case 'shieldFocus':
-      host.shieldTimer = SHIP_ABILITY.SHIELD_FRAMES;
-      host.abilityActiveFrames = SHIP_ABILITY.SHIELD_FRAMES;
-      break;
     case 'burstFire':
+      host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
       host.abilityActiveFrames = 8;
       break;
     case 'shockPulse':
+      host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
       host.abilityActiveFrames = 18;
       if (resolved) {
         applyShockPulse(host, resolved);

@@ -1,13 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../setup/serverLogger';
+import { ASTEROID_INTERACTIONS, segmentCircleContact } from '../../shared/asteroidPhenomena';
 import { type SatelliteProfile, satelliteProfileAt } from '../../shared/eoSatellites';
+import {
+  findNearestShieldImpact,
+  reflectProjectileVelocity,
+  type ShieldReflectionBody,
+} from '../../shared/shieldReflection';
 import type {
   Position,
   SatelliteData,
   SatelliteProjectileState,
   SatelliteShoot,
 } from '../../shared-types';
-import { DAMAGE, DEBUG, SATELLITE } from '../../src/constants';
+import { DAMAGE, DEBUG, SATELLITE, SHIELD } from '../../src/constants';
 import {
   aimAngleToward,
   applyAimJitter,
@@ -28,15 +34,28 @@ interface SatelliteTarget {
   health: number;
   exploding: boolean;
   respawnTimer?: number;
+  /** Pickups are interceptable bodies, but EO satellites never aim at them. */
+  aimable?: boolean;
+  kind?: 'ship' | 'pickup' | 'satellite';
+  /** The F surface and projected E surface are both laser-reflecting. */
+  shieldActive?: boolean;
+  shieldTime?: number;
+  shieldTimer?: number;
+  /** Lets GameEngine update the readable shield flash without serializing a callback. */
+  onShieldHit?: () => void;
 }
 
 export interface SatelliteHit {
   satelliteId: string;
   targetId: string;
+  targetKind: 'ship' | 'pickup' | 'satellite';
   damage: number;
 }
 
-type SatelliteProjectile = SatelliteProjectileState;
+type SatelliteProjectile = SatelliteProjectileState & {
+  bounces: number;
+  lastShieldId?: string;
+};
 
 interface SatelliteInternal extends SatelliteData {
   profile: SatelliteProfile;
@@ -163,9 +182,10 @@ export class SatelliteManager {
   /** Advance authoritative motion and return only newly-created visual shots. */
   public update(targets: SatelliteTarget[]): SatelliteShoot[] {
     this.pendingHits = this.advanceProjectiles(targets);
+    const aimableTargets = targets.filter((target) => target.aimable !== false);
     const shots: SatelliteShoot[] = [];
     for (const satellite of this.satellites.values()) {
-      const shot = this.updateOne(satellite, targets);
+      const shot = this.updateOne(satellite, aimableTargets);
       if (shot) {
         shots.push(shot);
       }
@@ -197,7 +217,8 @@ export class SatelliteManager {
       if (!projectile) {
         continue;
       }
-      projectile.position = {
+      let start = { ...projectile.position };
+      let end = {
         x: projectile.position.x + projectile.velocity.x,
         y: projectile.position.y + projectile.velocity.y,
       };
@@ -207,24 +228,158 @@ export class SatelliteManager {
         continue;
       }
 
-      const target = targets.find(
-        (candidate) =>
-          !candidate.exploding &&
-          candidate.health > 0 &&
-          candidate.respawnTimer === undefined &&
-          distanceTo(projectile.position, candidate.position) <= candidate.radius + 4
-      );
-      if (!target) {
-        continue;
+      let removed = false;
+      for (let bounceWork = 0; bounceWork <= ASTEROID_INTERACTIONS.maxBounces; bounceWork++) {
+        const distance = distanceTo(start, end);
+        const shieldBodies = this.getShieldBodies(targets);
+        const shieldImpact = findNearestShieldImpact(
+          start,
+          end,
+          shieldBodies,
+          projectile.lastShieldId
+        );
+        const target = targets
+          .flatMap((candidate) => {
+            if (
+              !this.isLiveTarget(candidate) ||
+              (projectile.bounces === 0 && candidate.id === projectile.satelliteId)
+            ) {
+              return [];
+            }
+            const fraction = segmentCircleContact(
+              start,
+              end,
+              candidate.position,
+              candidate.radius + 4
+            );
+            return fraction === undefined
+              ? []
+              : [
+                  {
+                    candidate,
+                    distance: fraction * distance,
+                  },
+                ];
+          })
+          .sort(
+            (left, right) =>
+              left.distance - right.distance || left.candidate.id.localeCompare(right.candidate.id)
+          )[0];
+
+        // A direct EO shot can also begin inside the larger shield bubble. An
+        // outward path must clear the surface before hull contact is tested;
+        // an inward path is returned as an immediate shield impact below.
+        const originShield = shieldBodies.find((shield) => {
+          const dx = start.x - shield.position.x;
+          const dy = start.y - shield.position.y;
+          return dx * dx + dy * dy < shield.radius * shield.radius;
+        });
+        const originRadial = originShield
+          ? {
+              x: start.x - originShield.position.x,
+              y: start.y - originShield.position.y,
+            }
+          : undefined;
+        const originMovingOutward =
+          originShield &&
+          originRadial &&
+          originRadial.x * (end.x - start.x) + originRadial.y * (end.y - start.y) >= 0;
+        if (originMovingOutward && originShield && distance > 1e-7) {
+          if (!shieldImpact || shieldImpact.shieldId !== originShield.id) {
+            projectile.position = end;
+            break;
+          }
+          const speed = Math.hypot(projectile.velocity.x, projectile.velocity.y);
+          if (speed <= 1e-9) {
+            projectile.position = end;
+            break;
+          }
+          const remaining = Math.max(0, distance - shieldImpact.distance);
+          const direction = {
+            x: projectile.velocity.x / speed,
+            y: projectile.velocity.y / speed,
+          };
+          projectile.position = { ...shieldImpact.point };
+          projectile.lastShieldId = originShield.id;
+          start = {
+            x: shieldImpact.point.x + direction.x * 1e-5,
+            y: shieldImpact.point.y + direction.y * 1e-5,
+          };
+          end = { x: start.x + direction.x * remaining, y: start.y + direction.y * remaining };
+          continue;
+        }
+
+        if (
+          shieldImpact &&
+          (!target || shieldImpact.distance <= target.distance) &&
+          projectile.bounces < ASTEROID_INTERACTIONS.maxBounces
+        ) {
+          const shield = targets.find((candidate) => candidate.id === shieldImpact.shieldId);
+          shield?.onShieldHit?.();
+          projectile.position = { ...shieldImpact.point };
+          projectile.velocity = reflectProjectileVelocity(projectile.velocity, shieldImpact.normal);
+          projectile.bounces += 1;
+          projectile.lastShieldId = shieldImpact.shieldId;
+          const speed = Math.hypot(projectile.velocity.x, projectile.velocity.y);
+          if (speed <= 1e-9) {
+            this.projectiles.splice(i, 1);
+            removed = true;
+            break;
+          }
+          const remaining = Math.max(0, distance - shieldImpact.distance);
+          const direction = { x: projectile.velocity.x / speed, y: projectile.velocity.y / speed };
+          start = {
+            x: shieldImpact.point.x + direction.x * 1e-5,
+            y: shieldImpact.point.y + direction.y * 1e-5,
+          };
+          end = { x: start.x + direction.x * remaining, y: start.y + direction.y * remaining };
+          continue;
+        }
+        if (shieldImpact && (!target || shieldImpact.distance <= target.distance)) {
+          projectile.position = { ...shieldImpact.point };
+          this.projectiles.splice(i, 1);
+          removed = true;
+          break;
+        }
+        if (target) {
+          hits.push({
+            satelliteId: projectile.satelliteId,
+            targetId: target.candidate.id,
+            targetKind: target.candidate.kind ?? 'ship',
+            damage: DAMAGE.LASER_HIT,
+          });
+          this.projectiles.splice(i, 1);
+          removed = true;
+          break;
+        }
+        projectile.position = end;
+        break;
       }
-      hits.push({
-        satelliteId: projectile.satelliteId,
-        targetId: target.id,
-        damage: DAMAGE.LASER_HIT,
-      });
-      this.projectiles.splice(i, 1);
+      if (removed) {
+      }
     }
     return hits;
+  }
+
+  private isLiveTarget(target: SatelliteTarget): boolean {
+    return !target.exploding && target.health > 0 && target.respawnTimer === undefined;
+  }
+
+  private getShieldBodies(targets: readonly SatelliteTarget[]): ShieldReflectionBody[] {
+    return targets
+      .filter(
+        (target) =>
+          this.isLiveTarget(target) &&
+          (target.shieldTimer !== undefined && target.shieldTimer > 0
+            ? true
+            : target.shieldActive === true &&
+              (target.shieldTime === undefined || target.shieldTime > 0))
+      )
+      .map((target) => ({
+        id: target.id,
+        position: target.position,
+        radius: target.radius * SHIELD.RADIUS_RATIO,
+      }));
   }
 
   private updateOne(
@@ -346,6 +501,7 @@ export class SatelliteManager {
       position: { ...laserStart },
       velocity: { ...laserDirection },
       age: 0,
+      bounces: 0,
     });
     return { id: satellite.id, shotId, laserStart, laserDirection };
   }

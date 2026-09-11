@@ -48,7 +48,7 @@ describe('supported gameplay message envelopes', () => {
             velocity: { x: 0, y: 0 },
             angle: 0,
             thrusting: false,
-            motionEpoch: pilot.asteroidMotion?.epoch,
+            motionEpoch: pilot.playerMotion?.epoch,
             motionSequence: 0,
             score: 150,
           },

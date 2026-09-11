@@ -124,26 +124,10 @@ function drawReflectiveCue(
   }
 }
 
-function drawSpinCue(ctx: DrawingContext, radius: number, charged: boolean): void {
-  const ring = radius * 1.18;
-  const arc = charged ? Math.PI * 0.68 : Math.PI * 0.42;
-  ctx.globalAlpha = charged ? 0.88 : 0.56;
-  ctx.strokeStyle = PALETTE.ROID;
-  ctx.lineWidth = Math.max(0.7, Math.min(1.05, radius * 0.045));
-  ctx.beginPath();
-  ctx.arc(0, 0, ring, -Math.PI * 0.95, -Math.PI * 0.95 + arc);
-  ctx.stroke();
-  if (charged) {
-    ctx.beginPath();
-    ctx.arc(0, 0, ring, Math.PI * 0.05, Math.PI * 0.05 + arc);
-    ctx.stroke();
-  }
-}
-
 /** Draw only sparse, screen-readable metadata cues; the rock remains an outline. */
 export function drawRoidInteractionCues(
   ctx: DrawingContext,
-  roid: Pick<Roid, 'phenomenon' | 'spinClass'>,
+  roid: Pick<Roid, 'phenomenon'>,
   radius: number,
   centerX = 0,
   centerY = 0
@@ -152,7 +136,7 @@ export function drawRoidInteractionCues(
     return;
   }
   const phenomenon = roid.phenomenon;
-  if (!phenomenon && !roid.spinClass) {
+  if (!phenomenon) {
     return;
   }
   ctx.save();
@@ -161,9 +145,6 @@ export function drawRoidInteractionCues(
   ctx.translate(centerX, centerY);
   if (phenomenon?.kind === 'reflective') {
     drawReflectiveCue(ctx, radius, phenomenon.energy, phenomenon.maxEnergy);
-  }
-  if (roid.spinClass) {
-    drawSpinCue(ctx, radius, roid.spinClass === 'charged');
   }
   ctx.restore();
 }

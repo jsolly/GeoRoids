@@ -18,7 +18,8 @@ export class SatellitePickup {
   color: string;
   state: SatellitePickupState;
   ownerId: string | null;
-  shieldFramesRemaining: number;
+  health: number;
+  maxHealth: number;
 
   constructor(data: SatellitePickupData) {
     this.id = data.id;
@@ -32,7 +33,8 @@ export class SatellitePickup {
     this.color = data.color;
     this.state = data.state;
     this.ownerId = data.ownerId;
-    this.shieldFramesRemaining = data.shieldFramesRemaining;
+    this.health = data.health;
+    this.maxHealth = data.maxHealth;
   }
 
   updateFromServer(data: SatellitePickupData): void {
@@ -46,6 +48,7 @@ export class SatellitePickup {
     this.color = data.color;
     this.state = data.state;
     this.ownerId = data.ownerId;
-    this.shieldFramesRemaining = data.shieldFramesRemaining;
+    this.health = data.health;
+    this.maxHealth = data.maxHealth;
   }
 }

@@ -100,6 +100,21 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
   }
 
+  test('intentional disconnect clears movement recovery after retiring the socket', async () => {
+    const player = entityFactory.createLocalPlayer('Departing pilot', { x: 0, y: 0 }, 'hauler');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
+    const ws = await connect();
+    acknowledge(ws);
+    player.ship.serverOwnsMotion = true;
+    player.ship.playerMotion = { epoch: 1, mode: 'handoff', ack: 0, anchor: { x: 0, y: 0 } };
+    manager.disconnect();
+    expect(ws.close).toHaveBeenCalled();
+    expect(player.ship.serverOwnsMotion).toBe(false);
+    expect(player.ship.playerMotion).toBeUndefined();
+    expect(manager.isConnected()).toBe(false);
+  });
+
   test('a new socket and join cannot reuse a departed session snapshot witness', async () => {
     clientPerformance.snapshotApplied({ sequence: 900, kind: 'keyframe', gameTime: 4000 });
     const ws = await connect();
@@ -157,7 +172,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
         id: player.id,
         kitId: 'hauler',
         thrusting: false,
-        asteroidMotion: { epoch: 3, mode: 'latched', ack: 0, asteroidId: rock.id, latchAngle: 0 },
+        playerMotion: { epoch: 3, mode: 'free', ack: 0 },
       });
       state.entities = [local];
       state.playerProjectiles = [];
@@ -173,29 +188,26 @@ describe('actual ConnectionManager WebSocket message path', () => {
       clock.mockReturnValue(10_017);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
       manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
-      expect(
-        ws.sent.filter((message) => message.type === 'asteroidInput').at(-1)?.data
-      ).toMatchObject({ thrust: true });
+      expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
+        thrusting: true,
+      });
 
       release(player);
       local.thrusting = true;
       clock.mockReturnValue(10_034);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
       manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
-      expect(
-        ws.sent.filter((message) => message.type === 'asteroidInput').at(-1)?.data
-      ).toMatchObject({ thrust: false });
+      expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
+        thrusting: false,
+      });
 
       press(player);
-      const sentBeforeDeath = ws.sent.filter((message) => message.type === 'asteroidInput').length;
       Object.assign(local, { health: 0, exploding: true, thrusting: false });
       clock.mockReturnValue(10_051);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(4));
       manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
       expect(player.ship.thrusting).toBe(false);
-      expect(ws.sent.filter((message) => message.type === 'asteroidInput')).toHaveLength(
-        sentBeforeDeath
-      );
+      expect(ws.sent.filter((message) => message.type === 'asteroidInput')).toHaveLength(0);
     }
   );
 
@@ -272,7 +284,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
         ...firstEntity,
         id: manager.getClientId(),
         position: { x: 500, y: 100 },
-        asteroidMotion: { epoch: 3, mode: 'free', ack: 4 },
+        playerMotion: { epoch: 3, mode: 'free', ack: 4 },
       },
     ];
     first.asteroids = [];
@@ -395,7 +407,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     Object.assign(oldEntity, {
       id: oldId,
       name: 'Runtime pilot',
-      asteroidMotion: { epoch: 1, mode: 'free', ack: 0 },
+      playerMotion: { epoch: 1, mode: 'free', ack: 0 },
     });
     state.asteroids = [];
     state.loot = [];
@@ -565,6 +577,9 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(pickups.get('pickup-0')?.ownerId).toBe('pilot-0');
     expect(belt.get('asteroid-0')?.taggedUntil).toBe(5000);
     const next = captureSnapshot(snapshotFixture(70));
+    const damagedPickup = next.satellitePickups[0];
+    assert.ok(damagedPickup, 'damaged pickup');
+    damagedPickup.health = 25;
     const nextAsteroid = next.asteroids[0];
     assert.ok(nextAsteroid, 'next asteroid');
     nextAsteroid.material = 'rubble';
@@ -580,7 +595,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(next).encode(2, { sequence: 1, state: first }));
     expect(satellites.get('eo-0')?.lasers).toEqual([]);
     expect(pickups.get('pickup-0')?.ownerId).toBeNull();
-    expect(pickups.get('pickup-0')?.shieldFramesRemaining).toBe(0);
+    expect(pickups.get('pickup-0')?.health).toBe(25);
     expect(belt.get('asteroid-0')).toMatchObject({
       material: 'rubble',
       offsets: [0.7, 1.2, 0.8],

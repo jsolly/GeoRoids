@@ -27,5 +27,5 @@ Former task: [Todoist](https://app.todoist.com/app/task/6hRXX2vwHGXpMGM2).
 - Let shooting the projection destroy the clue without granting mining rewards.
 - Distinguish projections through unusually strong radiation signatures.
 
-Reflective asteroids, spinning/tether mechanics, and automatic client refresh
-remain active release work and are not parked by this decision.
+Reflective asteroids and automatic client refresh remain active features and
+are not parked by this decision. Hauler retains only its basic E harpoon.

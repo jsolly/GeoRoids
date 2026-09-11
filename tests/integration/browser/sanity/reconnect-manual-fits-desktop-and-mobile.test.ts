@@ -26,6 +26,9 @@ for (const viewport of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
     );
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
+    expect(await page.locator('.demo button').count()).toBe(0);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`performance-wiki-${viewport.name}.png`),
     });

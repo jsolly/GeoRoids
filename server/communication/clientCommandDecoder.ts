@@ -1,12 +1,4 @@
-import type {
-  AsteroidMotionInput,
-  AsteroidToolAction,
-  PingMessage,
-  Position,
-  ShipKitId,
-  SoftFactionId,
-  Velocity,
-} from '../../shared-types';
+import type { PingMessage, Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
 import { parseSoftFactionId } from '../../src/entities/player/softFactions';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
 
@@ -36,8 +28,6 @@ export type ClientCommand =
       resumeToken?: string;
     }
   | { type: 'leave' }
-  | { type: 'asteroidTool'; action: AsteroidToolAction }
-  | { type: 'asteroidInput'; input: AsteroidMotionInput }
   | { type: 'snapshotResync' }
   | {
       type: 'useAbility';
@@ -63,7 +53,6 @@ export type ClientCommand =
   | { type: 'shield'; id: string; active: boolean }
   | { type: 'chat'; id: string; message: string }
   | { type: 'collisionDamage'; targetPlayerId: string; attackerId: string }
-  | { type: 'satellitePickupCollected'; pickupId: string; claimedPlayerId?: string }
   | { type: 'initAsteroids'; id: string }
   | { type: 'clientLog'; payload: WireRecord }
   | PingMessage;
@@ -126,72 +115,6 @@ function invalid(messageType: string, error?: string): ClientCommandDecodeResult
     ok: false,
     messageType,
     ...(error !== undefined ? { error } : {}),
-  };
-}
-
-function decodeAsteroidTool(payload: WireRecord): ClientCommandDecodeResult {
-  const sequence = readSafeInteger(payload['sequence']);
-  const targetId = payload['targetId'];
-  if (
-    payload['action'] !== 'latch' ||
-    sequence === undefined ||
-    (targetId !== undefined && typeof targetId !== 'string')
-  ) {
-    return invalid('asteroidTool', 'Unsupported asteroid tool action');
-  }
-  return {
-    ok: true,
-    command: {
-      type: 'asteroidTool',
-      action: {
-        action: 'latch',
-        sequence,
-        ...(targetId !== undefined ? { targetId } : {}),
-      },
-    },
-  };
-}
-
-function decodeAsteroidInput(payload: WireRecord): ClientCommandDecodeResult {
-  const epoch = readSafeInteger(payload['epoch']);
-  const sequence = readSafeInteger(payload['sequence']);
-  const thrust = payload['thrust'];
-  const turn = payload['turn'];
-  const aimAngle = readFiniteNumber(payload['aimAngle']);
-  const rawAction = payload['action'];
-  const action =
-    rawAction === 'release' ||
-    rawAction === 'anchor' ||
-    rawAction === 'brake' ||
-    rawAction === 'spin'
-      ? rawAction
-      : undefined;
-  const targetId = payload['targetId'];
-  if (
-    epoch === undefined ||
-    sequence === undefined ||
-    typeof thrust !== 'boolean' ||
-    (turn !== -1 && turn !== 0 && turn !== 1) ||
-    aimAngle === undefined ||
-    (rawAction !== undefined && action === undefined) ||
-    (targetId !== undefined && typeof targetId !== 'string')
-  ) {
-    return invalid('asteroidInput');
-  }
-  return {
-    ok: true,
-    command: {
-      type: 'asteroidInput',
-      input: {
-        epoch,
-        sequence,
-        thrust,
-        turn,
-        aimAngle,
-        ...(action !== undefined ? { action } : {}),
-        ...(targetId !== undefined ? { targetId } : {}),
-      },
-    },
   };
 }
 
@@ -342,10 +265,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       }
       return { ok: true, command: { type, ...(typeof probeId === 'number' ? { probeId } : {}) } };
     }
-    case 'asteroidTool':
-      return decodeAsteroidTool(payload);
-    case 'asteroidInput':
-      return decodeAsteroidInput(payload);
     case 'clientLog':
       return { ok: true, command: { type, payload } };
     case 'update':
@@ -404,23 +323,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return targetPlayerId && attackerId && damage !== undefined
         ? { ok: true, command: { type, targetPlayerId, attackerId } }
         : invalid(type, 'Missing required fields for collisionDamage');
-    }
-    case 'satellitePickupCollected': {
-      const pickupId = readNonEmptyString(fields['pickupId']);
-      if (!pickupId) {
-        return invalid(type, 'Missing pickup ID for satellitePickupCollected');
-      }
-      const claimed = fields['playerId'];
-      return claimed === undefined || typeof claimed === 'string'
-        ? {
-            ok: true,
-            command: {
-              type,
-              pickupId,
-              ...(claimed !== undefined ? { claimedPlayerId: claimed } : {}),
-            },
-          }
-        : invalid(type);
     }
     case 'initAsteroids':
       return id

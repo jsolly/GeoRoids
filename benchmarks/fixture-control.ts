@@ -129,11 +129,7 @@ export async function startFixtureControl(
           const position = { x: Math.cos(angle) * 100, y: Math.sin(angle) * 100 };
           if (actor.type === 'human') {
             assert(
-              engine.asteroidMotion.placeActorForTesting(
-                actor.id,
-                position,
-                engine.getServerTime()
-              ),
+              engine.playerMotion.placeActorForTesting(actor.id, position, engine.getServerTime()),
               'Human fixture motion session absent'
             );
           }

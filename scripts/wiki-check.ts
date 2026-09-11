@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listShipKits } from '../src/entities/ship/shipKits';
-import { articles } from '../src/wiki/content';
+import { articles, mediaForArticle } from '../src/wiki/content';
 import { media } from '../src/wiki/media';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,7 +17,7 @@ for (const kit of listShipKits()) {
   const article = articles.find((entry) => entry.id === kit.id);
   if (!article) {
     failures.push(`Missing ship article: ${kit.id}`);
-  } else if (!article.media.includes(kit.id)) {
+  } else if (!mediaForArticle(article).includes(kit.id)) {
     failures.push(`Missing ship ability demonstration: ${kit.id}`);
   }
 }
@@ -33,7 +33,7 @@ for (const article of articles) {
       failures.push(`${article.id}: broken related entry ${id}`);
     }
   }
-  for (const id of article.media) {
+  for (const id of mediaForArticle(article)) {
     if (!media[id]) {
       failures.push(`${article.id}: missing media definition ${id}`);
     }
@@ -45,7 +45,7 @@ for (const article of articles) {
   }
 }
 for (const [id, item] of Object.entries(media)) {
-  if (!articles.some((article) => article.media.includes(id))) {
+  if (!articles.some((article) => mediaForArticle(article).includes(id))) {
     failures.push(`Unreferenced demonstration: ${id}`);
   }
   if (!item.alt || !item.caption || !item.sources.length) {
@@ -94,7 +94,6 @@ const sourcePaths = new Set([
     'src/input',
     'src/physics',
     'src/constants',
-    'src/asteroidTools',
     'src/core',
     'src/ui',
     'src/rendering',

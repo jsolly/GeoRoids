@@ -7,7 +7,9 @@ import type { SatellitePickup } from './SatellitePickup';
 
 export function drawSatellitePickups(pickups: SatellitePickup[], viewer: Position): void {
   for (const pickup of pickups) {
-    drawSatellitePickup(pickup, viewer);
+    if (pickup.state !== 'broken' && pickup.health > 0) {
+      drawSatellitePickup(pickup, viewer);
+    }
   }
 }
 
@@ -37,6 +39,28 @@ function drawSatellitePickup(pickup: SatellitePickup, viewer: Position): void {
     drawRelayHardware(ctx, radius);
   }
   ctx.restore();
+
+  if (pickup.health < pickup.maxHealth) {
+    const width = radius * 2.4;
+    const left = screen.x - width / 2;
+    const top = screen.y - radius * 1.5 - 6;
+    ctx.save();
+    ctx.lineWidth = VISUAL.HEALTH_CAPSULE_HEIGHT;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = PALETTE.HUD_MUTED;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(left, top);
+    ctx.lineTo(left + width, top);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = PALETTE.HEALTH;
+    ctx.beginPath();
+    ctx.moveTo(left, top);
+    ctx.lineTo(left + width * Math.max(0, pickup.health / pickup.maxHealth), top);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawEchoHardware(ctx: DrawingContext, radius: number): void {

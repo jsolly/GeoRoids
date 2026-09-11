@@ -89,17 +89,32 @@ test('a bot shot damages a human but passes through a spawn-protected human', ()
 for (const shield of ['manual', 'warden'] as const) {
   test(`a hostile shot flashes the ${shield} shield while an allied shot passes quietly`, () => {
     for (const faction of ['ion', 'ember'] as const) {
-      const { engine, attacker, target } = arena(faction, shield === 'warden' ? 'warden' : 'dart');
+      const { engine, attacker, target } = arena(faction);
       if (shield === 'manual') {
         expect(engine.requestShield(target.id, true)).toBe(true);
       } else {
-        expect(engine.useAbility(target.id)).toBe(true);
+        const caster = engine.addPlayer(
+          'warden',
+          'Warden',
+          new RecordingSocket(),
+          { x: 0, y: 80 },
+          undefined,
+          'warden',
+          faction
+        );
+        expect(engine.useAbility(caster.id)).toBe(true);
+        expect(caster.shieldTargetId).toBe(target.id);
+        expect(target.shieldSourceId).toBe(caster.id);
+        for (const rock of engine.getAllAsteroids()) {
+          engine.removeAsteroid(rock.id);
+        }
       }
       const health = target.health;
       const shot = fire(engine, attacker.id);
       expect(target.health).toBe(health);
       expect(target.shieldFlashTime > 0).toBe(faction === 'ember');
-      expect(shot.hasExploded).toBe(faction === 'ember');
+      expect(shot.bounces ?? 0).toBe(faction === 'ember' ? 1 : 0);
+      expect(shot.velocity.x < 0).toBe(faction === 'ember');
       expect(target.shieldActive).toBe(shield === 'manual');
       const snapshot = engine.getGameState().entities.find((row) => row.id === target.id);
       expect(snapshot?.shieldFlashTime).toBe(target.shieldFlashTime);

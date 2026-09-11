@@ -7,7 +7,7 @@ import { getFactionColor } from '../../utils/colorUtils';
 import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
-import { applySharedHarpoonLatch } from '../ship/shipAbilities';
+import { applySharedHarpoonLatch, clearShieldProjection } from '../ship/shipAbilities';
 import { applyShipKitToShip } from '../ship/shipKits';
 import { applyShieldSnapshot, clearShield } from '../ship/shipShield';
 import {
@@ -137,6 +137,8 @@ export class Player {
     abilityCooldownFrames?: number;
     abilityActiveFrames?: number;
     shieldTimer?: number;
+    shieldTargetId?: string;
+    shieldSourceId?: string;
     harpoonTimer?: number;
     harpoonTargetId?: string;
     harpoonLatchPos?: { x: number; y: number };
@@ -362,6 +364,12 @@ export class Player {
       if (data.shieldTimer !== undefined) {
         this.ship.shieldTimer = data.shieldTimer;
       }
+      if (data.shieldTargetId !== undefined) {
+        this.ship.shieldTargetId = data.shieldTargetId;
+      }
+      if (data.shieldSourceId !== undefined) {
+        this.ship.shieldSourceId = data.shieldSourceId;
+      }
     }
     applyShieldSnapshot(this.ship, data);
     applySharedHarpoonLatch(
@@ -426,6 +434,7 @@ export class Player {
     this.ship.explodeTime = 0;
     this.ship.blinkCount = 0;
     this.ship.spawnProtectionTimer = 0;
+    clearShieldProjection(this.ship);
     this.ship.velocity.x = 0;
     this.ship.velocity.y = 0;
   }
@@ -453,6 +462,7 @@ export class Player {
     delete this.ship.lastExplodeCause;
     applyShipSpawnProtection(this.ship);
     clearShield(this.ship);
+    clearShieldProjection(this.ship);
 
     logger.debug('RESPAWN', 'Player respawn completed', {
       playerId: this.id,

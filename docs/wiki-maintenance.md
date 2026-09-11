@@ -4,15 +4,21 @@ The manual is a second Vite entry at `/wiki/`, deployed with the client on the s
 
 ## Content and coverage
 
-Edit `src/wiki/content.ts`. Every article declares its authoritative source files, related entry IDs, and demonstration IDs. Exact values should come from game definitions where possible. Explain player-visible behavior, including failure conditions and exceptions. Keep strategy separate from confirmed rules and avoid declaring a best tactic without gameplay evidence.
+Edit `src/wiki/content.ts`. Every article declares its authoritative source files and related entry IDs; sections own the demonstration that illustrates that section, and `mediaForArticle` derives the article media inventory for checks. Exact values should come from game definitions where possible. Explain player-visible behavior, including failure conditions and exceptions. Keep strategy separate from confirmed rules and avoid declaring a best tactic without gameplay evidence.
 
 Use `docs/wiki-coverage.md` as the inventory. A new ship or player-facing mechanic needs an entry or a documented section within an existing entry, plus cross-links. New important interactions need the same treatment. Do not interpret a passing hash check as proof that editorial coverage is complete.
 
+## Ship profiles
+
+Each ship page pairs an Apache ECharts SVG radar with seven base-stat ratings and exact values. `src/wiki/shipScorecard.ts` derives both displays from the current ship definitions. Each stat maps linearly from the fleet minimum to maximum onto 1–5 bubbles, rounded to a whole bubble. Size, shot interval, and ability cooldown reverse the scale so smaller or shorter scores higher. Equal fleet-wide values score 3. These compare base stats, not ability effectiveness or an overall ship ranking.
+
+The Wiki imports only the radar chart and SVG renderer; gameplay does not load ECharts. Navigation disposes the chart and its resize observer. The HTML values and accessible bubble labels remain the readable counterpart to the visual radar.
+
 ## Demonstrations
 
-`src/wiki/media.ts` describes each GIF and its static poster. Each demonstration has a title, descriptive alternative text, a caption explaining the controlled setup, and source files. Assets live in `public/wiki/media/`. Use actual simulation helpers and game geometry in the generator, with scripted inputs and a fixed clock. `scripts/wiki-satellite-demo.ts` records all six firing profiles from the real `SatelliteManager`, including burst gaps and projectile lifetimes; keep that simulation separate from panel layout. Never invent a visual rule that the game does not implement.
+`src/wiki/media.ts` describes each GIF and its static poster. Each demonstration has a title, descriptive alternative text, a caption explaining the controlled setup, and source files. Assets live in `public/wiki/media/`. Use actual simulation helpers and game geometry in the generator, with scripted inputs and a fixed clock. `scripts/wiki-satellite-demo.ts` records all six firing profiles from the real `SatelliteManager`, including burst gaps and projectile lifetimes; keep that simulation separate from panel layout. A section with a demonstration renders its copy and animation in one card, without a repeated caption. Keep the Hauler demonstration on its combat harpoon and keep reflective asteroid behavior in the reflection demonstration. Never invent a visual rule that the game does not implement.
 
-The manual displays posters by default. Play loads the GIF; Pause restores the poster. This also keeps GIFs from starting for readers who prefer reduced motion. A change to reduced-motion preference, or hiding the browser tab, stops active animations. Posters and descriptive text remain available without animation.
+Article demonstrations autoplay their GIF when an article opens; there are no playback controls to operate. When `prefers-reduced-motion: reduce` is active, articles use their static posters. Hiding the browser tab swaps active GIFs to posters, and returning to the tab resumes them when motion is allowed. Posters and descriptive text remain available without animation.
 
 ## Generate or verify GIFs
 

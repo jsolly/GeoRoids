@@ -19,7 +19,7 @@ inventory and reasons for stopping are in [optimization decisions](optimization-
 
 At the time of these local validation receipts, the changes had not been pushed
 or deployed. This record does not certify a production release; deployment proof
-belongs to the shipping receipt. The parallel tools-menu removal is reconciled:
+belongs to the shipping receipt. The gameplay-control cleanup is reconciled:
 direct controls, gesture cancellation and
 disabled-snapshot pilot clearing are preserved. The combined gameplay and Wiki
 checks passed. No additional optimization architecture is proposed.
@@ -43,8 +43,8 @@ pinned-revision benchmark framework and direct controls. The work stays in
 
 The simulation remains at 60 Hz and snapshots at 30 Hz. A server scheduling stall
 can catch up at most one second of game frames; longer wall time is discarded and
-counted. Game-frame timers and attached-object motion progress through the frames
-actually simulated. Motion receives an explicit simulation delta instead of
+counted. Game-frame timers and simulated entity motion progress through the
+frames actually simulated. Motion receives an explicit simulation delta instead of
 re-measuring wall time within each catch-up tick. Wall-clock reconnect grace
 remains wall-clock based. A visible client resumes
 with a zero presentation delta and requests current authoritative state.
@@ -107,17 +107,18 @@ credentials, repaired enhanced-session recovery after an event write failure,
 and corrected attached motion during fixed-tick catch-up. The earlier timed
 reports do not describe the final shipping source hash.
 
-After those ship fixes, 29 motion unit scenarios passed, including an attached
-Hauler's normal-tick/hitch equivalence and wall rollback with reconnect grace.
-The hitch regression failed against the old motion integration before that
-temporary mutation was removed. Four Hauler/reconnect/desktop-mobile Wiki
-integration scenarios and 27 recovery/benchmark unit scenarios passed with no
-skips. Their logs are `.performance/ship-motion-unit.txt`,
-`.performance/ship-motion-integration.txt`, and
-`.performance/ship-review-network-tests.txt`. The desktop/mobile Wiki and live
-Hauler captures were inspected and the source review recorded. The full gate
-then passed in `.performance/ship-gate-review.txt`, including the complete unit
-suite and production build.
+The archived motion receipts below cover the former attached Hauler tool path;
+they remain historical evidence and do not describe the current game. At that
+revision, 29 motion unit scenarios passed, including normal-tick/hitch
+equivalence and wall rollback with reconnect grace. The hitch regression failed
+against the old motion integration before that temporary mutation was removed.
+Four Hauler/reconnect/desktop-mobile Wiki integration scenarios and 27
+recovery/benchmark unit scenarios passed with no skips. Their logs are
+`.performance/ship-motion-unit.txt`, `.performance/ship-motion-integration.txt`,
+and `.performance/ship-review-network-tests.txt`. The desktop/mobile Wiki and
+live Hauler captures were inspected and the source review recorded. The full
+gate then passed in `.performance/ship-gate-review.txt`, including the complete
+unit suite and production build.
 
 The independent final benchmark review found no remaining findings in the
 reviewed delivery denominator, RTT completeness, proxy cleanup and authoritative

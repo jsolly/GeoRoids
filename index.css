@@ -794,32 +794,20 @@ body.touch-play #gameCanvas,
   text-underline-offset: 4px;
 }
 
-/* Direct controls report state without covering or intercepting the playfield. */
-#flight-feedback {
+/* Passive laser-core readout never captures playfield input. */
+#flight-upgrade {
   position: absolute;
   top: 112px;
   left: 16px;
   max-width: min(260px, 60vw);
-  color: var(--palette-hud-muted, #94a3b8);
+  color: var(--palette-laser, #fde68a);
   font: 11px / 1.5 var(--font-mono, monospace);
   pointer-events: none;
   overflow-wrap: anywhere;
 }
-#flight-upgrade {
-  color: var(--palette-laser, #fde68a);
-}
 @media (max-height: 500px) {
-  #flight-feedback {
+  #flight-upgrade {
     top: 76px;
     font-size: 10px;
   }
-}
-
-#flight-selection-announcement {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }

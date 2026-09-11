@@ -23,43 +23,49 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   hauler: {
     title: 'Hauler harpoon',
-    alt: 'A Hauler latches a cream tether to a nearby asteroid and pulls it inward.',
+    alt: 'A spinning asteroid passes through a Hauler on a cream tether, then strikes a second ship after the tether timer ends.',
     caption:
-      'Controlled demonstration: press E to hook a nearby rock. The cable pulls it toward the Hauler, then releases when its timer ends.',
+      'Controlled demonstration: press E to pull a spinning rock through the Hauler safely. The timed tether releases it toward a second ship, where the normal asteroid collision rule shows a visible impact.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
       'src/entities/ship/shipRenderer.ts',
+      'shared/combat.ts',
     ],
   },
   warden: {
-    title: 'Warden shield focus',
-    alt: 'A Warden hull raises a cyan shield ring while an incoming laser is absorbed.',
+    title: 'Warden shield projection',
+    alt: 'A Warden projects a cyan shield to a nearby ally, which reflects an incoming laser back into its shooter.',
     caption:
-      'Controlled demonstration: an incoming shot disappears against the active E shield. The shield ring disappears when its timer expires.',
+      'Controlled demonstration: E automatically shields the nearest living ally in reach. The ally reflects a hostile laser into its shooter while the link and three-second timer remain visible.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipShield.ts',
+      'src/entities/ship/shieldProjectionRenderer.ts',
+      'shared/shieldReflection.ts',
       'src/entities/ship/hullOutlines.ts',
     ],
   },
   skirmisher: {
     title: 'Skirmisher burst fire',
-    alt: 'A Skirmisher fires three amber laser bolts in a narrow spread.',
-    caption: 'Controlled demonstration: press E to fire three shots in a narrow spread.',
+    alt: 'A Skirmisher fires three amber laser bolts in a narrow spread and hits a second ship.',
+    caption:
+      'Controlled demonstration: press E to fire three shots in a tight spread; one bolt reaches the target hull.',
     sources: [
       'src/entities/ship/Ship.ts',
       'src/entities/ship/shipKits.ts',
       'src/entities/satellite/satelliteMath.ts',
+      'shared/combat.ts',
     ],
   },
   quake: {
     title: 'Quake shock pulse',
-    alt: 'A Quake emits a cyan expanding pulse that pushes nearby asteroids away.',
+    alt: 'A Quake emits a blue expanding pulse that reaches and pushes a second ship while asteroids scatter.',
     caption:
-      'Controlled demonstration: press E to spend fuel and push nearby rocks outward. They keep moving after the pulse ends.',
+      'Controlled demonstration: press E to spend fuel and push a nearby ship and rocks outward. The pulse reaches its target without dealing direct damage.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
+      'src/entities/ship/quakePulseRenderer.ts',
       'src/constants/index.ts',
       'src/entities/ship/hullOutlines.ts',
     ],
@@ -105,13 +111,14 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   shield: {
-    title: 'Shield timers',
-    alt: 'A Warden timed shield and the regular F shield are shown as separate cyan rings.',
+    title: 'Reflective shield lanes',
+    alt: 'A Warden projected shield and a regular F shield show separate cyan rings while incoming lasers turn back.',
     caption:
-      'Controlled demonstration: Warden E lasts three seconds; the separate F laser shield lasts two. Their timers run independently.',
+      'Controlled demonstration: Warden E projects a three-second reflective shield to an ally; the separate Warden F shield reflects lasers for four seconds. Their timers run independently.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipShield.ts',
+      'shared/shieldReflection.ts',
       'src/entities/ship/hullOutlines.ts',
     ],
   },
@@ -125,28 +132,6 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/physics/shockwave.ts',
       'src/constants/index.ts',
       'src/entities/roid/materialArt.ts',
-    ],
-  },
-  slingshot: {
-    title: 'Hauler slingshot',
-    alt: 'A Hauler swings around a latched asteroid, then releases with tangential momentum.',
-    caption:
-      'Controlled demonstration: latch onto a rock, orbit it, then release along the tangent and coast.',
-    sources: [
-      'shared/asteroidMotion.ts',
-      'docs/asteroid-interactions.md',
-      'src/entities/ship/hullOutlines.ts',
-    ],
-  },
-  winch: {
-    title: 'Winch coupling',
-    alt: 'A Hauler tether links a primary asteroid to a second payload as their angular momentum couples.',
-    caption:
-      'Controlled demonstration: attach a second rock to share momentum, then release the pair.',
-    sources: [
-      'shared/asteroidMotion.ts',
-      'server/core/AsteroidMotionService.ts',
-      'src/entities/ship/shipRenderer.ts',
     ],
   },
   satellites: {
@@ -164,9 +149,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   pickups: {
     title: 'Satellite pickup orbit',
-    alt: 'A collected satellite pickup changes to an orbiting state and circles the pilot.',
+    alt: 'An Echo pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a hostile laser.',
     caption:
-      'Controlled demonstration: an Echo pickup orbits its collector for three seconds, then returns to the field.',
+      'Controlled demonstration: a nearby Echo attaches automatically, keeps orbiting while a hostile laser removes 25 health, and remains active after the hit.',
     sources: [
       'server/core/SatellitePickupManager.ts',
       'src/entities/satellitePickup/satellitePickupMath.ts',

@@ -133,7 +133,7 @@ Using the archived delta fixture as an illustration, `8,166.60 × 30 × 8` is ab
 
 Measure payload distributions by message kind and actual delivery rate. Record large keyframes and repeated recovery separately from normal deltas. A client that continually recovers may use more bytes and feel worse despite the presence of delta encoding.
 
-If transmission or application load is dominant, compare 30 Hz with 20 Hz snapshots in an isolated candidate while keeping the authoritative simulation at 60 Hz. Twenty Hz changes the nominal update interval from 33.3 to 50 ms. Lower frequency may create larger deltas, and remote motion may need different presentation buffering, so neither byte savings nor smoothness follows automatically. Measure corrections, shot feedback, attached asteroid motion, and delivery gaps as well as bandwidth.
+If transmission or application load is dominant, compare 30 Hz with 20 Hz snapshots in an isolated candidate while keeping the authoritative simulation at 60 Hz. Twenty Hz changes the nominal update interval from 33.3 to 50 ms. Lower frequency may create larger deltas, and remote motion may need different presentation buffering, so neither byte savings nor smoothness follows automatically. Measure corrections, shot feedback, asteroid motion, and delivery gaps as well as bandwidth.
 
 A phone-specific cadence needs an explicit protocol/configuration design and tests for divergent recipient baselines. An interpolation policy adds visual delay to tolerate jitter. Tune it against measured gaps and gameplay cues; do not hide a growing queue behind an ever-longer buffer. Audit the existing entity-specific prediction and synchronization paths before adding another smoothing layer.
 
@@ -237,7 +237,7 @@ Do not apply every row. Each conditional candidate has an evidence gate; rejecti
 
 The first implementation change should connect DPR, CPU throttling, and ordered network impairment to the existing production-client runner and prove that each constraint actually applies. Add missing attribution counters and the controlled rendering-scale comparison next. Follow with the smallest successful rendering change. Add a production quality policy only after fixed settings prove useful on real phones. Remove temporary switches and unused experiment paths once decisions are made.
 
-Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve snapshot-v1 recovery and authoritative asteroid interactions. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
+Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve snapshot-v1 recovery and authoritative asteroid and projectile behavior. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
 
 Run the focused canvas/input/protocol tests appropriate to each implementation, then the repository gate. Integration and browser scenarios must use the repository runner. Include simultaneous steering/fire, ability/shield feedback, rotation, death/respawn, background recovery, and two-player reconnect. Visual checks must cover low-quality rendering as well as the normal tier.
 

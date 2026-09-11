@@ -1,11 +1,13 @@
+import {
+  findNearestShieldImpact,
+  reflectProjectileVelocity,
+} from '../../../shared/shieldReflection';
 import { DAMAGE } from '../../constants';
+import type { Laser } from '../../entities/laser/Laser';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { canDealCombatDamage } from '../../entities/player/softFactions';
 import type { Satellite } from '../../entities/satellite/Satellite';
-import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
-import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
-import { isWithinCollectRange } from '../../entities/satellitePickup/satellitePickupMath';
 import type { Ship } from '../../entities/ship/Ship';
 import {
   isReadableShieldUp,
@@ -20,6 +22,59 @@ import {
   checkLaserShipCollision,
   checkShipCollision,
 } from './collisionDetection';
+
+function reflectSatelliteLaserFromShield(
+  laser: Laser,
+  ship: Ship,
+  impact: ReturnType<typeof findNearestShieldImpact>
+): void {
+  const start = laser.prevPosition;
+  const end = laser.position;
+  const segmentDistance = Math.hypot(end.x - start.x, end.y - start.y);
+  if (impact && segmentDistance > 0) {
+    const remainingDistance = Math.max(0, segmentDistance - impact.distance);
+    laser.prevPosition = { ...impact.point };
+    laser.velocity = reflectProjectileVelocity(laser.velocity, impact.normal);
+    const speed = Math.hypot(laser.velocity.x, laser.velocity.y);
+    if (speed > 0) {
+      laser.position = {
+        x: impact.point.x + (laser.velocity.x / speed) * remainingDistance,
+        y: impact.point.y + (laser.velocity.y / speed) * remainingDistance,
+      };
+    } else {
+      laser.position = { ...impact.point };
+    }
+    laser.lastShieldId = ship.id;
+    laser.bounceCount += 1;
+    return;
+  }
+
+  // A snapshot can land a visual bolt exactly on a shield surface without a
+  // swept segment. Nudge it out along the radial normal while preserving speed.
+  const dx = laser.position.x - ship.position.x;
+  const dy = laser.position.y - ship.position.y;
+  const distance = Math.hypot(dx, dy);
+  const normal =
+    distance > 0
+      ? { x: dx / distance, y: dy / distance }
+      : {
+          x: -laser.velocity.x,
+          y: -laser.velocity.y,
+        };
+  const normalLength = Math.hypot(normal.x, normal.y);
+  if (normalLength <= 0) {
+    return;
+  }
+  const unitNormal = { x: normal.x / normalLength, y: normal.y / normalLength };
+  laser.velocity = reflectProjectileVelocity(laser.velocity, unitNormal);
+  laser.position = {
+    x: ship.position.x + unitNormal.x * (laserCollisionRadius(ship.r, ship) + 0.01),
+    y: ship.position.y + unitNormal.y * (laserCollisionRadius(ship.r, ship) + 0.01),
+  };
+  laser.prevPosition = { ...laser.position };
+  laser.lastShieldId = ship.id;
+  laser.bounceCount += 1;
+}
 
 export class CollisionManager {
   private static instance: CollisionManager;
@@ -136,47 +191,6 @@ export class CollisionManager {
     return match?.factionId;
   }
 
-  /** Send a collection request for the locally-overlapped loose pickup. */
-  checkPlayerSatellitePickupCollisions(
-    player: { ship: Ship; id: string; type: 'local' | 'remote' | 'bot' },
-    pickups: SatellitePickup[]
-  ): void {
-    if (
-      player.type !== 'local' ||
-      !player.ship ||
-      player.ship.health <= 0 ||
-      player.ship.exploding
-    ) {
-      return;
-    }
-
-    const pickupManager = SatellitePickupManager.getInstance();
-    const collectorId = this.networkManager.getLocalPlayerId() || player.id;
-    const now = Date.now();
-    for (const pickup of pickups) {
-      if (pickup.state !== 'loose' || pickupManager.shouldDebounceCollect(pickup.id, now)) {
-        continue;
-      }
-      if (
-        !isWithinCollectRange(
-          player.ship.position,
-          pickup.position,
-          player.ship.r,
-          pickup.radius,
-          0
-        )
-      ) {
-        continue;
-      }
-      pickupManager.markCollectAttempt(pickup.id, now);
-      this.networkManager.sendMessage({
-        type: 'satellitePickupCollected',
-        data: { pickupId: pickup.id, playerId: collectorId },
-      });
-      break;
-    }
-  }
-
   checkSatelliteLaserCollisions(
     satellites: Satellite[],
     localShip: Ship,
@@ -191,6 +205,31 @@ export class CollisionManager {
         if (laser.hasExploded) {
           continue;
         }
+        if (isReadableShieldUp(localShip)) {
+          const impact = findNearestShieldImpact(
+            laser.prevPosition,
+            laser.position,
+            [
+              {
+                id: localShip.id,
+                position: localShip.position,
+                radius: laserCollisionRadius(localShip.r, localShip),
+              },
+            ],
+            laser.lastShieldId
+          );
+          const overlapping = checkLaserShipCollision(
+            laser.position,
+            localShip.position,
+            laserCollisionRadius(localShip.r, localShip)
+          );
+          if (impact || overlapping) {
+            noteReadableShieldLaserHit(localShip);
+            reflectSatelliteLaserFromShield(laser, localShip, impact);
+            laser.playHitSound();
+            return;
+          }
+        }
         if (
           checkLaserShipCollision(
             laser.position,
@@ -198,12 +237,6 @@ export class CollisionManager {
             laserCollisionRadius(localShip.r, localShip)
           )
         ) {
-          if (isReadableShieldUp(localShip)) {
-            noteReadableShieldLaserHit(localShip);
-            laser.updateExplodeTime();
-            laser.playHitSound();
-            return;
-          }
           // The server simulates EO projectiles and owns the damage result.
           // This local overlap only removes the visual bolt at the same time.
           laser.updateExplodeTime();

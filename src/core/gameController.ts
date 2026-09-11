@@ -1,24 +1,13 @@
-import { previewChargedReflections } from '../../shared/asteroidPhenomena';
 import { areAllied } from '../../shared/factions';
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import type {
   AsteroidData,
-  AsteroidToolAction,
   LootData,
   Position,
   SatellitePickupCollected,
-  ServerEntityData,
   ShipKitId,
 } from '../../shared-types';
-import { AsteroidGestures } from '../asteroidTools/AsteroidGestures';
-import {
-  AsteroidToolsController,
-  type AsteroidToolsControllerUpdate,
-  type AsteroidToolsMotionAction,
-  type AsteroidToolsTarget,
-} from '../asteroidTools/AsteroidToolsController';
-import { FlightFeedback } from '../asteroidTools/FlightFeedback';
 import {
   replaceThrustSources,
   resetThrustSources,
@@ -66,6 +55,7 @@ import {
   getTerrainSeed,
 } from '../physics/terrain/terrainSession';
 import { canvasManager } from '../rendering/canvas';
+import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
 import { PLAYFIELD_CLOSE_SCALE } from '../rendering/playfieldCamera';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
@@ -74,15 +64,6 @@ import { formatGameOverText, preferDeathCause } from '../utils/deathCause';
 import { logger } from '../utils/Logger';
 import { GameStateManager } from './services/GameStateManager';
 import { InputManager } from './services/InputManager';
-
-interface AsteroidToolsSnapshotDetail {
-  enabled: boolean;
-  entity?: ServerEntityData;
-  asteroids?: AsteroidData[];
-}
-
-type ConstrainedMotionAction = Exclude<AsteroidToolsMotionAction, 'latch'>;
-type MotionActionDispatcher = (action: ConstrainedMotionAction, targetId?: string) => boolean;
 
 export class GameController {
   private static instance: GameController;
@@ -101,31 +82,7 @@ export class GameController {
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
   private simulationAccumulatorMs = 0;
-  private readonly asteroidToolsController: AsteroidToolsController;
-  private flightFeedback: FlightFeedback | null = null;
-  private asteroidGestures: AsteroidGestures | null = null;
-  private readonly reflectionRocks: AsteroidData[] = [];
-  private readonly asteroidToolsSnapshotHandler = (event: Event): void => {
-    this.applyAsteroidToolsSnapshot(event);
-  };
-  private readonly asteroidToolsKeyHandler = (event: KeyboardEvent): void => {
-    const target = event.target;
-    if (
-      !this.gameStateManager.getIsGameRunning() ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      (target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest('input, textarea, select, button')))
-    ) {
-      return;
-    }
-    this.asteroidToolsController.handleKeyDown(event);
-  };
-  private readonly asteroidToolsBlurHandler = (): void => {
-    this.asteroidToolsController.cancel();
-    this.asteroidGestures?.cancel();
-  };
+  private laserUpgradeReadout: LaserUpgradeReadout | undefined;
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -133,18 +90,6 @@ export class GameController {
     this.inputManager = InputManager.getInstance();
     this.networkManager = NetworkManager.getInstance();
     this.collisionManager = CollisionManager.getInstance();
-    this.asteroidToolsController = new AsteroidToolsController({
-      dispatchTool: (action) => this.dispatchAsteroidTool(action),
-      dispatchMotionAction: (action, targetId) =>
-        this.dispatchAsteroidMotionAction(action, targetId),
-      onChange: (state) => {
-        this.flightFeedback?.update(state);
-        if (!state.pilot || state.pilot.alive === false) {
-          this.asteroidGestures?.cancel();
-        }
-      },
-    });
-
     bindGameAudio({
       getListenerPosition: () => this.playerManager.getLocalShip()?.position,
       getViewport: () => {
@@ -167,9 +112,6 @@ export class GameController {
 
     // Set up network disconnection handler
     this.setupNetworkDisconnectionHandler();
-    window.addEventListener('asteroidToolsSnapshot', this.asteroidToolsSnapshotHandler);
-    window.addEventListener('keydown', this.asteroidToolsKeyHandler);
-    window.addEventListener('blur', this.asteroidToolsBlurHandler);
 
     // Set up game over handler
     this.setupGameOverHandler();
@@ -188,213 +130,13 @@ export class GameController {
     return GameController.instance;
   }
 
-  getAsteroidToolsController(): AsteroidToolsController {
-    return this.asteroidToolsController;
-  }
-
-  private ensureFlightControls(): void {
-    const canvas = canvasManager.getCanvas();
-    if (!canvas || this.flightFeedback) {
-      return;
-    }
-    this.flightFeedback = new FlightFeedback(document.getElementById('gameArea') ?? document.body);
-    this.flightFeedback.update(this.asteroidToolsController.getState());
-    this.asteroidGestures = new AsteroidGestures(canvas, this.asteroidToolsController, {
-      isPlaying: () => this.gameStateManager.getIsGameRunning(),
-      project: (position) => {
-        const ship = this.playerManager.getLocalShip();
-        if (!ship) {
-          return undefined;
-        }
-        const point = canvasManager.worldToScreen(position, ship.position);
-        const rect = canvas.getBoundingClientRect();
-        const viewport = canvasManager.getViewportSize();
-        return {
-          x: rect.left + (point.x * rect.width) / viewport.width,
-          y: rect.top + (point.y * rect.height) / viewport.height,
-          scale: (canvasManager.getPlayfieldScale() * rect.width) / viewport.width,
-        };
-      },
-    });
-  }
-
-  private dispatchAsteroidTool(action: AsteroidToolAction): boolean {
-    return this.networkManager.sendMessage({
-      type: 'asteroidTool',
-      data: action,
-      timestamp: Date.now(),
-    });
-  }
-
-  private dispatchAsteroidMotionAction: MotionActionDispatcher = (action, targetId) => {
-    return this.networkManager.dispatchAsteroidMotionAction(action, targetId);
-  };
-
-  private applyAsteroidToolsSnapshot(event: Event): void {
-    const detail = (event as CustomEvent<AsteroidToolsSnapshotDetail>).detail;
-    if (!detail || typeof detail !== 'object' || typeof detail.enabled !== 'boolean') {
-      return;
-    }
-
-    if (!detail.enabled) {
-      this.asteroidToolsController.update({
-        pilot: undefined,
-        targets: [],
-        reflectionPreview: undefined,
-      });
-      return;
-    }
-    const update: AsteroidToolsControllerUpdate = {};
-    if (detail.entity) {
-      update.pilot = {
-        id: detail.entity.id,
-        position: detail.entity.position,
-        ...(detail.entity.kitId !== undefined ? { kitId: detail.entity.kitId } : {}),
-        ...(detail.entity.factionId !== undefined ? { factionId: detail.entity.factionId } : {}),
-        alive: !detail.entity.exploding && detail.entity.health > 0,
-        ...(detail.entity.asteroidMotion !== undefined
-          ? { asteroidMotion: detail.entity.asteroidMotion }
-          : {}),
-        ...(detail.entity.laserUpgrade !== undefined
-          ? { laserUpgrade: detail.entity.laserUpgrade }
-          : {}),
-      };
-    }
-    if (detail.asteroids) {
-      update.targets = this.asteroidToolsTargetsFromSnapshot(detail.asteroids);
-    }
-    this.asteroidToolsController.update(update);
-  }
-
-  private asteroidToolsTargetsFromSnapshot(
-    asteroids: readonly AsteroidData[]
-  ): AsteroidToolsTarget[] {
-    const targets: AsteroidToolsTarget[] = [];
-    for (const asteroid of asteroids) {
-      if (
-        !asteroid.id ||
-        !Number.isFinite(asteroid.position.x) ||
-        !Number.isFinite(asteroid.position.y) ||
-        !Number.isFinite(asteroid.size) ||
-        asteroid.size <= 0
-      ) {
-        continue;
-      }
-      targets.push({
-        id: asteroid.id,
-        position: { ...asteroid.position },
-        size: asteroid.size,
-        ...(asteroid.material !== undefined ? { material: asteroid.material } : {}),
-        ...(asteroid.phenomenon !== undefined ? { phenomenon: asteroid.phenomenon } : {}),
-      });
-    }
-    return targets;
-  }
-
-  private updateAsteroidToolsPreview(): void {
-    const state = this.asteroidToolsController.getState();
-    const ship = this.playerManager.getLocalShip();
-    if (!state.selectedTargetId || !ship || ship.exploding || !this.currRoidBelt) {
-      if (state.reflectionPreview) {
-        this.asteroidToolsController.setReflectionPreview(undefined);
-      }
-      return;
-    }
-
-    let count = 0;
-    for (const roid of this.currRoidBelt.roids) {
-      const slot = this.reflectionRocks[count];
-      if (slot) {
-        slot.id = roid.id;
-        slot.position = roid.position;
-        slot.velocity = roid.velocity;
-        slot.size = roid.r;
-        slot.jaggedness = roid.jaggedness;
-        slot.rotation = roid.angle;
-        slot.angularVelocity = roid.angularVelocity;
-        slot.health = roid.health;
-        slot.maxHealth = roid.maxHealth;
-        slot.vertices = roid.vertices;
-        slot.offsets = roid.offsets;
-        slot.isCollabTarget = roid.isCollabTarget;
-        if (roid.material !== undefined) {
-          slot.material = roid.material;
-        } else {
-          delete slot.material;
-        }
-        if (roid.phenomenon !== undefined) {
-          slot.phenomenon = roid.phenomenon;
-        } else {
-          delete slot.phenomenon;
-        }
-        if (roid.spinClass !== undefined) {
-          slot.spinClass = roid.spinClass;
-        } else {
-          delete slot.spinClass;
-        }
-      } else {
-        this.reflectionRocks.push({
-          id: roid.id,
-          position: roid.position,
-          velocity: roid.velocity,
-          size: roid.r,
-          jaggedness: roid.jaggedness,
-          rotation: roid.angle,
-          angularVelocity: roid.angularVelocity,
-          health: roid.health,
-          maxHealth: roid.maxHealth,
-          vertices: roid.vertices,
-          offsets: roid.offsets,
-          isCollabTarget: roid.isCollabTarget,
-          ...(roid.material !== undefined ? { material: roid.material } : {}),
-          ...(roid.phenomenon !== undefined ? { phenomenon: roid.phenomenon } : {}),
-          ...(roid.spinClass !== undefined ? { spinClass: roid.spinClass } : {}),
-        });
-      }
-      count += 1;
-    }
-    this.reflectionRocks.length = count;
-
-    if (count === 0) {
-      this.asteroidToolsController.setReflectionPreview(undefined);
-      return;
-    }
-
-    const direction = { x: Math.cos(ship.angle), y: -Math.sin(ship.angle) };
-    const start = {
-      x: ship.position.x + direction.x * ship.r,
-      y: ship.position.y + direction.y * ship.r,
-    };
-    const canvas = canvasManager.getCanvas();
-    const scale = PLAYFIELD_CLOSE_SCALE;
-    const viewport = canvasManager.getViewportSize();
-    const maxDistance = canvas
-      ? Math.max(1, (Math.hypot(viewport.width, viewport.height) * 0.8) / Math.max(scale, 0.001))
-      : 1000;
-    const laserUpgrade = state.pilot?.laserUpgrade;
-    const initialEnergy =
-      laserUpgrade && laserUpgrade.charges > 0 && laserUpgrade.expiresAt > Date.now() ? 2 : 1;
-    const preview = previewChargedReflections(
-      start,
-      direction,
-      this.reflectionRocks,
-      maxDistance,
-      initialEnergy
-    );
-    this.asteroidToolsController.setReflectionPreview(preview);
-  }
-
   // Game lifecycle methods
   newGame(playerName?: string, kitId?: ShipKitId): void {
     clearAsteroidShatters();
     this.simulationAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
-    this.asteroidToolsController.update({
-      pilot: undefined,
-      targets: [],
-      reflectionPreview: undefined,
-    });
+    this.laserUpgradeReadout?.update(undefined);
 
     // Set the player name if provided
     if (playerName) {
@@ -412,7 +154,9 @@ export class GameController {
       clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
       setPlayView(true);
-      this.ensureFlightControls();
+      this.laserUpgradeReadout ??= new LaserUpgradeReadout(
+        document.getElementById('gameArea') ?? document.body
+      );
       this.gameStateManager.setIsGameRunning(true);
 
       // Reset button text to default state
@@ -685,11 +429,7 @@ export class GameController {
 
   private resetSessionForNewGame(): void {
     this.cancelPendingGameOver();
-    this.asteroidToolsController.update({
-      pilot: undefined,
-      targets: [],
-      reflectionPreview: undefined,
-    });
+    this.laserUpgradeReadout?.update(undefined);
     this.gameStateManager.clearOverlay();
     canvasManager.clearPlayfield();
     resetThrustSources();
@@ -702,8 +442,7 @@ export class GameController {
       return;
     }
     this.gameOverInProgress = true;
-    this.asteroidToolsController.cancel();
-    this.asteroidGestures?.cancel();
+    this.laserUpgradeReadout?.update(undefined);
 
     const localPlayer = this.playerManager.getLocalPlayer();
     const raw = preferDeathCause(
@@ -1098,7 +837,6 @@ export class GameController {
     SatelliteManager.getInstance().update();
 
     this.checkSatelliteLaserCollisions();
-    this.checkSatellitePickupCollisions();
 
     // Ship↔asteroid damage is server-owned. Keep local ship-ship overlap
     // for offline DOT / visual contact only. Factions still skip allies.
@@ -1106,10 +844,6 @@ export class GameController {
 
     // Check boundary collisions for ships
     this.checkBoundaryCollisions();
-
-    // Keep the tools' predicted reflective path aligned with the local
-    // predicted heading and the latest authoritative rock geometry.
-    this.updateAsteroidToolsPreview();
 
     // Update game state manager
     this.gameStateManager.updateKillMessageTimer();
@@ -1161,18 +895,6 @@ export class GameController {
       SatelliteManager.getInstance().getAll(),
       currPlayer.ship,
       localPlayerId
-    );
-  }
-
-  private checkSatellitePickupCollisions(): void {
-    const currPlayer = this.playerManager.getLocalPlayer();
-    if (!currPlayer) {
-      return;
-    }
-    const playerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
-    this.collisionManager.checkPlayerSatellitePickupCollisions(
-      { ship: currPlayer.ship, id: playerId, type: 'local' },
-      SatellitePickupManager.getInstance().getAll()
     );
   }
 
@@ -1242,6 +964,8 @@ export class GameController {
       currPlayer.lives,
       playersToRender
     );
-    this.flightFeedback?.draw(this.asteroidToolsController.getState(), currPlayer.ship.position);
+    this.laserUpgradeReadout?.update(
+      currPlayer.ship.exploding ? undefined : currPlayer.ship.laserUpgrade
+    );
   }
 }

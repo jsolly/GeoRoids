@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed touch steering, second-finger asteroid gestures, and matching controls documentation. Removed joystick references; desktop/mobile gameplay and field-manual browser checks passed. Existing thrust/coast demonstration remains accurate. Updated the realtime mobile benchmark to send playfield touches; benchmark typechecks and Markdown lint pass.",
+  "note": "Reviewed touch steering, second-finger asteroid gestures, and matching controls documentation. Desktop/mobile gameplay and field-manual checks passed. Updated the Hauler touch scenario for simultaneous steering and asteroid gestures; all touch, keyboard, and mouse latch/anchor/brake/spin/release flows pass. Existing demonstrations remain accurate. Realtime touch benchmark smoke passed with playfield steering.",
   "hashes": {
     "docs/asteroid-interactions.md": "sha256:6de2a0c03063d0c82a6ae335ec04bd63a4e9d0fdf1e69fc0b8c8bb00ed2ff042",
     "docs/protocol/snapshot-v1.md": "sha256:b23ead8eeaa54c52b18ab778b60b296a0e21c707035fea0ea62f673b4f057d51",
@@ -208,7 +208,7 @@
     "tests/integration/browser/e2e/satellites-appear-and-patrol-the-arena.test.ts": "sha256:6defedce5cb95b41234a61e8610ec612e0e5f32ef976ee547cbb512d3d1f5b8a",
     "tests/integration/browser/e2e/ship-respawns-randomly-after-asteroid-death.test.ts": "sha256:831979f9508965327885e45284f401e439ea113231eb3bb446e9879eb7b04998",
     "tests/integration/browser/e2e/ship-respawns-randomly-after-boundary-death.test.ts": "sha256:94aa14421f0c3f4f0692c8b46793d30dae8cc6f25868c21e1a8773bf6345ae28",
-    "tests/integration/browser/sanity/asteroid-interactions-playable-flows.test.ts": "sha256:543b9206525e105a7a20f190639f157ba7bf60dcdc88f3bab199698b224b616a",
+    "tests/integration/browser/sanity/asteroid-interactions-playable-flows.test.ts": "sha256:bf7a8bb72295f1bc934f15581cfcddf47d016fd9f82c548e9295bd00f7dabd1f",
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:c0f53f94eb42d7b4c7ad361806913839b2e6a1b146fbb5a66c2bfacd6377db54",
     "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts": "sha256:16506cfa65932e31870afa119be7bd2cf58c0b83075ec202c55a4cca1f130a39",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:6a17742bbf0cdece46fc2bd5756393c282c6bbd91da5e6086bc18fc49f44ef07",

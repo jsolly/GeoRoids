@@ -71,22 +71,19 @@ actual `codex/wiki-drafts` HEAD after validating the payload.
 
 ## Give the workflow its required permissions
 
-The workflow uses the repository's standard `GITHUB_TOKEN`. No personal access
-token or GitHub App secret is required for this design. The workflow declares
-these permissions:
+The publisher mints a short-lived GitHub App installation token for writes.
+Configure the shared automation app with either `APP_CLIENT_ID` or `APP_ID` as
+a repository variable or secret, store its private key as the `APP_PRIVATE_KEY`
+repository secret, and install it for `jsolly/GeoRoids` with `contents: write`
+and `pull-requests: write`. The publisher fails before touching the draft when
+those credentials are absent. It does not use a personal access token.
 
-- `contents: write` pushes the lease-guarded draft synchronization commit and
-  immutable snapshot branch.
-- `pull-requests: write` creates the publication pull request and enables squash
-  auto-merge.
-- `actions: write` dispatches the existing `ci.yml` workflow on the immutable
-  snapshot branch.
-- `checks: read` lets the job inspect the dispatched check run.
-
-In the repository settings, enable Actions and enable **Allow GitHub Actions to
-create and approve pull requests**. Keep `main` protected with the required
-`CI / ci` check and the existing squash auto-merge policy. The publisher does
-not bypass branch protection or push to `main`.
+The workflow's `GITHUB_TOKEN` is read-only for Actions, checks, repository
+contents, and pull requests. It lists the normal pull request CI run while the
+App token performs draft synchronization, snapshot branch pushes, PR creation,
+and squash auto-merge. Keep `main` protected with the required `CI / ci` check
+and the existing squash auto-merge policy. The publisher does not bypass branch
+protection or push to `main`.
 
 ## Publish saved edits
 
@@ -162,13 +159,13 @@ If the branch or its PR already exists, the workflow checks that its wiki tree
 still matches the captured draft SHA and then reuses it. A mismatch stops the
 run.
 
-## Why the workflow dispatches CI explicitly
+## Why the publisher uses a GitHub App token
 
-GitHub does not start another workflow when a workflow uses `GITHUB_TOKEN` to
-create a pull request. That behavior would leave the publication PR without the
-normal pull request CI run, so the publisher explicitly dispatches the existing
-`.github/workflows/ci.yml` workflow on the immutable snapshot branch. It waits
-for that run to complete successfully before it calls:
+GitHub places `pull_request` workflows created by a workflow's `GITHUB_TOKEN` in
+an approval-required state. The publisher uses the App installation token when
+it creates the immutable snapshot PR, so the normal `pull_request` CI and
+coverage workflows start without an approval step. It waits for the `CI / ci`
+run whose head SHA matches the snapshot before it calls:
 
 ```text
 gh pr merge --auto --squash --subject "docs(wiki): publish draft <draft-sha>"
@@ -178,9 +175,9 @@ The workflow also writes the full `GeoRoids wiki draft snapshot: <draft-sha>`
 marker into the squash commit body. The marker lets a later publish distinguish
 the last publisher snapshot from an independent main edit or rollback. The merge
 remains subject to protected `main` and its required `CI / ci` check.
-The existing `auto-merge.yml` is still the normal path for human-created PRs. A
-Pages CMS PR uses the same GitHub squash auto-merge API from `wiki-publish.yml`
-because the `GITHUB_TOKEN` event rule prevents `auto-merge.yml` from starting.
+The publisher-owned `codex/wiki-publish/*` branches are excluded from the
+general `auto-merge.yml` workflow, so one workflow owns each snapshot PR. Human
+PRs continue to use the general auto-merge path.
 
 ## Recover from a failed publish
 
@@ -191,14 +188,20 @@ intact. Fix the saved draft or resolve the branch conflict, then click **Publish
 wiki** again.
 
 If `CI / ci` fails, the immutable PR remains open and no merge occurs. Inspect
-the CI run, fix the source of the failure on `codex/wiki-drafts`, and publish
-again. The next run creates a new snapshot branch. Do not edit an immutable
+the CI run, fix the source of the failure on `codex/wiki-drafts`, create a new
+CMS save so the next capture has a new draft SHA, and publish again. The failed
+immutable branch and PR remain untouched. Do not edit an immutable
 `codex/wiki-publish/*` branch.
 
 If the PR becomes `BEHIND` or `DIRTY` while CI runs, the publisher stops instead
 of changing the snapshot branch. Publish again to create a snapshot based on the
-new `main` head. If a user closes a snapshot PR, the publisher will not reopen it;
-publish again after checking the closed PR and its reason.
+new `main` head. The existing immutable branch is never rewritten. Because its
+branch name is tied to the captured draft SHA, create a new CMS save so the next
+capture has a new draft SHA, then publish again.
+
+If a user closes a snapshot PR, the publisher will not reopen the PR or rewrite
+its immutable branch. Check the closed PR and its reason, create a new CMS save
+to produce a new draft SHA, and publish again for a new snapshot identity.
 
 If the workflow reports that the draft branch changed during three lease retries,
 the editor saved continuously during publication. Wait for the CMS save to finish

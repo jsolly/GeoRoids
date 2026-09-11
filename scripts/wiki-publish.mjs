@@ -242,12 +242,19 @@ function gitQuiet(args) {
   return gitResult(args).status === 0;
 }
 
-function gh(args) {
+function gh(args, { write = false } = {}) {
+  const token = write ? process.env.GH_APP_TOKEN : process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new PublishError(
+      `GitHub ${write ? 'write' : 'read'} token is missing from the workflow environment`
+    );
+  }
   try {
     return execFileSync('gh', args, {
       cwd: process.cwd(),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, GH_TOKEN: token },
     }).trim();
   } catch (error) {
     const detail = error.stderr?.toString().trim() || error.message;
@@ -255,8 +262,8 @@ function gh(args) {
   }
 }
 
-function ghJson(args) {
-  const output = gh(args);
+function ghJson(args, options = {}) {
+  const output = gh(args, options);
   try {
     return JSON.parse(output || 'null');
   } catch (error) {
@@ -339,6 +346,14 @@ function normalizeWikiMarkdownText(source) {
   return `${source.replace(/\r\n/g, '\n').replace(/\n+$/, '')}\n`;
 }
 
+function isWikiMarkdownPath(path) {
+  return (
+    typeof path === 'string' &&
+    path.startsWith('content/wiki/') &&
+    path.toLowerCase().endsWith('.md')
+  );
+}
+
 function sameTreeEntry(left, right) {
   if (!left || !right) {
     return !left && !right;
@@ -352,8 +367,8 @@ function sameTreeEntry(left, right) {
   return (
     left.type === 'blob' &&
     left.mode === '100644' &&
-    isAllowedWikiPath(left.path) &&
-    isAllowedWikiPath(right.path) &&
+    isWikiMarkdownPath(left.path) &&
+    isWikiMarkdownPath(right.path) &&
     left.path === right.path &&
     normalizeWikiMarkdownText(git(['cat-file', 'blob', left.sha])) ===
       normalizeWikiMarkdownText(git(['cat-file', 'blob', right.sha]))
@@ -395,7 +410,7 @@ function pathChangedAfterPublication(publicationSha, mainSha, path) {
 
 function normalizeWikiMarkdownFiles(paths) {
   for (const path of paths) {
-    if (!path.startsWith('content/wiki/') || !path.toLowerCase().endsWith('.md')) {
+    if (!isWikiMarkdownPath(path)) {
       continue;
     }
     const source = readFileSync(path, 'utf8');
@@ -613,18 +628,40 @@ function wikiTreesEquivalent(leftRef, rightRef) {
 }
 
 export function existingSnapshotMatches(snapshotSha, mainSha, sourceTreeSha) {
+  if (!isAncestor(mainSha, snapshotSha)) {
+    return false;
+  }
   validateChangedPaths(changedPaths(mainSha, snapshotSha));
   validateWikiTree(treeEntries(snapshotSha));
   validateWikiTree(treeEntries(sourceTreeSha));
   return wikiTreesEquivalent(sourceTreeSha, snapshotSha);
 }
 
-function createSnapshotBranch(mainSha, sourceTreeSha, sourceSha) {
+export function createSnapshotBranch(mainSha, sourceTreeSha, sourceSha) {
   const branch = snapshotBranchName(sourceSha);
   const existingSha = remoteBranchSha(branch);
   if (existingSha) {
     fetchBranch(branch);
     const remoteSha = revParse(`refs/remotes/origin/${branch}`);
+    if (!isAncestor(mainSha, remoteSha)) {
+      const existingPullRequest = pullRequestFor(branch);
+      const validatedPullRequest = validateSnapshotPullRequest(existingPullRequest, {
+        branch,
+        snapshotSha: remoteSha,
+      });
+      if (validatedPullRequest?.alreadyMerged) {
+        const currentPullRequest = pullRequestView(existingPullRequest.url);
+        validateSnapshotPullRequest(currentPullRequest, {
+          branch,
+          snapshotSha: remoteSha,
+        });
+        verifyMergedSnapshot(currentPullRequest, sourceSha);
+        return { branch, sha: remoteSha, changed: true, alreadyMerged: true };
+      }
+      throw new PublishError(
+        `Immutable snapshot branch ${branch} is based on an older main; refusing to rewrite it. Create a new CMS draft commit and publish again for a new snapshot identity.`
+      );
+    }
     if (!existingSnapshotMatches(remoteSha, mainSha, sourceTreeSha)) {
       throw new PublishError(
         `Immutable snapshot branch ${branch} exists but does not match source SHA ${sourceSha}; refusing to rewrite it`
@@ -706,58 +743,57 @@ function pullRequestFor(branch) {
   return Array.isArray(pullRequests) ? pullRequests[0] : undefined;
 }
 
+export function validateSnapshotPullRequest(existing, { branch, snapshotSha }) {
+  if (!existing) {
+    return undefined;
+  }
+  if (existing.baseRefName !== MAIN_BRANCH || existing.headRefName !== branch) {
+    throw new PublishError(
+      `Snapshot PR #${existing.number} does not target ${MAIN_BRANCH} from immutable branch ${branch}`
+    );
+  }
+  if (existing.state === 'MERGED' && existing.mergedAt) {
+    if (existing.headRefOid !== snapshotSha) {
+      throw new PublishError(
+        `Merged snapshot PR #${existing.number} no longer points at immutable ${snapshotSha}`
+      );
+    }
+    return { ...existing, alreadyMerged: true };
+  }
+  if (existing.state === 'MERGED' || existing.mergedAt) {
+    throw new PublishError(`Snapshot PR #${existing.number} has an invalid merged state`);
+  }
+  if (existing.state !== 'OPEN') {
+    throw new PublishError(
+      `Snapshot PR #${existing.number} is ${existing.state}; refusing to reopen it. Create a new CMS draft commit and publish again for a new snapshot identity.`
+    );
+  }
+  if (existing.headRefOid !== snapshotSha) {
+    throw new PublishError(
+      `Snapshot PR #${existing.number} no longer points at immutable ${snapshotSha}`
+    );
+  }
+  return existing;
+}
+
 function ensurePullRequest({ branch, snapshotSha, draftSha, mainSha }) {
   const existing = pullRequestFor(branch);
   if (existing) {
-    if (existing.baseRefName !== MAIN_BRANCH || existing.headRefName !== branch) {
-      throw new PublishError(
-        `Snapshot PR #${existing.number} does not target ${MAIN_BRANCH} from immutable branch ${branch}`
-      );
-    }
-    if (existing.state === 'MERGED' && existing.mergedAt) {
-      if (existing.headRefOid !== snapshotSha) {
-        throw new PublishError(
-          `Merged snapshot PR #${existing.number} no longer points at immutable ${snapshotSha}`
-        );
-      }
-      return { ...existing, alreadyMerged: true };
-    }
-    if (existing.state === 'MERGED' || existing.mergedAt) {
-      throw new PublishError(`Snapshot PR #${existing.number} has an invalid merged state`);
-    }
-    if (existing.state !== 'OPEN') {
-      throw new PublishError(
-        `Snapshot PR #${existing.number} is ${existing.state}; refusing to reopen it`
-      );
-    }
-    if (existing.headRefOid !== snapshotSha) {
-      throw new PublishError(
-        `Snapshot PR #${existing.number} no longer points at immutable ${snapshotSha}`
-      );
-    }
-    return existing;
+    return validateSnapshotPullRequest(existing, { branch, snapshotSha });
   }
 
   const title = `docs(wiki): publish draft ${draftSha}`;
   const body = buildPullRequestBody({ draftSha, mainSha, snapshotBranch: branch });
-  const url = gh([
-    'pr',
-    'create',
-    '--base',
-    MAIN_BRANCH,
-    '--head',
-    branch,
-    '--title',
-    title,
-    '--body',
-    body,
-  ]);
+  const url = gh(
+    ['pr', 'create', '--base', MAIN_BRANCH, '--head', branch, '--title', title, '--body', body],
+    { write: true }
+  );
   const created = ghJson([
     'pr',
     'view',
     url,
     '--json',
-    'number,url,state,baseRefName,headRefName,headRefOid,mergedAt',
+    'number,url,state,baseRefName,headRefName,headRefOid,mergedAt,body',
   ]);
   if (!created || created.headRefOid !== snapshotSha) {
     throw new PublishError(`Created PR does not point at immutable snapshot ${snapshotSha}`);
@@ -765,7 +801,19 @@ function ensurePullRequest({ branch, snapshotSha, draftSha, mainSha }) {
   if (created.baseRefName !== MAIN_BRANCH || created.headRefName !== branch) {
     throw new PublishError(`Created PR does not target ${MAIN_BRANCH} from ${branch}`);
   }
+  if (!hasSnapshotMarker(created.body, draftSha)) {
+    throw new PublishError(`Created snapshot PR #${created.number} is missing the draft marker`);
+  }
   return created;
+}
+
+export function selectLatestCiRun(runs, headSha) {
+  if (!Array.isArray(runs)) {
+    return undefined;
+  }
+  return runs
+    .filter((run) => run.headSha === headSha && run.event === 'pull_request')
+    .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))[0];
 }
 
 function latestCiRun(branch, headSha) {
@@ -776,23 +824,12 @@ function latestCiRun(branch, headSha) {
     CI_WORKFLOW,
     '--branch',
     branch,
-    '--event',
-    'workflow_dispatch',
     '--limit',
     '20',
     '--json',
-    'databaseId,headSha,status,conclusion,createdAt,updatedAt',
+    'databaseId,headSha,status,conclusion,createdAt,updatedAt,event',
   ]);
-  if (!Array.isArray(runs)) {
-    return undefined;
-  }
-  return runs
-    .filter((run) => run.headSha === headSha)
-    .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))[0];
-}
-
-function dispatchCi(branch) {
-  gh(['workflow', 'run', CI_WORKFLOW, '--ref', branch]);
+  return selectLatestCiRun(runs, headSha);
 }
 
 function wait(milliseconds) {
@@ -800,21 +837,9 @@ function wait(milliseconds) {
 }
 
 async function waitForCi(branch, headSha) {
-  let run = latestCiRun(branch, headSha);
-  const previousRunId = run?.databaseId;
-  let dispatched = false;
-  if (!run || (run.status === 'completed' && run.conclusion !== 'success')) {
-    dispatchCi(branch);
-    dispatched = true;
-  }
-
   const deadline = Date.now() + CI_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    run = latestCiRun(branch, headSha);
-    if (dispatched && run?.databaseId === previousRunId) {
-      await wait(CI_POLL_INTERVAL_MS);
-      continue;
-    }
+    const run = latestCiRun(branch, headSha);
     if (run?.status === 'completed') {
       if (run.conclusion === 'success') {
         console.info(`CI / ci passed for ${headSha} (run ${run.databaseId})`);
@@ -829,18 +854,76 @@ async function waitForCi(branch, headSha) {
   throw new PublishError(`Timed out waiting for CI / ci on immutable snapshot ${headSha}`);
 }
 
+function snapshotMarkerLine(draftSha) {
+  return `${WIKI_SNAPSHOT_MARKER} ${draftSha.toLowerCase()}`;
+}
+
+export function hasSnapshotMarker(message, draftSha) {
+  return (
+    typeof message === 'string' &&
+    message.split(/\r?\n/).some((line) => line.trim() === snapshotMarkerLine(draftSha))
+  );
+}
+
+export function validateMergedSnapshotCommit(message, draftSha) {
+  if (!hasSnapshotMarker(message, draftSha)) {
+    throw new PublishError(
+      `Merged snapshot commit is missing the marker for draft ${draftSha}; refusing to report publication success`
+    );
+  }
+  return true;
+}
+
+export function validateSnapshotAutoMerge(autoMergeRequest, draftSha) {
+  if (!autoMergeRequest) {
+    return true;
+  }
+  if (autoMergeRequest.mergeMethod !== 'SQUASH') {
+    throw new PublishError(
+      `Snapshot PR auto-merge uses ${autoMergeRequest.mergeMethod || 'an unknown method'}; refusing to continue without squash`
+    );
+  }
+  if (
+    !draftSha ||
+    typeof autoMergeRequest.commitBody !== 'string' ||
+    !hasSnapshotMarker(autoMergeRequest.commitBody, draftSha)
+  ) {
+    throw new PublishError(
+      'Snapshot PR auto-merge is missing the expected draft marker in its body'
+    );
+  }
+  return true;
+}
+
 function pullRequestView(url) {
   return ghJson([
     'pr',
     'view',
     url,
     '--json',
-    'number,url,state,baseRefName,headRefName,headRefOid,mergedAt,mergeStateStatus,autoMergeRequest',
+    'number,url,state,baseRefName,headRefName,headRefOid,mergedAt,mergeStateStatus,autoMergeRequest,body,mergeCommit',
   ]);
+}
+
+function verifyMergedSnapshot(current, draftSha) {
+  if (!current.mergeCommit?.oid) {
+    throw new PublishError(
+      `Merged snapshot PR #${current.number} has no merge commit; refusing to report publication success`
+    );
+  }
+  const repositoryName = process.env.GITHUB_REPOSITORY;
+  if (!repositoryName) {
+    throw new PublishError('GITHUB_REPOSITORY is missing while verifying the merged snapshot');
+  }
+  const commit = ghJson(['api', `repos/${repositoryName}/commits/${current.mergeCommit.oid}`]);
+  const message = commit?.commit?.message;
+  validateMergedSnapshotCommit(message, draftSha);
 }
 
 async function enableAutoMergeAndWait(pullRequest, draftSha, snapshotSha) {
   if (pullRequest.alreadyMerged) {
+    const merged = pullRequestView(pullRequest.url);
+    verifyMergedSnapshot(merged, draftSha);
     console.info(`Wiki snapshot PR #${pullRequest.number} is already merged`);
     return;
   }
@@ -852,7 +935,11 @@ async function enableAutoMergeAndWait(pullRequest, draftSha, snapshotSha) {
   ) {
     throw new PublishError(`Snapshot PR #${pullRequest.number} changed before auto-merge`);
   }
+  if (!hasSnapshotMarker(current.body, draftSha)) {
+    throw new PublishError(`Snapshot PR #${current.number} is missing the draft marker`);
+  }
   if (current.state === 'MERGED' && current.mergedAt) {
+    verifyMergedSnapshot(current, draftSha);
     console.info(`Wiki snapshot PR #${current.number} is already merged`);
     return;
   }
@@ -860,20 +947,25 @@ async function enableAutoMergeAndWait(pullRequest, draftSha, snapshotSha) {
     throw new PublishError(`Snapshot PR #${current.number} is not open for auto-merge`);
   }
   if (!current.autoMergeRequest) {
-    gh([
-      'pr',
-      'merge',
-      pullRequest.url,
-      '--auto',
-      '--squash',
-      '--delete-branch=false',
-      '--match-head-commit',
-      snapshotSha,
-      '--subject',
-      `docs(wiki): publish draft ${draftSha}`,
-      '--body',
-      `${WIKI_SNAPSHOT_MARKER} ${draftSha}`,
-    ]);
+    gh(
+      [
+        'pr',
+        'merge',
+        pullRequest.url,
+        '--auto',
+        '--squash',
+        '--delete-branch=false',
+        '--match-head-commit',
+        snapshotSha,
+        '--subject',
+        `docs(wiki): publish draft ${draftSha}`,
+        '--body',
+        `${WIKI_SNAPSHOT_MARKER} ${draftSha}`,
+      ],
+      { write: true }
+    );
+  } else {
+    validateSnapshotAutoMerge(current.autoMergeRequest, draftSha);
   }
 
   const deadline = Date.now() + MERGE_TIMEOUT_MS;
@@ -886,7 +978,14 @@ async function enableAutoMergeAndWait(pullRequest, draftSha, snapshotSha) {
     ) {
       throw new PublishError(`Snapshot PR #${current.number} changed while waiting to merge`);
     }
+    if (!hasSnapshotMarker(current.body, draftSha)) {
+      throw new PublishError(
+        `Snapshot PR #${current.number} lost the draft marker while waiting to merge`
+      );
+    }
+    validateSnapshotAutoMerge(current.autoMergeRequest, draftSha);
     if (current.state === 'MERGED' && current.mergedAt) {
+      verifyMergedSnapshot(current, draftSha);
       console.info(`Wiki snapshot PR #${current.number} merged with squash auto-merge`);
       return;
     }
@@ -949,10 +1048,9 @@ export async function publish() {
     draftSha: draftSnapshotSha,
     mainSha: sync.mainSha,
   });
-  if (pullRequest.alreadyMerged) {
-    return { status: 'merged', ...snapshot, pullRequest };
+  if (!snapshot.alreadyMerged && !pullRequest.alreadyMerged) {
+    await waitForCi(snapshot.branch, snapshot.sha);
   }
-  await waitForCi(snapshot.branch, snapshot.sha);
   await enableAutoMergeAndWait(pullRequest, draftSnapshotSha, snapshot.sha);
   return { status: 'merged', ...snapshot, pullRequest };
 }

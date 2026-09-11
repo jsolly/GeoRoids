@@ -10,10 +10,10 @@ name: Publish wiki
         type: string
 
 permissions:
-  actions: write
+  actions: read
   checks: read
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: wiki-publish
@@ -26,12 +26,34 @@ jobs:
     # CI and protected auto-merge each have bounded waits in the publisher.
     # Leave room for checkout, retries, and GitHub API latency around those waits.
     timeout-minutes: 60
+    env:
+      HAS_APP_CREDS: ${{ secrets.APP_PRIVATE_KEY != '' && (vars.APP_CLIENT_ID != '' || secrets.APP_CLIENT_ID != '' || vars.APP_ID != '' || secrets.APP_ID != '') }}
     steps:
+      - name: Mint the publisher GitHub App token
+        id: app-token
+        if: ${{ env.HAS_APP_CREDS == 'true' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          # github-actionlint 1.7.x bundles pre-v3.1 metadata (no client-id).
+          # scripts/check-actions.sh ignores that stale metadata warning.
+          client-id: ${{ vars.APP_CLIENT_ID || secrets.APP_CLIENT_ID }}
+          app-id: ${{ vars.APP_ID || secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Require publisher GitHub App credentials
+        if: ${{ env.HAS_APP_CREDS != 'true' }}
+        run: |
+          echo 'APP_PRIVATE_KEY plus APP_CLIENT_ID or APP_ID is required to publish a Pages CMS snapshot.' >&2
+          exit 1
+
       - name: Check out the workflow base
         uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
       - name: Configure the publisher identity
@@ -41,7 +63,8 @@ jobs:
 
       - name: Publish the immutable wiki snapshot
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REF: ${{ github.ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}

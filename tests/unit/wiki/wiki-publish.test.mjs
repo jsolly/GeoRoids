@@ -1,18 +1,24 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { expect, test } from 'vitest';
 import {
   assertWorkflowContext,
+  createSnapshotBranch,
+  hasSnapshotMarker,
   isAllowedWikiPath,
   parseGitNameStatus,
   parseGitTree,
   parsePagesCmsPayload,
+  selectLatestCiRun,
   snapshotBranchName,
   validateChangedPaths,
+  validateMergedSnapshotCommit,
+  validateSnapshotAutoMerge,
+  validateSnapshotPullRequest,
   validateWikiTree,
 } from '../../../scripts/wiki-publish.mjs';
 
@@ -85,6 +91,27 @@ function snapshotMatchesInFixture(cwd, snapshot, main, source) {
     cwd,
     encoding: 'utf8',
   }).trim();
+}
+
+function createSnapshotBranchInFixture(cwd, main, sourceTree, source, environment) {
+  const previousCwd = process.cwd();
+  const previousEnvironment = Object.fromEntries(
+    Object.keys(environment).map((name) => [name, process.env[name]])
+  );
+  try {
+    process.chdir(cwd);
+    Object.assign(process.env, environment);
+    return createSnapshotBranch(main, sourceTree, source);
+  } finally {
+    process.chdir(previousCwd);
+    for (const [name, value] of Object.entries(previousEnvironment)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  }
 }
 
 test('the Pages CMS payload validates the draft ref and workflow SHA', () => {
@@ -221,10 +248,214 @@ test('a squash merge plus a newer same-file draft edit stays conflict-free and p
   }
 });
 
+test('distinct raster bytes remain a conflict even when text normalization would match them', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'georoids-wiki-publish-raster-conflict-'));
+  try {
+    git(fixture, ['init', '--initial-branch', 'main']);
+    git(fixture, ['config', 'user.name', 'fixture']);
+    git(fixture, ['config', 'user.email', 'fixture@example.test']);
+    mkdirSync(join(fixture, 'public', 'wiki', 'uploads'), { recursive: true });
+    writeFileSync(join(fixture, 'public', 'wiki', 'uploads', 'image.webp'), 'base\n');
+    const base = commit(fixture, 'base');
+
+    git(fixture, ['switch', '--create', 'codex/wiki-drafts']);
+    writeFileSync(join(fixture, 'public', 'wiki', 'uploads', 'image.webp'), 'image');
+    const draft = commit(fixture, 'editor image');
+
+    git(fixture, ['switch', 'main']);
+    writeFileSync(join(fixture, 'public', 'wiki', 'uploads', 'image.webp'), 'image\n');
+    const main = commit(fixture, 'developer image');
+
+    expect(git(fixture, ['show', `${base}:public/wiki/uploads/image.webp`])).toBe('base\n');
+    expect(() => materializeInFixture(fixture, draft, main, draft)).toThrow(
+      /changed independently on main/
+    );
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('an immutable snapshot based on older main cannot be reused after main advances', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'georoids-wiki-publish-behind-'));
+  try {
+    git(fixture, ['init', '--initial-branch', 'main']);
+    git(fixture, ['config', 'user.name', 'fixture']);
+    git(fixture, ['config', 'user.email', 'fixture@example.test']);
+    mkdirSync(join(fixture, 'content', 'wiki'), { recursive: true });
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'base\n');
+    const base = commit(fixture, 'base');
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'published\n');
+    const snapshot = commit(fixture, 'snapshot');
+    writeFileSync(join(fixture, 'content', 'wiki', 'other.md'), 'main update\n');
+    const currentMain = commit(fixture, 'main update');
+
+    expect(gitSucceeds(fixture, ['merge-base', '--is-ancestor', currentMain, snapshot])).toBe(
+      false
+    );
+    expect(snapshotMatchesInFixture(fixture, snapshot, currentMain, snapshot)).toBe('false');
+    expect(git(fixture, ['show', `${base}:content/wiki/article.md`])).toBe('base\n');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('a repeat publish reuses an older snapshot only after verifying its merged marker', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'georoids-wiki-publish-merged-retry-'));
+  try {
+    git(fixture, ['init', '--initial-branch', 'main']);
+    git(fixture, ['config', 'user.name', 'fixture']);
+    git(fixture, ['config', 'user.email', 'fixture@example.test']);
+    mkdirSync(join(fixture, 'content', 'wiki'), { recursive: true });
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'base\n');
+    const base = commit(fixture, 'base');
+
+    git(fixture, ['switch', '--create', 'codex/wiki-drafts']);
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'published\n');
+    const source = commit(fixture, 'editor save');
+    const branch = `codex/wiki-publish/${source}`;
+
+    git(fixture, ['switch', 'main']);
+    git(fixture, ['switch', '--create', branch]);
+    writeFileSync(join(fixture, 'content', 'wiki', 'article.md'), 'published\n');
+    const snapshot = commit(fixture, 'docs: immutable snapshot');
+    git(fixture, ['switch', 'main']);
+    git(fixture, ['merge', '--squash', branch]);
+    const merge = commit(
+      fixture,
+      `docs(wiki): publish draft ${source}\n\nGeoRoids wiki draft snapshot: ${source}`
+    );
+
+    const bare = join(fixture, 'remote.git');
+    git(fixture, ['init', '--bare', bare]);
+    git(fixture, ['remote', 'add', 'origin', bare]);
+    git(fixture, ['push', 'origin', 'main', 'codex/wiki-drafts', branch]);
+
+    const fakeBin = join(fixture, 'fake-bin');
+    mkdirSync(fakeBin);
+    const fakeGh = join(fakeBin, 'gh');
+    const pullRequest = {
+      number: 600,
+      url: 'https://github.com/jsolly/GeoRoids/pull/600',
+      state: 'MERGED',
+      baseRefName: 'main',
+      headRefName: branch,
+      headRefOid: snapshot,
+      mergedAt: '2026-09-11T16:00:00Z',
+    };
+    const currentPullRequest = {
+      ...pullRequest,
+      mergeStateStatus: 'UNKNOWN',
+      autoMergeRequest: null,
+      body: `GeoRoids wiki draft snapshot: ${source}`,
+      mergeCommit: { oid: merge },
+    };
+    writeFileSync(
+      fakeGh,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === 'pr' && args[1] === 'list') {
+  console.log(${JSON.stringify(JSON.stringify([pullRequest]))});
+} else if (args[0] === 'pr' && args[1] === 'view') {
+  console.log(${JSON.stringify(JSON.stringify(currentPullRequest))});
+} else if (args[0] === 'api') {
+  console.log(${JSON.stringify(JSON.stringify({ commit: { message: `docs(wiki): publish draft ${source}\n\nGeoRoids wiki draft snapshot: ${source}` } }))});
+} else {
+  process.exit(1);
+}
+`
+    );
+    chmodSync(fakeGh, 0o755);
+
+    const result = createSnapshotBranchInFixture(fixture, merge, source, source, {
+      GITHUB_REPOSITORY: 'jsolly/GeoRoids',
+      GITHUB_TOKEN: 'read-token',
+      GH_APP_TOKEN: 'write-token',
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    });
+    expect(result).toEqual({ branch, sha: snapshot, changed: true, alreadyMerged: true });
+    expect(gitSucceeds(fixture, ['merge-base', '--is-ancestor', merge, snapshot])).toBe(false);
+    expect(git(fixture, ['show', `${base}:content/wiki/article.md`])).toBe('base\n');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('Git name-status parsing keeps paths with spaces intact', () => {
   expect(parseGitNameStatus('M\0content/wiki/a long title.md\0')).toEqual([
     { status: 'M', path: 'content/wiki/a long title.md' },
   ]);
+});
+
+test('the publisher waits for the normal pull request CI run for its snapshot head', () => {
+  const headSha = 'abcdef0123456789abcdef0123456789abcdef01';
+  expect(
+    selectLatestCiRun(
+      [
+        {
+          databaseId: 1,
+          event: 'workflow_dispatch',
+          headSha,
+          createdAt: '2026-09-11T10:00:00Z',
+        },
+        {
+          databaseId: 2,
+          event: 'pull_request',
+          headSha: '0123456789abcdef0123456789abcdef01234567',
+          createdAt: '2026-09-11T10:01:00Z',
+        },
+        {
+          databaseId: 3,
+          event: 'pull_request',
+          headSha,
+          createdAt: '2026-09-11T10:02:00Z',
+        },
+        {
+          databaseId: 4,
+          event: 'pull_request',
+          headSha,
+          createdAt: '2026-09-11T10:03:00Z',
+        },
+      ],
+      headSha
+    )
+  ).toMatchObject({ databaseId: 4, event: 'pull_request', headSha });
+});
+
+test('a closed snapshot PR requires a new draft identity instead of reopening', () => {
+  const branch = `codex/wiki-publish/${SOURCE_SHA}`;
+  expect(() =>
+    validateSnapshotPullRequest(
+      {
+        number: 553,
+        state: 'CLOSED',
+        baseRefName: 'main',
+        headRefName: branch,
+        headRefOid: SOURCE_SHA,
+      },
+      { branch, snapshotSha: SOURCE_SHA }
+    )
+  ).toThrow(/new CMS draft commit/);
+});
+
+test('merged snapshot verification requires the exact marker and squash auto-merge', () => {
+  const marker = `GeoRoids wiki draft snapshot: ${SOURCE_SHA}`;
+  expect(hasSnapshotMarker(`subject\n\n${marker}\n`, SOURCE_SHA)).toBe(true);
+  expect(hasSnapshotMarker(`subject\n\n${marker}\n`, `${SOURCE_SHA.slice(0, -1)}8`)).toBe(false);
+  expect(() => validateMergedSnapshotCommit('subject\n\nwithout marker\n', SOURCE_SHA)).toThrow(
+    /missing the marker/
+  );
+  expect(validateMergedSnapshotCommit(`subject\n\n${marker}\n`, SOURCE_SHA)).toBe(true);
+  expect(validateSnapshotAutoMerge(null, SOURCE_SHA)).toBe(true);
+  expect(validateSnapshotAutoMerge({ mergeMethod: 'SQUASH', commitBody: marker }, SOURCE_SHA)).toBe(
+    true
+  );
+  expect(() => validateSnapshotAutoMerge({ mergeMethod: 'MERGE' })).toThrow(/without squash/);
+  expect(() => validateSnapshotAutoMerge({ mergeMethod: 'SQUASH' }, SOURCE_SHA)).toThrow(
+    /expected draft marker/
+  );
+  expect(() =>
+    validateSnapshotAutoMerge({ mergeMethod: 'SQUASH', commitBody: 'wrong body' }, SOURCE_SHA)
+  ).toThrow(/expected draft marker/);
 });
 
 test('the snapshot normalizes CMS Markdown that omits its final newline', () => {

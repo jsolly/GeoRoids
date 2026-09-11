@@ -72,6 +72,7 @@ h2 {
   font-weight: 600;
 }
 .article-body h2 {
+  margin-top: 32px;
   font-size: 23px;
   margin-bottom: 16px;
 }
@@ -203,6 +204,12 @@ p {
   color: var(--muted);
   margin-bottom: 9px;
 }
+
+.article-body a {
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
 .sidebar nav a {
   display: block;
   font-size: 13px;
@@ -948,4 +955,33 @@ tbody th {
     scroll-behavior: auto;
     transition: none;
   }
+}
+
+.article-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+}
+
+.article-body pre,
+.article-body table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.article-body pre {
+  padding: 1rem;
+  background: var(--panel);
+}
+
+.article-body li {
+  margin-block: 0.5rem;
+}
+
+.article-body blockquote,
+.game-reference {
+  margin: 2rem 0;
+  padding: 1rem 1.5rem;
+  border-left: 2px solid currentColor;
 }

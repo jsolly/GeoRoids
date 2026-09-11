@@ -1,8 +1,8 @@
+import { articles } from 'virtual:wiki-content';
 import { GAME } from '../constants';
 import { serializeKitHullSvg } from '../entities/ship/hullOutlines';
 import { isShipKitId, listShipKits, SHIP_ABILITY } from '../entities/ship/shipKits';
-import { articles, mediaForArticle, type WikiArticle, type WikiSection } from './content';
-import { media } from './media';
+import type { WikiArticle } from './article';
 import { setMediaSource, shouldAutoplayMedia } from './mediaPlayback';
 import { searchArticles } from './search';
 import { mountShipRadar, shipScorecard } from './shipScorecard';
@@ -77,40 +77,13 @@ function renderIndex(): void {
   document.title = 'Field manual | GeoRoids';
 }
 
-function figure(id: string, showCaption = true, showHeading = true): string {
-  const item = media[id];
-  if (!item) {
-    return '';
-  }
-  const caption = showCaption
-    ? `<figcaption><strong>${escapeHtml(item.title)}</strong> ${escapeHtml(item.caption)}</figcaption>`
-    : '';
-  const heading = showHeading ? '<div class="demo-heading"><span>IN MOTION</span></div>' : '';
-  return `<figure class="demo" data-media="${id}">${heading}<img src="/wiki/media/${id}.png" width="640" height="360" loading="lazy" alt="${escapeHtml(item.alt)}" />${caption}</figure>`;
-}
-
-function renderSection(article: WikiArticle, section: WikiSection, index: number): string {
-  const headingId = `${article.id}-section-${index}`;
-  const paragraphs = section.paragraphs
-    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
-    .join('');
-  if (section.media === undefined) {
-    return `<section aria-labelledby="${headingId}"><h2 id="${headingId}">${escapeHtml(section.heading)}</h2>${paragraphs}</section>`;
-  }
-  const cardClass = isShipKitId(article.id) ? 'topic-demo-card ability-card' : 'topic-demo-card';
-  const label = isShipKitId(article.id) ? 'ABILITY' : 'DEMONSTRATION';
-  return `<section class="${cardClass}" aria-labelledby="${headingId}"><div class="topic-demo-card-copy"><p class="eyebrow">${label}</p><h2 id="${headingId}">${escapeHtml(section.heading)}</h2>${paragraphs}</div>${figure(section.media, false, false)}</section>`;
-}
-
 function renderArticle(article: WikiArticle): void {
-  const shipArticle = isShipKitId(article.id);
-  const articleMedia = mediaForArticle(article);
-  content.innerHTML = `<div class="breadcrumb"><a href="#content">Field manual</a><span aria-hidden="true">/</span><span>${escapeHtml(article.category)}</span></div><article><header class="article-header"><p class="eyebrow">${escapeHtml(article.category)}</p><div class="article-title">${hull(article.id, 80)}<h1>${escapeHtml(article.title)}</h1></div><p class="article-summary">${escapeHtml(article.summary)}</p></header>${shipArticle && isShipKitId(article.id) ? shipScorecard(article.id) : ''}<div class="article-body">${article.sections.map((section, index) => renderSection(article, section, index)).join('')}</div><aside class="related"><p class="eyebrow">KEEP EXPLORING</p><h2>Related entries</h2><div>${article.related
+  content.innerHTML = `<div class="breadcrumb"><a href="#content">Field manual</a><span aria-hidden="true">/</span><span>${escapeHtml(article.category)}</span></div><article><header class="article-header"><p class="eyebrow">${escapeHtml(article.category)}</p><div class="article-title">${hull(article.id, 80)}<h1>${escapeHtml(article.title)}</h1></div><p class="article-summary">${escapeHtml(article.summary)}</p></header>${isShipKitId(article.id) ? shipScorecard(article.id) : ''}<div class="article-body">${article.html}</div><aside class="related"><p class="eyebrow">KEEP EXPLORING</p><h2>Related entries</h2><div>${article.related
     .map((id) => articles.find((item) => item.id === id))
     .filter((item): item is WikiArticle => item !== undefined)
     .map((item) => articleLink(item, 'related-link'))
     .join('')}</div></aside></article>`;
-  if (articleMedia.length !== content.querySelectorAll('.demo').length) {
+  if (article.media.length !== content.querySelectorAll('.demo').length) {
     throw new Error(`Media mapping mismatch for ${article.id}`);
   }
   document.title = `${article.title} | GeoRoids field manual`;
@@ -214,6 +187,7 @@ function renderRoute(moveFocus = true): void {
     }
   }
 }
+
 search.addEventListener('input', renderSearch);
 clearSearch.addEventListener('click', resetSearch);
 requiredElement('#search-form', HTMLFormElement).addEventListener('submit', (event) => {

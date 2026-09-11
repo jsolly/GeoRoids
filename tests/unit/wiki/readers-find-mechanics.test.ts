@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { articles } from '../../../src/wiki/content';
+import { readWikiArticles } from '../../../scripts/wiki-content';
+
+const articles = readWikiArticles();
+
 import { searchArticles } from '../../../src/wiki/search';
 
 describe('readers find mechanics in the field manual', () => {

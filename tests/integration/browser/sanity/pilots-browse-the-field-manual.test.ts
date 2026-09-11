@@ -2,9 +2,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { expect, test } from 'vitest';
-import { articles, mediaForArticle } from '../../../../src/wiki/content';
+import { readWikiArticles } from '../../../../scripts/wiki-content';
 import { media } from '../../../../src/wiki/media';
 import { TestConfig } from '../../utils/test-config';
+
+const articles = readWikiArticles();
 
 test('pilots find rules and see autoplay demonstrations on desktop and mobile', async () => {
   const browser = await chromium.launch({ headless: true });
@@ -114,7 +116,11 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     for (const article of articles) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
       await expect.poll(() => page.locator('h1').textContent()).toBe(article.title);
-      const articleMedia = mediaForArticle(article);
+      const articleMedia = article.media;
+      expect(await page.locator('.game-reference section').count()).toBe(article.sections.length);
+      expect((await page.locator('.article-body').textContent())?.replace(/\s+/g, ' ')).toContain(
+        article.searchText.split(' ').slice(0, 2).join(' ')
+      );
       expect(
         await page
           .locator('.demo')
@@ -213,7 +219,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       )
       .toBeLessThan(1);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
-    expect(await page.locator('#content').textContent()).toContain(
+    expect((await page.locator('#content').textContent())?.replace(/\s+/g, ' ')).toContain(
       'touch and hold the playfield to steer toward your finger and thrust'
     );
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });

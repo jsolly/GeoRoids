@@ -365,7 +365,7 @@ start() {
             --prefix-colors "blue.bold,green.bold" \
             --prefix "[{name}]" \
             --names "vite,network" \
-            "vite --port $DEV_VITE_PORT --strictPort" \
+            "vite --configLoader runner --port $DEV_VITE_PORT --strictPort" \
             "tsx --env-file=.env.local server.ts"
     ) &
     DEV_PID=$!

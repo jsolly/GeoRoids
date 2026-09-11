@@ -1,0 +1,49 @@
+---
+name: Publish wiki
+
+'on':
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: Pages CMS action payload as JSON
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: wiki-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish saved wiki draft
+    runs-on: ubuntu-latest
+    # CI and protected auto-merge each have bounded waits in the publisher.
+    # Leave room for checkout, retries, and GitHub API latency around those waits.
+    timeout-minutes: 60
+    steps:
+      - name: Check out the workflow base
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure the publisher identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Publish the immutable wiki snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PAGES_CMS_PAYLOAD: ${{ inputs.payload }}
+        run: node scripts/wiki-publish.mjs

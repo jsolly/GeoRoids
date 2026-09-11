@@ -12,10 +12,10 @@
     "dev": "./scripts/dev-server.sh",
     "dev:check": "./scripts/check-dev-servers.sh",
     "dev:kill": "./scripts/dev-server.sh --stop",
-    "build": "npm run check:wiki && tsc -p tsconfig.build.json && vite build",
-    "start": "vite",
-    "watch": "vite build --watch",
-    "preview": "vite preview",
+    "build": "npm run check:wiki && tsc -p tsconfig.build.json && vite build --configLoader runner",
+    "start": "vite --configLoader runner",
+    "watch": "vite build --configLoader runner --watch",
+    "preview": "vite preview --configLoader runner",
     "test": "vitest run tests/unit/",
     "test:all": "npm run test && ./scripts/test-runner.sh tests/integration/server/ tests/integration/entities/",
     "test:unit": "vitest run tests/unit/",
@@ -84,11 +84,13 @@
     "jsdom": "^30.0.1",
     "jsonc-parser": "3.3.1",
     "knip": "6.35.1",
+    "markdown-it": "^15.0.2",
     "markdownlint-cli2": "^0.23.2",
     "playwright": "^1.63.0",
     "railway": "3.11.0",
     "ts-prune": "0.10.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "yaml": "^2.9.0"
   },
   "overrides": {
     "ts-prune": {

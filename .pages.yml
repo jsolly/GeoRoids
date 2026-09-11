@@ -1,0 +1,112 @@
+---
+media:
+  - name: wiki-images
+    label: Wiki images
+    input: public/wiki/uploads
+    output: /wiki/uploads
+    extensions: [png, jpg, jpeg, webp]
+    rename: safe
+
+content:
+  - name: wiki
+    label: Wiki articles
+    type: collection
+    path: content/wiki
+    format: yaml-frontmatter
+    subfolders: false
+    filename:
+      template: '{primary}.md'
+      field: false
+    operations:
+      rename: true
+      delete: true
+    view:
+      primary: title
+      fields: [title, category, order]
+      sort: [order, title]
+      search: [title, summary, body]
+      default:
+        sort: order
+        order: asc
+    fields:
+      - name: title
+        label: Title
+        type: string
+        required: true
+      - name: category
+        label: Category
+        type: select
+        required: true
+        options:
+          values: [Start here, Ships, Systems, Arena, Combat]
+      - name: summary
+        label: Short description
+        type: text
+        required: true
+        description: Shown in topic cards and search results.
+      - name: order
+        label: Navigation order
+        type: number
+        default: 200
+        required: true
+        description: Lower numbers appear first. Leave gaps for later articles.
+        options:
+          min: 0
+          step: 1
+      - name: related
+        label: Related articles
+        type: reference
+        options:
+          collection: wiki
+          multiple: true
+          search: title,summary
+          value: '{path}'
+          label: '{primary}'
+      - name: media
+        label: Gameplay demonstrations
+        type: object
+        list:
+          collapsible:
+            collapsed: true
+            summary: '{heading} — {demo}'
+        description: Place each demonstration beside its matching Heading 2 in the article. Update this heading if you rename the section.
+        fields:
+          - name: demo
+            label: Demonstration
+            type: select
+            required: true
+            options:
+              values: [dart, hauler, warden, skirmisher, quake, movement, shield, loot, split, reflection, terrain, satellites, pickups]
+          - name: heading
+            label: Section heading
+            type: string
+            required: true
+      - name: body
+        label: Article
+        type: rich-text
+        required: true
+        description: Use Heading 2 for sections. Link articles with /wiki/#article-id. Add alternative text to images. Current game values are added automatically below this text.
+        options:
+          format: markdown
+          media: wiki-images
+
+settings:
+  content:
+    merge: true
+  commit:
+    templates:
+      create: 'docs(wiki): create {filename}'
+      update: 'docs(wiki): update {filename}'
+      delete: 'docs(wiki): delete {filename}'
+      rename: 'docs(wiki): rename {oldFilename} to {newFilename}'
+
+actions:
+  - name: publish-wiki
+    label: Publish wiki
+    workflow: wiki-publish.yml
+    ref: main
+    cancelable: false
+    confirm:
+      title: Publish saved wiki changes?
+      message: Publishes all saved articles and images present when this job starts. Later saves stay as drafts. Automated checks must pass before publication.
+      button: Publish

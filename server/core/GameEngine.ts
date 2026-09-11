@@ -52,6 +52,7 @@ import {
 } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
+import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';
 import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import {
@@ -63,6 +64,7 @@ import {
   resolveCombatDamageSource,
   shieldSnapshot,
 } from '../../src/entities/ship/shipShield';
+import { createSkirmisherRingShots } from '../../src/entities/ship/skirmisherRing';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/physics/shockwave';
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
@@ -89,6 +91,7 @@ import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 
 interface ServerLaser {
+  abilityShot?: boolean;
   id: string;
   ownerId: string;
   /** Firing allegiance survives owner departure; never serialized to clients. */
@@ -381,13 +384,8 @@ export class GameEngine {
     } else if (humanPlayerCount > 0 && this.isPaused) {
       this.isPaused = false;
       logger.info('▶️ Game resumed - human players are back online');
-      // Bots were cleared by resetGameState() while paused. Recreate them so
-      // there are always opponents whenever a human is actively playing.
       if (this.entityManager.getBotCount() === 0) {
-        const bots = this.createBots(3);
-        if (bots) {
-          logger.info(`🤖 Recreated ${bots.length} bots on resume`);
-        }
+        this.createBots();
       }
       this.ensureAmbientSatellites();
     } else if (humanPlayerCount > 0) {
@@ -623,6 +621,7 @@ export class GameEngine {
       .map((laser) => ({
         id: laser.id,
         ownerId: laser.ownerId,
+        ...(laser.abilityShot ? { abilityShot: true } : {}),
         position: { ...laser.position },
         prevPosition: { ...laser.prevPosition },
         velocity: { ...laser.velocity },
@@ -688,7 +687,7 @@ export class GameEngine {
   }
 
   // Bot operations
-  public createBots(count: number): GameEntity[] | null {
+  public createBots(count: number = GAME.BOT_COUNT): GameEntity[] | null {
     return this.entityManager.createBotsSafely(count);
   }
 
@@ -1371,8 +1370,12 @@ export class GameEngine {
       return null;
     }
     const kit = getShipKit(shooter.kitId);
-    // Account for legitimate dash and radial impulse before the next movement clamp.
-    const maxShipSpeed = kit.maxVelocity + SHIP_ABILITY.DASH_BOOST + SHIP_ABILITY.SHOCK_FORCE;
+    // Only server-granted knockback or an active Dart dash expands the normal envelope.
+    const dashAllowance =
+      shooter.kitId === 'dart' && (shooter.abilityActiveFrames ?? 0) > 0
+        ? SHIP_ABILITY.DASH_BOOST
+        : 0;
+    const maxShipSpeed = this.playerMotion.legalSpeed(shooter, now) + dashAllowance;
     const maxLaserSpeed = maxShipSpeed + LASER.SPEED / GAME.FPS;
     const muzzleRadius = (4 / 3) * Math.max(kit.size / 2, radiusFromMass(shooter.mass));
     const maxOriginDistance =
@@ -1386,13 +1389,10 @@ export class GameEngine {
     ) {
       return null;
     }
-    // A bounded burst bucket tolerates packet bunching and the three-shot E volley
-    // (whose shoot packets precede useAbility). Sustained rate follows kit cooldown;
-    // Skirmisher also earns its two additional volley rounds per ability cooldown.
+    // Sustained regular-fire rate follows the kit cooldown. The Skirmisher E ring
+    // is spawned by the authoritative ability path and never uses this bucket.
     const previous = this.humanShootBudgets.get(shooter);
-    const bonusRate =
-      (kit.burstCount - 1) / (SHIP_ABILITY.COOLDOWN_FRAMES[kit.id] * (1000 / GAME.FPS));
-    const rate = 1 / kit.shotCooldown + bonusRate;
+    const rate = 1 / kit.shotCooldown;
     const available = previous
       ? Math.min(SHIP.MAX_LASERS, previous.tokens + Math.max(0, now - previous.at) * rate)
       : SHIP.MAX_LASERS;
@@ -1992,7 +1992,47 @@ export class GameEngine {
         : {}),
       ...(latchView?.canvas !== undefined ? { canvas: latchView.canvas } : {}),
     };
-    return activateAbilityOnHost(entity, world).activated;
+    const activation = activateAbilityOnHost(entity, world);
+    if (activation.activated && activation.abilityId === 'shockPulse') {
+      const now = this.getServerTime();
+      for (const other of world.entities) {
+        if (
+          !other.exploding &&
+          other.health > 0 &&
+          (other.respawnTimer ?? 0) <= 0 &&
+          Math.hypot(other.position.x - entity.position.x, other.position.y - entity.position.y) <=
+            SHIP_ABILITY.SHOCK_RADIUS
+        ) {
+          if (other.type === 'bot') {
+            other.knockbackVelocityLimit = Math.hypot(other.velocity.x, other.velocity.y);
+          }
+          this.playerMotion.applyExternalImpulse(other.id, now);
+        }
+      }
+      this.lootManager.applyQuakePulse(entity.position, entity.angle);
+      this.satelliteManager.applyQuakePulse(entity.position, entity.angle);
+      this.satellitePickupManager.applyQuakePulse(entity.position, entity.angle);
+      for (const laser of this.lasers) {
+        if (!laser.hasExploded) {
+          applyQuakeImpulse(laser, entity.position, entity.angle);
+        }
+      }
+    }
+    if (activation.activated && entity.kitId === 'skirmisher') {
+      const shots = createSkirmisherRingShots(
+        entity.position,
+        entity.angle,
+        radiusFromMass(entity.mass),
+        entity.velocity
+      );
+      for (const shot of shots) {
+        const laser = this.spawnLaser(entity.id, shot.position, shot.velocity);
+        if (laser) {
+          laser.abilityShot = true;
+        }
+      }
+    }
+    return activation.activated;
   }
 
   public tickAbilities(now = this.getServerTime()): void {
@@ -2000,7 +2040,9 @@ export class GameEngine {
     const asteroids = this.asteroidManager.getAllAsteroids();
     const entities = this.entityManager.getAllEntities();
     const emptyCandidates: Array<AsteroidData | GameEntity> = [];
-    let sharedCandidates: Array<AsteroidData | GameEntity> | undefined;
+    let sharedCandidates:
+      | Array<(AsteroidData | GameEntity) & { kind: 'asteroid' | 'ship' }>
+      | undefined;
     for (const entity of entities) {
       if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= now) {
         delete entity.laserUpgrade;
@@ -2015,7 +2057,10 @@ export class GameEngine {
         pullHarpoonTarget(entity, emptyCandidates);
         continue;
       }
-      sharedCandidates ??= [...asteroids, ...entities];
+      sharedCandidates ??= [
+        ...asteroids.map((asteroid) => ({ ...asteroid, kind: 'asteroid' as const })),
+        ...entities.map((ship) => ({ ...ship, kind: 'ship' as const })),
+      ];
       pullHarpoonTarget(entity, sharedCandidates);
     }
   }

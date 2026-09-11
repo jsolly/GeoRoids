@@ -1,14 +1,41 @@
 import type { CDPSession, Page } from 'playwright';
 
-export type TouchPoint = { x: number; y: number; id: number };
+type ScreenPoint = { x: number; y: number };
+export type TouchPoint = ScreenPoint & { id: number };
 type TouchEventType = 'touchStart' | 'touchMove' | 'touchCancel' | 'touchEnd';
 
-export async function centerOf(page: Page, selector: string): Promise<{ x: number; y: number }> {
+export async function centerOf(page: Page, selector: string): Promise<ScreenPoint> {
   const box = await page.locator(selector).boundingBox();
   if (!box) {
     throw new Error(`Missing touch target ${selector}`);
   }
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** Return a CSS-pixel point inside the visible game canvas. */
+export async function canvasPoint(
+  page: Page,
+  horizontalRatio: number,
+  verticalRatio: number
+): Promise<ScreenPoint> {
+  if (
+    !Number.isFinite(horizontalRatio) ||
+    !Number.isFinite(verticalRatio) ||
+    horizontalRatio < 0 ||
+    horizontalRatio > 1 ||
+    verticalRatio < 0 ||
+    verticalRatio > 1
+  ) {
+    throw new RangeError('Canvas point ratios must be finite values between 0 and 1');
+  }
+  const box = await page.locator('#gameCanvas').boundingBox();
+  if (!box) {
+    throw new Error('Missing touch target #gameCanvas');
+  }
+  return {
+    x: box.x + box.width * horizontalRatio,
+    y: box.y + box.height * verticalRatio,
+  };
 }
 
 /** Send real browser touch input through Chromium's input boundary. */
@@ -70,8 +97,7 @@ type TouchControlBox = {
 type TouchControlLayout = {
   viewport: { width: number; height: number };
   overflow: boolean;
-  canvas: { width: number; height: number } | null;
-  fire: TouchControlBox | null;
+  canvas: TouchControlBox | null;
   ability: TouchControlBox | null;
   shield: TouchControlBox | null;
 };
@@ -94,8 +120,7 @@ export async function readTouchControlLayout(page: Page): Promise<TouchControlLa
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-      canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
-      fire: box(document.getElementById('touch-fire')),
+      canvas: box(canvas),
       ability: box(document.getElementById('touch-ability')),
       shield: box(document.getElementById('touch-shield')),
     };

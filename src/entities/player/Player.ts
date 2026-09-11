@@ -84,7 +84,7 @@ export class Player {
       delete this.factionId;
     }
 
-    this.color = getFactionColor(this.type);
+    this.color = getFactionColor(this.factionId);
 
     // Create ship with player's color and friction coefficient
     this.ship = new Ship({
@@ -268,10 +268,8 @@ export class Player {
     if (data.thrusting !== undefined && this.type !== 'local') {
       this.ship.thrusting = data.thrusting;
     }
-    if (data.color !== undefined && this.type !== 'local') {
-      this.color = data.color;
-      this.ship.color = data.color;
-    }
+    this.color = getFactionColor(this.factionId);
+    this.ship.color = this.color;
     if (data.health !== undefined) {
       if (isLocal && this.lives <= 0) {
         this.ship.health = 0;

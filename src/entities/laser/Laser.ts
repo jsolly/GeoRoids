@@ -21,6 +21,7 @@ interface LaserData {
 }
 
 export class Laser implements LaserData {
+  abilityShot = false;
   serverId?: string;
   /** Prevent a reflected visual bolt from immediately re-contacting the same ring. */
   lastShieldId?: string;

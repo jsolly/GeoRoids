@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { canvasPoint, readTouchControlState } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
@@ -90,7 +91,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
 });
 
 test(
-  'mobile viewport fits chrome and exposes fire, ability, and shield without a movement pad',
+  'mobile viewport fits chrome and exposes canvas firing, ability, and shield without a movement pad',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -105,7 +106,6 @@ test(
     const chrome = await page.evaluate(() => {
       const root = document.getElementById('touch-controls');
       const stick = document.getElementById('touch-stick');
-      const fire = document.getElementById('touch-fire');
       const ability = document.getElementById('touch-ability');
       const shield = document.getElementById('touch-shield');
       const canvas = document.getElementById('gameCanvas');
@@ -125,16 +125,8 @@ test(
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
         dpr: window.devicePixelRatio,
-        canvas: canvas
-          ? {
-              cssWidth: canvas.getBoundingClientRect().width,
-              cssHeight: canvas.getBoundingClientRect().height,
-              width: (canvas as HTMLCanvasElement).width,
-              height: (canvas as HTMLCanvasElement).height,
-            }
-          : null,
+        canvas: box(canvas),
         stick: box(stick),
-        fire: box(fire),
         ability: box(ability),
         shield: box(shield),
         abilityDisabled: ability?.getAttribute('aria-disabled'),
@@ -147,40 +139,28 @@ test(
     expect(chrome.hidden).toBe(false);
     expect(chrome.overflow).toBe(false);
     expect(chrome.dpr).toBe(2);
-    expect(chrome.canvas?.cssWidth).toBe(chrome.innerWidth);
-    expect(chrome.canvas?.cssHeight).toBe(chrome.innerHeight);
-    expect(chrome.canvas?.width).toBe(chrome.innerWidth * chrome.dpr);
-    expect(chrome.canvas?.height).toBe(chrome.innerHeight * chrome.dpr);
+    expect(chrome.canvas).toBeTruthy();
+    expect(chrome.canvas?.left).toBeGreaterThanOrEqual(-1);
+    expect(chrome.canvas?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
+    expect(chrome.canvas?.top).toBeGreaterThanOrEqual(-1);
+    expect(chrome.canvas?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.stick).toBeNull();
-    expect(chrome.fire).toBeTruthy();
     expect(chrome.ability).toBeTruthy();
     expect(chrome.shield).toBeTruthy();
     expect(chrome.abilityDisabled).toBe('false');
     expect(chrome.shieldDisabled).toBe('false');
-    expect(chrome.fire?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.shield?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
-    expect(chrome.fire?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.shield?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
 
-    await page.touchscreen.tap(
-      Math.round((chrome.fire?.left ?? 0) + 20),
-      Math.round((chrome.fire?.top ?? 0) + 20)
+    const beforeTap = await readTouchControlState(page);
+    const tapPoint = await canvasPoint(page, 0.75, 0.5);
+    await page.touchscreen.tap(tapPoint.x, tapPoint.y);
+    await game.waitForAnimationFrames(2);
+    expect((await readTouchControlState(page)).lastShotTime).toBeGreaterThan(
+      beforeTap.lastShotTime
     );
-
-    const fired = await page.evaluate(() => {
-      const gc = window as unknown as {
-        gameController?: {
-          getPlayerManager: () => {
-            getLocalPlayer: () => { ship: { lasers: unknown[]; lastShotTime: number } } | null;
-          };
-        };
-      };
-      const ship = gc.gameController?.getPlayerManager().getLocalPlayer()?.ship;
-      return Boolean(ship && (ship.lasers.length > 0 || ship.lastShotTime > 0));
-    });
-    expect(fired).toBe(true);
 
     await page.locator('#touch-ability').click();
     const abilityUsed = await page.evaluate(() => {

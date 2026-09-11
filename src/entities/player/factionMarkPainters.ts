@@ -1,16 +1,7 @@
+import { FACTION_COLORS } from '../../../shared/factions';
 import type { SoftFactionId } from './softFactions';
 
-/** Game Director art call. Tiny marks only — never hull paint. */
-export const FACTION_MARK_COLORS = {
-  ion: '#A8A0C8',
-  ember: '#D4B896',
-} as const;
-
-/** Ownership hull strokes. Soft factions must not reuse these as hull fill/stroke. */
-export const OWNERSHIP_HULL_COLORS = {
-  local: '#5EEAD4',
-  bot: '#FB923C',
-} as const;
+export const FACTION_MARK_COLORS = FACTION_COLORS;
 
 export const FACTION_MARK_RADIUS_RATIO = 0.26;
 

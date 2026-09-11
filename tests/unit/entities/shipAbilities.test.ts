@@ -6,7 +6,6 @@ import {
   harpoonBodyFromRock,
   publishHarpoonField,
 } from '../../../src/entities/ship/harpoonField';
-import { Ship } from '../../../src/entities/ship/Ship';
 import {
   type AbilityBody,
   type AbilityHost,
@@ -52,7 +51,7 @@ test('Dart boost dash adds forward velocity', () => {
   expect(dart.harpoonTimer).toBe(0);
 });
 
-test('Hauler harpoon latches one rock and hauls only that rock', () => {
+test('Hauler reels only the latched rock toward itself when no enemy or momentum exists', () => {
   const hauler = host('hauler');
   const near = { id: 'near-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } };
   const far = { id: 'far-rock', position: { x: 200, y: 0 }, velocity: { x: 0, y: 0 } };
@@ -187,8 +186,20 @@ test('Hauler harpoon whiffs without a rock in range', () => {
 test('Hauler harpoon latches a nearby ship and hauls only that ship', () => {
   const hauler = host('hauler');
   hauler.id = 'hauler-1';
-  const near = { id: 'dart-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 }, health: 100 };
-  const far = { id: 'dart-2', position: { x: 200, y: 0 }, velocity: { x: 0, y: 0 }, health: 100 };
+  const near: AbilityBody = {
+    kind: 'ship',
+    id: 'dart-1',
+    position: { x: 80, y: 0 },
+    velocity: { x: 0, y: 0 },
+    health: 100,
+  };
+  const far: AbilityBody = {
+    kind: 'ship',
+    id: 'dart-2',
+    position: { x: 200, y: 0 },
+    velocity: { x: 0, y: 0 },
+    health: 100,
+  };
   const result = activateAbilityOnHost(hauler, { asteroids: [], entities: [near, far] });
   expect(result.activated).toBe(true);
   expect(hauler.harpoonTargetId).toBe('dart-1');
@@ -553,13 +564,10 @@ test('projected shield timers expire on both the caster and recipient', () => {
   expect(friend.shieldSourceId).toBeUndefined();
 });
 
-test('Skirmisher burst marks a volley and the ship fires three lasers', () => {
+test('Skirmisher E marks a full ring volley', () => {
   const skirmisher = host('skirmisher');
   const result = activateAbilityOnHost(skirmisher);
-  expect(result.abilityId).toBe('burstFire');
-  const ship = new Ship({ kitId: 'skirmisher' });
-  ship.activateAbility();
-  expect(ship.lasers.length).toBe(3);
+  expect(result.abilityId).toBe('ringFire');
 });
 
 test('Quake shock pulse knocks nearby rocks and ships without terrain', () => {
@@ -601,4 +609,190 @@ test('deep-zoom on-screen rock past the old 8000wu cap still latches', () => {
   });
   expect(result.activated).toBe(true);
   expect(hauler.harpoonLatchPos?.x).toBe(9000);
+});
+
+function slingScene() {
+  const hauler: AbilityHost = { ...host('hauler'), id: 'hauler', factionId: 'ion' };
+  const rock: AbilityBody = {
+    id: 'rock',
+    kind: 'asteroid',
+    position: { x: 80, y: 0 },
+    velocity: { x: 2, y: 0 },
+  };
+  const enemy = (id: string, x: number, y: number): AbilityBody => ({
+    id,
+    kind: 'ship',
+    position: { x, y },
+    velocity: { x: 0, y: 0 },
+    health: 100,
+  });
+  return { hauler, rock, enemy };
+}
+
+test('Hauler favors an enemy in the momentum path over a closer sideways or rear enemy', () => {
+  const { hauler, rock, enemy } = slingScene();
+  activateAbilityOnHost(hauler, {
+    asteroids: [rock],
+    entities: [enemy('side', 80, 120), enemy('rear', 20, 0), enemy('ahead', 560, 0)],
+  });
+  expect(rock.velocity.x).toBe(SHIP_ABILITY.HARPOON_SLING_SPEED);
+  expect(rock.velocity.y).toBe(0);
+});
+
+function reelUntilRelease(hauler: AbilityHost, rock: AbilityBody, enemies: AbilityBody[]): void {
+  for (let frame = 0; frame < SHIP_ABILITY.HARPOON_FRAMES; frame++) {
+    pullHarpoonTarget(hauler, [rock, ...enemies]);
+    if (
+      Math.hypot(rock.velocity.x, rock.velocity.y) >= SHIP_ABILITY.HARPOON_SLING_SPEED - 1e-8 &&
+      Math.hypot(rock.position.x - hauler.position.x, rock.position.y - hauler.position.y) <=
+        (hauler.r ?? 20) + (rock.r ?? rock.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP
+    ) {
+      return;
+    }
+    rock.position.x += rock.velocity.x;
+    rock.position.y += rock.velocity.y;
+    tickAbilityHost(hauler);
+  }
+  throw new Error('Rock never reached the Hauler and released');
+}
+
+test('a sideways enemy makes the rock reel before bouncing toward its predicted position', () => {
+  const { hauler, rock, enemy } = slingScene();
+  const moving = enemy('moving', 440, 300);
+  moving.velocity.y = 3;
+  const original = { ...rock.velocity };
+  activateAbilityOnHost(hauler, { asteroids: [rock], entities: [moving] });
+  expect(rock.velocity).toEqual(original);
+  pullHarpoonTarget(hauler, [rock, moving]);
+  expect(rock.velocity.x).toBeLessThan(original.x);
+  expect(rock.velocity.x).toBeGreaterThan(0);
+  expect(rock.velocity.y).toBe(0);
+  reelUntilRelease(hauler, rock, [moving]);
+  const flightTime = (moving.position.x - rock.position.x) / rock.velocity.x;
+  expect(rock.position.y + rock.velocity.y * flightTime).toBeCloseTo(
+    moving.position.y + moving.velocity.y * flightTime
+  );
+  const launched = { ...rock.velocity };
+  moving.velocity.y = -6;
+  for (let frame = 0; frame < SHIP_ABILITY.HARPOON_FRAMES + 1; frame++) {
+    pullHarpoonTarget(hauler, [rock, moving]);
+    tickAbilityHost(hauler);
+  }
+  expect(rock.velocity).toEqual(launched);
+});
+
+test('a nearby enemy in the forward collision corridor does not bend the original momentum', () => {
+  const { hauler, rock, enemy } = slingScene();
+  activateAbilityOnHost(hauler, { asteroids: [rock], entities: [enemy('ahead', 500, 10)] });
+  expect(rock.velocity).toEqual({ x: SHIP_ABILITY.HARPOON_SLING_SPEED, y: 0 });
+});
+
+test('an expired tether stops reeling without a delayed launch', () => {
+  const { hauler, rock, enemy } = slingScene();
+  const enemies = [enemy('side', 80, 300)];
+  activateAbilityOnHost(hauler, { asteroids: [rock], entities: enemies });
+  pullHarpoonTarget(hauler, [rock, ...enemies]);
+  const velocity = { ...rock.velocity };
+  hauler.harpoonTimer = 0;
+  pullHarpoonTarget(hauler, [rock, ...enemies]);
+  expect(rock.velocity).toEqual(velocity);
+});
+
+test('Hauler ignores allies, self, dead, respawning, shielded, and unreachable enemies', () => {
+  const { hauler, rock, enemy } = slingScene();
+  const excluded: AbilityBody[] = [
+    { ...enemy('ally', 180, 0), factionId: 'ion' },
+    { ...enemy('dead', 180, 0), health: 0 },
+    { ...enemy('exploding', 180, 0), exploding: true },
+    { ...enemy('respawning', 180, 0), respawnTimer: 30 },
+    { ...enemy('spawn', 180, 0), spawnProtectionTimer: 30 },
+    { ...enemy('shield', 180, 0), shieldActive: true },
+    { ...enemy('projection', 180, 0), shieldTimer: 30 },
+    { ...enemy('escaping', 180, 0), velocity: { x: 20, y: 0 } },
+    enemy('distant', 10000, 0),
+    hauler,
+  ];
+  activateAbilityOnHost(hauler, {
+    asteroids: [rock],
+    entities: [...excluded, enemy('valid', 80, 240)],
+  });
+  const valid = enemy('valid', 80, 240);
+  reelUntilRelease(hauler, rock, [...excluded, valid]);
+  expect(rock.velocity.y).toBeGreaterThan(11);
+  expect(rock.velocity.x).toBeGreaterThan(0);
+});
+
+test('A stationary rock reels before choosing the quickest intercept with stable target ties', () => {
+  for (const reverse of [false, true]) {
+    const { hauler, rock, enemy } = slingScene();
+    rock.velocity.x = 0;
+    const enemies = [enemy('b', 80, -240), enemy('a', 80, 240), enemy('far', 560, 0)];
+    activateAbilityOnHost(hauler, {
+      asteroids: [rock],
+      entities: reverse ? enemies.reverse() : enemies,
+    });
+    expect(rock.velocity).toEqual({ x: 0, y: 0 });
+    reelUntilRelease(hauler, rock, enemies);
+    expect(rock.velocity.y).toBeGreaterThan(11);
+  }
+});
+
+test('A fast rock without reachable enemies starts reeling without snapping its momentum', () => {
+  const { hauler, rock } = slingScene();
+  rock.velocity = { x: 15, y: 20 };
+  activateAbilityOnHost(hauler, { asteroids: [rock], entities: [] });
+  expect(rock.velocity).toEqual({ x: 15, y: 20 });
+  pullHarpoonTarget(hauler, [rock]);
+  expect(Math.hypot(rock.velocity.x - 15, rock.velocity.y - 20)).toBeCloseTo(
+    SHIP_ABILITY.HARPOON_REEL_ACCELERATION
+  );
+});
+
+test('a distant visible rock gets enough tether time to reel in and bounce', () => {
+  const { hauler, rock, enemy } = slingScene();
+  rock.position.x = 9000;
+  rock.velocity.x = 0;
+  const target = enemy('target', 300, 400);
+  activateAbilityOnHost(hauler, {
+    asteroids: [rock],
+    entities: [target],
+    playfieldScale: 0.1,
+    canvas: { width: 1920, height: 1080 },
+  });
+  expect(hauler.harpoonTimer).toBeGreaterThan(SHIP_ABILITY.HARPOON_FRAMES);
+  const duration = hauler.harpoonTimer;
+  let released = false;
+  for (let frame = 0; frame < duration; frame++) {
+    pullHarpoonTarget(hauler, [rock, target]);
+    if (rock.velocity.y > 0) {
+      released = true;
+      expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(12);
+      break;
+    }
+    rock.position.x += rock.velocity.x;
+    rock.position.y += rock.velocity.y;
+    tickAbilityHost(hauler);
+  }
+  expect(released).toBe(true);
+});
+
+test('local latch prediction waits for the server to launch the rock', () => {
+  const { hauler, rock } = slingScene();
+  bindHarpoonFieldSource(null);
+  publishHarpoonField([
+    {
+      id: 'rock',
+      kind: 'asteroid',
+      position: rock.position,
+      velocity: rock.velocity,
+    },
+  ]);
+  try {
+    const before = { ...rock.velocity };
+    expect(activateAbilityOnHost(hauler).activated).toBe(true);
+    expect(hauler.harpoonTargetId).toBe('rock');
+    expect(rock.velocity).toEqual(before);
+  } finally {
+    publishHarpoonField([]);
+  }
 });

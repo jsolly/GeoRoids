@@ -1,12 +1,9 @@
 import type { FactionId } from '../shared-types';
 
-/**
- * Mark/label hexes only — never hull stroke.
- * #5EEAD4 (local) and #FB923C (bot) stay ownership/role colors in PALETTE.
- */
+/** Shared colors for faction hulls, labels, radar and marks. */
 export const FACTION_COLORS: Record<FactionId, string> = {
-  ion: '#A8A0C8',
-  ember: '#D4B896',
+  ion: '#7DD3FC',
+  ember: '#FB923C',
 };
 
 export const FACTION_LABELS: Record<FactionId, string> = {

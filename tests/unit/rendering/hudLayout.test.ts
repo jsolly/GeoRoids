@@ -26,7 +26,7 @@ test('desktop 800x600 keeps the Wave1 compact cluster anchors', () => {
   });
 });
 
-test('phone portrait raises the radar above the fire button', () => {
+test('phone portrait raises the radar above the ability buttons', () => {
   const layout = computeHudLayout(
     { width: 390, height: 844 },
     { touchControls: true, safeArea: ZERO }

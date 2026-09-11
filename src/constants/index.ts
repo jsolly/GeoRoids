@@ -14,7 +14,7 @@ export const GAME = {
   STARTING_SCORE: 0,
 
   // Network (can be overridden by DEBUG.BOT_PLAYER.COUNT when in debug mode)
-  BOT_COUNT: 9,
+  BOT_COUNT: 2,
 
   // Physics
   FPS: 60,
@@ -45,9 +45,8 @@ export const CANVAS = {
 // TOUCH CONTROLS
 // ============================================================================
 export const TOUCH = {
-  FIRE_SIZE: 72,
-  // Canvas space reserved above the fire button so the radar stays readable.
-  FIRE_RESERVE: 112,
+  // Canvas space reserved above the ability buttons so the radar stays readable.
+  ACTION_RESERVE: 112,
   PHONE_MAX_WIDTH: 500,
   PHONE_LANDSCAPE_MAX_HEIGHT: 430,
   PHONE_LANDSCAPE_MAX_WIDTH: 1000,
@@ -407,7 +406,7 @@ export const DEBUG = {
 
   // Bot player settings
   BOT_PLAYER: {
-    COUNT: 2, // Reduced for better performance during development (overrides GAME.BOT_COUNT when in debug mode)
+    COUNT: 2, // Keep the same two-bot match in development.
     MOVEMENT: true,
     LASERS: true,
     SPAWN_PROTECTION: false,

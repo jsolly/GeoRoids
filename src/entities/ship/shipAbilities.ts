@@ -9,6 +9,8 @@ import {
   harpoonTargetIdsMatch,
   syncHarpoonFieldFromPlay,
 } from './harpoonField';
+import { slingHarpoonAsteroid, tickHarpoonSling } from './harpoonSling';
+import { applyQuakeImpulse } from './quakeImpulse';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId, type ShipKitId } from './shipKits';
 
 export interface AbilityHost extends FuelTank {
@@ -48,6 +50,7 @@ export interface AbilityBody {
   /** Timed ship shield (#454). Separate from Warden's projected E timer. */
   shieldActive?: boolean;
   respawnTimer?: number;
+  spawnProtectionTimer?: number;
 }
 
 export interface AbilityWorld {
@@ -240,17 +243,6 @@ export function applySharedHarpoonLatch(
   if (host.harpoonTimer <= 0) {
     delete host.harpoonTargetId;
   }
-}
-
-function pushBody(body: AbilityBody, toward: Position, force: number): void {
-  const dx = body.position.x - toward.x;
-  const dy = body.position.y - toward.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1) {
-    return;
-  }
-  body.velocity.x += (dx / dist) * force;
-  body.velocity.y += (dy / dist) * force;
 }
 
 function pullBody(body: AbilityBody, toward: Position, force: number): void {
@@ -503,23 +495,36 @@ function bodyMatchesLatchId(body: AbilityBody, id: string): boolean {
   return harpoonTargetIdsMatch(body.id, id);
 }
 
-/** Hauler-only: haul the latched rock or ship. Other kits never pull. */
+/** Hauler-only: haul ships or advance an authoritative asteroid reel. */
 export function pullHarpoonTarget(host: AbilityHost, bodies: AbilityBody[]): void {
   if (host.kitId !== 'hauler') {
+    tickHarpoonSling(host, undefined, bodies);
     clearHarpoonLatch(host);
     return;
   }
   if (host.harpoonTimer <= 0 || !host.harpoonTargetId) {
+    tickHarpoonSling(host, undefined, bodies);
     return;
   }
 
   const targetId = host.harpoonTargetId;
   const target =
-    bodies.find((body) => body !== host && bodyMatchesLatchId(body, targetId)) ??
+    bodies.find((body) => body.id === targetId && body.id !== host.id) ??
+    bodies.find((body) => body.id !== host.id && bodyMatchesLatchId(body, targetId)) ??
     findHarpoonFieldBody(targetId);
   // Keep cream VFX (timer + latchPos) if the field id is mid-sync. #481
   // cleared here and left abilityActiveFrames — activation ring, no tether.
   if (!target || !latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE_MAX)) {
+    tickHarpoonSling(host, undefined, bodies);
+    return;
+  }
+
+  if (isEnvironmentLatchBody(target)) {
+    tickHarpoonSling(
+      host,
+      target,
+      bodies.filter((body) => !isEnvironmentLatchBody(body))
+    );
     return;
   }
 
@@ -529,27 +534,17 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: AbilityBody[]): voi
 }
 
 export function applyShockPulse(host: AbilityHost, world: AbilityWorld): void {
-  for (const asteroid of world.asteroids) {
-    const dist = Math.hypot(
-      asteroid.position.x - host.position.x,
-      asteroid.position.y - host.position.y
-    );
-    if (dist > SHIP_ABILITY.SHOCK_RADIUS || dist < 1) {
+  for (const body of [...world.asteroids, ...world.entities]) {
+    if (
+      body === host ||
+      (host.id !== undefined && body.id === host.id) ||
+      body.exploding ||
+      (body.health !== undefined && body.health <= 0) ||
+      (body.respawnTimer ?? 0) > 0
+    ) {
       continue;
     }
-    const falloff = 1 - dist / SHIP_ABILITY.SHOCK_RADIUS;
-    pushBody(asteroid, host.position, SHIP_ABILITY.SHOCK_FORCE * falloff);
-  }
-  for (const entity of world.entities) {
-    const dist = Math.hypot(
-      entity.position.x - host.position.x,
-      entity.position.y - host.position.y
-    );
-    if (dist > SHIP_ABILITY.SHOCK_RADIUS || dist < 1) {
-      continue;
-    }
-    const falloff = 1 - dist / SHIP_ABILITY.SHOCK_RADIUS;
-    pushBody(entity, host.position, SHIP_ABILITY.SHOCK_FORCE * falloff);
+    applyQuakeImpulse(body, host.position, host.angle);
   }
 }
 
@@ -614,6 +609,11 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     host.harpoonTimer = SHIP_ABILITY.HARPOON_FRAMES;
     host.abilityActiveFrames = SHIP_ABILITY.HARPOON_FRAMES;
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
+    // Local prediction only paints the latch. Launch using the authoritative
+    // world, whose enemy rows include complete protection and respawn state.
+    if (world?.asteroids.includes(target)) {
+      slingHarpoonAsteroid(host, target, world.entities);
+    }
     return { activated: true, abilityId: 'harpoon' };
   }
 
@@ -638,7 +638,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       host.abilityActiveFrames = 12;
       break;
     }
-    case 'burstFire':
+    case 'ringFire':
       host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
       host.abilityActiveFrames = 8;
       break;

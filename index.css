@@ -605,37 +605,12 @@ body.touch-play .touch-controls:not([hidden]) {
 }
 
 body.touch-play #gameCanvas,
-.touch-fire,
 .touch-ability,
 .touch-shield {
   pointer-events: auto;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-}
-
-.touch-fire {
-  position: absolute;
-  right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: max(20px, env(safe-area-inset-bottom, 0px));
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  padding: 0;
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--palette-laser, #fde68a);
-  background: color-mix(in srgb, var(--palette-bg, #000011) 55%, transparent);
-  border: 1.5px solid var(--palette-laser, #fde68a);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--palette-laser, #fde68a) 35%, transparent);
-  text-shadow: 0 0 8px color-mix(in srgb, var(--palette-laser, #fde68a) 45%, transparent);
-}
-
-.touch-fire.is-pressed {
-  background: color-mix(in srgb, var(--palette-laser, #fde68a) 18%, transparent);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--palette-laser, #fde68a) 55%, transparent);
 }
 
 .touch-ability,
@@ -659,7 +634,7 @@ body.touch-play #gameCanvas,
 }
 
 .touch-shield {
-  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 148px);
+  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 66px);
   color: var(--palette-shield, #7dd3c8);
   border-color: var(--palette-shield, #7dd3c8);
   box-shadow: 0 0 10px color-mix(in srgb, var(--palette-shield, #7dd3c8) 28%, transparent);
@@ -667,7 +642,7 @@ body.touch-play #gameCanvas,
 }
 
 .touch-ability {
-  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 82px);
+  right: max(16px, env(safe-area-inset-right, 0px));
 }
 
 .touch-ability.is-pressed,
@@ -693,14 +668,6 @@ body.touch-play #gameCanvas,
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
-  .touch-fire {
-    width: 64px;
-    height: 64px;
-    right: max(20px, env(safe-area-inset-right, 0px));
-    bottom: max(12px, env(safe-area-inset-bottom, 0px));
-    font-size: 0.64rem;
-  }
-
   .touch-ability,
   .touch-shield {
     width: 48px;
@@ -710,11 +677,11 @@ body.touch-play #gameCanvas,
   }
 
   .touch-shield {
-    right: calc(max(20px, env(safe-area-inset-right, 0px)) + 130px);
+    right: calc(max(20px, env(safe-area-inset-right, 0px)) + 58px);
   }
 
   .touch-ability {
-    right: calc(max(20px, env(safe-area-inset-right, 0px)) + 72px);
+    right: max(20px, env(safe-area-inset-right, 0px));
   }
 
   .screen {

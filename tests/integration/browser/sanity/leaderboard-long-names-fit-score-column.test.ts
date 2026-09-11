@@ -112,7 +112,8 @@ async function verifyViewport(
   expect(name?.textAlign).toBe('left');
   expect(score?.textAlign).toBe('right');
   expect(name?.font).toBe('11px Arial');
-  expect(name?.fillStyle).toContain('94, 234, 212');
+  const faction = await page.evaluate(() => window.gameController?.getCurrPlayer()?.factionId);
+  expect(name?.fillStyle).toContain(faction === 'ember' ? '251, 146, 60' : '125, 211, 252');
   expect(score?.fillStyle).toContain('100, 116, 139');
   expect(name?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
     (score?.x ?? 0) - (name?.x ?? 0) - (score?.width ?? 0) - 6

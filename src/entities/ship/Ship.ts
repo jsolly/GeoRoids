@@ -4,6 +4,7 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
 import { createFuelTank } from '../../../shared/fuel';
+import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
   LaserUpgrade,
@@ -23,8 +24,8 @@ import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
 import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileField';
-import type { Laser } from '../laser/Laser';
-import { createLaser, createLaserAtAngle } from '../laser/laserUtils';
+import { Laser } from '../laser/Laser';
+import { createLaser } from '../laser/laserUtils';
 import { getHarpoonFieldCanvas, getHarpoonFieldScale } from './harpoonField';
 import { startQuakePulse } from './quakePulseRenderer';
 import {
@@ -35,7 +36,6 @@ import {
   tickAbilityHost,
 } from './shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
-
 import { activateShield, clearShield, deactivateShield, updateShield } from './shipShield';
 import {
   applyShipSpawnProtection,
@@ -46,11 +46,14 @@ import {
   shouldStartHealthRegeneration,
   tickShipImpactFlash,
 } from './shipUtils';
+import { createSkirmisherRingShots } from './skirmisherRing';
 
 class Ship {
   id: string = uuidv4(); // Unique identifier for event handling
   position: Position = { x: 0, y: 0 };
   velocity: Velocity = { x: 0, y: 0 };
+  /** Granted only by an authoritative motion rebase after an external impulse. */
+  knockbackVelocityLimit = 0;
   r: number = radiusFromMass(GROWTH.BASE_MASS);
   mass: number = GROWTH.BASE_MASS;
   angle: number = (90 / 180) * Math.PI;
@@ -206,7 +209,10 @@ class Ship {
 
   canShootAgain(): boolean {
     this.updateShootCooldown();
-    if (this.canShoot && this.lasers.length < SHIP.MAX_LASERS) {
+    if (
+      this.canShoot &&
+      this.lasers.filter((laser) => !laser.abilityShot).length < SHIP.MAX_LASERS
+    ) {
       return true;
     }
     this.canShoot = false;
@@ -247,22 +253,16 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  fireBurst(count: number, spread: number): void {
-    const mid = (count - 1) / 2;
-    for (let i = 0; i < count; i++) {
-      if (this.lasers.length >= SHIP.MAX_LASERS) {
-        break;
-      }
-      const angle = this.angle + (i - mid) * spread;
-      const laser = createLaserAtAngle(this, angle);
+  fireRing(): void {
+    const shots = createSkirmisherRingShots(this.position, this.angle, this.r, this.velocity);
+    for (const shot of shots) {
+      const laser = new Laser(shot.position, shot.velocity, 0, 0, false);
+      laser.abilityShot = true;
       this.lasers.push(laser);
-      if (i === 0) {
+      if (shot === shots[0]) {
         laser.playLaserSound();
       }
-      this.sendShootEvent(laser);
     }
-    this.canShoot = false;
-    this.lastShotTime = Date.now();
   }
 
   activateAbility(world?: AbilityWorld): boolean {
@@ -276,8 +276,8 @@ class Ship {
       this.lastLocalFuelWriteMs = Date.now();
       startQuakePulse(this, { ...this.position });
     }
-    if (result.abilityId === 'burstFire') {
-      this.fireBurst(kit.burstCount, 0.12);
+    if (result.abilityId === 'ringFire') {
+      this.fireRing();
     }
     // Always tell the server on a legal E. Do not start the Hauler cooldown
     // on a miss — that 3s lock was why a later in-range tap stayed dead.
@@ -561,6 +561,7 @@ class Ship {
     }
 
     this.angle += this.angularVelocity;
+    const velocityLimit = Math.max(this.maxVelocity, this.knockbackVelocityLimit);
     this.velocity = applyThrustOrFriction(
       this.velocity,
       this.angle,
@@ -568,17 +569,18 @@ class Ship {
       this.frictionCoefficient,
       this.thrust,
       this.mass,
-      this.maxVelocity
+      velocityLimit
     );
     applySharedShipSlope(this.velocity, this.position);
-    this.capVelocity();
+    this.capVelocity(velocityLimit);
+    this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;
     this.position = addPositionAndVelocity(this.position, this.velocity);
   }
 
-  private capVelocity(): void {
+  private capVelocity(maximum: number): void {
     const currentSpeed = Math.hypot(this.velocity.x, this.velocity.y);
-    if (currentSpeed > this.maxVelocity) {
-      const scale = this.maxVelocity / currentSpeed;
+    if (currentSpeed > maximum) {
+      const scale = maximum / currentSpeed;
       this.velocity.x *= scale;
       this.velocity.y *= scale;
     }

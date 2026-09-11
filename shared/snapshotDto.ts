@@ -197,6 +197,7 @@ const projectile = shape<SnapshotSatelliteProjectile>({
   age: (value) => number(value) && (value as number) >= 0,
 });
 const playerProjectile = shape<PlayerProjectileState>({
+  abilityShot: optional(boolean),
   id: string,
   ownerId: string,
   position,

@@ -17,8 +17,9 @@ media: []
 
 Players are assigned to ION or EMBER when they join, with the balancing helper
 filling the smaller side and resolving a tie in favor of ION. Faction is
-independent of ship kit. The HUD shows the side label and mark, while hull
-colors continue to identify the ship role.
+independent of ship kit. The HUD shows the side label and mark, and hull colors
+identify the side: blue for Ion, orange for Ember. Names append "(bot)" for
+bots.
 
 ## Damage rules
 
@@ -33,7 +34,8 @@ but Quake can push allies without damaging them.
 
 ## Bots
 
-Orange hulls are bots. They choose living hostile human pilots, lead moving
-targets when aiming, and patrol when there is no target. They share the faction
-rules and keep respawning after destruction. Their orange color identifies a
-bot, not its side: check the faction mark before assuming it is hostile.
+The default match keeps two bots: one Ion and one Ember. They choose living
+hostile human pilots, lead moving targets when aiming, and patrol when there is
+no target. They share the faction rules and keep respawning after destruction.
+Blue hulls and names identify Ion; orange identifies Ember. Bot names carry
+"(bot)" in ship labels and the leaderboard.

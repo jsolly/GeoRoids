@@ -28,19 +28,19 @@ There is **no Hook sixth ship class**. Harpoon is a **Hauler-only** ability.
 | Dart | needle — tall thin isosceles; inverted-V notch at aft | Boost dash |
 | Hauler | barge hex — wide low polygon; flat keel; faceted bow | **Harpoon** (tether / latch) |
 | Warden | Δ + forward shield arc — detached arc above the apex | Shield |
-| Skirmisher | Y-fork — two forward prongs; notched aft | Burst fire |
+| Skirmisher | Y-fork — two forward prongs; notched aft | Ring fire |
 | Quake | terraced mountain — triangular peak, cross ledges, narrow rear stem | Shock pulse |
 
 Soft factions stay on the factions stream (#465). Names stay **ION** / **EMBER**.
-Art is tiny marks only via `FACTION_MARK_PAINTERS`:
+Hull, label and minimap colors indicate faction; marks also use `FACTION_MARK_PAINTERS`:
 
 | Side | Mark | Stroke |
 | --- | --- | --- |
-| ION | chevron | `#A8A0C8` |
-| EMBER | diamond | `#D4B896` |
+| ION | chevron | `#7DD3FC` |
+| EMBER | diamond | `#FB923C` |
 
-Never paint full hulls with `#5EEAD4` or `#FB923C` — those are local/bot ownership
-only. Hull stroke stays local / remote / bot.
+Ion hulls and names are blue; Ember hulls and names are orange. Bot labels append
+“(bot)”. Player type does not change faction colors.
 
 ## Harpoon (Hauler only)
 

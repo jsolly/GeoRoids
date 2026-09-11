@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest';
-import { PALETTE } from '../../../src/constants';
 import {
   drawSoftFactionMark,
   FACTION_MARK_COLORS,
@@ -7,26 +6,21 @@ import {
   FACTION_MARK_RADIUS_RATIO,
   factionMarkScreenSize,
   getFactionMarkColor,
-  OWNERSHIP_HULL_COLORS,
   registerFactionMarkPainter,
 } from '../../../src/entities/player/factionMarkPainters';
 import { Player } from '../../../src/entities/player/Player';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { getFactionColor } from '../../../src/utils/colorUtils';
 
-test('ION and EMBER marks use the Game Director swatches, not ownership hull paint', () => {
-  expect(FACTION_MARK_COLORS.ion).toBe('#A8A0C8');
-  expect(FACTION_MARK_COLORS.ember).toBe('#D4B896');
-  expect(OWNERSHIP_HULL_COLORS.local).toBe('#5EEAD4');
-  expect(OWNERSHIP_HULL_COLORS.bot).toBe('#FB923C');
-  expect(getFactionMarkColor('ion')).not.toBe(PALETTE.LOCAL);
-  expect(getFactionMarkColor('ion')).not.toBe(PALETTE.BOT);
-  expect(getFactionMarkColor('ember')).not.toBe(PALETTE.LOCAL);
-  expect(getFactionMarkColor('ember')).not.toBe(PALETTE.BOT);
+test('faction marks use the same blue and orange as hulls', () => {
+  expect(FACTION_MARK_COLORS.ion).toBe('#7DD3FC');
+  expect(FACTION_MARK_COLORS.ember).toBe('#FB923C');
+  expect(getFactionMarkColor('ion')).toBe(getFactionColor('ion'));
+  expect(getFactionMarkColor('ember')).toBe(getFactionColor('ember'));
   expect(FACTION_MARK_RADIUS_RATIO).toBeLessThanOrEqual(0.35);
 });
 
-test('hull stroke stays local / remote / bot even when a side is assigned', () => {
+test('hull color follows faction for humans and bots and updates with a new side', () => {
   const ionLocal = new Player({
     id: 'ion-local',
     name: 'Ion',
@@ -41,10 +35,13 @@ test('hull stroke stays local / remote / bot even when a side is assigned', () =
     input: new MockPlayerInput(),
     factionId: 'ember',
   });
-  expect(ionLocal.color).toBe(getFactionColor('local'));
-  expect(ionLocal.ship.color).toBe(PALETTE.LOCAL);
-  expect(emberBot.color).toBe(getFactionColor('bot'));
-  expect(emberBot.color).not.toBe(FACTION_MARK_COLORS.ember);
+  expect(ionLocal.color).toBe(getFactionColor('ion'));
+  expect(ionLocal.ship.color).toBe(FACTION_MARK_COLORS.ion);
+  expect(emberBot.color).toBe(getFactionColor('ember'));
+  expect(emberBot.color).toBe(FACTION_MARK_COLORS.ember);
+  emberBot.updateFromServer({ factionId: 'ion', color: '#ffffff' });
+  expect(emberBot.color).toBe(ionLocal.color);
+  expect(emberBot.ship.color).toBe(ionLocal.ship.color);
 });
 
 function mockCtx(): { calls: string[]; colors: string[]; ctx: CanvasRenderingContext2D } {
@@ -81,14 +78,14 @@ test('unset side draws no mark', () => {
 test('ION paints a tiny chevron and EMBER paints a tiny diamond', () => {
   const ion = mockCtx();
   drawSoftFactionMark(ion.ctx, 'ion', { x: 0, y: 0, radius: 16, angle: 0 });
-  expect(ion.colors).toContain('#A8A0C8');
+  expect(ion.colors).toContain('#7DD3FC');
   expect(ion.calls).toContain('lineTo');
   expect(ion.calls).not.toContain('fill');
   expect(ion.calls).not.toContain('ellipse');
 
   const ember = mockCtx();
   drawSoftFactionMark(ember.ctx, 'ember', { x: 0, y: 0, radius: 16, angle: 0 });
-  expect(ember.colors).toContain('#D4B896');
+  expect(ember.colors).toContain('#FB923C');
   expect(ember.calls).toContain('closePath');
   expect(ember.calls).not.toContain('fill');
 });

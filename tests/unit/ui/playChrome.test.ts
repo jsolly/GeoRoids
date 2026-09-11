@@ -67,7 +67,7 @@ test('play shell creates the full touch overlay with semantic action buttons', (
   expect(document.body.classList.contains('touch-play')).toBe(true);
   const root = document.getElementById('touch-controls');
   expect(root?.hidden).toBe(false);
-  for (const id of ['touch-stick', 'touch-fire', 'touch-ability', 'touch-shield']) {
+  for (const id of ['touch-fire', 'touch-ability', 'touch-shield']) {
     expect(document.getElementById(id)).toBeTruthy();
   }
   for (const id of ['touch-fire', 'touch-ability', 'touch-shield']) {

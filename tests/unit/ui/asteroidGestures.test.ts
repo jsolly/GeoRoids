@@ -138,3 +138,20 @@ test('another finger cannot finish or replace a pending gesture', () => {
   pointer('pointerup');
   expect(tool).toHaveBeenCalledOnce();
 });
+
+test('a steering touch cannot also latch or flick a rock', () => {
+  const { canvas, pointer, tool, motion } = setup();
+  canvas.addEventListener('pointerdown', (event) => event.preventDefault(), { capture: true });
+  pointer('pointerdown');
+  pointer('pointerup', 200, 100);
+  expect(tool).not.toHaveBeenCalled();
+  expect(motion).not.toHaveBeenCalled();
+});
+
+test('releasing steering capture does not cancel the second finger rock gesture', () => {
+  const { pointer, tool } = setup();
+  pointer('pointerdown');
+  pointer('lostpointercapture', 400, 400, 'touch', 0, 2);
+  pointer('pointerup');
+  expect(tool).toHaveBeenCalledOnce();
+});

@@ -85,6 +85,7 @@ test('pilots find rules, follow related entries, and control demonstrations on d
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');
+    await page.screenshot({ path: resolve(output, 'wiki-controls-desktop.png'), fullPage: true });
     await page.goBack();
     await expect.poll(() => page.locator('h1').textContent()).toBe('Hauler');
     await page.goto(`${TestConfig.GAME_URL}/wiki/#missing-entry`);

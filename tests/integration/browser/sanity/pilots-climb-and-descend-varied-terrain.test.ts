@@ -165,16 +165,14 @@ for (const viewport of [
       const beforeLocal = await game.getShipPosition();
       if (viewport.hasTouch) {
         const session = await page.context().newCDPSession(page);
-        const stick = await centerOf(page, '#touch-stick');
+        const stick = await centerOf(page, '#gameCanvas');
         const direction = angle === 0 ? 1 : -1;
         const touchPoint = { x: stick.x + direction * 42, y: stick.y, id: 1 };
         await dispatchTouch(session, 'touchStart', [touchPoint]);
         await page.waitForFunction(
           () => window.gameController?.getCurrPlayer()?.ship?.thrusting === true
         );
-        expect(await page.locator('#touch-stick-knob').getAttribute('style')).toContain(
-          'translate'
-        );
+        expect(await page.locator('#touch-stick').count()).toBe(0);
         await page.waitForTimeout(1200);
         await dispatchTouch(session, 'touchEnd', []);
       } else {

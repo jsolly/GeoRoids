@@ -140,7 +140,7 @@ hash. Reports retain source/build hashes and fail if either changes during the
 session. The client uses the shipped entry point and real input; its
 `performance=collect` query enables the separate diagnostics recorder. Viewports
 are desktop, touch portrait and touch landscape. Chromium touch uses simultaneous
-trusted joystick/fire events. WebKit is available with `--browser webkit`, but
+trusted playfield steering/fire events. WebKit is available with `--browser webkit`, but
 desktop WebKit with touch emulation is not an iPhone measurement.
 
 The load driver uses the real protocol and decoder, realistic input/shoot

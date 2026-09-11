@@ -54,7 +54,7 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
 export const DESKTOP_CONTROLS_HINT =
   'WASD + Space · E ability · F shield · T target · Q latch/release · R anchor · X brake · C spin';
 export const TOUCH_CONTROLS_HINT =
-  'Stick + fire · tap rock to latch/anchor · flick ↓ release, ← brake, → spin';
+  'Hold screen to steer + thrust · FIRE to shoot · second finger for rock gestures';
 
 export function controlsHintFor(query: ViewportQuery = queryViewport()): string {
   return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;

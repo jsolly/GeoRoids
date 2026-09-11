@@ -1,21 +1,19 @@
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
+import { canvasManager } from '../rendering/canvas';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetTouchSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
 import { readAbilityChrome, readShieldChrome } from './touchAbility';
-import { readStickSample, type StickSample } from './touchStick';
 
-const STICK_ID = 'touch-stick';
-const KNOB_ID = 'touch-stick-knob';
 const FIRE_ID = 'touch-fire';
 const ABILITY_ID = 'touch-ability';
 const SHIELD_ID = 'touch-shield';
 const ROOT_ID = 'touch-controls';
 
 let initialized = false;
-let stickPointerId: number | null = null;
+let steerPointerId: number | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
 let shieldPointerId: number | null = null;
@@ -26,18 +24,10 @@ let lastShieldChromeKey = '';
 let abilityPointerClickPending = false;
 let shieldPointerClickPending = false;
 
-export function applyStickSample(player: Player, sample: StickSample | null): void {
-  if (!sample?.aim) {
-    controlSources.touchThrust = false;
-    controlSources.touchHeading = null;
-    controlSources.touchStickActive = false;
-    reconcilePlayerInput(player);
-    return;
-  }
-
-  controlSources.touchStickActive = true;
-  controlSources.touchHeading = sample.heading;
-  controlSources.touchThrust = sample.thrusting;
+export function setTouchHeading(player: Player, heading: number | null): void {
+  controlSources.touchSteeringActive = heading !== null;
+  controlSources.touchHeading = heading;
+  controlSources.touchThrust = heading !== null;
   reconcilePlayerInput(player);
 }
 
@@ -84,7 +74,7 @@ export function tickTouchControls(player: Player): void {
   if (controlSources.touchFire) {
     player.ship.shoot();
   }
-  if (controlSources.touchStickActive) {
+  if (controlSources.touchSteeringActive) {
     reconcilePlayerInput(player);
   }
 }
@@ -121,13 +111,6 @@ export function syncTouchChrome(
   } else {
     lastAbilityChromeKey = '';
     lastShieldChromeKey = '';
-  }
-}
-
-function resetKnob(): void {
-  const knob = document.getElementById(KNOB_ID);
-  if (knob) {
-    knob.style.transform = 'translate(-50%, -50%)';
   }
 }
 
@@ -215,31 +198,30 @@ function releasePointerCapture(element: HTMLElement | null, pointerId: number | 
 
 /** Clear every pointer source when the browser takes the gesture away. */
 function resetTouchInteraction(player: Player | null): void {
-  const stick = document.getElementById(STICK_ID);
+  const canvas = canvasManager.getCanvas();
   const fire = document.getElementById(FIRE_ID);
   const ability = document.getElementById(ABILITY_ID);
   const shield = document.getElementById(SHIELD_ID);
-  const activeStickPointerId = stickPointerId;
+  const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
   const activeShieldPointerId = shieldPointerId;
-  stickPointerId = null;
+  steerPointerId = null;
   firePointerId = null;
   abilityPointerId = null;
   shieldPointerId = null;
   abilityPointerClickPending = false;
   shieldPointerClickPending = false;
-  releasePointerCapture(stick, activeStickPointerId);
+  releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(fire, activeFirePointerId);
   releasePointerCapture(ability, activeAbilityPointerId);
   releasePointerCapture(shield, activeShieldPointerId);
   if (player) {
-    applyStickSample(player, null);
+    setTouchHeading(player, null);
     setTouchFire(player, false);
   } else {
     resetTouchSources();
   }
-  resetKnob();
   setFirePressed(false);
   setAbilityPressed(false);
   setShieldPressed(false);
@@ -251,8 +233,6 @@ function requireLocalPlayer(): Player | null {
 
 function ensureTouchDom(): {
   root: HTMLElement;
-  stick: HTMLElement;
-  knob: HTMLElement;
   fire: HTMLElement;
   ability: HTMLElement;
   shield: HTMLElement;
@@ -265,23 +245,6 @@ function ensureTouchDom(): {
     root.hidden = true;
     root.setAttribute('aria-hidden', 'true');
     document.body.appendChild(root);
-  }
-
-  let stick = document.getElementById(STICK_ID);
-  if (!stick) {
-    stick = document.createElement('fieldset');
-    stick.id = STICK_ID;
-    stick.className = 'touch-stick';
-    stick.setAttribute('aria-label', 'Steer and thrust');
-    root.appendChild(stick);
-  }
-
-  let knob = document.getElementById(KNOB_ID);
-  if (!knob) {
-    knob = document.createElement('div');
-    knob.id = KNOB_ID;
-    knob.className = 'touch-stick-knob';
-    stick.appendChild(knob);
   }
 
   let ability = document.getElementById(ABILITY_ID);
@@ -331,56 +294,67 @@ function ensureTouchDom(): {
     fire.setAttribute('aria-label', 'Fire');
   }
 
-  return { root, stick, knob, fire, ability, shield };
+  return { root, fire, ability, shield };
 }
 
-function stickOrigin(stick: HTMLElement): { x: number; y: number } {
-  const rect = stick.getBoundingClientRect();
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-}
-
-function onStickPointerDown(ev: PointerEvent, stick: HTMLElement, knob: HTMLElement): void {
-  if (stickPointerId !== null) {
+function onSteerPointerDown(ev: PointerEvent): void {
+  const canvas = canvasManager.getCanvas();
+  if (
+    !canvas ||
+    !isTouchChromeVisible() ||
+    ev.pointerType !== 'touch' ||
+    ev.target !== canvas ||
+    steerPointerId !== null
+  ) {
+    return;
+  }
+  const player = requireLocalPlayer();
+  if (!player || player.lives <= 0 || player.ship.exploding) {
     return;
   }
   ev.preventDefault();
-  stickPointerId = ev.pointerId;
-  stick.setPointerCapture(ev.pointerId);
-  moveStick(ev, stick, knob);
+  steerPointerId = ev.pointerId;
+  canvas.setPointerCapture(ev.pointerId);
+  moveSteering(ev);
 }
 
-function onStickPointerMove(ev: PointerEvent, stick: HTMLElement, knob: HTMLElement): void {
-  if (ev.pointerId !== stickPointerId) {
+function onSteerPointerMove(ev: PointerEvent): void {
+  if (ev.pointerId !== steerPointerId) {
     return;
   }
   ev.preventDefault();
-  moveStick(ev, stick, knob);
+  moveSteering(ev);
 }
 
-function onStickPointerUp(ev: PointerEvent, stick: HTMLElement): void {
-  if (ev.pointerId !== stickPointerId) {
+function onSteerPointerUp(ev: PointerEvent): void {
+  if (ev.pointerId !== steerPointerId) {
     return;
   }
   ev.preventDefault();
-  stickPointerId = null;
-  releasePointerCapture(stick, ev.pointerId);
-  resetKnob();
+  steerPointerId = null;
+  releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
   const player = requireLocalPlayer();
   if (player) {
-    applyStickSample(player, null);
+    setTouchHeading(player, null);
   } else {
-    resetTouchSources();
+    controlSources.touchHeading = null;
+    controlSources.touchThrust = false;
+    controlSources.touchSteeringActive = false;
   }
 }
 
-function moveStick(ev: PointerEvent, stick: HTMLElement, knob: HTMLElement): void {
-  const origin = stickOrigin(stick);
-  const sample = readStickSample(ev.clientX, ev.clientY, origin.x, origin.y);
-  knob.style.transform = `translate(calc(-50% + ${sample.knobX}px), calc(-50% + ${sample.knobY}px))`;
+function moveSteering(ev: PointerEvent): void {
   const player = requireLocalPlayer();
-  if (player) {
-    applyStickSample(player, sample);
+  const canvas = canvasManager.getCanvas();
+  if (!player || !canvas) {
+    return;
   }
+  const rect = canvas.getBoundingClientRect();
+  const viewport = canvasManager.getViewportSize();
+  const dx = ((ev.clientX - rect.left) * viewport.width) / rect.width - viewport.width / 2;
+  const dy = ((ev.clientY - rect.top) * viewport.height) / rect.height - viewport.height / 2;
+  // A touch exactly on the ship thrusts along its current heading.
+  setTouchHeading(player, dx === 0 && dy === 0 ? player.ship.angle : Math.atan2(-dy, dx));
 }
 
 function onFirePointerDown(ev: PointerEvent, fire: HTMLElement): void {
@@ -525,19 +499,15 @@ export function initializeTouchControls(): void {
     return;
   }
 
-  const { stick, knob, fire, ability, shield } = ensureTouchDom();
+  const { fire, ability, shield } = ensureTouchDom();
   abilityButton = ability;
   shieldButton = shield;
 
-  stick.addEventListener('pointerdown', (ev) => onStickPointerDown(ev, stick, knob));
-  stick.addEventListener('pointermove', (ev) => onStickPointerMove(ev, stick, knob));
-  stick.addEventListener('pointerup', (ev) => onStickPointerUp(ev, stick));
-  stick.addEventListener('pointercancel', (ev) => onStickPointerUp(ev, stick));
-  stick.addEventListener('lostpointercapture', () => {
-    if (stickPointerId !== null) {
-      resetTouchInteraction(requireLocalPlayer());
-    }
-  });
+  document.addEventListener('pointerdown', onSteerPointerDown, { passive: false, capture: true });
+  document.addEventListener('pointermove', onSteerPointerMove, { passive: false });
+  document.addEventListener('pointerup', onSteerPointerUp);
+  document.addEventListener('pointercancel', onSteerPointerUp);
+  document.addEventListener('lostpointercapture', onSteerPointerUp);
 
   fire.addEventListener('pointerdown', (ev) => onFirePointerDown(ev, fire));
   fire.addEventListener('pointerup', (ev) => onFirePointerUp(ev, fire));

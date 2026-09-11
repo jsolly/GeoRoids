@@ -3,7 +3,7 @@ import type { AsteroidToolsController, AsteroidToolsMotionAction } from './Aster
 
 type Gesture = { id: number; x: number; y: number; targetId: string | undefined };
 
-/** Canvas-only input leaves the stick, fire, ability and shield pointers independent. */
+/** A second playfield touch handles asteroid gestures while the first steers. */
 export class AsteroidGestures {
   private gesture: Gesture | undefined;
 
@@ -24,7 +24,10 @@ export class AsteroidGestures {
     document.addEventListener('visibilitychange', this.onVisibility);
   }
 
-  cancel = (): void => {
+  cancel = (event?: Event): void => {
+    if (event && 'pointerId' in event && event.pointerId !== this.gesture?.id) {
+      return;
+    }
     const gesture = this.gesture;
     this.gesture = undefined;
     if (gesture && this.canvas.hasPointerCapture(gesture.id)) {
@@ -51,6 +54,7 @@ export class AsteroidGestures {
 
   private onDown = (event: PointerEvent): void => {
     if (
+      event.defaultPrevented ||
       this.gesture ||
       !this.options.isPlaying() ||
       (event.pointerType === 'mouse' && event.button !== 1)

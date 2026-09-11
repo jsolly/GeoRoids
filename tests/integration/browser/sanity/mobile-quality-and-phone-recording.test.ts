@@ -70,7 +70,7 @@ test.each([false, true])(
     ).toBe(true);
     if (touch) {
       const session = await page.context().newCDPSession(page);
-      const stick = await centerOf(page, '#touch-stick');
+      const stick = await centerOf(page, '#gameCanvas');
       const fire = await centerOf(page, '#touch-fire');
       try {
         await dispatchTouch(session, 'touchStart', [

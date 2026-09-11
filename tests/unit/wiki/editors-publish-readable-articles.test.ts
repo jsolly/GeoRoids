@@ -70,6 +70,19 @@ test('an editor keeps the old URL when renaming an article title', () => {
   );
 });
 
+test('the compiler accepts Pages CMS frontmatter serialization', () => {
+  const root = fixture();
+  const file = join(root, 'content/wiki/field-manual.md');
+  const saved = readFileSync(file, 'utf8')
+    .replace('\nmedia: []', '')
+    .replace('---\n\n## What the manual covers', '---\n## What the manual covers')
+    .replace(/\n$/, '');
+  writeFileSync(file, saved);
+  expect(readWikiArticles(root).find((entry) => entry.id === 'field-manual')?.title).toBe(
+    'Read the field'
+  );
+});
+
 test('an editor places a demonstration beside its section and repairs renamed headings', () => {
   const root = fixture();
   addArticle(root, '## First flight\n\nPractice an orbit.');

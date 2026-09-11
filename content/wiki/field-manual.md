@@ -9,9 +9,7 @@ related:
   - content/wiki/dart.md
   - content/wiki/asteroids.md
   - content/wiki/hud-network.md
-media: []
 ---
-
 ## What the manual covers
 
 The field contains a moving asteroid belt, hostile Earth-observation satellite

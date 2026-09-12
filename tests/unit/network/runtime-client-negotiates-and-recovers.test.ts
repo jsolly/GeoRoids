@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
 import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
@@ -60,7 +61,10 @@ class Transport {
     this.onclose?.();
   });
   receive(type: string, data: unknown) {
-    this.onmessage?.({ data: JSON.stringify({ type, data, timestamp: 1 }) });
+    this.receiveRaw(JSON.stringify({ type, data, timestamp: 1 }));
+  }
+  receiveRaw(text: string) {
+    this.onmessage?.({ data: text });
   }
 }
 
@@ -116,19 +120,66 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a new socket and join cannot reuse a departed session snapshot witness', async () => {
-    clientPerformance.snapshotApplied({ sequence: 900, kind: 'keyframe', gameTime: 4000 });
-    const ws = await connect();
-    expect(clientPerformance.read()).toMatchObject({ lastKeyframeSequence: 0 });
-    expect(clientPerformance.read().lastSnapshot).toBeUndefined();
-    clientPerformance.snapshotApplied({ sequence: 901, kind: 'keyframe', gameTime: 4000 });
-    acknowledge(ws);
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'dart');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
+    const oldSocket = await connect();
+    const oldId = manager.getClientId();
+    acknowledge(oldSocket);
+    const oldSession = captureSnapshot(snapshotFixture());
+    const oldPilot = oldSession.entities[0];
+    assert.ok(oldPilot, 'old-session pilot');
+    oldPilot.id = oldId;
+    oldPilot.playerMotion = { epoch: 9, ack: 0, mode: 'free' };
+    oldSession.entities = [oldPilot];
+    oldSession.gameTime = 4000;
+    oldSocket.receive('snapshot', new SnapshotEncoder(oldSession).encode(1));
+    expect(player.ship.playerMotion?.epoch).toBe(9);
+    const oldMessage = oldSocket.onmessage;
+    assert.ok(oldMessage, 'old socket message handler');
+
+    manager.disconnect({ newSession: true });
     expect(clientPerformance.read().lastSnapshot).toBeUndefined();
     expect(clientPerformance.read().lastKeyframeSequence).toBe(0);
-    clientPerformance.snapshotApplied({ sequence: 1, kind: 'keyframe', gameTime: 4000 });
+    const freshSocket = await connect();
+    const freshId = manager.getClientId();
+    expect(freshId).not.toBe(oldId);
+    acknowledge(freshSocket, 'b'.repeat(64));
+    const freshSession = captureSnapshot(oldSession);
+    const freshPilot = freshSession.entities[0];
+    assert.ok(freshPilot, 'fresh-session pilot');
+    freshPilot.id = freshId;
+    freshPilot.playerMotion = { epoch: 2, ack: 0, mode: 'free' };
+    freshSocket.receive('snapshot', new SnapshotEncoder(freshSession).encode(1));
+    expect(player.ship.playerMotion?.epoch).toBe(2);
+    expect(clientPerformance.read()).toMatchObject({
+      lastKeyframeSequence: 1,
+      lastSnapshot: { gameTime: 4000 },
+    });
+
+    expect(
+      observesPreparedFixture(
+        { sequence: 1, gameTime: 4000, motionEpoch: 2 },
+        {
+          lastKeyframeSequence: 2,
+          lastSnapshotGameTime: oldSession.gameTime,
+          motionEpoch: oldPilot.playerMotion.epoch,
+        }
+      )
+    ).toBe(true);
+    oldMessage({
+      data: JSON.stringify({
+        type: 'snapshot',
+        data: new SnapshotEncoder(oldSession).encode(2, {
+          sequence: 1,
+          state: oldSession,
+        }),
+        timestamp: 1,
+      }),
+    });
+    expect(player.id).toBe(freshId);
+    expect(player.ship.playerMotion?.epoch).toBe(2);
     expect(clientPerformance.read().lastKeyframeSequence).toBe(1);
-    manager.disconnect();
-    expect(clientPerformance.read().lastSnapshot).toBeUndefined();
-    expect(clientPerformance.read().lastKeyframeSequence).toBe(0);
   });
 
   test.each([
@@ -457,6 +508,57 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
     expect(initialJoinData.resumeToken).toBeUndefined();
     acknowledge(ws);
+  });
+
+  test('malformed JSON fails at the real message callback without retiring the socket', async () => {
+    const errorLog = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const ws = await connect();
+
+    ws.receiveRaw('{"type":');
+
+    expect(errorLog).toHaveBeenCalledWith(
+      'NETWORK',
+      'Failed to parse server message',
+      expect.any(SyntaxError)
+    );
+    expect(ws.close).not.toHaveBeenCalled();
+    expect(manager.isConnected()).toBe(true);
+  });
+
+  test('an unknown typed envelope reaches dispatch without retiring the socket', async () => {
+    const debugLog = vi.spyOn(logger, 'debug').mockImplementation(() => undefined);
+    const ws = await connect();
+
+    ws.receiveRaw('{"type":"futureServerEvent","data":{"value":1}}');
+
+    expect(debugLog).toHaveBeenCalledWith('NETWORK', 'Unhandled server message type', {
+      type: 'futureServerEvent',
+    });
+    expect(ws.close).not.toHaveBeenCalled();
+    expect(manager.isConnected()).toBe(true);
+  });
+
+  test('a snapshot before the first join acknowledgment fails the current protocol', async () => {
+    const errorLog = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const ws = await connect();
+    const frame = new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1);
+
+    ws.receiveRaw(JSON.stringify({ type: 'snapshot', data: frame, timestamp: 1 }));
+
+    expect(errorLog).toHaveBeenCalledWith(
+      'STATE',
+      'snapshot_rejected',
+      expect.objectContaining({ message: expect.stringMatching(/before.*join ack/) }),
+      expect.objectContaining({
+        lastAcceptedSequence: 0,
+        expectedSequence: 1,
+        receivedSequence: 1,
+        receivedKind: 'keyframe',
+      })
+    );
+    expect(ws.close).toHaveBeenCalled();
+    expect(manager.isConnected()).toBe(false);
+    expect(manager.getAllPlayers()).toEqual([]);
   });
 
   test('real decoder applies keyframes/deltas, clears effects/empty worlds and survives malformed frames atomically', async () => {

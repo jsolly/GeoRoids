@@ -1,0 +1,417 @@
+{
+  "scope": "Diagnostic captures from different Chromium GPU paths and harness revisions, not a game optimization A/B or physical-phone FPS acceptance. Inclusive trace event durations overlap.",
+  "captures": [
+    {
+      "name": "current",
+      "reportPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/current.json",
+      "reportSha256": "81a02497522ea81cd38cceb020152651d365fb2257f879fe02b2c0b18e8b2ed3",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "f7645330ded01ca075d1e0ad69e49df8d5b18acd86dfb77950d963e669b7734b",
+        "productSha256": "36c9581a33113c843bf2165e3ba1f4f6480de2ef0e10eadd68e6ab6be833ec15",
+        "harnessSha256": "5b0889eb4b6d200450d2825aa8132c3c7a356dbcbf0490ebe082b469aa6a3c55",
+        "buildSha256": "7495bc856d688c40db602c31a5ca9837805d29e8f77f8cf132e4a7128dbcc581"
+      },
+      "status": "passed",
+      "profileRecorded": true,
+      "cleanupComplete": true,
+      "tracePath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/current.trace.json.gz",
+      "traceSha256": "8d8c66fca9e6b1dcc28018212eef5019cf86411159ca89ffff72b56b31f5bf72",
+      "traceBytes": 20360458,
+      "traceEvents": 1408174,
+      "trace": {
+        "path": ".performance/render-attribution/current.trace.json.gz",
+        "recorded": true,
+        "bytes": 20360458,
+        "dataLossOccurred": false,
+        "streamCompression": "gzip",
+        "bundleManifest": ".performance/render-attribution/current.trace.json.gz.bundles/manifest.json"
+      },
+      "bundleManifestPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/current.trace.json.gz.bundles/manifest.json",
+      "bundleManifestSha256": "9ce1508e147954ba7dbd3a4ec8003e972d4b0f97404ef0d7cd8b96e10734d7ae",
+      "observedFrameMetrics": {
+        "frameIntervalMs": 33.400000000001455,
+        "renderMs": 2.7999999821186066,
+        "frameCpuMs": 3.2999999821186066,
+        "inputToRenderMs": 5.5,
+        "over25Percent": 69.08212560386474
+      },
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "metal",
+      "reportPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/metal.json",
+      "reportSha256": "040fb97a609f3f94b095d692fd8055124f8892b92fc18fd0c680b3e8e3d5ec74",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "8043533b718bf4e5a7f24139ff8d839330daab39079028d16684c7bff44daeb1",
+        "productSha256": "36c9581a33113c843bf2165e3ba1f4f6480de2ef0e10eadd68e6ab6be833ec15",
+        "harnessSha256": "fbbe1e61bc5f9e9e12c0f9b0d378d1c82e2b228d53aea92310d85217473f2e0d",
+        "buildSha256": "025922fd307106274ef7de0cc0e0c1b12d2d101a786e9c9f819201b63f9b53e1"
+      },
+      "status": "passed",
+      "profileRecorded": true,
+      "cleanupComplete": true,
+      "tracePath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/metal.trace.json.gz",
+      "traceSha256": "b87298be3aaae5b390ad9acf4e1dd318715729dccea1fbb9ce15ac363d3f166b",
+      "traceBytes": 31209664,
+      "traceEvents": 2048888,
+      "trace": {
+        "path": ".performance/render-attribution/metal.trace.json.gz",
+        "recorded": true,
+        "bytes": 31209664,
+        "dataLossOccurred": false,
+        "streamCompression": "gzip",
+        "bundleManifest": ".performance/render-attribution/metal.trace.json.gz.bundles/manifest.json"
+      },
+      "bundleManifestPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/metal.trace.json.gz.bundles/manifest.json",
+      "bundleManifestSha256": "71503d9f12c6c4fe08259be2144f56fad16ccc6770b4a52f59d0a842d2949094",
+      "observedFrameMetrics": {
+        "frameIntervalMs": 16.700000000004366,
+        "renderMs": 2.699999988079071,
+        "frameCpuMs": 3.199999988079071,
+        "inputToRenderMs": 16.5,
+        "over25Percent": 0.11217049915872125
+      },
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "integrated",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9ccf5a8995565d77a9f28b246d1f6e320b33b32c92bed20ca612a75b64567d52",
+        "productSha256": "bfec9730deacd67fc36cbc1c668f1c4758489fb7151a3ed4b0906ced7e90109d",
+        "harnessSha256": "9a7c78f367e38ebf006b13be1eb32e0272a2266d00bc14cee8fcfaeaf9330a28",
+        "buildSha256": "96711b4be121d3c96a5cdb42d63948e9b8aef6d3c87f1ae3bda98f9d747e203c"
+      },
+      "status": "failed",
+      "profileRecorded": true,
+      "cleanupComplete": true,
+      "tracePath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated.trace.json.gz",
+      "traceSha256": "3cb8535938fd67d6b4ec5161f547c2699eaa382085dd11e11ad9eacd64492289",
+      "traceBytes": 31346158,
+      "traceEvents": 2014790,
+      "trace": {
+        "path": ".performance/render-attribution/integrated.trace.json.gz",
+        "recorded": true,
+        "complete": true,
+        "bytes": 31346158,
+        "dataLossOccurred": false,
+        "streamCompression": "gzip",
+        "bundleManifest": ".performance/render-attribution/integrated.trace.json.gz.bundles/manifest.json",
+        "measurementMarks": {
+          "start": "georoids-benchmark:measurement-start",
+          "end": "georoids-benchmark:measurement-end",
+          "measure": "georoids-benchmark:measured-phase"
+        }
+      },
+      "observedFrameMetrics": {
+        "frameIntervalMs": 16.700000000004366,
+        "renderMs": 2.800000011920929,
+        "frameCpuMs": 3.300000011920929,
+        "inputToRenderMs": 15.099999994039536,
+        "over25Percent": 0.11086474501108648
+      },
+      "errors": [],
+      "warnings": [],
+      "reportPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated.json",
+      "reportSha256": "75f9f7ef94f411993054483e8f121de348981c020ef202a9a4aa8e2a95e24443",
+      "bundleManifestPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated.trace.json.gz.bundles/manifest.json",
+      "bundleManifestSha256": "32f93d09191f2d614211185c73b0d53ef280907800015c98465978c21e1669a0",
+      "failure": {
+        "name": "AssertionError",
+        "message": "No authoritative projectile born after measured motion acknowledgment",
+        "stack": "AssertionError [ERR_ASSERTION]: No authoritative projectile born after measured motion acknowledgment\n    at Pilot.validateCompletion (/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/benchmarks/pilot.ts:357:5)\n    at <anonymous> (/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/benchmarks/realtime-client.ts:1545:14)"
+      },
+      "acceptance": "Failed workload: all four peers offered shots but the old fixed-speed driver yielded zero admitted projectile witnesses. Trace complete; not a passing benchmark."
+    },
+    {
+      "name": "integrated-driver-corrected",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "2f1da8efa5c22234bfeeb228da1968b883aeee1db4c3a469c0e56330d0973be5",
+        "productSha256": "bfec9730deacd67fc36cbc1c668f1c4758489fb7151a3ed4b0906ced7e90109d",
+        "harnessSha256": "d73a9b9649f63bcfa683e1bf137fa3b31c2458f7f452620271e867b0500ecdc9",
+        "buildSha256": "7041b0cda5ac418b862e6d1a7eb30cfd2ee1be218718c42038ee1fd469dd724b"
+      },
+      "status": "failed",
+      "profileRecorded": true,
+      "cleanupComplete": true,
+      "tracePath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated-driver-corrected.trace.json.gz",
+      "traceSha256": "60e46d9b0cea267944d36653f3f83c3f94ef8226f1c8237f4ee2949d4d52ef25",
+      "traceBytes": 30344291,
+      "traceEvents": 1951065,
+      "trace": {
+        "path": ".performance/render-attribution/integrated-driver-corrected.trace.json.gz",
+        "recorded": true,
+        "complete": true,
+        "bytes": 30344291,
+        "dataLossOccurred": false,
+        "streamCompression": "gzip",
+        "bundleManifest": ".performance/render-attribution/integrated-driver-corrected.trace.json.gz.bundles/manifest.json",
+        "measurementMarks": {
+          "start": "georoids-benchmark:measurement-start",
+          "end": "georoids-benchmark:measurement-end",
+          "measure": "georoids-benchmark:measured-phase"
+        }
+      },
+      "observedFrameMetrics": {
+        "frameIntervalMs": 16.700000000004366,
+        "renderMs": 2.5,
+        "frameCpuMs": 2.9000000059604645,
+        "inputToRenderMs": 15.899999976158142,
+        "over25Percent": 0.16638935108153077
+      },
+      "errors": [],
+      "warnings": [],
+      "reportPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated-driver-corrected.json",
+      "reportSha256": "7ef7bfaf43e001a82d4364840aca7aaddd5217d9814af0d7685c7e39504005f2",
+      "bundleManifestPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated-driver-corrected.trace.json.gz.bundles/manifest.json",
+      "bundleManifestSha256": "ea45d3eeca66e354d91afe08921afce70b5d0f1280688878d29f09af7a888570",
+      "failure": {
+        "name": "AssertionError",
+        "message": "Invalid measurement: browser.stateGapMs",
+        "stack": "AssertionError [ERR_ASSERTION]: Invalid measurement: browser.stateGapMs\n    at PerformanceBudget.observe (/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/benchmarks/performance-budget.ts:23:5)\n    at <anonymous> (/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/benchmarks/realtime-client.ts:1532:27)"
+      },
+      "acceptance": "Failed measurement boundary: snapshots could arrive after host end while awaiting end mark, creating a negative final gap. Trace complete, peer shots admitted; not a passing benchmark."
+    },
+    {
+      "name": "integrated-boundary-corrected",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "3cba55bae7b5ccf6c64eec7b4b60de08a37c98e0eba68ceac0542dda06990228",
+        "productSha256": "bfec9730deacd67fc36cbc1c668f1c4758489fb7151a3ed4b0906ced7e90109d",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "7408b98865b2aa3ed77c72bdf2caf27b2dbf22acb673da460a1b29227c4287aa"
+      },
+      "status": "passed",
+      "profileRecorded": true,
+      "cleanupComplete": true,
+      "tracePath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated-boundary-corrected.trace.json.gz",
+      "traceSha256": "08c9c0975168d04330e9314723cac9fee54f96b6ecda64edee83c4219e332fa3",
+      "traceBytes": 32256672,
+      "traceEvents": 2133791,
+      "trace": {
+        "path": ".performance/render-attribution/integrated-boundary-corrected.trace.json.gz",
+        "recorded": true,
+        "complete": true,
+        "bytes": 32256672,
+        "dataLossOccurred": false,
+        "streamCompression": "gzip",
+        "bundleManifest": ".performance/render-attribution/integrated-boundary-corrected.trace.json.gz.bundles/manifest.json",
+        "measurementMarks": {
+          "start": "georoids-benchmark:measurement-start",
+          "end": "georoids-benchmark:measurement-end",
+          "measure": "georoids-benchmark:measured-phase"
+        }
+      },
+      "observedFrameMetrics": {
+        "frameIntervalMs": 16.700000000004366,
+        "renderMs": 2.9000000059604645,
+        "frameCpuMs": 3.5,
+        "inputToRenderMs": 16,
+        "over25Percent": 0.05546311702717693
+      },
+      "errors": [],
+      "warnings": [],
+      "reportPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated-boundary-corrected.json",
+      "reportSha256": "9961aac157b67a7b1d0e762cdbe6bed055476364d474fc2f4142fd3e6a2e763c",
+      "bundleManifestPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/integrated-boundary-corrected.trace.json.gz.bundles/manifest.json",
+      "bundleManifestSha256": "e4caed91abdbe50355cb74c2495a537d2b010de0b3f6da4094d6681c7c84d143",
+      "bundlesVerified": 3,
+      "measurementMarkers": [
+        {
+          "args": {
+            "data": {
+              "callTime": 184102541149,
+              "navigationId": "245565E8DF7A31C59C33ED0B9CBBCD34",
+              "sampleTraceId": 559745427395996,
+              "startTime": 22408.29999998212
+            }
+          },
+          "cat": "blink.user_timing",
+          "name": "georoids-benchmark:measurement-start",
+          "ph": "I",
+          "pid": 3850,
+          "s": "t",
+          "tid": 15705701,
+          "ts": 184102541141,
+          "tts": 19212154
+        },
+        {
+          "args": {
+            "data": {
+              "callTime": 184132552170,
+              "navigationId": "245565E8DF7A31C59C33ED0B9CBBCD34",
+              "sampleTraceId": 559745427423404,
+              "startTime": 52419.19999998808
+            }
+          },
+          "cat": "blink.user_timing",
+          "name": "georoids-benchmark:measurement-end",
+          "ph": "I",
+          "pid": 3850,
+          "s": "t",
+          "tid": 15705701,
+          "ts": 184132552168,
+          "tts": 45494523
+        },
+        {
+          "args": {
+            "callTime": 184132552190,
+            "startTime": 22408.29999998212,
+            "traceId": 3669597834
+          },
+          "cat": "blink.user_timing",
+          "id2": {
+            "local": "0x34"
+          },
+          "name": "georoids-benchmark:measured-phase",
+          "ph": "b",
+          "pid": 3850,
+          "tid": 15705701,
+          "ts": 184102541141
+        },
+        {
+          "args": {},
+          "cat": "blink.user_timing",
+          "id2": {
+            "local": "0x34"
+          },
+          "name": "georoids-benchmark:measured-phase",
+          "ph": "e",
+          "pid": 3850,
+          "tid": 15705701,
+          "ts": 184132552168
+        }
+      ],
+      "markerDurationMs": 30011.027
+    },
+    {
+      "name": "current-wave-2",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "1331b1320f76d03b35acdccbadb777d73c5d0da35af1bf772dfa86d0c0963c44",
+        "productSha256": "75c50d872d719c383e077bb07e8ce961c855e2ede06ea393cdc543431490549c",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "4079e31c6c0551b5623c85e0ef70bc77021152821294375576e71a2197084793"
+      },
+      "status": "passed",
+      "profileRecorded": true,
+      "cleanupComplete": true,
+      "tracePath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/current-wave-2.trace.json.gz",
+      "traceSha256": "1efa2bd58b697a6c9a876c6aab35ac47dec7fed8ad7cca34f7c85fd66a1571c5",
+      "traceBytes": 30395536,
+      "traceEvents": 1945508,
+      "trace": {
+        "path": ".performance/render-attribution/current-wave-2.trace.json.gz",
+        "recorded": true,
+        "complete": true,
+        "bytes": 30395536,
+        "dataLossOccurred": false,
+        "streamCompression": "gzip",
+        "bundleManifest": ".performance/render-attribution/current-wave-2.trace.json.gz.bundles/manifest.json",
+        "measurementMarks": {
+          "start": "georoids-benchmark:measurement-start",
+          "end": "georoids-benchmark:measurement-end",
+          "measure": "georoids-benchmark:measured-phase"
+        }
+      },
+      "observedFrameMetrics": {
+        "frameIntervalMs": 16.799999999995634,
+        "renderMs": 2.5,
+        "frameCpuMs": 2.9000000059604645,
+        "inputToRenderMs": 15.899999976158142,
+        "over25Percent": 0.11092623405435385
+      },
+      "errors": [],
+      "warnings": [],
+      "reportPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/current-wave-2.json",
+      "reportSha256": "ca9935bff0008bfc20006ba2164f25ffcd22531f925b220e002f08ce0a3fdc08",
+      "bundleManifestPath": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/render-attribution/current-wave-2.trace.json.gz.bundles/manifest.json",
+      "bundleManifestSha256": "971014ea728436f47654c318d89f13e86521a81d4df55581a8fbbe510165b862",
+      "bundlesVerified": 3,
+      "measurementMarkers": [
+        {
+          "args": {
+            "data": {
+              "callTime": 190437712142,
+              "navigationId": "70FDA6AFC1E174493D80A46F40761A58",
+              "sampleTraceId": 6272939800379030,
+              "startTime": 22725.09999999404
+            }
+          },
+          "cat": "blink.user_timing",
+          "name": "georoids-benchmark:measurement-start",
+          "ph": "I",
+          "pid": 68473,
+          "s": "t",
+          "tid": 16089073,
+          "ts": 190437712134,
+          "tts": 19353284
+        },
+        {
+          "args": {
+            "data": {
+              "callTime": 190467723564,
+              "navigationId": "70FDA6AFC1E174493D80A46F40761A58",
+              "sampleTraceId": 6272939800342067,
+              "startTime": 52736.59999999404
+            }
+          },
+          "cat": "blink.user_timing",
+          "name": "georoids-benchmark:measurement-end",
+          "ph": "I",
+          "pid": 68473,
+          "s": "t",
+          "tid": 16089073,
+          "ts": 190467723562,
+          "tts": 45307860
+        },
+        {
+          "args": {
+            "callTime": 190467723586,
+            "startTime": 22725.09999999404,
+            "traceId": 3500050622
+          },
+          "cat": "blink.user_timing",
+          "id2": {
+            "local": "0x30"
+          },
+          "name": "georoids-benchmark:measured-phase",
+          "ph": "b",
+          "pid": 68473,
+          "tid": 16089073,
+          "ts": 190437712134
+        },
+        {
+          "args": {},
+          "cat": "blink.user_timing",
+          "id2": {
+            "local": "0x30"
+          },
+          "name": "georoids-benchmark:measured-phase",
+          "ph": "e",
+          "pid": 68473,
+          "tid": 16089073,
+          "ts": 190467723562
+        }
+      ],
+      "markerDurationMs": 30011.428
+    }
+  ]
+}

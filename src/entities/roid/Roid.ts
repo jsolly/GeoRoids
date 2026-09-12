@@ -36,7 +36,7 @@ class Roid {
   ) {
     this.id = id || crypto.randomUUID();
     this.angle = Math.random() * Math.PI * 2; // in radians
-    this.angularVelocity = (Math.random() - 0.5) * 0.01; // Much smaller random rotation
+    this.angularVelocity = (Math.random() - 0.5) * 0.01 * GAME.MOTION_SCALE;
     const speed = (Math.random() * ROID.SPEED) / GAME.FPS;
     this.velocity = {
       x: speed * (Math.random() < 0.5 ? 1 : -1),

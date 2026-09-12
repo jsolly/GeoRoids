@@ -1,0 +1,74 @@
+{
+  "date": "2026-09-12",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "scope": "per-recipient encode and serialize work, excluding encoder construction, sockets, capacity and phone FPS",
+  "provenance": "The measured snapshotProtocol source is preserved in measuredSnapshotProtocol.ts. format-equivalence.json proves the current source differs only by one ternary line wrap. Raw timing and validation hashes remain historical and unchanged.",
+  "independentReview": "Passed source, raw timing, exact wire and lifecycle audit. Combined gate remains pending.",
+  "artifacts": [
+    {
+      "path": "shared/snapshotProtocol.ts",
+      "sha256": "fc27b68368caf30564df681a9920cc0e7423472ee85a8514268dced7707076d6",
+      "bytes": 14524
+    },
+    {
+      "path": "server/services/GameStateBroadcaster.ts",
+      "sha256": "2f6be9cd7181fbd6099993dbab172308498a96c3059daf07a4efee5a76c32415",
+      "bytes": 20470
+    },
+    {
+      "path": "tests/unit/network/snapshotFixture.ts",
+      "sha256": "26a3d659ece59d48b7ada40da582e5d46fb499fea2fbd82cd259dc2400df136b",
+      "bytes": 4014
+    },
+    {
+      "path": "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
+      "sha256": "9767d4701a523b4295e353109d2d701f8fc4245d235cf1b0d1a1029b1eaaca0c",
+      "bytes": 11384
+    },
+    {
+      "path": "tests/unit/network/current-pilots-share-a-server.test.ts",
+      "sha256": "751c3d40ec976d6eaaf7cb9fcc6cb485d7f1385a9afd782f52479dffe5518777",
+      "bytes": 23781
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/final-benchmark.ts",
+      "sha256": "7f51966891ba10ef7f8f8fef86cffa083e51eb7370936913d8ed04c901ad2187",
+      "bytes": 23618
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/focused-verification.json",
+      "sha256": "f05c7e84035bb3a12d7c521779f1a8e423f500e2e37ff5c16f5f58abd0d43a13",
+      "bytes": 903
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/format-equivalence.json",
+      "sha256": "ece802020cf8a53f926f79c9e91a970939f2c28f35e49c719f28aa13bdb6f217",
+      "bytes": 725
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/legacySnapshotProtocol.ts",
+      "sha256": "98c9e2c82c8d368e50e182d9502eb5c6b8a6bafcbc0c9ff0b5a3145d1bc580c2",
+      "bytes": 11902
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/measuredSnapshotProtocol.ts",
+      "sha256": "96bcf7b9d71c15f7f66bd55c1480b8cc666fe0c033fea746d7425e01811198a5",
+      "bytes": 14540
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/results.md",
+      "sha256": "d74d0f931f68b71bd13eea6f3041c5cab83891a7241d6d55d08f6b3fc8715544",
+      "bytes": 3775
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/timing.json",
+      "sha256": "337f17d6d6c4b24cc51cd203eeb907d40553e9c78fa60267ba1f8b92aebce97f",
+      "bytes": 618831
+    },
+    {
+      "path": ".performance/snapshot-json-reuse/final/validation.json",
+      "sha256": "d9b31497a0a11dc9a4986095d2919ae5f59112d33a0bdbf6f840dc46d3cf7088",
+      "bytes": 1410
+    }
+  ]
+}

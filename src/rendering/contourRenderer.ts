@@ -1,10 +1,15 @@
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
+import type { ContourLevel } from '../physics/terrain/contours';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvas';
 import { drawContourLabels } from './contourLabels';
 import { contourCandidates } from './contourSpatialIndex';
+
+type ContourSegment = ContourLevel['segments'][number];
+
+const contourPathCache = new WeakMap<readonly ContourSegment[], Path2D>();
 
 /**
  * Muted topo lines in world space. Tight spacing is steep; keep alpha low so
@@ -42,24 +47,27 @@ export function drawIsoContours(shipPosition: Position): void {
     ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH;
     ctx.beginPath();
 
-    for (const segment of contourCandidates(levels, levelOrdinal, view)) {
-      const ax = centerX + (segment.ax - shipPosition.x) * scale;
-      const ay = centerY + (segment.ay - shipPosition.y) * scale;
-      const bx = centerX + (segment.bx - shipPosition.x) * scale;
-      const by = centerY + (segment.by - shipPosition.y) * scale;
-      if (
-        (ax < -pad && bx < -pad) ||
-        (ax > viewport.width + pad && bx > viewport.width + pad) ||
-        (ay < -pad && by < -pad) ||
-        (ay > viewport.height + pad && by > viewport.height + pad)
-      ) {
-        continue;
-      }
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(bx, by);
+    const candidates = contourCandidates(levels, levelOrdinal, view);
+    if (candidates.length === 0) {
+      continue;
     }
 
-    ctx.stroke();
+    let path = contourPathCache.get(candidates);
+    if (!path) {
+      path = new Path2D();
+      for (const segment of candidates) {
+        path.moveTo(segment.ax, segment.ay);
+        path.lineTo(segment.bx, segment.by);
+      }
+      contourPathCache.set(candidates, path);
+    }
+
+    ctx.save();
+    ctx.translate(centerX - shipPosition.x * scale, centerY - shipPosition.y * scale);
+    ctx.scale(scale, scale);
+    ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH / scale;
+    ctx.stroke(path);
+    ctx.restore();
   }
 
   drawContourLabels(ctx, levels, {

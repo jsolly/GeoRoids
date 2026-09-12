@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
-import { FUEL } from '../../../src/constants';
+import { FUEL, GAME } from '../../../src/constants';
 import {
   bindHarpoonFieldSource,
   harpoonBodyFromRock,
@@ -718,7 +718,7 @@ test('Hauler ignores allies, self, dead, respawning, shielded, and unreachable e
   });
   const valid = enemy('valid', 80, 240);
   reelUntilRelease(hauler, rock, [...excluded, valid]);
-  expect(rock.velocity.y).toBeGreaterThan(11);
+  expect(rock.velocity.y).toBeGreaterThan(11 * GAME.MOTION_SCALE);
   expect(rock.velocity.x).toBeGreaterThan(0);
 });
 
@@ -733,7 +733,7 @@ test('A stationary rock reels before choosing the quickest intercept with stable
     });
     expect(rock.velocity).toEqual({ x: 0, y: 0 });
     reelUntilRelease(hauler, rock, enemies);
-    expect(rock.velocity.y).toBeGreaterThan(11);
+    expect(rock.velocity.y).toBeGreaterThan(11 * GAME.MOTION_SCALE);
   }
 });
 
@@ -766,7 +766,9 @@ test('a distant visible rock gets enough tether time to reel in and bounce', () 
     pullHarpoonTarget(hauler, [rock, target]);
     if (rock.velocity.y > 0) {
       released = true;
-      expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(12);
+      expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(
+        SHIP_ABILITY.HARPOON_SLING_SPEED
+      );
       break;
     }
     rock.position.x += rock.velocity.x;

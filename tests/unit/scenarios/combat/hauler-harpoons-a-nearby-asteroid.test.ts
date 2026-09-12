@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -53,7 +54,7 @@ describe('A Hauler fires harpoon at a nearby rock', () => {
     for (let frame = 0; frame < 70 && rock.velocity.x <= 0; frame++) {
       world.engine.advanceOneFrame();
     }
-    expect(rock.velocity.x).toBeCloseTo(12);
+    expect(rock.velocity.x).toBeCloseTo(SHIP_ABILITY.HARPOON_SLING_SPEED);
     expect(rock.velocity.y).toBeCloseTo(0);
     const releasedPosition = { ...rock.position };
     const releasedVelocity = { ...rock.velocity };
@@ -119,11 +120,11 @@ describe('A Hauler fires harpoon at a nearby rock', () => {
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
     const rock = world.engine.getAsteroid('sling-rock');
-    expect(rock?.velocity.x).toBe(12);
+    expect(rock?.velocity.x).toBe(SHIP_ABILITY.HARPOON_SLING_SPEED);
     expect(rock?.velocity.y).toBe(0);
     world.entity(ahead).position.y = 400;
     world.tick(10);
-    expect(rock?.velocity.x).toBe(12);
+    expect(rock?.velocity.x).toBe(SHIP_ABILITY.HARPOON_SLING_SPEED);
     expect(rock?.velocity.y).toBe(0);
   });
 
@@ -164,7 +165,9 @@ describe('A Hauler fires harpoon at a nearby rock', () => {
       if (rock && rock.velocity.y > 5) {
         released = true;
         expect(Math.hypot(rock.position.x, rock.position.y)).toBeLessThan(100);
-        expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(12);
+        expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(
+          SHIP_ABILITY.HARPOON_SLING_SPEED
+        );
         const velocity = { ...rock.velocity };
         for (let coast = 0; coast < 3; coast++) {
           world.engine.advanceOneFrame();

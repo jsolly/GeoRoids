@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { logger } from '../../setup/serverLogger';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
-import { DAMAGE, DEBUG, ROID } from '../../src/constants';
+import { DAMAGE, DEBUG, GAME, ROID } from '../../src/constants';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { getAsteroidFieldRadius, stepAsteroidMotion } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
@@ -230,7 +230,7 @@ export class AsteroidManager {
         logger.debug('Placing asteroid randomly', { index: i, position });
       }
 
-      const velocity = this.rng.randomVelocity(4);
+      const velocity = this.rng.randomVelocity(ROID.SERVER_VELOCITY_MAX);
 
       const material = asteroidMaterialAt(i);
       const healthValue = DAMAGE.LASER_HIT * (material === 'metal' ? 3 : 1);
@@ -263,7 +263,8 @@ export class AsteroidManager {
         size,
         jaggedness,
         rotation: this.rng.random() * Math.PI * 2,
-        angularVelocity: (this.rng.random() - 0.5) * 0.01, // Angular velocity between -0.005 and 0.005 (matches client)
+        // Keep the server-owned spin in step with the client fallback.
+        angularVelocity: (this.rng.random() - 0.5) * 0.01 * GAME.MOTION_SCALE,
         health: healthValue,
         maxHealth: healthValue,
         vertices,
@@ -477,13 +478,17 @@ export class AsteroidManager {
           y: destroyed.position.y + offsetY,
         },
         velocity: {
-          x: destroyed.velocity.x + (this.rng.random() - 0.5) * 3 + offsetX * 0.1,
-          y: destroyed.velocity.y + (this.rng.random() - 0.5) * 3 + offsetY * 0.1,
+          x:
+            destroyed.velocity.x +
+            ((this.rng.random() - 0.5) * 3 + offsetX * 0.1) * GAME.MOTION_SCALE,
+          y:
+            destroyed.velocity.y +
+            ((this.rng.random() - 0.5) * 3 + offsetY * 0.1) * GAME.MOTION_SCALE,
         },
         size: newSize,
         jaggedness: newJaggedness,
         rotation: this.rng.random() * Math.PI * 2,
-        angularVelocity: (this.rng.random() - 0.5) * 0.01,
+        angularVelocity: (this.rng.random() - 0.5) * 0.01 * GAME.MOTION_SCALE,
         health: Math.floor(newSize * 0.8),
         maxHealth: Math.floor(newSize * 0.8),
         vertices: newVertices,

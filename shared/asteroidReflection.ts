@@ -45,6 +45,70 @@ interface ReflectionPreviewOptions {
 interface PreparedAsteroid {
   asteroid: ReflectionAsteroid;
   points: Position[];
+  x: number;
+  y: number;
+  size: number;
+  rotation: number;
+  vertices: number;
+  offsets: number[];
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+// Live server rocks are reused across shots. A pose or contour change replaces
+// this entry; removed rocks and their private geometry can be collected.
+const preparedContours = new WeakMap<ReflectionAsteroid, PreparedAsteroid>();
+
+function sameContour(asteroid: ReflectionAsteroid, cached: PreparedAsteroid): boolean {
+  if (
+    !Object.is(asteroid.position.x, cached.x) ||
+    !Object.is(asteroid.position.y, cached.y) ||
+    !Object.is(asteroid.size, cached.size) ||
+    !Object.is(asteroid.rotation, cached.rotation) ||
+    asteroid.vertices !== cached.vertices ||
+    asteroid.offsets.length !== cached.offsets.length
+  ) {
+    return false;
+  }
+  for (let index = 0; index < asteroid.offsets.length; index++) {
+    if (!Object.is(asteroid.offsets[index], cached.offsets[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function prepareContour(asteroid: ReflectionAsteroid): PreparedAsteroid {
+  const cached = preparedContours.get(asteroid);
+  if (cached && sameContour(asteroid, cached)) {
+    return cached;
+  }
+  // Validate all geometry, even an obstacle outside the swept segment's bounds.
+  const points = asteroidPolygonPoints(asteroid);
+  const prepared: PreparedAsteroid = {
+    asteroid,
+    points,
+    x: asteroid.position.x,
+    y: asteroid.position.y,
+    size: asteroid.size,
+    rotation: asteroid.rotation,
+    vertices: asteroid.vertices,
+    offsets: [...asteroid.offsets],
+    minX: Infinity,
+    maxX: -Infinity,
+    minY: Infinity,
+    maxY: -Infinity,
+  };
+  for (const point of points) {
+    prepared.minX = Math.min(prepared.minX, point.x);
+    prepared.maxX = Math.max(prepared.maxX, point.x);
+    prepared.minY = Math.min(prepared.minY, point.y);
+    prepared.maxY = Math.max(prepared.maxY, point.y);
+  }
+  preparedContours.set(asteroid, prepared);
+  return prepared;
 }
 
 function assertPoint(point: Position): void {
@@ -131,7 +195,7 @@ function prepare(asteroids: readonly ReflectionAsteroid[]): PreparedAsteroid[] {
       throw new RangeError('Reflection obstacles require unique nonempty IDs');
     }
     ids.add(asteroid.id);
-    return { asteroid, points: asteroidPolygonPoints(asteroid) };
+    return prepareContour(asteroid);
   });
 }
 
@@ -247,7 +311,27 @@ function nearestImpact(
   ignoreOriginAsteroidId?: string
 ): AsteroidImpact | null {
   let nearest: AsteroidImpact | null = null;
+  const end = advance(start, direction, distance);
+  // Keep the narrow phase's edge/corner tolerances, plus rounding at the largest
+  // allowed coordinates. Only disjoint swept boxes skip polygon edge work.
+  const padding =
+    CORNER_PROBE +
+    Number.EPSILON *
+      16 *
+      Math.max(1, Math.abs(start.x), Math.abs(start.y), Math.abs(end.x), Math.abs(end.y));
+  const minX = Math.min(start.x, end.x) - padding;
+  const maxX = Math.max(start.x, end.x) + padding;
+  const minY = Math.min(start.y, end.y) - padding;
+  const maxY = Math.max(start.y, end.y) + padding;
   for (const asteroid of asteroids) {
+    if (
+      asteroid.maxX < minX ||
+      asteroid.minX > maxX ||
+      asteroid.maxY < minY ||
+      asteroid.minY > maxY
+    ) {
+      continue;
+    }
     const hit = polygonImpact(start, direction, distance, asteroid, ignoreOriginAsteroidId);
     if (
       hit &&

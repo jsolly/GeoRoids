@@ -1,5 +1,17 @@
 # Performance plan relevance and optimization decisions
 
+The table below records the earlier strategy review, not a current performance
+ceiling. The [mobile implementation report](mobile-implementation-status.md)
+collects the subsequent decisions and measured renderer, collision and snapshot
+changes. The [current compression comparison](current-compression-results.md)
+rejects both tested levels after their server CPU increases exceeded the fixed
+limit. Missing profiling evidence does not disprove every alternative.
+
+The [current MessagePack screen](current-binary-codec-results.md) rejects its
+tested configuration: the 14–15% raw-byte saving comes with 11.6–15.3% more complete
+codec CPU, beyond the fixed limit. The earlier
+[offline trial](binary-codec-results.md) remains historical evidence.
+
 The recorded benchmark receipts below predate legacy-client retirement. Current
 load sessions use the required snapshot protocol for every pilot; old mixed-client
 measurements remain historical evidence only.
@@ -17,7 +29,17 @@ deployed capacity, instrumentation overhead and long-session memory remain
 unverified. Those missing measurements do not establish a benefit for a cache,
 pool, renderer rewrite or protocol change.
 
-## Disposition of the opportunities
+The [current contour query experiment](contour-query-cache-results.md) supersedes
+the historical cache disposition for that one measured function. A bounded
+last-query cache now has repeated timing and exact rendering evidence.
+
+The [collision work](asteroid-collision-work-results.md),
+[snapshot serialization](snapshot-json-reuse-results.md), and
+[validator preparation](snapshot-validation-results.md) reports likewise replace
+the historical no-bottleneck conclusions for those measured paths. Their phase
+gains do not establish phone or deployed capacity acceptance.
+
+## Historical disposition of the opportunities
 
 | Opportunity | Decision and evidence |
 | --- | --- |

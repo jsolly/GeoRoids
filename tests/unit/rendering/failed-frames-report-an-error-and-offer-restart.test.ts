@@ -7,6 +7,8 @@ import { NetworkManager } from '../../../src/network/networkManager';
 import { canvasManager } from '../../../src/rendering/canvas';
 import { logger } from '../../../src/utils/Logger';
 
+import { TestPath2D } from '../../support/TestPath2D';
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -27,6 +29,7 @@ test('an actual game-loop frame failure stops work and offers one restart notice
   const canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
   document.body.appendChild(canvas);
+  vi.stubGlobal('Path2D', TestPath2D);
   canvasManager.initialize();
   const player = PlayerManager.getInstance().createLocalPlayer();
   player.id = 'local-pilot';

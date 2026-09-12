@@ -26,6 +26,7 @@ import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRender
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { burstTick, driftSegment, easeOutCubic } from '../../../src/rendering/vectorJuice';
 import { hexToRgba } from '../../../src/utils/colorUtils';
+import { TestPath2D } from '../../support/TestPath2D';
 import { setWindowViewport } from '../../support/viewport';
 
 let restoreViewport = () => {};
@@ -42,6 +43,7 @@ afterEach(() => {
   canvas = undefined;
   previousCanvas = null;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   restoreViewport();
 });
 
@@ -100,8 +102,11 @@ function recordingContext() {
     arc(...args);
   });
   vi.spyOn(ctx, 'stroke').mockImplementation((...args: [] | [Path2D]) => {
+    const path = args[0];
+    const strokePoints =
+      path instanceof TestPath2D ? path.commands.map(({ x, y }) => ({ x, y })) : points;
     strokes.push({
-      points: [...points],
+      points: [...strokePoints],
       arcs: [...arcs],
       closed,
       color: ctx.strokeStyle,
@@ -110,7 +115,9 @@ function recordingContext() {
       shadow: ctx.shadowColor,
       blur: ctx.shadowBlur,
     });
-    Reflect.apply(stroke, ctx, args);
+    if (!(path instanceof TestPath2D)) {
+      Reflect.apply(stroke, ctx, args);
+    }
   });
   const fill = vi.spyOn(ctx, 'fill');
   return { ctx, strokes, fill };
@@ -378,6 +385,7 @@ test('remote ship lifecycle advances on the shared update clock', () => {
 });
 
 test('terrain and contour laser renderers emit finite muted strokes at runtime', () => {
+  vi.stubGlobal('Path2D', TestPath2D);
   const { ctx, strokes } = recordingContext();
   const prior = getTerrainField();
   try {

@@ -15,6 +15,13 @@ interface LevelIndex {
   maxX: number;
   minY: number;
   maxY: number;
+  lastQuery?: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    candidates: readonly Segment[];
+  };
 }
 
 const CELL_SIZE = 256;
@@ -59,7 +66,7 @@ function buildIndex(level: ContourLevel): LevelIndex {
   return index;
 }
 
-/** Conservative candidates only; the renderer retains its exact screen-space rejection. */
+/** Conservative viewport candidates in source order; Canvas clips the cached path. */
 export function contourCandidates(
   levels: readonly ContourLevel[],
   levelOrdinal: number,
@@ -95,6 +102,18 @@ export function contourCandidates(
   const maxX = Math.min(index.maxX, Math.floor((view.x + halfWidth + epsilon) / CELL_SIZE));
   const minY = Math.max(index.minY, Math.floor((view.y - halfHeight - epsilon) / CELL_SIZE));
   const maxY = Math.min(index.maxY, Math.floor((view.y + halfHeight + epsilon) / CELL_SIZE));
+  // Candidate membership depends only on these cells. Reuse its identity so the
+  // renderer can retain a world-space path while the camera moves within them.
+  const previous = index.lastQuery;
+  if (
+    previous &&
+    previous.minX === minX &&
+    previous.maxX === maxX &&
+    previous.minY === minY &&
+    previous.maxY === maxY
+  ) {
+    return previous.candidates;
+  }
   const ordinals = new Set<number>();
   for (let x = minX; x <= maxX; x++) {
     const column = index.cells.get(x);
@@ -117,5 +136,8 @@ export function contourCandidates(
       candidates.push(segment);
     }
   }
+  // Retain one result per level, not every camera position. Publish a new array
+  // when the cells change so a caller's previous result remains valid.
+  index.lastQuery = { minX, maxX, minY, maxY, candidates };
   return candidates;
 }

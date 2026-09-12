@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-12",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "scope": "isolated contour query cost and deterministic renderer equality; no phone or whole-game FPS claim",
+  "artifacts": [
+    {
+      "path": "src/rendering/contourSpatialIndex.ts",
+      "sha256": "e2f7e43f16c1a53eb24089e94eda1338c1afa139f33b76ad6977d6dd412668e8",
+      "bytes": 4576
+    },
+    {
+      "path": "tests/unit/rendering/contours-follow-the-camera-without-dropping-lines.test.ts",
+      "sha256": "09cec72d7d1fc052e6d525b318475ce4c0888cbe42e94e290afb37cca6e535d7",
+      "bytes": 5217
+    },
+    {
+      "path": ".performance/contour-cache/baseline.ts",
+      "sha256": "fb2e355e50118c7583acb6d0aa46e1e6caf15a1fc70b17e9865479c7734e2539",
+      "bytes": 3865
+    },
+    {
+      "path": ".performance/contour-cache/bench.ts",
+      "sha256": "a5b1ac14fefd56af8261eedc059070eb9ee8bd72045bccfef6fc274acc7c84d3",
+      "bytes": 4040
+    },
+    {
+      "path": ".performance/contour-cache/results.json",
+      "sha256": "7a61f7559cb3cbafa9d89b08cc2c5218ccabe11e598fa3e0e18cf556e7cdb8cf",
+      "bytes": 6554847
+    },
+    {
+      "path": ".performance/contour-cache/summary.json",
+      "sha256": "fc75bd71886495ae6930eeb4414253082e0425e45f650ae8f5ce2d77ce1833ed",
+      "bytes": 3029
+    },
+    {
+      "path": ".performance/contour-cache/render-check.ts",
+      "sha256": "24e30f2833a1d92b08dfad0ffbbfea998cef9e475c66400c67dbc59dd41ce6ea",
+      "bytes": 1728
+    },
+    {
+      "path": ".performance/contour-cache/render-results.json",
+      "sha256": "bc8c1538bb03b86bff915e89887b63f27dbd6712b1d7f8ad2b0ecf9a9d6e067f",
+      "bytes": 770533
+    },
+    {
+      "path": ".performance/contour-cache/tests.log",
+      "sha256": "fd6c68cbb35cc1861c01450220b9daa6bbff187f38b20e896173ed17c855e9e1",
+      "bytes": 242
+    },
+    {
+      "path": ".performance/contour-cache/typecheck.log",
+      "sha256": "006c8f896fb84789fffe28b901f51ef29db6e61feec7131ee089aedb98131414",
+      "bytes": 43
+    }
+  ]
+}

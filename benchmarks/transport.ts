@@ -116,28 +116,16 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
           counts.receivedPackets++;
           counts.receivedPayloadBytes += Buffer.byteLength(text);
         }
-        const message: unknown = JSON.parse(text);
-        assert(record(message) && typeof message['type'] === 'string', 'Invalid server message');
-        const data = message['data'];
-        switch (message['type']) {
-          case 'error':
-            throw new Error(`Server rejected transport client: ${JSON.stringify(data)}`);
-          case 'joined':
-            assert(
-              record(data) && data['id'] === id && !state.joined,
-              `Join identity mismatch for ${id}`
+        const result = decoder.readMessage(text, { acceptSnapshots: state.joined });
+        switch (result.kind) {
+          case 'snapshot':
+            assert(state.joined, 'Snapshot arrived before join');
+            assert.equal(
+              result.metadata.sequence,
+              state.sequence + 1,
+              'Snapshot sequence did not advance'
             );
-            assert(
-              data['snapshotVersion'] === 1 && data['asteroidInteractions'] === 1,
-              'Server did not negotiate enhanced snapshots'
-            );
-            state.joined = true;
-            break;
-          case 'snapshot': {
-            assert(state.joined && record(data), 'Snapshot arrived before join');
-            assert.equal(data['sequence'], state.sequence + 1, 'Snapshot sequence did not advance');
-            const decoded = decoder.decode(data);
-            state.decodedParticipantIds = decoded.entities
+            state.decodedParticipantIds = result.state.entities
               .filter((entity) => entity.type === 'human')
               .map((entity) => entity.id)
               .sort();
@@ -151,14 +139,41 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
               state.lastSnapshotAt = receivedAt;
             }
             break;
-          }
-          case 'pong':
-            if (measuring) {
-              assert(state.pingSentAt > 0, 'Unsolicited pong');
-              state.pingRttMs.push(receivedAt - state.pingSentAt);
-              state.pingSentAt = 0;
+          case 'snapshot-rejected':
+            throw result.error;
+          case 'message': {
+            const message = result.message;
+            assert(
+              record(message) && typeof message['type'] === 'string',
+              'Invalid server message'
+            );
+            const data = message['data'];
+            switch (message['type']) {
+              case 'error':
+                throw new Error(`Server rejected transport client: ${JSON.stringify(data)}`);
+              case 'joined':
+                assert(
+                  record(data) && data['id'] === id && !state.joined,
+                  `Join identity mismatch for ${id}`
+                );
+                assert(
+                  data['snapshotVersion'] === 1 && data['asteroidInteractions'] === 1,
+                  'Server did not negotiate enhanced snapshots'
+                );
+                state.joined = true;
+                decoder.reset();
+                state.sequence = 0;
+                break;
+              case 'pong':
+                if (measuring) {
+                  assert(state.pingSentAt > 0, 'Unsolicited pong');
+                  state.pingRttMs.push(receivedAt - state.pingSentAt);
+                  state.pingSentAt = 0;
+                }
+                break;
             }
             break;
+          }
         }
       } catch (error) {
         fail(error);

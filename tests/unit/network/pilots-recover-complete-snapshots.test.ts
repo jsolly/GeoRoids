@@ -1,15 +1,116 @@
 import { strict as assert } from 'node:assert';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   captureSnapshot,
   type SnapshotBaseline,
   SnapshotDecoder,
   SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
+import { decodeSnapshotMessage, snapshotMessage } from '../../support/decodeSnapshotMessage';
 import { snapshotFixture } from './snapshotFixture';
 
 describe('pilots reconstruct complete authoritative worlds', () => {
-  test('moving ticks preserve every field, effect clears, removal, death and respawn', () => {
+  test('compact world coordinates preserve precise ship handoffs, resources and future fields', () => {
+    const world = snapshotFixture();
+    const ship = world.entities[0];
+    const asteroid = world.asteroids[0];
+    assert.ok(ship && asteroid, 'ship and asteroid');
+    ship.position = { x: 1.23456789, y: -2.34567891 };
+    ship.velocity = { x: 0.00001234, y: -0.00002345 };
+    ship.angle = 2 * Math.PI;
+    ship.fuel = 45.12345678;
+    ship.playerMotion = { epoch: 7, mode: 'handoff', ack: 101, anchor: ship.position };
+    asteroid.position = Object.assign(
+      { x: 1.23456789, y: -2.34567891 },
+      {
+        futureVector: { x: 0.123456789, y: 0.987654321 },
+      }
+    );
+    asteroid.velocity = { x: 0.00001234, y: -0.00002345 };
+    asteroid.rotation = 0.987654321;
+    asteroid.angularVelocity = 0.000012345;
+    asteroid.offsets = [0.123456789, 0.987654321];
+    world.playerProjectiles = [
+      {
+        id: 'precise-shot',
+        ownerId: ship.id,
+        position: { x: 12.3456789, y: -12.3456789 },
+        prevPosition: { x: 1.23456789, y: -1.23456789 },
+        velocity: { x: 11.11111101, y: -11.11111101 },
+        age: 2,
+        bounces: 1,
+        energy: 1.23456789,
+      },
+    ];
+    const original = structuredClone(world);
+    expect(captureSnapshot(world)).toEqual(original);
+    const encoder = new SnapshotEncoder(world);
+    const decoder = new SnapshotDecoder();
+    const applied = decodeSnapshotMessage(decoder, encoder.encodeSerialized(1, undefined, 0).text);
+    expect(world).toEqual(original);
+    expect(applied.entities).toEqual(original.entities);
+    expect(applied.asteroids[0]).toEqual({
+      ...original.asteroids[0],
+      position: {
+        x: 1.2346,
+        y: -2.3457,
+        futureVector: { x: 0.123456789, y: 0.987654321 },
+      },
+      velocity: { x: 0, y: 0 },
+      rotation: 0.9877,
+    });
+    expect(applied.playerProjectiles[0]).toEqual({
+      ...original.playerProjectiles[0],
+      position: { x: 12.3457, y: -12.3457 },
+      prevPosition: { x: 1.2346, y: -1.2346 },
+      velocity: { x: 11.1111, y: -11.1111 },
+    });
+
+    const appliedAsteroid = applied.asteroids[0];
+    const appliedShip = applied.entities[0];
+    assert.ok(appliedAsteroid && appliedShip, 'decoded actors');
+    appliedAsteroid.position.x = 900;
+    appliedShip.position.x = 900;
+    asteroid.position.x = 1.23456781; // Same wire cell: a delta can omit this change.
+    const next = new SnapshotEncoder(world);
+    expect(
+      decodeSnapshotMessage(
+        decoder,
+        snapshotMessage(next.encode(2, { sequence: 1, state: encoder.state }))
+      )
+    ).toEqual(JSON.parse(JSON.stringify(next.state)));
+    expect(next.state.entities).toEqual(original.entities);
+    expect(next.state.asteroids[0]?.position.x).toBe(1.2346);
+  });
+
+  test('large finite coordinates survive compact snapshots and invalid numbers still fail', () => {
+    const world = snapshotFixture();
+    const asteroid = world.asteroids[0];
+    assert.ok(asteroid, 'asteroid');
+    for (const value of [
+      Number.MAX_VALUE,
+      -Number.MAX_VALUE,
+      Number.MAX_SAFE_INTEGER,
+      -Number.MAX_SAFE_INTEGER,
+      902_000_000_000.125,
+      -902_000_000_000.125,
+    ]) {
+      asteroid.position.x = value;
+      const encoder = new SnapshotEncoder(world);
+      expect(
+        decodeSnapshotMessage(new SnapshotDecoder(), snapshotMessage(encoder.encode(1)))
+          .asteroids[0]?.position.x
+      ).toBe(value);
+      expect(asteroid.position.x).toBe(value);
+    }
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      asteroid.position.x = value;
+      expect(() => new SnapshotEncoder(world)).toThrow(/Non-JSON/);
+      expect(Object.is(asteroid.position.x, value)).toBe(true);
+    }
+  });
+
+  test('moving ticks preserve the wire world, effect clears, removal, death and respawn', () => {
     const pilots: Array<{
       decoder: SnapshotDecoder;
       sequence: number;
@@ -89,8 +190,8 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         if (frame.kind === 'delta') {
           deltas++;
         }
-        expect(pilot.decoder.decode(JSON.parse(JSON.stringify(frame)))).toEqual(
-          JSON.parse(JSON.stringify(extended))
+        expect(decodeSnapshotMessage(pilot.decoder, snapshotMessage(frame))).toEqual(
+          JSON.parse(JSON.stringify(encoder.state))
         );
         pilot.baseline = { sequence, state: encoder.state };
       }
@@ -109,11 +210,13 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     assert.ok(secondBaselineAsteroid, 'second baseline asteroid');
     secondBaselineAsteroid.offsets = [0.2, 0.3];
     const decoder = new SnapshotDecoder();
-    decoder.decode(new SnapshotEncoder(a).encode(1));
-    const delta = new SnapshotEncoder(b).encode(2, { sequence: 1, state: a });
+    const first = new SnapshotEncoder(a);
+    const next = new SnapshotEncoder(b);
+    decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
+    const delta = next.encode(2, { sequence: 1, state: first.state });
     expect(delta.kind).toBe('delta');
-    const decoded = decoder.decode(delta);
-    expect(decoded).toEqual(b);
+    const decoded = decodeSnapshotMessage(decoder, snapshotMessage(delta));
+    expect(decoded).toEqual(next.state);
     const decodedEntity = decoded.entities[0];
     assert.ok(decodedEntity, 'decoded entity');
     expect(Object.hasOwn(decodedEntity, 'harpoonTargetId')).toBe(false);
@@ -122,45 +225,61 @@ describe('pilots reconstruct complete authoritative worlds', () => {
   test('bad packets leave the last baseline intact and a fresh keyframe repairs gaps', () => {
     const decoder = new SnapshotDecoder();
     const state = captureSnapshot(snapshotFixture());
-    decoder.decode(new SnapshotEncoder(state).encode(1));
+    const first = new SnapshotEncoder(state);
+    decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)));
     const next = captureSnapshot(snapshotFixture(1));
-    const delta = new SnapshotEncoder(next).encode(2, { sequence: 1, state });
-    expect(() => decoder.decode({ ...delta, sequence: 3 })).toThrow(/baseline/);
+    const nextEncoder = new SnapshotEncoder(next);
+    const delta = nextEncoder.encode(2, { sequence: 1, state: first.state });
     expect(() =>
-      decoder.decode({
-        version: 1,
-        sequence: 2,
-        kind: 'delta',
-        baseline: 1,
-        patch: {
-          set: {},
-          clear: [],
-          collections: {
-            entities: { add: [], update: [['pilot-0', { health: 'invalid' }, []]], remove: [] },
+      decodeSnapshotMessage(decoder, snapshotMessage({ ...delta, sequence: 3 }))
+    ).toThrow(/baseline/);
+    expect(() =>
+      decodeSnapshotMessage(
+        decoder,
+        JSON.stringify({
+          type: 'snapshot',
+          data: {
+            version: 1,
+            sequence: 2,
+            kind: 'delta',
+            baseline: 1,
+            patch: {
+              set: {},
+              clear: [],
+              collections: {
+                entities: {
+                  add: [],
+                  update: [['pilot-0', { health: 'invalid' }, []]],
+                  remove: [],
+                },
+              },
+            },
           },
-        },
-      })
+        })
+      )
     ).toThrow(/DTO/);
     const invalidReference = captureSnapshot(snapshotFixture(2));
     const satelliteProjectile = invalidReference.satelliteProjectiles[0];
     assert.ok(satelliteProjectile, 'satellite projectile');
     satelliteProjectile.satelliteId = 'missing-eo';
     expect(() =>
-      decoder.decode({ version: 1, sequence: 2, kind: 'keyframe', state: invalidReference })
+      decodeSnapshotMessage(
+        decoder,
+        snapshotMessage({ version: 1, sequence: 2, kind: 'keyframe', state: invalidReference })
+      )
     ).toThrow(/references/);
-    expect(decoder.decode(delta)).toEqual(next);
-    expect(() => decoder.decode(delta)).toThrow(/Stale/);
+    expect(decodeSnapshotMessage(decoder, snapshotMessage(delta))).toEqual(nextEncoder.state);
+    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/Stale/);
     expect(() =>
-      decoder.decode(
-        JSON.parse(
-          '{"version":1,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}'
-        )
+      decodeSnapshotMessage(
+        decoder,
+        '{"type":"snapshot","data":{"version":1,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}}'
       )
     ).toThrow(/Unsafe/);
-    expect(decoder.decode(new SnapshotEncoder(state).encode(50))).toEqual(state);
+    expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(50)))).toEqual(first.state);
     decoder.reset();
-    expect(() => decoder.decode(delta)).toThrow(/baseline/);
-    expect(decoder.decode(new SnapshotEncoder(state).encode(1))).toEqual(state);
+    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/baseline/);
+    expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)))).toEqual(first.state);
   });
 
   test('sequence digit changes choose the smaller frame and ties send the complete world', () => {
@@ -208,10 +327,51 @@ describe('pilots reconstruct complete authoritative worlds', () => {
             : { ...full, sequence: recipientSequence }
         );
         const decoder = new SnapshotDecoder();
-        decoder.decode(baseline.encode(baselineSequence));
-        expect(decoder.decode(frame)).toEqual(world);
+        decodeSnapshotMessage(decoder, snapshotMessage(baseline.encode(baselineSequence)));
+        expect(decodeSnapshotMessage(decoder, snapshotMessage(frame))).toEqual(world);
+
+        const serialized = encoder.encodeSerialized(
+          recipientSequence,
+          { sequence: baselineSequence, state: baseline.state },
+          0
+        );
+        expect(serialized.frame).toEqual(frame);
+        expect(serialized.text).toBe(
+          JSON.stringify({ type: 'snapshot', data: serialized.frame, timestamp: 0 })
+        );
       }
     }
+  });
+
+  test('serialized keyframes and deltas stay exact after source and consumer mutations', () => {
+    const source = snapshotFixture();
+    const encoder = new SnapshotEncoder(source);
+    const first = encoder.encodeSerialized(1, undefined, 1234);
+    expect(first.text).toBe(
+      JSON.stringify({ type: 'snapshot', data: first.frame, timestamp: 1234 })
+    );
+
+    const sourceEntity = source.entities[0];
+    const capturedEntity = encoder.state.entities[0];
+    assert.ok(sourceEntity && capturedEntity, 'snapshot entity');
+    sourceEntity.position.x = -900;
+    expect(capturedEntity.position.x).toBe(500);
+
+    const decoder = new SnapshotDecoder();
+    const applied = decodeSnapshotMessage(decoder, first.text);
+    const appliedEntity = applied.entities[0];
+    assert.ok(appliedEntity, 'decoded entity');
+    appliedEntity.position.x = -800;
+    expect(capturedEntity.position.x).toBe(500);
+
+    const nextState = snapshotFixture(1);
+    const next = new SnapshotEncoder(nextState);
+    const delta = next.encodeSerialized(2, { sequence: 1, state: encoder.state }, 1234);
+    expect(delta.frame.kind).toBe('delta');
+    expect(delta.text).toBe(
+      JSON.stringify({ type: 'snapshot', data: delta.frame, timestamp: 1234 })
+    );
+    expect(decodeSnapshotMessage(decoder, delta.text)).toEqual(next.state);
   });
 
   test('engine and application mutations never corrupt the other side of a baseline', () => {
@@ -224,7 +384,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     assert.ok(encodedEntity, 'encoded entity');
     expect(encodedEntity.position.x).toBe(500);
     const decoder = new SnapshotDecoder();
-    const applied = decoder.decode(JSON.parse(JSON.stringify(encoder.encode(1))));
+    const applied = decodeSnapshotMessage(decoder, snapshotMessage(encoder.encode(1)));
     const appliedEntity = applied.entities[0];
     assert.ok(appliedEntity, 'applied entity');
     appliedEntity.position.x = -800;
@@ -232,6 +392,49 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const changed = snapshotFixture();
     changed.gameTime = 1;
     const next = new SnapshotEncoder(changed);
-    expect(decoder.decode(next.encode(2, { sequence: 1, state: encoder.state }))).toEqual(changed);
+    expect(
+      decodeSnapshotMessage(
+        decoder,
+        snapshotMessage(next.encode(2, { sequence: 1, state: encoder.state }))
+      )
+    ).toEqual(next.state);
+  });
+
+  test('one parser call owns the envelope and snapshot admission', () => {
+    const decoder = new SnapshotDecoder();
+    const frame = new SnapshotEncoder(snapshotFixture()).encode(1);
+    const text = snapshotMessage(frame);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    const result = decoder.readMessage(text, { acceptSnapshots: true });
+
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse).toHaveBeenCalledWith(text);
+    expect(result).toMatchObject({
+      kind: 'snapshot',
+      metadata: { kind: 'keyframe', sequence: 1 },
+    });
+  });
+
+  test('rejected admission does not retain a baseline and non-snapshots stay messages', () => {
+    const decoder = new SnapshotDecoder();
+    const state = snapshotFixture();
+    const encoder = new SnapshotEncoder(state);
+    const keyframe = snapshotMessage(encoder.encode(1));
+    const rejected = decoder.readMessage(keyframe, { acceptSnapshots: false });
+    expect(rejected).toMatchObject({
+      kind: 'snapshot-rejected',
+      error: expect.objectContaining({ message: expect.stringMatching(/before.*join ack/) }),
+      metadata: { kind: 'keyframe', sequence: 1 },
+    });
+
+    expect(decodeSnapshotMessage(decoder, keyframe)).toEqual(
+      JSON.parse(JSON.stringify(encoder.state))
+    );
+    expect(
+      decoder.readMessage('{"type":"status","data":{"ready":true}}', {
+        acceptSnapshots: true,
+      })
+    ).toEqual({ kind: 'message', message: { type: 'status', data: { ready: true } } });
   });
 });

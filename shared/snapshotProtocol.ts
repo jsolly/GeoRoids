@@ -1,5 +1,6 @@
 import type { ServerGameSnapshot } from '../shared-types';
 import { validateSnapshotDto } from './snapshotDto';
+import { quantizeSnapshotKinematics } from './snapshotPrecision';
 
 export const SNAPSHOT_VERSION = 1;
 export const SNAPSHOT_KEYFRAME_INTERVAL = 90;
@@ -46,6 +47,11 @@ export type SnapshotFrame =
 export interface SnapshotBaseline {
   sequence: number;
   state: SnapshotState;
+}
+
+interface SerializedSnapshotMessage {
+  readonly frame: SnapshotFrame;
+  readonly text: string;
 }
 
 function object(value: unknown): value is Row {
@@ -171,45 +177,133 @@ function createSnapshotPatch(state: SnapshotState, baseline: SnapshotState): Sna
 }
 
 /** One detached world per broadcast; each socket keeps its own sequence and baseline. */
+interface SerializedPatch {
+  readonly patch: SnapshotPatch;
+  readonly text: string;
+}
+
+interface PreparedSnapshot {
+  readonly frame: SnapshotFrame;
+  readonly shell: string;
+  readonly payload: string;
+}
+
+function stringifyJson(value: unknown): string {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) {
+    throw new Error('Snapshot JSON serialization omitted a value');
+  }
+  return serialized;
+}
+
+/** Replace only the placeholder emitted by the small metadata shell. */
+function replaceNullField(shell: string, name: string, payload: string): string {
+  const marker = `"${name}":null`;
+  const index = shell.indexOf(marker);
+  if (index < 0 || index !== shell.lastIndexOf(marker)) {
+    throw new Error(`Snapshot JSON shell is missing its ${name} placeholder`);
+  }
+  return `${shell.slice(0, index)}"${name}":${payload}${shell.slice(index + marker.length)}`;
+}
+
 export class SnapshotEncoder {
   readonly state: SnapshotState;
-  private fullStateLength?: number;
-  private readonly patches = new Map<SnapshotState, { patch: SnapshotPatch; length: number }>();
+  private fullStateText?: string;
+  private readonly patches = new Map<SnapshotState, SerializedPatch>();
 
   constructor(state: SnapshotState) {
-    this.state = captureSnapshot(state);
+    const detached = captureSnapshot(state);
+    quantizeSnapshotKinematics(detached);
+    this.state = detached;
   }
 
   encode(sequence: number, baseline?: SnapshotBaseline): SnapshotFrame {
-    const full: SnapshotFrame = {
+    return this.prepare(sequence, baseline, false);
+  }
+
+  encodeSerialized(
+    sequence: number,
+    baseline: SnapshotBaseline | undefined,
+    timestamp: number
+  ): SerializedSnapshotMessage {
+    const prepared = this.prepare(sequence, baseline, true);
+    const frameText =
+      prepared.frame.kind === 'keyframe'
+        ? replaceNullField(prepared.shell, 'state', prepared.payload)
+        : replaceNullField(prepared.shell, 'patch', prepared.payload);
+    return {
+      frame: prepared.frame,
+      text: `{"type":"snapshot","data":${frameText},"timestamp":${stringifyJson(timestamp)}}`,
+    };
+  }
+
+  private prepare(
+    sequence: number,
+    baseline: SnapshotBaseline | undefined,
+    serialized: true
+  ): PreparedSnapshot;
+  private prepare(
+    sequence: number,
+    baseline: SnapshotBaseline | undefined,
+    serialized: false
+  ): SnapshotFrame;
+  private prepare(
+    sequence: number,
+    baseline: SnapshotBaseline | undefined,
+    serialized: boolean
+  ): PreparedSnapshot | SnapshotFrame {
+    const full = {
       version: SNAPSHOT_VERSION,
       sequence,
       kind: 'keyframe',
       state: this.state,
-    };
+    } satisfies SnapshotFrame;
     if (!baseline) {
-      return full;
+      if (!serialized) {
+        return full;
+      }
+      return {
+        frame: full,
+        shell: stringifyJson({ ...full, state: null }),
+        payload: this.serializedState(),
+      };
     }
 
     let change = this.patches.get(baseline.state);
     if (!change) {
       const patch = createSnapshotPatch(this.state, baseline.state);
-      change = { patch, length: JSON.stringify(patch).length };
+      const text = stringifyJson(patch);
+      change = { patch, text };
       this.patches.set(baseline.state, change);
     }
-    const delta: SnapshotFrame = {
+    const delta = {
       version: SNAPSHOT_VERSION,
       sequence,
       kind: 'delta',
       baseline: baseline.sequence,
       patch: change.patch,
-    };
-    this.fullStateLength ??= JSON.stringify(this.state).length;
+    } satisfies SnapshotFrame;
+    const fullState = this.serializedState();
     // Null stands in for the shared payload while JSON.stringify counts each
     // recipient's metadata, including sequence-number digit changes.
-    const deltaLength = JSON.stringify({ ...delta, patch: null }).length - 4 + change.length;
-    const fullLength = JSON.stringify({ ...full, state: null }).length - 4 + this.fullStateLength;
-    return deltaLength < fullLength ? delta : full;
+    const deltaShell = stringifyJson({ ...delta, patch: null });
+    const fullShell = stringifyJson({ ...full, state: null });
+    const deltaLength = deltaShell.length - 4 + change.text.length;
+    const fullLength = fullShell.length - 4 + fullState.length;
+    if (deltaLength < fullLength) {
+      return serialized ? { frame: delta, shell: deltaShell, payload: change.text } : delta;
+    }
+    return serialized ? { frame: full, shell: fullShell, payload: fullState } : full;
+  }
+
+  private serializedState(): string {
+    const cached = this.fullStateText;
+    if (cached !== undefined) {
+      return cached;
+    }
+    const text = stringifyJson(this.state);
+    this.fullStateText = text;
+    return text;
   }
 }
 function stringList(value: unknown): value is string[] {
@@ -304,14 +398,117 @@ function applyPatch(base: SnapshotState, patch: unknown): ServerGameSnapshot {
   validateSnapshot(state);
   return state;
 }
+
+export type SnapshotMetadata = Pick<SnapshotFrame, 'kind' | 'sequence'> & {
+  readonly baseline?: number;
+};
+
+interface SnapshotReadTimings {
+  readonly parseMs: number;
+  readonly decodeMs?: number;
+}
+
+type SnapshotReadTiming = { readonly timings?: SnapshotReadTimings };
+
+type SnapshotRead =
+  | ({
+      readonly kind: 'snapshot';
+      readonly state: ServerGameSnapshot;
+      readonly metadata: SnapshotMetadata;
+    } & SnapshotReadTiming)
+  | ({
+      readonly kind: 'snapshot-rejected';
+      readonly error: Error;
+      readonly metadata?: SnapshotMetadata;
+    } & SnapshotReadTiming)
+  | ({ readonly kind: 'message'; readonly message: unknown } & SnapshotReadTiming);
+
+interface SnapshotAdmission {
+  readonly acceptSnapshots: boolean;
+}
+
+function readSnapshotMetadata(value: unknown): SnapshotMetadata | undefined {
+  if (!object(value)) {
+    return undefined;
+  }
+  const sequence = value['sequence'];
+  if (!Number.isSafeInteger(sequence) || (sequence as number) <= 0) {
+    return undefined;
+  }
+  const kind = value['kind'];
+  if (kind !== 'keyframe' && kind !== 'delta') {
+    return undefined;
+  }
+  return {
+    kind,
+    sequence: sequence as number,
+    ...(kind === 'delta' && Number.isSafeInteger(value['baseline'])
+      ? { baseline: value['baseline'] as number }
+      : {}),
+  };
+}
+
+function copyOwnedSnapshot(state: ServerGameSnapshot): ServerGameSnapshot {
+  // #decodeOwned has already validated this parser-owned graph. copyJson keeps
+  // the wire-safety, depth and detachment checks without repeating DTO/index validation.
+  return copyJson(state) as unknown as ServerGameSnapshot;
+}
+
 /** Atomic decoder: neither a rejected packet nor consumers can mutate its baseline. */
 export class SnapshotDecoder {
   private baseline?: SnapshotBaseline;
+
   reset(): void {
     delete this.baseline;
   }
-  decode(input: unknown): ServerGameSnapshot {
-    const frame = input;
+
+  readMessage(text: string, admission: SnapshotAdmission, collectTimings = false): SnapshotRead {
+    const parseStarted = collectTimings ? performance.now() : 0;
+    const envelope: unknown = JSON.parse(text);
+    const parseMs = collectTimings ? performance.now() - parseStarted : 0;
+    const parseTimings = collectTimings ? { timings: { parseMs } } : {};
+    if (!object(envelope) || envelope['type'] !== 'snapshot') {
+      return { kind: 'message', message: envelope, ...parseTimings };
+    }
+
+    const frame = envelope['data'];
+    const metadata = readSnapshotMetadata(frame);
+    if (!admission.acceptSnapshots) {
+      return {
+        kind: 'snapshot-rejected',
+        error: new Error('Snapshot arrived before the current protocol join ack'),
+        ...(metadata ? { metadata } : {}),
+        ...parseTimings,
+      };
+    }
+
+    const decodeStarted = collectTimings ? performance.now() : 0;
+    try {
+      const state = this.#decodeOwned(frame);
+      if (!metadata) {
+        throw new Error('Decoded snapshot is missing diagnostic metadata');
+      }
+      return {
+        kind: 'snapshot',
+        state,
+        metadata,
+        ...(collectTimings
+          ? { timings: { parseMs, decodeMs: performance.now() - decodeStarted } }
+          : {}),
+      };
+    } catch (error) {
+      return {
+        kind: 'snapshot-rejected',
+        error: error instanceof Error ? error : new Error(String(error)),
+        ...(metadata ? { metadata } : {}),
+        ...(collectTimings
+          ? { timings: { parseMs, decodeMs: performance.now() - decodeStarted } }
+          : {}),
+      };
+    }
+  }
+
+  #decodeOwned(frame: unknown): ServerGameSnapshot {
     if (
       !object(frame) ||
       frame['version'] !== SNAPSHOT_VERSION ||
@@ -338,9 +535,7 @@ export class SnapshotDecoder {
     } else {
       throw new Error('Snapshot baseline missing; keyframe required');
     }
-    // Detach only the retained baseline. The application owns the parsed/reconstructed
-    // state, saving a second full clone while still isolating input and consumer writes.
-    const retained = captureSnapshot(state);
+    const retained = copyOwnedSnapshot(state);
     this.baseline = { sequence, state: retained };
     return state;
   }

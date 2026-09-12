@@ -7,6 +7,10 @@ import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 test(
   'two clients see the same kill-loot drops',
   async () => {
@@ -23,16 +27,20 @@ test(
     let deathPosition: { x: number; y: number } | undefined;
     page2.on('websocket', (socket) => {
       socket.on('framereceived', ({ payload }) => {
-        const message = JSON.parse(String(payload));
-        if (message.type === 'joined') {
-          decoder.reset();
-        } else if (message.type === 'snapshot') {
-          const victim = decoder
-            .decode(message.data)
-            .entities.find((actor) => actor.id === victimId);
-          if (victim && victim.lives < livesBefore && victim.exploding && !deathPosition) {
-            deathPosition = { ...victim.position };
+        const raw = String(payload);
+        const result = decoder.readMessage(raw, { acceptSnapshots: true });
+        if (result.kind === 'message') {
+          if (isRecord(result.message) && result.message['type'] === 'joined') {
+            decoder.reset();
           }
+          return;
+        }
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        const victim = result.state.entities.find((actor) => actor.id === victimId);
+        if (victim && victim.lives < livesBefore && victim.exploding && !deathPosition) {
+          deathPosition = { ...victim.position };
         }
       });
     });

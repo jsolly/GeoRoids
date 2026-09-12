@@ -137,9 +137,15 @@ async function startWorld(): Promise<{
 
 function decodeLatestSnapshot(client: WireClient, decoder: SnapshotDecoder): WireMessage {
   let latest: WireMessage | undefined;
-  for (const message of client.messages) {
-    if (message.type === 'snapshot') {
-      latest = { ...message, data: decoder.decode(message.data) };
+  for (const { raw } of client.wireMessages) {
+    const result = decoder.readMessage(raw, { acceptSnapshots: true });
+    if (result.kind === 'snapshot-rejected') {
+      throw result.error;
+    }
+    if (result.kind === 'snapshot') {
+      latest = { type: 'snapshot', data: result.state };
+    } else if (isRecord(result.message) && result.message['type'] === 'joined') {
+      decoder.reset();
     }
   }
   assert.ok(latest, 'expected a snapshot frame');

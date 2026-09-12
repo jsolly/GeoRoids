@@ -34,28 +34,20 @@ function observeAuthoritativeProjectiles(page: Page): {
       return;
     }
     socket.on('framereceived', ({ payload }) => {
-      let parsed: unknown;
+      const raw = String(payload);
       try {
-        parsed = JSON.parse(String(payload));
-      } catch (error) {
-        errors.push(
-          `received frame was not valid JSON: ${error instanceof Error ? error.message : String(error)}`
-        );
-        return;
-      }
-      if (!isRecord(parsed)) {
-        return;
-      }
-      if (parsed['type'] === 'joined') {
-        decoder.reset();
-        projectiles.clear();
-        return;
-      }
-      if (parsed['type'] !== 'snapshot') {
-        return;
-      }
-      try {
-        const snapshot = decoder.decode(parsed['data']);
+        const result = decoder.readMessage(raw, { acceptSnapshots: true });
+        if (result.kind === 'message') {
+          if (isRecord(result.message) && result.message['type'] === 'joined') {
+            decoder.reset();
+            projectiles.clear();
+          }
+          return;
+        }
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        const snapshot = result.state;
         for (const projectile of snapshot.playerProjectiles) {
           projectiles.set(projectile.id, projectile);
         }

@@ -1,170 +1,111 @@
 # Mobile performance implementation evidence
 
-## Latest controlled comparison
+The requested 25% movement and projectile slowdown is implemented, together
+with measured reductions in rendering, snapshot and collision work. Steering,
+firing cadence, cooldowns, damage and weapon ranges retain their behavior.
+Simulation remains 60 Hz and snapshots remain 30 Hz.
 
-The [contour timing comparison](contour-timing-results.md) completed three A/A
-pairs and three A/B pairs. Frame smoothness was inconclusive: 0.88 percentage
-points of median improvement versus 17.99 points of baseline variation. The
-separate deterministic fixture proves 98.63% fewer contour endpoint reads.
-The [isolated minimap comparison](minimap-work-results.md) is historical evidence
-from a player-only candidate: it measured six fewer Canvas strokes and twelve
-fewer satellite/pickup position reads per frame. The current product restores
-compact live marks for asteroids, loot, satellites, loose pickups, and orbiting
-pickups; no current frame-rate gain is claimed from that restoration.
-Performance results are report-only, with no numeric-overrun CI warnings or
-failures. Fixture recovery now checks live participants before resetting the world
-and retries departures during baseline observation. The full repository gate and
-missing/closed-transport integration cases passed. A 330-second combat run
-exercised browser gameover and sixteen peer recoveries; subsequent review tightened
-session-state checks. Final smoke verification covers the reviewed source.
+Physical-phone acceptance has not run. These results do not establish that the
+reported iPhone 16e/17 slowdown is fixed, a supported player capacity, or an
+absolute optimization ceiling. The user moved phone setup into the
+[Samsung/AWS follow-up](../phone-testing-setup.md). No account, device session,
+subscription or billable fixture was created.
 
-## Browser optimization in progress
+## Accepted changes
 
-Repeatable constrained browser measurements are the primary optimization baseline.
-Physical phones validate transfer to real hardware; missing Android hardware does
-not block browser comparisons, general optimizations or regression budgets.
-The browser sequence is recorded in the [runbook](mobile-measurement-runbook.md).
+Phase savings below come from different controlled workloads. They cannot be
+added together or translated directly into a whole-game FPS improvement.
+Each linked report retains its workload, comparison, correctness and limitations.
 
-The first long exploratory portrait run used CPU 4, DPR 3, clean networking and
-seeded combat, with 30 seconds of warmup and 330 seconds of measurement. It passed
-correctness checks and retained 329.87 seconds of foreground gameplay, 16,272
-frames, 999 input-latency observations, 544 input steps and 18 rejoins.
-Frame intervals exceeded 25 ms in 21.08% of samples; p95 and p99 were 33.4 ms.
-Frame CPU p95 was 2.8 ms, render submission p95 was 2.4 ms, and input-to-render
-p95 was 4.2 ms. One sample does not establish variance or a performance gain.
-Raw evidence is `.performance/mobile/aa-02-a.json` with source SHA-256
-`03d1d76ae5c8904d3d27bcc2b61b0a64b1508ce8fe459b5c90d9eedd3ae68825`.
-
-The preceding attempt failed CPU calibration before joining. Calibration now
-uses warmed, repeated alternating control/throttled samples. Independent review
-passed. The completed comparison validates source, fixture, release and environment
-evidence across sessions.
-
-## Outstanding acceptance
-
-Physical acceptance has not run. The available phone is an iPhone 16e; its
-OS/Safari version and recordings remain required. No Android phone is available.
-Desktop Chromium cannot establish phone GPU, memory, battery or thermal behavior.
-No reduced production graphics preset is accepted, and no phone performance
-improvement is claimed.
-
-The contour candidate has completed three A/A and three alternating A/B pairs.
-Resolution and glow controls have short correctness runs only. Paired timing and
-fifteen-minute instrumented/uninstrumented acceptance remain outstanding before
-adopting a visual reduction. The minimap has an isolated historical work-count
-comparison; a matched timing comparison remains necessary for any current
-frame-rate claim.
-
-## Implemented behavior
-
-- The minimap renders local, human and bot pilots with headings and faction marks,
-  plus compact live marks for asteroids, loot, hostile satellites, loose pickups,
-  and orbiting pickups. World marks follow their current positions and disappear
-  when the authoritative state removes them; pilots are drawn on top.
-- Diagnostic sessions can independently cap DPR at 2 or 1.5 and disable canvas
-  glow. Default desktop and touch rendering stays native/full. Gameplay geometry,
-  physics and the network world remain unchanged by these controls.
-- Phone collection has explicit Start/Stop/Download, metadata inputs, bounded
-  storage, interruption recovery and checksummed exports. Incomplete recordings
-  remain visibly incomplete. Automated and phone collectors cannot compete for
-  the recorder's drain.
-- Client diagnostics retain phase durations, input timings, receive bytes/gaps,
-  snapshot metadata and monotonic identified RTT probes. Server measurements
-  provide identifiable finalized windows.
-- The production benchmark supports CPU, DPR, network and seeded workload
-  controls, real protocol peers, actual constraint witnesses and owned cleanup.
-  Session comparisons ingest raw artifacts and retain their checksums.
-
-The [decision ledger](mobile-quality-decisions.md) records each candidate's visual
-tradeoff and removal comparison. The historical minimap simplification remains in
-the ledger as a measured candidate; the current world-mark policy is separate from
-temporary graphics reductions.
-
-## Verification receipts
-
-Local artifacts are under `.performance/mobile/` (gitignored). These working-tree
-runs are diagnostic evidence, not release measurements.
-
-| Check | Result |
+| Change | Evidence and tradeoff |
 | --- | --- |
-| Original revision b4aec298, portrait, 30 s warmup + 300 s | Passed legacy harness; 15,891 retained frames, 10 rejoins, only 10 input timing samples. DPR 1; unsuitable as a phone or causal candidate baseline |
-| Initial new control, combat, DPR 3, CPU 1, clean, 5 s + 15 s | Passed initial harness; 904 frames, 435 authoritative motion advances, 32 shots. Later review strengthened completion checks |
-| Initial combined CPU 4/degraded smoke | Failed unanswered peer RTT and bounded close waits; retained report. Found per-chunk proxy latency accumulating artificial queueing |
-| Corrected 1 Mbps combined stress | Failed useful delivery budget: 76 snapshots / 15.37 s, average 21,354 bytes per snapshot, about 109 KB/s total receive traffic against 125 KB/s capacity. Ideal capacity at that payload is 5.85 snapshots/s; observed 4.94 Hz. Excluded from graphics comparisons |
-| Full repository gate | Passed lint, unused-code checks, docs, runner contracts, both TypeScript checks, full unit suite and production build |
-| Rendering/HUD focused unit checks | 12 passed |
-| Collector browser checks | 4 passed, including reload recovery, download checksum and duration limit |
-| Touch/HUD browser checks | Passed simultaneous controls, ability/shield, cancellation, orientation and safe-area layout |
-| CPU 4 lifecycle and detector browser scenario | Passed orientation release, actual page freeze/resume, actual socket reconnect, injected render and input-handler work detection |
-| Wiki | Desktop/mobile navigation, search, media controls and routes passed; pickup media regenerated and reproducibility verified, images inspected |
+| [Slower pace](mobile-pace-results.md) | Shared spatial speeds scale by 0.75; inverse lifetimes preserve reach. Wiki articles and demonstrations reflect the change. |
+| [Asteroid collision work](asteroid-collision-work-results.md) | Fixed-tick server CPU fell 68.9% with identical evolving outcomes after geometry caching and swept-bound rejection. |
+| [Contour query cache](contour-query-cache-results.md) | Isolated lookup CPU fell 95.2–96.0%, preserving candidate order and pixels. |
+| [Native contour paths](contour-path-results.md) | Warm path work fell roughly 49–64%; cold construction costs more. Chromium/WebKit lifecycle correctness passed. Whole-game runs stayed near 60 Hz. |
+| [Contour label widths](contour-label-width-results.md) | Exact native pixels, about 0.06 ms less work per touch frame in the isolated comparison. |
+| [Snapshot field validation](snapshot-validation-results.md) | Validation CPU fell 50.1%; complete parse/decode work fell 24.2%, with identical accepted/rejected worlds. |
+| [Decoder ownership](decoder-owned-input-results.md) | Removes duplicate validation and retains a detached baseline; representative delta parse/decode/retention CPU fell 14.0%. |
+| [Snapshot JSON reuse](snapshot-json-reuse-results.md) | Ten-recipient encode/serialize work fell 41.0% with shared baselines and 26.8% with staggered baselines; exact wire bytes match. |
+| [Selected world precision](snapshot-precision-results.md) | Four-decimal world kinematics cut fixed mixed-stream bytes by 15.9%. Every player/bot field remains exact; authoritative state is never rounded. |
+| [Pending snapshot handling](pending-snapshot-results.md) | Successful pending sends no longer force unnecessary full snapshots. Selected stalled-sequence bytes fell 45.8%; noisy live candidates delivered 26–28 versus 23–24 states/s. |
 
-The required CI combined traversal lane uses the normal 5 Mbps profile, with a
-separate clean-network combat lane. This
-is an explicit adjustment from the proposed 1 Mbps lane: the 1 Mbps combat case
-currently saturates its link and remains a failing diagnostic, not a passing
-regression baseline. These early impaired artifacts were superseded when the proxy was further corrected
-to separate propagation from transmission under sustained backpressure. Their
-observed payload sizes identify a capacity concern; use the final matrix for
-network attribution.
-Payload/rate investigation remains required before claiming support for that
-network workload. The final short matrix is recorded below. The full repository gate passed, including unit tests and the production build. No changes have been pushed or deployed.
+The precision decision explicitly accepts a bandwidth/CPU tradeoff. Its
+16,800-message browser replay completed with correct state, but failed the
+strict per-phase CPU check. It is not a CPU speedup claim. Other accepted
+rendering work reuses contour smoothing and drawing paths; the
+[render attribution report](render-attribution-results.md) distinguishes native
+M3 Metal behavior from the earlier software-browser environment.
 
-### Historical short matrix
+## Alternatives tested
 
-All 22 planned viewport/constraint scenarios ran with a 5-second warmup and
-15-second measurement: 11 passed the then-current checks and 11 failed.
-This matrix predates report-only numerical thresholds. Its state-gap and delivery
-overruns are observations under the current policy; cleanup failures remain errors. Passing these
-checks does not imply sustained 60 fps.
+| Candidate | Decision |
+| --- | --- |
+| [C++ backend kernel](backend-language-results.md) | Isolated kernel about 30% faster, but ordinary per-query native conversion and result construction made the complete operation 12.6 times Node's time. Keep Node. |
+| [Immutable decoder](decoder-owned-input-results.md) | About 29% slower in the tested configuration; keep the owned-input decoder. |
+| [Extra renderer caches](render-followup-results.md) | Reject contour-label spatial indexing, viewport media-query caching and leaderboard-width caching: desktop regressions or savings below the fixed 0.02 ms floor. |
+| [DPR 2 default](resolution-screening-results.md) | Six accelerated M3 sessions showed no FPS benefit; both settings stayed near 60 Hz. Keep native/full pending phone evidence. |
+| [WebSocket compression](current-compression-results.md) | Level 6 and level 1 cut clean paired download bytes by about 66%, but increased server CPU by 54% and 23%, failing the fixed limit. Keep compression disabled. |
+| [MessagePack](current-binary-codec-results.md) | Current-source raw bytes are 14–15% lower, but all six primary CPU pairs regressed 11.6–15.3%, beyond the fixed 10% limit. Keep JSON. |
 
-| Lane | Desktop | Portrait | Landscape |
-| --- | --- | --- | --- |
-| CPU 1, clean, combat | Passed | Passed | Passed |
-| CPU 4, clean, combat | Failed: 433.1 ms state gap | Passed | Passed |
-| CPU 4, normal 5 Mbps, traversal | Failed: 342.3 ms state gap | Passed | Passed |
-| CPU 1, degraded 1 Mbps, combat | Failed delivery | Failed delivery | Failed delivery |
-| CPU 4, degraded 1 Mbps, combat | Failed delivery | Failed delivery | Failed delivery |
-| CPU 6, degraded 1 Mbps, combat | Failed delivery | Failed delivery | Failed delivery |
+Compression's 1 Mbps screen and 5/25-pilot ten-minute adoption soaks were not
+run after both settings failed the mandatory clean CPU gate. Failed, incomplete
+and superseded attempts remain in the linked receipts; a successful process
+exit does not imply an adoption pass. No memory or capacity claim follows.
 
-Four additional portrait controls passed: device DPR 1, DPR cap 2, DPR cap 1.5,
-and glow off. They are single short runs, not evidence for adopting a candidate.
+A hull-only remote-presentation buffer has a static projectile/hull alignment
+failure witness. Lower snapshot cadence needs the documented phone quality
+check. Worker rendering, a WebGL/library migration and a batched native backend
+need a remaining dominant cost in sustained device/server traces to justify
+implementation. The tested alternatives do not rule out every such design.
 
-All nine degraded cases also exceeded peer-close deadlines. Each verified that
-no human participants remained on the authoritative server. The harness retained
-cleanup failures and stopped subsequent cases; the missing touch cases were then
-run in separate owned sessions. Runner cleanup completed after each command.
-These reports are excluded from candidate comparisons.
+## Verification and release
 
-During verification, fixture reset omitted fuel retained from pickups, and abrupt
-browser closure could leave a resumable participant between viewports. Both
-harness defects were fixed. Fixture manifests and authoritative departure checks
-now expose these failures; earlier affected reports remain preserved.
+The combined repository gate passes lint and policy, unused-code checks,
+Markdown/YAML/Actions checks, process-runner contracts, both TypeScript checks,
+the full unit suite and production build. Shipping review repaired independent
+pace/range/cooldown assertions, removed timed benchmark execution from units,
+corrected a stale report field and accepted a cumulative Wiki source review.
+Affected semantic review is clean. The release workflow requires an exact
+commit gate, green PR CI and matching production release IDs on both Vercel
+and the separately deployed Railway server.
 
-The final matrix artifacts use `.performance/mobile/verified-*.json`; the
-`verified-matrix-receipt.json` file records each raw report SHA-256, outcome and
-final source/build hashes. All final runs used source hash
-`e282e7e01c8870a28f204a06735ba9a7ec4f2e6d4055274000d76ef9366c26e0`.
-The earlier CPU 4 desktop run recorded frame-interval p95 of 83.3 ms while
-frame CPU p95 was 3.8 ms (render submission 3.1 ms). This does not isolate a GPU
-cause: JavaScript submission time alone does not explain presentation delay.
-Inspect real-device timelines before choosing a rendering optimization.
+The integrated runtime also passed 11 live Wiki, touch, real-socket motion,
+reconnect and fixture cases. Earlier focused checks include 19 pending-send
+cases and 55 readiness cases. Benchmark readiness now waits for a fresh prepared
+world using session identity, epoch, game time and sequence boundaries. An older
+11.22-second fixture restart included broader driver time and is not the new
+request-to-prepared-world recovery metric.
 
-## Attribution rules
+The [pace report](mobile-pace-results.md) records regenerated demonstrations,
+visual inspection and gameplay verification. The
+[runbook](mobile-measurement-runbook.md) describes controlled browser collection.
+The [phone measurement plan](phone-fps-measurement.md) defines a fixed older
+Android reference and separate iPhone/Safari acceptance.
 
-A short smoke proves constraints and correctness checks execute. It does not
-establish stable frame percentiles or an improvement beyond noise. Compare the
-same source/harness and workload with one quality setting changed; keep whole
-session phase accounting and failed reports. Do not pool phone cohorts.
+## Measurement boundaries
 
-Contour indexing now has matched deterministic evidence and inconclusive timing
-evidence. DOM HUD cadence, worker decoding, network payload changes and server
-optimizations remain investigation candidates in the
-[measurement runbook](mobile-measurement-runbook.md). Browser measurements can
-investigate them without waiting for physical phones.
+Use the existing game recorder and raw frame intervals, input response and
+snapshot freshness. Phone collection has explicit Start/Stop/Download,
+interruption recovery, bounded storage and checksummed exports. Manual exports
+do not contain every automated fixture witness and must not be relabeled as
+controlled comparisons. Calibrate desktop CPU throttling against the real
+reference phone; it does not reproduce that phone's GPU or thermal behavior.
 
-## Recurring review
+Historical browser comparisons and the short constraint matrix are retained in
+[optimization decisions](optimization-decisions.md),
+[contour timing](contour-timing-results.md) and their raw receipts. The original
+contour comparison's frame smoothness was inconclusive: its 0.88-percentage-point
+median improvement was smaller than 17.99 points of baseline variation.
+Earlier 1 Mbps combat attempts saturated delivery and included proxy/cleanup
+failures; they are not passing graphics regression baselines.
 
-The [Grokbot prompt](monthly-review-prompt.md) requests a monthly review of retained
-benchmark results and reference values. No local scheduled automation has been
-created. Numerical changes produce reports only; they do not warn or fail CI.
-Reference values may move up or down after an explicit tradeoff review.
+The minimap retains current world marks and pilots. Its earlier player-only
+work-count experiment is historical; no current frame-rate gain is claimed from
+that simplification. Diagnostic DPR/glow controls remain opt-in, with no reduced
+production graphics default accepted.
+
+Numerical performance thresholds remain report-only in repository CI. Candidate
+adoption decisions use their predeclared experiment criteria and preserve
+failures. The [monthly review prompt](monthly-review-prompt.md) exists; this work
+created no recurring automation.

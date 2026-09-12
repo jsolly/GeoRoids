@@ -1,0 +1,626 @@
+[
+  {
+    "viewport": "touch-portrait",
+    "exactRepeats": true,
+    "sameGameOutcome": true,
+    "sameFinalFramePixels": true,
+    "changes": {
+      "render.asteroid.positionReads": {
+        "baselinePerFrame": 144,
+        "candidatePerFrame": 144,
+        "deltaPerFrame": 0
+      },
+      "render.calls": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.arc": {
+        "baselinePerFrame": 8,
+        "candidatePerFrame": 8,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.beginPath": {
+        "baselinePerFrame": 111,
+        "candidatePerFrame": 82,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.clip": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.closePath": {
+        "baselinePerFrame": 77,
+        "candidatePerFrame": 48,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.ellipse": {
+        "baselinePerFrame": 4,
+        "candidatePerFrame": 4,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fill": {
+        "baselinePerFrame": 2,
+        "candidatePerFrame": 2,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fillRect": {
+        "baselinePerFrame": 14,
+        "candidatePerFrame": 14,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fillText": {
+        "baselinePerFrame": 9,
+        "candidatePerFrame": 9,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.lineTo": {
+        "baselinePerFrame": 895,
+        "candidatePerFrame": 650,
+        "deltaPerFrame": -245
+      },
+      "render.canvas.measureText": {
+        "baselinePerFrame": 7,
+        "candidatePerFrame": 7,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.moveTo": {
+        "baselinePerFrame": 402,
+        "candidatePerFrame": 373,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.rect": {
+        "baselinePerFrame": 30,
+        "candidatePerFrame": 30,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.restore": {
+        "baselinePerFrame": 62,
+        "candidatePerFrame": 62,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.rotate": {
+        "baselinePerFrame": 12,
+        "candidatePerFrame": 12,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.roundRect": {
+        "baselinePerFrame": 3,
+        "candidatePerFrame": 3,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.save": {
+        "baselinePerFrame": 62,
+        "candidatePerFrame": 62,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.scale": {
+        "baselinePerFrame": 3,
+        "candidatePerFrame": 3,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.stroke": {
+        "baselinePerFrame": 110,
+        "candidatePerFrame": 110,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.translate": {
+        "baselinePerFrame": 12,
+        "candidatePerFrame": 12,
+        "deltaPerFrame": 0
+      },
+      "render.contour.endpointReads": {
+        "baselinePerFrame": 1388,
+        "candidatePerFrame": 1388,
+        "deltaPerFrame": 0
+      },
+      "render.localShip.positionReads": {
+        "baselinePerFrame": 44,
+        "candidatePerFrame": 44,
+        "deltaPerFrame": 0
+      },
+      "render.loot.positionReads": {
+        "baselinePerFrame": 12,
+        "candidatePerFrame": 12,
+        "deltaPerFrame": 0
+      },
+      "render.pickup.positionReads": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "render.satellite.positionReads": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "update.asteroid.positionReads": {
+        "baselinePerFrame": 120,
+        "candidatePerFrame": 120,
+        "deltaPerFrame": 0
+      },
+      "update.calls": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "update.localShip.positionReads": {
+        "baselinePerFrame": 2,
+        "candidatePerFrame": 2,
+        "deltaPerFrame": 0
+      }
+    },
+    "sources": [
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-portrait-a1.json",
+        "sha256": "76d4d4148be055d2274e538f6f237fbd9b1c9c2bd0c0ea33a24ebea51a7190a6",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": false,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+          "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-portrait-a2.json",
+        "sha256": "52744aaa1f49e9edf4323c6c823495d270b46a90e1497f3287ba2eb42f1661cb",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": false,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+          "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-portrait-b1.json",
+        "sha256": "5f8683df93a87c4778cea6ef89af0246de220904a151ec2754da407f85bfa9f6",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": true,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "aa881e6b2666dc97405edfc9333d39da1eea45f437f05daeac06ff60560e5817",
+          "productSha256": "477ebd7fdcb2888806496751a68c64505198cdaad7b959057b8ea7399f18a1e8",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-portrait-b2.json",
+        "sha256": "ea8fc261dda63c3b9b6b017bbc13e97563c259a3474d7933d60044602a67e0ea",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": true,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "aa881e6b2666dc97405edfc9333d39da1eea45f437f05daeac06ff60560e5817",
+          "productSha256": "477ebd7fdcb2888806496751a68c64505198cdaad7b959057b8ea7399f18a1e8",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "interpretation": "Exact work counts, not weighted CPU cost or proof of faster presentation. Pixel equality covers the final fixture frame."
+  },
+  {
+    "viewport": "touch-landscape",
+    "exactRepeats": true,
+    "sameGameOutcome": true,
+    "sameFinalFramePixels": true,
+    "changes": {
+      "render.asteroid.positionReads": {
+        "baselinePerFrame": 144,
+        "candidatePerFrame": 144,
+        "deltaPerFrame": 0
+      },
+      "render.calls": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.arc": {
+        "baselinePerFrame": 8,
+        "candidatePerFrame": 8,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.beginPath": {
+        "baselinePerFrame": 111,
+        "candidatePerFrame": 82,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.clip": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.closePath": {
+        "baselinePerFrame": 77,
+        "candidatePerFrame": 48,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.ellipse": {
+        "baselinePerFrame": 4,
+        "candidatePerFrame": 4,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fill": {
+        "baselinePerFrame": 2,
+        "candidatePerFrame": 2,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fillRect": {
+        "baselinePerFrame": 14,
+        "candidatePerFrame": 14,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fillText": {
+        "baselinePerFrame": 8,
+        "candidatePerFrame": 8,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.lineTo": {
+        "baselinePerFrame": 894,
+        "candidatePerFrame": 649,
+        "deltaPerFrame": -245
+      },
+      "render.canvas.measureText": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.moveTo": {
+        "baselinePerFrame": 401,
+        "candidatePerFrame": 372,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.rect": {
+        "baselinePerFrame": 30,
+        "candidatePerFrame": 30,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.restore": {
+        "baselinePerFrame": 61,
+        "candidatePerFrame": 61,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.rotate": {
+        "baselinePerFrame": 11,
+        "candidatePerFrame": 11,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.roundRect": {
+        "baselinePerFrame": 3,
+        "candidatePerFrame": 3,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.save": {
+        "baselinePerFrame": 61,
+        "candidatePerFrame": 61,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.scale": {
+        "baselinePerFrame": 3,
+        "candidatePerFrame": 3,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.stroke": {
+        "baselinePerFrame": 110,
+        "candidatePerFrame": 110,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.translate": {
+        "baselinePerFrame": 11,
+        "candidatePerFrame": 11,
+        "deltaPerFrame": 0
+      },
+      "render.contour.endpointReads": {
+        "baselinePerFrame": 1512,
+        "candidatePerFrame": 1512,
+        "deltaPerFrame": 0
+      },
+      "render.localShip.positionReads": {
+        "baselinePerFrame": 44,
+        "candidatePerFrame": 44,
+        "deltaPerFrame": 0
+      },
+      "render.loot.positionReads": {
+        "baselinePerFrame": 12,
+        "candidatePerFrame": 12,
+        "deltaPerFrame": 0
+      },
+      "render.pickup.positionReads": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "render.satellite.positionReads": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "update.asteroid.positionReads": {
+        "baselinePerFrame": 120,
+        "candidatePerFrame": 120,
+        "deltaPerFrame": 0
+      },
+      "update.calls": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "update.localShip.positionReads": {
+        "baselinePerFrame": 2,
+        "candidatePerFrame": 2,
+        "deltaPerFrame": 0
+      }
+    },
+    "sources": [
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-landscape-a1.json",
+        "sha256": "dfc32190cb6153e35a8a41426352e85757bd5030b42284782c79b03be46c7263",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": false,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+          "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-landscape-a2.json",
+        "sha256": "a4ab0f48c4e407578bee3b87646a4b50509674f0e238c36044147cb8af3a2a1e",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": false,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+          "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-landscape-b1.json",
+        "sha256": "0ecd69015221d1ded92eff281b7d3074df58f9b9423d01aa0fe85d353c2efe30",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": true,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "aa881e6b2666dc97405edfc9333d39da1eea45f437f05daeac06ff60560e5817",
+          "productSha256": "477ebd7fdcb2888806496751a68c64505198cdaad7b959057b8ea7399f18a1e8",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-touch-landscape-b2.json",
+        "sha256": "318d95667d20e700bbb16b501d5d0f0b118e81476ef7d8189208f987f7150d93",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": true,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "aa881e6b2666dc97405edfc9333d39da1eea45f437f05daeac06ff60560e5817",
+          "productSha256": "477ebd7fdcb2888806496751a68c64505198cdaad7b959057b8ea7399f18a1e8",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "interpretation": "Exact work counts, not weighted CPU cost or proof of faster presentation. Pixel equality covers the final fixture frame."
+  },
+  {
+    "viewport": "desktop",
+    "exactRepeats": true,
+    "sameGameOutcome": true,
+    "sameFinalFramePixels": true,
+    "changes": {
+      "render.asteroid.positionReads": {
+        "baselinePerFrame": 144,
+        "candidatePerFrame": 144,
+        "deltaPerFrame": 0
+      },
+      "render.calls": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.arc": {
+        "baselinePerFrame": 8,
+        "candidatePerFrame": 8,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.beginPath": {
+        "baselinePerFrame": 111,
+        "candidatePerFrame": 82,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.clip": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.closePath": {
+        "baselinePerFrame": 77,
+        "candidatePerFrame": 48,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.ellipse": {
+        "baselinePerFrame": 4,
+        "candidatePerFrame": 4,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fill": {
+        "baselinePerFrame": 2,
+        "candidatePerFrame": 2,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fillRect": {
+        "baselinePerFrame": 109,
+        "candidatePerFrame": 109,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.fillText": {
+        "baselinePerFrame": 47,
+        "candidatePerFrame": 47,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.lineTo": {
+        "baselinePerFrame": 2358,
+        "candidatePerFrame": 2113,
+        "deltaPerFrame": -245
+      },
+      "render.canvas.measureText": {
+        "baselinePerFrame": 45,
+        "candidatePerFrame": 45,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.moveTo": {
+        "baselinePerFrame": 1865,
+        "candidatePerFrame": 1836,
+        "deltaPerFrame": -29
+      },
+      "render.canvas.rect": {
+        "baselinePerFrame": 30,
+        "candidatePerFrame": 30,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.restore": {
+        "baselinePerFrame": 100,
+        "candidatePerFrame": 100,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.rotate": {
+        "baselinePerFrame": 50,
+        "candidatePerFrame": 50,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.roundRect": {
+        "baselinePerFrame": 3,
+        "candidatePerFrame": 3,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.save": {
+        "baselinePerFrame": 100,
+        "candidatePerFrame": 100,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.scale": {
+        "baselinePerFrame": 3,
+        "candidatePerFrame": 3,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.stroke": {
+        "baselinePerFrame": 110,
+        "candidatePerFrame": 110,
+        "deltaPerFrame": 0
+      },
+      "render.canvas.translate": {
+        "baselinePerFrame": 50,
+        "candidatePerFrame": 50,
+        "deltaPerFrame": 0
+      },
+      "render.contour.endpointReads": {
+        "baselinePerFrame": 9372,
+        "candidatePerFrame": 9372,
+        "deltaPerFrame": 0
+      },
+      "render.localShip.positionReads": {
+        "baselinePerFrame": 44,
+        "candidatePerFrame": 44,
+        "deltaPerFrame": 0
+      },
+      "render.loot.positionReads": {
+        "baselinePerFrame": 12,
+        "candidatePerFrame": 12,
+        "deltaPerFrame": 0
+      },
+      "render.pickup.positionReads": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "render.satellite.positionReads": {
+        "baselinePerFrame": 6,
+        "candidatePerFrame": 6,
+        "deltaPerFrame": 0
+      },
+      "update.asteroid.positionReads": {
+        "baselinePerFrame": 120,
+        "candidatePerFrame": 120,
+        "deltaPerFrame": 0
+      },
+      "update.calls": {
+        "baselinePerFrame": 1,
+        "candidatePerFrame": 1,
+        "deltaPerFrame": 0
+      },
+      "update.localShip.positionReads": {
+        "baselinePerFrame": 2,
+        "candidatePerFrame": 2,
+        "deltaPerFrame": 0
+      }
+    },
+    "sources": [
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-desktop-a1.json",
+        "sha256": "168cec64f1107a6cb60bc9b18b009832e692bf5407802bc84a881b2e8cef78ff",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": false,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+          "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-desktop-a2.json",
+        "sha256": "e6773f31b236b4fa24eabb331b6792ef586da797a08b6b248da2a6648a5ae1d2",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": false,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+          "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-desktop-b1.json",
+        "sha256": "e405cd86b04d2a1b799ab5b19a8e0c27b223f8399b8b8482df1eb9bd5f2a8cbd",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": true,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "aa881e6b2666dc97405edfc9333d39da1eea45f437f05daeac06ff60560e5817",
+          "productSha256": "477ebd7fdcb2888806496751a68c64505198cdaad7b959057b8ea7399f18a1e8",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/path-desktop-b2.json",
+        "sha256": "b9adbface62ecc5adbbc822ac881e46339eeb526c0dae9bb0d230cf089501c69",
+        "git": {
+          "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+          "dirty": true,
+          "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+          "sourceSha256": "aa881e6b2666dc97405edfc9333d39da1eea45f437f05daeac06ff60560e5817",
+          "productSha256": "477ebd7fdcb2888806496751a68c64505198cdaad7b959057b8ea7399f18a1e8",
+          "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+          "buildSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "interpretation": "Exact work counts, not weighted CPU cost or proof of faster presentation. Pixel equality covers the final fixture frame."
+  }
+]

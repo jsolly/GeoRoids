@@ -1,0 +1,153 @@
+{
+  "date": "2026-09-12",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "scope": "collision correctness and fixed-tick CPU; excludes movement commands, transport scheduling, capacity and phone FPS",
+  "artifacts": [
+    {
+      "path": "shared/asteroidReflection.ts",
+      "sha256": "1de6c8a538d6b7dd1f2da9740fad3e0f04364775724b24e4b82bc0132f157c9d",
+      "bytes": 15059
+    },
+    {
+      "path": "tests/unit/physics/lasers-bounce-on-asteroid-faces.test.ts",
+      "sha256": "6df3c348646cfbb8e8477177fda484abdd224cc6db65593be097b54727256149",
+      "bytes": 12069
+    },
+    {
+      "path": ".performance/reflection-cache/baseline.ts",
+      "sha256": "67ece5388faae9d55995cfed478c7fac1702172ee7a712405a9140342baaca30",
+      "bytes": 12379
+    },
+    {
+      "path": ".performance/reflection-cache/verify.ts",
+      "sha256": "d3e64f9e1a3c121c6eb87cc0f852c6f301f50b0c5eb0ee49ff8ce0b06b9c9ee0",
+      "bytes": 3407
+    },
+    {
+      "path": ".performance/reflection-cache/verification.json",
+      "sha256": "639c30a75d68b6ee2cb15a57fed37ff3a473a37b6ea1f29ec3311569fc8b6bc9",
+      "bytes": 726
+    },
+    {
+      "path": ".performance/reflection-cache/tests.log",
+      "sha256": "0e8be9964ac3a163ca3fa722490e56b21790fa577154ae506ed58cec9d163904",
+      "bytes": 255
+    },
+    {
+      "path": ".performance/reflection-cache/compare-server.py",
+      "sha256": "71d82b3ea6c0c14906217da58a3f8826ea63936e845d15ae7d204bf877140cfc",
+      "bytes": 2097
+    },
+    {
+      "path": ".performance/reflection-cache/server-comparison.json",
+      "sha256": "553723714a245fa6e1c79e2dc18c994570b9e5800f89ec69a0cbebf4a6c814a8",
+      "bytes": 25198
+    },
+    {
+      "path": ".performance/reflection-cache/server-summary.json",
+      "sha256": "096093d7c6253eb30161cf9752819f44075270b0f7f62da822a2687e9bd1d073",
+      "bytes": 695
+    },
+    {
+      "path": ".performance/backend-language/scratch/profile-server.ts",
+      "sha256": "e1860f41e9ae005182f84ea4ae12b8c1535716e75bffab35bc223b1bccf68200",
+      "bytes": 22178
+    },
+    {
+      "path": ".performance/backend-language/current-profile.json",
+      "sha256": "1aea18ee72ba5404744222b697d794f574d709940a42a22e386c7bd861abb5d6",
+      "bytes": 740059
+    },
+    {
+      "path": ".performance/backend-language/current.cpuprofile",
+      "sha256": "45adf8f0c7e67da55b507f23c39aa80e0ec508a655b3fb9d7bae524e054366ad",
+      "bytes": 84230
+    },
+    {
+      "path": ".performance/backend-language/profile-attribution.json",
+      "sha256": "868f6c81b206c50ec3175f3f9266497caf2cf8c3ce7c20394aa440f92b7323a8",
+      "bytes": 25243
+    },
+    {
+      "path": ".performance/reflection-cache/server-AA-0-0-A.json",
+      "sha256": "23268ced60eab706f30fc5d2fd6912c4fefab9f0f96219e30b0f55ff7bd6b919",
+      "bytes": 740079
+    },
+    {
+      "path": ".performance/reflection-cache/server-AA-0-1-A.json",
+      "sha256": "b4d2081e804082ca001bcd69179f92d4e0d94d9366f06322758c371180335fea",
+      "bytes": 739863
+    },
+    {
+      "path": ".performance/reflection-cache/server-AA-1-0-A.json",
+      "sha256": "2c84bd4a1877129617849a40084d7c4aab85a4eea972059b9dcadea643a36097",
+      "bytes": 739969
+    },
+    {
+      "path": ".performance/reflection-cache/server-AA-1-1-A.json",
+      "sha256": "baa814c0ac8baf59cf7b2686e9fadde976dbd36232473b03b1f857c063a8fd93",
+      "bytes": 740045
+    },
+    {
+      "path": ".performance/reflection-cache/server-AA-2-0-A.json",
+      "sha256": "62a1c010f956e813a18f28e4e3ec4c80c5081bde77cd28583f75927b8414d370",
+      "bytes": 739898
+    },
+    {
+      "path": ".performance/reflection-cache/server-AA-2-1-A.json",
+      "sha256": "379a66a46170f0184330849853dff76c527920484154e894304f5e08d8a9d938",
+      "bytes": 740107
+    },
+    {
+      "path": ".performance/reflection-cache/server-AB-0-0-A.json",
+      "sha256": "ade2f0647e36e6da88979ac4069afa0198425fcf120650272b82f3849780d090",
+      "bytes": 739995
+    },
+    {
+      "path": ".performance/reflection-cache/server-AB-0-1-B.json",
+      "sha256": "4e44feb9d4eba6b2c3c4feb2a9bdc839a7bf30d369f41a15490c5c33483b0f2f",
+      "bytes": 740407
+    },
+    {
+      "path": ".performance/reflection-cache/server-AB-1-0-B.json",
+      "sha256": "a0d52b227d3143539747ad0e095773b55dcf51f804784c8fc18892b08ced07d3",
+      "bytes": 740329
+    },
+    {
+      "path": ".performance/reflection-cache/server-AB-1-1-A.json",
+      "sha256": "bec36cf8a8ef734c2638b7ef085d7c94d89805835a0255fbbc4b004377e059f8",
+      "bytes": 740010
+    },
+    {
+      "path": ".performance/reflection-cache/server-AB-2-0-A.json",
+      "sha256": "0daf9289f0485023645530a2dd4ae2814c3e1cfb1f7944a943a0ac0d8edec661",
+      "bytes": 740102
+    },
+    {
+      "path": ".performance/reflection-cache/server-AB-2-1-B.json",
+      "sha256": "3422c3c4317e4b7b6d9473d4e0c85a770be1b5d2a5121037c2c545fefcdf141d",
+      "bytes": 740412
+    },
+    {
+      "path": ".performance/reflection-cache/adversarial/aabb-reproducer.ts",
+      "sha256": "8760bcd101e8946d736ec5227819564663b43d76da8122b4c5374240a5f86232",
+      "bytes": 10100
+    },
+    {
+      "path": ".performance/reflection-cache/adversarial/regression-lint.log",
+      "sha256": "54f6d733b3e5d94b76402889f2b1c51b01ad2ad873dbdc8cf019b03357d7c044",
+      "bytes": 41
+    },
+    {
+      "path": ".performance/reflection-cache/adversarial/regression-test.log",
+      "sha256": "30658c1897e751513735ddca8036f2e1aee5ed652187dd42e258645e60da3ad1",
+      "bytes": 256
+    },
+    {
+      "path": ".performance/reflection-cache/adversarial/results.log",
+      "sha256": "c58805ef88b62f75ab3f59e15a8f8bccbe08bf4908e3f3bbe676d1dbc890b924",
+      "bytes": 16790
+    }
+  ],
+  "correctnessScope": "Ordinary 44000-query/1200-preview corpus matches exactly; targeted extreme-coordinate corpus has376 baseline false hits outside polygon bounds, correctly rejected by the candidate. User accepts small numeric differences for measured performance; no universal bit-exact claim."
+}

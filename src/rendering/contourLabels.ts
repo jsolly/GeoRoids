@@ -11,6 +11,10 @@ interface ElevationLabel {
 }
 
 const labelCache = new WeakMap<readonly ContourLevel[], Map<number, ElevationLabel[]>>();
+const widthCache = new WeakMap<
+  DrawingContext,
+  { levels: readonly ContourLevel[]; font: string; widths: Map<string, number> }
+>();
 
 /** Select anchors once in world space so labels never swim as the camera moves. */
 function getLabels(levels: readonly ContourLevel[], spacing: number): ElevationLabel[] {
@@ -62,6 +66,12 @@ export function drawContourLabels(
   ctx.font = VISUAL.CONTOUR_LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  let metrics = widthCache.get(ctx);
+  if (!metrics || metrics.levels !== levels || metrics.font !== ctx.font) {
+    // Keep only this terrain's fixed-font labels for each drawing context.
+    metrics = { levels, font: ctx.font, widths: new Map() };
+    widthCache.set(ctx, metrics);
+  }
   for (const label of getLabels(levels, view.spacing)) {
     const x = view.width / 2 + (label.x - view.x) * view.scale;
     const y = view.height / 2 + (label.y - view.y) * view.scale;
@@ -76,7 +86,12 @@ export function drawContourLabels(
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(label.angle);
-    const width = ctx.measureText(label.text).width + VISUAL.CONTOUR_LABEL_PADDING * 2;
+    let textWidth = metrics.widths.get(label.text);
+    if (textWidth === undefined) {
+      textWidth = ctx.measureText(label.text).width;
+      metrics.widths.set(label.text, textWidth);
+    }
+    const width = textWidth + VISUAL.CONTOUR_LABEL_PADDING * 2;
     ctx.fillStyle = PALETTE.BG;
     ctx.fillRect(-width / 2, -VISUAL.CONTOUR_LABEL_HEIGHT / 2, width, VISUAL.CONTOUR_LABEL_HEIGHT);
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, view.alpha);

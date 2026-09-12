@@ -1,0 +1,1200 @@
+{
+  "scope": "Exploratory current-gameplay recordings, not calibrated pairs or a phone FPS result. The first passing 5 Mbps pair predates retention of successful browser handshake witnesses; subsequent rows retain observed negotiation. Proxy counts include warmup and measured gameplay, event/log traffic and probe traffic; they are not snapshot-only compression ratios. Failed recordings remain excluded from performance acceptance.",
+  "runs": [
+    {
+      "name": "baseline-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/network-compression/baseline-degraded.json",
+      "sha256": "2021106bddc82d687f4a9530ff10f0590ae95f23fffb20f8bca15a1cbb7fa345",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "65c024e2a1d4a7132b5e68ed628049b18250e6ed9aaf03bdc357af477ec4197e",
+        "productSha256": "36c9581a33113c843bf2165e3ba1f4f6480de2ef0e10eadd68e6ab6be833ec15",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "f7411ccdd91969dc84bd7b1492db2048e40c91e5d84b1140ab73b79e7451797d"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Game rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": null,
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 123,
+      "stateDelivery": {
+        "states": 0,
+        "startedAt": 0,
+        "endedAt": 55183.839542,
+        "averageSnapshotBytes": 0,
+        "p95GapMs": null,
+        "p99GapMs": null,
+        "maxGapMs": null
+      },
+      "presentation": {
+        "frameCount": 0,
+        "over25Percent": null,
+        "frameP99Ms": null,
+        "renderP95Ms": null,
+        "frameCpuP95Ms": null,
+        "inputP95Ms": null
+      },
+      "proxy": {
+        "bytesUp": 1070973,
+        "bytesDown": 29966929,
+        "peakWritableBytes": 69751,
+        "peakPendingDeliveryBytes": 131072,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 11
+      },
+      "restartDurationsMs": [4334.433041999997],
+      "peerExtensions": [null, null, null, null],
+      "acknowledgedMotionStates": 0,
+      "observedProjectiles": 0,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "candidate-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-degraded.json",
+      "sha256": "de7164169c89c128381603cbf7c713a4d1e9c55ca08f03fa2b3f778c55562bfe",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "93140dc71479385bb0fda628688273c5e7b35f39ddb5af7fbe8618e995f630b8",
+        "productSha256": "5d99873b18ca1052b1db762392ccb6aa9eaf49ce420bb4adeaa3697b47f6e507",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "6dc8fae222f478ca4f56e002216ae7b6e3be561667417d4eb5a672c760365594"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Peer rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": null,
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 1,
+      "stateDelivery": {
+        "states": 0,
+        "startedAt": 0,
+        "endedAt": 57054.080583,
+        "averageSnapshotBytes": 0,
+        "p95GapMs": null,
+        "p99GapMs": null,
+        "maxGapMs": null
+      },
+      "presentation": {
+        "frameCount": 0,
+        "over25Percent": null,
+        "frameP99Ms": null,
+        "renderP95Ms": null,
+        "frameCpuP95Ms": null,
+        "inputP95Ms": null
+      },
+      "proxy": {
+        "bytesUp": 1114442,
+        "bytesDown": 30794808,
+        "peakWritableBytes": 69786,
+        "peakPendingDeliveryBytes": 135379,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 14
+      },
+      "restartDurationsMs": [],
+      "peerExtensions": [null, null, null, null],
+      "acknowledgedMotionStates": 0,
+      "observedProjectiles": 0,
+      "errors": [
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "candidate-all-compressed-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-all-compressed-degraded.json",
+      "sha256": "e39267c30cce296662abc8a927a88fbb1d4191de6802746b5cb4e2e22844225b",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "b2af852121a9e2e82a9eb28c73839ff5927033652955062b1952df297cb67e3d",
+        "productSha256": "5d99873b18ca1052b1db762392ccb6aa9eaf49ce420bb4adeaa3697b47f6e507",
+        "harnessSha256": "87a4cfb72c4cd32654ab5f5d5b794d307afdc9b4ee478e31a017345469954c06",
+        "buildSha256": "1fecac6a0ddb438e002d64164c8ea60bc9fe51514d97eadcec96ed3839356e9e"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Peer rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:51096/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=12"
+            }
+          ],
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 1,
+      "stateDelivery": {
+        "states": 0,
+        "startedAt": 0,
+        "endedAt": 46860.27575,
+        "averageSnapshotBytes": 0,
+        "p95GapMs": null,
+        "p99GapMs": null,
+        "maxGapMs": null
+      },
+      "presentation": {
+        "frameCount": 0,
+        "over25Percent": null,
+        "frameP99Ms": null,
+        "renderP95Ms": null,
+        "frameCpuP95Ms": null,
+        "inputP95Ms": null
+      },
+      "proxy": {
+        "bytesUp": 931486,
+        "bytesDown": 23796943,
+        "peakWritableBytes": 75590,
+        "peakPendingDeliveryBytes": 134466,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 13
+      },
+      "restartDurationsMs": [],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 0,
+      "observedProjectiles": 0,
+      "errors": ["AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity"],
+      "warnings": []
+    },
+    {
+      "name": "baseline-normal",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/network-compression/baseline-normal.json",
+      "sha256": "5a5587b389a9af191ddf3d58506860d2a3c8961a8a617bcdb748c0eb39ed3c38",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "26b58f88d718b920971f99c7b2730f0dbbae28017e294c1e278ff4ef02bc97b3",
+        "productSha256": "36c9581a33113c843bf2165e3ba1f4f6480de2ef0e10eadd68e6ab6be833ec15",
+        "harnessSha256": "87a4cfb72c4cd32654ab5f5d5b794d307afdc9b4ee478e31a017345469954c06",
+        "buildSha256": "88e3a42ef441051a6000edc590bcee12acab0cdc4fc1512eefdd4562b38e6c29"
+      },
+      "status": "failed",
+      "cleanupComplete": true,
+      "failures": [
+        "Browser errors: AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\n\n11 !== 0\n",
+        "Real-time client report is missing parseMs samples",
+        "Real-time client report is missing keyframeDecodeMs samples",
+        "Real-time client report is missing deltaDecodeMs samples",
+        "Real-time client report is missing applyMs samples"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "normal",
+          "profile": {
+            "latencyMs": 40,
+            "jitterMs": 20,
+            "downBytesPerSecond": 625000,
+            "upBytesPerSecond": 125000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:52536/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": ""
+            }
+          ],
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 6,
+      "stateDelivery": {
+        "states": 2637,
+        "startedAt": 39275.987083,
+        "endedAt": 130160.470416,
+        "averageSnapshotBytes": 20961.150170648463,
+        "p95GapMs": 113.79995800000324,
+        "p99GapMs": 131.5788329999923,
+        "maxGapMs": 193.9912089999998
+      },
+      "presentation": {
+        "frameCount": 3355,
+        "over25Percent": 55.29061102831594,
+        "frameP99Ms": 50.099999999998545,
+        "renderP95Ms": 2.5,
+        "frameCpuP95Ms": 3,
+        "inputP95Ms": 4.0999999940395355
+      },
+      "proxy": {
+        "bytesUp": 3558984,
+        "bytesDown": 372614826,
+        "peakWritableBytes": 100282,
+        "peakPendingDeliveryBytes": 144302,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 13
+      },
+      "restartDurationsMs": [
+        537.4413329999988, 828.0042919999978, 1333.6529159999918, 2894.7194170000002,
+        3253.025999999998
+      ],
+      "peerExtensions": ["", "", "", ""],
+      "acknowledgedMotionStates": 1469,
+      "observedProjectiles": 96,
+      "errors": [
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "candidate-all-compressed-normal",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-all-compressed-normal.json",
+      "sha256": "55ac02e54720236ee93211243a477e666548173ef19946c4a1dc4e1f243ed89d",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "b2af852121a9e2e82a9eb28c73839ff5927033652955062b1952df297cb67e3d",
+        "productSha256": "5d99873b18ca1052b1db762392ccb6aa9eaf49ce420bb4adeaa3697b47f6e507",
+        "harnessSha256": "87a4cfb72c4cd32654ab5f5d5b794d307afdc9b4ee478e31a017345469954c06",
+        "buildSha256": "385851466b6f014dae14adce0fa62da99380777045b527239274219a10dc984c"
+      },
+      "status": "failed",
+      "cleanupComplete": true,
+      "failures": [
+        "Browser errors: AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\nAssertionError [ERR_ASSERTION]: Pilot has no authoritative entity\n\n6 !== 0\n",
+        "Real-time client report is missing parseMs samples",
+        "Real-time client report is missing keyframeDecodeMs samples",
+        "Real-time client report is missing deltaDecodeMs samples",
+        "Real-time client report is missing applyMs samples"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "normal",
+          "profile": {
+            "latencyMs": 40,
+            "jitterMs": 20,
+            "downBytesPerSecond": 625000,
+            "upBytesPerSecond": 125000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:53975/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=12"
+            }
+          ],
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 8,
+      "stateDelivery": {
+        "states": 2687,
+        "startedAt": 39108.007375,
+        "endedAt": 129131.088042,
+        "averageSnapshotBytes": 21228.240044659473,
+        "p95GapMs": 58.61429100000532,
+        "p99GapMs": 75.45400000000518,
+        "maxGapMs": 110.22675000000163
+      },
+      "presentation": {
+        "frameCount": 3384,
+        "over25Percent": 57.505910165484636,
+        "frameP99Ms": 50,
+        "renderP95Ms": 2.5,
+        "frameCpuP95Ms": 3.0999999940395355,
+        "inputP95Ms": 3.800000011920929
+      },
+      "proxy": {
+        "bytesUp": 3332696,
+        "bytesDown": 109372082,
+        "peakWritableBytes": 21629,
+        "peakPendingDeliveryBytes": 37341,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 12
+      },
+      "restartDurationsMs": [
+        203.79383299999972, 193.687208000003, 272.030792000005, 184.4650840000104,
+        216.3304999999964, 190.07154200000514, 206.36675000000105
+      ],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 1653,
+      "observedProjectiles": 135,
+      "errors": [
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity",
+        "AssertionError [ERR_ASSERTION]: Pilot has no authoritative entity"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "baseline-fixed-normal",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/network-compression/baseline-fixed-normal.json",
+      "sha256": "099e829ac1e905756ed17b900e8bd3daef2091e90f1a588e8d6c1f7a4383eb09",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "00e7f4409daa902e98b0542ae28e1839167a3a42c59492b0d36bf2c8f0feebf5",
+        "productSha256": "36c9581a33113c843bf2165e3ba1f4f6480de2ef0e10eadd68e6ab6be833ec15",
+        "harnessSha256": "828230b6a617122d841caa38222452c1e65ade3a78bfbbd20d187fb6cba43fe0",
+        "buildSha256": "5d27f0d38167c65824272f169e830dc158bdf1a0f7cdeb908908c569a67f9eaf"
+      },
+      "status": "passed",
+      "cleanupComplete": true,
+      "failures": [],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "normal",
+          "profile": {
+            "latencyMs": 40,
+            "jitterMs": 20,
+            "downBytesPerSecond": 625000,
+            "upBytesPerSecond": 125000
+          },
+          "webSocketNegotiations": null,
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 6,
+      "stateDelivery": {
+        "states": 2509,
+        "startedAt": 39432.323833,
+        "endedAt": 129447.817541,
+        "averageSnapshotBytes": 20864.310083698685,
+        "p95GapMs": 117.39937500000815,
+        "p99GapMs": 140.21187500000815,
+        "maxGapMs": 4176.775708000001
+      },
+      "presentation": {
+        "frameCount": 3601,
+        "over25Percent": 46.487086920299916,
+        "frameP99Ms": 50,
+        "renderP95Ms": 2.4000000059604645,
+        "frameCpuP95Ms": 2.9000000059604645,
+        "inputP95Ms": 3.699999988079071
+      },
+      "proxy": {
+        "bytesUp": 3513105,
+        "bytesDown": 370635101,
+        "peakWritableBytes": 88315,
+        "peakPendingDeliveryBytes": 138751,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 13
+      },
+      "restartDurationsMs": [
+        2730.5187909999986, 2891.6304579999996, 4007.853458999991, 2048.2297909999907,
+        2248.1997919999994
+      ],
+      "peerExtensions": ["", "", "", ""],
+      "acknowledgedMotionStates": 1310,
+      "observedProjectiles": 85,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "candidate-fixed-normal",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-fixed-normal.json",
+      "sha256": "583c75c1e2c5b2514a41ff2dc48fb9d8770f8e816c2c38f15612ae91fa7c7650",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "9fb3b5903cf2c183e733e9011c631e2e57d09e25ef8273d7300b9c185516ca3e",
+        "productSha256": "5d99873b18ca1052b1db762392ccb6aa9eaf49ce420bb4adeaa3697b47f6e507",
+        "harnessSha256": "828230b6a617122d841caa38222452c1e65ade3a78bfbbd20d187fb6cba43fe0",
+        "buildSha256": "e8f7a779b519c5d2e923c0543f838dd8473ddb205cad9b0a05d0e364d25417e1"
+      },
+      "status": "passed",
+      "cleanupComplete": true,
+      "failures": [],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "normal",
+          "profile": {
+            "latencyMs": 40,
+            "jitterMs": 20,
+            "downBytesPerSecond": 625000,
+            "upBytesPerSecond": 125000
+          },
+          "webSocketNegotiations": null,
+          "webSocketNegotiationSource": null
+        }
+      },
+      "fixtureAttempts": 6,
+      "stateDelivery": {
+        "states": 2682,
+        "startedAt": 39160.146334,
+        "endedAt": 129177.407292,
+        "averageSnapshotBytes": 21453.925801640566,
+        "p95GapMs": 60.91662500001257,
+        "p99GapMs": 78.20129199999792,
+        "maxGapMs": 125.88770799999475
+      },
+      "presentation": {
+        "frameCount": 3534,
+        "over25Percent": 51.21675155631013,
+        "frameP99Ms": 50,
+        "renderP95Ms": 2.699999988079071,
+        "frameCpuP95Ms": 3.199999988079071,
+        "inputP95Ms": 4
+      },
+      "proxy": {
+        "bytesUp": 3348236,
+        "bytesDown": 111023736,
+        "peakWritableBytes": 21252,
+        "peakPendingDeliveryBytes": 35801,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 12
+      },
+      "restartDurationsMs": [
+        216.578125, 182.86404200000106, 248.49558299999626, 221.95520900000702, 222.0988750000106
+      ],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 1705,
+      "observedProjectiles": 132,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "baseline-fixed-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/network-compression/baseline-fixed-degraded.json",
+      "sha256": "ed6eee83e8889eca46dc0e0d766c6644c4f5aede173324393134946f2afae2ae",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "43ea99cb443348300d8b88270a634b3926021cb23b764baa1c14e8c8588056cd",
+        "productSha256": "36c9581a33113c843bf2165e3ba1f4f6480de2ef0e10eadd68e6ab6be833ec15",
+        "harnessSha256": "ce39d05f36046413bb1a45a95112fb0cd02fa263287baa9e510e036840d344e9",
+        "buildSha256": "1f6419adeb5a38a3b2012e7118b9a6c266b640d39210408b60e9ba7b37a734c5"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Peer rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:63571/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": ""
+            }
+          ],
+          "webSocketNegotiationSource": "cdp"
+        }
+      },
+      "fixtureAttempts": 1,
+      "stateDelivery": {
+        "states": 35,
+        "startedAt": 49088.755833,
+        "endedAt": 63146.128583,
+        "averageSnapshotBytes": 20272.485714285714,
+        "p95GapMs": 568.0412910000014,
+        "p99GapMs": 577.9018340000039,
+        "maxGapMs": 577.9018340000039
+      },
+      "presentation": {
+        "frameCount": 153,
+        "over25Percent": 32.02614379084967,
+        "frameP99Ms": 33.400000000001455,
+        "renderP95Ms": 2.300000011920929,
+        "frameCpuP95Ms": 2.699999988079071,
+        "inputP95Ms": 3.300000011920929
+      },
+      "proxy": {
+        "bytesUp": 1400448,
+        "bytesDown": 34663924,
+        "peakWritableBytes": 86177,
+        "peakPendingDeliveryBytes": 131072,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 12
+      },
+      "restartDurationsMs": [],
+      "peerExtensions": ["", "", "", ""],
+      "acknowledgedMotionStates": 0,
+      "observedProjectiles": 0,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "candidate-fixed-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-fixed-degraded.json",
+      "sha256": "5fb3e518c1b5f2b9de70d8f2d46ded6235e8089a86aaeb76a2a64f3e26222d58",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "9c986b61b3eace18b05261f342f42aa55041ecb2983fa8393e86e4875ddf575f",
+        "productSha256": "5d99873b18ca1052b1db762392ccb6aa9eaf49ce420bb4adeaa3697b47f6e507",
+        "harnessSha256": "ce39d05f36046413bb1a45a95112fb0cd02fa263287baa9e510e036840d344e9",
+        "buildSha256": "bb0d9a6c7ab079ff0262aab6bb1229528bc0317677de63f1629eedc087160c05"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Peer rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:63992/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=12"
+            }
+          ],
+          "webSocketNegotiationSource": "cdp"
+        }
+      },
+      "fixtureAttempts": 1,
+      "stateDelivery": {
+        "states": 0,
+        "startedAt": 0,
+        "endedAt": 47089.300125,
+        "averageSnapshotBytes": 0,
+        "p95GapMs": null,
+        "p99GapMs": null,
+        "maxGapMs": null
+      },
+      "presentation": {
+        "frameCount": 0,
+        "over25Percent": null,
+        "frameP99Ms": null,
+        "renderP95Ms": null,
+        "frameCpuP95Ms": null,
+        "inputP95Ms": null
+      },
+      "proxy": {
+        "bytesUp": 963903,
+        "bytesDown": 24143223,
+        "peakWritableBytes": 68458,
+        "peakPendingDeliveryBytes": 131072,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 17
+      },
+      "restartDurationsMs": [],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 0,
+      "observedProjectiles": 0,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "candidate-window15-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-window15-degraded.json",
+      "sha256": "ba342371fe5c233b8fd47ac445d335f5b6885d25bc065ffbbd8f06361b628c2c",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "a7e6a218e6308749240a898998cff27fc5dbd34e85b5a7ae48bf9920b691d6f4",
+        "productSha256": "8f4101f1677d901c02742d32ce438a02b55f93f18f9ddc8c6b1508628f97ab97",
+        "harnessSha256": "ce39d05f36046413bb1a45a95112fb0cd02fa263287baa9e510e036840d344e9",
+        "buildSha256": "d7499415cbb3556171e728a526fd7f7715d75efc2f69a49aa9c27f70ff37c109"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Peer rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:64696/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=15"
+            }
+          ],
+          "webSocketNegotiationSource": "cdp"
+        }
+      },
+      "fixtureAttempts": 2,
+      "stateDelivery": {
+        "states": 775,
+        "startedAt": 48388.197041,
+        "endedAt": 81439.278666,
+        "averageSnapshotBytes": 18734.695483870968,
+        "p95GapMs": 431.4150420000078,
+        "p99GapMs": 509.91454100000556,
+        "maxGapMs": 541.8939580000006
+      },
+      "presentation": {
+        "frameCount": 955,
+        "over25Percent": 39.05759162303665,
+        "frameP99Ms": 50,
+        "renderP95Ms": 2.2000000178813934,
+        "frameCpuP95Ms": 2.800000011920929,
+        "inputP95Ms": 3.2999999821186066
+      },
+      "proxy": {
+        "bytesUp": 1741512,
+        "bytesDown": 45316520,
+        "peakWritableBytes": 74209,
+        "peakPendingDeliveryBytes": 136444,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 13
+      },
+      "restartDurationsMs": [13723.903375000002],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 190,
+      "observedProjectiles": 23,
+      "errors": [
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out",
+        "AssertionError [ERR_ASSERTION]: Game rejoin timed out"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "candidate-context15-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-context15-degraded.json",
+      "sha256": "0dd0b8e4003533b7c135538ef2cdd605dd0496837aa4525c76a9ba3b2e9ac70b",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "5cae667e85668e16b2c10e4bcbda1f024f42bec01456f02b9f17d4d75445d04a",
+        "productSha256": "207b3f562dfa4409a143cb71228fadc7513da4f8b260fbef948197c0a9a69c96",
+        "harnessSha256": "ce39d05f36046413bb1a45a95112fb0cd02fa263287baa9e510e036840d344e9",
+        "buildSha256": "4cf637f3be099c04c2fcd53ddce29d2c9888a48724e7c86b0b90bad592aa4b5a"
+      },
+      "status": "failed",
+      "cleanupComplete": false,
+      "failures": [
+        "Peer rejoin timed out",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted",
+        "The operation was aborted"
+      ],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:65271/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; client_no_context_takeover; server_max_window_bits=15"
+            }
+          ],
+          "webSocketNegotiationSource": "cdp"
+        }
+      },
+      "fixtureAttempts": 1,
+      "stateDelivery": {
+        "states": 338,
+        "startedAt": 40559.571208,
+        "endedAt": 53628.077417,
+        "averageSnapshotBytes": 19224.78106508876,
+        "p95GapMs": 431.99575000000186,
+        "p99GapMs": 514.5608750000029,
+        "maxGapMs": 557.5626249999987
+      },
+      "presentation": {
+        "frameCount": 109,
+        "over25Percent": 29.357798165137616,
+        "frameP99Ms": 50,
+        "renderP95Ms": 2.2000000178813934,
+        "frameCpuP95Ms": 2.899999976158142,
+        "inputP95Ms": 3.5999999940395355
+      },
+      "proxy": {
+        "bytesUp": 1280195,
+        "bytesDown": 27889905,
+        "peakWritableBytes": 69982,
+        "peakPendingDeliveryBytes": 134312,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 13
+      },
+      "restartDurationsMs": [],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 0,
+      "observedProjectiles": 12,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "candidate-context15-level6-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-context15-level6-degraded.json",
+      "sha256": "3a79120a6c12d05c0c6b7ced10013294fdc1aff09230d55d1b42874346b67581",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "15a4c379835030a16cb421055e0e85fea6f6e3781a24defe1044ed71ceb44f2f",
+        "productSha256": "a3c4376d30b1984a5d272e7b29f2616cf0344f8810b5c41f7f263439bd869e32",
+        "harnessSha256": "ce39d05f36046413bb1a45a95112fb0cd02fa263287baa9e510e036840d344e9",
+        "buildSha256": "a2915136f1574242c17c0856bbf6f9c6f8bdc4410d6f3bc5a5e3f5034fae4721"
+      },
+      "status": "passed",
+      "cleanupComplete": true,
+      "failures": [],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:49645/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; client_no_context_takeover; server_max_window_bits=15"
+            }
+          ],
+          "webSocketNegotiationSource": "cdp"
+        }
+      },
+      "fixtureAttempts": 5,
+      "stateDelivery": {
+        "states": 2729,
+        "startedAt": 40570.04375,
+        "endedAt": 130574.628666,
+        "averageSnapshotBytes": 19274.458043239283,
+        "p95GapMs": 381.93795899998804,
+        "p99GapMs": 479.9833329999965,
+        "maxGapMs": 536.5240840000042
+      },
+      "presentation": {
+        "frameCount": 4100,
+        "over25Percent": 28.804878048780488,
+        "frameP99Ms": 50,
+        "renderP95Ms": 2.2000000178813934,
+        "frameCpuP95Ms": 2.7000000178813934,
+        "inputP95Ms": 4.600000023841858
+      },
+      "proxy": {
+        "bytesUp": 3281259,
+        "bytesDown": 75293288,
+        "peakWritableBytes": 67357,
+        "peakPendingDeliveryBytes": 136297,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 15
+      },
+      "restartDurationsMs": [
+        3365.053458000002, 4076.0963340000017, 3846.500291999997, 5478.408708000003
+      ],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "acknowledgedMotionStates": 584,
+      "observedProjectiles": 85,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "candidate-context15-level6-20hz-degraded",
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/network-compression-experiment/.performance/network-compression/candidate-context15-level6-20hz-degraded.json",
+      "sha256": "9b53e3e5fbfa68dca0c063ae498502403f50a413f7e39311e51ddb18b911dd30",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": true,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "b57f7bf052768a8acc236c0c1de20b331787a58896af8b2e7b73103d32d89a4f",
+        "productSha256": "d307ea7dfe58557acd2206169826b75f89aacd4b680abbb7bd7a3031500e6aef",
+        "harnessSha256": "ce39d05f36046413bb1a45a95112fb0cd02fa263287baa9e510e036840d344e9",
+        "buildSha256": "f0ea3b679d43a507b991fce0035b1ccdaea19bab7fd6dffcd88479e9e724d0d1"
+      },
+      "status": "passed",
+      "cleanupComplete": true,
+      "failures": [],
+      "parameters": {
+        "warmupSeconds": 30,
+        "measuredSecondsRequested": 90,
+        "viewport": {
+          "name": "touch-portrait",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "hasTouch": true
+        },
+        "constraints": {
+          "dpr": 3,
+          "cpuSlowdown": 4,
+          "network": "degraded",
+          "profile": {
+            "latencyMs": 90,
+            "jitterMs": 60,
+            "downBytesPerSecond": 125000,
+            "upBytesPerSecond": 32000
+          },
+          "webSocketNegotiations": [
+            {
+              "url": "ws://localhost:51178/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; client_no_context_takeover; server_max_window_bits=15"
+            },
+            {
+              "url": "ws://localhost:51178/ws?snapshotVersion=1&asteroidInteractions=1",
+              "status": 101,
+              "extensions": "permessage-deflate; client_no_context_takeover; server_max_window_bits=15"
+            }
+          ],
+          "webSocketNegotiationSource": "cdp"
+        }
+      },
+      "fixtureAttempts": 6,
+      "stateDelivery": {
+        "states": 1693,
+        "startedAt": 40748.015791,
+        "endedAt": 130774.570208,
+        "averageSnapshotBytes": 21683.300059066747,
+        "p95GapMs": 111.74479100000462,
+        "p99GapMs": 150.9288749999978,
+        "maxGapMs": 4803.017250000004
+      },
+      "presentation": {
+        "frameCount": 3513,
+        "over25Percent": 50.612012524907485,
+        "frameP99Ms": 49.89999999999418,
+        "renderP95Ms": 2.7000000178813934,
+        "frameCpuP95Ms": 3.2000000178813934,
+        "inputP95Ms": 4.300000011920929
+      },
+      "proxy": {
+        "bytesUp": 3281716,
+        "bytesDown": 55271591,
+        "peakWritableBytes": 35726,
+        "peakPendingDeliveryBytes": 44250,
+        "failures": 0,
+        "activeSockets": 12,
+        "pendingTimers": 15
+      },
+      "restartDurationsMs": [
+        389.0005420000016, 4030.2763750000013, 402.17450000000827, 387.11366600000474,
+        525.6024999999936
+      ],
+      "peerExtensions": [
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate",
+        "permessage-deflate"
+      ],
+      "peerPingSamplesMs": [
+        [190.93112499999552],
+        [199.9597500000018],
+        [144.41387499999837],
+        [257.7773329999982]
+      ],
+      "acknowledgedMotionStates": 1099,
+      "observedProjectiles": 121,
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}

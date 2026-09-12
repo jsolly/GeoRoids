@@ -1,4 +1,5 @@
 import type { AsteroidData, Position } from '../shared-types';
+import { GAME } from '../src/constants';
 import { previewAsteroidReflections, type ReflectionPreview } from './asteroidReflection';
 
 export const ASTEROID_INTERACTIONS = {
@@ -8,7 +9,8 @@ export const ASTEROID_INTERACTIONS = {
   laserEnergyGain: 1.5,
   maxLaserEnergy: 8,
   maxBounces: 8,
-  maxLaserFrames: 300,
+  /** Inverse-scaled age guard keeps reflection travel distance unchanged. */
+  maxLaserFrames: Math.ceil(300 / GAME.MOTION_SCALE),
   coreCharges: 6,
   coreLifetimeMs: 60_000,
   coreScore: 150,

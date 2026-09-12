@@ -12,6 +12,7 @@ import {
   HAULER_TETHER_TIP_COLOR,
   KIT_HULLS_ARE_PLACEHOLDERS,
   listShipKits,
+  SHIP_ABILITY,
   SHIP_KIT_IDS,
 } from '../../../src/entities/ship/shipKits';
 
@@ -37,6 +38,16 @@ test('harpoon is Hauler-only and is not a sixth kit', () => {
   expect(listShipKits().some((kit) => String(kit.abilityId) === 'lootMagnet')).toBe(false);
   expect(HAULER_TETHER_COLOR).toBe('#E8D5A3');
   expect(HAULER_TETHER_TIP_COLOR).toBe('#FDE68A');
+  expect(SHIP_ABILITY.HARPOON_RANGE).toBe(280);
+  expect(SHIP_ABILITY.HARPOON_VISUAL_PX).toBe(720);
+  expect(SHIP_ABILITY.HARPOON_RANGE_MAX).toBe(1_000_000);
+  expect(SHIP_ABILITY.COOLDOWN_FRAMES).toEqual({
+    dart: 90,
+    hauler: 180,
+    warden: 150,
+    skirmisher: 150,
+    quake: 180,
+  });
 });
 
 test('Dart keeps classic ship numbers so existing play stays familiar', () => {
@@ -44,11 +55,12 @@ test('Dart keeps classic ship numbers so existing play stays familiar', () => {
   const dart = getShipKit('dart');
   expect(dart.maxHealth).toBe(SHIP.MAX_HEALTH);
   expect(dart.size).toBe(SHIP.SIZE);
-  expect(dart.turnSpeed).toBe(SHIP.TURN_SPEED);
+  expect(dart.turnSpeed).toBe(450);
+  expect(dart.shotCooldown).toBe(250);
   const ship = new Ship();
   expect(ship.kitId).toBe('dart');
   expect(ship.maxHealth).toBe(SHIP.MAX_HEALTH);
-  expect(ship.turnSpeed).toBe(SHIP.TURN_SPEED);
+  expect(ship.turnSpeed).toBe(450);
 });
 
 test('kit abilities are mixed flavors and geo is optional', () => {

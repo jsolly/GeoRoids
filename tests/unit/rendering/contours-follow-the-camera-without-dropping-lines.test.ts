@@ -1,10 +1,25 @@
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
+import { VISUAL } from '../../../src/constants';
 import type { ContourLevel } from '../../../src/physics/terrain/contours';
+import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
+import {
+  ensureTerrain,
+  getTerrainContours,
+  getTerrainField,
+} from '../../../src/physics/terrain/terrainSession';
+import { canvasManager } from '../../../src/rendering/canvas';
+import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { contourCandidates } from '../../../src/rendering/contourSpatialIndex';
+import { TestPath2D, type TestPathCommand } from '../../support/TestPath2D';
 
 type Segment = ContourLevel['segments'][number];
 const level = (segments: Segment[]): ContourLevel => ({ index: 0, height: 100, segments });
 const view = { x: 0, y: 0, width: 448, height: 448, scale: 1, pad: 32 };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 // The original renderer predicate, including equality at all four padded edges.
 function visible(segment: Segment, camera: typeof view) {
@@ -107,4 +122,108 @@ test('cached viewport queries avoid offscreen endpoint reads and rebuild for rep
   expect(contourCandidates(replacement, 0, view)).toEqual(replacement[0]?.segments);
   expect(contourCandidates(levels, 0, { ...view, x: 1e9, y: 1e9 })).toEqual([]);
   expect(contourCandidates(levels, 0, { ...view, scale: 0 })).toBe(segments);
+});
+
+test('camera motion within the same cells reuses candidates without changing retained results', () => {
+  const segments = [
+    { ax: -200, ay: 0, bx: -180, by: 20 },
+    { ax: 275, ay: 0, bx: 285, by: 0 },
+    { ax: 4096, ay: 0, bx: 4100, by: 0 },
+  ];
+  const levels = [level(segments)];
+  const firstCamera = { ...view, x: 32, y: 32 };
+  const first = contourCandidates(levels, 0, firstCamera);
+  const retained = [...first];
+  for (let x = 33; x < 64; x++) {
+    const camera = { ...firstCamera, x };
+    const candidates = contourCandidates(levels, 0, camera);
+    expect(candidates).toBe(first);
+    expect(candidates.filter((segment) => visible(segment, camera))).toEqual(
+      segments.filter((segment) => visible(segment, camera))
+    );
+  }
+  const distantCamera = { ...firstCamera, x: 4096 };
+  expect(contourCandidates(levels, 0, distantCamera)).toEqual([segments[2]]);
+  expect(first).toEqual(retained);
+  expect(contourCandidates(levels, 0, firstCamera)).toEqual(first);
+});
+
+test('renderer reuses world paths until the candidate arrays or terrain change', () => {
+  vi.stubGlobal('Path2D', TestPath2D);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Missing contour test canvas');
+  }
+  const viewport = { width: view.width, height: view.height };
+  vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
+  vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(canvas);
+  vi.spyOn(canvasManager, 'getViewportSize').mockReturnValue(viewport);
+  vi.spyOn(canvasManager, 'getPlayfieldScale').mockReturnValue(1);
+  const beginPath = vi.spyOn(ctx, 'beginPath');
+  const strokes: Array<{
+    path: TestPath2D;
+    lineWidth: number;
+    transform: ReturnType<CanvasRenderingContext2D['getTransform']>;
+  }> = [];
+  const nativeStroke = ctx.stroke.bind(ctx);
+  vi.spyOn(ctx, 'stroke').mockImplementation((...args: [] | [Path2D]) => {
+    const path = args[0];
+    if (path instanceof TestPath2D) {
+      strokes.push({ path, lineWidth: ctx.lineWidth, transform: ctx.getTransform() });
+      return;
+    }
+    Reflect.apply(nativeStroke, ctx, args);
+  });
+
+  const prior = getTerrainField();
+  try {
+    ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: 3100 });
+    const levels = getTerrainContours();
+    const firstCamera = { x: 32, y: 32 };
+    const firstCandidates = levels.map((_, index) =>
+      contourCandidates(levels, index, { ...view, ...firstCamera })
+    );
+    const expectedPaths = firstCandidates.filter((candidates) => candidates.length > 0);
+    ctx.setTransform(3, 0, 0, 3, 0, 0);
+
+    drawIsoContours(firstCamera);
+
+    expect(beginPath).toHaveBeenCalledTimes(levels.length);
+    expect(strokes).toHaveLength(expectedPaths.length);
+    for (const [index, candidates] of expectedPaths.entries()) {
+      const expectedCommands: TestPathCommand[] = candidates.flatMap((segment) => [
+        { kind: 'moveTo', x: segment.ax, y: segment.ay },
+        { kind: 'lineTo', x: segment.bx, y: segment.by },
+      ]);
+      const stroke = strokes[index];
+      expect(stroke?.path.commands).toEqual(expectedCommands);
+      expect(stroke?.lineWidth).toBe(VISUAL.CONTOUR_STROKE_WIDTH);
+      expect(stroke?.transform.a).toBe(3);
+      expect(stroke?.transform.d).toBe(3);
+      expect(stroke?.transform.e).toBe(3 * (viewport.width / 2 - firstCamera.x));
+      expect(stroke?.transform.f).toBe(3 * (viewport.height / 2 - firstCamera.y));
+    }
+    expect(ctx.getTransform()).toMatchObject({ a: 3, b: 0, c: 0, d: 3, e: 0, f: 0 });
+
+    const firstPaths = strokes.splice(0).map(({ path }) => path);
+    beginPath.mockClear();
+    drawIsoContours({ x: 33, y: 32 });
+    expect(beginPath).toHaveBeenCalledTimes(levels.length);
+    expect(strokes.map(({ path }) => path)).toEqual(firstPaths);
+
+    strokes.length = 0;
+    beginPath.mockClear();
+    drawIsoContours({ x: 1e9, y: 1e9 });
+    expect(beginPath).toHaveBeenCalledTimes(levels.length);
+    expect(strokes).toEqual([]);
+
+    strokes.length = 0;
+    ensureTerrain(TERRAIN.DEFAULT_SEED + 1, { cx: 0, cy: 0, radius: 3100 });
+    drawIsoContours(firstCamera);
+    expect(strokes.length).toBeGreaterThan(0);
+    expect(strokes.every(({ path }) => !firstPaths.includes(path))).toBe(true);
+  } finally {
+    ensureTerrain(prior.seed, { cx: prior.cx, cy: prior.cy, radius: prior.radius });
+  }
 });

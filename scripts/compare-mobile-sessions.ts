@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { inspectInputCadence } from '../benchmarks/input-cadence';
 import { compareMobileSessions } from '../benchmarks/mobile-comparison';
+import type { Pilot } from '../benchmarks/pilot';
 import { inspectReleaseEvidence } from '../benchmarks/release-evidence';
 import { canonicalJson } from '../benchmarks/results';
 
@@ -189,7 +190,7 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     assert.equal(
       parameters['profileRecorded'],
       false,
-      'CPU profiling disqualifies timing comparisons'
+      'profiling disqualifies timing comparisons (CPU profile or browser trace)'
     );
     const details = record(report['details']);
     assert(
@@ -262,7 +263,8 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
       ]) {
         assert(number(peer[key]) > 0, `Missing peer ${key}`);
       }
-      assert.equal(number(peer['omittedDecodeSamples']), 0, 'Peer decode samples omitted');
+      const omittedSamplesKey: keyof ReturnType<Pilot['report']> = 'omittedSnapshotHandlingSamples';
+      assert.equal(number(peer[omittedSamplesKey]), 0, 'Peer snapshot handling samples omitted');
       assert.equal(number(peer['unansweredMeasuredPings']), 0, 'Peer RTT probe unanswered');
       assert(
         Array.isArray(peer['stateIntervalMs']) &&

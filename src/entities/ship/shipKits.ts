@@ -1,5 +1,5 @@
 import type { ShipKitId } from '../../../shared-types';
-import { SHIP } from '../../constants';
+import { GAME, SHIP } from '../../constants';
 
 export type { ShipKitId };
 
@@ -79,7 +79,7 @@ export const HAULER_TETHER_COLOR = '#E8D5A3';
 export const HAULER_TETHER_TIP_COLOR = '#FDE68A';
 
 export const SHIP_ABILITY = {
-  DASH_BOOST: 6,
+  DASH_BOOST: 6 * GAME.MOTION_SCALE,
   HARPOON_RANGE: 280,
   /** Fallback "nearby" disk when the canvas size is unknown. */
   HARPOON_VISUAL_PX: 720,
@@ -90,19 +90,20 @@ export const SHIP_ABILITY = {
    */
   HARPOON_RANGE_MAX: 1_000_000,
   HARPOON_FRAMES: 90,
-  HARPOON_PULL: 0.42,
-  HARPOON_SLING_SPEED: 12,
-  HARPOON_INTERCEPT_FRAMES: 120,
+  HARPOON_PULL: 0.42 * GAME.MOTION_SCALE,
+  HARPOON_SLING_SPEED: 12 * GAME.MOTION_SCALE,
+  /** Keep the same reachable targets at the slower sling speed. */
+  HARPOON_INTERCEPT_FRAMES: Math.ceil(120 / GAME.MOTION_SCALE),
   HARPOON_PATH_ALIGNMENT: Math.cos(Math.PI / 12),
-  HARPOON_REEL_SPEED: 16,
-  HARPOON_REEL_ACCELERATION: 1.2,
+  HARPOON_REEL_SPEED: 16 * GAME.MOTION_SCALE,
+  HARPOON_REEL_ACCELERATION: 1.2 * GAME.MOTION_SCALE,
   HARPOON_RELEASE_GAP: 16,
   HARPOON_SLACK: 1.25,
   /** Warden's projected E shield duration. F uses the longer regular bubble. */
   SHIELD_PROJECTION_FRAMES: 180,
   SHIELD_PROJECTION_RANGE: 600,
   SHOCK_RADIUS: 420,
-  SHOCK_FORCE: 24,
+  SHOCK_FORCE: 24 * GAME.MOTION_SCALE,
   SHOCK_EDGE_FORCE_RATIO: 0.5,
   COOLDOWN_FRAMES: {
     dart: 90,
@@ -137,8 +138,8 @@ const KITS: Record<ShipKitId, ShipKit> = {
     flavor: 'utility',
     maxHealth: 140,
     size: 38,
-    thrust: 4,
-    maxVelocity: 6,
+    thrust: 4 * GAME.MOTION_SCALE,
+    maxVelocity: 6 * GAME.MOTION_SCALE,
     turnSpeed: 380,
     shotCooldown: 280,
   },
@@ -152,7 +153,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxHealth: 120,
     size: 32,
     thrust: SHIP.THRUST,
-    maxVelocity: 7,
+    maxVelocity: 7 * GAME.MOTION_SCALE,
     turnSpeed: SHIP.TURN_SPEED,
     shotCooldown: 260,
   },
@@ -165,8 +166,8 @@ const KITS: Record<ShipKitId, ShipKit> = {
     flavor: 'combat',
     maxHealth: 80,
     size: 28,
-    thrust: 5.4,
-    maxVelocity: 8.5,
+    thrust: 5.4 * GAME.MOTION_SCALE,
+    maxVelocity: 8.5 * GAME.MOTION_SCALE,
     turnSpeed: 540,
     shotCooldown: 200,
   },

@@ -20,14 +20,18 @@ describe('The guest keeps playing when the host leaves', () => {
   });
 
   test('closing the host tab does not reset the guest or the clock', () => {
+    const gameTime = world.engine.getDiagnostics().gameTime;
     world.disconnect(host);
 
     expect(world.isOnServer(host)).toBe(false);
     expect(world.isOnServer(guest)).toBe(true);
     expect(world.engine.isGamePaused()).toBe(false);
     expect(world.entity(guest).health).toBeGreaterThan(0);
+    expect(world.engine.getDiagnostics().gameTime).toBe(gameTime);
 
-    world.move(guest, { x: 140, y: 20 });
-    expect(world.entity(guest).position).toEqual({ x: 140, y: 20 });
+    world.move(guest, { x: 110, y: 20 });
+    expect(world.entity(guest).position).toEqual({ x: 110, y: 20 });
+    world.tick();
+    expect(world.engine.getDiagnostics().gameTime).toBe(gameTime + 1);
   });
 });

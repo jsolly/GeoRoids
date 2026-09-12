@@ -29,7 +29,8 @@ cream squares and diamonds mark wreckage and shards, green crosses mark fuel,
 yellow slashed diamonds mark laser cores, purple crosses mark satellites, and
 amber circles and diamonds mark loose and orbiting pickups. Ship headings and
 faction marks keep pilots identifiable above the world marks. Kill and pickup
-messages appear in the center for 120 frames, or 2 seconds. A health capsule
+messages appear in the center for 120 frames, or 2 seconds. On touch screens,
+they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.
 Hull, name, and minimap colors indicate faction: Ion is blue and Ember is
 orange, including your own ship. Bot names include "(bot)"; faction marks also

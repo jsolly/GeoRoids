@@ -220,7 +220,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       .toBeLessThan(1);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect((await page.locator('#content').textContent())?.replace(/\s+/g, ' ')).toContain(
-      'touch and hold the playfield to steer toward your finger and thrust'
+      'Touch and hold the playfield to steer toward your finger and thrust'
     );
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.locator('.breadcrumb a').click();

@@ -93,16 +93,23 @@ class Pilot {
   constructor(readonly ws: WebSocket) {
     ws.on('message', (raw) => {
       try {
-        const packet: unknown = JSON.parse(String(raw));
+        const text = String(raw);
+        const result = this.decoder.readMessage(text, { acceptSnapshots: true });
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        if (result.kind === 'snapshot') {
+          this.packets.push({ type: 'snapshot', data: result.metadata });
+          this.states.push(result.state);
+          return;
+        }
+        const packet = result.message;
         if (!isRecord(packet) || typeof packet['type'] !== 'string') {
           throw new Error('Server packet is missing its type');
         }
         this.packets.push({ ...packet, type: packet['type'] });
         if (packet['type'] === 'joined') {
           this.decoder.reset();
-        }
-        if (packet['type'] === 'snapshot') {
-          this.states.push(this.decoder.decode(packet['data']));
         }
       } catch (error) {
         this.failures.push(error);

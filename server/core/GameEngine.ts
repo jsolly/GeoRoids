@@ -146,7 +146,7 @@ export const HUMAN_SHOOT_POSE_ALLOWANCE_MS = 250;
 /** Bounded positional rounding/muzzle disagreement in addition to the movement allowance. */
 const HUMAN_SHOOT_MUZZLE_SLOP = 8;
 /** Stationary/counter-thrust shots must not remain in the authoritative list forever. */
-export const HUMAN_LASER_MAX_LIFETIME_MS = 5000;
+export const HUMAN_LASER_MAX_LIFETIME_MS = Math.ceil(5000 / GAME.MOTION_SCALE);
 const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 
 type PendingShockwave = {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { FUEL, GAME, SHIP } from '../../../../src/constants';
+import { FUEL } from '../../../../src/constants';
 import { Player } from '../../../../src/entities/player/Player';
 import { publishHarpoonField } from '../../../../src/entities/ship/harpoonField';
 import { applyShipKitToShip } from '../../../../src/entities/ship/shipKits';
@@ -12,7 +12,7 @@ import { setSelectedShipKitId } from '../../../../src/ui/shipKitSelect';
 // Space is the fire key (matching the documented "thrust = arrows, fire =
 // Space" scheme), so keyboard-only players can move AND shoot.
 
-const TURN = ((SHIP.TURN_SPEED / 180) * Math.PI) / GAME.FPS;
+const TURN = ((450 / 180) * Math.PI) / 60;
 
 let player: Player;
 

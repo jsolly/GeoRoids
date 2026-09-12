@@ -38,8 +38,7 @@ while its target still exists. Acknowledged expiry, target removal, death or
 natural timer expiry clears it. Reconnect neither extends that timer nor replays
 an ability request; this prediction does not restore server ability state.
 
-The codec preserves all public JSON fields recursively. It does not whitelist
-ship or asteroid fields; future keyed arrays automatically participate in delta
+The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
 make additions to the shared world/entity/asteroid/loot/EO/pickup/projectile/tag DTOs
 require corresponding validation. `ServerGameSnapshot` extends the core
@@ -52,6 +51,16 @@ shape/material/health, kits, factions and E/F timers use the shared DTO contract
 unsupported values fail loudly and close the negotiated socket instead of
 silently dropping state. Unknown valid JSON fields remain intact.
 
+Before encoding, the server rounds selected kinematics in its detached wire
+world to four decimal places: asteroid position, velocity and rotation; loot
+position; satellite and pickup position, velocity and angle; and projectile
+position, previous position where present, and velocity. Integers and values
+above the safe multiplication cutoff remain exact. Every player/bot field,
+including motion-handoff anchors, remains exact, as do resources, timers,
+counters, asteroid geometry/spin rate and unknown fields. This changes neither
+server simulation nor collision authority. Encoder baselines retain the rounded
+wire world so unchanged rounded values need no delta field.
+
 ## Baselines and recovery
 
 Baselines are keyed by actual sockets in a WeakMap. Join/rejoin replaces the
@@ -63,8 +72,10 @@ and a full frame replaces any delta that would be larger.
 
 Baselines advance only in a successful WebSocket send callback. This acknowledges
 the local transport write, **not remote application receipt**. WebSocket ordering
-plus client sequence validation protects that distinction. Pending writes,
-backpressure above 256 KiB, or failed writes force the next send to be full.
+plus client sequence validation protects that distinction. An offer skipped while
+a write is pending leaves its baseline alone: a successful callback permits the
+next delta. Backpressure above 256 KiB, failed writes and explicitly requested
+resynchronization force the next send to be full.
 Excluded recipients keep their own baseline. One detached canonical world is
 shared across recipients; no baseline points at mutable game engine state.
 
@@ -81,7 +92,7 @@ also repair a lost resync request. Unnegotiated snapshots close with protocol er
 Run from `/Users/johnsolly/code/GeoRoids` (or the integrated checkout):
 
 ```sh
-npx vitest run tests/unit/network/pilots-recover-complete-snapshots.test.ts tests/unit/network/current-pilots-share-a-server.test.ts tests/unit/network/runtime-client-negotiates-and-recovers.test.ts
+npx vitest run --dir tests/unit tests/unit/network/pilots-recover-complete-snapshots.test.ts tests/unit/network/current-pilots-share-a-server.test.ts tests/unit/network/runtime-client-negotiates-and-recovers.test.ts
 npm run benchmark -- measure codec --revision HEAD --seed 42
 npm run benchmark -- measure transport --revision HEAD --seed 42
 ```
@@ -100,11 +111,12 @@ and asteroid metadata/tag clearing. Run the real socket test through the seriali
 integration runner:
 
 ```sh
-./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts
+./scripts/test-runner.sh tests/integration/server/current-pilots-recover-after-reconnect.test.ts --dir tests/integration
 ```
 
 The current codec measurement uses the original seeded snapshot fixtures and
-checks every decoded keyframe and delta against its original fixture state. It
+checks every decoded keyframe and delta against the fixture's expected wire state,
+while preserving the original input as a mutation witness. It
 exercises shared and staggered recipient baselines at 1, 2, 5, 10 and 25
 recipients. Encode/serialize and decode timings are separate. Reported bytes are
 UTF-8 application payload bytes from the JSON snapshot envelope, not WebSocket

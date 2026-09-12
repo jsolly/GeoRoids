@@ -20,7 +20,9 @@ media:
 Shots leave the nose and inherit your ship's velocity, so a moving ship
 changes their flight path. Hold fire to repeat shots at your kit's interval.
 The local shot field has a cap for regular shots; the Skirmisher's E ring does
-not count against it. A regular shot deals the configured laser damage;
+not count against it. The slower movement leaves shots in flight longer while
+firing cadence and this cap stay fixed, so a full rack can remain occupied for
+more real time. A regular shot deals the configured laser damage;
 reflected or core-powered shots multiply that damage by their energy. Local
 shots appear immediately and stay visible while the server confirms them; the
 server still controls hits and removal.

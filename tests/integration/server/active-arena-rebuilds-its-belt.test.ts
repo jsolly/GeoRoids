@@ -9,6 +9,7 @@ import { WireClient, type WireMessage } from '../../support/wireClient';
 let server: ReturnType<typeof createServerInstance>;
 let url: string;
 const clients: WireClient[] = [];
+type DecoderRead = ReturnType<SnapshotDecoder['readMessage']>;
 const streams = new WeakMap<WireClient, { decoder: SnapshotDecoder; cursor: number }>();
 const resumeTokens = new WeakMap<WireClient, string>();
 
@@ -54,22 +55,39 @@ async function waitForMessage(
     .poll(
       () => {
         client.assertHealthy();
-        while (stream.cursor < client.messages.length) {
+        while (stream.cursor < client.wireMessages.length) {
           // @types/node 26 + noUncheckedIndexedAccess makes `arr[i++]` a circular
           // inference (TS7022). Read the cursor, then advance it separately.
           const index: number = stream.cursor;
-          const packet: WireMessage | undefined = client.messages.at(index);
+          const wire = client.wireMessages.at(index);
           stream.cursor += 1;
-          assert(packet);
-          assert.notEqual(packet.type, 'error', String(packet.data));
-          if (packet.type === 'joined') {
+          assert(wire);
+          const result: DecoderRead = stream.decoder.readMessage(wire.raw, {
+            acceptSnapshots: true,
+          });
+          if (result.kind === 'snapshot-rejected') {
+            throw result.error;
+          }
+          const message: WireMessage =
+            result.kind === 'snapshot'
+              ? { type: 'snapshot', data: result.state }
+              : (() => {
+                  const packet: unknown = result.message;
+                  assert(
+                    packet &&
+                      typeof packet === 'object' &&
+                      'type' in packet &&
+                      typeof packet.type === 'string'
+                  );
+                  return {
+                    type: packet.type,
+                    ...('data' in packet ? { data: packet.data } : {}),
+                  };
+                })();
+          assert.notEqual(message.type, 'error', String(message.data));
+          if (message.type === 'joined') {
             stream.decoder.reset();
           }
-          // Consume every recorded snapshot, even between waits, to preserve its baseline.
-          const message =
-            packet.type === 'snapshot'
-              ? { type: packet.type, data: stream.decoder.decode(packet.data) }
-              : packet;
           if (index >= start && matches(message)) {
             found = message;
             return true;

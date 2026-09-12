@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import { SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../shared-types';
+import { GAME, LASER } from '../src/constants';
 import { PerformanceBudget } from './performance-budget';
 
 export class Pilot {
@@ -43,7 +44,7 @@ export class Pilot {
   private measuredWallMs = 0;
   private lastMeasuredStateAt = 0;
   readonly stateIntervalMs: number[] = [];
-  readonly decodeMs: number[] = [];
+  readonly snapshotHandlingMs: number[] = [];
   readonly rttMs: number[] = [];
   private pingStartedAt: number | undefined;
   private pingMeasured = false;
@@ -67,7 +68,8 @@ export class Pilot {
     }
   ) {
     this.id = `benchmark-${index}`;
-    this.socket = new WebSocket(options.url, { perMessageDeflate: false });
+    // Match browsers: offer compression and let the server negotiate it.
+    this.socket = new WebSocket(options.url);
     this.socket.on('error', options.fail);
     this.socket.on('open', () => this.joinGame());
     this.socket.on('close', (code) => {
@@ -91,59 +93,61 @@ export class Pilot {
       this.messages++;
       const started = performance.now();
       try {
-        const message: unknown = JSON.parse(bytes.toString());
-        assert(
-          message && typeof message === 'object' && 'type' in message && 'data' in message,
-          'Invalid server envelope'
-        );
-        const data = message.data;
-        if (message.type === 'error') {
-          throw new Error(`Server rejected pilot command: ${JSON.stringify(data)}`);
-        }
-        if (message.type === 'joined') {
-          assert(
-            data &&
-              typeof data === 'object' &&
-              'id' in data &&
-              data.id === this.id &&
-              'snapshotVersion' in data &&
-              data.snapshotVersion === 1 &&
-              'asteroidInteractions' in data &&
-              data.asteroidInteractions === 1 &&
-              'resumeToken' in data &&
-              typeof data.resumeToken === 'string' &&
-              data.resumeToken.length > 0,
-            'Invalid joined acknowledgment'
-          );
-          this.joined = true;
-          this.joinedAt ??= performance.now();
-          this.decoder.reset();
-          this.snapshotSequence = 0;
-          if ('serverReleaseId' in data && typeof data.serverReleaseId === 'string') {
-            this.releaseId = data.serverReleaseId;
+        const result = this.decoder.readMessage(bytes.toString(), {
+          acceptSnapshots: this.joined,
+        });
+        if (result.kind === 'snapshot-rejected') {
+          if (!this.joined) {
+            return;
           }
+          throw result.error;
         }
-        if (message.type === 'snapshot' && !this.joined) {
-          return;
-        }
-        if (message.type === 'snapshot') {
+        if (result.kind === 'snapshot') {
           assert(this.joined, 'Snapshot without join acknowledgment');
-          this.state = this.decoder.decode(data);
-          assert(
-            data && typeof data === 'object' && 'sequence' in data,
-            'Missing snapshot sequence'
-          );
+          this.state = result.state;
           assert.equal(
-            data.sequence,
+            result.metadata.sequence,
             this.snapshotSequence + 1,
             'Snapshot delivery skipped a sequence'
           );
           this.snapshotSequence++;
-          if (data && typeof data === 'object' && 'kind' in data && data.kind === 'keyframe') {
+          if (result.metadata.kind === 'keyframe') {
             this.keyframes++;
             this.lastKeyframeSequence = this.snapshotSequence;
           }
         } else {
+          const message = result.message;
+          assert(
+            message && typeof message === 'object' && 'type' in message && 'data' in message,
+            'Invalid server envelope'
+          );
+          const data = message.data;
+          if (message.type === 'error') {
+            throw new Error(`Server rejected pilot command: ${JSON.stringify(data)}`);
+          }
+          if (message.type === 'joined') {
+            assert(
+              data &&
+                typeof data === 'object' &&
+                'id' in data &&
+                data.id === this.id &&
+                'snapshotVersion' in data &&
+                data.snapshotVersion === 1 &&
+                'asteroidInteractions' in data &&
+                data.asteroidInteractions === 1 &&
+                'resumeToken' in data &&
+                typeof data.resumeToken === 'string' &&
+                data.resumeToken.length > 0,
+              'Invalid joined acknowledgment'
+            );
+            this.joined = true;
+            this.joinedAt ??= performance.now();
+            this.decoder.reset();
+            this.snapshotSequence = 0;
+            if ('serverReleaseId' in data && typeof data.serverReleaseId === 'string') {
+              this.releaseId = data.serverReleaseId;
+            }
+          }
           return;
         }
         assert(
@@ -200,8 +204,8 @@ export class Pilot {
         } else {
           this.warmupStates++;
         }
-        if (this.options.measuring() && this.decodeMs.length < 60000) {
-          this.decodeMs.push(performance.now() - started);
+        if (this.options.measuring() && this.snapshotHandlingMs.length < 60000) {
+          this.snapshotHandlingMs.push(performance.now() - started);
         }
       } catch (error) {
         this.options.fail(error);
@@ -240,7 +244,8 @@ export class Pilot {
 
   drive(tick: number) {
     const entity = this.state?.entities.find((row) => row.id === this.id);
-    if (!this.joined) {
+    if (!this.joined || !this.state) {
+      // The acknowledgment and first snapshot can arrive in separate network chunks.
       assert(performance.now() - this.sessionStartedAt < 10000, 'Game rejoin timed out');
       return;
     }
@@ -286,7 +291,10 @@ export class Pilot {
         id: this.id,
         data: {
           laserStart: entity.position,
-          laserDirection: { x: Math.cos(entity.angle) * 10, y: Math.sin(entity.angle) * 10 },
+          laserDirection: {
+            x: (Math.cos(entity.angle) * LASER.SPEED) / GAME.FPS + entity.velocity.x,
+            y: (-Math.sin(entity.angle) * LASER.SPEED) / GAME.FPS + entity.velocity.y,
+          },
         },
       });
       this.shots++;
@@ -402,6 +410,7 @@ export class Pilot {
     return {
       performanceBudget: this.performanceBudget.report(),
       releaseId: this.releaseId,
+      webSocketExtensions: this.socket.extensions,
       joined: this.joined,
       gameJoins: this.gameJoins,
       acknowledgedMotionStates: this.acknowledgedMotionStates,
@@ -422,8 +431,8 @@ export class Pilot {
       measuredShotsOffered: this.measuredShotsOffered,
       observedMeasuredServerProjectiles: this.observedServerShots.size,
       resyncs: this.resyncs,
-      decodeMs: this.decodeMs,
-      omittedDecodeSamples: this.measuredStates - this.decodeMs.length,
+      snapshotHandlingMs: this.snapshotHandlingMs,
+      omittedSnapshotHandlingSamples: this.measuredStates - this.snapshotHandlingMs.length,
       measuredPings: this.measuredPings,
       unansweredMeasuredPings: this.unansweredMeasuredPings,
       rttMs: this.rttMs,

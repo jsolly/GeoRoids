@@ -69,7 +69,7 @@ describe('bot aim math', () => {
     const target = combatant({
       id: 'human',
       position: { x: 200, y: 0 },
-      velocity: { x: 0, y: 4 },
+      velocity: { x: 0, y: 4 * GAME.MOTION_SCALE },
     });
     const aim = leadAimPoint(shooter, target, 1);
     expect(aim.y).toBeGreaterThan(target.position.y);

@@ -1,0 +1,67 @@
+{
+  "date": "2026-09-12",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "scope": "exact validation/decoded worlds and Node phase timings; not phone FPS or capacity",
+  "artifacts": [
+    {
+      "path": "shared/snapshotDto.ts",
+      "sha256": "bd2cb653631d31f849a5006f6e2fb8f5ecb539b45d91ea9c38f75c9f3d222c89",
+      "bytes": 7392
+    },
+    {
+      "path": "shared/snapshotProtocol.ts",
+      "sha256": "fc27b68368caf30564df681a9920cc0e7423472ee85a8514268dced7707076d6",
+      "bytes": 14524
+    },
+    {
+      "path": "tests/unit/network/snapshotFixture.ts",
+      "sha256": "26a3d659ece59d48b7ada40da582e5d46fb499fea2fbd82cd259dc2400df136b",
+      "bytes": 4014
+    },
+    {
+      "path": ".performance/snapshot-validation/baselineDto.ts",
+      "sha256": "50496c864825a364320608e66f8ea9287954974c189e4e161c03018786ab2ba1",
+      "bytes": 7354
+    },
+    {
+      "path": ".performance/snapshot-validation/baselineProtocol.ts",
+      "sha256": "e28617b549d0fcb81ccddfc7b3da68cc6606c9a1640156eaa9ebe809cf96c14e",
+      "bytes": 14527
+    },
+    {
+      "path": ".performance/snapshot-validation/candidateProtocol.ts",
+      "sha256": "3f649ea80fc9c02fdfdb56141e4ee1c83269ca861c06354c0277f89399890aaf",
+      "bytes": 14538
+    },
+    {
+      "path": ".performance/snapshot-validation/compare.ts",
+      "sha256": "71cba0988940223fe17f8638de05391d99e843fb06f8779f6957262091e95b97",
+      "bytes": 6510
+    },
+    {
+      "path": ".performance/snapshot-validation/summary.json",
+      "sha256": "b3e9a179c5f0914a57a9bb465af06288fb0742e2feb0671e6e138f4375eec600",
+      "bytes": 748
+    },
+    {
+      "path": ".performance/snapshot-validation/timing.json",
+      "sha256": "e5e5564cb7658be75aa53a6a6341791ba9675983a2383bc17328c59ac6e618e4",
+      "bytes": 1418860
+    },
+    {
+      "path": ".performance/snapshot-validation/timing.log",
+      "sha256": "f282f56e2375e14f6bc9548b0eeae0f27d43640e495992b36358e3bfb194dd4b",
+      "bytes": 102
+    },
+    {
+      "path": ".performance/snapshot-validation/verification.json",
+      "sha256": "b5b88b35490be6238c724f36fa303088d91c20fc53700756cec7a8a35111bab3",
+      "bytes": 1233
+    },
+    {
+      "path": ".performance/snapshot-validation/verification.log",
+      "sha256": "f282f56e2375e14f6bc9548b0eeae0f27d43640e495992b36358e3bfb194dd4b",
+      "bytes": 102
+    }
+  ]
+}

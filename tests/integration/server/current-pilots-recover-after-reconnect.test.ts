@@ -5,7 +5,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { captureSnapshot, SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID, SATELLITE } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
@@ -74,14 +74,23 @@ test('current sockets render matching worlds across late join and reconnect', as
     socket.on('error', (error) => failures.push(error));
     socket.on('message', (text) => {
       try {
-        const raw: unknown = JSON.parse(text.toString());
+        const wireText = text.toString();
+        const result = decoder.readMessage(wireText, { acceptSnapshots: true });
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        if (result.kind === 'snapshot') {
+          snapshot = result.state;
+          state = result.state;
+          messages.push({ type: 'snapshot', data: result.metadata });
+          return;
+        }
+        const raw = result.message;
         assert.ok(raw && typeof raw === 'object' && 'type' in raw && typeof raw.type === 'string');
         assert.ok('data' in raw, 'Expected server message data');
-        const message = { type: raw.type, data: raw.data };
-        messages.push(message);
-        if (message.type === 'snapshot') {
-          snapshot = decoder.decode(message.data);
-          state = snapshot;
+        messages.push({ type: raw.type, data: raw.data });
+        if (raw.type === 'joined') {
+          decoder.reset();
         }
       } catch (error) {
         failures.push(error);
@@ -132,14 +141,14 @@ test('current sockets render matching worlds across late join and reconnect', as
   for (let tick = 0; tick < 8; tick++) {
     secondPlayer.position.x += 4;
     broadcaster.broadcastGameState();
-    const complete = captureSnapshot({
+    const complete = new SnapshotEncoder({
       ...engine.getGameState(),
       playerProjectiles: engine.getPlayerProjectiles(),
       satelliteProjectiles: engine
         .getActiveSatelliteProjectiles()
         .map((shot) => ({ id: shot.shotId, ...shot })),
       collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
-    });
+    }).state;
     await expect.poll(() => first.state()).toEqual(complete);
     await expect.poll(() => second.state()).toEqual(complete);
   }

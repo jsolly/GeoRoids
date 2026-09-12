@@ -78,7 +78,10 @@ and pickup counts before and after are part of the result.
 The codec runner checks every decoded message against the original fixture state,
 including keyframes, deltas, and divergent recipient baselines. Its byte counts
 use UTF-8 application payloads from the JSON snapshot envelope. They do not count
-WebSocket transport framing. Encode/serialize and decode timings are separate.
+WebSocket transport framing. `*-encode-serialize-ms` measures frame creation and
+envelope serialization. `*-parse-decode-ms` measures one decoder-owned envelope
+parse plus snapshot validation, reconstruction, and retained-baseline copying.
+The serialized envelopes are prepared before that timed region.
 
 The transport runner measures realtime ping RTT and snapshot delivery intervals,
 packet and UTF-8 payload counts, client `bufferedAmount`, and child-server event
@@ -216,6 +219,13 @@ motion sessions, advances placement epochs through the existing authoritative
 placement path, and requests a fresh snapshot baseline per recipient. Every
 participant must observe that baseline before warmup. Game rejoins repeat setup.
 The protocol peers share the load runner's `Pilot` implementation.
+Its `snapshotHandlingMs` samples cover the inbound callback from the
+decoder-owned parse through benchmark state and witness updates.
+Their projectiles use current shared laser tuning and inherited ship velocity.
+The September 12 driver correction replaces a fixed speed of 10 that the newer
+authority rules reject after the slowdown. That changes admitted combat work;
+older peer-shot workloads are not interchangeable timing controls. Failed client
+runs retain collected intervals in both the scenario and aggregate measurement.
 
 Each fixture reports the seed, full initial world manifest, hash, epoch, actual
 participant IDs and expected snapshot sequences. Random entity IDs are excluded
@@ -307,12 +317,35 @@ coverage, frame CPU counts and input latency sample counts must agree. Lifecycle
 and fifteen-minute thermal validation remain separate.
 
 For a separate attribution run, add `--cpu-profile .performance/game.cpuprofile`
-to the production-client command with Chromium and a single viewport. Profiling
-runs only around the measured phase and preserves a partial profile on failure.
-`profileRecorded` disqualifies the report from timing comparison. Reports also
-capture Chromium GPU devices, renderer and feature status; unsupported WebKit
-GPU inspection is explicit. Neither browser emulation nor a software renderer
-establishes the behavior of a phone GPU.
+or `--trace .performance/game.trace.json.gz` to the production-client command
+with Chromium and a single viewport. Profiling runs only around the measured
+phase and preserves a partial artifact on failure. A trace uses the Chrome
+DevTools Protocol streaming mode with bounded gzip output and timed stream reads.
+The trace contains `performance.mark`/`performance.measure` entries named
+`georoids-benchmark:measurement-start`, `georoids-benchmark:measurement-end` and
+`georoids-benchmark:measured-phase` so the measured window is auditable in the
+trace viewer. The marks bracket the observation loop after profiler/peer setup;
+their browser timestamps differ from the host measurement boundaries by the CDP
+delivery time. It writes the exact same-origin JavaScript responses beside it under
+`.performance/game.trace.json.gz.bundles/`, with `manifest.json` recording each
+URL, status, byte count, advertised `Content-Length` when valid and SHA-256.
+Responses whose valid `Content-Length` exceeds the limit are rejected before
+`response.body()` allocation;
+the decoded body is checked again afterward because Playwright does not expose a
+streaming response-body cap for chunked or content-encoded responses. The
+manifest records these limits and the resulting limitation. `profileRecorded`
+disqualifies either profiling mode from timing comparison. Reports also capture
+Chromium GPU devices, renderer, feature status and the effective
+`browserChannel`. `--chromium-gpu` selects Playwright's `chromium` channel with
+`--enable-gpu` and requires accelerated Canvas/compositing/rasterization plus a
+non-software renderer; the default Chromium channel remains the Playwright
+bundled browser. Unsupported WebKit GPU inspection is explicit. Neither browser
+emulation nor a software renderer establishes the behavior of a phone GPU.
+
+Chromium runs record successful gameplay WebSocket negotiation independently of
+`--trace`, including the negotiated extension header. Use the same harness when
+checking compression negotiation across runs; that witness does not claim that
+an unprofiled run is otherwise unchanged.
 
 Real-time performance budgets allow two states for window endpoints and record rates
 below 27 authoritative states/s on a

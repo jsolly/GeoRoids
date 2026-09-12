@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { type RawData, WebSocket } from 'ws';
+import { WebSocket } from 'ws';
 
 const WIRE_TIMEOUT_MS = 2_000;
 
@@ -14,7 +14,7 @@ function isRecord(value: unknown): value is WirePayload {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function decodeMessage(raw: RawData): WireMessage {
+function decodeMessage(raw: string): WireMessage {
   const parsed: unknown = JSON.parse(String(raw));
   if (!isRecord(parsed)) {
     throw new Error('Server message must be an object');
@@ -31,6 +31,7 @@ function decodeMessage(raw: RawData): WireMessage {
 
 export class WireClient {
   readonly messages: WireMessage[] = [];
+  readonly wireMessages: Array<{ readonly raw: string; readonly message: WireMessage }> = [];
   readonly failures: Error[] = [];
 
   constructor(readonly ws: WebSocket) {
@@ -39,7 +40,10 @@ export class WireClient {
     });
     ws.on('message', (raw) => {
       try {
-        this.messages.push(decodeMessage(raw));
+        const text = String(raw);
+        const message = decodeMessage(text);
+        this.messages.push(message);
+        this.wireMessages.push({ raw: text, message });
       } catch (error) {
         this.failures.push(error instanceof Error ? error : new Error(String(error)));
       }
@@ -81,6 +85,7 @@ export class WireClient {
 
   resetMessages(): void {
     this.messages.length = 0;
+    this.wireMessages.length = 0;
   }
 
   assertHealthy(): void {

@@ -412,8 +412,21 @@ export class GameServerWorld {
   snapshot(pilot: Pilot): ServerGameSnapshot {
     const decoder = new SnapshotDecoder();
     let state: ServerGameSnapshot | undefined;
-    for (const message of pilot.socket.received('snapshot')) {
-      state = decoder.decode(message.data);
+    for (const raw of pilot.socket.sent) {
+      const result = decoder.readMessage(raw, { acceptSnapshots: true });
+      if (result.kind === 'snapshot-rejected') {
+        throw result.error;
+      }
+      if (result.kind === 'snapshot') {
+        state = result.state;
+      } else if (
+        result.message &&
+        typeof result.message === 'object' &&
+        'type' in result.message &&
+        result.message.type === 'joined'
+      ) {
+        decoder.reset();
+      }
     }
     if (!state) {
       throw new Error(`${pilot.name} has not received a current snapshot`);

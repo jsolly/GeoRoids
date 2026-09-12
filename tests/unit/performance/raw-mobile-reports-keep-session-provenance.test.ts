@@ -98,7 +98,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
               measuredStates: 9000,
               observedMeasuredServerProjectiles: 10,
               measuredPings: 1,
-              omittedDecodeSamples: 0,
+              omittedSnapshotHandlingSamples: 0,
               unansweredMeasuredPings: 0,
               stateIntervalMs: Array(9000).fill(1000 / 30),
             })),
@@ -197,6 +197,12 @@ test.each(['quality', 'product'] as const)(
       const path = join(directory, 'session-7.json');
       const original = JSON.parse(await readFile(path, 'utf8'));
       for (const [mutation, error] of [
+        [
+          (r: typeof original) => {
+            r.details.scenarios[0].peers[0].omittedSnapshotHandlingSamples = 1;
+          },
+          'Peer snapshot handling samples omitted',
+        ],
         [
           (r: typeof original) => {
             r.metadata.git.harnessSha256 = hash('wrong');

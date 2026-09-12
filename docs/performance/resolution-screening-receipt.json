@@ -1,0 +1,1540 @@
+{
+  "decision": "No demonstrated FPS benefit on accelerated M3; keep native/full production preset",
+  "scope": "Short unprofiled screening only, not the five-minute comparison gate or physical-phone acceptance",
+  "completedRuns": 6,
+  "reports": [
+    {
+      "name": "aa-0-a",
+      "dpr": "native",
+      "reportSha256": "00c825575d02ff81c725777d529c64496a8f6aa4700768fcf97babfeaa8182be",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9f881a2fd7b07c8fea42837c005609d83a7872f9b43b6c4bead09e763d4b94d0",
+        "productSha256": "7bcea7b104bf4f4f30c910a86fd1b4c30987300217a7c5703397baa8d9f53e23",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "a3ee93b7e4aaf12f11c1bde10089542e3443c6ab01513d3e306df94ca782a037"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": ["--enable-gpu"]
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 4203,
+              "deviceId": 0,
+              "vendorString": "Google Inc. (Apple)",
+              "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+              "driverVendor": "Apple",
+              "driverVersion": "26.6.2"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_METAL",
+            "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+            "glVendor": "Google Inc. (Apple)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "enabled_on",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        }
+      },
+      "fixtureHashes": [
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59"
+      ],
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 1800,
+          "p95": 16.799999999995634,
+          "p99": 16.80000000000291
+        },
+        "frameCpuMs": {
+          "count": 1800,
+          "p95": 2.800000011920929,
+          "p99": 3.199999988079071
+        },
+        "updateMs": {
+          "count": 1800,
+          "p95": 0.9000000059604645,
+          "p99": 1.0999999940395355
+        },
+        "renderMs": {
+          "count": 1800,
+          "p95": 2.4000000059604645,
+          "p99": 2.800000011920929
+        },
+        "parseMs": {
+          "count": 1449,
+          "p95": 0.800000011920929,
+          "p99": 1.0999999940395355
+        },
+        "keyframeDecodeMs": {
+          "count": 10,
+          "p95": 1.5,
+          "p99": 1.5
+        },
+        "deltaDecodeMs": {
+          "count": 883,
+          "p95": 2,
+          "p99": 2.2000000178813934
+        },
+        "applyMs": {
+          "count": 893,
+          "p95": 1.0999999940395355,
+          "p99": 1.2000000178813934
+        },
+        "joinMs": {
+          "count": 1,
+          "p95": 399,
+          "p99": 399
+        },
+        "inputToRenderMs": {
+          "count": 60,
+          "p95": 17.099999994039536,
+          "p99": 17.69999998807907
+        },
+        "over25Percent": 0.0
+      },
+      "acknowledgedMotionStates": 881,
+      "observedProjectiles": 49,
+      "screenshot": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/resolution-current/aa-0-a.json.touch-portrait.png",
+      "population": {
+        "humans": {
+          "total": {
+            "min": 5,
+            "median": 5.0,
+            "max": 5
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 1.0,
+            "max": 5
+          }
+        },
+        "bots": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "asteroids": {
+          "total": {
+            "min": 52,
+            "median": 74.5,
+            "max": 82
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 4.0,
+            "max": 21
+          }
+        },
+        "satellites": {
+          "total": {
+            "min": 4,
+            "median": 6.0,
+            "max": 6
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "pickups": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 1
+          }
+        },
+        "projectiles": {
+          "total": {
+            "min": 0,
+            "median": 29.0,
+            "max": 42
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 4.0,
+            "max": 10
+          }
+        }
+      },
+      "restarts": [
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 38848.44,
+          "durationMs": 102.3180829999983
+        }
+      ],
+      "effectiveMetadata": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+        "dpr": 3,
+        "css": {
+          "width": 390,
+          "height": 844
+        },
+        "effectiveDpr": 3,
+        "touchPoints": 1,
+        "backing": {
+          "width": 1170,
+          "height": 2532
+        },
+        "visibility": "visible",
+        "clientReleaseId": "5d27a1a",
+        "serverReleaseId": "dev"
+      },
+      "peerWorkload": [
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 571,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 584,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 58
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 576,
+          "measuredShotsOffered": 57,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 585,
+          "measuredShotsOffered": 58,
+          "observedMeasuredServerProjectiles": 58
+        }
+      ]
+    },
+    {
+      "name": "aa-0-b",
+      "dpr": "native",
+      "reportSha256": "17a1b4ff33d604b518cc9a7921a350cda9e5e80272800dd0a5306cabc30125e7",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9f881a2fd7b07c8fea42837c005609d83a7872f9b43b6c4bead09e763d4b94d0",
+        "productSha256": "7bcea7b104bf4f4f30c910a86fd1b4c30987300217a7c5703397baa8d9f53e23",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "75f49a8b5f7bea192631905bd3d417578dedd7d23d07ff8f273f409352e048de"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": ["--enable-gpu"]
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 4203,
+              "deviceId": 0,
+              "vendorString": "Google Inc. (Apple)",
+              "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+              "driverVendor": "Apple",
+              "driverVersion": "26.6.2"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_METAL",
+            "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+            "glVendor": "Google Inc. (Apple)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "enabled_on",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        }
+      },
+      "fixtureHashes": [
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59"
+      ],
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 1801,
+          "p95": 16.799999999995634,
+          "p99": 16.80000000000291
+        },
+        "frameCpuMs": {
+          "count": 1801,
+          "p95": 2.5999999940395355,
+          "p99": 3
+        },
+        "updateMs": {
+          "count": 1801,
+          "p95": 0.800000011920929,
+          "p99": 1
+        },
+        "renderMs": {
+          "count": 1801,
+          "p95": 2.199999988079071,
+          "p99": 2.7000000178813934
+        },
+        "parseMs": {
+          "count": 1523,
+          "p95": 0.8999999761581421,
+          "p99": 1.0999999940395355
+        },
+        "keyframeDecodeMs": {
+          "count": 11,
+          "p95": 1.5999999940395355,
+          "p99": 1.5999999940395355
+        },
+        "deltaDecodeMs": {
+          "count": 883,
+          "p95": 2,
+          "p99": 2.2000000178813934
+        },
+        "applyMs": {
+          "count": 894,
+          "p95": 1,
+          "p99": 1.2000000178813934
+        },
+        "joinMs": {
+          "count": 1,
+          "p95": 378.90000000596046,
+          "p99": 378.90000000596046
+        },
+        "inputToRenderMs": {
+          "count": 61,
+          "p95": 17.099999994039536,
+          "p99": 17.5
+        },
+        "over25Percent": 0.0
+      },
+      "acknowledgedMotionStates": 861,
+      "observedProjectiles": 64,
+      "screenshot": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/resolution-current/aa-0-b.json.touch-portrait.png",
+      "population": {
+        "humans": {
+          "total": {
+            "min": 5,
+            "median": 5.0,
+            "max": 5
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 2.0,
+            "max": 5
+          }
+        },
+        "bots": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "asteroids": {
+          "total": {
+            "min": 62,
+            "median": 70.0,
+            "max": 80
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 5.0,
+            "max": 21
+          }
+        },
+        "satellites": {
+          "total": {
+            "min": 4,
+            "median": 5.0,
+            "max": 6
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "pickups": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 1
+          }
+        },
+        "projectiles": {
+          "total": {
+            "min": 0,
+            "median": 24.0,
+            "max": 35
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 3.5,
+            "max": 10
+          }
+        }
+      },
+      "restarts": [
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 28222.148041,
+          "durationMs": 67.97270899999785
+        },
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 48222.338583,
+          "durationMs": 66.30774999999994
+        }
+      ],
+      "effectiveMetadata": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+        "dpr": 3,
+        "css": {
+          "width": 390,
+          "height": 844
+        },
+        "effectiveDpr": 3,
+        "touchPoints": 1,
+        "backing": {
+          "width": 1170,
+          "height": 2532
+        },
+        "visibility": "visible",
+        "clientReleaseId": "5d27a1a",
+        "serverReleaseId": "dev"
+      },
+      "peerWorkload": [
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 570,
+          "measuredShotsOffered": 57,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 564,
+          "measuredShotsOffered": 57,
+          "observedMeasuredServerProjectiles": 56
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 572,
+          "measuredShotsOffered": 58,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 564,
+          "measuredShotsOffered": 57,
+          "observedMeasuredServerProjectiles": 57
+        }
+      ]
+    },
+    {
+      "name": "ab-0-a",
+      "dpr": "native",
+      "reportSha256": "400f214c8a43b182f998bdc9d44b5a4ccda1db9d44756e7ae05ccff3944eb2e4",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9f881a2fd7b07c8fea42837c005609d83a7872f9b43b6c4bead09e763d4b94d0",
+        "productSha256": "7bcea7b104bf4f4f30c910a86fd1b4c30987300217a7c5703397baa8d9f53e23",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "d8aedb329fb8fbcbdef853ec034ec765bc48f4389352b97cd0f6db3902376a36"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": ["--enable-gpu"]
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 4203,
+              "deviceId": 0,
+              "vendorString": "Google Inc. (Apple)",
+              "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+              "driverVendor": "Apple",
+              "driverVersion": "26.6.2"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_METAL",
+            "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+            "glVendor": "Google Inc. (Apple)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "enabled_on",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        }
+      },
+      "fixtureHashes": [
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59"
+      ],
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 1781,
+          "p95": 16.700000000004366,
+          "p99": 16.80000000000291
+        },
+        "frameCpuMs": {
+          "count": 1781,
+          "p95": 2.7999999821186066,
+          "p99": 3.2000000178813934
+        },
+        "updateMs": {
+          "count": 1781,
+          "p95": 0.800000011920929,
+          "p99": 1.0999999940395355
+        },
+        "renderMs": {
+          "count": 1781,
+          "p95": 2.4000000059604645,
+          "p99": 2.9000000059604645
+        },
+        "parseMs": {
+          "count": 1319,
+          "p95": 0.9000000059604645,
+          "p99": 1.0999999940395355
+        },
+        "keyframeDecodeMs": {
+          "count": 11,
+          "p95": 1.699999988079071,
+          "p99": 1.699999988079071
+        },
+        "deltaDecodeMs": {
+          "count": 771,
+          "p95": 2,
+          "p99": 2.300000011920929
+        },
+        "applyMs": {
+          "count": 782,
+          "p95": 1.0999999940395355,
+          "p99": 1.2000000178813934
+        },
+        "joinMs": {
+          "count": 2,
+          "p95": 356.7999999821186,
+          "p99": 356.7999999821186
+        },
+        "inputToRenderMs": {
+          "count": 58,
+          "p95": 16.400000005960464,
+          "p99": 17.299999982118607
+        },
+        "over25Percent": 0.0
+      },
+      "acknowledgedMotionStates": 757,
+      "observedProjectiles": 46,
+      "screenshot": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/resolution-current/ab-0-a.json.touch-portrait.png",
+      "population": {
+        "humans": {
+          "total": {
+            "min": 5,
+            "median": 5.0,
+            "max": 5
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 1.0,
+            "max": 5
+          }
+        },
+        "bots": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "asteroids": {
+          "total": {
+            "min": 57,
+            "median": 77.0,
+            "max": 82
+          },
+          "visibleCenters": {
+            "min": 2,
+            "median": 6.0,
+            "max": 21
+          }
+        },
+        "satellites": {
+          "total": {
+            "min": 4,
+            "median": 5.0,
+            "max": 6
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "pickups": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 1
+          }
+        },
+        "projectiles": {
+          "total": {
+            "min": 0,
+            "median": 26.5,
+            "max": 40
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 5.0,
+            "max": 14
+          }
+        }
+      },
+      "restarts": [
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 33199.015042,
+          "durationMs": 63.13070800000423
+        },
+        {
+          "kind": "browser-gameover",
+          "startedAt": 50263.034958,
+          "durationMs": 3360.2480420000065
+        }
+      ],
+      "effectiveMetadata": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+        "dpr": 3,
+        "css": {
+          "width": 390,
+          "height": 844
+        },
+        "effectiveDpr": 3,
+        "touchPoints": 1,
+        "backing": {
+          "width": 1170,
+          "height": 2532
+        },
+        "visibility": "visible",
+        "clientReleaseId": "5d27a1a",
+        "serverReleaseId": "dev"
+      },
+      "peerWorkload": [
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 580,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 58
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 591,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 58
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 586,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 59
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 585,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 59
+        }
+      ]
+    },
+    {
+      "name": "ab-0-b",
+      "dpr": "2",
+      "reportSha256": "7fc059e1eb9ec0b7c1719a0980b2ea875d8135ea90df20e086c7be0e3016a3a0",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9f881a2fd7b07c8fea42837c005609d83a7872f9b43b6c4bead09e763d4b94d0",
+        "productSha256": "7bcea7b104bf4f4f30c910a86fd1b4c30987300217a7c5703397baa8d9f53e23",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "1cf2bb124c1cac375120ba7d3b2bc50733fb4d816cf996b3bcecbd4720072f0f"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": ["--enable-gpu"]
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 4203,
+              "deviceId": 0,
+              "vendorString": "Google Inc. (Apple)",
+              "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+              "driverVendor": "Apple",
+              "driverVersion": "26.6.2"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_METAL",
+            "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+            "glVendor": "Google Inc. (Apple)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "enabled_on",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        }
+      },
+      "fixtureHashes": [
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59"
+      ],
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 1800,
+          "p95": 16.700000000004366,
+          "p99": 16.80000000000291
+        },
+        "frameCpuMs": {
+          "count": 1800,
+          "p95": 2.800000011920929,
+          "p99": 3.399999976158142
+        },
+        "updateMs": {
+          "count": 1800,
+          "p95": 0.800000011920929,
+          "p99": 1.0999999940395355
+        },
+        "renderMs": {
+          "count": 1800,
+          "p95": 2.399999976158142,
+          "p99": 2.800000011920929
+        },
+        "parseMs": {
+          "count": 1502,
+          "p95": 0.9000000059604645,
+          "p99": 1
+        },
+        "keyframeDecodeMs": {
+          "count": 11,
+          "p95": 2.4000000059604645,
+          "p99": 2.4000000059604645
+        },
+        "deltaDecodeMs": {
+          "count": 883,
+          "p95": 2,
+          "p99": 2.2000000178813934
+        },
+        "applyMs": {
+          "count": 894,
+          "p95": 1.0999999940395355,
+          "p99": 1.2000000178813934
+        },
+        "joinMs": {
+          "count": 1,
+          "p95": 380.30000001192093,
+          "p99": 380.30000001192093
+        },
+        "inputToRenderMs": {
+          "count": 60,
+          "p95": 16.5,
+          "p99": 18.299999982118607
+        },
+        "over25Percent": 0.0
+      },
+      "acknowledgedMotionStates": 879,
+      "observedProjectiles": 50,
+      "screenshot": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/resolution-current/ab-0-b.json.touch-portrait.png",
+      "population": {
+        "humans": {
+          "total": {
+            "min": 5,
+            "median": 5.0,
+            "max": 5
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 1.0,
+            "max": 5
+          }
+        },
+        "bots": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "asteroids": {
+          "total": {
+            "min": 63,
+            "median": 76.5,
+            "max": 81
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 5.0,
+            "max": 21
+          }
+        },
+        "satellites": {
+          "total": {
+            "min": 4,
+            "median": 5.0,
+            "max": 6
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "pickups": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 1
+          }
+        },
+        "projectiles": {
+          "total": {
+            "min": 0,
+            "median": 28.0,
+            "max": 34
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 2.5,
+            "max": 14
+          }
+        }
+      },
+      "restarts": [
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 29194.15525,
+          "durationMs": 37.44454200000109
+        },
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 51192.804,
+          "durationMs": 67.85195800000656
+        }
+      ],
+      "effectiveMetadata": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+        "dpr": 3,
+        "css": {
+          "width": 390,
+          "height": 844
+        },
+        "effectiveDpr": 2,
+        "touchPoints": 1,
+        "backing": {
+          "width": 780,
+          "height": 1688
+        },
+        "visibility": "visible",
+        "clientReleaseId": "5d27a1a",
+        "serverReleaseId": "dev"
+      },
+      "peerWorkload": [
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 578,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 59
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 576,
+          "measuredShotsOffered": 58,
+          "observedMeasuredServerProjectiles": 58
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 575,
+          "measuredShotsOffered": 57,
+          "observedMeasuredServerProjectiles": 56
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 570,
+          "measuredShotsOffered": 56,
+          "observedMeasuredServerProjectiles": 56
+        }
+      ]
+    },
+    {
+      "name": "ab-1-b",
+      "dpr": "2",
+      "reportSha256": "96efed3a364f00bc14dc99d733c5f0444912c99b580dfb8f5637f5563498aa49",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9f881a2fd7b07c8fea42837c005609d83a7872f9b43b6c4bead09e763d4b94d0",
+        "productSha256": "7bcea7b104bf4f4f30c910a86fd1b4c30987300217a7c5703397baa8d9f53e23",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "f72f79957092cfceb138253adee59b302088483a645dddcb763766227f8fb8c7"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": ["--enable-gpu"]
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 4203,
+              "deviceId": 0,
+              "vendorString": "Google Inc. (Apple)",
+              "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+              "driverVendor": "Apple",
+              "driverVersion": "26.6.2"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_METAL",
+            "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+            "glVendor": "Google Inc. (Apple)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "enabled_on",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        }
+      },
+      "fixtureHashes": [
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59"
+      ],
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 1799,
+          "p95": 16.799999999995634,
+          "p99": 16.80000000000291
+        },
+        "frameCpuMs": {
+          "count": 1799,
+          "p95": 2.800000011920929,
+          "p99": 3.2000000178813934
+        },
+        "updateMs": {
+          "count": 1799,
+          "p95": 0.800000011920929,
+          "p99": 1.0999999940395355
+        },
+        "renderMs": {
+          "count": 1799,
+          "p95": 2.4000000059604645,
+          "p99": 2.899999976158142
+        },
+        "parseMs": {
+          "count": 1470,
+          "p95": 0.8999999761581421,
+          "p99": 1
+        },
+        "keyframeDecodeMs": {
+          "count": 11,
+          "p95": 1.699999988079071,
+          "p99": 1.699999988079071
+        },
+        "deltaDecodeMs": {
+          "count": 882,
+          "p95": 2,
+          "p99": 2.2000000178813934
+        },
+        "applyMs": {
+          "count": 893,
+          "p95": 1.0999999940395355,
+          "p99": 1.2000000178813934
+        },
+        "joinMs": {
+          "count": 1,
+          "p95": 372.19999998807907,
+          "p99": 372.19999998807907
+        },
+        "inputToRenderMs": {
+          "count": 61,
+          "p95": 16.69999998807907,
+          "p99": 17.30000001192093
+        },
+        "over25Percent": 0.055586436909394105
+      },
+      "acknowledgedMotionStates": 867,
+      "observedProjectiles": 50,
+      "screenshot": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/resolution-current/ab-1-b.json.touch-portrait.png",
+      "population": {
+        "humans": {
+          "total": {
+            "min": 5,
+            "median": 5.0,
+            "max": 5
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 1.0,
+            "max": 5
+          }
+        },
+        "bots": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 1.0,
+            "max": 2
+          }
+        },
+        "asteroids": {
+          "total": {
+            "min": 56,
+            "median": 71.0,
+            "max": 80
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 4.5,
+            "max": 21
+          }
+        },
+        "satellites": {
+          "total": {
+            "min": 3,
+            "median": 6.0,
+            "max": 6
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 2
+          }
+        },
+        "pickups": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 1
+          }
+        },
+        "projectiles": {
+          "total": {
+            "min": 0,
+            "median": 26.0,
+            "max": 37
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 4.5,
+            "max": 11
+          }
+        }
+      },
+      "restarts": [
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 25194.921792,
+          "durationMs": 56.45487499999945
+        },
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 43195.50975,
+          "durationMs": 34.47541700000147
+        }
+      ],
+      "effectiveMetadata": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+        "dpr": 3,
+        "css": {
+          "width": 390,
+          "height": 844
+        },
+        "effectiveDpr": 2,
+        "touchPoints": 1,
+        "backing": {
+          "width": 780,
+          "height": 1688
+        },
+        "visibility": "visible",
+        "clientReleaseId": "5d27a1a",
+        "serverReleaseId": "dev"
+      },
+      "peerWorkload": [
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 566,
+          "measuredShotsOffered": 57,
+          "observedMeasuredServerProjectiles": 56
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 570,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 58
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 573,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 58
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 575,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 58
+        }
+      ]
+    },
+    {
+      "name": "ab-1-a",
+      "dpr": "native",
+      "reportSha256": "5390f28e4f56e95533ffde85a2688a6b84f1f5b54a3ae6b913348b6dcb42ec86",
+      "git": {
+        "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+        "dirty": true,
+        "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+        "sourceSha256": "9f881a2fd7b07c8fea42837c005609d83a7872f9b43b6c4bead09e763d4b94d0",
+        "productSha256": "7bcea7b104bf4f4f30c910a86fd1b4c30987300217a7c5703397baa8d9f53e23",
+        "harnessSha256": "89f97ded98d5ccde2903905df026d2e254535ef293116f6b685944610386c185",
+        "buildSha256": "fc303e6a478b5434f092ada26ab5492bd685ae0abf9536bf13d99314802b49a8"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": ["--enable-gpu"]
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 4203,
+              "deviceId": 0,
+              "vendorString": "Google Inc. (Apple)",
+              "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+              "driverVendor": "Apple",
+              "driverVersion": "26.6.2"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_METAL",
+            "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Version 26.6.2 (Build 25G83))",
+            "glVendor": "Google Inc. (Apple)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "enabled",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "enabled",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "enabled_on",
+            "rasterization": "enabled",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "enabled_on",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "enabled",
+            "video_encode": "enabled",
+            "webgl": "enabled",
+            "webgpu": "enabled",
+            "webnn": "disabled_off"
+          }
+        }
+      },
+      "fixtureHashes": [
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59",
+        "3f51d3dec9f9e5154cf6a381e17f9fa907b5ca6c61b67ea09381b5aff80d7c59"
+      ],
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 1801,
+          "p95": 16.799999999995634,
+          "p99": 16.80000000000291
+        },
+        "frameCpuMs": {
+          "count": 1801,
+          "p95": 2.899999976158142,
+          "p99": 3.2000000178813934
+        },
+        "updateMs": {
+          "count": 1801,
+          "p95": 0.8999999761581421,
+          "p99": 1.0999999940395355
+        },
+        "renderMs": {
+          "count": 1801,
+          "p95": 2.4000000059604645,
+          "p99": 2.7999999821186066
+        },
+        "parseMs": {
+          "count": 1532,
+          "p95": 0.9000000059604645,
+          "p99": 1.0999999940395355
+        },
+        "keyframeDecodeMs": {
+          "count": 11,
+          "p95": 1.4000000059604645,
+          "p99": 1.4000000059604645
+        },
+        "deltaDecodeMs": {
+          "count": 883,
+          "p95": 2,
+          "p99": 2.2999999821186066
+        },
+        "applyMs": {
+          "count": 894,
+          "p95": 1.0999999940395355,
+          "p99": 1.2000000178813934
+        },
+        "joinMs": {
+          "count": 1,
+          "p95": 374.09999999403954,
+          "p99": 374.09999999403954
+        },
+        "inputToRenderMs": {
+          "count": 61,
+          "p95": 16.400000005960464,
+          "p99": 17.799999982118607
+        },
+        "over25Percent": 0.0
+      },
+      "acknowledgedMotionStates": 863,
+      "observedProjectiles": 55,
+      "screenshot": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/resolution-current/ab-1-a.json.touch-portrait.png",
+      "population": {
+        "humans": {
+          "total": {
+            "min": 5,
+            "median": 5.0,
+            "max": 5
+          },
+          "visibleCenters": {
+            "min": 1,
+            "median": 1.0,
+            "max": 5
+          }
+        },
+        "bots": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.5,
+            "max": 2
+          }
+        },
+        "asteroids": {
+          "total": {
+            "min": 65,
+            "median": 73.5,
+            "max": 80
+          },
+          "visibleCenters": {
+            "min": 3,
+            "median": 6.0,
+            "max": 21
+          }
+        },
+        "satellites": {
+          "total": {
+            "min": 4,
+            "median": 6.0,
+            "max": 6
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.5,
+            "max": 2
+          }
+        },
+        "pickups": {
+          "total": {
+            "min": 2,
+            "median": 2.0,
+            "max": 2
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 0.0,
+            "max": 1
+          }
+        },
+        "projectiles": {
+          "total": {
+            "min": 0,
+            "median": 25.5,
+            "max": 37
+          },
+          "visibleCenters": {
+            "min": 0,
+            "median": 3.0,
+            "max": 9
+          }
+        }
+      },
+      "restarts": [
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 28209.624083,
+          "durationMs": 73.16454200000226
+        },
+        {
+          "kind": "peer-rejoin",
+          "startedAt": 47210.441833,
+          "durationMs": 96.54349999999977
+        }
+      ],
+      "effectiveMetadata": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+        "dpr": 3,
+        "css": {
+          "width": 390,
+          "height": 844
+        },
+        "effectiveDpr": 3,
+        "touchPoints": 1,
+        "backing": {
+          "width": 1170,
+          "height": 2532
+        },
+        "visibility": "visible",
+        "clientReleaseId": "5d27a1a",
+        "serverReleaseId": "dev"
+      },
+      "peerWorkload": [
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 574,
+          "measuredShotsOffered": 58,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 575,
+          "measuredShotsOffered": 59,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 570,
+          "measuredShotsOffered": 58,
+          "observedMeasuredServerProjectiles": 57
+        },
+        {
+          "completedScenario": true,
+          "acknowledgedMotionStates": 570,
+          "measuredShotsOffered": 58,
+          "observedMeasuredServerProjectiles": 57
+        }
+      ]
+    }
+  ],
+  "artifacts": {
+    ".performance/resolution-current/run.py": "67b8432118ba94fde07a0f2fea40fee6411ae86158b2edeca30db472ed508840",
+    ".performance/resolution-current/runs.json": "fc6f5df375906419df15c6b5bd4911724aef8de5ef96b3456dea103ee8440f36",
+    ".performance/resolution-current/run.log": "70a6f7f346d670e81d49dd0b769584023ec27e13848870d51ad15f44cddaa8df",
+    ".performance/resolution-current/plan.md": "80de30571e00cf0a3eebe267e6ec18a20cb9279961f25fb8c316a9aefdfd230a",
+    ".performance/resolution-current/summarize.py": "e2c1fc6bfad3a9af31ff72968dd96d35d667ec6597138f0d1e7781403f4d52c8",
+    ".performance/resolution-current/check-fixtures.mjs": "cfcd7bb75e22d2f2ea0df9c3764668514eb8c5b9e008c5a2124bd76b7db9da15",
+    ".performance/resolution-current/summary.json": "5e922a60411b995cf93b32509f260844de2f4039d1654222b7fee36fa783c3a4"
+  },
+  "visualReview": "Native and DPR2 first A/B screenshots inspected",
+  "limits": [
+    "Only one short A/A and two alternating short A/B pairs",
+    "Different evolving battle outcomes and restarts",
+    "Not the five-minute comparison gate or phone acceptance"
+  ]
+}

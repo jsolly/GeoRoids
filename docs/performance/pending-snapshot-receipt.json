@@ -1,0 +1,451 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-12",
+  "status": "adopted after independent deterministic and live review; combined shipping gate pending",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "behavior": "A skipped unsent offer for an open pending recipient does not invalidate an accepted snapshot baseline. Explicit resync, pressure and failure paths remain intact.",
+  "deterministic": {
+    "acceptedWorldsExact": true,
+    "acceptedFramesPerArm": 3,
+    "control": {
+      "keyframes": 2,
+      "deltas": 1,
+      "bytes": 63197
+    },
+    "candidate": {
+      "keyframes": 1,
+      "deltas": 2,
+      "bytes": 34231
+    },
+    "savingBytes": 28966,
+    "savingPercent": 45.834454167128186,
+    "independentPeerFrames": 9,
+    "pendingSkips": 6,
+    "scenarios": 9
+  },
+  "live": {
+    "scope": "one AA and two reversed AB pairs; 15s warmup/30s measurement; dynamic combat; 1 browser/4 peers; seed42; native/full DPR3 touch390x844 CPU4 Chromium153 M3Metal;5Mbps down/1Mbps up40ms latency20ms jitter;exact coordinates/currentC1 andPath2D;no compression",
+    "runs": [
+      {
+        "name": "normal-aa-a",
+        "arm": "control",
+        "statesPerSecond": 20.66168981105979,
+        "snapshotBytes": 18478670,
+        "averageSnapshotBytes": 29804.3064516129,
+        "kinds": {
+          "keyframes": 109,
+          "deltas": 511
+        },
+        "gapsMs": {
+          "count": 621,
+          "mean": 48.32081514975846,
+          "p95": 125.05387500000506,
+          "p99": 133.57658299999457,
+          "max": 182.2982919999995
+        },
+        "applyP95Ms": 1,
+        "frameCpuMeanMs": 1.8693503608708908,
+        "frameCpuP95Ms": 2.699999988079071,
+        "recoveryMs": [5401.0508340000015],
+        "rawWarningCount": 19,
+        "rawErrorCount": 0,
+        "server": {
+          "rssMaxBytes": 226934784,
+          "histogramP99Max": {
+            "tickDurationMs": 2,
+            "broadcastDurationMs": 4,
+            "transportAcceptanceMs": 250
+          },
+          "discardedDebtMs": 0,
+          "outboundFailures": 0,
+          "pressureSkipped": 0
+        },
+        "git": {
+          "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+          "dirty": true,
+          "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+          "sourceSha256": "8ae00ebe8924f9e5d8442c771e016e5f6bce543a17eb3ebefcd2835f5abec769",
+          "productSha256": "e73a8ddd0d95ca18c3c1b4acb5b489dd2251b665fe2ed053a6dc68f86c811832",
+          "harnessSha256": "2c2b982176329750891b30d0fe3ab3ff99e16e03dcc82d315571901f2514a1fa",
+          "buildSha256": "a26d32903caa33217712f2000f1dccbe83f624542745c652631a62ff774b2ffa"
+        }
+      },
+      {
+        "name": "normal-aa-b",
+        "arm": "control",
+        "statesPerSecond": 24.264744495488017,
+        "snapshotBytes": 18983178,
+        "averageSnapshotBytes": 25344.696929238984,
+        "kinds": {
+          "keyframes": 66,
+          "deltas": 683
+        },
+        "gapsMs": {
+          "count": 750,
+          "mean": 41.15710622266667,
+          "p95": 120.93475000000035,
+          "p99": 131.91670800000065,
+          "max": 225.97354199999972
+        },
+        "applyP95Ms": 1,
+        "frameCpuMeanMs": 1.6396328293543398,
+        "frameCpuP95Ms": 2.4000000059604645,
+        "recoveryMs": [3403.0675420000007, 5825.691333999996],
+        "rawWarningCount": 25,
+        "rawErrorCount": 0,
+        "server": {
+          "rssMaxBytes": 219168768,
+          "histogramP99Max": {
+            "tickDurationMs": 2,
+            "broadcastDurationMs": 4,
+            "transportAcceptanceMs": 250
+          },
+          "discardedDebtMs": 0,
+          "outboundFailures": 0,
+          "pressureSkipped": 0
+        },
+        "git": {
+          "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+          "dirty": true,
+          "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+          "sourceSha256": "8ae00ebe8924f9e5d8442c771e016e5f6bce543a17eb3ebefcd2835f5abec769",
+          "productSha256": "e73a8ddd0d95ca18c3c1b4acb5b489dd2251b665fe2ed053a6dc68f86c811832",
+          "harnessSha256": "2c2b982176329750891b30d0fe3ab3ff99e16e03dcc82d315571901f2514a1fa",
+          "buildSha256": "e053d791dca48a851d27b869f744aa04e436ad6d837377f85cf615027d86f7af"
+        }
+      },
+      {
+        "name": "normal-ab-a",
+        "arm": "control",
+        "statesPerSecond": 23.758957319617746,
+        "snapshotBytes": 20820861,
+        "averageSnapshotBytes": 25961.17331670823,
+        "kinds": {
+          "keyframes": 65,
+          "deltas": 737
+        },
+        "gapsMs": {
+          "count": 803,
+          "mean": 42.036973952677464,
+          "p95": 124.04245900000387,
+          "p99": 134.00254199999836,
+          "max": 147.08879199999865
+        },
+        "applyP95Ms": 1,
+        "frameCpuMeanMs": 1.762876915301183,
+        "frameCpuP95Ms": 2.5,
+        "recoveryMs": [5171.574916999998, 5702.379708999993],
+        "rawWarningCount": 22,
+        "rawErrorCount": 0,
+        "server": {
+          "rssMaxBytes": 217022464,
+          "histogramP99Max": {
+            "tickDurationMs": 2,
+            "broadcastDurationMs": 4,
+            "transportAcceptanceMs": 250
+          },
+          "discardedDebtMs": 0,
+          "outboundFailures": 0,
+          "pressureSkipped": 0
+        },
+        "git": {
+          "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+          "dirty": true,
+          "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+          "sourceSha256": "8ae00ebe8924f9e5d8442c771e016e5f6bce543a17eb3ebefcd2835f5abec769",
+          "productSha256": "e73a8ddd0d95ca18c3c1b4acb5b489dd2251b665fe2ed053a6dc68f86c811832",
+          "harnessSha256": "2c2b982176329750891b30d0fe3ab3ff99e16e03dcc82d315571901f2514a1fa",
+          "buildSha256": "508257dad9a5dcb71cd6264ff02caeefc1d7615d614c2c0a841d5cff2176a11b"
+        }
+      },
+      {
+        "name": "normal-ab-b",
+        "arm": "candidate",
+        "statesPerSecond": 26.330029938814178,
+        "snapshotBytes": 18494976,
+        "averageSnapshotBytes": 23411.362025316455,
+        "kinds": {
+          "keyframes": 9,
+          "deltas": 781
+        },
+        "gapsMs": {
+          "count": 791,
+          "mean": 37.931433417193425,
+          "p95": 119.35400000000664,
+          "p99": 131.02833299999475,
+          "max": 190.72804200000246
+        },
+        "applyP95Ms": 1,
+        "frameCpuMeanMs": 1.8120622563488022,
+        "frameCpuP95Ms": 2.699999988079071,
+        "recoveryMs": [5313.812749999997],
+        "rawWarningCount": 20,
+        "rawErrorCount": 0,
+        "server": {
+          "rssMaxBytes": 225886208,
+          "histogramP99Max": {
+            "tickDurationMs": 2,
+            "broadcastDurationMs": 4,
+            "transportAcceptanceMs": 250
+          },
+          "discardedDebtMs": 0,
+          "outboundFailures": 0,
+          "pressureSkipped": 0
+        },
+        "git": {
+          "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+          "dirty": true,
+          "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+          "sourceSha256": "d8ffef4c306bccdb82a4b81d406a8a4f71f9452c4ba1c7e834600c51410778d0",
+          "productSha256": "3a40c5a33506a7e2bac448680f025158355bfac28b64f5a0e3cf3bb2d2760566",
+          "harnessSha256": "2c2b982176329750891b30d0fe3ab3ff99e16e03dcc82d315571901f2514a1fa",
+          "buildSha256": "1631750d2721ede188208647bec1b0eafe788d2cb7a3078a4e10703adcf9b601"
+        }
+      },
+      {
+        "name": "normal-ba-b",
+        "arm": "candidate",
+        "statesPerSecond": 27.563828817970006,
+        "snapshotBytes": 18479491,
+        "averageSnapshotBytes": 22345.212817412335,
+        "kinds": {
+          "keyframes": 10,
+          "deltas": 817
+        },
+        "gapsMs": {
+          "count": 828,
+          "mean": 36.235614330917876,
+          "p95": 119.47000000000116,
+          "p99": 134.16212500000256,
+          "max": 171.68041700000322
+        },
+        "applyP95Ms": 1,
+        "frameCpuMeanMs": 1.842166666256057,
+        "frameCpuP95Ms": 2.699999988079071,
+        "recoveryMs": [5850.744583000003],
+        "rawWarningCount": 16,
+        "rawErrorCount": 0,
+        "server": {
+          "rssMaxBytes": 171458560,
+          "histogramP99Max": {
+            "tickDurationMs": 2,
+            "broadcastDurationMs": 4,
+            "transportAcceptanceMs": 100
+          },
+          "discardedDebtMs": 0,
+          "outboundFailures": 0,
+          "pressureSkipped": 0
+        },
+        "git": {
+          "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+          "dirty": true,
+          "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+          "sourceSha256": "d8ffef4c306bccdb82a4b81d406a8a4f71f9452c4ba1c7e834600c51410778d0",
+          "productSha256": "3a40c5a33506a7e2bac448680f025158355bfac28b64f5a0e3cf3bb2d2760566",
+          "harnessSha256": "2c2b982176329750891b30d0fe3ab3ff99e16e03dcc82d315571901f2514a1fa",
+          "buildSha256": "77d903dc71dd7f4da6e7c39ed2fd4248e3cf09ee09eba17fcd55c46eeb828c99"
+        }
+      },
+      {
+        "name": "normal-ba-a",
+        "arm": "control",
+        "statesPerSecond": 22.66208023932756,
+        "snapshotBytes": 18481716,
+        "averageSnapshotBytes": 27178.99411764706,
+        "kinds": {
+          "keyframes": 79,
+          "deltas": 601
+        },
+        "gapsMs": {
+          "count": 681,
+          "mean": 44.06177900146843,
+          "p95": 124.24566700000287,
+          "p99": 139.08812500000204,
+          "max": 216.17316700000083
+        },
+        "applyP95Ms": 1,
+        "frameCpuMeanMs": 1.7559133813256758,
+        "frameCpuP95Ms": 2.5,
+        "recoveryMs": [3627.268082999999],
+        "rawWarningCount": 23,
+        "rawErrorCount": 0,
+        "server": {
+          "rssMaxBytes": 212860928,
+          "histogramP99Max": {
+            "tickDurationMs": 2,
+            "broadcastDurationMs": 4,
+            "transportAcceptanceMs": 250
+          },
+          "discardedDebtMs": 0,
+          "outboundFailures": 0,
+          "pressureSkipped": 0
+        },
+        "git": {
+          "commit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+          "dirty": true,
+          "lockfileSha256": "5ba7fd5758214a9f6a986416218364c40fda39d7a1946219894d49abbaea8691",
+          "sourceSha256": "8ae00ebe8924f9e5d8442c771e016e5f6bce543a17eb3ebefcd2835f5abec769",
+          "productSha256": "e73a8ddd0d95ca18c3c1b4acb5b489dd2251b665fe2ed053a6dc68f86c811832",
+          "harnessSha256": "2c2b982176329750891b30d0fe3ab3ff99e16e03dcc82d315571901f2514a1fa",
+          "buildSha256": "4dae5c5415e02c214de099745462ba44a70a7f51234baa65bd5b699d32d1b158"
+        }
+      }
+    ]
+  },
+  "verification": {
+    "isolatedControlUnitTests": 17,
+    "isolatedCandidateUnitTests": 19,
+    "isolatedTypesWikiBuild": "passed for both arms",
+    "firstProductUnitCommand": "43 tests passed, but three scratch-copy suites failed import resolution because Vitest used substring path filtering; narrowed unit script discovery to tests/unit",
+    "focusedProductRerun": {
+      "passed": 19,
+      "files": 1,
+      "failed": 0,
+      "skipped": 0,
+      "command": "npx vitest run --dir tests/unit tests/unit/network/current-pilots-share-a-server.test.ts"
+    },
+    "fullShippingGate": "pending",
+    "wiki": "Internal transport change; no player controls or Wiki copy affected. Source-review record will be refreshed after combined verification."
+  },
+  "limits": [
+    "The selected stalled sequence is delta-favorable; 45.8% is not a whole-session saving.",
+    "Dynamic live worlds differ. Exact delivery percentage is not isolated beyond all AA variation.",
+    "No reliable recovery-time or client-CPU gain; no physical-phone FPS or long-soak result.",
+    "Raw server logs retain stale enhanced movement warnings; browser diagnostics and raw error arrays are empty.",
+    "The separate failed-callback benchmark-readiness repair is still in progress."
+  ],
+  "sourcesAtAdoption": [
+    {
+      "path": "server/services/GameStateBroadcaster.ts",
+      "bytes": 20506,
+      "sha256": "3992128a39600d292b5bf0482a3eb183da5bc9be65c0b76ebcb7e06bbf4a0570"
+    },
+    {
+      "path": "tests/unit/network/current-pilots-share-a-server.test.ts",
+      "bytes": 25818,
+      "sha256": "7b607bb76890aecf502aab514dc854e06b4c888147aa3a2d393887ece1bc6c39"
+    },
+    {
+      "path": "shared/snapshotProtocol.ts",
+      "bytes": 17567,
+      "sha256": "fca64e2a0fe8bdeaa95017c41f4d7db8aef14bd40022aadaf14043bd77ca7411"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".performance/pending-snapshot/source-hashes.json",
+      "bytes": 1473,
+      "sha256": "1dd3372b5e054ad4a258ab3a7a49688801734cb9bfa7cb7afdad15f8581afd51"
+    },
+    {
+      "path": ".performance/pending-snapshot/work-count.json",
+      "bytes": 273958,
+      "sha256": "633faef729e2e9f91b158c2e7b1397689de58c01f3963839a252241605784d0d"
+    },
+    {
+      "path": ".performance/pending-snapshot/product-unit-test.patch",
+      "bytes": 4250,
+      "sha256": "4456f4335b0798f510dd2bfd7785d295dc899f7156786390cffb1c1440c2a58b"
+    },
+    {
+      "path": ".performance/pending-snapshot/implementation-critic.md",
+      "bytes": 5729,
+      "sha256": "5ea411ac4c41349733d7efc80d445a23bbe44169e09415cc19b219d44af75a84"
+    },
+    {
+      "path": ".performance/pending-snapshot/network-adoption-critic.md",
+      "bytes": 9975,
+      "sha256": "ae9834b33ee64dd52904230ae33aa16b1c00bf3406e1a6b77dc12619bb8b8c22"
+    },
+    {
+      "path": ".performance/pending-snapshot/product-integration.json",
+      "bytes": 316,
+      "sha256": "ef6cc05b33ed51f167e63e6e5f4a3f0b1d868a032ca783eac28b7b2b7c95041c"
+    },
+    {
+      "path": ".performance/pending-snapshot/product-units.log",
+      "bytes": 392029,
+      "sha256": "28059868476998a5625033700ff76ec739bd3e7fa806158555b56234e924cccd"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/summary.json",
+      "bytes": 126576,
+      "sha256": "521c33a513544960590a7e824f5e29c479efa95ffd03ff835cfe1aada7990ec8"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/runs.json",
+      "bytes": 3693,
+      "sha256": "92688bc110e3c2a2a6a41408d94531125ab247265f18693a70b8abaa646a20a7"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/source-restoration.json",
+      "bytes": 705,
+      "sha256": "363333dc775b67e74b2113cb2e227625315c2844bbb806dc0988202fbe300dc9"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-aa-a.json",
+      "bytes": 6639441,
+      "sha256": "ebe2aac3af008f78d97db3bd660c080cf66f63b87a9ce7e52d43f08b6b151052"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-aa-b.json",
+      "bytes": 6346428,
+      "sha256": "303067ac4d4da2cb1b8997f80a3922e1c8bad0b670e86eaa13c5030fe80e0644"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ab-a.json",
+      "bytes": 6618984,
+      "sha256": "d6e96eacf55b4b2444710bec2cc2b4949286f95d2ad664332705bb0933632a64"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ab-b.json",
+      "bytes": 6632109,
+      "sha256": "e5d643468d089f36e9639b1ee4fb8ac2d1ffc81ffe35df2c3f98345fbbad1990"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ba-a.json",
+      "bytes": 6855410,
+      "sha256": "a4b734a8c5caa43bc03764bf6aeff8a06bb88feb08e200ec5656cc7d14367bc9"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ba-b.json",
+      "bytes": 6655952,
+      "sha256": "a7c69e00ce8146c0b104edc934523b9b240d66fef535e20e2499f4ff4f8ccced"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-aa-a.log",
+      "bytes": 149864,
+      "sha256": "62a8c8bc1a0481fde470747b2ef8bd9b70c2ac6d41505442af2f244373f52372"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-aa-b.log",
+      "bytes": 158905,
+      "sha256": "a128fe7a7f76db6a52c44e49ad7d1d32084c71b2c459b8d29462194d56be3638"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ab-a.log",
+      "bytes": 157827,
+      "sha256": "39cf886aea30438a2c125fb85362193064958500bb91437a4b08cde940c83975"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ab-b.log",
+      "bytes": 146252,
+      "sha256": "871bb7fb8bfc5e70dc0799ff775f5b31ccf86e3620c98c45f79f0e855bb2332a"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ba-a.log",
+      "bytes": 150936,
+      "sha256": "81c5d37902aa0d8fa229d793797ae3c17295b00c9468bffc94a83ef2cc5e7e43"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/pending-snapshot-network/.performance/pending-network/network/normal-ba-b.log",
+      "bytes": 145815,
+      "sha256": "aa2b061fc37fd27e21949a081261be2a776e5513d3f38ab8ac1abafac6434631"
+    },
+    {
+      "path": ".performance/pending-snapshot/product-units-rerun.log",
+      "bytes": 169438,
+      "sha256": "c08ad37821f2247d99940b63d18e0ed07265dba7b8e52cce27b4653c05ca1879"
+    }
+  ]
+}

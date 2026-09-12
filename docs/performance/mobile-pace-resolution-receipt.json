@@ -1,0 +1,505 @@
+{
+  "interpretation": "Exploratory software-renderer sessions, not calibrated A/A and A/B or phone acceptance. Long DPR2 run overlaps an initial eight-second observation.",
+  "reports": [
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-pace-performance/.performance/mobile-pace/native-1.json",
+      "sha256": "1386d2860f3d93c714becd39c54264f4953130a649e83cf2639dfbcb43fa075b",
+      "status": "passed",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": false,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+        "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "d755c41e47f13d3c7d9fee3a8e21b7015c33e9818207a5a0dc1aefdfa206a7d6"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": []
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 65535,
+              "deviceId": 65535,
+              "vendorString": "Google Inc. (Google)",
+              "deviceString": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+              "driverVendor": "SwANGLE",
+              "driverVersion": "5.0.0"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_SWIFTSHADER",
+            "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+            "glVendor": "Google Inc. (Google)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "unavailable_software",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "disabled_software",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "disabled_off",
+            "rasterization": "disabled_software",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "disabled_off",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "disabled_software",
+            "video_encode": "disabled_software",
+            "webgl": "unavailable_software",
+            "webgpu": "unavailable_software",
+            "webnn": "unavailable_software"
+          }
+        }
+      },
+      "measuredSeconds": 90,
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 3574,
+          "p95": 33.400000000001455,
+          "p99": 49.90000000000873,
+          "over25Percent": 48.88080581980974
+        },
+        "renderMs": {
+          "count": 3574,
+          "p95": 2.5,
+          "p99": 3.0999999940395355,
+          "over25Percent": 0
+        },
+        "frameCpuMs": {
+          "count": 3574,
+          "p95": 3,
+          "p99": 3.699999988079071,
+          "over25Percent": 0
+        },
+        "inputToRenderMs": {
+          "count": 175,
+          "p95": 4.299999982118607,
+          "p99": 5.699999988079071,
+          "over25Percent": 0
+        }
+      },
+      "scenarios": [
+        {
+          "durationMs": 90019.655834,
+          "inputSteps": 102,
+          "rejoins": 5,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-pace-performance/.performance/mobile-pace/dpr2-1.json",
+      "sha256": "b93e4afc86fadb8d1b84e6b8331310e5085fcfb1708ec2908e233687cb0a647d",
+      "status": "passed",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": false,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+        "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "208bf26d06c534e965016d95d4bf933e92f92cd5799f10a1fd430c8d84270167"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": []
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 65535,
+              "deviceId": 65535,
+              "vendorString": "Google Inc. (Google)",
+              "deviceString": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+              "driverVendor": "SwANGLE",
+              "driverVersion": "5.0.0"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_SWIFTSHADER",
+            "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+            "glVendor": "Google Inc. (Google)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "unavailable_software",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "disabled_software",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "disabled_off",
+            "rasterization": "disabled_software",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "disabled_off",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "disabled_software",
+            "video_encode": "disabled_software",
+            "webgl": "unavailable_software",
+            "webgpu": "unavailable_software",
+            "webnn": "unavailable_software"
+          }
+        }
+      },
+      "measuredSeconds": 90,
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 5294,
+          "p95": 16.799999999995634,
+          "p99": 33.30000000000291,
+          "over25Percent": 1.2278050623347185
+        },
+        "renderMs": {
+          "count": 5294,
+          "p95": 2.0999999940395355,
+          "p99": 2.5,
+          "over25Percent": 0
+        },
+        "frameCpuMs": {
+          "count": 5294,
+          "p95": 2.4000000059604645,
+          "p99": 2.9000000059604645,
+          "over25Percent": 0
+        },
+        "inputToRenderMs": {
+          "count": 177,
+          "p95": 8.099999994039536,
+          "p99": 8.900000005960464,
+          "over25Percent": 0
+        }
+      },
+      "scenarios": [
+        {
+          "durationMs": 90007.726417,
+          "inputSteps": 103,
+          "rejoins": 4,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-pace-performance/.performance/mobile-pace/glow-off-1.json",
+      "sha256": "71832aa4e20942083977dd7c185f145cb1290052e44c7c8b31cc8dad129ba75a",
+      "status": "passed",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": false,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+        "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "9fc1bca9c28c337e12075360819f17d7948fb987f334de2bc147553b2839dfe4"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": []
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 65535,
+              "deviceId": 65535,
+              "vendorString": "Google Inc. (Google)",
+              "deviceString": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+              "driverVendor": "SwANGLE",
+              "driverVersion": "5.0.0"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_SWIFTSHADER",
+            "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+            "glVendor": "Google Inc. (Google)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "unavailable_software",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "disabled_software",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "disabled_off",
+            "rasterization": "disabled_software",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "disabled_off",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "disabled_software",
+            "video_encode": "disabled_software",
+            "webgl": "unavailable_software",
+            "webgpu": "unavailable_software",
+            "webnn": "unavailable_software"
+          }
+        }
+      },
+      "measuredSeconds": 90,
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 4345,
+          "p95": 33.400000000001455,
+          "p99": 33.40000000000873,
+          "over25Percent": 24.257767548906788
+        },
+        "renderMs": {
+          "count": 4345,
+          "p95": 2.5999999940395355,
+          "p99": 3.0999999940395355,
+          "over25Percent": 0.023014959723820484
+        },
+        "frameCpuMs": {
+          "count": 4345,
+          "p95": 3.0999999940395355,
+          "p99": 3.699999988079071,
+          "over25Percent": 0.023014959723820484
+        },
+        "inputToRenderMs": {
+          "count": 181,
+          "p95": 4.0999999940395355,
+          "p99": 8.199999988079071,
+          "over25Percent": 0
+        }
+      },
+      "scenarios": [
+        {
+          "durationMs": 90023.999417,
+          "inputSteps": 105,
+          "rejoins": 6,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-measurement-baseline/.performance/mobile-pace/dpr2-long.json",
+      "sha256": "722b892f0661134f7852a587fb537f86c9b0f42e7cb796a04d23f2f0019ec1c5",
+      "status": "passed",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": false,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+        "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "aa91a0d9f0e3d362087abef5f1f78baddc758ac4d7a06f090881902914bdf69d"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": []
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 65535,
+              "deviceId": 65535,
+              "vendorString": "Google Inc. (Google)",
+              "deviceString": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+              "driverVendor": "SwANGLE",
+              "driverVersion": "5.0.0"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_SWIFTSHADER",
+            "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+            "glVendor": "Google Inc. (Google)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "unavailable_software",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "disabled_software",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "disabled_off",
+            "rasterization": "disabled_software",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "disabled_off",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "disabled_software",
+            "video_encode": "disabled_software",
+            "webgl": "unavailable_software",
+            "webgpu": "unavailable_software",
+            "webnn": "unavailable_software"
+          }
+        }
+      },
+      "measuredSeconds": 330,
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 18810,
+          "p95": 33.19999999999709,
+          "p99": 33.39999999999418,
+          "over25Percent": 5.039872408293461
+        },
+        "renderMs": {
+          "count": 18811,
+          "p95": 2.2000000178813934,
+          "p99": 2.7999999821186066,
+          "over25Percent": 0.005316038488118654
+        },
+        "frameCpuMs": {
+          "count": 18811,
+          "p95": 2.5999999940395355,
+          "p99": 3.2999999821186066,
+          "over25Percent": 0.005316038488118654
+        },
+        "inputToRenderMs": {
+          "count": 658,
+          "p95": 6.700000017881393,
+          "p99": 8.099999994039536,
+          "over25Percent": 0
+        }
+      },
+      "scenarios": [
+        {
+          "durationMs": 330016.71516599995,
+          "inputSteps": 358,
+          "rejoins": 18,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-measurement-baseline/.performance/mobile-pace/native-long.json",
+      "sha256": "243877d24c88b58c1e1325489c129352bb451ec7bf43ce234ae46041cd75049a",
+      "status": "passed",
+      "git": {
+        "commit": "771acd9261d9e6b2388593923ed2cf134440cd85",
+        "dirty": false,
+        "lockfileSha256": "6ee8b133e7a5a915a480b5b0a3ab49557182b921fa982487b35d81c826520f4f",
+        "sourceSha256": "e8ecf747b57290105be96647936b83ed585f1923171ffd6a6bbbebaceb395fb9",
+        "productSha256": "a3bd6001a7fd7131693da555cb0e5db18252a56cf4e8d31e3b0a33aaa5f664b7",
+        "harnessSha256": "ad7e00a9dee4f45eb364d39cfb9d88c5087782c0a712cb62134dd65735bc505d",
+        "buildSha256": "6cff68cd6a75b64cc344efec3f94027fdfd320f933302c5e53d9f08ce1ee32b8"
+      },
+      "environment": {
+        "nodeVersion": "v24.16.0",
+        "os": "darwin",
+        "osRelease": "25.6.0",
+        "arch": "arm64",
+        "cpuModel": "Apple M3",
+        "browser": {
+          "name": "chromium",
+          "version": "153.0.8010.12",
+          "launchFlags": []
+        },
+        "measurementSource": "emulated-touch",
+        "physicalDevice": false,
+        "gpu": {
+          "supported": true,
+          "devices": [
+            {
+              "vendorId": 65535,
+              "deviceId": 65535,
+              "vendorString": "Google Inc. (Google)",
+              "deviceString": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+              "driverVendor": "SwANGLE",
+              "driverVersion": "5.0.0"
+            }
+          ],
+          "renderer": {
+            "displayType": "ANGLE_SWIFTSHADER",
+            "glRenderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver-5.0.0)",
+            "glVendor": "Google Inc. (Google)",
+            "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28646 git hash: a6bc9eff8444)",
+            "passthroughCmdDecoder": true
+          },
+          "featureStatus": {
+            "2d_canvas": "unavailable_software",
+            "direct_rendering_display_compositor": "disabled_off_ok",
+            "gpu_compositing": "disabled_software",
+            "multiple_raster_threads": "enabled_on",
+            "opengl": "disabled_off",
+            "rasterization": "disabled_software",
+            "raw_draw": "disabled_off_ok",
+            "skia_graphite": "disabled_off",
+            "trees_in_viz": "disabled_off",
+            "video_decode": "disabled_software",
+            "video_encode": "disabled_software",
+            "webgl": "unavailable_software",
+            "webgpu": "unavailable_software",
+            "webnn": "unavailable_software"
+          }
+        }
+      },
+      "measuredSeconds": 330,
+      "metrics": {
+        "frameIntervalMs": {
+          "count": 14283,
+          "p95": 33.40000000000873,
+          "p99": 33.5,
+          "over25Percent": 37.324091577399706
+        },
+        "renderMs": {
+          "count": 14283,
+          "p95": 2.2000000178813934,
+          "p99": 2.699999988079071,
+          "over25Percent": 0.007001330252748022
+        },
+        "frameCpuMs": {
+          "count": 14283,
+          "p95": 2.5999999940395355,
+          "p99": 3.100000023841858,
+          "over25Percent": 0.007001330252748022
+        },
+        "inputToRenderMs": {
+          "count": 656,
+          "p95": 3.4000000059604645,
+          "p99": 3.9000000059604645,
+          "over25Percent": 0
+        }
+      },
+      "scenarios": [
+        {
+          "durationMs": 330019.703042,
+          "inputSteps": 357,
+          "rejoins": 17,
+          "errors": [],
+          "warnings": []
+        }
+      ]
+    }
+  ]
+}

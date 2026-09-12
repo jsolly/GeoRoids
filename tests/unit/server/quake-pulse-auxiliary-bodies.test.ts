@@ -3,6 +3,7 @@ import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { SatelliteManager } from '../../../server/core/SatelliteManager';
 import { SatellitePickupManager } from '../../../server/core/SatellitePickupManager';
+import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 
 describe('Quake pulse auxiliary bodies', () => {
   test('kicks loot through the expiry update and damps the motion', () => {
@@ -42,7 +43,7 @@ describe('Quake pulse auxiliary bodies', () => {
     satellite.orbitPhase = 0;
     satellite.velocity = { x: 0, y: 0 };
     expect(manager.applyQuakePulse({ x: 0, y: 0 }, 0)).toBe(1);
-    expect(satellite.velocity.x).toBeCloseTo(24);
+    expect(satellite.velocity.x).toBeCloseTo(SHIP_ABILITY.SHOCK_FORCE);
 
     manager.update([]);
     const afterFirst = manager.getSatellite(created.id);

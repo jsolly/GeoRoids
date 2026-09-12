@@ -30,6 +30,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
       'src/entities/ship/harpoonSling.ts',
+      'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipRenderer.ts',
       'shared/combat.ts',
     ],
@@ -95,6 +96,7 @@ export const media: Record<string, WikiMediaEntry> = {
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',
+      'src/physics/terrain/terrainConfig.ts',
       'src/physics/terrain/slopeForce.ts',
       'src/rendering/contourLabels.ts',
     ],
@@ -136,6 +138,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'Controlled demonstration: two pilots hit one large rock within the collaboration window. It splits and sends out two shockwaves.',
     sources: [
       'server/core/AsteroidManager.ts',
+      'shared/asteroidPhenomena.ts',
       'src/physics/shockwave.ts',
       'src/constants/index.ts',
       'src/entities/roid/materialArt.ts',
@@ -161,6 +164,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'Controlled demonstration: a nearby Echo attaches automatically, keeps orbiting while a hostile laser removes 25 health, and remains active after the hit.',
     sources: [
       'server/core/SatellitePickupManager.ts',
+      'src/constants/index.ts',
       'src/entities/satellitePickup/satellitePickupMath.ts',
       'src/entities/satellitePickup/satellitePickupRenderer.ts',
     ],

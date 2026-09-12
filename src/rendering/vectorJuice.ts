@@ -187,7 +187,7 @@ export function strokePhosphorPolyline(
   ctx.stroke();
   ctx.shadowBlur = 0;
   ctx.strokeStyle = hexToRgba(color, alpha);
-  trace();
+  // stroke() retains the path; reuse it for the crisp pass.
   ctx.stroke();
   ctx.restore();
 }

@@ -6,6 +6,7 @@ import { SnapshotDecoder, SnapshotEncoder, type SnapshotFrame } from '../shared/
 import type { PlayerProjectileState, ServerGameSnapshot } from '../shared-types';
 import { snapshotFixture } from '../tests/unit/network/snapshotFixture';
 import { type Measurement, validateMeasurement } from './results';
+import { assertSelectedSnapshotState, SELECTED_SNAPSHOT_CONTRACT } from './snapshot-state';
 
 type Variant = 'keyframe' | 'delta';
 type Payloads = Record<Variant, string>;
@@ -75,7 +76,15 @@ function parsedData(text: string): unknown {
 }
 
 function decodeSnapshot(text: string, decoder: SnapshotDecoder): ServerGameSnapshot {
-  return decoder.decode(parsedData(text));
+  const result = decoder.readMessage(text, { acceptSnapshots: true });
+  switch (result.kind) {
+    case 'snapshot':
+      return result.state;
+    case 'snapshot-rejected':
+      throw result.error;
+    case 'message':
+      throw new Error('Protocol experiment expected a snapshot message');
+  }
 }
 
 /** A small active laser set matching the fields emitted by GameEngine.getPlayerProjectiles(). */
@@ -116,11 +125,14 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     };
   });
   const history: Array<Payloads & { encoder: SnapshotEncoder }> = [];
+  const originalWorlds = structuredClone(worlds);
   let previous: SnapshotEncoder | undefined;
   for (const [tick, world] of worlds.entries()) {
     const current = payloads(world, tick + 1, previous);
+    assert.deepEqual(world, originalWorlds[tick], `Protocol encoder mutated input at tick ${tick}`);
     if (tick > 0) {
-      const frame = parsedData(current.delta) as SnapshotFrame;
+      const frame = parsedData(current.delta);
+      assert(frame && typeof frame === 'object' && 'kind' in frame);
       assert.equal(frame.kind, 'delta');
     }
     history.push(current);
@@ -147,12 +159,12 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
     if (tick > 0) {
       assert(previousState);
     }
-    assert.deepEqual(decodeSnapshot(current.keyframe, decoders.keyframe), world);
-    assert.deepEqual(decodeSnapshot(current.delta, decoders.delta), world);
+    assertSelectedSnapshotState(decodeSnapshot(current.keyframe, decoders.keyframe), world);
+    assertSelectedSnapshotState(decodeSnapshot(current.delta, decoders.delta), world);
     for (const variant of variants) {
       const text = current[variant];
       const encodeSerializeSamples = samplesFor(`${variant}-encode-serialize-ms`);
-      const decodeSamples = samplesFor(`${variant}-decode-ms`);
+      const parseDecodeSamples = samplesFor(`${variant}-parse-decode-ms`);
       const gzipSamples = samplesFor(`${variant}-gzip-ms`);
       const deflateSamples = samplesFor(`${variant}-deflate-ms`);
       encodeSerializeSamples.push(
@@ -167,7 +179,8 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
           envelope('snapshot', frame);
         })
       );
-      decodeSamples.push(
+      assert.deepEqual(world, originalWorlds[tick], `Timed ${variant} encoder mutated its input`);
+      parseDecodeSamples.push(
         timed(() => {
           decodeSnapshot(text, timedDecoders[variant]);
         })
@@ -204,6 +217,7 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
       (counts[`${variant}-deflate-bytes-total`] ?? 0) / input.measuredTicks;
   }
   const unicodeProbe = '🛰️ Δ';
+  assert.deepEqual(worlds, originalWorlds, 'Protocol experiment changed its original inputs');
   assert(Buffer.byteLength(unicodeProbe, 'utf8') > unicodeProbe.length);
   return {
     primaryMetric: 'delta-encode-serialize-ms',
@@ -218,6 +232,10 @@ function runProtocolExperiment(input: ProtocolExperimentOptions = DEFAULTS): Mea
       },
       utf8ByteSizing: "Buffer.byteLength(payload, 'utf8')",
       unicodeProbe: { value: unicodeProbe, utf8Bytes: Buffer.byteLength(unicodeProbe, 'utf8') },
+      stateContract: {
+        decoded: SELECTED_SNAPSHOT_CONTRACT,
+        originalInputsUnchanged: true,
+      },
       runtime: { node: process.version, platform: process.platform, arch: process.arch },
     },
     cleanup: 'complete',

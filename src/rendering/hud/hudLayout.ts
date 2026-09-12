@@ -124,6 +124,8 @@ export function computeHudLayout(
   const padBottom = Math.max(12, safe.bottom + 8);
   const compactHeight = viewport.height < 500;
   const boardWidth = viewport.width < 400 ? 148 : 168;
+  const rowHeight = compactHeight ? 16 : 18;
+  const maxRows = compactHeight ? 4 : 6;
   const miniMapSize = compactHeight ? 64 : 80;
   const lives = { x: padLeft, y: padTop };
   const factionY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
@@ -156,13 +158,13 @@ export function computeHudLayout(
     padBottom,
     lives,
     score: { x: padLeft, y: padTop },
-    killMessageY: padTop,
+    killMessageY: Math.max(fuel.y + fuel.height, padTop + rowHeight * maxRows) + 12,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
       width: boardWidth,
-      rowHeight: compactHeight ? 16 : 18,
-      maxRows: compactHeight ? 4 : 6,
+      rowHeight,
+      maxRows,
     },
     miniMap,
     overlayFontScale,

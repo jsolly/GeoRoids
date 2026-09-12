@@ -1,4 +1,8 @@
 import { expect, test } from 'vitest';
+import {
+  assertNoBrowserDiagnostics,
+  watchBrowserDiagnostics,
+} from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import type { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -10,7 +14,7 @@ import {
   waitForLaserCleanup,
 } from './laser-observation';
 
-const { browserManager } = createBrowserScenarioHooks();
+const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 async function expectPilotsAliveWithUnchangedLives(
   game1: GameInteractions,
@@ -59,6 +63,8 @@ test(
   'two pilots exchange matching laser state and remove each expired shot',
   async () => {
     const { page1, page2, game1, game2 } = await bootLaserClients(browserManager);
+    const diagnostics1 = watchBrowserDiagnostics(page1);
+    const diagnostics2 = watchBrowserDiagnostics(page2);
     const id1 = await localPlayerId(page1);
     const id2 = await localPlayerId(page2);
     const livesBeforeFirstExchange: [number, number] = [
@@ -102,6 +108,11 @@ test(
       waitForLaserCleanup(page1, id2, true),
     ]);
     await expectPilotsAliveWithUnchangedLives(game1, game2, id1, id2, livesBeforeSecondExchange);
+    await page1.screenshot({
+      path: screenshotManager.getScreenshotPath('slower-projectiles-desktop.png'),
+    });
+    assertNoBrowserDiagnostics(diagnostics1);
+    assertNoBrowserDiagnostics(diagnostics2);
   },
   TestConfig.DEFAULT_TIMEOUT * 2
 );

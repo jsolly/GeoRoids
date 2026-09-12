@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-12",
+  "status": "isolated and current-product optimization plus integration accepted; combined browser, 1232 unit tests and production build passed; shipping gate pending",
+  "implementationWorktree": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "scope": {
+    "singleParse": "product, timed workload and ordinary mixed-message routing",
+    "untimedRawWireObservers": "separate exact-envelope assertions may parse their own observation",
+    "retainedBaseline": "fully detached mutable application result; one full DTO validation; copyJson guards retained",
+    "performance": "isolated full raw parse/decode/retention; not phone FPS or browser apply"
+  },
+  "prototypeTiming": [
+    {
+      "mode": "delta-stream",
+      "medianSavingPercent": 15.378872745335928,
+      "maximumAaDriftPercent": 0.38506031384947503,
+      "pairedSavingsPercent": [12.14410040740779, 15.378872745335928, 18.9234221921216]
+    },
+    {
+      "mode": "keyframes",
+      "medianSavingPercent": 13.946785103388864,
+      "maximumAaDriftPercent": 3.538122805572001,
+      "pairedSavingsPercent": [13.946785103388864, 14.165765851016765, 13.904036775116444]
+    }
+  ],
+  "prototypeCorrectness": {
+    "worlds": 300,
+    "wireCases": 2659,
+    "accepted": 627,
+    "rejected": 2032,
+    "fieldPaths": 166,
+    "atomicRecoveryCases": 11
+  },
+  "verification": {
+    "focusedProductTests": {
+      "files": 6,
+      "passed": 58,
+      "skipped": 0
+    },
+    "firstCombinedUnits": {
+      "passed": 1226,
+      "failed": 3,
+      "failures": [
+        "two jsdom Path2D fixture gaps, subsequently corrected and focused2/2 pass",
+        "one stale Wiki source review"
+      ]
+    },
+    "fullGate": "pending",
+    "combinedBrowser": {
+      "status": "passed across initial and affected rerun",
+      "initial": "7 passed;1 fixture string-payload observation failed",
+      "rerun": "all5 motion-socket scenarios passed",
+      "otherPassed": ["reconnect", "sustained mobile controls", "desktop/mobile Wiki"]
+    },
+    "currentCombinedUnits": {
+      "files": 216,
+      "passed": 1232,
+      "failed": 0,
+      "skipped": 0
+    },
+    "productionBuild": "passed after fresh Wiki source review"
+  },
+  "sourcesAtReceiptCreation": [
+    {
+      "path": "shared/snapshotProtocol.ts",
+      "bytes": 17567,
+      "sha256": "fca64e2a0fe8bdeaa95017c41f4d7db8aef14bd40022aadaf14043bd77ca7411"
+    },
+    {
+      "path": "src/network/services/ConnectionManager.ts",
+      "bytes": 61855,
+      "sha256": "c0a9206974fd2d9f326f5b2f231c721ee84ee11ca972f722740e96edc2d191be"
+    },
+    {
+      "path": "src/network/types.ts",
+      "bytes": 321,
+      "sha256": "d2c747043fc9dbf319fe5618d87156f136e72d3a7d5c6029d84f61e5430fb757"
+    },
+    {
+      "path": "shared-types.ts",
+      "bytes": 8679,
+      "sha256": "173464c96f5470487e8667a29c35f6d477e45aeda299dd83f8112cf18212e448"
+    },
+    {
+      "path": "benchmarks/codec.ts",
+      "bytes": 12549,
+      "sha256": "f09fa36c30e655c30db070d3bdf8b6d80323463a3b37e2ccfcadc6f1edc678e7"
+    },
+    {
+      "path": "tests/unit/network/runtime-client-negotiates-and-recovers.test.ts",
+      "bytes": 35332,
+      "sha256": "1194ae29f9c5bc62a01137977fef13d067786033a083667fbe7cbb95c4416c2c"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".performance/decoder-owned-input/source-provenance.json",
+      "bytes": 825,
+      "sha256": "affa7af9afb228037ba795317cf6d334260b4772e84e1bd7e2be9f515a81b2f6"
+    },
+    {
+      "path": ".performance/decoder-owned-input/correctness.json",
+      "bytes": 830,
+      "sha256": "69e068c67f6b861dfc9b46c0546d8d3bf88642c6238475072bd970aa5a5a43b2"
+    },
+    {
+      "path": ".performance/decoder-owned-input/timing.json",
+      "bytes": 530459,
+      "sha256": "94e1529bc1d6ee72d7dc99e36b24568b8951afa418c97ae4364c436c0964a677"
+    },
+    {
+      "path": ".performance/decoder-owned-input/timing-summary.json",
+      "bytes": 8365,
+      "sha256": "07afa0d9d836ea37685f1fb22537ad77f42459612b5ed64652c1e19abb0c4f7d"
+    },
+    {
+      "path": ".performance/decoder-owned-input/critic.md",
+      "bytes": 7340,
+      "sha256": "3674608fba6bdd2811f50038021ae2e975813b9b9e99e2f79661770d4d3b0c6a"
+    },
+    {
+      "path": ".performance/decoder-product/integration-critic.md",
+      "bytes": 9788,
+      "sha256": "4d5a716d0a476465c67d59a050505b6615fc288e0caf3c195ddace5afbde27d4"
+    },
+    {
+      "path": ".performance/decoder-product/combined-units.log",
+      "bytes": 1840952,
+      "sha256": "b01a8a5a0d55833fd17892be7dc2c56caecedfa8248bbef7d3876b3e1ae9ff4a"
+    },
+    {
+      "path": ".performance/contour-path/additional-units.log",
+      "bytes": 587,
+      "sha256": "c1a7bb54089f79919bc07e01c8396885fcc0c4cb5b9ef8d0e5b5cccd6e321256"
+    },
+    {
+      "path": ".performance/decoder-product/timing-product.ts",
+      "bytes": 8581,
+      "sha256": "2d0f0f1bbe2a42fb527fc1d3ad51a05af27876254bca532d0f93c6896406be54"
+    },
+    {
+      "path": ".performance/decoder-product/timing/timing.json",
+      "bytes": 530322,
+      "sha256": "0f0cfdc22e3a2e03aee6333b841a42daccb5f9a79decffd5b8b7d38eace32047"
+    },
+    {
+      "path": ".performance/decoder-product/timing/timing-summary.json",
+      "bytes": 8105,
+      "sha256": "206ef7253845a079da5b4f860020589c68391774c47fc8aaba078082957def8b"
+    },
+    {
+      "path": ".performance/decoder-product/product-timing-critic.md",
+      "bytes": 5034,
+      "sha256": "d78138b5dfcc48bcfbcc65677e7213ccc7b0fe49a88114b45b9869c1fb29a671"
+    },
+    {
+      "path": ".performance/decoder-product/combined-browser.log",
+      "bytes": 117589,
+      "sha256": "9898e952491d9bb4eb1d4e287d7b404ecf4bbb46f815021981d149e8601598f5"
+    },
+    {
+      "path": ".performance/decoder-product/motion-sockets-rerun.log",
+      "bytes": 80808,
+      "sha256": "51e13d29192d542dc4f6ef32b5bff9a43a9e9359e31f9316aee98afe4a2427ca"
+    },
+    {
+      "path": ".performance/decoder-product/final-units.log",
+      "bytes": 1837541,
+      "sha256": "07cb137a4dab8a53ffb095ae4331e7ca848b7970af41e870494e6e9d4713ca61"
+    },
+    {
+      "path": ".performance/decoder-product/final-build.log",
+      "bytes": 935,
+      "sha256": "52a45711f538d622ab9b9044b0efbbca978e55f290fcece07c8d20becc532b17"
+    },
+    {
+      "path": ".performance/decoder-product/final-wiki-review.log",
+      "bytes": 876,
+      "sha256": "72cf3cbf1437b596eb1f34c3ad0a73040c9731d7bae32362d2bd9a7317881756"
+    }
+  ],
+  "limits": [
+    "Current product timing directly imports the source; diagnostic timing collection is disabled in that Node comparison.",
+    "No browser allocation/GC, physical-phone, sustained-capacity or deployment claim.",
+    "Current changes are uncommitted and unshipped."
+  ],
+  "currentProductTiming": [
+    {
+      "mode": "delta-stream",
+      "medianSavingPercent": 14.002251686450498,
+      "maximumAaDriftPercent": 0.6358151717412818,
+      "pairedSavingsPercent": [12.882417502176867, 14.002251686450498, 15.821917579223834]
+    },
+    {
+      "mode": "keyframes",
+      "medianSavingPercent": 13.890207012934455,
+      "maximumAaDriftPercent": 2.995004505263514,
+      "pairedSavingsPercent": [13.890207012934455, 12.392674027895064, 14.058542169433217]
+    }
+  ],
+  "immutableFollowup": {
+    "status": "C3 rejected after independent correctness and timing review; keep C1; no product migration",
+    "correctness": {
+      "schemaVersion": 1,
+      "control": "accepted product C1 raw-message decoder",
+      "proofInputs": {
+        "shared/snapshotProtocol.ts": "fca64e2a0fe8bdeaa95017c41f4d7db8aef14bd40022aadaf14043bd77ca7411",
+        "shared/snapshotDto.ts": "bd2cb653631d31f849a5006f6e2fb8f5ecb539b45d91ea9c38f75c9f3d222c89",
+        ".performance/wire-precision/fixture.json": "b89a7f7658165c065ab1a309c48d7a578304acc02962f6ee9c662c8044e9a8bb",
+        ".performance/decoder-immutable/candidateProtocol.ts": "2e580c49d9aef6846a5ac9b2d7cefd6b5f588bd5c5e653ab8d8f8209097a146c",
+        ".performance/decoder-immutable/correctness.ts": "963d56b01f72f986a96afcacc0c866df986e551dc41e2c54be1d0c1844fd9ec0"
+      },
+      "dtoSha256": "bd2cb653631d31f849a5006f6e2fb8f5ecb539b45d91ea9c38f75c9f3d222c89",
+      "sourceSha256": "fca64e2a0fe8bdeaa95017c41f4d7db8aef14bd40022aadaf14043bd77ca7411",
+      "fixtureSha256": "b89a7f7658165c065ab1a309c48d7a578304acc02962f6ee9c662c8044e9a8bb",
+      "candidateSha256": "2e580c49d9aef6846a5ac9b2d7cefd6b5f588bd5c5e653ab8d8f8209097a146c",
+      "encoder": {
+        "frames": 300,
+        "keyframes": 4,
+        "deltas": 296
+      },
+      "serverCapture": {
+        "equivalentCases": 6,
+        "rejectedCases": 5,
+        "detachmentWitnesses": 3
+      },
+      "representativeDecoded": 300,
+      "wireMatrix": {
+        "comparisons": 2659,
+        "accepted": 627,
+        "rejected": 2032,
+        "fieldPaths": 166
+      },
+      "unknownDeltaFrames": 2,
+      "atomicRecoveryCases": 11,
+      "deltaWireGuards": {
+        "acceptedBoundaryCases": 1,
+        "acceptedBoundaryFrozenObjects": 457,
+        "rejectedCases": 3,
+        "atomicRecoveries": 3
+      },
+      "runtimeImmutability": {
+        "keyframeFrozenObjects": 437,
+        "deltaFrozenObjects": 437,
+        "mutationWitnesses": 7
+      },
+      "copyOnWriteIdentities": {
+        "unchangedRootFields": 1,
+        "changedRows": 1,
+        "unchangedRows": 1
+      },
+      "admissionAndRejoinChecks": 6,
+      "envelopeChecks": 9,
+      "parseCallsPerCandidateRead": 1,
+      "scope": {
+        "wireOnly": true,
+        "cyclesAndAccessorsExcluded": true,
+        "nonFiniteRawWitness": "1e400",
+        "c3RuntimeImmutability": true,
+        "consumerMigration": false,
+        "numericChanges": false,
+        "timingRun": false
+      }
+    },
+    "timing": [
+      {
+        "mode": "delta-stream",
+        "medianRegressionPercent": 28.614371419649686,
+        "maximumAaDriftPercent": 2.3241225945643404,
+        "pairedRegressionPercent": [27.4396956865188, 28.614371419649686, 29.407014535023606]
+      },
+      {
+        "mode": "keyframes",
+        "medianRegressionPercent": 28.53918386161193,
+        "maximumAaDriftPercent": 1.3438019342815228,
+        "pairedRegressionPercent": [28.53918386161193, 35.84903103137032, 25.614117946742915]
+      }
+    ],
+    "artifacts": [
+      {
+        "path": ".performance/decoder-immutable/design.md",
+        "bytes": 4429,
+        "sha256": "6402e8568dac43052ec3c9beb9b937ff91b7ff55f0f05752add3bca22c8da86d"
+      },
+      {
+        "path": ".performance/decoder-immutable/candidate-mechanical.diff",
+        "bytes": 3954,
+        "sha256": "3c28b6b08f3770c4ae3be324e0357733c1c939eb65d7039ed7b6a2cd2fad7236"
+      },
+      {
+        "path": ".performance/decoder-immutable/source-provenance.json",
+        "bytes": 683,
+        "sha256": "e9f00b277fd1dbb61e6e52a56207a288b13bbcfb75b2012980dc2041a7a54b84"
+      },
+      {
+        "path": ".performance/decoder-immutable/correctness.ts",
+        "bytes": 32309,
+        "sha256": "963d56b01f72f986a96afcacc0c866df986e551dc41e2c54be1d0c1844fd9ec0"
+      },
+      {
+        "path": ".performance/decoder-immutable/correctness.json",
+        "bytes": 2106,
+        "sha256": "3adf7bc52f36446d906fb3a398520a8f6436f0a09f7b98eebe89c3015bd5ce0b"
+      },
+      {
+        "path": ".performance/decoder-immutable/timing.ts",
+        "bytes": 10574,
+        "sha256": "a4e7d0fa3f0fd2c5dcc6a7bf95d02ebcf01b0a68761d4ae68bd5e880459814e7"
+      },
+      {
+        "path": ".performance/decoder-immutable/timing/timing.json",
+        "bytes": 531408,
+        "sha256": "8951fb071065f401a7be2fd9caca280ba434cc5dac727df6c9ba1e785a34e36e"
+      },
+      {
+        "path": ".performance/decoder-immutable/timing/timing-summary.json",
+        "bytes": 8749,
+        "sha256": "9d3cca4cffecfcd7463ea49c5020a8cc46f3245877b8a5544c2cde86a3ed3867"
+      },
+      {
+        "path": ".performance/decoder-immutable/pre-timing-critic.md",
+        "bytes": 3882,
+        "sha256": "856c79f684eb746266a2441f3603c32b458f4e509ed290d73f0aa02fbed3c44b"
+      },
+      {
+        "path": ".performance/decoder-immutable/timing-critic.md",
+        "bytes": 4156,
+        "sha256": "6c7a5ab5d1186d91b511482f2bb75ea21f410b02b4a236b6d36b7313e450d1ca"
+      }
+    ]
+  }
+}

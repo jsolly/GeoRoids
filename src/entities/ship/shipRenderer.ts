@@ -100,7 +100,7 @@ export function strokePhosphorPolyline(
   ctx.stroke();
   ctx.shadowBlur = 0;
   ctx.strokeStyle = color;
-  trace();
+  // stroke() retains the path; reuse it for the crisp pass.
   ctx.stroke();
   ctx.restore();
 }

@@ -1,0 +1,357 @@
+{
+  "date": "2026-09-12",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "scope": "Direct original-algorithm C++ kernel vs original/optimized Node, fixed-pose corpus. Excludes equivalent native optimization, FFI, whole backend, capacity and phone FPS.",
+  "numericPolicy": "User accepts small numeric differences for measured speed. All 150 structural cases match; 129 of 715 numeric fields differ, with maximum absolute difference 4.55e-13.",
+  "artifacts": [
+    {
+      "path": ".performance/backend-language/native/README.md",
+      "sha256": "bd8d5740e4a9aaf05ce6a6550d68daf164d3d6be71349c183c47f27772d917a2",
+      "bytes": 6961
+    },
+    {
+      "path": ".performance/backend-language/native/asteroid_reflection",
+      "sha256": "2795afd33a69d8ccc1e04b83937e65c58e26e65124f4e8fbd589cc92261c65c7",
+      "bytes": 77888
+    },
+    {
+      "path": ".performance/backend-language/native/asteroid_reflection.cpp",
+      "sha256": "a8eec93efbf95503a687e58a23d81b0d4736b76d4d74e7a1cac0bcb8681a81b1",
+      "bytes": 22665
+    },
+    {
+      "path": ".performance/backend-language/native/asteroid_reflection_timing",
+      "sha256": "f8809d8743a759778cb47f18e43fd921dc4fe586f81d37421d6ff32512497e3f",
+      "bytes": 61800
+    },
+    {
+      "path": ".performance/backend-language/native/compiler-version.txt",
+      "sha256": "55f7662ee66d47566d9f08f35a12158ac9588e4852f788eed57fa3bf625c9a5d",
+      "bytes": 159
+    },
+    {
+      "path": ".performance/backend-language/native/corpus.bin",
+      "sha256": "d7550b132c885cf83a7b0cd24fe2cd6fc9050d8672c90d6f0d1a02f3e0a40e90",
+      "bytes": 1351794
+    },
+    {
+      "path": ".performance/backend-language/native/corpus.bin.json",
+      "sha256": "45f079ed5f9d8b0eb6f898dfddd755c5478171a253a1934abaa577e53c830620",
+      "bytes": 652
+    },
+    {
+      "path": ".performance/backend-language/native/corpus.bin.results.bin",
+      "sha256": "586a887b8d6d198dc1054e4740da0b69136c2932b3c83cf6698dd9dd5d04d086",
+      "bytes": 12056
+    },
+    {
+      "path": ".performance/backend-language/native/corpus.ts",
+      "sha256": "82b5284074279952b03dbaecc02d2bdb7ddb37a98cd57a665571ce7d5fead784",
+      "bytes": 11653
+    },
+    {
+      "path": ".performance/backend-language/native/correctness-final.log",
+      "sha256": "44553238b351fabaf8f5334ddbbfea7fa7ab497236699e908511a359ed0c358b",
+      "bytes": 472
+    },
+    {
+      "path": ".performance/backend-language/native/correctness-report.json",
+      "sha256": "38f307649a34f73ba42c337868e13b46c83ef6a63257a45f1f6adf9a960d21df",
+      "bytes": 190052
+    },
+    {
+      "path": ".performance/backend-language/native/correctness.ts",
+      "sha256": "821693354719b6cca533ec99944be97b41c4349eea5b6f2db0e575f7b54c6d1c",
+      "bytes": 16585
+    },
+    {
+      "path": ".performance/backend-language/native/format.ts",
+      "sha256": "8dce712ec85aa8fac3e0e029cf7a740995f846133387fba0b5a62542a19bf9fc",
+      "bytes": 13622
+    },
+    {
+      "path": ".performance/backend-language/native/native_timing.cpp",
+      "sha256": "e6203a856d26f68ec7b8b9487ceb648129e00d27d2b89cda2e94c49ae6cfb60f",
+      "bytes": 5131
+    },
+    {
+      "path": ".performance/backend-language/native/pre-timing-wrapper-correctness/asteroid_reflection",
+      "sha256": "2795afd33a69d8ccc1e04b83937e65c58e26e65124f4e8fbd589cc92261c65c7",
+      "bytes": 77888
+    },
+    {
+      "path": ".performance/backend-language/native/pre-timing-wrapper-correctness/corpus.bin.results.bin",
+      "sha256": "586a887b8d6d198dc1054e4740da0b69136c2932b3c83cf6698dd9dd5d04d086",
+      "bytes": 12056
+    },
+    {
+      "path": ".performance/backend-language/native/pre-timing-wrapper-correctness/correctness-report.json",
+      "sha256": "38f307649a34f73ba42c337868e13b46c83ef6a63257a45f1f6adf9a960d21df",
+      "bytes": 190052
+    },
+    {
+      "path": ".performance/backend-language/native/pre-timing-wrapper-correctness/source-checksums.json",
+      "sha256": "5a8267fb77b9ef7f474cc4c13c0989be870088d61c309cd00b3eb023bd24a16f",
+      "bytes": 748
+    },
+    {
+      "path": ".performance/backend-language/native/reference/asteroidReflection.original.ts",
+      "sha256": "0684d18f5b5f6a3f94933704eef37c9d57dd37a50075f5595d2894dd608b37c5",
+      "bytes": 12376
+    },
+    {
+      "path": ".performance/backend-language/native/run-correctness.sh",
+      "sha256": "254de38046251d29d03208d0e8526ce61c747d65d15e5e1b9a846407217c748d",
+      "bytes": 395
+    },
+    {
+      "path": ".performance/backend-language/native/run-timing.sh",
+      "sha256": "31e929aff0a3b145f5abfeae2471f0ea0b0ae59966fc81b7013b6387a77d3659",
+      "bytes": 397
+    },
+    {
+      "path": ".performance/backend-language/native/source-checksums.json",
+      "sha256": "b26dbfce5424b372e799ebf13328c13dc7796c1da112036c5a3181532470b61f",
+      "bytes": 978
+    },
+    {
+      "path": ".performance/backend-language/native/timing-final.json",
+      "sha256": "c318deaa90c619459553d02da468d94b2ba957b6d87b81d38c607319ab565344",
+      "bytes": 6485
+    },
+    {
+      "path": ".performance/backend-language/native/timing-final.log",
+      "sha256": "847473f752954e536f633b619ab5aa361fe0ad719418ed3b15a7c43d43e80868",
+      "bytes": 169
+    },
+    {
+      "path": ".performance/backend-language/native/timing-smoke-2.log",
+      "sha256": "b45ce3e635ecd73b0a6a1d0fe8fd121a58b8bae755bf5db050ce913ca35a07fe",
+      "bytes": 331
+    },
+    {
+      "path": ".performance/backend-language/native/timing-smoke.json",
+      "sha256": "d76950be12fbfaf9e2da37d209c5ccfbe389fcb12081ced577d149294f4c61a5",
+      "bytes": 4520
+    },
+    {
+      "path": ".performance/backend-language/native/timing-smoke.log",
+      "sha256": "069031fdca08038a1eadade9af592899534a5fb0fbe491162ddc494e254e6cfe",
+      "bytes": 78
+    },
+    {
+      "path": ".performance/backend-language/native/timing-summary.json",
+      "sha256": "cb6b8014e2308dd5bece695bccb6d27ad487a51e50dc576ca809d751ce533d06",
+      "bytes": 3297
+    },
+    {
+      "path": ".performance/backend-language/native/timing.ts",
+      "sha256": "223c957741c50235db084e828cbc9c73590ed54e7718a0211282df48a6c84be0",
+      "bytes": 18324
+    },
+    {
+      "path": "shared/asteroidReflection.ts",
+      "sha256": "1de6c8a538d6b7dd1f2da9740fad3e0f04364775724b24e4b82bc0132f157c9d",
+      "bytes": 15059
+    }
+  ],
+  "metric": "Elapsed wall time of the synchronous in-memory kernel, not OS CPU counters.",
+  "independentReview": "Bar met for the documented direct-port evaluation; optimized native/FFI/full server remain unmeasured.",
+  "correctnessRecheck": "Recompiled and repeated against current kernel source after the timing wrapper edits; same 150 structural matches and 129 numeric differences.",
+  "optimizedNativeFollowThrough": {
+    "decision": "Native kernel wins in isolation; Node square-root arithmetic and per-query N-API binding rejected",
+    "controlledSummary": {
+      "original-node": 2104.554541,
+      "original-node-control": 2094.8977080000004,
+      "optimized-node": 304.7223750000012,
+      "optimized-node-control": 317.278790999997,
+      "original-native": 1453.78967,
+      "optimized-native": 213.983583,
+      "medianPairedNativeReductionPercent": 29.978173723825456,
+      "optimizedNodeMaxAAAbsoluteMs": 16.458999999998923,
+      "pairedReductions": [
+        33.64055369422148, 29.99127805141792, 29.874558732667573, 29.978173723825456,
+        29.560212964341996
+      ]
+    },
+    "artifacts": {
+      ".performance/backend-language/native/optimized/asteroid_reflection_optimized.cpp": "c509265b70d43b3211bcee2055b3e02e46ad536c9acbc4be5a06ab1341a51cd7",
+      ".performance/backend-language/native/optimized/timing-final.json": "21a1109f9e825f1447aad8736650ae64d4d553b24ead7938fef15e6d45e9c8f2",
+      ".performance/backend-language/native/optimized/correctness-150-report.json": "45ee74e3d0b9f71a907f3ca75ee2374005ab0802c26cfc3c9d6388ad8208edb0",
+      ".performance/backend-language/native/optimized/mutable-correctness-report.json": "05f652d44aeb409be8bf1ff63c3269f0c2e3d793598854a6bd7f08f5bb612f4b",
+      ".performance/backend-language/native/optimized/critic.md": "64da20d11e5883ce356dc3e862e777a13ddec70ecd6fc22526383f4d22cdbffc",
+      ".performance/backend-language/native/hash-membership/asteroid_reflection_hash_membership.cpp": "8b4ada16e4d101c0c15910f07b6ef506b731a7a4acd8539543a9643e5aa7e7f4",
+      ".performance/backend-language/native/hash-membership/timing-final.json": "c47bb064ebf7135168bb1791f117220f9648bc6caa8ecdb160983673aeb49be5",
+      ".performance/backend-language/native/hash-membership/timing-controlled.json": "34f838dc7b72034cce1367d314ba4f50b005da95d4ec605ce79a3fe325273007",
+      ".performance/backend-language/native/hash-membership/timing-with-optimized-control.ts": "411de98ff982ab40bc30e25961b4648da1636110c1d85ebf4e0d61cd42268b2a",
+      ".performance/backend-language/native/hash-membership/timing-controlled-summary.json": "4f4f4296da2e950ecbe057d873ec12e896b3dac2be62d065edb333a9c70603c6",
+      ".performance/backend-language/native/hash-membership/correctness-150-report.json": "2901eee03060803a37c2634eb857979db2bb0261a75cf21b63848dc8def169d3",
+      ".performance/backend-language/native/hash-membership/mutable-correctness-report.json": "b4d31a4ce25a0a484534a0a35c2110ff8868d566eb0e7e40ff88a79a3e6d1632",
+      ".performance/backend-language/native/hash-membership/hypot-feasibility.md": "6cb33d01d84d5dfa5495e69c845ac48246367129acfdb3b6190730a314dd5598",
+      ".performance/backend-language/native/hash-membership/critic.md": "e79715c3b41cf60f8edfbc03ecf3787ddb63b7972b93966ff9353203188024e4"
+    },
+    "review": "Hash-membership independent review accepted scoped kernel behavior and controlled timing",
+    "arithmeticCandidate": {
+      "decision": "rejected:1.79% median paired change within A/A noise; no product edit",
+      "summary": {
+        "pairs": [
+          {
+            "baselineMs": 397.18166599999995,
+            "candidateMs": 444.47183399999994,
+            "reductionPercent": -11.906432760670278
+          },
+          {
+            "baselineMs": 381.70875000000024,
+            "candidateMs": 368.9070419999998,
+            "reductionPercent": 3.353789505742378
+          },
+          {
+            "baselineMs": 393.1240830000006,
+            "candidateMs": 386.08295799999996,
+            "reductionPercent": 1.791069360663065
+          },
+          {
+            "baselineMs": 391.2820419999998,
+            "candidateMs": 405.44066699999985,
+            "reductionPercent": -3.618521547175946
+          },
+          {
+            "baselineMs": 383.3190419999992,
+            "candidateMs": 363.70266600000105,
+            "reductionPercent": 5.117506267794067
+          }
+        ],
+        "medianBaselineMs": 391.2820419999998,
+        "medianCandidateMs": 386.08295799999996,
+        "medianPairedReductionPercent": 1.791069360663065,
+        "maxAAAbsoluteMs": 26.393540999999914
+      },
+      "verification": ".performance/reflection-sqrt/verification.json",
+      "excludedFirstTiming": ".performance/reflection-sqrt/invalid-absorption/",
+      "review": "Independent critic accepted rejection; see .performance/reflection-sqrt/critic.md"
+    }
+  },
+  "nativeBinding": {
+    "decision": "Per-query binding rejected; 12.61x median paired time versus current Node. Batched/fullnative boundary unmeasured.",
+    "review": "Independent critic accepted rejection of the per-query binding; batched/fullnative boundary remains unmeasured.",
+    "summary": {
+      "scope": "58,000 nearest-impact calls, JS conversion and native result construction included; not whole backend or phone FPS",
+      "mediansMs": {
+        "current-node": 325.0721250000006,
+        "current-node-control": 324.45074999999997,
+        "binding-native": 3987.1258749999997
+      },
+      "pairs": [
+        {
+          "batch": 0,
+          "nodeMs": 355.62704199999996,
+          "controlMs": 324.45074999999997,
+          "nativeBindingMs": 3937.509291,
+          "nodeControlDifferenceMs": 31.17629199999999,
+          "bindingToNodeRatio": 11.072018789279811,
+          "bindingSavingPercent": -1007.2018789279809
+        },
+        {
+          "batch": 1,
+          "nodeMs": 316.28237499999886,
+          "controlMs": 318.8805830000001,
+          "nativeBindingMs": 3987.1258749999997,
+          "nodeControlDifferenceMs": 2.59820800000125,
+          "bindingToNodeRatio": 12.606222129829442,
+          "bindingSavingPercent": -1160.6222129829441
+        },
+        {
+          "batch": 2,
+          "nodeMs": 325.0721250000006,
+          "controlMs": 538.9495420000003,
+          "nativeBindingMs": 3937.1971250000006,
+          "nodeControlDifferenceMs": 213.8774169999997,
+          "bindingToNodeRatio": 12.11176481219358,
+          "bindingSavingPercent": -1111.176481219358
+        },
+        {
+          "batch": 3,
+          "nodeMs": 309.1333330000016,
+          "controlMs": 318.1278749999983,
+          "nativeBindingMs": 4016.842209000002,
+          "nodeControlDifferenceMs": 8.994541999996727,
+          "bindingToNodeRatio": 12.993882510237036,
+          "bindingSavingPercent": -1199.3882510237036
+        },
+        {
+          "batch": 4,
+          "nodeMs": 325.3819590000021,
+          "controlMs": 336.0535830000008,
+          "nativeBindingMs": 4173.256041000001,
+          "nodeControlDifferenceMs": 10.671623999998701,
+          "bindingToNodeRatio": 12.82571428921778,
+          "bindingSavingPercent": -1182.5714289217779
+        }
+      ],
+      "medianBindingToNodeRatio": 12.606222129829442,
+      "maxNodeControlDifferenceMs": 213.8774169999997,
+      "sinkChecks": [
+        {
+          "batch": 0,
+          "currentSink": 551976592.7374737,
+          "controlSink": 551976592.7374737,
+          "bindingSink": 551976592.7374737,
+          "bindingAbsoluteDifference": 0,
+          "bindingRelativeDifference": 0,
+          "currentControlObjectIsExact": true
+        },
+        {
+          "batch": 1,
+          "currentSink": 551976592.7374737,
+          "controlSink": 551976592.7374737,
+          "bindingSink": 551976592.7374737,
+          "bindingAbsoluteDifference": 0,
+          "bindingRelativeDifference": 0,
+          "currentControlObjectIsExact": true
+        },
+        {
+          "batch": 2,
+          "currentSink": 551976592.7374737,
+          "controlSink": 551976592.7374737,
+          "bindingSink": 551976592.7374737,
+          "bindingAbsoluteDifference": 0,
+          "bindingRelativeDifference": 0,
+          "currentControlObjectIsExact": true
+        },
+        {
+          "batch": 3,
+          "currentSink": 551976592.7374737,
+          "controlSink": 551976592.7374737,
+          "bindingSink": 551976592.7374737,
+          "bindingAbsoluteDifference": 0,
+          "bindingRelativeDifference": 0,
+          "currentControlObjectIsExact": true
+        },
+        {
+          "batch": 4,
+          "currentSink": 551976592.7374737,
+          "controlSink": 551976592.7374737,
+          "bindingSink": 551976592.7374737,
+          "bindingAbsoluteDifference": 0,
+          "bindingRelativeDifference": 0,
+          "currentControlObjectIsExact": true
+        }
+      ]
+    },
+    "artifacts": {
+      ".performance/backend-language/native/binding/run-correctness.sh": "e8baec4ec96dfec5452f7b3f62f84b1676410f259b99657b4d1019464e9ae3dd",
+      ".performance/backend-language/native/binding/summary.json": "d98a6ecd6621d0738d71b6fa55ef2cd7621f1677c47d3559e54f06c7dce7ffad",
+      ".performance/backend-language/native/binding/binding_addon.cpp": "72c252428dd8b70ad5366db30321f187feb5fe72b00a00f8a8cfd4486ccd852c",
+      ".performance/backend-language/native/binding/timing.json": "4b58ecb71d9da9069b22b8a6ea99b61ca3ee5e50b7e874d707e3c52b12a75f7d",
+      ".performance/backend-language/native/binding/verify.ts": "f47efaba2753d185323b88b2d7406a7ccce5f8b41d5c9ff5e3de8ce484071281",
+      ".performance/backend-language/native/binding/timing.ts": "8e2aa2495ca984bec7415680e4cddaf034b66de5c85239272f5f04bb170430ff",
+      ".performance/backend-language/native/binding/README.md": "f898c80c433ee45c30632c71a4ddb1c255b38317ef91f864745f0f210d77ed81",
+      ".performance/backend-language/native/binding/build.sh": "d5ffc90f12a473ea0d09125c914d4011103e684772f9b422a5d4b8543ee884ce",
+      ".performance/backend-language/native/binding/run-timing.sh": "3ff82ad936ffb6eb90d42be9f123020fe2335307f0dc0dbffa34e11153691927",
+      ".performance/backend-language/native/binding/georoids_collision_binding.node": "542e10c1b824d1d4fadd4ef038f07dd8cd2037a0437e3d166788d7abdbcc7f97",
+      ".performance/backend-language/native/binding/timing.log": "03b1722ed2b7a13514113476e94f745775260d9eb65ce028172e6190c188f270",
+      ".performance/backend-language/native/binding/correctness-report.json": "11bf7d7a8fbe50fc0003717b457a2d9a9134d920ccdbada067fe3c6960725925",
+      ".performance/backend-language/native/binding/critic.md": "3e99c45597893f77b0cc66fba8097712592bba71cfb6d6410456e626b775f5f0"
+    }
+  }
+}

@@ -1,0 +1,1073 @@
+{
+  "schemaVersion": 1,
+  "decision": "Both tested compression levels rejected under the fixed clean-network CPU gate; no product transport change.",
+  "method": {
+    "host": "Apple M3, macOS, Node 24.16.0, accelerated Chromium 153.0.8010.12",
+    "viewport": "390x844 touch portrait, DPR3, CPU4, native/full",
+    "simulationHz": 60,
+    "snapshotHz": 30,
+    "seed": 42,
+    "participants": "one browser and four protocol peers",
+    "seconds": {
+      "warmup": 15,
+      "measurement": 60
+    },
+    "sequence": "control A/A, control/candidate A/B, candidate/control B/A",
+    "topology": "Per-TCP-connection proxy scheduling, not one aggregate physical-phone link",
+    "cpuLimit": "Each matched normalized CPU increase <= max(10%, same-lane absolute A/A relative drift)",
+    "recoveryMetric": "Actual requested join to same-generation prepared fixture, including driver, IPC and polling delay; measurement requests only"
+  },
+  "batches": [
+    {
+      "level": 6,
+      "lane": "clean",
+      "directory": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z",
+      "sourceBindingSha256": "02a559fcc3f9cbc9275176ac2afcb0f533c1ced7b087ce46e5592a461bf64915",
+      "runReceiptsSha256": "a3d5d42556e28317730096f19f4359fcb74720dee208f2a8490fb5d5df2312f6",
+      "summarySha256": "841cc69307b770dd3fcfa53144e298b3ae1e75460dee7c04526fdeaa1a53886c",
+      "calibration": {
+        "wsByteDriftRatio": 0.01578176684318345,
+        "cpuDriftRatio": 0.012203303299151414,
+        "nonRejoinGapP95DriftMs": 0.2848329999978887,
+        "rejoinMedianDriftMs": 364.143041000003
+      },
+      "comparisons": [
+        {
+          "lane": "clean",
+          "pair": "ab-1",
+          "byteReduction": 0.6571728319349022,
+          "cpuIncrease": 0.5445144234871362,
+          "byteGate": true,
+          "cpuGate": false,
+          "nonRejoinGapP95": {
+            "control": 36.90700000000652,
+            "candidate": 36.7087500000016,
+            "calibratedDriftMs": 0.2848329999978887,
+            "limit": 37.19183300000441,
+            "passed": true
+          },
+          "requestedRejoin": {
+            "verdict": "failed",
+            "controlMedian": 462.2573330000014,
+            "candidateMedian": 847.0225420000061,
+            "calibratedDriftMs": 364.143041000003,
+            "limit": 826.4003740000044
+          },
+          "verdict": "failed"
+        },
+        {
+          "lane": "clean",
+          "pair": "ab-2",
+          "verdict": "inconclusive",
+          "reason": "Matched gate or A/A calibration failed"
+        }
+      ],
+      "classification": "not-supported",
+      "runs": [
+        {
+          "label": "aa-1",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.713491243798753,
+          "wallStateRateHz": 29.713491243798753,
+          "nonRejoinGapP95Ms": 37.12354200000118,
+          "nonRejoinGapMaxMs": 118.29445800000394,
+          "finalStateAgeMs": 28.48466699999699,
+          "requestedRejoinP50Ms": 489.1368339999972,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08857351932845343,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2876463,
+              "bytesDown": 177338002
+            },
+            "/ws": {
+              "bytesUp": 2852117,
+              "bytesDown": 177338002
+            },
+            "/logs": {
+              "bytesUp": 24346,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z/clean-aa-1-control.json",
+            "sha256": "305d492f767a8afe2bf19c5dc19e32d51cc1d4d15a8572619d5dcc65ef565cdf"
+          }
+        },
+        {
+          "label": "aa-2",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.747161459418212,
+          "wallStateRateHz": 29.747161459418212,
+          "nonRejoinGapP95Ms": 37.40837499999907,
+          "nonRejoinGapMaxMs": 163.01441700000578,
+          "finalStateAgeMs": 33.06070900001214,
+          "requestedRejoinP50Ms": 853.2798750000002,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08749262980781507,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2802627,
+              "bytesDown": 180136709
+            },
+            "/ws": {
+              "bytesUp": 2772812,
+              "bytesDown": 180136709
+            },
+            "/logs": {
+              "bytesUp": 29815,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z/clean-aa-2-control.json",
+            "sha256": "ccc66702a7a110efc392c2bcdedd782b8e3c22beb8e650286fe5b797d8a3bbca"
+          }
+        },
+        {
+          "label": "ab-1-a",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.71221439434202,
+          "wallStateRateHz": 29.71221439434202,
+          "nonRejoinGapP95Ms": 36.90700000000652,
+          "nonRejoinGapMaxMs": 140.44695800000045,
+          "finalStateAgeMs": 2.5004579999949783,
+          "requestedRejoinP50Ms": 462.2573330000014,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08505010106361129,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2805204,
+              "bytesDown": 174098670
+            },
+            "/ws": {
+              "bytesUp": 2784144,
+              "bytesDown": 174098670
+            },
+            "/logs": {
+              "bytesUp": 21060,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z/clean-ab-1-a-control.json",
+            "sha256": "0901d406a6878f1af738403f900fb7ea53c9b9c39715235863fb3be8eedd652b"
+          }
+        },
+        {
+          "label": "ab-1-b",
+          "arm": "candidate",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.730865671482597,
+          "wallStateRateHz": 29.730865671482597,
+          "nonRejoinGapP95Ms": 36.7087500000016,
+          "nonRejoinGapMaxMs": 101.75370799999655,
+          "finalStateAgeMs": 9.146250000005239,
+          "requestedRejoinP50Ms": 847.0225420000061,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.13136110781178625,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2386200,
+              "bytesDown": 59685754
+            },
+            "/ws": {
+              "bytesUp": 2373037,
+              "bytesDown": 59685754
+            },
+            "/logs": {
+              "bytesUp": 13163,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z/clean-ab-1-b-candidate.json",
+            "sha256": "1c62db3ce27a2242c9b6e1087a771d56b765838407964f2e47679ba33949539a"
+          }
+        },
+        {
+          "label": "ab-2-b",
+          "arm": "candidate",
+          "exitCode": 1,
+          "gate": "failed",
+          "checks": {
+            "processCompleted": false,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": false,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": false,
+            "transportAccounting": false,
+            "processCpu": false,
+            "callbackAndPressure": false
+          },
+          "stateRateHz": 29.71280507513438,
+          "wallStateRateHz": 29.71280507513438,
+          "nonRejoinGapP95Ms": 37.340833999995084,
+          "nonRejoinGapMaxMs": 131.84362500000861,
+          "finalStateAgeMs": 27.670707999990555,
+          "requestedRejoinP50Ms": 99.69470799999544,
+          "unfinishedMeasuredRequests": 1,
+          "normalizedServerCpu": null,
+          "measurementBytes": {
+            "aggregate": null,
+            "/ws": null,
+            "/logs": null,
+            "unclassified": null
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z/clean-ab-2-b-candidate.json",
+            "sha256": "5ff2c3a1753663af1a423e661acd6a01f81481b678c35eee7f9a8ffcd6346b0f"
+          }
+        },
+        {
+          "label": "ab-2-a",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.7310128897169,
+          "wallStateRateHz": 29.7310128897169,
+          "nonRejoinGapP95Ms": 36.937417000001005,
+          "nonRejoinGapMaxMs": 114.38437500000873,
+          "finalStateAgeMs": 19.98262499998964,
+          "requestedRejoinP50Ms": 581.7822910000104,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08382055458136431,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2848423,
+              "bytesDown": 178259821
+            },
+            "/ws": {
+              "bytesUp": 2825137,
+              "bytesDown": 178259821
+            },
+            "/logs": {
+              "bytesUp": 23286,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-20-08-319Z/clean-ab-2-a-control.json",
+            "sha256": "89eb974e8c46fae590405af4674972fdd12ca222c50e81ca338f5b1b70664c02"
+          }
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "lane": "normal",
+      "directory": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z",
+      "sourceBindingSha256": "02a559fcc3f9cbc9275176ac2afcb0f533c1ced7b087ce46e5592a461bf64915",
+      "runReceiptsSha256": "6d149e2b297e58bbe93a36086b92e43d6aca8b6b16852f2fe028964b173e4b14",
+      "summarySha256": "ea2ac5427ab245593e7eeb1be8859b6e1188b98446f43e7ad85b18b5335bb439",
+      "calibration": null,
+      "comparisons": [
+        {
+          "lane": "normal",
+          "pair": "ab-1",
+          "verdict": "inconclusive",
+          "reason": "Matched gate or A/A calibration failed"
+        },
+        {
+          "lane": "normal",
+          "pair": "ab-2",
+          "verdict": "inconclusive",
+          "reason": "Matched gate or A/A calibration failed"
+        }
+      ],
+      "classification": "inconclusive",
+      "runs": [
+        {
+          "label": "aa-1",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.98033690259176,
+          "wallStateRateHz": 29.98033690259176,
+          "nonRejoinGapP95Ms": 111.64004199999908,
+          "nonRejoinGapMaxMs": 194.4432919999963,
+          "finalStateAgeMs": 2.2226669999945443,
+          "requestedRejoinP50Ms": 1142.426542000001,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.083546317058426,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2736536,
+              "bytesDown": 177264583
+            },
+            "/ws": {
+              "bytesUp": 2709360,
+              "bytesDown": 177264583
+            },
+            "/logs": {
+              "bytesUp": 27176,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z/normal-aa-1-control.json",
+            "sha256": "6d9e1421586c86eeabb3c32c93be3eb1a2a5d7d8e9c1036543931f023d6a2265"
+          }
+        },
+        {
+          "label": "aa-2",
+          "arm": "control",
+          "exitCode": 1,
+          "gate": "failed",
+          "checks": {
+            "processCompleted": false,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": false,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": false,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": false,
+            "transportAccounting": false,
+            "processCpu": false,
+            "callbackAndPressure": false
+          },
+          "stateRateHz": 28.994637226864562,
+          "wallStateRateHz": 27.381630576059806,
+          "nonRejoinGapP95Ms": 99.62216699999408,
+          "nonRejoinGapMaxMs": 640.7123330000031,
+          "finalStateAgeMs": 86.23799999999756,
+          "requestedRejoinP50Ms": 909.2328750000015,
+          "unfinishedMeasuredRequests": 1,
+          "normalizedServerCpu": null,
+          "measurementBytes": {
+            "aggregate": null,
+            "/ws": null,
+            "/logs": null,
+            "unclassified": null
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z/normal-aa-2-control.json",
+            "sha256": "981d49533e903380f2c82e5fcfc6fc063d24c72d4f3d3825a1b2d4e3fc564880"
+          }
+        },
+        {
+          "label": "ab-1-a",
+          "arm": "control",
+          "exitCode": 1,
+          "gate": "failed",
+          "checks": {
+            "processCompleted": false,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": false,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": false,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": false,
+            "transportAccounting": false,
+            "processCpu": false,
+            "callbackAndPressure": false
+          },
+          "stateRateHz": 29.1563683312914,
+          "wallStateRateHz": 27.780197817130958,
+          "nonRejoinGapP95Ms": 112.34470800000054,
+          "nonRejoinGapMaxMs": 832.1311659999992,
+          "finalStateAgeMs": 42.48754200000258,
+          "requestedRejoinP50Ms": 2525.2468329999974,
+          "unfinishedMeasuredRequests": 1,
+          "normalizedServerCpu": null,
+          "measurementBytes": {
+            "aggregate": null,
+            "/ws": null,
+            "/logs": null,
+            "unclassified": null
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z/normal-ab-1-a-control.json",
+            "sha256": "7c9b55c4ca9af3b98158ad116e977828925a848956bed6ee9332a03ce1873c4a"
+          }
+        },
+        {
+          "label": "ab-1-b",
+          "arm": "candidate",
+          "exitCode": 0,
+          "gate": "failed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": false,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.646389460601934,
+          "wallStateRateHz": 29.646389460601934,
+          "nonRejoinGapP95Ms": 61.25045799999498,
+          "nonRejoinGapMaxMs": 161.18970799999806,
+          "finalStateAgeMs": 32.114042000001064,
+          "requestedRejoinP50Ms": 1985.4395829999994,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.12802877709562638,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2265320,
+              "bytesDown": 57762365
+            },
+            "/ws": {
+              "bytesUp": 2252452,
+              "bytesDown": 57762365
+            },
+            "/logs": {
+              "bytesUp": 12868,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z/normal-ab-1-b-candidate.json",
+            "sha256": "8f3ef48d4310d65aef5a8d46baf81aab6d17d373c7b9aeb7f52e581d393d9b17"
+          }
+        },
+        {
+          "label": "ab-2-b",
+          "arm": "candidate",
+          "exitCode": 0,
+          "gate": "failed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": false,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.031225343642927,
+          "wallStateRateHz": 29.031225343642927,
+          "nonRejoinGapP95Ms": 60.99479199999769,
+          "nonRejoinGapMaxMs": 531.5137500000055,
+          "finalStateAgeMs": 5.371208000011393,
+          "requestedRejoinP50Ms": 779.9977919999947,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.1265124362332941,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2277525,
+              "bytesDown": 55196652
+            },
+            "/ws": {
+              "bytesUp": 2261582,
+              "bytesDown": 55196652
+            },
+            "/logs": {
+              "bytesUp": 15943,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z/normal-ab-2-b-candidate.json",
+            "sha256": "61c2139cd0b2463e43f85202bf79019067db8e9dbfc077b255bd091d8441fcd9"
+          }
+        },
+        {
+          "label": "ab-2-a",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.69767601281827,
+          "wallStateRateHz": 29.69767601281827,
+          "nonRejoinGapP95Ms": 112.20487500000309,
+          "nonRejoinGapMaxMs": 172.48824999999488,
+          "finalStateAgeMs": 37.50695799999812,
+          "requestedRejoinP50Ms": 1707.701000000001,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08459704032591098,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2790593,
+              "bytesDown": 179306855
+            },
+            "/ws": {
+              "bytesUp": 2768850,
+              "bytesDown": 179306855
+            },
+            "/logs": {
+              "bytesUp": 21743,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-30-36-521Z/normal-ab-2-a-control.json",
+            "sha256": "713d5539e262251c6f06091f36fd7731f212ef9f40a88c2eac4963240f40be71"
+          }
+        }
+      ]
+    },
+    {
+      "level": 1,
+      "lane": "clean",
+      "directory": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z",
+      "sourceBindingSha256": "0fb613c711309cf3d853098285f20a0053d641486c347a76645a059f75e7bc88",
+      "runReceiptsSha256": "9aef1ae26272fed153043fc0b5a2a1d80fc03a04b8e669ddb2875099ca9fa4c8",
+      "summarySha256": "a30bb2121499ab26c75aa5ff2dda9285b43ec6144ebdf6ded16eae638a5b40db",
+      "calibration": {
+        "wsByteDriftRatio": 0.015632355389235474,
+        "cpuDriftRatio": 0.05202620185637835,
+        "nonRejoinGapP95DriftMs": 0.11775099999067606,
+        "rejoinMedianDriftMs": 308.69970799998555
+      },
+      "comparisons": [
+        {
+          "lane": "clean",
+          "pair": "ab-1",
+          "verdict": "inconclusive",
+          "reason": "Matched gate or A/A calibration failed"
+        },
+        {
+          "lane": "clean",
+          "pair": "ab-2",
+          "byteReduction": 0.6609617331978908,
+          "cpuIncrease": 0.233887924735513,
+          "byteGate": true,
+          "cpuGate": false,
+          "nonRejoinGapP95": {
+            "control": 37.34758300000249,
+            "candidate": 37.18337499999325,
+            "calibratedDriftMs": 0.11775099999067606,
+            "limit": 37.46533399999316,
+            "passed": true
+          },
+          "requestedRejoin": {
+            "verdict": "passed",
+            "controlMedian": 981.789374999993,
+            "candidateMedian": 850.7639580000105,
+            "calibratedDriftMs": 308.69970799998555,
+            "limit": 1290.4890829999786
+          },
+          "verdict": "failed"
+        }
+      ],
+      "classification": "not-supported",
+      "runs": [
+        {
+          "label": "aa-1",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.614118125017693,
+          "wallStateRateHz": 29.614118125017693,
+          "nonRejoinGapP95Ms": 37.895041999996465,
+          "nonRejoinGapMaxMs": 143.70845800000097,
+          "finalStateAgeMs": 20.026792000004207,
+          "requestedRejoinP50Ms": 579.1330409999937,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08997687112685009,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2807579,
+              "bytesDown": 181163934
+            },
+            "/ws": {
+              "bytesUp": 2790277,
+              "bytesDown": 181163934
+            },
+            "/logs": {
+              "bytesUp": 17302,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z/clean-aa-1-control.json",
+            "sha256": "0ed0fc5fe157f28306920436e6c17c9a53c7db82082ed8355582c2040fc4018f"
+          }
+        },
+        {
+          "label": "aa-2",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.662474473598685,
+          "wallStateRateHz": 29.662474473598685,
+          "nonRejoinGapP95Ms": 37.77729100000579,
+          "nonRejoinGapMaxMs": 132.40366699999868,
+          "finalStateAgeMs": 33.175290999992285,
+          "requestedRejoinP50Ms": 270.43333300000813,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08529571626719924,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2796584,
+              "bytesDown": 178331915
+            },
+            "/ws": {
+              "bytesUp": 2773862,
+              "bytesDown": 178331915
+            },
+            "/logs": {
+              "bytesUp": 22722,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z/clean-aa-2-control.json",
+            "sha256": "1dc6e5ac85d466a26f0d2ec6b2b02c9ffdf932083e59d48a727717a8fd712380"
+          }
+        },
+        {
+          "label": "ab-1-a",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.68158214026947,
+          "wallStateRateHz": 29.68158214026947,
+          "nonRejoinGapP95Ms": 37.21583400000236,
+          "nonRejoinGapMaxMs": 157.96570800000336,
+          "finalStateAgeMs": 16.0293340000062,
+          "requestedRejoinP50Ms": 698.1505409999954,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.08924278264538671,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2849395,
+              "bytesDown": 184147357
+            },
+            "/ws": {
+              "bytesUp": 2828561,
+              "bytesDown": 184147357
+            },
+            "/logs": {
+              "bytesUp": 20834,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z/clean-ab-1-a-control.json",
+            "sha256": "7c7108c02dccdf2429791a492ee663cde84edcd9b2b9b20231d4d35f4dd7dd9b"
+          }
+        },
+        {
+          "label": "ab-1-b",
+          "arm": "candidate",
+          "exitCode": 0,
+          "gate": "failed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": false
+          },
+          "stateRateHz": 29.6303768805027,
+          "wallStateRateHz": 29.6303768805027,
+          "nonRejoinGapP95Ms": 37.081458000000566,
+          "nonRejoinGapMaxMs": 129.48362500000076,
+          "finalStateAgeMs": 25.001666000011028,
+          "requestedRejoinP50Ms": 561.6554579999975,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.11217358910872943,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2357819,
+              "bytesDown": 64075924
+            },
+            "/ws": {
+              "bytesUp": 2344426,
+              "bytesDown": 64075924
+            },
+            "/logs": {
+              "bytesUp": 13393,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z/clean-ab-1-b-candidate.json",
+            "sha256": "130b375946d489539a947b9be232faf6bc87b37107946487f85ed52430e94ce0"
+          }
+        },
+        {
+          "label": "ab-2-b",
+          "arm": "candidate",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.747410240043518,
+          "wallStateRateHz": 29.747410240043518,
+          "nonRejoinGapP95Ms": 37.18337499999325,
+          "nonRejoinGapMaxMs": 126.64808300000004,
+          "finalStateAgeMs": 20.44533400000364,
+          "requestedRejoinP50Ms": 850.7639580000105,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.11109058064218308,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2352936,
+              "bytesDown": 63759866
+            },
+            "/ws": {
+              "bytesUp": 2342279,
+              "bytesDown": 63759866
+            },
+            "/logs": {
+              "bytesUp": 10657,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z/clean-ab-2-b-candidate.json",
+            "sha256": "9a7a2f34b182fb3b16b16e6d9910dbbf61b868912bc47163baf4a0f716d80cf5"
+          }
+        },
+        {
+          "label": "ab-2-a",
+          "arm": "control",
+          "exitCode": 0,
+          "gate": "passed",
+          "checks": {
+            "processCompleted": true,
+            "cleanup": true,
+            "recoveryRecords": true,
+            "measuredRecoveryComplete": true,
+            "fixedStateRate": true,
+            "fixedNonRejoinGap": true,
+            "finalAge": true,
+            "candidateAbsoluteRejoin": true,
+            "usefulWork": true,
+            "probesAndDecode": true,
+            "negotiation": true,
+            "transportAccounting": true,
+            "processCpu": true,
+            "callbackAndPressure": true
+          },
+          "stateRateHz": 29.630017672626565,
+          "wallStateRateHz": 29.630017672626565,
+          "nonRejoinGapP95Ms": 37.34758300000249,
+          "nonRejoinGapMaxMs": 141.56166700000176,
+          "finalStateAgeMs": 11.86045799999556,
+          "requestedRejoinP50Ms": 981.789374999993,
+          "unfinishedMeasuredRequests": 0,
+          "normalizedServerCpu": 0.09003295876000701,
+          "measurementBytes": {
+            "aggregate": {
+              "bytesUp": 2808973,
+              "bytesDown": 188060972
+            },
+            "/ws": {
+              "bytesUp": 2787909,
+              "bytesDown": 188060972
+            },
+            "/logs": {
+              "bytesUp": 21064,
+              "bytesDown": 0
+            },
+            "unclassified": {
+              "bytesUp": 0,
+              "bytesDown": 0
+            }
+          },
+          "rawReport": {
+            "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-43-21-846Z/clean-ab-2-a-control.json",
+            "sha256": "4fa13278a713023dc945b8c412a8250822d6ffb07c4b42bbd11df8ae02dd5f07"
+          }
+        }
+      ]
+    }
+  ],
+  "correctness": {
+    "level1Directory": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/correctness-2026-09-12T22-42-30-432Z",
+    "casesPerArm": 12,
+    "filesPerArm": 4,
+    "bothExitCodes": 0,
+    "receiptSha256": "3172c54649ae421907efccedbe3c124cb5383a3f6a459959c4f70fa0ae1c9c07"
+  },
+  "retainedPreflightFailure": {
+    "directory": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/screen-2026-09-12T22-09-08-890Z",
+    "description": "All six arms failed Wiki build review before gameplay sampling; reviewed metadata repaired without product/runtime changes."
+  },
+  "notRun": [
+    "Level6 degraded1Mbps screen",
+    "Level1 normal5Mbps and degraded1Mbps screens",
+    "Matched5/25-pilot600-second compression soaks"
+  ],
+  "notRunReason": "Both settings fail the mandatory clean CPU gate; no candidate is proposed for adoption.",
+  "limits": [
+    "No physical-phone FPS, Safari, thermal or battery measurement.",
+    "No Railway/Linux capacity or sustained-memory conclusion.",
+    "Dynamic live worlds are not equal deterministic replays.",
+    "Endpoint-censored rejoins and instantaneous pending callbacks are incomplete gate evidence, not proof of unbounded product failure.",
+    "The result does not reject all compression configurations or binary protocols."
+  ],
+  "independentReview": {
+    "path": "/Users/johnsolly/code/GeoRoids-worktrees/mobile-performance-and-pace/.performance/compression-current/artifacts/final-decision-critic.md",
+    "sha256": "eb77ff675c9930a478dd1315c123a31cc415744bb8d835842d51e605cc30c90b",
+    "verdict": "BAR MET"
+  }
+}

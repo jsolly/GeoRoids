@@ -6,8 +6,8 @@ import WebSocket from 'ws';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { createServerInstance } from '../../../server/createServer';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
-import type { AsteroidData } from '../../../shared-types';
-import { ROID } from '../../../src/constants';
+import type { AsteroidData, ServerGameSnapshot } from '../../../shared-types';
+import { GAME, LASER, ROID } from '../../../src/constants';
 
 function asteroidAt(
   id: string,
@@ -173,19 +173,26 @@ describe('Asteroid destruction over real sockets', () => {
 
       const received: { type: string; data: unknown }[] = [];
       const decoder = new SnapshotDecoder();
-      const states: ReturnType<SnapshotDecoder['decode']>[] = [];
+      const states: ServerGameSnapshot[] = [];
       const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?asteroidInteractions=1`);
       ws.on('message', (raw) => {
-        const message: unknown = JSON.parse(String(raw));
+        const text = String(raw);
+        const result = decoder.readMessage(text, { acceptSnapshots: true });
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        if (result.kind === 'snapshot') {
+          states.push(result.state);
+          received.push({ type: 'snapshot', data: result.metadata });
+          return;
+        }
+        const message = result.message;
         assert.ok(typeof message === 'object' && message !== null);
         assert.ok('type' in message && typeof message.type === 'string');
         assert.ok('data' in message);
         received.push({ type: message.type, data: message.data });
         if (message.type === 'joined') {
           decoder.reset();
-        }
-        if (message.type === 'snapshot') {
-          states.push(decoder.decode(message.data));
         }
       });
       await once(ws, 'open', { signal: AbortSignal.timeout(2000) });
@@ -239,10 +246,11 @@ describe('Asteroid destruction over real sockets', () => {
               type: 'shoot',
               id: pilot.id,
               laserStart: { x: targetPosition.x - radius - 2, y: targetPosition.y },
-              laserDirection: { x: 10, y: 0 },
+              laserDirection: { x: LASER.SPEED / GAME.FPS, y: 0 },
             })
           );
           await barrier();
+          expect(server.gameEngine.getServerLasers()).toHaveLength(1);
           // Advance only the actual projectile pipeline. The stopped world cannot
           // supply an NPC hit, pickup score, expiry, or replacement asteroid.
           const hits = server.gameEngine.advanceLasersAndResolveHits();

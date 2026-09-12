@@ -206,9 +206,14 @@ export async function startFixtureControl(
         }
         const baselines = players.map((player) => {
           assert(player.ws, 'Participant has no transport');
+          const motionEpoch = player.playerMotion?.epoch;
+          assert(
+            typeof motionEpoch === 'number' && Number.isSafeInteger(motionEpoch) && motionEpoch > 0,
+            'Participant has no authoritative fixture motion epoch'
+          );
           const sequence = server.wsCore.getBroadcaster().requestSnapshotKeyframe(player.ws);
           assert(sequence !== undefined, 'Participant has no snapshot negotiation');
-          return { id: player.id, sequence };
+          return { id: player.id, sequence, motionEpoch };
         });
         const manifest = {
           version: 1,
@@ -332,9 +337,13 @@ export async function prepareFixture(path: string, request: FixtureRequest) {
         'sequence' in entry &&
         typeof entry.sequence === 'number' &&
         Number.isSafeInteger(entry.sequence) &&
-        entry.sequence > 0
+        entry.sequence > 0 &&
+        'motionEpoch' in entry &&
+        typeof entry.motionEpoch === 'number' &&
+        Number.isSafeInteger(entry.motionEpoch) &&
+        entry.motionEpoch > 0
     );
-    return { id: entry.id, sequence: entry.sequence };
+    return { id: entry.id, sequence: entry.sequence, motionEpoch: entry.motionEpoch };
   });
   assert.deepEqual(
     baselines.map((entry) => entry.id).sort(),

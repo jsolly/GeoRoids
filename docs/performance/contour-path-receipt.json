@@ -1,0 +1,481 @@
+{
+  "date": "2026-09-12",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "stage": "stage-4-adoption-screen",
+  "status": "accepted-for-integration",
+  "scope": "Native Path2D contour submission and accepted client integration; includes isolated synchronous painter timing, native correctness, full-scene localization, and six real-game screens. Excludes the final repository gate, ship or deploy, physical-phone FPS, and a whole-scene CPU win.",
+  "integration": {
+    "currentSourceNote": "The current source includes the measured contour renderer and a root-owned comment-only correction in contourSpatialIndex.ts made after measurement. The current source hashes are separated from the measured source snapshot.",
+    "currentSource": [
+      {
+        "path": "src/rendering/contourRenderer.ts",
+        "sha256": "6594f2f9edfa4973cc56368a142a35241f047f103538bbe31f4935f31efb7fa3",
+        "bytes": 2558
+      },
+      {
+        "path": "src/rendering/contourSpatialIndex.ts",
+        "sha256": "61114db4ca7847797e94a7390f351b6e8eac0c9c8fba6f68bcc5e097e3218344",
+        "bytes": 4574
+      }
+    ],
+    "testOnlyPath2D": {
+      "path": "tests/support/TestPath2D.ts",
+      "sha256": "e7420297c70ced8bebfe6f07ff59c579edc1ce96e4fa96bc2e822781bb7e9358",
+      "bytes": 446,
+      "productionDependencyChanges": "none"
+    },
+    "affectedTests": [
+      {
+        "path": "tests/unit/rendering/contours-follow-the-camera-without-dropping-lines.test.ts",
+        "sha256": "359dc088c286e326be5b381480d1ef4b0b81ad57bc536cd38aff57d4a72bdf61",
+        "bytes": 9122
+      },
+      {
+        "path": "tests/unit/systems/isoContourTerrain.test.ts",
+        "sha256": "be20be33886828cd00161fe03c722f3b0af80068abf246a2ce3656c6c435b1b9",
+        "bytes": 12317
+      },
+      {
+        "path": "tests/unit/systems/visualPolish.test.ts",
+        "sha256": "7aa46856e67b0aeb8623fbdb6506ff46ee8b4f716cf6d4635ac98eb3808478d1",
+        "bytes": 17553
+      }
+    ]
+  },
+  "measuredSource": {
+    "source": "src/rendering/contourRenderer.ts",
+    "function": "drawIsoContours",
+    "functionSha256": "e909b2289363ec19fd303839ffc72ad9962a310fd009a56ccd3b72919d809a37",
+    "provenance": {
+      "path": ".performance/contour-path/source-provenance.json",
+      "sha256": "41a747f39e3722603e1891c3a6e13dfe9b0365f5b49e3a18cc8762d466a2bd25",
+      "bytes": 734
+    },
+    "artifacts": [
+      {
+        "path": ".performance/contour-path/actual-drawIsoContours.source.ts",
+        "sha256": "ffa6aa98c732f21e182382aadf0386acb4dd98d78c558337e7624256551a105d",
+        "bytes": 1874
+      },
+      {
+        "path": ".performance/contour-path/baseline-painter.ts",
+        "sha256": "de72605f264a3f5307756133ae6fbfac16c972771cd61f2b584dca14253fc690",
+        "bytes": 5213
+      },
+      {
+        "path": ".performance/contour-path/path-painter.ts",
+        "sha256": "363e8de0eba4640f9edd40c3f93593ce858834ed27010361f67ab416378200a0",
+        "bytes": 7250
+      },
+      {
+        "path": ".performance/contour-path/candidate-integration-source.ts",
+        "sha256": "98ed7dacac9f4f767df5090c4e31e937a392d8f8ee77708fd9322ee90567aec4",
+        "bytes": 1351
+      },
+      {
+        "path": ".performance/contour-path/timing-entry.ts",
+        "sha256": "317920a33ab8deb85f12b5109d66fc410062bf1e02738994c05cce42ebe5d0d6",
+        "bytes": 21952
+      }
+    ]
+  },
+  "timing": {
+    "runtime": "Chromium 153.0.8010.12 on Apple M3; accelerated 2D Canvas through ANGLE Metal; device scale factor 3",
+    "metric": "Synchronous Canvas painter submission CPU measured around the uninstrumented painter call; cold candidate Path2D construction is included",
+    "warmupFrames": 300,
+    "measuredFramesPerArm": 1800,
+    "armRecords": 36,
+    "rawSamples": 64800,
+    "warmPooled": [
+      {
+        "viewport": "touch-portrait",
+        "baselineMsPerCall": 0.024658,
+        "candidateMsPerCall": 0.012576,
+        "savingMsPerCall": 0.012081,
+        "candidateGainPercent": 49.0,
+        "maximumAaDriftPercent": 2.03
+      },
+      {
+        "viewport": "touch-landscape",
+        "baselineMsPerCall": 0.023877,
+        "candidateMsPerCall": 0.011777,
+        "savingMsPerCall": 0.0121,
+        "candidateGainPercent": 50.68,
+        "maximumAaDriftPercent": 2.18
+      },
+      {
+        "viewport": "desktop",
+        "baselineMsPerCall": 0.072089,
+        "candidateMsPerCall": 0.026046,
+        "savingMsPerCall": 0.046043,
+        "candidateGainPercent": 63.87,
+        "maximumAaDriftPercent": 2.31
+      }
+    ],
+    "coldPooled": [
+      {
+        "viewport": "touch-portrait",
+        "baselineMsPerCall": 0.065278,
+        "candidateMsPerCall": 0.085417,
+        "candidateCostMsPerCall": 0.020139,
+        "candidateCostPercent": 30.85
+      },
+      {
+        "viewport": "touch-landscape",
+        "baselineMsPerCall": 0.0625,
+        "candidateMsPerCall": 0.084722,
+        "candidateCostMsPerCall": 0.022222,
+        "candidateCostPercent": 35.56
+      },
+      {
+        "viewport": "desktop",
+        "baselineMsPerCall": 0.144444,
+        "candidateMsPerCall": 0.15,
+        "candidateCostMsPerCall": 0.005556,
+        "candidateCostPercent": 3.85
+      }
+    ],
+    "artifacts": [
+      {
+        "path": ".performance/contour-path/artifacts/summary.json",
+        "sha256": "26a31d0c07074ef71ab9b5ea9d69103fc82135582518dc7ddb60ab50a28af0df",
+        "bytes": 1799
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-raw.json",
+        "sha256": "61a4b035d56fb5c640f6cadd56cb964d327a29074353ad37d08a0080895fe061",
+        "bytes": 17036678
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-summary.json",
+        "sha256": "03214ffc01afbdd3f2abca0a269a59aefe162543a987771ad2a9c33cec7bade4",
+        "bytes": 255387
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-summary.md",
+        "sha256": "02626758db301567c0f56a0c2fb7c32e24813625c70c2e0133a3244edf1ee719",
+        "bytes": 10113
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-provenance.json",
+        "sha256": "e2100619be6147c51ddf1eb795b51cf275570132c67965eb4ffc15a731e4138e",
+        "bytes": 1503
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-summary-regeneration-receipt.json",
+        "sha256": "2654912d5fec0887cae203ac654bd07c2dfc0f6dd835d3951e544ca3230ecf72",
+        "bytes": 532
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-summary-historical-incorrect.json",
+        "sha256": "4ddaac17f27b77704965f23837765aec1c96472af4bb745e7854d1c1575f8332",
+        "bytes": 123674
+      },
+      {
+        "path": ".performance/contour-path/artifacts/timing-summary-historical-incorrect.md",
+        "sha256": "ccf7bfe752abd7da5dbe50f52b8dbdbf537b6699773c2caad44845301e61f83f",
+        "bytes": 9018
+      }
+    ]
+  },
+  "correctness": {
+    "browserMatrix": {
+      "chromiumFrames": 150,
+      "webkitFrames": 150,
+      "contextsPerBrowser": 6,
+      "historyFramesPerContext": 25,
+      "result": "zero order, label, Canvas state, and outside-contour mismatches; empty paths had zero residual pixels and constructors; invalid-scale fallback matched only in the scratch candidate (production scale is fixed at 1)"
+    },
+    "fullScene": {
+      "steps": 23,
+      "witnesses": 24,
+      "changedPixelsByCase": {
+        "stationary": 52,
+        "cellCrossing": 60,
+        "terrainBReplacement": 29,
+        "terrainAReturn": 37
+      },
+      "outsideContourPixelsByCase": 0,
+      "candidatePathConstructors": 105,
+      "scene": "actual GameController update/render path with starfield, boundary, HUD, pilot, 24 asteroids, 6 loot, 3 satellites, and 3 pickups",
+      "artifacts": [
+        {
+          "path": ".performance/contour-path/artifacts/full-scene-baseline.json",
+          "sha256": "47ea7460e1941c9235eda297e3a155e9d92b5d0a41c83900f6150583fb56e689",
+          "bytes": 2334369
+        },
+        {
+          "path": ".performance/contour-path/artifacts/full-scene-candidate.json",
+          "sha256": "bc99fcca0a5543b00120a1ced834ff2bd40ca48f5da845ab014b82e32daa14f6",
+          "bytes": 2334643
+        },
+        {
+          "path": ".performance/contour-path/artifacts/full-scene-source-restore.json",
+          "sha256": "895f6f262efbf81e50b7ce9a21c95f647064aeb5f0e3c5a6d9f2cf4e735715fa",
+          "bytes": 330
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit-correctness.log",
+          "sha256": "c8222b4ed1072390aed59f7950ddea29ca3d98311a86cb7d490d1da80a242ef4",
+          "bytes": 3201
+        },
+        {
+          "path": ".performance/contour-path/artifacts/touch-portrait-dpr1.json",
+          "sha256": "bdcfbd65583ccabb9f7f979e2252c0586f2a42f13b5036e0c636c05f3ebc6ac8",
+          "bytes": 388162
+        },
+        {
+          "path": ".performance/contour-path/artifacts/touch-portrait-dpr3.json",
+          "sha256": "0a56fbd2076fd77042cc6614b5095522ccd67f00edb182990c06b1439e9dd842",
+          "bytes": 390154
+        },
+        {
+          "path": ".performance/contour-path/artifacts/touch-landscape-dpr1.json",
+          "sha256": "69d1a1763b20cddb0e23c975925e7516eb596d26dc557c08800406d7408c6db1",
+          "bytes": 387935
+        },
+        {
+          "path": ".performance/contour-path/artifacts/touch-landscape-dpr3.json",
+          "sha256": "d93b2163c6f88b5d61d1e6eca33ae80e9a36536f9e77a9d9c564b97d66c0e6d3",
+          "bytes": 389756
+        },
+        {
+          "path": ".performance/contour-path/artifacts/desktop-dpr1.json",
+          "sha256": "2abd337c5d8d776cdbd1e98a0c3c709d79a5148b2e8a92dd56fe15e9e8d7dc73",
+          "bytes": 406190
+        },
+        {
+          "path": ".performance/contour-path/artifacts/desktop-dpr3.json",
+          "sha256": "5da92e688e650b1ee007ce35875ce4574b7aef3b5dab44903bfb097c18c5d9e5",
+          "bytes": 407810
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit/touch-portrait-dpr1.json",
+          "sha256": "b814d5047f6f0805c7ba94ba63f78ac760a0afe594db2f0c349fbc71927ea9cd",
+          "bytes": 389020
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit/touch-portrait-dpr3.json",
+          "sha256": "d9d4d3592c347ad1eb356f199b3194f36d191caa495d9c32e719d24beca5aac4",
+          "bytes": 390148
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit/touch-landscape-dpr1.json",
+          "sha256": "bb9821dc5b8426a0472b8e9a46f53251ec39adc3ba0657d9d4b69b50aa65153d",
+          "bytes": 389639
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit/touch-landscape-dpr3.json",
+          "sha256": "bd8f3ccdf0a27d94c25cc114896b0bab83162feaa82ba4dda0d474b24a29e1ee",
+          "bytes": 389735
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit/desktop-dpr1.json",
+          "sha256": "0b3795086d359bdecbfc4484b38c9e96052ee95120f6bf9e62536059183c7652",
+          "bytes": 407760
+        },
+        {
+          "path": ".performance/contour-path/artifacts/webkit/desktop-dpr3.json",
+          "sha256": "c775a73f07d7e1464eb0235829696c4823819da804ecc65d34d79ff8cfb7a434",
+          "bytes": 407788
+        }
+      ]
+    }
+  },
+  "realtimeScreen": {
+    "environment": {
+      "browser": "Chromium 153.0.8010.12",
+      "cpu": "Apple M3 with four times CPU slowdown",
+      "mode": "emulated touch at 390x844 CSS pixels, device scale factor 3, 1170x2532 backing store",
+      "warmupSeconds": 15,
+      "measuredSeconds": 30,
+      "physicalDevice": false,
+      "fpsClaim": "none"
+    },
+    "sessions": 6,
+    "pairDeltas": [
+      {
+        "pair": "A/A baseline then baseline",
+        "frameCpuMeanPercent": 4.36,
+        "renderMeanPercent": 5.36,
+        "frameCpuP95Percent": -3.57,
+        "renderP95Percent": -4.17
+      },
+      {
+        "pair": "A/B baseline then candidate",
+        "frameCpuMeanPercent": -0.31,
+        "renderMeanPercent": -1.81,
+        "frameCpuP95Percent": 3.7,
+        "renderP95Percent": 9.09
+      },
+      {
+        "pair": "A/B candidate then baseline",
+        "frameCpuMeanPercent": -3.11,
+        "renderMeanPercent": -2.9,
+        "frameCpuP95Percent": -10.71,
+        "renderP95Percent": -12.5
+      }
+    ],
+    "frameIntervals": {
+      "allSessionMeansMs": 16.666,
+      "p95AndP99Ms": "16.7 or 16.8",
+      "frameCpuSamplesAbove25Ms": 0
+    },
+    "serverWarnings": {
+      "browserReportWarningsArraysEmpty": true,
+      "browserReportErrorsArraysEmpty": true,
+      "motionCommandRejectedCount": 15,
+      "countsByRun": {
+        "aa-0-a": 2,
+        "aa-0-b": 2,
+        "ab-0-a": 3,
+        "ab-0-b": 3,
+        "ab-1-a": 3,
+        "ab-1-b": 2
+      },
+      "breakdown": {
+        "staleEnhancedMotionPose": 14,
+        "envelopeExcess": 1
+      }
+    },
+    "artifacts": [
+      {
+        "path": ".performance/contour-path/artifacts/realtime/summary.json",
+        "sha256": "21901f51411c3d033eded08a8deefd02308f1c27f79a52fc022a0d3304017633",
+        "bytes": 47731
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/runs.json",
+        "sha256": "c5d95f458f9c58c14835c8c3f7d1eb9e19fd382c62eae229595327091d5ebe4b",
+        "bytes": 2789
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/source-restoration.json",
+        "sha256": "086b12cd385dec50a5808149fcfa622645a686f470c99ca08ffff0a32771b8b0",
+        "bytes": 455
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/preparation.json",
+        "sha256": "75fe475b9e4c296fd4aebb022fe2465cc031c6241a2f2c32ab155a671a9fa62f",
+        "bytes": 1752
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/baseline-wiki-source-review.json",
+        "sha256": "e51d93deb49e9ff87a7b887f5d94053f81e9803e0f904290f6e670c4a2437c50",
+        "bytes": 33068
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/candidate-wiki-source-review.json",
+        "sha256": "16ca293b594106c24a2da5d2f4972bed6638a1518aa693aa12c6f9cf65c4178f",
+        "bytes": 33058
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/aa-0-a.json",
+        "sha256": "4f5a699d0184bee4012106f84e19474669becbde0950b7e059b7f3baa94efeef",
+        "bytes": 7290633
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/aa-0-b.json",
+        "sha256": "7c85d9cd658d61dc142ee0548f4050db1ac5afe64a95cbb02995965cba67152b",
+        "bytes": 7189355
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-0-a.json",
+        "sha256": "89bf19eecdc71f222f7b9595492c83cc3e83fc778a3e89e0105d14707186e2a5",
+        "bytes": 7189216
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-0-b.json",
+        "sha256": "0767a9420d47a14b9d3a90e5c7489abfc7fc4aaa6e75021c46ba79a4162b865b",
+        "bytes": 7287363
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-1-a.json",
+        "sha256": "f69f09b97be5fcf19686548ba88993484439ba26460aacf51426e5e0b95c6ad4",
+        "bytes": 7185630
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-1-b.json",
+        "sha256": "e4a6f51d834d801b0d920d2d3d5c7b4cb11993bd3e3b340786d74263e46ebd9b",
+        "bytes": 7092540
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/aa-0-a.log",
+        "sha256": "7fac4517f3a2e59ef16d4a10b3516bbcf0c5af8efb2088456421615fcee149e8",
+        "bytes": 157477
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/aa-0-b.log",
+        "sha256": "4dd3cf8be571919d42c660761c193f2856a296b5985f5b23d3e42afe87b82c31",
+        "bytes": 157976
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-0-a.log",
+        "sha256": "f5f666ef7a26fa4cf53552eb1b20e9961d6f7bda577680f2d3d9c4c8530874d8",
+        "bytes": 144130
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-0-b.log",
+        "sha256": "32e6c793896fef7b6a22cbfdb84917403e230c9b4bc1cd1daf08bf2c25cc20fb",
+        "bytes": 145254
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-1-a.log",
+        "sha256": "76f41eaddb9221c037408b18cfff9e5bd5f8ccad1f66df00066411899fb9b107",
+        "bytes": 145183
+      },
+      {
+        "path": ".performance/contour-path/artifacts/realtime/ab-1-b.log",
+        "sha256": "4eaed627173bcb5a7aeacd34462090d59f8c2d60fcf8e59e2afbe583ceff80eb",
+        "bytes": 141971
+      }
+    ]
+  },
+  "summaryRepair": {
+    "rawSha256Before": "61a4b035d56fb5c640f6cadd56cb964d327a29074353ad37d08a0080895fe061",
+    "rawSha256After": "61a4b035d56fb5c640f6cadd56cb964d327a29074353ad37d08a0080895fe061",
+    "rawPreserved": true,
+    "issue": "The historical generator overwrote the first A/A arm under a shared baseline key and reversed candidate-first alternating gain direction.",
+    "normalization": "(baseline - candidate) / baseline; first and second arm positions remain explicit",
+    "historicalArtifacts": [
+      ".performance/contour-path/artifacts/timing-summary-historical-incorrect.json",
+      ".performance/contour-path/artifacts/timing-summary-historical-incorrect.md"
+    ],
+    "regenerationReceipt": ".performance/contour-path/artifacts/timing-summary-regeneration-receipt.json"
+  },
+  "reviewEvidence": [
+    {
+      "path": ".performance/contour-path/evidence-critic.md",
+      "sha256": "7e47c59e653e0950208c3ecfeb9d2d05434383fbe4c025953a290c53c14368e3",
+      "bytes": 8928
+    },
+    {
+      "path": ".performance/contour-path/adoption-screen-critic.md",
+      "sha256": "7e90e38385a1ce2a8a92d40d7a09eb9945705984e2f450b8ef8e5d3c03459989",
+      "bytes": 8283
+    },
+    {
+      "path": ".performance/contour-path/product-integration-critic.md",
+      "sha256": "e9ad9ee7b1a8644092f62f9729e118bb4468fcf81a3b705aaa28e4d02df8e169",
+      "bytes": 7747
+    }
+  ],
+  "checks": {
+    "docsBiome": "passed: node_modules/.bin/biome check --error-on-warnings docs/performance/contour-path-receipt.json",
+    "markdownlint": "passed: node_modules/.bin/markdownlint-cli2 docs/performance/contour-path-results.md",
+    "tests": "not run for this docs-only change",
+    "timing": "not rerun; retained artifacts are hashed above",
+    "fullGateOrShip": "not claimed"
+  },
+  "currentCombinedValidation": {
+    "unitFiles": 216,
+    "unitTestsPassed": 1232,
+    "unitTestsSkipped": 0,
+    "productionBuild": "passed",
+    "shippingGate": "pending",
+    "additionalTestOnlyPath2DFixtures": [
+      "tests/unit/rendering/contour-shots-follow-the-current-pilots.test.ts",
+      "tests/unit/rendering/failed-frames-report-an-error-and-offer-restart.test.ts"
+    ]
+  }
+}

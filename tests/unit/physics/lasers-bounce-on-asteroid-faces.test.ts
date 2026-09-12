@@ -24,6 +24,48 @@ function square(id = 'square', x = 0, y = 0): ReflectionAsteroid {
 }
 
 describe('pilots plan laser bounces on the actual asteroid faces', () => {
+  it('follows in-place asteroid pose and contour changes between consecutive shots', () => {
+    const rock = square();
+    const shoot = () => findNearestAsteroidImpact(point(-10, 0.3), point(10, 0.3), [rock]);
+    expect(shoot()?.point.x).toBeCloseTo(-1, 10);
+    rock.position.x = 4;
+    expect(shoot()?.point.x).toBeCloseTo(3, 10);
+    rock.size *= 2;
+    expect(shoot()?.point.x).toBeCloseTo(2, 10);
+    for (const change of [
+      () => {
+        rock.rotation += 0.4;
+      },
+      () => {
+        rock.offsets[2] = 0.25;
+      },
+      () => {
+        rock.offsets.push(1.2);
+        rock.vertices = 5;
+      },
+      () => {
+        rock.position.y = -0.5;
+      },
+    ]) {
+      change();
+      const fresh = structuredClone(rock);
+      expect(shoot()).toEqual(findNearestAsteroidImpact(point(-10, 0.3), point(10, 0.3), [fresh]));
+    }
+    // A caller may edit exported polygon points without corrupting private queries.
+    const pointToEdit = asteroidPolygonPoints(rock)[0];
+    if (pointToEdit) {
+      pointToEdit.x = 999;
+    }
+    expect(shoot()).toEqual(
+      findNearestAsteroidImpact(point(-10, 0.3), point(10, 0.3), [structuredClone(rock)])
+    );
+    // Off-path geometry still fails validation after a previously valid query.
+    rock.offsets[1] = NaN;
+    expect(() => findNearestAsteroidImpact(point(800, 800), point(801, 800), [rock])).toThrow(
+      RangeError
+    );
+  });
+
   it('uses the same translated, rotated, uneven contour that the canvas strokes', () => {
     const rock = {
       ...square(),
@@ -190,6 +232,26 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(path.termination).toBe('stationary');
     expect(path.segments).toEqual([]);
     expect(path.traveledDistance).toBe(0);
+  });
+
+  it('does not hit a huge contour when a shallow shot ends outside its bounds', () => {
+    const rock: ReflectionAsteroid = {
+      id: 'huge-rock',
+      position: point(8_900_000, 8_000_000),
+      size: 900_000,
+      rotation: 0,
+      vertices: 4,
+      offsets: [1, 1, 1, 1],
+    };
+    // Cross-product cancellation used to report a hit outside this polygon.
+    // Both endpoints are left of every vertex, beyond the corner tolerance.
+    expect(
+      findNearestAsteroidImpact(
+        point(7_929_289.321874062, 8_070_710.678125514),
+        point(7_999_999.9999929285, 8_000_000.0000070715),
+        [rock]
+      )
+    ).toBeNull();
   });
 
   it('fails loudly on malformed or excessive contours instead of skipping a nearer rock', () => {

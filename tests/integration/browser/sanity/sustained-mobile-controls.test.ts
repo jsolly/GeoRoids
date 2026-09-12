@@ -112,6 +112,15 @@ test(
     expect(afterCancel.thrusting).toBe(false);
     expect(afterCancel.canShoot).toBe(true);
 
+    // Keep the notice visible for layout inspection without relying on a random pickup.
+    await page.evaluate(() => {
+      const controller = window.gameController;
+      if (!controller) {
+        throw new Error('Game controller missing before HUD capture');
+      }
+      controller.getGameStateManager().setPickupMessage('Echo', 50);
+    });
+    await game.waitForAnimationFrames(2);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath('performance-mobile-portrait.png'),
     });

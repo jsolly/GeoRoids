@@ -1,33 +1,3 @@
-import type { PongMessage } from '../../shared-types';
-
-export type ServerMessage = PongMessage | GameServerMessage;
-
-interface GameServerMessage {
-  type:
-    | 'playerJoined'
-    | 'playerLeft'
-    | 'playerDamaged'
-    | 'playerKilled'
-    | 'scoreUpdate'
-    | 'snapshot'
-    | 'shotAcknowledged'
-    | 'error'
-    | 'joined'
-    | 'sessionExpired'
-    | 'asteroidCreate'
-    | 'asteroidCreateBatch'
-    | 'asteroidUpdate'
-    | 'asteroidDestroy'
-    | 'asteroidTagged'
-    | 'shockwave'
-    | 'abilityUsed'
-    | 'lootExploded'
-    | 'satelliteShoot'
-    | 'satellitePickupCollected';
-  data?: unknown;
-  timestamp: number;
-}
-
 export interface ClientMessage {
   type:
     | 'join'

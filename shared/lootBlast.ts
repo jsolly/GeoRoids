@@ -1,4 +1,5 @@
 import type { Position, Velocity } from '../shared-types';
+import { GAME } from '../src/constants';
 
 /**
  * Shoot-a-drop blast (GH #313 / Todoist destroy-drop).
@@ -7,7 +8,7 @@ import type { Position, Velocity } from '../shared-types';
 export const LOOT_BLAST = {
   RADIUS: 80,
   DAMAGE: 40,
-  PUSH: 4,
+  PUSH: 4 * GAME.MOTION_SCALE,
   /** Matches AsteroidManager "small" spawn band (size < 25). */
   SMALL_ROID_MAX: 24,
   /** Generous laser reach so a real shot can arm a drop without map-wide detonates. */

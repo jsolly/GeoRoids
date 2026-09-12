@@ -58,15 +58,16 @@ const array =
   (rule: Rule): Rule =>
   (value) =>
     Array.isArray(value) && value.every(rule);
-const shape =
-  <T>(rules: Shape<T>): Rule =>
-  (value) => {
+const shape = <T>(rules: Shape<T>): Rule => {
+  const entries = Object.entries(rules) as Array<[string, Rule]>;
+  return (value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return false;
     }
     const fields = value as Record<string, unknown>;
-    return Object.entries(rules).every(([name, rule]) => (rule as Rule)(fields[name]));
+    return entries.every(([name, rule]) => rule(fields[name]));
   };
+};
 const position = shape<{ x: number; y: number }>({ x: number, y: number });
 const energy: Rule = (value) => number(value) && (value as number) >= 0 && (value as number) <= 8;
 const material = enumeration<AsteroidMaterial>({ ice: true, metal: true, rubble: true });

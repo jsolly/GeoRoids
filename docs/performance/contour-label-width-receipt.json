@@ -1,0 +1,98 @@
+{
+  "status": "accepted; relevant live browser checks, all 1,226 unit tests and production build passed",
+  "kind": "contour label text width cache",
+  "source": {
+    "runtime": "v24.16.0",
+    "canvas": "3.2.3",
+    "source": {
+      "src/rendering/contourLabels.ts": "ced0fd05674799c32595f843e0c9ecd188c656195e0c3071aeb1a4114f48af10",
+      ".performance/contour-label-width/baseline.ts": "bcfe582281a4cc9bee3a256e88d7d708ebede69fc27bf1b1cef8abcbee28cb4e",
+      ".performance/contour-label-width/measured-baseline.ts": "b103dd1c186cc4bebc3b872423d8cdc7a6ddf8e6466636846a0dc10618d2a390",
+      ".performance/contour-label-width/compare.ts": "6990c1bcd9b079ce64242f7e7ebe5c6d2e461815972528fe003b3cdbf0ee927a",
+      "src/physics/terrain/terrainConfig.ts": "aca31393eb76c685a2d6c48fa579c3822b48cf52fe0dfea6cde348035aecce5a",
+      "src/constants/index.ts": "627630628805e7a67db3603cdedeeac6969cbd97b987269be7b153850dc8c5ab"
+    }
+  },
+  "correctness": [
+    {
+      "viewport": "portrait",
+      "frames": 120,
+      "baselineMeasures": 775,
+      "candidateMeasures": 49,
+      "finalImageSha256": "ef640614ecb3c1c48a94814c562b988344af2dfe47e4fbf83476708bf831cf15"
+    },
+    {
+      "viewport": "landscape",
+      "frames": 120,
+      "baselineMeasures": 804,
+      "candidateMeasures": 45,
+      "finalImageSha256": "492cd5d494be01ede5d0962415fbd9995341d7d97e137b0f1b972cbaa09012e5"
+    },
+    {
+      "viewport": "desktop",
+      "frames": 120,
+      "baselineMeasures": 2976,
+      "candidateMeasures": 59,
+      "finalImageSha256": "2643ccabc4c805683aae15265801c18502a67d7d0a1f028175909c355a32e9cf"
+    }
+  ],
+  "timing": {
+    "metric": "Isolated native Canvas contour-label submission time; not browser or phone FPS",
+    "warmupFrames": 300,
+    "measuredFrames": 1800,
+    "rows": [
+      {
+        "viewport": "portrait",
+        "baselineMs": 418.9600760000576,
+        "candidateMs": 303.57827500005624,
+        "medianPairedReductionPercent": 27.540046799109685,
+        "medianSavingsMsPerFrame": 0.06410100055555631,
+        "maxAAAbsoluteMs": 64.62871499997709,
+        "baselineCalls": 11300,
+        "candidateCalls": 1
+      },
+      {
+        "viewport": "landscape",
+        "baselineMs": 422.5857870000327,
+        "candidateMs": 310.36313599999266,
+        "medianPairedReductionPercent": 26.55618207056059,
+        "medianSavingsMsPerFrame": 0.06234591722224448,
+        "maxAAAbsoluteMs": 58.77405699997689,
+        "baselineCalls": 11453,
+        "candidateCalls": 2
+      },
+      {
+        "viewport": "desktop",
+        "baselineMs": 1547.2078909999982,
+        "candidateMs": 1135.701329999858,
+        "medianPairedReductionPercent": 26.25693852438898,
+        "medianSavingsMsPerFrame": 0.22465420555559223,
+        "maxAAAbsoluteMs": 69.9384910000299,
+        "baselineCalls": 42012,
+        "candidateCalls": 4
+      }
+    ]
+  },
+  "artifacts": {
+    "src/rendering/contourLabels.ts": "ced0fd05674799c32595f843e0c9ecd188c656195e0c3071aeb1a4114f48af10",
+    ".performance/contour-label-width/measured-baseline.ts": "b103dd1c186cc4bebc3b872423d8cdc7a6ddf8e6466636846a0dc10618d2a390",
+    ".performance/contour-label-width/baseline.ts": "bcfe582281a4cc9bee3a256e88d7d708ebede69fc27bf1b1cef8abcbee28cb4e",
+    ".performance/contour-label-width/compare.ts": "6990c1bcd9b079ce64242f7e7ebe5c6d2e461815972528fe003b3cdbf0ee927a",
+    ".performance/contour-label-width/correctness.json": "bd6dedc344eae3a5e2c74679fca685c7aea6db2200456a1e5930e4c2121678bf",
+    ".performance/contour-label-width/timing.json": "34bba58160f7916db88c9a3a08023f3bfa8929144281e724589bc133aa7f4b19",
+    ".performance/contour-label-width/summary.json": "537b1552244ca8eb5b0969850ebb53f61b003060a96010d17cb25ed1237b3e6f",
+    ".performance/contour-label-width/critic.md": "8c0c47e65a0684b7fd5e7a2c91383cffae67adc03d590025784aaeb063e5e618"
+  },
+  "limits": [
+    "Native Canvas label-path elapsed time, not browser GPU or phone FPS",
+    "Fixed product system font; arbitrary future font loading requires reevaluation",
+    "Context and terrain replacement bound cache lifetime"
+  ],
+  "combinedVerification": {
+    ".performance/contour-label-width/browser.log": "cdc22b6f9bb31f4ba1bed218172aa469f39cddadb3c4803ace0604516927da61",
+    ".performance/contour-label-width/types.log": "006c8f896fb84789fffe28b901f51ef29db6e61feec7131ee089aedb98131414",
+    ".performance/contour-label-width/wiki-review.log": "7ec15bffca6b1481ba021f6e82e90279d0c9a0f19bc50507e575485d6911b6a5",
+    ".performance/contour-label-width/all-units.log": "d00495d151a0a7ce648c79a281837cdf2c7ef1a460a2db060ddf834c3ce6e0b8",
+    ".performance/contour-label-width/build.log": "f1ca49213ae29eb5fcf4821335d7d137905b928a25cf2cdbf1cd8c804f84adab"
+  }
+}

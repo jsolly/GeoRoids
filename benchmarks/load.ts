@@ -175,7 +175,11 @@ try {
     assert(client.measuredStates > 0, 'Pilot did not receive measured states');
     assert(client.measuredMotionCommands > 0, 'No measured poses offered');
     assert(client.acknowledgedMotionStates > 0, 'Server did not acknowledge poses');
-    assert.equal(client.measuredStates, client.decodeMs.length, 'Raw decode samples omitted');
+    assert.equal(
+      client.measuredStates,
+      client.snapshotHandlingMs.length,
+      'Snapshot handling samples omitted'
+    );
     client.completedScenario = true;
   }
 } catch (error) {
@@ -212,12 +216,12 @@ try {
     fail(new Error('Load report has no measured server health sample'));
   }
   const reports = clients.map((client) => client.report());
-  const decodeSamples = clients.flatMap((client) => client.decodeMs);
+  const snapshotHandlingSamples = clients.flatMap((client) => client.snapshotHandlingMs);
   const rttSamples = clients.flatMap((client) => client.rttMs);
   const stateIntervals = clients.flatMap((client) => client.stateIntervalMs);
   const samples: Record<string, number[]> = {};
-  if (decodeSamples.length > 0) {
-    samples['decodeMs'] = decodeSamples;
+  if (snapshotHandlingSamples.length > 0) {
+    samples['snapshotHandlingMs'] = snapshotHandlingSamples;
   }
   if (rttSamples.length > 0) {
     samples['rttMs'] = rttSamples;
@@ -228,7 +232,7 @@ try {
   const measurement: Measurement | undefined =
     cleanupComplete && Object.keys(samples).length
       ? {
-          primaryMetric: samples['rttMs'] ? 'rttMs' : 'decodeMs',
+          primaryMetric: samples['rttMs'] ? 'rttMs' : 'snapshotHandlingMs',
           samples,
           counts: {
             offeredPilots: pilots,
@@ -246,12 +250,13 @@ try {
             admissionMs,
             inputHz: 20,
             offeredShotsHz: 2,
-            compression: false,
+            compression: clients.some((pilot) => pilot.socket.extensions === 'permessage-deflate'),
             networkProfile: networkName,
             minimumStateHz: MIN_STATE_HZ,
             maximumStateGapMs: MAX_STATE_GAP_MS,
             serverSeed: values.url ? 'unknown remote server seed' : 42,
-            timing: 'Native WebSocket scheduling and decoder application',
+            timing:
+              'Inbound WebSocket callback from decoder-owned parse through workload witness updates',
           },
           witness: {
             participants: reports,
@@ -282,7 +287,7 @@ try {
         admissionMs,
         inputHz: 20,
         offeredShotsHz: 2,
-        compression: false,
+        compression: clients.some((pilot) => pilot.socket.extensions === 'permessage-deflate'),
         serverSeed: values.url ? 'unknown remote server seed' : 42,
       },
       offeredPilots: pilots,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { PLAYER_MOTION } from '../../../../shared/playerMotion';
-import { GAME } from '../../../../src/constants';
+import { GAME, LASER } from '../../../../src/constants';
 import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
 import { GameServerWorld, useQuietServerConsole } from '../support/gameServerWorld';
 
@@ -25,7 +25,7 @@ test('Quake throws an allied human outward and old movement packets cannot cance
     id: caster.id,
     data: { kitId: 'quake', abilityId: 'shockPulse' },
   });
-  expect(actor.velocity.x).toBeGreaterThan(20);
+  expect(actor.velocity.x).toBeGreaterThan(20 * GAME.MOTION_SCALE);
   expect(actor.velocity.y).toBe(3);
   expect(actor.playerMotion?.epoch).toBe((oldEpoch ?? 0) + 1);
   const now = world.engine.getServerTime();
@@ -217,9 +217,9 @@ test('a blasted pilot can fire with real knockback carry only while its server g
   });
   const actor = world.entity(victim);
   const now = world.engine.getServerTime();
-  expect(actor.velocity.x).toBeGreaterThan(20);
+  expect(actor.velocity.x).toBeGreaterThan(20 * GAME.MOTION_SCALE);
   const muzzle = { x: actor.position.x + 20, y: actor.position.y };
-  const velocity = { x: actor.velocity.x + 5, y: actor.velocity.y };
+  const velocity = { x: actor.velocity.x + LASER.SPEED / GAME.FPS, y: actor.velocity.y };
   expect(world.engine.spawnHumanLaser(victim.id, muzzle, velocity, now)).not.toBeNull();
   expect(world.engine.spawnHumanLaser(victim.id, muzzle, velocity, now + 5000)).toBeNull();
 });
@@ -240,7 +240,7 @@ test('Quake turns incoming player shots outward without changing their owner', (
     .getPlayerProjectiles()
     .find((candidate) => candidate.id === shot?.id);
   expect(published?.ownerId).toBe(shooter.id);
-  expect(published?.velocity.x).toBeGreaterThan(20);
+  expect(published?.velocity.x).toBeGreaterThan(20 * GAME.MOTION_SCALE);
   expect(published?.velocity.y).toBe(2);
 });
 

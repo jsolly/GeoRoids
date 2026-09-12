@@ -18,11 +18,13 @@ import {
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvas';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
+import { TestPath2D } from '../../support/TestPath2D';
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function steepestSample(seed: number): { x: number; y: number; steep: number } {
@@ -195,6 +197,7 @@ describe('muted contour chrome', () => {
   });
 
   test('terrain elevations stay on their contours while the camera moves', () => {
+    vi.stubGlobal('Path2D', TestPath2D);
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 600;
@@ -209,6 +212,7 @@ describe('muted contour chrome', () => {
     ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
     const rendered: Array<{ text: string; x: number; y: number }> = [];
     const fillText = ctx.fillText.bind(ctx);
+    vi.spyOn(ctx, 'stroke').mockImplementation(() => {});
     vi.spyOn(ctx, 'fillText').mockImplementation((text, x, y) => {
       const transform = ctx.getTransform();
       rendered.push({ text, x: transform.e, y: transform.f });

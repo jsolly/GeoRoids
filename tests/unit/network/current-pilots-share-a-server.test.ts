@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
 import { normalizeFixtureAsteroids } from '../../../benchmarks/fixture-control';
+import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { serverPerformanceMetrics } from '../../../server/performanceMetrics';
@@ -11,7 +12,9 @@ import {
   SNAPSHOT_BACKPRESSURE_BYTES,
   SNAPSHOT_KEYFRAME_INTERVAL,
   SnapshotDecoder,
+  SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
+import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 type SendCallback = (error?: Error) => void;
@@ -64,6 +67,81 @@ function socket() {
   return { fake, close, ws: fake, messages: fake.inbox, pending };
 }
 
+interface SnapshotEnvelope {
+  readonly raw: string;
+  readonly data: unknown;
+  readonly timestamp: number;
+}
+
+function snapshotEnvelopes(pilot: ReturnType<typeof socket>): SnapshotEnvelope[] {
+  const result: SnapshotEnvelope[] = [];
+  for (const raw of pilot.fake.sent) {
+    const value: unknown = JSON.parse(raw);
+    if (
+      value === null ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      !('type' in value) ||
+      value.type !== 'snapshot' ||
+      !('data' in value) ||
+      !('timestamp' in value) ||
+      typeof value.timestamp !== 'number'
+    ) {
+      continue;
+    }
+    result.push({ raw, data: value.data, timestamp: value.timestamp });
+  }
+  return result;
+}
+
+interface SnapshotSummary {
+  readonly sequence: number;
+  readonly kind: 'keyframe' | 'delta';
+  readonly baseline?: number;
+}
+
+function snapshotSummary(data: unknown): SnapshotSummary {
+  if (
+    data === null ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    !('sequence' in data) ||
+    typeof data.sequence !== 'number' ||
+    !('kind' in data)
+  ) {
+    throw new Error('Malformed snapshot frame in recording');
+  }
+  if (data.kind === 'keyframe') {
+    return { sequence: data.sequence, kind: 'keyframe' };
+  }
+  if (data.kind === 'delta' && 'baseline' in data && typeof data.baseline === 'number') {
+    return { sequence: data.sequence, kind: 'delta', baseline: data.baseline };
+  }
+  throw new Error('Malformed snapshot frame kind in recording');
+}
+
+function decodedSnapshots(pilot: ReturnType<typeof socket>) {
+  const decoder = new SnapshotDecoder();
+  const states = [];
+  for (const raw of pilot.fake.sent) {
+    const result = decoder.readMessage(raw, { acceptSnapshots: true });
+    if (result.kind === 'snapshot-rejected') {
+      throw result.error;
+    }
+    if (result.kind === 'snapshot') {
+      states.push(result.state);
+    } else if (
+      result.message &&
+      typeof result.message === 'object' &&
+      'type' in result.message &&
+      result.message.type === 'joined'
+    ) {
+      decoder.reset();
+    }
+  }
+  return states;
+}
+
 describe('current pilots share the production handler and broadcaster', () => {
   let engine: GameEngine;
   let broadcaster: GameStateBroadcaster;
@@ -109,10 +187,9 @@ describe('current pilots share the production handler and broadcaster', () => {
       },
     });
     expect(pilot.messages[0]?.type).toBe('joined');
-    const decoder = new SnapshotDecoder();
-    const snapshot = pilot.messages.find((m) => m.type === 'snapshot');
-    assert.ok(snapshot, 'snapshot-v1 frame');
-    expect(decoder.decode(snapshot.data)).toMatchObject({
+    const snapshot = decodedSnapshots(pilot)[0];
+    assert.ok(snapshot, 'snapshot-v1 state');
+    expect(snapshot).toMatchObject({
       entities: expect.any(Array),
       playerProjectiles: expect.any(Array),
     });
@@ -146,6 +223,19 @@ describe('current pilots share the production handler and broadcaster', () => {
   });
 
   test('late joins, exclusions, backpressure, rejoin and reconnect have independent baselines', () => {
+    const expectedWorld = () =>
+      JSON.parse(
+        JSON.stringify(
+          new SnapshotEncoder({
+            ...engine.getGameState(),
+            playerProjectiles: engine.getPlayerProjectiles(),
+            satelliteProjectiles: engine
+              .getActiveSatelliteProjectiles()
+              .map((shot) => ({ id: shot.shotId, ...shot })),
+            collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
+          }).state
+        )
+      );
     const a = socket();
     join(handler, a.ws, 'a');
     const joinedA = a.messages.find((message) => message.type === 'joined');
@@ -158,13 +248,9 @@ describe('current pilots share the production handler and broadcaster', () => {
     assert.ok(pilotBSnapshot, 'pilot b snapshot');
     expect(pilotBSnapshot).toMatchObject({ data: { kind: 'keyframe' } });
     const reconstruct = (pilot: ReturnType<typeof socket>) => {
-      const decoder = new SnapshotDecoder();
-      return pilot.messages
-        .filter((message) => message.type === 'snapshot')
-        .map((message) => decoder.decode(message.data))
-        .at(-1);
+      return decodedSnapshots(pilot).at(-1);
     };
-    expect(reconstruct(a)).toMatchObject(JSON.parse(JSON.stringify(engine.getGameState())));
+    expect(reconstruct(a)).toEqual(expectedWorld());
     expect(reconstruct(b)).toEqual(reconstruct(a));
     const count = a.messages.length;
     broadcaster.broadcastGameState('a');
@@ -180,7 +266,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     const pilotAKeyframe = a.messages.at(-1);
     assert.ok(pilotAKeyframe, 'pilot a keyframe');
     expect(pilotAKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
-    expect(reconstruct(a)).toMatchObject(JSON.parse(JSON.stringify(engine.getGameState())));
+    expect(reconstruct(a)).toEqual(expectedWorld());
     expect(reconstruct(b)).toEqual(reconstruct(a));
     join(handler, a.ws, 'a', resumeTokenA as string);
     const rejoinedKeyframe = a.messages.at(-1);
@@ -198,9 +284,57 @@ describe('current pilots share the production handler and broadcaster', () => {
       sequence: 1,
       kind: 'keyframe',
     });
-    expect(reconstruct(reconnected)).toMatchObject(
-      JSON.parse(JSON.stringify(engine.getGameState()))
-    );
+    expect(reconstruct(reconnected)).toEqual(expectedWorld());
+  });
+
+  test('staggered recipients retain accepted baselines while peers advance independently', () => {
+    const a = socket();
+    const b = socket();
+    join(handler, a.ws, 'a');
+    join(handler, b.ws, 'b');
+
+    a.fake.defer = true;
+    broadcaster.broadcastGameState();
+    const playerB = engine.getPlayer('b');
+    assert.ok(playerB, 'pilot b');
+    playerB.position.x = 720;
+    broadcaster.broadcastGameState();
+    const pending = a.pending.shift();
+    assert.ok(pending, 'deferred snapshot callback');
+    pending();
+    a.fake.defer = false;
+    broadcaster.broadcastGameState();
+
+    const aSnapshots = snapshotEnvelopes(a);
+    const bSnapshots = snapshotEnvelopes(b);
+    expect(aSnapshots.map(({ data }) => snapshotSummary(data))).toEqual([
+      { sequence: 1, kind: 'keyframe' },
+      { sequence: 2, kind: 'delta', baseline: 1 },
+      { sequence: 3, kind: 'delta', baseline: 2 },
+      { sequence: 4, kind: 'delta', baseline: 3 },
+    ]);
+    expect(bSnapshots.map(({ data }) => snapshotSummary(data))).toEqual([
+      { sequence: 1, kind: 'keyframe' },
+      { sequence: 2, kind: 'delta', baseline: 1 },
+      { sequence: 3, kind: 'delta', baseline: 2 },
+      { sequence: 4, kind: 'delta', baseline: 3 },
+    ]);
+    for (const envelope of [...aSnapshots, ...bSnapshots]) {
+      expect(envelope.raw).toBe(
+        JSON.stringify({
+          type: 'snapshot',
+          data: envelope.data,
+          timestamp: envelope.timestamp,
+        })
+      );
+    }
+
+    const aDecoder = new SnapshotDecoder();
+    const bDecoder = new SnapshotDecoder();
+    const aWorld = aSnapshots.map(({ raw }) => decodeSnapshotMessage(aDecoder, raw)).at(-1);
+    const bWorld = bSnapshots.map(({ raw }) => decodeSnapshotMessage(bDecoder, raw)).at(-1);
+    expect(aWorld).toEqual(bWorld);
+    expect(aWorld).toMatchObject({ entities: expect.any(Array) });
   });
 
   test('a laser core stays collectible while current pilots decode keyframes and deltas', () => {
@@ -232,10 +366,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     broadcaster.requestSnapshotKeyframe(recovery.ws);
     broadcaster.broadcastGameState();
     const decodeAll = (pilot: ReturnType<typeof socket>) => {
-      const decoder = new SnapshotDecoder();
-      return pilot.messages
-        .filter((message) => message.type === 'snapshot')
-        .map((message) => decoder.decode(message.data));
+      return decodedSnapshots(pilot);
     };
     expect(
       decodeAll(recovery)
@@ -287,14 +418,19 @@ describe('current pilots share the production handler and broadcaster', () => {
       sequence: 2,
       kind: 'keyframe',
     });
+    const beforePeriodic = snapshotEnvelopes(a).length;
     for (let i = 0; i <= SNAPSHOT_KEYFRAME_INTERVAL; i++) {
       broadcaster.broadcastGameState();
     }
-    expect(a.messages.slice(-2)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ data: expect.objectContaining({ kind: 'keyframe' }) }),
-      ])
-    );
+    const periodic = snapshotEnvelopes(a)
+      .slice(beforePeriodic)
+      .map(({ data }) => snapshotSummary(data));
+    expect(periodic).toHaveLength(SNAPSHOT_KEYFRAME_INTERVAL + 1);
+    expect(periodic.slice(0, -1).every(({ kind }) => kind === 'delta')).toBe(true);
+    expect(periodic.at(-1)).toEqual({
+      sequence: SNAPSHOT_KEYFRAME_INTERVAL + 3,
+      kind: 'keyframe',
+    });
     handler.handleMessage({ type: 'snapshotResync' }, a.ws);
     broadcaster.broadcastGameState();
     const resyncKeyframe = a.messages.at(-1);
@@ -533,20 +669,249 @@ describe('current pilots share the production handler and broadcaster', () => {
     expect(pilot.close).not.toHaveBeenCalled();
   });
 
-  test('fixture readiness waits for a new keyframe after a pending transport send', () => {
+  test.each([
+    { pendingKind: 'keyframe' as const, outcome: 'success' as const },
+    { pendingKind: 'keyframe' as const, outcome: 'failure' as const },
+    { pendingKind: 'delta' as const, outcome: 'success' as const },
+    { pendingKind: 'delta' as const, outcome: 'failure' as const },
+  ])(
+    'fixture readiness rejects a pending old $pendingKind after callback $outcome',
+    ({ pendingKind, outcome }) => {
+      const pilot = socket();
+      join(handler, pilot.ws, 'pilot');
+      const decoder = new SnapshotDecoder();
+      let lastKeyframeSequence = 1;
+      let state = decodeSnapshotMessage(decoder, snapshotEnvelopes(pilot)[0]?.raw ?? '');
+      const actor = engine.getPlayer('pilot');
+      assert.ok(actor?.playerMotion, 'authoritative pilot motion');
+      const oldEpoch = actor.playerMotion.epoch;
+      if (pendingKind === 'keyframe') {
+        broadcaster.requestSnapshotKeyframe(pilot.ws);
+      }
+      pilot.fake.defer = true;
+      broadcaster.broadcastGameState();
+      const oldFrame = snapshotEnvelopes(pilot).at(-1);
+      assert.ok(oldFrame, 'pending old frame');
+      expect(snapshotSummary(oldFrame.data).kind).toBe(pendingKind);
+
+      expect(
+        engine.playerMotion.placeActorForTesting(
+          'pilot',
+          { x: 220, y: -140 },
+          engine.getServerTime()
+        )
+      ).toBe(true);
+      const motionEpoch = actor.playerMotion?.epoch;
+      assert.ok(motionEpoch, 'prepared authoritative motion epoch');
+      expect(motionEpoch).toBe(oldEpoch + 1);
+      const gameTime = engine.getGameState().gameTime;
+      const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
+      assert.ok(sequence, 'keyframe sequence lower bound');
+      expect(sequence).toBe(2);
+      const requirement = { sequence, gameTime, motionEpoch };
+
+      const complete = pilot.pending.shift();
+      assert.ok(complete, 'pending snapshot completion');
+      if (outcome === 'success') {
+        complete();
+        const result = decoder.readMessage(oldFrame.raw, { acceptSnapshots: true });
+        assert.equal(result.kind, 'snapshot');
+        state = result.state;
+        if (result.metadata.kind === 'keyframe') {
+          lastKeyframeSequence = result.metadata.sequence;
+        }
+      } else {
+        complete(new Error('write failed'));
+      }
+      const oldPlayer = state.entities.find((entity) => entity.id === 'pilot');
+      expect(
+        observesPreparedFixture(requirement, {
+          lastKeyframeSequence,
+          lastSnapshotGameTime: state.gameTime,
+          motionEpoch: oldPlayer?.playerMotion?.epoch ?? null,
+        })
+      ).toBe(false);
+
+      pilot.fake.defer = false;
+      broadcaster.broadcastGameState();
+      const recoveryFrame = snapshotEnvelopes(pilot).at(-1);
+      assert.ok(recoveryFrame, 'requested recovery keyframe');
+      const recovery = decoder.readMessage(recoveryFrame.raw, { acceptSnapshots: true });
+      assert.equal(recovery.kind, 'snapshot');
+      expect(recovery.metadata).toMatchObject({
+        kind: 'keyframe',
+        sequence: outcome === 'success' ? 3 : 2,
+      });
+      const recoveredPlayer = recovery.state.entities.find((entity) => entity.id === 'pilot');
+      expect(recovery.state.gameTime).toBe(gameTime);
+      expect(
+        observesPreparedFixture(requirement, {
+          lastKeyframeSequence: recovery.metadata.sequence,
+          lastSnapshotGameTime: recovery.state.gameTime,
+          motionEpoch: recoveredPlayer?.playerMotion?.epoch ?? null,
+        })
+      ).toBe(true);
+    }
+  );
+
+  test.each(['success', 'failure'] as const)(
+    'a stale callback %s cannot advance a fresh registration',
+    (outcome) => {
+      const pilot = socket();
+      join(handler, pilot.ws, 'pilot');
+      const oldActor = engine.getPlayer('pilot');
+      assert.ok(oldActor, 'old actor');
+      for (let epoch = 0; epoch < 4; epoch++) {
+        expect(
+          engine.playerMotion.placeActorForTesting(
+            'pilot',
+            { x: 100 + epoch, y: 100 },
+            engine.getServerTime()
+          )
+        ).toBe(true);
+      }
+      broadcaster.broadcastGameState();
+      broadcaster.broadcastGameState();
+      broadcaster.requestSnapshotKeyframe(pilot.ws);
+      pilot.fake.defer = true;
+      broadcaster.broadcastGameState();
+      const oldFrames = snapshotEnvelopes(pilot);
+      const oldFrame = oldFrames.at(-1);
+      const staleCompletion = pilot.pending.shift();
+      assert.ok(oldFrame && staleCompletion, 'old session pending keyframe');
+      const oldDecoder = new SnapshotDecoder();
+      let staleState = decodeSnapshotMessage(oldDecoder, oldFrames[0]?.raw ?? '');
+      for (const frame of oldFrames.slice(1)) {
+        staleState = decodeSnapshotMessage(oldDecoder, frame.raw);
+      }
+      const staleMetadata = snapshotSummary(oldFrame.data);
+
+      handler.handleMessage({ type: 'leave', data: {} }, pilot.ws);
+      pilot.fake.defer = false;
+      join(handler, pilot.ws, 'pilot');
+      const freshActor = engine.getPlayer('pilot');
+      assert.ok(freshActor?.playerMotion, 'fresh actor registration');
+      expect(freshActor.playerMotion.epoch).toBe(1);
+      expect(
+        engine.playerMotion.placeActorForTesting(
+          'pilot',
+          { x: -240, y: 80 },
+          engine.getServerTime()
+        )
+      ).toBe(true);
+      const freshEpoch = freshActor.playerMotion?.epoch;
+      assert.ok(freshEpoch, 'fresh prepared epoch');
+      const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
+      assert.ok(sequence, 'fresh keyframe lower bound');
+      broadcaster.broadcastGameState();
+      const freshFrames = snapshotEnvelopes(pilot).slice(oldFrames.length);
+      const freshDecoder = new SnapshotDecoder();
+      let freshState = decodeSnapshotMessage(freshDecoder, freshFrames[0]?.raw ?? '');
+      for (const frame of freshFrames.slice(1)) {
+        freshState = decodeSnapshotMessage(freshDecoder, frame.raw);
+      }
+      const requirement = {
+        sequence,
+        gameTime: freshState.gameTime,
+        motionEpoch: freshEpoch,
+      };
+      const stalePlayer = staleState.entities.find((entity) => entity.id === 'pilot');
+      expect(staleMetadata.kind).toBe('keyframe');
+      expect(staleMetadata.sequence).toBeGreaterThanOrEqual(sequence);
+      expect(stalePlayer?.playerMotion?.epoch).toBeGreaterThan(freshEpoch);
+      expect(
+        observesPreparedFixture(requirement, {
+          lastKeyframeSequence: staleMetadata.sequence,
+          lastSnapshotGameTime: staleState.gameTime,
+          motionEpoch: stalePlayer?.playerMotion?.epoch ?? null,
+        })
+      ).toBe(true);
+
+      staleCompletion(outcome === 'failure' ? new Error('old write failed') : undefined);
+      broadcaster.broadcastGameState();
+      const current = snapshotEnvelopes(pilot).at(-1);
+      assert.ok(current, 'current session frame');
+      expect(snapshotSummary(current.data)).toMatchObject({ sequence: 3, kind: 'delta' });
+      const freshPlayer = freshState.entities.find((entity) => entity.id === 'pilot');
+      expect(
+        observesPreparedFixture(requirement, {
+          lastKeyframeSequence: 2,
+          lastSnapshotGameTime: freshState.gameTime,
+          motionEpoch: freshPlayer?.playerMotion?.epoch ?? null,
+        })
+      ).toBe(true);
+    }
+  );
+
+  test('a resumed motion session keeps its epoch monotonic', () => {
+    const original = socket();
+    join(handler, original.ws, 'pilot');
+    const joined = original.messages.find((message) => message.type === 'joined');
+    assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
+    const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
+    assert(typeof resumeToken === 'string', 'resume token');
+    const actor = engine.getPlayer('pilot');
+    assert.ok(actor?.playerMotion, 'registered actor motion');
+    expect(
+      engine.playerMotion.placeActorForTesting('pilot', { x: 320, y: -40 }, engine.getServerTime())
+    ).toBe(true);
+    const preparedEpoch = actor.playerMotion?.epoch;
+    assert.ok(preparedEpoch, 'prepared epoch');
+
+    const replacement = socket();
+    join(handler, replacement.ws, 'ignored-id', resumeToken);
+    expect(engine.getPlayer('pilot')).toBe(actor);
+    expect(engine.getPlayer('pilot')?.playerMotion?.epoch).toBe(preparedEpoch);
+  });
+
+  test('fixture readiness accepts an immediate requested keyframe lower bound', () => {
     const pilot = socket();
     join(handler, pilot.ws, 'pilot');
-    pilot.fake.defer = true;
-    broadcaster.broadcastGameState();
     const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
-    const complete = pilot.pending.shift();
-    assert.ok(complete);
-    complete();
+    expect(sequence).toBe(2);
     broadcaster.broadcastGameState();
-    expect(pilot.messages.at(-1)).toMatchObject({
-      type: 'snapshot',
-      data: { kind: 'keyframe', sequence },
-    });
-    expect(sequence).toBeGreaterThan(1);
+    const frame = snapshotEnvelopes(pilot).at(-1);
+    assert.ok(frame, 'requested keyframe');
+    expect(snapshotSummary(frame.data)).toEqual({ kind: 'keyframe', sequence: 2 });
   });
+
+  test.each([{ outcome: 'success' }, { outcome: 'failure' }])(
+    'a stale $outcome callback cannot mutate a same-socket rejoin',
+    ({ outcome }) => {
+      const pilot = socket();
+      join(handler, pilot.ws, 'pilot');
+      pilot.fake.defer = true;
+      broadcaster.broadcastGameState();
+      const staleCallback = pilot.pending.shift();
+      assert.ok(staleCallback, 'old-session callback');
+
+      pilot.fake.defer = false;
+      broadcaster.negotiateSnapshot(pilot.ws);
+      broadcaster.sendToWebSocket(pilot.ws, {
+        type: 'joined',
+        data: { snapshotVersion: 1 },
+        timestamp: Date.now(),
+      });
+      broadcaster.broadcastGameState();
+      staleCallback(outcome === 'failure' ? new Error('stale callback failure') : undefined);
+      const actor = engine.getPlayer('pilot');
+      assert.ok(actor, 'rejoined pilot');
+      actor.position.x += 1;
+      broadcaster.broadcastGameState();
+
+      expect(
+        snapshotEnvelopes(pilot)
+          .slice(-2)
+          .map(({ data }) => snapshotSummary(data))
+      ).toEqual([
+        { sequence: 1, kind: 'keyframe' },
+        { sequence: 2, kind: 'delta', baseline: 1 },
+      ]);
+      expect(
+        decodedSnapshots(pilot)
+          .at(-1)
+          ?.entities.find(({ id }) => id === 'pilot')?.position.x
+      ).toBe(actor.position.x);
+    }
+  );
 });

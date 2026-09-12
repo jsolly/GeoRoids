@@ -69,6 +69,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Movement values',
       paragraphs: [
         `Shared movement defaults: thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, turn rate ${SHIP.TURN_SPEED} degrees per second, and coasting friction ${GAME.FRICTION}. The simulation runs at ${GAME.FPS} frames per second.`,
+        `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },
   ],

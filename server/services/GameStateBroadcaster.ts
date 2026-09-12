@@ -149,8 +149,11 @@ export class GameStateBroadcaster {
         this.closeSocketForRecovery(ws, 1002, 'Snapshot negotiation required');
         continue;
       }
-      if (ws.readyState !== WebSocket.OPEN || recipient.pending) {
+      if (ws.readyState !== WebSocket.OPEN) {
         recipient.needsKeyframe = true;
+        continue;
+      }
+      if (recipient.pending) {
         continue;
       }
       if (ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) {
@@ -172,17 +175,17 @@ export class GameStateBroadcaster {
         const sequence = recipient.sequence + 1;
         const full =
           recipient.needsKeyframe || recipient.sinceKeyframe >= SNAPSHOT_KEYFRAME_INTERVAL;
-        const frame = canonical.encode(sequence, full ? undefined : recipient.baseline);
+        const encoded = canonical.encodeSerialized(
+          sequence,
+          full ? undefined : recipient.baseline,
+          timestamp
+        );
+        const { frame } = encoded;
         recipient.pending = true;
         recipient.needsKeyframe = false;
         const deliveredState = canonical.state;
         const recipientPlayerId = player.id;
-        const serialized = JSON.stringify({
-          type: 'snapshot',
-          data: frame,
-          timestamp,
-        });
-        const result = this.sendSerialized(ws, serialized, 'snapshot', (error) => {
+        const result = this.sendSerialized(ws, encoded.text, 'snapshot', (error) => {
           recipient.pending = false;
           if (error) {
             recipient.needsKeyframe = true;
@@ -255,12 +258,13 @@ export class GameStateBroadcaster {
     return SNAPSHOT_VERSION;
   }
 
+  /** Request a keyframe and return its earliest possible sequence as a lower bound. */
   public requestSnapshotKeyframe(ws: WebSocket): number | undefined {
     const recipient = this.snapshotRecipients.get(ws);
     if (recipient) {
       // Coalesce requests; the periodic broadcast supplies the keyframe.
       recipient.needsKeyframe = true;
-      return recipient.sequence + (recipient.pending ? 2 : 1);
+      return recipient.sequence + 1;
     }
     return undefined;
   }

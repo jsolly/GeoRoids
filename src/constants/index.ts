@@ -18,6 +18,8 @@ export const GAME = {
 
   // Physics
   FPS: 60,
+  /** Spatial pace multiplier; simulation cadence and cooldowns stay fixed. */
+  MOTION_SCALE: 0.75,
   FRICTION: 0.6,
 } as const;
 
@@ -186,8 +188,8 @@ const EXPLODE_DURATION_FRAMES = 18;
 export const SHIP = {
   // Movement
   TURN_SPEED: 450, // degrees per second
-  THRUST: 5, // pixels per second² (acceleration)
-  MAX_VELOCITY: 8, // pixels per second
+  THRUST: 5 * GAME.MOTION_SCALE, // pixels per second² (acceleration)
+  MAX_VELOCITY: 8 * GAME.MOTION_SCALE, // pixels per second
   BOT_FRICTION: 2.0, // higher = more friction for bots
   SIZE: 30, // height in pixels
 
@@ -228,7 +230,7 @@ export const DAMAGE = {
 // LASER CONFIGURATION
 // ============================================================================
 export const LASER = {
-  SPEED: 300, // pixels per second
+  SPEED: 300 * GAME.MOTION_SCALE, // pixels per second
   MAX_COUNT: 200, // limit of lasers that can exist
   TRAVEL_DISTANCE_RATIO: 0.6, // fraction of screen width
   EXPLODE_DURATION: 0.1, // seconds
@@ -240,7 +242,9 @@ export const LASER = {
 // ============================================================================
 export const ROID = {
   // Movement and size
-  SPEED: 50, // starting speed in pixels per second
+  SPEED: 50 * GAME.MOTION_SCALE, // starting speed in pixels per second
+  /** Server asteroid velocity uses pixels per 60 Hz tick, unlike SPEED. */
+  SERVER_VELOCITY_MAX: 4 * GAME.MOTION_SCALE,
   SIZE: 50, // starting size in pixels
   VERTICES: 10, // average number of vertices
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged
@@ -278,8 +282,8 @@ export const ROID = {
 export const SATELLITE = {
   SIZE: 32,
   ORBIT_RADIUS: 160,
-  ORBIT_SPEED: 0.018,
-  DRIFT_SPEED: 0.35,
+  ORBIT_SPEED: 0.018 * GAME.MOTION_SCALE,
+  DRIFT_SPEED: 0.35 * GAME.MOTION_SCALE,
   /** Keep the whole six-bird product roster visible in an active arena. */
   AMBIENT_COUNT: 6,
   MAX_COUNT: 6,
@@ -291,7 +295,8 @@ export const SATELLITE = {
   EXPLODE_DURATION_FRAMES: 18,
   RESPAWN_FRAMES: 180,
   MASS: 1,
-  PROJECTILE_MAX_FRAMES: 240,
+  /** Inverse-scaled age guard keeps satellite shot travel distance unchanged. */
+  PROJECTILE_MAX_FRAMES: Math.ceil(240 / GAME.MOTION_SCALE),
 } as const;
 
 // Collectible EO communications hardware (Echo + Relay). This is a pickup
@@ -299,8 +304,8 @@ export const SATELLITE = {
 export const SATELLITE_PICKUP = {
   SIZE: 18,
   ORBIT_RADIUS: 42,
-  ORBIT_SPEED: 0.08,
-  DRIFT_SPEED: 0.28,
+  ORBIT_SPEED: 0.08 * GAME.MOTION_SCALE,
+  DRIFT_SPEED: 0.28 * GAME.MOTION_SCALE,
   LOOSE_ORBIT_RADIUS: 70,
   SCORE_BONUS: 50,
   HEALTH: 50,
@@ -329,14 +334,14 @@ export const SHOCKWAVE = {
     delayFrames: 0,
     durationFrames: 8,
     radius: 150,
-    impulse: 3.2,
+    impulse: 3.2 * GAME.MOTION_SCALE,
     strokeWidth: 1.25,
   },
   HEAVY: {
     delayFrames: 7,
     durationFrames: 36,
     radius: 400,
-    impulse: 7.0,
+    impulse: 7.0 * GAME.MOTION_SCALE,
     strokeWidth: 2.25,
   },
 } as const;

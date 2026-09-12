@@ -323,8 +323,3 @@ export interface PingMessage {
   timestamp?: number;
   probeId?: number;
 }
-export interface PongMessage {
-  type: 'pong';
-  timestamp: number;
-  probeId?: number;
-}

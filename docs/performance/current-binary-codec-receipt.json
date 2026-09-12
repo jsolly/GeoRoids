@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "current-binary-codec-feasibility-evidence",
+  "status": "rejected",
+  "startedAt": "2026-09-12T23:24:42.662Z",
+  "command": "cd /Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment && node --import ./.codec-lab/node_modules/tsx/dist/loader.mjs .codec-lab/current-source-binary-node-cpu.ts --timing",
+  "exitCode": 0,
+  "runtime": {
+    "node": "v24.16.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "scope": {
+    "recipients": 1,
+    "fanoutClaim": false,
+    "control": "current SnapshotEncoder.encodeSerialized + SnapshotDecoder.readMessage",
+    "candidate": "current SnapshotEncoder.encode + pinned exact MessagePack + parser-owning C1-equivalent reader",
+    "ordinaryEvents": "text and excluded",
+    "sourceSimulationHz": 60,
+    "sourceSnapshotHz": 30,
+    "executionPacing": "unpaced Node loop; frequencies describe deterministic source advancement and snapshot cadence, not wall-clock simulation, sockets, or delivery",
+    "warmupSnapshots": 30,
+    "measuredSnapshots": 180,
+    "aaPairsPerStream": 3,
+    "abPairsPerStream": 3,
+    "abOrder": ["json/msgpack", "msgpack/json", "json/msgpack"]
+  },
+  "predeclaredRule": {
+    "primaryMode": "delta-with-90-frame-keyframes",
+    "diagnosticMode": "keyframe-only",
+    "cap": "every AB slowdown <= max(10%, same-stream largest absolute JSON/JSON relative drift)",
+    "stop": "reject on a clear primary Node CPU regression; do not run browser or live raw-wire stages"
+  },
+  "primary": [
+    {
+      "workload": "moving",
+      "jsonBytes": 1752746,
+      "msgpackBytes": 1494482,
+      "byteReductionPercent": 14.734821816737853,
+      "aaDriftPercent": [2.1839173385213373, 1.234863972080868, 0.7241085819277537],
+      "maximumAaDriftPercent": 2.1839173385213373,
+      "allowedSlowdownPercent": 10,
+      "abSlowdownPercent": [12.885180779675562, 11.559391750848306, 13.203401295021624],
+      "pass": false
+    },
+    {
+      "workload": "moving-with-churn",
+      "jsonBytes": 1776468,
+      "msgpackBytes": 1519587,
+      "byteReductionPercent": 14.460209809577208,
+      "aaDriftPercent": [0.12612154968172085, 0.8146245219913752, 0.24539998129888513],
+      "maximumAaDriftPercent": 0.8146245219913752,
+      "allowedSlowdownPercent": 10,
+      "abSlowdownPercent": [12.215294967709015, 11.848060746450512, 15.346398322219546],
+      "pass": false
+    }
+  ],
+  "byteAccounting": {
+    "framesPerStream": 210,
+    "composition": "30 warmup plus 180 measured CPU frames",
+    "relationshipToEarlierRawProbe": "separate diagnostic; not pooled",
+    "earlierRawProbeReductionPercent": {
+      "moving": 14.2021,
+      "movingWithChurn": 14.0748
+    }
+  },
+  "diagnostics": [
+    {
+      "workload": "moving",
+      "mode": "keyframe-only",
+      "byteReductionPercent": 4.312103834441572,
+      "maximumAaDriftPercent": 0.8285954895858535,
+      "abSlowdownPercent": [36.04620145269811, 37.8004068018442, 36.573775449406874]
+    },
+    {
+      "workload": "moving-with-churn",
+      "mode": "keyframe-only",
+      "byteReductionPercent": 4.4065213971461015,
+      "maximumAaDriftPercent": 1.5597101824571875,
+      "abSlowdownPercent": [38.44744053433967, 35.912309825231524, 36.081965393528534]
+    }
+  ],
+  "correctness": {
+    "checkedBeforeClock": true,
+    "framesPerStream": 210,
+    "frameWitnessesInRawReceipt": [
+      "kind",
+      "sequence",
+      "baseline",
+      "authoritativeSha256",
+      "expectedSha256",
+      "jsonDecodedSha256",
+      "msgpackDecodedSha256"
+    ],
+    "movingInputSha256": "f903901a984db52ad77b7f1dcf5d4bd2e8399a519a748e9df6c8a47cebebffdf",
+    "movingWithChurnInputSha256": "3edeb60690f3b436a1ea4b39b0ba9483df998807c5ccaaac6f6c857cab3e1969",
+    "independentP4Oracle": true,
+    "inputUnchanged": true,
+    "exactCodecEdges": true,
+    "admissionRejected": true,
+    "ordinaryEventRejected": true,
+    "malformedDoesNotAdvanceBaseline": true,
+    "duplicateRejected": true,
+    "truncatedRejected": true
+  },
+  "sourceFiles": [
+    {
+      "path": "shared/snapshotProtocol.ts",
+      "bytes": 17706,
+      "sha256": "d72180ba03b592f183b56b73a72c5f0e0be674dea3c30fef4b55c28a8ce8164b"
+    },
+    {
+      "path": "shared/snapshotPrecision.ts",
+      "bytes": 1468,
+      "sha256": "45c9383bbe34509c59eac24adcb1318dd7c5a4f6e445a08665453351f3db54e6"
+    },
+    {
+      "path": "shared/snapshotDto.ts",
+      "bytes": 7392,
+      "sha256": "bd2cb653631d31f849a5006f6e2fb8f5ecb539b45d91ea9c38f75c9f3d222c89"
+    },
+    {
+      "path": "shared-types.ts",
+      "bytes": 8679,
+      "sha256": "173464c96f5470487e8667a29c35f6d477e45aeda299dd83f8112cf18212e448"
+    },
+    {
+      "path": "shared/eoSatellites.ts",
+      "bytes": 3695,
+      "sha256": "0e947e6ff2440e419c97ed5c38ef841d5bb2a5ae66fe816d42193a6f796b82aa"
+    },
+    {
+      "path": "tests/unit/network/snapshotFixture.ts",
+      "bytes": 4014,
+      "sha256": "26a3d659ece59d48b7ada40da582e5d46fb499fea2fbd82cd259dc2400df136b"
+    },
+    {
+      "path": ".codec-lab/current-source-binary-reader.ts",
+      "bytes": 11281,
+      "sha256": "d0714f8fd83f04c7f838cf45cf0e93f7d5210b13bd4d453427ec140677106130"
+    },
+    {
+      "path": ".codec-lab/current-source-binary-workload.ts",
+      "bytes": 6826,
+      "sha256": "59454f166dc8a6318a0d16a440ba3cf411ad8aba6188dbcbe8dcddbc77c8a69d"
+    },
+    {
+      "path": ".codec-lab/current-source-binary-node-cpu.ts",
+      "bytes": 16303,
+      "sha256": "0e074f2a3e7d031fc569f3b533c039bcceb971fbf785e914dc8195e65982fb03"
+    },
+    {
+      "path": ".codec-lab/current-source-binary-current-evidence-plan.json",
+      "bytes": 4251,
+      "sha256": "99059761ac0a1c3acab0064fcbd2ebec2757ced0e667d2880376698d5d1f1ded"
+    },
+    {
+      "path": ".codec-lab/package-lock.json",
+      "bytes": 15298,
+      "sha256": "ab7e01f7841ae418af0f786008ead5890e76eb3b34d7992cd5a34d7a15d1efe0"
+    },
+    {
+      "path": ".codec-lab/node_modules/@msgpack/msgpack/package.json",
+      "bytes": 3879,
+      "sha256": "2c481eb6a64d6ab3e6c7b1cbd73fbb8d3461405699e193665b20e607f503b071"
+    }
+  ],
+  "installedCodec": {
+    "name": "@msgpack/msgpack",
+    "version": "3.1.3",
+    "files": 112,
+    "sha256": "7b6c391321f4125e366e00db92f73f53b55c852f82d58be221bdd8533170cdfe"
+  },
+  "rawReceipt": {
+    "localPath": ".codec-lab/current-source-binary-node-cpu-attempt-2026-09-12T232442662Z/receipt.json",
+    "bytes": 502999,
+    "sha256": "80ee2cfe970ae2cca2031801e809b07f5e5fd8ba38ff5c8abee6ce08d4ac9c39"
+  },
+  "critics": {
+    "preExecution": "BAR MET",
+    "postRun": "DECISION VERIFIED"
+  },
+  "decision": {
+    "primaryPass": false,
+    "result": "reject-current-binary-cpu-feasibility",
+    "browserReplayRun": false,
+    "liveFiveMbpsRawWireRun": false,
+    "phoneFpsMeasured": false,
+    "reason": "Every primary MessagePack AB observation exceeded its 10% cap."
+  }
+}

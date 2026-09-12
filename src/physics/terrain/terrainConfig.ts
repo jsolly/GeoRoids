@@ -1,3 +1,5 @@
+import { GAME } from '../../constants';
+
 /**
  * Shared iso-contour terrain tunables. Client render and server ship physics
  * both read these so every player in a room gets the same hills and the same slope.
@@ -28,7 +30,7 @@ export const TERRAIN = {
    * Downslope acceleration in the same units as SHIP.THRUST (px/s² as applied
    * via `/ FPS` each tick). About half of thrust so ships can still climb.
    */
-  SLOPE_ACCEL: 2.4,
+  SLOPE_ACCEL: 2.4 * GAME.MOTION_SCALE,
   /** Extra deceleration when velocity points uphill. */
   UPHILL_DRAG: 1.8,
   /** Gradient magnitude that maps to full slope force. */

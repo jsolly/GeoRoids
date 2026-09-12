@@ -23,6 +23,16 @@ describe('performance budgets inform development without blocking it', () => {
       exceededFrames: 0,
     });
   });
+  it('records an observed zero when a warm cache eliminates the measured work', () => {
+    expect(evaluateFrameWorkBudget(budget, 'touch-portrait', [{ reads: 0 }])[0]).toEqual({
+      metric: 'reads',
+      maximum: 1000,
+      observedMaximum: 0,
+      delta: -1000,
+      exceededFrames: 0,
+      measuredFrames: 1,
+    });
+  });
   it('rejects missing and invalid measurements instead of calling them passing', () => {
     for (const frames of [[], [{}], [{ reads: Number.NaN }], [{ reads: -1 }]]) {
       expect(() => evaluateFrameWorkBudget(budget, 'touch-portrait', frames)).toThrow();

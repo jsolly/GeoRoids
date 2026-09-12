@@ -1,0 +1,61 @@
+{
+  "date": "2026-09-12",
+  "productIntegration": false,
+  "decisions": {
+    "contourLabelQuery": "reject: failed fixed all-viewport timing gate",
+    "viewportQuery": "reject: measured saving below fixed 0.02ms contribution floor",
+    "remoteHullBuffer": "reject: source-level short-shot/hull timeline conflict; static witness unexecuted",
+    "leaderboardWidth": "reject: mean full-draw cost increased in every viewport despite removing warm native text measurements"
+  },
+  "commands": {
+    "label": {
+      "directExit": 0,
+      "performanceVerdict": "fail",
+      "completedArms": 36,
+      "cleanup": true
+    },
+    "viewport": {
+      "directExit": 0,
+      "performanceVerdict": "reject",
+      "completedRecords": 72,
+      "cleanup": true
+    },
+    "leaderboard": {
+      "directExit": 0,
+      "performanceVerdict": "reject",
+      "completedRecords": 36,
+      "cleanup": true
+    }
+  },
+  "independentPreTimingReviews": "passed",
+  "independentRawTimingReview": "passed",
+  "artifacts": {
+    ".performance/contour-label-query/source-provenance.json": "fe6b9f474769393799b2bcf77160b7ec8619f2528449681c049b3754688dc2d1",
+    ".performance/contour-label-query/affected-critic.md": "4ecf01cb563808cec545017db07df8867294931c1e10eb039e45aa78302cba70",
+    ".performance/contour-label-query/attempts/correctness-20260912T210130.670112Z-33699/browser-correctness.json": "355319c1a8dba057e8aff2eefb909d174b14604f2e8b19b5fb39e9e6a09789a2",
+    ".performance/contour-label-query/attempts/timing-20260912T211116.046350Z-60881/summary.json": "7facd076c54b2109ffa28d44fcffbffe9314c6c86719043406fbb72d4f0dd60c",
+    ".performance/contour-label-query/attempts/timing-20260912T211116.046350Z-60881/receipt.json": "ca3908488472082187e9bc6246d1376884dda53da06a9a841df14005fd29b150",
+    ".performance/viewport-query/source-manifest.json": "dfad5edfe54e688bd0471ddea74960a2ffab24354d236e0c3b8d42d52a98fe0f",
+    ".performance/viewport-query/critic.md": "50fee89230bf42ed7021e2a194035659d822a6c9fdc2142f1c3038609d1d4cea",
+    ".performance/viewport-query/attempts/correctness-20260912T210808.418267Z/correctness.json": "a739f7c39386ec2e0c646cfe29fea66e5bf25a5ce82c335987ae185b0d42fb5a",
+    ".performance/viewport-query/attempts/timing-20260912T211247.950651Z/summary.json": "57243d2372f1120c51bf3e08ae7a87b889226a767759453c0c9d1fbc7abe4147",
+    ".performance/viewport-query/attempts/timing-20260912T211247.950651Z/receipt.json": "f1281b935b73608a3078bf146a4743fd9892be99b238076d97ce17da72f08974",
+    ".performance/remote-presentation/README.md": "f052f111229abb5d9bcae5431798ada9e37b53d3c4167df217fd244863f59fbe",
+    ".performance/remote-presentation/coherence-witness.md": "7a373841abdad8193acbaca2a926b69339ba8f7a32d75cf660153ac27f410ed9",
+    ".performance/remote-presentation/critic.md": "9cfec072342556fcaee2e76f166807000a64311a84c7d7d6ecaf5534b9a5e1f1",
+    ".performance/remote-presentation/remote-presentation.patch": "fcc837ccfb4cf6c8c23ae36022eebd833e9831ddaea0dba484299d8ac036a18c",
+    ".performance/remote-presentation/source-hashes.txt": "710727f19e047b8709eecee7b22228aae6e3212eb8e31d6789c014ed5af2c068",
+    ".performance/contour-label-query/timing-critic.md": "081e5dca70f266b7ef1a88fe20e93a2541874b65fce7c16e1dbd0427aa47b546",
+    ".performance/viewport-query/timing-critic.md": "c93943d4b9422626eb474552e9c0ff14cc313227504f3bd7f5f1fa15f08aa736",
+    ".performance/leaderboard-width/source-manifest.json": "b95648676ca70e282b145677c85ded294faed1f20be42ddf967bb905022efeea",
+    ".performance/leaderboard-width/critic.md": "6b28a47f38531fe13b5e226b0ba88c0bc40bf971d582177c98a09454d85f299a",
+    ".performance/leaderboard-width/integration.patch": "9bfff190d0dd831f5abaea299d2271710697e4f5d205b3ab754b9ebadc3f1530",
+    ".performance/leaderboard-width/accepted-correctness.json": "1f3134458f8591ec8e48b291d90188af7de36b948f08a55690c897111a1e4ff1",
+    ".performance/leaderboard-width/attempts/correctness-20260912T215010.169551Z/correctness.json": "38a97d626c5df025718d36389056a1d1ae5eefd5d3f80ae94c964f32693e4dae",
+    ".performance/leaderboard-width/attempts/timing-20260912T215219.618236Z/summary.json": "65dfc34db783eb501d1c6ac7a104b923a9b68905bbd412749827f3f8a730d28e",
+    ".performance/leaderboard-width/attempts/timing-20260912T215219.618236Z/receipt.json": "cea9db0661cad466f1b7ea9ebee1d5ac213e14688f11f102f5828014ef84c487",
+    ".performance/leaderboard-width/timing-critic.md": "2cb2b92f7c7882b2e2419dc6b1e3c5e2f6252c656d25e3f6a3a09ce3d333be3e"
+  },
+  "scope": "Synchronous browser CPU submission/calls on M3; no phone or whole-game FPS claim.",
+  "leaderboardIndependentRawTimingReview": "passed: independent raw recomputation confirms reject"
+}

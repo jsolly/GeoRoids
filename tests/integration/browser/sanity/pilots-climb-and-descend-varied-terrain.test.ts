@@ -33,22 +33,21 @@ function observeAuthoritativePositions(page: Page): {
 
   page.on('websocket', (socket) => {
     socket.on('framereceived', ({ payload }) => {
-      const parsed: unknown = JSON.parse(String(payload));
-      if (!isRecord(parsed)) {
+      const raw = String(payload);
+      const result = decoder.readMessage(raw, { acceptSnapshots: true });
+      if (result.kind === 'message') {
+        if (isRecord(result.message) && result.message['type'] === 'joined') {
+          decoder.reset();
+          positions.clear();
+          angles.clear();
+          thrusting.clear();
+        }
         return;
       }
-      if (parsed['type'] === 'joined') {
-        decoder.reset();
-        positions.clear();
-        angles.clear();
-        thrusting.clear();
-        return;
+      if (result.kind === 'snapshot-rejected') {
+        throw result.error;
       }
-      if (parsed['type'] !== 'snapshot') {
-        return;
-      }
-
-      const snapshot = decoder.decode(parsed['data']);
+      const snapshot = result.state;
       for (const entity of snapshot.entities) {
         positions.set(entity.id, { ...entity.position });
         angles.set(entity.id, entity.angle);

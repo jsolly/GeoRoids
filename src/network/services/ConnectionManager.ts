@@ -1,7 +1,7 @@
 import {
   SNAPSHOT_VERSION,
   SnapshotDecoder,
-  type SnapshotFrame,
+  type SnapshotMetadata,
 } from '../../../shared/snapshotProtocol';
 import {
   captureDiagnosticActorState,
@@ -45,7 +45,7 @@ import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
-import type { ClientMessage, ServerMessage } from '../types';
+import type { ClientMessage } from '../types';
 import {
   applyAsteroidFieldPartition,
   asteroidHasSpawnPose,
@@ -75,9 +75,12 @@ interface ConnectionState {
   socket: WebSocket | null;
 }
 
-type SnapshotDiagnosticMetadata = Pick<SnapshotFrame, 'kind' | 'sequence'> & {
-  baseline?: number;
-};
+interface ServerMessageEnvelope {
+  readonly type: string;
+  readonly data?: unknown;
+  readonly timestamp?: unknown;
+  readonly probeId?: unknown;
+}
 
 let nextConnectionId = 0;
 
@@ -85,35 +88,14 @@ function isValidResumeToken(value: unknown): value is string {
   return typeof value === 'string' && value.length === 64;
 }
 
-function readSnapshotSequence(data: unknown): number | undefined {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return undefined;
-  }
-  const frame = data as Record<string, unknown>;
-  if (!Number.isSafeInteger(frame['sequence']) || (frame['sequence'] as number) <= 0) {
-    return undefined;
-  }
-  return frame['sequence'] as number;
-}
-
-function readSnapshotDiagnosticMetadata(
-  data: unknown,
-  sequence = readSnapshotSequence(data)
-): SnapshotDiagnosticMetadata | undefined {
-  if (sequence === undefined || !data || typeof data !== 'object' || Array.isArray(data)) {
-    return undefined;
-  }
-  const frame = data as Record<string, unknown>;
-  if (frame['kind'] !== 'keyframe' && frame['kind'] !== 'delta') {
-    return undefined;
-  }
-  return {
-    kind: frame['kind'],
-    sequence,
-    ...(frame['kind'] === 'delta' && Number.isSafeInteger(frame['baseline'])
-      ? { baseline: frame['baseline'] as number }
-      : {}),
-  };
+function isServerMessageEnvelope(value: unknown): value is ServerMessageEnvelope {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    'type' in value &&
+    typeof value.type === 'string'
+  );
 }
 
 function captureClientPlayerState(player: Player) {
@@ -306,25 +288,55 @@ export class ConnectionManager {
           if (this.state.socket !== socket) {
             return;
           }
-          this.lastServerMessageAt = Date.now();
+          const receivedAt = Date.now();
+          const acceptSnapshots = this.currentProtocolReady;
+          this.lastServerMessageAt = receivedAt;
           const started = clientPerformance.enabled ? performance.now() : 0;
           let stateMetric: 'keyframeMessageMs' | 'deltaMessageMs' | undefined;
           try {
-            const message: ServerMessage = JSON.parse(event.data);
-            if (clientPerformance.enabled) {
-              clientPerformance.message(message.type, event.data, started);
-              const payload: unknown = 'data' in message ? message.data : undefined;
-              if (
-                message.type === 'snapshot' &&
-                payload &&
-                typeof payload === 'object' &&
-                'kind' in payload
-              ) {
-                stateMetric = payload.kind === 'keyframe' ? 'keyframeMessageMs' : 'deltaMessageMs';
-              }
-              clientPerformance.record('parseMs', performance.now() - started);
+            const text: unknown = event.data;
+            if (typeof text !== 'string') {
+              throw new Error('Expected a text WebSocket message');
             }
-            this.handleServerMessage(message);
+            const result = this.snapshotDecoder.readMessage(
+              text,
+              { acceptSnapshots },
+              clientPerformance.enabled
+            );
+            if (result.kind === 'message') {
+              if (!isServerMessageEnvelope(result.message)) {
+                throw new Error('Invalid server message envelope');
+              }
+              if (clientPerformance.enabled) {
+                clientPerformance.message(result.message.type, text, started);
+                if (result.timings) {
+                  clientPerformance.record('parseMs', result.timings.parseMs);
+                }
+              }
+              this.handleServerMessage(result.message);
+              return;
+            }
+            if (clientPerformance.enabled) {
+              clientPerformance.message('snapshot', text, started);
+              if (result.timings) {
+                clientPerformance.record('parseMs', result.timings.parseMs);
+              }
+              if (result.metadata) {
+                stateMetric =
+                  result.metadata.kind === 'keyframe' ? 'keyframeMessageMs' : 'deltaMessageMs';
+              }
+            }
+            if (result.kind === 'snapshot-rejected') {
+              this.requestSnapshotResync(result.error, result.metadata, receivedAt);
+              return;
+            }
+            if (clientPerformance.enabled && result.timings?.decodeMs !== undefined) {
+              clientPerformance.record(
+                result.metadata.kind === 'keyframe' ? 'keyframeDecodeMs' : 'deltaDecodeMs',
+                result.timings.decodeMs
+              );
+            }
+            this.handleSnapshot(result.state, result.metadata, receivedAt);
           } catch (error) {
             logger.error(
               'NETWORK',
@@ -843,7 +855,7 @@ export class ConnectionManager {
     return true;
   }
 
-  private handleServerMessage(message: ServerMessage): void {
+  private handleServerMessage(message: ServerMessageEnvelope): void {
     const data = 'data' in message ? message.data : undefined;
     switch (message.type) {
       case 'pong':
@@ -864,9 +876,6 @@ export class ConnectionManager {
             projectileId: data.projectileId,
           });
         }
-        break;
-      case 'snapshot':
-        this.handleSnapshot(data);
         break;
       case 'sessionExpired': {
         // Remove the previous map key before initializeAsteroidSync changes
@@ -1008,7 +1017,7 @@ export class ConnectionManager {
 
   private requestSnapshotResync(
     error: unknown,
-    metadata?: SnapshotDiagnosticMetadata,
+    metadata?: SnapshotMetadata,
     receivedAt = Date.now()
   ): void {
     clientPerformance.count('messageFailures');
@@ -1051,41 +1060,24 @@ export class ConnectionManager {
     return sent;
   }
 
-  private handleSnapshot(data: unknown): void {
-    const receivedAt = Date.now();
-    const sequence = readSnapshotSequence(data);
-    const sampled = sequence !== undefined && shouldSampleSnapshot(sequence);
-    const metadata = sampled ? readSnapshotDiagnosticMetadata(data, sequence) : undefined;
+  private handleSnapshot(
+    state: ServerGameSnapshot,
+    metadata: SnapshotMetadata,
+    receivedAt: number
+  ): void {
+    const sampled = shouldSampleSnapshot(metadata.sequence);
     const localBefore = sampled ? PlayerManager.getInstance().getLocalPlayer() : undefined;
     const clientBeforeApply = localBefore ? captureClientPlayerState(localBefore) : undefined;
     try {
-      if (!this.currentProtocolReady) {
-        throw new Error('Snapshot arrived before the current protocol join ack');
-      }
-      const decodeStarted = clientPerformance.enabled ? performance.now() : 0;
-      const state = this.snapshotDecoder.decode(data);
-      if (clientPerformance.enabled) {
-        clientPerformance.record(
-          data && typeof data === 'object' && 'kind' in data && data.kind === 'keyframe'
-            ? 'keyframeDecodeMs'
-            : 'deltaDecodeMs',
-          performance.now() - decodeStarted
-        );
-      }
       this.snapshotResyncPending = false;
       this.applyReceivedSnapshot(state);
-      if (sequence !== undefined) {
-        this.lastAcceptedSnapshotSequence = sequence;
-        clientPerformance.snapshotApplied({
-          sequence,
-          kind:
-            data && typeof data === 'object' && 'kind' in data && data.kind === 'keyframe'
-              ? 'keyframe'
-              : 'delta',
-          gameTime: state.gameTime,
-        });
-      }
-      if (sampled && metadata) {
+      this.lastAcceptedSnapshotSequence = metadata.sequence;
+      clientPerformance.snapshotApplied({
+        sequence: metadata.sequence,
+        kind: metadata.kind,
+        gameTime: state.gameTime,
+      });
+      if (sampled) {
         const authoritative = state.entities.find(
           (entity) => entity.id === (this.localPlayerId || this.clientId)
         );
@@ -1112,11 +1104,7 @@ export class ConnectionManager {
         });
       }
     } catch (error) {
-      this.requestSnapshotResync(
-        error,
-        metadata ?? readSnapshotDiagnosticMetadata(data, sequence),
-        receivedAt
-      );
+      this.requestSnapshotResync(error, metadata, receivedAt);
     }
   }
 
@@ -1168,7 +1156,7 @@ export class ConnectionManager {
       abilityActiveFrames?: number;
       quakePulse?: { origin: Position; startedAt: number };
     },
-    sentAt: number
+    sentAt: unknown
   ): void {
     if (!data.id) {
       return;
@@ -1201,7 +1189,10 @@ export class ConnectionManager {
       Number.isFinite(pulse.origin?.x) &&
       Number.isFinite(pulse.origin?.y)
     ) {
-      const elapsedMs = Number.isFinite(sentAt) ? Math.max(0, sentAt - pulse.startedAt) : 0;
+      const elapsedMs =
+        typeof sentAt === 'number' && Number.isFinite(sentAt)
+          ? Math.max(0, sentAt - pulse.startedAt)
+          : 0;
       startQuakePulse(entity.ship, pulse.origin, elapsedMs, performance.now());
       if (localPlayer && localPlayer !== entity && localPlayer.id === data.id) {
         startQuakePulse(localPlayer.ship, pulse.origin, elapsedMs, performance.now());

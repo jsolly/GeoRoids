@@ -1,14 +1,23 @@
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { type FileHandle, mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
-import { type Browser, type CDPSession, chromium, type Page, webkit } from 'playwright';
+import {
+  type Browser,
+  type CDPSession,
+  chromium,
+  type Page,
+  type Response as PlaywrightResponse,
+  webkit,
+} from 'playwright';
 import { SnapshotDecoder } from '../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../shared-types';
 import type { ClientPerformanceMetrics } from '../src/diagnostics/performanceMetrics';
 import { PLAYFIELD_CLOSE_SCALE } from '../src/rendering/playfieldCamera';
 import { finalizeServerWindow, prepareFixture } from './fixture-control';
+import { observesPreparedFixture } from './fixture-readiness';
 import {
   collectLiveReportMetadata,
   createLiveReport,
@@ -22,6 +31,308 @@ import { Pilot } from './pilot';
 import type { Measurement } from './results';
 
 const initialMetadata = collectLiveReportMetadata();
+
+const TRACE_CATEGORIES = [
+  'blink.user_timing',
+  'cc',
+  'devtools.timeline',
+  'disabled-by-default-devtools.timeline',
+  'disabled-by-default-gpu.service',
+  'disabled-by-default-skia',
+  'disabled-by-default-v8.cpu_profiler',
+  'gpu',
+  'renderer.scheduler',
+  'toplevel',
+].join(',');
+const TRACE_BUFFER_SIZE_KB = 256 * 1024;
+const TRACE_MAX_BYTES = 256 * 1024 * 1024;
+const TRACE_READ_SIZE = 1024 * 1024;
+const TRACE_IO_READ_TIMEOUT_MS = 30_000;
+const TRACE_COMPLETION_TIMEOUT_MS = 30_000;
+const TRACE_MAX_BUNDLE_BYTES = 64 * 1024 * 1024;
+const TRACE_MAX_BUNDLE_TOTAL_BYTES = 128 * 1024 * 1024;
+const TRACE_MAX_BUNDLES = 32;
+const TRACE_BUNDLE_BODY_TIMEOUT_MS = 30_000;
+const TRACE_MEASUREMENT_START_MARK = 'georoids-benchmark:measurement-start';
+const TRACE_MEASUREMENT_END_MARK = 'georoids-benchmark:measurement-end';
+const TRACE_MEASUREMENT_MEASURE = 'georoids-benchmark:measured-phase';
+
+type TraceCompletion = {
+  dataLossOccurred: boolean;
+  stream?: string;
+  streamCompression?: 'none' | 'gzip';
+};
+
+type TraceChunk = {
+  base64Encoded?: boolean;
+  data: string;
+  eof: boolean;
+};
+
+type TraceCompletionWait = {
+  cancel: (reason: unknown) => void;
+  promise: Promise<TraceCompletion>;
+};
+
+type TraceArtifact = {
+  bytes: number;
+  complete: boolean;
+  dataLossOccurred: boolean | null;
+  streamCompression: 'none' | 'gzip';
+};
+
+type LoadedBundle = {
+  advertisedBytes?: number;
+  bytes: number;
+  contentType: string;
+  path: string;
+  sha256: string;
+  status: number;
+  url: string;
+};
+
+class TraceCaptureError extends Error {
+  readonly artifact: TraceArtifact;
+
+  constructor(message: string, artifact: TraceArtifact, cause?: unknown) {
+    const detail =
+      cause instanceof AggregateError ? cause.errors.map(String).join('; ') : String(cause);
+    super(cause === undefined ? message : `${message}: ${detail}`, {
+      ...(cause === undefined ? {} : { cause }),
+    });
+    this.name = 'TraceCaptureError';
+    this.artifact = artifact;
+  }
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  description: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${description} timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+async function writeTraceChunk(file: FileHandle, chunk: Buffer, position: number): Promise<number> {
+  let offset = 0;
+  while (offset < chunk.byteLength) {
+    const result = await file.write(chunk, offset, chunk.byteLength - offset, position + offset);
+    assert(result.bytesWritten > 0, 'Trace writer made no progress');
+    offset += result.bytesWritten;
+  }
+  return offset;
+}
+
+function waitForTraceCompletion(session: CDPSession): TraceCompletionWait {
+  let finished = false;
+  let rejectWait: (reason?: unknown) => void = () => undefined;
+  let cleanupWait: () => void = () => undefined;
+  const promise = new Promise<TraceCompletion>((resolve, reject) => {
+    rejectWait = reject;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      session.off('Tracing.tracingComplete', onComplete);
+      session.off('close', onClose);
+    };
+    cleanupWait = cleanup;
+    const onComplete = (payload: TraceCompletion) => {
+      finished = true;
+      cleanup();
+      resolve(payload);
+    };
+    const onClose = () => {
+      finished = true;
+      cleanup();
+      reject(new Error('Chromium CDP session closed before tracing completed'));
+    };
+    timer = setTimeout(() => {
+      finished = true;
+      cleanup();
+      reject(new Error('Chromium tracing did not complete within 30 seconds'));
+    }, TRACE_COMPLETION_TIMEOUT_MS);
+    session.once('Tracing.tracingComplete', onComplete);
+    session.once('close', onClose);
+  });
+  return {
+    promise,
+    cancel(reason) {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      cleanupWait();
+      rejectWait(reason);
+    },
+  };
+}
+
+async function stopAndSaveTrace(session: CDPSession, outputPath: string): Promise<TraceArtifact> {
+  const completion = waitForTraceCompletion(session);
+  const ending = Promise.resolve().then(() =>
+    withTimeout(session.send('Tracing.end'), TRACE_COMPLETION_TIMEOUT_MS, 'Chromium Tracing.end')
+  );
+  let result: TraceCompletion;
+  try {
+    [, result] = await Promise.all([ending, completion.promise]);
+  } catch (error) {
+    completion.cancel(error);
+    throw error;
+  } finally {
+    // Promise.all attaches rejection handlers to both operations immediately;
+    // cancellation also removes the event/timer when either operation fails.
+    completion.cancel(new Error('Tracing completion no longer required'));
+  }
+  const artifact: TraceArtifact = {
+    bytes: 0,
+    complete: false,
+    dataLossOccurred: result.dataLossOccurred,
+    streamCompression: result.streamCompression ?? 'none',
+  };
+  if (!result.stream) {
+    throw new TraceCaptureError('Chromium tracing completed without a stream', artifact);
+  }
+  let file: FileHandle | undefined;
+  let operationFailure: unknown;
+  let operationFailed = false;
+  try {
+    await mkdir(dirname(outputPath), { recursive: true });
+    file = await open(outputPath, 'w');
+    let eof = false;
+    while (!eof) {
+      const chunk: TraceChunk = await withTimeout(
+        session.send('IO.read', {
+          handle: result.stream,
+          size: TRACE_READ_SIZE,
+        }),
+        TRACE_IO_READ_TIMEOUT_MS,
+        'Chromium trace IO.read'
+      );
+      const data = Buffer.from(chunk.data, chunk.base64Encoded ? 'base64' : 'utf8');
+      assert(data.byteLength > 0 || chunk.eof, 'Chromium trace stream made no progress');
+      assert(
+        artifact.bytes + data.byteLength <= TRACE_MAX_BYTES,
+        `Browser trace exceeded ${TRACE_MAX_BYTES} bytes`
+      );
+      artifact.bytes += await writeTraceChunk(file, data, artifact.bytes);
+      eof = chunk.eof;
+    }
+  } catch (error) {
+    operationFailed = true;
+    operationFailure = error;
+  }
+  const cleanupFailures: unknown[] = [];
+  if (file) {
+    try {
+      await file.close();
+    } catch (error) {
+      cleanupFailures.push(error);
+    }
+  }
+  try {
+    await withTimeout(
+      session.send('IO.close', { handle: result.stream }),
+      TRACE_IO_READ_TIMEOUT_MS,
+      'Chromium trace IO.close'
+    );
+  } catch (error) {
+    cleanupFailures.push(error);
+  }
+  if (operationFailed) {
+    const failure =
+      cleanupFailures.length > 0
+        ? new AggregateError(
+            [operationFailure, ...cleanupFailures],
+            'Trace write or cleanup failed'
+          )
+        : operationFailure;
+    throw new TraceCaptureError('Trace capture failed', artifact, failure);
+  }
+  if (cleanupFailures.length > 0) {
+    throw new TraceCaptureError(
+      'Trace cleanup failed',
+      artifact,
+      new AggregateError(cleanupFailures, 'Trace cleanup failed')
+    );
+  }
+  artifact.complete = true;
+  return artifact;
+}
+
+function advertisedContentLength(response: PlaywrightResponse): number | undefined {
+  const value = response.headers()['content-length'];
+  if (value === undefined) {
+    return undefined;
+  }
+  const bytes = Number(value);
+  return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : undefined;
+}
+
+function bundleFileName(url: string, sha256: string): string {
+  const name = new URL(url).pathname.split('/').at(-1) || 'bundle.js';
+  const safeName = name.replace(/[^A-Za-z0-9._-]/g, '_');
+  return `${safeName}-${sha256}.js`;
+}
+
+async function saveLoadedBundle(
+  response: PlaywrightResponse,
+  outputDirectory: string,
+  totalBytes: number
+): Promise<LoadedBundle> {
+  const advertisedBytes = advertisedContentLength(response);
+  if (advertisedBytes !== undefined) {
+    assert(
+      advertisedBytes <= TRACE_MAX_BUNDLE_BYTES,
+      `Advertised JavaScript bundle exceeded ${TRACE_MAX_BUNDLE_BYTES} bytes`
+    );
+    assert(
+      totalBytes + advertisedBytes <= TRACE_MAX_BUNDLE_TOTAL_BYTES,
+      `Advertised JavaScript bundles exceeded ${TRACE_MAX_BUNDLE_TOTAL_BYTES} bytes`
+    );
+  }
+  const body = await withTimeout(
+    response.body(),
+    TRACE_BUNDLE_BODY_TIMEOUT_MS,
+    `JavaScript bundle response ${response.url()}`
+  );
+  assert(
+    body.byteLength <= TRACE_MAX_BUNDLE_BYTES,
+    `Loaded JavaScript bundle exceeded ${TRACE_MAX_BUNDLE_BYTES} bytes`
+  );
+  assert(
+    totalBytes + body.byteLength <= TRACE_MAX_BUNDLE_TOTAL_BYTES,
+    `Loaded JavaScript bundles exceeded ${TRACE_MAX_BUNDLE_TOTAL_BYTES} bytes`
+  );
+  const url = response.url();
+  const sha256 = createHash('sha256').update(body).digest('hex');
+  const path = join(outputDirectory, bundleFileName(url, sha256));
+  await mkdir(outputDirectory, { recursive: true });
+  await writeFile(path, body);
+  return {
+    ...(advertisedBytes !== undefined ? { advertisedBytes } : {}),
+    url,
+    status: response.status(),
+    contentType: response.headers()['content-type'] ?? '',
+    bytes: body.byteLength,
+    sha256,
+    path,
+  };
+}
 
 const { values } = parseArgs({
   options: {
@@ -38,12 +349,21 @@ const { values } = parseArgs({
     'render-dpr': { type: 'string', default: 'native' },
     'render-glow': { type: 'string', default: 'full' },
     'cpu-profile': { type: 'string' },
+    trace: { type: 'string' },
+    'chromium-gpu': { type: 'boolean', default: false },
   },
 });
 assert(
   !values['cpu-profile'] || (values.browser === 'chromium' && values.viewport !== 'all'),
   'CPU profiling requires Chromium and one viewport'
 );
+assert(
+  !values.trace || (values.browser === 'chromium' && values.viewport !== 'all'),
+  'Browser tracing requires Chromium and one viewport'
+);
+const chromiumGpu = values['chromium-gpu'];
+assert(!chromiumGpu || values.browser === 'chromium', 'chromium-gpu requires Chromium');
+const browserLaunchArgs = chromiumGpu ? ['--enable-gpu'] : [];
 const dpr = Number(values.dpr);
 const cpuSlowdown = Number(values['cpu-slowdown']);
 const seed = Number(values.seed);
@@ -78,6 +398,8 @@ assert(
   values.browser === 'chromium' || values.browser === 'webkit',
   'browser must be chromium or webkit'
 );
+const browserChannel =
+  values.browser === 'chromium' ? (chromiumGpu ? 'chromium' : 'playwright-bundled') : 'webkit';
 const cases = [
   { name: 'desktop', viewport: { width: 1280, height: 900 }, hasTouch: false },
   { name: 'touch-portrait', viewport: { width: 390, height: 844 }, hasTouch: true },
@@ -95,7 +417,13 @@ let browser: Browser | undefined;
 let browserVersion = 'unknown';
 let cleanupComplete = true;
 let gpu: object = { supported: false, reason: 'SystemInfo unavailable in WebKit' };
-let profileRecorded = false;
+let profileRecorded = Boolean(values.trace);
+let traceArtifact: TraceArtifact | undefined;
+const tracePath = values.trace;
+const traceBundleDirectory = tracePath ? `${tracePath}.bundles` : undefined;
+const traceBundleManifest = traceBundleDirectory
+  ? join(traceBundleDirectory, 'manifest.json')
+  : undefined;
 
 function metricSamples(suffix: string): number[] {
   const intervals =
@@ -153,6 +481,7 @@ function createMeasurement(): Measurement | undefined {
     },
     parameters: {
       browser: values.browser,
+      browserChannel,
       dpr,
       cpuSlowdown,
       network,
@@ -199,13 +528,33 @@ async function drain(page: Page): Promise<Interval> {
 }
 
 try {
-  browser = await (values.browser === 'webkit' ? webkit : chromium).launch({ headless: true });
+  browser = await (values.browser === 'webkit' ? webkit : chromium).launch({
+    headless: true,
+    args: browserLaunchArgs,
+    ...(chromiumGpu ? { channel: 'chromium' } : {}),
+  });
   browserVersion = browser.version();
   const activeBrowser = browser;
   if (values.browser === 'chromium') {
     const systemSession = await activeBrowser.newBrowserCDPSession();
     try {
       const info = await systemSession.send('SystemInfo.getInfo');
+      if (chromiumGpu) {
+        for (const feature of ['2d_canvas', 'gpu_compositing', 'rasterization']) {
+          const status = info.gpu.featureStatus?.[feature];
+          assert(
+            status === 'enabled' || status === 'enabled_on',
+            `Requested GPU path lacks accelerated ${feature}: ${status}`
+          );
+        }
+        const renderer = info.gpu.auxAttributes?.['glRenderer'];
+        assert(
+          typeof renderer === 'string' &&
+            renderer.length > 0 &&
+            !/swiftshader|llvmpipe|software/i.test(renderer),
+          'Requested GPU path lacks an observed hardware renderer'
+        );
+      }
       gpu = {
         supported: true,
         devices: info.gpu.devices,
@@ -274,9 +623,13 @@ try {
     }> = [];
     let metadata: Record<string, unknown> | undefined;
     let joined: Interval | undefined;
+    let traceMeasurementStarted = false;
+    let traceMeasurementEndAttempted = false;
     const constraints: Record<string, unknown> = {
+      browserChannel,
       dpr,
       cpuSlowdown,
+      chromiumGpu,
       network,
       seed,
       workload,
@@ -289,6 +642,80 @@ try {
       deviceScaleFactor: dpr,
     });
     const page = await context.newPage();
+    const loadedBundles: LoadedBundle[] = [];
+    const capturedBundleUrls = new Set<string>();
+    const bundleCaptureFailures: unknown[] = [];
+    let bundleCaptureTail = Promise.resolve();
+    let bundleBytes = 0;
+    let bundleLimitReported = false;
+    let traceBundleManifestSaved = false;
+    if (tracePath && traceBundleDirectory && traceBundleManifest) {
+      page.on('response', (response) => {
+        const request = response.request();
+        const url = response.url();
+        if (request.resourceType() !== 'script' || new URL(url).origin !== origin) {
+          return;
+        }
+        if (capturedBundleUrls.has(url)) {
+          return;
+        }
+        if (capturedBundleUrls.size >= TRACE_MAX_BUNDLES) {
+          if (!bundleLimitReported) {
+            bundleLimitReported = true;
+            bundleCaptureFailures.push(
+              new Error(`Loaded more than ${TRACE_MAX_BUNDLES} same-origin JavaScript bundles`)
+            );
+          }
+          return;
+        }
+        capturedBundleUrls.add(url);
+        bundleCaptureTail = bundleCaptureTail
+          .then(async () => {
+            const bundle = await saveLoadedBundle(response, traceBundleDirectory, bundleBytes);
+            bundleBytes += bundle.bytes;
+            loadedBundles.push(bundle);
+          })
+          .catch((error: unknown) => {
+            bundleCaptureFailures.push(
+              new Error(`Failed to retain loaded JavaScript bundle ${url}`, { cause: error })
+            );
+          });
+      });
+    }
+    async function saveTraceBundles(): Promise<void> {
+      if (!traceBundleDirectory || !traceBundleManifest || traceBundleManifestSaved) {
+        return;
+      }
+      await bundleCaptureTail;
+      await mkdir(traceBundleDirectory, { recursive: true });
+      await writeFile(
+        traceBundleManifest,
+        JSON.stringify(
+          {
+            schemaVersion: 1,
+            tracePath,
+            capturePolicy: {
+              traceIoReadTimeoutMs: TRACE_IO_READ_TIMEOUT_MS,
+              maxBundleBytes: TRACE_MAX_BUNDLE_BYTES,
+              maxTotalBytes: TRACE_MAX_BUNDLE_TOTAL_BYTES,
+              maxBundles: TRACE_MAX_BUNDLES,
+              responseBodyTimeoutMs: TRACE_BUNDLE_BODY_TIMEOUT_MS,
+              contentLengthPrecheck:
+                'Valid Content-Length is checked before response.body(); decoded bodies are checked again after allocation when the header is absent or encoded.',
+            },
+            bundles: loadedBundles,
+            captureErrors: bundleCaptureFailures.map((error) => errorRecord(error)),
+          },
+          null,
+          2
+        )
+      );
+      traceBundleManifestSaved = true;
+      if (bundleCaptureFailures.length > 0) {
+        throw new AggregateError(bundleCaptureFailures, 'JavaScript bundle retention failed');
+      }
+      assert(loadedBundles.length > 0, 'No same-origin JavaScript bundles captured');
+    }
     page.on('websocket', (socket) => {
       if (new URL(socket.url()).pathname !== '/ws') {
         return;
@@ -296,37 +723,38 @@ try {
       sockets.push(socket.url());
       const decoder = new SnapshotDecoder();
       let sequence = 0;
+      let acceptSnapshots = false;
       socket.on('framereceived', ({ payload }) => {
         try {
-          const envelope: unknown = JSON.parse(
-            typeof payload === 'string' ? payload : payload.toString()
-          );
-          if (
-            !envelope ||
-            typeof envelope !== 'object' ||
-            !('type' in envelope) ||
-            !('data' in envelope)
-          ) {
+          const text = typeof payload === 'string' ? payload : payload.toString();
+          const result = decoder.readMessage(text, { acceptSnapshots });
+          if (result.kind === 'snapshot-rejected') {
+            throw result.error;
+          }
+          if (result.kind === 'message') {
+            const envelope = result.message;
+            if (
+              !envelope ||
+              typeof envelope !== 'object' ||
+              !('type' in envelope) ||
+              !('data' in envelope)
+            ) {
+              return;
+            }
+            if (envelope.type === 'joined') {
+              decoder.reset();
+              sequence = 0;
+              acceptSnapshots = true;
+            }
             return;
           }
-          if (envelope.type === 'joined') {
-            decoder.reset();
-            sequence = 0;
-            return;
-          }
-          if (envelope.type !== 'snapshot') {
-            return;
-          }
-          const snapshot = envelope.data;
-          assert(
-            snapshot &&
-              typeof snapshot === 'object' &&
-              'sequence' in snapshot &&
-              snapshot.sequence === sequence + 1,
+          assert.equal(
+            result.metadata.sequence,
+            sequence + 1,
             'Browser snapshot sequence is not contiguous'
           );
           sequence++;
-          const state = decoder.decode(snapshot);
+          const state = result.state;
           latestAuthoritativeState = state;
           const motion = state.entities.find(
             (entity) => entity.id === measuredPilotId
@@ -391,11 +819,122 @@ try {
       await writeFile(values['cpu-profile'], JSON.stringify(profile));
       await session.detach();
     }
+    let traceSession: CDPSession | undefined;
+    let traceStarted = false;
+    async function startTrace() {
+      if (!tracePath) {
+        return;
+      }
+      const session = await context.newCDPSession(page);
+      traceSession = session;
+      await session.send('Tracing.start', {
+        transferMode: 'ReturnAsStream',
+        streamFormat: 'json',
+        streamCompression: 'gzip',
+        bufferUsageReportingInterval: 1_000,
+        traceConfig: {
+          enableSampling: true,
+          recordMode: 'recordAsMuchAsPossible',
+          traceBufferSizeInKb: TRACE_BUFFER_SIZE_KB,
+          includedCategories: TRACE_CATEGORIES.split(','),
+        },
+      });
+      traceStarted = true;
+    }
+    async function stopTrace() {
+      if (!traceSession) {
+        return;
+      }
+      const session = traceSession;
+      traceSession = undefined;
+      let stopFailure: unknown;
+      let stopFailed = false;
+      try {
+        if (traceStarted) {
+          assert(tracePath);
+          try {
+            traceArtifact = await stopAndSaveTrace(session, tracePath);
+            assert(!traceArtifact.dataLossOccurred, 'Chromium tracing reported data loss');
+          } catch (error) {
+            if (error instanceof TraceCaptureError) {
+              traceArtifact = error.artifact;
+            }
+            stopFailed = true;
+            stopFailure = error;
+          }
+        }
+      } finally {
+        traceStarted = false;
+      }
+      let detachFailure: unknown;
+      let detachFailed = false;
+      try {
+        await withTimeout(
+          session.detach(),
+          TRACE_COMPLETION_TIMEOUT_MS,
+          'Chromium tracing CDP detach'
+        );
+      } catch (error) {
+        detachFailed = true;
+        detachFailure = error;
+      }
+      if (stopFailed) {
+        if (detachFailed) {
+          throw new AggregateError([stopFailure, detachFailure], 'Trace stop or detach failed');
+        }
+        throw stopFailure;
+      }
+      if (detachFailed) {
+        throw detachFailure;
+      }
+    }
+    async function markTraceMeasurementEnd(): Promise<void> {
+      if (!traceMeasurementStarted || traceMeasurementEndAttempted || !tracePath) {
+        return;
+      }
+      traceMeasurementEndAttempted = true;
+      await page.evaluate(
+        ({ end, measure, start }) => {
+          performance.mark(end);
+          performance.measure(measure, start, end);
+        },
+        {
+          end: TRACE_MEASUREMENT_END_MARK,
+          measure: TRACE_MEASUREMENT_MEASURE,
+          start: TRACE_MEASUREMENT_START_MARK,
+        }
+      );
+    }
     let touchSession: CDPSession | undefined;
     let touchActive = false;
     try {
       const cpuSession =
         values.browser === 'chromium' ? await context.newCDPSession(page) : undefined;
+      const webSocketNegotiations: Array<{ url: string; status: number; extensions: string }> = [];
+      constraints['webSocketNegotiations'] = webSocketNegotiations;
+      constraints['webSocketNegotiationSource'] = cpuSession ? 'cdp' : 'unavailable';
+      if (cpuSession) {
+        const gameplaySockets = new Map<string, string>();
+        cpuSession.on('Network.webSocketCreated', ({ requestId, url }) => {
+          if (new URL(url).pathname === '/ws') {
+            gameplaySockets.set(requestId, url);
+          }
+        });
+        cpuSession.on('Network.webSocketHandshakeResponseReceived', ({ requestId, response }) => {
+          const url = gameplaySockets.get(requestId);
+          if (url) {
+            const extensions =
+              Object.entries(response.headers).find(
+                ([name]) => name.toLowerCase() === 'sec-websocket-extensions'
+              )?.[1] ?? '';
+            webSocketNegotiations.push({ url, status: response.status, extensions });
+          }
+        });
+        cpuSession.on('Network.webSocketClosed', ({ requestId }) => {
+          gameplaySockets.delete(requestId);
+        });
+        await cpuSession.send('Network.enable');
+      }
       async function calibrate() {
         return page.evaluate(() => {
           const start = performance.now();
@@ -625,26 +1164,23 @@ try {
             let browserDeparted = false;
             let peerDeparted = false;
             while (performance.now() < baselineDeadline) {
-              const witness = await page.evaluate(
-                ({ sequence, gameTime, playerId }) => {
-                  const interval = window.georoidsPerformance?.read();
-                  return {
-                    departed:
-                      window.gameController?.getCurrPlayer()?.id !== playerId ||
-                      (window.gameController?.getCurrPlayer()?.lives ?? 0) <= 0 ||
-                      !window.gameController?.getNetworkManager().isConnected ||
-                      !interval ||
-                      interval.pendingJoin,
-                    ready: Boolean(
-                      interval &&
-                        interval.lastKeyframeSequence >= sequence &&
-                        interval.lastSnapshot &&
-                        interval.lastSnapshot.gameTime >= gameTime
-                    ),
-                  };
-                },
-                { sequence: own.sequence, gameTime: fixture.gameTime, playerId: id }
-              );
+              const witness = await page.evaluate((playerId) => {
+                const interval = window.georoidsPerformance?.read();
+                const player = window.gameController?.getCurrPlayer();
+                return {
+                  departed:
+                    player?.id !== playerId ||
+                    (player?.lives ?? 0) <= 0 ||
+                    !window.gameController?.getNetworkManager().isConnected ||
+                    !interval ||
+                    interval.pendingJoin,
+                  observation: {
+                    lastKeyframeSequence: interval?.lastKeyframeSequence ?? null,
+                    lastSnapshotGameTime: interval?.lastSnapshot?.gameTime ?? null,
+                    motionEpoch: player?.ship.playerMotion?.epoch ?? null,
+                  },
+                };
+              }, id);
               browserDeparted = witness.departed;
               peerDeparted = peers.some(
                 (peer, index) => !peer.state || peer.gameJoins !== joins[index]
@@ -655,9 +1191,31 @@ try {
               const peersReady = peers.every((peer) => {
                 const baseline = fixture.baselines.find((row) => row.id === peer.id);
                 assert(baseline, 'Missing peer baseline');
-                return peer.lastKeyframeSequence >= baseline.sequence;
+                const player = peer.state?.entities.find((entity) => entity.id === peer.id);
+                return observesPreparedFixture(
+                  {
+                    sequence: baseline.sequence,
+                    gameTime: fixture.gameTime,
+                    motionEpoch: baseline.motionEpoch,
+                  },
+                  {
+                    lastKeyframeSequence: peer.lastKeyframeSequence,
+                    lastSnapshotGameTime: peer.state?.gameTime ?? null,
+                    motionEpoch: player?.playerMotion?.epoch ?? null,
+                  }
+                );
               });
-              if (witness.ready && peersReady) {
+              if (
+                observesPreparedFixture(
+                  {
+                    sequence: own.sequence,
+                    gameTime: fixture.gameTime,
+                    motionEpoch: own.motionEpoch,
+                  },
+                  witness.observation
+                ) &&
+                peersReady
+              ) {
                 preparedJoins = joins;
                 return;
               }
@@ -943,6 +1501,7 @@ try {
       delivery = deliveryBudget(network, warmupSnapshotBytes / warmupSnapshotCount);
       constraints['deliveryBudget'] = delivery;
       const serverBoundary = await finalizeServerWindow(join(sessionPath, 'fixture.sock'));
+      await startTrace();
       if (values['cpu-profile']) {
         profileSession = await context.newCDPSession(page);
         await profileSession.send('Profiler.enable');
@@ -957,6 +1516,10 @@ try {
       const started = performance.now();
       stateMeasuredStarted = started;
       lastMeasuredStateAt = started;
+      if (tracePath) {
+        await page.evaluate((mark) => performance.mark(mark), TRACE_MEASUREMENT_START_MARK);
+        traceMeasurementStarted = true;
+      }
       await observe(seconds * 1000, intervals);
       const stateMeasuredEnded = performance.now();
       measurementStoppedAt = stateMeasuredEnded;
@@ -965,7 +1528,10 @@ try {
       for (const peer of peers) {
         peer.stopMeasurement();
       }
+      await markTraceMeasurementEnd();
       await stopProfile();
+      await stopTrace();
+      await saveTraceBundles();
       const durationMs = stateMeasuredEnded - started;
       const stateTailGapMs = stateMeasuredEnded - lastMeasuredStateAt;
       const completeStateGaps = [
@@ -1127,6 +1693,12 @@ try {
         'Raw samples were omitted'
       );
       await mkdir(dirname(values.output), { recursive: true });
+      if (cpuSession) {
+        assert(
+          webSocketNegotiations.some((handshake) => handshake.status === 101),
+          'No successful gameplay WebSocket negotiation recorded'
+        );
+      }
       const screenshot = `${values.output}.${scenario.name}.png`;
       await page.screenshot({ path: screenshot });
       assert.equal(errors.length, 0, `Browser errors: ${errors.join('\n')}`);
@@ -1135,7 +1707,6 @@ try {
           new Error(`${scenario.name} emitted browser warnings: ${warnings.join('\n')}`)
         );
       }
-      measuredIntervals.push(...intervals);
       runs.push({
         scenario,
         metadata,
@@ -1170,15 +1741,8 @@ try {
           finalStateAgeMs: stateTailGapMs,
         },
         constraints: {
-          dpr,
-          cpuSlowdown,
-          cpuControl,
-          cpuConstrained,
-          cpuCalibration,
-          network,
+          ...constraints,
           profile: networkProfiles[network],
-          networkProbes,
-          sockets,
           proxy: proxyStats,
         },
         errors,
@@ -1242,12 +1806,33 @@ try {
         health,
       });
     } finally {
+      measuredIntervals.push(...intervals);
       measuring = false;
+      try {
+        await markTraceMeasurementEnd();
+      } catch (error) {
+        cleanupComplete = false;
+        failures.push(error);
+      }
       try {
         await stopProfile();
       } catch (error) {
         cleanupComplete = false;
         failures.push(error);
+      }
+      try {
+        await stopTrace();
+      } catch (error) {
+        cleanupComplete = false;
+        failures.push(error);
+      }
+      if (tracePath) {
+        try {
+          await saveTraceBundles();
+        } catch (error) {
+          cleanupComplete = false;
+          failures.push(error);
+        }
       }
       clearInterval(peerTimer);
       for (const peer of peers) {
@@ -1333,7 +1918,11 @@ try {
     ...(measurement ? { measurement } : {}),
     metadata: {
       ...collectLiveReportMetadata({
-        browser: { name: values.browser ?? 'chromium', version: browserVersion },
+        browser: {
+          name: values.browser ?? 'chromium',
+          version: browserVersion,
+          launchFlags: browserLaunchArgs,
+        },
         gpu,
         measurementSource: cases.some((scenario) => scenario.hasTouch) ? 'emulated-touch' : 'host',
       }),
@@ -1342,10 +1931,29 @@ try {
     failed: failures.length > 0,
     details: {
       browser: values.browser,
+      browserChannel,
       browserVersion,
       cleanupComplete,
       profileRecorded,
       ...(values['cpu-profile'] ? { cpuProfile: values['cpu-profile'] } : {}),
+      ...(tracePath
+        ? {
+            trace: {
+              path: tracePath,
+              recorded: (traceArtifact?.bytes ?? 0) > 0,
+              complete: traceArtifact?.complete ?? false,
+              bytes: traceArtifact?.bytes ?? 0,
+              dataLossOccurred: traceArtifact?.dataLossOccurred ?? null,
+              streamCompression: traceArtifact?.streamCompression ?? 'gzip',
+              bundleManifest: traceBundleManifest,
+              measurementMarks: {
+                start: TRACE_MEASUREMENT_START_MARK,
+                end: TRACE_MEASUREMENT_END_MARK,
+                measure: TRACE_MEASUREMENT_MEASURE,
+              },
+            },
+          }
+        : {}),
       build: 'production',
       warmupSeconds: warmup,
       measuredSeconds: seconds,

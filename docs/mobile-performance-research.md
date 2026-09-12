@@ -1,5 +1,16 @@
 # GeoRoids mobile performance research
 
+Current decisions and their evidence are collected in the
+[mobile implementation report](performance/mobile-implementation-status.md).
+Follow-up implementation and measurements are recorded in the
+[September 12 rendering and pace report](performance/mobile-pace-results.md)
+and the [snapshot compression investigation](performance/network-compression-results.md).
+The [browser rendering attribution](performance/render-attribution-results.md)
+separates deferred software Canvas work from GPU-backed browser behavior.
+The [phone testing setup follow-up](phone-testing-setup.md) records the Samsung
+and AWS investigation and the remaining real-device setup procedure.
+The research below retains its original source revision and evidence limits.
+
 ## Recommendation and evidence limits
 
 Prioritize a repeatable mobile test path with constrained CPU and network conditions, then calibrate it against physical-phone sessions. Use that path to compare render resolution and glow effects while recording snapshot delivery and server timing. Keep Canvas 2D and the current single-world Railway architecture for this first round. The available evidence does not establish that a renderer rewrite, more Railway resources, or a different hosting provider would fix the reported slowdown.
@@ -34,7 +45,7 @@ Pointer controls and cancellation handling already exist in `src/input/touchCont
 
 The authoritative simulation runs at 60 Hz; periodic snapshots target 30 Hz. The server uses monotonic scheduling and bounds accumulated simulation debt. Broadcast state uses required snapshot-v1 keyframes and deltas, with per-recipient sequence and baseline state. A new canonical encoder is shared within one broadcast, but recipient encoding and JSON serialization still occur inside the recipient loop.[^3]
 
-The broadcaster has a 256 KiB projected outbound limit, tracks pending sends, and requests a keyframe after skipped or failed delivery paths. Periodic keyframes use a 90-delta interval, approximately three seconds at an uninterrupted 30 Hz cadence. Recovery and skipped sends can alter that interval. These controls already exist and should be measured before changing them.[^3]
+The broadcaster has a 256 KiB projected outbound limit and tracks pending sends. The [pending-send follow-up](performance/pending-snapshot-results.md) now preserves a successful baseline after an unsent pending offer; pressure skips and failed delivery still request a keyframe. Periodic keyframes use a 90-delta interval, approximately three seconds at an uninterrupted 30 Hz cadence. Recovery and skipped sends can alter that interval. These controls already exist and should be measured before changing them.[^3]
 
 WebSocket compression is not enabled in the inspected server configuration. The existing optimization is JSON delta encoding. The historical protocol experiment measured standalone gzip and deflate codec work; it did not validate deployed per-message compression.[^4]
 

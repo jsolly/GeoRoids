@@ -7,7 +7,8 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
-import { DAMAGE, GAME, SHIP } from '../../../src/constants';
+import type { ServerGameSnapshot } from '../../../shared-types';
+import { DAMAGE, GAME, LASER, SHIP } from '../../../src/constants';
 import { WireClient } from '../../support/wireClient';
 
 test('both pilots see the same delayed health recovery after a hostile laser hit', async () => {
@@ -64,12 +65,25 @@ test('both pilots see the same delayed health recovery after a hostile laser hit
         await peer.barrier();
         const cursor = decoders[index];
         assert.ok(cursor);
-        const frames = peer.messages
-          .slice(cursor.offset)
-          .filter((message) => message.type === 'snapshot');
-        expect(frames.length).toBeGreaterThan(0);
-        const snapshots = frames.map((message) => cursor.decoder.decode(message.data));
-        cursor.offset = peer.messages.length;
+        const snapshots: ServerGameSnapshot[] = [];
+        for (const { raw } of peer.wireMessages.slice(cursor.offset)) {
+          const result = cursor.decoder.readMessage(raw, { acceptSnapshots: true });
+          if (result.kind === 'snapshot-rejected') {
+            throw result.error;
+          }
+          if (result.kind === 'snapshot') {
+            snapshots.push(result.state);
+          } else if (
+            result.message &&
+            typeof result.message === 'object' &&
+            'type' in result.message &&
+            result.message.type === 'joined'
+          ) {
+            cursor.decoder.reset();
+          }
+        }
+        expect(snapshots.length).toBeGreaterThan(0);
+        cursor.offset = peer.wireMessages.length;
         const snapshot = snapshots.at(-1);
         assert.ok(snapshot);
         const observed = snapshot.entities.find((entity) => entity.id === 'target');
@@ -81,13 +95,16 @@ test('both pilots see the same delayed health recovery after a hostile laser hit
     }
 
     await expectSharedHealth(maxHealth);
+    const laserStart = { x: 20, y: 0 };
+    const laserSpeed = LASER.SPEED / GAME.FPS;
     attackerPeer.send({
       type: 'shoot',
-      data: { id: attacker.id, laserStart: { x: 20, y: 0 }, laserDirection: { x: 10, y: 0 } },
+      data: { id: attacker.id, laserStart, laserDirection: { x: laserSpeed, y: 0 } },
     });
     await attackerPeer.barrier();
     expect(engine.getPlayerProjectiles()).toHaveLength(1);
-    for (let frame = 0; frame < 10; frame++) {
+    const flightFrames = Math.ceil((target.position.x - laserStart.x) / laserSpeed);
+    for (let frame = 0; frame < flightFrames; frame++) {
       engine.advanceLasersAndResolveHits();
     }
     expect(engine.getPlayerProjectiles()).toEqual([]);

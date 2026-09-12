@@ -8,7 +8,11 @@ import { WireClient } from '../../support/wireClient';
 
 interface Packet {
   type: string;
-  data?: Record<string, unknown>;
+  data?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 class PilotSocket {
@@ -22,13 +26,27 @@ class PilotSocket {
     this.wire = new WireClient(ws);
     ws.on('message', (raw) => {
       try {
-        const packet = JSON.parse(String(raw)) as Packet;
+        const text = String(raw);
+        const result = this.decoder.readMessage(text, { acceptSnapshots: true });
+        if (result.kind === 'snapshot-rejected') {
+          throw result.error;
+        }
+        if (result.kind === 'snapshot') {
+          this.snapshots.push(result.state);
+          this.messages.push({ type: 'snapshot' });
+          return;
+        }
+        if (!isRecord(result.message) || typeof result.message['type'] !== 'string') {
+          throw new Error('Server packet is missing its type');
+        }
+        const data = result.message['data'];
+        const packet: Packet = {
+          type: result.message['type'],
+          ...(Object.hasOwn(result.message, 'data') ? { data } : {}),
+        };
         this.messages.push(packet);
         if (packet.type === 'joined') {
           this.decoder.reset();
-        }
-        if (packet.type === 'snapshot') {
-          this.snapshots.push(this.decoder.decode(packet.data));
         }
       } catch (error) {
         this.failures.push(error instanceof Error ? error : new Error(String(error)));
@@ -79,10 +97,10 @@ class PilotSocket {
       asteroidInteractions: 1,
       ...(resumeToken ? { resumeToken } : {}),
     });
-    return this.waitFor(
-      () => this.messages.slice(after).find((message) => message.type === 'joined')?.data,
-      `join ${id}`
-    );
+    return this.waitFor(() => {
+      const data = this.messages.slice(after).find((message) => message.type === 'joined')?.data;
+      return isRecord(data) ? data : undefined;
+    }, `join ${id}`);
   }
 
   async open(): Promise<void> {
@@ -150,7 +168,8 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(duringGrace.playerMotion).toMatchObject({ mode: 'free', epoch: 1, ack: 0 });
     expect(
       observer.messages.some(
-        (message) => message.type === 'playerLeft' && message.data?.['id'] === 'pilot'
+        (message) =>
+          message.type === 'playerLeft' && isRecord(message.data) && message.data['id'] === 'pilot'
       )
     ).toBe(false);
 
@@ -275,7 +294,8 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     );
     expect(
       observer.messages.some(
-        (message) => message.type === 'playerLeft' && message.data?.['id'] === 'pilot'
+        (message) =>
+          message.type === 'playerLeft' && isRecord(message.data) && message.data['id'] === 'pilot'
       )
     ).toBe(true);
 

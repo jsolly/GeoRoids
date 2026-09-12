@@ -1,0 +1,112 @@
+{
+  "scope": "Offline exact MessagePack versus JSON, synthetic current SnapshotEncoder histories; not a transport/browser or physical-phone acceptance. Raw-wire trial remains open.",
+  "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+  "package": "@msgpack/msgpack@3.1.3",
+  "productionChanges": false,
+  "artifacts": [
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/report.md",
+      "bytes": 7675,
+      "sha256": "131a5adda66d99eb62a34e6f3de780e26515607d32d4d22182d7c09f0dcc3db8"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/experiment.ts",
+      "bytes": 17171,
+      "sha256": "09a8847bcb48a509ba50bd691d99f3ff063c18db7a6b379469202ef87ef29b6b"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/experiment-f64.ts",
+      "bytes": 16212,
+      "sha256": "2deecaaa9b91d08e0d8036ced551bd55c3a95cc2625035781909c77cc8c0fc8c"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/package-lock.json",
+      "bytes": 15298,
+      "sha256": "ab7e01f7841ae418af0f786008ead5890e76eb3b34d7992cd5a34d7a15d1efe0"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/correctness.json",
+      "bytes": 4153,
+      "sha256": "7b2953f4b1df5c0f06023c9b1c62af7c67169390573f1a3c37b2608a9fac73cd"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/timing-integer.json",
+      "bytes": 1132244,
+      "sha256": "df188948d020ae5bf092f01b0fb6d7804d136522167bbfd02bcf2d488a070078"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/timing-f64.json",
+      "bytes": 1694873,
+      "sha256": "2362f2da802823bb8b8e0f43deef824ab8611e9ed1f213f8b68a6ee5a3d15bb0"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/summary-integer.json",
+      "bytes": 15873,
+      "sha256": "f8dd5f5f726219e6cc643264f2dff8f8cd952e1431189fc274589f1e9e62815a"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/summary-f64.json",
+      "bytes": 23771,
+      "sha256": "65bf2d14fb5f594a5ec629f106d4b624a398fef9555e9a0057e7043406ca012a"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/run-receipt-integer.json",
+      "bytes": 247,
+      "sha256": "2213402180060137aafb0db3b6bddfaf7d35f4c42a58fb47036f2946bbe28d77"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/run-receipt-f64.json",
+      "bytes": 226,
+      "sha256": "b1fe69fecb79c5bba712120636ee034afa7df20f25eee62f62a94294bb244059"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/summarize.py",
+      "bytes": 5778,
+      "sha256": "1abdfa632b3beca29c20cb325bed86785ccf58399bc1ee2bf549f18a7f37bd7a"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/summary-receipt.json",
+      "bytes": 1636,
+      "sha256": "0eb3a28a37045da239684486b5e0ddfaadbc846af4a5b6735502154924d9498a"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/quantile-conventions.json",
+      "bytes": 49896,
+      "sha256": "66639f7c56f15c0717248b771b7b02adfcfbebfc46997a668b0245e77ae58072"
+    },
+    {
+      "path": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment/.codec-lab/SHA256SUMS",
+      "bytes": 1738,
+      "sha256": "b7646d4889b7466fd648f20492d521ebfda1ff63af0512140de6a646e1f3c552"
+    }
+  ],
+  "summaryReceipt": {
+    "kind": "offline-summary-regeneration",
+    "baseCommit": "5d27a1adf12777f9a36ba9b7f1751b17a23bdda8",
+    "command": "python3 .codec-lab/summarize.py",
+    "workingDirectory": "/Users/johnsolly/code/GeoRoids-worktrees/binary-codec-experiment",
+    "pythonVersion": "3.9.6",
+    "timingOrTestsExecuted": false,
+    "inputSha256": {
+      "timing-f64.json": "2362f2da802823bb8b8e0f43deef824ab8611e9ed1f213f8b68a6ee5a3d15bb0",
+      "experiment-f64.ts": "2deecaaa9b91d08e0d8036ced551bd55c3a95cc2625035781909c77cc8c0fc8c",
+      "timing-integer.json": "df188948d020ae5bf092f01b0fb6d7804d136522167bbfd02bcf2d488a070078",
+      "experiment.ts": "09a8847bcb48a509ba50bd691d99f3ff063c18db7a6b379469202ef87ef29b6b",
+      "run-receipt-f64.json": "b1fe69fecb79c5bba712120636ee034afa7df20f25eee62f62a94294bb244059",
+      "run-receipt-integer.json": "2213402180060137aafb0db3b6bddfaf7d35f4c42a58fb47036f2946bbe28d77",
+      "package-lock.json": "ab7e01f7841ae418af0f786008ead5890e76eb3b34d7992cd5a34d7a15d1efe0",
+      "summarize.py": "1abdfa632b3beca29c20cb325bed86785ccf58399bc1ee2bf549f18a7f37bd7a"
+    },
+    "outputSha256": {
+      "summary-f64.json": "65bf2d14fb5f594a5ec629f106d4b624a398fef9555e9a0057e7043406ca012a",
+      "summary-integer.json": "f8dd5f5f726219e6cc643264f2dff8f8cd952e1431189fc274589f1e9e62815a",
+      "quantile-conventions.json": "66639f7c56f15c0717248b771b7b02adfcfbebfc46997a668b0245e77ae58072"
+    },
+    "verified": [
+      "Recorded benchmark script hashes match retained scripts",
+      "Three rounds and 540 pooled samples per metric",
+      "Payload byte histories identical across repeat rounds",
+      "Summary inputs unchanged during regeneration"
+    ]
+  }
+}

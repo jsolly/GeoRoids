@@ -92,7 +92,5 @@ test('turning off glow retains every phosphor hull stroke and vertex', () => {
   expect(full.lines).toEqual([
     [25, 40],
     [40, 10],
-    [25, 40],
-    [40, 10],
   ]);
 });

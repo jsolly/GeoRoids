@@ -26,7 +26,7 @@ test('desktop 800x600 keeps the Wave1 compact cluster anchors', () => {
   });
 });
 
-test('phone portrait raises the radar above the ability buttons', () => {
+test('phone portrait keeps notices below the leaderboard and radar above the ability buttons', () => {
   const layout = computeHudLayout(
     { width: 390, height: 844 },
     { touchControls: true, safeArea: ZERO }
@@ -36,6 +36,10 @@ test('phone portrait raises the radar above the ability buttons', () => {
   expect(layout.miniMap.x + layout.miniMap.size).toBeLessThanOrEqual(390 - 12);
   expect(layout.miniMap.y + layout.miniMap.size).toBeLessThanOrEqual(844 - 12 - 112);
   expect(layout.leaderboard.maxRows).toBeLessThanOrEqual(6);
+  expect(layout.killMessageY).toBeGreaterThan(
+    layout.leaderboard.y + layout.leaderboard.rowHeight * layout.leaderboard.maxRows
+  );
+  expect(layout.killMessageY).toBeGreaterThan(layout.fuel.y + layout.fuel.height);
 });
 
 test('phone landscape parks the radar under lives so it misses the stick', () => {

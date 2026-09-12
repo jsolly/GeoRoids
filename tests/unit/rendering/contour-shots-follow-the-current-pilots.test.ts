@@ -7,12 +7,16 @@ import { NetworkManager } from '../../../src/network/networkManager';
 import { canvasManager } from '../../../src/rendering/canvas';
 import * as contourLasers from '../../../src/rendering/contourLaserRenderer';
 
+import { TestPath2D } from '../../support/TestPath2D';
+
 afterEach(() => {
   canvasManager.destroy();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 test('successive frames reuse shot sources and remove a departed pilot without retaining their lasers', () => {
+  vi.stubGlobal('Path2D', TestPath2D);
   canvasManager.initialize();
   const local = PlayerManager.getInstance().createLocalPlayer();
   local.id = 'local-pilot';

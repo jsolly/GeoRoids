@@ -62,23 +62,23 @@ test(
         }
       });
       socket.on('framereceived', ({ payload }) => {
-        const message = parseFrame(payload, 'received');
-        if (!isRecord(message)) {
-          return;
-        }
-        if (message['type'] === 'joined') {
-          decoder.reset();
-          currentBotSnapshots.clear();
-          botSnapshots.length = 0;
-          healthBeforeFirstShot = undefined;
-          firstShotSampleIndex = 0;
-          return;
-        }
-        if (message['type'] !== 'snapshot') {
-          return;
-        }
+        const raw = String(payload);
         try {
-          const snapshot = decoder.decode(message['data']);
+          const result = decoder.readMessage(raw, { acceptSnapshots: true });
+          if (result.kind === 'message') {
+            if (isRecord(result.message) && result.message['type'] === 'joined') {
+              decoder.reset();
+              currentBotSnapshots.clear();
+              botSnapshots.length = 0;
+              healthBeforeFirstShot = undefined;
+              firstShotSampleIndex = 0;
+            }
+            return;
+          }
+          if (result.kind === 'snapshot-rejected') {
+            throw result.error;
+          }
+          const snapshot = result.state;
           currentBotSnapshots.clear();
           for (const entity of snapshot.entities) {
             if (entity.type !== 'bot') {
@@ -95,9 +95,12 @@ test(
             }
           }
         } catch (error) {
-          snapshotErrors.push(
-            `authoritative snapshot could not be decoded: ${error instanceof Error ? error.message : String(error)}`
-          );
+          const detail = error instanceof Error ? error.message : String(error);
+          if (error instanceof SyntaxError) {
+            malformedFrames.push(`received frame was not valid JSON: ${detail}`);
+          } else {
+            snapshotErrors.push(`authoritative snapshot could not be decoded: ${detail}`);
+          }
         }
       });
     });

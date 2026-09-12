@@ -10,6 +10,7 @@ import {
 import type { ServerGameSnapshot } from '../shared-types';
 import { snapshotFixture } from '../tests/unit/network/snapshotFixture';
 import type { Measurement } from './results';
+import { assertSelectedSnapshotState, SELECTED_SNAPSHOT_CONTRACT } from './snapshot-state';
 
 const FULL_FIXTURE_KEYS = [
   'asteroids',
@@ -18,6 +19,7 @@ const FULL_FIXTURE_KEYS = [
   'gameTime',
   'isPaused',
   'loot',
+  'playerProjectiles',
   'satellitePickups',
   'satelliteProjectiles',
   'satellites',
@@ -92,16 +94,16 @@ function validateOptions(options: CodecSampleOptions): void {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseEnvelope(text: string): unknown {
-  const value: unknown = JSON.parse(text);
-  if (!isRecord(value) || value['type'] !== 'snapshot' || !Object.hasOwn(value, 'data')) {
-    throw new Error('Serialized codec fixture did not contain a snapshot envelope');
+function decodeSnapshot(text: string, decoder: SnapshotDecoder) {
+  const result = decoder.readMessage(text, { acceptSnapshots: true });
+  switch (result.kind) {
+    case 'snapshot':
+      return result;
+    case 'snapshot-rejected':
+      throw result.error;
+    case 'message':
+      throw new Error('Serialized codec fixture was not a snapshot message');
   }
-  return value['data'];
 }
 
 function worlds(options: CodecSampleOptions): ServerGameSnapshot[] {
@@ -159,17 +161,23 @@ function timedEncode(
   }));
   const history: WireMessage[][] = [];
   const samples: number[] = [];
-  // Keep the original expected worlds untouched even if a candidate mutates its inputs.
+  // Give the encoder owned inputs while retaining an independent mutation witness.
   const inputs = structuredClone(fixtureWorlds);
   for (const [tick, world] of inputs.entries()) {
+    let messages: WireMessage[];
     if (tick < options.warmupTicks) {
-      history.push(encodeTick(world, tick, pattern, state));
-      continue;
+      messages = encodeTick(world, tick, pattern, state);
+    } else {
+      const startedAt = performance.now();
+      messages = encodeTick(world, tick, pattern, state);
+      const elapsed = performance.now() - startedAt;
+      samples.push(elapsed);
     }
-    const startedAt = performance.now();
-    const messages = encodeTick(world, tick, pattern, state);
-    const elapsed = performance.now() - startedAt;
-    samples.push(elapsed);
+    assert.deepEqual(
+      world,
+      fixtureWorlds[tick],
+      `Codec encoder mutated its original input at tick ${tick}`
+    );
     history.push(messages);
   }
   return { samples, history };
@@ -205,10 +213,8 @@ function validateHistory(
     for (const message of messages) {
       const recipient = state[message.recipient];
       assert(recipient, `Missing codec recipient ${message.recipient}`);
-      const frame = parseEnvelope(message.text);
-      const decoded = recipient.decoder.decode(frame);
-      assert.deepEqual(decoded, world, 'Codec decode changed the original fixture state');
-      assert(isRecord(frame), 'Codec frame must be an object');
+      const { state: decoded, metadata: frame } = decodeSnapshot(message.text, recipient.decoder);
+      assertSelectedSnapshotState(decoded, world);
       const sequence = frame['sequence'];
       const kind = frame['kind'];
       assert(typeof sequence === 'number' && sequence === recipient.sequence + 1);
@@ -262,30 +268,30 @@ function validateHistory(
   };
 }
 
-function timedDecode(
+function timedParseDecode(
   history: readonly WireMessage[][],
   options: CodecSampleOptions,
   recipientCount: number
 ) {
   const decoders = Array.from({ length: recipientCount }, () => new SnapshotDecoder());
-  const decode = (batch: readonly WireMessage[]): void => {
+  const parseDecode = (batch: readonly WireMessage[]): void => {
     for (const message of batch) {
       const decoder = decoders[message.recipient];
       if (!decoder) {
         throw new Error(`Missing decoder for recipient ${message.recipient}`);
       }
-      decoder.decode(parseEnvelope(message.text));
+      decodeSnapshot(message.text, decoder);
     }
   };
   const samples: number[] = [];
   let messages = 0;
   for (const [tick, batch] of history.entries()) {
     if (tick < options.warmupTicks) {
-      decode(batch);
+      parseDecode(batch);
       continue;
     }
     const startedAt = performance.now();
-    decode(batch);
+    parseDecode(batch);
     samples.push(performance.now() - startedAt);
     messages += batch.length;
   }
@@ -318,17 +324,17 @@ export function runCodecSample(
         pattern,
         recipientCount
       );
-      const decoded = timedDecode(encoded.history, options, recipientCount);
+      const decoded = timedParseDecode(encoded.history, options, recipientCount);
       assert.equal(
         decoded.messages,
         validation.stats.messages,
-        'Measured encode/decode work differs'
+        'Measured encode and parse/decode work differs'
       );
       scenarios.push(validation.witness);
       lastDecodedWorld = validation.lastDecodedWorld;
       const key = scenarioKey(pattern, recipientCount);
       samples[`${key}-encode-serialize-ms`] = encoded.samples;
-      samples[`${key}-decode-ms`] = decoded.samples;
+      samples[`${key}-parse-decode-ms`] = decoded.samples;
       counts[`${key}-messages`] = validation.stats.messages;
       counts[`${key}-keyframes`] = validation.stats.keyframes;
       counts[`${key}-deltas`] = validation.stats.deltas;
@@ -347,6 +353,10 @@ export function runCodecSample(
     witness: {
       before: { firstWorld: structuredClone(firstWorld), fixtureKeys: FULL_FIXTURE_KEYS },
       after: { lastDecodedWorld: structuredClone(lastDecodedWorld), scenarios },
+      stateContract: {
+        decoded: SELECTED_SNAPSHOT_CONTRACT,
+        originalInputsUnchanged: true,
+      },
     },
     parameters: options,
     cleanup: 'complete',

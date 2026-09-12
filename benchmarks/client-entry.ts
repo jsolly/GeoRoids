@@ -238,6 +238,11 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             value = next;
           },
         });
+        // A successfully installed probe can observe zero reads on a cached frame.
+        // Keep that distinct from a missing probe in the strict work-budget check.
+        for (const prefix of ['update', 'render']) {
+          canvasCalls[`${prefix}.${name}`] ??= 0;
+        }
         restores.push(() => Object.defineProperty(target, key, { ...descriptor, value }));
       }
       if (options.observe) {

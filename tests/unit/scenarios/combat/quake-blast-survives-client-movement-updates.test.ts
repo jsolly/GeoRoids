@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { PLAYER_MOTION } from '../../../../shared/playerMotion';
 import { GAME, LASER } from '../../../../src/constants';
-import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
 import { GameServerWorld, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -123,34 +122,6 @@ test('an authenticated Quake blast dispatches to every authoritative physical bo
     return;
   }
 
-  const satelliteRows = world.engine.getAllSatellites();
-  const selectedRow = satelliteRows[0];
-  expect(selectedRow).toBeDefined();
-  if (!selectedRow) {
-    return;
-  }
-  for (const row of satelliteRows) {
-    const satellite = world.engine.getSatellite(row.id);
-    expect(satellite).toBeDefined();
-    if (!satellite) {
-      return;
-    }
-    const selected = row.id === selectedRow.id;
-    const position = selected
-      ? { x: origin.x + 100, y: origin.y }
-      : { x: origin.x + SHIP_ABILITY.SHOCK_RADIUS + 1000, y: origin.y };
-    satellite.position = { ...position };
-    satellite.orbitCenter = { ...position };
-    satellite.orbitRadiusX = 0;
-    satellite.orbitRadiusY = 0;
-    satellite.orbitPhase = 0;
-    satellite.driftAngle = 0;
-    satellite.velocity = { x: 0, y: 0 };
-    satellite.shootCooldown = selected ? 0 : 1000;
-    satellite.burstRemaining = 0;
-    satellite.burstCooldown = selected ? 0 : 1000;
-  }
-
   const playerShot = world.engine.spawnLaser(
     caster.id,
     { x: origin.x + 200, y: origin.y },
@@ -161,20 +132,6 @@ test('an authenticated Quake blast dispatches to every authoritative physical bo
     return;
   }
   const playerVelocityBefore = { ...playerShot.velocity };
-  const satelliteShots = world.engine.tickSatellites();
-  expect(satelliteShots).toHaveLength(1);
-  const satelliteProjectileBefore = world.engine
-    .getActiveSatelliteProjectiles()
-    .find((projectile) => projectile.satelliteId === selectedRow.id);
-  expect(satelliteProjectileBefore).toBeDefined();
-  if (!satelliteProjectileBefore) {
-    return;
-  }
-  const selectedSatellite = world.engine.getSatellite(selectedRow.id);
-  if (!selectedSatellite) {
-    throw new Error('Missing configured satellite');
-  }
-  const satelliteVelocityBefore = { ...selectedSatellite.velocity };
   const pickupVelocityBefore = { ...pickupBefore.velocity };
   const fuelBefore = world.entity(caster).fuel;
 
@@ -185,20 +142,12 @@ test('an authenticated Quake blast dispatches to every authoritative physical bo
   });
 
   expect(world.entity(caster).fuel).toBeLessThan(fuelBefore);
-  const satelliteAfter = world.engine.getSatellite(selectedRow.id);
-  expect(satelliteAfter?.velocity.x).toBeGreaterThan(satelliteVelocityBefore.x);
   const pickupAfter = world.engine.getSatellitePickup(loosePickup.id);
   expect(pickupAfter?.velocity.x).toBeGreaterThan(pickupVelocityBefore.x);
   const playerShotAfter = world.engine
     .getPlayerProjectiles()
     .find((projectile) => projectile.id === playerShot.id);
   expect(playerShotAfter?.velocity.x).toBeGreaterThan(playerVelocityBefore.x);
-  const satelliteProjectileAfter = world.engine
-    .getActiveSatelliteProjectiles()
-    .find((projectile) => projectile.shotId === satelliteProjectileBefore.shotId);
-  expect(satelliteProjectileAfter?.velocity.x).toBeGreaterThan(
-    satelliteProjectileBefore.velocity.x
-  );
 
   world.engine.advanceOneFrame();
   const lootAfter = world.engine.getLoot().find((loot) => loot.id === lootBefore.id);

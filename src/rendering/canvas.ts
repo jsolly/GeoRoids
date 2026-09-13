@@ -6,8 +6,6 @@ import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
 import type { RoidBelt } from '../entities/roid/Roid';
 import { drawRoidsRelative } from '../entities/roid/roidRenderer';
-import { SatelliteManager } from '../entities/satellite/SatelliteManager';
-import { drawSatellites } from '../entities/satellite/satelliteRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
 import { drawQuakePulseRelative } from '../entities/ship/quakePulseRenderer';
@@ -328,10 +326,8 @@ class CanvasManager {
     }
 
     const loot = LootField.getInstance().getAll();
-    const satellites = SatelliteManager.getInstance().getAll();
     const satellitePickups = SatellitePickupManager.getInstance().getAll();
     drawLootRelative(currShip, loot);
-    drawSatellites(satellites, currShip.position);
     drawSatellitePickups(satellitePickups, currShip.position);
 
     const localLaserColor = getLaserColor(true);
@@ -412,7 +408,7 @@ class CanvasManager {
     }
 
     const hudLayout = hudLayoutForCanvas(viewport);
-    drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellites, satellitePickups);
+    drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups);
 
     drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
 

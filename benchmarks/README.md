@@ -72,8 +72,8 @@ are kept outside the timed result.
 The server runner fixes `Date.now()` and seeds `Math.random()` while retaining
 native `performance.now()` for tick timing. It creates two actual loopback human
 connections and two bots through the seeded engine. Natural authoritative
-simulation continues during warmup and measurement, so asteroid, loot, satellite,
-and pickup counts before and after are part of the result.
+simulation continues during warmup and measurement, so asteroid, loot, and
+satellite-pickup counts before and after are part of the result.
 
 The codec runner checks every decoded message against the original fixture state,
 including keyframes, deltas, and divergent recipient baselines. Its byte counts
@@ -212,7 +212,7 @@ statistics survive in `.performance/runner-*`, including build failures.
 
 Traversal prepares one human with the current ambient populations. Combat
 prepares five human pilots (one browser plus four real-protocol peers), two
-observed bots, 80 asteroids, six satellites, and two pickups. A private Unix
+observed bots, 80 asteroids, and six Earth-observation satellite pickups. A private Unix
 socket in the runner's temporary session directory validates the complete
 participant set before synchronous between-tick arrangement. It preserves human
 motion sessions, advances placement epochs through the existing authoritative

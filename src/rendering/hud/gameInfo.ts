@@ -64,7 +64,7 @@ export function drawScoreOverlay(
     ctx.fillText(gameStateManager.getKillMessage(), viewportWidth / 2, layout.killMessageY);
   }
   if (gameStateManager.hasPickupMessage()) {
-    ctx.fillStyle = PALETTE.SATELLITE_PICKUP;
+    ctx.fillStyle = PALETTE.SATELLITE;
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';

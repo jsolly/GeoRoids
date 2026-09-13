@@ -61,9 +61,9 @@ Warden links to a nearby friendly with a thin mint line (`#7DD3C8`). The recipie
 shows the same transparent shield ring as F. Keep the link distinct from the
 Hauler's cream cable and amber tip; never fill the shield disc.
 
-## EO satellite NPCs
+## EO satellite pickups
 
-The six ambient hostiles use the hardware outlines in `eo-satellites/`: Landsat 7, Terra, Aqua, GOES-16, ENVISAT and WorldView-3. Their common neutral lilac hull (`#C4B5FD`) and pale shot accents (`#E9D5FF`) distinguish them from both factions. Geometry lives in `src/entities/satellite/eoOutlines.ts`; the SVGs use the same paths.
+The six collectible hulls use the hardware outlines in `eo-satellites/`: Landsat 7, Terra, Aqua, GOES-16, ENVISAT and WorldView-3. Their common neutral lilac hull (`#C4B5FD`) distinguishes them from both factions. Geometry lives in `src/entities/satellite/eoOutlines.ts`; the SVGs use the same paths. The runtime treats these as orbiting pickups rather than firing NPCs.
 
 The source pack contained briefs but no EO vector assets. Codex completed the hardware drawings from those briefs during the September 7 takeover. The recovered UFO discs are historical references and are not the active renderer.
 

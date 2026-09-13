@@ -6,7 +6,6 @@ interface EoOutline {
   readonly lines: readonly (readonly number[])[];
   /** Center x/y and horizontal/vertical radii. */
   readonly ellipses: readonly (readonly [number, number, number, number])[];
-  readonly muzzle: readonly [number, number];
 }
 
 export const EO_OUTLINES = {
@@ -24,7 +23,6 @@ export const EO_OUTLINES = {
       [-3, 12, -3, 17],
     ],
     ellipses: [[0, -2, 3.5, 5]],
-    muzzle: [-3, 17],
   },
   terra: {
     name: 'Terra',
@@ -43,7 +41,6 @@ export const EO_OUTLINES = {
       [-10, 17, 2.5, 2],
       [-3, 17, 2.5, 2],
     ],
-    muzzle: [-6.5, 20],
   },
   aqua: {
     name: 'Aqua',
@@ -60,7 +57,6 @@ export const EO_OUTLINES = {
       [11, 10, 20, 10],
     ],
     ellipses: [[8, -8, 10, 6]],
-    muzzle: [12, -16],
   },
   'goes-16': {
     name: 'GOES-16',
@@ -78,7 +74,6 @@ export const EO_OUTLINES = {
       [7, 13, 7, 19],
     ],
     ellipses: [[5, 5, 3.5, 4]],
-    muzzle: [7, 19],
   },
   envisat: {
     name: 'ENVISAT',
@@ -96,7 +91,6 @@ export const EO_OUTLINES = {
       [3, 18, 3, 23],
     ],
     ellipses: [],
-    muzzle: [27, 1],
   },
   'worldview-3': {
     name: 'WorldView-3',
@@ -113,21 +107,18 @@ export const EO_OUTLINES = {
       [0, -27, 0, -31],
     ],
     ellipses: [[0, -24, 6, 3]],
-    muzzle: [0, -31],
   },
 } as const satisfies Record<string, EoOutline>;
 
 export type EoOutlineId = keyof typeof EO_OUTLINES;
 const EO_HULL_COLOR = '#C4B5FD';
-const EO_SHOT_COLOR = '#E9D5FF';
 
 export function drawEoSatelliteOutline(
   ctx: DrawingContext,
   typeId: EoOutlineId,
   radius: number,
   angle: number,
-  color: string,
-  firing: boolean
+  color: string
 ): void {
   if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(angle)) {
     return;
@@ -156,14 +147,6 @@ export function drawEoSatelliteOutline(
     ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   }
   ctx.stroke();
-  if (firing) {
-    const [x, y] = outline.muzzle;
-    ctx.strokeStyle = EO_SHOT_COLOR;
-    ctx.beginPath();
-    ctx.moveTo(x - 1.5, y);
-    ctx.lineTo(x + 1.5, y);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 

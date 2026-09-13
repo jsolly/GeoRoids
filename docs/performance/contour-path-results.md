@@ -65,7 +65,8 @@ anti-aliasing.
 
 The full-scene fixture exercised the actual GameController update/render path for
 23 steps with 24 actor witness records. It included the starfield, boundary, HUD,
-pilot, 24 asteroids, 6 loot items, 3 satellites, and 3 pickups. The four
+pilot, 24 asteroids, 6 loot items, 3 then-current hostile satellites, and 3
+pickups. Live play no longer has hostile satellite NPCs. The four
 baseline/candidate comparisons changed 52, 60, 29, and 37 pixels for stationary,
 cell-crossing, terrain-B replacement, and terrain-A return cases. Every changed
 pixel was inside a contour bound, with zero outside-contour pixels. The candidate

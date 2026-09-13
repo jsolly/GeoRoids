@@ -16,7 +16,7 @@ media:
 
 ## Shock pulse
 
-E spends fuel to push ships, rocks, loot, satellites, pickups, and shots within
+E spends fuel to push ships, rocks, loot, satellite pickups, and shots within
 its radial area. The blast reverses incoming motion and delivers strong outward
 knockback even near its edge. It pushes allies too and deals no direct damage;
 the tank must have enough fuel to fire. The blue expanding ring marks the

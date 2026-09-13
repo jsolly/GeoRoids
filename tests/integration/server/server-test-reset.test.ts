@@ -25,7 +25,6 @@ const emptyWorld = {
   bots: 0,
   asteroids: 0,
   loot: 0,
-  satellites: 0,
   satellitePickups: 0,
 };
 

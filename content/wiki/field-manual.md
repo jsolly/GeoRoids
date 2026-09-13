@@ -12,8 +12,8 @@ related:
 ---
 ## What the manual covers
 
-The field contains a moving asteroid belt, hostile Earth-observation satellite
-types, satellite pickups, sloping terrain, and pilots who can be assigned to
+The field contains a moving asteroid belt, Earth-observation satellite
+pickups, sloping terrain, and pilots who can be assigned to
 the ION or EMBER side. Choose a kit, learn its E ability, then read the arena
 entries for the rules that every pilot shares.
 

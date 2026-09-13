@@ -68,47 +68,21 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
       kind: i % 2 ? 'fuel' : 'shard',
       ...(i % 2 ? { fuel: 20 } : {}),
     })),
-    satellites: SATELLITE_PROFILES.map((profile, i) => ({
-      id: `eo-${i}`,
+    satellitePickups: SATELLITE_PROFILES.map((profile, i) => ({
+      id: `pickup-${i}`,
       name: profile.displayName,
       typeId: profile.typeId,
       assetKey: profile.assetKey,
-      shotManner: profile.shotManner,
-      position: { x: i * 120 + tick * 0.2, y: 900 },
-      velocity: { x: 0.2, y: 0 },
-      angle: tick * 0.02,
-      exploding: false,
-      color: profile.hullColor,
-      health: 50,
-      maxHealth: 50,
-      radius: 16,
-    })),
-    satellitePickups: (['echo', 'relay'] as const).map((typeId, i) => ({
-      id: `pickup-${i}`,
-      name: typeId === 'echo' ? 'Echo' : 'Relay',
-      typeId,
-      assetKey: `pickup/${typeId}`,
-      position: { x: 300 + i * 150, y: 550 + tick * 0.1 },
+      position: { x: 300 + i * 80, y: 550 + tick * 0.1 },
       velocity: { x: 0, y: 0.1 },
       angle: tick * 0.08,
-      radius: 9,
-      color: '#FBBF24',
+      radius: 12,
+      color: profile.hullColor,
       state: tick < 60 ? 'orbiting' : 'loose',
       ownerId: tick < 60 ? 'pilot-0' : null,
       health: 50,
       maxHealth: 50,
     })),
-    satelliteProjectiles:
-      tick % 120 < 90
-        ? SATELLITE_PROFILES.map((_, i) => ({
-            id: `shot-${Math.floor(tick / 120)}-${i}`,
-            shotId: `shot-${Math.floor(tick / 120)}-${i}`,
-            satelliteId: `eo-${i}`,
-            position: { x: i * 120 + (tick % 120) * 5, y: 920 },
-            velocity: { x: 5, y: 0 },
-            age: tick % 120,
-          }))
-        : [],
     playerProjectiles: [],
     collabTags:
       tick < 40

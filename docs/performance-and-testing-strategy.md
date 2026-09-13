@@ -125,8 +125,8 @@ Compare run-level results, not thousands of autocorrelated frames as independent
 | Scenario | Required activity | Primary risk |
 | --- | --- | --- |
 | Cold arrival and menu | Cold cache, font loading, animated title terrain, nickname entry, Play, successful and failed joins | Startup work, input delay, first-use stalls |
-| Ordinary arena | One local pilot, configured bots/asteroids/satellites, moving camera across mountain and boundary | Typical frame cost and gameplay correctness |
-| Loaded battle | Ten humans, 80 asteroids, 15 initial drops, configured satellites/pickups; sustained shots and explosions | Render/decode cost, combat interactions, allocation |
+| Ordinary arena | One local pilot, configured bots/asteroids/satellite pickups, moving camera across mountain and boundary | Typical frame cost and gameplay correctness |
+| Loaded battle | Ten humans, 80 asteroids, 15 initial drops, configured satellite pickups; sustained shots and explosions | Render/decode cost, combat interactions, allocation |
 | Dense visible battle | Concentrate entities and effects inside the viewport and sweep the camera | Offscreen fixtures can conceal expensive visible work |
 | Recovery burst | Disconnect, same-socket rejoin, resync, keyframe after pressure, background/resume | Baseline correctness, catch-up bursts, duplicate effects |
 | Long play | 30-minute desktop and mobile sessions, repeated death/respawn and join/leave | Memory leaks, thermal degradation, stale subscriptions |

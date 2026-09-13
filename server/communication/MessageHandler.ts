@@ -422,7 +422,7 @@ export class MessageHandler {
     const { targetPlayerId, attackerId } = command;
     logger.debug('handleCollisionDamage', { targetPlayerId });
 
-    // Ship↔asteroid, ship↔ship, and satellite hull damage are resolved in the
+    // Ship↔asteroid and ship↔ship damage are resolved in the
     // server game loop. This path is reserved for the client's boundary hit.
     if (!isClientOwnedCollisionAttacker(attackerId)) {
       return;

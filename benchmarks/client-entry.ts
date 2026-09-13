@@ -57,11 +57,11 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       const { canvasManager } = await import('../src/rendering/canvas');
       const { Roid } = await import('../src/entities/roid/Roid');
       const { LootField } = await import('../src/entities/loot/LootField');
-      const { SatelliteManager } = await import('../src/entities/satellite/SatelliteManager');
       const { SatellitePickupManager } = await import(
         '../src/entities/satellitePickup/SatellitePickupManager'
       );
       const { satelliteProfileAt } = await import('../shared/eoSatellites');
+      const { SATELLITE_PICKUP } = await import('../src/constants');
       const { ensureTerrain, getTerrainContours } = await import(
         '../src/physics/terrain/terrainSession'
       );
@@ -118,44 +118,29 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           kind: 'wreckage',
         }))
       );
-      const satellites = SatelliteManager.getInstance();
-      satellites.syncFromServer(
-        Array.from({ length: 3 }, (_, index) => {
+      const pickups = SatellitePickupManager.getInstance();
+      pickups.syncFromServer(
+        Array.from({ length: 6 }, (_, index) => {
           const profile = satelliteProfileAt(index);
           return {
-            id: `benchmark-satellite-${index}`,
+            id: `benchmark-pickup-${index}`,
             name: profile.displayName,
             typeId: profile.typeId,
             assetKey: profile.assetKey,
-            shotManner: profile.shotManner,
-            position: { x: -75 + index * 75, y: -70 },
+            position: {
+              x: -75 + (index % 3) * 75,
+              y: index < 3 ? -70 : 110,
+            },
             velocity: { x: 0, y: 0 },
             angle: index,
-            exploding: false,
+            radius: SATELLITE_PICKUP.SIZE / 2,
             color: profile.hullColor,
-            health: 100,
-            maxHealth: 100,
-            radius: 12,
+            state: 'loose' as const,
+            ownerId: null,
+            health: SATELLITE_PICKUP.HEALTH,
+            maxHealth: SATELLITE_PICKUP.HEALTH,
           };
         })
-      );
-      const pickups = SatellitePickupManager.getInstance();
-      pickups.syncFromServer(
-        Array.from({ length: 3 }, (_, index) => ({
-          id: `benchmark-pickup-${index}`,
-          name: 'Echo',
-          typeId: 'echo',
-          assetKey: 'pickup/echo',
-          position: { x: -75 + index * 75, y: 110 },
-          velocity: { x: 0, y: 0 },
-          angle: index,
-          radius: 8,
-          color: '#99ffaa',
-          state: 'loose',
-          ownerId: null,
-          health: 50,
-          maxHealth: 50,
-        }))
       );
       state.clearOverlay();
       ensureTerrain(options.seed);
@@ -199,9 +184,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             offsets: [...roid.offsets],
           })),
           loot: loot.getAll().map((item) => ({ id: item.id, position: { ...item.position } })),
-          satellites: satellites
-            .getAll()
-            .map((item) => ({ id: item.id, health: item.health, position: { ...item.position } })),
           pickups: pickups
             .getAll()
             .map((item) => ({ id: item.id, state: item.state, position: { ...item.position } })),
@@ -250,7 +232,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           ['localShip', [local.ship]],
           ['asteroid', belt.roids],
           ['loot', loot.getAll()],
-          ['satellite', satellites.getAll()],
           ['pickup', pickups.getAll()],
         ] satisfies [string, readonly object[]][]) {
           for (const actor of actors) {
@@ -365,32 +346,27 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         after.local.shieldCooldown !== 10 ||
         after.asteroids.length !== 24 ||
         after.loot.length !== 6 ||
-        after.satellites.length !== 3 ||
-        after.pickups.length !== 3
+        after.pickups.length !== 6
       ) {
         throw new Error('Visible fixture did not survive with its expected lifecycle outcome');
       }
       if (
         JSON.stringify(before.loot) !== JSON.stringify(after.loot) ||
-        JSON.stringify(before.satellites) !== JSON.stringify(after.satellites) ||
         JSON.stringify(before.pickups) !== JSON.stringify(after.pickups)
       ) {
         throw new Error('Fixture lost or changed a stationary scene participant');
       }
-      const visibleActors = [
-        ...after.asteroids,
-        ...after.loot,
-        ...after.satellites,
-        ...after.pickups,
-      ].filter((actor) => {
-        const screen = canvasManager.worldToScreen(actor.position, local.ship.position);
-        return (
-          screen.x >= 24 &&
-          screen.y >= 24 &&
-          screen.x <= canvas.width - 24 &&
-          screen.y <= canvas.height - 24
-        );
-      }).length;
+      const visibleActors = [...after.asteroids, ...after.loot, ...after.pickups].filter(
+        (actor) => {
+          const screen = canvasManager.worldToScreen(actor.position, local.ship.position);
+          return (
+            screen.x >= 24 &&
+            screen.y >= 24 &&
+            screen.x <= canvas.width - 24 &&
+            screen.y <= canvas.height - 24
+          );
+        }
+      ).length;
       if (visibleActors !== 36) {
         throw new Error('Fixture participants fell outside the visible playfield');
       }
@@ -467,7 +443,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           local.ship,
           belt.getRoids(),
           LootField.getInstance().getAll(),
-          SatelliteManager.getInstance().getAll(),
           SatellitePickupManager.getInstance().getAll()
         );
         drawScoreOverlay(ctx, layout, canvas, local.score, local.lives, local.factionId);
@@ -547,7 +522,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           remoteHumans: network.getRemotePlayers().length,
           asteroids: after.asteroids.length,
           loot: after.loot.length,
-          satellites: after.satellites.length,
           satellitePickups: after.pickups.length,
           visibleActorsExcludingPilot: visibleActors,
           ...measuredCalls,

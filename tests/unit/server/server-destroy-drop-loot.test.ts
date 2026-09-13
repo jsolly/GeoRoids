@@ -124,13 +124,8 @@ async function startWorld(): Promise<{
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
     server.gameEngine.removeAsteroid(asteroid.id);
   }
-  for (const satelliteSnapshot of server.gameEngine.getAllSatellites()) {
-    const satellite = server.gameEngine.getSatellite(satelliteSnapshot.id);
-    assert.ok(satellite, `live satellite ${satelliteSnapshot.id}`);
-    satellite.position = { x: -2_400, y: -2_400 };
-  }
+  server.gameEngine.parkSatellitePickups({ x: -2_400, y: -2_400 });
   expect(server.gameEngine.getLoot()).toEqual([]);
-  expect(server.gameEngine.getActiveSatelliteProjectiles()).toEqual([]);
 
   return { server, playerA, playerB, decoderA, decoderB };
 }

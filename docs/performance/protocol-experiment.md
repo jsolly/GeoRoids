@@ -16,7 +16,7 @@ npx tsx benchmarks/protocol-experiment.ts --seed 42 --warmup 30 --ticks 120
 
 The executable returns the shared `Measurement` shape as JSON. It reuses
 `tests/unit/network/snapshotFixture.ts` (10 entities, 80 asteroids, loot,
-satellites, pickups, and collaboration tags) and adds a representative
+satellite pickups, and collaboration tags) and adds a representative
 four-row active `playerProjectiles` collection, then warms up 30 evolving
 worlds and measures 120 worlds. Every decoded payload is compared with its
 source world. All encode, decode and

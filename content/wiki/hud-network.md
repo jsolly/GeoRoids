@@ -22,20 +22,20 @@ Shots, impacts, explosions, and thrust vary their pitch slightly each time they
 start, keeping repeated actions from sounding identical. A held thrust keeps a
 steady pitch until the next burst. Nearby action is louder; off-screen combat
 cues stay silent. Harpoons have launch, latch, and release cues. Orbital pickup
-and orbital fire sound different from ship lasers. Fuel, laser cores, and
+and pickup-break sounds differ from ship lasers. Fuel, laser cores, and
 material pickups have separate cues, as do kit abilities and respawning.
 
 The HUD shows lives as kit hull icons, score, faction label and mark, kit name,
 and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a
 minimap; touch layouts use a compact leaderboard and an adaptive minimap. The
 minimap shows
-your ship, other human pilots, bot pilots, asteroids, loot drops, hostile
-satellites, loose pickups, and orbiting pickups inside the arena ring. Compact
+your ship, other human pilots, bot pilots, asteroids, loot drops, loose
+satellite pickups, and orbiting pickups inside the arena ring. Compact
 marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, green crosses mark fuel,
-yellow slashed diamonds mark laser cores, purple crosses mark satellites, and
-amber circles and diamonds mark loose and orbiting pickups. Ship headings and
+yellow slashed diamonds mark laser cores, and lilac circles and diamonds mark
+loose and orbiting satellite pickups. Ship headings and
 faction marks keep pilots identifiable above the world marks. Kill and pickup
 messages appear in the center for 120 frames, or 2 seconds. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule

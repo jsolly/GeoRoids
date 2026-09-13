@@ -1,80 +1,12 @@
-import {
-  findNearestShieldImpact,
-  reflectProjectileVelocity,
-} from '../../../shared/shieldReflection';
 import { DAMAGE } from '../../constants';
-import type { Laser } from '../../entities/laser/Laser';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { canDealCombatDamage } from '../../entities/player/softFactions';
-import type { Satellite } from '../../entities/satellite/Satellite';
 import type { Ship } from '../../entities/ship/Ship';
-import {
-  isReadableShieldUp,
-  laserCollisionRadius,
-  noteReadableShieldLaserHit,
-} from '../../entities/ship/shipShield';
 import { applyShipBoundaryDeath, isShipCollisionImmune } from '../../entities/ship/shipUtils';
 import { NetworkManager } from '../../network/networkManager';
 import { logger } from '../../utils/Logger';
-import {
-  checkBoundaryCollision,
-  checkLaserShipCollision,
-  checkShipCollision,
-} from './collisionDetection';
-
-function reflectSatelliteLaserFromShield(
-  laser: Laser,
-  ship: Ship,
-  impact: ReturnType<typeof findNearestShieldImpact>
-): void {
-  const start = laser.prevPosition;
-  const end = laser.position;
-  const segmentDistance = Math.hypot(end.x - start.x, end.y - start.y);
-  if (impact && segmentDistance > 0) {
-    const remainingDistance = Math.max(0, segmentDistance - impact.distance);
-    laser.prevPosition = { ...impact.point };
-    laser.velocity = reflectProjectileVelocity(laser.velocity, impact.normal);
-    const speed = Math.hypot(laser.velocity.x, laser.velocity.y);
-    if (speed > 0) {
-      laser.position = {
-        x: impact.point.x + (laser.velocity.x / speed) * remainingDistance,
-        y: impact.point.y + (laser.velocity.y / speed) * remainingDistance,
-      };
-    } else {
-      laser.position = { ...impact.point };
-    }
-    laser.lastShieldId = ship.id;
-    laser.bounceCount += 1;
-    return;
-  }
-
-  // A snapshot can land a visual bolt exactly on a shield surface without a
-  // swept segment. Nudge it out along the radial normal while preserving speed.
-  const dx = laser.position.x - ship.position.x;
-  const dy = laser.position.y - ship.position.y;
-  const distance = Math.hypot(dx, dy);
-  const normal =
-    distance > 0
-      ? { x: dx / distance, y: dy / distance }
-      : {
-          x: -laser.velocity.x,
-          y: -laser.velocity.y,
-        };
-  const normalLength = Math.hypot(normal.x, normal.y);
-  if (normalLength <= 0) {
-    return;
-  }
-  const unitNormal = { x: normal.x / normalLength, y: normal.y / normalLength };
-  laser.velocity = reflectProjectileVelocity(laser.velocity, unitNormal);
-  laser.position = {
-    x: ship.position.x + unitNormal.x * (laserCollisionRadius(ship.r, ship) + 0.01),
-    y: ship.position.y + unitNormal.y * (laserCollisionRadius(ship.r, ship) + 0.01),
-  };
-  laser.prevPosition = { ...laser.position };
-  laser.lastShieldId = ship.id;
-  laser.bounceCount += 1;
-}
+import { checkBoundaryCollision, checkShipCollision } from './collisionDetection';
 
 export class CollisionManager {
   private static instance: CollisionManager;
@@ -189,62 +121,6 @@ export class CollisionManager {
   private factionForShip(ship: Ship): Player['factionId'] {
     const match = this.networkManager.getAllPlayers().find((player) => player.ship === ship);
     return match?.factionId;
-  }
-
-  checkSatelliteLaserCollisions(
-    satellites: Satellite[],
-    localShip: Ship,
-    _localPlayerId?: string
-  ): void {
-    if (!localShip || isShipCollisionImmune(localShip)) {
-      return;
-    }
-
-    for (const satellite of satellites) {
-      for (const laser of satellite.lasers) {
-        if (laser.hasExploded) {
-          continue;
-        }
-        if (isReadableShieldUp(localShip)) {
-          const impact = findNearestShieldImpact(
-            laser.prevPosition,
-            laser.position,
-            [
-              {
-                id: localShip.id,
-                position: localShip.position,
-                radius: laserCollisionRadius(localShip.r, localShip),
-              },
-            ],
-            laser.lastShieldId
-          );
-          const overlapping = checkLaserShipCollision(
-            laser.position,
-            localShip.position,
-            laserCollisionRadius(localShip.r, localShip)
-          );
-          if (impact || overlapping) {
-            noteReadableShieldLaserHit(localShip);
-            reflectSatelliteLaserFromShield(laser, localShip, impact);
-            laser.playHitSound();
-            return;
-          }
-        }
-        if (
-          checkLaserShipCollision(
-            laser.position,
-            localShip.position,
-            laserCollisionRadius(localShip.r, localShip)
-          )
-        ) {
-          // The server simulates EO projectiles and owns the damage result.
-          // This local overlap only removes the visual bolt at the same time.
-          laser.updateExplodeTime();
-          laser.playHitSound();
-          return;
-        }
-      }
-    }
   }
 
   /**

@@ -52,5 +52,5 @@ the recorded death cause, and the final-life state shows the game-over overlay.
 
 ## Score values
 
-Human kills, bot kills, satellites, asteroid breaks, shard pickups, and
+Human kills, bot kills, asteroid breaks, shard pickups, and
 satellite pickups each award their own score value.

@@ -10,7 +10,7 @@ function isClosed(socket: WebSocket): boolean {
 import { GameEngine } from '../server/core/GameEngine';
 import { ServerClock } from '../server/core/ServerClock';
 import { GAME_TICK_MS } from '../shared/gameClock';
-import type { Position, SatelliteData, ServerGameState } from '../shared-types';
+import type { Position, SatellitePickupData, ServerGameState } from '../shared-types';
 import type { Measurement } from './results';
 
 const LOOPBACK_TIMEOUT_MS = 5_000;
@@ -151,12 +151,7 @@ function validateDiagnostics(
       `Expected ${expectedBots} bots after measurement, observed ${diagnostics.bots}`
     );
   }
-  if (
-    diagnostics.bots < 0 ||
-    diagnostics.asteroids < 0 ||
-    diagnostics.satellites < 0 ||
-    diagnostics.satellitePickups < 0
-  ) {
+  if (diagnostics.bots < 0 || diagnostics.asteroids < 0 || diagnostics.satellitePickups < 0) {
     throw new Error('Server diagnostics contained an invalid negative entity count');
   }
 }
@@ -172,7 +167,6 @@ function validateStateScene(state: ServerGameState, diagnostics: Diagnostics): v
     ['bots', botEntities, diagnostics.bots],
     ['asteroids', state.asteroids.length, diagnostics.asteroids],
     ['loot', state.loot.length, diagnostics.loot],
-    ['satellites', state.satellites.length, diagnostics.satellites],
     ['satellite pickups', state.satellitePickups.length, diagnostics.satellitePickups],
   ] as const;
   for (const [label, observed, expected] of counts) {
@@ -184,20 +178,22 @@ function validateStateScene(state: ServerGameState, diagnostics: Diagnostics): v
   }
 }
 
-function validateSatelliteAccess(engine: GameEngine): SatelliteData {
-  const detached = engine.getAllSatellites()[0];
+function validatePickupAccess(engine: GameEngine): SatellitePickupData {
+  const detached = engine.getAllSatellitePickups()[0];
   if (!detached) {
-    throw new Error('Seeded server fixture did not create a satellite');
+    throw new Error('Seeded server fixture did not create a satellite pickup');
   }
-  const live = engine.getSatellite(detached.id);
-  if (!live || engine.getSatellite(detached.id) !== live) {
-    throw new Error(`Satellite ${detached.id} is not returned as a stable live actor`);
+  const viaGet = engine.getSatellitePickup(detached.id);
+  if (!viaGet) {
+    throw new Error(`Satellite pickup ${detached.id} is missing`);
   }
   const before = structuredClone(detached);
-  const liveX = live.position.x;
+  const liveX = viaGet.position.x;
   detached.position.x += 1;
-  if (live.position.x !== liveX) {
-    throw new Error('getAllSatellites returned a live satellite position');
+  viaGet.position.x += 1;
+  const again = engine.getSatellitePickup(detached.id);
+  if (!again || again.position.x !== liveX) {
+    throw new Error('Satellite pickup accessors returned a live pickup position');
   }
   return before;
 }
@@ -369,8 +365,8 @@ export async function runServerSample(
     assert.equal(before.loot, 0, 'Server fixture must begin with no fabricated loot');
     const beforeState = stateSnapshot(engine);
     validateStateScene(beforeState, before);
-    const satelliteBefore = validateSatelliteAccess(engine);
-    const satelliteId = satelliteBefore.id;
+    const pickupBefore = validatePickupAccess(engine);
+    const pickupId = pickupBefore.id;
 
     for (let index = 0; index < options.warmupTicks; index++) {
       advanceTick(engine, clock);
@@ -395,15 +391,13 @@ export async function runServerSample(
     validateParticipantPresence(engine, peers, participantIds);
     const afterState = stateSnapshot(engine);
     validateStateScene(afterState, after);
-    const liveSatellite = engine.getSatellite(satelliteId);
-    if (!liveSatellite) {
-      throw new Error(`Satellite ${satelliteId} disappeared during measurement`);
+    const livePickup = engine.getSatellitePickup(pickupId);
+    if (!livePickup) {
+      throw new Error(`Satellite pickup ${pickupId} disappeared during measurement`);
     }
-    const satelliteAfter = engine
-      .getAllSatellites()
-      .find((satellite) => satellite.id === satelliteId);
-    if (!satelliteAfter) {
-      throw new Error(`Detached satellite ${satelliteId} disappeared during measurement`);
+    const pickupAfter = engine.getAllSatellitePickups().find((pickup) => pickup.id === pickupId);
+    if (!pickupAfter) {
+      throw new Error(`Detached satellite pickup ${pickupId} disappeared during measurement`);
     }
     const witness = outcomeWitness({
       before,
@@ -411,7 +405,7 @@ export async function runServerSample(
       beforeState,
       afterState,
       participantIds,
-      satellite: { before: satelliteBefore, after: satelliteAfter },
+      pickup: { before: pickupBefore, after: pickupAfter },
     });
     result = {
       primaryMetric: 'advanceOneFrame-ms',
@@ -427,8 +421,6 @@ export async function runServerSample(
         asteroidsAfter: after.asteroids,
         lootBefore: before.loot,
         lootAfter: after.loot,
-        satellitesBefore: before.satellites,
-        satellitesAfter: after.satellites,
         satellitePickupsBefore: before.satellitePickups,
         satellitePickupsAfter: after.satellitePickups,
       },

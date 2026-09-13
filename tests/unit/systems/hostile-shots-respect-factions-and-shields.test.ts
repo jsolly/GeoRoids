@@ -21,11 +21,7 @@ function arena(faction: SoftFactionId = 'ember', kit: 'dart' | 'warden' = 'dart'
   for (const bot of engine.getAllBots()) {
     engine.removeBot(bot.id);
   }
-  for (const satellite of engine.getAllSatellites()) {
-    const row = engine.getSatellite(satellite.id);
-    assert(row);
-    row.position = { x: 20000, y: 20000 };
-  }
+  engine.parkSatellitePickups();
   const attacker = engine.addPlayer(
     'attacker',
     'Attacker',

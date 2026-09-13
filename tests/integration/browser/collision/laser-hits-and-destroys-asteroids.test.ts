@@ -31,18 +31,18 @@ test(
     );
     await game.bootGame();
     await game.waitForCombatReady();
-    // Keep ambient satellite encounters out of the score baseline while choosing a target.
+    // Keep satellite pickups out of the score baseline while choosing a target.
     await game.placeShipAt(-1800, -1800);
     await game.waitForAsteroids(1);
 
     const initialScore = await game.getScore();
-    const [asteroids, satellites, bots] = await Promise.all([
+    const [asteroids, pickups, bots] = await Promise.all([
       game.getAsteroidPositions(),
-      game.getSatellites(),
+      game.getSatellitePickups(),
       game.getBots(),
     ]);
     const hazards = [
-      ...satellites.map((satellite) => ({ x: satellite.x, y: satellite.y })),
+      ...pickups.map((pickup) => ({ x: pickup.x, y: pickup.y })),
       ...bots
         .filter((bot) => bot.health > 0 && !bot.exploding)
         .map((bot) => ({ x: bot.x, y: bot.y })),

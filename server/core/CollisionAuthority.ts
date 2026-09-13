@@ -8,7 +8,7 @@ import {
   shouldApplyShipShipTick,
 } from '../../shared/combat';
 import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
-import type { AsteroidData, SatelliteData, SatellitePickupData } from '../../shared-types';
+import type { AsteroidData, SatellitePickupData } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
 
 function toCombatCircle(entity: GameEntity): CombatCircle {
@@ -45,21 +45,6 @@ export class CollisionAuthority {
       })),
       shouldSkip
     );
-  }
-
-  public collectShipSatelliteHits(
-    entities: GameEntity[],
-    satellites: SatelliteData[]
-  ): Array<{ shipId: string; satelliteId: string }> {
-    const living = satellites.filter((satellite) => !satellite.exploding && satellite.health > 0);
-    return findShipAsteroidOverlaps(
-      entities.map(toCombatCircle),
-      living.map((satellite) => ({
-        id: satellite.id,
-        position: satellite.position,
-        radius: satellite.radius,
-      }))
-    ).map((hit) => ({ shipId: hit.shipId, satelliteId: hit.asteroidId }));
   }
 
   public collectAsteroidPickupHits(

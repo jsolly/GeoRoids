@@ -49,11 +49,7 @@ test('both pilots see the same delayed health recovery after a hostile laser hit
     for (const bot of engine.getAllBots()) {
       engine.removeBot(bot.id);
     }
-    for (const row of engine.getAllSatellites()) {
-      const satellite = engine.getSatellite(row.id);
-      assert.ok(satellite);
-      satellite.position = { x: 1000, y: 1000 };
-    }
+    engine.parkSatellitePickups({ x: 1000, y: 1000 });
     const lives = target.lives;
     const maxHealth = target.maxHealth;
     expect(target.health).toBe(SHIP.MAX_HEALTH);

@@ -145,10 +145,6 @@ function findBotDuelLane(
         position: entity.position,
         radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
       })),
-    ...gameEngine
-      .getAllSatellites()
-      .filter((satellite) => satellite.health > 0 && !satellite.exploding)
-      .map((satellite) => ({ position: satellite.position, radius: satellite.radius })),
     ...gameEngine.getLoot().map((loot) => ({ position: loot.position, radius: loot.radius })),
   ];
 

@@ -26,8 +26,9 @@ bots.
 Once both ships have a side, direct shots and ship collision damage from the
 same faction do no damage; hostile ships can hurt you. An unassigned side does
 not receive that same-faction protection. Asteroids, boundary damage, and
-other environmental sources remain dangerous regardless of side. Satellites
-are hostile to every faction. A reflected laser is marked as a ricochet and
+other environmental sources remain dangerous regardless of side. Satellite
+pickups intercept shots and rocks for their owner; they do not deal faction
+damage. A reflected laser is marked as a ricochet and
 can damage its originating pilot or a same-faction pilot after it bounces.
 Exploding loot also hurts allies and the shooter. Hauler E skips allied ships,
 but Quake can push allies without damaging them.

@@ -15,7 +15,6 @@ const cleanWorld = {
   bots: 0,
   asteroids: 0,
   loot: 0,
-  satellites: 0,
   satellitePickups: 0,
 };
 
@@ -95,7 +94,7 @@ test.each([
   expect(fetchSpy).toHaveBeenCalledTimes(1);
 });
 
-test.each(['bots', 'asteroids', 'loot', 'satellites', 'satellitePickups'] as const)(
+test.each(['bots', 'asteroids', 'loot', 'satellitePickups'] as const)(
   'remaining %s prevents a clean-world verdict',
   (field) => {
     expect(isWorldClean({ ...cleanWorld, [field]: 1 })).toBe(false);

@@ -63,7 +63,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   quake: {
     title: 'Quake shock pulse',
-    alt: 'A Quake emits a blue expanding pulse that reaches and pushes a second ship while rocks, loot, satellites, pickups, and shots scatter.',
+    alt: 'A Quake emits a blue expanding pulse that reaches and pushes a second ship while rocks, loot, satellite pickups, and shots scatter.',
     caption:
       'Controlled demonstration: press E to spend fuel and push nearby physical objects outward. The pulse reaches its target without dealing direct damage.',
     sources: [
@@ -72,7 +72,6 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/quakePulseRenderer.ts',
       'server/core/GameEngine.ts',
       'server/core/LootManager.ts',
-      'server/core/SatelliteManager.ts',
       'server/core/SatellitePickupManager.ts',
       'src/constants/index.ts',
       'src/entities/ship/hullOutlines.ts',
@@ -145,28 +144,28 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   satellites: {
-    title: 'EO satellite patrol',
-    alt: 'Six separate satellite views show patrol motion and projectiles from each firing pattern.',
+    title: 'EO satellite pickups',
+    alt: 'Six separate satellite views show the Earth-observation hulls drifting as collectible pickups.',
     caption:
-      'Controlled demonstration: six separate views compare real satellite patrols and firing patterns. The first volleys start together for comparison.',
+      'Controlled demonstration: six separate views compare the live Earth-observation pickup hulls. They drift as collectible hardware rather than firing.',
     sources: [
       'shared/eoSatellites.ts',
-      'server/core/SatelliteManager.ts',
+      'server/core/SatellitePickupManager.ts',
       'scripts/wiki-satellite-demo.ts',
-      'src/entities/satellite/satelliteMath.ts',
       'src/entities/satellite/eoOutlines.ts',
     ],
   },
   pickups: {
     title: 'Satellite pickup orbit',
-    alt: 'An Echo pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a hostile laser.',
+    alt: 'A Landsat 7 pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a hostile laser.',
     caption:
-      'Controlled demonstration: a nearby Echo attaches automatically, keeps orbiting while a hostile laser removes 25 health, and remains active after the hit.',
+      'Controlled demonstration: a nearby Landsat 7 attaches automatically, keeps orbiting while a hostile laser removes 25 health, and remains active after the hit.',
     sources: [
       'server/core/SatellitePickupManager.ts',
       'src/constants/index.ts',
       'src/entities/satellitePickup/satellitePickupMath.ts',
       'src/entities/satellitePickup/satellitePickupRenderer.ts',
+      'src/entities/satellite/eoOutlines.ts',
     ],
   },
 };

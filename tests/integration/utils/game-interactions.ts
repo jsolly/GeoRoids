@@ -524,156 +524,6 @@ export class GameInteractions {
     });
   }
 
-  /** Snapshot of all satellites the client currently knows about. */
-  async getSatellites(): Promise<
-    Array<{
-      id: string;
-      name: string;
-      x: number;
-      y: number;
-      health: number;
-      maxHealth: number;
-      exploding: boolean;
-      r: number;
-      laserCount: number;
-    }>
-  > {
-    return await this.page.evaluate(() => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('gameController is not available');
-      }
-      const satellites = gc.getSatellites();
-      return satellites.map((sat) => ({
-        id: sat.id,
-        name: sat.name,
-        x: sat.position.x,
-        y: sat.position.y,
-        health: sat.health,
-        maxHealth: sat.maxHealth,
-        exploding: sat.exploding,
-        r: sat.radius,
-        laserCount: sat.lasers?.length ?? 0,
-      }));
-    });
-  }
-
-  /** Wait until at least `count` satellites are known to the client. */
-  async waitForSatellites(count: number, timeoutMs = 25000): Promise<void> {
-    await this.page.waitForFunction(
-      (expected) => {
-        const gc = window.gameController;
-        return gc ? gc.getSatellites().length >= expected : false;
-      },
-      count,
-      { timeout: timeoutMs }
-    );
-  }
-
-  async attackSatelliteWithLasers(
-    satelliteId: string,
-    shots = 8
-  ): Promise<{ minHealthObserved: number; everExploding: boolean; scoreGain: number }> {
-    const startScore = await this.getScore();
-    let minHealthObserved = Number.POSITIVE_INFINITY;
-    let everExploding = false;
-
-    for (let i = 0; i < shots; i++) {
-      const sample = await this.page.evaluate((id) => {
-        const gc = window.gameController;
-        if (!gc) {
-          throw new Error('gameController is not available');
-        }
-        const sat = gc?.getSatellites().find((s) => s.id === id);
-        const ship = gc.getPlayerManager().getLocalPlayer()?.ship;
-        if (!sat) {
-          return null;
-        }
-        if (!ship) {
-          throw new Error('No local ship available');
-        }
-        return {
-          health: sat.health,
-          exploding: sat.exploding,
-          firingPoint: { x: sat.position.x - 45, y: sat.position.y },
-        };
-      }, satelliteId);
-
-      if (sample) {
-        await this.placeShipAt(sample.firingPoint.x, sample.firingPoint.y);
-        await this.armSpawnProtection();
-        await this.page.evaluate((id) => {
-          const gc = window.gameController;
-          if (!gc) {
-            throw new Error('gameController is not available');
-          }
-          const sat = gc.getSatellites().find((s) => s.id === id);
-          const ship = gc.getPlayerManager().getLocalPlayer()?.ship;
-          if (!sat || sat.health <= 0 || sat.exploding) {
-            return;
-          }
-          if (!ship) {
-            throw new Error('No local ship available');
-          }
-          ship.angle = Math.atan2(
-            -(sat.position.y - ship.position.y),
-            sat.position.x - ship.position.x
-          );
-          ship.canShoot = true;
-          ship.shoot();
-        }, satelliteId);
-        minHealthObserved = Math.min(minHealthObserved, sample.health);
-        everExploding = everExploding || sample.exploding;
-      }
-      await this.page.waitForTimeout(160);
-
-      const after = await this.page.evaluate((id) => {
-        const gc = window.gameController;
-        if (!gc) {
-          throw new Error('gameController is not available');
-        }
-        const sat = gc.getSatellites().find((s) => s.id === id);
-        return sat ? { health: sat.health, exploding: sat.exploding } : null;
-      }, satelliteId);
-      if (after) {
-        minHealthObserved = Math.min(minHealthObserved, after.health);
-        everExploding = everExploding || after.exploding;
-        if (after.exploding || after.health <= 0) {
-          break;
-        }
-      }
-    }
-
-    const endScore = await this.getScore();
-    if (!Number.isFinite(minHealthObserved)) {
-      throw new Error(`No live health observation was available for satellite ${satelliteId}`);
-    }
-    return {
-      minHealthObserved,
-      everExploding,
-      scoreGain: endScore - startScore,
-    };
-  }
-
-  async pinShipOnSatellite(satelliteId: string, durationMs = 2500): Promise<void> {
-    const deadline = Date.now() + durationMs;
-    while (Date.now() < deadline) {
-      const position = await this.page.evaluate((id) => {
-        const gc = window.gameController;
-        if (!gc) {
-          throw new Error('gameController is not available');
-        }
-        const sat = gc.getSatellites().find((s) => s.id === id);
-        return sat ? { x: sat.position.x, y: sat.position.y } : null;
-      }, satelliteId);
-      if (!position) {
-        return;
-      }
-      await this.placeShipAt(position.x, position.y);
-      await this.page.waitForTimeout(100);
-    }
-  }
-
   /** Snapshot of all bots the client currently knows about. */
   async getBots(): Promise<
     Array<{
@@ -1238,23 +1088,13 @@ export class GameInteractions {
             throw new Error('gameController is not available');
           }
           const players = gc.getNetworkManager().getAllPlayers();
-          const satellites = gc.getSatellites();
-          return [
-            ...players
-              .filter((player) => player.ship.health > 0 && !player.ship.exploding)
-              .map((player) => ({
-                x: player.ship.position.x,
-                y: player.ship.position.y,
-                radius: player.ship.r,
-              })),
-            ...satellites
-              .filter((satellite) => satellite.health > 0 && !satellite.exploding)
-              .map((satellite) => ({
-                x: satellite.position.x,
-                y: satellite.position.y,
-                radius: satellite.radius,
-              })),
-          ];
+          return players
+            .filter((player) => player.ship.health > 0 && !player.ship.exploding)
+            .map((player) => ({
+              x: player.ship.position.x,
+              y: player.ship.position.y,
+              radius: player.ship.r,
+            }));
         }),
       ]);
       const actorClearance = (candidate: (typeof field)[number]) =>

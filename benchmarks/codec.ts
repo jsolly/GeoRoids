@@ -21,8 +21,6 @@ const FULL_FIXTURE_KEYS = [
   'loot',
   'playerProjectiles',
   'satellitePickups',
-  'satelliteProjectiles',
-  'satellites',
   'terrainSeed',
 ];
 const BASELINE_PATTERNS: readonly BaselinePattern[] = ['shared', 'staggered'];

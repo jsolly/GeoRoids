@@ -22,9 +22,10 @@ polygons. Invalid off-path geometry still throws.
 Three A/A controls and three alternating A/B comparisons execute the real
 `GameEngine` and `GameStateBroadcaster`. Each fresh process uses seed 42,
 300 warmup ticks and 600 measured ticks, with periodic broadcasts every second
-tick. The initial world has 10 human participants, two bots, 80 asteroids,
-six satellites and two pickups. Human pilots offer regular shots while the
-ordinary bot, collision, asteroid, death and respawn paths advance.
+tick. The initial world had 10 human participants, two bots, 80 asteroids,
+six hostile satellites and two pickups. Human pilots offer regular shots while the
+ordinary bot, collision, asteroid, death and respawn paths advance. That fixture
+predates the pickup-only satellite roster.
 
 During measurement, all ten participants remain present, seven to ten are alive,
 59–71 asteroids remain and 25–75 player projectiles are active. Every human has

@@ -10,17 +10,7 @@ import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { GROWTH } from '../../shared/shipGrowth';
-import {
-  DAMAGE,
-  FUEL,
-  GAME,
-  ROID,
-  SATELLITE,
-  SATELLITE_PICKUP,
-  SHIELD,
-  SHIP,
-  SHOCKWAVE,
-} from '../constants';
+import { DAMAGE, FUEL, GAME, ROID, SATELLITE_PICKUP, SHIELD, SHIP, SHOCKWAVE } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS, type ShipKitId } from '../entities/ship/shipKits';
 import { SKIRMISHER_RING_COUNT } from '../entities/ship/skirmisherRing';
 import { getGameBoundary } from '../physics/boundary';
@@ -40,17 +30,8 @@ function shipStats(id: ShipKitId): string {
 }
 
 function satelliteProfiles(): string[] {
-  const patterns: Record<string, string> = {
-    steady: 'a steady, aimed single shot',
-    'wide-sweep': 'a three-shot fan that sweeps a wide angle',
-    'spin-burst': 'a rotating six-shot burst',
-    'weather-beam': 'four fast shots along one narrow line',
-    'radar-sweep': 'a two-shot sweep',
-    'precision-stab': 'a fast, tightly aimed single shot',
-  };
   return SATELLITE_PROFILES.map(
-    (profile) =>
-      `${profile.displayName}: ${patterns[profile.shotPattern] ?? profile.shotPattern}; volley every ${(profile.cadenceFrames / GAME.FPS).toFixed(2)} seconds (${profile.cadenceFrames} frames); projectile speed ${profile.speedMultiplier}× normal satellite shot speed.`
+    (profile) => `${profile.displayName}: collectible ${profile.typeId} hull (${profile.assetKey}).`
   );
 }
 
@@ -60,7 +41,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Current values',
       paragraphs: [
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
-        `Ambient satellite profiles: ${SATELLITE_PROFILES.length}.`,
+        `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
       ],
     },
   ],
@@ -182,12 +163,6 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: satelliteProfiles(),
     },
     {
-      heading: 'Satellite values',
-      paragraphs: [
-        `Ambient count: ${SATELLITE.AMBIENT_COUNT}; health: ${SATELLITE.HEALTH}; destruction score: ${SATELLITE.POINTS}; collision damage: ${SATELLITE.COLLISION_DAMAGE}; projectile lifetime: ${SATELLITE.PROJECTILE_MAX_FRAMES} frames. Satellites are repositioned beyond ${SATELLITE.DESPAWN_DISTANCE} units and stay within a ${SATELLITE.BOUNDARY_RADIUS} unit boundary. Explosion duration is ${SATELLITE.EXPLODE_DURATION_FRAMES} frames and respawn delay is ${SATELLITE.RESPAWN_FRAMES} frames.`,
-      ],
-    },
-    {
       heading: 'Pickup values',
       paragraphs: [
         `Loose pickup maximum: ${SATELLITE_PICKUP.MAX_COUNT}; pickup field radius: ${SATELLITE_PICKUP.FIELD_RADIUS}; collection score: ${SATELLITE_PICKUP.SCORE_BONUS}; automatic collection range: ${SATELLITE_PICKUP.AUTO_COLLECT_RANGE}; health: ${SATELLITE_PICKUP.HEALTH}; minimum owner orbit radius: ${SATELLITE_PICKUP.ORBIT_RADIUS}; hull gap: ${SATELLITE_PICKUP.ORBIT_GAP}; broken pickup respawn: ${frameValue(SATELLITE_PICKUP.RESPAWN_FRAMES)}.`,
@@ -220,7 +195,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Score values',
       paragraphs: [
-        `Kill score: human ${KILL_SCORE.human}, bot ${KILL_SCORE.bot}. Satellite score: ${SATELLITE.POINTS}. Asteroid score: large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, small ${ROID.POINTS_SMALL}. Shard score: ${GROWTH.SHARD_SCORE}. Satellite pickup score: ${SATELLITE_PICKUP.SCORE_BONUS}.`,
+        `Kill score: human ${KILL_SCORE.human}, bot ${KILL_SCORE.bot}. Asteroid score: large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, small ${ROID.POINTS_SMALL}. Shard score: ${GROWTH.SHARD_SCORE}. Satellite pickup score: ${SATELLITE_PICKUP.SCORE_BONUS}.`,
       ],
     },
   ],

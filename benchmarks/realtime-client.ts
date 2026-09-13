@@ -1412,7 +1412,6 @@ try {
               humans: state.entities.filter((entity) => entity.type === 'human'),
               bots: state.entities.filter((entity) => entity.type === 'bot'),
               asteroids: state.asteroids,
-              satellites: state.satellites,
               pickups: state.satellitePickups,
               projectiles: state.playerProjectiles,
             };

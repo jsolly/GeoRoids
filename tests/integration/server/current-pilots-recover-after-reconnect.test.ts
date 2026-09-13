@@ -7,7 +7,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
-import { ROID, SATELLITE } from '../../../src/constants';
+import { ROID } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
 
 let cleanup: (() => Promise<void>) | undefined;
@@ -117,15 +117,17 @@ test('current sockets render matching worlds across late join and reconnect', as
   const second = await pilot('second');
   // Seed a real active shot and a normal large ice rock's cooperative window.
   // These must survive reconnect even when the one-shot event was missed.
-  const satellite = engine.getAllSatellites()[0];
   const firstPlayer = engine.getPlayer('first');
   const secondPlayer = engine.getPlayer('second');
-  assert.ok(satellite && firstPlayer && secondPlayer);
-  firstPlayer.position = { x: satellite.position.x + 180, y: satellite.position.y };
-  for (let frame = 0; frame < 240 && engine.getActiveSatelliteProjectiles().length === 0; frame++) {
-    engine.tickSatellites();
-  }
-  expect(engine.getActiveSatelliteProjectiles().length).toBeGreaterThan(0);
+  assert.ok(firstPlayer && secondPlayer);
+  const shot = engine.spawnLaser(
+    'first',
+    { x: firstPlayer.position.x + 20, y: firstPlayer.position.y },
+    { x: 8, y: 0 }
+  );
+  assert.ok(shot);
+  expect(engine.getPlayerProjectiles().length).toBeGreaterThan(0);
+  expect(engine.getAllSatellitePickups()).toHaveLength(6);
   const rockFixture = snapshotFixture().asteroids[0];
   assert.ok(rockFixture);
   const rock = {
@@ -144,17 +146,15 @@ test('current sockets render matching worlds across late join and reconnect', as
     const complete = new SnapshotEncoder({
       ...engine.getGameState(),
       playerProjectiles: engine.getPlayerProjectiles(),
-      satelliteProjectiles: engine
-        .getActiveSatelliteProjectiles()
-        .map((shot) => ({ id: shot.shotId, ...shot })),
       collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
     }).state;
     await expect.poll(() => first.state()).toEqual(complete);
     await expect.poll(() => second.state()).toEqual(complete);
   }
   expect(first.messages.some((message) => message.type === 'snapshot')).toBe(true);
-  expect(first.state()).toHaveProperty('satelliteProjectiles');
+  expect(first.state()).toHaveProperty('playerProjectiles');
   expect(first.state()).toHaveProperty('collabTags');
+  expect(first.state()).toHaveProperty('satellitePickups');
   expect(failures).toEqual([]);
   const joined = second.messages.find((message) => message.type === 'joined')?.data;
   assert.ok(joined && typeof joined === 'object' && 'resumeToken' in joined);
@@ -176,17 +176,15 @@ test('current sockets render matching worlds across late join and reconnect', as
   expect(engine.getPlayer('untrusted-replacement-id')).toBeUndefined();
   const recovered = reconnected.snapshot();
   assert.ok(recovered, 'Expected a decoded reconnect snapshot');
-  expect(recovered.satelliteProjectiles.length).toBeGreaterThan(0);
+  expect(recovered.playerProjectiles.length).toBeGreaterThan(0);
   expect(recovered.collabTags.map((tag) => tag.asteroidId)).toContain(rock.id);
+  expect(recovered.satellitePickups).toHaveLength(6);
   const firstFrame = reconnected.messages.find((message) => message.type === 'snapshot');
   assert.ok(firstFrame);
   expect(firstFrame.data).toMatchObject({
     kind: 'keyframe',
     sequence: 1,
   });
-  for (const eo of engine.getAllSatellites()) {
-    engine.handleSatelliteDamage(eo.id, 'first', SATELLITE.HEALTH);
-  }
   engine.removeAsteroid(rock.id);
   reconnected.socket.send(JSON.stringify({ type: 'snapshotResync' }));
   const pong = once(reconnected.socket, 'pong', { signal: AbortSignal.timeout(2_000) });
@@ -201,7 +199,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   ).toMatchObject({ kind: 'keyframe' });
   const resynced = reconnected.snapshot();
   assert.ok(resynced);
-  expect(resynced.satelliteProjectiles).toEqual([]);
   expect(resynced.collabTags).toEqual([]);
+  expect(resynced.satellitePickups).toHaveLength(6);
   expect(failures).toEqual([]);
 });

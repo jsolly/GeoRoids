@@ -41,8 +41,9 @@ uses per-message raw DEFLATE at level 6/window 15 without context reuse. These
 compressed sizes are hypothetical, not observed wire bytes.
 
 Histories are synthetic: ten human/bot rows, up to 80 asteroids, 15 loot drops,
-six satellites, two pickups and two to four player shots. They are not production
-replays or phone measurements. Both short batches completed in quiet windows
+six then-current hostile satellites, two pickups and two to four player shots.
+They are not production replays or phone measurements. Live play no longer has
+hostile satellite NPCs. Both short batches completed in quiet windows
 with successful exit status and raw samples retained.
 
 ## Correctness and provenance

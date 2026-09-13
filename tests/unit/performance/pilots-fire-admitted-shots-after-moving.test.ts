@@ -33,11 +33,7 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     for (const rock of server.gameEngine.getAllAsteroids()) {
       server.gameEngine.removeAsteroid(rock.id);
     }
-    for (const { id } of server.gameEngine.getAllSatellites()) {
-      const satellite = server.gameEngine.getSatellite(id);
-      assert(satellite);
-      satellite.position = { x: -2400, y: -2400 };
-    }
+    server.gameEngine.parkSatellitePickups({ x: -2400, y: -2400 });
     const barrier = async () => {
       const pong = once(pilot.socket, 'pong', { signal: AbortSignal.timeout(2000) });
       pilot.socket.ping();

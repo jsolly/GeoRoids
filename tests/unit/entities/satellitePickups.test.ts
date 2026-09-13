@@ -56,20 +56,31 @@ describe('Satellite pickups', () => {
     addPilot();
     const state = gameEngine.getGameState();
 
-    expect(state.satellitePickups).toHaveLength(2);
+    expect(state.satellitePickups).toHaveLength(6);
     expect(state.satellitePickups?.[0]?.id).toMatch(/^server-pickup-/);
-    expect(state.satellitePickups?.map((pickup) => pickup.typeId)).toEqual(['echo', 'relay']);
+    expect(state.satellitePickups?.map((pickup) => pickup.typeId)).toEqual([
+      'landsat-7',
+      'terra',
+      'aqua',
+      'goes-16',
+      'envisat',
+      'worldview-3',
+    ]);
     expect(state.satellitePickups?.map((pickup) => pickup.assetKey)).toEqual([
-      'pickup/echo',
-      'pickup/relay',
+      'eo/landsat-7',
+      'eo/terra',
+      'eo/aqua',
+      'eo/goes-16',
+      'eo/envisat',
+      'eo/worldview-3',
     ]);
     expect(state.satellitePickups?.[0]?.state).toBe('loose');
     expect(state.satellitePickups?.[0]?.health).toBe(SATELLITE_PICKUP.HEALTH);
     expect(state.satellitePickups?.[0]?.maxHealth).toBe(SATELLITE_PICKUP.HEALTH);
-    expect(state.satellitePickups?.[0]?.color.toLowerCase()).toBe('#fbbf24');
+    expect(state.satellitePickups?.[0]?.color.toLowerCase()).toBe('#c4b5fd');
     expect(state.loot).toEqual([]);
     expect(gameEngine.getDiagnostics().loot).toBe(0);
-    expect(gameEngine.getDiagnostics().satellitePickups).toBe(2);
+    expect(gameEngine.getDiagnostics().satellitePickups).toBe(6);
   });
 
   test('a reasonably close human is collected automatically and receives only the score bonus', () => {
@@ -129,8 +140,12 @@ describe('Satellite pickups', () => {
     assert.ok(secondAttached);
     expect(firstAttached.ownerId).toBe('pilot');
     expect(secondAttached.ownerId).toBe('pilot');
-    expect(Math.abs(secondAttached.position.x - firstAttached.position.x)).toBeGreaterThan(50);
-    expect(Math.abs(secondAttached.position.y - firstAttached.position.y)).toBeGreaterThan(1);
+    expect(
+      Math.hypot(
+        secondAttached.position.x - firstAttached.position.x,
+        secondAttached.position.y - firstAttached.position.y
+      )
+    ).toBeGreaterThan(40);
   });
 
   test('two ordinary physical hits break a pickup and it respawns loose after the delay', () => {

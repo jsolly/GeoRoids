@@ -5,7 +5,6 @@ import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import { PlayerNetwork } from '../../entities/player/playerNetwork';
 import type { SoftFactionId } from '../../entities/player/softFactions';
 import type { Roid } from '../../entities/roid/Roid';
-import type { Satellite } from '../../entities/satellite/Satellite';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
 import type { Ship } from '../../entities/ship/Ship';
 import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
@@ -32,7 +31,6 @@ const LOOT_MARK_KINDS = ['wreckage', 'shard', 'fuel', 'laserCore'] satisfies rea
 // much larger playfield silhouettes.
 const MINIMAP_ROID_SIZE = 1.5;
 const MINIMAP_LOOT_SIZE = 2;
-const MINIMAP_SATELLITE_HALF_SIZE = 2;
 const MINIMAP_ORBITER_SIZE = 3;
 
 interface MiniMapGeometry {
@@ -263,45 +261,6 @@ function drawLootMarks(
   }
 }
 
-function drawSatelliteMarks(
-  ctx: CanvasRenderingContext2D,
-  satellites: readonly Satellite[],
-  geometry: MiniMapGeometry
-): void {
-  if (satellites.length === 0) {
-    return;
-  }
-
-  const { projection } = geometry;
-  let painted = false;
-  for (const satellite of satellites) {
-    if (
-      satellite.exploding ||
-      !Number.isFinite(satellite.health) ||
-      satellite.health <= 0 ||
-      !projectPosition(geometry, satellite.position)
-    ) {
-      continue;
-    }
-    if (!painted) {
-      ctx.save();
-      ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE, 0.9);
-      ctx.lineWidth = 1;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-    }
-    ctx.moveTo(projection.x - MINIMAP_SATELLITE_HALF_SIZE, projection.y);
-    ctx.lineTo(projection.x + MINIMAP_SATELLITE_HALF_SIZE, projection.y);
-    ctx.moveTo(projection.x, projection.y - MINIMAP_SATELLITE_HALF_SIZE);
-    ctx.lineTo(projection.x, projection.y + MINIMAP_SATELLITE_HALF_SIZE);
-    painted = true;
-  }
-  if (painted) {
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
 function drawLoosePickupMarks(
   ctx: CanvasRenderingContext2D,
   pickups: readonly SatellitePickup[],
@@ -319,7 +278,7 @@ function drawLoosePickupMarks(
     }
     if (!painted) {
       ctx.save();
-      ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE_PICKUP, 0.95);
+      ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE, 0.95);
       ctx.lineWidth = 1;
       ctx.beginPath();
     }
@@ -351,7 +310,7 @@ function drawOrbiterMarks(
     }
     if (!painted) {
       ctx.save();
-      ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE_PICKUP, 0.95);
+      ctx.strokeStyle = hexToRgba(PALETTE.SATELLITE, 0.95);
       ctx.lineWidth = 1;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -372,7 +331,6 @@ export function drawMiniMap(
   ship: Ship,
   roids: readonly Roid[],
   loot: readonly LootData[],
-  satellites: readonly Satellite[],
   pickups: readonly SatellitePickup[]
 ): void {
   const boundary = getGameBoundary();
@@ -401,12 +359,11 @@ export function drawMiniMap(
   try {
     drawAsteroidMarks(ctx, roids, geometry);
     drawLootMarks(ctx, loot, geometry);
-    drawSatelliteMarks(ctx, satellites, geometry);
     drawLoosePickupMarks(ctx, pickups, geometry);
     drawOrbiterMarks(ctx, pickups, geometry);
 
     // The pilot hulls are deliberately last: they must remain readable over
-    // dense rock, loot, satellite, and pickup fields.
+    // dense rock, loot, and pickup fields.
     const playerNetwork = PlayerNetwork.getInstance();
     const otherPlayers = playerNetwork.getOtherPlayers();
 

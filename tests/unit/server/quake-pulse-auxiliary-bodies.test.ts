@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
-import { SatelliteManager } from '../../../server/core/SatelliteManager';
 import { SatellitePickupManager } from '../../../server/core/SatellitePickupManager';
-import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 
 describe('Quake pulse auxiliary bodies', () => {
   test('kicks loot through the expiry update and damps the motion', () => {
@@ -23,83 +21,6 @@ describe('Quake pulse auxiliary bodies', () => {
     const secondStep = (second?.position.x ?? 0) - (first?.position.x ?? 0);
     expect(secondStep).toBeGreaterThan(0);
     expect(secondStep).toBeLessThan(firstStep);
-  });
-
-  test('keeps an NPC satellite pulse after the orbit update overwrites its base velocity', () => {
-    const manager = new SatelliteManager(new RNGService(12));
-    const created = manager.createSatellites(1)[0];
-    expect(created).toBeDefined();
-    if (!created) {
-      return;
-    }
-    const satellite = manager.getSatellite(created.id);
-    expect(satellite).toBeDefined();
-    if (!satellite) {
-      return;
-    }
-
-    satellite.position = { x: 0, y: 0 };
-    satellite.orbitCenter = { x: 0, y: 0 };
-    satellite.orbitPhase = 0;
-    satellite.velocity = { x: 0, y: 0 };
-    expect(manager.applyQuakePulse({ x: 0, y: 0 }, 0)).toBe(1);
-    expect(satellite.velocity.x).toBeCloseTo(SHIP_ABILITY.SHOCK_FORCE);
-
-    manager.update([]);
-    const afterFirst = manager.getSatellite(created.id);
-    expect(afterFirst).toBeDefined();
-    expect(afterFirst?.position.x).toBeGreaterThan(20);
-    const firstPositionX = afterFirst?.position.x ?? 0;
-    const firstKnockback = afterFirst?.quakeMotion.velocity.x ?? 0;
-
-    manager.update([]);
-    const afterSecond = manager.getSatellite(created.id);
-    expect(afterSecond).toBeDefined();
-    expect(afterSecond?.position.x).toBeGreaterThan(firstPositionX);
-    expect(afterSecond?.quakeMotion.velocity.x).toBeCloseTo(firstKnockback * 0.92);
-  });
-
-  test('kicks active satellite projectiles through their authoritative movement loop', () => {
-    const manager = new SatelliteManager(new RNGService(13));
-    const created = manager.createSatellites(1)[0];
-    expect(created).toBeDefined();
-    if (!created) {
-      return;
-    }
-    const satellite = manager.getSatellite(created.id);
-    expect(satellite).toBeDefined();
-    if (!satellite) {
-      return;
-    }
-    satellite.position = { x: 0, y: 0 };
-    satellite.orbitCenter = { x: 0, y: 0 };
-    satellite.orbitPhase = 0;
-    satellite.shootCooldown = 0;
-    satellite.burstRemaining = 0;
-    satellite.burstCooldown = 0;
-
-    manager.update([
-      {
-        id: 'pilot',
-        position: { x: 300, y: 0 },
-        radius: 15,
-        health: 100,
-        exploding: false,
-      },
-    ]);
-    const before = manager.getActiveProjectiles()[0];
-    expect(before).toBeDefined();
-    if (!before) {
-      return;
-    }
-    const beforeVelocity = before.velocity.x;
-    expect(manager.applyQuakePulse(before.position, 0)).toBeGreaterThanOrEqual(1);
-    const kicked = manager.getActiveProjectiles()[0];
-    expect(kicked?.velocity.x).toBeGreaterThan(beforeVelocity);
-
-    manager.update([]);
-    const moved = manager.getActiveProjectiles()[0];
-    expect(moved?.position.x).toBeGreaterThan(before.position.x);
   });
 
   test('kicks an orbiting satellite pickup without losing its owner link', () => {

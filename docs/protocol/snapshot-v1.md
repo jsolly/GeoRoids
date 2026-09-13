@@ -42,18 +42,18 @@ The codec preserves all public JSON fields recursively. Future keyed arrays auto
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
 make additions to the shared world/entity/asteroid/loot/EO/pickup/projectile/tag DTOs
 require corresponding validation. `ServerGameSnapshot` extends the core
-`ServerGameState` with `satelliteProjectiles`, `playerProjectiles` and `collabTags`. Projectile IDs equal their stable `shotId`,
+`ServerGameState` with `playerProjectiles` and `collabTags`. Projectile IDs equal their stable `shotId`,
 so an event and subsequent keyframe repair one shot instead of creating two.
 Tags include asteroid ID, shooter hit records and expiry. Keyframes restore active
 shots and cooperative windows after reconnect without replaying old events.
-All six EO types, fire patterns, Echo/Relay ownership and shield duration, asteroid
+All six EO pickup types, asteroid
 shape/material/health, kits, factions and E/F timers use the shared DTO contract. Public state must be finite JSON;
 unsupported values fail loudly and close the negotiated socket instead of
 silently dropping state. Unknown valid JSON fields remain intact.
 
 Before encoding, the server rounds selected kinematics in its detached wire
 world to four decimal places: asteroid position, velocity and rotation; loot
-position; satellite and pickup position, velocity and angle; and projectile
+position; satellite pickup position, velocity and angle; and projectile
 position, previous position where present, and velocity. Integers and values
 above the safe multiplication cutoff remain exact. Every player/bot field,
 including motion-handoff anchors, remains exact, as do resources, timers,

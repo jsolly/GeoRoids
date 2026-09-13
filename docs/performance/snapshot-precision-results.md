@@ -28,9 +28,11 @@ failed candidate is retained separately.
 
 ## Captured workload and correctness
 
-The current GameEngine fixture produced 300 measured broadcasts after 60 warmup
-and 600 measured simulation ticks. It has ten humans, two bots, 66–84 asteroids,
-five or six satellites, two pickups, 8–74 player shots and 0–34 satellite shots.
+The then-current GameEngine fixture produced 300 measured broadcasts after 60 warmup
+and 600 measured simulation ticks. It had ten humans, two bots, 66–84 asteroids,
+five or six hostile satellites, two pickups, 8–74 player shots and 0–34 satellite
+shots. Hostile satellite NPCs and their shots are gone; live play uses six
+Earth-observation pickups and player/bot shots only.
 Its normal stream has four keyframes and 296 deltas. The alternate stream sends
 every state as a keyframe to expose join/recovery costs. These are controlled
 combat worlds with an immediate transport sink, not a production replay.

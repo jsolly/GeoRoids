@@ -132,7 +132,10 @@ Labels: tiny phosphor HUD text `#E2E8F0` or `#64748B`, never larger than the sma
 
 ---
 
-## Hostile saucer / satellite (ambient NPC)
+## Hostile saucer / satellite (historical, retired)
+
+Runtime uses six Earth-observation pickup hulls. They do not fire. Keep the
+prompts below only as provenance for the recovered UFO placeholders.
 
 ```text
 {shared style}

@@ -43,7 +43,7 @@ operation and its assertion; cleanup must also complete.
 - Reset world, singleton, mock, clock, and configuration state between tests.
 - Use the local test controls to arrange browser scenes and synchronize the
   authoritative pose. Those controls must not produce the outcome under test.
-- Isolate the chosen interaction from unrelated bots, asteroids, satellites,
+- Isolate the chosen interaction from unrelated bots, asteroids, satellite pickups,
   drops, and previous deaths. Identify targets explicitly; do not pick an
   arbitrary first entity and hope ambient combat creates the desired result.
 - Keep fixture helpers small. Prefer a controlled starting scene over a browser

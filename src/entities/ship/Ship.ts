@@ -16,6 +16,7 @@ import type {
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
 import { getThrustSound } from '../../audio/gameSounds';
+import { playHarpoonRelease, playShieldActivation } from '../../audio/interactionSounds';
 import type { Sound } from '../../audio/Sound';
 import { DAMAGE, FUEL, GAME, PALETTE, SHIP } from '../../constants';
 import { NetworkManager } from '../../network/networkManager';
@@ -259,9 +260,6 @@ class Ship {
       const laser = new Laser(shot.position, shot.velocity, 0, 0, false);
       laser.abilityShot = true;
       this.lasers.push(laser);
-      if (shot === shots[0]) {
-        laser.playLaserSound();
-      }
     }
   }
 
@@ -352,6 +350,7 @@ class Ship {
     if (!activateShield(this, this.exploding, this.kitId)) {
       return false;
     }
+    playShieldActivation(this.position);
     this.sendShieldEvent(true);
     return true;
   }
@@ -530,7 +529,14 @@ class Ship {
     for (let i = 0; i < steps; i++) {
       this.updateInvincibility();
       tickShipImpactFlash(this);
+      const wasHarpoonActive = this.harpoonTimer > 0;
+      const harpoonReleasePosition = this.harpoonLatchPos
+        ? { ...this.harpoonLatchPos }
+        : { ...this.position };
       tickAbilityHost(this);
+      if (wasHarpoonActive && this.harpoonTimer <= 0) {
+        playHarpoonRelease(harpoonReleasePosition);
+      }
       this.updateHealth();
     }
   }

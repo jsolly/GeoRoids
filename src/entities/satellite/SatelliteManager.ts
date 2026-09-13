@@ -67,13 +67,13 @@ export class SatelliteManager {
     }
   }
 
-  addLaser(satelliteId: string, shotId: string, position: Position, velocity: Velocity): void {
+  addLaser(satelliteId: string, shotId: string, position: Position, velocity: Velocity): boolean {
     if (!shotId || this.activeShotIds.has(shotId)) {
-      return;
+      return false;
     }
     const satellite = this.satellites.get(satelliteId);
     if (!satellite || satellite.exploding || satellite.health <= 0) {
-      return;
+      return false;
     }
     satellite.addLaser(
       entityFactory.createLaser({
@@ -86,6 +86,7 @@ export class SatelliteManager {
       shotId
     );
     this.activeShotIds.add(shotId);
+    return true;
   }
 
   /** Apply a complete server keyframe without duplicating live shot events. */

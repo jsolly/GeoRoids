@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-
 import { GameEngine } from '../../../server/core/GameEngine';
+import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { LOOT_BLAST } from '../../../shared/lootBlast';
 import { applyLootMass, GROWTH } from '../../../shared/shipGrowth';
 import { ROID } from '../../../src/constants';
@@ -65,6 +65,27 @@ describe('destroy-drop shards on the #458 loot path', () => {
     expect(player.mass).toBeCloseTo(applyLootMass(beforeMass, GROWTH.SHARD_MASS));
     expect(player.score).toBe(ROID.POINTS_SMALL + GROWTH.SHARD_SCORE);
     expect(engine.getLoot()).toHaveLength(0);
+    const broadcaster = new GameStateBroadcaster(engine);
+    broadcaster.broadcastGameState();
+    broadcaster.broadcastGameState();
+    const notifications = ws.inbox.filter((message) => message.type === 'lootCollected');
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.data).toEqual({
+      lootId: collected[0]?.lootId,
+      collectorId: player.id,
+      kind: 'shard',
+      position: { x: 20, y: 30 },
+    });
+    expect(engine.drainLootCollections()).toEqual([]);
+  });
+
+  test('ending a world discards pickup sounds that have not been broadcast', () => {
+    const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 30 });
+    addSmallAsteroid(engine, 'roid-1');
+    engine.handleAsteroidHit('roid-1', player.id, 'laser');
+    expect(engine.collectLoot()).toHaveLength(1);
+    engine.resetForTesting();
+    expect(engine.drainLootCollections()).toEqual([]);
   });
 
   test('shooting a shard detonates it and damages nearby hulls', () => {

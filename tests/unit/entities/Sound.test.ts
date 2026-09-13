@@ -118,3 +118,118 @@ test('Sound with multiple streams', () => {
   multiSound.streamNum = 0; // Should wrap around
   expect(multiSound.streamNum).toBe(0);
 });
+
+test('repeated shots restart with independently varied audible pitch', async () => {
+  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
+  const stream = testSound.streams[0];
+  assert.ok(stream);
+  stream.currentTime = 0.3;
+  await testSound.play();
+  expect(stream.preservesPitch).toBe(false);
+  expect(stream.playbackRate).toBeCloseTo(0.9);
+  expect(stream.currentTime).toBe(0);
+  await testSound.play();
+  expect(stream.playbackRate).toBeCloseTo(1.1);
+  expect(random).toHaveBeenCalledTimes(2);
+});
+
+test('thrust keeps a stable pitch during volume updates and rerolls on restart', async () => {
+  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
+  const stream = loop.streams[0];
+  assert.ok(stream);
+  stream.play = mockPlay;
+  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
+  await loop.play();
+  loop.setVolumeScale(0.4);
+  expect(stream.playbackRate).toBeCloseTo(0.95);
+  expect(random).toHaveBeenCalledTimes(1);
+  loop.stop();
+  await loop.play();
+  expect(stream.playbackRate).toBeCloseTo(1.05);
+});
+
+test('thrust updates do not restart a loop while browser playback is pending', async () => {
+  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
+  const stream = loop.streams[0];
+  assert.ok(stream);
+  let finish = () => {};
+  stream.play = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  const starting = loop.play();
+  await loop.play(0.5);
+  expect(stream.play).toHaveBeenCalledTimes(1);
+  expect(random).toHaveBeenCalledTimes(1);
+  expect(stream.volume).toBeCloseTo(0.025);
+  finish();
+  await starting;
+});
+
+test('a stopped pending thrust cannot suppress its restart or overwrite the new attempt', async () => {
+  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
+  const stream = loop.streams[0];
+  assert.ok(stream);
+  let finishFirst = () => {};
+  let finishSecond = () => {};
+  stream.play = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirst = resolve;
+        })
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSecond = resolve;
+        })
+    );
+  const first = loop.play();
+  setSound(false);
+  finishFirst();
+  await first;
+  expect(loop.playing).toBe(false);
+  setSound(true);
+  const second = loop.play();
+  await loop.play(0.5);
+  expect(stream.play).toHaveBeenCalledTimes(2);
+  finishSecond();
+  await second;
+});
+
+test('restarting thrust before an old play settles keeps the new pending guard', async () => {
+  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
+  const stream = loop.streams[0];
+  assert.ok(stream);
+  let finishFirst = () => {};
+  let finishSecond = () => {};
+  stream.play = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirst = resolve;
+        })
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSecond = resolve;
+        })
+    );
+  const first = loop.play();
+  loop.stop();
+  const second = loop.play();
+  finishFirst();
+  await first;
+  expect(loop.playing).toBe(false);
+  await loop.play(0.5);
+  expect(stream.play).toHaveBeenCalledTimes(2);
+  finishSecond();
+  await second;
+});

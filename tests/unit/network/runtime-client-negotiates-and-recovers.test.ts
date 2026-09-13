@@ -4,6 +4,8 @@ import { observesPreparedFixture } from '../../../benchmarks/fixture-readiness';
 import { calculateHealthRegenPerFrame } from '../../../shared/constants/health';
 import { captureSnapshot, SnapshotEncoder } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
+import { Sound, setSound } from '../../../src/audio/Sound';
+import { bindGameAudio, resetGameAudio } from '../../../src/audio/spatialAudio';
 import { clientPerformance } from '../../../src/diagnostics/performanceMetrics';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { LootField } from '../../../src/entities/loot/LootField';
@@ -103,6 +105,169 @@ describe('actual ConnectionManager WebSocket message path', () => {
       resumeToken,
     });
   }
+
+  test('nearby remote shots sound once, self echoes stay silent and collected loot is deduplicated', async () => {
+    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'dart');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const played: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      played.push(this.streams[0]?.src ?? 'missing source');
+      return Promise.resolve();
+    });
+    try {
+      ws.receive('playerShotFired', {
+        id: 'remote-shot',
+        ownerId: 'other-pilot',
+        position: { x: 30, y: 0 },
+      });
+      expect(played).toHaveLength(1);
+      expect(played[0]).toMatch(/\/sounds\/laser\.m4a$/);
+      ws.receive('playerShotFired', {
+        id: 'self-shot',
+        ownerId: player.id,
+        position: { x: 0, y: 0 },
+      });
+      ws.receive('playerShotFired', {
+        id: 'distant-shot',
+        ownerId: 'other-pilot',
+        position: { x: 10000, y: 0 },
+      });
+      ws.receive('playerShotFired', { ownerId: 'other-pilot', position: { x: 'bad', y: 0 } });
+      expect(played).toHaveLength(1);
+      const collection = {
+        lootId: 'collected-fuel',
+        collectorId: 'other-pilot',
+        kind: 'fuel',
+        position: { x: 30, y: 0 },
+      };
+      ws.receive('lootCollected', collection);
+      ws.receive('lootCollected', collection);
+      expect(played).toHaveLength(2);
+      expect(played[1]).toMatch(/\/sounds\/fuel-pickup\.m4a$/);
+      ws.receive('lootCollected', { ...collection, lootId: 'invalid-kind', kind: 'unknown' });
+      ws.receive('lootCollected', {
+        ...collection,
+        lootId: 'distant-loot',
+        position: { x: 10000, y: 0 },
+      });
+      expect(played).toHaveLength(2);
+      setSound(false);
+      ws.receive('playerShotFired', {
+        id: 'muted-shot',
+        ownerId: 'other-pilot',
+        position: { x: 30, y: 0 },
+      });
+      ws.receive('lootCollected', { ...collection, lootId: 'muted-loot' });
+      expect(played).toHaveLength(2);
+      manager.disconnect();
+      const reconnected = await connect();
+      acknowledge(reconnected);
+      setSound(true);
+      reconnected.receive('lootCollected', collection);
+      expect(played).toHaveLength(3);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
+  test('a warm reconnect silently hydrates destruction before later deaths sound normally', async () => {
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    const alive = captureSnapshot(snapshotFixture());
+    for (const satellite of alive.satellites ?? []) {
+      satellite.position = { x: 0, y: 0 };
+    }
+    for (const pickup of alive.satellitePickups ?? []) {
+      pickup.position = { x: 0, y: 0 };
+    }
+    ws.receive('snapshot', new SnapshotEncoder(alive).encode(1));
+    const retained = SatelliteManager.getInstance().getAll()[0];
+    assert.ok(retained);
+    ws.close();
+    const resumed = await connect();
+    acknowledge(resumed);
+    const dead = captureSnapshot(alive);
+    dead.satelliteProjectiles = [];
+    for (const satellite of dead.satellites ?? []) {
+      satellite.exploding = true;
+      satellite.health = 0;
+    }
+    for (const pickup of dead.satellitePickups ?? []) {
+      pickup.state = 'broken';
+      pickup.health = 0;
+    }
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const played = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
+    try {
+      resumed.receive('snapshot', new SnapshotEncoder(dead).encode(1));
+      expect(SatelliteManager.getInstance().get(retained.id)).toBe(retained);
+      expect(retained.exploding).toBe(true);
+      expect(played).not.toHaveBeenCalled();
+      resumed.receive('snapshot', new SnapshotEncoder(alive).encode(2));
+      played.mockClear();
+      resumed.receive('snapshot', new SnapshotEncoder(dead).encode(3));
+      expect(played).toHaveBeenCalledTimes(
+        (dead.satellites?.length ?? 0) + (dead.satellitePickups?.length ?? 0)
+      );
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
+  test('ring fire waits for one accepted ability cue and unknown orbital pickups use event positions', async () => {
+    const player = entityFactory.createLocalPlayer('Ring pilot', { x: 0, y: 0 }, 'skirmisher');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const paths: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      paths.push(this.streams[0]?.src ?? 'missing');
+      return Promise.resolve();
+    });
+    try {
+      player.ship.fireRing();
+      expect(paths).toEqual([]);
+      ws.receive('abilityUsed', { id: player.id, kitId: 'skirmisher', abilityId: 'ringFire' });
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toMatch(/ability-ring\.m4a$/);
+      const pickup = {
+        pickupId: 'uncached',
+        playerId: 'uncached-pilot',
+        playerName: 'Remote',
+        pickupName: 'Echo',
+        scoreBonus: 1,
+      };
+      ws.receive('satellitePickupCollected', { ...pickup, position: { x: 10000, y: 0 } });
+      ws.receive('satellitePickupCollected', pickup);
+      expect(paths).toHaveLength(1);
+      ws.receive('satellitePickupCollected', { ...pickup, position: { x: 30, y: 0 } });
+      expect(paths).toHaveLength(2);
+      expect(paths[1]).toMatch(/orbital-pickup\.m4a$/);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
 
   test('intentional disconnect clears movement recovery after retiring the socket', async () => {
     const player = entityFactory.createLocalPlayer('Departing pilot', { x: 0, y: 0 }, 'hauler');

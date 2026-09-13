@@ -17,6 +17,18 @@ type ViewportProvider = () => ViewportSize | undefined;
 let getListenerPosition: ListenerProvider = () => undefined;
 let getViewportSize: ViewportProvider = () => undefined;
 const resetHooks: Array<() => void> = [];
+let worldAudioSuppressed = false;
+
+/** Applying a connection baseline updates retained entities without replaying missed events. */
+export function withoutWorldAudio(apply: () => void): void {
+  const previous = worldAudioSuppressed;
+  worldAudioSuppressed = true;
+  try {
+    apply();
+  } finally {
+    worldAudioSuppressed = previous;
+  }
+}
 
 export function registerAudioResetHook(hook: () => void): void {
   resetHooks.push(hook);
@@ -111,6 +123,9 @@ export function planBoundPlayback(
   sourcePosition: Position | undefined,
   options?: { requireViewport?: boolean }
 ): PlaybackPlan {
+  if (worldAudioSuppressed) {
+    return { shouldPlay: false, volumeScale: 0 };
+  }
   return planPositionalPlayback(sourcePosition, getListenerPosition(), getViewportSize(), options);
 }
 

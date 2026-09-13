@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { RNGService } from '../../../server/core/RNGService';
 import { SatelliteManager as ServerSatelliteManager } from '../../../server/core/SatelliteManager';
 import type { SatelliteData } from '../../../shared-types';
+import * as destructionSounds from '../../../src/audio/destructionSounds';
 import { SATELLITE } from '../../../src/constants';
 import { SatelliteManager } from '../../../src/entities/satellite/SatelliteManager';
 import { canvasManager } from '../../../src/rendering/canvas';
@@ -93,4 +94,19 @@ describe('EO projectile visuals follow the authoritative lifetime', () => {
     manager.addLaser(satellite.id, 'late-shot', { x: 10, y: 0 }, { x: 5, y: 0 });
     expect(manager.get(satellite.id)?.lasers).toHaveLength(0);
   });
+});
+
+test('satellite explosions sound once per death and never replay from an initial snapshot', () => {
+  const sound = vi.spyOn(destructionSounds, 'playDestructionSound').mockImplementation(() => {});
+  const manager = SatelliteManager.getInstance();
+  const dead = { ...satellite, exploding: true, health: 0 };
+  manager.syncFromServer([dead]);
+  expect(sound).not.toHaveBeenCalled();
+  manager.syncFromServer([satellite]);
+  manager.syncFromServer([dead]);
+  manager.syncFromServer([dead]);
+  expect(sound).toHaveBeenCalledExactlyOnceWith('satellite', satellite.position);
+  manager.clear();
+  manager.syncFromServer([dead]);
+  expect(sound).toHaveBeenCalledTimes(1);
 });

@@ -15,7 +15,15 @@ media: []
 ## What the HUD shows
 
 Before entering a game, set your pilot name, choose a kit, and use the Sound
-checkbox on the title screen to enable or mute audio.
+checkbox on the title screen to enable or mute audio. Muting stops sounds already
+playing too.
+
+Shots, impacts, explosions, and thrust vary their pitch slightly each time they
+start, keeping repeated actions from sounding identical. A held thrust keeps a
+steady pitch until the next burst. Nearby action is louder; off-screen combat
+cues stay silent. Harpoons have launch, latch, and release cues. Orbital pickup
+and orbital fire sound different from ship lasers. Fuel, laser cores, and
+material pickups have separate cues, as do kit abilities and respawning.
 
 The HUD shows lives as kit hull icons, score, faction label and mark, kit name,
 and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a

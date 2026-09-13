@@ -6,6 +6,8 @@ import type {
   Velocity,
 } from '../../../shared-types';
 
+import { playDestructionSound } from '../../audio/destructionSounds';
+
 export class SatellitePickup {
   id: string;
   name: string;
@@ -38,6 +40,9 @@ export class SatellitePickup {
   }
 
   updateFromServer(data: SatellitePickupData): void {
+    if (data.state === 'broken' && this.state !== 'broken') {
+      playDestructionSound('satellite', data.position);
+    }
     this.name = data.name;
     this.typeId = data.typeId;
     this.assetKey = data.assetKey;

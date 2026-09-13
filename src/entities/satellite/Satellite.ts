@@ -1,5 +1,6 @@
 import type { SatelliteShotManner, SatelliteTypeId } from '../../../shared/eoSatellites';
 import type { Position, SatelliteData, Velocity } from '../../../shared-types';
+import { playDestructionSound } from '../../audio/destructionSounds';
 import { SATELLITE } from '../../constants';
 import type { Laser } from '../laser/Laser';
 
@@ -52,6 +53,7 @@ export class Satellite {
     this.maxHealth = data.maxHealth;
     this.radius = data.radius;
     if (data.exploding && !this.exploding) {
+      playDestructionSound('satellite', data.position);
       this.explodeTime = SATELLITE.EXPLODE_DURATION_FRAMES;
     }
     this.exploding = data.exploding;

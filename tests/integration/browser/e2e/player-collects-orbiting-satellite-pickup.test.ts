@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { SATELLITE_PICKUP } from '../../../../src/constants';
+import { installAudioProbe } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -16,6 +17,7 @@ test.each([1280, 390])(
     }
 
     await page.setViewportSize({ width, height: 900 });
+    await installAudioProbe(page);
     const sent: string[] = [];
     page.on('websocket', (socket) =>
       socket.on('framesent', ({ payload }) => {
@@ -56,6 +58,13 @@ test.each([1280, 390])(
     const attached = (await game.getSatellitePickups()).find((pickup) => pickup.id === target.id);
     expect(attached?.health).toBe(attached?.maxHealth);
     expect(sent).not.toContain('satellitePickupCollected');
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (document.documentElement.dataset['audioEvents'] ?? '').includes('orbital-pickup.m4a')
+        )
+      )
+      .toBe(true);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`satellite-auto-latch-${width}.png`),
     });

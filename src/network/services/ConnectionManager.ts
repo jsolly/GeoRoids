@@ -11,6 +11,8 @@ import type {
   AsteroidData,
   AsteroidDestroyEvent,
   AsteroidTaggedEvent,
+  LootCollected,
+  LootKind,
   PingMessage,
   PlayerJoin,
   PlayerLeave,
@@ -21,6 +23,18 @@ import type {
   ServerGameSnapshot,
   ShockwaveEvent,
 } from '../../../shared-types';
+import { playDestructionSound } from '../../audio/destructionSounds';
+import { playLaserSound } from '../../audio/gameSounds';
+import {
+  playAbilityActivation,
+  playHarpoonLatch,
+  playHarpoonRelease,
+  playLootPickup,
+  playOrbitalFire,
+  playOrbitalPickup,
+  playShieldActivation,
+} from '../../audio/interactionSounds';
+import { withoutWorldAudio } from '../../audio/spatialAudio';
 import { PALETTE, ROID } from '../../constants';
 import { clientPerformance } from '../../diagnostics/performanceMetrics';
 import { entityFactory } from '../../entities/EntityFactory';
@@ -37,7 +51,7 @@ import {
   setHoldEmptyHarpoonField,
 } from '../../entities/ship/harpoonField';
 import { startQuakePulse } from '../../entities/ship/quakePulseRenderer';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
+import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
@@ -98,6 +112,44 @@ function isServerMessageEnvelope(value: unknown): value is ServerMessageEnvelope
   );
 }
 
+function isFinitePosition(value: unknown): value is Position {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  return (
+    'x' in value &&
+    typeof value.x === 'number' &&
+    Number.isFinite(value.x) &&
+    'y' in value &&
+    typeof value.y === 'number' &&
+    Number.isFinite(value.y)
+  );
+}
+
+function isLootKind(value: unknown): value is LootKind {
+  return value === 'shard' || value === 'wreckage' || value === 'fuel' || value === 'laserCore';
+}
+
+function isLootCollectedEvent(value: unknown): value is LootCollected {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  return (
+    'lootId' in value &&
+    typeof value.lootId === 'string' &&
+    value.lootId.length > 0 &&
+    'collectorId' in value &&
+    typeof value.collectorId === 'string' &&
+    value.collectorId.length > 0 &&
+    'kind' in value &&
+    isLootKind(value.kind) &&
+    'position' in value &&
+    isFinitePosition(value.position)
+  );
+}
+
+const MAX_PLAYED_LOOT_COLLECTION_IDS = 256;
+
 function captureClientPlayerState(player: Player) {
   return captureDiagnosticActorState({
     position: player.ship.position,
@@ -134,6 +186,8 @@ export class ConnectionManager {
   private readonly playerListCache = new PlayerListCache<Player>();
   private readonly snapshotEntityIds = new Set<string>();
   private readonly taggedAsteroidIds = new Set<string>();
+  private readonly playedLootCollectionIds = new Set<string>();
+  private readonly knownShieldStateIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
   private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
   private readonly updateEnvelope: ClientMessage = {
@@ -467,6 +521,7 @@ export class ConnectionManager {
     this.state.socket = null;
     this.allPlayers.clear();
     this.taggedAsteroidIds.clear();
+    this.playedLootCollectionIds.clear();
     this.playerListCache.invalidate();
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
@@ -670,6 +725,7 @@ export class ConnectionManager {
     if (this.allPlayers.delete(id)) {
       this.playerListCache.invalidate();
     }
+    this.knownShieldStateIds.delete(id);
   }
 
   getPlayer(playerId: string): Player | undefined {
@@ -861,6 +917,19 @@ export class ConnectionManager {
       case 'pong':
         clientPerformance.pong(message.probeId, performance.now());
         return;
+      case 'playerShotFired':
+        if (
+          data &&
+          typeof data === 'object' &&
+          'ownerId' in data &&
+          typeof data.ownerId === 'string' &&
+          data.ownerId !== PlayerManager.getInstance().getLocalPlayer()?.id &&
+          'position' in data &&
+          isFinitePosition(data.position)
+        ) {
+          playLaserSound(data.position);
+        }
+        break;
       case 'shotAcknowledged':
         if (
           data &&
@@ -956,6 +1025,9 @@ export class ConnectionManager {
           data as { lootId: string; position: Position; radius: number; shooterId: string }
         );
         break;
+      case 'lootCollected':
+        this.handleLootCollected(data);
+        break;
       case 'abilityUsed':
         this.handleAbilityUsed(
           data as {
@@ -999,6 +1071,7 @@ export class ConnectionManager {
     this.snapshotResyncPending = false;
     this.localHarpoonAcknowledged = false;
     this.lastAcceptedSnapshotSequence = 0;
+    this.knownShieldStateIds.clear();
     delete this.serverReleaseId;
     clientPerformance.serverReleaseId = undefined;
   }
@@ -1070,7 +1143,11 @@ export class ConnectionManager {
     const clientBeforeApply = localBefore ? captureClientPlayerState(localBefore) : undefined;
     try {
       this.snapshotResyncPending = false;
-      this.applyReceivedSnapshot(state);
+      if (this.lastAcceptedSnapshotSequence === 0) {
+        withoutWorldAudio(() => this.applyReceivedSnapshot(state));
+      } else {
+        this.applyReceivedSnapshot(state);
+      }
       this.lastAcceptedSnapshotSequence = metadata.sequence;
       clientPerformance.snapshotApplied({
         sequence: metadata.sequence,
@@ -1148,6 +1225,8 @@ export class ConnectionManager {
   private handleAbilityUsed(
     data: {
       id?: string;
+      kitId?: unknown;
+      abilityId?: unknown;
       harpoonTimer?: number;
       harpoonTargetId?: string;
       harpoonLatchPos?: Position;
@@ -1166,6 +1245,16 @@ export class ConnectionManager {
       this.allPlayers.get(data.id) ?? (localPlayer?.id === data.id ? localPlayer : undefined);
     if (!entity) {
       return;
+    }
+    const abilityId = getShipKit(data.kitId ?? entity.ship.kitId).abilityId;
+    playAbilityActivation(abilityId, entity.ship.position);
+    if (abilityId === 'harpoon') {
+      const targetPosition = isFinitePosition(data.harpoonLatchPos)
+        ? data.harpoonLatchPos
+        : typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0
+          ? findHarpoonFieldBody(data.harpoonTargetId)?.position
+          : undefined;
+      playHarpoonLatch(targetPosition ?? entity.ship.position);
     }
     if (localPlayer?.id === data.id && (data.harpoonTimer ?? 0) > 0) {
       this.localHarpoonAcknowledged = true;
@@ -1276,6 +1365,12 @@ export class ConnectionManager {
         } else {
           delete entity.ship.playerMotion;
         }
+        const wasHarpoonActive = entity.ship.harpoonTimer > 0;
+        const harpoonReleasePosition = entity.ship.harpoonLatchPos
+          ? { ...entity.ship.harpoonLatchPos }
+          : { ...entity.ship.position };
+        const wasShieldActive = entity.ship.shieldActive;
+        const shieldStateWasKnown = this.knownShieldStateIds.has(entityData.id);
         entity.name = entityData.name;
         if (entityData.factionId !== undefined) {
           entity.factionId = entityData.factionId;
@@ -1328,6 +1423,13 @@ export class ConnectionManager {
           } else {
             delete entity.ship.harpoonLatchPos;
           }
+          if (
+            wasHarpoonActive &&
+            entityData.harpoonTimer !== undefined &&
+            entityData.harpoonTimer <= 0
+          ) {
+            playHarpoonRelease(harpoonReleasePosition);
+          }
         }
         if (entityData.laserUpgrade) {
           entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
@@ -1344,6 +1446,17 @@ export class ConnectionManager {
           entity.ship.shieldSourceId = entityData.shieldSourceId;
         } else {
           delete entity.ship.shieldSourceId;
+        }
+        if (
+          entity.type !== 'local' &&
+          shieldStateWasKnown &&
+          !wasShieldActive &&
+          entityData.shieldActive === true
+        ) {
+          playShieldActivation(entityData.position);
+        }
+        if (entityData.shieldActive !== undefined) {
+          this.knownShieldStateIds.add(entityData.id);
         }
         entity.ship.shieldActive = entityData.shieldActive ?? false;
         entity.ship.shieldTime = entityData.shieldTime ?? 0;
@@ -1418,9 +1531,27 @@ export class ConnectionManager {
       return;
     }
     LootField.getInstance().remove(data.lootId);
-    if (data.position && Number.isFinite(data.radius)) {
+    if (isFinitePosition(data.position) && Number.isFinite(data.radius)) {
+      playDestructionSound('loot', data.position);
       LootField.getInstance().noteBlast(data.position, data.radius);
     }
+  }
+
+  private handleLootCollected(data: unknown): void {
+    if (!isLootCollectedEvent(data)) {
+      return;
+    }
+    if (this.playedLootCollectionIds.has(data.lootId)) {
+      return;
+    }
+    if (this.playedLootCollectionIds.size >= MAX_PLAYED_LOOT_COLLECTION_IDS) {
+      const oldestId = this.playedLootCollectionIds.values().next().value;
+      if (typeof oldestId === 'string') {
+        this.playedLootCollectionIds.delete(oldestId);
+      }
+    }
+    this.playedLootCollectionIds.add(data.lootId);
+    playLootPickup(data.kind, data.position);
   }
 
   private applyAuthoritativeAsteroids(asteroids: AsteroidData[], complete = false): void {
@@ -1577,17 +1708,23 @@ export class ConnectionManager {
     if (typeof data.shotId !== 'string' || data.shotId.length === 0) {
       return;
     }
-    SatelliteManager.getInstance().addLaser(
+    const added = SatelliteManager.getInstance().addLaser(
       data.id,
       data.shotId,
       data.laserStart,
       data.laserDirection
     );
+    if (added) {
+      playOrbitalFire(data.laserStart);
+    }
   }
 
   private handleSatellitePickupCollected(data: SatellitePickupCollected): void {
     if (!data?.playerId || !data.pickupId) {
       return;
+    }
+    if (isFinitePosition(data.position)) {
+      playOrbitalPickup(data.position);
     }
     window.dispatchEvent(new CustomEvent('satellitePickupCollected', { detail: data }));
   }

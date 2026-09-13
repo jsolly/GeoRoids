@@ -34,20 +34,22 @@ not GPU draw calls, and are not weighted CPU costs.
 ## Current product policy
 
 The current minimap restores compact marks for live asteroids, loot drops,
-hostile satellites, loose satellite pickups, and orbiting pickups. It reads each
+loose Earth-observation satellite pickups, and orbiting pickups. It reads each
 entity’s current position on every draw, skips dead or exploding entities, and
 lets authoritative removal clear collected or expired objects. World marks are
 batched by category and pilots are drawn on top. A new matched timing comparison
 would be required before making a current frame-rate claim from this policy.
 
 A September 10, 2026 observation of the restored marks used the same seed 42,
-30 warmup frames, and 120 measured touch-portrait frames. The fixture contains
-24 asteroids, six wreckage drops, three satellites, and three loose pickups.
-Every measured frame used 110 Canvas strokes, compared with the historical
-player-only reference of 107. Satellite and pickup position reads were six each,
-compared with three each; contour endpoint reads stayed at 1,388. This is a
-single deterministic work observation, not a matched timing or phone FPS result.
-Other loot kinds and attached orbiters are covered by rendering tests.
+30 warmup frames, and 120 measured touch-portrait frames. The fixture then
+contained 24 asteroids, six wreckage drops, three hostile satellites, and three
+loose pickups. Hostile satellite NPCs are gone; current play draws six EO
+pickups as lilac circles (loose) or diamonds (orbiting). Every measured frame
+used 110 Canvas strokes, compared with the historical player-only reference of
+107. Satellite and pickup position reads were six each, compared with three
+each; contour endpoint reads stayed at 1,388. This is a single deterministic
+work observation, not a matched timing or phone FPS result. Other loot kinds
+and attached orbiters are covered by rendering tests.
 
 The report is `.performance/projectiles-minimap/frame-work.json`, SHA-256
 `38c1c1946b2f5925c87ab5f4e03253edd2c579d2e2b18c728adc39d6151f46b7`.

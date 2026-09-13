@@ -9,7 +9,7 @@
 ### Canon docs
 
 - `style-guide.md` — beauty bar, locked playfield palette, line rules
-- `palette-ships-factions.md` — ION/EMBER marks, shield, loot, terrain, harpoon, saucer (temp)
+- `palette-ships-factions.md` — ION/EMBER marks, shield, loot, terrain, harpoon, EO pickup hulls
 - `ships-and-factions.md` — silhouette v2 LOCKED topology + soft-faction rules
 - `hud-treatment.md`, `shot-list.md`, `REFERENCES.md`
 - `prompt-sheets-*.md` — paste prompts if regenerating assets
@@ -37,9 +37,10 @@
 - Marks only — never full-hull paint
 - Ownership strokes stay: local `#5EEAD4` · remote `#7DD3FC` · bot `#FB923C`
 
-### Temp hostile NPC (replace with EO)
+### Retired hostile NPC art (historical)
 
-- `saucer-npc.svg`, `saucer-npc-firing.svg`, silhouette PNGs — **temp UFO only**
+- `saucer-npc.svg`, `saucer-npc-firing.svg`, silhouette PNGs — recovered UFO
+  placeholders. Runtime uses the six EO pickup hulls instead.
 
 ### Harpoon / VFX ref
 
@@ -66,7 +67,7 @@ The table below records what was absent from the recovered source ZIP. Those sta
 | **Five ship v2 SVGs** (one file per class) | **Missing in source ZIP** — only contact + play-scale PNG sheets |
 | **EO six-bird sprite/SVG assets** | **Missing in source ZIP** — briefs only in `eo-satellites/` |
 | **Personality roids ice / metal / rubble** assets | **Missing in source ZIP** — Todoist brief only (`6hR7g44RRHgRx9HF`); no files in pack |
-| Per-bird shot manner art | Product TBD; not drawn |
+| Per-bird shot manner art | Retired — hulls are pickups, not firing NPCs |
 | In-repo bake of hulls from v2 topology | Code/Dev — use PNG sheets until SVGs exist |
 
 ## Recovered ART implementation inventory
@@ -76,7 +77,7 @@ The table below records what was absent from the recovered source ZIP. Those sta
 | **Five ship v2 SVGs** (one file per class) | **Produced** in `ships-v2/`; traced from the locked v2 outlines and covered by serializer parity tests |
 | **EO six-bird SVG assets** | **Produced** in `eo-satellites/`; six distinct hardware outlines and serializer parity tests are present. Runtime call-site wiring belongs to the integrating gameplay branch |
 | **Personality roids ice / metal / rubble** assets | **Produced** in `personality-roids/`; contours and facets share the Canvas data and have serializer parity tests |
-| Per-bird shot manner art | **Implemented as runtime outline/muzzle geometry**; cadence and projectile behavior are owned by the integrating gameplay branch |
+| Per-bird shot manner art | **Retired** — runtime treats EO hulls as collectible orbiting pickups, not firing NPCs |
 | In-repo bake of hulls and mineral contours | **Complete** in `src/entities/ship/hullOutlines.ts` and `src/entities/roid/materialArt.ts` |
 
 ## Current gameplay contract
@@ -98,12 +99,12 @@ The following bars remain the product checks for the combined client/server rele
 
 - Server/client must re-seed asteroids after soft reconnect (`initAsteroids` skip bug)
 
-### EO NPCs (when art lands)
+### EO pickups
 
 - Tell all six apart at 32–64px
 - EO hardware, not UFO disc
-- Different shot manners; personal score / ambient — not faction-aligned
-- Kill temp saucer when EO pack lands
+- Collectible orbiting interceptors — not faction-aligned, not hostile NPCs
+- Temp saucer is historical only; live play uses the EO pickup roster
 
 ### Personality roids (when art lands)
 

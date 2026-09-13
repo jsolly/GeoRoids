@@ -33,11 +33,11 @@ This report assesses source revision `b4aec298e72840d026a2492902c5a4251d8d4e3c` 
 
 ### Rendering and input
 
-`eventLoop.ts` updates and renders during each visible animation callback. `CanvasManager.drawGame` paints the background, stars, contours, contour laser effects, boundary, asteroids, loot, satellites, ships, projectiles, and HUD. The opaque context already uses `alpha: false`. Resize notifications are coalesced, unchanged backing dimensions are preserved, and visibility changes reset presentation time and request authoritative resynchronization.[^2]
+`eventLoop.ts` updates and renders during each visible animation callback. `CanvasManager.drawGame` paints the background, stars, contours, contour laser effects, boundary, asteroids, loot, satellite pickups, ships, projectiles, and HUD. The opaque context already uses `alpha: false`. Resize notifications are coalesced, unchanged backing dimensions are preserved, and visibility changes reset presentation time and request authoritative resynchronization.[^2]
 
 The main canvas calculates backing dimensions as viewport dimensions multiplied by the browser's device pixel ratio. `contourRenderer.ts` walks all contour segments on each draw, projects endpoints, then rejects segments outside the viewport. It batches strokes by contour level. `contourLabels.ts` caches label anchors, but visible labels still perform text measurement and drawing. These distinctions matter: terrain generation and label placement are already cached; segment traversal and label rendering are separate costs.[^2]
 
-Glow is distributed across ship hulls, lasers, shields, explosions, asteroids, boundary rendering, pickups, satellites, and other effects. A quality experiment must cover these sites consistently. Removing one glow constant and assuming all blur work disappeared would produce an ambiguous comparison.[^2]
+Glow is distributed across ship hulls, lasers, shields, explosions, asteroids, boundary rendering, satellite pickups, and other effects. A quality experiment must cover these sites consistently. Removing one glow constant and assuming all blur work disappeared would produce an ambiguous comparison.[^2]
 
 Pointer controls and cancellation handling already exist in `src/input/touchControls.ts`. A complaint about unresponsive steering may arise from event scheduling, visual feedback, authoritative correction, or an interrupted gesture. It should not automatically trigger replacement of the touch controls.
 

@@ -41,14 +41,14 @@ New hex roles only. **Do not rename** locked playfield hexes in `style-guide.md`
 
 Faction paints must never replace ownership colors on the full hull.
 
-## Ambient hostile (not faction)
+## Collectible EO hardware (not faction)
 
 | Role | Hex | Use |
 | ------ | ----- | ----- |
 | eo_satellite | `#C4B5FD` | Neutral EO satellite hull outline |
-| eo_shot | `#E9D5FF` | EO satellite short shot segments |
 
-Not faction-aligned. Do not reuse bot amber or ION/EMBER marks on the hull.
+Not faction-aligned. Do not reuse bot amber or ION/EMBER marks on the hull. These
+hulls are collectible orbiting pickups; they do not fire.
 
 ## Harpoon (ability VFX)
 

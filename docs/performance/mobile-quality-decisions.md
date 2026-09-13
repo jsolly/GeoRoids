@@ -73,7 +73,7 @@ update the Wiki and source review, and record the retirement evidence here.
 ## Current minimap policy
 
 The minimap shows the local ship, other human pilots and bots, plus compact marks
-for live asteroids, loot drops, hostile satellites, loose satellite pickups, and
+for live asteroids, loot drops, loose Earth-observation satellite pickups, and
 orbiting pickups. Marks use current entity positions, skip dead or exploding
 objects, and disappear when authoritative state removes a collected or expired
 object. World marks are batched by category and pilots remain on top. This policy

@@ -25,9 +25,10 @@ All six sessions passed gameplay and cleanup checks with no browser warnings
 or errors. The browser observed 757–881 acknowledged motion states and 46–64
 projectiles per session. Every protocol peer completed its workload and observed
 measured server projectiles. Measured population samples retained five humans,
-two bots and two pickups. Asteroids, satellites, projectiles and game-over
-restarts varied as the live battles evolved; their distributions are retained
-in the receipt. These are repeated workloads, not identical replayed worlds.
+two bots and two pickups. Asteroids, then-current hostile satellites, projectiles
+and game-over restarts varied as the live battles evolved; their distributions
+are retained in the receipt. These are repeated workloads, not identical
+replayed worlds. Live play no longer has hostile satellite NPCs.
 
 The native and capped screenshots were inspected. Both retain hulls, projectiles,
 labels, radar and controls; the capped image is softer. That visible tradeoff

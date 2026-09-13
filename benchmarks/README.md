@@ -72,8 +72,8 @@ are kept outside the timed result.
 The server runner fixes `Date.now()` and seeds `Math.random()` while retaining
 native `performance.now()` for tick timing. It creates two actual loopback human
 connections and two bots through the seeded engine. Natural authoritative
-simulation continues during warmup and measurement, so asteroid, loot, satellite,
-and pickup counts before and after are part of the result.
+simulation continues during warmup and measurement, so asteroid, loot, and
+satellite-pickup counts before and after are part of the result.
 
 The codec runner checks every decoded message against the original fixture state,
 including keyframes, deltas, and divergent recipient baselines. Its byte counts

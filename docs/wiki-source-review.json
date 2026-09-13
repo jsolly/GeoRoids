@@ -1,5 +1,5 @@
 {
-  "note": "Replaced hostile EO NPCs with six collectible Earth-observation pickup hulls. Removed enemy satellite protocol, firing, collision damage and gold Echo/Relay pickups. Reviewed satellites, factions, quake, combat-survival and HUD copy plus the satellites, pickups and quake demonstrations. Regenerated those three GIFs/posters from the live pickup roster; other Wiki media is unchanged.",
+  "note": "Un-exported ShieldReflectionBody after SatelliteManager removal; Biome import format on GameEngine and gameReference. No wiki article or demonstration behavior change.",
   "hashes": {
     ".pages.yml": "sha256:7b6e5cdee9dde2bc949133156b5e7334d21cbca8ab0cecb0384a4c4c30a9ab72",
     "docs/protocol/snapshot-v1.md": "sha256:728fff7900f203279d27e3bce6aac782481dd7a78bb4db4cc45791d905da68fa",
@@ -53,7 +53,7 @@
     "server/core/AsteroidManager.ts": "sha256:2e0df54424a79748c4c2182e20221f23dca422bd495b9c8c381e2a6db4b2dac1",
     "server/core/CollisionAuthority.ts": "sha256:55e63d3fbf37729b74ce103291dfcd3b45ec9c44896b50756d8e7ac68a654640",
     "server/core/EntityManager.ts": "sha256:5f80835e861296986dddb2e9410a6764f8d4de34edc8c356d28b5e9137043ee6",
-    "server/core/GameEngine.ts": "sha256:b1a3d2e992e572e8f72b0329f4569084df2d9b2f8de22a1d0905f4e37bdeef47",
+    "server/core/GameEngine.ts": "sha256:20a9c2621c40afee7280ef75bbc37ed95823e095516c8d342afdf6a18b7d2b2f",
     "server/core/LootManager.ts": "sha256:419b831c260017a1189bdcb41dd27deb336910d841aea1b0f1b8a55d8c781a3c",
     "server/core/PlayerMotionService.ts": "sha256:925932147ff27ba53214f1292b640403789301cc25a27c3fe47f514708f41c90",
     "server/core/RNGService.ts": "sha256:c4bad2457733835e0cd3104126d07f4347f011129abf2271dc4825eda88d4f83",
@@ -76,7 +76,7 @@
     "shared/logRecords.ts": "sha256:362f7e43d1ab5ac829f3b37db7b5d5a06ebe5e6c8e114b6a0a9303e7865fe1de",
     "shared/lootBlast.ts": "sha256:31ed331328baa1080437223dfd6bb4fbf144b223e8460807cb9a88773c802529",
     "shared/playerMotion.ts": "sha256:11c06a8a17655a4c0f0200a4843b0c291b673c863243be2ef9a5ea5755975cfb",
-    "shared/shieldReflection.ts": "sha256:8b45adaad26c5f6fd02960363776ca838f592fc1aff0f3cf29581b81cffe25c2",
+    "shared/shieldReflection.ts": "sha256:578e8762ab83edc2d3e363305d295377db35f276f41d7442cbcd6b06a8aaf3da",
     "shared/shipGrowth.ts": "sha256:beb8b367660721e30b130d5eced2ae7bd3749a162e05e8efa12a6d65bd33bbe5",
     "shared/snapshotDto.ts": "sha256:234970950fe3ae96128b8f762ade02a3117a791cfa996817b5aab6c093fa278c",
     "shared/snapshotPrecision.ts": "sha256:5df129b05af46836b7d5bad0e0dc115aa4b3e85bf37a53e963681fd0892d82f2",
@@ -198,7 +198,7 @@
     "src/utils/spawnPosition.ts": "sha256:21ef7d819d9ca05b94235e8200e8d7bb59975ecb4f3d8d220a6e2fc3b28c226e",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:8e562df6ddeceec167d84210454a03a7e91114b0e598f0fb3308cf6ef7b5bf1a",
-    "src/wiki/gameReference.ts": "sha256:b0782dc1a0b5ebb588837d979e24a93ed8e0d807d3464060a05a51e743dd526d",
+    "src/wiki/gameReference.ts": "sha256:1e3fb642aa1db06ab20cae1b69aa257dacd1707494cb2e6bfd37d9679e696fa1",
     "src/wiki/main.ts": "sha256:e9448d3a477ac6177f27a7145b323f17296e33db5b6033b1f1e4cbf097b6d457",
     "src/wiki/media.ts": "sha256:eb5e9693f70167f8b79ca42ced34e494c7d500c501391dde6219610023c744e1",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",

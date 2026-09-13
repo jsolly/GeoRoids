@@ -10,16 +10,7 @@ import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { GROWTH } from '../../shared/shipGrowth';
-import {
-  DAMAGE,
-  FUEL,
-  GAME,
-  ROID,
-  SATELLITE_PICKUP,
-  SHIELD,
-  SHIP,
-  SHOCKWAVE,
-} from '../constants';
+import { DAMAGE, FUEL, GAME, ROID, SATELLITE_PICKUP, SHIELD, SHIP, SHOCKWAVE } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS, type ShipKitId } from '../entities/ship/shipKits';
 import { SKIRMISHER_RING_COUNT } from '../entities/ship/skirmisherRing';
 import { getGameBoundary } from '../physics/boundary';

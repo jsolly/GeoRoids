@@ -37,15 +37,7 @@ import type {
   SoftFactionId,
   Velocity,
 } from '../../shared-types';
-import {
-  CANVAS,
-  DAMAGE,
-  GAME,
-  LASER,
-  ROID,
-  SATELLITE_PICKUP,
-  SHIP,
-} from '../../src/constants';
+import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';

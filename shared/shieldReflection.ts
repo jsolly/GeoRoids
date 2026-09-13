@@ -2,7 +2,7 @@ import type { Position } from '../shared-types';
 import { reflectVector } from './asteroidReflection';
 
 /** A live circular shield surface in the swept projectile coordinate space. */
-export interface ShieldReflectionBody {
+interface ShieldReflectionBody {
   id: string;
   position: Position;
   radius: number;

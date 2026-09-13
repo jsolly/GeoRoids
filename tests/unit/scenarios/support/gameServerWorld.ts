@@ -204,27 +204,6 @@ export class GameServerWorld {
     }
   }
 
-  shootSatellite(attacker: Pilot, satelliteId: string, damage: number = DAMAGE.LASER_HIT): void {
-    const satellite = this.engine.getSatellite(satelliteId);
-    if (!satellite) {
-      throw new Error(`No satellite with id ${satelliteId}`);
-    }
-
-    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
-    this.clearAsteroids();
-    for (let i = 0; i < hitCount && satellite.health > 0; i++) {
-      const shooter = this.entity(attacker);
-      const target = { x: shooter.position.x + 40, y: shooter.position.y + 80 };
-      satellite.position = target;
-      satellite.orbitCenter = { ...target };
-      satellite.orbitPhase = 0;
-      satellite.orbitRadiusX = 0;
-      satellite.orbitRadiusY = 0;
-      satellite.driftAngle = Math.PI;
-      this.fireAt(attacker, satellite.position, () => satellite.health <= 0);
-    }
-  }
-
   shootBot(attacker: Pilot, botId: string, damage: number = DAMAGE.LASER_HIT): void {
     const bot = this.engine.getBot(botId);
     if (!bot) {

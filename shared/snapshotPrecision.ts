@@ -22,19 +22,10 @@ export function quantizeSnapshotKinematics(state: ServerGameSnapshot): void {
   for (const row of state.loot) {
     vector(row.position);
   }
-  for (const row of state.satellites) {
-    vector(row.position);
-    vector(row.velocity);
-    row.angle = rounded(row.angle);
-  }
   for (const row of state.satellitePickups) {
     vector(row.position);
     vector(row.velocity);
     row.angle = rounded(row.angle);
-  }
-  for (const row of state.satelliteProjectiles) {
-    vector(row.position);
-    vector(row.velocity);
   }
   for (const row of state.playerProjectiles) {
     vector(row.position);

@@ -221,13 +221,8 @@ describe('Asteroid destruction over real sockets', () => {
         server.gameEngine.removeBot(bot.id);
       }
       // Keep the stopped world's other laser targets far from the shot corridor.
-      for (const { id } of server.gameEngine.getAllSatellites()) {
-        const satellite = server.gameEngine.getSatellite(id);
-        assert.ok(satellite);
-        satellite.position = { x: -2400, y: -2400 };
-      }
+      server.gameEngine.parkSatellitePickups({ x: -2400, y: -2400 });
       expect(server.gameEngine.getLoot()).toEqual([]);
-      expect(server.gameEngine.getActiveSatelliteProjectiles()).toEqual([]);
       const targetPosition = { x: 800 + radius + 30, y: 800 };
       const target = asteroidAt('solo-ice', radius, { ...targetPosition }, { material: 'ice' });
       isolateAsteroid(server.gameEngine, target);

@@ -229,9 +229,6 @@ describe('current pilots share the production handler and broadcaster', () => {
           new SnapshotEncoder({
             ...engine.getGameState(),
             playerProjectiles: engine.getPlayerProjectiles(),
-            satelliteProjectiles: engine
-              .getActiveSatelliteProjectiles()
-              .map((shot) => ({ id: shot.shotId, ...shot })),
             collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
           }).state
         )
@@ -659,8 +656,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       humanPlayers: 1,
       bots: 2,
       asteroids: 80,
-      satellites: 6,
-      satellitePickups: 2,
+      satellitePickups: 6,
     });
     expect(engine.getPlayerProjectiles()).toHaveLength(0);
     const firstRocks = normalizeFixtureAsteroids(engine.getAllAsteroids());

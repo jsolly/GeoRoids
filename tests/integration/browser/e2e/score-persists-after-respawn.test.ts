@@ -18,13 +18,13 @@ test(
     await game.waitForCombatReady();
     await game.waitForAsteroids(1);
 
-    const [asteroids, satellites, bots] = await Promise.all([
+    const [asteroids, pickups, bots] = await Promise.all([
       game.getAsteroidPositions(),
-      game.getSatellites(),
+      game.getSatellitePickups(),
       game.getBots(),
     ]);
     const hazards = [
-      ...satellites.map((satellite) => ({ x: satellite.x, y: satellite.y })),
+      ...pickups.map((pickup) => ({ x: pickup.x, y: pickup.y })),
       ...bots
         .filter((bot) => bot.health > 0 && !bot.exploding)
         .map((bot) => ({ x: bot.x, y: bot.y })),

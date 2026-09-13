@@ -17,7 +17,6 @@ import type {
   PlayerUpdate,
   Position,
   SatellitePickupCollected,
-  SatelliteShoot,
   ServerGameSnapshot,
   ShockwaveEvent,
 } from '../../../shared-types';
@@ -29,7 +28,6 @@ import type { Laser } from '../../entities/laser/Laser';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
-import { SatelliteManager } from '../../entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import {
   findHarpoonFieldBody,
@@ -471,7 +469,6 @@ export class ConnectionManager {
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
     LootField.getInstance().clear();
-    SatelliteManager.getInstance().clear();
     SatellitePickupManager.getInstance().clear();
     this.localPlayerId = '';
     this.lastDamageStateLogAt = 0;
@@ -923,9 +920,6 @@ export class ConnectionManager {
         break;
       case 'shockwave':
         this.handleShockwave(data as ShockwaveEvent);
-        break;
-      case 'satelliteShoot':
-        this.handleSatelliteShoot(data as SatelliteShoot);
         break;
       case 'satellitePickupCollected':
         this.handleSatellitePickupCollected(data as SatellitePickupCollected);
@@ -1383,14 +1377,12 @@ export class ConnectionManager {
     this.applyAuthoritativeAsteroids(data.asteroids, true);
 
     LootField.getInstance().applySnapshot(data.loot);
-    SatelliteManager.getInstance().syncFromServer(data.satellites);
     SatellitePickupManager.getInstance().syncFromServer(data.satellitePickups);
     const projectileField = AuthoritativeProjectileField.getInstance();
     projectileField.sync(data.playerProjectiles);
     for (const player of this.allPlayers.values()) {
       projectileField.reconcileShip(player.ship, player.id);
     }
-    SatelliteManager.getInstance().syncProjectilesFromServer(data.satelliteProjectiles);
     const activeTags = new Set(data.collabTags.map((tag) => tag.asteroidId));
     for (const id of this.taggedAsteroidIds) {
       if (!activeTags.has(id)) {
@@ -1470,7 +1462,6 @@ export class ConnectionManager {
     if (!keepField) {
       this.seenAsteroidIds.clear();
       LootField.getInstance().clear();
-      SatelliteManager.getInstance().clear();
       SatellitePickupManager.getInstance().clear();
     }
     // `keepField` controls whether the warm local belt is retained. It must
@@ -1565,23 +1556,6 @@ export class ConnectionManager {
           asteroidId: data.asteroidId,
         },
       })
-    );
-  }
-
-  private handleSatelliteShoot(data: SatelliteShoot): void {
-    logger.debug('NETWORK', 'Satellite shot laser', {
-      satelliteId: data.id,
-      laserStart: data.laserStart,
-      laserDirection: data.laserDirection,
-    });
-    if (typeof data.shotId !== 'string' || data.shotId.length === 0) {
-      return;
-    }
-    SatelliteManager.getInstance().addLaser(
-      data.id,
-      data.shotId,
-      data.laserStart,
-      data.laserDirection
     );
   }
 

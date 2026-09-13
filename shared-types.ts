@@ -156,43 +156,16 @@ export interface LootData {
   fuel?: number;
 }
 
-/** Server-owned ambient hostile EO NPC. No kit, no soft faction. */
-export interface SatelliteData {
-  id: string;
-  name: string;
-  /** Stable roster identity used by both the renderer and server AI. */
-  typeId: import('./shared/eoSatellites').SatelliteTypeId;
-  /** Stable key for the six canonical EO hardware outlines. */
-  assetKey: string;
-  shotManner: import('./shared/eoSatellites').SatelliteShotManner;
-  position: Position;
-  velocity: Velocity;
-  angle: number;
-  exploding: boolean;
-  color: string;
-  health: number;
-  maxHealth: number;
-  radius: number;
-}
-
-export interface SatelliteShoot {
-  id: string;
-  /** One server-authored projectile identity; clients use it only for visuals. */
-  shotId: string;
-  laserStart: Position;
-  laserDirection: Velocity;
-}
-
-export type SatellitePickupTypeId = 'echo' | 'relay';
+export type SatellitePickupTypeId = import('./shared/eoSatellites').SatelliteTypeId;
 export type SatellitePickupState = 'loose' | 'orbiting' | 'broken';
 
-/** Server-owned collectible EO communications hardware. */
+/** Server-owned collectible Earth-observation hardware. */
 export interface SatellitePickupData {
   id: string;
-  name: 'Echo' | 'Relay';
+  name: string;
   typeId: SatellitePickupTypeId;
-  /** Stable asset hook; pickups are distinct communications hardware. */
-  assetKey: `pickup/${SatellitePickupTypeId}`;
+  /** Stable key for the six canonical EO hardware outlines. */
+  assetKey: `eo/${SatellitePickupTypeId}`;
   position: Position;
   velocity: Velocity;
   angle: number;
@@ -208,7 +181,7 @@ export interface SatellitePickupCollected {
   pickupId: string;
   playerId: string;
   playerName: string;
-  pickupName: 'Echo' | 'Relay';
+  pickupName: string;
   scoreBonus: number;
 }
 
@@ -235,21 +208,11 @@ export interface ServerGameState {
   entities: ServerEntityData[];
   asteroids: AsteroidData[];
   loot: LootData[];
-  satellites: SatelliteData[];
   satellitePickups: SatellitePickupData[];
   gameTime: number;
   isPaused: boolean;
   /** Same seed on every client → same contours and slope field. */
   terrainSeed?: number;
-}
-
-/** Public authoritative projectile state, shared by simulation, transport and client. */
-export interface SatelliteProjectileState {
-  satelliteId: string;
-  shotId: string;
-  position: Position;
-  velocity: Velocity;
-  age: number;
 }
 
 /** Complete collaborative hit window; omitted windows are no longer active. */
@@ -259,11 +222,6 @@ export interface ActiveCollabTag {
   expiresAt: number;
 }
 
-export interface SnapshotSatelliteProjectile extends SatelliteProjectileState {
-  /** Identical to shotId; enables the generic keyed collection delta. */
-  id: string;
-}
-
 export interface SnapshotCollabTag extends ActiveCollabTag {
   /** Identical to asteroidId; enables explicit tag removals. */
   id: string;
@@ -271,7 +229,6 @@ export interface SnapshotCollabTag extends ActiveCollabTag {
 
 /** Complete authoritative snapshot, including recovery state. */
 export interface ServerGameSnapshot extends ServerGameState {
-  satelliteProjectiles: SnapshotSatelliteProjectile[];
   collabTags: SnapshotCollabTag[];
   playerProjectiles: PlayerProjectileState[];
 }

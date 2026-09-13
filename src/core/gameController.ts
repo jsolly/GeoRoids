@@ -25,7 +25,6 @@ import { PlayerNetwork } from '../entities/player/playerNetwork';
 import { advanceRemotePlayerShips } from '../entities/player/remoteLasers';
 import type { RoidBelt } from '../entities/roid/Roid';
 import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/roidRenderer';
-import { SatelliteManager } from '../entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import {
   bindHarpoonFieldSource,
@@ -610,10 +609,6 @@ export class GameController {
     return LootField.getInstance().getAll();
   }
 
-  getSatellites() {
-    return SatelliteManager.getInstance().getAll();
-  }
-
   getSatellitePickups() {
     return SatellitePickupManager.getInstance().getAll();
   }
@@ -834,12 +829,6 @@ export class GameController {
       this.publishLiveHarpoonField(currPlayer);
     }
 
-    SatelliteManager.getInstance().update();
-
-    this.checkSatelliteLaserCollisions();
-
-    // Ship↔asteroid damage is server-owned. Keep local ship-ship overlap
-    // for offline DOT / visual contact only. Factions still skip allies.
     this.checkShipShipCollisions(allPlayers);
 
     // Check boundary collisions for ships
@@ -883,19 +872,6 @@ export class GameController {
       this.localFirstPlayers.push(player);
     }
     return this.localFirstPlayers;
-  }
-
-  private checkSatelliteLaserCollisions(): void {
-    const currPlayer = this.playerManager.getLocalPlayer();
-    if (!currPlayer) {
-      return;
-    }
-    const localPlayerId = this.networkManager.getLocalPlayerId() || currPlayer.id;
-    this.collisionManager.checkSatelliteLaserCollisions(
-      SatelliteManager.getInstance().getAll(),
-      currPlayer.ship,
-      localPlayerId
-    );
   }
 
   // Check boundary collisions for ships

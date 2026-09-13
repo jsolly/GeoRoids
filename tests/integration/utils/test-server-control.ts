@@ -43,7 +43,7 @@ function isWorldDiagnostics(value: unknown): value is ServerWorldDiagnostics {
     typeof world['gameTime'] === 'number' &&
     Number.isFinite(world['gameTime']) &&
     world['gameTime'] >= 0 &&
-    ['humanPlayers', 'bots', 'asteroids', 'loot', 'satellites', 'satellitePickups'].every(
+    ['humanPlayers', 'bots', 'asteroids', 'loot', 'satellitePickups'].every(
       (field) =>
         typeof world[field] === 'number' && Number.isSafeInteger(world[field]) && world[field] >= 0
     )
@@ -110,7 +110,6 @@ export function isWorldClean(world: ServerWorldDiagnostics): boolean {
     world.bots === 0 &&
     world.asteroids === 0 &&
     world.loot === 0 &&
-    world.satellites === 0 &&
     world.satellitePickups === 0
   );
 }

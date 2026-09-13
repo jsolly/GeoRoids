@@ -212,7 +212,7 @@ statistics survive in `.performance/runner-*`, including build failures.
 
 Traversal prepares one human with the current ambient populations. Combat
 prepares five human pilots (one browser plus four real-protocol peers), two
-observed bots, 80 asteroids, six satellites, and two pickups. A private Unix
+observed bots, 80 asteroids, and six Earth-observation satellite pickups. A private Unix
 socket in the runner's temporary session directory validates the complete
 participant set before synchronous between-tick arrangement. It preserves human
 motion sessions, advances placement epochs through the existing authoritative

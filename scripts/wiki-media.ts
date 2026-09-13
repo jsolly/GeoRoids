@@ -39,7 +39,7 @@ import {
   radiusFromMass,
   sizeScaleFromMass,
 } from '../shared/shipGrowth';
-import type { AsteroidData, Position, Velocity } from '../shared-types';
+import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import {
   DAMAGE,
   FUEL,
@@ -211,10 +211,9 @@ function renderSatellite(
   typeId: Parameters<typeof drawEoSatelliteOutline>[1],
   radius: number,
   angle: number,
-  color: string,
-  firing: boolean
+  color: string
 ): void {
-  drawEoSatelliteOutline(ctx, typeId, radius, angle, color, firing);
+  drawEoSatelliteOutline(ctx, typeId, radius, angle, color);
 }
 
 interface Demo {
@@ -1140,24 +1139,12 @@ function makeQuakeDemo(): Demo {
     velocity: { x: -0.2, y: 0.15 },
     r: 8,
   };
-  const satellite: AbilityBody & {
-    angle: number;
-    color: string;
-    radius: number;
-  } = {
-    id: 'quake-satellite',
-    position: { x: 160, y: -58 },
-    velocity: { x: 0.1, y: 0.15 },
-    angle: 0.2,
-    color: PALETTE.SATELLITE,
-    radius: 15,
-  };
   const pickup: AbilityBody & {
     angle: number;
     color: string;
     health: number;
     radius: number;
-    typeId: 'echo';
+    typeId: SatellitePickupTypeId;
     state: 'loose';
     maxHealth: number;
   } = {
@@ -1165,12 +1152,32 @@ function makeQuakeDemo(): Demo {
     position: { x: -164, y: -54 },
     velocity: { x: -0.1, y: -0.18 },
     angle: 0,
-    color: PALETTE.SATELLITE_PICKUP,
-    radius: 10,
-    typeId: 'echo',
+    color: PALETTE.SATELLITE,
+    radius: 12,
+    typeId: 'terra',
     state: 'loose',
-    health: 100,
-    maxHealth: 100,
+    health: 50,
+    maxHealth: 50,
+  };
+  const secondPickup: AbilityBody & {
+    angle: number;
+    color: string;
+    health: number;
+    radius: number;
+    typeId: SatellitePickupTypeId;
+    state: 'loose';
+    maxHealth: number;
+  } = {
+    id: 'quake-pickup-aqua',
+    position: { x: 160, y: -58 },
+    velocity: { x: 0.1, y: 0.15 },
+    angle: 0.2,
+    color: PALETTE.SATELLITE,
+    radius: 12,
+    typeId: 'aqua',
+    state: 'loose',
+    health: 50,
+    maxHealth: 50,
   };
   const shot: AbilityBody = {
     id: 'quake-shot',
@@ -1192,7 +1199,7 @@ function makeQuakeDemo(): Demo {
     rocks.some((rock) => Math.hypot(rock.velocity.x, rock.velocity.y) > 0),
     'Quake did not push a nearby rock'
   );
-  const extraBodies = [loot, satellite, pickup, shot];
+  const extraBodies = [loot, secondPickup, pickup, shot];
   for (const body of extraBodies) {
     invariant(applyQuakeImpulse(body, host.position, host.angle), 'Quake missed a nearby object');
   }
@@ -1289,22 +1296,11 @@ function makeQuakeDemo(): Demo {
         PALETTE.LOOT,
         2
       );
-      const satelliteScreen = screenPoint(satellite.position, displayScale);
-      ctx.save();
-      ctx.translate(satelliteScreen.x, satelliteScreen.y);
-      renderSatellite(
-        ctx,
-        'aqua',
-        satellite.radius * displayScale,
-        satellite.angle,
-        satellite.color,
-        false
-      );
-      ctx.restore();
+      drawPickup(ctx, secondPickup, displayScale);
       drawArrow(
         ctx,
-        { x: satellite.position.x * displayScale, y: satellite.position.y * displayScale },
-        { x: satellite.velocity.x * displayScale, y: satellite.velocity.y * displayScale },
+        { x: secondPickup.position.x * displayScale, y: secondPickup.position.y * displayScale },
+        { x: secondPickup.velocity.x * displayScale, y: secondPickup.velocity.y * displayScale },
         PALETTE.SATELLITE,
         2
       );
@@ -1313,7 +1309,7 @@ function makeQuakeDemo(): Demo {
         ctx,
         { x: pickup.position.x * displayScale, y: pickup.position.y * displayScale },
         { x: pickup.velocity.x * displayScale, y: pickup.velocity.y * displayScale },
-        PALETTE.SATELLITE_PICKUP,
+        PALETTE.SATELLITE,
         2
       );
       drawLaser(
@@ -2249,10 +2245,12 @@ function makeSplitDemo(): Demo {
 
 function makeSatellitesDemo(): Demo {
   const recording = recordSatelliteDemo(FRAME_COUNT, SIM_TICKS_PER_FRAME);
-  const patterns = new Set(SATELLITE_PROFILES.map((profile) => profile.shotPattern));
   invariant(recording.length === FRAME_COUNT, 'satellite recording length changed');
   invariant(recording[0]?.length === 6, 'satellite recording lost a profile');
-  invariant(patterns.size === 6, 'satellite firing patterns are not all represented');
+  invariant(
+    new Set(SATELLITE_PROFILES.map((profile) => profile.typeId)).size === 6,
+    'satellite pickup hulls are not all represented'
+  );
   return {
     id: 'satellites',
     posterFrame: 12,
@@ -2262,29 +2260,28 @@ function makeSatellitesDemo(): Demo {
         'satellite recording does not keep all profiles visible'
       );
       invariant(
-        recording.some((panels) => panels.some((panel) => panel.projectiles.length > 0)),
-        'satellite recording contains no projectiles'
+        recording.some((panels) =>
+          panels.some((panel) => Math.hypot(panel.pickup.position.x, panel.pickup.position.y) > 0)
+        ),
+        'satellite recording contains no pickup motion'
       );
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'EO SATELLITES',
-        'six hulls · six firing styles',
+        'six hulls · collectible interceptors',
         frame,
         PALETTE.SATELLITE
       );
       const panels: readonly SatelliteDemoPanel[] = recording[frame] ?? [];
       const displayScale = 0.3;
       for (const [index, panel] of panels.entries()) {
-        const { satellite, projectiles } = panel;
-        const profile = SATELLITE_PROFILES.find(
-          (candidate) => candidate.typeId === satellite.typeId
-        );
+        const { pickup } = panel;
+        const profile = SATELLITE_PROFILES.find((candidate) => candidate.typeId === pickup.typeId);
         if (profile === undefined) {
           continue;
         }
-        const firing = projectiles.some((shot) => shot.age <= SIM_TICKS_PER_FRAME);
         const column = index % 2;
         const row = Math.floor(index / 2);
         const panelOrigin = {
@@ -2292,47 +2289,27 @@ function makeSatellitesDemo(): Demo {
           y: -85 + row * 80,
         };
         const position = {
-          x: panelOrigin.x + satellite.position.x * displayScale,
-          y: panelOrigin.y + satellite.position.y * displayScale,
+          x: panelOrigin.x + pickup.position.x * displayScale,
+          y: panelOrigin.y + pickup.position.y * displayScale,
         };
         const screen = screenPoint(position);
         ctx.save();
         ctx.translate(screen.x, screen.y);
-        renderSatellite(ctx, satellite.typeId, 17, satellite.angle, satellite.color, firing);
+        renderSatellite(ctx, pickup.typeId, 17, pickup.angle, pickup.color);
         ctx.restore();
-        for (const shot of projectiles) {
-          const shotPosition = {
-            x: panelOrigin.x + shot.position.x * displayScale,
-            y: panelOrigin.y + shot.position.y * displayScale,
-          };
-          const shotScreen = screenPoint(shotPosition);
-          const panelScreen = screenPoint(panelOrigin);
-          if (
-            Math.abs(shotScreen.x - panelScreen.x) > 135 ||
-            Math.abs(shotScreen.y - panelScreen.y) > 34
-          ) {
-            continue;
-          }
-          drawLaser(
-            ctx,
-            shotPosition,
-            { x: shot.velocity.x * displayScale, y: shot.velocity.y * displayScale },
-            PALETTE.LASER_ENEMY
-          );
-        }
         ctx.save();
         ctx.fillStyle = PALETTE.HUD;
         ctx.font = '700 18px Arial';
         ctx.fillText(profile.displayName, screen.x - 55, screen.y - 22);
         ctx.restore();
       }
-      drawTag(ctx, 'six firing styles', 410, 315, PALETTE.HUD_MUTED);
+      drawTag(ctx, 'six collectible hulls', 410, 315, PALETTE.HUD_MUTED);
     },
   };
 }
 
 interface PickupView {
-  typeId: 'echo' | 'relay';
+  typeId: SatellitePickupTypeId;
   position: Position;
   angle: number;
   radius: number;
@@ -2347,35 +2324,9 @@ function drawPickup(ctx: RenderContext, pickup: PickupView, scale = 1): void {
   const radius = Math.max(6, pickup.radius * scale);
   ctx.save();
   ctx.translate(screen.x, screen.y);
-  ctx.rotate(-pickup.angle);
-  ctx.strokeStyle = pickup.color;
   ctx.shadowColor = pickup.color;
   ctx.shadowBlur = 3;
-  ctx.lineWidth = 1.5;
-  if (pickup.typeId === 'echo') {
-    ctx.beginPath();
-    ctx.roundRect(-radius * 0.65, -radius * 0.42, radius * 1.3, radius * 0.84, radius * 0.16);
-    ctx.moveTo(0, -radius * 0.42);
-    ctx.lineTo(0, -radius * 1.05);
-    ctx.moveTo(-radius * 0.9, radius * 0.65);
-    ctx.lineTo(radius * 0.9, radius * 0.65);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(radius * 0.42, -radius * 0.95, radius * 0.48, Math.PI, 0);
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-    ctx.rect(-radius * 0.38, -radius * 0.7, radius * 0.76, radius * 1.4);
-    ctx.moveTo(-radius * 0.38, 0);
-    ctx.lineTo(-radius * 1.25, -radius * 0.48);
-    ctx.lineTo(-radius * 1.25, radius * 0.48);
-    ctx.lineTo(-radius * 0.38, 0);
-    ctx.moveTo(radius * 0.38, 0);
-    ctx.lineTo(radius * 1.25, -radius * 0.48);
-    ctx.lineTo(radius * 1.25, radius * 0.48);
-    ctx.lineTo(radius * 0.38, 0);
-    ctx.stroke();
-  }
+  renderSatellite(ctx, pickup.typeId, radius, pickup.angle, pickup.color);
   ctx.restore();
   if (pickup.state === 'broken' || pickup.health >= pickup.maxHealth) {
     return;
@@ -2405,7 +2356,7 @@ function makePickupsDemo(): Demo {
   const created = manager.createPickups(2);
   const first = created[0];
   if (first === undefined) {
-    throw new Error('wiki-media verification failed: pickup manager did not create Echo');
+    throw new Error('wiki-media verification failed: pickup manager did not create Landsat 7');
   }
   const owner = {
     id: 'pilot',
@@ -2443,9 +2394,9 @@ function makePickupsDemo(): Demo {
       drawFrameChrome(
         ctx,
         'SATELLITE PICKUPS',
-        'auto-collect nearby Echo → orbit indefinitely while it intercepts fire',
+        'auto-collect nearby Landsat 7 → orbit indefinitely while it intercepts fire',
         frame,
-        PALETTE.SATELLITE_PICKUP
+        PALETTE.SATELLITE
       );
       runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
         manager.update([owner]);
@@ -2464,8 +2415,11 @@ function makePickupsDemo(): Demo {
           drawRing(
             ctx,
             { x: 0, y: 0 },
-            Math.max(42, owner.radius + firstPickup.radius + SATELLITE_PICKUP.ORBIT_GAP),
-            PALETTE.SATELLITE_PICKUP,
+            Math.max(
+              SATELLITE_PICKUP.ORBIT_RADIUS,
+              owner.radius + firstPickup.radius + SATELLITE_PICKUP.ORBIT_GAP
+            ),
+            PALETTE.SATELLITE,
             0.28
           );
         }
@@ -2493,13 +2447,13 @@ function makePickupsDemo(): Demo {
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'
-          ? `Echo orbit · ${firstPickup.health}/${firstPickup.maxHealth} HP`
+          ? `${firstPickup.name} orbit · ${firstPickup.health}/${firstPickup.maxHealth} HP`
           : firstPickup?.state === 'loose'
-            ? 'Echo released'
-            : 'Echo collected',
+            ? `${firstPickup.name} released`
+            : `${firstPickup?.name ?? 'Landsat 7'} collected`,
         340,
         112,
-        PALETTE.SATELLITE_PICKUP
+        PALETTE.SATELLITE
       );
       drawTag(
         ctx,

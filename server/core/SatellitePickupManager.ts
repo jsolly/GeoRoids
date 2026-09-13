@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../setup/serverLogger';
-import type { Position, SatellitePickupData, SatellitePickupTypeId } from '../../shared-types';
+import { satelliteProfileAt } from '../../shared/eoSatellites';
+import type { Position, SatellitePickupData } from '../../shared-types';
 import { DEBUG, PALETTE, SATELLITE_PICKUP } from '../../src/constants';
 import {
   advanceDriftCenter,
@@ -19,8 +20,6 @@ import {
   type QuakeMotion,
 } from './quakeMotion';
 import type { RNGService } from './RNGService';
-
-const PICKUP_NAMES = ['Echo', 'Relay'] as const;
 
 interface PickupOwnerPose {
   id: string;
@@ -159,12 +158,10 @@ export class SatellitePickupManager {
     return count;
   }
 
-  /** Place a second pickup opposite the owner's current orbiting pickup. */
+  /** Place the next pickup in the next even orbit slot around the owner. */
   public nextOrbitPhaseFor(ownerId: string): number {
-    const existing = Array.from(this.pickups.values())
-      .filter((pickup) => pickup.state === 'orbiting' && pickup.ownerId === ownerId)
-      .sort((a, b) => a.id.localeCompare(b.id))[0];
-    return existing ? existing.orbitPhase + Math.PI : 0;
+    const count = this.countOrbitingFor(ownerId);
+    return (count * Math.PI * 2) / SATELLITE_PICKUP.MAX_COUNT;
   }
 
   public releaseOwner(ownerId: string): void {
@@ -273,23 +270,16 @@ export class SatellitePickupManager {
   }
 
   private respawnLoose(pickup: SatellitePickupInternal): void {
-    const next = this.spawnLoose(
-      pickup.rosterIndex,
-      this.pickups.size,
-      pickup.id,
-      pickup.name,
-      pickup.typeId
-    );
+    const next = this.spawnLoose(pickup.rosterIndex, this.pickups.size, pickup.id);
     Object.assign(pickup, next);
   }
 
   private spawnLoose(
     index: number,
     count: number,
-    id = `server-pickup-${randomUUID()}`,
-    name = PICKUP_NAMES[index % PICKUP_NAMES.length] ?? 'Relay',
-    typeId: SatellitePickupTypeId = index % 2 === 0 ? 'echo' : 'relay'
+    id = `server-pickup-${randomUUID()}`
   ): SatellitePickupInternal {
+    const profile = satelliteProfileAt(index);
     const orbitCenter = spawnRingPosition(index, count, () => this.rng.random());
     const orbitPhase = this.rng.random() * Math.PI * 2;
     const offset = orbitOffset(orbitPhase, SATELLITE_PICKUP.LOOSE_ORBIT_RADIUS);
@@ -303,14 +293,14 @@ export class SatellitePickupManager {
 
     return {
       id,
-      name,
-      typeId,
-      assetKey: `pickup/${typeId}`,
+      name: profile.displayName,
+      typeId: profile.typeId,
+      assetKey: profile.assetKey,
       position,
       velocity: { x: 0, y: 0 },
       angle: orbitPhase,
       radius: SATELLITE_PICKUP.SIZE / 2,
-      color: PALETTE.SATELLITE_PICKUP,
+      color: PALETTE.SATELLITE,
       state: 'loose',
       ownerId: null,
       health: SATELLITE_PICKUP.HEALTH,

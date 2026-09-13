@@ -20,7 +20,7 @@ E automatically projects a reflective laser shield to the nearest living allied
 ship in reach, preferring the forward hemisphere and then the nearest fallback.
 There is no precise aim; a miss does not spend the cooldown. The cyan link stays
 visible while the projection is active. The projected shield reflects hostile
-player, bot, and satellite lasers back toward their source but does not stop
+player and bot lasers back toward their source but does not stop
 collisions. An exploding loot drop bypasses both shields; spawn protection blocks
 that blast.
 

@@ -153,13 +153,11 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         world.asteroids = [];
       }
       if (tick >= 45 && tick < 65) {
-        const satellite = world.satellites[0];
-        assert.ok(satellite, 'snapshot satellite');
-        satellite.exploding = true;
-        satellite.health = 0;
-        world.satelliteProjectiles = world.satelliteProjectiles.filter(
-          (shot) => shot.satelliteId !== 'eo-0'
-        );
+        const pickup = world.satellitePickups[0];
+        assert.ok(pickup, 'snapshot pickup');
+        pickup.state = 'broken';
+        pickup.health = 0;
+        pickup.ownerId = null;
       }
       if (tick === 25) {
         const asteroid = world.asteroids[0];
@@ -170,8 +168,6 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         asteroid.vertices = 4;
       }
       if (tick >= 130) {
-        world.satellites = [];
-        world.satelliteProjectiles = [];
         world.satellitePickups = [];
       }
       // New fields and collections cannot be dropped by a stale codec whitelist.
@@ -259,9 +255,9 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       )
     ).toThrow(/DTO/);
     const invalidReference = captureSnapshot(snapshotFixture(2));
-    const satelliteProjectile = invalidReference.satelliteProjectiles[0];
-    assert.ok(satelliteProjectile, 'satellite projectile');
-    satelliteProjectile.satelliteId = 'missing-eo';
+    const collabTag = invalidReference.collabTags[0];
+    assert.ok(collabTag, 'collab tag');
+    collabTag.asteroidId = 'missing-asteroid';
     expect(() =>
       decodeSnapshotMessage(
         decoder,
@@ -287,9 +283,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       entities: [],
       asteroids: [],
       loot: [],
-      satellites: [],
       satellitePickups: [],
-      satelliteProjectiles: [],
       playerProjectiles: [],
       collabTags: [],
       gameTime: 1,

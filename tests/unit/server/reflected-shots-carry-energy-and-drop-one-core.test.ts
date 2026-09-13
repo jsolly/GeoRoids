@@ -45,7 +45,6 @@ function snapshot(engine: GameEngine) {
   return captureSnapshot({
     ...engine.getGameState(),
     playerProjectiles: engine.getPlayerProjectiles(),
-    satelliteProjectiles: [],
     collabTags: [],
   });
 }
@@ -87,12 +86,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
     for (const player of [alpha, beta, zeta]) {
       delete player.spawnProtectionTimer;
     }
-    for (const satellite of engine.getAllSatellites()) {
-      const internal = engine.getSatellite(satellite.id);
-      if (internal) {
-        internal.position = { x: 20_000, y: 20_000 };
-      }
-    }
+    engine.parkSatellitePickups();
 
     const alphaHealth = alpha.health;
     const betaHealth = beta.health;

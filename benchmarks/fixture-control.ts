@@ -192,7 +192,6 @@ export async function startFixtureControl(
           humans: players.length,
           bots: engine.getAllBots().length,
           asteroids: engine.getAsteroidCount(),
-          satellites: engine.getSatelliteCount(),
           pickups: engine.getSatellitePickupCount(),
         };
         if (request.scenario === 'combat') {
@@ -200,8 +199,7 @@ export async function startFixtureControl(
             humans: 5,
             bots: 2,
             asteroids: 80,
-            satellites: 6,
-            pickups: 2,
+            pickups: 6,
           });
         }
         const baselines = players.map((player) => {
@@ -231,10 +229,8 @@ export async function startFixtureControl(
             fuel: actor.fuel,
           })),
           asteroids: normalizeFixtureAsteroids(engine.getAllAsteroids()),
-          satellites: engine.getAllSatellites().map(({ id: _id, ...satellite }) => satellite),
           pickups: engine.getAllSatellitePickups().map(({ id: _id, ...pickup }) => pickup),
           playerProjectiles: engine.getPlayerProjectiles(),
-          satelliteProjectiles: engine.getActiveSatelliteProjectiles(),
         };
         const hash = createHash('sha256').update(JSON.stringify(manifest)).digest('hex');
         socket.end(

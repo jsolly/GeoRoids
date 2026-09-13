@@ -10,7 +10,6 @@ import { LootField } from '../../../src/entities/loot/LootField';
 import type { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { Roid } from '../../../src/entities/roid/Roid';
-import { SatelliteManager } from '../../../src/entities/satellite/SatelliteManager';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { tickAbilityHost } from '../../../src/entities/ship/shipAbilities';
@@ -227,9 +226,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       });
       state.entities = [local];
       state.playerProjectiles = [];
-      state.satelliteProjectiles = [];
       state.collabTags = [];
-      state.satellites = [];
       state.satellitePickups = [];
       state.loot = [];
       ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
@@ -340,9 +337,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ];
     first.asteroids = [];
     first.loot = [];
-    first.satellites = [];
     first.satellitePickups = [];
-    first.satelliteProjectiles = [];
     first.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
     ws.receive(
@@ -389,9 +384,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     baseline.entities = [baselineEntity];
     baseline.asteroids = [];
     baseline.loot = [];
-    baseline.satellites = [];
     baseline.satellitePickups = [];
-    baseline.satelliteProjectiles = [];
     baseline.collabTags = [];
 
     ws.receive('snapshot', new SnapshotEncoder(baseline).encode(1));
@@ -462,9 +455,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     state.asteroids = [];
     state.loot = [];
-    state.satellites = [];
     state.satellitePickups = [];
-    state.satelliteProjectiles = [];
     state.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     expect(manager.getAllPlayers()).toEqual([player]);
@@ -629,7 +620,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(LootField.getInstance().getAll()).toEqual(first.loot);
   });
 
-  test('EO shots, pickup ownership, tag expiry and asteroid metadata reconcile in real managers', async () => {
+  test('pickup ownership, tag expiry and asteroid metadata reconcile in real managers', async () => {
     const ws = await connect();
     acknowledge(ws);
     const belt = new Map<string, Roid>();
@@ -663,19 +654,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     const first = captureSnapshot(snapshotFixture());
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
-    const satellites = SatelliteManager.getInstance();
     const pickups = SatellitePickupManager.getInstance();
-    expect(satellites.getAll()).toHaveLength(6);
-    expect(satellites.get('eo-0')?.lasers).toHaveLength(1);
-    const projectile = first.satelliteProjectiles[0];
-    assert.ok(projectile, 'satellite projectile');
-    ws.receive('satelliteShoot', {
-      id: projectile.satelliteId,
-      shotId: projectile.shotId,
-      laserStart: projectile.position,
-      laserDirection: projectile.velocity,
-    });
-    expect(satellites.get('eo-0')?.lasers).toHaveLength(1);
+    expect(pickups.getAll()).toHaveLength(6);
     expect(pickups.get('pickup-0')?.ownerId).toBe('pilot-0');
     expect(belt.get('asteroid-0')?.taggedUntil).toBe(5000);
     const next = captureSnapshot(snapshotFixture(70));
@@ -689,13 +669,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     nextAsteroid.offsets = [0.7, 1.2, 0.8];
     nextAsteroid.jaggedness = 0.9;
     delete nextAsteroid.isCollabTarget;
-    const nextSatellite = next.satellites[0];
-    assert.ok(nextSatellite, 'next satellite');
-    nextSatellite.exploding = true;
-    nextSatellite.health = 0;
-    next.satelliteProjectiles = [];
     ws.receive('snapshot', new SnapshotEncoder(next).encode(2, { sequence: 1, state: first }));
-    expect(satellites.get('eo-0')?.lasers).toEqual([]);
     expect(pickups.get('pickup-0')?.ownerId).toBeNull();
     expect(pickups.get('pickup-0')?.health).toBe(25);
     expect(belt.get('asteroid-0')).toMatchObject({
@@ -706,13 +680,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
       isCollabTarget: false,
       taggedUntil: 0,
     });
-    // A rejoin starts a new sequence and reconstructs shots even after local caches were lost.
+    // A rejoin starts a new sequence and reconstructs ownership even after local caches were lost.
     manager.initializeAsteroidSync();
     acknowledge(ws);
-    satellites.clear();
     pickups.clear();
     ws.receive('snapshot', new SnapshotEncoder(first).encode(1));
-    expect(satellites.get('eo-0')?.lasers).toHaveLength(1);
     expect(pickups.get('pickup-0')?.ownerId).toBe('pilot-0');
   });
 

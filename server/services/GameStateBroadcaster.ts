@@ -92,9 +92,6 @@ export class GameStateBroadcaster {
     this.broadcastInterval = setInterval(() => {
       this.flushExpiredCollabHits();
       if (this.gameEngine.getPlayerCount() > 0) {
-        for (const shot of this.gameEngine.drainSatelliteShots()) {
-          this.broadcastSatelliteShoot(shot);
-        }
         this.broadcastGameState();
       }
     }, 1000 / 30); // 30 FPS (33.33ms) for smooth bot movement
@@ -165,9 +162,6 @@ export class GameStateBroadcaster {
         canonical ??= new SnapshotEncoder({
           ...gameState,
           playerProjectiles: this.gameEngine.getPlayerProjectiles(),
-          satelliteProjectiles: this.gameEngine
-            .getActiveSatelliteProjectiles()
-            .map((projectile) => ({ id: projectile.shotId, ...projectile })),
           collabTags: this.gameEngine
             .getActiveCollabTags()
             .map((tag) => ({ id: tag.asteroidId, ...tag })),
@@ -297,19 +291,6 @@ export class GameStateBroadcaster {
     } as const;
 
     this.broadcastToAll(message, playerId);
-  }
-
-  public broadcastSatelliteShoot(shot: {
-    id: string;
-    shotId: string;
-    laserStart: { x: number; y: number };
-    laserDirection: { x: number; y: number };
-  }): void {
-    this.broadcastToAll({
-      type: 'satelliteShoot',
-      data: shot,
-      timestamp: Date.now(),
-    });
   }
 
   public broadcastCombatResult(result: CombatBroadcast): void {

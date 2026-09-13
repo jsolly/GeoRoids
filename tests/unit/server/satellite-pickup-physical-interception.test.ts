@@ -2,8 +2,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { RNGService } from '../../../server/core/RNGService';
-import { SatelliteManager } from '../../../server/core/SatelliteManager';
 import type { AsteroidData } from '../../../shared-types';
 import { DAMAGE, SATELLITE_PICKUP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -12,10 +10,6 @@ function clearAsteroids(engine: GameEngine): void {
   for (const asteroid of engine.getAllAsteroids()) {
     engine.removeAsteroid(asteroid.id);
   }
-}
-
-function clearSatellites(engine: GameEngine): void {
-  engine.createSatellites(0);
 }
 
 function asteroidAt(id: string, position: { x: number; y: number }): AsteroidData {
@@ -57,7 +51,6 @@ describe('satellite pickups intercept physical damage', () => {
     );
     engine.updatePlayer('owner', { spawnProtectionTimer: 0 });
     clearAsteroids(engine);
-    clearSatellites(engine);
   }
 
   function attachFirstPickup(): string {
@@ -164,139 +157,5 @@ describe('satellite pickups intercept physical damage', () => {
     engine.resolveAuthoritativeCombat(1_001);
     expect(engine.getSatellitePickup(pickup.id)?.state).toBe('broken');
     expect(engine.getAsteroid('pickup-rock')).toBeDefined();
-  });
-});
-
-describe('EO projectiles choose the nearest swept body', () => {
-  test('a projectile can hit an un-aimable pickup on its way to a farther ship', () => {
-    const manager = new SatelliteManager(new RNGService(77));
-    const satellite = manager.createSatellites(1)[0];
-    assert.ok(satellite);
-
-    let shot = manager.getActiveProjectiles()[0];
-    for (let frame = 0; frame < 240 && !shot; frame += 1) {
-      manager.update([
-        {
-          id: 'ship',
-          position: { x: satellite.position.x + 180, y: satellite.position.y },
-          radius: 15,
-          health: 100,
-          exploding: false,
-          kind: 'ship',
-        },
-      ]);
-      shot = manager.getActiveProjectiles()[0];
-    }
-    assert.ok(shot, 'EO satellite produced a projectile');
-
-    const endpoint = {
-      x: shot.position.x + shot.velocity.x,
-      y: shot.position.y + shot.velocity.y,
-    };
-    const fartherShip = {
-      id: 'farther-ship',
-      position: {
-        x: endpoint.x + shot.velocity.x * 2,
-        y: endpoint.y + shot.velocity.y * 2,
-      },
-      radius: 10,
-      health: 100,
-      exploding: false,
-      kind: 'ship' as const,
-    };
-    const pickup = {
-      id: 'pickup-body',
-      position: endpoint,
-      radius: SATELLITE_PICKUP.SIZE / 2,
-      health: SATELLITE_PICKUP.HEALTH,
-      exploding: false,
-      aimable: false,
-      kind: 'pickup' as const,
-    };
-
-    manager.update([fartherShip, pickup]);
-    const hit = manager.drainHits()[0];
-    expect(hit?.targetId).toBe(pickup.id);
-    expect(hit?.targetKind).toBe('pickup');
-  });
-
-  test('EO satellites never fire when the only available body is a pickup', () => {
-    const manager = new SatelliteManager(new RNGService(78));
-    manager.createSatellites(1);
-    const shots = manager.update([
-      {
-        id: 'pickup-body',
-        position: { x: 0, y: 0 },
-        radius: SATELLITE_PICKUP.SIZE / 2,
-        health: SATELLITE_PICKUP.HEALTH,
-        exploding: false,
-        aimable: false,
-        kind: 'pickup',
-      },
-    ]);
-
-    expect(shots).toEqual([]);
-  });
-
-  test('a reflected EO projectile can return to its source satellite', () => {
-    const manager = new SatelliteManager(new RNGService(79));
-    const satellite = manager.createSatellites(1)[0];
-    assert.ok(satellite);
-    const sourcePosition = { x: -140, y: 0 };
-    const internalSatellite = manager.getSatellite(satellite.id);
-    assert.ok(internalSatellite);
-    internalSatellite.position = { ...sourcePosition };
-    internalSatellite.orbitCenter = { ...sourcePosition };
-    internalSatellite.shootCooldown = 999;
-
-    const projectile = {
-      satelliteId: satellite.id,
-      shotId: 'source-shot',
-      position: { x: -100, y: 0 },
-      velocity: { x: 100, y: 0 },
-      age: 0,
-      bounces: 0,
-    };
-    const internals = manager as unknown as { projectiles: Array<typeof projectile> };
-    internals.projectiles.push(projectile);
-
-    let shieldFlashCount = 0;
-    const shieldedShip = {
-      id: 'shielded-ship',
-      position: { x: 0, y: 0 },
-      radius: 20,
-      health: 100,
-      exploding: false,
-      kind: 'ship' as const,
-      shieldActive: true,
-      shieldTime: 30,
-      onShieldHit: () => {
-        shieldFlashCount += 1;
-      },
-    };
-    const sourceBody = {
-      id: satellite.id,
-      position: sourcePosition,
-      radius: satellite.radius,
-      health: satellite.health,
-      exploding: false,
-      aimable: false,
-      kind: 'satellite' as const,
-    };
-
-    manager.update([sourceBody, shieldedShip]);
-    expect(manager.drainHits()).toEqual([]);
-    expect(shieldFlashCount).toBe(1);
-    expect(manager.getActiveProjectiles()[0]?.velocity.x).toBeLessThan(0);
-
-    manager.update([sourceBody, shieldedShip]);
-    expect(manager.drainHits()).toEqual([
-      {
-        satelliteId: satellite.id,
-        targetId: satellite.id,
-        targetKind: 'satellite',
-        damage: DAMAGE.LASER_HIT,
-      },
-    ]);
   });
 });

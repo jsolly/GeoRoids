@@ -369,16 +369,17 @@ test(
 
       // Place both cameras near the same surviving rock, choosing the greatest
       // clearance from live NPCs and leaving space outside its hull.
-      const [field, bots, satellites, radius1, radius2] = await Promise.all([
+      const [field, bots, pickups, radius1, radius2] = await Promise.all([
         game1.getAsteroidPositions(),
         game1.getBots(),
-        game1.getSatellites(),
+        game1.getSatellitePickups(),
         game1.getShipRadius(),
         game2.getShipRadius(),
       ]);
-      const enemies = [...bots, ...satellites].filter(
-        (enemy) => !enemy.exploding && enemy.health > 0
-      );
+      const enemies = [
+        ...bots.filter((enemy) => !enemy.exploding && enemy.health > 0),
+        ...pickups.filter((pickup) => pickup.health > 0 && pickup.state !== 'broken'),
+      ];
       const clearance = (rock: Field[number]) =>
         Math.min(...enemies.map((enemy) => Math.hypot(enemy.x - rock.x, enemy.y - rock.y)));
       const focus = [...field].sort((a, b) => clearance(b) - clearance(a))[0];

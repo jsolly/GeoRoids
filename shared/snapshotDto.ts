@@ -7,7 +7,6 @@ import type {
   LootKind,
   PlayerMotionState,
   PlayerProjectileState,
-  SatelliteData,
   SatellitePickupData,
   SatellitePickupState,
   SatellitePickupTypeId,
@@ -16,10 +15,8 @@ import type {
   ServerGameState,
   ShipKitId,
   SnapshotCollabTag,
-  SnapshotSatelliteProjectile,
   SoftFactionId,
 } from '../shared-types';
-import type { SatelliteShotManner, SatelliteTypeId } from './eoSatellites';
 
 type Rule = (value: unknown) => boolean;
 /** Every DTO key must have a validator; additions cannot silently escape validation. */
@@ -145,10 +142,10 @@ const loot = shape<LootData>({
   kind: lootKind,
   fuel: optional(number),
 });
-const satellite = shape<SatelliteData>({
+const pickup = shape<SatellitePickupData>({
   id: string,
   name: string,
-  typeId: enumeration<SatelliteTypeId>({
+  typeId: enumeration<SatellitePickupTypeId>({
     'landsat-7': true,
     terra: true,
     aqua: true,
@@ -157,28 +154,6 @@ const satellite = shape<SatelliteData>({
     'worldview-3': true,
   }),
   assetKey: string,
-  shotManner: enumeration<SatelliteShotManner>({
-    'steady-optical-ping': true,
-    'wide-modis-sweep': true,
-    'microwave-spin-burst': true,
-    'geo-weather-beam': true,
-    'radar-plank-sweep': true,
-    'sharp-vhr-stab': true,
-  }),
-  position,
-  velocity: position,
-  angle: number,
-  exploding: boolean,
-  color: string,
-  health: number,
-  maxHealth: number,
-  radius: number,
-});
-const pickup = shape<SatellitePickupData>({
-  id: string,
-  name: choice('Echo', 'Relay'),
-  typeId: enumeration<SatellitePickupTypeId>({ echo: true, relay: true }),
-  assetKey: choice('pickup/echo', 'pickup/relay'),
   position,
   velocity: position,
   angle: number,
@@ -188,14 +163,6 @@ const pickup = shape<SatellitePickupData>({
   ownerId: (value) => value === null || string(value),
   health: number,
   maxHealth: number,
-});
-const projectile = shape<SnapshotSatelliteProjectile>({
-  id: string,
-  satelliteId: string,
-  shotId: string,
-  position,
-  velocity: position,
-  age: (value) => number(value) && (value as number) >= 0,
 });
 const playerProjectile = shape<PlayerProjectileState>({
   abilityShot: optional(boolean),
@@ -220,7 +187,6 @@ const worldRules = {
   entities: array(entity),
   asteroids: array(asteroid),
   loot: array(loot),
-  satellites: array(satellite),
   satellitePickups: array(pickup),
   gameTime: number,
   isPaused: boolean,
@@ -228,7 +194,6 @@ const worldRules = {
 } satisfies Shape<ServerGameState>;
 const world = shape<ServerGameSnapshot>({
   ...worldRules,
-  satelliteProjectiles: array(projectile),
   collabTags: array(collabTag),
   playerProjectiles: array(playerProjectile),
 });
@@ -238,14 +203,8 @@ export function validateSnapshotDto(value: unknown): asserts value is ServerGame
     throw new Error('Incomplete or invalid public snapshot DTO');
   }
   const snapshot = value as ServerGameSnapshot;
-  const satelliteIds = new Set(
-    snapshot.satellites.filter((item) => !item.exploding && item.health > 0).map((item) => item.id)
-  );
   const asteroidIds = new Set(snapshot.asteroids.map((item) => item.id));
   if (
-    snapshot.satelliteProjectiles.some(
-      (item) => item.id !== item.shotId || !satelliteIds.has(item.satelliteId)
-    ) ||
     snapshot.collabTags.some(
       (item) => item.id !== item.asteroidId || !asteroidIds.has(item.asteroidId)
     )

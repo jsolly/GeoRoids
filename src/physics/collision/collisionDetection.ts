@@ -48,7 +48,7 @@ export function asteroidPointsForRadius(radius: number): number {
   return pointsForRoidSize(radius);
 }
 
-/** Check if a satellite projectile hits a ship/bot. */
+/** Check if a laser hits a ship/bot. */
 export function checkLaserShipCollision(
   laserPos: Position,
   shipPos: Position,

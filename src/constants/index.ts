@@ -77,9 +77,8 @@ export const PALETTE = {
   LOOT: '#E8D5A3',
   /** F-key laser bubble ring. Mint, distinct from local teal and remote sky. */
   SHIELD: '#7DD3C8',
-  /** Ambient EO hardware; deliberately independent of ION/EMBER. */
+  /** Collectible EO hardware; deliberately independent of ION/EMBER. */
   SATELLITE: '#C4B5FD',
-  SATELLITE_PICKUP: '#FBBF24',
 } as const;
 
 export const TITLE = {
@@ -275,35 +274,11 @@ export const ROID = {
   FIELD_INNER_SCALE: 0.96,
 } as const;
 
-// ============================================================================
-// AMBIENT EO SATELLITE NPC
-// ============================================================================
-// Ambient, server-owned. Not a ship kit and not ION/EMBER-aligned.
-export const SATELLITE = {
-  SIZE: 32,
-  ORBIT_RADIUS: 160,
-  ORBIT_SPEED: 0.018 * GAME.MOTION_SCALE,
-  DRIFT_SPEED: 0.35 * GAME.MOTION_SCALE,
-  /** Keep the whole six-bird product roster visible in an active arena. */
-  AMBIENT_COUNT: 6,
-  MAX_COUNT: 6,
-  HEALTH: 50,
-  POINTS: 75,
-  COLLISION_DAMAGE: 50,
-  DESPAWN_DISTANCE: 2600,
-  BOUNDARY_RADIUS: 2800,
-  EXPLODE_DURATION_FRAMES: 18,
-  RESPAWN_FRAMES: 180,
-  MASS: 1,
-  /** Inverse-scaled age guard keeps satellite shot travel distance unchanged. */
-  PROJECTILE_MAX_FRAMES: Math.ceil(240 / GAME.MOTION_SCALE),
-} as const;
-
-// Collectible EO communications hardware (Echo + Relay). This is a pickup
-// effect, not a sixth ship kit or a faction.
+// Collectible Earth-observation hardware. This is a pickup effect, not a sixth
+// ship kit, a faction, or a hostile NPC.
 export const SATELLITE_PICKUP = {
-  SIZE: 18,
-  ORBIT_RADIUS: 42,
+  SIZE: 24,
+  ORBIT_RADIUS: 48,
   ORBIT_SPEED: 0.08 * GAME.MOTION_SCALE,
   DRIFT_SPEED: 0.28 * GAME.MOTION_SCALE,
   LOOSE_ORBIT_RADIUS: 70,
@@ -312,7 +287,7 @@ export const SATELLITE_PICKUP = {
   AUTO_COLLECT_RANGE: 140,
   RESPAWN_FRAMES: 180,
   ORBIT_GAP: 8,
-  MAX_COUNT: 2,
+  MAX_COUNT: 6,
   SPAWN_RING_MIN: 380,
   SPAWN_RING_MAX: 480,
   FIELD_RADIUS: 700,
@@ -417,14 +392,8 @@ export const DEBUG = {
     SPAWN_PROTECTION: false,
   },
 
-  SATELLITE: {
-    COUNT: 6,
-    MOVEMENT: true,
-    LASERS: true,
-  },
-
   SATELLITE_PICKUP: {
-    COUNT: 2,
+    COUNT: 6,
     MOVEMENT: true,
   },
 

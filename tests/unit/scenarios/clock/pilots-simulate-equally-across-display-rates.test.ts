@@ -4,11 +4,9 @@ import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../../shared/gameClock';
 import { GameController } from '../../../../src/core/gameController';
 import { Laser } from '../../../../src/entities/laser/Laser';
 import { Roid } from '../../../../src/entities/roid/Roid';
-import { SatelliteManager } from '../../../../src/entities/satellite/SatelliteManager';
 import { canvasManager } from '../../../../src/rendering/canvas';
 
 const game = GameController.getInstance();
-const satellites = SatelliteManager.getInstance();
 
 beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -16,7 +14,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  satellites.clear();
   game.getCurrRoidBelt().roids.length = 0;
   canvasManager.destroy();
   vi.restoreAllMocks();
@@ -36,25 +33,6 @@ function arrangeFlight() {
   const asteroid = new Roid({ x: -500, y: -500 }, 20, 'clock-asteroid');
   asteroid.velocity = { x: 0.2, y: -0.1 };
   game.getCurrRoidBelt().roids = [asteroid];
-  satellites.clear();
-  satellites.syncFromServer([
-    {
-      id: 'clock-satellite',
-      name: 'Landsat 7',
-      typeId: 'landsat-7',
-      assetKey: 'eo/landsat-7',
-      shotManner: 'steady-optical-ping',
-      position: { x: 1000, y: -1000 },
-      velocity: { x: 0, y: 0 },
-      angle: 0,
-      exploding: false,
-      color: '#C4B5FD',
-      health: 50,
-      maxHealth: 50,
-      radius: 16,
-    },
-  ]);
-  satellites.addLaser('clock-satellite', 'clock-shot', { x: 900, y: -900 }, { x: 1, y: 0 });
   return ship;
 }
 
@@ -67,10 +45,6 @@ function flightSnapshot() {
     angle: ship.angle,
     shieldCooldown: ship.shieldCooldown,
     lasers: ship.lasers.map((laser) => ({ ...laser.position, distance: laser.distTraveled })),
-    satelliteLasers: satellites.get('clock-satellite')?.lasers.map((laser) => ({
-      ...laser.position,
-      distance: laser.distTraveled,
-    })),
     asteroids: game.getCurrRoidBelt().roids.map((asteroid) => ({ ...asteroid.position })),
   };
 }
@@ -85,7 +59,6 @@ test.each([30, 60, 120, 144])(
     const reference = flightSnapshot();
     expect(reference.shieldCooldown).toBe(180);
     expect(reference.lasers).toEqual([{ x: 620, y: 500, distance: 120 }]);
-    expect(reference.satelliteLasers).toEqual([{ x: 960, y: -900, distance: 60 }]);
 
     const ship = arrangeFlight();
     const steps = vi.spyOn(ship, 'update');

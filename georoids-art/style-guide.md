@@ -16,7 +16,7 @@ Retro means **elegance**: luminous thin lines, quiet negative space, intentional
 
 ## Ships & soft factions
 
-Also: ambient **hostile EO satellite** NPCs (six distinct hardware silhouettes, lilac `#C4B5FD`) — not faction-aligned. See `ships-and-factions.md`.
+Also: collectible **EO satellite** pickups (six distinct hardware silhouettes, lilac `#C4B5FD`) — not faction-aligned. See `ships-and-factions.md`.
 
 Ship classes and soft faction marks are detailed in [`ships-and-factions.md`](ships-and-factions.md). Beauty bar and locked playfield palette above still rule.
 
@@ -80,9 +80,12 @@ At a glance: local cyan-mint vs remote sky vs bot amber. Roids quieter. HUD neve
 
 **Keep / rework:** lives as tiny outline ship glyphs (local color); score as small phosphor text top-left; leaderboard as sparse translucent list (bot amber / human sky names); radar as a hairline muted ring with pin-dot contacts; health as a thin tick or 2px capsule — show `100/100` only on damage or settings.
 
-## Hostile EO satellites (ambient)
+## Collectible EO satellites
 
-Six recognizable Earth-observation satellites in `#C4B5FD`, with `#E9D5FF` shot accents. They are not faction-aligned. Their hardware and shot manners follow `eo-satellites/roster-and-briefs.md`; the former UFO artwork is historical only.
+Six recognizable Earth-observation satellites in `#C4B5FD`. They are not
+faction-aligned. Their hardware follows `eo-satellites/roster-and-briefs.md`;
+the former UFO artwork is historical only. Runtime uses these hulls as
+collectible orbiting pickups, not ambient hostiles.
 
 ## Harpoon (ability)
 

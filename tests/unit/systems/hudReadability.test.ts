@@ -236,7 +236,6 @@ describe('painted HUD composition', () => {
     const { NetworkManager } = await import('../../../src/network/networkManager');
     const { LootField } = await import('../../../src/entities/loot/LootField');
     const { Roid } = await import('../../../src/entities/roid/Roid');
-    const { SatelliteManager } = await import('../../../src/entities/satellite/SatelliteManager');
     const { SatellitePickupManager } = await import(
       '../../../src/entities/satellitePickup/SatellitePickupManager'
     );
@@ -262,49 +261,17 @@ describe('painted HUD composition', () => {
     });
     bot.ship.angle = 0;
     vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, bot]);
-    SatelliteManager.getInstance().syncFromServer([
-      {
-        id: 'radar-satellite',
-        name: 'Landsat 7',
-        typeId: 'landsat-7',
-        assetKey: 'eo/landsat-7',
-        shotManner: 'steady-optical-ping',
-        position: { x: 0, y: -boundary.radius / 2 },
-        velocity: { x: 0, y: 0 },
-        angle: 0,
-        exploding: false,
-        color: '#C4B5FD',
-        health: 100,
-        maxHealth: 100,
-        radius: 22,
-      },
-      {
-        id: 'radar-dead-satellite',
-        name: 'Terra',
-        typeId: 'terra',
-        assetKey: 'eo/terra',
-        shotManner: 'wide-modis-sweep',
-        position: { x: boundary.radius / 4, y: 0 },
-        velocity: { x: 0, y: 0 },
-        angle: 0,
-        exploding: true,
-        color: '#C4B5FD',
-        health: 100,
-        maxHealth: 100,
-        radius: 22,
-      },
-    ]);
     SatellitePickupManager.getInstance().syncFromServer([
       {
         id: 'radar-pickup',
-        name: 'Echo',
-        typeId: 'echo',
-        assetKey: 'pickup/echo',
+        name: 'Landsat 7',
+        typeId: 'landsat-7',
+        assetKey: 'eo/landsat-7',
         position: { x: 0, y: boundary.radius / 2 },
         velocity: { x: 0, y: 0 },
         angle: 0,
-        radius: 15,
-        color: '#FBBF24',
+        radius: 12,
+        color: '#C4B5FD',
         state: 'loose',
         ownerId: null,
         health: 50,
@@ -312,14 +279,14 @@ describe('painted HUD composition', () => {
       },
       {
         id: 'radar-pickup-secondary',
-        name: 'Echo',
-        typeId: 'echo',
-        assetKey: 'pickup/echo',
+        name: 'Terra',
+        typeId: 'terra',
+        assetKey: 'eo/terra',
         position: { x: boundary.radius / 4, y: boundary.radius / 2 },
         velocity: { x: 0, y: 0 },
         angle: 0,
-        radius: 15,
-        color: '#FBBF24',
+        radius: 12,
+        color: '#C4B5FD',
         state: 'loose',
         ownerId: null,
         health: 50,
@@ -327,14 +294,14 @@ describe('painted HUD composition', () => {
       },
       {
         id: 'radar-orbiter',
-        name: 'Relay',
-        typeId: 'relay',
-        assetKey: 'pickup/relay',
+        name: 'Aqua',
+        typeId: 'aqua',
+        assetKey: 'eo/aqua',
         position: { x: -boundary.radius / 2, y: 0 },
         velocity: { x: 0, y: 0 },
         angle: 0,
-        radius: 15,
-        color: '#FBBF24',
+        radius: 12,
+        color: '#C4B5FD',
         state: 'orbiting',
         ownerId: 'radar-remote',
         health: 50,
@@ -361,7 +328,6 @@ describe('painted HUD composition', () => {
         player.ship,
         roids,
         LootField.getInstance().getAll(),
-        SatelliteManager.getInstance().getAll(),
         SatellitePickupManager.getInstance().getAll()
       );
     };
@@ -385,7 +351,7 @@ describe('painted HUD composition', () => {
       rectangles: [{ x: 759.25, y: 535.25, width: 1.5, height: 1.5 }],
       style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
     });
-    expect(strokes.slice(1, 5)).toEqual([
+    expect(strokes.slice(1, 4)).toEqual([
       {
         points: [
           [736, 522],
@@ -399,22 +365,11 @@ describe('painted HUD composition', () => {
       },
       {
         points: [
-          [734, 512],
-          [738, 512],
-          [736, 510],
-          [736, 514],
-        ],
-        closed: false,
-        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.9)'),
-        width: 1,
-      },
-      {
-        points: [
           [738.5, 560],
           [750.5, 560],
         ],
         closed: false,
-        style: normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'),
+        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'),
         width: 1,
       },
       {
@@ -425,12 +380,12 @@ describe('painted HUD composition', () => {
           [709, 536],
         ],
         closed: true,
-        style: normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'),
+        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'),
         width: 1,
       },
     ]);
-    // One arena ring, four batched world marks, then three two-pass pilot hulls.
-    expect(strokes).toHaveLength(11);
+    // One arena ring, three batched world marks, then three two-pass pilot hulls.
+    expect(strokes).toHaveLength(10);
     const botHeading = strokes.filter(
       (call) => call.style === normalizedCanvasColor(ctx, '#64748B') && call.points[0]?.[0] === 765
     );
@@ -480,7 +435,7 @@ describe('painted HUD composition', () => {
       style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
     });
     const movedOrbiter = strokes.find(
-      (call) => call.style === normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)') && call.closed
+      (call) => call.style === normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)') && call.closed
     );
     expect(movedOrbiter?.points).toEqual([
       [748, 533],
@@ -495,21 +450,20 @@ describe('painted HUD composition', () => {
     SatellitePickupManager.getInstance().syncFromServer([
       {
         id: 'radar-orbiter',
-        name: 'Relay',
-        typeId: 'relay',
-        assetKey: 'pickup/relay',
+        name: 'Aqua',
+        typeId: 'aqua',
+        assetKey: 'eo/aqua',
         position: { x: boundary.radius / 4, y: 0 },
         velocity: { x: 0, y: 0 },
         angle: 0,
-        radius: 15,
-        color: '#FBBF24',
+        radius: 12,
+        color: '#C4B5FD',
         state: 'orbiting',
         ownerId: 'radar-remote',
         health: 50,
         maxHealth: 50,
       },
     ]);
-    SatelliteManager.getInstance().syncFromServer([]);
     LootField.getInstance().clear();
     roids.length = 0;
     draw();
@@ -520,7 +474,7 @@ describe('painted HUD composition', () => {
       []
     );
     expect(
-      strokes.filter((call) => call.style === normalizedCanvasColor(ctx, 'rgba(251,191,36,0.95)'))
+      strokes.filter((call) => call.style === normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'))
     ).toHaveLength(1);
   });
 });
@@ -543,7 +497,6 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
     LOOT: '#E8D5A3',
     SHIELD: '#7DD3C8',
     SATELLITE: '#C4B5FD',
-    SATELLITE_PICKUP: '#FBBF24',
   });
   expect(TITLE.ACCENT).toBe('#A78BFA');
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');

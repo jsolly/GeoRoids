@@ -17,7 +17,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | quake | Ships | Stats scorecard, fuel-gated physical-object shock pulse |
 | fuel-growth | Systems | Fuel tank, fuel drops, loot mass, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
-| satellites | Arena | Six EO profiles, hostile patrols, auto-collected Echo and Relay interceptors |
+| satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, shields, faction gate exceptions, lives, respawn, score |
 | factions | Combat | ION and EMBER assignment, direct fire, collisions, ricochets, two opposite bots, faction colors, and bot labels |
@@ -34,7 +34,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | What happens when I shoot a loot drop? | fuel-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
 | How does a Hauler pull, sling, or bounce a nearby target? | hauler | src/entities/ship/harpoonField.ts, harpoonSling.ts, ship ability tests |
-| Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, satellite managers, pickup collision tests |
+| Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
 | What hurts me, protects me, kills me, and resets on respawn? | combat-survival, factions | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
 | What do bots do and how do I identify their side? | combat-survival, factions, hud-network | server/ai/botController.ts, shared/factions.ts, faction and authoritative combat tests |
@@ -90,8 +90,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   laser hit value. A stale DAMAGE.ASTEROID_COLLISION comment says 100, so the
   manual follows shared/combat.ts and GameEngine.resolveAuthoritativeCombat.
   Boundary damage is 100 and can be survived by a high-health ship.
-- Echo and Relay are maintained by the satellite pickup manager and are
-  spawned separately from satellite destruction. A nearest living human within
+- The six Earth-observation hulls are maintained by the satellite pickup manager
+  and spawn separately from asteroid destruction. A nearest living human within
   the automatic collection range claims one; the hardware orbits indefinitely,
   intercepts hostile shots and asteroid collisions, preserves health on owner
   release, and respawns loose and healthy after breaking.
@@ -99,7 +99,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   normal play; numeric health text is a debug view. The top-left HUD carries
   lives, score, faction, kit, and fuel.
 - The current KeyE Quake path is the fuel-gated shock pulse. It applies a strong
-  outward impulse to nearby ships, rocks, loot, satellites, pickups, and shots;
+  outward impulse to nearby ships, rocks, loot, satellite pickups, and shots;
   the pulse itself deals no direct damage, though the resulting motion can still
   cause ordinary collisions. Legacy EMP helpers remain in the source and should
   not be used to invent a second player action.
@@ -107,9 +107,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   the shooter and allies, and bypasses faction filtering and both shield lanes.
   It deals 40 damage within an 80-unit radius, while spawn protection is the
   exception. It pushes only rocks of size 24 or smaller.
-- Normal ship-to-ship collision ticks use the faction damage gate. Satellites
-  remain hostile to every faction, and reflected lasers are marked as ricochets
-  so they can damage the originating or same-faction pilot.
+- Normal ship-to-ship collision ticks use the faction damage gate. Satellite
+  pickups intercept shots and rocks for their owner and do not deal faction
+  damage. Reflected lasers are marked as ricochets so they can damage the
+  originating or same-faction pilot.
 - The default match keeps two bots, one Ion and one Ember. Blue and orange
   hull, name, and minimap colors identify those sides, while bot labels include
   “(bot)”.

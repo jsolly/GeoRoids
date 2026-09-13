@@ -31,9 +31,9 @@ test('locked palette hexes match the art-direction swatch', () => {
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');
   expect(PALETTE.SHIELD).toBe('#7DD3C8');
   expect(PALETTE.SHIELD.toLowerCase()).not.toBe('#ffffff');
-  expect(PALETTE.SATELLITE_PICKUP).toBe('#FBBF24');
-  expect(PALETTE.SATELLITE_PICKUP.toLowerCase()).not.toBe('#ffffff');
-  expect(PALETTE.SATELLITE_PICKUP.toLowerCase()).not.toBe('#67e8f9');
+  expect(PALETTE.SATELLITE).toBe('#C4B5FD');
+  expect(PALETTE.SATELLITE.toLowerCase()).not.toBe('#ffffff');
+  expect(PALETTE.SATELLITE.toLowerCase()).not.toBe('#67e8f9');
 });
 
 test('faction colors identify sides and unassigned pilots remain neutral', () => {

@@ -26,8 +26,10 @@ import { captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import type {
   ActiveCollabTag,
   AsteroidData,
+  LootCollected,
   LootData,
   PlayerProjectileState,
+  PlayerShotFired,
   Position,
   SatellitePickupCollected,
   SatellitePickupData,
@@ -134,6 +136,7 @@ const HUMAN_SHOOT_MUZZLE_SLOP = 8;
 /** Stationary/counter-thrust shots must not remain in the authoritative list forever. */
 export const HUMAN_LASER_MAX_LIFETIME_MS = Math.ceil(5000 / GAME.MOTION_SCALE);
 const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
+const MAX_PENDING_LOOT_COLLECTIONS = 256;
 
 type PendingShockwave = {
   origin: Position;
@@ -174,6 +177,8 @@ export class GameEngine {
   private onAsteroidHits?: (hits: AppliedAsteroidHit[]) => void;
   private pendingAsteroidHits: AppliedAsteroidHit[] = [];
   private pendingShockwaves: PendingShockwave[] = [];
+  private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
+  private pendingLootCollections: LootCollected[] = [];
   private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
   private readonly humanShootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly humanLaserExpiry = new WeakMap<ServerLaser, number>();
@@ -443,6 +448,8 @@ export class GameEngine {
     this.departedPlayers = [];
     this.decoratedFieldId = undefined;
     this.pendingLootBlasts = [];
+    this.pendingLootCollections = [];
+    this.pendingShotSounds = [];
     this.pendingAsteroidHits = [];
     this.pendingSatellitePickupCollections = [];
     this.satellitePickupManager.clear();
@@ -595,6 +602,17 @@ export class GameEngine {
         bounces: laser.bounces,
         age: laser.age,
       }));
+  }
+
+  public drainShotSounds(): PlayerShotFired[] {
+    return this.pendingShotSounds
+      .splice(0)
+      .filter(({ laser }) => !laser.abilityShot)
+      .map(({ laser, position }) => ({ id: laser.id, ownerId: laser.ownerId, position }));
+  }
+
+  public drainLootCollections(): LootCollected[] {
+    return this.pendingLootCollections.splice(0);
   }
 
   public drainLootBlasts() {
@@ -775,6 +793,7 @@ export class GameEngine {
       collector.score += SATELLITE_PICKUP.SCORE_BONUS;
       collector.lastUpdate = this.getServerTime();
       this.queueSatellitePickupCollected({
+        position: { ...pickup.position },
         pickupId: collected.id,
         playerId: collector.id,
         playerName: collector.name,
@@ -1297,6 +1316,11 @@ export class GameEngine {
       }
     }
     this.lasers.push(laser);
+    // Match bounded event queues; ability rings get their own single activation cue.
+    if (this.pendingShotSounds.length >= 256) {
+      this.pendingShotSounds.shift();
+    }
+    this.pendingShotSounds.push({ laser, position: { ...position } });
     return laser;
   }
 
@@ -1939,6 +1963,15 @@ export class GameEngine {
     const collected = this.lootManager.collectOverlaps(this.entityManager.getAllEntities());
     const results: Array<{ collectorId: string; lootId: string; mass: number }> = [];
     for (const { collector, loot } of collected) {
+      if (this.pendingLootCollections.length >= MAX_PENDING_LOOT_COLLECTIONS) {
+        this.pendingLootCollections.shift();
+      }
+      this.pendingLootCollections.push({
+        lootId: loot.id,
+        collectorId: collector.id,
+        kind: loot.kind,
+        position: { ...loot.position },
+      });
       if (loot.kind === 'laserCore') {
         collector.laserUpgrade = {
           charges: ASTEROID_INTERACTIONS.coreCharges,

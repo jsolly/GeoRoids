@@ -91,6 +91,7 @@ function files(directory: string): string[] {
 // that happened to be cited when the manual was first written.
 const sourcePaths = new Set([
   ...[
+    'src/audio',
     'src/entities',
     'src/input',
     'src/physics',
@@ -128,6 +129,7 @@ const sourcePaths = new Set([
   ...files('src/wiki'),
   ...files('scripts').filter((path) => path.includes('/wiki-media')),
   ...files('public/wiki/media'),
+  ...files('public/sounds'),
 ]);
 const hashes: Record<string, string> = {};
 for (const path of [...sourcePaths].sort()) {

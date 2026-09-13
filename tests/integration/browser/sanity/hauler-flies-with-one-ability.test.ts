@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest';
+import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
+import { installAudioProbe } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { captureConsole } from '../../utils/reflective-asteroids-driver';
@@ -17,6 +19,7 @@ test.each([
       throw new Error('Page unavailable');
     }
     await page.setViewportSize(viewport);
+    await installAudioProbe(page);
     const consoleState = captureConsole(page);
     const messages: string[] = [];
     page.on('websocket', (socket) =>
@@ -104,7 +107,7 @@ test.each([
     await expect
       .poll(
         () =>
-          page.evaluate(() => {
+          page.evaluate((releaseGap) => {
             const gc = window.gameController;
             const ship = gc?.getCurrPlayer()?.ship;
             const rock = gc
@@ -116,13 +119,23 @@ test.each([
                 rock &&
                 ship.harpoonTimer > 0 &&
                 Math.hypot(ship.position.x - rock.position.x, ship.position.y - rock.position.y) <
-                  rock.r
+                  ship.r + rock.r + releaseGap
             );
-          }),
+          }, SHIP_ABILITY.HARPOON_RELEASE_GAP),
         { timeout: 2500, interval: 20 }
       )
       .toBe(true);
     expect(await game.getShipHealth()).toBeGreaterThanOrEqual(healthBeforePull);
+    for (const cue of ['harpoon-launch.m4a', 'harpoon-latch.m4a']) {
+      await expect
+        .poll(() =>
+          page.evaluate(
+            (name) => (document.documentElement.dataset['audioEvents'] ?? '').includes(name),
+            cue
+          )
+        )
+        .toBe(true);
+    }
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`hauler-basic-${viewport.width}.png`),
     });

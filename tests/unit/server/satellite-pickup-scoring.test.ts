@@ -98,6 +98,13 @@ describe('Server scoring via automatic satellite pickup collection', () => {
     expect(collected.type).toBe('satellitePickupCollected');
     expect(collected.data['playerId']).toBe(playerId);
     expect(collected.data['pickupId']).toBe(pickup.id);
+    const source = collected.data['position'];
+    if (!isRecord(source) || typeof source['x'] !== 'number' || typeof source['y'] !== 'number') {
+      throw new Error('Collection event must include its world position');
+    }
+    expect(
+      Math.hypot(source['x'] - collector.position.x, source['y'] - collector.position.y)
+    ).toBeLessThanOrEqual(SATELLITE_PICKUP.AUTO_COLLECT_RANGE);
     expect(collected.data['scoreBonus']).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(collected.data).not.toHaveProperty('shieldFrames');
   });

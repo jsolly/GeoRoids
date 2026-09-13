@@ -8,6 +8,7 @@ import type {
   SatellitePickupCollected,
   ShipKitId,
 } from '../../shared-types';
+import { playDestructionSound } from '../audio/destructionSounds';
 import {
   replaceThrustSources,
   resetThrustSources,
@@ -309,6 +310,8 @@ export class GameController {
     if (showDestructionVfx) {
       if (collabSplit) {
         this.spawnCollabShockwave(origin ?? roid.position, asteroidId);
+      } else {
+        playDestructionSound('asteroid', roid.position);
       }
       recordAsteroidShatter(roid);
     }

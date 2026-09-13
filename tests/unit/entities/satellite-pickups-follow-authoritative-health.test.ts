@@ -1,5 +1,6 @@
-import { beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { SatellitePickupData } from '../../../shared-types';
+import * as destructionSounds from '../../../src/audio/destructionSounds';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 
 const manager = SatellitePickupManager.getInstance();
@@ -20,6 +21,7 @@ const landsat: SatellitePickupData = {
 };
 
 beforeEach(() => manager.clear());
+afterEach(() => vi.restoreAllMocks());
 
 test('a collected satellite keeps its identity while damage and breakage arrive in snapshots', () => {
   manager.syncFromServer([landsat]);
@@ -33,4 +35,18 @@ test('a collected satellite keeps its identity while damage and breakage arrive 
   expect(pickup).toMatchObject({ state: 'loose', health: 50 });
   manager.syncFromServer([]);
   expect(manager.getAll()).toEqual([]);
+});
+
+test('orbital breakage sounds once and a reconnect to a broken orbital stays silent', () => {
+  const sound = vi.spyOn(destructionSounds, 'playDestructionSound').mockImplementation(() => {});
+  const broken: SatellitePickupData = { ...landsat, state: 'broken', health: 0 };
+  manager.syncFromServer([broken]);
+  expect(sound).not.toHaveBeenCalled();
+  manager.syncFromServer([landsat]);
+  manager.syncFromServer([broken]);
+  manager.syncFromServer([broken]);
+  expect(sound).toHaveBeenCalledExactlyOnceWith('satellite', landsat.position);
+  manager.clear();
+  manager.syncFromServer([broken]);
+  expect(sound).toHaveBeenCalledTimes(1);
 });

@@ -207,6 +207,14 @@
     "tests/unit/systems/hudReadability.test.ts",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
     "tests/unit/network/asteroidFieldSync.test.ts",
-    "tests/integration/browser/sanity/faction-colors-identify-bots-and-allies.test.ts"
+    "tests/integration/browser/sanity/faction-colors-identify-bots-and-allies.test.ts",
+    "src/audio/Sound.ts",
+    "src/audio/pitch.ts",
+    "src/audio/interactionSounds.ts",
+    "src/audio/destructionSounds.ts",
+    "src/audio/splitSound.ts",
+    "src/audio/spatialAudio.ts",
+    "src/constants/user-preferences.ts",
+    "docs/sounds.md"
   ]
 }

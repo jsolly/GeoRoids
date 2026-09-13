@@ -1,6 +1,8 @@
 import type { Position } from '../../shared-types';
 import { soundIsOn } from '../constants/user-preferences';
 import { playExplosionSound } from './explosionSound';
+import { randomPlaybackRate } from './pitch';
+import { registerSoundStopHook } from './Sound';
 import { planBoundPlayback } from './spatialAudio';
 
 type WebAudioWindow = Window & {
@@ -9,6 +11,13 @@ type WebAudioWindow = Window & {
 };
 
 let sharedContext: AudioContext | null = null;
+const activeMasters = new Set<GainNode>();
+registerSoundStopHook(() => {
+  for (const master of activeMasters) {
+    master.disconnect();
+  }
+  activeMasters.clear();
+});
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') {
@@ -36,7 +45,7 @@ function startTone(
     duration: number;
     peak: number;
   }
-): void {
+): OscillatorNode {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = options.type;
@@ -52,6 +61,7 @@ function startTone(
   gain.connect(destination);
   osc.start(options.start);
   osc.stop(options.start + options.duration + 0.02);
+  return osc;
 }
 
 /**
@@ -64,9 +74,11 @@ export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext(
   }
 
   const now = ctx.currentTime;
+  const pitch = randomPlaybackRate();
   const master = ctx.createGain();
   master.gain.value = 0.22 * volumeScale;
   master.connect(ctx.destination);
+  activeMasters.add(master);
 
   const noiseDuration = 0.055;
   const noiseBuffer = ctx.createBuffer(
@@ -80,6 +92,7 @@ export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext(
   }
   const noise = ctx.createBufferSource();
   noise.buffer = noiseBuffer;
+  noise.playbackRate.value = pitch;
   const noiseFilter = ctx.createBiquadFilter();
   noiseFilter.type = 'highpass';
   noiseFilter.frequency.value = 1400;
@@ -93,21 +106,29 @@ export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext(
 
   startTone(ctx, master, {
     type: 'sawtooth',
-    startHz: 880,
-    endHz: 220,
+    startHz: 880 * pitch,
+    endHz: 220 * pitch,
     start: now,
     duration: 0.16,
     peak: 0.35,
   });
-  startTone(ctx, master, {
+  const tail = startTone(ctx, master, {
     type: 'sine',
-    startHz: 180,
-    endHz: 70,
+    startHz: 180 * pitch,
+    endHz: 70 * pitch,
     start: now + 0.07,
     duration: 0.28,
     peak: 0.55,
   });
 
+  tail.addEventListener(
+    'ended',
+    () => {
+      master.disconnect();
+      activeMasters.delete(master);
+    },
+    { once: true }
+  );
   return true;
 }
 

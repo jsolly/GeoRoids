@@ -1,6 +1,7 @@
 import { applyFuelSnapshot } from '../../../shared/fuel';
 import { radiusFromMass } from '../../../shared/shipGrowth';
 import type { Position, ShipKitId, SoftFactionId } from '../../../shared-types';
+import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getFactionColor } from '../../utils/colorUtils';
@@ -323,6 +324,7 @@ export class Player {
           this.ship.health > 0 &&
           (data.health === undefined || data.health > 0)
         ) {
+          playRespawn(this.ship.position);
           delete this.ship.lastExplodeCause;
           delete this.deathCause;
         }
@@ -439,6 +441,7 @@ export class Player {
 
   // Respawn method implementation
   respawn(): void {
+    const wasDeadOrExploding = this.ship.health <= 0 || this.ship.exploding;
     logger.debug('RESPAWN', 'Player respawn method called', {
       playerId: this.id,
       currentHealth: this.ship.health,
@@ -461,6 +464,9 @@ export class Player {
     applyShipSpawnProtection(this.ship);
     clearShield(this.ship);
     clearShieldProjection(this.ship);
+    if (wasDeadOrExploding) {
+      playRespawn(this.ship.position);
+    }
 
     logger.debug('RESPAWN', 'Player respawn completed', {
       playerId: this.id,

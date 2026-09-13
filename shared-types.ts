@@ -147,6 +147,14 @@ export interface AsteroidData {
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; fuel fills the EMP tank. */
 export type LootKind = 'shard' | 'wreckage' | 'fuel' | 'laserCore';
 
+/** One accepted collection, emitted before the next world snapshot. */
+export interface LootCollected {
+  lootId: string;
+  collectorId: string;
+  kind: LootKind;
+  position: Position;
+}
+
 export interface LootData {
   id: string;
   position: Position;
@@ -178,6 +186,7 @@ export interface SatellitePickupData {
 }
 
 export interface SatellitePickupCollected {
+  position: Position;
   pickupId: string;
   playerId: string;
   playerName: string;
@@ -280,3 +289,6 @@ export interface PingMessage {
   timestamp?: number;
   probeId?: number;
 }
+
+/** One newly accepted ship shot; snapshots remain silent on join/reconnect. */
+export type PlayerShotFired = Pick<PlayerProjectileState, 'id' | 'ownerId' | 'position'>;

@@ -1,5 +1,5 @@
 {
-  "note": "Cumulative mobile performance and pace review: checked shared movement, projectile and ability tuning at 75% speed; inverse lifetime guards and preserved weapon reach; unchanged steering, firing cadence, cooldowns and active-shot caps; contour, label, HUD and native-path rendering; and snapshot precision, validation and pending-send behavior. Reviewed affected combat, terrain and HUD/network articles, source references and generated ship facts. All 13 Wiki demonstrations and posters were regenerated; the ten changed posters were visually inspected. The retained integrated pass covers 11 desktop/mobile Wiki, touch-control and real-socket motion/reconnect/fixture cases. The new 30 focused regression cases pass, covering literal pace and turn values, shot reach/cooldown, authoritative and client EO lifetime/range, complete selected-snapshot validation and current comparison-report fields. Both TypeScript checks and focused lint pass; the previous combined full gate passed. This acceptance records the full cumulative gameplay/rendering/media review before the final full gate.",
+  "note": "Raised Hauler thrust from 4 to 4.5 and max velocity from 6 to 7 (both times MOTION_SCALE). Reviewed the Hauler article: narrative still covers harpoon only, while generated Hauler values and the ship scorecard now show thrust 3.375 and speed cap 5.25, matching Warden's cap and remaining below Dart. Controls still defers handling numbers to each kit page. Harpoon demonstration GIFs are unchanged because they do not encode cruise speed. No new player-facing control or ability.",
   "hashes": {
     ".pages.yml": "sha256:7b6e5cdee9dde2bc949133156b5e7334d21cbca8ab0cecb0384a4c4c30a9ab72",
     "docs/protocol/snapshot-v1.md": "sha256:e350abcfd859af5b70b1320edd322741fa94682f89d9e9b9d0c40b4695034daf",
@@ -122,7 +122,7 @@
     "src/entities/ship/quakePulseRenderer.ts": "sha256:1e401e4a17e6d9dbd57709f52e85a64c864762b141cbad80737557ff7f26976e",
     "src/entities/ship/shieldProjectionRenderer.ts": "sha256:79629847287c07d1e22485e0d80c6dbd806510fa5790102721afc4282f9ecd79",
     "src/entities/ship/shipAbilities.ts": "sha256:dee06f51e8f62027920ae7958e53a7af11790159de08a53f5dcc5399f6db7b37",
-    "src/entities/ship/shipKits.ts": "sha256:2db5d0baaf6864f532293f976ab8397259c52a7ca8e807d8b9e09481504c3c5c",
+    "src/entities/ship/shipKits.ts": "sha256:47dc0db00cfcccda4fd1f66755c17a39277c3548157e320a15260e23b3270808",
     "src/entities/ship/shipRenderer.ts": "sha256:4ec4b36585a149d1d8be899872a1bb370b5a43837cc598abb43ee56005afe814",
     "src/entities/ship/shipShield.ts": "sha256:948df809a40c6b04fba729510ec55b86b9f4d18476047ea3ed3fc446c9997765",
     "src/entities/ship/shipUtils.ts": "sha256:9c148326af2060ab11fd2bb3bc463baabaaccc057480a7c42eabcc83c685abc6",
@@ -243,7 +243,7 @@
     "tests/unit/entities/ship-picks-up-fuel-when-flying-over-drop.test.ts": "sha256:f78083fb7fb2a4d44efcb148912e5207cc18fb5ed004c7631358be405d0a2b9b",
     "tests/unit/entities/shipAbilities.test.ts": "sha256:0ffe981d3f9157e76583d4a88ab9f241093eddb8f559495d5746f03b74332564",
     "tests/unit/entities/shipDamage.test.ts": "sha256:75644254daea1ef5885e442e0368b44c4273b0c6ecfd2a6c737558bdb8cf5b2d",
-    "tests/unit/entities/shipKits.test.ts": "sha256:f6517a1e9e640c9d42ec89a986370712e5d480b75eaf2a9480ade6bedd367aa6",
+    "tests/unit/entities/shipKits.test.ts": "sha256:398292a5fa5ee5bbd42235c36b7f46a0ab1dd926231d27ce773508815e81f40e",
     "tests/unit/entities/shipLifecycle.test.ts": "sha256:56976f0d01508721eadacb4043400d7699cc06918a3e1f65f1dd971d6c6108c4",
     "tests/unit/entities/shipShield.test.ts": "sha256:752bd2a5860401993cc9c68587402d8bef0b551bf11c93ab4d234f27356ed902",
     "tests/unit/entities/skirmisher-ring.test.ts": "sha256:b0dced7b15d2dc98eab1c2f076f160485771024d0f4febba36107b0127ff9da2",

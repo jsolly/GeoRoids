@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { SHIP } from '../../../src/constants';
+import { GAME, SHIP } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
   AD_V2_HULL_BAKE_LOCKED,
@@ -61,6 +61,18 @@ test('Dart keeps classic ship numbers so existing play stays familiar', () => {
   expect(ship.kitId).toBe('dart');
   expect(ship.maxHealth).toBe(SHIP.MAX_HEALTH);
   expect(ship.turnSpeed).toBe(450);
+});
+
+test('Hauler keeps a heavy hull with quicker thrust and a Warden-class speed cap', () => {
+  const dart = getShipKit('dart');
+  const hauler = getShipKit('hauler');
+  const warden = getShipKit('warden');
+  expect(hauler.thrust).toBe(4.5 * GAME.MOTION_SCALE);
+  expect(hauler.maxVelocity).toBe(7 * GAME.MOTION_SCALE);
+  expect(hauler.maxVelocity).toBe(warden.maxVelocity);
+  expect(hauler.thrust).toBeLessThan(dart.thrust);
+  expect(hauler.maxVelocity).toBeLessThan(dart.maxVelocity);
+  expect(hauler.maxHealth).toBeGreaterThan(dart.maxHealth);
 });
 
 test('kit abilities are mixed flavors and geo is optional', () => {

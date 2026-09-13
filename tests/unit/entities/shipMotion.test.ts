@@ -80,7 +80,7 @@ describe('shared ship motion helper', () => {
 
   test.each([
     ['dart', 6],
-    ['hauler', 4.5],
+    ['hauler', 5.25],
     ['warden', 5.25],
     ['skirmisher', 6.375],
     ['quake', 6],

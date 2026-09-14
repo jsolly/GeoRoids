@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed Hauler and touch controls: pointer taps activate once even when the follow-up click is delayed; semantic activation and release during/after cooldown are preserved. Existing Wiki rules and tow demonstration remain accurate; no article or media changes needed. Chromium and WebKit gameplay checks and desktop/mobile Wiki navigation/render checks passed with no browser diagnostics.",
+  "note": "Reviewed Hauler and touch controls: pointer taps activate once despite delayed clicks; semantic activation and release during/after cooldown remain accurate in existing Wiki rules and media. Chromium/WebKit gameplay and desktop/mobile Wiki checks passed without browser diagnostics. Reproduced and repaired the autofire test sampling race: it now observes no further shots for two cooldowns after release is delivered. All 13 affected browser cases passed; this test-only correction changes no rules or demonstrations.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:b9cda885acb38a36c3954535bcce181c6c5a755e654cf3b98b155cd5a0e0da69",
@@ -240,7 +240,7 @@
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts": "sha256:93325334e930e20071feaa1115b12d2927c57876b126a52ea52c3579329ae2ba",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts": "sha256:513d3a658811369b3ac623b94b4a272f0c86cb902cee469f6dc7dbe48677f35d",
     "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts": "sha256:a0b2108977f4054c2488f30fb5e0694ee4b6642e4f368ef8b953c7d0b9f1befa",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:6546178519aac641e5e6e00d1d096a28b25e4acc49b079f6162e65536be46a5c",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:e2f04df1ad12955e7f01e6b861efb3f842681408d10f2e38bdcdbb06f414eecf",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:5060ce2c60253186525b6ac7aa1aa7c222f80db034f6d8b3023a43eac0610016",
     "tests/integration/entities/input/mouse.test.ts": "sha256:dabcd5275612fb90db5e83246f308ca1173d2b33534303b6c8f3c5c4e454ef7f",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:2bdcb0c6395f2907783226e50fe3489f1edd5ab6e91ac9c96c8fe14784df031d",

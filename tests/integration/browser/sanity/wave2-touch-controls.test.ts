@@ -233,11 +233,18 @@ test(
       expect(afterAutofire.lastShotTime).toBeGreaterThan(duringHold.lastShotTime);
 
       await dispatchTouch(session, 'touchEnd', [{ ...firePoint, id: 12 }]);
+      // Shots are still allowed while the release command reaches the browser.
+      // Start the no-more-shots observation after that input has been delivered.
+      const atFireRelease = await readLocalTouchState(page);
+      await page.waitForFunction((lastShotTime) => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        return ship && Date.now() - lastShotTime >= ship.shotCooldown * 2;
+      }, atFireRelease.lastShotTime);
       await game.waitForAnimationFrames(2);
       const afterFireRelease = await readLocalTouchState(page);
       expect(afterFireRelease.thrusting).toBe(true);
       expect(afterFireRelease.canShoot).toBe(true);
-      expect(afterFireRelease.lastShotTime).toBe(afterAutofire.lastShotTime);
+      expect(afterFireRelease.lastShotTime).toBe(atFireRelease.lastShotTime);
 
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;

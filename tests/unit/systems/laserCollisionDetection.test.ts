@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { LASER } from '../../../src/constants';
 import {
   asteroidPointsForRadius,
   checkLaserHit,
@@ -26,7 +27,7 @@ describe('Laser Collision Detection Functions', () => {
     });
 
     test('returns true when laser is just inside collision boundary', () => {
-      const laserPos = { x: 100 + 21.9, y: 100 }; // Just inside (laser radius 2 + asteroid radius 20 = 22)
+      const laserPos = { x: 100 + 20 + LASER.HIT_RADIUS - 0.1, y: 100 };
       const asteroidPos = { x: 100, y: 100 };
       const asteroidRadius = 20;
 
@@ -35,7 +36,7 @@ describe('Laser Collision Detection Functions', () => {
     });
 
     test('returns false when laser is just outside collision boundary', () => {
-      const laserPos = { x: 100 + 22.1, y: 100 }; // Just outside
+      const laserPos = { x: 100 + 20 + LASER.HIT_RADIUS + 0.1, y: 100 };
       const asteroidPos = { x: 100, y: 100 };
       const asteroidRadius = 20;
 
@@ -46,12 +47,18 @@ describe('Laser Collision Detection Functions', () => {
     test('works with different asteroid sizes', () => {
       const asteroidPos = { x: 100, y: 100 };
 
-      // Large asteroid (radius 40)
-      const largeResult = checkLaserHit({ x: 100 + 41.9, y: 100 }, asteroidPos, 40);
+      const largeResult = checkLaserHit(
+        { x: 100 + 40 + LASER.HIT_RADIUS - 0.1, y: 100 },
+        asteroidPos,
+        40
+      );
       expect(largeResult).toBe(true);
 
-      // Small asteroid (radius 10)
-      const smallResult = checkLaserHit({ x: 100 + 11.9, y: 100 }, asteroidPos, 10);
+      const smallResult = checkLaserHit(
+        { x: 100 + 10 + LASER.HIT_RADIUS - 0.1, y: 100 },
+        asteroidPos,
+        10
+      );
       expect(smallResult).toBe(true);
     });
 
@@ -93,7 +100,7 @@ describe('Laser Collision Detection Functions', () => {
     });
 
     test('returns true when laser is just inside collision boundary', () => {
-      const laserPos = { x: 100 + 16.9, y: 100 }; // Just inside (laser radius 2 + ship radius 15 = 17)
+      const laserPos = { x: 100 + 15 + LASER.HIT_RADIUS - 0.1, y: 100 };
       const shipPos = { x: 100, y: 100 };
       const shipRadius = 15;
 
@@ -102,7 +109,7 @@ describe('Laser Collision Detection Functions', () => {
     });
 
     test('returns false when laser is just outside collision boundary', () => {
-      const laserPos = { x: 100 + 17.1, y: 100 }; // Just outside
+      const laserPos = { x: 100 + 15 + LASER.HIT_RADIUS + 0.1, y: 100 };
       const shipPos = { x: 100, y: 100 };
       const shipRadius = 15;
 
@@ -113,12 +120,18 @@ describe('Laser Collision Detection Functions', () => {
     test('works with different ship sizes', () => {
       const shipPos = { x: 100, y: 100 };
 
-      // Large ship (radius 25)
-      const largeResult = checkLaserShipCollision({ x: 100 + 26.9, y: 100 }, shipPos, 25);
+      const largeResult = checkLaserShipCollision(
+        { x: 100 + 25 + LASER.HIT_RADIUS - 0.1, y: 100 },
+        shipPos,
+        25
+      );
       expect(largeResult).toBe(true);
 
-      // Small ship (radius 8)
-      const smallResult = checkLaserShipCollision({ x: 100 + 9.9, y: 100 }, shipPos, 8);
+      const smallResult = checkLaserShipCollision(
+        { x: 100 + 8 + LASER.HIT_RADIUS - 0.1, y: 100 },
+        shipPos,
+        8
+      );
       expect(smallResult).toBe(true);
     });
   });

@@ -10,7 +10,17 @@ import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { GROWTH } from '../../shared/shipGrowth';
-import { DAMAGE, FUEL, GAME, ROID, SATELLITE_PICKUP, SHIELD, SHIP, SHOCKWAVE } from '../constants';
+import {
+  DAMAGE,
+  FUEL,
+  GAME,
+  LASER,
+  ROID,
+  SATELLITE_PICKUP,
+  SHIELD,
+  SHIP,
+  SHOCKWAVE,
+} from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS, type ShipKitId } from '../entities/ship/shipKits';
 import { SKIRMISHER_RING_COUNT } from '../entities/ship/skirmisherRing';
 import { getGameBoundary } from '../physics/boundary';
@@ -126,6 +136,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Growth and loot values',
       paragraphs: [
         `Growth starts at mass ${GROWTH.BASE_MASS}, soft-caps at ${GROWTH.SOFT_MAX_MASS}, caps size scaling at ${GROWTH.MAX_SIZE_SCALE}, and bottoms out at thrust scale ${GROWTH.MIN_THRUST_SCALE} and speed scale ${GROWTH.MIN_SPEED_SCALE}. A kill always contributes at least ${GROWTH.BASE_KILL_MASS} mass, converts ${GROWTH.DROP_FRACTION * 100}% of excess mass, targets ${GROWTH.PELLET_MASS} mass per pellet, allows at most ${GROWTH.MAX_PELLETS} pellets, and caps live loot at ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
+        `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}; fuel drops have radius ${FUEL.DROP_RADIUS}. A living ship magnetizes drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL} added to the drop's current velocity. Pickup overlap uses the ship's mass-scaled hull radius plus the drop radius.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. A reflective core grants ${ASTEROID_INTERACTIONS.coreCharges} charges, scores ${ASTEROID_INTERACTIONS.coreScore}, lasts ${ASTEROID_INTERACTIONS.coreLifetimeMs / 1000} seconds, and uses a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
       ],
     },
@@ -181,7 +192,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `A ship can have ${SHIP.MAX_LASERS} local lasers. A normal laser hit deals ${DAMAGE.LASER_HIT}; player collision damage is ${DAMAGE.PLAYER_COLLISION_PER_SECOND} per second in ${DAMAGE.PLAYER_COLLISION_INTERVAL_MS} millisecond ticks (${shipShipTickDamage()} damage per tick); an asteroid collision deals ${DAMAGE.ASTEROID_COLLISION}; a boundary impact deals ${DAMAGE.BOUNDARY_COLLISION}; and exploding loot deals ${LOOT_BLAST.DAMAGE}.`,
+        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; ship hull and shield radii stay independent of that projectile size. A normal laser hit deals ${DAMAGE.LASER_HIT}; player collision damage is ${DAMAGE.PLAYER_COLLISION_PER_SECOND} per second in ${DAMAGE.PLAYER_COLLISION_INTERVAL_MS} millisecond ticks (${shipShipTickDamage()} damage per tick); an asteroid collision deals ${DAMAGE.ASTEROID_COLLISION}; a boundary impact deals ${DAMAGE.BOUNDARY_COLLISION}; and exploding loot deals ${LOOT_BLAST.DAMAGE}.`,
         `The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds with a ${SHIELD.COOLDOWN_SECONDS} second cooldown. Warden F lasts ${SHIELD.WARDEN_DURATION_SECONDS} seconds and its E projection lasts ${frameValue(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES)}. Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },

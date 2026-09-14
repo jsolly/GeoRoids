@@ -102,10 +102,15 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   loot: {
     title: 'Loot blast and growth',
-    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A Dart collects a separate shard and grows.',
+    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Dart and is collected, growing the ship.',
     caption:
-      'Controlled demonstration: shoot one drop to detonate it and push a small rock. Collect a separate shard to grow.',
-    sources: ['shared/lootBlast.ts', 'shared/shipGrowth.ts', 'src/entities/loot/lootRenderer.ts'],
+      'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and grows the ship.',
+    sources: [
+      'shared/lootBlast.ts',
+      'shared/shipGrowth.ts',
+      'server/core/LootManager.ts',
+      'src/entities/loot/lootRenderer.ts',
+    ],
   },
   reflection: {
     title: 'Reflective asteroid',

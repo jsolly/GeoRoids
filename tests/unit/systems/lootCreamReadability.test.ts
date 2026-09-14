@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { GROWTH } from '../../../shared/shipGrowth';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { LootField } from '../../../src/entities/loot/LootField';
 import {
@@ -48,9 +49,9 @@ test('loot geometry rejects invalid radii and keeps tiny valid drops visible', (
   expect(lootScreenRadius(Number.NaN, 1)).toBeNull();
   expect(lootScreenRadius(0, 1)).toBeNull();
   expect(lootScreenRadius(-1, 1)).toBeNull();
-  expect(lootScreenRadius(7, 0)).toBeNull();
-  expect(lootScreenRadius(7, 0.1)).toBe(VISUAL.LOOT_MIN_SCREEN_PX);
-  expect(lootScreenRadius(40, 0.1)).toBe(4);
+  expect(lootScreenRadius(GROWTH.LOOT_RADIUS, 0)).toBeNull();
+  expect(lootScreenRadius(GROWTH.LOOT_RADIUS, 0.1)).toBe(VISUAL.LOOT_MIN_SCREEN_PX);
+  expect(lootScreenRadius(80, 0.1)).toBe(8);
 });
 
 test('cream loot uses a restrained stroke and a stronger void separation layer', () => {
@@ -70,8 +71,20 @@ test('dense metal shards get a second readable inner outline', () => {
   );
 
   drawLootRelative(new Ship(), [
-    { id: 'normal-shard', position: { x: 20, y: 20 }, mass: 0.25, radius: 7, kind: 'shard' },
-    { id: 'dense-shard', position: { x: 40, y: 20 }, mass: 0.75, radius: 7, kind: 'shard' },
+    {
+      id: 'normal-shard',
+      position: { x: 20, y: 20 },
+      mass: 0.25,
+      radius: GROWTH.LOOT_RADIUS,
+      kind: 'shard',
+    },
+    {
+      id: 'dense-shard',
+      position: { x: 40, y: 20 },
+      mass: 0.75,
+      radius: GROWTH.LOOT_RADIUS,
+      kind: 'shard',
+    },
   ]);
 
   // Every visible drop is traced three times (void, glow, cream). The dense

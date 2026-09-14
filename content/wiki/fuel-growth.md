@@ -32,10 +32,13 @@ and laser cores do not add mass.
 Asteroid breaks can release shards, and a ship kill releases wreckage. A kill
 converts a base amount plus a fraction of the destroyed ship's excess mass into
 pellets, subject to per-pellet and global limits. Loot expires after its
-configured lifetime. Mass follows a shared growth curve: greater mass raises
-radius and health capacity while reducing thrust and speed; the growth model
-soft-caps mass, caps size scaling, and enforces minimum thrust and speed scales.
-Death resets the growth.
+configured lifetime. A nearby drop is pulled toward a living ship once it comes
+within magnet range. The pull adds to whatever motion the drop already has,
+including a Quake knockback. Collecting still happens when the drop overlaps
+the hull, not an inflated ship hitbox. Mass follows a shared growth curve:
+greater mass raises radius and health capacity while reducing thrust and speed;
+the growth model soft-caps mass, caps size scaling, and enforces minimum thrust
+and speed scales. Death resets the growth.
 
 A shard has a score value. A reflective core grants stronger laser charges with
 energy 2, scores when collected, expires after a timed lifetime, and is cleared

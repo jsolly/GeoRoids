@@ -148,6 +148,7 @@
     "src/entities/ship/Ship.ts",
     "src/entities/laser/laserUtils.ts",
     "src/entities/laser/AuthoritativeProjectileField.ts",
+    "src/physics/collision/collisionDetection.ts",
     "src/entities/ship/shipShield.ts",
     "server/core/EntityManager.ts",
     "server/core/combatScoring.ts",

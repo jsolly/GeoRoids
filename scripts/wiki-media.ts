@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createCanvas } from 'canvas';
 import { AsteroidManager } from '../server/core/AsteroidManager';
+import type { GameEntity } from '../server/core/EntityManager';
 import { LootManager } from '../server/core/LootManager';
 import { RNGService } from '../server/core/RNGService';
 import { SatellitePickupManager } from '../server/core/SatellitePickupManager';
@@ -437,12 +438,13 @@ function drawLaser(
   const speed = Math.hypot(velocity.x, velocity.y) || 1;
   const dx = velocity.x / speed;
   const dy = velocity.y / speed;
+  const half = VISUAL.LASER_LENGTH / 2;
   renderSegment(
     ctx,
-    screen.x - dx * 9,
-    screen.y - dy * 9,
-    screen.x + dx * 9,
-    screen.y + dy * 9,
+    screen.x - dx * half,
+    screen.y - dy * half,
+    screen.x + dx * half,
+    screen.y + dy * half,
     color,
     VISUAL.LASER_STROKE_WIDTH,
     VISUAL.LASER_GLOW
@@ -1575,8 +1577,8 @@ function drawLootDiamond(
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
   ctx.shadowColor = color;
-  ctx.shadowBlur = 4;
-  ctx.lineWidth = 1.6;
+  ctx.shadowBlur = VISUAL.LOOT_GLOW;
+  ctx.lineWidth = VISUAL.LOOT_STROKE_WIDTH;
   ctx.beginPath();
   ctx.moveTo(screen.x, screen.y - screenRadius);
   ctx.lineTo(screen.x + screenRadius, screen.y);
@@ -1613,12 +1615,23 @@ function makeLootDemo(): Demo {
     !inLootArmRange(shooterStart, firstDrop.position),
     'loot arm setup started inside the arm range'
   );
+  let magnetized = false;
+  const parkedCollector = { x: -20, y: 0 };
   const shipPositionAt = (frame: number): Position => {
     if (frame <= 12) {
       return { x: shooterStart.x + frame * 50, y: 0 };
     }
+    if (frame >= 24) {
+      return parkedCollector;
+    }
     return { x: -400 + (frame - 12) * 35, y: 0 };
   };
+  const collectorAt = (position: Position): GameEntity =>
+    ({
+      exploding: false,
+      health: 100,
+      position,
+    }) as GameEntity;
   return {
     id: 'loot',
     posterFrame: 26,
@@ -1628,13 +1641,14 @@ function makeLootDemo(): Demo {
       invariant(firstRemoved && contactFrame >= 0, 'loot shot did not remove the first drop');
       invariant(collected && mass > initialMass, 'loot mass growth never applied');
       invariant(rock.position.x > 44, 'loot blast did not push the small rock');
+      invariant(magnetized, 'remaining shard never magnetized toward the hull');
       invariant(lootManager.get(secondDrop.id) === undefined, 'collected shard remained in loot');
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'LOOT · ARM + GROWTH',
-        'laser hits shard → blast pushes rock → collect a shard',
+        'laser hits shard → blast pushes rock → remaining shard magnetizes',
         frame,
         PALETTE.LOOT
       );
@@ -1672,15 +1686,22 @@ function makeLootDemo(): Demo {
       if (detonated && frame >= 24) {
         secondVisible = true;
       }
-      if (
-        secondVisible &&
-        !collected &&
-        lootOverlap(shooter, mass, secondDrop.position, secondDrop.radius)
-      ) {
-        const removed = lootManager.remove(secondDrop.id);
-        if (removed !== undefined) {
-          collected = true;
-          mass = applyLootMass(mass, removed.mass);
+      let liveSecond = lootManager.get(secondDrop.id);
+      if (secondVisible && !collected && liveSecond) {
+        runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
+          lootManager.expire(frame, [collectorAt(shooter)]);
+        });
+        liveSecond = lootManager.get(secondDrop.id);
+        if (liveSecond && liveSecond.position.x < secondDrop.position.x) {
+          magnetized = true;
+        }
+        if (liveSecond && lootOverlap(shooter, mass, liveSecond.position, liveSecond.radius)) {
+          const removed = lootManager.remove(secondDrop.id);
+          if (removed !== undefined) {
+            collected = true;
+            mass = applyLootMass(mass, removed.mass);
+            liveSecond = undefined;
+          }
         }
       }
       const displayRockPosition = {
@@ -1717,12 +1738,12 @@ function makeLootDemo(): Demo {
           displayScale
         );
       }
-      if (secondVisible && !collected) {
+      if (secondVisible && !collected && liveSecond) {
         drawLootDiamond(
           ctx,
-          secondDrop.position,
-          secondDrop.radius,
-          lootStrokeColor(secondDrop.kind),
+          liveSecond.position,
+          liveSecond.radius,
+          lootStrokeColor(liveSecond.kind),
           1,
           displayScale
         );
@@ -1760,17 +1781,15 @@ function makeLootDemo(): Demo {
         112,
         PALETTE.LOOT
       );
-      drawTag(
-        ctx,
-        collected
-          ? `ship size ${sizeScaleFromMass(mass).toFixed(2)}×`
-          : secondVisible
-            ? 'new shard ahead'
-            : 'laser removes the first shard',
-        350,
-        286,
-        PALETTE.HUD_MUTED
-      );
+      let growthTag = 'laser removes the first shard';
+      if (collected) {
+        growthTag = `ship size ${sizeScaleFromMass(mass).toFixed(2)}×`;
+      } else if (magnetized) {
+        growthTag = 'shard pulling toward the hull';
+      } else if (secondVisible) {
+        growthTag = 'new shard ahead';
+      }
+      drawTag(ctx, growthTag, 350, 286, PALETTE.HUD_MUTED);
     },
   };
 }

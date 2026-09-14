@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { LASER } from '../../../src/constants';
 import type { Laser } from '../../../src/entities/laser/Laser';
 import type { Roid } from '../../../src/entities/roid/Roid';
 import type { Ship } from '../../../src/entities/ship/Ship';
@@ -58,29 +59,26 @@ describe('Laser Collision Detection', () => {
     });
 
     test('laser hits asteroid when just touching edge', () => {
-      // Position laser at the edge of asteroid (radius 20 + laser radius 2 = 22)
-      // Use 21.9 to be just inside the collision boundary
-      mockLaser.position = { x: 100 + 21.9, y: 100 };
+      const reach = mockAsteroid.r + LASER.HIT_RADIUS;
+      mockLaser.position = { x: 100 + reach - 0.1, y: 100 };
       const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(true);
     });
 
     test('laser misses asteroid when just outside edge', () => {
-      // Position laser just outside asteroid edge
-      mockLaser.position = { x: 100 + 22.1, y: 100 };
+      const reach = mockAsteroid.r + LASER.HIT_RADIUS;
+      mockLaser.position = { x: 100 + reach + 0.1, y: 100 };
       const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
       expect(result).toBe(false);
     });
 
     test('laser collision works with different asteroid sizes', () => {
-      // Test with large asteroid
       mockAsteroid.r = 40;
-      mockLaser.position = { x: 100 + 41.9, y: 100 }; // Just inside collision boundary
+      mockLaser.position = { x: 100 + 40 + LASER.HIT_RADIUS - 0.1, y: 100 };
       expect(checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r)).toBe(true);
 
-      // Test with small asteroid
       mockAsteroid.r = 10;
-      mockLaser.position = { x: 100 + 11.9, y: 100 }; // Just inside collision boundary
+      mockLaser.position = { x: 100 + 10 + LASER.HIT_RADIUS - 0.1, y: 100 };
       expect(checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r)).toBe(true);
     });
   });
@@ -98,29 +96,26 @@ describe('Laser Collision Detection', () => {
     });
 
     test('laser hits ship when just touching edge', () => {
-      // Position laser at the edge of ship (radius 15 + laser radius 2 = 17)
-      // Use 16.9 to be just inside the collision boundary
-      mockLaser.position = { x: 100 + 16.9, y: 100 };
+      const reach = mockShip.r + LASER.HIT_RADIUS;
+      mockLaser.position = { x: 100 + reach - 0.1, y: 100 };
       const result = checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r);
       expect(result).toBe(true);
     });
 
     test('laser misses ship when just outside edge', () => {
-      // Position laser just outside ship edge
-      mockLaser.position = { x: 100 + 17.1, y: 100 };
+      const reach = mockShip.r + LASER.HIT_RADIUS;
+      mockLaser.position = { x: 100 + reach + 0.1, y: 100 };
       const result = checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r);
       expect(result).toBe(false);
     });
 
     test('laser collision works with different ship sizes', () => {
-      // Test with larger ship
       mockShip.r = 25;
-      mockLaser.position = { x: 100 + 26.9, y: 100 }; // Just inside collision boundary
+      mockLaser.position = { x: 100 + 25 + LASER.HIT_RADIUS - 0.1, y: 100 };
       expect(checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r)).toBe(true);
 
-      // Test with smaller ship
       mockShip.r = 8;
-      mockLaser.position = { x: 100 + 9.9, y: 100 }; // Just inside collision boundary
+      mockLaser.position = { x: 100 + 8 + LASER.HIT_RADIUS - 0.1, y: 100 };
       expect(checkLaserShipCollision(mockLaser.position, mockShip.position, mockShip.r)).toBe(true);
     });
   });
@@ -130,7 +125,7 @@ describe('Laser Collision Detection', () => {
       mockAsteroid.r = 0;
       mockLaser.position = { x: 100, y: 100 }; // Exact same position
       const result = checkLaserHit(mockLaser.position, mockAsteroid.position, mockAsteroid.r);
-      expect(result).toBe(true); // Laser radius (2) should still hit
+      expect(result).toBe(true); // Laser hit radius should still hit
     });
 
     test('laser collision works with negative coordinates', () => {

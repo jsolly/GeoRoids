@@ -1,10 +1,26 @@
 import { describe, expect, test } from 'vitest';
 
+import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { GROWTH } from '../../../shared/shipGrowth';
+import { FUEL } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
+
+function collectorAt(
+  position: { x: number; y: number },
+  fuel: number = FUEL.START,
+  maxFuel: number = FUEL.MAX
+): GameEntity {
+  return {
+    exploding: false,
+    health: 100,
+    position,
+    fuel,
+    maxFuel,
+  } as GameEntity;
+}
 
 describe('LootManager destroy-drop shards', () => {
   test('spawnShard drops a shard at the break site', () => {
@@ -42,5 +58,46 @@ describe('LootManager destroy-drop shards', () => {
     expect(manager.remove(shard.id)?.id).toBe(shard.id);
     expect(manager.remove(shard.id)).toBeUndefined();
     expect(manager.getCount()).toBe(0);
+  });
+
+  test('nearby loot flies toward a living ship', () => {
+    const manager = new LootManager(new RNGService(7));
+    const shard = manager.spawnShard({ x: 64, y: 0 }, 20);
+    manager.expire(1, [collectorAt({ x: 0, y: 0 })]);
+    const after = manager.get(shard.id);
+    expect(after?.position.x).toBeCloseTo(64 - GROWTH.LOOT_MAGNET_ACCEL);
+    expect(after?.position.y).toBe(0);
+  });
+
+  test('loot magnet adds to knockback instead of replacing it', () => {
+    const manager = new LootManager(new RNGService(7));
+    const shard = manager.spawnShard({ x: 80, y: 0 }, 20);
+    expect(manager.applyQuakePulse({ x: 0, y: 0 }, 0)).toBe(1);
+    manager.expire(21, [collectorAt({ x: 0, y: 0 })]);
+    const after = manager.get(shard.id);
+    expect(after?.position.x).toBeGreaterThan(80);
+  });
+
+  test('a full fuel tank does not magnetize a fuel drop', () => {
+    const manager = new LootManager(new RNGService(9));
+    const fuel = manager.spawnFuelFromAsteroid(
+      {
+        id: 'roid',
+        position: { x: 40, y: 0 },
+        velocity: { x: 0, y: 0 },
+        size: FUEL.MIN_ROID_SIZE_TO_DROP,
+        jaggedness: 0.5,
+        rotation: 0,
+        angularVelocity: 0,
+        health: 10,
+        maxHealth: 10,
+        vertices: 8,
+        offsets: [1, 1, 1, 1, 1, 1, 1, 1],
+      },
+      0
+    );
+    expect(fuel).toBeDefined();
+    manager.expire(1, [collectorAt({ x: 0, y: 0 }, FUEL.MAX, FUEL.MAX)]);
+    expect(manager.get(fuel?.id ?? '')?.position).toEqual(fuel?.position);
   });
 });

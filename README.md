@@ -41,7 +41,7 @@ npm run test:integration:server
 npm run test:integration:browser
 ```
 
-`npm run gate` checks dependencies, lint, configuration, TypeScript, unit tests and the production build. Browser tests need the pinned Playwright browser installation (`npx --no-install playwright install chromium`). Always use `./scripts/test-runner.sh` for individual integration scenarios; it enforces serialized execution.
+`npm run gate` checks dependencies, lint, configuration, TypeScript, unit tests and the production build. Browser tests need the pinned Playwright browser installation (`npx --no-install playwright install chromium webkit`). Always use `./scripts/test-runner.sh` for individual integration scenarios; it enforces serialized execution.
 
 Test-writing conventions are in [tests/AGENTS.ms](tests/AGENTS.ms): focused feature scenarios, controlled setup, and observable outcomes.
 

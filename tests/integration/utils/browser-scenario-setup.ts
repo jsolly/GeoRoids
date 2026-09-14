@@ -1,3 +1,4 @@
+import type { BrowserType } from 'playwright';
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { BrowserManager } from './browser-manager';
 import { checkAllServers } from './health-checker';
@@ -5,7 +6,10 @@ import { ScreenshotManager } from './screenshot-manager';
 import { resetWorld } from './test-server-control';
 
 /** Shared browser lifecycle hooks for scenario integration tests. */
-export function createBrowserScenarioHooks(testDir?: string): {
+export function createBrowserScenarioHooks(
+  testDir?: string,
+  browserType?: BrowserType
+): {
   browserManager: BrowserManager;
   screenshotManager: ScreenshotManager;
 } {
@@ -15,7 +19,7 @@ export function createBrowserScenarioHooks(testDir?: string): {
   beforeAll(async () => {
     await checkAllServers();
     screenshotManager.ensureScreenshotsDirectory();
-    await browserManager.initialize();
+    await browserManager.initialize(browserType);
   });
 
   afterAll(async () => {

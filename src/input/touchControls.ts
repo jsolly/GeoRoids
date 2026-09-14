@@ -21,7 +21,6 @@ let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
 let abilityButton: HTMLElement | null = null;
 let lastAbilityChromeKey = '';
-let abilityPointerClickPending = false;
 
 export function setTouchHeading(player: Player, heading: number | null): void {
   controlSources.pointerHeading = heading;
@@ -160,7 +159,6 @@ function resetTouchInteraction(player: Player | null): void {
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
-  abilityPointerClickPending = false;
   releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(canvas, activeFirePointerId);
   releasePointerCapture(ability, activeAbilityPointerId);
@@ -339,12 +337,9 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
     return;
   }
   ev.preventDefault();
-  // Pointer activation already performs the action. Consume the follow-up
-  // native click so a touch tap cannot activate E twice.
   if (steerTap) {
     steerTap.canFire = false;
   }
-  abilityPointerClickPending = true;
   abilityPointerId = ev.pointerId;
   ability.setPointerCapture(ev.pointerId);
   setAbilityPressed(true);
@@ -363,21 +358,12 @@ function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
   abilityPointerId = null;
   releasePointerCapture(ability, ev.pointerId);
   setAbilityPressed(false);
-  if (ev.type === 'pointercancel') {
-    abilityPointerClickPending = false;
-  } else {
-    // Browsers dispatch the compatibility click immediately after pointerup.
-    // If a platform suppresses it, avoid carrying the dedup marker into the
-    // next keyboard or programmatic activation.
-    window.setTimeout(() => {
-      abilityPointerClickPending = false;
-    }, 0);
-  }
 }
 
 function onAbilityClick(ev: MouseEvent): void {
-  if (abilityPointerClickPending) {
-    abilityPointerClickPending = false;
+  // Pointer presses already activate on pointerdown. Their click can arrive
+  // later; only keyboard/accessibility/programmatic clicks have no click count.
+  if (ev.detail !== 0) {
     return;
   }
   const player = requireLocalPlayer();

@@ -14,8 +14,8 @@ npm run test:integration:browser
 ./scripts/test-runner.sh tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts --reporter=verbose
 ```
 
-The runner requires unused configured ports and an installed Playwright Chromium
-browser. It starts and owns both services. Do not start a second runner or attach
+The runner requires unused configured ports and the Playwright Chromium and WebKit
+browsers (`npx --no-install playwright install chromium webkit`). It starts and owns both services. Do not start a second runner or attach
 tests to a developer's existing game server.
 
 ## Arrange a controlled scene

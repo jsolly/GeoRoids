@@ -226,7 +226,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 - **Node:** `package.json` requires `^24.15.0` (jsdom's Node 24 floor); `.nvmrc` is `24`.
 - **`.env`:** an empty `.env` file must exist at the repo root (server startup uses `--env-file=.env`); create one with `touch .env` if missing.
 - **`canvas` native deps:** the `canvas` npm package needs Cairo, Pango, libjpeg, libgif, and librsvg dev headers installed on the system.
-- **Playwright browsers** (browser E2E): `npx --no-install playwright install chromium`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
+- **Playwright browsers** (browser E2E): `npx --no-install playwright install chromium webkit`. If the headless-shell binary is missing, remove the stale lock (`rm -f ~/.cache/ms-playwright/__dirlock`) and reinstall.
 
 ### Services
 

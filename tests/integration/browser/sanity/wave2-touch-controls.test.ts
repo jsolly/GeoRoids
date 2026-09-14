@@ -233,11 +233,18 @@ test(
       expect(afterAutofire.lastShotTime).toBeGreaterThan(duringHold.lastShotTime);
 
       await dispatchTouch(session, 'touchEnd', [{ ...firePoint, id: 12 }]);
+      // Shots are still allowed while the release command reaches the browser.
+      // Start the no-more-shots observation after that input has been delivered.
+      const atFireRelease = await readLocalTouchState(page);
+      await page.waitForFunction((lastShotTime) => {
+        const ship = window.gameController?.getCurrPlayer()?.ship;
+        return ship && Date.now() - lastShotTime >= ship.shotCooldown * 2;
+      }, atFireRelease.lastShotTime);
       await game.waitForAnimationFrames(2);
       const afterFireRelease = await readLocalTouchState(page);
       expect(afterFireRelease.thrusting).toBe(true);
       expect(afterFireRelease.canShoot).toBe(true);
-      expect(afterFireRelease.lastShotTime).toBe(afterAutofire.lastShotTime);
+      expect(afterFireRelease.lastShotTime).toBe(atFireRelease.lastShotTime);
 
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
@@ -417,7 +424,6 @@ test(
               return false;
             }
             return {
-              lives: player.lives,
               thrusting: player.ship.thrusting,
               canShoot: player.ship.canShoot,
               abilityDisabled: ability.getAttribute('aria-disabled'),
@@ -435,11 +441,13 @@ test(
         });
       const [observed] = await Promise.all([deadControls, game.dieOnceViaBoundary()]);
       expect(observed).toEqual({
-        lives: livesBefore - 1,
         thrusting: false,
         canShoot: true,
         abilityDisabled: 'true',
       });
+      // Local death disables controls before the server confirms the lost life.
+      // dieOnceViaBoundary waits for that confirmation and the respawn placement.
+      expect(await game.getLives()).toBe(livesBefore - 1);
       await page.waitForFunction(() => {
         const player = window.gameController?.getCurrPlayer();
         return player && !player.ship.exploding && player.ship.health > 0 && player.ship.thrusting;

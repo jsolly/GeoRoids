@@ -9,7 +9,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, five kits, starting a life |
-| controls | Start here | Keyboard, mouse, touch steering, playfield tap-to-fire, and movement controls |
+| controls | Start here | Automatic thrust, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
 | dart | Ships | Stats scorecard, boost dash |
 | hauler | Ships | Stats scorecard, combat harpoon reel, collision-course sling, and fallback bounce |
 | warden | Ships | Stats scorecard, automatic friendly E projection, reflective F shield |

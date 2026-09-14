@@ -1,13 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { getExplosionSound, playExplosionSound } from '../../../src/audio/explosionSound';
-import {
-  getLaserSound,
-  getThrustSound,
-  playLaserSound,
-  replaceThrustSources,
-  thrustSourcesFromPlayers,
-  upsertThrustSource,
-} from '../../../src/audio/gameSounds';
+import { getLaserSound, playLaserSound } from '../../../src/audio/gameSounds';
 import { Sound, setSound } from '../../../src/audio/Sound';
 import {
   bindGameAudio,
@@ -19,10 +12,31 @@ import {
 import { AUDIO } from '../../../src/constants';
 import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 import { Player } from '../../../src/entities/player/Player';
+import { reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 
 const listener = { x: 400, y: 300 };
 const viewport = { width: 800, height: 600 };
+
+test('automatic thrust stays silent while firing still plays its sound', () => {
+  bindGameAudio({ getListenerPosition: () => listener, getViewport: () => viewport });
+  const player = new Player({
+    id: 'silent-pilot',
+    name: 'Pilot',
+    type: 'local',
+    input: new MockPlayerInput(),
+  });
+  player.ship.position = { ...listener };
+  const play = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
+  for (let frame = 0; frame < 60; frame++) {
+    reconcilePlayerInput(player);
+    player.ship.update();
+  }
+  expect(player.ship.thrusting).toBe(true);
+  expect(play).not.toHaveBeenCalled();
+  player.ship.shoot();
+  expect(play).toHaveBeenCalledOnce();
+});
 
 beforeEach(() => {
   localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
@@ -152,7 +166,7 @@ test('playLaserSound skips off-viewport shots and plays near ones', () => {
   expect(playSpy).toHaveBeenCalledWith(1);
 });
 
-test('laser, explosion, and thrust share Sound.play so Sound-off mutes all of them', () => {
+test('laser and explosion share Sound.play so Sound-off mutes both', () => {
   bindGameAudio({
     getListenerPosition: () => listener,
     getViewport: () => viewport,
@@ -162,7 +176,6 @@ test('laser, explosion, and thrust share Sound.play so Sound-off mutes all of th
   setSound(false);
   playExplosionSound(listener);
   playLaserSound(listener);
-  upsertThrustSource({ id: 'local', thrusting: true, position: listener });
 
   expect(playSpy).not.toHaveBeenCalled();
 });
@@ -170,63 +183,6 @@ test('laser, explosion, and thrust share Sound.play so Sound-off mutes all of th
 test('player and bot lasers use the same laser sound instance', () => {
   expect(getLaserSound()).toBe(getLaserSound());
   expect(getLaserSound()).toBeInstanceOf(Sound);
-});
-
-test('player and bot ships feed the same thrust source helper', () => {
-  const local = new Player({
-    id: 'local',
-    name: 'Local',
-    type: 'local',
-    input: new MockPlayerInput(),
-  });
-  const bot = new Player({
-    id: 'bot',
-    name: 'Bot',
-    type: 'bot',
-    input: new MockPlayerInput(),
-  });
-  local.ship.thrusting = true;
-  bot.ship.thrusting = true;
-  bot.ship.exploding = true;
-
-  const sources = thrustSourcesFromPlayers([local, local, bot]);
-  expect(sources).toEqual([
-    { id: 'local', thrusting: true, position: local.ship.position },
-    { id: 'bot', thrusting: false, position: bot.ship.position },
-  ]);
-});
-
-test('thrust volume follows the loudest nearby ship, including bots', () => {
-  bindGameAudio({
-    getListenerPosition: () => listener,
-    getViewport: () => viewport,
-  });
-  const playSpy = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
-
-  replaceThrustSources([
-    { id: 'bot-far', thrusting: true, position: { x: listener.x + 300, y: listener.y } },
-    { id: 'bot-near', thrusting: true, position: listener },
-  ]);
-
-  expect(playSpy).toHaveBeenCalledTimes(1);
-  expect(playSpy).toHaveBeenCalledWith(1);
-});
-
-test('far bot thrust is quieter than a local burn', () => {
-  bindGameAudio({
-    getListenerPosition: () => listener,
-    getViewport: () => viewport,
-  });
-  const playSpy = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
-
-  replaceThrustSources([
-    { id: 'bot', thrusting: true, position: { x: listener.x + 300, y: listener.y } },
-  ]);
-
-  expect(playSpy).toHaveBeenCalledTimes(1);
-  const scale = playSpy.mock.calls[0]?.[0] as number;
-  expect(scale).toBeGreaterThan(0);
-  expect(scale).toBeLessThan(1);
 });
 
 test('server exploding flag plays once for a bot and a second update does not', async () => {
@@ -270,14 +226,11 @@ test('health drop and exploding flag together still play only one explosion', ()
   expect(playSpy).toHaveBeenCalledTimes(1);
 });
 
-test('muted steering and firing leave idle media untouched across simulation steps', () => {
+test('muted firing leaves idle media untouched across simulation steps', () => {
   setSound(false);
-  const stop = vi.spyOn(getThrustSound(), 'stop');
   const laserPlay = vi.spyOn(getLaserSound(), 'play');
   for (let frame = 0; frame < 60; frame++) {
-    replaceThrustSources([{ id: 'local', thrusting: frame % 2 === 0, position: listener }]);
     playLaserSound();
   }
-  expect(stop).not.toHaveBeenCalled();
   expect(laserPlay).not.toHaveBeenCalled();
 });

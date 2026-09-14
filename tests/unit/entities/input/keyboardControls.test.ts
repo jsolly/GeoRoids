@@ -3,14 +3,11 @@ import { FUEL } from '../../../../src/constants';
 import { Player } from '../../../../src/entities/player/Player';
 import { publishHarpoonField } from '../../../../src/entities/ship/harpoonField';
 import { applyShipKitToShip } from '../../../../src/entities/ship/shipKits';
-import { keyDown, keyUp } from '../../../../src/input/keybindings';
+import { keyDown, keyUp, reconcilePlayerInput } from '../../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import { setSelectedShipKitId } from '../../../../src/ui/shipKitSelect';
 
-// Covers the "controls appeared unresponsive" report: WASD did nothing and
-// Space did not fire. Movement now supports WASD alongside the arrow keys, and
-// Space is the fire key (matching the documented "thrust = arrows, fire =
-// Space" scheme), so keyboard-only players can move AND shoot.
+// Keyboard steering and combat remain usable while the ship automatically cruises.
 
 const TURN = ((450 / 180) * Math.PI) / 60;
 
@@ -21,6 +18,7 @@ const release = (code: string): void => keyUp(new KeyboardEvent('keyup', { code 
 
 beforeEach(() => {
   player = new Player({ id: 'p', name: 'P', type: 'local', input: new MockPlayerInput() });
+  reconcilePlayerInput(player);
 });
 
 afterEach(() => {
@@ -28,11 +26,12 @@ afterEach(() => {
   publishHarpoonField([]);
 });
 
-test('KeyW thrusts and releasing it stops thrust', () => {
+test('KeyW is freed while cruise continues without throttle input', () => {
+  reconcilePlayerInput(player);
   press('KeyW');
   expect(player.ship.thrusting).toBe(true);
   release('KeyW');
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
 });
 
 test('KeyA turns left and KeyD turns right', () => {
@@ -47,11 +46,11 @@ test('KeyA turns left and KeyD turns right', () => {
   expect(player.ship.angularVelocity).toBeCloseTo(0, 10);
 });
 
-test('Space fires (calls shoot) and does not thrust', () => {
+test('Space fires while automatic thrust continues', () => {
   const shootSpy = vi.spyOn(player.ship, 'shoot');
   press('Space');
   expect(shootSpy).toHaveBeenCalledTimes(1);
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
 });
 
 test('Space creates a laser end-to-end', () => {
@@ -131,6 +130,7 @@ test('KeyF toggles the local ship shield and KeyF again drops it into cooldown',
 
 test('WASD is ignored while dead', () => {
   player.lives = 0;
+  reconcilePlayerInput(player);
   press('KeyW');
   press('KeyA');
   expect(player.ship.thrusting).toBe(false);

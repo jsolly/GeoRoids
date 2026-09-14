@@ -44,7 +44,7 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
     // Playwright viewport changes do not emit a phone's orientation event.
     await page.evaluate(() => window.dispatchEvent(new Event('orientationchange')));
     await game.waitForAnimationFrames(2);
-    expect((await readTouchControlState(page)).thrusting).toBe(false);
+    expect((await readTouchControlState(page)).thrusting).toBe(true);
     await dispatchTouch(session, 'touchCancel', []);
     touching = false;
     const beforeFreeze = await page.evaluate(
@@ -59,7 +59,7 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
       const current = window.georoidsPerformance?.read().lastSnapshot?.gameTime;
       return current !== undefined && current > before;
     }, beforeFreeze);
-    expect((await readTouchControlState(page)).thrusting).toBe(false);
+    expect((await readTouchControlState(page)).thrusting).toBe(true);
     const connection = await page.evaluateHandle<ConnectionManager>(
       "import('/src/network/services/ConnectionManager.ts').then(({ ConnectionManager }) => ConnectionManager.getInstance())"
     );
@@ -129,7 +129,7 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
         { once: true }
       );
     });
-    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowLeft');
     await game.waitForAnimationFrames(3);
     const input = await page.evaluate(() => window.georoidsPerformance?.read());
     assert(input);

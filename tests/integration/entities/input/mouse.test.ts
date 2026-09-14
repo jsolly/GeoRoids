@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { LOCAL_STORAGE_KEYS } from '../../../../src/constants/user-preferences';
 import { Player } from '../../../../src/entities/player/Player';
-import { Ship } from '../../../../src/entities/ship/Ship';
 import { resetControlSources } from '../../../../src/input/controlSources';
+import { reconcilePlayerInput } from '../../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 import {
   handleMouseDown,
@@ -13,9 +13,6 @@ import {
 import { canvasManager } from '../../../../src/rendering/canvas';
 
 let player: Player;
-let playSpy: ReturnType<typeof vi.spyOn>;
-let stopSpy: ReturnType<typeof vi.spyOn>;
-let isPlayingStub: ReturnType<typeof vi.spyOn>;
 let testCanvas: HTMLCanvasElement;
 
 beforeEach(() => {
@@ -49,24 +46,12 @@ beforeEach(() => {
     });
   }
 
-  // Create spies for thrust sounds to avoid polluting global state
-  playSpy = vi.spyOn(Ship.fxThrust, 'play') as ReturnType<typeof vi.spyOn>;
-  stopSpy = vi.spyOn(Ship.fxThrust, 'stop');
-  isPlayingStub = vi.spyOn(Ship.fxThrust, 'isPlaying');
-
-  // Stub isPlaying to return false initially so sounds will play
-  isPlayingStub.mockReturnValue(false);
-
   player = new Player({ id: 'p1', name: 'Tester', type: 'local', input: new MockPlayerInput() });
+  reconcilePlayerInput(player);
 });
 
 afterEach(() => {
   resetControlSources();
-  // Restore all spies to clean up global state
-  playSpy.mockRestore();
-  stopSpy.mockRestore();
-  isPlayingStub.mockRestore();
-
   // Perform DOM-safe cleanup by removing only the test canvas
   if (testCanvas?.parentNode) {
     testCanvas.parentNode.removeChild(testCanvas);
@@ -75,11 +60,11 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-test('mouse move sets ship angle toward cursor', () => {
+test('mouse movement turns the ship toward the cursor at a capped rate', () => {
   const canvas = canvasManager.getCanvas();
   expect(canvas).not.toBeNull();
   if (!canvas) {
-    return;
+    throw new Error('Canvas unavailable');
   }
 
   const viewport = canvasManager.getViewportSize();
@@ -89,11 +74,21 @@ test('mouse move sets ship angle toward cursor', () => {
   // Move to the right of center => angle ~ 0
   const evRight = new MouseEvent('mousemove', { clientX: centerX + 50, clientY: centerY });
   handleMouseMove(evRight, player);
+  expect(player.ship.angle).toBeCloseTo(Math.PI / 2);
+  for (let frame = 0; frame < 20; frame++) {
+    reconcilePlayerInput(player);
+    player.ship.update();
+  }
   expect(Math.abs(player.ship.angle - 0)).toBeLessThan(1e-6);
 
   // Move above center => angle ~ +PI/2
   const evUp = new MouseEvent('mousemove', { clientX: centerX, clientY: centerY - 50 });
   handleMouseMove(evUp, player);
+  expect(player.ship.angle).toBeCloseTo(0);
+  for (let frame = 0; frame < 20; frame++) {
+    reconcilePlayerInput(player);
+    player.ship.update();
+  }
   expect(Math.abs(player.ship.angle - Math.PI / 2)).toBeLessThan(1e-6);
 });
 
@@ -108,16 +103,14 @@ test('left click fires shoot() and release resets canShoot', () => {
   expect(player.ship.canShoot).toBeTruthy();
 });
 
-test('right click toggles thrust with sound', () => {
+test('right click is unbound and does not interrupt automatic thrust', () => {
   const down = new MouseEvent('mousedown', { button: 2 });
   handleMouseDown(down, player);
   expect(player.ship.thrusting).toBeTruthy();
-  expect(playSpy).toHaveBeenCalled();
 
   const up = new MouseEvent('mouseup', { button: 2 });
   handleMouseUp(up, player);
-  expect(player.ship.thrusting).toBeFalsy();
-  expect(stopSpy).toHaveBeenCalled();
+  expect(player.ship.thrusting).toBeTruthy();
 });
 
 test('preventContextMenu prevents default on right click', () => {

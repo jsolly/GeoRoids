@@ -18,11 +18,10 @@ test('hiding a pilot with held movement releases the controls and resumes withou
   const player = PlayerManager.getInstance().createLocalPlayer();
   GameStateManager.getInstance().setIsGameRunning(true);
   InputManager.getInstance().initializeListeners();
-  document.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }));
   document.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true }));
   expect(player.ship.thrusting).toBe(true);
   expect(player.ship.angularVelocity).not.toBe(0);
-  controlSources.mouseThrust = true;
+  controlSources.pointerHeading = 1;
   const visible = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
   const frames: FrameRequestCallback[] = [];
   Object.defineProperty(window, 'requestAnimationFrame', {
@@ -42,11 +41,11 @@ test('hiding a pilot with held movement releases the controls and resumes withou
   frames.shift()?.(initial);
   visible.mockReturnValue(true);
   document.dispatchEvent(new Event('visibilitychange'));
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
   expect(player.ship.angularVelocity).toBe(0);
   expect(getPressedKeysForPlayer(player).size).toBe(0);
-  expect(keys.ArrowUp).toBe(false);
-  expect(controlSources.mouseThrust).toBe(false);
+  expect(keys.ArrowLeft).toBe(false);
+  expect(controlSources.pointerHeading).toBeNull();
   frames.shift()?.(initial + 60_000);
   expect(updates).toHaveBeenCalledTimes(1);
   visible.mockReturnValue(false);

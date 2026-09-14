@@ -7,7 +7,7 @@ import { TestConfig } from '../../utils/test-config';
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
 test(
-  'a second pilot moves and the first client receives the changed position',
+  'a second pilot cruises without input and the first client receives the changed position',
   async () => {
     const { game1, game2 } = await bootTwoClientGames(browserManager);
 
@@ -25,7 +25,6 @@ test(
       'client 1 should have an initial position for the remote ship'
     ).not.toBeNull();
 
-    await game2.holdMovementKey('ArrowUp', 1200);
     await game2.waitForAnimationFrames(30);
 
     await expect

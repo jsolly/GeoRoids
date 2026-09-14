@@ -18,7 +18,7 @@ npm run dev
 
 Vite serves the client at `http://localhost:5173`; the game server listens on port 3001. `npm run dev` routes `/ws` and `/logs` through the Vite origin to the local server, including custom dev ports. A public HTTPS tunnel to Vite therefore also carries the game WebSocket, so phones never connect to their own `localhost`. Direct Vite and production endpoint configuration is documented in `.env.example`.
 
-Choose a ship, enter the game, use arrow keys to turn and thrust, Space to fire, E for the selected kit's ability and F for the shield. Mobile players use the on-screen controls. The minimap provides the wider arena view.
+Choose a ship, enter the game, steer with the mouse or left/right arrow keys while thrust stays on, Space to fire, E for the selected kit's ability and F for the shield. Mobile players use the on-screen controls. The minimap provides the wider arena view.
 
 Reflective asteroid clusters can bounce lasers and release laser-core upgrades. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, core charges and the shared snapshot behavior.
 

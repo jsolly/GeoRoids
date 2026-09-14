@@ -5,6 +5,7 @@ import {
 } from '../../../shared/constants/health';
 import { createFuelTank } from '../../../shared/fuel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
+import { cruiseSpeed, dashSpeedBonus } from '../../../shared/shipFlight';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
   LaserUpgrade,
@@ -15,9 +16,7 @@ import type {
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
-import { getThrustSound } from '../../audio/gameSounds';
 import { playHarpoonRelease, playShieldActivation } from '../../audio/interactionSounds';
-import type { Sound } from '../../audio/Sound';
 import { DAMAGE, FUEL, GAME, PALETTE, SHIP } from '../../constants';
 import { NetworkManager } from '../../network/networkManager';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
@@ -27,6 +26,7 @@ import { addPositionAndVelocity } from '../../utils/mathUtils';
 import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileField';
 import { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
+import { advanceCruiseVelocity } from './cruiseMotion';
 import { getHarpoonFieldCanvas, getHarpoonFieldScale } from './harpoonField';
 import { startQuakePulse } from './quakePulseRenderer';
 import {
@@ -112,10 +112,6 @@ class Ship {
   collidingPlayerId?: string;
   /** Last non-generic explode token (boundary, asteroid, attacker id). */
   lastExplodeCause?: string;
-
-  static get fxThrust(): Sound {
-    return getThrustSound();
-  }
 
   constructor(options?: {
     position?: Position;
@@ -567,17 +563,26 @@ class Ship {
     }
 
     this.angle += this.angularVelocity;
-    const velocityLimit = Math.max(this.maxVelocity, this.knockbackVelocityLimit);
-    this.velocity = applyThrustOrFriction(
-      this.velocity,
-      this.angle,
-      this.thrusting,
-      this.frictionCoefficient,
-      this.thrust,
-      this.mass,
-      velocityLimit
-    );
-    applySharedShipSlope(this.velocity, this.position);
+    const speed =
+      cruiseSpeed(this.mass, this.maxVelocity) +
+      dashSpeedBonus(this.kitId, this.abilityActiveFrames);
+    const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);
+    if (this.knockbackVelocityLimit <= speed) {
+      // Steering redirects normal momentum before thrust and terrain forces act.
+      // A server-granted blast keeps its motion until the excess speed decays.
+      advanceCruiseVelocity(this, speed);
+    } else {
+      this.velocity = applyThrustOrFriction(
+        this.velocity,
+        this.angle,
+        this.thrusting,
+        this.frictionCoefficient,
+        this.thrust,
+        this.mass,
+        velocityLimit
+      );
+      applySharedShipSlope(this.velocity, this.position);
+    }
     this.capVelocity(velocityLimit);
     this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;
     this.position = addPositionAndVelocity(this.position, this.velocity);

@@ -93,7 +93,7 @@ export class InputManager {
           handleMouseUp(ev, localPlayer);
         }
       });
-      // Prevent default context menu for right-click thrust
+      // Keep browser context menus out of the playfield
       canvas.addEventListener('contextmenu', preventContextMenu);
       canvas.addEventListener(
         'touchstart',

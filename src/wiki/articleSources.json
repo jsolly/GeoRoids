@@ -18,14 +18,21 @@
     "tests/unit/input/touchAbility.test.ts",
     "tests/unit/input/mouseDesktop.test.ts",
     "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts"
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts",
+    "src/input/pointerSteering.ts",
+    "src/entities/ship/cruiseMotion.ts",
+    "shared/shipFlight.ts",
+    "src/rendering/headingCueRenderer.ts"
   ],
   "dart": [
     "src/entities/ship/shipKits.ts",
     "src/entities/ship/shipAbilities.ts",
     "src/constants/index.ts",
     "tests/unit/entities/shipKits.test.ts",
-    "tests/unit/entities/shipAbilities.test.ts"
+    "tests/unit/entities/shipAbilities.test.ts",
+    "shared/shipFlight.ts",
+    "server/core/PlayerMotionService.ts",
+    "tests/unit/scenarios/combat/dart-dash-grants-a-temporary-speed-burst.test.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -141,7 +148,9 @@
     "src/physics/terrain/terrainSession.ts",
     "src/physics/boundary.ts",
     "shared-types.ts",
-    "tests/unit/systems/contourLaser.test.ts"
+    "tests/unit/systems/contourLaser.test.ts",
+    "src/entities/ship/cruiseMotion.ts",
+    "tests/unit/systems/isoContourTerrain.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",

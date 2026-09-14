@@ -3,6 +3,7 @@ import { canvasManager } from '../rendering/canvas';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
+import { pointerHeadingFromCenter } from './pointerSteering';
 
 /* =============
 Mouse Input Handling
@@ -29,26 +30,10 @@ export function handleMouseMove(ev: MouseEvent, player: Player): void {
   }
 
   const rect = canvas.getBoundingClientRect();
-
-  // Keep input in the same CSS-logical coordinate space as the renderer. The
-  // canvas backing store may be larger on high-DPI displays.
-  const viewport = canvasManager.getViewportSize();
-  const scaleX = viewport.width / rect.width;
-  const scaleY = viewport.height / rect.height;
-  const mouseX = (ev.clientX - rect.left) * scaleX;
-  const mouseY = (ev.clientY - rect.top) * scaleY;
-
-  // Ship is rendered at screen center; compute angle from center to mouse.
-  const centerX = viewport.width / 2;
-  const centerY = viewport.height / 2;
-
-  // Game uses angle 0 = +x axis, positive angles rotate counter-clockwise,
-  // and ship forward vector is (cos(angle), -sin(angle)). Therefore use atan2 of -(dy).
-  const dx = mouseX - centerX;
-  const dy = mouseY - centerY;
-  const desiredAngle = Math.atan2(-dy, dx);
-
-  player.ship.angle = desiredAngle;
+  const dx = ev.clientX - rect.left - rect.width / 2;
+  const dy = ev.clientY - rect.top - rect.height / 2;
+  controlSources.pointerHeading = pointerHeadingFromCenter(dx, dy, player.ship.r);
+  reconcilePlayerInput(player);
 }
 
 export function handleMouseDown(ev: MouseEvent, player: Player): void {
@@ -66,13 +51,10 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
     return;
   }
 
-  // 0: left, 2: right
+  // Left mouse fires; cruise needs no throttle button.
   if (ev.button === 0) {
     logger.debug('MOUSE', 'Left mouse click - shooting', { playerId: player.id });
     player.ship.shoot();
-  } else if (ev.button === 2) {
-    controlSources.mouseThrust = true;
-    reconcilePlayerInput(player);
   }
 }
 
@@ -80,14 +62,7 @@ export function handleMouseUp(ev: MouseEvent, player: Player): void {
   if (isSyntheticTouchMouse(ev)) {
     return;
   }
-  // Handle right-button release unconditionally to ensure cleanup even for dead/exploding players
-  if (ev.button === 2) {
-    controlSources.mouseThrust = false;
-    reconcilePlayerInput(player);
-    return;
-  }
-
-  // Early return for dead/exploding players (only applies to non-right-button events)
+  // Early return for dead/exploding players
   if (player.lives <= 0 || player.ship.exploding) {
     return;
   }

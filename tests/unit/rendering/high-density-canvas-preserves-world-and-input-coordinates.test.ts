@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { harpoonLatchRange } from '../../../src/entities/ship/shipAbilities';
+import { reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { handleMouseMove } from '../../../src/input/mouse';
 import { Point } from '../../../src/physics/Point';
@@ -161,6 +162,11 @@ describe('the playfield viewport stays in CSS-logical coordinates', () => {
       input: new MockPlayerInput(),
     });
     handleMouseMove(new MouseEvent('mousemove', { clientX: 650, clientY: 300 }), player);
+    expect(player.ship.angle).toBeCloseTo(Math.PI / 2);
+    for (let frame = 0; frame < 10; frame++) {
+      reconcilePlayerInput(player);
+      player.ship.update();
+    }
     expect(player.ship.angle).toBeCloseTo(Math.atan2(150, 50), 10);
 
     expect(harpoonLatchRange(PLAYFIELD_CLOSE_SCALE, canvasManager.getViewportSize())).toBe(750);

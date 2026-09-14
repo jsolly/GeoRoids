@@ -109,7 +109,7 @@ test(
     await dispatchTouch(session, 'touchCancel', []);
     await game.waitForAnimationFrames(2);
     const afterCancel = await readTouchControlState(page);
-    expect(afterCancel.thrusting).toBe(false);
+    expect(afterCancel.thrusting).toBe(true);
     expect(afterCancel.canShoot).toBe(true);
 
     // Keep the notice visible for layout inspection without relying on a random pickup.
@@ -139,7 +139,7 @@ test(
     await game.waitForAnimationFrames(2);
 
     const afterResize = await readTouchControlState(page);
-    expect(afterResize.thrusting).toBe(false);
+    expect(afterResize.thrusting).toBe(true);
     expect(afterResize.canShoot).toBe(true);
     expect(await page.locator('#touch-stick').count()).toBe(0);
     assertLayoutFitsViewport(await readTouchControlLayout(page));

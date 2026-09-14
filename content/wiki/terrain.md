@@ -18,7 +18,9 @@ media:
 
 The arena contains hills, valleys, and saddles, with a flat spawn area at the
 center. Pilots in the same room share the same terrain. Slopes accelerate your
-ship downhill and resist travel uphill. Terrain itself does not deal damage.
+ship downhill and resist travel uphill, even with automatic thrust. Steering
+redirects normal momentum toward the nose before the slope force acts. Terrain
+itself does not deal damage.
 
 The circular arena is 6,000 units across with a 100 unit buffer; the damaging
 boundary comes from that geometry. The asteroid belt uses a separate radius.
@@ -29,7 +31,7 @@ the first hit, but staying outside remains dangerous.
 
 Contour lines are closest together on steep slopes and farther apart on gentle
 ground. Faint numbers mark relative elevations, including negative values in
-valleys. Watch the contours and your drift to tell uphill from downhill.
+valleys. Watch the contours and changes in motion to tell uphill from downhill.
 Normal hull and mass speed limits still apply, and bots feel the same slope
 force. Laser paths do not interact with terrain; glints where shots cross contours are
 visual feedback, with no terrain reflection or extra damage.

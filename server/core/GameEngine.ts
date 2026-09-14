@@ -1235,11 +1235,7 @@ export class GameEngine {
     }
     const kit = getShipKit(shooter.kitId);
     // Only server-granted knockback or an active Dart dash expands the normal envelope.
-    const dashAllowance =
-      shooter.kitId === 'dart' && (shooter.abilityActiveFrames ?? 0) > 0
-        ? SHIP_ABILITY.DASH_BOOST
-        : 0;
-    const maxShipSpeed = this.playerMotion.legalSpeed(shooter, now) + dashAllowance;
+    const maxShipSpeed = this.playerMotion.legalSpeed(shooter, now);
     const maxLaserSpeed = maxShipSpeed + LASER.SPEED / GAME.FPS;
     const muzzleRadius = (4 / 3) * Math.max(kit.size / 2, radiusFromMass(shooter.mass));
     const maxOriginDistance =
@@ -1248,8 +1244,9 @@ export class GameEngine {
       maxShipSpeed * GAME.FPS * (HUMAN_SHOOT_POSE_ALLOWANCE_MS / 1000);
     if (
       Math.hypot(start.x - shooter.position.x, start.y - shooter.position.y) > maxOriginDistance ||
-      Math.hypot(velocity.x, velocity.y) > maxLaserSpeed ||
-      Math.hypot(shooter.velocity.x, shooter.velocity.y) > maxShipSpeed
+      // Match pose validation tolerance for floating-point mass-scaled caps.
+      Math.hypot(velocity.x, velocity.y) > maxLaserSpeed + 1e-6 ||
+      Math.hypot(shooter.velocity.x, shooter.velocity.y) > maxShipSpeed + 1e-6
     ) {
       return null;
     }

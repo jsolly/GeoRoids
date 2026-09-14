@@ -51,7 +51,7 @@ function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
 }
 
 test(
-  'touching the playfield steers toward the finger and release stops thrust',
+  'touch steering turns toward the finger and keeps flying after release',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -65,6 +65,17 @@ test(
     const session = await page.context().newCDPSession(page);
     let touchActive = false;
     try {
+      // A finger resting over the hull must not turn tiny offsets into a new heading.
+      const restingAngle = await game.getShipAngle();
+      await dispatchTouch(session, 'touchStart', [{ x: center.x + 2, y: center.y - 2, id: 1 }]);
+      touchActive = true;
+      await game.waitForAnimationFrames(8);
+      expect(await game.getShipAngle()).toBeCloseTo(restingAngle, 6);
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath('cruise-mobile-resting-finger.png'),
+      });
+      await dispatchTouch(session, 'touchEnd', []);
+      touchActive = false;
       const points = [
         { x: center.x + 100, y: center.y, angle: 0 },
         { x: center.x, y: center.y - 100, angle: Math.PI / 2 },
@@ -78,13 +89,25 @@ test(
         touchActive = true;
         await page.waitForFunction(() => window.gameController?.getCurrPlayer()?.ship.thrusting);
         expect((await readLocalTouchState(page)).thrusting).toBe(true);
-        const angle = await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.angle);
-        expect(angle).toBeCloseTo(point.angle, 3);
+        await page.waitForFunction((desired) => {
+          const angle = window.gameController?.getCurrPlayer()?.ship.angle;
+          return (
+            angle !== undefined &&
+            Math.abs(Math.atan2(Math.sin(angle - desired), Math.cos(angle - desired))) < 0.001
+          );
+        }, point.angle);
       }
+      const beforeRelease = await game.getShipPosition();
+      const releaseAngle = await game.getShipAngle();
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
-      await game.waitForAnimationFrames(2);
-      expect((await readLocalTouchState(page)).thrusting).toBe(false);
+      await game.waitForAnimationFrames(12);
+      const afterRelease = await game.getShipPosition();
+      expect(
+        Math.hypot(afterRelease.x - beforeRelease.x, afterRelease.y - beforeRelease.y)
+      ).toBeGreaterThan(5);
+      expect(await game.getShipAngle()).toBeCloseTo(releaseAngle, 6);
+      expect((await readLocalTouchState(page)).thrusting).toBe(true);
       expect(await page.locator('#touch-stick').count()).toBe(0);
       expect(diagnostics).toEqual({ errors: [], warnings: [] });
     } finally {
@@ -101,7 +124,7 @@ test(
 );
 
 test(
-  'a quick one-finger canvas tap fires on release and then stops thrust',
+  'a quick one-finger canvas tap fires on release while automatic thrust continues',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -120,7 +143,7 @@ test(
       touchActive = true;
       await game.waitForAnimationFrames(2);
       const duringTap = await readLocalTouchState(page);
-      expect(duringTap.thrusting).toBe(false);
+      expect(duringTap.thrusting).toBe(true);
       expect(duringTap.lastShotTime).toBe(beforeTap.lastShotTime);
 
       await dispatchTouch(session, 'touchEnd', []);
@@ -128,7 +151,7 @@ test(
       await game.waitForAnimationFrames(2);
       const afterTap = await readLocalTouchState(page);
       expect(afterTap.lastShotTime).toBeGreaterThan(beforeTap.lastShotTime);
-      expect(afterTap.thrusting).toBe(false);
+      expect(afterTap.thrusting).toBe(true);
       expect(afterTap.canShoot).toBe(true);
       expect(diagnostics).toEqual({ errors: [], warnings: [] });
     } finally {
@@ -180,7 +203,7 @@ test.each(['ability', 'shield'] as const)(
       await game.waitForAnimationFrames(2);
       const afterAction = await readLocalTouchState(page);
       expect(afterAction.lastShotTime).toBe(beforeAction.lastShotTime);
-      expect(afterAction.thrusting).toBe(false);
+      expect(afterAction.thrusting).toBe(true);
       expect(diagnostics).toEqual({ errors: [], warnings: [] });
     } finally {
       try {
@@ -236,7 +259,7 @@ test(
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
       await game.waitForAnimationFrames(2);
-      expect((await readLocalTouchState(page)).thrusting).toBe(false);
+      expect((await readLocalTouchState(page)).thrusting).toBe(true);
       expect(diagnostics).toEqual({ errors: [], warnings: [] });
     } finally {
       try {
@@ -295,8 +318,7 @@ test.each(KITS)(
             ship &&
             ship.health > 0 &&
             !ship.exploding &&
-            Math.abs(ship.position.x + 1580) < 1 &&
-            Math.abs(ship.position.y - 80) < 1
+            Math.hypot(ship.position.x + 1580, ship.position.y - 80) < 100
           );
         },
         friendlyId,
@@ -394,11 +416,11 @@ test.each(KITS)(
     }
     expect(await page.locator('#touch-shield').getAttribute('aria-disabled')).toBe('true');
 
-    // Browser backgrounding must release every continuous source.
+    // Browser backgrounding releases held firing and steering; automatic thrust stays enabled.
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
     await game.waitForAnimationFrames(1);
     const afterBlur = await readLocalTouchState(page);
-    expect(afterBlur.thrusting).toBe(false);
+    expect(afterBlur.thrusting).toBe(true);
     expect(afterBlur.canShoot).toBe(true);
 
     // A real orientation change also drops stale pointer ownership before the
@@ -412,7 +434,7 @@ test.each(KITS)(
     await page.evaluate(() => window.dispatchEvent(new Event('orientationchange')));
     await game.waitForAnimationFrames(1);
     const afterRotation = await readLocalTouchState(page);
-    expect(afterRotation.thrusting).toBe(false);
+    expect(afterRotation.thrusting).toBe(true);
     expect(afterRotation.canShoot).toBe(true);
     expect(await page.locator('#touch-controls').isHidden()).toBe(false);
     await page.setViewportSize({ width: 390, height: 844 });
@@ -421,7 +443,7 @@ test.each(KITS)(
     await dispatchTouch(session, 'touchCancel', []);
     await game.waitForAnimationFrames(1);
     const afterCancel = await readLocalTouchState(page);
-    expect(afterCancel.thrusting).toBe(false);
+    expect(afterCancel.thrusting).toBe(true);
     expect(afterCancel.canShoot).toBe(true);
     expect(await page.locator('#touch-stick').count()).toBe(0);
 
@@ -498,6 +520,16 @@ test(
         abilityDisabled: 'true',
         shieldDisabled: 'true',
       });
+      await page.waitForFunction(() => {
+        const player = window.gameController?.getCurrPlayer();
+        return player && !player.ship.exploding && player.ship.health > 0 && player.ship.thrusting;
+      });
+      const respawnPosition = await game.getShipPosition();
+      await game.waitForAnimationFrames(12);
+      const flyingPosition = await game.getShipPosition();
+      expect(
+        Math.hypot(flyingPosition.x - respawnPosition.x, flyingPosition.y - respawnPosition.y)
+      ).toBeGreaterThan(1);
     } finally {
       try {
         await dispatchTouch(session, 'touchCancel', []);
@@ -522,6 +554,32 @@ test(
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
     await game.waitForAnimationFrames(4);
+
+    const beforeMove = await game.getShipPosition();
+    await game.waitForAnimationFrames(12);
+    const afterMove = await game.getShipPosition();
+    expect(Math.hypot(afterMove.x - beforeMove.x, afterMove.y - beforeMove.y)).toBeGreaterThan(5);
+    const center = await centerOf(page, '#gameCanvas');
+    await page.mouse.move(center.x, center.y - 120);
+    await page.waitForFunction(() => {
+      const angle = window.gameController?.getCurrPlayer()?.ship.angle;
+      return (
+        angle !== undefined &&
+        Math.abs(Math.atan2(Math.sin(angle - Math.PI / 2), Math.cos(angle - Math.PI / 2))) < 0.001
+      );
+    });
+    await page.keyboard.down('ArrowRight');
+    await game.waitForAnimationFrames(8);
+    await page.keyboard.up('ArrowRight');
+    const keyboardAngle = await game.getShipAngle();
+    expect(Math.abs(keyboardAngle - Math.PI / 2)).toBeGreaterThan(0.1);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.up({ button: 'right' });
+    await page.keyboard.press('KeyW');
+    await page.keyboard.press('ArrowUp');
+    await game.waitForAnimationFrames(3);
+    expect(await game.getShipAngle()).toBeCloseTo(keyboardAngle, 6);
+    expect((await readLocalTouchState(page)).thrusting).toBe(true);
 
     expect(await page.locator('#touch-controls').isHidden()).toBe(true);
     expect(await page.locator('#gameCanvas').isVisible()).toBe(true);

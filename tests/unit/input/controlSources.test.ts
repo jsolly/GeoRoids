@@ -34,41 +34,49 @@ function release(code: string): void {
   keyUp(new KeyboardEvent('keyup', { code }), player);
 }
 
-test('keyboard thrust is unchanged when the touch is idle', () => {
-  press('ArrowUp');
+test('cruise starts without a held control and the freed throttle keys do not change it', () => {
+  reconcilePlayerInput(player);
   expect(player.ship.thrusting).toBe(true);
-  release('ArrowUp');
-  expect(player.ship.thrusting).toBe(false);
+  for (const code of ['ArrowUp', 'KeyW']) {
+    press(code);
+    release(code);
+    expect(player.ship.thrusting).toBe(true);
+  }
 });
 
-test('releasing a thrust key keeps thrusting while the touch is held', () => {
+test('keyboard steering takes over from the pointer and release keeps cruising on the new heading', () => {
   setTouchHeading(player, 0);
-  press('ArrowUp');
-  expect(player.ship.thrusting).toBe(true);
-  release('ArrowUp');
-  expect(player.ship.thrusting).toBe(true);
-  setTouchHeading(player, null);
-  expect(player.ship.thrusting).toBe(false);
-});
-
-test('right-mouse thrust still composes with keys', () => {
-  controlSources.mouseThrust = true;
-  reconcilePlayerInput(player);
-  expect(player.ship.thrusting).toBe(true);
-  controlSources.mouseThrust = false;
-  reconcilePlayerInput(player);
-  expect(player.ship.thrusting).toBe(false);
-});
-
-test('touch heading matches mouse-style aim and does not fight WASD turn', () => {
-  setTouchHeading(player, Math.PI / 2);
-  expect(player.ship.angle).toBeCloseTo(Math.PI / 2, 8);
-  expect(player.ship.angularVelocity).toBe(0);
-
   press('ArrowLeft');
-  expect(player.ship.angularVelocity).toBeCloseTo(TURN, 10);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN);
+  player.ship.update();
   release('ArrowLeft');
-  expect(player.ship.angle).toBeCloseTo(Math.PI / 2, 8);
+  expect(player.ship.angularVelocity).toBe(0);
+  expect(player.ship.thrusting).toBe(true);
+  expect(controlSources.pointerHeading).toBeNull();
+});
+
+test('touch turns toward the finger at the kit limit and release keeps the attained heading', () => {
+  player.ship.angle = 0;
+  setTouchHeading(player, Math.PI / 2);
+  expect(player.ship.angle).toBe(0);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN, 10);
+  player.ship.update();
+  expect(player.ship.angle).toBeCloseTo(TURN, 10);
+  setTouchHeading(player, null);
+  const angle = player.ship.angle;
+  player.ship.update();
+  expect(player.ship.angle).toBe(angle);
+  expect(player.ship.thrusting).toBe(true);
+  expect(Math.hypot(player.ship.velocity.x, player.ship.velocity.y)).toBeGreaterThan(0);
+});
+
+test('touch takes the short route across the angle wrap and settles without overshoot', () => {
+  player.ship.angle = Math.PI - TURN / 4;
+  setTouchHeading(player, -Math.PI + TURN / 4);
+  expect(player.ship.angularVelocity).toBeCloseTo(TURN / 2);
+  player.ship.update();
+  tickTouchControls(player);
+  expect(player.ship.angularVelocity).toBeCloseTo(0);
 });
 
 test('firing touch shoots once and re-arms on release', () => {

@@ -92,12 +92,7 @@ test(
     await game.verifyGameArea();
 
     const beforeMove = await game.getShipPosition();
-    await page.keyboard.down('ArrowUp');
-    try {
-      await game.waitForAnimationFrames(30);
-    } finally {
-      await page.keyboard.up('ArrowUp');
-    }
+    await game.waitForAnimationFrames(30);
     await game.waitForAnimationFrames(2);
     const afterMove = await game.getShipPosition();
     expect(Math.hypot(afterMove.x - beforeMove.x, afterMove.y - beforeMove.y)).toBeGreaterThan(1);

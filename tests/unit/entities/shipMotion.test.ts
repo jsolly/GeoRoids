@@ -9,10 +9,9 @@ import { canvasManager } from '../../../src/rendering/canvas';
 afterEach(() => vi.restoreAllMocks());
 
 describe('shared ship motion helper', () => {
-  test('thrust and fired shots move another 25 percent slower', () => {
+  test('automatic thrust accelerates at the existing pace and shots keep their speed', () => {
     expect(GAME.MOTION_SCALE).toBe(0.5625);
     expect(GAME.FPS).toBe(60);
-    const thrustStep = SHIP.THRUST / GAME.FPS;
     const laserStep = LASER.SPEED / GAME.FPS;
     const ship = new Ship({ position: { x: 0, y: 0 }, isLocalPlayer: true });
     ship.angle = 0;
@@ -21,7 +20,7 @@ describe('shared ship motion helper', () => {
     ship.thrusting = true;
     ship.exploding = false;
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(thrustStep);
+    expect(ship.velocity.x).toBeCloseTo(SHIP.THRUST / GAME.FPS);
     expect(ship.velocity.y).toBeCloseTo(0);
 
     const firingShip = new Ship({ position: { x: 0, y: 0 }, isLocalPlayer: true });
@@ -107,22 +106,73 @@ describe('shared ship motion helper', () => {
     expect(next.y).toBeCloseTo(-2 * (1 - 0.6 / GAME.FPS));
   });
 
-  test('Ship.update uses frictionCoefficient for non-bot ships', () => {
-    const ship = new Ship({ isBot: false, frictionCoefficient: 0.01 });
+  test('cruise discards sideways momentum and follows every turn without coasting', () => {
+    const ship = new Ship({ isLocalPlayer: true });
     ship.position = { x: 0, y: 0 };
-    ship.velocity = { x: 3, y: 1 };
-    ship.thrusting = false;
-    ship.exploding = false;
+    ship.angle = 0;
+    ship.velocity = { x: 0, y: 3 };
     ship.update();
-    const expected = applyThrustOrFriction(
-      { x: 3, y: 1 },
-      ship.angle,
-      false,
-      0.01,
-      ship.thrust,
-      ship.mass,
-      ship.maxVelocity
+    expect(ship.velocity.x).toBeCloseTo(3 + SHIP.THRUST / GAME.FPS);
+    expect(ship.velocity.y).toBeCloseTo(0);
+    ship.angle = Math.PI / 2;
+    ship.update();
+    expect(ship.position.x).toBeCloseTo(3 + SHIP.THRUST / GAME.FPS);
+    expect(ship.position.y).toBeCloseTo(-(3 + (2 * SHIP.THRUST) / GAME.FPS));
+  });
+
+  test('grown ships cruise at the existing mass-adjusted speed', () => {
+    const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
+    ship.mass = 8;
+    ship.velocity = { x: 10, y: 0 };
+    ship.angle = 0;
+    ship.update();
+    expect(ship.velocity.x).toBeCloseTo(7 * 0.5625 * 0.6);
+    expect(ship.velocity.y).toBeCloseTo(0);
+  });
+
+  test('Dart dashes above cruise for its active window then returns to cruise', () => {
+    const ship = new Ship({ kitId: 'dart', isLocalPlayer: true });
+    ship.angle = 0;
+    ship.velocity = { x: 4.5, y: 0 };
+    ship.update();
+    expect(ship.velocity.x).toBeCloseTo(4.5);
+    expect(ship.activateAbility()).toBe(true);
+    ship.update();
+    expect(ship.velocity.x).toBeCloseTo(4.5 + 6 * 0.5625);
+    for (let frame = 1; frame < 12; frame++) {
+      ship.update();
+    }
+    expect(ship.abilityActiveFrames).toBe(0);
+    expect(ship.velocity.x).toBeCloseTo(4.5);
+  });
+
+  test('an authoritative blast pushes the pilot before cruise regains the heading', () => {
+    const ship = new Ship({ isLocalPlayer: true });
+    ship.angle = 0;
+    ship.velocity = { x: 0, y: 12 };
+    ship.knockbackVelocityLimit = 12;
+    ship.thrusting = true;
+    ship.update();
+    expect(ship.position.y).toBeGreaterThan(4.5);
+    expect(ship.velocity.y).toBeGreaterThan(ship.velocity.x);
+    for (let frame = 0; frame < 60; frame++) {
+      ship.update();
+    }
+    expect(ship.velocity.x).toBeCloseTo(4.5);
+    // Terrain can still deflect travel slightly after the blast has decayed.
+    expect(Math.abs(Math.atan2(-ship.velocity.y, ship.velocity.x) - ship.angle)).toBeLessThan(
+      Math.PI / 180
     );
-    expect(ship.velocity).toEqual(expected);
+  });
+
+  test('cruise cannot advance a dead ship or a server-owned handoff', () => {
+    const ship = new Ship({ isLocalPlayer: true });
+    ship.serverOwnsMotion = true;
+    ship.update();
+    expect(ship.position).toEqual({ x: 0, y: 0 });
+    ship.serverOwnsMotion = false;
+    ship.health = 0;
+    ship.update();
+    expect(ship.position).toEqual({ x: 0, y: 0 });
   });
 });

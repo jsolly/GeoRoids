@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import type { AsteroidData } from '../../../shared-types';
-import { ROID } from '../../../src/constants';
+import { GAME, LASER, ROID } from '../../../src/constants';
 import { WireClient, type WireMessage } from '../../support/wireClient';
 
 type TestServer = ReturnType<typeof createServerInstance>;
@@ -144,7 +144,10 @@ async function sendCurrentShot(
     id: playerId,
     data: {
       laserStart,
-      laserDirection: { x: direction.x * 5, y: direction.y * 5 },
+      laserDirection: {
+        x: direction.x * (LASER.SPEED / GAME.FPS),
+        y: direction.y * (LASER.SPEED / GAME.FPS),
+      },
     },
   });
   await client.barrier();

@@ -285,13 +285,14 @@ test.each([1, 8])(
       uphill.update();
       if (frame === 14) {
         expect(Math.hypot(downhill.velocity.x, downhill.velocity.y)).toBeGreaterThan(
-          Math.hypot(uphill.velocity.x, uphill.velocity.y)
+          Math.hypot(uphill.velocity.x, uphill.velocity.y) * 1.05
         );
       }
     }
     const downDistance = startX - downhill.position.x;
     const upDistance = uphill.position.x - startX;
     expect(upDistance).toBeGreaterThan(50);
-    expect(downDistance).toBeGreaterThan(upDistance * 1.05);
+    // Both ships reach the lower cap sooner, but downhill acceleration still gives a lead.
+    expect(downDistance).toBeGreaterThan(upDistance);
   }
 );

@@ -78,17 +78,17 @@ describe('shared ship motion helper', () => {
 
     const capped = applyThrustOrFriction({ x: 20, y: 0 }, 0, true, GAME.FRICTION);
     const speed = Math.sqrt(capped.x * capped.x + capped.y * capped.y);
-    expect(SHIP.MAX_VELOCITY).toBe(8 * GAME.MOTION_SCALE);
+    expect(SHIP.MAX_VELOCITY).toBe(1.125);
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });
 
   test.each([
-    ['dart', 8 * GAME.MOTION_SCALE],
-    ['hauler', 7 * GAME.MOTION_SCALE],
-    ['warden', 7 * GAME.MOTION_SCALE],
-    ['skirmisher', 8.5 * GAME.MOTION_SCALE],
-    ['quake', 8 * GAME.MOTION_SCALE],
-  ] as const)('%s keeps its extra 25 percent slower cruising speed cap', (kitId, cap) => {
+    ['dart', 1.125],
+    ['hauler', 0.984375],
+    ['warden', 0.984375],
+    ['skirmisher', 1.1953125],
+    ['quake', 1.125],
+  ] as const)('%s cruises at one-quarter of its former speed', (kitId, cap) => {
     expect(getShipKit(kitId).maxVelocity).toBe(cap);
     const ship = new Ship({ kitId, position: { x: 0, y: 0 }, isLocalPlayer: true });
     ship.angle = 0;
@@ -110,14 +110,14 @@ describe('shared ship motion helper', () => {
     const ship = new Ship({ isLocalPlayer: true });
     ship.position = { x: 0, y: 0 };
     ship.angle = 0;
-    ship.velocity = { x: 0, y: 3 };
+    ship.velocity = { x: 0, y: 0.5 };
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(3 + SHIP.THRUST / GAME.FPS);
+    expect(ship.velocity.x).toBeCloseTo(0.5 + SHIP.THRUST / GAME.FPS);
     expect(ship.velocity.y).toBeCloseTo(0);
     ship.angle = Math.PI / 2;
     ship.update();
-    expect(ship.position.x).toBeCloseTo(3 + SHIP.THRUST / GAME.FPS);
-    expect(ship.position.y).toBeCloseTo(-(3 + (2 * SHIP.THRUST) / GAME.FPS));
+    expect(ship.position.x).toBeCloseTo(0.5 + SHIP.THRUST / GAME.FPS);
+    expect(ship.position.y).toBeCloseTo(-(0.5 + (2 * SHIP.THRUST) / GAME.FPS));
   });
 
   test('grown ships cruise at the existing mass-adjusted speed', () => {
@@ -126,24 +126,24 @@ describe('shared ship motion helper', () => {
     ship.velocity = { x: 10, y: 0 };
     ship.angle = 0;
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(7 * 0.5625 * 0.6);
+    expect(ship.velocity.x).toBeCloseTo(0.590625);
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
   test('Dart dashes above cruise for its active window then returns to cruise', () => {
     const ship = new Ship({ kitId: 'dart', isLocalPlayer: true });
     ship.angle = 0;
-    ship.velocity = { x: 4.5, y: 0 };
+    ship.velocity = { x: 1.125, y: 0 };
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(4.5);
+    expect(ship.velocity.x).toBeCloseTo(1.125);
     expect(ship.activateAbility()).toBe(true);
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(4.5 + 6 * 0.5625);
+    expect(ship.velocity.x).toBeCloseTo(1.96875);
     for (let frame = 1; frame < 12; frame++) {
       ship.update();
     }
     expect(ship.abilityActiveFrames).toBe(0);
-    expect(ship.velocity.x).toBeCloseTo(4.5);
+    expect(ship.velocity.x).toBeCloseTo(1.125);
   });
 
   test('an authoritative blast pushes the pilot before cruise regains the heading', () => {
@@ -158,7 +158,7 @@ describe('shared ship motion helper', () => {
     for (let frame = 0; frame < 60; frame++) {
       ship.update();
     }
-    expect(ship.velocity.x).toBeCloseTo(4.5);
+    expect(ship.velocity.x).toBeCloseTo(1.125);
     // Terrain can still deflect travel slightly after the blast has decayed.
     expect(Math.abs(Math.atan2(-ship.velocity.y, ship.velocity.x) - ship.angle)).toBeLessThan(
       Math.PI / 180

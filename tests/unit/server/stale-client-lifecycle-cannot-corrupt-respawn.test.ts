@@ -109,7 +109,7 @@ describe('late client death updates after authoritative respawn', () => {
     for (let frame = 0; frame <= SHIP.EXPLODE_DURATION_FRAMES; frame++) {
       engine.advanceOneFrame();
     }
-    const nextPosition = { x: spawnPosition.x + 25, y: spawnPosition.y };
+    const nextPosition = { x: spawnPosition.x + 6.25, y: spawnPosition.y };
     core.handleClientMessage(
       {
         type: 'update',

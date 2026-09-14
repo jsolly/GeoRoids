@@ -62,7 +62,13 @@ describe('invalid client movement cannot corrupt the shared world', () => {
         {
           type: 'update',
           id: pilot.id,
-          data: { position, velocity: { x: 3, y: 4 }, angle: 0.75, thrusting: true, ...movement },
+          data: {
+            position,
+            velocity: { x: 0.3, y: 0.4 },
+            angle: 0.75,
+            thrusting: true,
+            ...movement,
+          },
         },
         owner
       );
@@ -86,7 +92,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
           id: pilot.id,
           data: {
             position: nextPosition,
-            velocity: { x: 1, y: 2 },
+            velocity: { x: 0.25, y: 0.5 },
             angle: 0.25,
             angularVelocity: 0.5,
             thrusting: true,
@@ -97,7 +103,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
         owner
       );
       expect(pilot.position).toEqual(nextPosition);
-      expect(pilot.velocity).toEqual({ x: 1, y: 2 });
+      expect(pilot.velocity).toEqual({ x: 0.25, y: 0.5 });
       expect(pilot.angle).toBe(0.25);
       expect(pilot.thrusting).toBe(true);
       expect(pilot.playerMotion).toMatchObject({ mode: 'free', ack: 1 });
@@ -129,7 +135,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     });
     peer.clear();
     const position = JSON.parse('{"x":5,"y":5,"__proto__":{"poison":true},"extra":null}');
-    const velocity = { x: 1, y: 2, unexpected: 'not public state' };
+    const velocity = { x: 0.25, y: 0.5, unexpected: 'not public state' };
     const unknown = JSON.parse('{"__proto__":{"poison":true},"constructor":{"bad":true}}');
     core.handleClientMessage(
       {
@@ -164,7 +170,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     expect(pilot.harpoonTargetId).toBe(rock.id);
     expect(pilot.harpoonLatchPos).toEqual(latch);
     expect(pilot.position).toEqual({ x: 5, y: 5 });
-    expect(pilot.velocity).toEqual({ x: 1, y: 2 });
+    expect(pilot.velocity).toEqual({ x: 0.25, y: 0.5 });
     expect(pilot).not.toHaveProperty('futureServerField');
     expect(Object.getPrototypeOf(pilot)).toBe(Object.prototype);
     expect(peer.inbox.some((message) => message.type === 'playerUpdate')).toBe(false);

@@ -10,7 +10,7 @@ import {
 } from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
-import { DAMAGE } from '../../../src/constants';
+import { DAMAGE, GAME, LASER } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function arena() {
@@ -149,7 +149,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
         id: pilot.id,
         data: {
           laserStart: { ...pilot.position },
-          laserDirection: { x: 0, y: -5 },
+          laserDirection: { x: 0, y: -LASER.SPEED / GAME.FPS },
         },
       },
       ws

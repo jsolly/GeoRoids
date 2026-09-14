@@ -79,7 +79,7 @@ export const HAULER_TETHER_COLOR = '#E8D5A3';
 export const HAULER_TETHER_TIP_COLOR = '#FDE68A';
 
 export const SHIP_ABILITY = {
-  DASH_BOOST: 6 * GAME.MOTION_SCALE,
+  DASH_BOOST: 1.5 * GAME.MOTION_SCALE,
   HARPOON_RANGE: 280,
   /** Fallback "nearby" disk when the canvas size is unknown. */
   HARPOON_VISUAL_PX: 720,
@@ -139,7 +139,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxHealth: 140,
     size: 38,
     thrust: 4.5 * GAME.MOTION_SCALE,
-    maxVelocity: 7 * GAME.MOTION_SCALE,
+    maxVelocity: 1.75 * GAME.MOTION_SCALE,
     turnSpeed: 380,
     shotCooldown: 280,
   },
@@ -153,7 +153,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxHealth: 120,
     size: 32,
     thrust: SHIP.THRUST,
-    maxVelocity: 7 * GAME.MOTION_SCALE,
+    maxVelocity: 1.75 * GAME.MOTION_SCALE,
     turnSpeed: SHIP.TURN_SPEED,
     shotCooldown: 260,
   },
@@ -167,7 +167,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxHealth: 80,
     size: 28,
     thrust: 5.4 * GAME.MOTION_SCALE,
-    maxVelocity: 8.5 * GAME.MOTION_SCALE,
+    maxVelocity: 2.125 * GAME.MOTION_SCALE,
     turnSpeed: 540,
     shotCooldown: 200,
   },

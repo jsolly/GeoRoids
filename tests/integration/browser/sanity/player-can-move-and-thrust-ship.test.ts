@@ -22,6 +22,15 @@ test(
     await game.waitForAnimationFrames(24);
     const afterThrust = await game.getShipPosition();
     expect(Math.hypot(afterThrust.x - startPos.x, afterThrust.y - startPos.y)).toBeGreaterThan(5);
+    const cruiseSpeed = await page.evaluate(() => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Local ship unavailable');
+      }
+      return Math.hypot(ship.velocity.x, ship.velocity.y);
+    });
+    expect(cruiseSpeed).toBeGreaterThan(0);
+    expect(cruiseSpeed).toBeLessThanOrEqual(1.125 + 1e-6);
 
     await game.holdMovementKey('ArrowRight', 400);
     const afterTurn = await game.getShipAngle();

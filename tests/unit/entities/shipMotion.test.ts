@@ -83,11 +83,8 @@ describe('shared ship motion helper', () => {
   });
 
   test.each([
-    ['dart', 1.125],
+    ['surveyor', 1.125],
     ['hauler', 0.984375],
-    ['warden', 0.984375],
-    ['skirmisher', 1.1953125],
-    ['quake', 1.125],
   ] as const)('%s cruises at one-quarter of its former speed', (kitId, cap) => {
     expect(getShipKit(kitId).maxVelocity).toBe(cap);
     const ship = new Ship({ kitId, position: { x: 0, y: 0 }, isLocalPlayer: true });
@@ -128,22 +125,6 @@ describe('shared ship motion helper', () => {
     ship.update();
     expect(ship.velocity.x).toBeCloseTo(0.590625);
     expect(ship.velocity.y).toBeCloseTo(0);
-  });
-
-  test('Dart dashes above cruise for its active window then returns to cruise', () => {
-    const ship = new Ship({ kitId: 'dart', isLocalPlayer: true });
-    ship.angle = 0;
-    ship.velocity = { x: 1.125, y: 0 };
-    ship.update();
-    expect(ship.velocity.x).toBeCloseTo(1.125);
-    expect(ship.activateAbility()).toBe(true);
-    ship.update();
-    expect(ship.velocity.x).toBeCloseTo(1.96875);
-    for (let frame = 1; frame < 12; frame++) {
-      ship.update();
-    }
-    expect(ship.abilityActiveFrames).toBe(0);
-    expect(ship.velocity.x).toBeCloseTo(1.125);
   });
 
   test('an authoritative blast pushes the pilot before cruise regains the heading', () => {

@@ -3,9 +3,8 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
-import { createFuelTank } from '../../../shared/fuel';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import { cruiseSpeed, dashSpeedBonus } from '../../../shared/shipFlight';
+import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
   LaserUpgrade,
@@ -17,23 +16,21 @@ import type {
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
 import { playHarpoonRelease, playShieldActivation } from '../../audio/interactionSounds';
-import { DAMAGE, FUEL, GAME, PALETTE, SHIP } from '../../constants';
+import { DAMAGE, GAME, PALETTE, SHIP } from '../../constants';
 import { NetworkManager } from '../../network/networkManager';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
 import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileField';
-import { Laser } from '../laser/Laser';
+import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
 import { getHarpoonFieldCanvas, getHarpoonFieldScale } from './harpoonField';
-import { startQuakePulse } from './quakePulseRenderer';
 import {
   type AbilityWorld,
   activateAbilityOnHost,
   canActivateAbility,
-  clearShieldProjection,
   tickAbilityHost,
 } from './shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
@@ -47,7 +44,6 @@ import {
   shouldStartHealthRegeneration,
   tickShipImpactFlash,
 } from './shipUtils';
-import { createSkirmisherRingShots } from './skirmisherRing';
 
 class Ship {
   id: string = uuidv4(); // Unique identifier for event handling
@@ -77,9 +73,7 @@ class Ship {
   shieldFlashTime = 0;
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
-  fuel: number = FUEL.START;
-  maxFuel: number = FUEL.MAX;
-  lastLocalFuelWriteMs: number = 0;
+
   lastDamageTime: number = 0;
   healthRegenTimer: number = 0;
   lastCollisionTime: number = 0;
@@ -98,9 +92,7 @@ class Ship {
   turnSpeed: number = SHIP.TURN_SPEED;
   abilityCooldownFrames: number = 0;
   abilityActiveFrames: number = 0;
-  shieldTimer: number = 0;
-  shieldTargetId?: string;
-  shieldSourceId?: string;
+
   harpoonTimer: number = 0;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
@@ -156,9 +148,7 @@ class Ship {
     if (options?.frictionCoefficient !== undefined) {
       this.frictionCoefficient = options.frictionCoefficient;
     }
-    const tank = createFuelTank();
-    this.fuel = tank.fuel;
-    this.maxFuel = tank.maxFuel;
+
     applyShipKitToShip(this, options?.kitId ?? DEFAULT_SHIP_KIT_ID);
     if (options?.shotCooldown !== undefined) {
       this.shotCooldown = options.shotCooldown;
@@ -188,7 +178,7 @@ class Ship {
     this.thrusting = false;
     this.angularVelocity = 0;
     clearShield(this);
-    clearShieldProjection(this);
+
     playExplosionSound(this.position);
 
     // Dispatch event to notify that ship has exploded with cause information
@@ -206,10 +196,7 @@ class Ship {
 
   canShootAgain(): boolean {
     this.updateShootCooldown();
-    if (
-      this.canShoot &&
-      this.lasers.filter((laser) => !laser.abilityShot).length < SHIP.MAX_LASERS
-    ) {
+    if (this.canShoot && this.lasers.length < SHIP.MAX_LASERS) {
       return true;
     }
     this.canShoot = false;
@@ -250,15 +237,6 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  fireRing(): void {
-    const shots = createSkirmisherRingShots(this.position, this.angle, this.r, this.velocity);
-    for (const shot of shots) {
-      const laser = new Laser(shot.position, shot.velocity, 0, 0, false);
-      laser.abilityShot = true;
-      this.lasers.push(laser);
-    }
-  }
-
   activateAbility(world?: AbilityWorld): boolean {
     if (this.exploding) {
       return false;
@@ -266,13 +244,6 @@ class Ship {
     const kit = getShipKit(this.kitId);
     const canTry = canActivateAbility(this);
     const result = activateAbilityOnHost(this, world);
-    if (result.activated && result.abilityId === 'shockPulse') {
-      this.lastLocalFuelWriteMs = Date.now();
-      startQuakePulse(this, { ...this.position });
-    }
-    if (result.abilityId === 'ringFire') {
-      this.fireRing();
-    }
     // Always tell the server on a legal E. Do not start the Hauler cooldown
     // on a miss — that 3s lock was why a later in-range tap stayed dead.
     if (this.isLocalPlayer && !this.isBot && canTry) {
@@ -343,7 +314,7 @@ class Ship {
       this.sendShieldEvent(false);
       return true;
     }
-    if (!activateShield(this, this.exploding, this.kitId)) {
+    if (!activateShield(this, this.exploding)) {
       return false;
     }
     playShieldActivation(this.position);
@@ -563,9 +534,7 @@ class Ship {
     }
 
     this.angle += this.angularVelocity;
-    const speed =
-      cruiseSpeed(this.mass, this.maxVelocity) +
-      dashSpeedBonus(this.kitId, this.abilityActiveFrames);
+    const speed = cruiseSpeed(this.mass, this.maxVelocity);
     const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);
     if (this.knockbackVelocityLimit <= speed) {
       // Steering redirects normal momentum before thrust and terrain forces act.

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { GAME, SHIP } from '../../../../src/constants';
+import { GAME } from '../../../../src/constants';
 import { Player } from '../../../../src/entities/player/Player';
 import { resetControlSources } from '../../../../src/input/controlSources';
 import { keyDown, keyUp, reconcilePlayerInput } from '../../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
 
 let player: Player;
-const turn = (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS);
+const turn = (540 * Math.PI) / (180 * GAME.FPS);
 const press = (code: string) => keyDown(new KeyboardEvent('keydown', { code }), player);
 const release = (code: string) => keyUp(new KeyboardEvent('keyup', { code }), player);
 

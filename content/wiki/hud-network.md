@@ -1,7 +1,7 @@
 ---
 title: HUD and the shared world
 category: Systems
-summary: Read lives, fuel, health, nearby threats, and scores. Understand what
+summary: Read lives, health, nearby threats, and scores. Understand what
   to do if the connection drops.
 order: 150
 related:
@@ -22,18 +22,17 @@ audio, effects become available as they load; missed sounds do not play later.
 Shots, impacts, and explosions vary their pitch slightly each time they
 start, keeping repeated actions from sounding identical. Automatic thrust is silent. Nearby action is louder; off-screen combat
 cues stay silent. Harpoons have launch, latch, and release cues. Orbital pickup
-and pickup-break sounds differ from ship lasers. Fuel, laser cores, and
+and pickup-break sounds differ from ship lasers. Laser cores and
 material pickups have separate cues, as do kit abilities and respawning.
 
-The HUD shows lives as kit hull icons, score, faction label and mark, kit name,
-and a fuel bar. Desktop layouts include a leaderboard of up to 10 rows and a
+The HUD shows lives as kit hull icons, score, faction label and mark, and kit name. Desktop layouts include a leaderboard of up to 10 rows and a
 minimap; touch layouts use a compact leaderboard and an adaptive minimap. The
 minimap shows
 your ship, other human pilots, bot pilots, asteroids, loot drops, loose
 satellite pickups, and orbiting pickups inside the arena ring. Compact
 marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
-cream squares and diamonds mark wreckage and shards, green crosses mark fuel,
+cream squares and diamonds mark wreckage and shards,
 yellow slashed diamonds mark laser cores, and lilac circles and diamonds mark
 loose and orbiting satellite pickups. Ship headings and
 faction marks keep pilots identifiable above the world marks. Kill and pickup
@@ -66,3 +65,10 @@ interruption, the local view may lag behind the shared world; wait for the
 connection to recover before relying on a pickup or hit result. If joining
 fails or reconnect attempts are exhausted, the game returns to the title
 screen. Select Enter Game to try again. A full reload can start a new session.
+
+## Surveyor scan
+
+Press E or tap Scan to identify nearby asteroid minerals temporarily on radar.
+Ice becomes a circle, metal a square, and rubble a triangle; the legend labels
+each shape. Farther rocks and rocks after the scan expires remain ordinary dots.
+The textures visible on asteroid bodies remain visible to both ships.

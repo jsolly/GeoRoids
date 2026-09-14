@@ -18,7 +18,7 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
 
   test('only the Hauler latches and the foe is hauled in', () => {
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'dart', factionId: 'ember' });
+    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor', factionId: 'ember' });
     world.parkBots();
     world.clearAsteroids();
 
@@ -47,7 +47,7 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
       'target-host',
       'Target',
       { x: 80, y: 0 },
-      { kitId: 'dart', factionId: 'ember' }
+      { kitId: 'surveyor', factionId: 'ember' }
     );
     const hostEntity = world.entity(host);
     const targetEntity = world.entity(target);
@@ -62,7 +62,7 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
 
   test('same-side mates are never latched', () => {
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'dart', factionId: 'ion' });
+    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor', factionId: 'ion' });
     world.parkBots();
     world.clearAsteroids();
 
@@ -78,12 +78,11 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
 
   test('timed ship shield blocks a Hauler latch', () => {
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'dart', factionId: 'ember' });
+    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor', factionId: 'ember' });
     world.parkBots();
     world.clearAsteroids();
     expect(world.engine.requestShield(bob.id, true)).toBe(true);
     expect(world.entity(bob).shieldActive).toBe(true);
-    expect(world.entity(bob).shieldTimer).toBe(0);
 
     world.send(alice, {
       type: 'useAbility',
@@ -98,7 +97,7 @@ describe('A Hauler fires harpoon at a nearby ship', () => {
 
   test('an active F shield blocks a Hauler latch', () => {
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'warden', factionId: 'ember' });
+    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'hauler', factionId: 'ember' });
     world.parkBots();
     world.clearAsteroids();
     expect(world.engine.requestShield(bob.id, true)).toBe(true);

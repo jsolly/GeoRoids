@@ -1,4 +1,6 @@
 import { FACTION_COLORS } from '../shared/factions';
+import type { ShipKitId } from '../shared-types';
+import { scannedMaterial } from '../src/entities/ship/surveyScan';
 import './wiki-media-node-shim';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -34,7 +36,7 @@ import {
   LOOT_BLAST,
 } from '../shared/lootBlast';
 import { findNearestShieldImpact, reflectProjectileVelocity } from '../shared/shieldReflection';
-import { cruiseSpeed, cruiseVelocity, dashSpeedBonus } from '../shared/shipFlight';
+import { cruiseSpeed } from '../shared/shipFlight';
 import {
   applyLootMass,
   lootOverlap,
@@ -44,7 +46,6 @@ import {
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import {
   DAMAGE,
-  FUEL,
   GAME,
   PALETTE,
   SATELLITE_PICKUP,
@@ -59,8 +60,6 @@ import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
 import { advanceCruiseVelocity } from '../src/entities/ship/cruiseMotion';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
-import { applyQuakeImpulse } from '../src/entities/ship/quakeImpulse';
-import { paintQuakePulse } from '../src/entities/ship/quakePulseRenderer';
 import {
   type AbilityBody,
   type AbilityHost,
@@ -69,7 +68,7 @@ import {
   pullHarpoonTarget,
   tickAbilityHost,
 } from '../src/entities/ship/shipAbilities';
-import { getShipKit, SHIP_ABILITY, type ShipKitId } from '../src/entities/ship/shipKits';
+import { getShipKit, SHIP_ABILITY } from '../src/entities/ship/shipKits';
 import { strokeKitHullOutline, strokePhosphorSegment } from '../src/entities/ship/shipRenderer';
 import {
   activateShield,
@@ -77,10 +76,6 @@ import {
   isShieldBlockingLasers,
   updateShield,
 } from '../src/entities/ship/shipShield';
-import {
-  createSkirmisherRingShots,
-  SKIRMISHER_RING_COUNT,
-} from '../src/entities/ship/skirmisherRing';
 import { steeringTurn } from '../src/input/pointerSteering';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
 import {
@@ -105,11 +100,8 @@ import { recordSatelliteDemo, type SatelliteDemoPanel } from './wiki-satellite-d
 
 type RenderContext = DrawingContext;
 type MediaId =
-  | 'dart'
+  | 'surveyor'
   | 'hauler'
-  | 'warden'
-  | 'skirmisher'
-  | 'quake'
   | 'movement'
   | 'terrain'
   | 'loot'
@@ -120,11 +112,8 @@ type MediaId =
   | 'pickups';
 
 const MEDIA_IDS: readonly MediaId[] = [
-  'dart',
+  'surveyor',
   'hauler',
-  'warden',
-  'skirmisher',
-  'quake',
   'movement',
   'terrain',
   'loot',
@@ -280,10 +269,6 @@ function assertSubjectBounds(kind: string, screen: Position, radius: number): vo
       screen.y + radius <= HEIGHT - 40,
     `${kind} left the readable play area at (${screen.x.toFixed(1)}, ${screen.y.toFixed(1)})`
   );
-}
-
-function secondsLabel(frames: number): string {
-  return `${Math.max(0, frames / GAME.FPS).toFixed(1)} s`;
 }
 
 function drawFrameChrome(
@@ -528,11 +513,9 @@ function makeAbilityHost(kitId: ShipKitId, position: Position, angle = 0): Abili
     angle,
     exploding: false,
     health: getShipKit(kitId).maxHealth,
-    fuel: FUEL.START,
-    maxFuel: FUEL.MAX,
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
-    shieldTimer: 0,
+
     harpoonTimer: 0,
     r: getShipKit(kitId).size / 2,
   };
@@ -567,79 +550,68 @@ function makeAsteroid(
   };
 }
 
-function makeDartDemo(): Demo {
-  const host = makeAbilityHost('dart', { x: -600, y: 28 });
-  host.velocity = cruiseVelocity(host.angle, SHIP.MAX_VELOCITY);
-  const start = copyPosition(host.position);
-  const result = activateAbilityOnHost(host);
+function makeSurveyorDemo(): Demo {
+  const host = makeAbilityHost('surveyor', { x: 0, y: 0 });
+  const rocks = [
+    { position: { x: -100, y: -50 }, material: 'ice' as const, health: 75 },
+    { position: { x: 100, y: -35 }, material: 'metal' as const, health: 75 },
+    { position: { x: 40, y: 75 }, material: 'rubble' as const, health: 75 },
+  ];
+  const activated = activateAbilityOnHost(host);
   invariant(
-    result.activated && result.abilityId === 'boostDash',
-    'Dart E did not activate boostDash'
+    activated.activated && activated.abilityId === 'surveyScan',
+    'Surveyor scan must activate'
   );
-  invariant(
-    host.velocity.x > 0 && host.velocity.y === 0,
-    'Dart boost did not add forward velocity'
-  );
-  const movingHost = {
-    mass: 1,
-    thrust: SHIP.THRUST,
-    ...host,
-    position: copyPosition(host.position),
-    velocity: { ...host.velocity },
-  };
-  const positions: Position[] = [copyPosition(movingHost.position)];
-  const speeds: number[] = [Math.hypot(movingHost.velocity.x, movingHost.velocity.y)];
-  const activeFrames: number[] = [movingHost.abilityActiveFrames];
-  const totalTicks = (FRAME_COUNT - 1) * SIM_TICKS_PER_FRAME;
-  for (let tick = 0; tick < totalTicks; tick += 1) {
-    tickAbilityHost(movingHost);
-    advanceCruiseVelocity(
-      movingHost,
-      cruiseSpeed(1, SHIP.MAX_VELOCITY) + dashSpeedBonus('dart', movingHost.abilityActiveFrames)
-    );
-    movingHost.position.x += movingHost.velocity.x;
-    movingHost.position.y += movingHost.velocity.y;
-    if ((tick + 1) % SIM_TICKS_PER_FRAME === 0) {
-      positions.push(copyPosition(movingHost.position));
-      speeds.push(Math.hypot(movingHost.velocity.x, movingHost.velocity.y));
-      activeFrames.push(movingHost.abilityActiveFrames);
-    }
-  }
+  let classified = false;
+  let expired = false;
   return {
-    id: 'dart',
-    posterFrame: 1,
+    id: 'surveyor',
+    posterFrame: 10,
     verify: () => {
-      invariant(activeFrames[0] === 12, 'Dart active window changed');
-      invariant(
-        positions.some((position, index) => position.x > start.x && (index ?? 0) > 0),
-        'Dart did not advance after the boost'
-      );
-      invariant((speeds.at(-1) ?? 0) < (speeds[0] ?? 0), 'Dart did not return below burst speed');
+      invariant(classified && expired, 'Scan must classify minerals then expire');
     },
     render: (ctx, frame) => {
-      drawFrameChrome(ctx, 'DART · BOOST DASH', 'E trigger → burst → automatic thrust', frame);
-      const displayScale = 0.3;
-      const position = positions[frame] ?? positions[0] ?? start;
-      const pathStart = screenPoint(positions[Math.max(0, frame - 8)] ?? start, displayScale);
-      const pathEnd = screenPoint(position, displayScale);
-      renderSegment(ctx, pathStart.x, pathStart.y, pathEnd.x, pathEnd.y, FACTION_COLORS.ion, 1, 2);
-      drawShip(
+      if (frame > 0) {
+        runSimulationTicks(SIM_TICKS_PER_FRAME * 2, () => tickAbilityHost(host));
+      }
+      drawFrameChrome(
         ctx,
-        'dart',
-        { x: position.x * displayScale, y: position.y * displayScale },
-        0,
-        FACTION_COLORS.ion,
-        getShipKit('dart').size / 2,
-        (activeFrames[frame] ?? 0) > 0
+        'SURVEYOR · MINERAL SCAN',
+        'E scan → identify nearby minerals → fade',
+        frame
       );
-      drawTag(
-        ctx,
-        (activeFrames[frame] ?? 0) > 0 ? 'E · boost active' : 'dash complete · automatic thrust',
-        380,
-        112,
-        FACTION_COLORS.ion
-      );
-      drawTag(ctx, `speed ${speeds[frame]?.toFixed(2) ?? '0.00'}`, 440, 286, PALETTE.HUD_MUTED);
+      drawRing(ctx, host.position, 122, PALETTE.HUD_MUTED, 0.4);
+      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, FACTION_COLORS.ion, 15);
+      for (const rock of rocks) {
+        const material = scannedMaterial(host, rock);
+        classified ||= material !== undefined;
+        expired ||= material === undefined;
+        const point = screenPoint(rock.position);
+        ctx.fillStyle =
+          material === 'metal'
+            ? '#FDE68A'
+            : material === 'ice'
+              ? '#A5F3FC'
+              : material === 'rubble'
+                ? '#FDBA74'
+                : PALETTE.HUD_MUTED;
+        ctx.beginPath();
+        if (material === 'metal') {
+          ctx.rect(point.x - 5, point.y - 5, 10, 10);
+        } else if (material === 'rubble') {
+          ctx.moveTo(point.x, point.y - 6);
+          ctx.lineTo(point.x + 6, point.y + 5);
+          ctx.lineTo(point.x - 6, point.y + 5);
+          ctx.closePath();
+        } else {
+          ctx.arc(point.x, point.y, material ? 5 : 2, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        if (material) {
+          drawTag(ctx, material, point.x + 15, point.y + 8, PALETTE.HUD);
+        }
+      }
+      drawTag(ctx, host.abilityActiveFrames > 0 ? 'SCAN ACTIVE' : 'SCAN EXPIRED', 210, 325);
     },
   };
 }
@@ -659,7 +631,7 @@ function makeHaulerDemo(): Demo {
     position: { x: -300, y: 16 },
     velocity: { x: 0, y: 0 },
     health: 100,
-    r: getShipKit('dart').size / 2,
+    r: getShipKit('surveyor').size / 2,
   };
   const world: AbilityWorld = {
     asteroids: [target],
@@ -799,7 +771,7 @@ function makeHaulerDemo(): Demo {
       );
       drawShip(
         ctx,
-        'dart',
+        'surveyor',
         displayVictim,
         Math.PI,
         FACTION_COLORS.ember,
@@ -839,510 +811,6 @@ function makeHaulerDemo(): Demo {
         '#FDE68A'
       );
       drawTag(ctx, 'E · reel right → bounce left → impact', 400, 286, PALETTE.HUD_MUTED);
-    },
-  };
-}
-
-function makeWardenDemo(): Demo {
-  const host = makeAbilityHost('warden', { x: -90, y: 18 });
-  host.factionId = 'ion';
-  const friendly: AbilityBody & { shieldTimer: number } = {
-    id: 'warden-demo-friendly',
-    kind: 'ship',
-    factionId: 'ion',
-    position: { x: 40, y: 18 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    r: getShipKit('dart').size / 2,
-    shieldTimer: 0,
-  };
-  const attacker: AbilityBody = {
-    id: 'warden-demo-attacker',
-    kind: 'ship',
-    factionId: 'ember',
-    position: { x: 170, y: 18 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    r: getShipKit('dart').size / 2,
-  };
-  const world: AbilityWorld = {
-    asteroids: [],
-    entities: [friendly, attacker],
-    canvas: { width: WIDTH, height: HEIGHT },
-    playfieldScale: 1,
-  };
-  const result = activateAbilityOnHost(host, world);
-  invariant(
-    result.activated && result.abilityId === 'shieldFocus',
-    'Warden E did not activate shieldFocus'
-  );
-  invariant(host.shieldTargetId === friendly.id, 'Warden E did not project to a nearby ally');
-  invariant(
-    friendly.shieldTimer === SHIP_ABILITY.SHIELD_PROJECTION_FRAMES,
-    'projected shield timer changed'
-  );
-  const shieldImpact = findNearestShieldImpact(
-    attacker.position,
-    friendly.position,
-    [
-      {
-        id: 'warden-demo-friendly',
-        position: friendly.position,
-        radius: (friendly.r ?? 0) * SHIELD.RADIUS_RATIO,
-      },
-    ],
-    attacker.id ?? 'warden-demo-attacker'
-  );
-  if (shieldImpact === null) {
-    throw new Error(
-      'wiki-media verification failed: projected shield did not intercept the incoming laser'
-    );
-  }
-  const incomingVelocity = { x: -10, y: 0 };
-  const reflectedVelocity = reflectProjectileVelocity(incomingVelocity, shieldImpact.normal);
-  invariant(
-    reflectedVelocity.x > 0,
-    'projected shield did not reflect the laser toward its shooter'
-  );
-  let sawExpired = false;
-  let reflectedShot = false;
-  let attackerHit = false;
-  const contactFrame = 12;
-  const attackerHitFrame =
-    contactFrame +
-    Math.ceil(Math.abs(attacker.position.x - shieldImpact.point.x) / Math.abs(reflectedVelocity.x));
-  return {
-    id: 'warden',
-    posterFrame: 12,
-    verify: () => {
-      invariant(
-        sawExpired,
-        'projected Warden shield timer did not expire after the shown duration'
-      );
-      invariant(reflectedShot, 'projected Warden shield did not reflect the incoming laser');
-      invariant(attackerHit, 'reflected Warden laser did not reach its shooter');
-      invariant(friendly.health === 100, 'projected shielded ally took reflected-laser damage');
-      invariant(
-        attacker.health === 100 - DAMAGE.LASER_HIT,
-        'reflected laser did not damage its shooter'
-      );
-    },
-    render: (ctx, frame) => {
-      drawFrameChrome(
-        ctx,
-        'WARDEN · SHIELD PROJECTION',
-        'E trigger → nearest ally shield → reflected shot',
-        frame,
-        PALETTE.SHIELD
-      );
-      if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          tickAbilityHost(host);
-          if (friendly.shieldTimer > 0) {
-            friendly.shieldTimer -= 1;
-            if (friendly.shieldTimer <= 0) {
-              delete friendly.shieldSourceId;
-            }
-          }
-          sawExpired ||= friendly.shieldTimer <= 0;
-        });
-      }
-      if (frame >= contactFrame) {
-        reflectedShot = true;
-      }
-      if (frame >= attackerHitFrame) {
-        attackerHit = true;
-        attacker.health = 100 - DAMAGE.LASER_HIT;
-      }
-      const shieldUp = friendly.shieldTimer > 0;
-      if (host.abilityActiveFrames > 0 && shieldUp) {
-        drawCable(ctx, host.position, friendly.position, PALETTE.SHIELD);
-      }
-      if (shieldUp) {
-        drawRing(
-          ctx,
-          friendly.position,
-          (friendly.r ?? 0) * SHIELD.RADIUS_RATIO,
-          PALETTE.SHIELD,
-          0.92
-        );
-      }
-      drawShip(ctx, 'warden', host.position, 0, FACTION_COLORS.ion, getShipKit('warden').size / 2);
-      drawShip(ctx, 'dart', friendly.position, 0, FACTION_COLORS.ion, friendly.r ?? 0);
-      drawShip(ctx, 'dart', attacker.position, Math.PI, FACTION_COLORS.ember, attacker.r ?? 0);
-      if (frame <= contactFrame) {
-        const contactProgress = Math.min(1, frame / contactFrame);
-        const laser = {
-          x: attacker.position.x + (shieldImpact.point.x - attacker.position.x) * contactProgress,
-          y: attacker.position.y,
-        };
-        drawLaser(ctx, laser, incomingVelocity, PALETTE.LASER_ENEMY);
-      } else if (!attackerHit) {
-        const reflectedProgress = frame - contactFrame;
-        const laser = {
-          x: shieldImpact.point.x + reflectedVelocity.x * reflectedProgress,
-          y: shieldImpact.point.y + reflectedVelocity.y * reflectedProgress,
-        };
-        drawLaser(ctx, laser, reflectedVelocity, PALETTE.LASER_LOCAL);
-      }
-      if (frame === contactFrame) {
-        drawRing(
-          ctx,
-          friendly.position,
-          (friendly.r ?? 0) * SHIELD.RADIUS_RATIO + 10,
-          PALETTE.SHIELD,
-          0.9
-        );
-      }
-      if (frame >= attackerHitFrame && frame < attackerHitFrame + 6) {
-        drawRing(ctx, attacker.position, (attacker.r ?? 0) + 15, PALETTE.LASER_LOCAL, 0.9);
-      }
-      drawTag(
-        ctx,
-        shieldUp ? `ally shield · ${secondsLabel(friendly.shieldTimer)}` : 'ally shield expired',
-        350,
-        112,
-        PALETTE.SHIELD
-      );
-      drawTag(
-        ctx,
-        frame < contactFrame
-          ? 'hostile laser approaching ally'
-          : attackerHit
-            ? 'reflected laser · shooter hit'
-            : 'shield contact · laser reflected',
-        340,
-        286,
-        PALETTE.HUD_MUTED
-      );
-    },
-  };
-}
-
-function makeSkirmisherDemo(): Demo {
-  const host = makeAbilityHost('skirmisher', { x: -140, y: 42 }, 0);
-  const target: AbilityBody = {
-    id: 'skirmisher-demo-target',
-    kind: 'ship',
-    factionId: 'ember',
-    position: { x: 0, y: 42 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    r: getShipKit('dart').size / 2,
-  };
-  const result = activateAbilityOnHost(host);
-  invariant(
-    result.activated && result.abilityId === 'ringFire',
-    'Skirmisher E did not activate ringFire'
-  );
-  const kit = getShipKit('skirmisher');
-  const shots = createSkirmisherRingShots(host.position, host.angle, kit.size / 2, host.velocity);
-  invariant(shots.length === SKIRMISHER_RING_COUNT, 'Skirmisher ring count changed');
-  let targetHit = false;
-  let targetHitFrame: number | undefined;
-  return {
-    id: 'skirmisher',
-    posterFrame: 8,
-    verify: () => {
-      invariant(host.abilityActiveFrames === 8, 'Skirmisher active window changed');
-      invariant(targetHit, 'Skirmisher ring did not hit the demonstration target');
-      invariant(
-        target.health === 100 - DAMAGE.LASER_HIT,
-        'Skirmisher target took the wrong hit damage'
-      );
-    },
-    render: (ctx, frame) => {
-      drawFrameChrome(
-        ctx,
-        'SKIRMISHER · RING FIRE',
-        'E trigger → outward laser ring → target hit',
-        frame,
-        PALETTE.LASER_LOCAL
-      );
-      drawShip(
-        ctx,
-        'skirmisher',
-        host.position,
-        host.angle,
-        FACTION_COLORS.ion,
-        getShipKit('skirmisher').size / 2
-      );
-      for (const shot of shots) {
-        const position = {
-          x: shot.position.x + shot.velocity.x * frame * 2.1,
-          y: shot.position.y + shot.velocity.y * frame * 2.1,
-        };
-        if (!targetHit && circlesOverlap(position, 4, target.position, target.r ?? 0)) {
-          targetHit = true;
-          targetHitFrame = frame;
-          target.health = Math.max(0, (target.health ?? 0) - DAMAGE.LASER_HIT);
-        }
-        drawLaser(ctx, position, shot.velocity);
-      }
-      drawShip(ctx, 'dart', target.position, Math.PI, FACTION_COLORS.ember, target.r ?? 0);
-      if (targetHitFrame !== undefined && frame < targetHitFrame + 7) {
-        drawRing(ctx, target.position, (target.r ?? 0) + 16, PALETTE.LASER_LOCAL, 0.9);
-      }
-      drawTag(
-        ctx,
-        targetHit
-          ? `target hit · ${target.health} hull`
-          : `${SKIRMISHER_RING_COUNT} lasers · full ring`,
-        340,
-        112,
-        PALETTE.LASER_LOCAL
-      );
-      drawTag(
-        ctx,
-        targetHit ? 'ring reaches the target hull' : 'lasers fan out in every direction',
-        394,
-        286,
-        PALETTE.HUD_MUTED
-      );
-    },
-  };
-}
-
-function makeQuakeDemo(): Demo {
-  const host = makeAbilityHost('quake', { x: 0, y: 0 });
-  const target: AbilityBody = {
-    id: 'quake-demo-target',
-    kind: 'ship',
-    factionId: 'ember',
-    position: { x: 120, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    r: getShipKit('dart').size / 2,
-  };
-  const rocks: AbilityBody[] = [
-    {
-      id: 'quake-ice',
-      kind: 'asteroid',
-      position: { x: -92, y: -44 },
-      velocity: { x: 0, y: 0 },
-      size: 24,
-    },
-    {
-      id: 'quake-metal',
-      kind: 'asteroid',
-      position: { x: 84, y: 54 },
-      velocity: { x: 0, y: 0 },
-      size: 36,
-    },
-  ];
-  const loot: AbilityBody = {
-    id: 'quake-loot',
-    position: { x: -150, y: 26 },
-    velocity: { x: -0.2, y: 0.15 },
-    r: 8,
-  };
-  const pickup: AbilityBody & {
-    angle: number;
-    color: string;
-    health: number;
-    radius: number;
-    typeId: SatellitePickupTypeId;
-    state: 'loose';
-    maxHealth: number;
-  } = {
-    id: 'quake-pickup',
-    position: { x: -164, y: -54 },
-    velocity: { x: -0.1, y: -0.18 },
-    angle: 0,
-    color: PALETTE.SATELLITE,
-    radius: 12,
-    typeId: 'terra',
-    state: 'loose',
-    health: 50,
-    maxHealth: 50,
-  };
-  const secondPickup: AbilityBody & {
-    angle: number;
-    color: string;
-    health: number;
-    radius: number;
-    typeId: SatellitePickupTypeId;
-    state: 'loose';
-    maxHealth: number;
-  } = {
-    id: 'quake-pickup-aqua',
-    position: { x: 160, y: -58 },
-    velocity: { x: 0.1, y: 0.15 },
-    angle: 0.2,
-    color: PALETTE.SATELLITE,
-    radius: 12,
-    typeId: 'aqua',
-    state: 'loose',
-    health: 50,
-    maxHealth: 50,
-  };
-  const shot: AbilityBody = {
-    id: 'quake-shot',
-    position: { x: 102, y: 94 },
-    velocity: { x: -2.5, y: 0.5 },
-  };
-  const world: AbilityWorld = {
-    asteroids: rocks,
-    entities: [target],
-    canvas: { width: WIDTH, height: HEIGHT },
-  };
-  const result = activateAbilityOnHost(host, world);
-  invariant(
-    result.activated && result.abilityId === 'shockPulse',
-    'Quake E did not activate shockPulse'
-  );
-  invariant(host.fuel === FUEL.START - FUEL.EMP_COST, 'Quake did not spend EMP fuel');
-  invariant(
-    rocks.some((rock) => Math.hypot(rock.velocity.x, rock.velocity.y) > 0),
-    'Quake did not push a nearby rock'
-  );
-  const extraBodies = [loot, secondPickup, pickup, shot];
-  for (const body of extraBodies) {
-    invariant(applyQuakeImpulse(body, host.position, host.angle), 'Quake missed a nearby object');
-  }
-  const physicalBodies = [...rocks, target, ...extraBodies];
-  const startingPositions = physicalBodies.map((body) => ({ ...body.position }));
-  const targetStart = copyPosition(target.position);
-  let targetPushed = false;
-  let targetHitFrame: number | undefined;
-  return {
-    id: 'quake',
-    posterFrame: 3,
-    verify: () => {
-      invariant(
-        physicalBodies.some(
-          (body, index) =>
-            Math.hypot(
-              body.position.x - (startingPositions[index]?.x ?? 0),
-              body.position.y - (startingPositions[index]?.y ?? 0)
-            ) > 0
-        ),
-        'Quake objects did not move after the pulse'
-      );
-      invariant(
-        targetPushed && target.position.x > targetStart.x,
-        'Quake pulse did not push the demonstration ship'
-      );
-      invariant(
-        extraBodies.every((body) => Math.hypot(body.velocity.x, body.velocity.y) > 0),
-        'Quake did not push every physical object in the demonstration'
-      );
-    },
-    render: (ctx, frame) => {
-      drawFrameChrome(
-        ctx,
-        'QUAKE · SHOCK PULSE',
-        'E trigger → blue pulse → nearby objects pushed',
-        frame,
-        '#60A5FA'
-      );
-      if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          // Keep the whole object set in the readable frame while retaining the
-          // direction and relative strength produced by the real impulse helper.
-          for (const body of physicalBodies) {
-            body.position.x += body.velocity.x * 0.04;
-            body.position.y += body.velocity.y * 0.04;
-          }
-          tickAbilityHost(host);
-        });
-      }
-      const displayScale = 0.32;
-      const pulseProgress = Math.min(0.999, (frame * 1000) / FPS / 650);
-      const pulseRadius = SHIP_ABILITY.SHOCK_RADIUS * (1 - (1 - pulseProgress) ** 2);
-      if (!targetPushed && pulseRadius >= Math.hypot(targetStart.x, targetStart.y)) {
-        targetPushed = true;
-        targetHitFrame = frame;
-      }
-      if (pulseProgress < 1) {
-        paintQuakePulse(
-          ctx,
-          screenPoint(host.position),
-          SHIP_ABILITY.SHOCK_RADIUS * displayScale,
-          pulseProgress
-        );
-      }
-      for (const [index, rock] of rocks.entries()) {
-        drawRoid(
-          ctx,
-          {
-            position: rock.position,
-            size: rock.size ?? 24,
-            rotation: index * 0.5,
-            vertices: 8,
-            offsets: [1, 0.8, 1.05, 0.92, 1, 0.78, 1.04, 0.88],
-            material: index === 0 ? 'ice' : 'metal',
-            health: 100,
-            maxHealth: 100,
-          },
-          displayScale
-        );
-        drawArrow(
-          ctx,
-          { x: rock.position.x * displayScale, y: rock.position.y * displayScale },
-          { x: rock.velocity.x * displayScale, y: rock.velocity.y * displayScale },
-          '#60A5FA',
-          5
-        );
-      }
-      drawLootDiamond(ctx, loot.position, loot.r ?? 8, PALETTE.LOOT, 1, displayScale);
-      drawArrow(
-        ctx,
-        { x: loot.position.x * displayScale, y: loot.position.y * displayScale },
-        { x: loot.velocity.x * displayScale, y: loot.velocity.y * displayScale },
-        PALETTE.LOOT,
-        2
-      );
-      drawPickup(ctx, secondPickup, displayScale);
-      drawArrow(
-        ctx,
-        { x: secondPickup.position.x * displayScale, y: secondPickup.position.y * displayScale },
-        { x: secondPickup.velocity.x * displayScale, y: secondPickup.velocity.y * displayScale },
-        PALETTE.SATELLITE,
-        2
-      );
-      drawPickup(ctx, pickup, displayScale);
-      drawArrow(
-        ctx,
-        { x: pickup.position.x * displayScale, y: pickup.position.y * displayScale },
-        { x: pickup.velocity.x * displayScale, y: pickup.velocity.y * displayScale },
-        PALETTE.SATELLITE,
-        2
-      );
-      drawLaser(
-        ctx,
-        { x: shot.position.x * displayScale, y: shot.position.y * displayScale },
-        { x: shot.velocity.x * displayScale, y: shot.velocity.y * displayScale },
-        PALETTE.LASER_ENEMY
-      );
-      drawShip(
-        ctx,
-        'dart',
-        { x: target.position.x * displayScale, y: target.position.y * displayScale },
-        Math.PI,
-        FACTION_COLORS.ember,
-        (target.r ?? 0) * displayScale
-      );
-      if (targetHitFrame !== undefined && frame >= targetHitFrame && frame < targetHitFrame + 8) {
-        drawRing(
-          ctx,
-          { x: target.position.x * displayScale, y: target.position.y * displayScale },
-          (target.r ?? 0) * displayScale + 14,
-          '#60A5FA',
-          0.9
-        );
-      }
-      drawShip(ctx, 'quake', host.position, 0, FACTION_COLORS.ion, getShipKit('quake').size / 2);
-      drawTag(ctx, `EMP · fuel ${host.fuel}/${host.maxFuel}`, 350, 112, '#60A5FA');
-      drawTag(
-        ctx,
-        targetPushed
-          ? 'pulse reached target · nearby objects pushed'
-          : 'blue pulse expanding · physical objects pushed',
-        340,
-        286,
-        PALETTE.HUD_MUTED
-      );
     },
   };
 }
@@ -1401,11 +869,11 @@ function makeMovementDemo(): Demo {
       renderSegment(ctx, a.x, a.y, b.x, b.y, FACTION_COLORS.ion, 1, 2);
       drawShip(
         ctx,
-        'dart',
+        'surveyor',
         { x: position.x * displayScale, y: position.y * displayScale },
         angles[frame + 1] ?? 0,
         FACTION_COLORS.ion,
-        getShipKit('dart').size / 2,
+        getShipKit('surveyor').size / 2,
         true
       );
       drawTag(
@@ -1529,11 +997,11 @@ function makeTerrainDemo(): Demo {
       const directionScale = steepness > 0 ? 64 / steepness : 0;
       drawShip(
         ctx,
-        'dart',
+        'surveyor',
         { x: 0, y: 0 },
         0,
         FACTION_COLORS.ion,
-        getShipKit('dart').size / 2,
+        getShipKit('surveyor').size / 2,
         true
       );
       drawArrow(
@@ -1756,7 +1224,7 @@ function makeLootDemo(): Demo {
       const shipRadius = radiusFromMass(mass);
       drawShip(
         ctx,
-        'dart',
+        'surveyor',
         { x: shooter.x * displayScale, y: shooter.y * displayScale },
         0,
         FACTION_COLORS.ion,
@@ -1860,267 +1328,58 @@ function makeReflectionDemo(): Demo {
 }
 
 function makeShieldDemo(): Demo {
-  const warden = makeAbilityHost('warden', { x: -150, y: -72 });
-  warden.factionId = 'ion';
-  const projected: AbilityBody & { shieldTimer: number } = {
-    id: 'shield-demo-projected',
-    kind: 'ship',
-    factionId: 'ion',
-    position: { x: -20, y: -72 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    r: getShipKit('dart').size / 2,
-    shieldTimer: 0,
-  };
-  const world: AbilityWorld = {
-    asteroids: [],
-    entities: [projected],
-    canvas: { width: WIDTH, height: HEIGHT },
-    playfieldScale: 1,
-  };
-  const wardenResult = activateAbilityOnHost(warden, world);
-  const regular = createShieldState();
-  invariant(
-    wardenResult.activated && wardenResult.abilityId === 'shieldFocus',
-    'shield comparison Warden projection did not activate'
+  const state = createShieldState();
+  invariant(activateShield(state), 'F shield must activate');
+  const position = { x: -80, y: 20 };
+  const attacker = { x: 150, y: 20 };
+  const radius = (getShipKit('surveyor').size / 2) * SHIELD.RADIUS_RATIO;
+  const hit = findNearestShieldImpact(
+    attacker,
+    position,
+    [{ id: 'shield-demo', position, radius }],
+    'enemy'
   );
-  invariant(
-    projected.shieldTimer === SHIP_ABILITY.SHIELD_PROJECTION_FRAMES,
-    'shield comparison projection duration changed'
-  );
-  invariant(
-    activateShield(regular, false, 'warden'),
-    'shield comparison Warden F lane did not activate'
-  );
-  invariant(isShieldBlockingLasers(regular), 'regular F shield is not laser blocking');
-  const regularPosition = { x: -20, y: 72 };
-  const projectedAttacker = { x: 190, y: -72 };
-  const regularAttacker = { x: 190, y: 72 };
-  const projectedImpact = findNearestShieldImpact(
-    projectedAttacker,
-    projected.position,
-    [
-      {
-        id: projected.id ?? 'projected',
-        position: projected.position,
-        radius: (projected.r ?? 0) * SHIELD.RADIUS_RATIO,
-      },
-    ],
-    'projected-attacker'
-  );
-  const regularImpact = findNearestShieldImpact(
-    regularAttacker,
-    regularPosition,
-    [
-      {
-        id: 'regular-f-shield',
-        position: regularPosition,
-        radius: (getShipKit('dart').size / 2) * SHIELD.RADIUS_RATIO,
-      },
-    ],
-    'regular-attacker'
-  );
-  invariant(projectedImpact !== null, 'projected shield comparison did not intercept a laser');
-  invariant(regularImpact !== null, 'regular F shield comparison did not intercept a laser');
-  if (projectedImpact === null || regularImpact === null) {
-    throw new Error('wiki-media verification failed: shield comparison impact was not found');
+  if (!hit) {
+    throw new Error('F shield must intercept the incoming laser');
   }
-  const incomingVelocity = { x: -10, y: 0 };
-  const projectedVelocity = reflectProjectileVelocity(incomingVelocity, projectedImpact.normal);
-  const regularVelocity = reflectProjectileVelocity(incomingVelocity, regularImpact.normal);
-  invariant(
-    projectedVelocity.x > 0 && regularVelocity.x > 0,
-    'shield comparison did not reflect lasers'
-  );
-  const contactFrame = 10;
-  const projectedHitFrame =
-    contactFrame +
-    Math.ceil(
-      Math.abs(projectedAttacker.x - projectedImpact.point.x) / Math.abs(projectedVelocity.x)
-    );
-  const regularHitFrame =
-    contactFrame +
-    Math.ceil(Math.abs(regularAttacker.x - regularImpact.point.x) / Math.abs(regularVelocity.x));
-  let wardenExpired = false;
-  let regularExpired = false;
-  let projectedReflected = false;
-  let regularReflected = false;
+  const reflected = reflectProjectileVelocity({ x: -10, y: 0 }, hit.normal);
+  let expired = false;
   return {
     id: 'shield',
-    posterFrame: 8,
+    posterFrame: 12,
     verify: () => {
-      invariant(
-        wardenExpired && regularExpired,
-        'shield lanes did not show their full timed windows'
-      );
-      invariant(
-        projectedReflected && regularReflected,
-        'shield lanes did not reflect incoming lasers'
-      );
+      invariant(reflected.x > 0 && expired, 'F shield must reflect and then expire');
     },
     render: (ctx, frame) => {
+      if (frame > 0) {
+        runSimulationTicks(SIM_TICKS_PER_FRAME, () => updateShield(state));
+      }
       drawFrameChrome(
         ctx,
-        'SHIELDS · E PROJECTION vs F',
-        'nearby ally projection · own shield · both reflect lasers',
-        frame,
-        PALETTE.SHIELD
+        'F · REFLECTIVE SHIELD',
+        'Raise shield → reflect incoming laser → cooldown',
+        frame
       );
-      if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          tickAbilityHost(warden);
-          if (projected.shieldTimer > 0) {
-            projected.shieldTimer -= 1;
-            if (projected.shieldTimer <= 0) {
-              delete projected.shieldSourceId;
-            }
-          }
-          updateShield(regular);
-          wardenExpired ||= projected.shieldTimer <= 0;
-          regularExpired ||= regular.shieldTime <= 0;
-        });
-      }
-      if (warden.abilityActiveFrames > 0 && projected.shieldTimer > 0) {
-        drawCable(ctx, warden.position, projected.position, PALETTE.SHIELD);
-      }
-      if (projected.shieldTimer > 0) {
-        drawRing(
-          ctx,
-          projected.position,
-          (projected.r ?? 0) * SHIELD.RADIUS_RATIO,
-          PALETTE.SHIELD,
-          0.9
-        );
-      }
-      if (regular.shieldTime > 0) {
-        drawRing(
-          ctx,
-          regularPosition,
-          (getShipKit('dart').size / 2) * SHIELD.RADIUS_RATIO,
-          PALETTE.SHIELD,
-          0.9
-        );
-      }
-      drawShip(
-        ctx,
-        'warden',
-        warden.position,
-        0,
-        FACTION_COLORS.ion,
-        getShipKit('warden').size / 2
-      );
-      drawShip(ctx, 'dart', projected.position, 0, FACTION_COLORS.ember, projected.r ?? 0);
-      drawShip(ctx, 'dart', regularPosition, 0, FACTION_COLORS.ember, getShipKit('dart').size / 2);
-      drawShip(
-        ctx,
-        'dart',
-        projectedAttacker,
-        Math.PI,
-        FACTION_COLORS.ember,
-        getShipKit('dart').size / 2
-      );
-      drawShip(
-        ctx,
-        'dart',
-        regularAttacker,
-        Math.PI,
-        FACTION_COLORS.ember,
-        getShipKit('dart').size / 2
-      );
-      if (frame <= contactFrame) {
-        const progress = Math.min(1, frame / contactFrame);
-        drawLaser(
-          ctx,
-          {
-            x: projectedAttacker.x + (projectedImpact.point.x - projectedAttacker.x) * progress,
-            y: projectedAttacker.y,
-          },
-          incomingVelocity,
-          PALETTE.LASER_ENEMY
-        );
-        drawLaser(
-          ctx,
-          {
-            x: regularAttacker.x + (regularImpact.point.x - regularAttacker.x) * progress,
-            y: regularAttacker.y,
-          },
-          incomingVelocity,
-          PALETTE.LASER_ENEMY
-        );
+      drawShip(ctx, 'surveyor', position, 0, FACTION_COLORS.ion, 15);
+      drawShip(ctx, 'hauler', attacker, Math.PI, FACTION_COLORS.ember, 19);
+      if (isShieldBlockingLasers(state)) {
+        drawRing(ctx, position, radius, PALETTE.SHIELD);
       } else {
-        projectedReflected = true;
-        regularReflected = true;
-        if (frame < projectedHitFrame) {
-          drawLaser(
-            ctx,
-            {
-              x: projectedImpact.point.x + projectedVelocity.x * (frame - contactFrame),
-              y: projectedImpact.point.y + projectedVelocity.y * (frame - contactFrame),
-            },
-            projectedVelocity,
-            PALETTE.LASER_LOCAL
-          );
-        }
-        if (frame < regularHitFrame) {
-          drawLaser(
-            ctx,
-            {
-              x: regularImpact.point.x + regularVelocity.x * (frame - contactFrame),
-              y: regularImpact.point.y + regularVelocity.y * (frame - contactFrame),
-            },
-            regularVelocity,
-            PALETTE.LASER_LOCAL
-          );
-        }
+        expired = true;
       }
-      if (frame === contactFrame) {
-        drawRing(
-          ctx,
-          projected.position,
-          (projected.r ?? 0) * SHIELD.RADIUS_RATIO + 10,
-          PALETTE.SHIELD,
-          0.9
-        );
-        drawRing(
-          ctx,
-          regularPosition,
-          (getShipKit('dart').size / 2) * SHIELD.RADIUS_RATIO + 10,
-          PALETTE.SHIELD,
-          0.9
-        );
-      }
-      if (frame >= projectedHitFrame && frame < projectedHitFrame + 6) {
-        drawRing(
-          ctx,
-          projectedAttacker,
-          getShipKit('dart').size / 2 + 15,
-          PALETTE.LASER_LOCAL,
-          0.9
-        );
-      }
-      if (frame >= regularHitFrame && frame < regularHitFrame + 6) {
-        drawRing(ctx, regularAttacker, getShipKit('dart').size / 2 + 15, PALETTE.LASER_LOCAL, 0.9);
+      const x =
+        frame <= 10
+          ? attacker.x + ((hit.point.x - attacker.x) * frame) / 10
+          : hit.point.x + reflected.x * (frame - 10);
+      if (x <= attacker.x) {
+        drawLaser(ctx, { x, y: position.y }, { x: frame <= 10 ? -10 : reflected.x, y: 0 });
       }
       drawTag(
         ctx,
-        `E → ally · ${projected.shieldTimer > 0 ? secondsLabel(projected.shieldTimer) : 'expired'}`,
-        80,
-        132,
+        state.shieldActive ? 'SHIELD ACTIVE' : 'SHIELD COOLDOWN',
+        200,
+        310,
         PALETTE.SHIELD
-      );
-      drawTag(
-        ctx,
-        `F own shield · ${regular.shieldTime > 0 ? secondsLabel(regular.shieldTime) : 'expired'}`,
-        80,
-        236,
-        PALETTE.SHIELD
-      );
-      drawTag(
-        ctx,
-        'both shields reflect · attacker takes the return shot',
-        300,
-        286,
-        PALETTE.HUD_MUTED
       );
     },
   };
@@ -2457,7 +1716,14 @@ function makePickupsDemo(): Demo {
       if (loose) {
         drawPickup(ctx, loose, 0.35);
       }
-      drawShip(ctx, 'dart', { x: 0, y: 0 }, 0, FACTION_COLORS.ion, getShipKit('dart').size / 2);
+      drawShip(
+        ctx,
+        'surveyor',
+        { x: 0, y: 0 },
+        0,
+        FACTION_COLORS.ion,
+        getShipKit('surveyor').size / 2
+      );
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'
@@ -2482,11 +1748,8 @@ function makePickupsDemo(): Demo {
 
 function buildDemos(): Demo[] {
   return [
-    makeDartDemo(),
+    makeSurveyorDemo(),
     makeHaulerDemo(),
-    makeWardenDemo(),
-    makeSkirmisherDemo(),
-    makeQuakeDemo(),
     makeMovementDemo(),
     makeTerrainDemo(),
     makeLootDemo(),

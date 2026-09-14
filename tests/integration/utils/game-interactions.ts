@@ -1589,7 +1589,7 @@ export class GameInteractions {
   /** Standard one-client boot against the multiplayer server. */
   async bootGame(options?: {
     waitForCombatReady?: boolean;
-    kitId?: 'dart' | 'hauler' | 'warden' | 'skirmisher' | 'quake';
+    kitId?: 'surveyor' | 'hauler';
   }): Promise<void> {
     await this.navigateToGame();
     if (options?.kitId) {
@@ -1609,7 +1609,7 @@ export class GameInteractions {
   /** Alias used by satellite-pickup scenario tests. */
   async bootSinglePlayerGame(options?: {
     waitForCombatReady?: boolean;
-    kitId?: 'dart' | 'hauler' | 'warden' | 'skirmisher' | 'quake';
+    kitId?: 'surveyor' | 'hauler';
   }): Promise<void> {
     await this.bootGame(options);
   }

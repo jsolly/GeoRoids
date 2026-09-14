@@ -1,8 +1,9 @@
 import { RadarChart } from 'echarts/charts';
 import { init, use } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
+import type { ShipKitId } from '../../shared-types';
 import { GAME } from '../constants';
-import { getShipKit, listShipKits, SHIP_ABILITY, type ShipKitId } from '../entities/ship/shipKits';
+import { getShipKit, listShipKits, SHIP_ABILITY } from '../entities/ship/shipKits';
 
 use([RadarChart, SVGRenderer]);
 

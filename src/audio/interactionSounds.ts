@@ -16,22 +16,10 @@ const fxHarpoonRelease = new Sound(...AUDIO.HARPOON_RELEASE);
 const fxOrbitalFire = new Sound(...AUDIO.ORBITAL_FIRE);
 const fxOrbitalPickup = new Sound(...AUDIO.ORBITAL_PICKUP);
 const fxLootPickup = new Sound(...AUDIO.LOOT_PICKUP);
-const fxFuelPickup = new Sound(...AUDIO.FUEL_PICKUP);
 const fxCorePickup = new Sound(...AUDIO.CORE_PICKUP);
-const fxAbilityBoost = new Sound(...AUDIO.ABILITY_BOOST);
+const fxSurveyScan = new Sound(...AUDIO.SURVEY_SCAN);
 const fxAbilityShield = new Sound(...AUDIO.ABILITY_SHIELD);
-const fxAbilityRing = new Sound(...AUDIO.ABILITY_RING);
-const fxAbilityPulse = new Sound(...AUDIO.ABILITY_PULSE);
 const fxRespawn = new Sound(...AUDIO.RESPAWN);
-
-type NonHarpoonAbilityId = Exclude<ShipAbilityId, 'harpoon'>;
-
-const abilitySounds: Record<NonHarpoonAbilityId, Sound> = {
-  boostDash: fxAbilityBoost,
-  shieldFocus: fxAbilityShield,
-  ringFire: fxAbilityRing,
-  shockPulse: fxAbilityPulse,
-};
 
 function playInteraction(sound: Sound, position?: Position): void {
   playWorldSound(sound, position, { requireViewport: true });
@@ -49,7 +37,7 @@ export function playHarpoonRelease(position?: Position): void {
   playInteraction(fxHarpoonRelease, position);
 }
 
-/** Play the regular Q shield activation cue. */
+/** Play the regular F shield activation cue. */
 export function playShieldActivation(position?: Position): void {
   playInteraction(fxAbilityShield, position);
 }
@@ -64,9 +52,6 @@ export function playOrbitalPickup(position?: Position): void {
 
 export function playLootPickup(kind: LootKind, position?: Position): void {
   switch (kind) {
-    case 'fuel':
-      playInteraction(fxFuelPickup, position);
-      return;
     case 'laserCore':
       playInteraction(fxCorePickup, position);
       return;
@@ -87,5 +72,5 @@ export function playAbilityActivation(abilityId: ShipAbilityId, position?: Posit
     playHarpoonLaunch(position);
     return;
   }
-  playInteraction(abilitySounds[abilityId], position);
+  playInteraction(fxSurveyScan, position);
 }

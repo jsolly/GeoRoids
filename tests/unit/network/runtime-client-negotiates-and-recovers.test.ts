@@ -80,7 +80,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     manager.disconnect();
     unbindAsteroidFieldApply();
     vi.restoreAllMocks();
-    setSelectedShipKitId('dart');
+    setSelectedShipKitId('surveyor');
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     resetControlSources();
@@ -106,7 +106,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   }
 
   test('nearby remote shots sound once, self echoes stay silent and collected loot is deduplicated', async () => {
-    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -141,15 +141,15 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('playerShotFired', { ownerId: 'other-pilot', position: { x: 'bad', y: 0 } });
       expect(played).toHaveLength(1);
       const collection = {
-        lootId: 'collected-fuel',
+        lootId: 'collected-shard',
         collectorId: 'other-pilot',
-        kind: 'fuel',
+        kind: 'shard',
         position: { x: 30, y: 0 },
       };
       ws.receive('lootCollected', collection);
       ws.receive('lootCollected', collection);
       expect(played).toHaveLength(2);
-      expect(played[1]).toMatch(/sounds\/fuel-pickup\.m4a$/);
+      expect(played[1]).toMatch(/sounds\/loot-pickup\.m4a$/);
       ws.receive('lootCollected', { ...collection, lootId: 'invalid-kind', kind: 'unknown' });
       ws.receive('lootCollected', {
         ...collection,
@@ -178,7 +178,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a warm reconnect silently hydrates destruction before later deaths sound normally', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -218,8 +218,8 @@ describe('actual ConnectionManager WebSocket message path', () => {
     }
   });
 
-  test('ring fire waits for one accepted ability cue and unknown orbital pickups use event positions', async () => {
-    const player = entityFactory.createLocalPlayer('Ring pilot', { x: 0, y: 0 }, 'skirmisher');
+  test('mineral scan waits for one accepted ability cue and unknown orbital pickups use event positions', async () => {
+    const player = entityFactory.createLocalPlayer('Survey pilot', { x: 0, y: 0 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -234,11 +234,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
       return Promise.resolve();
     });
     try {
-      player.ship.fireRing();
+      player.ship.activateAbility();
       expect(paths).toEqual([]);
-      ws.receive('abilityUsed', { id: player.id, kitId: 'skirmisher', abilityId: 'ringFire' });
+      ws.receive('abilityUsed', { id: player.id, kitId: 'surveyor', abilityId: 'surveyScan' });
       expect(paths).toHaveLength(1);
-      expect(paths[0]).toMatch(/ability-ring\.m4a$/);
+      expect(paths[0]).toMatch(/survey-scan\.m4a$/);
       const pickup = {
         pickupId: 'uncached',
         playerId: 'uncached-pilot',
@@ -274,7 +274,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('a new socket and join cannot reuse a departed session snapshot witness', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
     const oldSocket = await connect();
@@ -415,7 +415,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   );
 
   test('cruise and held turn resume after authoritative respawn', async () => {
-    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     ws.receive('joined', {
@@ -429,7 +429,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const state = captureSnapshot(snapshotFixture());
     const [local] = state.entities;
     assert.ok(local);
-    Object.assign(local, { id: player.id, kitId: 'dart', thrusting: false });
+    Object.assign(local, { id: player.id, kitId: 'surveyor', thrusting: false });
     state.entities = [local];
     const receive = (sequence: number) =>
       ws.receive('snapshot', new SnapshotEncoder(state).encode(sequence));
@@ -463,7 +463,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('sampled snapshots correlate predicted and authoritative local state', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const log = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const ws = await connect();
@@ -526,7 +526,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('applies authoritative local health damage and partial regeneration snapshots', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 900, y: 700 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
@@ -587,7 +587,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
   });
 
   test('an expired enhanced session replaces its cached identity before a fresh join', async () => {
-    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'dart');
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     const oldId = manager.getClientId();
@@ -764,7 +764,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(manager.getPlayer('pilot-1')?.ship.harpoonLatchPos).toBeUndefined();
     expect(manager.getPlayer('pilot-1')?.ship.harpoonTimer).toBe(0);
     expect(manager.getPlayer('pilot-1')?.ship.shieldActive).toBe(false);
-    expect(manager.getPlayer('pilot-1')?.ship.kitId).toBe('dart');
+    expect(manager.getPlayer('pilot-1')?.ship.kitId).toBe('surveyor');
     expect(manager.getPlayer('pilot-1')?.factionId).toBeUndefined();
     expect(manager.getPlayer('pilot-1')?.name).toBe('Renamed pilot');
     expect(manager.getPlayer('pilot-1')?.ship.shieldTime).toBe(0);
@@ -998,15 +998,15 @@ describe('actual ConnectionManager WebSocket message path', () => {
     const queued = captureSnapshot(snapshotFixture(1));
     const queuedPilot = queued.entities[1];
     assert.ok(queuedPilot, 'queued pilot entity');
-    queuedPilot.fuel = 23;
+    queuedPilot.health = 23;
     ws.receive('snapshot', new SnapshotEncoder(queued).encode(16, { sequence: 15, state }));
     expect(ws.close).not.toHaveBeenCalled();
-    expect(manager.getPlayer('pilot-1')?.ship.fuel).toBe(23);
+    expect(manager.getPlayer('pilot-1')?.ship.health).toBe(23);
     acknowledge(ws);
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     const statePilot = state.entities[1];
     assert.ok(statePilot, 'state pilot entity');
-    expect(manager.getPlayer('pilot-1')?.ship.fuel).toBe(statePilot.fuel);
+    expect(manager.getPlayer('pilot-1')?.ship.health).toBe(statePilot.health);
     expect(ws.close).not.toHaveBeenCalled();
   });
 

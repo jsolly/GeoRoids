@@ -140,8 +140,6 @@ export const VISUAL = {
   LOOT_SHARD_DENSE_INNER: 0.68,
   /** Positive screen-space radius keeps tiny world drops visible at deep zoom. */
   LOOT_MIN_SCREEN_PX: 5,
-  FUEL_BAR_WIDTH: 72,
-  FUEL_BAR_HEIGHT: 2,
   MINIMAP_SIZE: 96,
   MINIMAP_DOT: 5,
   MINIMAP_LOCAL_SIZE: 6,
@@ -331,28 +329,8 @@ export const SHOCKWAVE = {
 } as const;
 
 // ============================================================================
-// FUEL CONFIGURATION
-// ============================================================================
-// Shared tank on every kit. Biggest rocks drop fuel; Quake shock spends it.
-// Reuses PALETTE.LOOT (locked cream) — do not add a sixth kit.
-export const FUEL = {
-  MAX: 100,
-  START: 50,
-  EMP_COST: 25,
-  DROP_AMOUNT: 25,
-  DROP_RADIUS: 14,
-  MIN_ROID_SIZE_TO_DROP: ROID.COLLAB_SPLIT_MIN_SIZE,
-} as const;
-
-// ============================================================================
-// SHIELD CONFIGURATION
-// ============================================================================
-// Timed bubble that reflects enemy lasers only. The active duration is long
-// enough to protect a pilot through a firing exchange; the cooldown keeps it
-// from being permanent. Shared by players and bots.
 export const SHIELD = {
   DURATION_SECONDS: 2,
-  WARDEN_DURATION_SECONDS: 4,
   COOLDOWN_SECONDS: 6,
   RADIUS_RATIO: 1.55,
   FLASH_SECONDS: 0.12,
@@ -374,12 +352,9 @@ export const AUDIO = {
   ORBITAL_FIRE: ['/sounds/orbital-fire.m4a', 6, 0.032],
   ORBITAL_PICKUP: ['/sounds/orbital-pickup.m4a', 4, 0.04],
   LOOT_PICKUP: ['/sounds/loot-pickup.m4a', 4, 0.04],
-  FUEL_PICKUP: ['/sounds/fuel-pickup.m4a', 4, 0.04],
   CORE_PICKUP: ['/sounds/core-pickup.m4a', 4, 0.04],
-  ABILITY_BOOST: ['/sounds/ability-boost.m4a', 3, 0.035],
+  SURVEY_SCAN: ['/sounds/survey-scan.m4a', 3, 0.035],
   ABILITY_SHIELD: ['/sounds/ability-shield.m4a', 3, 0.035],
-  ABILITY_RING: ['/sounds/ability-ring.m4a', 3, 0.035],
-  ABILITY_PULSE: ['/sounds/ability-pulse.m4a', 3, 0.045],
   RESPAWN: ['/sounds/respawn.m4a', 3, 0.035],
   ASTEROID_EXPLODE: ['/sounds/asteroid-explode.m4a', 5, 0.045],
   SATELLITE_EXPLODE: ['/sounds/satellite-explode.m4a', 4, 0.045],

@@ -24,16 +24,6 @@
     "shared/shipFlight.ts",
     "src/rendering/headingCueRenderer.ts"
   ],
-  "dart": [
-    "src/entities/ship/shipKits.ts",
-    "src/entities/ship/shipAbilities.ts",
-    "src/constants/index.ts",
-    "tests/unit/entities/shipKits.test.ts",
-    "tests/unit/entities/shipAbilities.test.ts",
-    "shared/shipFlight.ts",
-    "server/core/PlayerMotionService.ts",
-    "tests/unit/scenarios/combat/dart-dash-grants-a-temporary-speed-burst.test.ts"
-  ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
     "src/entities/ship/shipAbilities.ts",
@@ -44,69 +34,9 @@
     "tests/unit/entities/shipAbilities.test.ts",
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-ship.test.ts",
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts",
-    "tests/integration/browser/sanity/hauler-e-latches-cream-tether-near-a-rock.test.ts"
-  ],
-  "warden": [
-    "src/entities/ship/shipKits.ts",
-    "src/entities/ship/shipAbilities.ts",
-    "src/entities/ship/shipShield.ts",
-    "src/entities/ship/shieldProjectionRenderer.ts",
-    "src/entities/ship/Ship.ts",
-    "shared/shieldReflection.ts",
-    "src/constants/index.ts",
-    "tests/unit/entities/shipKits.test.ts",
-    "tests/unit/entities/shipAbilities.test.ts",
-    "tests/unit/entities/shipShield.test.ts",
-    "tests/unit/entities/shipDamage.test.ts",
-    "tests/unit/shared/shieldReflection.test.ts",
-    "tests/integration/browser/sanity/shields-send-lasers-back-to-the-shooter.test.ts"
-  ],
-  "skirmisher": [
-    "src/entities/ship/shipKits.ts",
-    "src/entities/ship/shipAbilities.ts",
-    "src/entities/ship/Ship.ts",
-    "src/entities/ship/skirmisherRing.ts",
-    "src/constants/index.ts",
-    "tests/unit/entities/shipKits.test.ts",
-    "tests/unit/entities/shipAbilities.test.ts",
-    "tests/unit/entities/skirmisher-ring.test.ts",
-    "tests/integration/browser/sanity/skirmisher-fires-a-full-outward-ring.test.ts"
-  ],
-  "quake": [
-    "src/entities/ship/shipKits.ts",
-    "src/entities/ship/shipAbilities.ts",
-    "src/entities/ship/quakeImpulse.ts",
-    "src/entities/ship/quakePulseRenderer.ts",
-    "server/core/GameEngine.ts",
-    "server/core/LootManager.ts",
-    "server/core/SatellitePickupManager.ts",
-    "server/core/PlayerMotionService.ts",
-    "shared/playerMotion.ts",
-    "src/constants/index.ts",
-    "shared/fuel.ts",
-    "tests/unit/entities/shipKits.test.ts",
-    "tests/unit/entities/shipAbilities.test.ts",
-    "tests/unit/entities/emp-spends-fuel-when-activated.test.ts",
-    "tests/unit/entities/quake-blasts-incoming-and-edge-targets-outward.test.ts",
-    "tests/unit/scenarios/combat/quake-blast-survives-client-movement-updates.test.ts",
-    "tests/unit/server/quake-pulse-auxiliary-bodies.test.ts",
-    "tests/integration/browser/sanity/quake-shows-an-expanding-blue-pulse.test.ts"
-  ],
-  "fuel-growth": [
-    "shared/fuel.ts",
-    "shared/shipGrowth.ts",
-    "shared/lootBlast.ts",
-    "shared/asteroidReflection.ts",
-    "server/core/LootManager.ts",
-    "server/core/GameEngine.ts",
-    "src/constants/index.ts",
-    "tests/unit/entities/ship-picks-up-fuel-when-flying-over-drop.test.ts",
-    "tests/unit/entities/asteroids-release-fuel-when-they-break-up.test.ts",
-    "tests/unit/systems/shipGrowth.test.ts",
-    "tests/unit/systems/lootBlast.test.ts",
-    "tests/unit/server/loot-manager.test.ts",
-    "tests/unit/server/fuel-pickup-and-emp-spend.test.ts",
-    "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts"
+    "tests/integration/browser/sanity/hauler-e-latches-cream-tether-near-a-rock.test.ts",
+    "server/core/AsteroidManager.ts",
+    "tests/unit/server/hauler-mines-metal-without-stronger-pvp-lasers.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -169,7 +99,6 @@
     "tests/unit/entities/shipLifecycle.test.ts",
     "tests/unit/entities/combatDamage.test.ts",
     "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts",
-    "tests/unit/entities/skirmisher-ring.test.ts",
     "tests/unit/scenarios/combat/wall-or-roid-hit-explodes-then-respawns-without-freeze.test.ts",
     "tests/unit/scenarios/combat/a-laser-hit-at-low-health-explodes-the-ship-immediately.test.ts",
     "tests/integration/browser/e2e/ship-respawns-randomly-after-boundary-death.test.ts",
@@ -226,5 +155,29 @@
     "src/audio/spatialAudio.ts",
     "src/constants/user-preferences.ts",
     "docs/sounds.md"
+  ],
+  "surveyor": [
+    "src/entities/ship/shipKits.ts",
+    "src/entities/ship/shipAbilities.ts",
+    "src/constants/index.ts",
+    "tests/unit/entities/shipKits.test.ts",
+    "tests/unit/entities/shipAbilities.test.ts",
+    "shared/shipFlight.ts",
+    "server/core/PlayerMotionService.ts",
+    "src/entities/ship/surveyScan.ts",
+    "src/rendering/hud/minimap.ts",
+    "tests/unit/entities/surveyor-identifies-nearby-minerals.test.ts"
+  ],
+  "loot-growth": [
+    "shared/shipGrowth.ts",
+    "shared/lootBlast.ts",
+    "shared/asteroidReflection.ts",
+    "server/core/LootManager.ts",
+    "server/core/GameEngine.ts",
+    "src/constants/index.ts",
+    "tests/unit/systems/shipGrowth.test.ts",
+    "tests/unit/systems/lootBlast.test.ts",
+    "tests/unit/server/loot-manager.test.ts",
+    "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts"
   ]
 }

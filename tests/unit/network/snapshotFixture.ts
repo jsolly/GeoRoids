@@ -2,7 +2,7 @@ import { SATELLITE_PROFILES } from '../../../shared/eoSatellites';
 import type { AsteroidMaterial, ServerGameSnapshot, ShipKitId } from '../../../shared-types';
 
 export function snapshotFixture(tick = 0): ServerGameSnapshot {
-  const kits: ShipKitId[] = ['dart', 'hauler', 'warden', 'skirmisher', 'quake'];
+  const kits: ShipKitId[] = ['surveyor', 'hauler'];
   const materials: AsteroidMaterial[] = ['ice', 'metal', 'rubble'];
   return {
     entities: Array.from({ length: 10 }, (_, i) => {
@@ -24,14 +24,13 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
         score: 10,
         health: 100,
         maxHealth: 100,
-        fuel: 50,
-        maxFuel: 100,
+
         mass: 4,
         kitId,
         factionId: i % 2 ? 'ion' : 'ember',
         abilityCooldownFrames: 0,
         abilityActiveFrames: 0,
-        shieldTimer: 0,
+
         harpoonTimer: 0,
         shieldActive: false,
         shieldTime: 0,
@@ -65,8 +64,8 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
       position: { x: i * 50, y: 600 },
       mass: 1,
       radius: 5,
-      kind: i % 2 ? 'fuel' : 'shard',
-      ...(i % 2 ? { fuel: 20 } : {}),
+      kind: i % 2 ? 'wreckage' : 'shard',
+      ...(i % 2 ? {} : {}),
     })),
     satellitePickups: SATELLITE_PROFILES.map((profile, i) => ({
       id: `pickup-${i}`,

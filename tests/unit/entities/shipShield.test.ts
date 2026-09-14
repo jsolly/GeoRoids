@@ -7,17 +7,14 @@ import {
   clearShield,
   createShieldState,
   deactivateShield,
-  isReadableShieldUp,
   isShieldBlockingLasers,
   laserCollisionRadius,
   maybeActivateBotShield,
-  noteReadableShieldLaserHit,
   noteShieldLaserHit,
   requestShield,
   resolveCombatDamageSource,
   shieldCooldownFrames,
   shieldDurationFrames,
-  shieldFlashFrames,
   shieldSnapshot,
   updateShield,
 } from '../../../src/entities/ship/shipShield';
@@ -29,15 +26,6 @@ describe('shared ship shield state machine', () => {
     expect(state.shieldActive).toBe(true);
     expect(state.shieldTime).toBe(shieldDurationFrames());
     expect(isShieldBlockingLasers(state)).toBe(true);
-  });
-
-  test('Warden F shield lasts four seconds while other kits last two', () => {
-    expect(shieldDurationFrames()).toBe(2 * GAME.FPS);
-    expect(shieldDurationFrames('warden')).toBe(4 * GAME.FPS);
-
-    const warden = createShieldState();
-    expect(activateShield(warden, false, 'warden')).toBe(true);
-    expect(warden.shieldTime).toBe(4 * GAME.FPS);
   });
 
   test('cannot activate while already up or on cooldown', () => {
@@ -124,17 +112,8 @@ describe('shared ship shield state machine', () => {
     expect(resolveCombatDamageSource('asteroid', 'laser')).toBe('laser');
   });
 
-  test('a projected Warden shield uses the same rendered radius as F', () => {
-    const state = { ...createShieldState(), shieldTimer: 12 };
-    expect(isReadableShieldUp(state)).toBe(true);
-    expect(isShieldBlockingLasers(state)).toBe(false);
-    expect(laserCollisionRadius(10, state)).toBe(10 * SHIELD.RADIUS_RATIO);
-    noteReadableShieldLaserHit(state);
-    expect(state.shieldFlashTime).toBe(shieldFlashFrames());
-  });
-
   test('a raised readable shield stays quiet until an enemy laser is recorded', () => {
-    const state = { ...createShieldState(), shieldTimer: 12 };
+    const state = { ...createShieldState() };
     expect(state.shieldFlashTime).toBe(0);
     expect(isShieldBlockingLasers(state)).toBe(false);
   });
@@ -147,11 +126,10 @@ describe('player and bot share the same shield activation', () => {
       health: 40,
       maxHealth: 100,
       exploding: false,
-      kitId: 'warden' as const,
     };
     expect(maybeActivateBotShield(bot, () => 0)).toBe(true);
     expect(bot.shieldActive).toBe(true);
-    expect(bot.shieldTime).toBe(shieldDurationFrames('warden'));
+    expect(bot.shieldTime).toBe(shieldDurationFrames());
   });
 
   test('healthy or exploding bots do not raise a shield', () => {

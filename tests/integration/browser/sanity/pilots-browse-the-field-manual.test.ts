@@ -35,11 +35,11 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
   try {
     await page.goto(`${TestConfig.GAME_URL}/wiki`);
     await page.locator('.ship-card').first().waitFor();
-    expect(await page.locator('.ship-card').count()).toBe(5);
+    expect(await page.locator('.ship-card').count()).toBe(2);
     expect(await page.locator('.demo img[src$=".gif"]').count()).toBe(0);
     await page.screenshot({ path: resolve(output, 'wiki-desktop.png'), fullPage: true });
     await page.locator('.comparison summary').click();
-    expect(await page.locator('tbody tr').count()).toBe(5);
+    expect(await page.locator('tbody tr').count()).toBe(2);
     await page.locator('#wiki-search').fill('shield');
     expect(await page.locator('#search-status').textContent()).toBe(
       `${await page.locator('.topic-card').count()} matching entries`
@@ -76,8 +76,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
       .toMatch(/\.png$/);
-    await page.goto(`${TestConfig.GAME_URL}/wiki/#warden`);
-    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Warden');
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#surveyor`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Surveyor');
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.png$/);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -183,8 +183,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.locator('.ship-card').first().waitFor();
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     await page.locator('#navigation summary').click();
-    await page.locator('#article-nav a[href="#warden"]').click();
-    await expect.poll(() => page.locator('h1').textContent()).toBe('Warden');
+    await page.locator('#article-nav a[href="#surveyor"]').click();
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Surveyor');
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
@@ -196,7 +196,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
-    await page.screenshot({ path: resolve(output, 'wiki-warden-mobile.png'), fullPage: true });
+    await page.screenshot({ path: resolve(output, 'wiki-surveyor-mobile.png'), fullPage: true });
     await page.locator('.ship-rating-guide summary').click();
     expect(await page.locator('.ship-rating-guide p').isVisible()).toBe(true);
     expect(await page.locator('.ship-rating-guide p').textContent()).toContain('Smaller size');
@@ -220,12 +220,12 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       .toBeLessThan(1);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect((await page.locator('#content').textContent())?.replace(/\s+/g, ' ')).toContain(
-      'Touch and hold the playfield to steer toward your finger and thrust'
+      'Touch and hold the playfield to steer'
     );
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.locator('.breadcrumb a').click();
     await page.screenshot({ path: resolve(output, 'wiki-mobile.png'), fullPage: true });
-    await page.locator('#wiki-search').fill('fuel');
+    await page.locator('#wiki-search').fill('minerals');
     expect(await page.locator('.topic-card').count()).toBeGreaterThan(0);
     await page.locator('#clear-search').click();
     await page.keyboard.press('Tab');

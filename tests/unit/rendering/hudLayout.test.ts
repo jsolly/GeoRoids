@@ -39,7 +39,7 @@ test('phone portrait keeps notices below the leaderboard and radar above the abi
   expect(layout.killMessageY).toBeGreaterThan(
     layout.leaderboard.y + layout.leaderboard.rowHeight * layout.leaderboard.maxRows
   );
-  expect(layout.killMessageY).toBeGreaterThan(layout.fuel.y + layout.fuel.height);
+  expect(layout.killMessageY).toBeGreaterThan(layout.kitNameY + 18);
 });
 
 test('phone landscape parks the radar under lives so it misses the stick', () => {

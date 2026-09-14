@@ -33,76 +33,48 @@ describe('authoritative shield: lasers reflect, collisions still hurt', () => {
     expect(entityB?.shieldActive).toBe(false);
   });
 
-  test('Warden keeps the longer four-second F shield duration on the server', () => {
+  test('a swept enemy laser reflects from the F shield without changing target health', () => {
     const ws = new RecordingSocket();
-    engine.addPlayer('warden', 'Warden', ws, { x: 0, y: 0 }, undefined, 'warden', 'ion');
-    engine.entityManager.updateEntity('warden', { spawnProtectionTimer: 0 });
-
-    expect(engine.requestShield('warden', true)).toBe(true);
-    expect(engine.getPlayer('warden')?.shieldTime).toBe(4 * 60);
-  });
-
-  test.each(['F shield', 'projected shield'])(
-    'a swept enemy laser reflects from the %s without changing target health',
-    (shield) => {
-      const ws = new RecordingSocket();
-      const target = engine.addPlayer(
-        'target',
-        'Target',
-        ws,
-        { x: 0, y: 100_000 },
-        undefined,
-        'dart',
-        'ion'
-      );
-      engine.addPlayer(
-        'attacker',
-        'Attacker',
-        ws,
-        { x: -100, y: 100_000 },
-        undefined,
-        'dart',
-        'ember'
-      );
-      for (const asteroid of engine.getAllAsteroids()) {
-        engine.removeAsteroid(asteroid.id);
-      }
-      engine.entityManager.updateEntity('target', { spawnProtectionTimer: 0 });
-      engine.entityManager.updateEntity('attacker', { spawnProtectionTimer: 0 });
-      if (shield === 'projected shield') {
-        engine.addPlayer(
-          'warden',
-          'Warden',
-          ws,
-          { x: 200, y: 100_000 },
-          undefined,
-          'warden',
-          'ion'
-        );
-        expect(engine.useAbility('warden')).toBe(true);
-        expect(target.shieldSourceId).toBe('warden');
-        expect(target.shieldActive).toBe(false);
-        expect(target.shieldTimer).toBeGreaterThan(0);
-      } else {
-        expect(engine.requestShield('target', true)).toBe(true);
-      }
-
-      const healthBefore = target.health;
-      const attackerHealthBefore = engine.getPlayer('attacker')?.health ?? 0;
-      const laser = engine.spawnLaser('attacker', { x: -100, y: 100_000 }, { x: 200, y: 0 });
-      expect(laser).toBeDefined();
-      engine.advanceLasersAndResolveHits();
-
-      const after = engine.getPlayer('target');
-      expect(after?.health).toBe(healthBefore);
-      expect(after?.shieldActive || (after?.shieldTimer ?? 0) > 0).toBe(true);
-      expect(after?.shieldFlashTime).toBeGreaterThan(0);
-      expect(laser?.hasExploded).toBe(true);
-      expect(laser?.bounces).toBe(1);
-      expect(laser?.velocity.x).toBeLessThan(0);
-      expect(engine.getPlayer('attacker')?.health).toBe(attackerHealthBefore - DAMAGE.LASER_HIT);
+    const target = engine.addPlayer(
+      'target',
+      'Target',
+      ws,
+      { x: 0, y: 100_000 },
+      undefined,
+      'surveyor',
+      'ion'
+    );
+    engine.addPlayer(
+      'attacker',
+      'Attacker',
+      ws,
+      { x: -100, y: 100_000 },
+      undefined,
+      'surveyor',
+      'ember'
+    );
+    for (const asteroid of engine.getAllAsteroids()) {
+      engine.removeAsteroid(asteroid.id);
     }
-  );
+    engine.entityManager.updateEntity('target', { spawnProtectionTimer: 0 });
+    engine.entityManager.updateEntity('attacker', { spawnProtectionTimer: 0 });
+    expect(engine.requestShield('target', true)).toBe(true);
+
+    const healthBefore = target.health;
+    const attackerHealthBefore = engine.getPlayer('attacker')?.health ?? 0;
+    const laser = engine.spawnLaser('attacker', { x: -100, y: 100_000 }, { x: 200, y: 0 });
+    expect(laser).toBeDefined();
+    engine.advanceLasersAndResolveHits();
+
+    const after = engine.getPlayer('target');
+    expect(after?.health).toBe(healthBefore);
+    expect(after?.shieldActive).toBe(true);
+    expect(after?.shieldFlashTime).toBeGreaterThan(0);
+    expect(laser?.hasExploded).toBe(true);
+    expect(laser?.bounces).toBe(1);
+    expect(laser?.velocity.x).toBeLessThan(0);
+    expect(engine.getPlayer('attacker')?.health).toBe(attackerHealthBefore - DAMAGE.LASER_HIT);
+  });
 
   test('a pointblank inward laser that starts inside the bubble reflects before hull damage', () => {
     const ws = new RecordingSocket();
@@ -112,10 +84,18 @@ describe('authoritative shield: lasers reflect, collisions still hurt', () => {
       ws,
       { x: 0, y: 100_000 },
       undefined,
-      'dart',
+      'surveyor',
       'ion'
     );
-    engine.addPlayer('attacker', 'Attacker', ws, { x: 0, y: 100_000 }, undefined, 'dart', 'ember');
+    engine.addPlayer(
+      'attacker',
+      'Attacker',
+      ws,
+      { x: 0, y: 100_000 },
+      undefined,
+      'surveyor',
+      'ember'
+    );
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
     }

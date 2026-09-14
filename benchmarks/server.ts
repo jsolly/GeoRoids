@@ -354,7 +354,7 @@ export async function runServerSample(
         peer,
         participantPosition(index, options.humanPlayers),
         '#89aaff',
-        'dart',
+        'surveyor',
         index % 2 === 0 ? 'ion' : 'ember'
       );
       participantIds.push(id);

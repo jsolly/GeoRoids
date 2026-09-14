@@ -6,7 +6,7 @@ summary: Six Earth-observation satellite pickups drift in the shared field and
 order: 110
 related:
   - content/wiki/factions.md
-  - content/wiki/fuel-growth.md
+  - content/wiki/loot-growth.md
   - content/wiki/combat-survival.md
   - content/wiki/hud-network.md
 media:

@@ -229,7 +229,7 @@ export class Pilot {
       data: {
         name: `測試-${this.index}`,
         position: { x: 100 + this.index * 70, y: 100 },
-        kitId: 'dart',
+        kitId: 'surveyor',
         snapshotVersion: 1,
         asteroidInteractions: 1,
       },

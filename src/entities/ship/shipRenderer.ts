@@ -1,4 +1,4 @@
-import type { Position, SoftFactionId, Velocity } from '../../../shared-types';
+import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import type { DrawingContext } from '../../rendering/drawingContext';
@@ -23,8 +23,8 @@ import {
 } from './hullOutlines';
 import type { Ship } from './Ship';
 import { findHarpoonTarget } from './shipAbilities';
-import { CLASSIC_HULL, type HullProfile, type ShipKitId } from './shipKits';
-import { isReadableShieldUp, shieldCooldownFrames } from './shipShield';
+import { CLASSIC_HULL, type HullProfile } from './shipKits';
+import { isShieldBlockingLasers, shieldCooldownFrames } from './shipShield';
 
 const shipTriangle = {
   nose: { x: 0, y: 0 },
@@ -573,7 +573,7 @@ export function drawShipAtPosition(
     angle: ship.angle,
     context: 'hull',
   });
-  drawAbilityFx(ctx, ship, screenX, screenY, shipR, shipPosition);
+  drawAbilityFx(ctx, ship, screenX, screenY, shipR);
 
   drawShipShield(ctx, ship, screenX, screenY, shipR);
   drawShipImpactFlash(ctx, ship, screenX, screenY, shipR);
@@ -595,23 +595,6 @@ export function canDrawHaulerHarpoon(ship: {
     ship.kitId === 'hauler' &&
     ship.harpoonTimer > 0 &&
     (Boolean(ship.harpoonTargetId) || Boolean(ship.harpoonLatchPos))
-  );
-}
-
-/** Generic E ring. Hauler must never show this — that is the live "activation-only" miss. */
-export function canDrawGenericAbilityRing(ship: {
-  kitId: string;
-  abilityActiveFrames: number;
-  harpoonTimer: number;
-  shieldTimer: number;
-}): boolean {
-  return (
-    ship.kitId !== 'hauler' &&
-    ship.kitId !== 'quake' &&
-    ship.kitId !== 'warden' &&
-    ship.abilityActiveFrames > 0 &&
-    ship.harpoonTimer <= 0 &&
-    ship.shieldTimer <= 0
   );
 }
 
@@ -697,10 +680,9 @@ function drawAbilityFx(
   ship: Ship,
   screenX: number,
   screenY: number,
-  shipR: number,
-  _cameraShipPosition: { x: number; y: number }
+  shipR: number
 ): void {
-  if (canDrawGenericAbilityRing(ship)) {
+  if (ship.kitId === 'surveyor' && ship.abilityActiveFrames > 0) {
     ctx.beginPath();
     ctx.arc(screenX, screenY, shipR + 6, 0, Math.PI * 2);
     ctx.strokeStyle = hexToRgba(TITLE.ACCENT, 0.45);
@@ -722,7 +704,7 @@ export function drawShipShield(
 
   const radius = shipR * SHIELD.RADIUS_RATIO;
 
-  if (isReadableShieldUp(ship)) {
+  if (isShieldBlockingLasers(ship)) {
     const flashing = ship.shieldFlashTime > 0;
     ctx.save();
     ctx.lineCap = 'round';

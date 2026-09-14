@@ -6,7 +6,7 @@ summary: Automatic thrust on every device, with keyboard or pointer steering,
 order: 20
 related:
   - content/wiki/field-manual.md
-  - content/wiki/dart.md
+  - content/wiki/surveyor.md
   - content/wiki/hauler.md
 media:
   - heading: Keyboard

@@ -98,8 +98,8 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
       case 'KeyE':
         if (!ev.repeat) {
           const selectedKit = getSelectedShipKitId();
-          // Title kit only wins when the live ship is still the default Dart.
-          // A stale dart menu must not strip Quake / Hauler mid-match.
+          // Title kit only wins when the live ship is still the default Surveyor.
+          // A stale menu selection must not replace a live Hauler mid-match.
           if (player.ship.kitId === DEFAULT_SHIP_KIT_ID && selectedKit !== player.ship.kitId) {
             applyShipKitToShip(player.ship, selectedKit);
           }

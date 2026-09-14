@@ -5,7 +5,7 @@ summary: A heavy hull that reels nearby asteroids in and slings them at enemies 
 order: 40
 related:
   - content/wiki/controls.md
-  - content/wiki/fuel-growth.md
+  - content/wiki/loot-growth.md
   - content/wiki/factions.md
 media:
   - heading: Harpoon E
@@ -30,3 +30,10 @@ tether can extend for distant rocks so the gradual reel can reach the hull; a
 directly latched hostile ship is still pulled toward the Hauler. While an
 asteroid is latched, it cannot damage its Hauler; normal asteroid collisions
 resume after the tether expires. A miss does not spend the cooldown.
+
+## Mining lasers
+
+Hauler deals double mining damage to metal and collaborative health targets.
+Metal takes two hits instead of three. Small ice and rubble already break in
+one hit. The different-pilot requirement for cooperative large-rock splits
+remains unchanged. Lasers deal ordinary damage to other ships.

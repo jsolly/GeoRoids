@@ -17,24 +17,24 @@ describe('A pilot joins with a chosen ship kit', () => {
     world.dispose();
   });
 
-  test('the default kit is Dart with classic health', () => {
+  test('the default kit is Surveyor with classic health', () => {
     alice = world.join('Alice');
-    expect(world.entity(alice).kitId).toBe('dart');
+    expect(world.entity(alice).kitId).toBe('surveyor');
     expect(world.entity(alice).maxHealth).toBe(SHIP.MAX_HEALTH);
     expect(world.entity(alice).health).toBe(SHIP.MAX_HEALTH);
   });
 
-  test('joining as Warden applies Warden health', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'warden' });
-    const warden = getShipKit('warden');
-    expect(world.entity(alice).kitId).toBe('warden');
-    expect(world.entity(alice).maxHealth).toBe(warden.maxHealth);
-    expect(world.entity(alice).health).toBe(warden.maxHealth);
+  test('joining as Hauler applies Hauler health', () => {
+    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    const hauler = getShipKit('hauler');
+    expect(world.entity(alice).kitId).toBe('hauler');
+    expect(world.entity(alice).maxHealth).toBe(hauler.maxHealth);
+    expect(world.entity(alice).health).toBe(hauler.maxHealth);
   });
 
   test('join assigns a soft side without changing the chosen kit', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'skirmisher' });
-    expect(world.entity(alice).kitId).toBe('skirmisher');
+    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    expect(world.entity(alice).kitId).toBe('hauler');
     expect(
       world.entity(alice).factionId === 'ion' || world.entity(alice).factionId === 'ember'
     ).toBe(true);

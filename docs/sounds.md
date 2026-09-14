@@ -11,14 +11,11 @@ crack and descending tones.
 
 | Shipped file in `public/sounds` | Kenney source in `Audio` |
 | --- | --- |
-| `ability-boost.m4a` | `thrusterFire_000.ogg` |
-| `ability-pulse.m4a` | `lowFrequency_explosion_000.ogg` |
-| `ability-ring.m4a` | `laserLarge_000.ogg` |
+| `survey-scan.m4a` | `thrusterFire_000.ogg` |
 | `ability-shield.m4a` | `forceField_001.ogg` |
 | `asteroid-explode.m4a` | `explosionCrunch_001.ogg` |
 | `core-pickup.m4a` | `laserRetro_004.ogg` |
 | `explode.m4a` | `explosionCrunch_000.ogg` |
-| `fuel-pickup.m4a` | `forceField_004.ogg` |
 | `harpoon-latch.m4a` | `impactMetal_000.ogg` |
 | `harpoon-launch.m4a` | `doorOpen_000.ogg` |
 | `harpoon-release.m4a` | `doorClose_000.ogg` |

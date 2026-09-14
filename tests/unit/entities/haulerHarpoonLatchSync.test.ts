@@ -45,7 +45,7 @@ test('local Hauler keeps the cable through a brief socket rejoin snapshot gap', 
   expect(canDrawHaulerHarpoon(local.ship)).toBe(true);
 });
 
-test('local Hauler keeps its kit when a stale snapshot echoes dart', () => {
+test('local Hauler keeps its kit when a stale snapshot echoes surveyor', () => {
   const local = new Player({
     id: 'alice',
     name: 'Alice',
@@ -54,7 +54,7 @@ test('local Hauler keeps its kit when a stale snapshot echoes dart', () => {
     kitId: 'hauler',
   });
   local.updateFromServer({
-    kitId: 'dart',
+    kitId: 'surveyor',
     harpoonTimer: 70,
     harpoonTargetId: 'server-asteroid-10',
   });

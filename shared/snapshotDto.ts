@@ -38,17 +38,14 @@ const enumeration =
   (value) =>
     typeof value === 'string' && Object.hasOwn(values, value);
 const kit = enumeration<ShipKitId>({
-  dart: true,
+  surveyor: true,
   hauler: true,
-  warden: true,
-  skirmisher: true,
-  quake: true,
 });
 const faction = enumeration<SoftFactionId>({ ion: true, ember: true });
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,
-  fuel: true,
+
   laserCore: true,
 });
 const array =
@@ -95,8 +92,7 @@ const entity = shape<ServerEntityData>({
   score: number,
   health: number,
   maxHealth: number,
-  fuel: number,
-  maxFuel: number,
+
   mass: number,
   respawnTimer: optional(number),
   spawnProtectionTimer: optional(number),
@@ -104,9 +100,7 @@ const entity = shape<ServerEntityData>({
   factionId: optional(faction),
   abilityCooldownFrames: optional(number),
   abilityActiveFrames: optional(number),
-  shieldTimer: optional(number),
-  shieldTargetId: optional(string),
-  shieldSourceId: optional(string),
+
   harpoonTimer: optional(number),
   harpoonTargetId: optional(string),
   harpoonLatchPos: optional(position),
@@ -140,7 +134,6 @@ const loot = shape<LootData>({
   mass: number,
   radius: number,
   kind: lootKind,
-  fuel: optional(number),
 });
 const pickup = shape<SatellitePickupData>({
   id: string,
@@ -165,7 +158,6 @@ const pickup = shape<SatellitePickupData>({
   maxHealth: number,
 });
 const playerProjectile = shape<PlayerProjectileState>({
-  abilityShot: optional(boolean),
   id: string,
   ownerId: string,
   position,

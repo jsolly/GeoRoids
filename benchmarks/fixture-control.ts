@@ -7,7 +7,6 @@ import type { createServerInstance } from '../server/createServer';
 import { serverPerformanceMetrics } from '../server/performanceMetrics';
 import { radiusFromMass, resetShipMass } from '../shared/shipGrowth';
 import type { AsteroidData } from '../shared-types';
-import { FUEL } from '../src/constants';
 import { applyShipKitStats } from '../src/entities/ship/shipKits';
 import { clearShield } from '../src/entities/ship/shipShield';
 
@@ -116,8 +115,7 @@ export async function startFixtureControl(
           applyShipKitStats(actor, actor.kitId);
           clearShield(actor);
           // Network-facing updatePlayer deliberately ignores these authority-owned fields.
-          actor.fuel = FUEL.START;
-          actor.maxFuel = FUEL.MAX;
+
           actor.healthRegenTimer = 0;
           delete actor.respawnTimer;
           delete actor.explodeTime;
@@ -143,7 +141,7 @@ export async function startFixtureControl(
             score: 0,
             abilityCooldownFrames: 0,
             abilityActiveFrames: 0,
-            shieldTimer: 0,
+
             harpoonTimer: 0,
           });
         }
@@ -226,7 +224,6 @@ export async function startFixtureControl(
             kitId: actor.kitId,
             mass: actor.mass,
             health: actor.health,
-            fuel: actor.fuel,
           })),
           asteroids: normalizeFixtureAsteroids(engine.getAllAsteroids()),
           pickups: engine.getAllSatellitePickups().map(({ id: _id, ...pickup }) => pickup),

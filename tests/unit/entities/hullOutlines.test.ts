@@ -14,13 +14,7 @@ import {
   projectHullPoint,
   serializeKitHullSvg,
 } from '../../../src/entities/ship/hullOutlines';
-import {
-  AD_V2_HULL_BAKE_LOCKED,
-  AD_V2_HULL_SHEET,
-  AD_V2_HULL_TOPOLOGY,
-  KIT_HULLS_ARE_PLACEHOLDERS,
-  SHIP_KIT_IDS,
-} from '../../../src/entities/ship/shipKits';
+import { SHIP_HULL_TOPOLOGY, SHIP_KIT_IDS } from '../../../src/entities/ship/shipKits';
 
 const EO_SVG_PACK_DIR = 'georoids-art/eo-satellites';
 const EO_SVG_FILE_NAMES: Record<EoOutlineId, string> = {
@@ -32,42 +26,30 @@ const EO_SVG_FILE_NAMES: Record<EoOutlineId, string> = {
   'worldview-3': 'worldview-3.svg',
 };
 
-test('AD v2 hull bake is locked and no longer a shared placeholder', () => {
-  expect(AD_V2_HULL_BAKE_LOCKED).toBe(true);
-  expect(KIT_HULLS_ARE_PLACEHOLDERS).toBe(false);
-  expect(AD_V2_HULL_SHEET.playScalePx).toBe(32);
-  expect(AD_V2_HULL_SHEET.stroke).toBe('#5EEAD4');
-  expect(AD_V2_HULL_SHEET.sheets).toEqual([
-    'ship-silhouettes-contact-v2',
-    'ship-silhouettes-play-scale-v2',
-  ]);
-});
-
 test('each kit bakes a unique v2 topology', () => {
   const outlines = listKitHullOutlines();
   expect(outlines.map((outline) => outline.kitId)).toEqual([...SHIP_KIT_IDS]);
-  expect(new Set(outlines.map((outline) => outline.topology)).size).toBe(5);
-  expect(AD_V2_HULL_TOPOLOGY).toEqual({
-    dart: 'needle',
+  expect(new Set(outlines.map((outline) => outline.topology)).size).toBe(2);
+  expect(SHIP_HULL_TOPOLOGY).toEqual({
+    surveyor: 'needle',
     hauler: 'barge-hex',
-    warden: 'delta-shield-arc',
-    skirmisher: 'y-fork',
-    quake: 'terraced-mountain',
   });
   const fingerprints = outlines.map((outline) =>
     outline.hull.points.map((point) => `${point.f}:${point.p}`).join('|')
   );
-  expect(new Set(fingerprints).size).toBe(5);
+  expect(new Set(fingerprints).size).toBe(2);
 });
 
-test('Dart needle keeps two tail fins around its inverted-V aft notch', () => {
-  const dart = getKitHullOutline('dart');
-  expect(dart.topology).toBe('needle');
-  expect(dart.hull.points).toHaveLength(6);
-  const minF = Math.min(...dart.hull.points.map((point) => point.f));
-  const wings = dart.hull.points.filter((point) => point.f === minF);
+test('Surveyor needle keeps two tail fins around its inverted-V aft notch', () => {
+  const surveyor = getKitHullOutline('surveyor');
+  expect(surveyor.topology).toBe('needle');
+  expect(surveyor.hull.points).toHaveLength(6);
+  const minF = Math.min(...surveyor.hull.points.map((point) => point.f));
+  const wings = surveyor.hull.points.filter((point) => point.f === minF);
   expect(wings).toHaveLength(2);
-  const notch = dart.hull.points.find((point) => point.p === 0 && point.f > minF && point.f < 0);
+  const notch = surveyor.hull.points.find(
+    (point) => point.p === 0 && point.f > minF && point.f < 0
+  );
   expect(notch).toBeTruthy();
 });
 
@@ -85,58 +67,6 @@ test('Hauler barge is squat with a pointed bow, bevelled sides, and a flat keel'
   const widest = hauler.hull.points.filter((point) => Math.abs(point.p) > 1);
   expect(widest).toHaveLength(2);
   expect(widest.every((point) => point.f > minF && point.f < maxF)).toBe(true);
-});
-
-test('Warden is a notched delta with a detached forward shield arc', () => {
-  const warden = getKitHullOutline('warden');
-  expect(warden.topology).toBe('delta-shield-arc');
-  expect(warden.hull.points).toHaveLength(6);
-  const minF = Math.min(...warden.hull.points.map((point) => point.f));
-  const aft = warden.hull.points.filter((point) => point.f === minF);
-  expect(aft).toHaveLength(4);
-  const notch = warden.hull.points.find((point) => point.p === 0 && point.f > minF && point.f < 0);
-  expect(notch).toBeTruthy();
-  expect(warden.extras).toHaveLength(1);
-  const arc = warden.extras[0];
-  expect(arc?.closed).toBe(false);
-  const apex = warden.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
-  const arcMinF = Math.min(...(arc?.points.map((point) => point.f) ?? []));
-  expect(arcMinF).toBeGreaterThan(apex.f);
-});
-
-test('Skirmisher keeps a deep forward fork and a separate notched aft', () => {
-  const skirmisher = getKitHullOutline('skirmisher');
-  expect(skirmisher.topology).toBe('y-fork');
-  const tips = skirmisher.hull.points.filter((point) => point.f > 1);
-  expect(tips).toHaveLength(2);
-  expect(tips.every((tip) => Math.abs(tip.p) > 0.3)).toBe(true);
-  expect(tips[0] && tips[1] && tips[0].f === tips[1].f).toBe(true);
-  const valley = skirmisher.hull.points.find(
-    (point) => point.p === 0 && point.f > -0.5 && point.f < 0
-  );
-  expect(valley).toBeTruthy();
-  const aft = skirmisher.hull.points.filter((point) => point.f < -1);
-  expect(aft).toHaveLength(2);
-  const aftNotch = skirmisher.hull.points.find(
-    (point) => point.p === 0 && point.f < -0.5 && point.f > -1
-  );
-  expect(aftNotch).toBeTruthy();
-});
-
-test('Quake keeps a triangular peak, stepped cross ledges, and narrow rear stem', () => {
-  const quake = getKitHullOutline('quake');
-  expect(quake.topology).toBe('terraced-mountain');
-  const peak = quake.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
-  expect(peak.p).toBe(0);
-  const terraceFs = [...new Set(quake.hull.points.map((point) => point.f))].filter(
-    (f) => quake.hull.points.filter((point) => point.f === f).length >= 2
-  );
-  expect(terraceFs.length).toBeGreaterThanOrEqual(3);
-  const rearF = Math.min(...quake.hull.points.map((point) => point.f));
-  const rear = quake.hull.points.filter((point) => point.f === rearF);
-  const widest = Math.max(...quake.hull.points.map((point) => Math.abs(point.p)));
-  expect(rear).toHaveLength(2);
-  expect(rear.every((point) => Math.abs(point.p) < widest * 0.6)).toBe(true);
 });
 
 test('v2 SVG pack matches the outline bake and names no v1 sheets', () => {

@@ -46,16 +46,12 @@ describe('interaction sound cues', () => {
     playOrbitalFire(listener);
     playOrbitalPickup(listener);
     playLootPickup('shard', listener);
-    playLootPickup('fuel', listener);
     playLootPickup('laserCore', listener);
-    playAbilityActivation('boostDash', listener);
-    playAbilityActivation('shieldFocus', listener);
-    playAbilityActivation('ringFire', listener);
-    playAbilityActivation('shockPulse', listener);
+    playAbilityActivation('surveyScan', listener);
     playRespawn(listener);
 
-    expect(played).toHaveLength(13);
-    expect(new Set(played).size).toBe(13);
+    expect(played).toHaveLength(9);
+    expect(new Set(played).size).toBe(9);
     expect(played.map((sound) => sound.src.split('/').pop())).toEqual([
       'harpoon-launch.m4a',
       'harpoon-latch.m4a',
@@ -63,16 +59,12 @@ describe('interaction sound cues', () => {
       'orbital-fire.m4a',
       'orbital-pickup.m4a',
       'loot-pickup.m4a',
-      'fuel-pickup.m4a',
       'core-pickup.m4a',
-      'ability-boost.m4a',
-      'ability-shield.m4a',
-      'ability-ring.m4a',
-      'ability-pulse.m4a',
+      'survey-scan.m4a',
       'respawn.m4a',
     ]);
     playLootPickup('wreckage', listener);
-    expect(played[13]).toBe(played[5]);
+    expect(played[9]).toBe(played[5]);
   });
 
   test('world interaction cues use viewport culling and distance attenuation', () => {
@@ -96,14 +88,13 @@ describe('interaction sound cues', () => {
     playHarpoonRelease(listener);
     playOrbitalFire(listener);
     playOrbitalPickup(listener);
-    playLootPickup('fuel', listener);
-    playAbilityActivation('shockPulse', listener);
+    playAbilityActivation('surveyScan', listener);
     playRespawn(listener);
 
     expect(playSpy).not.toHaveBeenCalled();
   });
 
-  test('the regular shield cue shares the Warden shield sound', () => {
+  test('the regular shield cue uses its pooled shield sound', () => {
     const played: Sound[] = [];
     vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
       played.push(this);
@@ -111,9 +102,8 @@ describe('interaction sound cues', () => {
     });
 
     playShieldActivation(listener);
-    playAbilityActivation('shieldFocus', listener);
 
-    expect(played).toHaveLength(2);
-    expect(played[0]).toBe(played[1]);
+    expect(played).toHaveLength(1);
+    expect(played[0]?.src).toMatch(/ability-shield\.m4a$/);
   });
 });

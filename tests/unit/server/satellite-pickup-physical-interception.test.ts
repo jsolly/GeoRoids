@@ -46,7 +46,7 @@ describe('satellite pickups intercept physical damage', () => {
       new RecordingSocket(),
       { x: 0, y: 0 },
       undefined,
-      'dart',
+      'surveyor',
       'ion'
     );
     engine.updatePlayer('owner', { spawnProtectionTimer: 0 });
@@ -73,7 +73,7 @@ describe('satellite pickups intercept physical damage', () => {
       new RecordingSocket(),
       { x: 1000, y: 1000 },
       undefined,
-      'dart',
+      'surveyor',
       faction
     );
     engine.updatePlayer('attacker', { spawnProtectionTimer: 0 });

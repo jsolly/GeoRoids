@@ -37,10 +37,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('wreckage and shards share locked cream; fuel stays health green', () => {
+test('wreckage and shards share locked cream', () => {
   expect(lootStrokeColor('wreckage')).toBe(PALETTE.LOOT);
   expect(lootStrokeColor('shard')).toBe(PALETTE.LOOT);
-  expect(lootStrokeColor('fuel')).toBe(PALETTE.HEALTH);
+
   expect(PALETTE.LOOT).toBe('#E8D5A3');
   expect(PALETTE.LOOT).toBe(HAULER_TETHER_COLOR);
 });

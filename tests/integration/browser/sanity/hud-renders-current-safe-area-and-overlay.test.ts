@@ -120,8 +120,8 @@ async function captureHudFrame(
       local.lives = 3;
       local.factionId = 'ion';
       local.ship.factionId = 'ion';
-      local.ship.kitId = 'dart';
-      local.ship.fuel = local.ship.maxFuel / 2;
+      local.ship.kitId = 'surveyor';
+
       for (const player of players) {
         if (player.id === local.id) {
           player.name = local.name;

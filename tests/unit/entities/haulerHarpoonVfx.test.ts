@@ -6,7 +6,6 @@ import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { HAULER_TETHER_COLOR, HAULER_TETHER_TIP_COLOR } from '../../../src/entities/ship/shipKits';
 import {
-  canDrawGenericAbilityRing,
   canDrawHaulerHarpoon,
   drawHaulerHarpoonVfx,
   harpoonTetherStyle,
@@ -16,9 +15,9 @@ test('tether VFX is Hauler-only while latched', () => {
   expect(
     canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTimer: 40, harpoonTargetId: 'rock-1' })
   ).toBe(true);
-  expect(canDrawHaulerHarpoon({ kitId: 'dart', harpoonTimer: 40, harpoonTargetId: 'rock-1' })).toBe(
-    false
-  );
+  expect(
+    canDrawHaulerHarpoon({ kitId: 'surveyor', harpoonTimer: 40, harpoonTargetId: 'rock-1' })
+  ).toBe(false);
   expect(
     canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTimer: 0, harpoonTargetId: 'rock-1' })
   ).toBe(false);
@@ -28,25 +27,6 @@ test('tether VFX is Hauler-only while latched', () => {
       kitId: 'hauler',
       harpoonTimer: 40,
       harpoonLatchPos: { x: 40, y: 0 },
-    })
-  ).toBe(true);
-});
-
-test('Hauler never paints the generic activation ring', () => {
-  expect(
-    canDrawGenericAbilityRing({
-      kitId: 'hauler',
-      abilityActiveFrames: 40,
-      harpoonTimer: 0,
-      shieldTimer: 0,
-    })
-  ).toBe(false);
-  expect(
-    canDrawGenericAbilityRing({
-      kitId: 'dart',
-      abilityActiveFrames: 12,
-      harpoonTimer: 0,
-      shieldTimer: 0,
     })
   ).toBe(true);
 });
@@ -256,9 +236,9 @@ test('non-Hauler draw is a no-op even if a latch is spoofed', () => {
     setLineDash: () => calls.push('setLineDash'),
   } as unknown as CanvasRenderingContext2D;
   publishHarpoonField([{ id: 'rock-1', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
-  const dart = new Ship({ kitId: 'dart' });
-  dart.harpoonTimer = 40;
-  dart.harpoonTargetId = 'rock-1';
-  drawHaulerHarpoonVfx(ctx, dart, 0, 0, { x: 0, y: 0 });
+  const surveyor = new Ship({ kitId: 'surveyor' });
+  surveyor.harpoonTimer = 40;
+  surveyor.harpoonTargetId = 'rock-1';
+  drawHaulerHarpoonVfx(ctx, surveyor, 0, 0, { x: 0, y: 0 });
   expect(calls).toEqual([]);
 });

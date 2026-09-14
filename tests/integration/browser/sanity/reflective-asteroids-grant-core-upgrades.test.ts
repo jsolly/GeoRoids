@@ -226,7 +226,7 @@ test(
     await page.setViewportSize({ width: 1280, height: 900 });
     const consoleState = captureConsole(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'warden' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
     await waitForAsteroidField(page);
     await game.waitForBots(2);
     await defend(page);
@@ -458,7 +458,6 @@ test(
             position: ship.position,
             velocity: ship.velocity,
             health: ship.health,
-            shieldTimer: ship.shieldTimer,
           },
           laserUpgrade: ship.laserUpgrade,
           loot: gc.getLoot(),

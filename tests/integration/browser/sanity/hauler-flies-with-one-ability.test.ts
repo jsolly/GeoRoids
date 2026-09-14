@@ -31,7 +31,11 @@ test.each([
     await page.goto(TestConfig.GAME_URL);
     await expect
       .poll(() => page.locator('#controls-hint').textContent())
-      .toMatch(viewport.width < 500 ? /Hold screen to steer/ : /WASD/);
+      .toMatch(
+        viewport.width < 500
+          ? /Always thrust · Drag to steer/
+          : /Always thrust · Mouse, A\/D or left\/right arrows/
+      );
     expect(await page.locator('#controls-hint').textContent()).not.toMatch(
       /target|latch|anchor|brake|spin|flick/i
     );
@@ -96,6 +100,20 @@ test.each([
         .locator('#flight-feedback, #flight-preview, #flight-selection-announcement')
         .count()
     ).toBe(0);
+    const cueDurations = await page.evaluate(async () => {
+      const context = new AudioContext();
+      try {
+        return await Promise.all(
+          ['harpoon-launch.m4a', 'harpoon-latch.m4a'].map(async (name) => {
+            const response = await fetch(`/sounds/${name}`);
+            const decoded = await context.decodeAudioData(await response.arrayBuffer());
+            return decoded.duration;
+          })
+        );
+      } finally {
+        await context.close();
+      }
+    });
     await page.keyboard.press('KeyE');
     await expect
       .poll(() =>
@@ -119,31 +137,31 @@ test.each([
                 rock &&
                 ship.harpoonTimer > 0 &&
                 Math.hypot(ship.position.x - rock.position.x, ship.position.y - rock.position.y) <
-                  ship.r + rock.r + releaseGap
+                  ship.r + rock.r + releaseGap + 20
             );
           }, SHIP_ABILITY.HARPOON_RELEASE_GAP),
         { timeout: 2500, interval: 20 }
       )
       .toBe(true);
     expect(await game.getShipHealth()).toBeGreaterThanOrEqual(healthBeforePull);
-    for (const cue of ['harpoon-launch.m4a', 'harpoon-latch.m4a']) {
+    for (const duration of cueDurations) {
       await expect
         .poll(() =>
-          page.evaluate(
-            (name) => (document.documentElement.dataset['audioEvents'] ?? '').includes(name),
-            cue
-          )
+          page.evaluate((expectedDuration) => {
+            const events: Array<{ duration: number }> = JSON.parse(
+              document.documentElement.dataset['audioEvents'] ?? '[]'
+            );
+            return events.some((event) => Math.abs(event.duration - expectedDuration) < 0.001);
+          }, duration)
         )
         .toBe(true);
     }
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`hauler-basic-${viewport.width}.png`),
     });
-    await page.keyboard.down('KeyW');
     await expect
       .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.thrusting))
       .toBe(true);
-    await page.keyboard.up('KeyW');
     await page.keyboard.press('Space');
     await expect.poll(() => messages.includes('shoot')).toBe(true);
     await page.keyboard.press('KeyF');

@@ -16,11 +16,8 @@ import {
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const KITS = [
-  { kitId: 'dart' as const, label: 'DASH', name: 'Boost dash' },
+  { kitId: 'surveyor' as const, label: 'SCAN', name: 'Mineral scan' },
   { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
-  { kitId: 'warden' as const, label: 'GUARD', name: 'Projected ally shield' },
-  { kitId: 'skirmisher' as const, label: 'RING', name: 'Ring fire' },
-  { kitId: 'quake' as const, label: 'PULSE', name: 'Shock pulse' },
 ];
 
 async function tapTouchPoint(
@@ -133,7 +130,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = collectConsole(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
     let touchActive = false;
@@ -177,7 +174,7 @@ test.each(['ability', 'shield'] as const)(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = collectConsole(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const steerPoint = await canvasPoint(page, 0.75, 0.5);
     const actionPoint = await centerOf(page, `#touch-${action}`);
     const session = await page.context().newCDPSession(page);
@@ -228,7 +225,7 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const diagnostics = collectConsole(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const steer = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
@@ -287,44 +284,6 @@ test.each(KITS)(
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId });
-    if (kitId === 'warden') {
-      await game.placeShipAt(-1700, 0);
-      const faction = await page.evaluate(() => window.gameController?.getCurrPlayer()?.factionId);
-      let friendlyId: string | undefined;
-      for (let index = 0; index < 2; index++) {
-        const otherPage = await browserManager.createAdditionalPage();
-        const other = new GameInteractions(otherPage);
-        await other.bootGame({ kitId: 'dart', waitForCombatReady: false });
-        const otherFaction = await otherPage.evaluate(
-          () => window.gameController?.getCurrPlayer()?.factionId
-        );
-        if (otherFaction === faction) {
-          friendlyId = await other.getLocalPlayerId();
-          await other.placeShipAt(-1580, 80);
-        } else {
-          await other.placeShipAt(-1900, 500);
-        }
-      }
-      if (!friendlyId) {
-        throw new Error('Balanced factions must provide a controlled friendly pilot');
-      }
-      await page.waitForFunction(
-        (id) => {
-          const ship = window.gameController
-            ?.getNetworkManager()
-            .getAllPlayers()
-            .find((pilot) => pilot.id === id)?.ship;
-          return (
-            ship &&
-            ship.health > 0 &&
-            !ship.exploding &&
-            Math.hypot(ship.position.x + 1580, ship.position.y - 80) < 100
-          );
-        },
-        friendlyId,
-        { timeout: 5000 }
-      );
-    }
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
@@ -410,10 +369,6 @@ test.each(KITS)(
     const shieldDownWhileHeld = await readLocalTouchState(page);
     expect(shieldDownWhileHeld.shieldActive).toBe(false);
     expect(shieldDownWhileHeld.shieldCooldown).toBeGreaterThan(0);
-    if (kitId === 'warden') {
-      // E protects the friendly recipient; it does not restore the caster's F shield.
-      expect(shieldDownWhileHeld.shieldTimer).toBe(0);
-    }
     expect(await page.locator('#touch-shield').getAttribute('aria-disabled')).toBe('true');
 
     // Browser backgrounding releases held firing and steering; automatic thrust stays enabled.
@@ -605,7 +560,7 @@ test(
     const consoleState = collectConsole(page);
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&

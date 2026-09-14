@@ -29,7 +29,7 @@ export function countFactions(
 
 /**
  * Assign the smaller side. Ties fill ion first so the next join lands on ember.
- * Only reads `faction` — ship kits (Dart/Hauler/Warden/Skirmisher/Quake) stay
+ * Only reads `faction` — ship kits (Surveyor/Hauler) stay
  * a parallel stream and never affect side assignment.
  */
 export function pickBalancedFaction(existing: readonly (FactionId | undefined)[]): FactionId {

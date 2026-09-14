@@ -5,7 +5,6 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
 import { pickBalancedFactionFromShips } from '../../shared/factions';
-import { createFuelTank } from '../../shared/fuel';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
   LaserUpgrade,
@@ -15,9 +14,9 @@ import type {
   SoftFactionId,
   Velocity,
 } from '../../shared-types';
-import { DEBUG, FUEL, GAME, PALETTE, SHIP } from '../../src/constants';
+import { DEBUG, GAME, PALETTE, SHIP } from '../../src/constants';
 import { parseSoftFactionId } from '../../src/entities/player/softFactions';
-import { clearShieldProjection, tickAbilityHost } from '../../src/entities/ship/shipAbilities';
+import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import {
   applyShipKitStats,
   DEFAULT_SHIP_KIT_ID,
@@ -72,8 +71,7 @@ export interface GameEntity extends ShieldState {
   maxHealth: number;
   /** Frames remaining before server-authoritative health regeneration resumes. */
   healthRegenTimer: number;
-  fuel: number;
-  maxFuel: number;
+
   mass: number;
   lastUpdate: number;
   respawnTimer?: number;
@@ -84,9 +82,7 @@ export interface GameEntity extends ShieldState {
   factionId?: SoftFactionId;
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
-  shieldTimer: number;
-  shieldTargetId?: string;
-  shieldSourceId?: string;
+
   harpoonTimer: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;
@@ -212,8 +208,7 @@ export class EntityManager {
       health: ignoredHealth,
       mass: ignoredMass,
       healthRegenTimer: _ignoredHealthRegenTimer,
-      maxFuel: _ignoredMaxFuel,
-      fuel: _ignoredFuel,
+
       shieldActive: _ignoredShieldActive,
       shieldTime: _ignoredShieldTime,
       shieldCooldown: _ignoredShieldCooldown,
@@ -232,7 +227,7 @@ export class EntityManager {
     const entity = this.entities.get(entityId);
     if (entity) {
       this.stashHumanForRejoin(entity);
-      this.clearShieldProjectionLinks(entityId);
+
       this.entities.delete(entityId);
       logger.debug('ENTITY', 'Entity removed', { entityId, entityType: entity.type });
     }
@@ -241,34 +236,6 @@ export class EntityManager {
 
   private nextFaction(): SoftFactionId {
     return pickBalancedFactionFromShips(this.getAllEntities());
-  }
-
-  /** Clear every projection link touching a caster, recipient, or leaving ship. */
-  private clearShieldProjectionLinks(entityId: string): void {
-    const entity = this.entities.get(entityId);
-    if (!entity) {
-      return;
-    }
-    if (entity.shieldSourceId) {
-      const source = this.entities.get(entity.shieldSourceId);
-      if (source?.shieldTargetId === entityId) {
-        delete source.shieldTargetId;
-        source.abilityActiveFrames = 0;
-      }
-    }
-    for (const candidate of this.entities.values()) {
-      if (candidate.id === entityId) {
-        continue;
-      }
-      if (candidate.shieldTargetId === entityId) {
-        delete candidate.shieldTargetId;
-        candidate.abilityActiveFrames = 0;
-      }
-      if (candidate.shieldSourceId === entityId) {
-        clearShieldProjection(candidate);
-      }
-    }
-    clearShieldProjection(entity);
   }
 
   // Human player management
@@ -289,7 +256,7 @@ export class EntityManager {
         return this.attachLiveHuman(existing, id, name, ws, kitId);
       }
       // Leftover 0-life ship after game-over — Start must not rejoin it.
-      this.clearShieldProjectionLinks(id);
+
       this.entities.delete(id);
     }
 
@@ -298,7 +265,6 @@ export class EntityManager {
       return this.attachLiveHuman(sameName, id, name, ws, kitId);
     }
     if (sameName && sameName.lives <= 0) {
-      this.clearShieldProjectionLinks(sameName.id);
       this.entities.delete(sameName.id);
     }
 
@@ -318,7 +284,7 @@ export class EntityManager {
       health: 100,
       maxHealth: 100,
       healthRegenTimer: 0,
-      ...createFuelTank(FUEL.START, FUEL.MAX),
+
       mass: GROWTH.BASE_MASS,
       lastUpdate: this.now(),
       spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
@@ -328,7 +294,7 @@ export class EntityManager {
       factionId: parseSoftFactionId(factionId) ?? this.nextFaction(),
       abilityCooldownFrames: 0,
       abilityActiveFrames: 0,
-      shieldTimer: 0,
+
       harpoonTimer: 0,
     };
     applyShipKitStats(entity, kitId ?? DEFAULT_SHIP_KIT_ID);
@@ -370,7 +336,6 @@ export class EntityManager {
     const oldWs = existing.ws;
     const oldId = existing.id;
     if (oldId !== id) {
-      this.clearShieldProjectionLinks(oldId);
       this.entities.delete(oldId);
       existing.id = id;
       this.entities.set(id, existing);
@@ -500,7 +465,7 @@ export class EntityManager {
         health: 100,
         maxHealth: 100,
         healthRegenTimer: 0,
-        ...createFuelTank(FUEL.START, FUEL.MAX),
+
         mass: GROWTH.BASE_MASS,
         lastUpdate: this.now(),
         spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
@@ -508,7 +473,7 @@ export class EntityManager {
         factionId: factionForBotSlot(i, firstFaction),
         abilityCooldownFrames: 0,
         abilityActiveFrames: 0,
-        shieldTimer: 0,
+
         harpoonTimer: 0,
         ...createShieldState(),
       };
@@ -561,7 +526,7 @@ export class EntityManager {
       entity.exploding = true;
       // Set explosion timer for all entity types
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
-      this.clearShieldProjectionLinks(entity.id);
+
       clearShield(entity);
     }
 
@@ -702,12 +667,11 @@ export class EntityManager {
     applyShipKitStats(entity, entity.kitId);
     entity.health = entity.maxHealth;
     entity.healthRegenTimer = 0;
-    entity.fuel = FUEL.START;
-    entity.maxFuel = FUEL.MAX;
+
     entity.exploding = false;
     delete entity.explodeTime;
     delete entity.deathCause;
-    this.clearShieldProjectionLinks(entity.id);
+
     clearShield(entity);
     this.placeEntityInArena(entity);
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;

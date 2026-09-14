@@ -11,9 +11,6 @@ export function lootStrokeColor(kind: LootKind): string {
   if (kind === 'laserCore') {
     return PALETTE.LASER_LOCAL;
   }
-  if (kind === 'fuel') {
-    return PALETTE.HEALTH;
-  }
   return PALETTE.LOOT;
 }
 
@@ -74,20 +71,11 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     }
 
     const isCore = drop.kind === 'laserCore';
-    const isFuel = drop.kind === 'fuel';
     const isShard = drop.kind === 'shard';
     const isDenseShard = isShard && Number.isFinite(drop.mass) && drop.mass >= 0.5;
     const color = lootStrokeColor(drop.kind);
     const trace = (): void => {
       ctx.beginPath();
-      if (isFuel) {
-        ctx.arc(screen.x, screen.y, r, 0, Math.PI * 2);
-        ctx.moveTo(screen.x, screen.y - r * 0.45);
-        ctx.lineTo(screen.x, screen.y + r * 0.45);
-        ctx.moveTo(screen.x - r * 0.45, screen.y);
-        ctx.lineTo(screen.x + r * 0.45, screen.y);
-        return;
-      }
       traceDiamond(ctx, screen.x, screen.y, r);
       if (isCore) {
         ctx.moveTo(screen.x - r * 0.45, screen.y + r * 0.3);

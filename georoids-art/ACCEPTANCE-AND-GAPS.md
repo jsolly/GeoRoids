@@ -1,5 +1,9 @@
 # GeoRoids art pack — acceptance + gaps
 
+Historical source-pack record. Current ship definitions and assets are in
+[ships-and-factions.md](ships-and-factions.md); retired kit entries below are
+provenance only and are not current gameplay or asset instructions.
+
 **Pack date:** 2026-09-07
 **For:** Codex implementation; stalled Cursor work has been recovered and archived.
 **Historical hold:** Wave 2 feature merges were held until Hauler cream+tip PASS on a production duo.

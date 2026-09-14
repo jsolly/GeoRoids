@@ -1,4 +1,3 @@
-import { createFuelLootData, isFuelLoot, shouldReleaseFuel } from '../../shared/fuel';
 import {
   addLootMagnetPull,
   canCollectLoot,
@@ -6,11 +5,8 @@ import {
   lootOverlap,
   planKillLoot,
 } from '../../shared/shipGrowth';
-import type { AsteroidData, LootData, Position, Velocity } from '../../shared-types';
-import { FUEL } from '../../src/constants';
-import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';
+import type { LootData, Position, Velocity } from '../../shared-types';
 import type { GameEntity } from './EntityManager';
-import { QUAKE_KNOCKBACK_DECAY } from './quakeMotion';
 import type { RNGService } from './RNGService';
 
 interface TrackedLoot extends LootData {
@@ -25,20 +21,6 @@ export class LootManager {
 
   constructor(rngService: RNGService) {
     this.rng = rngService;
-  }
-
-  public spawnFuelFromAsteroid(asteroid: AsteroidData, gameTime: number): LootData | undefined {
-    if (!shouldReleaseFuel(asteroid.size)) {
-      return undefined;
-    }
-    const drop: TrackedLoot = {
-      ...createFuelLootData(`fuel-${this.nextId++}`, asteroid.position),
-      expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
-      velocity: { x: 0, y: 0 },
-    };
-    this.loot.set(drop.id, drop);
-    this.enforceCap();
-    return this.toPublic(drop);
   }
 
   public spawnFromKill(
@@ -125,9 +107,7 @@ export class LootManager {
         ) {
           return false;
         }
-        if (isFuelLoot(drop) && (entity.fuel ?? FUEL.START) >= (entity.maxFuel ?? FUEL.MAX)) {
-          return false;
-        }
+
         return true;
       });
       if (!winner) {
@@ -143,31 +123,17 @@ export class LootManager {
   public expire(gameTime: number, collectors: readonly GameEntity[] = []): void {
     const liveCollectors = collectors.filter((entity) => canCollectLoot(entity));
     const magnetPositions = liveCollectors.map((entity) => entity.position);
-    const fuelMagnetPositions = liveCollectors
-      .filter((entity) => (entity.fuel ?? FUEL.START) < (entity.maxFuel ?? FUEL.MAX))
-      .map((entity) => entity.position);
 
     for (const [id, drop] of this.loot) {
-      addLootMagnetPull(drop, isFuelLoot(drop) ? fuelMagnetPositions : magnetPositions);
+      addLootMagnetPull(drop, magnetPositions);
       drop.position.x += drop.velocity.x;
       drop.position.y += drop.velocity.y;
-      drop.velocity.x *= QUAKE_KNOCKBACK_DECAY;
-      drop.velocity.y *= QUAKE_KNOCKBACK_DECAY;
+      drop.velocity.x *= GROWTH.LOOT_DRAG;
+      drop.velocity.y *= GROWTH.LOOT_DRAG;
       if (gameTime >= drop.expiresAt) {
         this.loot.delete(id);
       }
     }
-  }
-
-  /** Apply a Quake kick to every live loot body; motion advances in expire(). */
-  public applyQuakePulse(origin: Position, fallbackAngle = 0): number {
-    let affected = 0;
-    for (const drop of this.loot.values()) {
-      if (applyQuakeImpulse(drop, origin, fallbackAngle)) {
-        affected += 1;
-      }
-    }
-    return affected;
   }
 
   public getAll(): LootData[] {
@@ -223,10 +189,7 @@ export class LootManager {
       radius: drop.radius,
       kind: drop.kind,
     };
-    if (isFuelLoot(drop)) {
-      publicDrop.kind = 'fuel';
-      publicDrop.fuel = drop.fuel ?? FUEL.DROP_AMOUNT;
-    }
+
     return publicDrop;
   }
 }

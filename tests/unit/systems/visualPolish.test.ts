@@ -141,11 +141,8 @@ function pilot(id: string, type: Player['type'] = 'local') {
 }
 
 const KITS: ReadonlyArray<{ id: ShipKitId; vertices: number; aft: number }> = [
-  { id: 'dart', vertices: 6, aft: -0.85 },
+  { id: 'surveyor', vertices: 6, aft: -0.85 },
   { id: 'hauler', vertices: 7, aft: -0.85 },
-  { id: 'warden', vertices: 6, aft: -0.575 },
-  { id: 'skirmisher', vertices: 12, aft: -0.7 },
-  { id: 'quake', vertices: 15, aft: -0.9125 },
 ];
 
 test('every playable kit draws its outlined hull and retained details without filling', () => {
@@ -333,10 +330,10 @@ test('local and remote kit thrusters draw two open V contours only while thrusti
   expect(fill).not.toHaveBeenCalled();
 });
 
-test('a destroyed dart breaks into drifting hull edges, an expanding ring and unfilled sparks', () => {
+test('a destroyed surveyor breaks into drifting hull edges, an expanding ring and unfilled sparks', () => {
   const { ctx, strokes, fill } = recordingContext();
-  const ship = pilot('destroyed-dart').ship;
-  ship.kitId = 'dart';
+  const ship = pilot('destroyed-surveyor').ship;
+  ship.kitId = 'surveyor';
   ship.r = 20;
   ship.angle = 0;
   ship.exploding = true;
@@ -352,7 +349,7 @@ test('a destroyed dart breaks into drifting hull edges, an expanding ring and un
   expect(burstTick(0, 0, 0, 4, 10)).toEqual({ x1: 4, y1: 0, x2: 10, y2: 0 });
   expect(strokes).toHaveLength(1 + 6 + VISUAL.EXPLOSION_SPARKS + 4);
   expect(strokes[0]?.arcs[0]).toEqual([400, 300, 52.125, 0, Math.PI * 2]);
-  const edges = projectKitHullEdges(400, 300, 20, 0, 'dart');
+  const edges = projectKitHullEdges(400, 300, 20, 0, 'surveyor');
   expect(edges).toHaveLength(6);
   expect(strokes.slice(1, 7).map((path) => path.points)).toEqual(
     edges.map(([a, b]) => {
@@ -364,7 +361,7 @@ test('a destroyed dart breaks into drifting hull edges, an expanding ring and un
   const edgeA = firstEdge?.[0];
   const edgeB = firstEdge?.[1];
   if (!edgeA || !edgeB) {
-    throw new Error('Destroyed dart did not draw its first drifting hull edge');
+    throw new Error('Destroyed surveyor did not draw its first drifting hull edge');
   }
   expect(
     Math.hypot((edgeA.x + edgeB.x) / 2 - 402.125, (edgeA.y + edgeB.y) / 2 - 298.375)
@@ -375,7 +372,7 @@ test('a destroyed dart breaks into drifting hull edges, an expanding ring and un
   const sparkInner = sparks[0]?.points[0];
   const sparkOuter = sparks[0]?.points[1];
   if (!sparkInner || !sparkOuter) {
-    throw new Error('Destroyed dart did not draw a complete spark');
+    throw new Error('Destroyed surveyor did not draw a complete spark');
   }
   expect(Math.hypot(sparkInner.x - 400, sparkInner.y - 300)).toBeCloseTo(27.125);
   expect(Math.hypot(sparkOuter.x - 400, sparkOuter.y - 300)).toBeCloseTo(36.125);

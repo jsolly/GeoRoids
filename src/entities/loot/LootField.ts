@@ -1,13 +1,13 @@
 import type { LootData, LootKind, Position } from '../../../shared-types';
 
 function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
-  if (kind === 'shard' || kind === 'fuel' || kind === 'laserCore') {
+  if (kind === 'shard' || kind === 'laserCore') {
     return kind;
   }
   return 'wreckage';
 }
 
-/** Client snapshot of server-authoritative loot (wreckage, shards, fuel). */
+/** Client snapshot of server-authoritative loot (wreckage, shards, laser cores). */
 export class LootField {
   private static instance: LootField;
   private loot: LootData[] = [];
@@ -27,7 +27,6 @@ export class LootField {
       mass: drop.mass,
       radius: drop.radius,
       kind: normalizeKind(drop.kind),
-      ...(drop.kind === 'fuel' && drop.fuel !== undefined ? { fuel: drop.fuel } : {}),
     }));
   }
 

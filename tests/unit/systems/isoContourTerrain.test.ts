@@ -162,6 +162,7 @@ describe('ships feel the slope', () => {
     player.blinkCount = 0;
     player.spawnProtectionTimer = 0;
     const bot = {
+      kitId: player.kitId,
       position: { ...start },
       velocity: { x: 0, y: 0 },
       angle: player.angle,

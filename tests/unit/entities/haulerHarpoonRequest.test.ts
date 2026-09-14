@@ -56,8 +56,8 @@ test('local Hauler still sends useAbility after a local latch', () => {
   );
 });
 
-test('Dart does not send a failed ability request', () => {
-  const ship = new Ship({ kitId: 'dart', isLocalPlayer: true });
+test('Surveyor does not send a failed ability request', () => {
+  const ship = new Ship({ kitId: 'surveyor', isLocalPlayer: true });
   ship.abilityCooldownFrames = 40;
   expect(ship.activateAbility()).toBe(false);
   expect(mockSendMessage).not.toHaveBeenCalled();

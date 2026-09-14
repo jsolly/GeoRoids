@@ -33,7 +33,7 @@ export interface Velocity {
 
 // Network update interface - only what needs to be synced
 /** Chosen at join. Shared by human and bot ships. Independent of soft faction. */
-export type ShipKitId = 'dart' | 'hauler' | 'warden' | 'skirmisher' | 'quake';
+export type ShipKitId = 'surveyor' | 'hauler';
 
 /** Soft side (ION / EMBER). Assigned on join by the factions stream. */
 export type SoftFactionId = 'ion' | 'ember';
@@ -50,8 +50,7 @@ export interface PlayerUpdate {
   exploding: boolean;
   health: number;
   maxHealth: number;
-  fuel?: number;
-  maxFuel?: number;
+
   kitId?: ShipKitId;
   factionId?: SoftFactionId;
   mass?: number;
@@ -108,7 +107,7 @@ export interface LaserUpgrade {
 
 export interface PlayerProjectileState {
   /** Ability bolts do not consume the regular weapon limit. */
-  abilityShot?: boolean;
+
   id: string;
   ownerId: string;
   position: Position;
@@ -144,8 +143,8 @@ export interface AsteroidData {
   phenomenon?: AsteroidPhenomenon;
 }
 
-/** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; fuel fills the EMP tank. */
-export type LootKind = 'shard' | 'wreckage' | 'fuel' | 'laserCore';
+/** Shared world pickups. Kill loot is wreckage; destroy-drop is shard. */
+export type LootKind = 'shard' | 'wreckage' | 'laserCore';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -161,7 +160,6 @@ export interface LootData {
   mass: number;
   radius: number;
   kind: LootKind;
-  fuel?: number;
 }
 
 export type SatellitePickupTypeId = import('./shared/eoSatellites').SatelliteTypeId;
@@ -256,8 +254,7 @@ export interface ServerEntityData {
   score: number;
   health: number;
   maxHealth: number;
-  fuel: number;
-  maxFuel: number;
+
   mass: number;
   respawnTimer?: number;
   spawnProtectionTimer?: number;
@@ -265,11 +262,7 @@ export interface ServerEntityData {
   factionId?: SoftFactionId;
   abilityCooldownFrames?: number;
   abilityActiveFrames?: number;
-  shieldTimer?: number;
-  /** Warden E caster's authoritative projected recipient. */
-  shieldTargetId?: string;
-  /** Authoritative Warden id that currently projects onto this ship. */
-  shieldSourceId?: string;
+
   harpoonTimer?: number;
   harpoonTargetId?: string;
   harpoonLatchPos?: Position;

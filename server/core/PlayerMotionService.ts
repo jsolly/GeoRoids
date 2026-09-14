@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
-import { cruiseSpeed, dashSpeedBonus } from '../../shared/shipFlight';
+import { cruiseSpeed } from '../../shared/shipFlight';
 import { radiusFromMass } from '../../shared/shipGrowth';
 import type { PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
@@ -71,18 +71,12 @@ export class PlayerMotionService {
       finiteMotionVector(actor.velocity) &&
       Number.isFinite(actor.angle) &&
       Number.isFinite(actor.mass) &&
-      actor.mass > 0 &&
-      Number.isFinite(actor.fuel) &&
-      Number.isFinite(actor.maxFuel) &&
-      actor.fuel >= 0 &&
-      actor.fuel <= actor.maxFuel
+      actor.mass > 0
     );
   }
 
   public legalSpeed(actor: GameEntity, now: number): number {
-    const normal =
-      cruiseSpeed(actor.mass, getShipKit(actor.kitId).maxVelocity) +
-      dashSpeedBonus(actor.kitId, actor.abilityActiveFrames ?? 0);
+    const normal = cruiseSpeed(actor.mass, getShipKit(actor.kitId).maxVelocity);
     const impulse = this.sessions.get(actor.id)?.knockback;
     if (!impulse) {
       return normal;

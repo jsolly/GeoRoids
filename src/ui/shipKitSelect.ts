@@ -1,5 +1,6 @@
+import type { ShipKitId } from '../../shared-types';
 import { kitHullPickerSvg } from '../entities/ship/hullOutlines';
-import { listShipKits, parseShipKitId, type ShipKitId } from '../entities/ship/shipKits';
+import { listShipKits, parseShipKitId } from '../entities/ship/shipKits';
 import { attachEventListener, getElementById } from '../utils/dom';
 import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
@@ -44,7 +45,7 @@ export function mountShipKitSelect(): void {
     button.className = 'ship-kit-card';
     button.dataset['kitId'] = kit.id;
     button.setAttribute('aria-pressed', 'false');
-    button.innerHTML = `${kitHullPickerSvg(kit.id)}<span class="ship-kit-name">${kit.name}</span><span class="ship-kit-ability">${kit.abilityName}</span>`;
+    button.innerHTML = `${kitHullPickerSvg(kit.id)}<span class="ship-kit-name">${kit.name}</span><span class="ship-kit-ability">${kit.abilityName}</span><span class="ship-kit-role">${kit.abilityHint}</span>`;
     attachEventListener(button, 'click', () => {
       setSelectedShipKitId(kit.id);
     });

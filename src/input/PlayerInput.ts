@@ -6,5 +6,4 @@ export interface PlayerInput {
   getThrusting(): boolean;
   getAngularVelocity(): number;
   getShooting(): boolean;
-  getEmpPulse(): boolean;
 }

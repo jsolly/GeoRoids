@@ -10,15 +10,16 @@ interface WikiMediaEntry {
  * gameplay change has an obvious media review surface.
  */
 export const media: Record<string, WikiMediaEntry> = {
-  dart: {
-    title: 'Dart boost dash',
-    alt: 'A Dart hull gains a short forward burst and leaves a bright motion trail.',
+  surveyor: {
+    title: 'Surveyor mineral scan',
+    alt: 'A Surveyor scan changes nearby radar dots into distinct ice, metal, and rubble marks, then returns them to ordinary dots.',
     caption:
-      'Controlled demonstration: press E for a forward boost, then return to automatic thrust at normal speed.',
+      'Press E to identify nearby asteroid minerals temporarily. Circles mark ice, squares metal, and triangles rubble.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
+      'src/entities/ship/surveyScan.ts',
+      'src/rendering/hud/minimap.ts',
       'src/entities/ship/shipKits.ts',
-      'src/entities/ship/hullOutlines.ts',
     ],
   },
   hauler: {
@@ -35,51 +36,9 @@ export const media: Record<string, WikiMediaEntry> = {
       'shared/combat.ts',
     ],
   },
-  warden: {
-    title: 'Warden shield projection',
-    alt: 'A Warden projects a cyan shield to a nearby ally, which reflects an incoming laser back into its shooter.',
-    caption:
-      'Controlled demonstration: E automatically shields the nearest living ally in reach. The ally reflects a hostile laser into its shooter while the link and three-second timer remain visible.',
-    sources: [
-      'src/entities/ship/shipAbilities.ts',
-      'src/entities/ship/shipShield.ts',
-      'src/entities/ship/shieldProjectionRenderer.ts',
-      'shared/shieldReflection.ts',
-      'src/entities/ship/hullOutlines.ts',
-    ],
-  },
-  skirmisher: {
-    title: 'Skirmisher ring fire',
-    alt: 'A Skirmisher fires a full ring of amber laser bolts and hits a second ship.',
-    caption:
-      'Controlled demonstration: press E to fire an outward ring of twelve shots; one bolt reaches the target hull.',
-    sources: [
-      'src/entities/ship/Ship.ts',
-      'src/entities/ship/shipAbilities.ts',
-      'src/entities/ship/shipKits.ts',
-      'src/entities/ship/skirmisherRing.ts',
-      'server/core/GameEngine.ts',
-    ],
-  },
-  quake: {
-    title: 'Quake shock pulse',
-    alt: 'A Quake emits a blue expanding pulse that reaches and pushes a second ship while rocks, loot, satellite pickups, and shots scatter.',
-    caption:
-      'Controlled demonstration: press E to spend fuel and push nearby physical objects outward. The pulse reaches its target without dealing direct damage.',
-    sources: [
-      'src/entities/ship/shipAbilities.ts',
-      'src/entities/ship/quakeImpulse.ts',
-      'src/entities/ship/quakePulseRenderer.ts',
-      'server/core/GameEngine.ts',
-      'server/core/LootManager.ts',
-      'server/core/SatellitePickupManager.ts',
-      'src/constants/index.ts',
-      'src/entities/ship/hullOutlines.ts',
-    ],
-  },
   movement: {
     title: 'Automatic thrust and steering',
-    alt: 'A Dart accelerates automatically, turns its nose, and keeps flying after steering is released.',
+    alt: 'A Surveyor accelerates automatically, turns its nose, and keeps flying after steering is released.',
     caption:
       'Controlled demonstration: thrust stays on while steering turns the ship; releasing steering keeps it flying.',
     sources: [
@@ -90,7 +49,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   terrain: {
     title: 'Terrain slope force',
-    alt: 'A Dart thrusts across the contour map while an arrow shows the downhill pull.',
+    alt: 'A Surveyor thrusts across the contour map while an arrow shows the downhill pull.',
     caption:
       'Controlled demonstration: contour lines show the landscape while an arrow marks the downhill pull on a ship with automatic thrust.',
     sources: [
@@ -103,7 +62,7 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   loot: {
     title: 'Loot blast and growth',
-    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Dart and is collected, growing the ship.',
+    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Surveyor and is collected, growing the ship.',
     caption:
       'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and grows the ship.',
     sources: [
@@ -125,12 +84,11 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   shield: {
-    title: 'Reflective shield lanes',
-    alt: 'A Warden projected shield and a regular F shield show separate cyan rings while incoming lasers turn back.',
+    title: 'Reflective shield',
+    alt: 'A Surveyor raises its F shield and reflects an incoming laser.',
     caption:
-      'Controlled demonstration: Warden E projects a three-second reflective shield to an ally; the separate Warden F shield reflects lasers for four seconds. Their timers run independently.',
+      'The timed F shield reflects incoming lasers. Its cooldown starts when the shield ends.',
     sources: [
-      'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipShield.ts',
       'shared/shieldReflection.ts',
       'src/entities/ship/hullOutlines.ts',

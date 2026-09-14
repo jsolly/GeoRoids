@@ -215,7 +215,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
           id,
           name: `Transport Pilot ${index}`,
           position: { x: Math.cos(angle) * 600, y: Math.sin(angle) * 600 },
-          kitId: 'dart',
+          kitId: 'surveyor',
           factionId: index === 0 ? 'ion' : 'ember',
           asteroidInteractions: 1,
           snapshotVersion: 1,

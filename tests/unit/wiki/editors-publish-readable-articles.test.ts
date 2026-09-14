@@ -41,9 +41,9 @@ test('an editor adds a formatted searchable article without changing application
   expect(searchArticles(articles, 'orbiting').map((entry) => entry.id)).toContain('practice');
   expect(article?.sources).toEqual([]);
   expect(article?.related).toEqual(['controls']);
-  const dart = articles.find((entry) => entry.id === 'dart');
-  expect(dart?.html).toContain(String(getShipKit('dart').maxHealth));
-  expect(dart?.html).toContain('CURRENT GAME VALUES');
+  const surveyor = articles.find((entry) => entry.id === 'surveyor');
+  expect(surveyor?.html).toContain(String(getShipKit('surveyor').maxHealth));
+  expect(surveyor?.html).toContain('CURRENT GAME VALUES');
 });
 
 test('an editor cannot publish a broken article link or a missing image', () => {

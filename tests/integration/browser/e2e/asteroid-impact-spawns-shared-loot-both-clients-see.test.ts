@@ -68,10 +68,7 @@ test(
       impactedPilot.getLocalPlayerId(),
       collector.getLocalPlayerId(),
     ]);
-    await Promise.all([
-      impactedPilot.waitForRemoteHumanPlayers(1),
-      collector.waitForRemoteHumanPlayers(1),
-    ]);
+    await Promise.all([impactedPilot.waitForRemotePlayers(1), collector.waitForRemotePlayers(1)]);
 
     const livesBefore = await impactedPilot.getLives();
     const scoreBefore = await collector.getScore();

@@ -28,10 +28,7 @@ test.each(['empty', 'boundary'] as const)(
     await teammate.bootGame({ kitId: 'hauler', waitForCombatReady: false });
     const shooterId = await shooter.getLocalPlayerId();
     const teammateId = await teammate.getLocalPlayerId();
-    await Promise.all([
-      shooter.waitForRemoteHumanPlayers(1),
-      teammate.waitForRemoteHumanPlayers(1),
-    ]);
+    await Promise.all([shooter.waitForRemotePlayers(1), teammate.waitForRemotePlayers(1)]);
     await arrangeCrewField([shooterId, teammateId], scenario);
     await Promise.all([shooter.waitForCombatReady(), teammate.waitForCombatReady()]);
 

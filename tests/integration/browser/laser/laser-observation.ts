@@ -26,7 +26,7 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
     pages.push(page);
     games.push(game);
   }
-  await Promise.all(games.map((game) => game.waitForRemoteHumanPlayers(count - 1)));
+  await Promise.all(games.map((game) => game.waitForRemotePlayers(count - 1)));
   await parkLaserClients(games);
   const [page1, page2, page3] = pages;
   const [game1, game2, game3] = games;

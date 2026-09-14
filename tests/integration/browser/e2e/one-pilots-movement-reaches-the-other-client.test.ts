@@ -11,7 +11,7 @@ test(
   async () => {
     const { game1, game2 } = await bootTwoClientGames(browserManager);
 
-    const remoteIdsOnClient1 = await game1.getRemoteHumanPlayerIds();
+    const remoteIdsOnClient1 = await game1.getRemotePlayerIds();
     expect(
       remoteIdsOnClient1.length,
       'client 1 should see client 2 as a remote player'

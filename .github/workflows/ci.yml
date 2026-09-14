@@ -32,8 +32,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install pinned Playwright Chromium and OS dependencies
-        run: npx --no-install playwright install --with-deps chromium
+      - name: Install pinned Playwright Chromium, WebKit and OS dependencies
+        run: npx --no-install playwright install --with-deps chromium webkit
       - name: Run serialized critical behavioral scenarios
         run: |
           set +e
@@ -41,6 +41,7 @@ jobs:
           GEOROIDS_TEST_MAX_DURATION_SECONDS=300 ./scripts/test-runner.sh \
             tests/integration/browser/sanity/critical-gameplay-smoke.test.ts \
             tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts \
+            tests/integration/browser/sanity/hauler-touch-taps-act-once-with-delayed-clicks.test.ts \
             tests/integration/browser/sanity/pilots-climb-and-descend-varied-terrain.test.ts \
             tests/integration/browser/roid/two-players-hit-big-roid-within-one-second-splits.test.ts \
             tests/integration/browser/sanity/mobile-viewport-fits-and-shows-touch-controls.test.ts \

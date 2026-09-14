@@ -31,8 +31,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Install pinned Playwright Chromium and OS dependencies
-        run: npx --no-install playwright install --with-deps chromium
+      - name: Install pinned Playwright Chromium, WebKit and OS dependencies
+        run: npx --no-install playwright install --with-deps chromium webkit
       - name: Run the complete serialized integration suite
         run: |
           set +e

@@ -1,4 +1,10 @@
-import { type Browser, type BrowserContext, chromium, type Page } from 'playwright';
+import {
+  type Browser,
+  type BrowserContext,
+  type BrowserType,
+  chromium,
+  type Page,
+} from 'playwright';
 
 export class BrowserManager {
   private browser: Browser | null = null;
@@ -9,23 +15,26 @@ export class BrowserManager {
   private cleanupFailed = false;
   private readonly pageErrors: Error[] = [];
 
-  async initialize(): Promise<void> {
-    this.browser = await chromium.launch({
+  async initialize(browserType: BrowserType = chromium): Promise<void> {
+    this.browser = await browserType.launch({
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-features=VizDisplayCompositor',
-        // Keep the game loop (requestAnimationFrame) and timers running at full
-        // speed even when the headless page is treated as backgrounded. Without
-        // these, Chromium throttles rAF to ~1fps under load, which starves the
-        // client-side collision/boundary checks and makes placement-based tests
-        // flaky in long suite runs.
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-ipc-flooding-protection',
-      ],
+      args:
+        browserType === chromium
+          ? [
+              '--no-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-features=VizDisplayCompositor',
+              // Keep the game loop (requestAnimationFrame) and timers running at full
+              // speed even when the headless page is treated as backgrounded. Without
+              // these, Chromium throttles rAF to ~1fps under load, which starves the
+              // client-side collision/boundary checks and makes placement-based tests
+              // flaky in long suite runs.
+              '--disable-background-timer-throttling',
+              '--disable-backgrounding-occluded-windows',
+              '--disable-renderer-backgrounding',
+              '--disable-ipc-flooding-protection',
+            ]
+          : [],
     });
   }
 

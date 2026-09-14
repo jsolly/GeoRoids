@@ -41,7 +41,7 @@ is not an assertion that the scenario succeeded.
 ## Run tests
 
 Use Node 24.15 or newer within major 24 and run commands from the GeoRoids checkout. Install the
-pinned Chromium browser once with `npx --no-install playwright install chromium`.
+pinned Chromium and WebKit browsers once with `npx --no-install playwright install chromium webkit`.
 
 ```sh
 npm run test:integration

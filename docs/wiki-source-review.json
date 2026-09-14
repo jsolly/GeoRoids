@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed bounded elapsed travel and correction recovery, server-confirmed ability state and cooldown release, and preservation of the joined ship kit. Hauler/HUD articles describe the confirmed behavior; existing tow/scan demonstrations remain accurate. Solo scoreboard rendering now matches the documented all-pilots display. Focused movement/input and desktop/touch ability, delayed-shot, real-WebSocket recovery, mining, scoreboard and long-name scenarios passed. Inspected gameplay and affected Wiki pages at desktop/mobile widths with clean diagnostics. Cooperative and terrain fixture repairs change verification only; no additional manual content or demonstrations need updating.",
+  "note": "Reviewed Hauler and touch controls: pointer taps activate once even when the follow-up click is delayed; semantic activation and release during/after cooldown are preserved. Existing Wiki rules and tow demonstration remain accurate; no article or media changes needed. Chromium and WebKit gameplay checks and desktop/mobile Wiki navigation/render checks passed with no browser diagnostics.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:b9cda885acb38a36c3954535bcce181c6c5a755e654cf3b98b155cd5a0e0da69",
@@ -148,7 +148,7 @@
     "src/input/mouse.ts": "sha256:fdc790507c9c5d03dc47f009a7763e919d737aec9b3f833ad59181ec73eadaaf",
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:a9c3d0c42ad04fe426efbcfa645d0e64eb5d99fbc7916b1cb8943d632b3b8f24",
-    "src/input/touchControls.ts": "sha256:9830873a9dd98792f2f481cb57f0156a2ca3226991080bae4dbc74548886c670",
+    "src/input/touchControls.ts": "sha256:5c525ce9d47e80b99c1fbc6b8315df6a07bf7fb95c27b5e6dc169f5d13082bc8",
     "src/network/networkManager.ts": "sha256:3cbfbd0ac415289ea30e16b7e09705ffcbb3212db0d891e535a1a7719babdc18",
     "src/network/services/ConnectionManager.ts": "sha256:e16d39e299894c52067aa67795b9dddb1d67b452427bbf9ce83d2055440a5e8f",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:ae1866890c28fe6880168a0e721ae82458aecddf91efed82b923cc02035aaa3d",
@@ -258,7 +258,7 @@
     "tests/unit/entities/shipKits.test.ts": "sha256:0125d1f77522512ecbdc17737ac38cc71b41fcf2ebd2d4e77157d9e8509ec47b",
     "tests/unit/entities/shipLifecycle.test.ts": "sha256:6dd7db1149061db600b9fe7cdebef748936f8ec66c43b0b9f360c312fd080d79",
     "tests/unit/entities/surveyor-identifies-nearby-minerals.test.ts": "sha256:3c9cedec1ec5b30ff1e8f42faefeb14ea182c65b2fa4459b68592fa3de2f9327",
-    "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "sha256:44c4780e93923bc1110f48e40c0700c2447778b2142d59b348e8f2374206b298",
+    "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "sha256:f23188afb7aea572ac5b5dc6f160c3833416e790478e733267e405fd6e1b9c7e",
     "tests/unit/input/mouseDesktop.test.ts": "sha256:40ff8c1e6a931e6b715332fe132ea7c03c54a40bbeefe17cafdf9c0cc2b6d02e",
     "tests/unit/input/touchAbility.test.ts": "sha256:3ba2125cd01f8ca04a81c9735b4a98cd117ead8345cb4eb0fdf42bdca1e956b0",
     "tests/unit/network/asteroidFieldSync.test.ts": "sha256:fbf8423d24c54085a86298cd1d061a61ebf7c696a0ab133c335483f092619698",

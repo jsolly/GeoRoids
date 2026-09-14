@@ -144,6 +144,29 @@ test('ability buttons do not create playfield shots or change steering', () => {
   expect(player.ship.thrusting).toBe(true);
 });
 
+test('a delayed pointer click cannot repeat an ability, while a following semantic click still works', () => {
+  vi.useFakeTimers();
+  try {
+    const activate = vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
+    const ability = document.getElementById('touch-ability');
+    if (!ability) {
+      throw new Error('Missing ability button');
+    }
+    ability.setPointerCapture = vi.fn();
+    ability.hasPointerCapture = () => false;
+    pointer('pointerdown', 1, 0, 320, 780, ability);
+    pointer('pointerup', 1, 100, 320, 780, ability);
+    expect(activate).toHaveBeenCalledTimes(1);
+    ability.click();
+    expect(activate).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(250);
+    ability.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    expect(activate).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test('holding a finger starts steering, and release cancels its target without stopping cruise', () => {
   vi.useFakeTimers();
   try {

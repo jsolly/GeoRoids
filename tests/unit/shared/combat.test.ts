@@ -14,24 +14,18 @@ describe('shared combat helpers', () => {
       isCombatantImmune({
         exploding: false,
         health: 100,
-        type: 'human',
         spawnProtectionTimer: 12,
       })
     ).toBe(true);
     expect(isCombatantImmune({ exploding: false, health: 100, blinkCount: 0 })).toBe(false);
-  });
-
-  test('bot spawn protection follows the shared debug flag', () => {
     expect(
       isCombatantImmune({
         exploding: false,
         health: 100,
-        type: 'bot',
-        spawnProtectionTimer: 12,
+        spawnProtectionTimer: 0,
       })
     ).toBe(false);
   });
-
   test('finds the first asteroid overlap for each ship', () => {
     const ships = [
       { id: 'a', position: { x: 0, y: 0 }, radius: 15, immune: false },

@@ -152,7 +152,7 @@ describe('ships feel the slope', () => {
     expect(velocity.y).toBeCloseTo(1, 6);
   });
 
-  test('terrain still pushes an automatically thrusting pilot and an idle bot downhill', () => {
+  test('terrain still pushes an automatically thrusting pilot and an idle hull downhill', () => {
     const field = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
     const start = { x: BOUNDS.radius / 2, y: 0 };
     const player = new Ship({ position: { ...start }, isLocalPlayer: true });
@@ -161,7 +161,7 @@ describe('ships feel the slope', () => {
     player.thrusting = false;
     player.blinkCount = 0;
     player.spawnProtectionTimer = 0;
-    const bot = {
+    const idleHull = {
       kitId: player.kitId,
       position: { ...start },
       velocity: { x: 0, y: 0 },
@@ -172,13 +172,13 @@ describe('ships feel the slope', () => {
 
     for (let frame = 0; frame < 60; frame++) {
       player.update();
-      applyShipMotionFrame(bot);
+      applyShipMotionFrame(idleHull);
     }
 
-    expect(sampleHeight(field, bot.position.x, bot.position.y)).toBeLessThan(
+    expect(sampleHeight(field, idleHull.position.x, idleHull.position.y)).toBeLessThan(
       sampleHeight(field, start.x, start.y)
     );
-    expect(Math.hypot(bot.velocity.x, bot.velocity.y)).toBeGreaterThan(0);
+    expect(Math.hypot(idleHull.velocity.x, idleHull.velocity.y)).toBeGreaterThan(0);
     expect(player.position.x).not.toBeCloseTo(start.x, 5);
     expect(player.position.y).toBeLessThan(start.y);
     expect(Math.abs(player.velocity.x)).toBeGreaterThan(0);

@@ -1,13 +1,11 @@
 import { PALETTE, TITLE } from '../constants';
 
-type PlayerColorType = 'local' | 'remote' | 'bot';
+type PlayerColorType = 'local' | 'remote';
 
 export function getPlayerColor(type: PlayerColorType): string {
   switch (type) {
     case 'local':
       return PALETTE.LOCAL;
-    case 'bot':
-      return PALETTE.BOT;
     case 'remote':
       return PALETTE.REMOTE;
   }

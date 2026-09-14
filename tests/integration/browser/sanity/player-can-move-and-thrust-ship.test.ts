@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { SHIP } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -30,7 +31,7 @@ test(
       return Math.hypot(ship.velocity.x, ship.velocity.y);
     });
     expect(cruiseSpeed).toBeGreaterThan(0);
-    expect(cruiseSpeed).toBeLessThanOrEqual(1.125 + 1e-6);
+    expect(cruiseSpeed).toBeLessThanOrEqual(SHIP.MAX_VELOCITY + 1e-6);
 
     await game.holdMovementKey('ArrowRight', 400);
     const afterTurn = await game.getShipAngle();

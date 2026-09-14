@@ -81,8 +81,8 @@ const KITS: Record<ShipKitId, ShipKit> = {
     abilityHint: 'Tow surveyed asteroids to a furnace. E releases the cable.',
     maxHealth: 140,
     size: 38,
-    thrust: 4.5 * GAME.MOTION_SCALE,
-    maxVelocity: 1.75 * GAME.MOTION_SCALE,
+    thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
+    maxVelocity: 1.75 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
     turnSpeed: 380,
     shotCooldown: 280,
   },
@@ -118,7 +118,7 @@ interface KitShipTarget extends KitStatTarget {
   turnSpeed: number;
 }
 
-/** Shared human + bot kit application. Does not touch playfield colors. */
+/** Shared kit application. Does not touch playfield colors. */
 export function applyShipKitStats(target: KitStatTarget, kitId: unknown): ShipKit {
   const kit = getShipKit(kitId);
   target.kitId = kit.id;

@@ -1,9 +1,6 @@
-import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
-import { GameEngine } from '../../../server/core/GameEngine';
 import { SPAWN } from '../../../src/constants';
 import { entityFactory } from '../../../src/entities/EntityFactory';
-import { getAsteroidFieldRadius } from '../../../src/physics/asteroidMotion';
 import { resolveSpawnPosition } from '../../../src/utils/spawnPosition';
 
 // Regression test for the live-multiplayer bug where two players joining the
@@ -22,50 +19,19 @@ test('local players spawn near the arena center so co-players are in view', () =
   }
 });
 
-test('local players and client bot ships share the same near-center spawn', () => {
+test('remote players spawn on the same near-center path as local ships', () => {
   for (let i = 0; i < 40; i++) {
-    const viaEntity = entityFactory.createLocalPlayer('ViaEntity');
-    const viaBot = entityFactory.createBotPlayer('ViaBot');
-    expect(Math.hypot(viaEntity.ship.position.x, viaEntity.ship.position.y)).toBeLessThanOrEqual(
+    const local = entityFactory.createLocalPlayer('Local');
+    const remote = entityFactory.createRemotePlayer('remote', 'Remote', { x: 12, y: -8 });
+    expect(Math.hypot(local.ship.position.x, local.ship.position.y)).toBeLessThanOrEqual(
       SPAWN.NEAR_CENTER_RADIUS
     );
-    expect(Math.hypot(viaBot.ship.position.x, viaBot.ship.position.y)).toBeLessThanOrEqual(
-      SPAWN.NEAR_CENTER_RADIUS
-    );
+    expect(remote.ship.position).toEqual({ x: 12, y: -8 });
   }
 });
 
 test('resolveSpawnPosition keeps an explicit late-join pose', () => {
   expect(resolveSpawnPosition({ x: 80, y: -12 })).toEqual({ x: 80, y: -12 });
-});
-
-test('client bots spawn on the same near-center path as humans', () => {
-  const bots = [0, 1, 2].map((i) => entityFactory.createBotPlayer(`Bot ${i}`));
-  expect(bots).toHaveLength(3);
-  for (const bot of bots) {
-    expect(Math.hypot(bot.ship.position.x, bot.ship.position.y)).toBeLessThanOrEqual(
-      SPAWN.NEAR_CENTER_RADIUS
-    );
-  }
-});
-
-test('server bots spawn and bounce inside the shared asteroid field', () => {
-  const engine = new GameEngine(3);
-  const bots = engine.entityManager.createBots(2);
-  const field = getAsteroidFieldRadius();
-  expect(bots.length).toBeGreaterThan(0);
-  for (const bot of bots) {
-    expect(Math.hypot(bot.position.x, bot.position.y)).toBeLessThanOrEqual(field + 1);
-  }
-  const wanderer = bots[0];
-  assert.ok(wanderer);
-  wanderer.position = { x: 3000, y: 0 };
-  wanderer.velocity = { x: 8, y: 0 };
-  engine.entityManager.updateBotMovement([]);
-  const after = engine.getBot(wanderer.id);
-  assert.ok(after);
-  expect(Math.hypot(after.position.x, after.position.y)).toBeLessThanOrEqual(field + 1);
-  engine.stopGameLoop();
 });
 
 test('two freshly spawned players are close enough to share a viewport', () => {

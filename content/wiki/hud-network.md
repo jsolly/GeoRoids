@@ -26,17 +26,19 @@ and pickup-break sounds differ from ship lasers. Laser cores and
 material pickups have separate cues, as do kit abilities and respawning.
 
 The HUD shows lives as kit hull icons, score, kit name, and the current ability.
-Desktop layouts include a leaderboard of every active human and bot row and a
+Desktop layouts include a leaderboard of every active human row and a
 local minimap; touch layouts use a compact leaderboard and an adaptive local
 minimap. The local minimap follows the ship's nearby radar: it shows your ship,
-other human pilots, bot pilots, explored asteroids, loot drops, loose satellite
+other human pilots, explored asteroids, loot drops, loose satellite
 pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
 marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, yellow slashed diamonds
 mark laser cores, and lilac circles and diamonds mark loose and orbiting
 satellite pickups. Ship headings and kit colors keep pilots identifiable above
-the world marks. Press M or use the Map button to open the full-screen universe
+the world marks. Completed sectors are hatched on both maps. Crossing into a
+new open sector shows a brief HUD notice with that sector's coordinates. Press
+M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are
 outside the local radar. A discovered furnace stays marked in the local radar
@@ -45,9 +47,8 @@ when it is farther away. Death, delivery, and pickup
 messages appear in the center for 120 frames, or 2 seconds. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.
-Every active pilot, including existing bots, stays on the leaderboard so the
-crew can see shared asteroid work and delivery points. Bot names include
-"(bot)".
+Every active pilot stays on the leaderboard so the
+crew can see shared asteroid work and delivery points.
 
 ## Display refresh rate
 
@@ -76,7 +77,7 @@ screen. Select Enter Game to try again. A full reload can start a new session.
 
 The local minimap and full-screen universe map use one persistent shared
 exploration chart. Passive Surveyor reveal reaches 650 world units and passive
-Hauler reveal reaches 260; every crew member and bot contributes to the same
+Hauler reveal reaches 260; every crew member contributes to the same
 explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
 Open the universe map with M or the Map button, then close it with M, Escape,

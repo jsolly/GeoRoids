@@ -72,7 +72,6 @@ class Ship {
   lastShotTime: number = 0;
   shotCooldown: number = 250;
   color: string = PALETTE.LOCAL;
-  isBot: boolean = false; // Flag to identify if this ship belongs to a bot
   frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
   isLocalPlayer: boolean = false; // Track if this is the local player
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID;
@@ -91,7 +90,6 @@ class Ship {
     position?: Position;
     shotCooldown?: number;
     color?: string;
-    isBot?: boolean;
     isLocalPlayer?: boolean;
     frictionCoefficient?: number;
     kitId?: ShipKitId;
@@ -111,7 +109,7 @@ class Ship {
     // Initialize blinkOn based on initial blinkCount
     this.blinkOn = this.blinkCount % 2 === 0;
 
-    // Apply optional overrides for bot-specific configuration
+    // Apply optional overrides
     if (options?.position) {
       this.position = options.position;
     }
@@ -120,9 +118,6 @@ class Ship {
     }
     if (options?.color) {
       this.color = options.color;
-    }
-    if (options?.isBot !== undefined) {
-      this.isBot = options.isBot;
     }
     if (options?.isLocalPlayer !== undefined) {
       this.isLocalPlayer = options.isLocalPlayer;
@@ -225,7 +220,7 @@ class Ship {
     const result = activateAbilityOnHost(this, world);
     // Always tell the server on a legal E. Do not start the Hauler cooldown
     // on a miss — that 3s lock was why a later in-range tap stayed dead.
-    if (this.isLocalPlayer && !this.isBot && canTry) {
+    if (this.isLocalPlayer && canTry) {
       const networkManager = NetworkManager.getInstance();
       if (networkManager.isConnected) {
         networkManager.sendMessage({
@@ -262,21 +257,15 @@ class Ship {
   }
 
   private sendShootEvent(laser: Laser): void {
-    // Only send shooting events for non-bot ships
-    if (!this.isBot) {
-      const networkManager = NetworkManager.getInstance();
-      if (networkManager.isConnected) {
-        // Send dedicated shoot event to server
-        logger.debug('SHIP', 'Sending shoot event', {
-          position: laser.position,
-          velocity: laser.velocity,
-        });
-        networkManager.sendShootEvent(laser);
-      } else {
-        logger.debug('SHIP', 'Network not connected, cannot send shoot event');
-      }
+    const networkManager = NetworkManager.getInstance();
+    if (networkManager.isConnected) {
+      logger.debug('SHIP', 'Sending shoot event', {
+        position: laser.position,
+        velocity: laser.velocity,
+      });
+      networkManager.sendShootEvent(laser);
     } else {
-      logger.debug('SHIP', 'Bot ship, not sending shoot event');
+      logger.debug('SHIP', 'Network not connected, cannot send shoot event');
     }
   }
 
@@ -315,21 +304,7 @@ class Ship {
 
     if (shouldStartHealthRegeneration(this.lastDamageTime, this.health, this.maxHealth)) {
       if (this.healthRegenTimer <= 0) {
-        const healthBefore = this.health;
         this.heal(calculateHealthRegenPerFrame());
-        const healthAfter = this.health;
-
-        if (healthBefore !== healthAfter) {
-          // Health regenerated
-          if (this.isBot) {
-            logger.debug('SHIP', 'Bot health regenerated', {
-              healthBefore,
-              healthAfter,
-              lastDamageTime: this.lastDamageTime,
-              healthRegenTimer: this.healthRegenTimer,
-            });
-          }
-        }
       } else {
         this.healthRegenTimer--;
       }
@@ -373,7 +348,7 @@ class Ship {
   }
 
   /**
-   * 60 Hz explode / blink / regen. Shared by local, remote, and bot ships.
+   * 60 Hz explode / blink / regen. Shared by local and remote ships.
    * Movement is not applied here so remotes can tick death FX without predicting pose.
    */
   updateLifecycle(lifecycleFrames = 1): void {
@@ -415,11 +390,6 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
-    // Bot poses are supplied by the server.
-    if (this.isBot) {
-      return;
-    }
-
     this.angle += this.angularVelocity;
     const speed = cruiseSpeed(this.mass, this.maxVelocity);
     const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);

@@ -159,7 +159,7 @@ npx vitest run tests/unit/path/to.test.ts        # OK for unit tests only
 ### Two processes, one game
 
 - **Client** (`src/`, served by Vite): rendering, input, prediction, HUD. Entry is `index.html` → bootstraps `GameController` (singleton) which wires `GameStateManager`, `PlayerManager`, `InputManager`, `NetworkManager`, `CollisionManager`.
-- **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state. Bots run server-side.
+- **Server** (`server.ts` → `server/`): authoritative game loop. `GameEngine` owns world state via `EntityManager`, `AsteroidManager`, deterministic `RNGService`. `WebSocketCore` (`server/communication/`) routes messages through `MessageHandler`. `GameStateBroadcaster` periodically pushes state.
 - **Two WebSocket paths on the same server**: `/ws` for gameplay, `/logs` for forwarded client logs (`ClientLogger` writes them to `logs/client.log`). HTTP routes on the same port: `/health`, `/status` (HTML or JSON depending on Accept/UA), `/test-server-log` (development/test only).
 
 Vite dev proxies `/ws` to `ws://localhost:3001` so the client always connects via the Vite origin.
@@ -171,13 +171,13 @@ protocol opt-out flags or rollback procedure. Reconnects use a private resume to
 
 ### Server-authoritative model
 
-Asteroids and bots live on the server; clients render snapshots. Clients still simulate their local ship for responsiveness. `playerNetwork.ts` and `network/networkManager.ts` handle outbound (input/shoot) and inbound (state) messages. Shared message/payload types live in `shared-types.ts` (top level, imported by both client and server).
+Asteroids live on the server; clients render snapshots. Clients still simulate their local ship for responsiveness. `playerNetwork.ts` and `network/networkManager.ts` handle outbound (input/shoot) and inbound (state) messages. Shared message/payload types live in `shared-types.ts` (top level, imported by both client and server).
 
 ### Key client modules
 
 - `src/core/gameController.ts` — top-level lifecycle (`newGame`, `startGame`, `setupNetworkDisconnectionHandler`).
 - `src/core/eventLoop.ts` — render/update loop.
-- `src/entities/{player,ship,roid,laser,satellite,satellitePickup,loot}/` — entity classes and their managers/renderers. Ship motion and combat live in `Ship.ts` and its ship helpers; bots run on the server.
+- `src/entities/{player,ship,roid,laser,satellite,satellitePickup,loot}/` — entity classes and their managers/renderers. Ship motion and combat live in `Ship.ts` and its ship helpers.
 - `src/physics/collision/{CollisionManager,collisionDetection}.ts` — collision system.
 - `src/network/networkManager.ts` + `services/ConnectionManager.ts` — WS lifecycle, reconnection, message dispatch.
 - `src/rendering/{canvas,boundaryRenderer,hud/}` — canvas + HUD; `GameController.renderGame` calls `canvasManager.drawGame`.
@@ -191,7 +191,7 @@ Debug behavior is **constants, not env vars**. To enable debug mode, edit `src/c
 1. `LOGGING.GLOBAL_LOG_LEVEL = 'debug'`
 2. `DEBUG.ENABLED = true`
 
-Notable flags under `DEBUG.*`: `BOT_PLAYER.{COUNT,MOVEMENT,LASERS,SPAWN_PROTECTION}`, `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_BOT}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
+Notable flags under `DEBUG.*`: `ROIDS.{INITIAL_COUNT,MOVEMENT,PLACE_ON_LOCAL_PLAYER}`, `PLACE_PLAYERS_NEAR_CENTER`. Client logs forward over `/logs` to the server; both ends append to:
 
 - `logs/client.log` — client-side (forwarded over WS)
 - `logs/server.log` — server-side
@@ -203,7 +203,7 @@ Logs are structured JSONL. Use `npm run --silent logs -- --player <id>` to merge
 - `tests/unit/` — pure, fast. Run via `npm run test`.
 - `tests/integration/server/` — vitest against server modules directly.
 - `tests/integration/entities/` — vitest against entity interactions and input behavior.
-- `tests/integration/browser/` — Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`, `e2e/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `bots-explode-and-respawn-after-asteroid-collision.test.ts` (what happens) over `test-bot-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
+- `tests/integration/browser/` — Playwright driving a real browser. Organized by scenario: `sanity/`, `laser/`, `collision/`, `roid/`, `e2e/`. **Name each test for the user scenario it describes**, not the function under test — e.g. `ship-respawns-near-furnace-after-asteroid-death.test.ts` (what happens) over `test-collision.test.ts` (what's tested). Screenshots land in `tests/integration/browser/screenshots/`.
 
 Integration tests start their own dev servers through `scripts/test-runner.sh` on unused configured ports. If a test hangs or fails strangely, inspect the runner output and confirm only its configured ports and child processes need cleanup before retrying.
 

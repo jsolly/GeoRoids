@@ -68,9 +68,6 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
   const first = new GameEngine(82, undefined, firstStore);
   const scout = pilot(first, 'scout', 'surveyor');
   const hauler = pilot(first, 'hauler', 'hauler', { x: 80, y: 0 });
-  for (const bot of first.getAllBots()) {
-    first.removeBot(bot.id);
-  }
   for (const rock of first.getAllAsteroids()) {
     first.removeAsteroid(rock.id);
   }
@@ -113,9 +110,6 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
 test('travelling far across the world loads local ore and returning does not replenish mined deposits', () => {
   const engine = new GameEngine(82);
   const traveller = pilot(engine, 'traveller', 'surveyor');
-  for (const bot of engine.getAllBots()) {
-    engine.removeBot(bot.id);
-  }
   const original = engine
     .getAllAsteroids()
     .find((rock) => Math.abs(rock.position.x) < 1_000 && Math.abs(rock.position.y) < 1_000);
@@ -150,7 +144,17 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
   const originalPosition = { ...drift.position };
   drift.position = { x: 8_200, y: 200 };
   const save = () => {
-    store.checkpoint({ seed: 82, startedAt: 1, exploration: [] }, field.checkpoint(manager), []);
+    store.checkpoint(
+      {
+        seed: 82,
+        startedAt: 1,
+        generation: WORLD.generation,
+        exploration: [],
+        completedSectors: [],
+      },
+      field.checkpoint(manager),
+      []
+    );
     field.saved();
   };
   save();

@@ -16,7 +16,7 @@ function isWorldDiagnostics(value: unknown): value is ServerWorldDiagnostics {
     typeof world['gameTime'] === 'number' &&
     Number.isFinite(world['gameTime']) &&
     world['gameTime'] >= 0 &&
-    ['humanPlayers', 'bots', 'asteroids', 'loot', 'satellitePickups'].every(
+    ['humanPlayers', 'asteroids', 'loot', 'satellitePickups'].every(
       (field) =>
         typeof world[field] === 'number' && Number.isSafeInteger(world[field]) && world[field] >= 0
     )
@@ -46,7 +46,6 @@ export function isWorldClean(world: ServerWorldDiagnostics): boolean {
   return (
     world.isPaused &&
     world.humanPlayers === 0 &&
-    world.bots === 0 &&
     world.asteroids === 0 &&
     world.loot === 0 &&
     world.satellitePickups === 0
@@ -126,7 +125,7 @@ function sleep(ms: number): Promise<void> {
 
 export async function arrangeCrewField(
   playerIds: string[],
-  scenario: 'delivery' | 'empty' | 'boundary' | 'impact' | 'mining' | 'reflection' | 'bot-mining'
+  scenario: 'delivery' | 'empty' | 'boundary' | 'impact' | 'mining' | 'reflection'
 ): Promise<void> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-crew-field`, {
     method: 'POST',

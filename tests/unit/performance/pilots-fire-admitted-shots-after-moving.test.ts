@@ -27,9 +27,6 @@ test('a benchmark pilot moves and fires a shot that the authoritative world publ
     actor.position = { x: 0, y: 0 };
     actor.velocity = { x: 0, y: 0 };
     actor.angle = 0;
-    for (const bot of server.gameEngine.getAllBots()) {
-      server.gameEngine.removeBot(bot.id);
-    }
     for (const rock of server.gameEngine.getAllAsteroids()) {
       server.gameEngine.removeAsteroid(rock.id);
     }

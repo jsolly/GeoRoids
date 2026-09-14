@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { SHIP } from '../../../src/constants';
+import { GAME, SHIP } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
   applyShipKitToShip,
@@ -26,19 +26,17 @@ test('Surveyor handles more nimbly while Hauler keeps its heavy hull and slow cr
   expect(surveyor.turnSpeed).toBeGreaterThan(hauler.turnSpeed);
   expect(surveyor.size).toBeLessThan(hauler.size);
   expect(surveyor.maxVelocity).toBe(SHIP.MAX_VELOCITY);
-  expect(hauler.maxVelocity).toBe(0.984375);
+  expect(hauler.maxVelocity).toBe(1.75 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
   expect(hauler.maxHealth).toBeGreaterThan(surveyor.maxHealth);
   expect(surveyor.abilityId).toBe('surveyScan');
   expect(hauler.abilityId).toBe('harpoon');
 });
 
-test('human and bot ships share the two kit definitions', () => {
-  for (const isBot of [false, true]) {
-    const ship = new Ship({ isBot, kitId: 'hauler' });
-    expect(ship.maxHealth).toBe(140);
-    applyShipKitToShip(ship, 'surveyor');
-    expect(ship.kitId).toBe('surveyor');
-    expect(ship.turnSpeed).toBe(540);
-    expect(ship.maxHealth).toBe(100);
-  }
+test('every ship uses the same two kit definitions', () => {
+  const ship = new Ship({ kitId: 'hauler' });
+  expect(ship.maxHealth).toBe(140);
+  applyShipKitToShip(ship, 'surveyor');
+  expect(ship.kitId).toBe('surveyor');
+  expect(ship.turnSpeed).toBe(540);
+  expect(ship.maxHealth).toBe(100);
 });

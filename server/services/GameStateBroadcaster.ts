@@ -90,13 +90,13 @@ export class GameStateBroadcaster {
       return; // Already running
     }
 
-    // Periodic game state broadcast (30 FPS for smooth bot movement)
+    // Periodic game state broadcast (30 FPS)
     this.broadcastInterval = setInterval(() => {
       this.flushExpiredCollabHits();
       if (this.gameEngine.getPlayerCount() > 0) {
         this.broadcastGameState();
       }
-    }, 1000 / 30); // 30 FPS (33.33ms) for smooth bot movement
+    }, 1000 / 30); // 30 FPS (33.33ms)
   }
 
   public stopPeriodicBroadcast(): void {
@@ -323,16 +323,14 @@ export class GameStateBroadcaster {
   }
 
   public broadcastCombatResult(result: CombatBroadcast): void {
-    if (result.targetType !== 'bot') {
-      this.broadcastPlayerDamaged(
-        result.targetId,
-        result.attackerId,
-        result.damage,
-        result.remainingHealth,
-        result.isDestroyed,
-        result.remainingLives
-      );
-    }
+    this.broadcastPlayerDamaged(
+      result.targetId,
+      result.attackerId,
+      result.damage,
+      result.remainingHealth,
+      result.isDestroyed,
+      result.remainingLives
+    );
 
     if (result.destroyedAsteroidId) {
       this.broadcastAsteroidDestruction(

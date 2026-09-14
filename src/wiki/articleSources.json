@@ -7,7 +7,8 @@
     "shared/exploration.ts",
     "shared/furnaces.ts",
     "shared/world.ts",
-    "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts"
+    "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts",
+    "shared/sectors.ts"
   ],
   "controls": [
     "src/input/keybindings.ts",
@@ -145,7 +146,7 @@
     "tests/unit/systems/hudReadability.test.ts",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
     "tests/unit/network/asteroidFieldSync.test.ts",
-    "tests/integration/browser/sanity/crew-scoreboard-includes-bots.test.ts",
+    "tests/integration/browser/sanity/crew-scoreboard-lists-human-pilots.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
     "src/audio/Sound.ts",
     "src/audio/pitch.ts",
@@ -154,7 +155,8 @@
     "src/audio/splitSound.ts",
     "src/audio/spatialAudio.ts",
     "src/constants/user-preferences.ts",
-    "docs/sounds.md"
+    "docs/sounds.md",
+    "src/rendering/sectorRenderer.ts"
   ],
   "surveyor": [
     "src/entities/ship/shipKits.ts",
@@ -167,7 +169,7 @@
     "shared/world.ts",
     "server/core/PlayerMotionService.ts",
     "server/core/GameEngine.ts",
-    "server/ai/botController.ts",
+    "shared/sectors.ts",
     "src/entities/ship/surveyScan.ts",
     "src/rendering/hud/minimap.ts",
     "tests/unit/entities/surveyor-identifies-nearby-minerals.test.ts"
@@ -191,7 +193,7 @@
     "shared/furnaces.ts",
     "shared/world.ts",
     "server/core/GameEngine.ts",
-    "server/ai/botController.ts",
+    "shared/sectors.ts",
     "server/services/GameStateBroadcaster.ts",
     "src/entities/ship/shipAbilities.ts",
     "src/entities/ship/towCable.ts",
@@ -206,8 +208,8 @@
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts",
-    "tests/integration/browser/e2e/bots-mine-and-share-the-crew-field.test.ts",
-    "tests/integration/browser/sanity/crew-scoreboard-includes-bots.test.ts",
+    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts",
+    "tests/integration/browser/sanity/crew-scoreboard-lists-human-pilots.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
     "server/world/WorldStore.ts",
     "server/world/RegionalAsteroidField.ts",
@@ -215,6 +217,7 @@
     "server/world/AsteroidSpatialIndex.ts",
     "tests/unit/server/persistent-world-boundaries.test.ts",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts",
-    "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts"
+    "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts",
+    "tests/unit/shared/sectors.test.ts"
   ]
 }

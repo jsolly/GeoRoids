@@ -29,7 +29,7 @@ export interface Velocity {
 }
 
 // Network update interface - only what needs to be synced
-/** Chosen at join. Shared by human and bot ships. */
+/** Chosen at join. Shared by every human ship. */
 export type ShipKitId = 'surveyor' | 'hauler';
 
 export interface PlayerUpdate {
@@ -210,6 +210,8 @@ export interface ShockwaveEvent {
 export interface ServerGameState {
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
   exploration: ExplorationTile[];
+  /** Finished world sectors that stay walled off. */
+  completedSectors: string[];
   /** Revealed landmarks and valuable drops, independent of local simulation visibility. */
   mapAssets: MapAsset[];
   entities: ServerEntityData[];
@@ -250,7 +252,7 @@ export interface ServerGameSnapshot extends ServerGameState {
 export interface ServerEntityData {
   id: string;
   name: string;
-  type: 'human' | 'bot';
+  type: 'human';
   position: Position;
   velocity: Velocity;
   angle: number;

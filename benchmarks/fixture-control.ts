@@ -108,7 +108,7 @@ export async function startFixtureControl(
         });
         // This synchronous callback runs between simulation ticks. No HTTP route or production hook.
         engine.prepareDiagnosticWorld(request.scenario);
-        const actors = [...players, ...engine.getAllBots()];
+        const actors = [...players];
         for (const [index, actor] of actors.entries()) {
           resetShipMass(actor);
           applyShipKitStats(actor, actor.kitId);
@@ -184,14 +184,12 @@ export async function startFixtureControl(
         const state = engine.getGameState();
         const counts = {
           humans: players.length,
-          bots: engine.getAllBots().length,
           asteroids: engine.getAsteroidCount(),
           pickups: engine.getSatellitePickupCount(),
         };
         if (request.scenario === 'combat') {
           assert.deepEqual(counts, {
             humans: 5,
-            bots: 2,
             asteroids: 80,
             pickups: 6,
           });

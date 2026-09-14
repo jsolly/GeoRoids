@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { applyShipImpactFlash, tickShipImpactFlash } from '../../../src/entities/ship/shipUtils';
 
-test('impact flash ticks down on the shared player/bot path', () => {
+test('impact flash ticks down on the shared ship path', () => {
   const ship = { impactFlashFrames: 0 };
   applyShipImpactFlash(ship);
   expect(ship.impactFlashFrames).toBeGreaterThan(0);

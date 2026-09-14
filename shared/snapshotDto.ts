@@ -81,7 +81,7 @@ const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
 const entity = shape<ServerEntityData>({
   id: string,
   name: string,
-  type: choice('human', 'bot'),
+  type: choice('human'),
   position,
   velocity: position,
   angle: number,
@@ -177,8 +177,10 @@ const mapAsset = shape<MapAsset>({
   position,
   name: string,
 });
+const sectorIdentity: Rule = (value) => typeof value === 'string' && /^-?\d+,-?\d+$/.test(value);
 const worldRules = {
   exploration: validExploration,
+  completedSectors: array(sectorIdentity),
   mapAssets: array(mapAsset),
   entities: array(entity),
   asteroids: array(asteroid),

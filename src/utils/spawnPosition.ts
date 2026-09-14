@@ -7,9 +7,9 @@ import { getRandomPositionNearBoundary, getRandomPositionNearPoint } from './pos
 const WORLD_ORIGIN: Position = { x: 0, y: 0 };
 
 /**
- * Shared player/bot spawn. Local, remote, and bot ships use this — no
- * factory-specific forks. Debug "near center" is world origin, not canvas
- * (400, 300), so a late-join camera does not sit 500px off the belt.
+ * Shared player spawn. Local and remote ships use this — no factory-specific
+ * forks. Debug "near center" is world origin, not canvas (400, 300), so a
+ * late-join camera does not sit 500px off the belt.
  */
 export function resolveSpawnPosition(explicit?: Position): Position {
   if (explicit) {

@@ -1,4 +1,4 @@
-// Mulberry32 seeded PRNG for deterministic asteroid/bot generation
+// Mulberry32 seeded PRNG for deterministic asteroid generation
 export class RNGService {
   private rngState: number;
   private readonly initialSeed: number;

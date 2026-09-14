@@ -114,8 +114,8 @@ async function captureHudFrame(
       }
       const local = gameController.getCurrPlayer();
       const players = gameController.getNetworkManager().getAllPlayers();
-      if (!local || players.length < 2) {
-        throw new Error('HUD fixture requires a local player and at least one bot');
+      if (!local) {
+        throw new Error('HUD fixture requires a local player');
       }
 
       local.name = 'HUD pilot';
@@ -205,7 +205,6 @@ test(
     try {
       const game = new GameInteractions(page);
       await game.bootGame({ waitForCombatReady: false });
-      await game.waitForBots(1);
       wasRunning = await page.evaluate(() => {
         const gameController = window.gameController;
         if (!gameController) {

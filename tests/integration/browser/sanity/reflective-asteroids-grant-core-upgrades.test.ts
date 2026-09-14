@@ -112,7 +112,7 @@ test(
     const playerId = await game.getLocalPlayerId();
     await arrangeCrewField([playerId], 'reflection');
     // Keep the real client and server poses aligned after the diagnostic
-    // arrangement. The fixture has no bots or other hazards to navigate.
+    // arrangement. The fixture has no extra hazards to navigate.
     await game.placeShipAt(FIRING_POSITION.x, FIRING_POSITION.y);
     await expect
       .poll(() => readReflector(page), { timeout: 5000 })

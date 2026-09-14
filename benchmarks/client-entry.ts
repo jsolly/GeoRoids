@@ -515,7 +515,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           updateCalls: options.measuredFrames,
           renderCalls: options.measuredFrames,
           humans: 1,
-          bots: network.getAllPlayers().filter((player) => player.type === 'bot').length,
           remoteHumans: network.getRemotePlayers().length,
           asteroids: after.asteroids.length,
           loot: after.loot.length,

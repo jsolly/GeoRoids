@@ -20,7 +20,7 @@ class PlayerManager {
   }
 
   public getNonLocalPlayers(): Player[] {
-    // Return all players except the local player (includes bots and remote players)
+    // Return all players except the local player
     const allPlayers = this.networkManager.getAllPlayers();
     return allPlayers.filter((p) => p.type !== 'local');
   }

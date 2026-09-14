@@ -12,7 +12,6 @@ test('locked palette hexes match the art-direction swatch', () => {
   expect(PALETTE.STARS).toBe('#8BA3C7');
   expect(PALETTE.LOCAL).toBe('#5EEAD4');
   expect(PALETTE.REMOTE).toBe('#7DD3FC');
-  expect(PALETTE.BOT).toBe('#FB923C');
   expect(PALETTE.ROID).toBe('#94A3B8');
   expect(PALETTE.LASER_LOCAL).toBe('#FDE68A');
   expect(PALETTE.HUD).toBe('#E2E8F0');
@@ -45,17 +44,10 @@ test('players and ships use the role palette instead of white', () => {
     type: 'remote',
     input: new MockPlayerInput(),
   });
-  const bot = new Player({
-    id: 'p-bot',
-    name: 'Bot',
-    type: 'bot',
-    input: new MockPlayerInput(),
-  });
 
   expect(local.color).toBe(PALETTE.LOCAL);
   expect(local.ship.color).toBe(PALETTE.LOCAL);
   expect(remote.color).toBe(PALETTE.REMOTE);
-  expect(bot.color).toBe(PALETTE.BOT);
   expect(new Ship().color).toBe(PALETTE.LOCAL);
 });
 

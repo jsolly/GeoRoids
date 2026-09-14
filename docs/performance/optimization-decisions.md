@@ -79,7 +79,7 @@ were answered. Each negotiated pilot observed authoritative projectiles born
 after its measured input acknowledgment. The driver also exercised natural
 game-over rejoins and six deliberate periodic resyncs per negotiated pilot.
 
-The default evolving world has two bots and starts with 20 asteroids; this is not
+The default evolving world starts with 20 asteroids; this is not
 the proposed 10-human/80-asteroid loaded battle. State-gap maxima were 151–170 ms.
 After-warmup full metric windows had tick p99 bucket bounds no higher than 4 ms
 and broadcast p99 bounds no higher than 8 ms, but isolated maxima reached about

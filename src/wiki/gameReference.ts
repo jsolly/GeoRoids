@@ -154,7 +154,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Humans start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; human and bot respawns use the nearest furnace with a 180-unit offset.`,
+        `Humans start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest furnace with a 180-unit offset and skip completed sectors.`,
         `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },
@@ -183,7 +183,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Shared field values',
       paragraphs: [
-        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot and bot.`,
+        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited, fully mapped, empty sector is walled off.`,
         `${starterFurnaces.map((furnace) => `${furnace.name} (${furnace.radius}-unit intake)`).join(', ')} anchor the starter area; ${FURNACES.length - starterFurnaces.length} regional Works sites are distributed across the field. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
       ],
     },

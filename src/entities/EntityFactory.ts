@@ -9,7 +9,7 @@ import { Roid, RoidBelt } from './roid/Roid';
 interface PlayerConfig {
   id?: string;
   name: string;
-  type: 'local' | 'remote' | 'bot';
+  type: 'local' | 'remote';
   position?: Position;
   color?: string;
   shotCooldown?: number;
@@ -22,10 +22,7 @@ interface RoidConfig {
   id?: string;
 }
 
-/**
- * Unified factory for players (local, remote, bot) and world entities.
- * Bots are the same Player type as humans; the server owns spawn/AI.
- */
+/** Unified factory for players (local, remote) and world entities. */
 class EntityFactory {
   private static instance: EntityFactory;
 
@@ -38,11 +35,9 @@ class EntityFactory {
     return EntityFactory.instance;
   }
 
-  // Player creation methods
   createPlayer(config: PlayerConfig): Player {
     const player = this.instantiatePlayer(config);
     this.applyPlayerConfiguration(player, config);
-    this.applyTypeSpecificConfiguration(player, config);
     return player;
   }
 
@@ -65,15 +60,6 @@ class EntityFactory {
     });
   }
 
-  createBotPlayer(name: string, position?: Position): Player {
-    return this.createPlayer({
-      name,
-      type: 'bot',
-      ...(position !== undefined ? { position: position } : {}),
-    });
-  }
-
-  // Roid creation methods
   createRoid(config: RoidConfig = {}): Roid {
     const position = config.position || getRandomPositionInAsteroidField();
     const size = config.size || 15; // Default medium size
@@ -84,7 +70,6 @@ class EntityFactory {
     return new RoidBelt();
   }
 
-  // Laser creation method
   createLaser(config: {
     position: Position;
     velocity: Velocity;
@@ -101,7 +86,6 @@ class EntityFactory {
     );
   }
 
-  // Private helper methods
   private instantiatePlayer(config: PlayerConfig): Player {
     const id = config.id || uuidv4();
     return new Player({
@@ -116,7 +100,6 @@ class EntityFactory {
   private applyPlayerConfiguration(player: Player, config: PlayerConfig): void {
     player.ship.position = resolveSpawnPosition(config.position);
 
-    // Apply customizations
     if (config.color) {
       player.color = config.color;
       player.ship.color = config.color;
@@ -124,23 +107,6 @@ class EntityFactory {
 
     if (config.shotCooldown !== undefined) {
       player.ship.shotCooldown = config.shotCooldown;
-    }
-  }
-
-  private applyTypeSpecificConfiguration(player: Player, config: PlayerConfig): void {
-    switch (config.type) {
-      case 'bot':
-        this.applyBotConfiguration(player, config);
-        break;
-      case 'local':
-        // Local players use default configuration
-        break;
-    }
-  }
-
-  private applyBotConfiguration(player: Player, config: PlayerConfig): void {
-    if (config.shotCooldown === undefined) {
-      player.ship.shotCooldown = 500 + Math.random() * 500; // 0.5-1.0 seconds
     }
   }
 }

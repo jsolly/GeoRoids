@@ -11,8 +11,8 @@ Stroke is `#5EEAD4` on `#000011`, with a play-scale target around 32px.
 | Surveyor | Six-point needle with an aft notch | Nimble exploration and radar mineral scan |
 | Hauler | Seven-point barge with a flat keel | Tow cargo to furnaces; stronger mining lasers |
 
-All humans and scoreboard bots share one crew. Ownership colors identify the
-local pilot (teal), other humans (sky) and bots (amber). Kit silhouettes identify
+All humans share one crew. Ownership colors identify the
+local pilot (teal) and other humans (sky). Kit silhouettes identify
 their jobs. There are no faction marks or enemy colors on the crew scoreboard.
 
 ## Harpoon (Hauler only)

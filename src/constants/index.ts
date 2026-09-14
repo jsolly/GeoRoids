@@ -14,13 +14,12 @@ export const GAME = {
   START_LIVES: 3,
   STARTING_SCORE: 0,
 
-  // Network (can be overridden by DEBUG.BOT_PLAYER.COUNT when in debug mode)
-  BOT_COUNT: 2,
-
   // Physics
   FPS: 60,
   /** Spatial pace multiplier; simulation cadence and cooldowns stay fixed. */
   MOTION_SCALE: 0.5625, // 0.75 × 0.75 — extra 25% slowdown on the existing pace
+  /** Extra multiplier applied only to player cruise, not world projectiles. */
+  PLAYER_SPEED_SCALE: 1.25,
   FRICTION: 0.6,
 } as const;
 
@@ -28,13 +27,8 @@ export const GAME = {
 // SPAWN CONFIGURATION
 // ============================================================================
 export const SPAWN = {
-  // Radius (px) around the arena center within which human players spawn.
-  // The open world is large, so spawning anywhere inside it puts
-  // players thousands of px apart — far outside each other's viewport, so two
-  // people joining the same server never see one another. Clustering spawns
-  // near the center keeps freshly-joined players within view of each other
-  // (max separation ~2x this radius) and near where bots/asteroids converge.
-  NEAR_CENTER_RADIUS: 150,
+  // Radius (px) around a living ally or open-sector center for new pilots.
+  NEAR_CENTER_RADIUS: WORLD.spawnClusterRadius,
 } as const;
 
 // ============================================================================
@@ -71,7 +65,6 @@ export const PALETTE = {
   STARS: '#8BA3C7',
   LOCAL: '#5EEAD4',
   REMOTE: '#7DD3FC',
-  BOT: '#FB923C',
   ROID: '#94A3B8',
   /** Canonical terrain slate; subdued beneath ships, lasers, and pickups. */
   CONTOUR: '#5A6B7D',
@@ -186,9 +179,8 @@ const EXPLODE_DURATION_FRAMES = 18;
 export const SHIP = {
   // Movement
   TURN_SPEED: 450, // degrees per second
-  THRUST: 5 * GAME.MOTION_SCALE, // pixels per second² (acceleration)
-  MAX_VELOCITY: 2 * GAME.MOTION_SCALE, // pixels per frame; one-quarter of the former cruise speed
-  BOT_FRICTION: 2.0, // higher = more friction for bots
+  THRUST: 5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
+  MAX_VELOCITY: 2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   SIZE: 30, // height in pixels
 
   // Combat
@@ -248,7 +240,7 @@ export const ROID = {
   POINTS_SMALL: 100,
 
   // Collaborative split: only the biggest asteroids, and only when two
-  // distinct ships (player or bot) land laser hits within this window.
+  // distinct ships land laser hits within this window.
   // The server owns the clock, shooter identity, and resolve/expire.
   COLLAB_SPLIT_WINDOW_MS: 1000,
   COLLAB_SPLIT_MIN_SIZE: 40,
@@ -354,14 +346,6 @@ export const DEBUG = {
   // DEBUG MODE chrome does not paint in production builds.
   ENABLED: false,
 
-  // Bot player settings
-  BOT_PLAYER: {
-    COUNT: 2, // Keep the same two-bot match in development.
-    MOVEMENT: true,
-    LASERS: true,
-    SPAWN_PROTECTION: false,
-  },
-
   SATELLITE_PICKUP: {
     COUNT: 6,
     MOVEMENT: true,
@@ -371,12 +355,11 @@ export const DEBUG = {
   ROIDS: {
     INITIAL_COUNT: 20, // Overrides ROID.INITIAL_ROID_COUNT in debug mode
     MOVEMENT: false,
-    PLACE_ON_BOT: false,
     PLACE_ON_LOCAL_PLAYER: false,
     ALL_LARGE: true, // Force all generated roids to be large size
   },
 
-  // Player positioning settings (Affects local, remote, and bot players)
+  // Player positioning settings (Affects local and remote players)
   PLACE_PLAYERS_NEAR_CENTER: false,
   PLACE_PLAYERS_NEAR_BOUNDARY: false,
 } as const;

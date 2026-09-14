@@ -6,26 +6,23 @@ import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLas
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { canvasManager } from '../../../src/rendering/canvas';
 
-function makePlayer(type: 'local' | 'remote' | 'bot'): Player {
+function makePlayer(type: 'local' | 'remote'): Player {
   return new Player({ id: type, name: type, type, input: new MockPlayerInput() });
 }
 
 test('ticks lifecycle and lasers only for remote players', () => {
   const remote = makePlayer('remote');
   const local = makePlayer('local');
-  const bot = makePlayer('bot');
 
   const remoteLife = vi.spyOn(remote.ship, 'updateLifecycle');
   const remoteLasers = vi.spyOn(remote.ship, 'moveLasers');
   const localLife = vi.spyOn(local.ship, 'updateLifecycle');
-  const botLife = vi.spyOn(bot.ship, 'updateLifecycle');
 
-  advanceRemotePlayerShips([remote, local, bot]);
+  advanceRemotePlayerShips([remote, local]);
 
   expect(remoteLife).toHaveBeenCalledOnce();
   expect(remoteLasers).toHaveBeenCalledTimes(1);
   expect(localLife).not.toHaveBeenCalled();
-  expect(botLife).not.toHaveBeenCalled();
 });
 
 test("a remote player's laser travels instead of freezing at the muzzle", () => {

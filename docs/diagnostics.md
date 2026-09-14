@@ -161,7 +161,7 @@ including HUD and environment probes. Those counts describe API submissions, not
 GPU draws, and remain outside the timed context.
 
 The server runner directly advances `GameEngine` with two real loopback human
-connections and two bots created by the seeded engine. It fixes `Date.now()` and
+connections created by the seeded engine. It fixes `Date.now()` and
 seeds `Math.random()` while using native `performance.now()` for tick samples.
 Natural authoritative simulation remains active, so asteroid, loot, satellite and
 pickup counts before and after the measured ticks are recorded. This direct runner

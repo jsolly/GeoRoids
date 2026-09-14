@@ -30,7 +30,7 @@ test under a different implementation-oriented name.
    event can precede the next loot snapshot.
 
 Place unrelated actors outside the scenario's interaction area. Do not rely on
-ambient bots to damage a target, on a randomly chosen asteroid to survive, or on
+a randomly chosen asteroid to survive, or on
 a fixed sleep to make a shot land. Keep deterministic simulation rules in the
 lower-level tests instead of adding browser aiming and navigation machinery to
 retest them.

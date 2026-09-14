@@ -180,29 +180,29 @@ test('laser and explosion share Sound.play so Sound-off mutes both', () => {
   expect(playSpy).not.toHaveBeenCalled();
 });
 
-test('player and bot lasers use the same laser sound instance', () => {
+test('every laser uses the same laser sound instance', () => {
   expect(getLaserSound()).toBe(getLaserSound());
   expect(getLaserSound()).toBeInstanceOf(Sound);
 });
 
-test('server exploding flag plays once for a bot and a second update does not', async () => {
+test('server exploding flag plays once for a remote and a second update does not', async () => {
   bindGameAudio({
     getListenerPosition: () => listener,
     getViewport: () => viewport,
   });
   const playSpy = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
-  const bot = new Player({
-    id: 'bot-1',
-    name: 'Bot',
-    type: 'bot',
+  const remote = new Player({
+    id: 'remote-1',
+    name: 'Remote',
+    type: 'remote',
     input: new MockPlayerInput(),
   });
-  bot.ship.position = listener;
+  remote.ship.position = listener;
 
-  bot.updateFromServer({ health: 0, exploding: true, deathCause: 'asteroid' });
-  bot.updateFromServer({ health: 0, exploding: true, deathCause: 'asteroid' });
+  remote.updateFromServer({ health: 0, exploding: true, deathCause: 'asteroid' });
+  remote.updateFromServer({ health: 0, exploding: true, deathCause: 'asteroid' });
 
-  expect(bot.ship.exploding).toBe(true);
+  expect(remote.ship.exploding).toBe(true);
   expect(playSpy).toHaveBeenCalledTimes(1);
 });
 

@@ -2,13 +2,11 @@
  * Remote-player presence helpers.
  *
  * The server removes a human on socket close and now also broadcasts
- * `playerLeft`. `handleSnapshotState` still updates entities in place (clearing
- * the map used to make bots flicker), so snapshot pruning remains the
- * fallback if a `playerLeft` is dropped.
+ * `playerLeft`. `handleSnapshotState` still updates entities in place, so snapshot
+ * pruning remains the fallback if a `playerLeft` is dropped.
  *
  * These helpers drop only `type === 'remote'` humans missing from the latest
- * authoritative snapshot. Local and bot entries stay — bots can be omitted
- * from a snapshot without having left the world.
+ * authoritative snapshot. Local entries stay.
  */
 
 /** True when this snapshot row is the local pilot, including a new-id clone. */

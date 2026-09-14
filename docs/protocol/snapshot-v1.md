@@ -30,7 +30,7 @@ Top-level `set` replaces a value, including nested arrays/objects. `clear` delet
 named optional fields. An omitted field is unchanged. Collection patches contain
 `add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
 `order` (complete ID order when membership/order changes). Empty arrays are
-complete empty collections. Removed bots/remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
+complete empty collections. Removed remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
 Harpoon attachments persist until release, delivery, target removal, death or
 excessive cable separation. An explicit null target clears the client's cached
 latch. Reconnection uses authoritative attachment state and never replays an
@@ -54,7 +54,7 @@ Before encoding, the server rounds selected kinematics in its detached wire
 world to four decimal places: asteroid position, velocity and rotation; loot
 position; satellite pickup position, velocity and angle; and projectile
 position, previous position where present, and velocity. Integers and values
-above the safe multiplication cutoff remain exact. Every player/bot field,
+above the safe multiplication cutoff remain exact. Every player field,
 including motion-handoff anchors, remains exact, as do resources, timers,
 counters, asteroid geometry/spin rate and unknown fields. This changes neither
 server simulation nor collision authority. Encoder baselines retain the rounded
@@ -77,7 +77,7 @@ next delta. Backpressure above 1 MiB, failed writes and explicitly requested
 resynchronization force the next send to be full.
 Excluded recipients keep their own baseline. Each recipient receives nearby
 asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
-The crew roster, shared exploration and revealed `mapAssets` remain global.
+The crew roster, shared exploration, completed sectors and revealed `mapAssets` remain global.
 These lightweight furnace and valuable-drop markers supply the universe map;
 they do not require distant asteroid geometry. The outbound budget accommodates
 a fully explored 120,000-unit-wide atlas on late joins and resynchronization.
@@ -128,7 +128,7 @@ UTF-8 application payload bytes from the JSON snapshot envelope, not WebSocket
 transport framing. The transport measurement uses two real loopback clients and
 an owned child server; its native scheduling is nondeterministic and its server
 seed belongs to the server factory. The direct server runner uses two loopback
-humans and two seeded engine-created bots.
+humans.
 
 These measurements describe a fixture and its machine. They do not establish an
 optimization result, a supported device or a supported server capacity.

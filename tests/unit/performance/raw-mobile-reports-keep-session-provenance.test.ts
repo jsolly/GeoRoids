@@ -106,7 +106,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
               {
                 measured: true,
                 counts: Object.fromEntries(
-                  ['humans', 'bots', 'asteroids', 'pickups', 'projectiles'].map((entity) => [
+                  ['humans', 'asteroids', 'pickups', 'projectiles'].map((entity) => [
                     entity,
                     { total: 5, visibleCenters: 3 },
                   ])

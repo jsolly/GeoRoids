@@ -1,4 +1,3 @@
-import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
 import {
@@ -60,21 +59,5 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
     expect(ship.respawnTimer).toBeUndefined();
     expect(ship.spawnProtectionTimer).toBeGreaterThan(SPAWN_PROTECTION_FRAMES - 2);
     expect(ship.lives).toBe(GAME.START_LIVES - 1);
-  });
-
-  test('player and bot ships share the same respawn schedule', () => {
-    const bot = world.engine.createBots(1)?.[0];
-    assert.ok(bot, 'Expected the newly created bot');
-    world.engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
-
-    world.engine.handleShipDamage(bot.id, 'asteroid', bot.health);
-    expect(world.ship(bot.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
-
-    world.tick(EXPLOSION_FRAMES);
-
-    const respawned = world.ship(bot.id);
-    expect(respawned.health).toBe(respawned.maxHealth);
-    expect(respawned.respawnTimer).toBeUndefined();
-    expect(respawned.spawnProtectionTimer).toBeGreaterThan(0);
   });
 });

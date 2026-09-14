@@ -1,9 +1,14 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { WORLD } from '../../shared/world';
+import { sectorBounds } from '../../shared/sectors';
+import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { PALETTE } from '../constants';
 import { PlayerManager } from '../entities/player/PlayerManager';
-import { getWorldExploration, getWorldMapAssets } from '../network/worldExploration';
+import {
+  getCompletedSectors,
+  getWorldExploration,
+  getWorldMapAssets,
+} from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 
@@ -408,6 +413,19 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.arc(0, 0, WORLD.radius, 0, Math.PI * 2);
   context.stroke();
 
+  context.fillStyle = hexToRgba(PALETTE.DANGER, 0.16);
+  context.strokeStyle = hexToRgba(PALETTE.DANGER, 0.7);
+  context.lineWidth = 2 / frame.scale;
+  for (const id of getCompletedSectors()) {
+    const parsed = parseSectorId(id);
+    if (!parsed) {
+      continue;
+    }
+    const bounds = sectorBounds(parsed.x, parsed.y);
+    context.fillRect(bounds.minX, bounds.minY, WORLD.sectorSize, WORLD.sectorSize);
+    context.strokeRect(bounds.minX, bounds.minY, WORLD.sectorSize, WORLD.sectorSize);
+  }
+
   context.strokeStyle = hexToRgba(PALETTE.REMOTE, 0.2);
   context.lineWidth = 1 / frame.scale;
   context.beginPath();
@@ -557,11 +575,7 @@ function drawCrew(context: CanvasRenderingContext2D, frame: MapFrame): number {
       context.fillStyle = hexToRgba(PALETTE.HUD, 0.9);
       context.textAlign = 'left';
       context.textBaseline = 'bottom';
-      context.fillText(
-        player.type === 'bot' ? `${player.name} · bot` : player.name,
-        size * 1.4,
-        -size
-      );
+      context.fillText(player.name, size * 1.4, -size);
     }
     context.restore();
   }
@@ -577,7 +591,7 @@ function updateStatus(revealedAssetCount: number, crewCount: number): void {
     return;
   }
   const exploredCells = getWorldExploration().length;
-  elements.status.textContent = `Sector ${Math.floor(view.center.x / WORLD.sectorSize)},${Math.floor(view.center.y / WORLD.sectorSize)} · X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored sectors`;
+  elements.status.textContent = `Sector ${sectorAt(view.center).x},${sectorAt(view.center).y} · X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored sectors`;
 }
 
 function updateAccessibleLocations(assets: readonly MapAsset[]): void {
@@ -593,7 +607,7 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
     ...players
       .filter((player) => finitePosition(player.ship.position))
       .map((player) => ({
-        name: `${player.name}${player.type === 'local' ? ' (you)' : player.type === 'bot' ? ' (crew bot)' : ' (crew)'}`,
+        name: `${player.name}${player.type === 'local' ? ' (you)' : ' (crew)'}`,
         position: player.ship.position,
       })),
   ];

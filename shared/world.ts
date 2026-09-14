@@ -7,12 +7,41 @@ export const WORLD = {
   interestRadius: 2_800,
   minimapRadius: 1_800,
   depositsPerSector: 24,
+  /** Saved worlds with a different generation reset instead of loading stale progress. */
+  generation: 1,
+  spawnClusterRadius: 150,
+  spawnInset: 220,
 } as const;
+
+const SECTOR_ID_PATTERN = /^-?\d+,-?\d+$/;
+
+export function sectorId(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+export function parseSectorId(id: string): { x: number; y: number } | null {
+  if (!SECTOR_ID_PATTERN.test(id)) {
+    return null;
+  }
+  const [rawX, rawY] = id.split(',');
+  const x = Number(rawX);
+  const y = Number(rawY);
+  if (
+    rawX === undefined ||
+    rawY === undefined ||
+    !Number.isSafeInteger(x) ||
+    !Number.isSafeInteger(y) ||
+    sectorId(x, y) !== id
+  ) {
+    return null;
+  }
+  return { x, y };
+}
 
 export function sectorAt(position: Position): { x: number; y: number; id: string } {
   const x = Math.floor(position.x / WORLD.sectorSize);
   const y = Math.floor(position.y / WORLD.sectorSize);
-  return { x, y, id: `${x},${y}` };
+  return { x, y, id: sectorId(x, y) };
 }
 
 export function nearbyWorldRows<T extends { position: Position }>(

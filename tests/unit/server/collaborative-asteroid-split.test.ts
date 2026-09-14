@@ -89,9 +89,6 @@ async function startWorld(
   }
   await Promise.all(clients.map((client) => client.barrier()));
 
-  for (const bot of server.gameEngine.getAllBots()) {
-    server.gameEngine.removeBot(bot.id);
-  }
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
     server.gameEngine.removeAsteroid(asteroid.id);
   }

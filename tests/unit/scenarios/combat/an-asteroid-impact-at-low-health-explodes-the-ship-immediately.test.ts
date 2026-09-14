@@ -1,4 +1,3 @@
-import assert from 'node:assert/strict';
 import { describe, expect, test } from 'vitest';
 import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
 import { Ship } from '../../../../src/entities/ship/Ship';
@@ -85,21 +84,6 @@ describe('Server view: environmental damage', () => {
       targetPlayerId: bob.id,
       attackerId: 'asteroid',
     });
-
-    world.dispose();
-  });
-
-  test('a bot ship also explodes immediately when an asteroid finishes it', () => {
-    const world = new GameServerWorld();
-    const bots = world.engine.createBots(1);
-    assert.ok(bots);
-    const bot = bots[0];
-    assert.ok(bot);
-    bot.health = LOW_HEALTH;
-    world.engine.handleShipDamage(bot.id, 'asteroid', DAMAGE.ASTEROID_COLLISION);
-
-    expect(world.ship(bot.id).health).toBe(0);
-    expect(world.ship(bot.id).exploding).toBe(true);
 
     world.dispose();
   });

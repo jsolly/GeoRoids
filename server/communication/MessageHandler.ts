@@ -399,7 +399,7 @@ export class MessageHandler {
     if (!activated) {
       return;
     }
-    const entity = this.gameEngine.getPlayer(playerId) ?? this.gameEngine.getBot(playerId);
+    const entity = this.gameEngine.getPlayer(playerId);
     if (!entity) {
       return;
     }

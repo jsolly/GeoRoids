@@ -20,19 +20,19 @@ test('allPlayers returns the same array until the map membership changes', () =>
   expect(cache.allPlayers(players)).toBe(first);
   expect(first[1]?.name).toBe('Retro Castle');
 
-  players.set('c', { type: 'bot', name: 'Bot' });
+  players.set('c', { type: 'remote', name: 'Peer' });
   cache.invalidate();
   const afterAdd = cache.allPlayers(players);
   expect(afterAdd).not.toBe(first);
   expect(afterAdd).toHaveLength(3);
 });
 
-test('remotePlayers skips local and bot entries and is cached', () => {
+test('remotePlayers skips local entries and is cached', () => {
   const cache = new PlayerListCache<{ type: string }>();
   const players = new Map<string, { type: string }>([
     ['local', { type: 'local' }],
     ['remote', { type: 'remote' }],
-    ['bot', { type: 'bot' }],
+    ['other', { type: 'local' }],
   ]);
 
   const remotes = cache.remotePlayers(players);

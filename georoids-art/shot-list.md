@@ -7,7 +7,7 @@ Priority order. Code-drawn Canvas polish lands first; raster/sprite work is late
 | P0 | Palette pass on live draw calls | Ships, roids, lasers, HUD — locked hexes | Code (first PR) |
 | P0 | HUD quieting | Kill debug chrome, shrink score, translucent leaderboard, quiet radar | Code (first PR) |
 | P0 | Laser intensity cap | Thin stroke + capped glow; no bloom wash | Code (first PR) |
-| P1 | Ship outline + thruster polish | Local / remote / bot crew strokes; trail length | Code (first PR) |
+| P1 | Ship outline + thruster polish | Local / remote crew strokes; trail length | Code (first PR) |
 | P1 | Roid stroke tiers | 3 sizes × 3 weights, `#94A3B8` outlines | Code (first PR) |
 | P2 | Title / enter-game screen art | Richer OK; `accent_ui` `#A78BFA` menus only | Art gen → integrate |
 | P2 | Favicon | Local `#5EEAD4` ship glyph on `#000011` | Art gen |

@@ -58,6 +58,11 @@ export class GameStateManager {
     this.pickupMessageTimer = this.PICKUP_MESSAGE_DURATION_FRAMES;
   }
 
+  setNotice(message: string): void {
+    this.pickupMessage = message;
+    this.pickupMessageTimer = this.PICKUP_MESSAGE_DURATION_FRAMES;
+  }
+
   clearPickupMessage(): void {
     this.pickupMessage = '';
     this.pickupMessageTimer = 0;

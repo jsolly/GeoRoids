@@ -17,7 +17,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, and score |
-| teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, bot mining, and persistent exploration |
+| teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, reconnect |
 
 ## Coverage matrix
@@ -34,7 +34,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
-| How do bots and pilots contribute to the shared field? | teamwork, hud-network | server/ai/botController.ts, shared/exploration.ts, shared/furnaces.ts, GameEngine.ts |
+| How do pilots complete a sector and keep the shared field going? | teamwork, hud-network | shared/sectors.ts, shared/exploration.ts, shared/furnaces.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
 
 ## Maintenance rules
@@ -81,8 +81,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   1,200-unit scan range; each qualifying rock keeps that classification while
   it remains in the nearby radar and records the Surveyor player ID for delivery.
   Surveyor passive exploration reaches 650 world units and Hauler passive
-  exploration reaches 260; the chart persists and is shared by every pilot and
-  bot. The local minimap follows the nearby radar, while M or the on-screen Map
+  exploration reaches 260; the chart persists and is shared by every pilot.
+  The local minimap follows the nearby radar, while M or the on-screen Map
   button opens a full-screen universe overview. Pilots stay readable;
   discovered furnace and other important asset markers remain visible on the
   overview while uncharted asteroid, loot, and furnace positions remain hidden.
@@ -105,13 +105,15 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
   lives, score, current ability, and kit. The leaderboard includes every active
-  human and bot.
+  human.
 - A laser detonation of any loot kind removes the drop and leaves every nearby
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
   pickups intercept laser shots and rocks for their owner.
-- Every match includes the configured bot roster in the shared field. Bots mine
-  asteroids and Surveyor bots run automatic scans, so their chart reveals and
-  mineral tags contribute to the same crew loop. Bot labels include “(bot)”.
+- Completing a visited sector (every explorable cell mapped and every asteroid
+  gone) walls it off. Completed-sector walls kill ships like the outer boundary,
+  bounce lasers, and relocate anyone already inside without taking a life.
+  New spawns skip those sectors. Crossing into a new open sector shows a HUD
+  notice, and both maps hatch finished ground.
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.

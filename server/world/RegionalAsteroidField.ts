@@ -14,6 +14,7 @@ export class RegionalAsteroidField {
   private active = new Set<string>();
   private dormant = new Map<string, AsteroidData[]>();
   private changed = new Map<string, AsteroidData[]>();
+  private visited = new Set<string>();
 
   constructor(
     private readonly seed: number,
@@ -79,6 +80,7 @@ export class RegionalAsteroidField {
   }
 
   private load(id: string): AsteroidData[] {
+    this.visited.add(id);
     const cached = this.dormant.get(id) ?? this.store?.loadSector(id);
     if (cached) {
       return cached;
@@ -90,7 +92,11 @@ export class RegionalAsteroidField {
     return this.generate(x, y);
   }
 
-  update(manager: AsteroidManager, observers: readonly Position[]): AsteroidData[] {
+  update(
+    manager: AsteroidManager,
+    observers: readonly Position[],
+    completed: ReadonlySet<string> = new Set()
+  ): AsteroidData[] {
     const wanted = new Map<string, { x: number; y: number }>();
     for (const observer of observers) {
       const start = sectorAt({
@@ -103,13 +109,15 @@ export class RegionalAsteroidField {
       });
       for (let y = start.y; y <= end.y; y++) {
         for (let x = start.x; x <= end.x; x++) {
+          const id = `${x},${y}`;
           if (
+            completed.has(id) ||
             Math.hypot((x + 0.5) * WORLD.sectorSize, (y + 0.5) * WORLD.sectorSize) >
-            WORLD.radius + WORLD.sectorSize
+              WORLD.radius + WORLD.sectorSize
           ) {
             continue;
           }
-          wanted.set(`${x},${y}`, { x, y });
+          wanted.set(id, { x, y });
         }
       }
     }
@@ -187,5 +195,37 @@ export class RegionalAsteroidField {
     this.active.clear();
     this.dormant.clear();
     this.changed.clear();
+    this.visited.clear();
+  }
+
+  isActive(id: string): boolean {
+    return this.active.has(id);
+  }
+
+  hasVisited(id: string): boolean {
+    return (
+      this.visited.has(id) ||
+      this.active.has(id) ||
+      this.dormant.has(id) ||
+      this.store?.loadSector(id) !== undefined
+    );
+  }
+
+  visitedSectorIds(): string[] {
+    const ids = new Set(this.visited);
+    for (const id of this.active) {
+      ids.add(id);
+    }
+    for (const id of this.dormant.keys()) {
+      ids.add(id);
+    }
+    for (const id of this.store?.listSectorIds() ?? []) {
+      ids.add(id);
+    }
+    return [...ids];
+  }
+
+  dormantSectors(): ReadonlyMap<string, AsteroidData[]> {
+    return this.dormant;
   }
 }

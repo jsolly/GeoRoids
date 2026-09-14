@@ -515,54 +515,6 @@ export class GameInteractions {
     });
   }
 
-  /** Snapshot of all bots the client currently knows about. */
-  async getBots(): Promise<
-    Array<{
-      id: string;
-      x: number;
-      y: number;
-      health: number;
-      maxHealth: number;
-      exploding: boolean;
-      r: number;
-    }>
-  > {
-    return await this.page.evaluate(() => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('gameController is not available');
-      }
-      const players = gc.getNetworkManager().getAllPlayers();
-      return players
-        .filter((p) => p.type === 'bot')
-        .map((p) => ({
-          id: p.id,
-          x: p.ship.position.x,
-          y: p.ship.position.y,
-          health: p.ship.health,
-          maxHealth: p.ship.maxHealth,
-          exploding: p.ship.exploding,
-          r: p.ship.r,
-        }));
-    });
-  }
-
-  /** Wait until at least `count` bots are known to the client. */
-  async waitForBots(count: number, timeoutMs = 25000): Promise<void> {
-    await this.page.waitForFunction(
-      (expected) => {
-        const gc = window.gameController;
-        if (!gc) {
-          return false;
-        }
-        const players = gc.getNetworkManager().getAllPlayers();
-        return players.filter((p) => p.type === 'bot').length >= expected;
-      },
-      count,
-      { timeout: timeoutMs }
-    );
-  }
-
   /** Aim the ship at a world point and fire one laser. */
   async fireLaserToward(targetX: number, targetY: number): Promise<void> {
     await this.page.evaluate(
@@ -1101,49 +1053,6 @@ export class GameInteractions {
       }
       return { x: found.ship.position.x, y: found.ship.position.y };
     }, playerId);
-  }
-
-  /** Pin the local ship on a bot so ship-to-ship collision damage applies. */
-  async pinShipOnBot(botId: string, durationMs = 2500): Promise<void> {
-    const deadline = Date.now() + durationMs;
-    while (Date.now() < deadline) {
-      const position = await this.page.evaluate((id) => {
-        const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
-        const bot = players.find((p) => p.id === id);
-        return bot?.ship ? { x: bot.ship.position.x, y: bot.ship.position.y } : null;
-      }, botId);
-      if (!position) {
-        return;
-      }
-      await this.placeShipAt(position.x, position.y);
-      await this.page.waitForTimeout(100);
-    }
-  }
-
-  /** Poll until a bot finishes respawning at full health. */
-  async waitForBotRespawn(botId: string, timeoutMs = 20000): Promise<{ x: number; y: number }> {
-    await this.page.waitForFunction(
-      (id) => {
-        const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
-        const bot = players.find((p) => p.id === id);
-        return Boolean(
-          bot?.ship &&
-            bot.ship.health > 0 &&
-            // The authoritative respawn window survives immediate pickup growth
-            // or new damage; full health is only momentary in the live arena.
-            bot.serverSpawnProtectionTimer > 0 &&
-            !bot.ship.exploding
-        );
-      },
-      botId,
-      { timeout: timeoutMs, polling: 200 }
-    );
-    const bots = await this.getBots();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot) {
-      throw new Error(`Bot ${botId} missing after respawn`);
-    }
-    return { x: bot.x, y: bot.y };
   }
 
   async dieOnceViaBoundary(): Promise<{ x: number; y: number }> {

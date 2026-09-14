@@ -1,16 +1,16 @@
 # Persistent world operations
 
-GeoRoids has one cooperative world with a 60,000-unit radius. It survives empty sessions and server restarts. There is currently no automatic world reset: a month-long run keeps its discoveries and depleted deposits.
+GeoRoids has one cooperative world with a 60,000-unit radius. It survives empty sessions and server restarts. Changing `WORLD.generation` resets saved progress on the next server start so a new expedition can begin.
 
 ## Active regions
 
-The server generates deterministic ore deposits in 2,000-unit sectors. It activates sectors around connected pilots and the crew bots, and pauses distant sectors. Each client receives nearby asteroid, loot, and projectile rows, plus the shared crew roster and exploration changes. Returning to a harvested sector does not replenish its resources.
+The server generates deterministic ore deposits in 2,000-unit sectors. It activates sectors around connected pilots and pauses distant sectors. Each client receives nearby asteroid, loot, and projectile rows, plus the shared crew roster, exploration changes, and completed-sector walls. Returning to a harvested sector does not replenish its resources. A visited, fully mapped, empty sector is completed: ships die on its walls, lasers bounce, and new spawns skip it. Saved worlds store a generation number; a mismatch resets the database instead of loading stale progress.
 
 The local radar spans 3,600 units. Its 125-unit survey cells are permanent shared discoveries. Furnaces are fixed landmarks; a furnace appears on radar after the crew reveals its location. Surveyors passively explore farther and can scan a larger area. Scanned cargo records its Surveyor contributors until consumption, giving each the same full furnace reward as the Hauler.
 
 ## Database and credentials
 
-`server/world/WorldStore.ts` uses SQLite with WAL and full synchronous transactions. The database stores world seed and start time, shared exploration, visited sector contents, and pilot progress. Ordinary flight and partial mining checkpoint every five seconds; terminal asteroid breaks, deliveries, score-bearing loot collections, successful loot blasts, new pilot credentials, and the final player's departure checkpoint immediately. Graceful shutdown checkpoints before closing the database. A hard crash can lose the uncheckpointed ordinary flight or partial-mining interval (normally about five seconds); a committed break or delivery consumes its world object and records its contributor scores in the same transaction.
+`server/world/WorldStore.ts` uses SQLite with WAL and full synchronous transactions. The database stores world seed, start time, generation, completed sectors, shared exploration, visited sector contents, and pilot progress. Ordinary flight and partial mining checkpoint every five seconds; terminal asteroid breaks, deliveries, score-bearing loot collections, successful loot blasts, new pilot credentials, and the final player's departure checkpoint immediately. Graceful shutdown checkpoints before closing the database. A hard crash can lose the uncheckpointed ordinary flight or partial-mining interval (normally about five seconds); a committed break or delivery consumes its world object and records its contributor scores in the same transaction.
 
 A private random bearer token identifies a pilot. The browser stores it locally; the database stores its SHA-256 digest. A valid token restores progress after a browser reload or server restart. Offline Surveyors receive delivery credit on their next return. Clearing browser storage loses that credential. Names and public pilot IDs do not grant access to saved progress. Treat the database and browser credentials as private.
 

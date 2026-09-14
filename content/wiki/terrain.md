@@ -35,6 +35,6 @@ remain available between sessions.
 Contour lines are closest together on steep slopes and farther apart on gentle
 ground. Faint numbers mark relative elevations, including negative values in
 valleys. Watch the contours and changes in motion to tell uphill from downhill.
-Normal hull and mass speed limits still apply, and bots feel the same slope
+Normal hull and mass speed limits still apply, and every ship feels the same slope
 force. Laser paths do not interact with terrain; glints where shots cross contours are
 visual feedback, with no terrain reflection or extra damage.

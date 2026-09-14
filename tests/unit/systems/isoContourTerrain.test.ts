@@ -62,10 +62,10 @@ describe('seeded heightfield is shared', () => {
   test('gameState carries the room seed so late joiners match', () => {
     const engine = new GameEngine(1);
     const state = engine.getGameState();
-    expect(state.terrainSeed).toBe(TERRAIN.DEFAULT_SEED);
+    expect(state.terrainSeed).toBe(1);
     expect(engine.getTerrainSeed()).toBe(getTerrainSeed());
     applyTerrainSeed(state.terrainSeed);
-    expect(getTerrainSeed()).toBe(TERRAIN.DEFAULT_SEED);
+    expect(getTerrainSeed()).toBe(1);
     engine.stopGameLoop();
   });
 });

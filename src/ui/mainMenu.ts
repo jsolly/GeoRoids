@@ -87,7 +87,6 @@ function generateFunNickname(): string {
     'Rogue',
     'Blade',
     'Sword',
-    'Shield',
     'Armor',
     'Helmet',
     'Crown',

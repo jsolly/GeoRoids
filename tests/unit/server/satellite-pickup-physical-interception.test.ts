@@ -40,15 +40,7 @@ describe('satellite pickups intercept physical damage', () => {
   });
 
   function addOwner(): void {
-    engine.addPlayer(
-      'owner',
-      'Owner',
-      new RecordingSocket(),
-      { x: 0, y: 0 },
-      undefined,
-      'surveyor',
-      'ion'
-    );
+    engine.addPlayer('owner', 'Owner', new RecordingSocket(), { x: 0, y: 0 }, 'surveyor');
     engine.updatePlayer('owner', { spawnProtectionTimer: 0 });
     clearAsteroids(engine);
   }
@@ -66,54 +58,22 @@ describe('satellite pickups intercept physical damage', () => {
     return pickup.id;
   }
 
-  function addAttacker(faction: 'ion' | 'ember' = 'ember'): void {
+  function addAttacker(): void {
     engine.addPlayer(
       'attacker',
       'Attacker',
       new RecordingSocket(),
       { x: 1000, y: 1000 },
-      undefined,
-      'surveyor',
-      faction
+      'surveyor'
     );
     engine.updatePlayer('attacker', { spawnProtectionTimer: 0 });
     clearAsteroids(engine);
   }
 
-  test('a pickup intercepts a hostile shot before the owner hull and takes ordinary damage', () => {
+  test('a player laser passes through an owned pickup and its owner hull', () => {
     addOwner();
     const pickupId = attachFirstPickup();
     addAttacker();
-    const ownerHealth = engine.getPlayer('owner')?.health;
-
-    engine.spawnLaser('attacker', { x: 120, y: 0 }, { x: -240, y: 0 });
-    engine.advanceLasersAndResolveHits(1_000);
-
-    expect(engine.getSatellitePickup(pickupId)?.health).toBe(
-      SATELLITE_PICKUP.HEALTH - DAMAGE.LASER_HIT
-    );
-    expect(engine.getPlayer('owner')?.health).toBe(ownerHealth);
-    expect(engine.getServerLasers()).toHaveLength(0);
-  });
-
-  test('a shot that misses the pickup still damages the owner hull', () => {
-    addOwner();
-    const pickupId = attachFirstPickup();
-    addAttacker();
-    const ownerHealth = engine.getPlayer('owner')?.health;
-
-    engine.spawnLaser('attacker', { x: 0, y: -120 }, { x: 0, y: 240 });
-    engine.advanceLasersAndResolveHits(1_000);
-
-    expect(engine.getPlayer('owner')?.health).toBe((ownerHealth ?? 0) - DAMAGE.LASER_HIT);
-    expect(engine.getSatellitePickup(pickupId)?.health).toBe(SATELLITE_PICKUP.HEALTH);
-    expect(engine.getServerLasers()).toHaveLength(0);
-  });
-
-  test('a friendly first-pass shot follows the existing no-friendly-fire rule through the pickup', () => {
-    addOwner();
-    const pickupId = attachFirstPickup();
-    addAttacker('ion');
     const ownerHealth = engine.getPlayer('owner')?.health;
 
     engine.spawnLaser('attacker', { x: 120, y: 0 }, { x: -240, y: 0 });
@@ -124,16 +84,28 @@ describe('satellite pickups intercept physical damage', () => {
     expect(engine.getServerLasers()).toHaveLength(1);
   });
 
-  test('two ordinary shots break the intercepted pickup and the owner stays exposed afterward', () => {
+  test('a player laser that misses the pickup also passes through the owner hull', () => {
     addOwner();
     const pickupId = attachFirstPickup();
     addAttacker();
     const ownerHealth = engine.getPlayer('owner')?.health;
 
-    for (let shot = 0; shot < 2; shot += 1) {
-      engine.spawnLaser('attacker', { x: 120, y: 0 }, { x: -240, y: 0 });
-      engine.advanceLasersAndResolveHits(1_000 + shot);
-    }
+    engine.spawnLaser('attacker', { x: 0, y: -120 }, { x: 0, y: 240 });
+    engine.advanceLasersAndResolveHits(1_000);
+
+    expect(engine.getPlayer('owner')?.health).toBe(ownerHealth);
+    expect(engine.getSatellitePickup(pickupId)?.health).toBe(SATELLITE_PICKUP.HEALTH);
+    expect(engine.getServerLasers()).toHaveLength(1);
+  });
+
+  test('ordinary pickup damage still breaks the pickup while the owner remains unharmed by a player laser', () => {
+    addOwner();
+    const pickupId = attachFirstPickup();
+    addAttacker();
+    const ownerHealth = engine.getPlayer('owner')?.health;
+
+    expect(engine.handleSatellitePickupDamage(pickupId, DAMAGE.LASER_HIT)).not.toBeNull();
+    expect(engine.handleSatellitePickupDamage(pickupId, DAMAGE.LASER_HIT)?.state).toBe('broken');
 
     expect(engine.getSatellitePickup(pickupId)?.state).toBe('broken');
     expect(engine.getSatellitePickup(pickupId)?.health).toBe(0);
@@ -141,7 +113,7 @@ describe('satellite pickups intercept physical damage', () => {
 
     engine.spawnLaser('attacker', { x: 0, y: -120 }, { x: 0, y: 240 });
     engine.advanceLasersAndResolveHits(1_100);
-    expect(engine.getPlayer('owner')?.health).toBe((ownerHealth ?? 0) - DAMAGE.LASER_HIT);
+    expect(engine.getPlayer('owner')?.health).toBe(ownerHealth);
   });
 
   test('an asteroid body damages a loose pickup without protecting a ship globally', () => {
@@ -150,11 +122,11 @@ describe('satellite pickups intercept physical damage', () => {
     assert.ok(pickup);
     engine.addAsteroid(asteroidAt('pickup-rock', pickup.position));
 
-    engine.resolveAuthoritativeCombat(1_000);
+    engine.resolveAuthoritativeCombat();
     expect(engine.getSatellitePickup(pickup.id)?.health).toBe(
       SATELLITE_PICKUP.HEALTH - DAMAGE.LASER_HIT
     );
-    engine.resolveAuthoritativeCombat(1_001);
+    engine.resolveAuthoritativeCombat();
     expect(engine.getSatellitePickup(pickup.id)?.state).toBe('broken');
     expect(engine.getAsteroid('pickup-rock')).toBeDefined();
   });

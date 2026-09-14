@@ -23,7 +23,6 @@ function assertLayoutFitsViewport(
   for (const [name, control] of [
     ['canvas', layout.canvas],
     ['ability', layout.ability],
-    ['shield', layout.shield],
   ] as const) {
     if (!control) {
       throw new Error(`${name} touch control is missing after resize`);
@@ -40,7 +39,7 @@ function assertLayoutFitsViewport(
 }
 
 test(
-  'a mobile pilot sustains steering and autofire, uses ability and shield, then releases on resize and cancellation',
+  'a mobile pilot sustains steering and autofire, uses the ability, then releases on resize and cancellation',
   async () => {
     await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
@@ -63,7 +62,6 @@ test(
     const steer = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const ability = await centerOf(page, '#touch-ability');
-    const shield = await centerOf(page, '#touch-shield');
     const session = await page.context().newCDPSession(page);
     const beforeHold = await readTouchControlState(page);
 
@@ -98,13 +96,6 @@ test(
     const afterAbility = await readTouchControlState(page);
     expect(afterAbility.abilityCooldownFrames).toBeGreaterThan(0);
     expect(afterAbility.thrusting).toBe(true);
-
-    await dispatchTouch(session, 'touchStart', [...held, { ...shield, id: 14 }]);
-    await dispatchTouch(session, 'touchMove', held);
-    await game.waitForAnimationFrames(2);
-    const afterShield = await readTouchControlState(page);
-    expect(afterShield.shieldActive).toBe(true);
-    expect(afterShield.thrusting).toBe(true);
 
     await dispatchTouch(session, 'touchCancel', []);
     await game.waitForAnimationFrames(2);

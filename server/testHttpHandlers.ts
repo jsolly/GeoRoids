@@ -1,22 +1,16 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { logger } from '../setup/serverLogger';
-import { segmentCircleContact } from '../shared/asteroidPhenomena';
-import { GROWTH, radiusFromMass } from '../shared/shipGrowth';
-import type { Position } from '../shared-types';
-import { canDealCombatDamage } from '../src/entities/player/softFactions';
+import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
+import { WORLD } from '../shared/world';
+import { DAMAGE } from '../src/constants';
 import type { WebSocketCore } from './communication/WebSocketCore';
-import type { GameEntity } from './core/EntityManager';
 import type { GameEngine } from './core/GameEngine';
 import type { ServerPerformanceSummary } from './performanceMetrics';
 import { SERVER_RELEASE_ID } from './release';
 
 const TEST_FIXTURE_MAX_BYTES = 1024;
-const TEST_FIXTURE_MAX_COORDINATE = 10_000;
+const TEST_FIXTURE_MAX_COORDINATE = 100_000;
 const TEST_FIXTURE_BODY_TIMEOUT_MS = 2000;
-const BOT_DUEL_TARGET_RADIUS = 820;
-const BOT_DUEL_LANE_COUNT = 24;
-const BOT_DUEL_MIN_DISTANCE = 80;
-const BOT_DUEL_CLEARANCE = 16;
 
 type TestResponder = (status: number, body: Record<string, unknown>) => void;
 
@@ -119,64 +113,6 @@ function readBoundedTestJson(
   });
 }
 
-function findBotDuelLane(
-  gameEngine: GameEngine,
-  player: GameEntity,
-  bot: GameEntity
-): { playerPosition: Position; botPosition: Position } | undefined {
-  const playerRadius = radiusFromMass(player.mass ?? GROWTH.BASE_MASS);
-  const botRadius = radiusFromMass(bot.mass ?? GROWTH.BASE_MASS);
-  const distance = Math.max(BOT_DUEL_MIN_DISTANCE, playerRadius + botRadius + 40);
-  const obstacles = [
-    ...gameEngine
-      .getAllAsteroids()
-      .map((asteroid) => ({ position: asteroid.position, radius: asteroid.size })),
-    ...gameEngine.entityManager
-      .getAllEntities()
-      .filter(
-        (entity) =>
-          entity.id !== player.id &&
-          entity.id !== bot.id &&
-          entity.health > 0 &&
-          !entity.exploding &&
-          entity.respawnTimer === undefined
-      )
-      .map((entity) => ({
-        position: entity.position,
-        radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
-      })),
-    ...gameEngine.getLoot().map((loot) => ({ position: loot.position, radius: loot.radius })),
-  ];
-
-  for (let index = 0; index < BOT_DUEL_LANE_COUNT; index++) {
-    const angle = (index * Math.PI * 2) / BOT_DUEL_LANE_COUNT;
-    const outward = { x: Math.cos(angle), y: Math.sin(angle) };
-    const botPosition = {
-      x: outward.x * BOT_DUEL_TARGET_RADIUS,
-      y: outward.y * BOT_DUEL_TARGET_RADIUS,
-    };
-    const playerPosition = {
-      x: botPosition.x + outward.x * distance,
-      y: botPosition.y + outward.y * distance,
-    };
-    const laneRadius = Math.max(playerRadius, botRadius) + BOT_DUEL_CLEARANCE;
-    if (
-      obstacles.every(
-        (obstacle) =>
-          segmentCircleContact(
-            playerPosition,
-            botPosition,
-            obstacle.position,
-            obstacle.radius + laneRadius
-          ) === undefined
-      )
-    ) {
-      return { playerPosition, botPosition };
-    }
-  }
-  return undefined;
-}
-
 /** Test-only HTTP routes — enabled only in local dev and Vitest, never in production. */
 export function areTestHttpEndpointsEnabled(nodeEnv: string): boolean {
   return nodeEnv === 'test' || nodeEnv === 'development';
@@ -190,7 +126,7 @@ export function buildHealthPayload(
 ): Record<string, unknown> {
   const diagnostics = gameEngine.getDiagnostics();
   return {
-    status: 'healthy',
+    status: gameEngine.isPersistenceHealthy() ? 'healthy' : 'unhealthy',
     releaseId: SERVER_RELEASE_ID,
     timestamp: new Date().toISOString(),
     players: wsCore.getPlayerCount(),
@@ -310,6 +246,7 @@ export function handleTestPlacePlayer(
       respond(409, { error: 'Fixture player motion state unavailable' });
       return;
     }
+    gameEngine.ensureAsteroidField();
     wsCore.getBroadcaster().broadcastGameState();
     respond(200, {
       status: 'placed',
@@ -320,8 +257,8 @@ export function handleTestPlacePlayer(
   });
 }
 
-/** Arrange a real human and hostile bot for one short, unobstructed laser shot. */
-export function handleTestArrangeBotShot(
+/** Arrange a safe crew scene; real inputs and the game loop must produce the outcome. */
+export function handleTestArrangeCrewField(
   req: IncomingMessage,
   res: ServerResponse,
   nodeEnv: string,
@@ -331,78 +268,157 @@ export function handleTestArrangeBotShot(
   if (!acceptTestPost(req, res, nodeEnv)) {
     return;
   }
-  readBoundedTestJson(req, res, (parsed, respond) => {
+  readBoundedTestJson(req, res, (body, respond) => {
     if (
-      !isRecord(parsed) ||
-      Object.keys(parsed).some((key) => key !== 'playerId' && key !== 'botId') ||
-      typeof parsed['playerId'] !== 'string' ||
-      parsed['playerId'].length === 0 ||
-      Buffer.byteLength(parsed['playerId']) > 128 ||
-      typeof parsed['botId'] !== 'string' ||
-      parsed['botId'].length === 0 ||
-      Buffer.byteLength(parsed['botId']) > 128
+      !isRecord(body) ||
+      Object.keys(body).some((key) => key !== 'playerIds' && key !== 'scenario') ||
+      !Array.isArray(body['playerIds']) ||
+      body['playerIds'].length < 1 ||
+      body['playerIds'].length > 4 ||
+      !body['playerIds'].every(
+        (id: unknown) => typeof id === 'string' && id.length > 0 && id.length < 128
+      ) ||
+      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'reflection', 'bot-mining'].includes(
+        String(body['scenario'])
+      )
     ) {
-      respond(400, { error: 'Invalid fixture payload' });
+      respond(400, { error: 'Invalid crew fixture' });
       return;
     }
-
-    const player = gameEngine.getPlayer(parsed['playerId']);
-    const bot = gameEngine.getPlayer(parsed['botId']);
+    const ids = body['playerIds'] as string[];
+    const players = ids.map((id) => gameEngine.getPlayer(id));
     if (
-      player?.type !== 'human' ||
-      player.health <= 0 ||
-      player.exploding ||
-      player.respawnTimer !== undefined
+      new Set(ids).size !== ids.length ||
+      players.some((player) => player?.type !== 'human' || player.exploding || player.health <= 0)
     ) {
-      respond(404, { error: 'Live fixture player not found' });
+      respond(404, { error: 'Live fixture crew unavailable' });
       return;
     }
-    if (bot?.type !== 'bot' || bot.health <= 0 || bot.exploding || bot.respawnTimer !== undefined) {
-      respond(404, { error: 'Live fixture bot not found' });
-      return;
+    const botMining = body['scenario'] === 'bot-mining';
+    gameEngine.prepareDiagnosticWorld(botMining ? 'combat' : 'traversal');
+    const poses: { playerId: string; position: { x: number; y: number }; motionEpoch?: number }[] =
+      [];
+    for (const [index, player] of players.entries()) {
+      if (!player) {
+        throw new Error('Validated crew disappeared');
+      }
+      const position =
+        body['scenario'] === 'boundary'
+          ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+          : body['scenario'] === 'delivery'
+            ? player.kitId === 'hauler'
+              ? { x: 0, y: -360 }
+              : { x: 220, y: -460 }
+            : body['scenario'] === 'reflection'
+              ? { x: -220, y: -460 }
+              : botMining
+                ? { x: index * 120, y: 1000 }
+                : { x: index * 120, y: -360 };
+      if (
+        !gameEngine.playerMotion.placeActorForTesting(
+          player.id,
+          position,
+          gameEngine.getServerTime()
+        )
+      ) {
+        respond(409, { error: 'Crew fixture motion unavailable' });
+        return;
+      }
+      player.angle =
+        body['scenario'] === 'reflection' || body['scenario'] === 'boundary' ? 0 : Math.PI / 2;
+      player.spawnProtectionTimer = body['scenario'] === 'delivery' ? 600 : 0;
+      if (body['scenario'] === 'impact' && index === 0) {
+        player.health = DAMAGE.ASTEROID_COLLISION;
+        player.healthRegenTimer = calculateHealthRegenDelayFrames();
+      }
+      player.abilityCooldownFrames = 0;
+      poses.push({
+        playerId: player.id,
+        position,
+        ...(player.playerMotion ? { motionEpoch: player.playerMotion.epoch } : {}),
+      });
     }
-    if (!canDealCombatDamage(player.factionId, bot.factionId)) {
-      respond(409, { error: 'Fixture bot is not hostile to player' });
-      return;
+    gameEngine.ensureAsteroidField();
+    for (const rock of gameEngine.getAllAsteroids()) {
+      gameEngine.removeAsteroid(rock.id);
     }
-    if (bot.shieldActive || (bot.shieldTime ?? 0) > 0) {
-      respond(409, { error: 'Fixture bot shield is active' });
-      return;
+    for (const [index, bot] of gameEngine.getAllBots().entries()) {
+      if (botMining) {
+        bot.position = { x: index === 0 ? -500 : 500, y: -460 };
+        bot.velocity = { x: 0, y: 0 };
+        bot.angle = index === 0 ? 0 : Math.PI;
+        bot.spawnProtectionTimer = 0;
+        bot.abilityCooldownFrames = 0;
+      } else {
+        gameEngine.removeBot(bot.id);
+      }
     }
-
-    const lane = findBotDuelLane(gameEngine, player, bot);
-    if (!lane) {
-      respond(409, { error: 'No clear fixture firing lane' });
-      return;
+    gameEngine.parkSatellitePickups();
+    const first = poses[0];
+    if (body['scenario'] === 'reflection') {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-reflector',
+        position: { x: 0, y: -460 },
+        velocity: { x: 0, y: 0 },
+        size: 32,
+        health: 75,
+        maxHealth: 75,
+        material: 'metal',
+        rotation: Math.PI / 2,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+        phenomenon: {
+          kind: 'reflective',
+          clusterId: 'crew-fixture-reflector',
+          energy: 0,
+          maxEnergy: 6,
+        },
+      });
+    } else if (body['scenario'] !== 'empty' && body['scenario'] !== 'boundary' && first) {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-ore',
+        position: body['scenario'] === 'impact' ? { ...first.position } : { x: 0, y: -460 },
+        velocity: { x: 0, y: 0 },
+        size: 25,
+        health: body['scenario'] === 'mining' || botMining ? 25 : 75,
+        maxHealth: body['scenario'] === 'mining' || botMining ? 25 : 75,
+        material: body['scenario'] === 'mining' || botMining ? 'ice' : 'metal',
+        rotation: 0,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
     }
-    const playerPlaced = gameEngine.playerMotion.placeActorForTesting(
-      player.id,
-      lane.playerPosition,
-      gameEngine.getServerTime()
-    );
-    if (!playerPlaced) {
-      respond(409, { error: 'Fixture player motion state unavailable' });
-      return;
+    if (botMining) {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-survey-deposit',
+        position: { x: 0, y: -800 },
+        velocity: { x: 0, y: 0 },
+        size: 100,
+        health: 300,
+        maxHealth: 300,
+        material: 'metal',
+        isCollabTarget: true,
+        rotation: 0,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
     }
-    const placedBot = gameEngine.updatePlayer(bot.id, {
-      position: lane.botPosition,
-      velocity: { x: 0, y: 0 },
-      thrusting: false,
-    });
-    if (!placedBot) {
-      respond(409, { error: 'Fixture bot motion state unavailable' });
-      return;
-    }
-
     wsCore.getBroadcaster().broadcastGameState();
     respond(200, {
       status: 'arranged',
-      playerId: player.id,
-      botId: bot.id,
-      playerPosition: lane.playerPosition,
-      botPosition: lane.botPosition,
-      botHealth: bot.health,
-      ...(player.playerMotion ? { motionEpoch: player.playerMotion.epoch } : {}),
+      poses,
+      asteroidId:
+        body['scenario'] === 'empty' || body['scenario'] === 'boundary'
+          ? null
+          : body['scenario'] === 'reflection'
+            ? 'crew-fixture-reflector'
+            : 'crew-fixture-ore',
     });
   });
 }

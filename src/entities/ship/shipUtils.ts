@@ -1,20 +1,9 @@
 import { GROWTH, maxVelocityFromMass, thrustScaleFromMass } from '../../../shared/shipGrowth';
 import type { Position, Velocity } from '../../../shared-types';
-import { DAMAGE, GAME, SHIP } from '../../constants';
+import { GAME, SHIP } from '../../constants';
 import { checkBoundaryCollision } from '../../physics/collision/collisionDetection';
-import {
-  isGenericDeathCause,
-  formatDeathCauseForOverlay as overlayDeathCause,
-} from '../../utils/deathCause';
+import { isGenericDeathCause } from '../../utils/deathCause';
 import { addPositions, createPositionFromAngle } from '../../utils/mathUtils';
-
-/** Overlay copy. Never print "unknown". */
-export function formatDeathCauseForOverlay(
-  cause?: string,
-  resolveName?: (id: string) => string | undefined
-): string | undefined {
-  return overlayDeathCause(cause, resolveName);
-}
 
 /** Minimal ship shape shared by local players, remotes, and bots. */
 interface ShipCollisionState {
@@ -33,7 +22,7 @@ interface SharedShipCombatVisuals extends ShipSpawnProtectionState {
   exploding: boolean;
   explodeTime: number;
   health: number;
-  explode(cause?: string, killerName?: string): void;
+  explode(cause?: string): void;
 }
 
 interface ShipImpactFlashState {
@@ -43,7 +32,7 @@ interface ShipImpactFlashState {
 interface ShipLethalHitState extends ShipImpactFlashState {
   health: number;
   exploding: boolean;
-  takeDamage(amount: number, cause?: string, killerName?: string): void;
+  takeDamage(amount: number, cause?: string): void;
 }
 
 /** Only a positive timer is an active respawn countdown. Omitted or 0 is not dead. */
@@ -135,24 +124,12 @@ export function resolveCombatDeathCause(
   return known ?? 'unknown';
 }
 
-/**
- * Instant-kill environment hit (wall or roid): flash + shared explode path.
- * Player and bot ships both use this — one DRY ship type.
- */
-export function applyShipLethalCollision(
-  ship: ShipLethalHitState,
-  cause: 'boundary' | 'asteroid'
-): void {
+/** Predict wall contact while the server confirms the life loss. */
+export function applyShipBoundaryDeath(ship: ShipLethalHitState): void {
   applyShipImpactFlash(ship);
   if (!ship.exploding) {
-    const damage = cause === 'asteroid' ? DAMAGE.ASTEROID_COLLISION : DAMAGE.BOUNDARY_COLLISION;
-    ship.takeDamage(damage, cause);
+    ship.takeDamage(ship.health, 'boundary');
   }
-}
-
-/** Instant-kill wall contact: flash + shared takeDamage/explode path. */
-export function applyShipBoundaryDeath(ship: ShipLethalHitState, cause = 'boundary'): void {
-  applyShipLethalCollision(ship, cause === 'asteroid' ? 'asteroid' : 'boundary');
 }
 
 /** True when a ship must not report or receive collision damage. */
@@ -199,17 +176,6 @@ export function shouldApplyDamagedHealth(
   isDestroyed: boolean
 ): boolean {
   return isDestroyed || remainingHealth < currentHealth;
-}
-
-export function canTakeCollisionDamage(
-  lastCollisionTime: number,
-  cooldownMs: number = 500
-): boolean {
-  const now = Date.now();
-  if (now - lastCollisionTime < cooldownMs) {
-    return false;
-  }
-  return true;
 }
 
 /** Short phosphor ring so a roid graze is visible before the server health packet. */

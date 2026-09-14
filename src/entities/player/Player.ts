@@ -1,15 +1,14 @@
 import { radiusFromMass } from '../../../shared/shipGrowth';
-import type { Position, ShipKitId, SoftFactionId } from '../../../shared-types';
+import type { Position, ShipKitId } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
 import type { PlayerInput } from '../../input/PlayerInput';
-import { getFactionColor } from '../../utils/colorUtils';
+import { getPlayerColor } from '../../utils/colorUtils';
 import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
 import { applySharedHarpoonLatch } from '../ship/shipAbilities';
 import { applyShipKitToShip } from '../ship/shipKits';
-import { applyShieldSnapshot, clearShield } from '../ship/shipShield';
 import {
   applySharedShipExplodingFlag,
   applySharedShipRespawnCue,
@@ -18,7 +17,6 @@ import {
   isSilentHudReset,
   resolveCombatDeathCause,
 } from '../ship/shipUtils';
-import { parseSoftFactionId } from './softFactions';
 
 function copyVec2(dest: { x: number; y: number }, src: { x: number; y: number }): void {
   dest.x = src.x;
@@ -34,9 +32,8 @@ export class Player {
   lastUpdate: number = Date.now();
   lives: number = GAME.START_LIVES;
   color: string; // Player's unique color for lasers and other visual elements
-  deathCause?: string; // What killed the player (asteroid, boundary, player name, etc.)
+  deathCause?: string; // Environmental death cause
   input: PlayerInput; // Unified input system for all player types
-  factionId?: SoftFactionId;
 
   // For the local player: from the moment it dies until it is confirmed alive
   // again, trust the server for position (so the respawn point is adopted).
@@ -71,20 +68,12 @@ export class Player {
     type: 'local' | 'remote' | 'bot';
     input: PlayerInput;
     kitId?: ShipKitId;
-    factionId?: SoftFactionId;
   }) {
     this.id = params.id;
     this.name = params.name;
     this.type = params.type;
     this.input = params.input;
-    const factionIdValue = parseSoftFactionId(params.factionId);
-    if (factionIdValue !== undefined) {
-      this.factionId = factionIdValue;
-    } else {
-      delete this.factionId;
-    }
-
-    this.color = getFactionColor(this.factionId);
+    this.color = getPlayerColor(this.type);
 
     // Create ship with player's color and friction coefficient
     this.ship = new Ship({
@@ -94,11 +83,6 @@ export class Player {
       frictionCoefficient: this.getFrictionCoefficient(),
       ...(params.kitId !== undefined ? { kitId: params.kitId } : {}),
     });
-    if (this.factionId !== undefined) {
-      this.ship.factionId = this.factionId;
-    } else {
-      delete this.ship.factionId;
-    }
     this.networkState = {
       position: this.ship.position,
       velocity: this.ship.velocity,
@@ -132,36 +116,17 @@ export class Player {
     respawnTimer?: number;
     spawnProtectionTimer?: number;
     kitId?: ShipKitId;
-    factionId?: SoftFactionId;
     abilityCooldownFrames?: number;
     abilityActiveFrames?: number;
 
-    harpoonTimer?: number;
-    harpoonTargetId?: string;
+    harpoonTargetId?: string | null;
     harpoonLatchPos?: { x: number; y: number };
-    shieldActive?: boolean;
-    shieldTime?: number;
-    shieldCooldown?: number;
-    shieldFlashTime?: number;
   }): void {
     // Local selection is established at join. Preserve it during runtime reconciliation.
     if (data.kitId && data.kitId !== this.ship.kitId && this.type !== 'local') {
       const color = this.ship.color;
       applyShipKitToShip(this.ship, data.kitId);
       this.ship.color = color;
-    }
-    if (data.factionId !== undefined) {
-      const factionIdValue = parseSoftFactionId(data.factionId);
-      if (factionIdValue !== undefined) {
-        this.factionId = factionIdValue;
-      } else {
-        delete this.factionId;
-      }
-      if (this.factionId !== undefined) {
-        this.ship.factionId = this.factionId;
-      } else {
-        delete this.ship.factionId;
-      }
     }
     if (data.spawnProtectionTimer !== undefined) {
       this.serverSpawnProtectionTimer = data.spawnProtectionTimer;
@@ -264,8 +229,10 @@ export class Player {
     if (data.thrusting !== undefined && this.type !== 'local') {
       this.ship.thrusting = data.thrusting;
     }
-    this.color = getFactionColor(this.factionId);
-    this.ship.color = this.color;
+    if (data.color !== undefined && this.type !== 'local') {
+      this.color = data.color;
+      this.ship.color = data.color;
+    }
     if (data.health !== undefined) {
       if (isLocal && this.lives <= 0) {
         this.ship.health = 0;
@@ -357,16 +324,10 @@ export class Player {
         this.ship.abilityActiveFrames = data.abilityActiveFrames;
       }
     }
-    applyShieldSnapshot(this.ship, data);
-    applySharedHarpoonLatch(
-      this.ship,
-      {
-        ...(data.harpoonTimer !== undefined ? { harpoonTimer: data.harpoonTimer } : {}),
-        ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
-        ...(data.harpoonLatchPos !== undefined ? { harpoonLatchPos: data.harpoonLatchPos } : {}),
-      },
-      this.type === 'local' ? 'predicting' : 'authoritative'
-    );
+    applySharedHarpoonLatch(this.ship, {
+      ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
+      ...(data.harpoonLatchPos !== undefined ? { harpoonLatchPos: data.harpoonLatchPos } : {}),
+    });
     // Handle respawn timer from server
     if (data.respawnTimer !== undefined) {
       // When respawnTimer is 0, the server has finished the countdown. Remote
@@ -448,7 +409,6 @@ export class Player {
     delete this.deathCause;
     delete this.ship.lastExplodeCause;
     applyShipSpawnProtection(this.ship);
-    clearShield(this.ship);
 
     if (wasDeadOrExploding) {
       playRespawn(this.ship.position);

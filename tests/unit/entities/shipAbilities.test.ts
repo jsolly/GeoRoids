@@ -1,9 +1,6 @@
-import assert from 'node:assert/strict';
-import { expect, test } from 'vitest';
-import { GAME } from '../../../src/constants';
+import { afterEach, expect, test } from 'vitest';
 import {
   bindHarpoonFieldSource,
-  harpoonBodyFromRock,
   publishHarpoonField,
 } from '../../../src/entities/ship/harpoonField';
 import {
@@ -13,13 +10,12 @@ import {
   applySharedHarpoonLatch,
   diagnoseHarpoonLatch,
   findHarpoonTarget,
-  harpoonLatchRange,
   harpoonSurfaceGap,
-  isEnvironmentLatchBody,
   pullHarpoonTarget,
   tickAbilityHost,
 } from '../../../src/entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
+import { attachTowCable, tickTowCable } from '../../../src/entities/ship/towCable';
 
 function host(kitId: AbilityHost['kitId']): AbilityHost {
   return {
@@ -31,23 +27,40 @@ function host(kitId: AbilityHost['kitId']): AbilityHost {
     health: 100,
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
-
-    harpoonTimer: 0,
+    harpoonTargetId: null,
   };
 }
 
-test('Hauler reels only the latched rock toward itself when no enemy or momentum exists', () => {
+afterEach(() => {
+  bindHarpoonFieldSource(null);
+  publishHarpoonField([]);
+});
+
+test('Hauler attaches the nearest rock and only pulls that rock when the cable is taut', () => {
   const hauler = host('hauler');
-  const near = { id: 'near-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } };
-  const far = { id: 'far-rock', position: { x: 200, y: 0 }, velocity: { x: 0, y: 0 } };
-  const result = activateAbilityOnHost(hauler, { asteroids: [near, far], entities: [] });
+  const near: AbilityBody = {
+    id: 'near-rock',
+    position: { x: 80, y: 0 },
+    velocity: { x: 0, y: 0 },
+  };
+  const far: AbilityBody = {
+    id: 'far-rock',
+    position: { x: 200, y: 0 },
+    velocity: { x: 0, y: 0 },
+  };
+  const result = activateAbilityOnHost(hauler, { asteroids: [near, far] });
   expect(result.activated).toBe(true);
   expect(result.abilityId).toBe('harpoon');
   expect(hauler.harpoonTargetId).toBe('near-rock');
-  expect(hauler.harpoonTimer).toBe(SHIP_ABILITY.HARPOON_FRAMES);
+  expect(hauler.harpoonLatchPos).toEqual({ x: 80, y: 0 });
+
+  hauler.position.x = -100;
   pullHarpoonTarget(hauler, [near, far]);
+
+  expect(hauler.harpoonTargetId).toBe('near-rock');
   expect(near.velocity.x).toBeLessThan(0);
   expect(far.velocity.x).toBe(0);
+  expect(Math.abs(near.velocity.x)).toBeLessThan(1);
 });
 
 test('harpoon latches the nearer rock even if a farther rock is ahead', () => {
@@ -61,59 +74,31 @@ test('harpoon latches the nearer rock even if a farther rock is ahead', () => {
 test('non-Hauler kits never latch or haul', () => {
   const surveyor = host('surveyor');
   const rock = { id: 'rock', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } };
-  activateAbilityOnHost(surveyor, { asteroids: [rock], entities: [] });
-  expect(surveyor.harpoonTargetId).toBeUndefined();
-  surveyor.harpoonTimer = 90;
+  expect(activateAbilityOnHost(surveyor, { asteroids: [rock] }).abilityId).toBe('surveyScan');
+  expect(surveyor.harpoonTargetId).toBeNull();
   surveyor.harpoonTargetId = 'rock';
-  surveyor.kitId = 'surveyor';
   pullHarpoonTarget(surveyor, [rock]);
   expect(rock.velocity.x).toBe(0);
-  expect(surveyor.harpoonTimer).toBe(0);
+  expect(surveyor.harpoonTargetId).toBeNull();
 });
 
-test('unpublished canvas still reaches a 1080p-near rock', () => {
-  expect(harpoonLatchRange()).toBeGreaterThanOrEqual(900);
-});
-
-test('zoomed playfields widen local latch range so a visually-near rock hooks', () => {
-  expect(harpoonLatchRange(1)).toBeGreaterThanOrEqual(SHIP_ABILITY.HARPOON_RANGE);
-  expect(harpoonLatchRange(0.25)).toBeGreaterThan(1000);
-  const hauler = host('hauler');
-  const almostNear = {
-    id: 'zoom-rock',
-    position: { x: 400, y: 0 },
-    velocity: { x: 0, y: 0 },
-  };
-  expect(findHarpoonTarget(hauler, [almostNear])).toBeUndefined();
-  expect(findHarpoonTarget(hauler, [almostNear], harpoonLatchRange(0.25))?.id).toBe('zoom-rock');
-});
-
-test('1:1 large canvas latches a rock past the old 320wu / 1600wu #480 cap', () => {
-  const hd = { width: 1920, height: 1080 };
-  expect(harpoonLatchRange(1, hd)).toBeGreaterThan(500);
-  expect(harpoonLatchRange(0.1, hd)).toBeGreaterThan(2000);
-  // #485 kept the 8000wu cap. 1080p at scale 0.1 puts a 900px-near rock at 9000wu.
-  expect(harpoonLatchRange(0.1, hd)).toBeGreaterThan(9000);
+test('physical reach keeps an intake-bound rock near enough to tow', () => {
   const hauler = host('hauler');
   const liveNear = {
     id: 'live-near',
-    position: { x: 520, y: 0 },
+    position: { x: 260, y: 0 },
     velocity: { x: 0, y: 0 },
   };
-  expect(findHarpoonTarget(hauler, [liveNear])).toBeUndefined();
-  expect(findHarpoonTarget(hauler, [liveNear], harpoonLatchRange(1, hd))?.id).toBe('live-near');
+  expect(findHarpoonTarget(hauler, [liveNear])?.id).toBe('live-near');
   const result = activateAbilityOnHost(hauler, {
     asteroids: [liveNear],
-    entities: [],
-    playfieldScale: 1,
-    canvas: hd,
   });
   expect(result.activated).toBe(true);
   expect(hauler.harpoonTargetId).toBe('live-near');
-  expect(hauler.harpoonLatchPos?.x).toBe(520);
+  expect(hauler.harpoonLatchPos?.x).toBe(260);
 });
 
-test('a large rock whose surface is within 280wu latches even if its center is farther', () => {
+test('a large rock whose surface is within range latches even if its center is farther', () => {
   const hauler = host('hauler');
   hauler.r = 19;
   const rock = {
@@ -126,35 +111,19 @@ test('a large rock whose surface is within 280wu latches even if its center is f
   expect(findHarpoonTarget(hauler, [rock])?.id).toBe('big-rock');
 });
 
-test('overlapping a rock still latches (center gap under 1wu)', () => {
+test('overlapping a rock still latches', () => {
   const hauler = host('hauler');
   const rock = { id: 'on-top', position: { x: 0, y: 0 }, velocity: { x: 0, y: 0 }, r: 80 };
   expect(findHarpoonTarget(hauler, [rock])?.id).toBe('on-top');
 });
 
-test('same-side faction does not block a rock with no faction', () => {
-  const hauler = host('hauler');
-  hauler.factionId = 'ember';
-  const rock = { id: 'neutral-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } };
-  const mate = {
-    id: 'mate-bot',
-    position: { x: 240, y: 0 },
-    velocity: { x: 0, y: 0 },
-    factionId: 'ember' as const,
-    health: 100,
-  };
-  expect(findHarpoonTarget(hauler, [mate, rock])?.id).toBe('neutral-rock');
-});
-
 test('Hauler E syncs the live belt so an unpublished field still latches', () => {
   publishHarpoonField([]);
-  bindHarpoonFieldSource(() => ({
-    bodies: [{ id: 'live-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }],
-    playfieldScale: 1,
-  }));
+  bindHarpoonFieldSource(() => [
+    { id: 'live-rock', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } },
+  ]);
   const hauler = host('hauler');
   const result = activateAbilityOnHost(hauler);
-  bindHarpoonFieldSource(null);
   expect(result.activated).toBe(true);
   expect(hauler.harpoonTargetId).toBe('live-rock');
   expect(hauler.harpoonLatchPos?.x).toBe(80);
@@ -162,110 +131,13 @@ test('Hauler E syncs the live belt so an unpublished field still latches', () =>
 
 test('Hauler harpoon whiffs without a rock in range', () => {
   const hauler = host('hauler');
-  const result = activateAbilityOnHost(hauler, { asteroids: [], entities: [] });
+  const result = activateAbilityOnHost(hauler, { asteroids: [] });
   expect(result.activated).toBe(false);
   expect(hauler.abilityCooldownFrames).toBe(0);
-  expect(hauler.harpoonTimer).toBe(0);
+  expect(hauler.harpoonTargetId).toBeNull();
 });
 
-test('Hauler harpoon latches a nearby ship and hauls only that ship', () => {
-  const hauler = host('hauler');
-  hauler.id = 'hauler-1';
-  const near: AbilityBody = {
-    kind: 'ship',
-    id: 'surveyor-1',
-    position: { x: 80, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const far: AbilityBody = {
-    kind: 'ship',
-    id: 'surveyor-2',
-    position: { x: 200, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const result = activateAbilityOnHost(hauler, { asteroids: [], entities: [near, far] });
-  expect(result.activated).toBe(true);
-  expect(hauler.harpoonTargetId).toBe('surveyor-1');
-  pullHarpoonTarget(hauler, [near, far]);
-  expect(near.velocity.x).toBeLessThan(0);
-  expect(far.velocity.x).toBe(0);
-});
-
-test('a rock in reach wins over a closer hostile ship', () => {
-  const hauler = host('hauler');
-  hauler.id = 'hauler-1';
-  const rock = {
-    id: 'rock',
-    position: { x: 220, y: 0 },
-    velocity: { x: 0, y: 0 },
-    kind: 'asteroid' as const,
-  };
-  const foe = {
-    id: 'falcon',
-    position: { x: 50, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    kind: 'ship' as const,
-  };
-  expect(findHarpoonTarget(hauler, [foe, rock], 280)?.id).toBe('rock');
-});
-
-test('an asteroid-tagged rock still latches when a faction field leaked onto it', () => {
-  const hauler = host('hauler');
-  hauler.factionId = 'ion';
-  const rock = {
-    id: 'leaky-rock',
-    position: { x: 80, y: 0 },
-    velocity: { x: 0, y: 0 },
-    kind: 'asteroid' as const,
-    factionId: 'ion' as const,
-  };
-  expect(isEnvironmentLatchBody(rock)).toBe(true);
-  expect(findHarpoonTarget(hauler, [rock])?.id).toBe('leaky-rock');
-});
-
-test('harpoon latches a touching rock instead of a distant forward ship', () => {
-  const hauler = host('hauler');
-  hauler.id = 'hauler-1';
-  hauler.angle = 0;
-  const rockBehind = { id: 'rock', position: { x: -40, y: 0 }, velocity: { x: 0, y: 0 } };
-  const shipAhead = {
-    id: 'foe',
-    position: { x: 90, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    kind: 'ship' as const,
-  };
-  expect(findHarpoonTarget(hauler, [rockBehind, shipAhead])?.id).toBe('rock');
-});
-
-test('harpoonBodyFromRock tags belt rows as asteroid so ship filters cannot reject them', () => {
-  const body = harpoonBodyFromRock({
-    position: { x: 10, y: 4 },
-    velocity: { x: 0, y: 0 },
-    r: 50,
-    health: 0,
-  });
-  assert.ok(body);
-  expect(body.kind).toBe('asteroid');
-  expect(body.id).toMatch(/^rock:/);
-  expect(isEnvironmentLatchBody(body)).toBe(true);
-});
-
-test('an environment rock without an id still latches via pose', () => {
-  const hauler = host('hauler');
-  const rock = { position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 }, r: 40 };
-  expect(isEnvironmentLatchBody(rock)).toBe(true);
-  expect(findHarpoonTarget(hauler, [rock])).toBe(rock);
-  const result = activateAbilityOnHost(hauler, { asteroids: [rock], entities: [] });
-  expect(result.activated).toBe(true);
-  expect(hauler.harpoonTimer).toBeGreaterThan(0);
-  expect(hauler.harpoonLatchPos?.x).toBe(80);
-});
-
-test('a visible rock with health 0 still latches', () => {
+test('a depleted rock is not a tow target', () => {
   const hauler = host('hauler');
   const rock = {
     id: 'chip-rock',
@@ -274,28 +146,23 @@ test('a visible rock with health 0 still latches', () => {
     health: 0,
     r: 40,
   };
-  expect(isEnvironmentLatchBody(rock)).toBe(true);
-  expect(findHarpoonTarget(hauler, [rock])?.id).toBe('chip-rock');
-  const result = activateAbilityOnHost(hauler, { asteroids: [rock], entities: [] });
-  expect(result.activated).toBe(true);
-  expect(hauler.harpoonTimer).toBeGreaterThan(0);
+  expect(findHarpoonTarget(hauler, [rock])).toBeUndefined();
+  expect(activateAbilityOnHost(hauler, { asteroids: [rock] }).activated).toBe(false);
 });
 
-test('pull keeps the latch when the field id is missing so cream VFX stays', () => {
+test('pull clears a latch when its asteroid leaves the authoritative world', () => {
   const hauler = host('hauler');
-  hauler.harpoonTimer = 80;
   hauler.harpoonTargetId = 'server-asteroid-3';
   hauler.harpoonLatchPos = { x: 40, y: 0 };
   pullHarpoonTarget(hauler, []);
-  expect(hauler.harpoonTimer).toBe(80);
-  expect(hauler.harpoonTargetId).toBe('server-asteroid-3');
-  expect(hauler.harpoonLatchPos?.x).toBe(40);
+  expect(hauler.harpoonTargetId).toBeNull();
+  expect(hauler.harpoonLatchPos).toBeUndefined();
 });
 
 test('diagnoseHarpoonLatch reports kit, nearest gap, and chosen target', () => {
   const hauler = host('hauler');
   const rock = { id: 'near-rock', position: { x: 60, y: 0 }, velocity: { x: 0, y: 0 }, r: 20 };
-  const probe = diagnoseHarpoonLatch(hauler, { asteroids: [rock], entities: [] });
+  const probe = diagnoseHarpoonLatch(hauler, { asteroids: [rock] });
   expect(probe.kitId).toBe('hauler');
   expect(probe.canActivate).toBe(true);
   expect(probe.fieldCount).toBe(1);
@@ -303,87 +170,24 @@ test('diagnoseHarpoonLatch reports kit, nearest gap, and chosen target', () => {
   expect(probe.nearest?.reason).toBe('ok');
 });
 
-test('harpoon skips self, same-side mates, and an active shield', () => {
-  const hauler = host('hauler');
-  hauler.id = 'hauler-1';
-  hauler.factionId = 'ion';
-  const self = { id: 'hauler-1', position: { x: 30, y: 0 }, velocity: { x: 0, y: 0 }, health: 100 };
-  const mate = {
-    id: 'mate',
-    position: { x: 40, y: 0 },
-    velocity: { x: 0, y: 0 },
-    factionId: 'ion' as const,
-    health: 100,
-  };
-  const shielded = {
-    id: 'shielded',
-    shieldActive: true,
-    position: { x: 50, y: 0 },
-    velocity: { x: 0, y: 0 },
-    factionId: 'ember' as const,
-    health: 100,
-  };
-  const foe = {
-    id: 'foe',
-    position: { x: 90, y: 0 },
-    velocity: { x: 0, y: 0 },
-    factionId: 'ember' as const,
-    health: 100,
-  };
-  expect(findHarpoonTarget(hauler, [self, mate, shielded, foe])?.id).toBe('foe');
-  expect(findHarpoonTarget(hauler, [self, shielded, foe])?.id).toBe('foe');
-});
-
-test('harpoon skips a timed ship shield', () => {
-  const hauler = host('hauler');
-  hauler.id = 'hauler-1';
-  const shielded = {
-    id: 'surveyor-1',
-    position: { x: 50, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    shieldActive: true,
-  };
-  const foe = {
-    id: 'surveyor-2',
-    position: { x: 90, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  expect(findHarpoonTarget(hauler, [shielded, foe])?.id).toBe('surveyor-2');
-});
-
-test('server latch copies the field pose so the cream tip has a world point', () => {
-  publishHarpoonField([{ id: 'bot-1', position: { x: 90, y: 10 }, velocity: { x: 0, y: 0 } }]);
+test('server latch copies the field pose and explicit null clears it', () => {
+  publishHarpoonField([{ id: 'rock-1', position: { x: 90, y: 10 }, velocity: { x: 0, y: 0 } }]);
   const local = host('hauler');
-  applySharedHarpoonLatch(local, { harpoonTimer: 80, harpoonTargetId: 'bot-1' }, 'predicting');
-  expect(local.harpoonLatchPos?.x).toBe(90);
-  expect(local.harpoonLatchPos?.y).toBe(10);
-  applySharedHarpoonLatch(
-    local,
-    { harpoonTimer: 70, harpoonTargetId: 'bot-1', harpoonLatchPos: { x: 95, y: 12 } },
-    'predicting'
-  );
-  expect(local.harpoonLatchPos?.x).toBe(95);
+  applySharedHarpoonLatch(local, { harpoonTargetId: 'rock-1' });
+  expect(local.harpoonTargetId).toBe('rock-1');
+  expect(local.harpoonLatchPos).toEqual({ x: 90, y: 10 });
+  applySharedHarpoonLatch(local, { harpoonTargetId: null });
+  expect(local.harpoonTargetId).toBeNull();
+  expect(local.harpoonLatchPos).toBeUndefined();
 });
 
-test('local and remote adopt the same server latch', () => {
+test('an omitted server latch field leaves the previous persistent latch alone', () => {
   const local = host('hauler');
-  applySharedHarpoonLatch(local, { harpoonTimer: 80, harpoonTargetId: 'bot-1' }, 'predicting');
-  expect(local.harpoonTargetId).toBe('bot-1');
-  expect(local.harpoonTimer).toBe(80);
-  applySharedHarpoonLatch(local, { harpoonTimer: 0 }, 'predicting');
-  expect(local.harpoonTimer).toBe(80);
-  expect(local.harpoonTargetId).toBe('bot-1');
-
-  const remote = host('hauler');
-  remote.harpoonTimer = 40;
-  remote.harpoonTargetId = 'old';
-  applySharedHarpoonLatch(remote, { harpoonTimer: 80, harpoonTargetId: 'bot-1' }, 'authoritative');
-  expect(remote.harpoonTargetId).toBe('bot-1');
-  applySharedHarpoonLatch(remote, { harpoonTimer: 0 }, 'authoritative');
-  expect(remote.harpoonTimer).toBe(0);
-  expect(remote.harpoonTargetId).toBeUndefined();
+  local.harpoonTargetId = 'rock-1';
+  local.harpoonLatchPos = { x: 90, y: 10 };
+  applySharedHarpoonLatch(local, {});
+  expect(local.harpoonTargetId).toBe('rock-1');
+  expect(local.harpoonLatchPos).toEqual({ x: 90, y: 10 });
 });
 
 test('ability cooldown ticks down', () => {
@@ -394,8 +198,7 @@ test('ability cooldown ticks down', () => {
   expect(surveyor.abilityCooldownFrames).toBe(start - 1);
 });
 
-test('deep-zoom on-screen rock past the old 8000wu cap still latches', () => {
-  const hd = { width: 1920, height: 1080 };
+test('a rock beyond physical reach stays untowable regardless of zoom', () => {
   const hauler = host('hauler');
   const liveNear = {
     id: 'zoom-edge',
@@ -403,202 +206,52 @@ test('deep-zoom on-screen rock past the old 8000wu cap still latches', () => {
     velocity: { x: 0, y: 0 },
     r: 40,
   };
-  const range = harpoonLatchRange(0.1, hd);
-  expect(range).toBeGreaterThan(9000);
-  expect(findHarpoonTarget(hauler, [liveNear], range)?.id).toBe('zoom-edge');
-  const result = activateAbilityOnHost(hauler, {
-    asteroids: [liveNear],
-    entities: [],
-    playfieldScale: 0.1,
-    canvas: hd,
-  });
-  expect(result.activated).toBe(true);
-  expect(hauler.harpoonLatchPos?.x).toBe(9000);
+  expect(findHarpoonTarget(hauler, [liveNear])).toBeUndefined();
+  expect(activateAbilityOnHost(hauler, { asteroids: [liveNear] }).activated).toBe(false);
 });
 
-function slingScene() {
-  const hauler: AbilityHost = { ...host('hauler'), id: 'hauler', factionId: 'ion' };
-  const rock: AbilityBody = {
+test('attaching a tow cable preserves the rock pose and momentum', () => {
+  const hauler = host('hauler');
+  const rock = {
     id: 'rock',
-    kind: 'asteroid',
     position: { x: 80, y: 0 },
-    velocity: { x: 2, y: 0 },
+    velocity: { x: 2, y: -1 },
   };
-  const enemy = (id: string, x: number, y: number): AbilityBody => ({
-    id,
-    kind: 'ship',
-    position: { x, y },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  });
-  return { hauler, rock, enemy };
-}
-
-test('Hauler favors an enemy in the momentum path over a closer sideways or rear enemy', () => {
-  const { hauler, rock, enemy } = slingScene();
-  activateAbilityOnHost(hauler, {
-    asteroids: [rock],
-    entities: [enemy('side', 80, 120), enemy('rear', 20, 0), enemy('ahead', 560, 0)],
-  });
-  expect(rock.velocity.x).toBe(SHIP_ABILITY.HARPOON_SLING_SPEED);
-  expect(rock.velocity.y).toBe(0);
-});
-
-function reelUntilRelease(hauler: AbilityHost, rock: AbilityBody, enemies: AbilityBody[]): void {
-  for (let frame = 0; frame < SHIP_ABILITY.HARPOON_FRAMES; frame++) {
-    pullHarpoonTarget(hauler, [rock, ...enemies]);
-    if (
-      Math.hypot(rock.velocity.x, rock.velocity.y) >= SHIP_ABILITY.HARPOON_SLING_SPEED - 1e-8 &&
-      Math.hypot(rock.position.x - hauler.position.x, rock.position.y - hauler.position.y) <=
-        (hauler.r ?? 20) + (rock.r ?? rock.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP
-    ) {
-      return;
-    }
-    rock.position.x += rock.velocity.x;
-    rock.position.y += rock.velocity.y;
-    tickAbilityHost(hauler);
-  }
-  throw new Error('Rock never reached the Hauler and released');
-}
-
-test('a sideways enemy makes the rock reel before bouncing toward its predicted position', () => {
-  const { hauler, rock, enemy } = slingScene();
-  const moving = enemy('moving', 440, 300);
-  moving.velocity.y = 3;
-  const original = { ...rock.velocity };
-  activateAbilityOnHost(hauler, { asteroids: [rock], entities: [moving] });
-  expect(rock.velocity).toEqual(original);
-  pullHarpoonTarget(hauler, [rock, moving]);
-  expect(rock.velocity.x).toBeLessThan(original.x);
-  expect(rock.velocity.x).toBeGreaterThan(0);
-  expect(rock.velocity.y).toBe(0);
-  reelUntilRelease(hauler, rock, [moving]);
-  const flightTime = (moving.position.x - rock.position.x) / rock.velocity.x;
-  expect(rock.position.y + rock.velocity.y * flightTime).toBeCloseTo(
-    moving.position.y + moving.velocity.y * flightTime
-  );
-  const launched = { ...rock.velocity };
-  moving.velocity.y = -6;
-  for (let frame = 0; frame < SHIP_ABILITY.HARPOON_FRAMES + 1; frame++) {
-    pullHarpoonTarget(hauler, [rock, moving]);
-    tickAbilityHost(hauler);
-  }
-  expect(rock.velocity).toEqual(launched);
-});
-
-test('a nearby enemy in the forward collision corridor does not bend the original momentum', () => {
-  const { hauler, rock, enemy } = slingScene();
-  activateAbilityOnHost(hauler, { asteroids: [rock], entities: [enemy('ahead', 500, 10)] });
-  expect(rock.velocity).toEqual({ x: SHIP_ABILITY.HARPOON_SLING_SPEED, y: 0 });
-});
-
-test('an expired tether stops reeling without a delayed launch', () => {
-  const { hauler, rock, enemy } = slingScene();
-  const enemies = [enemy('side', 80, 300)];
-  activateAbilityOnHost(hauler, { asteroids: [rock], entities: enemies });
-  pullHarpoonTarget(hauler, [rock, ...enemies]);
+  hauler.harpoonTargetId = rock.id ?? null;
+  const position = { ...rock.position };
   const velocity = { ...rock.velocity };
-  hauler.harpoonTimer = 0;
-  pullHarpoonTarget(hauler, [rock, ...enemies]);
+
+  attachTowCable(hauler, rock);
+
+  expect(rock.position).toEqual(position);
   expect(rock.velocity).toEqual(velocity);
 });
 
-test('Hauler ignores allies, self, dead, respawning, shielded, and unreachable enemies', () => {
-  const { hauler, rock, enemy } = slingScene();
-  const excluded: AbilityBody[] = [
-    { ...enemy('ally', 180, 0), factionId: 'ion' },
-    { ...enemy('dead', 180, 0), health: 0 },
-    { ...enemy('exploding', 180, 0), exploding: true },
-    { ...enemy('respawning', 180, 0), respawnTimer: 30 },
-    { ...enemy('spawn', 180, 0), spawnProtectionTimer: 30 },
-    { ...enemy('shield', 180, 0), shieldActive: true },
-    { ...enemy('escaping', 180, 0), velocity: { x: 20, y: 0 } },
-    enemy('distant', 10000, 0),
-    hauler,
-  ];
-  activateAbilityOnHost(hauler, {
-    asteroids: [rock],
-    entities: [...excluded, enemy('valid', 80, 240)],
-  });
-  const valid = enemy('valid', 80, 240);
-  reelUntilRelease(hauler, rock, [...excluded, valid]);
-  expect(rock.velocity.y).toBeGreaterThan(11 * GAME.MOTION_SCALE);
-  expect(rock.velocity.x).toBeGreaterThan(0);
+test('a Hauler E release detaches the tow without a delayed launch', () => {
+  const hauler = host('hauler');
+  const rock: AbilityBody = {
+    id: 'rock',
+    position: { x: 80, y: 0 },
+    velocity: { x: 2, y: 0 },
+  };
+  expect(activateAbilityOnHost(hauler, { asteroids: [rock] }).activated).toBe(true);
+  const beforeRelease = { ...rock.velocity };
+  expect(activateAbilityOnHost(hauler, { asteroids: [rock] }).activated).toBe(true);
+  expect(hauler.harpoonTargetId).toBeNull();
+  tickTowCable(hauler, rock);
+  expect(rock.velocity).toEqual(beforeRelease);
 });
 
-test('A stationary rock reels before choosing the quickest intercept with stable target ties', () => {
-  for (const reverse of [false, true]) {
-    const { hauler, rock, enemy } = slingScene();
-    rock.velocity.x = 0;
-    const enemies = [enemy('b', 80, -240), enemy('a', 80, 240), enemy('far', 560, 0)];
-    activateAbilityOnHost(hauler, {
-      asteroids: [rock],
-      entities: reverse ? enemies.reverse() : enemies,
-    });
-    expect(rock.velocity).toEqual({ x: 0, y: 0 });
-    reelUntilRelease(hauler, rock, enemies);
-    expect(rock.velocity.y).toBeGreaterThan(11 * GAME.MOTION_SCALE);
-  }
-});
-
-test('A fast rock without reachable enemies starts reeling without snapping its momentum', () => {
-  const { hauler, rock } = slingScene();
-  rock.velocity = { x: 15, y: 20 };
-  activateAbilityOnHost(hauler, { asteroids: [rock], entities: [] });
-  expect(rock.velocity).toEqual({ x: 15, y: 20 });
-  pullHarpoonTarget(hauler, [rock]);
-  expect(Math.hypot(rock.velocity.x - 15, rock.velocity.y - 20)).toBeCloseTo(
-    SHIP_ABILITY.HARPOON_REEL_ACCELERATION
-  );
-});
-
-test('a distant visible rock gets enough tether time to reel in and bounce', () => {
-  const { hauler, rock, enemy } = slingScene();
-  rock.position.x = 9000;
-  rock.velocity.x = 0;
-  const target = enemy('target', 300, 400);
-  activateAbilityOnHost(hauler, {
-    asteroids: [rock],
-    entities: [target],
-    playfieldScale: 0.1,
-    canvas: { width: 1920, height: 1080 },
-  });
-  expect(hauler.harpoonTimer).toBeGreaterThan(SHIP_ABILITY.HARPOON_FRAMES);
-  const duration = hauler.harpoonTimer;
-  let released = false;
-  for (let frame = 0; frame < duration; frame++) {
-    pullHarpoonTarget(hauler, [rock, target]);
-    if (rock.velocity.y > 0) {
-      released = true;
-      expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(
-        SHIP_ABILITY.HARPOON_SLING_SPEED
-      );
-      break;
-    }
-    rock.position.x += rock.velocity.x;
-    rock.position.y += rock.velocity.y;
-    tickAbilityHost(hauler);
-  }
-  expect(released).toBe(true);
-});
-
-test('local latch prediction waits for the server to launch the rock', () => {
-  const { hauler, rock } = slingScene();
-  bindHarpoonFieldSource(null);
-  publishHarpoonField([
-    {
-      id: 'rock',
-      kind: 'asteroid',
-      position: rock.position,
-      velocity: rock.velocity,
-    },
-  ]);
-  try {
-    const before = { ...rock.velocity };
-    expect(activateAbilityOnHost(hauler).activated).toBe(true);
-    expect(hauler.harpoonTargetId).toBe('rock');
-    expect(rock.velocity).toEqual(before);
-  } finally {
-    publishHarpoonField([]);
-  }
+test('local latch prediction records the target while leaving server rock momentum alone', () => {
+  const hauler: AbilityHost = { ...host('hauler'), id: 'hauler' };
+  const rock = {
+    id: 'rock',
+    position: { x: 80, y: 0 },
+    velocity: { x: 2, y: 0 },
+  };
+  publishHarpoonField([rock]);
+  const before = { ...rock.velocity };
+  expect(activateAbilityOnHost(hauler).activated).toBe(true);
+  expect(hauler.harpoonTargetId).toBe('rock');
+  expect(rock.velocity).toEqual(before);
 });

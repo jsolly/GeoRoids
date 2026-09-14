@@ -34,7 +34,7 @@ geometry and camera projection remain in CSS pixels.
 | --- | --- | --- |
 | DPR cap 2 | Softer thin lines and text on higher-density screens | Experiment only; compare native resolution |
 | DPR cap 1.5 | Greater softness, particularly distant projectiles and text | Experiment only; compare DPR 2 and native |
-| Glow off | Less luminous hulls, projectiles, shields and effects | Experiment only; compare full glow at the same DPR |
+| Glow off | Less luminous hulls, projectiles, scan pulses and effects | Experiment only; compare full glow at the same DPR |
 
 No measured performance improvement is claimed by the presence of these controls.
 The numerical target is sustained 60 Hz presentation on both physical phones,

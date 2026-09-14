@@ -1,13 +1,20 @@
-import { getSideColor } from '../../shared/factions';
-import type { SoftFactionId } from '../../shared-types';
 import { PALETTE, TITLE } from '../constants';
 
-export function getFactionColor(factionId: SoftFactionId | undefined): string {
-  return factionId ? getSideColor(factionId) : PALETTE.HUD_MUTED;
+type PlayerColorType = 'local' | 'remote' | 'bot';
+
+export function getPlayerColor(type: PlayerColorType): string {
+  switch (type) {
+    case 'local':
+      return PALETTE.LOCAL;
+    case 'bot':
+      return PALETTE.BOT;
+    case 'remote':
+      return PALETTE.REMOTE;
+  }
 }
 
-export function getLaserColor(isLocal: boolean): string {
-  return isLocal ? PALETTE.LASER_LOCAL : PALETTE.LASER_ENEMY;
+export function getLaserColor(): string {
+  return PALETTE.LASER_LOCAL;
 }
 
 const RGBA_ALPHA_BUCKETS = 100;

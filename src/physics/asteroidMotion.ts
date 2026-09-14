@@ -1,17 +1,12 @@
 import { ROID } from '../constants';
 import { getGameBoundary } from './boundary';
 
-/** Shared belt radius: inside the ship-kill wall, near a typical camera. */
+/** Asteroids inhabit the full world; the server activates nearby sectors. */
 export function getAsteroidFieldRadius(): number {
   return Math.min(getGameBoundary().radius, ROID.FIELD_RADIUS);
 }
 
-/**
- * Pull an escaped pose back onto the shared belt along the same ray.
- * Opposite-side wrap at the 3100 arena wall (see #437) parked the field at
- * ~3000px — on the minimap, off the ship camera — which is the >60s empty
- * canvas. Same-ray contain keeps late-join / live-server 10k poses in view.
- */
+/** Return a drifting asteroid inside the circular world at its outer edge. */
 export function containAsteroidPositionInto(
   dest: { x: number; y: number },
   x: number,
@@ -27,7 +22,7 @@ export function containAsteroidPositionInto(
     dest.y = y;
     return dest;
   }
-  const scale = (radius * ROID.FIELD_INNER_SCALE) / dist;
+  const scale = (radius - 1e-5) / dist;
   dest.x = cx + dx * scale;
   dest.y = cy + dy * scale;
   return dest;

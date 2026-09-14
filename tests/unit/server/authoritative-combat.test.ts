@@ -60,7 +60,7 @@ describe('server-authoritative combat', () => {
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid());
 
-    const results = engine.resolveAuthoritativeCombat(1_000);
+    const results = engine.resolveAuthoritativeCombat();
     const player = engine.getPlayer('p1');
 
     expect(results).toHaveLength(1);
@@ -70,14 +70,7 @@ describe('server-authoritative combat', () => {
   });
 
   test('an active Hauler harpoon protects its owner from the attached asteroid', () => {
-    engine.addPlayer(
-      'hauler',
-      'Hauler',
-      new RecordingSocket(),
-      { x: 0, y: 0 },
-      undefined,
-      'hauler'
-    );
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
@@ -86,24 +79,16 @@ describe('server-authoritative combat', () => {
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     expect(hauler?.harpoonTargetId).toBe('attached');
-    expect(hauler?.harpoonTimer).toBeGreaterThan(0);
 
     const healthBefore = hauler.health;
-    engine.resolveAuthoritativeCombat(1_000);
+    engine.resolveAuthoritativeCombat();
 
     expect(hauler.health).toBe(healthBefore);
     expect(engine.getAsteroid('attached')).toBeDefined();
   });
 
   test('an active Hauler harpoon does not protect its owner from another asteroid', () => {
-    engine.addPlayer(
-      'hauler',
-      'Hauler',
-      new RecordingSocket(),
-      { x: 0, y: 0 },
-      undefined,
-      'hauler'
-    );
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
@@ -114,7 +99,7 @@ describe('server-authoritative combat', () => {
     expect(hauler.harpoonTargetId).toBe('attached');
     engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: 0, y: 0 } }));
     const healthBefore = hauler.health;
-    engine.resolveAuthoritativeCombat(1_000);
+    engine.resolveAuthoritativeCombat();
 
     expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
     expect(engine.getAsteroid('attached')).toBeDefined();
@@ -122,14 +107,7 @@ describe('server-authoritative combat', () => {
   });
 
   test('an attached overlapping rock does not mask a second overlapping rock', () => {
-    engine.addPlayer(
-      'hauler',
-      'Hauler',
-      new RecordingSocket(),
-      { x: 0, y: 0 },
-      undefined,
-      'hauler'
-    );
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
@@ -139,58 +117,16 @@ describe('server-authoritative combat', () => {
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     const healthBefore = hauler.health;
-    engine.resolveAuthoritativeCombat(1_000);
+    engine.resolveAuthoritativeCombat();
 
     expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
     expect(engine.getAsteroid('attached')).toBeDefined();
     expect(engine.getAsteroid('unrelated')).toBeUndefined();
   });
 
-  test('harpoon expiration restores the owner collision with its former target', () => {
-    engine.addPlayer(
-      'hauler',
-      'Hauler',
-      new RecordingSocket(),
-      { x: 0, y: 0 },
-      undefined,
-      'hauler'
-    );
-    clearProtection(engine, 'hauler');
-    clearAsteroidField(engine);
-    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
-
-    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
-    const hauler = engine.getPlayer('hauler');
-    assert.ok(hauler, 'hauler');
-    hauler.harpoonTimer = 1;
-    const healthBefore = hauler.health;
-    engine.tickAbilities(1_000);
-
-    expect(hauler.harpoonTimer).toBe(0);
-    expect(hauler.harpoonTargetId).toBeUndefined();
-    engine.resolveAuthoritativeCombat(1_000);
-
-    expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
-    expect(engine.getAsteroid('attached')).toBeUndefined();
-  });
-
   test('an attached asteroid still damages and breaks for another overlapping pilot', () => {
-    engine.addPlayer(
-      'hauler',
-      'Hauler',
-      new RecordingSocket(),
-      { x: 0, y: 0 },
-      undefined,
-      'hauler'
-    );
-    engine.addPlayer(
-      'pilot',
-      'Pilot',
-      new RecordingSocket(),
-      { x: 39, y: 0 },
-      undefined,
-      'surveyor'
-    );
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, 'surveyor');
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'pilot');
     clearAsteroidField(engine);
@@ -204,7 +140,7 @@ describe('server-authoritative combat', () => {
     const haulerHealth = hauler.health;
     const pilotHealth = pilot.health;
 
-    engine.resolveAuthoritativeCombat(1_000);
+    engine.resolveAuthoritativeCombat();
 
     expect(hauler.health).toBe(haulerHealth);
     expect(pilot.health).toBe(pilotHealth - DAMAGE.LASER_HIT);
@@ -222,37 +158,16 @@ describe('server-authoritative combat', () => {
     });
     engine.addAsteroid(testAsteroid({ id: 'server-asteroid-bot', position: { x: 10, y: 0 } }));
 
-    engine.resolveAuthoritativeCombat(2_000);
+    engine.resolveAuthoritativeCombat();
     expect(engine.getBot(bot.id)?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
     expect(engine.getAsteroid('server-asteroid-bot')).toBeUndefined();
-  });
-
-  test('two overlapping humans take the same ship-ship tick', () => {
-    engine.addPlayer('nova', 'Nova', new RecordingSocket(), { x: 0, y: 0 });
-    engine.addPlayer('retro', 'Retro', new RecordingSocket(), { x: 4, y: 0 });
-    clearProtection(engine, 'nova');
-    clearProtection(engine, 'retro');
-    clearAsteroidField(engine);
-
-    const first = engine.resolveAuthoritativeCombat(10_000);
-    expect(first).toHaveLength(2);
-    expect(engine.getPlayer('nova')?.health).toBe(SHIP.MAX_HEALTH - 1);
-    expect(engine.getPlayer('retro')?.health).toBe(SHIP.MAX_HEALTH - 1);
-
-    expect(engine.resolveAuthoritativeCombat(10_049)).toHaveLength(0);
-    expect(engine.getPlayer('nova')?.health).toBe(SHIP.MAX_HEALTH - 1);
-
-    const second = engine.resolveAuthoritativeCombat(10_050);
-    expect(second).toHaveLength(2);
-    expect(engine.getPlayer('nova')?.health).toBe(SHIP.MAX_HEALTH - 2);
-    expect(engine.getPlayer('retro')?.health).toBe(SHIP.MAX_HEALTH - 2);
   });
 
   test('spawn protection blocks server ram for humans', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.addAsteroid(testAsteroid());
 
-    engine.resolveAuthoritativeCombat(3_000);
+    engine.resolveAuthoritativeCombat();
     expect(engine.getPlayer('p1')?.health).toBe(SHIP.MAX_HEALTH);
     expect(engine.getAsteroid('server-asteroid-0')).toBeDefined();
   });
@@ -265,7 +180,7 @@ describe('server-authoritative combat', () => {
     clearProtection(engine, 'p1');
 
     for (let hit = 0; hit < 4; hit++) {
-      engine.handleShipDamage('p1', 'asteroid', DAMAGE.LASER_HIT, 'collision');
+      engine.handleShipDamage('p1', 'asteroid', DAMAGE.LASER_HIT);
     }
     for (let frame = 0; frame < SHIP.RESPAWN_DELAY_FRAMES; frame++) {
       engine.advanceCombatFrame();
@@ -304,21 +219,21 @@ describe('server-authoritative combat', () => {
     wsCore.handleClientMessage(
       {
         type: 'collisionDamage',
-        data: { targetPlayerId: 'nova', attackerId: 'asteroid', damage: 25 },
+        data: { targetPlayerId: 'nova', attackerId: 'asteroid' },
       },
       novaWs
     );
     wsCore.handleClientMessage(
       {
         type: 'collisionDamage',
-        data: { targetPlayerId: 'nova', attackerId: 'retro', damage: 1 },
+        data: { targetPlayerId: 'nova', attackerId: 'retro' },
       },
       novaWs
     );
     wsCore.handleClientMessage(
       {
         type: 'collisionDamage',
-        data: { targetPlayerId: 'retro', attackerId: 'asteroid', damage: 25 },
+        data: { targetPlayerId: 'retro', attackerId: 'asteroid' },
       },
       retroWs
     );
@@ -389,11 +304,6 @@ describe('server-authoritative combat', () => {
     );
     expect(engine.getPlayer('beta')?.position).toEqual({ x: 100, y: 0 });
     expect(engine.getPlayer('alpha')?.position).toEqual({ x: 0, y: 0 });
-
-    wsCore.handleClientMessage({ type: 'shield', id: 'beta', data: { active: true } }, alphaWs);
-    wsCore.handleClientMessage({ type: 'shield', id: 'alpha', data: { active: true } }, unjoinedWs);
-    expect(engine.getPlayer('beta')?.shieldActive).toBe(false);
-    expect(engine.getPlayer('alpha')?.shieldActive).toBe(false);
 
     wsCore.handleClientMessage(
       {
@@ -480,7 +390,7 @@ describe('server-authoritative combat', () => {
     wsCore.handleClientMessage(
       {
         type: 'collisionDamage',
-        data: { targetPlayerId: 'nova', attackerId: 'boundary', damage: 100 },
+        data: { targetPlayerId: 'nova', attackerId: 'boundary' },
       },
       novaWs
     );

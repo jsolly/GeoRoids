@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { KILL_SCORE } from '../../../server/core/combatScoring';
 import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { DAMAGE, DEBUG, SHIP } from '../../../src/constants';
@@ -35,7 +34,7 @@ describe('server bot damage and lifecycle scenarios', () => {
     const targetHealth = target.health;
     const bystanderHealth = bystander.health;
 
-    const destroyed = engine.handleBotDamage(target.id, 'asteroid', DAMAGE.LASER_HIT);
+    const destroyed = engine.handleShipDamage(target.id, 'asteroid', DAMAGE.LASER_HIT).isDestroyed;
 
     expect(destroyed).toBe(false);
     expect(target.health).toBe(targetHealth - DAMAGE.LASER_HIT);
@@ -49,7 +48,7 @@ describe('server bot damage and lifecycle scenarios', () => {
     const healthBeforeHit = target.health;
     target.spawnProtectionTimer = 1;
 
-    const destroyed = engine.handleBotDamage(target.id, 'asteroid', DAMAGE.LASER_HIT);
+    const destroyed = engine.handleShipDamage(target.id, 'asteroid', DAMAGE.LASER_HIT).isDestroyed;
 
     expect(destroyed).toBe(false);
     if (DEBUG.BOT_PLAYER.SPAWN_PROTECTION) {
@@ -64,13 +63,15 @@ describe('server bot damage and lifecycle scenarios', () => {
     delete target.spawnProtectionTimer;
     const overkill = target.health + 50;
 
-    expect(engine.handleBotDamage(target.id, 'asteroid', overkill)).toBe(true);
+    expect(engine.handleShipDamage(target.id, 'asteroid', overkill).isDestroyed).toBe(true);
     expect(target.health).toBe(0);
     expect(target.exploding).toBe(true);
     expect(target.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES);
     expect(target.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
 
-    expect(engine.handleBotDamage(target.id, 'asteroid', DAMAGE.LASER_HIT)).toBe(false);
+    expect(engine.handleShipDamage(target.id, 'asteroid', DAMAGE.LASER_HIT).isDestroyed).toBe(
+      false
+    );
     expect(target.health).toBe(0);
     expect(target.exploding).toBe(true);
   });
@@ -78,8 +79,7 @@ describe('server bot damage and lifecycle scenarios', () => {
   test('explicit explosion and respawn ticks restore the bot with protection and its anchor', () => {
     const [target] = createBotPair(engine);
     delete target.spawnProtectionTimer;
-    const factionBeforeDeath = target.factionId;
-    expect(engine.handleBotDamage(target.id, 'asteroid', target.health)).toBe(true);
+    expect(engine.handleShipDamage(target.id, 'asteroid', target.health).isDestroyed).toBe(true);
 
     expect(engine.entityManager.updateExplosions()).toEqual([]);
     expect(target.explodeTime).toBe(SHIP.EXPLODE_DURATION_FRAMES - 1);
@@ -99,35 +99,23 @@ describe('server bot damage and lifecycle scenarios', () => {
     expect(target.health).toBe(target.maxHealth);
     expect(target.exploding).toBe(false);
     expect(target.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
-    expect(target.factionId).toBe(factionBeforeDeath);
-  });
-
-  test('a bot kill credits the named bot attacker and preserves the target life count', () => {
-    const [target, attacker] = createBotPair(engine);
-    delete target.spawnProtectionTimer;
-    delete attacker.spawnProtectionTimer;
-    const livesBefore = target.lives;
-
-    expect(engine.handleBotDamage(target.id, attacker.id, target.health)).toBe(true);
-
-    expect(attacker.score).toBe(KILL_SCORE.bot);
-    expect(target.lives).toBe(livesBefore);
-    expect(target.deathCause).toBe(attacker.id);
   });
 
   test('missing, zero, and negative bot damage retain their explicit edge behavior', () => {
-    expect(engine.handleBotDamage('missing-bot', 'asteroid', DAMAGE.LASER_HIT)).toBe(false);
+    expect(engine.handleShipDamage('missing-bot', 'asteroid', DAMAGE.LASER_HIT).isDestroyed).toBe(
+      false
+    );
 
     const [target] = createBotPair(engine);
     delete target.spawnProtectionTimer;
     const initialHealth = target.health;
 
-    expect(engine.handleBotDamage(target.id, 'asteroid', 0)).toBe(false);
+    expect(engine.handleShipDamage(target.id, 'asteroid', 0).isDestroyed).toBe(false);
     expect(target.health).toBe(initialHealth);
 
-    expect(engine.handleBotDamage(target.id, 'asteroid', 30)).toBe(false);
+    expect(engine.handleShipDamage(target.id, 'asteroid', 30).isDestroyed).toBe(false);
     expect(target.health).toBe(initialHealth - 30);
-    expect(engine.handleBotDamage(target.id, 'asteroid', -20)).toBe(false);
+    expect(engine.handleShipDamage(target.id, 'asteroid', -20).isDestroyed).toBe(false);
     expect(target.health).toBe(initialHealth - 10);
   });
 });

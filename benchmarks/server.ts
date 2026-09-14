@@ -353,9 +353,7 @@ export async function runServerSample(
         `Benchmark Pilot ${index}`,
         peer,
         participantPosition(index, options.humanPlayers),
-        '#89aaff',
-        'surveyor',
-        index % 2 === 0 ? 'ion' : 'ember'
+        'surveyor'
       );
       participantIds.push(id);
     }

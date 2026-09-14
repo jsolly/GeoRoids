@@ -95,7 +95,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       local.ship.blinkOn = false;
       local.ship.spawnProtectionTimer = 0;
       const totalFrames = options.warmupFrames + options.measuredFrames;
-      local.ship.shieldCooldown = totalFrames + 10;
       const belt = game.getCurrRoidBelt();
       for (let index = 0; index < 24; index++) {
         const angle = (index / 24) * Math.PI * 2;
@@ -174,7 +173,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             health: local.ship.health,
             lives: local.lives,
             exploding: local.ship.exploding,
-            shieldCooldown: local.ship.shieldCooldown,
           },
           asteroids: belt.roids.map((roid) => ({
             id: roid.id,
@@ -343,7 +341,6 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         after.local.exploding ||
         after.local.position.x !== 0 ||
         after.local.position.y !== 0 ||
-        after.local.shieldCooldown !== 10 ||
         after.asteroids.length !== 24 ||
         after.loot.length !== 6 ||
         after.pickups.length !== 6
@@ -445,7 +442,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           LootField.getInstance().getAll(),
           SatellitePickupManager.getInstance().getAll()
         );
-        drawScoreOverlay(ctx, layout, canvas, local.score, local.lives, local.factionId);
+        drawScoreOverlay(ctx, layout, canvas, local.score, local.lives);
         drawLivesIndicator(ctx, layout, local.lives, PALETTE.LOCAL, local.ship.kitId);
         drawTextOverlay(ctx, layout, canvas, 'Game Over: killed by Benchmark Rival', 1);
         const rival = entityFactory.createRemotePlayer(

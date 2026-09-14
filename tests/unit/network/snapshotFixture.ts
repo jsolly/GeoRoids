@@ -1,10 +1,13 @@
 import { SATELLITE_PROFILES } from '../../../shared/eoSatellites';
+import { EMPTY_EXPLORATION } from '../../../shared/exploration';
 import type { AsteroidMaterial, ServerGameSnapshot, ShipKitId } from '../../../shared-types';
 
 export function snapshotFixture(tick = 0): ServerGameSnapshot {
   const kits: ShipKitId[] = ['surveyor', 'hauler'];
   const materials: AsteroidMaterial[] = ['ice', 'metal', 'rubble'];
   return {
+    exploration: EMPTY_EXPLORATION,
+    mapAssets: [],
     entities: Array.from({ length: 10 }, (_, i) => {
       const kitId = kits[i % kits.length];
       if (!kitId) {
@@ -27,15 +30,8 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
 
         mass: 4,
         kitId,
-        factionId: i % 2 ? 'ion' : 'ember',
         abilityCooldownFrames: 0,
         abilityActiveFrames: 0,
-
-        harpoonTimer: 0,
-        shieldActive: false,
-        shieldTime: 0,
-        shieldCooldown: 0,
-        shieldFlashTime: 0,
       };
     }),
     asteroids: Array.from({ length: 80 }, (_, i) => {

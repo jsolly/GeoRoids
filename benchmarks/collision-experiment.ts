@@ -2,12 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import {
-  type CombatCircle,
-  circlesOverlap,
-  findShipAsteroidOverlaps,
-  findShipShipPairs,
-} from '../shared/combat';
+import { type CombatCircle, circlesOverlap, findShipAsteroidOverlaps } from '../shared/combat';
 import { type Measurement, validateMeasurement } from './results';
 
 // Experiment only. Preserve source-array priority, including first asteroid per ship.
@@ -46,11 +41,9 @@ function grid(items: CombatCircle[]) {
 }
 function indexed(ships: CombatCircle[], rocks: CombatCircle[]) {
   const queryRocks = grid(rocks);
-  const queryShips = grid(ships);
   const hits: ReturnType<typeof findShipAsteroidOverlaps> = [];
-  const pairs: ReturnType<typeof findShipShipPairs> = [];
   let candidates = 0;
-  for (const [i, ship] of ships.entries()) {
+  for (const ship of ships) {
     if (ship.immune) {
       continue;
     }
@@ -63,22 +56,8 @@ function indexed(ships: CombatCircle[], rocks: CombatCircle[]) {
         break;
       }
     }
-    for (const j of queryShips(ship)) {
-      if (j <= i) {
-        continue;
-      }
-      const other = ships[j];
-      assert(other);
-      if (other.immune) {
-        continue;
-      }
-      candidates++;
-      if (circlesOverlap(ship.position, ship.radius, other.position, other.radius)) {
-        pairs.push({ a: ship.id, b: other.id });
-      }
-    }
   }
-  return { hits, pairs, candidates };
+  return { hits, candidates };
 }
 let seed = 42;
 function random() {
@@ -107,11 +86,9 @@ for (const span of [2000, 200]) {
     for (const { ships, rocks } of worlds) {
       const found = indexed(ships, rocks);
       assert.deepEqual(found.hits, findShipAsteroidOverlaps(ships, rocks));
-      assert.deepEqual(found.pairs, findShipShipPairs(ships));
     }
     const simple = (world: (typeof worlds)[number]) => ({
       hits: findShipAsteroidOverlaps(world.ships, world.rocks),
-      pairs: findShipShipPairs(world.ships),
     });
     const accelerated = (world: (typeof worlds)[number]) => indexed(world.ships, world.rocks);
     const baseline: number[] = [];
@@ -130,7 +107,7 @@ for (const span of [2000, 200]) {
       primaryMetric: 'baselineBatchMeanMs',
       samples: { baselineBatchMeanMs: baseline, candidateBatchMeanMs: candidate },
       counts: { worlds: worlds.length, ships: count, rocks: 80, matchedOutcomes: worlds.length },
-      parameters: { seed: 42, span, cell: CELL, scenarioVersion: 1 },
+      parameters: { seed: 42, span, cell: CELL, scenarioVersion: 2 },
       witness: { identicalCollisionPriority: true },
       cleanup: 'complete',
     };

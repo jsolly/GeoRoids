@@ -2,7 +2,7 @@
 title: Terrain and the boundary
 category: Arena
 summary: Contour lines reveal slopes that change your motion. The outer wall
-  damages ships that cross it.
+  destroys ships that cross it.
 order: 120
 related:
   - content/wiki/controls.md
@@ -16,16 +16,19 @@ media:
 
 ## Read the landscape
 
-The arena contains hills, valleys, and saddles, with a flat spawn area at the
-center. Pilots in the same room share the same terrain. Slopes accelerate your
-ship downhill and resist travel uphill, even with automatic thrust. Steering
-redirects normal momentum toward the nose before the slope force acts. Terrain
-itself does not deal damage.
+The open world contains hills, valleys, and saddles, with a flat starter area at
+the center. Pilots in the same world share the same terrain. The server loads
+nearby world sectors as the crew travels, while the minimap keeps the local
+radar readable. Slopes accelerate your ship downhill and resist travel uphill,
+even with automatic thrust. Steering redirects normal momentum toward the nose
+before the slope force acts. Terrain itself does not deal damage.
 
-The circular arena is 6,000 units across with a 100 unit buffer; the damaging
-boundary comes from that geometry. The asteroid belt uses a separate radius.
-Crossing the boundary deals damage per impact; a healthy heavy hull can survive
-the first hit, but staying outside remains dangerous.
+The world is circular. Asteroids bounce inward at the outer boundary, keeping
+the remaining deposits in the world. Lasers reflect off the wall and can mine
+asteroids on their returning path; reflected crew lasers remain harmless to
+ships. Crossing the boundary destroys a vulnerable ship regardless of its
+health or mass and costs one life. Regional terrain and furnace landmarks
+remain available between sessions.
 
 ## Slope and contours
 

@@ -25,12 +25,13 @@ test('Enter Game is an outline phosphor control in the title menu', () => {
   expect(start?.classList.contains('btn-success')).toBe(false);
 });
 
-test('title menu presents the keyboard and E/F control hint', () => {
+test('title menu presents the keyboard and ability control hint', () => {
   const hint = document.getElementById('controls-hint');
   expect(hint?.closest('#start-screen')).toBeTruthy();
-  expect(hint?.textContent).toContain('WASD + Space / arrows');
+  expect(hint?.textContent).toContain('Always thrust');
+  expect(hint?.textContent).toContain('Space fires');
   expect(hint?.textContent).toContain('E ability');
-  expect(hint?.textContent).toContain('F shield');
+  expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
 });
 
 test('title menu exposes the ship kit picker before entering play', () => {
@@ -57,7 +58,7 @@ test('play view keeps the controls hint in title chrome and toggles the game are
   expect(gameArea?.style.display).toBe('none');
 });
 
-test('play shell creates the full touch overlay with semantic action buttons', () => {
+test('play shell creates the touch ability overlay with a semantic action button', () => {
   initializeTouchControls();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
@@ -67,13 +68,9 @@ test('play shell creates the full touch overlay with semantic action buttons', (
   expect(document.body.classList.contains('touch-play')).toBe(true);
   const root = document.getElementById('touch-controls');
   expect(root?.hidden).toBe(false);
-  for (const id of ['touch-ability', 'touch-shield']) {
-    expect(document.getElementById(id)).toBeTruthy();
-  }
-  for (const id of ['touch-ability', 'touch-shield']) {
-    const action = document.getElementById(id);
-    expect(action?.tagName).toBe('BUTTON');
-    expect(action?.getAttribute('type')).toBe('button');
-    expect(action?.getAttribute('aria-label')).toBeTruthy();
-  }
+  const action = document.getElementById('touch-ability');
+  expect(action?.tagName).toBe('BUTTON');
+  expect(action?.getAttribute('type')).toBe('button');
+  expect(action?.getAttribute('aria-label')).toBeTruthy();
+  expect(document.getElementById('touch-shield')).toBeNull();
 });

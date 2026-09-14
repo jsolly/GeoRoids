@@ -1,39 +1,45 @@
 ---
 title: Hauler
 category: Ships
-summary: A heavy hull that reels nearby asteroids in and slings them at enemies with its combat harpoon E ability.
+summary: A heavy hull that tows asteroids to arena furnaces and mines metal efficiently.
 order: 40
 related:
   - content/wiki/controls.md
   - content/wiki/loot-growth.md
-  - content/wiki/factions.md
+  - content/wiki/teamwork.md
 media:
-  - heading: Harpoon E
+  - heading: Tow cable E
     demo: hauler
 ---
 
-## Harpoon E
+## Tow cable E
 
-E attaches to the nearest valid asteroid in reach, or a hostile ship when no
-rock is in reach. Reach is view-aware and expands with the visible area.
-Same-faction, shielded, exploding, and dead targets are ignored.
+E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
+hull gap. The ability never targets a ship, and it cannot deal ship damage.
 
-A latched asteroid on an unchanged collision course with a hostile ship keeps
-its heading. Other latched asteroids reel toward the Hauler, then release near
-the hull toward the enemy's predicted position. Targeting ignores allies,
-dead, exploding, respawning, spawn-protected, and shielded ships and considers
-reachable intercepts.
+The asteroid keeps its existing motion and trails behind the Hauler as the
+Hauler flies under normal thrust and steering. The cable only applies a small
+correction when it is stretched; it never reels a rock into the hull or throws
+it toward a target. A successful attachment starts the three-second ability
+cooldown, while pressing E again releases the cable immediately. If no eligible
+rock is in range, the attempt leaves the cable detached and does not start a
+cooldown. While towing, the touch button reads Release and stays available.
+After release, a new attachment waits for any remaining cooldown. A dead or
+removed rock detaches automatically.
 
-A stationary rock chooses the quickest reachable intercept after reeling. If no
-eligible enemy remains at release, the rock bounces away from the Hauler. The
-tether can extend for distant rocks so the gradual reel can reach the hull; a
-directly latched hostile ship is still pulled toward the Hauler. While an
-asteroid is latched, it cannot damage its Hauler; normal asteroid collisions
-resume after the tether expires. A miss does not spend the cooldown.
+Fly the towed asteroid into an arena furnace to deliver it. Delivery consumes
+the rock and awards the Hauler. If a Surveyor scanned the rock, the Hauler and
+each Surveyor contributor receive identical delivery points.
+
+Hauler passive exploration reaches 260 world units and contributes to the same
+persistent crew chart as Surveyor. Use the shared chart to follow discovered
+furnace markers; the local radar shows a discovered furnace while it is within
+the nearby radar view, and the universe map keeps its exact landmark anywhere
+in the explored world.
 
 ## Mining lasers
 
-Hauler deals double mining damage to metal and collaborative health targets.
+Hauler deals double mining damage to metal asteroids and cooperative large rocks.
 Metal takes two hits instead of three. Small ice and rubble already break in
 one hit. The different-pilot requirement for cooperative large-rock splits
-remains unchanged. Lasers deal ordinary damage to other ships.
+remains unchanged. Lasers mine asteroids only; they cannot damage teammates.

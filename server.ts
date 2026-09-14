@@ -3,7 +3,15 @@ import { SERVER_RELEASE_ID } from './server/release';
 import { flushServerLogs, logger } from './setup/serverLogger';
 import { boundedDiagnosticError } from './shared/stateDiagnostics';
 
-const server = createServerInstance();
+const worldPath =
+  process.env['GEOROIDS_WORLD_PATH'] ??
+  (process.env['NODE_ENV'] === 'development' || process.env['NODE_ENV'] === 'test'
+    ? '.data/world.sqlite'
+    : undefined);
+if (!worldPath) {
+  throw new Error('GEOROIDS_WORLD_PATH must point to the mounted persistent world volume');
+}
+const server = createServerInstance({ worldPath });
 let shuttingDown = false;
 let requestedExitCode = 0;
 

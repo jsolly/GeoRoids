@@ -91,7 +91,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
 });
 
 test(
-  'mobile viewport fits chrome and exposes canvas firing, ability, and shield without a movement pad',
+  'mobile viewport fits chrome and exposes canvas firing and the ship ability without a movement pad',
   async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
@@ -107,7 +107,6 @@ test(
       const root = document.getElementById('touch-controls');
       const stick = document.getElementById('touch-stick');
       const ability = document.getElementById('touch-ability');
-      const shield = document.getElementById('touch-shield');
       const canvas = document.getElementById('gameCanvas');
       const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
       const box = (el: Element | null) => {
@@ -128,9 +127,7 @@ test(
         canvas: box(canvas),
         stick: box(stick),
         ability: box(ability),
-        shield: box(shield),
         abilityDisabled: ability?.getAttribute('aria-disabled'),
-        shieldDisabled: shield?.getAttribute('aria-disabled'),
       };
     });
 
@@ -146,13 +143,9 @@ test(
     expect(chrome.canvas?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
     expect(chrome.stick).toBeNull();
     expect(chrome.ability).toBeTruthy();
-    expect(chrome.shield).toBeTruthy();
     expect(chrome.abilityDisabled).toBe('false');
-    expect(chrome.shieldDisabled).toBe('false');
     expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
-    expect(chrome.shield?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
-    expect(chrome.shield?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
 
     const beforeTap = await readTouchControlState(page);
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
@@ -177,19 +170,6 @@ test(
       return Boolean(ship && (ship.abilityCooldownFrames > 0 || ship.abilityActiveFrames > 0));
     });
     expect(abilityUsed).toBe(true);
-
-    await page.locator('#touch-shield').click();
-    const shieldRaised = await page.evaluate(() => {
-      const gc = window as unknown as {
-        gameController?: {
-          getPlayerManager: () => {
-            getLocalPlayer: () => { ship: { shieldActive: boolean } } | null;
-          };
-        };
-      };
-      return Boolean(gc.gameController?.getPlayerManager().getLocalPlayer()?.ship.shieldActive);
-    });
-    expect(shieldRaised).toBe(true);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

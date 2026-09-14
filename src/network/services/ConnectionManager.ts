@@ -1,3 +1,4 @@
+import { validExploration } from '../../../shared/exploration';
 import {
   SNAPSHOT_VERSION,
   SnapshotDecoder,
@@ -11,6 +12,7 @@ import type {
   AsteroidData,
   AsteroidDestroyEvent,
   AsteroidTaggedEvent,
+  FurnaceDelivery,
   LootCollected,
   LootKind,
   PingMessage,
@@ -30,7 +32,6 @@ import {
   playHarpoonRelease,
   playLootPickup,
   playOrbitalPickup,
-  playShieldActivation,
 } from '../../audio/interactionSounds';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
 import { PALETTE, ROID } from '../../constants';
@@ -42,11 +43,7 @@ import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
-import {
-  findHarpoonFieldBody,
-  harpoonTargetIdsMatch,
-  setHoldEmptyHarpoonField,
-} from '../../entities/ship/harpoonField';
+import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
@@ -55,7 +52,9 @@ import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
+import { getStoredItem, removeStoredItem, setStoredItem } from '../../utils/safeStorage';
 import type { ClientMessage } from '../types';
+import { resetWorldExploration, setWorldExploration, setWorldMapAssets } from '../worldExploration';
 import {
   applyAsteroidFieldPartition,
   asteroidHasSpawnPose,
@@ -93,9 +92,10 @@ interface ServerMessageEnvelope {
 }
 
 let nextConnectionId = 0;
+const RESUME_TOKEN_STORAGE_KEY = 'georoids-resume-token';
 
 function isValidResumeToken(value: unknown): value is string {
-  return typeof value === 'string' && value.length === 64;
+  return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
 }
 
 function isServerMessageEnvelope(value: unknown): value is ServerMessageEnvelope {
@@ -171,7 +171,6 @@ export class ConnectionManager {
   private resumeToken?: string;
   private readonly motionReconciliation = new PlayerMotionReconciliation();
   private snapshotResyncPending = false;
-  private localHarpoonAcknowledged = false;
 
   private clientId: string;
   private localPlayerName: string = '';
@@ -183,7 +182,6 @@ export class ConnectionManager {
   private readonly snapshotEntityIds = new Set<string>();
   private readonly taggedAsteroidIds = new Set<string>();
   private readonly playedLootCollectionIds = new Set<string>();
-  private readonly knownShieldStateIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
   private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
   private readonly updateEnvelope: ClientMessage = {
@@ -220,6 +218,10 @@ export class ConnectionManager {
     this.clientId = readOrCreateClientId(
       typeof sessionStorage === 'undefined' ? null : sessionStorage
     );
+    const storedResumeToken = getStoredItem(RESUME_TOKEN_STORAGE_KEY);
+    if (isValidResumeToken(storedResumeToken)) {
+      this.resumeToken = storedResumeToken;
+    }
     // Tab close / bfcache must tear the socket down so the server drops us
     // and other clients can prune this player from their leaderboard.
     bindPageHideDisconnect(() => this.disconnect());
@@ -496,7 +498,6 @@ export class ConnectionManager {
     if (this.state.socket?.readyState === WebSocket.OPEN && this.joinAcknowledged) {
       this.sendPayload({ type: 'leave', data: {} });
     }
-    delete this.resumeToken;
     this.clearReconnectTimer();
     this.reconnectAttempt = 0;
     this.stopHeartbeat();
@@ -526,18 +527,16 @@ export class ConnectionManager {
     this.localPlayerId = '';
     this.lastDamageStateLogAt = 0;
     setClientLogContext({});
-    // pagehide / unexpected close keep the stored id (#467). Game-over Start
-    // mints a new one so we do not rejoin a 0-life ship.
+    // pagehide / unexpected close keep the stored id (#467). A new game may
+    // still resume the private pilot credential so progress survives a return
+    // to the menu or a kit change.
     this.hasConnectedOnce = false;
     if (options?.newSession) {
       this.clientId = replaceStoredClientId(
         typeof sessionStorage === 'undefined' ? null : sessionStorage
       );
+      resetWorldExploration();
     }
-  }
-
-  private describeAttacker(attackerId: string): string {
-    return describeDeathCause(attackerId, (id) => this.allPlayers.get(id)?.name);
   }
 
   private clearReconnectTimer(): void {
@@ -720,7 +719,6 @@ export class ConnectionManager {
     if (this.allPlayers.delete(id)) {
       this.playerListCache.invalidate();
     }
-    this.knownShieldStateIds.delete(id);
   }
 
   getPlayer(playerId: string): Player | undefined {
@@ -894,12 +892,6 @@ export class ConnectionManager {
     if (!this.sendPayload(message)) {
       return false;
     }
-    if (
-      message['type'] === 'useAbility' &&
-      (message['data'] as { abilityId?: unknown } | undefined)?.abilityId === 'harpoon'
-    ) {
-      this.localHarpoonAcknowledged = false;
-    }
     logger.debug('NETWORK', 'Sent message', {
       messageType: typeof message['type'] === 'string' ? message['type'] : 'unknown',
     });
@@ -953,7 +945,10 @@ export class ConnectionManager {
         }
         this.localPlayerId = '';
         setClientLogContext({ connectionId: this.connectionId });
+        // The server explicitly rejected this credential; discard it so the
+        // next menu join creates a fresh pilot instead of retrying forever.
         delete this.resumeToken;
+        removeStoredItem(RESUME_TOKEN_STORAGE_KEY);
         this.motionReconciliation.reset();
         this.joinAcknowledged = false;
         this.currentProtocolReady = false;
@@ -1003,15 +998,6 @@ export class ConnectionManager {
           }
         );
         break;
-      case 'playerKilled':
-        this.handlePlayerKilled(
-          data as {
-            targetPlayerId: string;
-            targetPlayerName: string;
-            attackerId: string;
-          }
-        );
-        break;
       case 'lootExploded':
         this.handleLootExploded(
           data as { lootId: string; position: Position; radius: number; shooterId: string }
@@ -1020,14 +1006,16 @@ export class ConnectionManager {
       case 'lootCollected':
         this.handleLootCollected(data);
         break;
+      case 'furnaceDelivery':
+        this.handleFurnaceDelivery(data as FurnaceDelivery);
+        break;
       case 'abilityUsed':
         this.handleAbilityUsed(
           data as {
             id?: string;
             kitId?: string;
             abilityId?: string;
-            harpoonTimer?: number;
-            harpoonTargetId?: string;
+            harpoonTargetId?: string | null;
             harpoonLatchPos?: Position;
 
             abilityActiveFrames?: number;
@@ -1058,9 +1046,7 @@ export class ConnectionManager {
     clientPerformance.resetSnapshotWitness();
     this.currentProtocolReady = false;
     this.snapshotResyncPending = false;
-    this.localHarpoonAcknowledged = false;
     this.lastAcceptedSnapshotSequence = 0;
-    this.knownShieldStateIds.clear();
     delete this.serverReleaseId;
     clientPerformance.serverReleaseId = undefined;
   }
@@ -1215,8 +1201,7 @@ export class ConnectionManager {
     id?: string;
     kitId?: unknown;
     abilityId?: unknown;
-    harpoonTimer?: number;
-    harpoonTargetId?: string;
+    harpoonTargetId?: string | null;
     harpoonLatchPos?: Position;
 
     abilityActiveFrames?: number;
@@ -1231,23 +1216,26 @@ export class ConnectionManager {
       return;
     }
     const abilityId = getShipKit(data.kitId ?? entity.ship.kitId).abilityId;
-    playAbilityActivation(abilityId, entity.ship.position);
-    if (abilityId === 'harpoon') {
-      const targetPosition = isFinitePosition(data.harpoonLatchPos)
-        ? data.harpoonLatchPos
-        : typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0
-          ? findHarpoonFieldBody(data.harpoonTargetId)?.position
-          : undefined;
-      playHarpoonLatch(targetPosition ?? entity.ship.position);
+    const isHarpoonRelease = abilityId === 'harpoon' && data.harpoonTargetId === null;
+    if (!isHarpoonRelease) {
+      playAbilityActivation(abilityId, entity.ship.position);
     }
-    if (localPlayer?.id === data.id && (data.harpoonTimer ?? 0) > 0) {
-      this.localHarpoonAcknowledged = true;
+    if (abilityId === 'harpoon') {
+      if (isHarpoonRelease) {
+        playHarpoonRelease(entity.ship.position);
+      } else {
+        const targetPosition = isFinitePosition(data.harpoonLatchPos)
+          ? data.harpoonLatchPos
+          : typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0
+            ? findHarpoonFieldBody(data.harpoonTargetId)?.position
+            : undefined;
+        playHarpoonLatch(targetPosition ?? entity.ship.position);
+      }
     }
     const latch = {
       ...(data.abilityActiveFrames !== undefined
         ? { abilityActiveFrames: data.abilityActiveFrames }
         : {}),
-      ...(data.harpoonTimer !== undefined ? { harpoonTimer: data.harpoonTimer } : {}),
       ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
       ...(data.harpoonLatchPos !== undefined ? { harpoonLatchPos: data.harpoonLatchPos } : {}),
     };
@@ -1259,6 +1247,10 @@ export class ConnectionManager {
 
   private handleSnapshotState(data: ServerGameSnapshot): void {
     applyTerrainSeed(data.terrainSeed);
+    setWorldMapAssets(data.mapAssets);
+    if (validExploration(data.exploration)) {
+      setWorldExploration(data.exploration);
+    }
 
     // Update local game state from server using unified entity system
     if (data.entities) {
@@ -1302,7 +1294,6 @@ export class ConnectionManager {
               type: entityData.type === 'bot' ? 'bot' : 'remote',
               color: entityData.color,
               ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
-              ...(entityData.factionId !== undefined ? { factionId: entityData.factionId } : {}),
               position: entityData.position,
             });
           }
@@ -1323,100 +1314,25 @@ export class ConnectionManager {
         }
 
         // Apply the parsed entity directly — no per-tick snapshot wrapper.
-        // Kit / faction / ability / deathCause / mass / F-key shield stay on the row.
+        // Kit / ability / deathCause / mass stay on the row.
         entityData.spawnProtectionTimer ??= 0;
         if (entityData.playerMotion !== undefined) {
           entity.ship.playerMotion = entityData.playerMotion;
         } else {
           delete entity.ship.playerMotion;
         }
-        const wasHarpoonActive = entity.ship.harpoonTimer > 0;
-        const harpoonReleasePosition = entity.ship.harpoonLatchPos
-          ? { ...entity.ship.harpoonLatchPos }
-          : { ...entity.ship.position };
-        const wasShieldActive = entity.ship.shieldActive;
-        const shieldStateWasKnown = this.knownShieldStateIds.has(entityData.id);
         entity.name = entityData.name;
-        if (entityData.factionId !== undefined) {
-          entity.factionId = entityData.factionId;
-          entity.ship.factionId = entityData.factionId;
-        } else {
-          delete entity.factionId;
-          delete entity.ship.factionId;
-        }
         if (entity.type !== 'local') {
           entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
         }
-        if (isLocalPlayer && (entityData.harpoonTimer ?? 0) > 0) {
-          this.localHarpoonAcknowledged = true;
-        }
-        // Preserve only the existing, locally ticking visual prediction while
-        // this socket has not acknowledged its latch. Reconnect does not revive
-        // server ability state or extend the timer. Once acknowledged, a zero
-        // is authoritative expiry; a missing target also ends warm prediction.
-        const targetId = entity.ship.harpoonTargetId;
-        const targetInSnapshot =
-          typeof targetId === 'string' &&
-          (data.asteroids.some((rock) => harpoonTargetIdsMatch(rock.id, targetId)) ||
-            data.entities.some((player) => harpoonTargetIdsMatch(player.id, targetId)));
-        // An empty belt tick during a flap still contains remotes. Keep the
-        // unacked cream prediction while the held field still has that rock.
-        const targetHeldOnEmptyBelt =
-          typeof targetId === 'string' &&
-          data.asteroids.length === 0 &&
-          Boolean(findHarpoonFieldBody(targetId));
-        const preservePredictedLatch =
-          isLocalPlayer &&
-          entity.type === 'local' &&
-          entity.ship.kitId === 'hauler' &&
-          !this.localHarpoonAcknowledged &&
-          entity.ship.harpoonTimer > 0 &&
-          !entityData.exploding &&
-          entityData.health > 0 &&
-          (targetInSnapshot || targetHeldOnEmptyBelt);
-        if (!preservePredictedLatch) {
-          entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
-          entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
-          entity.ship.harpoonTimer = entityData.harpoonTimer ?? 0;
-          if (entityData.harpoonTargetId !== undefined) {
-            entity.ship.harpoonTargetId = entityData.harpoonTargetId;
-          } else {
-            delete entity.ship.harpoonTargetId;
-          }
-          if (entityData.harpoonLatchPos !== undefined) {
-            entity.ship.harpoonLatchPos = entityData.harpoonLatchPos;
-          } else {
-            delete entity.ship.harpoonLatchPos;
-          }
-          if (
-            wasHarpoonActive &&
-            entityData.harpoonTimer !== undefined &&
-            entityData.harpoonTimer <= 0
-          ) {
-            playHarpoonRelease(harpoonReleasePosition);
-          }
-        }
+        entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
+        entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
         if (entityData.laserUpgrade) {
           entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
         } else {
           delete entity.ship.laserUpgrade;
         }
 
-        if (
-          entity.type !== 'local' &&
-          shieldStateWasKnown &&
-          !wasShieldActive &&
-          entityData.shieldActive === true
-        ) {
-          playShieldActivation(entityData.position);
-        }
-        if (entityData.shieldActive !== undefined) {
-          this.knownShieldStateIds.add(entityData.id);
-        }
-        entity.ship.shieldActive = entityData.shieldActive ?? false;
-        entity.ship.shieldTime = entityData.shieldTime ?? 0;
-        entity.ship.shieldCooldown = entityData.shieldCooldown ?? 0;
-        entity.ship.shieldFlashTime = entityData.shieldFlashTime ?? 0;
         if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
           delete entity.deathCause;
         }
@@ -1507,7 +1423,17 @@ export class ConnectionManager {
     playLootPickup(data.kind, data.position);
   }
 
+  private handleFurnaceDelivery(data: FurnaceDelivery): void {
+    if (!data?.furnaceId || !isFinitePosition(data.position)) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('furnaceDelivery', { detail: data }));
+  }
+
   private applyAuthoritativeAsteroids(asteroids: AsteroidData[], complete = false): void {
+    if (complete) {
+      setHoldEmptyHarpoonField(false);
+    }
     applyAsteroidFieldPartition(
       partitionAsteroidSnapshot(asteroids, this.seenAsteroidIds, this.asteroidScratch, complete),
       complete
@@ -1533,6 +1459,7 @@ export class ConnectionManager {
     this.shotAcknowledgements = data.shotAcknowledgements === true;
     this.currentProtocolReady = true;
     this.resumeToken = data.resumeToken;
+    setStoredItem(RESUME_TOKEN_STORAGE_KEY, data.resumeToken);
     if (data.serverReleaseId) {
       this.serverReleaseId = data.serverReleaseId;
       clientPerformance.serverReleaseId = data.serverReleaseId;
@@ -1567,6 +1494,10 @@ export class ConnectionManager {
     const localPlayer = PlayerManager.getInstance().getLocalPlayer();
     if (localPlayer) {
       localPlayer.resetCombatLifecycle();
+      if (data.name) {
+        localPlayer.name = data.name;
+        this.localPlayerName = data.name;
+      }
     }
     if (data.id) {
       if (localPlayer?.id && localPlayer.id !== data.id) {
@@ -1578,13 +1509,10 @@ export class ConnectionManager {
       }
     }
     if (localPlayer) {
-      const selectedKit = getSelectedShipKitId();
-      if (localPlayer.ship.kitId !== selectedKit) {
-        applyShipKitToShip(localPlayer.ship, selectedKit);
+      const authoritativeKit = data.kitId ?? getSelectedShipKitId();
+      if (localPlayer.ship.kitId !== authoritativeKit) {
+        applyShipKitToShip(localPlayer.ship, authoritativeKit);
       }
-    }
-    if (data.factionId && localPlayer) {
-      localPlayer.updateFromServer({ factionId: data.factionId });
     }
     this.initializeAsteroids();
   }
@@ -1728,7 +1656,7 @@ export class ConnectionManager {
       data.remainingLives !== undefined &&
       prevLocalLives > data.remainingLives
     ) {
-      const deathCause = this.describeAttacker(data.attackerId);
+      const deathCause = describeDeathCause(data.attackerId);
       localPlayer.deathCause = deathCause;
       this.dispatchLocalPlayerDied(localPlayer, data.remainingLives, deathCause);
     }
@@ -1810,26 +1738,5 @@ export class ConnectionManager {
       return;
     }
     player.ship.health = remainingHealth;
-  }
-
-  private handlePlayerKilled(data: {
-    targetPlayerId: string;
-    targetPlayerName: string;
-    attackerId: string;
-  }): void {
-    const localId = this.localPlayerId ?? this.clientId;
-    if (data.attackerId !== localId) {
-      return;
-    }
-
-    window.dispatchEvent(
-      new CustomEvent('remotePlayerDied', {
-        detail: {
-          playerId: data.targetPlayerId,
-          playerName: data.targetPlayerName,
-          deathCause: 'laser',
-        },
-      })
-    );
   }
 }

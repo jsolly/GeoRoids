@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
+import type { Position, ShipKitId, Velocity } from '../../shared-types';
 import { MockPlayerInput } from '../input/MockPlayerInput';
 import { getRandomPositionInAsteroidField, resolveSpawnPosition } from '../utils/spawnPosition';
 import { Laser } from './laser/Laser';
@@ -14,7 +14,6 @@ interface PlayerConfig {
   color?: string;
   shotCooldown?: number;
   kitId?: ShipKitId;
-  factionId?: SoftFactionId;
 }
 
 interface RoidConfig {
@@ -111,7 +110,6 @@ class EntityFactory {
       type: config.type,
       input: new MockPlayerInput(),
       ...(config.kitId !== undefined ? { kitId: config.kitId } : {}),
-      ...(config.factionId !== undefined ? { factionId: config.factionId } : {}),
     });
   }
 
@@ -119,7 +117,7 @@ class EntityFactory {
     player.ship.position = resolveSpawnPosition(config.position);
 
     // Apply customizations
-    if (config.color && !player.factionId) {
+    if (config.color) {
       player.color = config.color;
       player.ship.color = config.color;
     }

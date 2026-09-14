@@ -97,6 +97,7 @@ export class AuthoritativeProjectileField {
         laser.position = { ...row.position };
         laser.prevPosition = { ...row.prevPosition };
         laser.velocity = { ...row.velocity };
+        laser.bounceCount = row.bounces;
         laser.distTraveled = 0;
         laser.hasExploded = false;
         laser.explodeTime = 0;

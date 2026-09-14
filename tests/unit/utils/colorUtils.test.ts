@@ -1,16 +1,10 @@
 import { expect, test } from 'vitest';
-import { FACTION_COLORS } from '../../../shared/factions';
 import { DEBUG, PALETTE, ROID, SHIP, TITLE, VISUAL } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { getRoidStrokeWidth } from '../../../src/entities/roid/roidRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import {
-  applyLockedPaletteCss,
-  getFactionColor,
-  getLaserColor,
-  hexToRgba,
-} from '../../../src/utils/colorUtils';
+import { applyLockedPaletteCss, getLaserColor, hexToRgba } from '../../../src/utils/colorUtils';
 import { isDebugMode } from '../../../src/utils/debugUtils';
 
 test('locked palette hexes match the art-direction swatch', () => {
@@ -21,7 +15,6 @@ test('locked palette hexes match the art-direction swatch', () => {
   expect(PALETTE.BOT).toBe('#FB923C');
   expect(PALETTE.ROID).toBe('#94A3B8');
   expect(PALETTE.LASER_LOCAL).toBe('#FDE68A');
-  expect(PALETTE.LASER_ENEMY).toBe('#FCA5A5');
   expect(PALETTE.HUD).toBe('#E2E8F0');
   expect(PALETTE.HUD_MUTED).toBe('#64748B');
   expect(PALETTE.DANGER).toBe('#F43F5E');
@@ -29,27 +22,17 @@ test('locked palette hexes match the art-direction swatch', () => {
   expect(PALETTE.LOOT).toBe('#E8D5A3');
   expect(TITLE.ACCENT).toBe('#A78BFA');
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');
-  expect(PALETTE.SHIELD).toBe('#7DD3C8');
-  expect(PALETTE.SHIELD.toLowerCase()).not.toBe('#ffffff');
   expect(PALETTE.SATELLITE).toBe('#C4B5FD');
   expect(PALETTE.SATELLITE.toLowerCase()).not.toBe('#ffffff');
   expect(PALETTE.SATELLITE.toLowerCase()).not.toBe('#67e8f9');
 });
 
-test('faction colors identify sides and unassigned pilots remain neutral', () => {
-  expect(getFactionColor('ion')).toBe(FACTION_COLORS.ion);
-  expect(getFactionColor('ember')).toBe(FACTION_COLORS.ember);
-  expect(getFactionColor(undefined)).toBe(PALETTE.HUD_MUTED);
-});
-
 test('laser colors never use white', () => {
-  expect(getLaserColor(true)).toBe(PALETTE.LASER_LOCAL);
-  expect(getLaserColor(false)).toBe(PALETTE.LASER_ENEMY);
-  expect(getLaserColor(true).toLowerCase()).not.toBe('#ffffff');
-  expect(getLaserColor(false).toLowerCase()).not.toBe('#ffffff');
+  expect(getLaserColor()).toBe(PALETTE.LASER_LOCAL);
+  expect(getLaserColor().toLowerCase()).not.toBe('#ffffff');
 });
 
-test('new players and ships default to faction colors instead of white', () => {
+test('players and ships use the role palette instead of white', () => {
   const local = new Player({
     id: 'p-local',
     name: 'Local',
@@ -69,10 +52,10 @@ test('new players and ships default to faction colors instead of white', () => {
     input: new MockPlayerInput(),
   });
 
-  expect(local.color).toBe(PALETTE.HUD_MUTED);
-  expect(local.ship.color).toBe(PALETTE.HUD_MUTED);
-  expect(remote.color).toBe(PALETTE.HUD_MUTED);
-  expect(bot.color).toBe(PALETTE.HUD_MUTED);
+  expect(local.color).toBe(PALETTE.LOCAL);
+  expect(local.ship.color).toBe(PALETTE.LOCAL);
+  expect(remote.color).toBe(PALETTE.REMOTE);
+  expect(bot.color).toBe(PALETTE.BOT);
   expect(new Ship().color).toBe(PALETTE.LOCAL);
 });
 

@@ -1,5 +1,5 @@
-import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../../shared-types';
-import { GAME, LASER, PALETTE, SHIELD, SHIP, TITLE, VISUAL } from '../../constants';
+import type { Position, ShipKitId, Velocity } from '../../../shared-types';
+import { GAME, LASER, PALETTE, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvas';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import { resolveGlow } from '../../rendering/renderQuality';
@@ -13,8 +13,7 @@ import {
 } from '../../rendering/vectorJuice';
 import { hexToRgba } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
-import { drawSoftFactionMark } from '../player/factionMarkPainters';
-import { findHarpoonFieldBody, getHarpoonField } from './harpoonField';
+import { findHarpoonFieldBody } from './harpoonField';
 import {
   getKitHullOutline,
   projectHullPoint,
@@ -22,9 +21,7 @@ import {
   projectKitHullEdges,
 } from './hullOutlines';
 import type { Ship } from './Ship';
-import { findHarpoonTarget } from './shipAbilities';
 import { CLASSIC_HULL, type HullProfile } from './shipKits';
-import { isShieldBlockingLasers, shieldCooldownFrames } from './shipShield';
 
 const shipTriangle = {
   nose: { x: 0, y: 0 },
@@ -276,8 +273,7 @@ export function drawPlayerName(
   x: number,
   y: number,
   shipRadius: number,
-  color: string = PALETTE.HUD,
-  factionId?: SoftFactionId
+  color: string = PALETTE.HUD
 ): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
@@ -291,17 +287,7 @@ export function drawPlayerName(
   ctx.font = VISUAL.NAME_LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  const nameWidth = ctx.measureText(name).width;
-  ctx.fillText(name, x + (factionId ? 3 : 0), nameY);
-  if (factionId) {
-    drawSoftFactionMark(ctx, factionId, {
-      x: x - nameWidth / 2 - 5,
-      y: nameY + 5,
-      radius: 6,
-      angle: Math.PI / 2,
-      context: 'label',
-    });
-  }
+  ctx.fillText(name, x, nameY);
   ctx.restore();
 }
 
@@ -533,8 +519,7 @@ export function drawShipAtPosition(
   ship: Ship,
   shipPosition: { x: number; y: number },
   color?: string,
-  playerName?: string,
-  factionId?: SoftFactionId
+  playerName?: string
 ): void {
   const ctx = canvasManager.getContext();
   const cvs = canvasManager.getCanvas();
@@ -566,36 +551,22 @@ export function drawShipAtPosition(
   const shipColor = color || ship.color;
 
   strokeKitHullOutline(ctx, screenX, screenY, shipR, ship.angle, shipColor, ship.kitId);
-  drawSoftFactionMark(ctx, factionId, {
-    x: screenX,
-    y: screenY,
-    radius: shipR,
-    angle: ship.angle,
-    context: 'hull',
-  });
   drawAbilityFx(ctx, ship, screenX, screenY, shipR);
 
-  drawShipShield(ctx, ship, screenX, screenY, shipR);
   drawShipImpactFlash(ctx, ship, screenX, screenY, shipR);
   drawFloatingHealthCapsule(ctx, ship, screenX, screenY, shipR);
 
   // Draw player name under ship if provided
   if (playerName) {
-    drawPlayerName(playerName, screenX, screenY, shipR, shipColor, factionId);
+    drawPlayerName(playerName, screenX, screenY, shipR, shipColor);
   }
 }
 
 export function canDrawHaulerHarpoon(ship: {
   kitId: string;
-  harpoonTimer: number;
-  harpoonTargetId?: string;
-  harpoonLatchPos?: { x: number; y: number };
+  harpoonTargetId: string | null;
 }): boolean {
-  return (
-    ship.kitId === 'hauler' &&
-    ship.harpoonTimer > 0 &&
-    (Boolean(ship.harpoonTargetId) || Boolean(ship.harpoonLatchPos))
-  );
+  return ship.kitId === 'hauler' && ship.harpoonTargetId !== null;
 }
 
 /** Tether geometry is already in screen space; keep it hairline at every zoom. */
@@ -630,18 +601,11 @@ export function drawHaulerHarpoonVfx(
   screenY: number,
   cameraShipPosition: { x: number; y: number }
 ): void {
-  if (ship.kitId !== 'hauler' || ship.harpoonTimer <= 0) {
+  if (ship.kitId !== 'hauler' || ship.harpoonTargetId === null) {
     return;
   }
   const target = findHarpoonFieldBody(ship.harpoonTargetId);
-  let latchWorld = target?.position ?? ship.harpoonLatchPos;
-  if (!latchWorld) {
-    latchWorld = findHarpoonTarget(
-      ship,
-      [...getHarpoonField()],
-      Number.POSITIVE_INFINITY
-    )?.position;
-  }
+  const latchWorld = target?.position ?? ship.harpoonLatchPos;
   if (!latchWorld) {
     return;
   }
@@ -688,47 +652,6 @@ function drawAbilityFx(
     ctx.strokeStyle = hexToRgba(TITLE.ACCENT, 0.45);
     ctx.lineWidth = 3;
     ctx.stroke();
-  }
-}
-
-export function drawShipShield(
-  ctx: DrawingContext,
-  ship: Ship,
-  screenX: number,
-  screenY: number,
-  shipR: number
-): void {
-  if (ship.exploding) {
-    return;
-  }
-
-  const radius = shipR * SHIELD.RADIUS_RATIO;
-
-  if (isShieldBlockingLasers(ship)) {
-    const flashing = ship.shieldFlashTime > 0;
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineWidth = flashing ? VISUAL.SHIELD_STROKE_WIDTH + 0.5 : VISUAL.SHIELD_STROKE_WIDTH;
-    ctx.shadowColor = PALETTE.SHIELD;
-    ctx.shadowBlur = resolveGlow(VISUAL.SHIELD_GLOW);
-    ctx.strokeStyle = hexToRgba(PALETTE.SHIELD, flashing ? SHIELD.FLASH_ALPHA : SHIELD.IDLE_ALPHA);
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
-
-  if (ship.isLocalPlayer && ship.shieldCooldown > 0) {
-    const remaining = ship.shieldCooldown / shieldCooldownFrames();
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = hexToRgba(PALETTE.HUD_MUTED, 0.35);
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, radius, -Math.PI / 2, -Math.PI / 2 + remaining * Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
   }
 }
 

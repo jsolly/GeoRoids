@@ -20,12 +20,29 @@ import {
   turnToward,
 } from '../../../server/ai/shipMotion';
 import { radiusFromMass } from '../../../shared/shipGrowth';
-import type { ShipKitId } from '../../../shared-types';
+import type { AsteroidData, ShipKitId } from '../../../shared-types';
 import { GAME, LASER } from '../../../src/constants';
 import { generateLaserVelocity } from '../../../src/entities/laser/laserUtils';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 
 const fixedRng = { random: () => 0.5 };
+
+function asteroid(overrides: Partial<AsteroidData> = {}): AsteroidData {
+  return {
+    id: 'rock',
+    position: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    size: 25,
+    jaggedness: 0.5,
+    rotation: 0,
+    angularVelocity: 0,
+    health: 100,
+    maxHealth: 100,
+    vertices: 8,
+    offsets: [1, 1, 1, 1, 1, 1, 1, 1],
+    ...overrides,
+  };
+}
 
 function combatant(
   overrides: Partial<Combatant> & { angle?: number; kitId?: ShipKitId } = {}
@@ -43,7 +60,6 @@ function combatant(
     ...(overrides.spawnProtectionTimer !== undefined
       ? { spawnProtectionTimer: overrides.spawnProtectionTimer }
       : {}),
-    ...(overrides.factionId !== undefined ? { factionId: overrides.factionId } : {}),
     angle: overrides.angle ?? 0,
   };
 }
@@ -72,7 +88,7 @@ describe('bot aim math', () => {
 
   test('lead aim points ahead of a crossing target', () => {
     const shooter = combatant({ position: { x: 0, y: 0 }, velocity: { x: 0, y: 0 } });
-    const target = combatant({
+    const target = asteroid({
       id: 'human',
       position: { x: 200, y: 0 },
       velocity: { x: 0, y: 4 * GAME.MOTION_SCALE },
@@ -100,33 +116,25 @@ describe('bot aim math', () => {
 });
 
 describe('bot target choice', () => {
-  test('picks the nearest living human', () => {
+  test('picks the nearest living asteroid', () => {
     const bot = combatant();
-    const near = combatant({ id: 'near', position: { x: 80, y: 0 } });
-    const far = combatant({ id: 'far', position: { x: 400, y: 0 } });
+    const near = asteroid({ id: 'near', position: { x: 80, y: 0 } });
+    const far = asteroid({ id: 'far', position: { x: 400, y: 0 } });
     expect(chooseTarget(bot, [far, near])?.id).toBe('near');
   });
 
-  test('skips dead and exploding humans', () => {
+  test('skips depleted rocks while choosing a live mineral target', () => {
     const bot = combatant();
-    const dead = combatant({ id: 'dead', health: 0, position: { x: 10, y: 0 } });
-    const boom = combatant({ id: 'boom', exploding: true, position: { x: 20, y: 0 } });
-    const live = combatant({ id: 'live', position: { x: 300, y: 0 } });
-    expect(chooseTarget(bot, [dead, boom, live])?.id).toBe('live');
-  });
-
-  test('skips same-faction humans when sides are assigned', () => {
-    const bot = combatant({ factionId: 'ion' });
-    const ally = combatant({ id: 'ally', position: { x: 80, y: 0 }, factionId: 'ion' });
-    const foe = combatant({ id: 'foe', position: { x: 400, y: 0 }, factionId: 'ember' });
-    expect(chooseTarget(bot, [ally, foe])?.id).toBe('foe');
+    const depleted = asteroid({ id: 'depleted', health: 0, position: { x: 10, y: 0 } });
+    const live = asteroid({ id: 'live', position: { x: 300, y: 0 } });
+    expect(chooseTarget(bot, [depleted, live])?.id).toBe('live');
   });
 });
 
 describe('bot fire cadence and thrust', () => {
   test('fires after reaction ticks when lined up in range', () => {
     const bot = combatant({ angle: 0 });
-    const target = combatant({ id: 'human', position: { x: 220, y: 0 } });
+    const target = asteroid({ id: 'rock', position: { x: 220, y: 0 } });
     const memory = createBotMemory(fixedRng, 0);
     const decisions = [];
     for (let i = 0; i < BOT_AI.REACTION_TICKS + 2; i++) {
@@ -138,7 +146,7 @@ describe('bot fire cadence and thrust', () => {
 
   test('does not fire when heading is off', () => {
     const bot = combatant({ angle: 0 });
-    const target = combatant({ id: 'human', position: { x: 0, y: 220 } });
+    const target = asteroid({ id: 'rock', position: { x: 0, y: 220 } });
     const memory = memoryReadyToFire();
     const decision = decideBotAction(bot, target, memory, fixedRng);
     expect(decision.fire).toBe(false);
@@ -147,7 +155,7 @@ describe('bot fire cadence and thrust', () => {
 
   test('respects shot cooldown between bursts', () => {
     const bot = combatant({ angle: 0 });
-    const target = combatant({ id: 'human', position: { x: 220, y: 0 } });
+    const target = asteroid({ id: 'rock', position: { x: 220, y: 0 } });
     const memory = memoryReadyToFire();
     const first = decideBotAction(bot, target, memory, fixedRng);
     const second = decideBotAction(bot, target, memory, fixedRng);
@@ -157,7 +165,7 @@ describe('bot fire cadence and thrust', () => {
 
   test('pauses after a two-shot burst', () => {
     const bot = combatant({ angle: 0 });
-    const target = combatant({ id: 'human', position: { x: 220, y: 0 } });
+    const target = asteroid({ id: 'rock', position: { x: 220, y: 0 } });
     const memory = memoryReadyToFire();
     expect(decideBotAction(bot, target, memory, fixedRng).fire).toBe(true);
     memory.lastShotTick = memory.ticks - BOT_AI.SHOT_COOLDOWN_TICKS;
@@ -166,34 +174,29 @@ describe('bot fire cadence and thrust', () => {
     expect(decideBotAction(bot, target, memory, fixedRng).fire).toBe(false);
   });
 
-  test('does not fire while the bot or target is spawn-protected', () => {
-    const target = combatant({ id: 'human', position: { x: 220, y: 0 } });
+  test('does not fire while the bot is spawn-protected or has no target', () => {
+    const target = asteroid({ id: 'rock', position: { x: 220, y: 0 } });
     const protectedBot = decideBotAction(
       combatant({ angle: 0, spawnProtectionTimer: 60 }),
       target,
       memoryReadyToFire(),
       fixedRng
     );
-    const protectedTarget = decideBotAction(
-      combatant({ angle: 0 }),
-      combatant({ id: 'human', position: { x: 220, y: 0 }, spawnProtectionTimer: 60 }),
-      memoryReadyToFire(),
-      fixedRng
-    );
+    const noTarget = decideBotAction(combatant({ angle: 0 }), null, memoryReadyToFire(), fixedRng);
     expect(protectedBot.fire).toBe(false);
-    expect(protectedTarget.fire).toBe(false);
+    expect(noTarget.fire).toBe(false);
   });
 
   test('thrusts to close when far and facing, coasts when too close', () => {
     const far = decideBotAction(
       combatant({ angle: 0 }),
-      combatant({ id: 'human', position: { x: 500, y: 0 } }),
+      asteroid({ id: 'rock', position: { x: 500, y: 0 } }),
       createBotMemory(fixedRng, 0),
       fixedRng
     );
     const close = decideBotAction(
       combatant({ angle: 0 }),
-      combatant({ id: 'human', position: { x: 40, y: 0 } }),
+      asteroid({ id: 'rock', position: { x: 40, y: 0 } }),
       createBotMemory(fixedRng, 0),
       fixedRng
     );
@@ -232,7 +235,7 @@ describe('shared ship motion and shot spawn', () => {
       const bot = combatant({ kitId });
       const decision = decideBotAction(
         bot,
-        combatant({ id: 'target', position: { x: -200, y: 0 } }),
+        asteroid({ id: 'target', position: { x: -200, y: 0 } }),
         memoryReadyToFire(),
         fixedRng
       );

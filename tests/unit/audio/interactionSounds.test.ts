@@ -8,7 +8,6 @@ import {
   playOrbitalFire,
   playOrbitalPickup,
   playRespawn,
-  playShieldActivation,
 } from '../../../src/audio/interactionSounds';
 import { Sound, setSound } from '../../../src/audio/Sound';
 import { bindGameAudio, resetGameAudio } from '../../../src/audio/spatialAudio';
@@ -92,18 +91,5 @@ describe('interaction sound cues', () => {
     playRespawn(listener);
 
     expect(playSpy).not.toHaveBeenCalled();
-  });
-
-  test('the regular shield cue uses its pooled shield sound', () => {
-    const played: Sound[] = [];
-    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
-      played.push(this);
-      return Promise.resolve();
-    });
-
-    playShieldActivation(listener);
-
-    expect(played).toHaveLength(1);
-    expect(played[0]?.src).toMatch(/ability-shield\.m4a$/);
   });
 });

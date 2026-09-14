@@ -36,7 +36,7 @@ describe('human game-over stay-dead', () => {
 
   test('last life does not schedule a respawn and health stays at 0', () => {
     player.lives = 1;
-    const destroyed = gameEngine.handlePlayerDamage('pilot-1', 'asteroid', player.health);
+    const destroyed = gameEngine.handleShipDamage('pilot-1', 'asteroid', player.health).isDestroyed;
     expect(destroyed).toBe(true);
     expect(player.lives).toBe(0);
     expect(player.exploding).toBe(true);
@@ -62,7 +62,7 @@ describe('human game-over stay-dead', () => {
 
   test('spare lives still get a respawn timer after the explosion', () => {
     player.lives = 2;
-    const destroyed = gameEngine.handlePlayerDamage('pilot-1', 'asteroid', player.health);
+    const destroyed = gameEngine.handleShipDamage('pilot-1', 'asteroid', player.health).isDestroyed;
     expect(destroyed).toBe(true);
     expect(player.lives).toBe(1);
 

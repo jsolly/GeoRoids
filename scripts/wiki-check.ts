@@ -107,6 +107,7 @@ const sourcePaths = new Set([
     'server/communication',
     'server/ai',
     'server/services',
+    'server/world',
   ]
     .flatMap(files)
     .filter((path) => path.endsWith('.ts')),

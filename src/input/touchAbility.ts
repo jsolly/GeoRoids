@@ -1,11 +1,5 @@
 import type { ShipKitId } from '../../shared-types';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
-import {
-  canActivateShield,
-  isShieldBlockingLasers,
-  type ShieldState,
-  shieldCooldownFrames,
-} from '../entities/ship/shipShield';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
 
@@ -15,26 +9,12 @@ type AbilityChromeHost = {
   health: number;
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
+  harpoonTargetId?: string | null;
 };
 
 type AbilityChromeState = {
   label: string;
   name: string;
-  ready: boolean;
-  active: boolean;
-  cooling: boolean;
-  unavailable: boolean;
-  cooldownRatio: number;
-};
-
-type ShieldChromeHost = ShieldState & {
-  exploding: boolean;
-  health: number;
-};
-
-type ShieldChromeState = {
-  label: 'SHIELD';
-  name: 'Shield bubble';
   ready: boolean;
   active: boolean;
   cooling: boolean;
@@ -68,36 +48,16 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const alive = !host.exploding && Number.isFinite(host.health) && host.health > 0;
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
-  const active = Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0;
+  const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
+  const active =
+    towing || (Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0);
   return {
-    label: ABILITY_LABEL[kit.abilityId],
-    name: touchAbilityName(kit.id),
-    ready: alive && !cooling && !unavailable,
+    label: towing ? 'RELEASE' : ABILITY_LABEL[kit.abilityId],
+    name: towing ? 'Release asteroid' : touchAbilityName(kit.id),
+    ready: alive && (towing || !cooling),
     active,
     cooling,
     unavailable,
-    cooldownRatio: abilityCooldownRatio(kit.id, host.abilityCooldownFrames),
-  };
-}
-
-export function shieldCooldownRatio(cooldownFrames: number): number {
-  if (!Number.isFinite(cooldownFrames) || cooldownFrames <= 0) {
-    return 0;
-  }
-  return Math.min(1, cooldownFrames / shieldCooldownFrames());
-}
-
-export function readShieldChrome(host: ShieldChromeHost): ShieldChromeState {
-  const alive = !host.exploding && Number.isFinite(host.health) && host.health > 0;
-  const active = isShieldBlockingLasers(host);
-  const cooling = Number.isFinite(host.shieldCooldown) && host.shieldCooldown > 0;
-  return {
-    label: 'SHIELD',
-    name: 'Shield bubble',
-    ready: alive && (active || canActivateShield(host)),
-    active,
-    cooling,
-    unavailable: !alive,
-    cooldownRatio: shieldCooldownRatio(host.shieldCooldown),
+    cooldownRatio: towing ? 0 : abilityCooldownRatio(kit.id, host.abilityCooldownFrames),
   };
 }

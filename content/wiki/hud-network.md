@@ -1,14 +1,14 @@
 ---
 title: HUD and the shared world
 category: Systems
-summary: Read lives, health, nearby threats, and scores. Understand what
+summary: Read lives, health, the local radar, the universe map, and scores. Understand what
   to do if the connection drops.
 order: 150
 related:
   - content/wiki/field-manual.md
   - content/wiki/controls.md
   - content/wiki/combat-survival.md
-  - content/wiki/factions.md
+  - content/wiki/teamwork.md
 media: []
 ---
 
@@ -21,31 +21,37 @@ audio, effects become available as they load; missed sounds do not play later.
 
 Shots, impacts, and explosions vary their pitch slightly each time they
 start, keeping repeated actions from sounding identical. Automatic thrust is silent. Nearby action is louder; off-screen combat
-cues stay silent. Harpoons have launch, latch, and release cues. Orbital pickup
+cues stay silent. Tow cables have attach and release cues. Orbital pickup
 and pickup-break sounds differ from ship lasers. Laser cores and
 material pickups have separate cues, as do kit abilities and respawning.
 
-The HUD shows lives as kit hull icons, score, faction label and mark, and kit name. Desktop layouts include a leaderboard of up to 10 rows and a
-minimap; touch layouts use a compact leaderboard and an adaptive minimap. The
-minimap shows
-your ship, other human pilots, bot pilots, asteroids, loot drops, loose
-satellite pickups, and orbiting pickups inside the arena ring. Compact
+The HUD shows lives as kit hull icons, score, kit name, and the current ability.
+Desktop layouts include a leaderboard of every active human and bot row and a
+local minimap; touch layouts use a compact leaderboard and an adaptive local
+minimap. The local minimap follows the ship's nearby radar: it shows your ship,
+other human pilots, bot pilots, explored asteroids, loot drops, loose satellite
+pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
 marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
-cream squares and diamonds mark wreckage and shards,
-yellow slashed diamonds mark laser cores, and lilac circles and diamonds mark
-loose and orbiting satellite pickups. Ship headings and
-faction marks keep pilots identifiable above the world marks. Kill and pickup
+cream squares and diamonds mark wreckage and shards, yellow slashed diamonds
+mark laser cores, and lilac circles and diamonds mark loose and orbiting
+satellite pickups. Ship headings and kit colors keep pilots identifiable above
+the world marks. Press M or use the Map button to open the full-screen universe
+map. It uses the crew's shared exploration chart and keeps discovered furnaces
+and other important assets visible across the large world, even when they are
+outside the local radar. A discovered furnace stays marked in the local radar
+while it is within that nearby view; the universe map keeps its exact landmark
+when it is farther away. Death, delivery, and pickup
 messages appear in the center for 120 frames, or 2 seconds. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.
-Hull, name, and minimap colors indicate faction: Ion is blue and Ember is
-orange, including your own ship. Bot names include "(bot)"; faction marks also
-distinguish the sides.
+Every active pilot, including existing bots, stays on the leaderboard so the
+crew can see shared asteroid work and delivery points. Bot names include
+"(bot)".
 
 ## Display refresh rate
 
-Flight, projectiles, shields, and HUD message timers advance at the shared
+Flight, projectiles, abilities, exploration, and HUD message timers advance at the shared
 simulation rate. A faster display does not increase ship speed or shorten
 cooldowns. After a visible stall, the client catches up only within its
 bounded simulation window; switching back from a hidden tab instead resumes
@@ -68,7 +74,18 @@ screen. Select Enter Game to try again. A full reload can start a new session.
 
 ## Surveyor scan
 
-Press E or tap Scan to identify nearby asteroid minerals temporarily on radar.
-Ice becomes a circle, metal a square, and rubble a triangle; the legend labels
-each shape. Farther rocks and rocks after the scan expires remain ordinary dots.
-The textures visible on asteroid bodies remain visible to both ships.
+The local minimap and full-screen universe map use one persistent shared
+exploration chart. Passive Surveyor reveal reaches 650 world units and passive
+Hauler reveal reaches 260; every crew member and bot contributes to the same
+explored area. Pilots stay readable; discovered furnaces remain marked on the
+universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
+Open the universe map with M or the Map button, then close it with M, Escape,
+or the Close control.
+
+Press E or tap Scan to identify nearby asteroid minerals on every teammate's
+radar. An active scan reaches 1,200 world units around its Surveyor. Ice becomes
+a circle, metal a square, and rubble a triangle; the legend labels each shape.
+The classification remains visible for that rock while it is in the nearby
+radar, even after the active scan ends. Unscanned rocks remain ordinary dots.
+The Surveyor's scan also records its player ID on the rock for a later furnace
+delivery.

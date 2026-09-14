@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { DAMAGE } from '../../../../src/constants';
 import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -26,7 +25,6 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
       data: {
         targetPlayerId: ace.id,
         attackerId: 'boundary',
-        damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
     expect(world.entity(ace).exploding).toBe(true);
@@ -50,7 +48,6 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
       data: {
         targetPlayerId: ace.id,
         attackerId: 'boundary',
-        damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
     expect(world.entity(ace).health).toBe(0);
@@ -70,7 +67,6 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
       data: {
         targetPlayerId: ace.id,
         attackerId: 'boundary',
-        damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
     expect(world.entity(ace).exploding).toBe(true);
@@ -91,7 +87,6 @@ describe('Death, disconnect, and rejoin leave no corpse or ghost', () => {
       data: {
         targetPlayerId: ace.id,
         attackerId: 'boundary',
-        damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
     const livesAfterDeath = world.entity(ace).lives;

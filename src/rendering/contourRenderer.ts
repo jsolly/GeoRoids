@@ -22,14 +22,17 @@ export function drawIsoContours(shipPosition: Position): void {
     return;
   }
 
-  const levels = getTerrainContours();
+  const pad = 32;
+  const scale = canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
+  const viewRadius =
+    Math.hypot(viewport.width / 2, viewport.height / 2) / Math.max(scale, Number.EPSILON) +
+    pad / Math.max(scale, Number.EPSILON);
+  const levels = getTerrainContours(shipPosition, viewRadius);
   if (levels.length === 0) {
     return;
   }
 
-  const pad = 32;
-  const scale = canvasManager.getPlayfieldScale();
-  const viewport = canvasManager.getViewportSize();
   const centerX = viewport.width / 2;
   const centerY = viewport.height / 2;
   ctx.save();

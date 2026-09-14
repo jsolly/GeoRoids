@@ -1,13 +1,11 @@
 import { PALETTE } from '../../constants';
-import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import type { Player } from '../../entities/player/Player';
-import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
+import { hexToRgba } from '../../utils/colorUtils';
 import type { HudLayout } from './hudLayout';
 
 const LEADERBOARD_FONT = '11px Arial';
 const LEADERBOARD_RANK_X_OFFSET = 4;
-const LEADERBOARD_FACTION_MARK_X_OFFSET = 20;
-const LEADERBOARD_NAME_X_OFFSET = 28;
+const LEADERBOARD_NAME_X_OFFSET = 20;
 const LEADERBOARD_SCORE_X_INSET = 4;
 const LEADERBOARD_NAME_SCORE_GAP = 6;
 const LEADERBOARD_ELLIPSIS = '…';
@@ -48,28 +46,6 @@ export function fitLeaderboardName(ctx: TextMeasurer, name: string, maxWidth: nu
   return `${characters.slice(0, low).join('').trimEnd()}${LEADERBOARD_ELLIPSIS}`;
 }
 
-/** One row per name so a drop-then-rejoin clone does not list PilotB three times. */
-function uniquePlayersForLeaderboard<
-  T extends { id: string; name: string; type: string; score: number },
->(players: readonly T[], currentPlayerId: string): T[] {
-  const byName = new Map<string, T>();
-  for (const player of players) {
-    const current = byName.get(player.name);
-    if (!current) {
-      byName.set(player.name, player);
-      continue;
-    }
-    const preferIncoming =
-      player.id === currentPlayerId ||
-      player.type === 'local' ||
-      (current.id !== currentPlayerId && current.type !== 'local' && player.score >= current.score);
-    if (preferIncoming) {
-      byName.set(player.name, player);
-    }
-  }
-  return [...byName.values()];
-}
-
 export function drawLeaderboard(
   ctx: CanvasRenderingContext2D,
   layout: HudLayout,
@@ -80,9 +56,7 @@ export function drawLeaderboard(
     return;
   }
 
-  const entries = uniquePlayersForLeaderboard(players, currentPlayerId).sort(
-    (a, b) => b.score - a.score
-  );
+  const entries = players.toSorted((a, b) => b.score - a.score);
 
   const { x: boardX, y: boardY, width: boardWidth, rowHeight, maxRows } = layout.leaderboard;
   const visible = entries.slice(0, maxRows);
@@ -91,7 +65,7 @@ export function drawLeaderboard(
 
   visible.forEach((entry, index) => {
     const y = boardY + 6 + index * rowHeight;
-    const nameColor = getFactionColor(entry.factionId);
+    const nameColor = entry.color;
     const alpha = entry.id === currentPlayerId ? 0.92 : 0.78;
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.4);
@@ -105,19 +79,8 @@ export function drawLeaderboard(
     const scoreWidth = ctx.measureText(scoreText).width;
     const nameMaxWidth = Math.max(0, scoreX - scoreWidth - LEADERBOARD_NAME_SCORE_GAP - nameX);
 
-    // The fixed name anchor leaves the rank and faction mark on the left;
-    // score measurement reserves the right column on compact boards.
+    // Score measurement reserves the right column on compact boards.
     ctx.fillText(rankText, rankX, y);
-
-    if (entry.factionId) {
-      drawSoftFactionMark(ctx, entry.factionId, {
-        x: boardX + LEADERBOARD_FACTION_MARK_X_OFFSET,
-        y: y - 4,
-        radius: 6,
-        angle: Math.PI / 2,
-        context: 'hud',
-      });
-    }
 
     ctx.fillStyle = hexToRgba(nameColor, alpha);
     const suffix = entry.type === 'bot' ? ' (bot)' : '';

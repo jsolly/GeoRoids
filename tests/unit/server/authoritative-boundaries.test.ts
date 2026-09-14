@@ -100,6 +100,10 @@ describe('server authority boundaries', () => {
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
     }
+    const field = addRubble(engine);
+    ownerWs.clear();
+    otherWs.clear();
+    unjoinedWs.clear();
 
     const request = {
       type: 'initAsteroids',
@@ -108,10 +112,15 @@ describe('server authority boundaries', () => {
     };
     core.handleClientMessage(request, otherWs);
     core.handleClientMessage(request, unjoinedWs);
-    expect(engine.getAsteroidCount()).toBe(0);
+    expect(ownerWs.received('asteroidCreateBatch')).toHaveLength(0);
+    expect(otherWs.received('asteroidCreateBatch')).toHaveLength(0);
+    expect(unjoinedWs.received('asteroidCreateBatch')).toHaveLength(0);
+    expect(engine.getAsteroid(field.id)).toBeDefined();
 
     core.handleClientMessage(request, ownerWs);
-    expect(engine.getAsteroidCount()).toBeGreaterThan(0);
+    expect(ownerWs.lastReceived('asteroidCreateBatch')?.data).toMatchObject({
+      asteroids: [expect.objectContaining({ id: field.id })],
+    });
   });
 
   test('a rammed rubble rock does not announce a cooperative split', () => {
@@ -123,7 +132,7 @@ describe('server authority boundaries', () => {
     }
     const rubble = addRubble(engine);
 
-    const results = engine.resolveAuthoritativeCombat(1_000);
+    const results = engine.resolveAuthoritativeCombat();
     const result = results.find((entry) => entry.destroyedAsteroidId === rubble.id);
     assert.ok(result, 'rubble collision result');
 

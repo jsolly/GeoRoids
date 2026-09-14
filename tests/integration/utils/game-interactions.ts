@@ -1,17 +1,8 @@
 import type { Page } from 'playwright';
+import { WORLD } from '../../../shared/world';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
-import type { BotShotArrangement } from './test-server-control';
-import {
-  arrangeBotShot,
-  getWorldDiagnostics,
-  isBotShieldActiveError,
-  placePlayer,
-} from './test-server-control';
-
-const BOT_SHOT_SETUP_TIMEOUT_MS = 15_000;
-
-type BotShieldWaitResult = 'clear' | 'dead';
+import { getWorldDiagnostics, placePlayer } from './test-server-control';
 
 export class GameInteractions {
   constructor(private page: Page) {}
@@ -534,7 +525,6 @@ export class GameInteractions {
       maxHealth: number;
       exploding: boolean;
       r: number;
-      factionId?: 'ion' | 'ember';
     }>
   > {
     return await this.page.evaluate(() => {
@@ -553,98 +543,8 @@ export class GameInteractions {
           maxHealth: p.ship.maxHealth,
           exploding: p.ship.exploding,
           r: p.ship.r,
-          ...((p.factionId ?? p.ship.factionId)
-            ? { factionId: p.factionId ?? p.ship.factionId }
-            : {}),
         }));
     });
-  }
-
-  /** Resolve a currently alive bot on the opposite assigned soft faction. */
-  async getHostileBotId(timeoutMs = 25000): Promise<string> {
-    await this.page.waitForFunction(
-      () => {
-        const gc = window.gameController;
-        const local = gc?.getPlayerManager()?.getLocalPlayer?.();
-        const localFaction = local?.factionId ?? local?.ship?.factionId;
-        if (!localFaction) {
-          return false;
-        }
-        const players = gc?.getNetworkManager().getAllPlayers() ?? [];
-        return players.some((player) => {
-          const faction = player.factionId ?? player.ship?.factionId;
-          return (
-            player.type === 'bot' &&
-            player.ship &&
-            player.ship.health > 0 &&
-            !player.ship.exploding &&
-            faction &&
-            faction !== localFaction
-          );
-        });
-      },
-      undefined,
-      { timeout: timeoutMs, polling: 200 }
-    );
-
-    return await this.page.evaluate(() => {
-      const gc = window.gameController;
-      const local = gc?.getPlayerManager()?.getLocalPlayer?.();
-      const localFaction = local?.factionId ?? local?.ship?.factionId;
-      const players = gc?.getNetworkManager().getAllPlayers() ?? [];
-      const hostile = players.find((player) => {
-        const faction = player.factionId ?? player.ship?.factionId;
-        return (
-          player.type === 'bot' &&
-          player.ship &&
-          player.ship.health > 0 &&
-          !player.ship.exploding &&
-          faction &&
-          faction !== localFaction
-        );
-      });
-      if (!hostile?.id) {
-        throw new Error(
-          `No alive hostile bot found for local faction ${localFaction ?? 'unknown'}`
-        );
-      }
-      return hostile.id;
-    });
-  }
-
-  /** Wait for a live bot's real laser shield to expire before the next shot. */
-  async waitForBotShieldToClear(
-    botId: string,
-    timeoutMs = BOT_SHOT_SETUP_TIMEOUT_MS
-  ): Promise<BotShieldWaitResult> {
-    const state = await this.page.waitForFunction(
-      (id) => {
-        const gc = window.gameController;
-        if (!gc) {
-          return false;
-        }
-        const players = gc.getNetworkManager().getAllPlayers();
-        const bot = players.find((player) => player.id === id);
-        if (!bot?.ship) {
-          return false;
-        }
-        if (bot.ship.exploding || bot.ship.health <= 0) {
-          return 'dead';
-        }
-        return !bot.ship.shieldActive && (bot.ship.shieldTime ?? 0) <= 0 ? 'clear' : false;
-      },
-      botId,
-      { timeout: timeoutMs, polling: 100 }
-    );
-    try {
-      const result: unknown = await state.jsonValue();
-      if (result !== 'clear' && result !== 'dead') {
-        throw new Error(`Bot ${botId} shield wait returned an invalid state`);
-      }
-      return result;
-    } finally {
-      await state.dispose();
-    }
   }
 
   /** Wait until at least `count` bots are known to the client. */
@@ -712,7 +612,7 @@ export class GameInteractions {
       y: number;
     } | null> => {
       return await this.page.evaluate(
-        ({ id, shipRadius }) => {
+        ({ id, shipRadius, worldRadius }) => {
           const gc = window.gameController;
           if (!gc) {
             throw new Error('gameController is not available');
@@ -733,7 +633,7 @@ export class GameInteractions {
             const angle = (index * Math.PI * 2) / 16;
             const shipX = targetX - Math.cos(angle) * gap;
             const shipY = targetY - Math.sin(angle) * gap;
-            if (Math.hypot(shipX, shipY) > 3000) {
+            if (Math.hypot(shipX, shipY) > worldRadius - shipRadius) {
               continue;
             }
 
@@ -764,7 +664,7 @@ export class GameInteractions {
           }
           return null;
         },
-        { id: asteroid.id, shipRadius }
+        { id: asteroid.id, shipRadius, worldRadius: WORLD.radius }
       );
     };
 
@@ -814,160 +714,6 @@ export class GameInteractions {
       }
     }
     throw new Error(`Asteroid ${asteroid.id} was not destroyed by laser within ${timeoutMs}ms`);
-  }
-
-  /**
-   * Fire repeated, re-aimed lasers at a bot until it is destroyed (or
-   * the shot budget is exhausted). Returns what was observed so the caller can
-   * assert on real damage/kill signals.
-   */
-  async attackBotWithLasers(
-    botId: string,
-    shots = 8
-  ): Promise<{
-    minHealthObserved: number;
-    everExploding: boolean;
-    scoreGain: number;
-    firstShotHealthBefore: number;
-  }> {
-    const startScore = await this.getScore();
-    const playerId = await this.getLocalPlayerId();
-    const retreat = { x: -1800, y: -1800 };
-    let minHealthObserved = Number.POSITIVE_INFINITY;
-    let everExploding = false;
-    let fired = 0;
-    let firstShotHealthBefore: number | undefined;
-
-    while (fired < shots) {
-      const setupDeadline = Date.now() + BOT_SHOT_SETUP_TIMEOUT_MS;
-      let arrangement: BotShotArrangement | undefined;
-      while (!arrangement) {
-        const remainingMs = setupDeadline - Date.now();
-        if (remainingMs <= 0) {
-          throw new Error(`Timed out arranging bot ${botId} after shield synchronization`);
-        }
-
-        const shieldState = await this.waitForBotShieldToClear(botId, remainingMs);
-        if (shieldState === 'dead') {
-          if (fired === 0) {
-            throw new Error(`Bot ${botId} became terminal before the first fixture shot`);
-          }
-          minHealthObserved = Math.min(minHealthObserved, 0);
-          break;
-        }
-
-        const requestTimeoutMs = setupDeadline - Date.now();
-        if (requestTimeoutMs <= 0) {
-          throw new Error(`Timed out arranging bot ${botId} after shield synchronization`);
-        }
-        try {
-          arrangement = await arrangeBotShot(playerId, botId, requestTimeoutMs);
-        } catch (error) {
-          if (!isBotShieldActiveError(error)) {
-            throw error;
-          }
-        }
-      }
-      if (!arrangement) {
-        break;
-      }
-      await this.waitForFixtureMotionEpoch(arrangement.motionEpoch);
-      await this.setPredictedShipPosition(
-        arrangement.playerPosition.x,
-        arrangement.playerPosition.y
-      );
-      const sample = await this.page.waitForFunction(
-        ({ id, expectedHealth, expectedPosition }) => {
-          const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
-          const bot = players.find((player) => player.id === id);
-          if (!bot?.ship) {
-            return false;
-          }
-          const dying = bot.ship.exploding || bot.ship.health <= 0;
-          if (
-            !dying &&
-            (bot.ship.health !== expectedHealth ||
-              Math.hypot(
-                bot.ship.position.x - expectedPosition.x,
-                bot.ship.position.y - expectedPosition.y
-              ) > 20)
-          ) {
-            return false;
-          }
-          return {
-            health: bot.ship.health,
-            exploding: bot.ship.exploding,
-            position: { x: bot.ship.position.x, y: bot.ship.position.y },
-          };
-        },
-        {
-          id: botId,
-          expectedHealth: arrangement.botHealth,
-          expectedPosition: arrangement.botPosition,
-        },
-        { timeout: 2000, polling: 20 }
-      );
-      const before = await sample.jsonValue();
-      if (!before) {
-        throw new Error(`Bot ${botId} was unavailable after fixture arrangement`);
-      }
-      if (firstShotHealthBefore === undefined) {
-        firstShotHealthBefore = arrangement.botHealth;
-      }
-      minHealthObserved = Math.min(minHealthObserved, before.health);
-      everExploding = everExploding || before.exploding;
-      if (before.exploding || before.health <= 0) {
-        break;
-      }
-
-      await this.fireLaserToward(before.position.x, before.position.y);
-      fired++;
-      await this.placeShipAt(retreat.x, retreat.y);
-      const impactDeadline = Date.now() + 1000;
-      while (Date.now() < impactDeadline) {
-        await this.page.waitForTimeout(50);
-        const after = await this.page.evaluate((id) => {
-          const players = window.gameController?.getNetworkManager().getAllPlayers() ?? [];
-          const bot = players.find((p) => p.id === id);
-          return bot ? { health: bot.ship.health, exploding: bot.ship.exploding } : null;
-        }, botId);
-        if (!after) {
-          throw new Error(`Bot ${botId} disappeared while waiting for laser impact`);
-        }
-        minHealthObserved = Math.min(minHealthObserved, after.health);
-        everExploding = everExploding || after.exploding;
-        if (after.exploding || after.health <= 0) {
-          break;
-        }
-        if (after.health < before.health) {
-          break;
-        }
-      }
-      // Once the selected hostile bot is dead, stop issuing shots. The server
-      // keeps bots firing during the same window, so continuing a lethal
-      // volley can kill the fixture ship and make the next pose acknowledgement
-      // impossible while it is exploding/respawning.
-      if (everExploding || minHealthObserved <= 0) {
-        break;
-      }
-    }
-
-    if (!Number.isFinite(minHealthObserved)) {
-      throw new Error(`No live health observation was available for bot ${botId}`);
-    }
-    if (fired === 0) {
-      throw new Error(`No real laser was fired at hostile bot ${botId}`);
-    }
-    if (firstShotHealthBefore === undefined) {
-      throw new Error(`No arranged health observation was available for bot ${botId}`);
-    }
-    const endScore = await this.getScore();
-    return {
-      minHealthObserved,
-      everExploding,
-      scoreGain: endScore - startScore,
-      firstShotHealthBefore,
-    };
   }
 
   /** Wait until the local player is registered on the server (post-join). */
@@ -1261,17 +1007,6 @@ export class GameInteractions {
     });
   }
 
-  /** Kill banner text from GameStateManager (empty when inactive). */
-  async getKillMessage(): Promise<string> {
-    return await this.page.evaluate(() => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('gameController is not available');
-      }
-      return gc.getGameStateManager().getKillMessage();
-    });
-  }
-
   /** HUD overlay text (game over, death messages). */
   async getHudText(): Promise<string> {
     return await this.page.evaluate(() => {
@@ -1419,7 +1154,10 @@ export class GameInteractions {
     const rotation = Math.max(0, 3 - livesBefore) * ((Math.PI * 2) / 3);
     const deathPosition = Array.from({ length: 24 }, (_, index) => {
       const angle = rotation + (index * Math.PI * 2) / 24;
-      const point = { x: 3150 * Math.cos(angle), y: 3150 * Math.sin(angle) };
+      const point = {
+        x: (WORLD.radius + 50) * Math.cos(angle),
+        y: (WORLD.radius + 50) * Math.sin(angle),
+      };
       const clearance = loot.length
         ? Math.min(...loot.map((drop) => Math.hypot(drop.x - point.x, drop.y - point.y)))
         : Number.POSITIVE_INFINITY;
@@ -1433,7 +1171,10 @@ export class GameInteractions {
       // A final boundary death disconnects before another motion acknowledgement
       // can arrive. Finish fixture placement inside the arena, then cross the
       // wall through the real client collision path.
-      await this.placeShipAt((deathPosition.x * 3000) / 3150, (deathPosition.y * 3000) / 3150);
+      await this.placeShipAt(
+        (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
+        (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
+      );
       await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
       // Observe enough collision frames for a ship whose collected mass raised
       // its health above the base 100, including the final game-over transition.
@@ -1481,21 +1222,15 @@ export class GameInteractions {
    * Fire at a remote player's ship from client A (requires both clients in game).
    * Parks the shooter adjacent to the target and fires one laser.
    */
-  async fireLaserAtRemotePlayer(targetPlayerId: string, distance = 45): Promise<void> {
+  async fireLaserAtRemotePlayer(targetPlayerId: string, distance = 45): Promise<string> {
     const firingPoint = await this.page.evaluate(
       ({ targetId, distance }) => {
         const gc = window.gameController;
         const players = gc?.getNetworkManager().getAllPlayers() ?? [];
         const target = players.find((p) => p.id === targetId);
-        const local = gc?.getPlayerManager()?.getLocalPlayer?.();
         const ship = gc?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!target?.ship || !ship) {
           throw new Error('Shooter or target ship unavailable');
-        }
-        const localFaction = local?.factionId ?? ship.factionId;
-        const targetFaction = target.factionId ?? target.ship.factionId;
-        if (!localFaction || !targetFaction || localFaction === targetFaction) {
-          throw new Error('Remote laser target must belong to the opposing faction');
         }
         const tx = target.ship.position.x;
         const ty = target.ship.position.y;
@@ -1504,6 +1239,12 @@ export class GameInteractions {
       { targetId: targetPlayerId, distance }
     );
     await this.placeShipAt(firingPoint.x, firingPoint.y);
+    const existing = await this.page.evaluate(
+      () =>
+        window.gameController
+          ?.getCurrPlayer()
+          ?.ship.lasers.flatMap((laser) => (laser.serverId ? [laser.serverId] : [])) ?? []
+    );
     await this.page.evaluate((targetId) => {
       const gc = window.gameController;
       const players = gc?.getNetworkManager().getAllPlayers() ?? [];
@@ -1519,7 +1260,21 @@ export class GameInteractions {
       ship.canShoot = true;
       ship.shoot();
     }, targetPlayerId);
-    await this.page.waitForTimeout(300);
+    const acknowledgement = await this.page.waitForFunction(
+      (prior) =>
+        window.gameController
+          ?.getCurrPlayer()
+          ?.ship.lasers.find((laser) => laser.serverId && !prior.includes(laser.serverId))
+          ?.serverId,
+      existing,
+      { timeout: 5000 }
+    );
+    const id = await acknowledgement.jsonValue();
+    await acknowledgement.dispose();
+    if (typeof id !== 'string') {
+      throw new Error('Shot did not receive an authoritative projectile identity');
+    }
+    return id;
   }
 
   /** Read a remote player's synced health by id. */
@@ -1604,13 +1359,5 @@ export class GameInteractions {
     if (options?.waitForCombatReady !== false) {
       await this.waitForCombatReady();
     }
-  }
-
-  /** Alias used by satellite-pickup scenario tests. */
-  async bootSinglePlayerGame(options?: {
-    waitForCombatReady?: boolean;
-    kitId?: 'surveyor' | 'hauler';
-  }): Promise<void> {
-    await this.bootGame(options);
   }
 }

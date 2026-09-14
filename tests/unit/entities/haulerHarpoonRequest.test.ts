@@ -40,7 +40,6 @@ test('a missed Hauler E does not lock the next tap behind cooldown', () => {
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
   expect(ship.activateAbility()).toBe(true);
   expect(ship.harpoonTargetId).toBe('rock-1');
-  expect(ship.harpoonTimer).toBeGreaterThan(0);
 });
 
 test('local Hauler still sends useAbility after a local latch', () => {

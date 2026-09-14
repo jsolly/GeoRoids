@@ -91,8 +91,6 @@ describe('Satellite pickups', () => {
 
     expect(pilot.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(pilot.spawnProtectionTimer).toBe(0);
-    expect(pilot.shieldActive).toBe(false);
-    expect(pilot.shieldCooldown).toBe(0);
     expect(attached.state).toBe('orbiting');
     expect(attached.ownerId).toBe('pilot');
     expect(attached.health).toBe(SATELLITE_PICKUP.HEALTH);
@@ -183,7 +181,7 @@ describe('Satellite pickups', () => {
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
 
-    gameEngine.handleShipDamage('pilot', 'asteroid', pilot.health, 'collision');
+    gameEngine.handleShipDamage('pilot', 'asteroid', pilot.health);
 
     const released = gameEngine.getSatellitePickup(attached.id);
     expect(released?.state).toBe('loose');
@@ -221,17 +219,6 @@ describe('Satellite pickups', () => {
     gameEngine.tickSatellitePickups();
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');
     expect(gameEngine.getPlayer('pilot')?.score).toBe(0);
-  });
-
-  test('the ordinary F-key shield remains independent after automatic collection', () => {
-    addPilot();
-    collectNearest();
-
-    expect(gameEngine.requestShield('pilot', true)).toBe(true);
-    const pilot = gameEngine.getPlayer('pilot');
-    expect(pilot?.shieldActive).toBe(true);
-    expect(pilot?.shieldTime).toBeGreaterThan(0);
-    expect(pilot?.spawnProtectionTimer).toBe(0);
   });
 
   test('resetting the world clears pickups', () => {

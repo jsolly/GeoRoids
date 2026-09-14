@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
+import { PALETTE, VISUAL } from '../../../../src/constants';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -10,83 +11,90 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 /** Observe the real animation loop and real core strokes while the shoot packet is in flight. */
 async function paintedShotFrames(page: Page) {
-  return page.evaluate(async () => {
-    const original = CanvasRenderingContext2D.prototype.stroke;
-    const originalMoveTo = CanvasRenderingContext2D.prototype.moveTo;
-    const originalLineTo = CanvasRenderingContext2D.prototype.lineTo;
-    let from = { x: 0, y: 0 };
-    let to = { x: 0, y: 0 };
-    CanvasRenderingContext2D.prototype.moveTo = function (x: number, y: number) {
-      from = { x, y };
-      originalMoveTo.call(this, x, y);
-    };
-    CanvasRenderingContext2D.prototype.lineTo = function (x: number, y: number) {
-      to = { x, y };
-      originalLineTo.call(this, x, y);
-    };
-    let painted = 0;
-    let started = false;
-    let raf = 0;
-    const frames: Array<{ count: number; painted: number; x: number; y: number }> = [];
-    CanvasRenderingContext2D.prototype.stroke = function (
-      this: CanvasRenderingContext2D,
-      path?: Path2D
-    ) {
-      if (
-        this.canvas.id === 'gameCanvas' &&
-        this.strokeStyle === '#fde68a' &&
-        this.lineWidth === 2
+  return page.evaluate(
+    async ({ coreWidth, coreLength, coreColor }) => {
+      const original = CanvasRenderingContext2D.prototype.stroke;
+      const originalMoveTo = CanvasRenderingContext2D.prototype.moveTo;
+      const originalLineTo = CanvasRenderingContext2D.prototype.lineTo;
+      let from = { x: 0, y: 0 };
+      let to = { x: 0, y: 0 };
+      CanvasRenderingContext2D.prototype.moveTo = function (x: number, y: number) {
+        from = { x, y };
+        originalMoveTo.call(this, x, y);
+      };
+      CanvasRenderingContext2D.prototype.lineTo = function (x: number, y: number) {
+        to = { x, y };
+        originalLineTo.call(this, x, y);
+      };
+      let painted = 0;
+      let started = false;
+      let raf = 0;
+      const frames: Array<{ count: number; painted: number; x: number; y: number }> = [];
+      CanvasRenderingContext2D.prototype.stroke = function (
+        this: CanvasRenderingContext2D,
+        path?: Path2D
       ) {
-        const ship = window.gameController?.getPlayerManager().getLocalShip();
-        const shot = ship?.lasers[0];
-        if (ship && shot) {
-          const x = innerWidth / 2 + shot.position.x - ship.position.x;
-          const y = innerHeight / 2 + shot.position.y - ship.position.y;
-          if (
-            Math.hypot((from.x + to.x) / 2 - x, (from.y + to.y) / 2 - y) < 0.01 &&
-            Math.abs(Math.hypot(to.x - from.x, to.y - from.y) - 15) < 0.01
-          ) {
-            painted++;
-          }
-        }
-      }
-      Reflect.apply(original, this, path ? [path] : []);
-    };
-    let deadline = 0;
-    try {
-      return await new Promise<typeof frames>((resolve, reject) => {
-        deadline = window.setTimeout(() => reject(new Error('No painted local shot')), 5000);
-        const sample = () => {
+        if (
+          this.canvas.id === 'gameCanvas' &&
+          this.strokeStyle === coreColor &&
+          this.lineWidth === coreWidth
+        ) {
           const ship = window.gameController?.getPlayerManager().getLocalShip();
           const shot = ship?.lasers[0];
-          if (shot) {
-            started = true;
+          if (ship && shot) {
+            const x = innerWidth / 2 + shot.position.x - ship.position.x;
+            const y = innerHeight / 2 + shot.position.y - ship.position.y;
+            if (
+              Math.hypot((from.x + to.x) / 2 - x, (from.y + to.y) / 2 - y) < 0.01 &&
+              Math.abs(Math.hypot(to.x - from.x, to.y - from.y) - coreLength) < 0.01
+            ) {
+              painted++;
+            }
           }
-          if (started) {
-            frames.push({
-              count: ship?.lasers.length ?? 0,
-              painted,
-              x: shot?.position.x ?? NaN,
-              y: shot?.position.y ?? NaN,
-            });
-          }
-          painted = 0;
-          if (frames.length === 12) {
-            resolve(frames);
-          } else {
-            raf = requestAnimationFrame(sample);
-          }
-        };
-        raf = requestAnimationFrame(sample);
-      });
-    } finally {
-      clearTimeout(deadline);
-      cancelAnimationFrame(raf);
-      CanvasRenderingContext2D.prototype.stroke = original;
-      CanvasRenderingContext2D.prototype.moveTo = originalMoveTo;
-      CanvasRenderingContext2D.prototype.lineTo = originalLineTo;
+        }
+        Reflect.apply(original, this, path ? [path] : []);
+      };
+      let deadline = 0;
+      try {
+        return await new Promise<typeof frames>((resolve, reject) => {
+          deadline = window.setTimeout(() => reject(new Error('No painted local shot')), 5000);
+          const sample = () => {
+            const ship = window.gameController?.getPlayerManager().getLocalShip();
+            const shot = ship?.lasers[0];
+            if (shot) {
+              started = true;
+            }
+            if (started) {
+              frames.push({
+                count: ship?.lasers.length ?? 0,
+                painted,
+                x: shot?.position.x ?? NaN,
+                y: shot?.position.y ?? NaN,
+              });
+            }
+            painted = 0;
+            if (frames.length === 12) {
+              resolve(frames);
+            } else {
+              raf = requestAnimationFrame(sample);
+            }
+          };
+          raf = requestAnimationFrame(sample);
+        });
+      } finally {
+        clearTimeout(deadline);
+        cancelAnimationFrame(raf);
+        CanvasRenderingContext2D.prototype.stroke = original;
+        CanvasRenderingContext2D.prototype.moveTo = originalMoveTo;
+        CanvasRenderingContext2D.prototype.lineTo = originalLineTo;
+      }
+    },
+    {
+      coreWidth: VISUAL.LASER_STROKE_WIDTH,
+      coreLength: VISUAL.LASER_LENGTH,
+      coreColor: PALETTE.LASER_LOCAL.toLowerCase(),
     }
-  });
+  );
 }
 
 for (const touch of [false, true]) {

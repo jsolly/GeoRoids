@@ -18,15 +18,17 @@ import {
   acceptTestPost,
   areTestHttpEndpointsEnabled,
   buildHealthPayload,
-  handleTestArrangeBotShot,
+  handleTestArrangeCrewField,
   handleTestPlacePlayer,
   handleTestResetWorld,
 } from './testHttpHandlers';
+import { WorldStore } from './world/WorldStore';
 
 type CreateServerOptions = {
   port?: number;
   nodeEnv?: string;
   seed?: number;
+  worldPath?: string;
 };
 
 export function createServerInstance(options: CreateServerOptions = {}) {
@@ -63,7 +65,9 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     });
 
     if (req.url === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(gameEngine.isPersistenceHealthy() ? 200 : 503, {
+        'Content-Type': 'application/json',
+      });
       res.end(
         JSON.stringify(
           buildHealthPayload(
@@ -82,13 +86,13 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       return;
     }
 
-    if (req.url === '/test/place-player') {
-      handleTestPlacePlayer(req, res, NODE_ENV, gameEngine, wsCore);
+    if (req.url === '/test/arrange-crew-field') {
+      handleTestArrangeCrewField(req, res, NODE_ENV, gameEngine, wsCore);
       return;
     }
 
-    if (req.url === '/test/arrange-bot-shot') {
-      handleTestArrangeBotShot(req, res, NODE_ENV, gameEngine, wsCore);
+    if (req.url === '/test/place-player') {
+      handleTestPlacePlayer(req, res, NODE_ENV, gameEngine, wsCore);
       return;
     }
 
@@ -280,7 +284,8 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     logger.error('❌ WebSocket server error:', error);
   });
 
-  const gameEngine = new GameEngine(options.seed);
+  const worldStore = options.worldPath ? new WorldStore(options.worldPath) : undefined;
+  const gameEngine = new GameEngine(options.seed, undefined, worldStore);
   acquireServerPerformanceMetrics();
   // Ensure server-side game loop (including bot regen) runs
   gameEngine.startGameLoop();
@@ -421,6 +426,12 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     clearInterval(cleanupInterval);
     wsCore.stopPeriodicGameStateBroadcast();
     gameEngine.stopGameLoop();
+    let checkpointError: unknown;
+    try {
+      gameEngine.checkpointWorld();
+    } catch (error) {
+      checkpointError = error;
+    }
     releaseServerPerformanceMetrics();
     closing = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
@@ -447,8 +458,12 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       });
       void Promise.all([stopWebSockets, stopHttp])
         .then(async () => {
+          worldStore?.close();
           if (!(await ClientLogger.flushPending())) {
             throw new Error('Timed out flushing forwarded client logs');
+          }
+          if (checkpointError) {
+            throw checkpointError;
           }
         })
         .then(

@@ -91,10 +91,3 @@ test('dense metal shards get a second readable inner outline', () => {
   // shard contributes one extra diamond to each pass.
   expect(ctx.lineToCount).toBe(45);
 });
-
-test('shield remains independent mint rather than health green', () => {
-  expect(PALETTE.SHIELD).toBe('#7DD3C8');
-  expect(PALETTE.SHIELD).not.toBe(PALETTE.LOCAL);
-  expect(PALETTE.SHIELD).not.toBe(PALETTE.REMOTE);
-  expect(PALETTE.SHIELD).not.toBe(PALETTE.HEALTH);
-});

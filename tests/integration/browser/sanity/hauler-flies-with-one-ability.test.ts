@@ -1,175 +1,138 @@
 import { expect, test } from 'vitest';
-import { SHIP_ABILITY } from '../../../../src/entities/ship/shipKits';
-import { installAudioProbe } from '../../utils/audio-probe';
+import {
+  assertNoBrowserDiagnostics,
+  watchBrowserDiagnostics,
+} from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
-import { captureConsole } from '../../utils/reflective-asteroids-driver';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const FIXTURE_ASTEROID_ID = 'crew-fixture-ore';
 
 test.each([
   { width: 1280, height: 900 },
   { width: 390, height: 844 },
 ])(
-  'Hauler uses E without extra asteroid controls at $width pixels',
+  'Hauler E attaches and releases one persistent tow cable at $width pixels',
   async (viewport) => {
-    const page = browserManager.getCurrentPage();
-    if (!page) {
-      throw new Error('Page unavailable');
-    }
+    const mobile = viewport.width < 600;
+    const page = await browserManager.recreatePage({ hasTouch: mobile });
+    const useAbility = () =>
+      mobile ? page.locator('#touch-ability').tap() : page.keyboard.press('KeyE');
     await page.setViewportSize(viewport);
-    await installAudioProbe(page);
-    const consoleState = captureConsole(page);
-    const messages: string[] = [];
-    page.on('websocket', (socket) =>
-      socket.on('framesent', ({ payload }) => {
-        const message = JSON.parse(String(payload));
-        messages.push(message.type);
-      })
-    );
-    await page.goto(TestConfig.GAME_URL);
-    await expect
-      .poll(() => page.locator('#controls-hint').textContent())
-      .toMatch(
-        viewport.width < 500
-          ? /Always thrust · Drag to steer/
-          : /Always thrust · Mouse, A\/D or left\/right arrows/
-      );
-    expect(await page.locator('#controls-hint').textContent()).not.toMatch(
-      /target|latch|anchor|brake|spin|flick/i
-    );
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`hauler-menu-${viewport.width}.png`),
-    });
+    const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
-    await game.waitForAsteroids(1);
-    const target = await page.evaluate(() => {
-      const gc = window.gameController;
-      const rocks = gc?.getCurrRoidBelt().getRoids() ?? [];
-      const clearance = (rock: (typeof rocks)[number]) =>
-        Math.min(
-          ...rocks
-            .filter((other) => other.id !== rock.id)
-            .map(
-              (other) =>
-                Math.hypot(other.position.x - rock.position.x, other.position.y - rock.position.y) -
-                other.r -
-                rock.r
-            )
-        );
-      const rock = [...rocks].sort((a, b) => clearance(b) - clearance(a))[0];
-      if (!rock) {
-        throw new Error('Asteroid unavailable');
-      }
-      return { x: rock.position.x + rock.r + 100, y: rock.position.y };
-    });
-    await game.placeShipAt(target.x, target.y);
-    for (const key of ['KeyT', 'KeyQ', 'KeyR', 'KeyX', 'KeyC']) {
-      await page.keyboard.press(key);
-    }
+    const playerId = await game.getLocalPlayerId();
+    await arrangeCrewField([playerId], 'delivery');
+    await page.waitForFunction(
+      (asteroidId) => {
+        const controller = window.gameController;
+        const asteroid = controller
+          ?.getCurrRoidBelt()
+          .getRoids()
+          .find((rock) => rock.id === asteroidId);
+        return controller?.getCurrPlayer()?.ship.kitId === 'hauler' && asteroid?.health === 75;
+      },
+      FIXTURE_ASTEROID_ID,
+      { timeout: 5000, polling: 50 }
+    );
+
     const canvas = await page.locator('#gameCanvas').boundingBox();
     if (!canvas) {
-      throw new Error('Canvas unavailable');
+      throw new Error('Game canvas unavailable');
     }
-    await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2, {
-      button: 'middle',
-    });
-    const touch = await page.context().newCDPSession(page);
-    try {
-      const x = canvas.x + canvas.width / 2;
-      const y = canvas.y + canvas.height / 2;
-      await touch.send('Input.dispatchTouchEvent', {
-        type: 'touchStart',
-        touchPoints: [{ x, y, id: 7 }],
-      });
-      await touch.send('Input.dispatchTouchEvent', {
-        type: 'touchMove',
-        touchPoints: [{ x: x + 60, y, id: 7 }],
-      });
-      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    } finally {
-      await touch.detach();
-    }
-    expect(messages.filter((type) => type === 'asteroidTool' || type === 'asteroidInput')).toEqual(
-      []
-    );
-    expect(
-      await page
-        .locator('#flight-feedback, #flight-preview, #flight-selection-announcement')
-        .count()
-    ).toBe(0);
-    const cueDurations = await page.evaluate(async () => {
-      const context = new AudioContext();
-      try {
-        return await Promise.all(
-          ['harpoon-launch.m4a', 'harpoon-latch.m4a'].map(async (name) => {
-            const response = await fetch(`/sounds/${name}`);
-            const decoded = await context.decodeAudioData(await response.arrayBuffer());
-            return decoded.duration;
-          })
-        );
-      } finally {
-        await context.close();
-      }
-    });
-    await page.keyboard.press('KeyE');
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.12);
+    await useAbility();
     await expect
-      .poll(() =>
-        page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTimer ?? 0)
+      .poll(
+        () => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId),
+        { timeout: 5000, message: 'Hauler E should attach the fixture asteroid' }
       )
-      .toBeGreaterThan(0);
-    expect(messages).toContain('useAbility');
-    const healthBeforePull = await game.getShipHealth();
+      .toBe(FIXTURE_ASTEROID_ID);
+
+    const atAttach = await page.evaluate((asteroidId) => {
+      const asteroid = window.gameController
+        ?.getCurrRoidBelt()
+        .getRoids()
+        .find((rock) => rock.id === asteroidId);
+      if (!asteroid) {
+        throw new Error('Tow fixture disappeared at attachment');
+      }
+      return { x: asteroid.position.x, y: asteroid.position.y };
+    }, FIXTURE_ASTEROID_ID);
+
+    // Attachment preserves the rock's momentum. Turn away from it so the
+    // persistent cable becomes taut before checking that towing moves cargo.
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.88);
     await expect
       .poll(
         () =>
-          page.evaluate((releaseGap) => {
-            const gc = window.gameController;
-            const ship = gc?.getCurrPlayer()?.ship;
-            const rock = gc
-              ?.getCurrRoidBelt()
-              .getRoids()
-              .find((row) => row.id === ship?.harpoonTargetId);
-            return Boolean(
-              ship &&
-                rock &&
-                ship.harpoonTimer > 0 &&
-                Math.hypot(ship.position.x - rock.position.x, ship.position.y - rock.position.y) <
-                  ship.r + rock.r + releaseGap + 20
-            );
-          }, SHIP_ABILITY.HARPOON_RELEASE_GAP),
-        { timeout: 2500, interval: 20 }
+          page.evaluate(
+            ({ asteroidId, beforeY }) => {
+              const controller = window.gameController;
+              const ship = controller?.getCurrPlayer()?.ship;
+              const asteroid = controller
+                ?.getCurrRoidBelt()
+                .getRoids()
+                .find((rock) => rock.id === asteroidId);
+              return (
+                ship?.harpoonTargetId === asteroidId &&
+                asteroid !== undefined &&
+                Math.abs(asteroid.position.y - beforeY) > 0.5
+              );
+            },
+            { asteroidId: FIXTURE_ASTEROID_ID, beforeY: atAttach.y }
+          ),
+        {
+          timeout: 5000,
+          message: 'The taut tow cable should move the attached rock with the Hauler',
+        }
       )
       .toBe(true);
-    expect(await game.getShipHealth()).toBeGreaterThanOrEqual(healthBeforePull);
-    for (const duration of cueDurations) {
-      await expect
-        .poll(() =>
-          page.evaluate((expectedDuration) => {
-            const events: Array<{ duration: number }> = JSON.parse(
-              document.documentElement.dataset['audioEvents'] ?? '[]'
-            );
-            return events.some((event) => Math.abs(event.duration - expectedDuration) < 0.001);
-          }, duration)
-        )
-        .toBe(true);
+    const duringTow = await page.evaluate((asteroidId) => {
+      const controller = window.gameController;
+      const ship = controller?.getCurrPlayer()?.ship;
+      const asteroid = controller
+        ?.getCurrRoidBelt()
+        .getRoids()
+        .find((rock) => rock.id === asteroidId);
+      if (!ship || !asteroid) {
+        throw new Error('Tow fixture disappeared before release');
+      }
+      return {
+        towId: ship.harpoonTargetId,
+        asteroid: { x: asteroid.position.x, y: asteroid.position.y },
+        hasRemovedTimer: 'harpoonTimer' in ship,
+      };
+    }, FIXTURE_ASTEROID_ID);
+    expect(duringTow.towId).toBe(FIXTURE_ASTEROID_ID);
+    expect(duringTow.hasRemovedTimer).toBe(false);
+    if (mobile) {
+      expect(await page.locator('#touch-ability').textContent()).toBe('RELEASE');
+      expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('false');
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath('hauler-release-mobile.png'),
+      });
     }
+    expect(duringTow.asteroid.y).not.toBe(atAttach.y);
+
+    await useAbility();
+    await expect
+      .poll(
+        () => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId),
+        {
+          timeout: 5000,
+          message: 'Hauler E should release the tow cable',
+        }
+      )
+      .toBeNull();
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`hauler-basic-${viewport.width}.png`),
+      path: screenshotManager.getScreenshotPath(`hauler-tow-${viewport.width}.png`),
     });
-    await expect
-      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.thrusting))
-      .toBe(true);
-    await page.keyboard.press('Space');
-    await expect.poll(() => messages.includes('shoot')).toBe(true);
-    await page.keyboard.press('KeyF');
-    await expect
-      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.shieldActive))
-      .toBe(true);
-    expect(consoleState.errors).toEqual([]);
-    expect(consoleState.warnings).toEqual([]);
+    assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

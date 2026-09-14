@@ -19,7 +19,6 @@ declare global {
       shipId?: string;
       position?: Position;
       cause?: string;
-      killerName?: string;
     }>;
     serverAsteroidTagged: CustomEvent<AsteroidTaggedEvent>;
     serverAsteroidDestroyed: CustomEvent<AsteroidDestroyEvent>;

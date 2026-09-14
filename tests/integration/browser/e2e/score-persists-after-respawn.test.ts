@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager } = createBrowserScenarioHooks();
 
@@ -15,46 +16,22 @@ test(
 
     const game = new GameInteractions(page);
     await game.bootGame();
+    await arrangeCrewField([await game.getLocalPlayerId()], 'mining');
     await game.waitForCombatReady();
-    await game.waitForAsteroids(1);
-
-    const [asteroids, pickups, bots] = await Promise.all([
-      game.getAsteroidPositions(),
-      game.getSatellitePickups(),
-      game.getBots(),
-    ]);
-    const hazards = [
-      ...pickups.map((pickup) => ({ x: pickup.x, y: pickup.y })),
-      ...bots
-        .filter((bot) => bot.health > 0 && !bot.exploding)
-        .map((bot) => ({ x: bot.x, y: bot.y })),
-    ];
-    const target = asteroids
-      .filter(
-        (asteroid) =>
-          asteroid.isCollabTarget !== true && asteroid.material === 'ice' && asteroid.radius < 40
-      )
-      .map((asteroid) => ({
-        ...asteroid,
-        clearance: hazards.length
-          ? Math.min(
-              ...hazards.map((position) =>
-                Math.hypot(asteroid.x - position.x, asteroid.y - position.y)
-              )
-            )
-          : Number.MAX_SAFE_INTEGER,
-      }))
-      .sort((left, right) => right.clearance - left.clearance)[0];
-    expect(
-      target,
-      'an ordinary ice asteroid clear of hostile actors should be available'
-    ).toBeDefined();
-    if (!target) {
-      return;
-    }
+    await game.placeShipAt(0, -360);
+    await page.evaluate(() => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Mining fixture pilot missing');
+      }
+      ship.angle = Math.PI / 2;
+    });
+    await expect
+      .poll(async () => (await game.getAsteroidPositions()).map((rock) => rock.id))
+      .toEqual(['crew-fixture-ore']);
     const livesBeforeScore = await game.getLives();
     const scoreBefore = await game.getScore();
-    await game.destroyAsteroidWithLaser(target, 25000);
+    await page.keyboard.press('Space');
 
     await expect
       .poll(() => game.getScore(), {

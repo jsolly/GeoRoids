@@ -41,7 +41,7 @@ test('two bots ram separate asteroids in the same tick without duplicate damage'
     engine.addAsteroid(rock(`impact-${index}`, position));
   }
 
-  const impacts = engine.resolveAuthoritativeCombat(1000);
+  const impacts = engine.resolveAuthoritativeCombat();
 
   expect(impacts).toHaveLength(2);
   expect(impacts.every((impact) => impact.attackerId === 'asteroid')).toBe(true);
@@ -50,7 +50,7 @@ test('two bots ram separate asteroids in the same tick without duplicate damage'
   for (const index of bots.keys()) {
     expect(engine.getAsteroid(`impact-${index}`)).toBeUndefined();
   }
-  expect(engine.resolveAuthoritativeCombat(1050)).toHaveLength(0);
+  expect(engine.resolveAuthoritativeCombat()).toHaveLength(0);
   expect(bots.map((bot) => bot.health)).toEqual(damagedHealth);
 });
 
@@ -67,7 +67,7 @@ test('a weakened bot killed by an asteroid respawns at full health after the res
   });
   engine.addAsteroid(rock('fatal-impact', impactPosition));
 
-  const impacts = engine.resolveAuthoritativeCombat(1000);
+  const impacts = engine.resolveAuthoritativeCombat();
 
   expect(impacts).toHaveLength(1);
   expect(impacts[0]?.attackerId).toBe('asteroid');

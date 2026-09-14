@@ -1,9 +1,6 @@
 // Shared types between client and server
 // These types are used in network communication and should be identical on both sides
 
-/** Soft sides for readability + same-side cooperation. Not a team win condition. */
-export type FactionId = 'ion' | 'ember';
-
 export type DiagnosticLogRecord = {
   version: 1;
   timestamp: string;
@@ -32,11 +29,8 @@ export interface Velocity {
 }
 
 // Network update interface - only what needs to be synced
-/** Chosen at join. Shared by human and bot ships. Independent of soft faction. */
+/** Chosen at join. Shared by human and bot ships. */
 export type ShipKitId = 'surveyor' | 'hauler';
-
-/** Soft side (ION / EMBER). Assigned on join by the factions stream. */
-export type SoftFactionId = 'ion' | 'ember';
 
 export interface PlayerUpdate {
   id: string;
@@ -52,7 +46,6 @@ export interface PlayerUpdate {
   maxHealth: number;
 
   kitId?: ShipKitId;
-  factionId?: SoftFactionId;
   mass?: number;
   /** Acknowledges the server's current movement ownership epoch. */
   motionEpoch?: number;
@@ -74,7 +67,6 @@ export interface PlayerJoin {
   position: Position;
   color: string;
   kitId?: ShipKitId;
-  factionId?: SoftFactionId;
   /** Seeded heightfield shared by every client in the room. */
   terrainSeed?: number;
 }
@@ -138,6 +130,10 @@ export interface AsteroidData {
   offsets: number[];
   /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
+  /** Surveyors who identified this deposit; retained until it leaves the field. */
+  surveyedBy?: string[];
+  /** Pilots who have mined this deposit; persisted until the deposit is destroyed. */
+  miningContributors?: string[];
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
   phenomenon?: AsteroidPhenomenon;
@@ -212,6 +208,10 @@ export interface ShockwaveEvent {
 }
 
 export interface ServerGameState {
+  /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
+  exploration: ExplorationTile[];
+  /** Revealed landmarks and valuable drops, independent of local simulation visibility. */
+  mapAssets: MapAsset[];
   entities: ServerEntityData[];
   asteroids: AsteroidData[];
   loot: LootData[];
@@ -220,6 +220,13 @@ export interface ServerGameState {
   isPaused: boolean;
   /** Same seed on every client → same contours and slope field. */
   terrainSeed?: number;
+}
+
+export interface MapAsset {
+  id: string;
+  kind: 'furnace' | 'laserCore' | 'wreckage' | 'satellite';
+  position: Position;
+  name: string;
 }
 
 /** Complete collaborative hit window; omitted windows are no longer active. */
@@ -259,19 +266,13 @@ export interface ServerEntityData {
   respawnTimer?: number;
   spawnProtectionTimer?: number;
   kitId?: ShipKitId;
-  factionId?: SoftFactionId;
   abilityCooldownFrames?: number;
   abilityActiveFrames?: number;
 
-  harpoonTimer?: number;
-  harpoonTargetId?: string;
+  harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
-  /** Last killer token (boundary, asteroid, player/bot id). Omitted after respawn. */
+  /** Last environmental cause (boundary or asteroid). Omitted after respawn. */
   deathCause?: string;
-  shieldActive?: boolean;
-  shieldTime?: number;
-  shieldCooldown?: number;
-  shieldFlashTime?: number;
   playerMotion?: PlayerMotionState;
   laserUpgrade?: LaserUpgrade;
 }
@@ -285,3 +286,18 @@ export interface PingMessage {
 
 /** One newly accepted ship shot; snapshots remain silent on join/reconnect. */
 export type PlayerShotFired = Pick<PlayerProjectileState, 'id' | 'ownerId' | 'position'>;
+
+/** One authoritative delivery, including the same full reward for each contributor. */
+export interface FurnaceDelivery {
+  furnaceId: string;
+  asteroidId: string;
+  position: Position;
+  material: AsteroidMaterial;
+  rewards: Array<{ playerId: string; playerName: string; points: number; score: number }>;
+}
+
+/** A sector of permanent shared map discoveries; 16 by 16 bits, hex encoded. */
+export interface ExplorationTile {
+  id: string;
+  bits: string;
+}

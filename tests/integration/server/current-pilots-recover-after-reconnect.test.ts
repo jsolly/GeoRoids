@@ -6,6 +6,7 @@ import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { SnapshotDecoder, SnapshotEncoder } from '../../../shared/snapshotProtocol';
+import { nearbyWorldRows } from '../../../shared/world';
 import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
@@ -115,6 +116,22 @@ test('current sockets render matching worlds across late join and reconnect', as
   }
   const first = await pilot('first');
   const second = await pilot('second');
+  const expectedWorld = (position: { x: number; y: number }) => {
+    const gameState = engine.getGameState();
+    const asteroids = nearbyWorldRows(gameState.asteroids, position);
+    const asteroidIds = new Set(asteroids.map((asteroid) => asteroid.id));
+    return new SnapshotEncoder({
+      ...gameState,
+      asteroids,
+      loot: nearbyWorldRows(gameState.loot, position),
+      satellitePickups: nearbyWorldRows(gameState.satellitePickups, position),
+      playerProjectiles: nearbyWorldRows(engine.getPlayerProjectiles(), position),
+      collabTags: engine
+        .getActiveCollabTags()
+        .filter((tag) => asteroidIds.has(tag.asteroidId))
+        .map((tag) => ({ id: tag.asteroidId, ...tag })),
+    }).state;
+  };
   // Seed a real active shot and a normal large ice rock's cooperative window.
   // These must survive reconnect even when the one-shot event was missed.
   const firstPlayer = engine.getPlayer('first');
@@ -143,13 +160,8 @@ test('current sockets render matching worlds across late join and reconnect', as
   for (let tick = 0; tick < 8; tick++) {
     secondPlayer.position.x += 4;
     broadcaster.broadcastGameState();
-    const complete = new SnapshotEncoder({
-      ...engine.getGameState(),
-      playerProjectiles: engine.getPlayerProjectiles(),
-      collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
-    }).state;
-    await expect.poll(() => first.state()).toEqual(complete);
-    await expect.poll(() => second.state()).toEqual(complete);
+    await expect.poll(() => first.state()).toEqual(expectedWorld(firstPlayer.position));
+    await expect.poll(() => second.state()).toEqual(expectedWorld(secondPlayer.position));
   }
   expect(first.messages.some((message) => message.type === 'snapshot')).toBe(true);
   expect(first.state()).toHaveProperty('playerProjectiles');

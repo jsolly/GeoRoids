@@ -11,29 +11,32 @@ interface WikiMediaEntry {
  */
 export const media: Record<string, WikiMediaEntry> = {
   surveyor: {
-    title: 'Surveyor mineral scan',
-    alt: 'A Surveyor scan changes nearby radar dots into distinct ice, metal, and rubble marks, then returns them to ordinary dots.',
+    title: 'Surveyor shared mineral scan',
+    alt: 'A Surveyor activates a range-limited scan while a teammate radar receives ice, metal, and rubble marks for the same rocks.',
     caption:
-      'Press E to identify nearby asteroid minerals temporarily. Circles mark ice, squares metal, and triangles rubble.',
+      'Press E to classify nearby rocks on every teammate radar. The scan also records the Surveyor as a contributor for a later furnace delivery.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/surveyScan.ts',
       'src/rendering/hud/minimap.ts',
       'src/entities/ship/shipKits.ts',
+      'server/core/GameEngine.ts',
+      'shared/exploration.ts',
     ],
   },
   hauler: {
-    title: 'Hauler harpoon',
-    alt: 'A spinning asteroid reels toward a Hauler on a cream tether, then reverses near its hull and strikes an enemy ship.',
+    title: 'Hauler tow cable and furnace delivery',
+    alt: 'A Hauler tows a spinning asteroid behind its hull toward a furnace while a Surveyor watches the shared delivery score.',
     caption:
-      'Controlled demonstration: E reels the spinning rock toward the Hauler, then bounces it back toward the enemy. The released rock coasts freely until impact.',
+      'Controlled demonstration: E attaches a moving asteroid, the rock trails behind normal Hauler movement, and the crew brings it to a furnace for equal Hauler and Surveyor credit.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/harpoonField.ts',
-      'src/entities/ship/harpoonSling.ts',
+      'src/entities/ship/towCable.ts',
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipRenderer.ts',
-      'shared/combat.ts',
+      'shared/furnaces.ts',
+      'server/core/GameEngine.ts',
     ],
   },
   movement: {
@@ -76,22 +79,11 @@ export const media: Record<string, WikiMediaEntry> = {
     title: 'Reflective asteroid',
     alt: 'An amber laser strikes a faceted metal asteroid and reflects from its polygon face.',
     caption:
-      'Controlled demonstration: a laser bounces from a metal face along the predicted path. A ricochet can hit its shooter or an ally.',
+      'Controlled demonstration: a laser bounces from a metal face along the predicted path. Reflection remains a bounded asteroid interaction and never hurts a crew member.',
     sources: [
       'shared/asteroidReflection.ts',
       'shared/asteroidPhenomena.ts',
       'src/entities/roid/materialArt.ts',
-    ],
-  },
-  shield: {
-    title: 'Reflective shield',
-    alt: 'A Surveyor raises its F shield and reflects an incoming laser.',
-    caption:
-      'The timed F shield reflects incoming lasers. Its cooldown starts when the shield ends.',
-    sources: [
-      'src/entities/ship/shipShield.ts',
-      'shared/shieldReflection.ts',
-      'src/entities/ship/hullOutlines.ts',
     ],
   },
   split: {
@@ -121,15 +113,29 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   pickups: {
     title: 'Satellite pickup orbit',
-    alt: 'A Landsat 7 pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a hostile laser.',
+    alt: 'A Landsat 7 pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a laser.',
     caption:
-      'Controlled demonstration: a nearby Landsat 7 attaches automatically, keeps orbiting while a hostile laser removes 25 health, and remains active after the hit.',
+      'Controlled demonstration: a nearby Landsat 7 attaches automatically, keeps orbiting while a laser removes 25 health, and remains active after the hit.',
     sources: [
       'server/core/SatellitePickupManager.ts',
       'src/constants/index.ts',
       'src/entities/satellitePickup/satellitePickupMath.ts',
       'src/entities/satellitePickup/satellitePickupRenderer.ts',
       'src/entities/satellite/eoOutlines.ts',
+    ],
+  },
+  survival: {
+    title: 'Surviving an asteroid impact',
+    alt: 'A Surveyor clips an environmental asteroid, loses 25 health, and keeps flying with a visible 75 out of 100 health capsule.',
+    caption:
+      'Controlled demonstration: one server-sized asteroid impact removes 25 health, leaves the Surveyor alive, and lets it continue flying clear of the hazard.',
+    sources: [
+      'src/entities/ship/Ship.ts',
+      'src/entities/ship/shipUtils.ts',
+      'src/constants/index.ts',
+      'shared/combat.ts',
+      'server/core/CollisionAuthority.ts',
+      'tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts',
     ],
   },
 };

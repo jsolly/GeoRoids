@@ -2,7 +2,6 @@ import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { LOOT_BLAST } from '../../../shared/lootBlast';
 import { applyLootMass, GROWTH } from '../../../shared/shipGrowth';
 import { ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -88,7 +87,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
     expect(engine.drainLootCollections()).toEqual([]);
   });
 
-  test('shooting a shard detonates it and damages nearby hulls', () => {
+  test('shooting a shard detonates it while preserving every crew hull', () => {
     const ws = new RecordingSocket();
     const shooter = engine.addPlayer('p1', 'Pilot', ws, { x: 20, y: 30 });
     const bystander = engine.addPlayer('p2', 'Near', ws, { x: 36, y: 30 });
@@ -104,9 +103,8 @@ describe('destroy-drop shards on the #458 loot path', () => {
 
     expect(blast.success).toBe(true);
     expect(engine.getLoot()).toHaveLength(0);
-    expect(blast.damagedIds).toEqual(expect.arrayContaining(['p1', 'p2']));
-    expect(bystander.health).toBe(healthBefore - LOOT_BLAST.DAMAGE);
-    expect(shooter.health).toBeLessThan(100);
+    expect(bystander.health).toBe(healthBefore);
+    expect(shooter.health).toBe(100);
   });
 
   test('blast pushes small roids away and leaves big ones', () => {

@@ -100,13 +100,10 @@ describe('Game-over returns to the menu', () => {
     expect(text.toLowerCase()).not.toContain('unknown');
   });
 
-  test('every killer token prints a phrase — never unknown or a raw id', () => {
+  test('each environmental death names the hazard', () => {
     const cases: Array<[string, string]> = [
       ['boundary', 'the arena wall'],
       ['asteroid', 'an asteroid'],
-      ['server-bot-0', 'a bot'],
-      ['client-friend', 'another ship'],
-      ['laser', 'a laser'],
     ];
     for (const [token, phrase] of cases) {
       GameController.getInstance().cancelPendingGameOver();
@@ -114,9 +111,6 @@ describe('Game-over returns to the menu', () => {
       const text = GameStateManager.getInstance().getText();
       expect(text).toBe(`Game Over: You were killed by ${phrase}`);
       expect(text.toLowerCase()).not.toContain('unknown');
-      if (token.startsWith('server-') || token.startsWith('client-')) {
-        expect(text).not.toContain(token);
-      }
     }
   });
 });
@@ -142,11 +136,11 @@ describe('Last life on the server', () => {
     expect(world.entity(ace).lives).toBe(0);
     expect(world.entity(ace).health).toBe(0);
     expect(world.entity(ace).exploding).toBe(true);
-    expect(ace.socket.lastReceived('playerKilled')?.data).toMatchObject({
+    expect(ace.socket.lastReceived('playerDamaged')?.data).toMatchObject({
       targetPlayerId: ace.id,
       attackerId: 'boundary',
     });
-    expect(ace.socket.lastReceived('playerKilled')?.data).not.toMatchObject({
+    expect(ace.socket.lastReceived('playerDamaged')?.data).not.toMatchObject({
       attackerId: 'unknown',
     });
     expect(ace.socket.lastReceived('playerDamaged')?.data).toMatchObject({
@@ -173,15 +167,5 @@ describe('Last life on the server', () => {
     world.tick(20);
     expect(world.entity(ace).health).toBeGreaterThan(0);
     expect(world.entity(ace).deathCause).toBeUndefined();
-  });
-
-  test('a bot kill stores the bot id on the snapshot', () => {
-    const bot = world.engine.createBots(1)?.[0];
-    assert.ok(bot, 'Expected the newly created bot');
-    world.engine.handlePlayerDamage(ace.id, bot.id, world.entity(ace).health);
-    expect(world.entity(ace).deathCause).toBe(bot.id);
-    expect(
-      world.engine.getGameState().entities.find((entity) => entity.id === ace.id)?.deathCause
-    ).toBe(bot.id);
   });
 });

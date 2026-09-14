@@ -45,26 +45,3 @@ export function checkLaserHit(
 export function asteroidPointsForRadius(radius: number): number {
   return pointsForRoidSize(radius);
 }
-
-/** Check if a laser hits a ship/bot. */
-export function checkLaserShipCollision(
-  laserPos: Position,
-  shipPos: Position,
-  shipRadius: number
-): boolean {
-  return checkLaserHit(laserPos, shipPos, shipRadius);
-}
-
-/**
- * Check if two ships are colliding
- */
-export function checkShipCollision(
-  ship1Pos: Position,
-  ship1Radius: number,
-  ship2Pos: Position,
-  ship2Radius: number
-): boolean {
-  const isColliding = checkCircularCollision(ship1Pos, ship1Radius, ship2Pos, ship2Radius);
-
-  return isColliding;
-}

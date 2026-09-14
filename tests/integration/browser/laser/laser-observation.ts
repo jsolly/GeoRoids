@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
-import { ROID } from '../../../../src/constants';
 import type { BrowserManager } from '../../utils/browser-manager';
 import { GameInteractions } from '../../utils/game-interactions';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 interface ObservedLaser {
   ownerId: string;
@@ -12,7 +12,7 @@ interface ObservedLaser {
   onCanvas: boolean;
 }
 
-/** Initially park each pilot, then re-park all of them after every client joins. */
+/** Join every pilot before arranging their shared, empty firing lane. */
 export async function bootLaserClients(browserManager: BrowserManager, count: 2 | 3 = 2) {
   const pages: Page[] = [];
   const games: GameInteractions[] = [];
@@ -23,11 +23,9 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
     }
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
-    await parkLaserClient(game, index);
     pages.push(page);
     games.push(game);
   }
-  await Promise.all(games.map((game) => game.waitForCombatReady()));
   await Promise.all(games.map((game) => game.waitForRemoteHumanPlayers(count - 1)));
   await parkLaserClients(games);
   const [page1, page2, page3] = pages;
@@ -47,12 +45,14 @@ export async function bootLaserClients(browserManager: BrowserManager, count: 2 
 
 /** Keep the actual simulation running in a clear, nearby firing lane. */
 export async function parkLaserClient(game: GameInteractions, index = 0): Promise<void> {
-  await game.placeShipAt(ROID.FIELD_RADIUS + 500, index * 100);
+  await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+  await game.placeShipAt(index * 120, -360);
 }
 
 /** Re-establish every participant's clear firing lane after all clients join. */
 export async function parkLaserClients(games: readonly GameInteractions[]): Promise<void> {
-  await Promise.all(games.map((game, index) => parkLaserClient(game, index)));
+  await arrangeCrewField(await Promise.all(games.map((game) => game.getLocalPlayerId())), 'empty');
+  await Promise.all(games.map((game, index) => game.placeShipAt(index * 120, -360)));
   await Promise.all(games.map((game) => game.waitForCombatReady()));
 }
 

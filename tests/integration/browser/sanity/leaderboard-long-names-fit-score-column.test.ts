@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
+import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -100,20 +101,21 @@ async function verifyViewport(
   const calls = await captureLeaderboardRow(page);
   const name = calls.find((call) => call.text.includes('…') && call.x > width / 2);
   const score = calls.find((call) => call.text === String(WIDE_SCORE) && call.x > width / 2);
-  const touch = width <= 500 || height <= 430;
-  const boardWidth = touch ? (width < 400 ? 148 : 168) : 180;
-  const boardEdge = touch ? 12 : 16;
-  const boardX = width - boardWidth - boardEdge;
+  const touchControls = width <= 500 || height <= 430;
+  const layout = computeHudLayout(
+    { width, height },
+    { touchControls, safeArea: { top: 0, right: 0, bottom: 0, left: 0 } }
+  );
+  const boardX = layout.leaderboard.x;
   expect(name, `ellipsis name should render at ${width}x${height}`).toBeDefined();
   expect(score, `wide score should render at ${width}x${height}`).toBeDefined();
-  expect(name?.x).toBe(boardX + 28);
-  expect(score?.x).toBe(boardX + boardWidth - 4);
+  expect(name?.x).toBe(boardX + 20);
+  expect(score?.x).toBe(boardX + layout.leaderboard.width - 4);
   expect(name?.y).toBe(score?.y);
   expect(name?.textAlign).toBe('left');
   expect(score?.textAlign).toBe('right');
   expect(name?.font).toBe('11px Arial');
-  const faction = await page.evaluate(() => window.gameController?.getCurrPlayer()?.factionId);
-  expect(name?.fillStyle).toContain(faction === 'ember' ? '251, 146, 60' : '125, 211, 252');
+  expect(name?.fillStyle).toContain('94, 234, 212');
   expect(score?.fillStyle).toContain('100, 116, 139');
   expect(name?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
     (score?.x ?? 0) - (name?.x ?? 0) - (score?.width ?? 0) - 6

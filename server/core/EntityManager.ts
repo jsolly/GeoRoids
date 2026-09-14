@@ -4,57 +4,30 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
-import { pickBalancedFactionFromShips } from '../../shared/factions';
+import { FURNACES } from '../../shared/furnaces';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
+  AsteroidData,
   LaserUpgrade,
   PlayerMotionState,
   Position,
   ShipKitId,
-  SoftFactionId,
   Velocity,
 } from '../../shared-types';
 import { DEBUG, GAME, PALETTE, SHIP } from '../../src/constants';
-import { parseSoftFactionId } from '../../src/entities/player/softFactions';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import {
   applyShipKitStats,
   DEFAULT_SHIP_KIT_ID,
-  isShipKitId,
   SHIP_KIT_IDS,
 } from '../../src/entities/ship/shipKits';
-import {
-  type CombatDamageSource,
-  clearShield,
-  createShieldState,
-  maybeActivateBotShield,
-  type ShieldState,
-  updateShield,
-} from '../../src/entities/ship/shipShield';
-import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import { BOT_AI, BotBrain, type BotShot, makeBotShot } from '../ai/botController';
 import { applyShipMotionSteps, containShipInArena } from '../ai/shipMotion';
 import type { RNGService } from './RNGService';
 
-/** Keep lives/score after a dropped socket so the same id can rejoin. */
-const HUMAN_REJOIN_STASH_TTL_MS = 5 * 60 * 1000;
-
-function factionForBotSlot(slot: number, firstFaction: SoftFactionId): SoftFactionId {
-  if (slot % 2 === 0) {
-    return firstFaction;
-  }
-  return firstFaction === 'ion' ? 'ember' : 'ion';
-}
-
-interface HumanRejoinStash {
-  lives: number;
-  score: number;
-  name: string;
-  savedAt: number;
-}
-
-export interface GameEntity extends ShieldState {
+/** Authoritative live ship state; GameEngine owns persisted pilot progress. */
+export interface GameEntity {
   id: string;
   name: string;
   type: 'human' | 'bot';
@@ -79,14 +52,12 @@ export interface GameEntity extends ShieldState {
   ws?: WebSocket; // Only for human players
   explodeTime?: number; // For bot explosion handling
   kitId: ShipKitId;
-  factionId?: SoftFactionId;
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
 
-  harpoonTimer: number;
-  harpoonTargetId?: string;
+  harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
-  /** Killer of the current death (cleared on respawn). */
+  /** Environmental cause of the current death (cleared on respawn). */
   deathCause?: string;
   asteroidInteractions?: 1;
   playerMotion?: PlayerMotionState;
@@ -98,11 +69,7 @@ export class EntityManager {
   private rng: RNGService;
   private readonly now: () => number;
   private isCreatingBots = false;
-  private humanRejoinStash = new Map<string, HumanRejoinStash>();
-  private humanRejoinByName = new Map<string, HumanRejoinStash>();
   private readonly botBrain = new BotBrain();
-  /** Old human id remapped by same-name takeover — consume after addHumanPlayer. */
-  private replacedHumanId: string | undefined;
 
   constructor(rngService: RNGService, now: () => number = () => Date.now()) {
     this.rng = rngService;
@@ -201,18 +168,13 @@ export class EntityManager {
       }
     }
 
-    // Apply other allowed properties. Shield timers are owned by requestShield /
-    // updateShields — a stale client echo must not toggle them off.
+    // Apply remaining internal updates after validating health and mass.
     const {
       maxHealth: ignoredMaxHealth,
       health: ignoredHealth,
       mass: ignoredMass,
       healthRegenTimer: _ignoredHealthRegenTimer,
 
-      shieldActive: _ignoredShieldActive,
-      shieldTime: _ignoredShieldTime,
-      shieldCooldown: _ignoredShieldCooldown,
-      shieldFlashTime: _ignoredShieldFlashTime,
       ...otherUpdates
     } = allowedUpdates;
     Object.assign(entity, otherUpdates);
@@ -226,16 +188,10 @@ export class EntityManager {
   public removeEntity(entityId: string): GameEntity | undefined {
     const entity = this.entities.get(entityId);
     if (entity) {
-      this.stashHumanForRejoin(entity);
-
       this.entities.delete(entityId);
       logger.debug('ENTITY', 'Entity removed', { entityId, entityType: entity.type });
     }
     return entity;
-  }
-
-  private nextFaction(): SoftFactionId {
-    return pickBalancedFactionFromShips(this.getAllEntities());
   }
 
   // Human player management
@@ -244,31 +200,12 @@ export class EntityManager {
     name: string,
     ws: WebSocket,
     position?: Position,
-    _color?: string,
-    kitId?: ShipKitId,
-    factionId?: SoftFactionId
+    kitId?: ShipKitId
   ): GameEntity {
-    this.replacedHumanId = undefined;
-
-    const existing = this.entities.get(id);
-    if (existing && existing.type === 'human') {
-      if (existing.lives > 0) {
-        return this.attachLiveHuman(existing, id, name, ws, kitId);
-      }
-      // Leftover 0-life ship after game-over — Start must not rejoin it.
-
-      this.entities.delete(id);
+    if (this.entities.has(id)) {
+      throw new Error(`Pilot ${id} already exists; resume it with its private token`);
     }
 
-    const sameName = this.getHumanPlayers().find((human) => human.name === name);
-    if (sameName && sameName.lives > 0) {
-      return this.attachLiveHuman(sameName, id, name, ws, kitId);
-    }
-    if (sameName && sameName.lives <= 0) {
-      this.entities.delete(sameName.id);
-    }
-
-    const restored = this.consumeHumanRejoinStash(id, name);
     const entity: GameEntity = {
       id,
       name,
@@ -279,8 +216,8 @@ export class EntityManager {
       exploding: false,
       thrusting: false,
       color: PALETTE.REMOTE,
-      lives: restored?.lives ?? 3,
-      score: restored?.score ?? 0,
+      lives: 3,
+      score: 0,
       health: 100,
       maxHealth: 100,
       healthRegenTimer: 0,
@@ -288,14 +225,11 @@ export class EntityManager {
       mass: GROWTH.BASE_MASS,
       lastUpdate: this.now(),
       spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
-      ...createShieldState(),
       ws,
       kitId: DEFAULT_SHIP_KIT_ID,
-      factionId: parseSoftFactionId(factionId) ?? this.nextFaction(),
       abilityCooldownFrames: 0,
       abilityActiveFrames: 0,
-
-      harpoonTimer: 0,
+      harpoonTargetId: null,
     };
     applyShipKitStats(entity, kitId ?? DEFAULT_SHIP_KIT_ID);
 
@@ -303,108 +237,8 @@ export class EntityManager {
     return entity;
   }
 
-  private applyRequestedKit(entity: GameEntity, kitId?: unknown): void {
-    if (!isShipKitId(kitId)) {
-      return;
-    }
-    applyShipKitStats(entity, kitId);
-  }
-
-  /** Id displaced by a same-name takeover. Call after addHumanPlayer. */
-  public consumeReplacedHumanId(): string | undefined {
-    const id = this.replacedHumanId;
-    this.replacedHumanId = undefined;
-    return id;
-  }
-
-  private isPendingShipRespawn(entity: GameEntity): boolean {
-    return entity.exploding || entity.health <= 0 || entity.respawnTimer !== undefined;
-  }
-
-  /**
-   * Attach a new socket to a living human. Mid-death reuse must finish
-   * respawn so two-tab reconnect never inherits a corpse, zero-vel, or
-   * leftover explode timer. Live flyers keep pose and velocity.
-   */
-  private attachLiveHuman(
-    existing: GameEntity,
-    id: string,
-    name: string,
-    ws: WebSocket,
-    kitId?: unknown
-  ): GameEntity {
-    const oldWs = existing.ws;
-    const oldId = existing.id;
-    if (oldId !== id) {
-      this.entities.delete(oldId);
-      existing.id = id;
-      this.entities.set(id, existing);
-      this.replacedHumanId = oldId;
-    }
-    existing.ws = ws;
-    existing.name = name;
-    existing.lastUpdate = this.now();
-    if (!existing.factionId) {
-      existing.factionId = this.nextFaction();
-    }
-    this.applyRequestedKit(existing, kitId);
-    if (this.isPendingShipRespawn(existing) && this.shouldScheduleRespawn(existing)) {
-      this.respawnShip(existing);
-    }
-    if (oldWs && oldWs !== ws) {
-      try {
-        oldWs.close();
-      } catch (error) {
-        logger.error('ENTITY_REBIND_SOCKET_CLOSE_FAILED', {
-          oldPlayerId: oldId,
-          newPlayerId: id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-    return existing;
-  }
-
-  private stashHumanForRejoin(entity: GameEntity): void {
-    if (entity.type !== 'human' || entity.lives <= 0) {
-      return;
-    }
-    const stash: HumanRejoinStash = {
-      lives: entity.lives,
-      score: entity.score,
-      name: entity.name,
-      savedAt: this.now(),
-    };
-    this.humanRejoinStash.set(entity.id, stash);
-    this.humanRejoinByName.set(entity.name, stash);
-  }
-
-  private consumeHumanRejoinStash(id: string, name?: string): HumanRejoinStash | undefined {
-    const stash =
-      this.humanRejoinStash.get(id) ?? (name ? this.humanRejoinByName.get(name) : undefined);
-    if (!stash) {
-      return undefined;
-    }
-    for (const [key, value] of this.humanRejoinStash) {
-      if (value === stash || key === id) {
-        this.humanRejoinStash.delete(key);
-      }
-    }
-    this.humanRejoinByName.delete(stash.name);
-    if (name) {
-      this.humanRejoinByName.delete(name);
-    }
-    if (this.now() - stash.savedAt > HUMAN_REJOIN_STASH_TTL_MS) {
-      return undefined;
-    }
-    return stash;
-  }
-
   // Bot management
-  public createBots(
-    count: number = GAME.BOT_COUNT,
-    bounds = { radius: getAsteroidFieldRadius() }
-  ): GameEntity[] {
+  public createBots(count: number = GAME.BOT_COUNT, bounds = { radius: 1_000 }): GameEntity[] {
     // Clear existing bots
     const existingBots = this.getBots();
     for (const bot of existingBots) {
@@ -433,7 +267,6 @@ export class EntityManager {
     this.rng.setState(0x9e3779b9 + 0x12345678); // Different seed for bots
 
     const newBots: GameEntity[] = [];
-    const firstFaction = this.nextFaction();
 
     for (let i = 0; i < Math.min(botCount, botNames.length); i++) {
       const botId = `server-bot-${i}`;
@@ -470,12 +303,9 @@ export class EntityManager {
         lastUpdate: this.now(),
         spawnProtectionTimer: SHIP.INVINCIBILITY_DURATION_FRAMES,
         kitId: DEFAULT_SHIP_KIT_ID,
-        factionId: factionForBotSlot(i, firstFaction),
         abilityCooldownFrames: 0,
         abilityActiveFrames: 0,
-
-        harpoonTimer: 0,
-        ...createShieldState(),
+        harpoonTargetId: null,
       };
       applyShipKitStats(bot, SHIP_KIT_IDS[i % SHIP_KIT_IDS.length]);
 
@@ -489,13 +319,8 @@ export class EntityManager {
     return newBots;
   }
 
-  // Damage system — projectile resolution reflects at shields; direct
-  // collision/damage calls stay independent from visual shield state.
-  public damageEntity(
-    entityId: string,
-    damage: number,
-    _source: CombatDamageSource = 'collision'
-  ): GameEntity | null {
+  // Environmental damage is authoritative; crew lasers never enter this path.
+  public damageEntity(entityId: string, damage: number): GameEntity | null {
     const entity = this.entities.get(entityId);
     if (!entity || entity.exploding || entity.health <= 0) {
       return null;
@@ -526,8 +351,6 @@ export class EntityManager {
       entity.exploding = true;
       // Set explosion timer for all entity types
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
-
-      clearShield(entity);
     }
 
     entity.lastUpdate = this.now();
@@ -620,16 +443,6 @@ export class EntityManager {
     return finishedRespawning;
   }
 
-  public updateShields(): void {
-    for (const entity of this.entities.values()) {
-      updateShield(entity);
-      if (entity.type === 'bot') {
-        maybeActivateBotShield(entity, Math.random);
-      }
-    }
-  }
-
-  /** Tick the shared server-owned health regeneration clock for every ship. */
   public updateHealthRegeneration(): number {
     const regenPerFrame = calculateHealthRegenPerFrame();
     let healedEntities = 0;
@@ -672,18 +485,22 @@ export class EntityManager {
     delete entity.explodeTime;
     delete entity.deathCause;
 
-    clearShield(entity);
     this.placeEntityInArena(entity);
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
   }
 
-  private placeEntityInArena(entity: GameEntity, boundsRadius = getAsteroidFieldRadius()): void {
-    const respawnRadius = boundsRadius * 0.8;
+  private placeEntityInArena(entity: GameEntity): void {
+    const station = FURNACES.reduce((nearest, site) =>
+      !nearest ||
+      Math.hypot(site.position.x - entity.position.x, site.position.y - entity.position.y) <
+        Math.hypot(nearest.position.x - entity.position.x, nearest.position.y - entity.position.y)
+        ? site
+        : nearest
+    );
     const angle = this.rng.random() * Math.PI * 2;
-    const radius = this.rng.random() * respawnRadius;
     entity.position = {
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
+      x: (station?.position.x ?? 0) + Math.cos(angle) * 180,
+      y: (station?.position.y ?? 0) + Math.sin(angle) * 180,
     };
     entity.angle = this.rng.random() * Math.PI * 2;
     entity.velocity = { x: 0, y: 0 };
@@ -691,7 +508,7 @@ export class EntityManager {
   }
 
   // Controller-driven bot step. Same hull physics as players; only the brain is unique.
-  public updateBotMovement(): BotShot[] {
+  public updateBotMovement(asteroids: AsteroidData[]): BotShot[] {
     if (!DEBUG.BOT_PLAYER.MOVEMENT) {
       return [];
     }
@@ -703,7 +520,6 @@ export class EntityManager {
       logger.info('🤖', `Updating movement for ${bots.length} bots`);
     }
 
-    const humans = this.getHumanPlayers();
     const shots: BotShot[] = [];
 
     for (const bot of bots) {
@@ -711,7 +527,7 @@ export class EntityManager {
         continue;
       }
 
-      const decision = this.botBrain.decide(bot, humans, this.rng);
+      const decision = this.botBrain.decide(bot, asteroids, this.rng);
       bot.angle = decision.angle;
       bot.thrusting = decision.thrusting;
 
@@ -728,26 +544,29 @@ export class EntityManager {
   }
 
   // Cleanup
-  public cleanupStaleEntities(): string[] {
+  /**
+   * Return stale human IDs for the engine to remove through its lifecycle.
+   * EntityManager cannot perform that removal itself because the engine owns
+   * motion sessions, persistence capture, and pause transitions.
+   */
+  public getStaleHumanIds(): string[] {
     const now = this.now();
-    const removedEntities: string[] = [];
+    const staleHumanIds: string[] = [];
 
     for (const [entityId, entity] of this.entities) {
       // Only cleanup human players (bots are managed by server)
       if (entity.type === 'human' && now - entity.lastUpdate > 30000) {
-        // 30 seconds
-        this.removeEntity(entityId);
-        removedEntities.push(entityId);
+        staleHumanIds.push(entityId);
       }
     }
 
-    return removedEntities;
+    return staleHumanIds;
   }
 
   // Atomic bot creation to prevent race conditions
   public createBotsSafely(
     count: number = GAME.BOT_COUNT,
-    bounds = { radius: getAsteroidFieldRadius() }
+    bounds = { radius: 1_000 }
   ): GameEntity[] | null {
     if (this.isCreatingBots) {
       return null; // Already creating bots

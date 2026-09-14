@@ -5,10 +5,11 @@ with **Space**; the ordinary controls remain available while a shot is in
 flight. The passive HUD keeps the laser-core charge count visible when a core
 upgrade is active. There is no asteroid selection or tool mode.
 
-While a Hauler's combat harpoon is actively attached to an asteroid, that
-asteroid passes through its Hauler without causing collision damage. Unrelated
-asteroids and other pilots keep the normal collision rules. When the timer or
-attachment ends, the harpooned asteroid collides normally again.
+A Hauler presses **E** to attach to a nearby asteroid and tows it at the cable's
+original length. Press **E** again to release it. Attached cargo cannot damage its
+Hauler or be destroyed by crew lasers. Other asteroids remain dangerous; crew
+ships can overlap safely. Tow surveyed cargo into a furnace to award the Hauler
+and each contributing Surveyor the same delivery points.
 
 ## Reflective clusters and laser cores
 
@@ -18,8 +19,8 @@ when its stored energy fills, or when a shot reaches its energy, bounce, or
 lifetime limit. Reflection follows the server's authoritative collision result;
 the client does not offer a selection-dependent path preview.
 
-Reflected shots can hurt their shooter and faction mates. Ordinary direct shots
-still respect friendly fire. A broken reflector leaves one laser core: collect
+Direct and reflected crew shots leave every crew ship unharmed, including bots
+and the shooter. A broken reflector leaves one laser core: collect
 it for 150 points and six stronger shots, usable for 60 seconds. The upgrade
 expires on death. Shots, damage, charge use, and collection belong to the shared
 world, so reconnecting does not replay rewards.
@@ -29,9 +30,9 @@ world, so reconnecting does not replay rewards.
 Every pilot uses snapshot v1 with `asteroidInteractions:1`, acknowledged by the
 server with a private resume token. Unsupported clients cannot join. The server
 owns projectile collisions, and clients render keyed projectile snapshots.
-Reflective phenomena seed when a pilot enters an active world and remain until
-that world ends. Resume tokens are private to the joined socket and never appear
-in the common public world.
+Reflective phenomena are generated with each world sector and persist with its
+deposits. Private resume tokens recover pilot progress across disconnects and
+server restarts; they never appear in the common public world.
 
 ## Updating open clients
 

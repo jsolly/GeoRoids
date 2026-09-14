@@ -143,7 +143,7 @@ function renderSearch(): void {
     return;
   }
   const results = searchArticles(articles, query);
-  content.innerHTML = `<section class="search-results"><p class="eyebrow">SEARCH THE MANUAL</p><h1>Results for “${escapeHtml(query)}”</h1><p>${results.length} ${results.length === 1 ? 'entry' : 'entries'} found</p>${results.length ? `<div class="topic-grid">${results.map(card).join('')}</div>` : '<div class="empty-state"><h2>No matching entries</h2><p>Try a ship name, “shield”, “minerals”, or “asteroid”.</p><button type="button" id="reset-results">Show all topics</button></div>'}</section>`;
+  content.innerHTML = `<section class="search-results"><p class="eyebrow">SEARCH THE MANUAL</p><h1>Results for “${escapeHtml(query)}”</h1><p>${results.length} ${results.length === 1 ? 'entry' : 'entries'} found</p>${results.length ? `<div class="topic-grid">${results.map(card).join('')}</div>` : '<div class="empty-state"><h2>No matching entries</h2><p>Try a ship name, “furnace”, “minerals”, or “asteroid”.</p><button type="button" id="reset-results">Show all topics</button></div>'}</section>`;
   status.textContent = `${results.length} matching entries`;
   document.title = 'Search | GeoRoids field manual';
   content.querySelector('#reset-results')?.addEventListener('click', resetSearch);

@@ -14,6 +14,7 @@ import {
   preventContextMenu,
 } from '../../input/mouse';
 import { initializeTouchControls } from '../../input/touchControls';
+import { initializeUniverseMap, isUniverseMapOpen } from '../../ui/universeMap';
 import { logger } from '../../utils/Logger';
 import { GameStateManager } from './GameStateManager';
 
@@ -44,6 +45,12 @@ export class InputManager {
 
     // Keyboard listeners
     document.addEventListener('keydown', (ev) => {
+      // The universe map owns its keyboard controls while open. This guard is
+      // intentionally duplicated with the map's capture listener so a future
+      // input source cannot make firing or steering leak through the dialog.
+      if (isUniverseMapOpen()) {
+        return;
+      }
       const localPlayer = getLocalPlayer();
       if (!localPlayer) {
         return;
@@ -60,6 +67,9 @@ export class InputManager {
     });
 
     document.addEventListener('keyup', (ev) => {
+      if (isUniverseMapOpen()) {
+        return;
+      }
       const localPlayer = getLocalPlayer();
       if (!localPlayer) {
         return;
@@ -134,6 +144,7 @@ export class InputManager {
       }
     });
     initializeTouchControls();
+    initializeUniverseMap({ onOpen: releaseInput });
 
     this.listenersInitialized = true;
   }

@@ -44,7 +44,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
       const pilot = engine.getPlayer('pilot');
       assert.ok(pilot, 'movement pilot');
       delete pilot.spawnProtectionTimer;
-      expect(engine.handlePlayerDamage(pilot.id, 'boundary', pilot.maxHealth)).toBe(true);
+      expect(engine.handleShipDamage(pilot.id, 'boundary', pilot.maxHealth).isDestroyed).toBe(true);
       for (let frame = 0; frame <= SHIP.RESPAWN_DELAY_FRAMES && pilot.health <= 0; frame++) {
         engine.advanceOneFrame();
       }
@@ -129,7 +129,6 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     // owner; the untrusted movement route may not rewrite its active endpoint.
     const latch = { ...rock.position };
     engine.updatePlayer(pilot.id, {
-      harpoonTimer: 30,
       harpoonTargetId: rock.id,
       harpoonLatchPos: latch,
     });
@@ -153,7 +152,6 @@ describe('invalid client movement cannot corrupt the shared world', () => {
           type: 'bot',
           name: 'Spoofed',
           socket: {},
-          harpoonTimer: 999,
           harpoonTargetId: 'missing',
           harpoonLatchPos: { x: null, y: 'bad' },
           lasers: [{ position: null }],
@@ -166,7 +164,6 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     expect(pilot.ws).toBe(owner);
     expect(pilot.type).toBe('human');
     expect(pilot.name).toBe('Pilot');
-    expect(pilot.harpoonTimer).toBe(30);
     expect(pilot.harpoonTargetId).toBe(rock.id);
     expect(pilot.harpoonLatchPos).toEqual(latch);
     expect(pilot.position).toEqual({ x: 5, y: 5 });

@@ -87,22 +87,8 @@ test('KeyE reapplies the title Hauler kit before activate', () => {
   expect(player.ship.kitId).toBe('surveyor');
   press('KeyE');
   expect(player.ship.kitId).toBe('hauler');
-  expect(player.ship.harpoonTimer).toBeGreaterThan(0);
+  expect(player.ship.harpoonTargetId).toBe('rock-1');
   expect(player.ship.harpoonLatchPos).toBeTruthy();
-});
-
-test('KeyF toggles the local ship shield and KeyF again drops it into cooldown', () => {
-  expect(player.ship.shieldActive).toBe(false);
-  press('KeyF');
-  expect(player.ship.shieldActive).toBe(true);
-  expect(player.ship.shieldTime).toBeGreaterThan(0);
-
-  press('KeyF');
-  expect(player.ship.shieldActive).toBe(false);
-  expect(player.ship.shieldCooldown).toBeGreaterThan(0);
-
-  press('KeyF');
-  expect(player.ship.shieldActive).toBe(false);
 });
 
 test('WASD is ignored while dead', () => {

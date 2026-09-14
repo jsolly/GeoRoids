@@ -38,3 +38,6 @@ dist/*
 # Local benchmark results and progress
 /.performance/
 /coverage/
+
+# Local persistent world (SQLite database and journals)
+/.data/

@@ -14,6 +14,12 @@ export interface ContourLevel {
   segments: ContourSegment[];
 }
 
+export interface ContourBounds {
+  cx: number;
+  cy: number;
+  radius: number;
+}
+
 function interp(
   x0: number,
   y0: number,
@@ -48,12 +54,13 @@ function addSegment(
 export function extractIsoContours(
   field: Heightfield,
   gridSize: number = TERRAIN.GRID_SIZE,
-  levelCount: number = TERRAIN.LEVELS
+  levelCount: number = TERRAIN.LEVELS,
+  bounds: ContourBounds = field
 ): ContourLevel[] {
   const n = gridSize;
-  const cell = (2 * field.radius) / n;
-  const originX = field.cx - field.radius;
-  const originY = field.cy - field.radius;
+  const cell = (2 * bounds.radius) / n;
+  const originX = bounds.cx - bounds.radius;
+  const originY = bounds.cy - bounds.radius;
   const dim = n + 1;
   const heights = new Float64Array(dim * dim);
 

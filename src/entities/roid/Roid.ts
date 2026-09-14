@@ -18,6 +18,8 @@ class Roid {
   health: number;
   maxHealth: number;
   material?: AsteroidMaterial;
+  surveyedBy?: string[];
+  miningContributors?: string[];
   /** Optional server-owned reflection metadata. */
   phenomenon?: AsteroidPhenomenon;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */

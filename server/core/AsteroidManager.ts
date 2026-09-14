@@ -1,10 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../setup/serverLogger';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
+import { WORLD } from '../../shared/world';
 import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
 import { DAMAGE, DEBUG, GAME, ROID } from '../../src/constants';
 import { isBiggestAsteroid, pointsForRoidSize } from '../../src/entities/roid/roidScore';
-import { getAsteroidFieldRadius, stepAsteroidMotion } from '../../src/physics/asteroidMotion';
+import {
+  containAsteroidPosition,
+  getAsteroidFieldRadius,
+  stepAsteroidMotion,
+} from '../../src/physics/asteroidMotion';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import { isDebugMode } from '../../src/utils/debugUtils';
 import type { RNGService } from './RNGService';
@@ -17,10 +22,14 @@ export type AsteroidHitOutcome = {
   newAsteroids: AsteroidData[];
   split: boolean;
   expiresAt?: number;
+  /** Laser miners and Surveyors credited for this destruction. */
+  contributors?: string[];
 };
 
 export type ExpiredCollabHit = {
   playerId: string;
+  /** Every laser miner and Surveyor credited for the destroyed deposit. */
+  contributors: string[];
   points: number;
   destroyed: AsteroidData;
   newAsteroids: AsteroidData[];
@@ -44,7 +53,6 @@ export class AsteroidManager {
   // Asteroid splitting constants - can be overridden by DEBUG settings
   private readonly MIN_ASTEROID_SIZE = 10;
   private readonly SPLIT_SIZE_RATIO = 0.6; // New asteroids are 60% of original size
-  private readonly MAX_ASTEROID_COUNT = 200; // Prevent too many asteroids
 
   constructor(rngService: RNGService) {
     this.rng = rngService;
@@ -57,10 +65,6 @@ export class AsteroidManager {
 
   private get splitSizeRatio(): number {
     return this.SPLIT_SIZE_RATIO;
-  }
-
-  private get maxAsteroidCount(): number {
-    return this.MAX_ASTEROID_COUNT;
   }
 
   public addAsteroid(asteroid: AsteroidData): void {
@@ -314,6 +318,8 @@ export class AsteroidManager {
       return { outcome: 'missing', newAsteroids: [], split: false };
     }
 
+    this.recordMiningHit(asteroidId, shooterId);
+
     // Metal chips remain present until their mining HP is exhausted. This
     // does not enter the cooperative tag-expiry table: waiting never kills it.
     if (asteroid.material === 'metal') {
@@ -370,6 +376,19 @@ export class AsteroidManager {
     return this.finishDestroy(asteroidId, false);
   }
 
+  /** Record a non-collab mining path (for example a high-HP target) uniformly. */
+  public recordMiningHit(asteroidId: string, minerId: string): void {
+    const asteroid = this.asteroids.get(asteroidId);
+    if (!asteroid) {
+      return;
+    }
+    const contributors = asteroid.miningContributors ?? [];
+    if (!contributors.includes(minerId)) {
+      contributors.push(minerId);
+      asteroid.miningContributors = contributors;
+    }
+  }
+
   /**
    * After the collab window closes with only one shooter, the tagged biggest
    * asteroid is destroyed without splitting.
@@ -394,7 +413,10 @@ export class AsteroidManager {
       if (result.destroyed && lastHit) {
         expired.push({
           playerId: lastHit.shooterId,
-          points: lastHit.points,
+          contributors: [
+            ...new Set([...(result.contributors ?? []), ...(result.destroyed.surveyedBy ?? [])]),
+          ],
+          points: pointsForRoidSize(result.destroyed.size),
           destroyed: result.destroyed,
           newAsteroids: result.newAsteroids,
         });
@@ -424,6 +446,16 @@ export class AsteroidManager {
       return { outcome: 'missing', newAsteroids: [], split: false };
     }
 
+    // Capture the hit and survey identities before removeAsteroid clears the
+    // collab window. The GameEngine awards these pilots after the
+    // authoritative destruction and persists the score with the field change.
+    const contributors = [
+      ...new Set([
+        ...(destroyed.miningContributors ?? []),
+        ...(this.laserHits.get(asteroidId) ?? []).map((hit) => hit.shooterId),
+        ...(destroyed.surveyedBy ?? []),
+      ]),
+    ];
     this.removeAsteroid(asteroidId);
 
     const fragmentCount = destroyed.material === 'rubble' ? 3 : 2;
@@ -431,8 +463,15 @@ export class AsteroidManager {
       destroyed.material === 'rubble'
         ? destroyed.size > this.minAsteroidSize * 2
         : isBiggestAsteroid(destroyed.size);
+    const nearbyCount = [...this.asteroids.values()].filter(
+      (rock) =>
+        Math.hypot(
+          rock.position.x - destroyed.position.x,
+          rock.position.y - destroyed.position.y
+        ) <= WORLD.sectorSize
+    ).length;
     const newAsteroids =
-      split && canSplit && this.asteroids.size + fragmentCount <= this.maxAsteroidCount
+      split && canSplit && nearbyCount + fragmentCount <= WORLD.depositsPerSector * 6
         ? this.createSplitFragments(destroyed)
         : [];
 
@@ -445,6 +484,7 @@ export class AsteroidManager {
       destroyed,
       newAsteroids,
       split: newAsteroids.length > 0,
+      ...(contributors.length > 0 ? { contributors } : {}),
     };
   }
 
@@ -474,10 +514,10 @@ export class AsteroidManager {
 
       newAsteroids.push({
         id: `server-asteroid-${this.managerNonce}-${this.fieldGeneration}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        position: {
-          x: destroyed.position.x + offsetX,
-          y: destroyed.position.y + offsetY,
-        },
+        position: containAsteroidPosition(
+          destroyed.position.x + offsetX,
+          destroyed.position.y + offsetY
+        ),
         velocity: {
           x:
             destroyed.velocity.x +

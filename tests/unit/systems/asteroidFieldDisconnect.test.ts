@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('disconnecting one of two humans does not clear or pause the shared field', () => {
@@ -29,17 +28,22 @@ test('disconnecting one of two humans does not clear or pause the shared field',
 
   engine.removePlayer('peer-a');
   expect(engine.isGamePaused()).toBe(true);
-  expect(engine.getAsteroidCount()).toBe(0);
+  expect(
+    engine
+      .getAllAsteroids()
+      .map((asteroid) => asteroid.id)
+      .sort()
+  ).toEqual(idsBefore);
 });
 
-test('an active arena reseeds the canonical belt after its last asteroid is destroyed', () => {
+test('a depleted active field stays empty instead of regenerating harvested deposits', () => {
   const engine = new GameEngine(7);
   const player = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
   const firstField = engine.getAllAsteroids();
   const firstIds = new Set(firstField.map((asteroid) => asteroid.id));
 
   expect(player.type).toBe('human');
-  expect(firstField).toHaveLength(ROID.INITIAL_ROID_COUNT);
+  expect(firstField.length).toBeGreaterThan(0);
   expect(engine.isGamePaused()).toBe(false);
 
   for (const asteroid of firstField) {
@@ -47,11 +51,10 @@ test('an active arena reseeds the canonical belt after its last asteroid is dest
   }
   expect(engine.getAsteroidCount()).toBe(0);
 
-  // No reconnect or new player is involved; the normal authoritative frame
-  // loop owns the repair before the next state broadcast.
+  // No reconnect or new player is involved. Depleted deposits remain depleted.
   engine.advanceOneFrame();
   const secondField = engine.getAllAsteroids();
-  expect(secondField).toHaveLength(ROID.INITIAL_ROID_COUNT);
+  expect(secondField).toEqual([]);
   expect(secondField.every((asteroid) => !firstIds.has(asteroid.id))).toBe(true);
 
   engine.removePlayer('pilot');

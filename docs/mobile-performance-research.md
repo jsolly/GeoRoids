@@ -37,7 +37,7 @@ This report assesses source revision `b4aec298e72840d026a2492902c5a4251d8d4e3c` 
 
 The main canvas calculates backing dimensions as viewport dimensions multiplied by the browser's device pixel ratio. `contourRenderer.ts` walks all contour segments on each draw, projects endpoints, then rejects segments outside the viewport. It batches strokes by contour level. `contourLabels.ts` caches label anchors, but visible labels still perform text measurement and drawing. These distinctions matter: terrain generation and label placement are already cached; segment traversal and label rendering are separate costs.[^2]
 
-Glow is distributed across ship hulls, lasers, shields, explosions, asteroids, boundary rendering, satellite pickups, and other effects. A quality experiment must cover these sites consistently. Removing one glow constant and assuming all blur work disappeared would produce an ambiguous comparison.[^2]
+Glow is distributed across ship hulls, lasers, explosions, asteroids, boundary rendering, satellite pickups, and other effects. A quality experiment must cover these sites consistently. Removing one glow constant and assuming all blur work disappeared would produce an ambiguous comparison.[^2]
 
 Pointer controls and cancellation handling already exist in `src/input/touchControls.ts`. A complaint about unresponsive steering may arise from event scheduling, visual feedback, authoritative correction, or an interrupted gesture. It should not automatically trigger replacement of the touch controls.
 
@@ -45,7 +45,7 @@ Pointer controls and cancellation handling already exist in `src/input/touchCont
 
 The authoritative simulation runs at 60 Hz; periodic snapshots target 30 Hz. The server uses monotonic scheduling and bounds accumulated simulation debt. Broadcast state uses required snapshot-v1 keyframes and deltas, with per-recipient sequence and baseline state. A new canonical encoder is shared within one broadcast, but recipient encoding and JSON serialization still occur inside the recipient loop.[^3]
 
-The broadcaster has a 256 KiB projected outbound limit and tracks pending sends. The [pending-send follow-up](performance/pending-snapshot-results.md) now preserves a successful baseline after an unsent pending offer; pressure skips and failed delivery still request a keyframe. Periodic keyframes use a 90-delta interval, approximately three seconds at an uninterrupted 30 Hz cadence. Recovery and skipped sends can alter that interval. These controls already exist and should be measured before changing them.[^3]
+The broadcaster has a 1 MiB projected outbound limit and tracks pending sends. The [pending-send follow-up](performance/pending-snapshot-results.md) now preserves a successful baseline after an unsent pending offer; pressure skips and failed delivery still request a keyframe. Periodic keyframes use a 90-delta interval, approximately three seconds at an uninterrupted 30 Hz cadence. Recovery and skipped sends can alter that interval. These controls already exist and should be measured before changing them.[^3]
 
 WebSocket compression is not enabled in the inspected server configuration. The existing optimization is JSON delta encoding. The historical protocol experiment measured standalone gzip and deflate codec work; it did not validate deployed per-message compression.[^4]
 
@@ -98,15 +98,15 @@ Moving from DPR 3 to 2 reduces backing pixels by 55.6%; moving to 1.5 reduces th
 
 For the first implementation candidate, expose one effective rendering scale at the canvas boundary. Keep viewport dimensions, camera projection, world coordinates, and touch hit testing in CSS pixels. Update backing dimensions and the context transform together. Reusing backing-pixel dimensions in input conversion would change aiming or steering and invalidate the experiment.
 
-Compare fixed tiers before introducing an automatic controller. DPR 2 is the recommended first candidate because it offers a large pixel reduction on DPR 3 phones with less sharpness loss than 1 or 1.5. Test thin contour lines, distant projectiles, names, HUD text, shields, and safe-area layouts in portrait and landscape. A slower or blurrier result is a reason to reject the candidate on that cohort.
+Compare fixed tiers before introducing an automatic controller. DPR 2 is the recommended first candidate because it offers a large pixel reduction on DPR 3 phones with less sharpness loss than 1 or 1.5. Test thin contour lines, distant projectiles, names, HUD text, tow cables, and safe-area layouts in portrait and landscape. A slower or blurrier result is a reason to reject the candidate on that cohort.
 
 If fixed tiers work, add conservative adaptation using sustained frame misses, a cooldown, and slower upgrades than downgrades. Do not resize every frame. Freeze adaptation during controlled benchmarks and record every tier transition in normal sessions. A whole-canvas scale is simpler initially; a separately rendered sharp HUD becomes justified only if text quality prevents adoption of an otherwise effective scale.
 
 ### Glow and visual density
 
-MDN recommends avoiding expensive repeated canvas work, including unnecessary shadow blur and text drawing, and caching reusable imagery where appropriate.[^8] GeoRoids should test blur separately from geometry: keep hull strokes, projectile cores, shield boundaries, explosion timing, and danger signals visible while suppressing their glow. This distinguishes cosmetic blur cost from the cost of drawing the objects themselves.
+MDN recommends avoiding expensive repeated canvas work, including unnecessary shadow blur and text drawing, and caching reusable imagery where appropriate.[^8] GeoRoids should test blur separately from geometry: keep hull strokes, projectile cores, tow cables, explosion timing, and danger signals visible while suppressing their glow. This distinguishes cosmetic blur cost from the cost of drawing the objects themselves.
 
-A successful reduced-glow candidate should preserve faction recognition, collision cues, and projectile readability. Quality tiers must change presentation only. Reducing authoritative asteroids, collisions, projectile lifetime, damage checks, or network state to make a phone appear faster would change gameplay.
+A successful reduced-glow candidate should preserve ship-role recognition, collision cues, and projectile readability. Quality tiers must change presentation only. Reducing authoritative asteroids, collisions, projectile lifetime, damage checks, or network state to make a phone appear faster would change gameplay.
 
 If blur dominates and the art requires it, compare bounded caches of reusable glow shapes with direct blur. Include cache construction, scaling, eviction, and memory in the measurements. Unique rotations, sizes, colors, and animated states can multiply cache variants. A small curated set is easier to reason about than caching every rendered object state.
 
@@ -150,7 +150,7 @@ A phone-specific cadence needs an explicit protocol/configuration design and tes
 
 ### Backpressure and recovery
 
-The current 256 KiB limit is a memory guard, not a freshness target. At an illustrative 1 Mbit/s drain rate, 256 KiB represents roughly 2.10 seconds of bytes. That calculation does not mean every current socket queues that amount; pending-send handling also limits production behavior. It demonstrates why a byte threshold alone cannot certify responsiveness.
+The current 1 MiB limit is a memory guard, not a freshness target. At an illustrative 1 Mbit/s drain rate, 1 MiB represents roughly 8.39 seconds of bytes. That calculation does not mean every current socket queues that amount; pending-send handling also limits production behavior. It demonstrates why a byte threshold alone cannot certify responsiveness.
 
 A congestion experiment should correlate queue size, pending duration, snapshot gaps, recovery keyframes, and time until the client applies current state. Consider a freshness-oriented policy only if the trace shows stale work accumulating. Preserve the distinction between replaceable world presentation and reliable gameplay events.
 
@@ -234,7 +234,7 @@ Drain bounded metric recorders often enough to avoid silently dropping samples. 
 | Priority | Candidate | Evidence that justifies adoption | Reason to reject or change direction |
 | --- | --- | --- | --- |
 | 1 | Effective DPR 2, then 1.5 | Repeatable tail-frame improvement with readable gameplay | CPU/network dominates or unacceptable loss of sharpness |
-| 2 | Reduced glow | Lower render/raster cost with preserved cues | No measurable benefit or ambiguous projectiles/shields |
+| 2 | Reduced glow | Lower render/raster cost with preserved cues | No measurable benefit or ambiguous projectiles/tow cables |
 | 3 | Contour chunks or reusable paths | Profiled traversal cost drops across terrain scenes | Cache cost, seams, or memory outweigh savings |
 | 4 | Cached label widths and selective HUD updates | Reduced measured text/HUD cost | Stale urgent information or negligible contribution |
 | 5 | 60 Hz presentation cap on high-refresh devices | Better sustained behavior with acceptable input response | Incorrect timing or visible cadence artifacts |
@@ -250,7 +250,7 @@ The first implementation change should connect DPR, CPU throttling, and ordered 
 
 Server or protocol work follows the measurements, with client and server changes coordinated when necessary. Preserve snapshot-v1 recovery and authoritative asteroid and projectile behavior. Any accepted quality setting or changed user-visible behavior needs corresponding Wiki controls, behavior, and troubleshooting updates with source-review verification. This research-only addition changes no Wiki behavior.
 
-Run the focused canvas/input/protocol tests appropriate to each implementation, then the repository gate. Integration and browser scenarios must use the repository runner. Include simultaneous steering/fire, ability/shield feedback, rotation, death/respawn, background recovery, and two-player reconnect. Visual checks must cover low-quality rendering as well as the normal tier.
+Run the focused canvas/input/protocol tests appropriate to each implementation, then the repository gate. Integration and browser scenarios must use the repository runner. Include simultaneous steering/fire, scan/tow feedback, rotation, death/respawn, background recovery, and two-player reconnect. Visual checks must cover low-quality rendering as well as the normal tier.
 
 Ship through the branch, PR, and CI-gated merge flow. Client changes use Vercel Git deployment. Server changes require the separate Railway deployment and must preserve unrelated staged configuration. Verify release ancestry through both relevant `x-release-id` headers, then run two-player and reconnect smoke before repeating mobile acceptance. An HTTP 200 response alone does not prove a performance change reached production.
 

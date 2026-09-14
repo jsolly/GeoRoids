@@ -8,7 +8,6 @@ import type {
   Position,
   ServerGameSnapshot,
   ShipKitId,
-  SoftFactionId,
 } from '../../../../shared-types';
 import { DAMAGE, GAME, LASER, SHIP } from '../../../../src/constants';
 import { RecordingSocket } from '../../../support/recordingSocket';
@@ -47,7 +46,6 @@ export interface Pilot {
 
 interface JoinOptions {
   kitId?: ShipKitId;
-  factionId?: SoftFactionId;
   resumeToken?: string;
 }
 
@@ -167,7 +165,6 @@ export class GameServerWorld {
           name,
           position,
           kitId: options.kitId,
-          factionId: options.factionId,
           snapshotVersion: 1,
           asteroidInteractions: 1,
           ...(options.resumeToken ? { resumeToken: options.resumeToken } : {}),
@@ -192,32 +189,6 @@ export class GameServerWorld {
 
   send(pilot: Pilot, message: Record<string, unknown>): void {
     this.core.handleClientMessage(message, pilot.socket);
-  }
-
-  shoot(attacker: Pilot, target: Pilot, damage: number = DAMAGE.LASER_HIT): void {
-    const targetEntity = this.entity(target);
-    this.clearAsteroids();
-    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
-    for (let i = 0; i < hitCount && targetEntity.health > 0; i++) {
-      const healthBefore = targetEntity.health;
-      this.fireAt(attacker, targetEntity.position, () => targetEntity.health < healthBefore);
-    }
-  }
-
-  shootBot(attacker: Pilot, botId: string, damage: number = DAMAGE.LASER_HIT): void {
-    const bot = this.engine.getBot(botId);
-    if (!bot) {
-      throw new Error(`No bot with id ${botId}`);
-    }
-
-    this.clearAsteroids();
-    const shooter = this.entity(attacker);
-    bot.position = { x: shooter.position.x + 40, y: shooter.position.y };
-    bot.velocity = { x: 0, y: 0 };
-    const hitCount = Math.max(1, Math.ceil(damage / DAMAGE.LASER_HIT));
-    for (let i = 0; i < hitCount && bot.health > 0; i++) {
-      this.fireAt(attacker, bot.position, () => bot.health <= 0);
-    }
   }
 
   shootAsteroid(attacker: Pilot, asteroidId: string, damage: number = DAMAGE.LASER_HIT): void {
@@ -274,7 +245,6 @@ export class GameServerWorld {
       data: {
         targetPlayerId: pilot.id,
         attackerId: 'boundary',
-        damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
   }
@@ -287,7 +257,7 @@ export class GameServerWorld {
         position: { x: ship.position.x, y: ship.position.y },
       })
     );
-    this.engine.resolveAuthoritativeCombat(Date.now());
+    this.engine.resolveAuthoritativeCombat();
   }
 
   move(pilot: Pilot, position: Position): void {

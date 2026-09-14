@@ -31,12 +31,4 @@ describe('A pilot joins with a chosen ship kit', () => {
     expect(world.entity(alice).maxHealth).toBe(hauler.maxHealth);
     expect(world.entity(alice).health).toBe(hauler.maxHealth);
   });
-
-  test('join assigns a soft side without changing the chosen kit', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
-    expect(world.entity(alice).kitId).toBe('hauler');
-    expect(
-      world.entity(alice).factionId === 'ion' || world.entity(alice).factionId === 'ember'
-    ).toBe(true);
-  });
 });

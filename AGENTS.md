@@ -17,6 +17,8 @@ deletion are blocked. Human approval and conversation resolution are optional so
 CI-gated auto-merge can run unattended. The local break-glass variable does not
 override these GitHub protections.
 
+Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. See [world operations](docs/persistent-world.md).
+
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
 Local gate before push: `npm run gate` (full working-tree checks, including an empty index; shared dotagents preamble). GitHub CI checks the PR independently.

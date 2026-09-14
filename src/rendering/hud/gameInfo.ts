@@ -1,8 +1,5 @@
-import { FACTION_LABELS, getSideColor } from '../../../shared/factions';
-import type { FactionId } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { GameStateManager } from '../../core/services/GameStateManager';
-import { drawSoftFactionMark } from '../../entities/player/factionMarkPainters';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { getShipKit } from '../../entities/ship/shipKits';
 import { hexToRgba } from '../../utils/colorUtils';
@@ -15,8 +12,7 @@ export function drawScoreOverlay(
   layout: HudLayout,
   viewport: PlayfieldSize,
   score: number,
-  lives: number,
-  faction?: FactionId
+  lives: number
 ): void {
   ctx.save();
   ctx.fillStyle = PALETTE.HUD;
@@ -32,19 +28,6 @@ export function drawScoreOverlay(
 
   ctx.font = scaleHudFont(VISUAL.NAME_LABEL_FONT, layout.hudTypeScale);
   ctx.textBaseline = 'top';
-  if (faction) {
-    ctx.fillStyle = hexToRgba(getSideColor(faction), 0.85);
-    const metaX = VISUAL.HUD_INSET + dx;
-    const factionLabel = FACTION_LABELS[faction];
-    drawSoftFactionMark(ctx, faction, {
-      x: metaX + 3,
-      y: layout.factionY + 6,
-      radius: 6,
-      angle: Math.PI / 2,
-      context: 'hud',
-    });
-    ctx.fillText(factionLabel, metaX + 11, layout.factionY);
-  }
 
   const localShip = PlayerManager.getInstance().getLocalShip();
   if (localShip) {
@@ -54,21 +37,12 @@ export function drawScoreOverlay(
   }
 
   const gameStateManager = GameStateManager.getInstance();
-  if (gameStateManager.hasKillMessage()) {
-    ctx.fillStyle = PALETTE.DANGER;
-    ctx.font = scaleHudFont('bold 14px Arial', layout.hudTypeScale);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(gameStateManager.getKillMessage(), viewportWidth / 2, layout.killMessageY);
-  }
   if (gameStateManager.hasPickupMessage()) {
     ctx.fillStyle = PALETTE.SATELLITE;
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    const pickupY = gameStateManager.hasKillMessage()
-      ? layout.killMessageY + 18
-      : layout.killMessageY;
+    const pickupY = layout.notificationY;
     ctx.fillText(gameStateManager.getPickupMessage(), viewportWidth / 2, pickupY);
   }
 

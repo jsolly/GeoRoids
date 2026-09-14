@@ -4,7 +4,9 @@ import { quantizeSnapshotKinematics } from './snapshotPrecision';
 
 export const SNAPSHOT_VERSION = 1;
 export const SNAPSHOT_KEYFRAME_INTERVAL = 90;
-export const SNAPSHOT_BACKPRESSURE_BYTES = 256 * 1024;
+// A late join includes the entire explored atlas plus nearby asteroid geometry.
+// Keep that keyframe admissible while bounding each socket's projected queue.
+export const SNAPSHOT_BACKPRESSURE_BYTES = 1024 * 1024;
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type Row = { [key: string]: Json };

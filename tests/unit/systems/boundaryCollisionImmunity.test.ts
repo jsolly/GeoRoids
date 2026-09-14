@@ -47,13 +47,13 @@ describe('Boundary collision immunity', () => {
   });
 
   test('sends boundary damage for a vulnerable ship', () => {
+    ship.health = 400;
     collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
     expect(mockSendMessage).toHaveBeenCalledWith({
       type: 'collisionDamage',
       data: {
         targetPlayerId: 'local-player-123',
         attackerId: 'boundary',
-        damage: 100,
       },
     });
     expect(ship.exploding).toBe(true);

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { PALETTE, ROID } from '../../../../src/constants';
+import { PALETTE } from '../../../../src/constants';
 import { getGameBoundary } from '../../../../src/physics/boundary';
 import {
   drawingOffsets,
@@ -302,11 +302,9 @@ function survivingRockMoved(before: Field, after: Field): boolean {
   });
 }
 
-async function parkOutsideBelt(game: GameInteractions, side: number): Promise<void> {
-  // Leave the initial bot-combat area immediately, without disabling gameplay.
-  const x = side * (ROID.FIELD_RADIUS + 500);
-  expect(Math.abs(x) + (await game.getShipRadius())).toBeLessThan(getGameBoundary().radius);
-  await game.placeShipAt(x, 0);
+async function visitSharedSector(game: GameInteractions): Promise<void> {
+  // A distant region separates the camera check from the crew bots near launch.
+  await game.placeShipAt(20_000, 0);
 }
 
 test(
@@ -330,9 +328,9 @@ test(
 
       // Install both observers before either browser joins the shared world.
       await game1.bootGame({ waitForCombatReady: false });
-      await parkOutsideBelt(game1, 1);
+      await visitSharedSector(game1);
       await game2.bootGame({ waitForCombatReady: false });
-      await parkOutsideBelt(game2, -1);
+      await visitSharedSector(game2);
 
       // Compare contemporary observations. Destruction/splitting may legitimately
       // change the field while the second browser boots or between network ticks.
@@ -376,12 +374,12 @@ test(
         game1.getShipRadius(),
         game2.getShipRadius(),
       ]);
-      const enemies = [
-        ...bots.filter((enemy) => !enemy.exploding && enemy.health > 0),
+      const nearbyPilots = [
+        ...bots.filter((bot) => !bot.exploding && bot.health > 0),
         ...pickups.filter((pickup) => pickup.health > 0 && pickup.state !== 'broken'),
       ];
       const clearance = (rock: Field[number]) =>
-        Math.min(...enemies.map((enemy) => Math.hypot(enemy.x - rock.x, enemy.y - rock.y)));
+        Math.min(...nearbyPilots.map((pilot) => Math.hypot(pilot.x - rock.x, pilot.y - rock.y)));
       const focus = [...field].sort((a, b) => clearance(b) - clearance(a))[0];
       expect(focus, 'a surviving shared rock should be available for camera focus').toBeDefined();
       if (!focus) {

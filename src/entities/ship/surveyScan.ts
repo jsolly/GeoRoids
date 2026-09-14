@@ -9,18 +9,25 @@ type Scanner = {
   exploding: boolean;
 };
 
-/** Classification is temporary and local to the surveying pilot. */
+function isActiveScanner(scanner: Scanner): boolean {
+  return (
+    scanner.kitId === 'surveyor' &&
+    scanner.abilityActiveFrames > 0 &&
+    !scanner.exploding &&
+    scanner.health > 0
+  );
+}
+
+/** Active scanners share their classification, centered on each Surveyor. */
+export function activeScanners(viewer: Scanner, others: readonly Scanner[]): Scanner[] {
+  return [viewer, ...others].filter((scanner) => isActiveScanner(scanner));
+}
+
 export function scannedMaterial(
   scanner: Scanner,
   asteroid: { position: Position; material?: AsteroidMaterial; health: number }
 ): AsteroidMaterial | undefined {
-  if (
-    scanner.kitId !== 'surveyor' ||
-    scanner.abilityActiveFrames <= 0 ||
-    scanner.exploding ||
-    scanner.health <= 0 ||
-    asteroid.health <= 0
-  ) {
+  if (!isActiveScanner(scanner) || asteroid.health <= 0) {
     return undefined;
   }
   const dx = asteroid.position.x - scanner.position.x;

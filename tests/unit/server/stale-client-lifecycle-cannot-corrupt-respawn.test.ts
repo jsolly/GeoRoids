@@ -59,7 +59,7 @@ describe('late client death updates after authoritative respawn', () => {
     pilot.position = { x: 3150, y: 0 };
     delete pilot.spawnProtectionTimer;
     pilot.score = 17;
-    expect(engine.handlePlayerDamage(pilot.id, 'boundary', pilot.maxHealth)).toBe(true);
+    expect(engine.handleShipDamage(pilot.id, 'boundary', pilot.maxHealth).isDestroyed).toBe(true);
     expect(pilot.health).toBe(0);
     expect(pilot.lives).toBe(2);
     expect(pilot.exploding).toBe(true);

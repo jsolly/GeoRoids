@@ -7,7 +7,7 @@ import { searchArticles } from '../../../src/wiki/search';
 
 describe('readers find mechanics in the field manual', () => {
   it('finds rules in article bodies even when they are absent from the title', () => {
-    const results = searchArticles(articles, 'minerals');
+    const results = searchArticles(articles, 'classification');
     expect(results.some((article) => article.id === 'surveyor')).toBe(true);
   });
 
@@ -21,11 +21,11 @@ describe('readers find mechanics in the field manual', () => {
   });
 
   it('ignores letter case and extra spaces', () => {
-    expect(searchArticles(articles, '  SHIELD  ')).toEqual(searchArticles(articles, 'shield'));
+    expect(searchArticles(articles, '  HARPOON  ')).toEqual(searchArticles(articles, 'harpoon'));
   });
 
   it('requires all search words and returns an empty result for an unknown mechanic', () => {
-    expect(searchArticles(articles, 'shield nonexistent-mechanic')).toEqual([]);
+    expect(searchArticles(articles, 'harpoon nonexistent-mechanic')).toEqual([]);
   });
 
   it('returns the full inventory for an empty query', () => {

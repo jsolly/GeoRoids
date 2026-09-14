@@ -3,6 +3,7 @@ import { pointsForRoidSize } from '../../../../src/entities/roid/roidScore';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager } = createBrowserScenarioHooks();
 
@@ -30,45 +31,25 @@ test(
       })
     );
     await game.bootGame();
+    await arrangeCrewField([await game.getLocalPlayerId()], 'mining');
     await game.waitForCombatReady();
-    // Keep satellite pickups out of the score baseline while choosing a target.
-    await game.placeShipAt(-1800, -1800);
-    await game.waitForAsteroids(1);
-
-    const initialScore = await game.getScore();
-    const [asteroids, pickups, bots] = await Promise.all([
-      game.getAsteroidPositions(),
-      game.getSatellitePickups(),
-      game.getBots(),
-    ]);
-    const hazards = [
-      ...pickups.map((pickup) => ({ x: pickup.x, y: pickup.y })),
-      ...bots
-        .filter((bot) => bot.health > 0 && !bot.exploding)
-        .map((bot) => ({ x: bot.x, y: bot.y })),
-    ];
-    const target = asteroids
-      .filter(
-        (candidate) =>
-          candidate.isCollabTarget !== true && candidate.material === 'ice' && candidate.radius < 40
-      )
-      .map((candidate) => ({
-        ...candidate,
-        clearance: hazards.length
-          ? Math.min(
-              ...hazards.map((position) =>
-                Math.hypot(candidate.x - position.x, candidate.y - position.y)
-              )
-            )
-          : Number.MAX_SAFE_INTEGER,
-      }))
-      .sort((left, right) => right.clearance - left.clearance)[0];
-    expect(target, 'expected an ordinary ice asteroid clear of hostile actors').toBeDefined();
+    await game.placeShipAt(0, -360);
+    await page.evaluate(() => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      if (!ship) {
+        throw new Error('Mining fixture pilot missing');
+      }
+      ship.angle = Math.PI / 2;
+    });
+    await expect
+      .poll(async () => (await game.getAsteroidPositions()).map((rock) => rock.id))
+      .toEqual(['crew-fixture-ore']);
+    const [target] = await game.getAsteroidPositions();
     if (!target) {
-      return;
+      throw new Error('Mining fixture asteroid missing');
     }
-
-    await game.destroyAsteroidWithLaser(target, 25000);
+    const initialScore = await game.getScore();
+    await page.keyboard.press('Space');
 
     await expect
       .poll(() => destroyedAsteroidIds.has(target.id), {

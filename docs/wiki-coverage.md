@@ -10,32 +10,32 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life |
 | controls | Start here | Automatic thrust, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
-| surveyor | Ships | Stats scorecard, nimble movement, temporary radar mineral scan |
-| hauler | Ships | Stats scorecard, combat harpoon reel, collision-course sling, and fallback bounce |
+| surveyor | Ships | Stats scorecard, passive exploration reveal, shared active radar mineral scan, and delivery tags |
+| hauler | Ships | Stats scorecard, momentum-preserving tow cable, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
-| combat-survival | Combat | Damage, shields, faction gate exceptions, lives, respawn, score |
-| factions | Combat | ION and EMBER assignment, direct fire, collisions, ricochets, two opposite bots, faction colors, and bot labels |
-| hud-network | Systems | Health capsule, faction colors and bot labels, HUD values, minimap, settings, reconnect |
+| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, and score |
+| teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, bot mining, and persistent exploration |
+| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, reconnect |
 
 ## Coverage matrix
 
 | Player question | Article | Primary source families |
 | --- | --- | --- |
-| How do I move, aim, fire, or use E/F? | controls | src/input/, src/constants/index.ts, input tests |
+| How do I move, aim, fire, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
-| How do mass, shards, cores, and kill loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
+| How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
-| How does a Hauler pull, sling, or bounce a nearby target? | hauler | src/entities/ship/harpoonField.ts, harpoonSling.ts, ship ability tests |
+| How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | src/entities/ship/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
-| What hurts me, protects me, kills me, and resets on respawn? | combat-survival, factions | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
-| What do bots do and how do I identify their side? | combat-survival, factions, hud-network | server/ai/botController.ts, shared/factions.ts, faction and authoritative combat tests |
-| How do I read the HUD and recover from a disconnect? | hud-network | src/rendering/hud/, ConnectionManager.ts, broadcaster, snapshot protocol |
+| What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
+| How do bots and pilots contribute to the shared field? | teamwork, hud-network | server/ai/botController.ts, shared/exploration.ts, shared/furnaces.ts, GameEngine.ts |
+| How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
 
 ## Maintenance rules
 
@@ -48,7 +48,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Prefer imports from client and shared definitions for values rendered in
   content. Server-only rules may stay in reviewed prose, but their server
   source must be cited.
-- Preserve units. Ship shot intervals are milliseconds; ability, shield,
+- Preserve units. Ship shot intervals are milliseconds; ability,
   explosion, respawn, pickup, and satellite timers are frames unless the text
   converts them using the 60 FPS clock.
 - Write the player-visible rule and its failure conditions before adding a tip.
@@ -57,9 +57,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   demonstration beside the section that explains its mechanic. The Markdown
   compiler derives the aggregate list used by coverage checks from each
   article's media placements. Requested demonstrations
-  include ship abilities, movement, reflection, cooperative splits, shields,
-  Hauler harpoon, reflective asteroids, satellites, pickups, terrain slope, and
-  loot blast or growth.
+  include ship abilities, movement, reflection, cooperative splits,
+  Hauler tow cable and furnace delivery, shared scans, reflective asteroids,
+  satellites, pickups, terrain slope, and
+  loot blast or growth, and surviving an environmental asteroid impact.
 - When gameplay source changes, review the affected article and demonstration
   before accepting a new docs/wiki-source-review.json digest. Run the normal
   TypeScript, lint, Markdown, wiki, and relevant gameplay checks from the
@@ -67,42 +68,50 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 ## Known rule discrepancies and maintenance notes
 
-- The ordinary Hauler E uses a view-aware reach with a 280-unit minimum and
-  prefers a valid asteroid in reach over a hostile ship. Same-faction ships,
-  shielded ships, exploding ships, and dead entities are rejected. A clear
-  momentum collision course keeps its heading; other rocks reel toward the
-  Hauler and release near the hull toward a predicted enemy. A miss does not
-  spend the cooldown. While an asteroid is actively harpooned, it passes
-  through that Hauler without collision damage; unrelated asteroids and other
-  pilots keep normal collision damage, and the target collides normally again
-  after the tether expires. A rock with no eligible enemy at release bounces
-  away from the Hauler.
-- Surveyor E classifies nearby minerals temporarily on radar; both kits keep the
-  regular F reflective shield. Hauler mining damage is doubled for metal and
-  collaborative HP targets while PvP laser damage remains unchanged.
-- The authoritative ship-to-asteroid ram currently applies the shared 25-point
-  laser hit value. A stale DAMAGE.ASTEROID_COLLISION comment says 100, so the
-  manual follows shared/combat.ts and GameEngine.resolveAuthoritativeCombat.
-  Boundary damage is 100 and can be survived by a high-health ship.
+- Hauler E uses a fixed 280-unit hull-gap reach and selects only a living
+  asteroid. E again releases the persistent tow cable. The asteroid
+  keeps its momentum and trails behind normal Hauler movement; the cable applies
+  a correction only while stretched and never reels or throws the rock. A towed
+  successful attachment starts the three-second ability cooldown, but E again
+  releases the cable immediately; an out-of-range attempt leaves the cooldown
+  unchanged. A towed rock delivered inside a furnace's
+  85-unit intake is consumed and awards the Hauler plus every recorded Surveyor
+  the full material reward.
+- Surveyor E classifies nearby minerals on every teammate radar for the active
+  1,200-unit scan range; each qualifying rock keeps that classification while
+  it remains in the nearby radar and records the Surveyor player ID for delivery.
+  Surveyor passive exploration reaches 650 world units and Hauler passive
+  exploration reaches 260; the chart persists and is shared by every pilot and
+  bot. The local minimap follows the nearby radar, while M or the on-screen Map
+  button opens a full-screen universe overview. Pilots stay readable;
+  discovered furnace and other important asset markers remain visible on the
+  overview while uncharted asteroid, loot, and furnace positions remain hidden.
+- Hauler mining damage is doubled for metal asteroids and cooperative large rocks;
+  normal asteroid mining damage remains configured per material. Large ice
+  collaboration requires distinct pilot IDs; both contributors receive the
+  collaboration score. Every miner and recorded Surveyor receives the full
+  mining reward; partial-rock contributor history survives saved-region reloads
+  and server restarts, and offline pilots retain their credit.
+- Ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
+  never damage crew hulls. Asteroid impacts remain world hazards and remove 25
+  health per impact. Boundary contact destroys a vulnerable ship regardless of
+  health, enforced by `server/core/GameEngine.ts` and verified in
+  `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager
   and spawn separately from asteroid destruction. A nearest living human within
   the automatic collection range claims one; the hardware orbits indefinitely,
-  intercepts hostile shots and asteroid collisions, preserves health on owner
+  intercepts laser shots and asteroid collisions, preserves health on owner
   release, and respawns loose and healthy after breaking.
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
-  lives, score, faction, and kit.
-- A laser detonation of any loot kind reaches every nearby live hull, including
-  the shooter and allies, and bypasses faction filtering and the F shield.
-  It deals 40 damage within an 80-unit radius, while spawn protection is the
-  exception. It pushes only rocks of size 24 or smaller.
-- Normal ship-to-ship collision ticks use the faction damage gate. Satellite
-  pickups intercept shots and rocks for their owner and do not deal faction
-  damage. Reflected lasers are marked as ricochets so they can damage the
-  originating or same-faction pilot.
-- The default match keeps two bots, one Ion and one Ember. Blue and orange
-  hull, name, and minimap colors identify those sides, while bot labels include
-  “(bot)”.
+  lives, score, current ability, and kit. The leaderboard includes every active
+  human and bot.
+- A laser detonation of any loot kind removes the drop and leaves every nearby
+  crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
+  pickups intercept laser shots and rocks for their owner.
+- Every match includes the configured bot roster in the shared field. Bots mine
+  asteroids and Surveyor bots run automatic scans, so their chart reveals and
+  mineral tags contribute to the same crew loop. Bot labels include “(bot)”.
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.

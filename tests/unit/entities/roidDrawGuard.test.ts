@@ -56,7 +56,6 @@ function asteroidScene() {
     id: 'observer',
     name: 'Observer',
     type: 'remote',
-    factionId: 'ion',
     position: { x: 20, y: 30 },
   });
   return { ctx, pilot };

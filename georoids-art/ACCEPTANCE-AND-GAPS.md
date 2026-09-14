@@ -1,7 +1,9 @@
 # GeoRoids art pack — acceptance + gaps
 
+> Historical acceptance record for the September 5–7 source pack. Current rules are in [cooperative ships](cooperative-ships.md) and the [ship/world palette](ship-world-palette.md); the retired kit, faction and shield notes below preserve the original review.
+
 Historical source-pack record. Current ship definitions and assets are in
-[ships-and-factions.md](ships-and-factions.md); retired kit entries below are
+[cooperative-ships.md](cooperative-ships.md); retired kit entries below are
 provenance only and are not current gameplay or asset instructions.
 
 **Pack date:** 2026-09-07
@@ -13,8 +15,8 @@ provenance only and are not current gameplay or asset instructions.
 ### Canon docs
 
 - `style-guide.md` — beauty bar, locked playfield palette, line rules
-- `palette-ships-factions.md` — ION/EMBER marks, shield, loot, terrain, harpoon, EO pickup hulls
-- `ships-and-factions.md` — silhouette v2 LOCKED topology + soft-faction rules
+- `ship-world-palette.md` — ION/EMBER marks, shield, loot, terrain, harpoon, EO pickup hulls
+- `cooperative-ships.md` — silhouette v2 LOCKED topology + soft-faction rules
 - `hud-treatment.md`, `shot-list.md`, `REFERENCES.md`
 - `prompt-sheets-*.md` — paste prompts if regenerating assets
 - `eo-satellites/roster-and-briefs.md` — locked 6-bird roster + per-bird tells

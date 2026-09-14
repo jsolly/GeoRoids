@@ -2,11 +2,11 @@ import { type Browser, type BrowserContext, chromium, type Page } from 'playwrig
 
 export class BrowserManager {
   private browser: Browser | null = null;
-  private context: BrowserContext | null = null;
-  private touchContext: BrowserContext | null = null;
   private page: Page | null = null;
   private pages: Page[] = [];
-  private pageCleanupFailed = false;
+  private readonly pageContexts = new Map<Page, BrowserContext>();
+  private contexts = new Set<BrowserContext>();
+  private cleanupFailed = false;
   private readonly pageErrors: Error[] = [];
 
   async initialize(): Promise<void> {
@@ -27,25 +27,43 @@ export class BrowserManager {
         '--disable-ipc-flooding-protection',
       ],
     });
-    this.context = await this.browser.newContext({ hasTouch: false });
   }
 
   async createPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
-    if (this.pageCleanupFailed) {
+    if (this.cleanupFailed) {
       await this.closeAllPages();
     }
-    if (!this.browser || !this.context) {
+    if (!this.browser) {
       throw new Error('Browser not initialized. Call initialize() first.');
     }
 
-    let context = this.context;
-    if (options.hasTouch) {
-      this.touchContext ??= await this.browser.newContext({ hasTouch: true, deviceScaleFactor: 2 });
-      context = this.touchContext;
+    // Each page is a separate pilot. In particular, private resume tokens in
+    // localStorage must never make a second pilot take over the first pilot's
+    // connection. Reloads still happen inside this context and retain that
+    // pilot's session as expected.
+    const context = await this.browser.newContext(
+      options.hasTouch ? { hasTouch: true, deviceScaleFactor: 2 } : { hasTouch: false }
+    );
+    this.contexts.add(context);
+    let page: Page;
+    try {
+      page = await context.newPage();
+    } catch (error: unknown) {
+      try {
+        await context.close();
+        this.contexts.delete(context);
+      } catch (closeError: unknown) {
+        throw new AggregateError(
+          [error, closeError],
+          'Browser context failed while creating a scenario page'
+        );
+      }
+      throw error;
     }
-    const page = await context.newPage();
+
     this.page = page;
     this.pages.push(page);
+    this.pageContexts.set(page, context);
     const onPageError = (error: Error) => this.pageErrors.push(error);
     page.on('pageerror', onPageError);
     page.once('close', () => page.off('pageerror', onPageError));
@@ -72,13 +90,14 @@ export class BrowserManager {
     return this.createPage(options);
   }
 
-  /** Alias for closePage — closes every page opened in this manager. */
+  /** Alias for closePage — closes every page and owned context in this manager. */
   async closeAllPages(): Promise<void> {
     const failures: unknown[] = [];
     const remaining: Page[] = [];
     for (const page of this.pages) {
       try {
         await page.close();
+        this.pageContexts.delete(page);
       } catch (error: unknown) {
         failures.push(error);
         remaining.push(page);
@@ -86,14 +105,36 @@ export class BrowserManager {
     }
     this.pages = remaining;
     this.page = remaining.at(-1) ?? null;
-    this.pageCleanupFailed = remaining.length > 0;
+
+    // Do not close a context while one of its pages still needs a retry. A
+    // context with no remaining page is fully owned by this manager and is
+    // closed here rather than accumulating until the file-level cleanup.
+    const activeContexts = new Set(
+      remaining.map((page) => this.pageContexts.get(page)).filter(this.isContext)
+    );
+    const remainingContexts = new Set<BrowserContext>();
+    for (const context of this.contexts) {
+      if (activeContexts.has(context)) {
+        remainingContexts.add(context);
+        continue;
+      }
+      try {
+        await context.close();
+      } catch (error: unknown) {
+        failures.push(error);
+        remainingContexts.add(context);
+      }
+    }
+    this.contexts = remainingContexts;
+
+    this.cleanupFailed = remaining.length > 0 || remainingContexts.size > 0;
     failures.push(...this.pageErrors.splice(0));
     if (failures.length > 0) {
       throw new AggregateError(failures, `Scenario pages failed with ${failures.length} error(s)`);
     }
   }
 
-  /** Open an additional browser tab for multi-client scenarios. */
+  /** Open an additional independent browser context for a multi-client scenario. */
   async createAdditionalPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
     return this.createPage(options);
   }
@@ -121,21 +162,30 @@ export class BrowserManager {
       }
     }
 
-    for (const resource of [this.context, this.touchContext, this.browser]) {
+    // closeAllPages normally drains these. A page whose close failed remains
+    // associated with its context, so cleanup retries every context explicitly
+    // before closing the browser and retains ownership if anything fails.
+    for (const context of this.contexts) {
       try {
-        await resource?.close();
+        await context.close();
+        this.contexts.delete(context);
       } catch (error: unknown) {
         failures.push(error);
       }
     }
+    try {
+      await this.browser?.close();
+    } catch (error: unknown) {
+      failures.push(error);
+    }
     failures.push(...this.pageErrors.splice(0));
-    if (!this.browser?.isConnected()) {
-      this.context = null;
-      this.touchContext = null;
+    if (failures.length === 0 && !this.browser?.isConnected()) {
+      this.contexts.clear();
+      this.pageContexts.clear();
       this.browser = null;
       this.pages = [];
       this.page = null;
-      this.pageCleanupFailed = false;
+      this.cleanupFailed = false;
     }
 
     if (failures.length > 0) {
@@ -145,5 +195,9 @@ export class BrowserManager {
 
   getCurrentPage(): Page | null {
     return this.page;
+  }
+
+  private isContext(value: BrowserContext | undefined): value is BrowserContext {
+    return value !== undefined;
   }
 }

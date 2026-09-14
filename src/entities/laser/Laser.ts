@@ -1,3 +1,5 @@
+import { reflectVector } from '../../../shared/asteroidReflection';
+import { findWorldBoundaryImpact } from '../../../shared/worldBoundary';
 import type { Position, Velocity } from '../../../shared-types';
 import {
   getHitSound,
@@ -22,8 +24,6 @@ interface LaserData {
 
 export class Laser implements LaserData {
   serverId?: string;
-  /** Prevent a reflected visual bolt from immediately re-contacting the same ring. */
-  lastShieldId?: string;
   bounceCount = 0;
   static get fxLaser(): Sound {
     return getLaserSound();
@@ -52,6 +52,18 @@ export class Laser implements LaserData {
         x: this.position.x + this.velocity.x,
         y: this.position.y + this.velocity.y,
       };
+      const impact = findWorldBoundaryImpact(this.prevPosition, this.position);
+      if (impact) {
+        const speed = getVelocityMagnitude(this.velocity);
+        this.velocity = reflectVector(this.velocity, impact.normal);
+        const remaining = Math.max(0, speed - impact.distance);
+        this.prevPosition = impact.point;
+        this.position = {
+          x: impact.point.x - impact.normal.x * 1e-5 + (this.velocity.x / speed) * remaining,
+          y: impact.point.y - impact.normal.y * 1e-5 + (this.velocity.y / speed) * remaining,
+        };
+        this.bounceCount++;
+      }
       this.distTraveled += getVelocityMagnitude(this.velocity);
     }
   }

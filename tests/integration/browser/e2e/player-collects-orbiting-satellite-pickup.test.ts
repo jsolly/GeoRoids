@@ -25,7 +25,7 @@ test.each([1280, 390])(
       })
     );
     const game = new GameInteractions(page);
-    await game.bootSinglePlayerGame();
+    await game.bootGame();
     await game.waitForSatellitePickups(2);
 
     const pickups = await game.getSatellitePickups();
@@ -34,6 +34,18 @@ test.each([1280, 390])(
     const target = pickups.find((pickup) => pickup.state === 'loose');
     assert.ok(target, 'Orbiting satellite pickup missing');
     const scoreBefore = await game.getScore();
+    const pickupSound = await page.evaluate(async () => {
+      const context = new OfflineAudioContext(1, 1, 48000);
+      const response = await fetch('/sounds/orbital-pickup.m4a');
+      if (!response.ok) {
+        throw new Error('Satellite pickup sound missing');
+      }
+      const buffer = await context.decodeAudioData(await response.arrayBuffer());
+      return {
+        duration: buffer.duration,
+        eventCount: JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]').length,
+      };
+    });
 
     await game.placeShipAt(target.x + 110, target.y);
     await expect
@@ -60,9 +72,14 @@ test.each([1280, 390])(
     expect(sent).not.toContain('satellitePickupCollected');
     await expect
       .poll(() =>
-        page.evaluate(() =>
-          (document.documentElement.dataset['audioEvents'] ?? '').includes('orbital-pickup.m4a')
-        )
+        page.evaluate(({ duration, eventCount }) => {
+          const events: Array<{ duration: number }> = JSON.parse(
+            document.documentElement.dataset['audioEvents'] ?? '[]'
+          );
+          return events
+            .slice(eventCount)
+            .some((event) => Math.abs(event.duration - duration) < 0.002);
+        }, pickupSound)
       )
       .toBe(true);
     await page.screenshot({

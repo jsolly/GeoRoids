@@ -1,6 +1,9 @@
 import { existsSync } from 'node:fs';
 import { expect, test } from 'vitest';
 
+import { VISUAL } from '../../../../src/constants';
+import { layoutHudCluster } from '../../../../src/rendering/hud/cluster';
+import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -118,16 +121,12 @@ async function captureHudFrame(
       local.name = 'HUD pilot';
       local.score = capture.score;
       local.lives = 3;
-      local.factionId = 'ion';
-      local.ship.factionId = 'ion';
       local.ship.kitId = 'surveyor';
 
       for (const player of players) {
         if (player.id === local.id) {
           player.name = local.name;
           player.score = local.score;
-          player.factionId = local.factionId;
-          player.ship.factionId = local.ship.factionId;
         }
       }
 
@@ -167,6 +166,17 @@ function arcDrawn(frame: HudFrame, radius: number, x: number, y: number): DrawnA
 function styleHas(style: string, hex: string, channels: string): boolean {
   const normalized = style.toLowerCase();
   return normalized.includes(hex.toLowerCase()) || normalized.includes(channels);
+}
+
+function miniMapCenter(layout: ReturnType<typeof computeHudLayout>): { x: number; y: number } {
+  return {
+    x: layout.miniMap.x + layout.miniMap.size / 2,
+    y: layout.miniMap.y + layout.miniMap.size / 2,
+  };
+}
+
+function scoreOrigin(layout: ReturnType<typeof computeHudLayout>, lives: number): number {
+  return layoutHudCluster(lives).score.x + layout.lives.x - VISUAL.HUD_INSET;
 }
 
 function saveScreenshot(page: import('playwright').Page, path: string): Promise<void> {
@@ -212,9 +222,16 @@ test(
         safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
         score: 2468,
       });
+      const desktopLayout = computeHudLayout(
+        { width: 1280, height: 900 },
+        { touchControls: false, safeArea: { top: 0, right: 0, bottom: 0, left: 0 } }
+      );
+      const desktopRadar = miniMapCenter(desktopLayout);
       expect(desktop.canvas).toEqual({ width: 1280, height: 900 });
-      expect(textDrawn(desktop, '2468', true)?.x).toBe(80);
-      expect(arcDrawn(desktop, 48, 1216, 836)).toBeDefined();
+      expect(textDrawn(desktop, '2468', true)?.x).toBe(scoreOrigin(desktopLayout, 3));
+      expect(
+        arcDrawn(desktop, desktopLayout.miniMap.size / 2, desktopRadar.x, desktopRadar.y)
+      ).toBeDefined();
       await saveScreenshot(
         page,
         screenshotManager.getScreenshotPath('hud-composition-desktop.png')
@@ -230,26 +247,46 @@ test(
         score: 2468,
         overlay: 'Game Over: radar collision',
       });
+      const portraitLayout = computeHudLayout(
+        { width: 390, height: 844 },
+        { touchControls: true, safeArea: { top: 0, right: 0, bottom: 0, left: 0 } }
+      );
+      const shiftedPortraitLayout = computeHudLayout(
+        { width: 390, height: 844 },
+        { touchControls: true, safeArea: { top: 47, right: 24, bottom: 34, left: 24 } }
+      );
+      const portraitRadar = miniMapCenter(portraitLayout);
+      const shiftedPortraitRadar = miniMapCenter(shiftedPortraitLayout);
       expect(portrait.canvas).toEqual({ width: 390, height: 844 });
       expect(shiftedPortrait.canvas).toEqual(portrait.canvas);
 
       const portraitScore = textDrawn(portrait, '2468', true);
       const shiftedScore = textDrawn(shiftedPortrait, '2468', true);
-      const portraitFaction = textDrawn(portrait, 'ION');
-      const shiftedFaction = textDrawn(shiftedPortrait, 'ION');
+      const portraitKit = textDrawn(portrait, 'Surveyor');
+      const shiftedKit = textDrawn(shiftedPortrait, 'Surveyor');
       expect(portraitScore).toBeDefined();
       expect(shiftedScore).toBeDefined();
-      expect(portraitFaction).toBeDefined();
-      expect(shiftedFaction).toBeDefined();
+      expect(portraitKit).toBeDefined();
+      expect(shiftedKit).toBeDefined();
       expect(shiftedScore?.x).toBe((portraitScore?.x ?? 0) + 20);
       expect(shiftedScore?.y).toBe((portraitScore?.y ?? 0) + 43);
-      expect(shiftedFaction?.x).toBe((portraitFaction?.x ?? 0) + 20);
-      expect(shiftedFaction?.y).toBe((portraitFaction?.y ?? 0) + 43);
+      expect(shiftedKit?.x).toBe((portraitKit?.x ?? 0) + 20);
+      expect(shiftedKit?.y).toBe((portraitKit?.y ?? 0) + 43);
       expect(styleHas(portraitScore?.fillStyle ?? '', '#e2e8f0', '226, 232, 240')).toBe(true);
-      expect(portraitFaction?.fillStyle).toContain('168, 160, 200');
+      expect(styleHas(portraitKit?.fillStyle ?? '', '#64748b', '100, 116, 139')).toBe(true);
 
-      const portraitRing = arcDrawn(portrait, 40, 338, 680);
-      const shiftedRing = arcDrawn(shiftedPortrait, 40, 318, 650);
+      const portraitRing = arcDrawn(
+        portrait,
+        portraitLayout.miniMap.size / 2,
+        portraitRadar.x,
+        portraitRadar.y
+      );
+      const shiftedRing = arcDrawn(
+        shiftedPortrait,
+        shiftedPortraitLayout.miniMap.size / 2,
+        shiftedPortraitRadar.x,
+        shiftedPortraitRadar.y
+      );
       expect(portraitRing).toBeDefined();
       expect(shiftedRing).toBeDefined();
       expect(shiftedRing?.x).toBe((portraitRing?.x ?? 0) - 20);
@@ -275,18 +312,23 @@ test(
         safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
         score: 2468,
       });
+      const landscapeLayout = computeHudLayout(
+        { width: 844, height: 390 },
+        { touchControls: true, safeArea: { top: 0, right: 0, bottom: 0, left: 0 } }
+      );
+      const landscapeRadar = miniMapCenter(landscapeLayout);
       expect(landscape.canvas).toEqual({ width: 844, height: 390 });
-      const radar = arcDrawn(landscape, 32, 44, 117);
+      const radar = arcDrawn(
+        landscape,
+        landscapeLayout.miniMap.size / 2,
+        landscapeRadar.x,
+        landscapeRadar.y
+      );
       expect(radar).toBeDefined();
-      expect(textDrawn(landscape, '2468', true)?.x).toBe(76);
+      expect(textDrawn(landscape, '2468', true)?.x).toBe(scoreOrigin(landscapeLayout, 3));
       expect(await page.locator('#asteroid-tools-launcher, #asteroid-tools-overlay').count()).toBe(
         0
       );
-      expect(
-        await page
-          .locator('#flight-feedback')
-          .evaluate((element) => getComputedStyle(element).pointerEvents)
-      ).toBe('none');
       await saveScreenshot(
         page,
         screenshotManager.getScreenshotPath('hud-composition-landscape.png')

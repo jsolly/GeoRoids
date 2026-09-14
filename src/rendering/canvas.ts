@@ -21,7 +21,7 @@ import { shouldDrawShipHull } from '../entities/ship/shipUtils';
 import { NetworkManager } from '../network/networkManager';
 import { Point } from '../physics/Point';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
-import { getFactionColor, getLaserColor } from '../utils/colorUtils';
+import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
 import { drawFieryBoundary } from './boundaryRenderer';
 import {
@@ -31,6 +31,7 @@ import {
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
+import { drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
@@ -122,6 +123,15 @@ class CanvasManager {
 
     this.viewport.width = width;
     this.viewport.height = height;
+
+    // The DOM Map button shares the canvas radar's layout, including touch and safe areas.
+    const { miniMap } = hudLayoutForCanvas(this.viewport);
+    const chrome = this.canvas.parentElement;
+    chrome?.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
+    chrome?.style.setProperty(
+      '--map-toggle-y',
+      `${touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84}px`
+    );
 
     if (this.canvas.width !== backingWidth) {
       this.canvas.width = backingWidth;
@@ -323,14 +333,14 @@ class CanvasManager {
     if (roids.length > 0) {
       drawRoidsRelative(currShip, roids);
     }
+    drawFurnacesRelative(currShip.position);
 
     const loot = LootField.getInstance().getAll();
     const satellitePickups = SatellitePickupManager.getInstance().getAll();
     drawLootRelative(currShip, loot);
     drawSatellitePickups(satellitePickups, currShip.position);
 
-    const localLaserColor = getLaserColor(true);
-    const enemyLaserColor = getLaserColor(false);
+    const laserColor = getLaserColor();
 
     // Cable first — a dying or blinking hull must not hide the cream tether.
     for (const player of allPlayers) {
@@ -340,23 +350,22 @@ class CanvasManager {
     }
 
     for (const player of allPlayers) {
-      const factionColor = getFactionColor(player.factionId);
       const isLocal = player.id === localId;
       const ship = isLocal ? currShip : player.ship;
+      const shipColor = isLocal ? currPlayer.color : player.color;
 
       if (ship.exploding) {
         if (isLocal) {
-          drawShipExplosion(currShip, factionColor);
+          drawShipExplosion(currShip, shipColor);
         } else {
-          drawShipExplosionAtPosition(ship, currShip.position, factionColor);
+          drawShipExplosionAtPosition(ship, currShip.position, shipColor);
         }
       } else if (shouldDrawShipHull(ship)) {
         drawShipAtPosition(
           ship,
           currShip.position,
-          factionColor,
-          player.type === 'bot' ? `${player.name} (bot)` : isLocal ? currPlayer.name : player.name,
-          player.factionId
+          shipColor,
+          player.type === 'bot' ? `${player.name} (bot)` : isLocal ? currPlayer.name : player.name
         );
       }
     }
@@ -367,23 +376,23 @@ class CanvasManager {
       if (!shouldDrawShipHull(ship) || !ship.thrusting) {
         continue;
       }
-      const factionColor = getFactionColor(player.factionId);
+      const shipColor = isLocal ? currPlayer.color : player.color;
       if (isLocal) {
-        drawThruster(currShip, factionColor);
+        drawThruster(currShip, shipColor);
       } else {
-        drawThrusterAtPosition(ship, currShip.position, factionColor);
+        drawThrusterAtPosition(ship, currShip.position, shipColor);
       }
     }
 
     drawShockwaves(currShip.position);
 
-    drawLasers(currShip, localLaserColor);
+    drawLasers(currShip, laserColor);
 
     for (const player of allPlayers) {
       if (player.id === localId || !shouldDrawShipHull(player.ship)) {
         continue;
       }
-      drawLasers(player.ship, enemyLaserColor, currShip.position);
+      drawLasers(player.ship, laserColor, currShip.position);
     }
 
     drawHeadingCue(ctx, viewport, currShip);
@@ -391,15 +400,9 @@ class CanvasManager {
     const hudLayout = hudLayoutForCanvas(viewport);
     drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups);
 
-    drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives, currPlayer.factionId);
+    drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives);
 
-    drawLivesIndicator(
-      ctx,
-      hudLayout,
-      lives,
-      getFactionColor(currPlayer.factionId),
-      currShip.kitId
-    );
+    drawLivesIndicator(ctx, hudLayout, lives, currPlayer.color, currShip.kitId);
 
     if (text && textAlpha > 0) {
       drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);

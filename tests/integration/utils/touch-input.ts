@@ -59,10 +59,6 @@ type TouchControlState = {
   lasers: number;
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
-  shieldActive: boolean;
-
-  shieldCooldown: number;
-  shieldFlashTime: number;
 };
 
 export async function readTouchControlState(page: Page): Promise<TouchControlState> {
@@ -79,10 +75,6 @@ export async function readTouchControlState(page: Page): Promise<TouchControlSta
       lasers: ship.lasers.length,
       abilityCooldownFrames: ship.abilityCooldownFrames,
       abilityActiveFrames: ship.abilityActiveFrames,
-      shieldActive: ship.shieldActive,
-
-      shieldCooldown: ship.shieldCooldown,
-      shieldFlashTime: ship.shieldFlashTime,
     };
   });
 }
@@ -99,7 +91,6 @@ type TouchControlLayout = {
   overflow: boolean;
   canvas: TouchControlBox | null;
   ability: TouchControlBox | null;
-  shield: TouchControlBox | null;
 };
 
 export async function readTouchControlLayout(page: Page): Promise<TouchControlLayout> {
@@ -122,7 +113,6 @@ export async function readTouchControlLayout(page: Page): Promise<TouchControlLa
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
       canvas: box(canvas),
       ability: box(document.getElementById('touch-ability')),
-      shield: box(document.getElementById('touch-shield')),
     };
   });
 }

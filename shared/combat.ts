@@ -1,5 +1,5 @@
 import type { Position } from '../shared-types';
-import { DAMAGE, DEBUG } from '../src/constants';
+import { DEBUG } from '../src/constants';
 
 interface CombatantState {
   exploding: boolean;
@@ -46,17 +46,6 @@ export function circlesOverlap(
   return dx * dx + dy * dy < minDist * minDist;
 }
 
-export function asteroidRamDamage(): number {
-  return DAMAGE.LASER_HIT;
-}
-
-export function shipShipTickDamage(): number {
-  return Math.max(
-    1,
-    Math.round(DAMAGE.PLAYER_COLLISION_PER_SECOND * (DAMAGE.PLAYER_COLLISION_INTERVAL_MS / 1000))
-  );
-}
-
 export function findShipAsteroidOverlaps(
   ships: CombatCircle[],
   asteroids: Array<{ id: string; position: Position; radius: number }>,
@@ -80,66 +69,6 @@ export function findShipAsteroidOverlaps(
   return hits;
 }
 
-export function findShipShipPairs(ships: CombatCircle[]): Array<{ a: string; b: string }> {
-  const pairs: Array<{ a: string; b: string }> = [];
-  for (let i = 0; i < ships.length; i++) {
-    const left = ships[i];
-    if (!left || left.immune) {
-      continue;
-    }
-    for (let j = i + 1; j < ships.length; j++) {
-      const right = ships[j];
-      if (!right || right.immune) {
-        continue;
-      }
-      if (circlesOverlap(left.position, left.radius, right.position, right.radius)) {
-        pairs.push({ a: left.id, b: right.id });
-      }
-    }
-  }
-  return pairs;
-}
-
-export function shipShipPairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
-}
-
-export function shouldApplyShipShipTick(
-  lastTickMs: number | undefined,
-  now: number,
-  intervalMs: number = DAMAGE.PLAYER_COLLISION_INTERVAL_MS
-): boolean {
-  if (lastTickMs === undefined) {
-    return true;
-  }
-  return now - lastTickMs >= intervalMs;
-}
-
-/** Client laser reports: reporter must be the shooter or the target. */
-export function isAllowedLaserReporter(
-  reporterId: string,
-  attackerId: string,
-  targetId: string
-): boolean {
-  return reporterId === attackerId || reporterId === targetId;
-}
-
-export function clampLaserDamage(damage: number): number {
-  if (!Number.isFinite(damage) || damage <= 0) {
-    return 0;
-  }
-  return Math.min(DAMAGE.LASER_HIT, damage);
-}
-
 export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
   return attackerId === 'boundary';
-}
-
-/** Asteroid ram is resolved on the server; ignore leftover client reports. */
-export function isServerOwnedRamAttacker(attackerId: string): boolean {
-  return (
-    attackerId === 'asteroid' ||
-    attackerId.startsWith('asteroid') ||
-    attackerId.startsWith('server-sat-')
-  );
 }

@@ -92,7 +92,6 @@ class PilotSocket {
       name: id,
       position: { x, y: 0 },
       kitId: 'hauler',
-      factionId: 'ion',
       snapshotVersion: 1,
       asteroidInteractions: 1,
       ...(resumeToken ? { resumeToken } : {}),
@@ -181,7 +180,6 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     );
     expect(resumed).toMatchObject({
       id: 'pilot',
-      factionId: 'ion',
       resumeToken: joined['resumeToken'],
     });
     expect(entity(await replacement.state(), 'pilot').playerMotion).toMatchObject({
@@ -280,8 +278,10 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     });
   });
 
-  it('expires a disconnected session after grace and rejects its retired token', async () => {
+  it('preserves a disconnected pilot after grace, rotates its token, and retires the old token', async () => {
     const { pilot, observer, joined, engine } = await world();
+    const token = String(joined['resumeToken']);
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
     engine.startGameLoop();
     await pilot.close();
     await observer.waitFor(
@@ -300,46 +300,62 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     ).toBe(true);
 
     const replacement = await connect();
-    replacement.send('join', {
-      id: 'expired',
-      name: 'expired',
-      snapshotVersion: 1,
-      asteroidInteractions: 1,
-      resumeToken: joined['resumeToken'],
-    });
-    await replacement.waitFor(
-      () => replacement.messages.find((message) => message.type === 'sessionExpired'),
-      'expired token rejection'
-    );
-    expect(replacement.messages.some((message) => message.type === 'joined')).toBe(false);
-    const fresh = await replacement.join('pilot', 100);
-    expect(fresh['resumeToken']).not.toBe(joined['resumeToken']);
+    const resumed = await replacement.join('expired', 100, token);
+    expect(resumed).toMatchObject({ id: 'pilot' });
+    expect(resumed['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+    expect(resumed['resumeToken']).not.toBe(token);
+    expect(engine.getPlayer('expired')).toBeUndefined();
     expect(entity(await replacement.state(), 'pilot').playerMotion).toMatchObject({
       mode: 'free',
       epoch: 1,
     });
+
+    const retired = await connect();
+    retired.send('join', {
+      id: 'retired',
+      name: 'retired',
+      position: { x: 100, y: 0 },
+      kitId: 'hauler',
+      snapshotVersion: 1,
+      asteroidInteractions: 1,
+      resumeToken: token,
+    });
+    await retired.waitFor(
+      () => retired.messages.find((message) => message.type === 'sessionExpired'),
+      'retired token rejection after archived resume'
+    );
+    expect(retired.messages.some((message) => message.type === 'joined')).toBe(false);
   });
 
-  it('invalidates a private token on explicit leave before allowing a fresh session', async () => {
+  it('preserves a pilot after explicit leave, rotates its token, and retires the old token', async () => {
     const { pilot, observer, joined, engine } = await world();
+    const token = String(joined['resumeToken']);
+    expect(token).toMatch(/^[a-f0-9]{64}$/);
     pilot.send('leave');
     expect((await observer.state()).entities.some((row) => row.id === 'pilot')).toBe(false);
     expect(engine.getPlayerCount()).toBe(1);
 
     const replacement = await connect();
-    replacement.send('join', {
-      id: 'pilot',
-      name: 'pilot',
+    const resumed = await replacement.join('pilot', 100, token);
+    expect(resumed).toMatchObject({ id: 'pilot' });
+    expect(resumed['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+    expect(resumed['resumeToken']).not.toBe(token);
+    expect(engine.getPlayerCount()).toBe(2);
+
+    const retired = await connect();
+    retired.send('join', {
+      id: 'retired',
+      name: 'retired',
+      position: { x: 100, y: 0 },
+      kitId: 'hauler',
       snapshotVersion: 1,
       asteroidInteractions: 1,
-      resumeToken: joined['resumeToken'],
+      resumeToken: token,
     });
-    await replacement.waitFor(
-      () => replacement.messages.find((message) => message.type === 'sessionExpired'),
-      'explicit leave invalidates token immediately'
+    await retired.waitFor(
+      () => retired.messages.find((message) => message.type === 'sessionExpired'),
+      'retired token rejection after explicit-leave resume'
     );
-    expect(replacement.messages.some((message) => message.type === 'joined')).toBe(false);
-    const fresh = await replacement.join('pilot', 100);
-    expect(fresh['resumeToken']).not.toBe(joined['resumeToken']);
+    expect(retired.messages.some((message) => message.type === 'joined')).toBe(false);
   });
 });

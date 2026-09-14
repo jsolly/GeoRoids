@@ -62,7 +62,7 @@ describe('authoritative asteroid motion', () => {
 
   test('an escaped asteroid is pulled back along the same ray, not the opposite rim', () => {
     const fieldRadius = getAsteroidFieldRadius();
-    const contained = containAsteroidPosition(10000, 8000);
+    const contained = containAsteroidPosition(fieldRadius + 10000, 8000);
     expect(Math.hypot(contained.x, contained.y)).toBeLessThanOrEqual(fieldRadius);
     expect(contained.x).toBeGreaterThan(0);
     expect(contained.y).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ describe('authoritative asteroid motion', () => {
     const asteroid = manager.getAllAsteroids()[0];
     assert.ok(asteroid);
     manager.updateAsteroid(asteroid.id, {
-      position: { x: 12000, y: 0 },
+      position: { x: getAsteroidFieldRadius() + 1000, y: 0 },
       velocity: { x: 2, y: 0 },
     });
     manager.updateMotion();
@@ -86,18 +86,25 @@ describe('authoritative asteroid motion', () => {
     expect(after.velocity.x).toBeLessThan(0);
   });
 
-  test('bouncing at the field edge does not teleport to the opposite side', () => {
+  test('bouncing at the field edge stays at the wall instead of jumping into the interior', () => {
     const fieldRadius = getAsteroidFieldRadius();
     const stepped = stepAsteroidMotion({ x: fieldRadius + 40, y: 0 }, { x: 8, y: 0 });
     expect(stepped.position.x).toBeGreaterThan(0);
     expect(stepped.position.x).toBeLessThanOrEqual(fieldRadius);
     expect(stepped.velocity.x).toBeLessThan(0);
+    expect(stepped.position.x).toBeCloseTo(fieldRadius, 3);
     expect(Math.abs(stepped.position.x - -(fieldRadius * 0.96))).toBeGreaterThan(500);
   });
 
   test('after 60s of ticks the belt stays in-field and on a 1080p canvas from origin', () => {
     const manager = new AsteroidManager(new RNGService(7));
     manager.createAsteroids(20);
+    const cameraAsteroid = manager.getAllAsteroids()[0];
+    assert.ok(cameraAsteroid);
+    manager.updateAsteroid(cameraAsteroid.id, {
+      position: { x: 0, y: 0 },
+      velocity: { x: 0, y: 0 },
+    });
     const fieldRadius = getAsteroidFieldRadius();
     const origin = { x: 0, y: 0 };
 

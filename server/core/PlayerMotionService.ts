@@ -66,7 +66,6 @@ export class PlayerMotionService {
     return (
       this.alive(actor) &&
       actor.asteroidInteractions === 1 &&
-      (actor.factionId === 'ion' || actor.factionId === 'ember') &&
       finiteMotionVector(actor.position) &&
       finiteMotionVector(actor.velocity) &&
       Number.isFinite(actor.angle) &&
@@ -214,8 +213,7 @@ export class PlayerMotionService {
 
   private clearHarpoon(actor: GameEntity): void {
     actor.abilityActiveFrames = 0;
-    actor.harpoonTimer = 0;
-    delete actor.harpoonTargetId;
+    actor.harpoonTargetId = null;
     delete actor.harpoonLatchPos;
   }
 

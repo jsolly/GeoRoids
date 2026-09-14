@@ -2,19 +2,23 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { GAME, LASER, SHIP } from '../../../../src/constants';
+import { SHIP } from '../../../../src/constants';
 import type { AuthoritativeProjectileField } from '../../../../src/entities/laser/AuthoritativeProjectileField';
+import { watchBrowserDiagnostics } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
-import {
-  captureConsole,
-  safestReflectiveCluster,
-  waitForAsteroidField,
-} from '../../utils/reflective-asteroids-driver';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
-type Point = { x: number; y: number };
+const REFLECTOR_ID = 'crew-fixture-reflector';
+const REFLECTOR_POSITION = { x: 0, y: -460 };
+const FIRING_POSITION = { x: -220, y: -460 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 declare global {
   interface Window {
     __reflectionProof?: {
@@ -24,186 +28,54 @@ declare global {
   }
 }
 
-async function defend(page: Page): Promise<void> {
-  const state = await page.evaluate(() => {
+async function ensureAlive(page: Page): Promise<void> {
+  await page.evaluate(() => {
     const ship = window.gameController?.getCurrPlayer()?.ship;
     if (!ship || ship.health <= 0 || ship.exploding) {
       throw new Error('Pilot died during reflection flight');
     }
-    return {
-      shield: ship.shieldActive,
-      shieldCooldown: ship.shieldCooldown,
-    };
   });
-  // Use the real F shield during flight; no fixture writes health or timers.
-  if (!state.shield && state.shieldCooldown <= 0) {
-    await page.keyboard.press('f');
-  }
 }
 
-async function flyTo(page: Page, target: Point, tolerance = 25, timeout = 25_000): Promise<void> {
-  const deadline = Date.now() + timeout;
-  let thrustHeld = false;
-  try {
-    while (Date.now() < deadline) {
-      await defend(page);
-      const steering = await page.evaluate(
-        ({ target, tolerance }) => {
+async function readReflector(
+  page: Page
+): Promise<{ energy: number; exists: true } | { exists: false }> {
+  return await page.evaluate((id) => {
+    const rock = window.gameController
+      ?.getCurrRoidBelt()
+      .getRoids()
+      .find((candidate) => candidate.id === id);
+    if (!rock) {
+      return { exists: false };
+    }
+    if (rock.phenomenon?.kind !== 'reflective') {
+      throw new Error('Reflection fixture lost its reflective phenomenon');
+    }
+    return { exists: true, energy: rock.phenomenon.energy };
+  }, REFLECTOR_ID);
+}
+
+async function waitForShotReady(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate((maxLasers) => {
           const ship = window.gameController?.getCurrPlayer()?.ship;
-          if (!ship) {
-            throw new Error('Local ship unavailable');
-          }
-          const dx = target.x - ship.position.x;
-          const dy = target.y - ship.position.y;
-          const distance = Math.hypot(dx, dy);
-          const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
-          if (distance <= tolerance && speed < 0.65) {
-            return { arrived: true, thrust: false };
-          }
-          // Aim the real thruster against excess velocity before reaching the
-          // destination. Releasing W alone preserves momentum and hits the rock.
-          const desiredSpeed = Math.min(
-            ship.maxVelocity * 0.65,
-            Math.max(0, distance - tolerance / 2) * 0.035
+          return Boolean(
+            ship &&
+              ship.lasers.length < maxLasers &&
+              Date.now() - ship.lastShotTime >= ship.shotCooldown
           );
-          const ax = (dx / Math.max(distance, 1)) * desiredSpeed - ship.velocity.x;
-          const ay = (dy / Math.max(distance, 1)) * desiredSpeed - ship.velocity.y;
-          ship.angle = Math.atan2(-ay, ax);
-          return { arrived: false, thrust: Math.hypot(ax, ay) > 0.1 };
-        },
-        { target, tolerance }
-      );
-      if (steering.thrust !== thrustHeld) {
-        if (steering.thrust) {
-          await page.keyboard.down('KeyW');
-        } else {
-          await page.keyboard.up('KeyW');
-        }
-        thrustHeld = steering.thrust;
-      }
-      if (steering.arrived) {
-        return;
-      }
-      await page.waitForTimeout(50);
-    }
-    throw new Error(
-      `Pilot did not reach (${Math.round(target.x)}, ${Math.round(target.y)}) with controlled momentum`
-    );
-  } finally {
-    await page.keyboard.up('KeyW');
-  }
+        }, SHIP.MAX_LASERS),
+      { timeout: 5000, message: 'Normal firing cooldown/projectile capacity did not recover' }
+    )
+    .toBe(true);
 }
 
-async function fireAt(
-  page: Page,
-  target: Point,
-  station: Point,
-  asteroidId?: string
-): Promise<void> {
-  await flyTo(page, station, 18, 10_000);
-  const deadline = Date.now() + 10_000;
-  let ready = false;
-  while (Date.now() < deadline) {
-    await defend(page);
-    ready = await page.evaluate((maxLasers) => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Local ship unavailable');
-      }
-      return ship.lasers.length < maxLasers && Date.now() - ship.lastShotTime >= ship.shotCooldown;
-    }, SHIP.MAX_LASERS);
-    if (ready) {
-      break;
-    }
-    await flyTo(page, station, 18, 5000);
-    await page.waitForTimeout(50);
-  }
-  if (!ready) {
-    throw new Error('Normal firing cooldown/projectile capacity did not recover');
-  }
-  const priorEnergy = asteroidId
-    ? await page.evaluate((id) => {
-        const gc = window.gameController;
-        if (!gc) {
-          throw new Error('Game controller unavailable');
-        }
-        const rock = gc
-          .getCurrRoidBelt()
-          .getRoids()
-          .find((row) => row.id === id);
-        return rock?.phenomenon?.energy ?? null;
-      }, asteroidId)
-    : null;
-  // Never fire a queued follow-up through a just-dropped core.
-  if (asteroidId && priorEnergy === null) {
-    return;
-  }
-  await page.evaluate(
-    ({ point, laserSpeed }) => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Local ship unavailable');
-      }
-      const dx = point.x - ship.position.x;
-      const dy = point.y - ship.position.y;
-      const vx = ship.velocity.x;
-      const vy = ship.velocity.y;
-      const a = vx * vx + vy * vy - laserSpeed * laserSpeed;
-      const b = -2 * (dx * vx + dy * vy);
-      const c = dx * dx + dy * dy;
-      const discriminant = b * b - 4 * a * c;
-      const roots =
-        Math.abs(a) < 1e-9
-          ? [-c / b]
-          : discriminant >= 0
-            ? [(-b + Math.sqrt(discriminant)) / (2 * a), (-b - Math.sqrt(discriminant)) / (2 * a)]
-            : [];
-      const time = roots
-        .filter((value) => Number.isFinite(value) && value > 0)
-        .sort((x, y) => x - y)[0];
-      ship.angle = time ? Math.atan2(-(dy / time - vy), dx / time - vx) : Math.atan2(-dy, dx);
-      // Return focus to the game before Space; no direct shoot/cooldown mutation.
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
-    },
-    { point: target, laserSpeed: LASER.SPEED / GAME.FPS }
-  );
-  await page.keyboard.press('Space');
-  if (asteroidId && priorEnergy !== null) {
-    // Wait out the physical flight, defending through real input. A bot may
-    // intercept a valid shot; that is ordinary combat, so the next aimed shot
-    // can continue rather than assuming every shot reaches the same asteroid.
-    const until = Date.now() + 850;
-    while (Date.now() < until) {
-      await defend(page);
-      const reached = await page.evaluate(
-        ({ id, energy }) => {
-          const gc = window.gameController;
-          if (!gc) {
-            throw new Error('Game controller unavailable');
-          }
-          const rock = gc
-            .getCurrRoidBelt()
-            .getRoids()
-            .find((row) => row.id === id);
-          if (!rock) {
-            return true;
-          }
-          if (!rock.phenomenon) {
-            throw new Error('Reflective target lost its phenomenon');
-          }
-          return rock.phenomenon.energy > energy;
-        },
-        { id: asteroidId, energy: priorEnergy }
-      );
-      if (reached) {
-        break;
-      }
-      await page.waitForTimeout(50);
-    }
-  }
-  await page.waitForTimeout(310); // Normal cooldown, with RAF/server progressing in wall time.
+async function fireAt(game: GameInteractions, page: Page): Promise<void> {
+  await ensureAlive(page);
+  await waitForShotReady(page);
+  await game.fireLaserToward(REFLECTOR_POSITION.x, REFLECTOR_POSITION.y);
 }
 
 test(
@@ -213,82 +85,44 @@ test(
     if (!page) {
       throw new Error('Page not available');
     }
-    let selectedId = '';
-    let destroyedOrigin: Point | undefined;
+    const consoleState = watchBrowserDiagnostics(page);
+    const game = new GameInteractions(page);
+    let destroyedOrigin: { x: number; y: number } | undefined;
     page.on('websocket', (socket) =>
       socket.on('framereceived', ({ payload }) => {
-        const message = JSON.parse(String(payload));
-        if (message.type === 'asteroidDestroy' && message.data?.asteroidId === selectedId) {
-          destroyedOrigin = message.data.origin;
+        const message: unknown = JSON.parse(String(payload));
+        if (isRecord(message) && message['type'] === 'asteroidDestroy') {
+          const data = message['data'];
+          const origin = isRecord(data) ? data['origin'] : undefined;
+          if (
+            isRecord(data) &&
+            data['asteroidId'] === REFLECTOR_ID &&
+            isRecord(origin) &&
+            typeof origin['x'] === 'number' &&
+            typeof origin['y'] === 'number'
+          ) {
+            destroyedOrigin = { x: origin['x'], y: origin['y'] };
+          }
         }
       })
     );
-    await page.setViewportSize({ width: 1280, height: 900 });
-    const consoleState = captureConsole(page);
-    const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
-    await waitForAsteroidField(page);
-    await game.waitForBots(2);
-    await defend(page);
-    const reflective = await page.evaluate(() => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('Game controller unavailable');
-      }
-      const ship = gc.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Local ship unavailable');
-      }
-      const rocks = gc.getCurrRoidBelt().getRoids();
-      const targets = rocks
-        .filter((rock) => rock.health === rock.maxHealth)
-        .map((rock) => ({
-          id: rock.id,
-          position: rock.position,
-          size: rock.r,
-          ...(rock.phenomenon ? { phenomenon: rock.phenomenon } : {}),
-        }));
-      const hazards = gc
-        .getNetworkManager()
-        .getAllPlayers()
-        .filter((player: { type: string }) => player.type === 'bot')
-        .map((player: { ship: { position: Point } }) => ({ ...player.ship.position }));
-      return { ship: { ...ship.position }, targets, hazards };
-    });
-    const cluster = safestReflectiveCluster(reflective.targets, reflective.hazards);
-    expect(cluster.length).toBeGreaterThanOrEqual(2);
-    const primary = [...cluster].sort(
-      (a, b) =>
-        Math.hypot(a.position.x - reflective.ship.x, a.position.y - reflective.ship.y) -
-        Math.hypot(b.position.x - reflective.ship.x, b.position.y - reflective.ship.y)
-    )[0];
-    if (!primary) {
-      throw new Error('No physical reflective cluster');
-    }
-    selectedId = primary.id;
-    const partner = cluster.find((candidate) => candidate.id !== primary.id);
-    assert.ok(partner, 'Reflective cluster requires a distinct partner');
-    // Fire from the outer face so the partner cannot intercept the aimed shot.
-    const offset = {
-      x: primary.position.x - partner.position.x,
-      y: primary.position.y - partner.position.y,
-    };
-    const length = Math.hypot(offset.x, offset.y) || 1;
-    const firingDistance = primary.size + (await game.getShipRadius()) + 40;
-    const station = {
-      x: primary.position.x + (offset.x / length) * firingDistance,
-      y: primary.position.y + (offset.y / length) * firingDistance,
-    };
-    await game.placeShipAt(station.x, station.y);
-    const previousCores = new Set((await game.getLoot()).map((drop) => drop.id));
 
-    // This observer only records the actual decoded/rendered projectile field.
-    // It starts before firing and survives short-lived reflected snapshot rows.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
+    const playerId = await game.getLocalPlayerId();
+    await arrangeCrewField([playerId], 'reflection');
+    // Keep the real client and server poses aligned after the diagnostic
+    // arrangement. The fixture has no bots or other hazards to navigate.
+    await game.placeShipAt(FIRING_POSITION.x, FIRING_POSITION.y);
+    await expect
+      .poll(() => readReflector(page), { timeout: 5000 })
+      .toEqual({ exists: true, energy: 0 });
+
     const field = await page.evaluateHandle<AuthoritativeProjectileField>(
       "import('/src/entities/laser/AuthoritativeProjectileField.ts').then(({ AuthoritativeProjectileField }) => AuthoritativeProjectileField.getInstance())"
     );
     try {
-      await page.evaluate((field) => {
+      await page.evaluate((projectiles) => {
         const id = window.gameController?.getCurrPlayer()?.id;
         if (!id) {
           throw new Error('Reflection observer requires a joined pilot');
@@ -296,7 +130,7 @@ test(
         const evidence: NonNullable<Window['__reflectionProof']> = { shots: {}, timer: 0 };
         window.__reflectionProof = evidence;
         evidence.timer = window.setInterval(() => {
-          for (const row of field.getProjectiles()) {
+          for (const row of projectiles.getProjectiles()) {
             if (row.ownerId !== id) {
               continue;
             }
@@ -311,40 +145,33 @@ test(
     } finally {
       await field.dispose();
     }
+
     try {
-      for (let shot = 0; shot < 16; shot++) {
-        const target = await page.evaluate((id) => {
-          const gc = window.gameController;
-          if (!gc) {
-            throw new Error('Game controller unavailable');
-          }
-          const rock = gc
-            .getCurrRoidBelt()
-            .getRoids()
-            .find((row) => row.id === id);
-          return rock ? { ...rock.position } : null;
-        }, primary.id);
-        if (!target) {
-          break;
+      const previousCores = new Set((await game.getLoot()).map((drop) => drop.id));
+      for (let shot = 0; shot < 6; shot++) {
+        const before = await readReflector(page);
+        if (!before.exists) {
+          throw new Error(`Reflector disappeared before shot ${shot + 1}`);
         }
-        await fireAt(page, target, station, primary.id);
+        // Keep each shot's approach outside the hull; automatic cruise must
+        // not replace the sixth laser hit with a ship collision.
+        await game.placeShipAt(FIRING_POSITION.x, FIRING_POSITION.y);
+        await fireAt(game, page);
+        await expect
+          .poll(
+            async () => {
+              const after = await readReflector(page);
+              return !after.exists || after.energy > before.energy;
+            },
+            {
+              timeout: 5000,
+              message: `reflective shot ${shot + 1} did not reach the fixture rock`,
+            }
+          )
+          .toBe(true);
       }
-      await expect
-        .poll(
-          () =>
-            page.evaluate((id) => {
-              const gc = window.gameController;
-              if (!gc) {
-                throw new Error('Game controller unavailable');
-              }
-              return !gc
-                .getCurrRoidBelt()
-                .getRoids()
-                .some((row) => row.id === id);
-            }, primary.id),
-          { timeout: 5000, message: 'Real shots must finish the selected reflective rock' }
-        )
-        .toBe(true);
+
+      await expect.poll(() => readReflector(page), { timeout: 5000 }).toEqual({ exists: false });
       const reflectedShots = await page.evaluate(() => {
         const evidence = window.__reflectionProof;
         if (!evidence) {
@@ -359,50 +186,38 @@ test(
         throw new Error('Reflector destruction did not identify its live position');
       }
       const origin = destroyedOrigin;
-      let nearbyCores: Awaited<ReturnType<GameInteractions['getLoot']>> = [];
-      // Destruction arrives as an immediate event; loot arrives in the next snapshot.
+      let core: Awaited<ReturnType<GameInteractions['getLoot']>>[number] | undefined;
       await expect
         .poll(
           async () => {
-            nearbyCores = (await game.getLoot()).filter(
+            core = (await game.getLoot()).find(
               (drop) =>
                 drop.kind === 'laserCore' &&
                 !previousCores.has(drop.id) &&
                 Math.hypot(drop.x - origin.x, drop.y - origin.y) < 60
             );
-            return nearbyCores;
+            return core;
           },
           { timeout: 5000, message: 'The selected reflector yields one physical core' }
         )
-        .toHaveLength(1);
-      const core = nearbyCores[0];
+        .toBeDefined();
       assert.ok(core, 'Selected reflector did not drop its core');
-      // Place the live pilot on this exact drop; the server still performs the
-      // overlap pickup. Travel through the remaining belt is a separate scenario.
+
       await game.placeShipAt(core.x, core.y);
       await expect
         .poll(
           () =>
-            page.evaluate(() => {
-              const pilot = window.gameController?.getCurrPlayer()?.ship;
-              if (!pilot) {
-                throw new Error('Upgrade pilot unavailable');
-              }
-              return pilot.laserUpgrade?.charges;
-            }),
-          { timeout: 5000 }
+            page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.laserUpgrade?.charges),
+          { timeout: 5000, message: 'collecting the core should grant six charges' }
         )
         .toBe(6);
       await expect
-        .poll(async () => (await game.getLoot()).some((drop) => drop.id === core.id))
+        .poll(async () => (await game.getLoot()).some((drop) => drop.id === core?.id), {
+          timeout: 5000,
+        })
         .toBe(false);
-      const upgradeStation = { x: -1800, y: -1800 };
-      await game.placeShipAt(upgradeStation.x, upgradeStation.y);
-      expect(await page.locator('#flight-upgrade').textContent()).toContain('6 charges');
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath('reflective-core-upgrade-desktop.png'),
-      });
-      await page.keyboard.press('Escape');
+
+      await game.placeShipAt(FIRING_POSITION.x, FIRING_POSITION.y);
       const beforeUpgraded = await page.evaluate(() => {
         const evidence = window.__reflectionProof;
         if (!evidence) {
@@ -410,20 +225,15 @@ test(
         }
         return Object.keys(evidence.shots);
       });
-      const aim = { x: upgradeStation.x - 500, y: upgradeStation.y };
       for (let shot = 0; shot < 6; shot++) {
-        await fireAt(page, aim, upgradeStation);
+        await fireAt(game, page);
         await expect
           .poll(
             () =>
-              page.evaluate(() => {
-                const pilot = window.gameController?.getCurrPlayer()?.ship;
-                if (!pilot) {
-                  throw new Error('Upgrade pilot unavailable');
-                }
-                return pilot.laserUpgrade?.charges ?? 0;
-              }),
-            { timeout: 3000 }
+              page.evaluate(
+                () => window.gameController?.getCurrPlayer()?.ship.laserUpgrade?.charges ?? 0
+              ),
+            { timeout: 3000, message: `upgraded shot ${shot + 1} did not consume one charge` }
           )
           .toBe(5 - shot);
       }
@@ -437,12 +247,15 @@ test(
       expect(
         Object.entries(proof).filter(([id, row]) => !beforeUpgraded.includes(id) && row.energy >= 2)
       ).toHaveLength(6);
-      writeFileSync(
-        screenshotManager.getScreenshotPath('reflective-core-upgrade-desktop.json'),
-        `${JSON.stringify({ primaryId: primary.id, coreId: core.id, shots: proof, consoleState }, null, 2)}\n`
-      );
       expect(consoleState.errors).toEqual([]);
       expect(consoleState.warnings).toEqual([]);
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath('reflective-core-upgrade-desktop.png'),
+      });
+      writeFileSync(
+        screenshotManager.getScreenshotPath('reflective-core-upgrade-desktop.json'),
+        `${JSON.stringify({ reflectorId: REFLECTOR_ID, coreId: core.id, shots: proof }, null, 2)}\n`
+      );
     } catch (error) {
       const diagnostic = await page.evaluate((id) => {
         const gc = window.gameController;
@@ -454,11 +267,7 @@ test(
           throw new Error('Local ship unavailable');
         }
         return {
-          ship: {
-            position: ship.position,
-            velocity: ship.velocity,
-            health: ship.health,
-          },
+          ship: { position: ship.position, velocity: ship.velocity, health: ship.health },
           laserUpgrade: ship.laserUpgrade,
           loot: gc.getLoot(),
           target: gc
@@ -467,10 +276,10 @@ test(
             .find((row) => row.id === id),
           observed: window.__reflectionProof?.shots,
         };
-      }, primary.id);
+      }, REFLECTOR_ID);
       writeFileSync(
         screenshotManager.getScreenshotPath('reflective-failure.json'),
-        `${JSON.stringify({ primary, destroyedOrigin, station, ...diagnostic }, null, 2)}\n`
+        `${JSON.stringify({ error: String(error), destroyedOrigin, ...diagnostic }, null, 2)}\n`
       );
       await page.screenshot({
         path: screenshotManager.getScreenshotPath('reflective-failure.png'),

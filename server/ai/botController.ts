@@ -1,7 +1,6 @@
 import { radiusFromMass } from '../../shared/shipGrowth';
-import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
+import type { AsteroidData, Position, ShipKitId, Velocity } from '../../shared-types';
 import { DEBUG } from '../../src/constants';
-import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { getShipKit } from '../../src/entities/ship/shipKits';
 import { calculateLaserStartPosition } from '../../src/entities/ship/shipUtils';
 import type { GameEntity } from '../core/EntityManager';
@@ -46,7 +45,6 @@ export interface Combatant {
   health: number;
   exploding: boolean;
   spawnProtectionTimer?: number;
-  factionId?: SoftFactionId;
 }
 
 export interface BotShot {
@@ -73,25 +71,24 @@ interface BotMemory {
   wanderAngle: number;
 }
 
-function isCombatantAlive(entity: Combatant): boolean {
-  return !entity.exploding && entity.health > 0;
-}
-
 function isSpawnProtected(entity: Combatant): boolean {
   return (entity.spawnProtectionTimer ?? 0) > 0;
 }
 
-export function chooseTarget(bot: Combatant, humans: Combatant[]): Combatant | null {
-  let best: Combatant | null = null;
+export function chooseTarget(
+  bot: Pick<Combatant, 'position'>,
+  asteroids: AsteroidData[]
+): AsteroidData | null {
+  let best: AsteroidData | null = null;
   let bestDist = Number.POSITIVE_INFINITY;
 
-  for (const human of humans) {
-    if (!isCombatantAlive(human) || !canDealCombatDamage(bot.factionId, human.factionId)) {
+  for (const rock of asteroids) {
+    if (rock.health <= 0) {
       continue;
     }
-    const dist = Math.hypot(human.position.x - bot.position.x, human.position.y - bot.position.y);
+    const dist = Math.hypot(rock.position.x - bot.position.x, rock.position.y - bot.position.y);
     if (dist < bestDist) {
-      best = human;
+      best = rock;
       bestDist = dist;
     }
   }
@@ -135,7 +132,11 @@ export function interceptTime(
   return Math.min(...hits);
 }
 
-export function leadAimPoint(shooter: Combatant, target: Combatant, leadScale: number): Position {
+export function leadAimPoint(
+  shooter: Combatant,
+  target: Pick<AsteroidData, 'position' | 'velocity'>,
+  leadScale: number
+): Position {
   const relPos = {
     x: target.position.x - shooter.position.x,
     y: target.position.y - shooter.position.y,
@@ -177,7 +178,7 @@ export function createBotMemory(rng: Pick<RNGService, 'random'>, heading: number
 
 export function decideBotAction(
   bot: Combatant & { angle: number; kitId: ShipKitId },
-  target: Combatant | null,
+  target: AsteroidData | null,
   memory: BotMemory,
   rng: Pick<RNGService, 'random'>
 ): BotDecision {
@@ -236,7 +237,6 @@ export function decideBotAction(
     alignedForFire &&
     !isSpawnProtected(bot) &&
     !!target &&
-    !isSpawnProtected(target) &&
     memory.ticks >= memory.nextFireTick &&
     memory.ticks - memory.lastShotTick >= BOT_AI.SHOT_COOLDOWN_TICKS &&
     memory.ticks >= memory.burstPauseUntilTick;
@@ -284,9 +284,9 @@ export class BotBrain {
     return state;
   }
 
-  decide(bot: GameEntity, humans: Combatant[], rng: Pick<RNGService, 'random'>): BotDecision {
+  decide(bot: GameEntity, asteroids: AsteroidData[], rng: Pick<RNGService, 'random'>): BotDecision {
     const memory = this.remember(bot.id, rng, bot.angle);
-    const target = chooseTarget(bot, humans);
+    const target = chooseTarget(bot, asteroids);
     return decideBotAction(bot, target, memory, rng);
   }
 

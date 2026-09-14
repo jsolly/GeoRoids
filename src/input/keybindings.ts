@@ -106,11 +106,6 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
           player.ship.activateAbility();
         }
         break;
-      case 'KeyF':
-        if (!ev.repeat) {
-          player.ship.requestShieldToggle();
-        }
-        break;
       case 'ArrowLeft':
       case 'KeyA':
       case 'ArrowRight':

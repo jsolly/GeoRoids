@@ -61,7 +61,7 @@ test('server bots spawn and bounce inside the shared asteroid field', () => {
   assert.ok(wanderer);
   wanderer.position = { x: 3000, y: 0 };
   wanderer.velocity = { x: 8, y: 0 };
-  engine.entityManager.updateBotMovement();
+  engine.entityManager.updateBotMovement([]);
   const after = engine.getBot(wanderer.id);
   assert.ok(after);
   expect(Math.hypot(after.position.x, after.position.y)).toBeLessThanOrEqual(field + 1);

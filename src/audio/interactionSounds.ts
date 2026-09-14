@@ -18,7 +18,6 @@ const fxOrbitalPickup = new Sound(...AUDIO.ORBITAL_PICKUP);
 const fxLootPickup = new Sound(...AUDIO.LOOT_PICKUP);
 const fxCorePickup = new Sound(...AUDIO.CORE_PICKUP);
 const fxSurveyScan = new Sound(...AUDIO.SURVEY_SCAN);
-const fxAbilityShield = new Sound(...AUDIO.ABILITY_SHIELD);
 const fxRespawn = new Sound(...AUDIO.RESPAWN);
 
 function playInteraction(sound: Sound, position?: Position): void {
@@ -35,11 +34,6 @@ export function playHarpoonLatch(position?: Position): void {
 
 export function playHarpoonRelease(position?: Position): void {
   playInteraction(fxHarpoonRelease, position);
-}
-
-/** Play the regular F shield activation cue. */
-export function playShieldActivation(position?: Position): void {
-  playInteraction(fxAbilityShield, position);
 }
 
 export function playOrbitalFire(position?: Position): void {

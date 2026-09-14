@@ -1,17 +1,18 @@
-import { KILL_SCORE } from '../../server/core/combatScoring';
 import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import { ASTEROID_INTERACTIONS } from '../../shared/asteroidPhenomena';
-import { shipShipTickDamage } from '../../shared/combat';
 import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
+import { EXPLORATION_RANGE } from '../../shared/exploration';
+import { FURNACES, furnaceReward } from '../../shared/furnaces';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { GROWTH } from '../../shared/shipGrowth';
+import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
-import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIELD, SHIP, SHOCKWAVE } from '../constants';
+import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
 
@@ -35,6 +36,8 @@ function satelliteProfiles(): string[] {
   );
 }
 
+const starterFurnaces = FURNACES.slice(0, 3);
+
 export const gameReference: Record<string, { heading: string; paragraphs: string[] }[]> = {
   'field-manual': [
     {
@@ -42,6 +45,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
+        `Starter furnaces: ${starterFurnaces.map((furnace) => furnace.name).join(', ')}; ${FURNACES.length - starterFurnaces.length} regional Works sites fill the ${WORLD.radius.toLocaleString('en-US')}-unit world.`,
+        `After game over, a fresh run starts with ${GAME.START_LIVES} lives and ${GAME.STARTING_SCORE} score; the persistent universe, exploration chart, and delivered progress remain.`,
       ],
     },
   ],
@@ -60,9 +65,10 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [shipStats('surveyor')],
     },
     {
-      heading: 'Ability and shield values',
+      heading: 'Ability and exploration values',
       paragraphs: [
-        `E identifies minerals within ${SHIP_ABILITY.SCAN_RANGE} units for ${seconds(SHIP_ABILITY.SCAN_FRAMES)}. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}. The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds and its cooldown is ${SHIELD.COOLDOWN_SECONDS} seconds.`,
+        `E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `Passive shared exploration reaches ${EXPLORATION_RANGE.surveyor} world units for Surveyor and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist for the match.`,
       ],
     },
   ],
@@ -72,11 +78,11 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [shipStats('hauler')],
     },
     {
-      heading: 'Harpoon and mining values',
+      heading: 'Tow and mining values',
       paragraphs: [
-        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal and collaborative HP targets. Damage to ships is unchanged.`,
-        `The combat harpoon has a minimum range of ${SHIP_ABILITY.HARPOON_RANGE} units, lasts ${frameValue(SHIP_ABILITY.HARPOON_FRAMES)} for nearby catches, and applies pull strength ${SHIP_ABILITY.HARPOON_PULL} with distance falloff.`,
-        `A clear momentum collision course is accepted within a ${Math.round((Math.acos(SHIP_ABILITY.HARPOON_PATH_ALIGNMENT) * 180) / Math.PI)}-degree path and keeps the rock's heading, boosting it to at least ${SHIP_ABILITY.HARPOON_SLING_SPEED} units per frame while preserving faster momentum. Other rocks reel toward the Hauler at a relative target of ${SHIP_ABILITY.HARPOON_REEL_SPEED} units per frame with ${SHIP_ABILITY.HARPOON_REEL_ACCELERATION} units per-frame acceleration, then release near the hull with a ${SHIP_ABILITY.HARPOON_RELEASE_GAP} unit safety gap toward a predicted enemy within ${frameValue(SHIP_ABILITY.HARPOON_INTERCEPT_FRAMES)}.`,
+        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids and cooperative large rocks. The ability has no ship-targeting mode.`,
+        `E attaches the persistent tow cable within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. The rock keeps its velocity and the cable corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the cable immediately.`,
+        `Furnace intakes are ${starterFurnaces[0]?.radius ?? 0} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor.`,
       ],
     },
   ],
@@ -84,7 +90,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Growth and loot values',
       paragraphs: [
-        `Growth starts at mass ${GROWTH.BASE_MASS}, soft-caps at ${GROWTH.SOFT_MAX_MASS}, caps size scaling at ${GROWTH.MAX_SIZE_SCALE}, and bottoms out at thrust scale ${GROWTH.MIN_THRUST_SCALE} and speed scale ${GROWTH.MIN_SPEED_SCALE}. A kill always contributes at least ${GROWTH.BASE_KILL_MASS} mass, converts ${GROWTH.DROP_FRACTION * 100}% of excess mass, targets ${GROWTH.PELLET_MASS} mass per pellet, allows at most ${GROWTH.MAX_PELLETS} pellets, and caps live loot at ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
+        `Growth starts at mass ${GROWTH.BASE_MASS}, soft-caps at ${GROWTH.SOFT_MAX_MASS}, caps size scaling at ${GROWTH.MAX_SIZE_SCALE}, and bottoms out at thrust scale ${GROWTH.MIN_THRUST_SCALE} and speed scale ${GROWTH.MIN_SPEED_SCALE}. An environmental ship death always contributes at least ${GROWTH.BASE_KILL_MASS} mass, converts ${GROWTH.DROP_FRACTION * 100}% of excess mass, targets ${GROWTH.PELLET_MASS} mass per pellet, allows at most ${GROWTH.MAX_PELLETS} pellets, and caps live loot at ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
         `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}. A living ship magnetizes drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL} added to the drop's current velocity. Pickup overlap uses the ship's mass-scaled hull radius plus the drop radius.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. A reflective core grants ${ASTEROID_INTERACTIONS.coreCharges} charges, scores ${ASTEROID_INTERACTIONS.coreScore}, lasts ${ASTEROID_INTERACTIONS.coreLifetimeMs / 1000} seconds, and uses a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
       ],
@@ -92,7 +98,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Loot blast values',
       paragraphs: [
-        `A laser can arm a drop within ${LOOT_BLAST.ARM_RANGE} units. The blast radius is ${LOOT_BLAST.RADIUS} units, damage is ${LOOT_BLAST.DAMAGE}, the asteroid push is ${LOOT_BLAST.PUSH}, and the affected small-asteroid size is at most ${LOOT_BLAST.SMALL_ROID_MAX}.`,
+        `A laser can arm a drop within ${LOOT_BLAST.ARM_RANGE} units. The shot-triggered blast radius is ${LOOT_BLAST.RADIUS} units, leaves crew hulls unharmed, applies an asteroid push of ${LOOT_BLAST.PUSH}, and affects small asteroids up to size ${LOOT_BLAST.SMALL_ROID_MAX}.`,
       ],
     },
   ],
@@ -100,7 +106,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Field and material values',
       paragraphs: [
-        `The starting field has ${ROID.INITIAL_ROID_COUNT} rocks inside a ${ROID.FIELD_RADIUS} unit radius. Ice and rubble have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
+        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Ice and rubble have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
       ],
     },
     {
@@ -133,7 +139,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Boundary values',
       paragraphs: [
-        `The damaging boundary radius is ${getGameBoundary().radius.toLocaleString('en-US')} units. The asteroid field radius is ${ROID.FIELD_RADIUS} units and a boundary impact deals ${DAMAGE.BOUNDARY_COLLISION} damage.`,
+        `The lethal boundary radius is ${getGameBoundary().radius.toLocaleString('en-US')} units. The asteroid field radius is ${ROID.FIELD_RADIUS} units and boundary contact destroys a vulnerable ship regardless of hull health. Asteroids and lasers bounce inward; reflected crew lasers remain harmless to ships.`,
       ],
     },
   ],
@@ -141,33 +147,44 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; ship hull and shield radii stay independent of that projectile size. A normal laser hit deals ${DAMAGE.LASER_HIT}; player collision damage is ${DAMAGE.PLAYER_COLLISION_PER_SECOND} per second in ${DAMAGE.PLAYER_COLLISION_INTERVAL_MS} millisecond ticks (${shipShipTickDamage()} damage per tick); an asteroid collision deals ${DAMAGE.ASTEROID_COLLISION}; a boundary impact deals ${DAMAGE.BOUNDARY_COLLISION}; and exploding loot deals ${LOOT_BLAST.DAMAGE}.`,
-        `The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds with a ${SHIELD.COOLDOWN_SECONDS} second cooldown. Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
+        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; boundary contact destroys a vulnerable ship regardless of hull health.`,
+        `Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Humans start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; human respawns use the asteroid field radius.`,
+        `Humans start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; human and bot respawns use the nearest furnace with a 180-unit offset.`,
         `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },
     {
       heading: 'Score values',
       paragraphs: [
-        `Kill score: human ${KILL_SCORE.human}, bot ${KILL_SCORE.bot}. Asteroid score: large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, small ${ROID.POINTS_SMALL}. Shard score: ${GROWTH.SHARD_SCORE}. Satellite pickup score: ${SATELLITE_PICKUP.SCORE_BONUS}.`,
+        `Asteroid score: large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, small ${ROID.POINTS_SMALL}. Shard score: ${GROWTH.SHARD_SCORE}. Satellite pickup score: ${SATELLITE_PICKUP.SCORE_BONUS}. Furnace delivery at size 25 awards ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, or rubble ${furnaceReward({ material: 'rubble', size: 25 })} to each contributor.`,
       ],
     },
   ],
   'hud-network': [
     {
       heading: 'Display and HUD values',
-      paragraphs: [`The shared simulation runs at ${GAME.FPS} frames per second.`],
+      paragraphs: [
+        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius; the full-screen universe map uses the shared exploration chart and keeps discovered furnaces and other important assets visible across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight.`,
+      ],
     },
     {
       heading: 'Connection and protocol values',
       paragraphs: [
         `The client allows at most ${MAX_CATCH_UP_TICKS} catch-up frames after a stall.`,
+      ],
+    },
+  ],
+  teamwork: [
+    {
+      heading: 'Shared field values',
+      paragraphs: [
+        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot and bot.`,
+        `${starterFurnaces.map((furnace) => `${furnace.name} (${furnace.radius}-unit intake)`).join(', ')} anchor the starter area; ${FURNACES.length - starterFurnaces.length} regional Works sites are distributed across the field. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
       ],
     },
   ],

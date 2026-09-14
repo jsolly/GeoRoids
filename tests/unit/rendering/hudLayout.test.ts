@@ -12,7 +12,7 @@ test('desktop 800x600 keeps the Wave1 compact cluster anchors', () => {
   );
   expect(layout.lives).toEqual({ x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET });
   expect(layout.score).toEqual({ x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET });
-  expect(layout.killMessageY).toBe(12);
+  expect(layout.notificationY).toBe(12);
   expect(layout.leaderboard).toMatchObject({
     x: 800 - 180 - 16,
     y: 16,
@@ -36,10 +36,10 @@ test('phone portrait keeps notices below the leaderboard and radar above the abi
   expect(layout.miniMap.x + layout.miniMap.size).toBeLessThanOrEqual(390 - 12);
   expect(layout.miniMap.y + layout.miniMap.size).toBeLessThanOrEqual(844 - 12 - 112);
   expect(layout.leaderboard.maxRows).toBeLessThanOrEqual(6);
-  expect(layout.killMessageY).toBeGreaterThan(
+  expect(layout.notificationY).toBeGreaterThan(
     layout.leaderboard.y + layout.leaderboard.rowHeight * layout.leaderboard.maxRows
   );
-  expect(layout.killMessageY).toBeGreaterThan(layout.kitNameY + 18);
+  expect(layout.notificationY).toBeGreaterThan(layout.kitNameY + 18);
 });
 
 test('phone landscape parks the radar under lives so it misses the stick', () => {

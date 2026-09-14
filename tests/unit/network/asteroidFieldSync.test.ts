@@ -16,6 +16,7 @@ import {
   unbindAsteroidFieldApply,
   writeAsteroidKinematicUpdates,
 } from '../../../src/network/services/asteroidFieldSync';
+import { getAsteroidFieldRadius } from '../../../src/physics/asteroidMotion';
 
 function roid(id: string, x: number, y: number): AsteroidData {
   return {
@@ -81,7 +82,7 @@ test('a duplicate create still writes the live pose onto the existing roid', () 
   expect(local.velocity).toEqual({ x: 1, y: 0 });
 });
 
-test('an empty snapshot does not wipe seen ids so a remaining tab keeps the belt', () => {
+test('an empty creation batch preserves the local belt', () => {
   const seen = new Set(['server-asteroid-0', 'server-asteroid-1']);
   const { created, updated, removed } = partitionAsteroidSnapshot([], seen);
   expect(created).toEqual([]);
@@ -90,19 +91,44 @@ test('an empty snapshot does not wipe seen ids so a remaining tab keeps the belt
   expect(seen.size).toBe(2);
 });
 
-test('a later non-empty snapshot prunes ids the server no longer has', () => {
+test('a complete local snapshot prunes asteroids outside the current view', () => {
   const seen = new Set(['server-asteroid-0', 'gone']);
-  const { removed } = partitionAsteroidSnapshot([roid('server-asteroid-0', 4, 5)], seen);
+  const { removed } = partitionAsteroidSnapshot(
+    [roid('server-asteroid-0', 4, 5)],
+    seen,
+    undefined,
+    true
+  );
   expect(removed).toEqual(['gone']);
   expect(seen.has('gone')).toBe(false);
   expect(seen.has('server-asteroid-0')).toBe(true);
 });
 
-test('applying a 10k live pose contains it inside the shared belt', () => {
+test('new split fragments preserve unrelated visible asteroids until the next complete snapshot', () => {
+  const seen = new Set(['nearby-rock', 'split-parent']);
+  const batch = partitionAsteroidSnapshot(
+    [roid('fragment-a', 1, 2), roid('fragment-b', 3, 4)],
+    seen
+  );
+  expect(batch.created.map((rock) => rock.id)).toEqual(['fragment-a', 'fragment-b']);
+  expect(batch.removed).toEqual([]);
+  expect(seen).toEqual(new Set(['nearby-rock', 'split-parent', 'fragment-a', 'fragment-b']));
+  const snapshot = partitionAsteroidSnapshot(
+    [roid('nearby-rock', 0, 0), roid('fragment-a', 1, 2), roid('fragment-b', 3, 4)],
+    seen,
+    undefined,
+    true
+  );
+  expect(snapshot.removed).toEqual(['split-parent']);
+  expect(partitionAsteroidSnapshot([], seen, undefined, true).removed).toHaveLength(3);
+  expect(seen.size).toBe(0);
+});
+
+test('applying a live pose inside the shared world leaves its position intact', () => {
   const local = localRoid(1, 2);
   applyAsteroidKinematics(local, roid('server-asteroid-0', 10000, 0));
   expect(local.position.x).toBeGreaterThan(0);
-  expect(Math.hypot(local.position.x, local.position.y)).toBeLessThan(1300);
+  expect(local.position).toEqual({ x: 10000, y: 0 });
 });
 
 test('small pose error keeps the interpolated position so the field does not hitch', () => {
@@ -130,15 +156,19 @@ test('a large pose error snaps so a late joiner shares the live field', () => {
   expect(local.position).toEqual({ x: 80, y: -12 });
 });
 
-test('an escaped local pose contains even when the server echo is also far', () => {
-  const local = localRoid(10000, 40);
+test('an escaped local pose is contained even when the server echo is also far', () => {
+  const fieldRadius = getAsteroidFieldRadius();
+  const local = localRoid(fieldRadius + 1000, 40);
   applyAsteroidKinematics(local, {
-    position: { x: 10005, y: 40 },
+    position: { x: fieldRadius + 1005, y: 40 },
     velocity: { x: 1, y: 0 },
   });
-  expect(shouldSnapAsteroidPose({ x: 10000, y: 40 }, { x: 10005, y: 40 })).toBe(false);
-  expect(Math.hypot(local.position.x, local.position.y)).toBeLessThan(1300);
+  expect(
+    shouldSnapAsteroidPose({ x: fieldRadius + 1000, y: 40 }, { x: fieldRadius + 1005, y: 40 })
+  ).toBe(false);
+  expect(Math.hypot(local.position.x, local.position.y)).toBeLessThanOrEqual(fieldRadius);
   expect(local.position.x).toBeGreaterThan(0);
+  expect(local.position.y / local.position.x).toBeCloseTo(40 / (fieldRadius + 1005), 10);
 });
 
 test('a lean first-seen row does not mark seen so a later full row can still create', () => {
@@ -265,6 +295,23 @@ test('reflection and spin metadata reaches the local rock for live cues and prev
   applyAsteroidKinematics(local, reflective);
 
   expect(local.phenomenon).toEqual(reflective.phenomenon);
+});
+
+test('mining contributor metadata roundtrips through complete and kinematic asteroid updates', () => {
+  const local = localRoid(1, 2);
+  const source = {
+    ...roid('mining-ledger-0', 10, 10),
+    surveyedBy: ['surveyor-0'],
+    miningContributors: ['miner-0', 'miner-1'],
+  };
+
+  applyAsteroidKinematics(local, source, { complete: true });
+  expect(local.surveyedBy).toEqual(source.surveyedBy);
+  expect(local.miningContributors).toEqual(source.miningContributors);
+  expect(asteroidKinematicUpdates(source).miningContributors).toEqual(source.miningContributors);
+
+  applyAsteroidKinematics(local, { miningContributors: ['miner-2'] });
+  expect(local.miningContributors).toEqual(['miner-2']);
 });
 
 test('partition scratch arrays and snapshot set stay the same identity', () => {

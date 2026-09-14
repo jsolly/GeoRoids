@@ -1,9 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
-  arrangeBotShot,
-  BotShotArrangementHttpError,
   getWorldDiagnostics,
-  isBotShieldActiveError,
   isWorldClean,
   resetWorld,
 } from '../../integration/utils/test-server-control';
@@ -54,44 +51,6 @@ test('successful reset waits for verified empty world diagnostics', async () => 
     .mockResolvedValueOnce(Response.json({ world: cleanWorld }));
   await expect(resetWorld()).resolves.toBeUndefined();
   expect(fetchSpy).toHaveBeenCalledTimes(2);
-});
-
-test.each([
-  {
-    body: { error: 'Fixture bot shield is active' },
-    expectedReason: 'Fixture bot shield is active',
-    shieldRace: true,
-  },
-  {
-    body: { error: 'No clear fixture firing lane' },
-    expectedReason: 'No clear fixture firing lane',
-    shieldRace: false,
-  },
-  {
-    body: '{malformed',
-    expectedReason: 'invalid JSON error body',
-    shieldRace: false,
-  },
-] as const)('arrange bot shot preserves a typed setup failure: %j', async (scenario) => {
-  const response =
-    typeof scenario.body === 'string'
-      ? new Response(scenario.body, { status: 409 })
-      : Response.json(scenario.body, { status: 409 });
-  const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response);
-
-  const error = await arrangeBotShot('player-id', 'bot-id').then(
-    () => undefined,
-    (reason: unknown) => reason
-  );
-  expect(error).toBeInstanceOf(BotShotArrangementHttpError);
-  if (!(error instanceof BotShotArrangementHttpError)) {
-    throw new Error('arrangeBotShot did not expose its HTTP failure');
-  }
-  expect(error.status).toBe(409);
-  expect(error.reason).toBe(scenario.expectedReason);
-  expect(error.message).toContain(scenario.expectedReason);
-  expect(isBotShieldActiveError(error)).toBe(scenario.shieldRace);
-  expect(fetchSpy).toHaveBeenCalledTimes(1);
 });
 
 test.each(['bots', 'asteroids', 'loot', 'satellitePickups'] as const)(

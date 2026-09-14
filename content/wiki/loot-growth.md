@@ -1,7 +1,7 @@
 ---
 title: Loot and growth
 category: Systems
-summary: Collect loot to grow, or shoot a drop to create a dangerous blast.
+summary: Collect loot to grow, or shoot a drop to push nearby small rocks.
 order: 80
 related:
   - content/wiki/hauler.md
@@ -20,13 +20,13 @@ maximum health, it adds the same amount to current health; it does not fully
 repair existing damage. For a heavy kit such as Hauler, the first small mass
 pickup can lower its starting maximum health to the shared growth value. Laser cores do not add mass.
 
-Asteroid breaks can release shards, and a ship kill releases wreckage. A kill
-converts a base amount plus a fraction of the destroyed ship's excess mass into
-pellets, subject to per-pellet and global limits. Loot expires after its
-configured lifetime. A nearby drop is pulled toward a living ship once it comes
-within magnet range. The pull adds to whatever motion the drop already has,
-including motion from its existing velocity. Collecting still happens when the drop overlaps
-the hull, not an inflated ship hitbox. Mass follows a shared growth curve:
+Asteroid breaks can release shards, and an environmental ship death releases
+wreckage. A death converts a base amount plus a fraction of the destroyed
+ship's excess mass into pellets, subject to per-pellet and global limits. Loot
+expires after its configured lifetime. A nearby drop is pulled toward a living
+ship once it comes within magnet range. The pull adds to whatever motion the
+drop already has, including motion from its existing velocity. Collecting still
+happens when the drop overlaps the hull, not an inflated ship hitbox. Mass follows a shared growth curve:
 greater mass raises radius and health capacity while reducing thrust and speed;
 the growth model soft-caps mass, caps size scaling, and enforces minimum thrust
 and speed scales. Death resets the growth.
@@ -39,7 +39,7 @@ lets a laser apply the metal hit twice.
 ## Shoot a drop
 
 A laser can detonate a nearby loot drop when the shooter is within its arm
-range. The drop is removed and the blast reaches nearby live hulls, including
-the shooter and allies. It bypasses both E and F shields; spawn protection
-blocks it. It adds an outward velocity impulse to small asteroids. A hull or
-rock is affected when its edge reaches the blast radius.
+range. The drop is removed and its shot-triggered blast is safe for every crew
+hull, including the shooter and teammates. It adds an outward velocity impulse
+to small asteroids. A rock is affected when its edge reaches the blast radius;
+the blast does not deal ship damage or consume a life.

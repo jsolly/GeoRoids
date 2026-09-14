@@ -44,7 +44,7 @@ test('phone-sized play view unhides the full touch control overlay', () => {
   expect(document.getElementById('touch-stick')).toBeNull();
   expect(document.getElementById('touch-fire')).toBeNull();
   expect(document.getElementById('touch-ability')).toBeTruthy();
-  expect(document.getElementById('touch-shield')).toBeTruthy();
+  expect(document.getElementById('touch-shield')).toBeNull();
 });
 
 test('desktop-sized play view keeps the overlay hidden', () => {

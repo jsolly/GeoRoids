@@ -16,6 +16,8 @@ MOCK_TEST_CHILD_PID_FILE="$TEMP_DIR/mock-test-child.pid"
 MOCK_FAILURE_MARKER_FILE="$TEMP_DIR/process-tree-failure-seen"
 REAL_RMDIR="$(command -v rmdir)"
 REAL_PGREP="$(command -v pgrep)"
+REAL_RM="$(command -v rm)"
+REAL_TOUCH="$(command -v touch)"
 
 cleanup() {
     local pid_file
@@ -316,7 +318,37 @@ fi
 exec "$GEOROIDS_CONTRACT_REAL_RMDIR" "$@"
 EOF
 
-    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir" "$MOCK_BIN/npm"
+    cat > "$MOCK_BIN/rm" <<'EOF'
+#!/usr/bin/env bash
+if [ "$GEOROIDS_CONTRACT_MODE" = log-remove-failure ]; then
+    for path in "$@"; do
+        case "$path" in
+            logs/client.log|logs/server.log)
+                echo "simulated test-log removal failure" >&2
+                exit 1
+                ;;
+        esac
+    done
+fi
+exec "$GEOROIDS_CONTRACT_REAL_RM" "$@"
+EOF
+
+    cat > "$MOCK_BIN/touch" <<'EOF'
+#!/usr/bin/env bash
+if [ "$GEOROIDS_CONTRACT_MODE" = log-touch-failure ]; then
+    for path in "$@"; do
+        case "$path" in
+            logs/client.log|logs/server.log)
+                echo "simulated test-log creation failure" >&2
+                exit 1
+                ;;
+        esac
+    done
+fi
+exec "$GEOROIDS_CONTRACT_REAL_TOUCH" "$@"
+EOF
+
+    chmod +x "$MOCK_BIN/lsof" "$MOCK_BIN/curl" "$MOCK_BIN/npx" "$MOCK_BIN/ps" "$MOCK_BIN/pgrep" "$MOCK_BIN/rmdir" "$MOCK_BIN/rm" "$MOCK_BIN/touch" "$MOCK_BIN/npm"
 }
 
 run_mock_runner() {
@@ -329,7 +361,8 @@ run_mock_runner() {
         "$MOCK_TEST_PID_FILE" \
         "$MOCK_DEV_CHILD_PID_FILE" \
         "$MOCK_TEST_CHILD_PID_FILE" \
-        "$MOCK_FAILURE_MARKER_FILE" "$MOCK_DEV_PID_FILE.proxy" "$MOCK_DEV_PID_FILE.session"
+        "$MOCK_FAILURE_MARKER_FILE" "$MOCK_DEV_PID_FILE.proxy" "$MOCK_DEV_PID_FILE.session" \
+        "$MOCK_TEST_PID_FILE.command" "$MOCK_DEV_PID_FILE.build"
     env \
         PATH="$MOCK_BIN:$PATH" \
         GEOROIDS_CONTRACT_MODE="$mode" \
@@ -340,6 +373,8 @@ run_mock_runner() {
         GEOROIDS_CONTRACT_LOCK_DIR="$LOCK_DIR" \
         GEOROIDS_CONTRACT_REAL_RMDIR="$REAL_RMDIR" \
         GEOROIDS_CONTRACT_REAL_PGREP="$REAL_PGREP" \
+        GEOROIDS_CONTRACT_REAL_RM="$REAL_RM" \
+        GEOROIDS_CONTRACT_REAL_TOUCH="$REAL_TOUCH" \
         GEOROIDS_CONTRACT_FAILURE_MARKER="$MOCK_FAILURE_MARKER_FILE" \
         GEOROIDS_TEST_MAX_DURATION_SECONDS="$max_duration" \
         GEOROIDS_TEST_VITE_PORT=59993 \
@@ -494,6 +529,34 @@ assert_invalid_build_rejected() {
     assert_lock_released
 }
 
+assert_log_preparation_failure_is_not_success() {
+    local mode="$1"
+    local expected_message="$2"
+    local output_file="$TEMP_DIR/$mode.txt"
+    local exit_code
+    if run_mock_runner "$mode" 10 "$output_file" tests/integration/server/; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    [ "$exit_code" -eq 1 ] || {
+        cat "$output_file" >&2
+        fail "$mode allowed the runner to continue after log preparation failed (exit $exit_code)"
+    }
+    grep -Fq "$expected_message" "$output_file" || {
+        cat "$output_file" >&2
+        fail "$mode did not identify the failed log operation"
+    }
+    [ ! -e "$MOCK_DEV_PID_FILE" ] || fail "$mode started a dev server after log preparation failed"
+    [ ! -e "$MOCK_TEST_PID_FILE" ] || fail "$mode launched Vitest after log preparation failed"
+    [ ! -e "$MOCK_TEST_PID_FILE.command" ] || fail "$mode invoked the test command after log preparation failed"
+    if grep -Fq "Running tests" "$output_file" || grep -Fq "Tests completed successfully" "$output_file"; then
+        cat "$output_file" >&2
+        fail "$mode reported test execution or success after log preparation failed"
+    fi
+    assert_lock_released
+}
+
 assert_port_inspection_failure_is_not_success() {
     local mode="$1"
     local expected_exit="$2"
@@ -593,6 +656,10 @@ assert_invalid_duration_rejected
 assert_invalid_build_rejected
 assert_occupied_port_rejected
 setup_mock_tools
+assert_log_preparation_failure_is_not_success \
+    log-remove-failure "Could not clear test logs"
+assert_log_preparation_failure_is_not_success \
+    log-touch-failure "Could not create fresh test logs"
 assert_port_inspection_failure_is_not_success \
     port-inspection-failure 2 "simulated lsof inspection failure (status 2)"
 assert_port_inspection_failure_is_not_success \

@@ -33,15 +33,7 @@ describe('server motion clock', () => {
 
   test('a wall-clock rollback cannot stop an active session grace deadline', () => {
     const socket = {} as WebSocket;
-    const player = engine.addPlayer(
-      'pilot',
-      'Pilot',
-      socket,
-      { x: 0, y: 0 },
-      undefined,
-      undefined,
-      'ion'
-    );
+    const player = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, undefined);
     player.asteroidInteractions = 1;
     const registered = engine.playerMotion.register(player, socket, 1, Date.now());
     expect(registered.ok).toBe(true);
@@ -63,21 +55,7 @@ describe('server motion clock', () => {
 
     advanceElapsed(30_001);
     vi.setSystemTime(9_999);
-    expect(engine.entityManager.cleanupStaleEntities()).toEqual(['pilot']);
-  });
-
-  test('rejoin stash expiry follows elapsed time after a wall rollback', () => {
-    const socket = {} as WebSocket;
-    const player = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
-    player.lives = 2;
-    player.score = 17;
-    expect(engine.removePlayer('pilot')).toBeDefined();
-
-    advanceElapsed(5 * 60 * 1000 + 1);
-    vi.setSystemTime(9_999);
-    const rejoined = engine.addPlayer('pilot', 'Pilot', {} as WebSocket, { x: 0, y: 0 });
-    expect(rejoined.lives).toBe(3);
-    expect(rejoined.score).toBe(0);
+    expect(engine.entityManager.getStaleHumanIds()).toEqual(['pilot']);
   });
 
   test('human laser expiry follows elapsed time after a wall rollback', () => {

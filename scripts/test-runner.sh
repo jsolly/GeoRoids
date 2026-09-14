@@ -314,8 +314,14 @@ ensure_env_local() {
 
 prepare_logs() {
     mkdir -p logs || return 1
-    rm -f logs/client.log logs/server.log
-    touch logs/client.log logs/server.log
+    if ! rm -f logs/client.log logs/server.log; then
+        echo "❌ Could not clear test logs before starting the runner" >&2
+        return 1
+    fi
+    if ! touch logs/client.log logs/server.log; then
+        echo "❌ Could not create fresh test logs before starting the runner" >&2
+        return 1
+    fi
 }
 
 start_dev_servers() {
@@ -410,6 +416,7 @@ start_dev_servers() {
         export NODE_ENV="$BUILD_MODE"
         export VITEST=false
         export PORT="$TEST_SERVER_PORT"
+        export GEOROIDS_WORLD_PATH=:memory:
         if [ "$RUN_MODE" != tests ]; then
             export GEOROIDS_PERFORMANCE=1
         fi

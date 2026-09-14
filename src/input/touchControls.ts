@@ -6,10 +6,9 @@ import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
 import { pointerHeadingFromCenter } from './pointerSteering';
-import { readAbilityChrome, readShieldChrome } from './touchAbility';
+import { readAbilityChrome } from './touchAbility';
 
 const ABILITY_ID = 'touch-ability';
-const SHIELD_ID = 'touch-shield';
 const ROOT_ID = 'touch-controls';
 
 let initialized = false;
@@ -20,13 +19,9 @@ let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
-let shieldPointerId: number | null = null;
 let abilityButton: HTMLElement | null = null;
-let shieldButton: HTMLElement | null = null;
 let lastAbilityChromeKey = '';
-let lastShieldChromeKey = '';
 let abilityPointerClickPending = false;
-let shieldPointerClickPending = false;
 
 export function setTouchHeading(player: Player, heading: number | null): void {
   controlSources.pointerHeading = heading;
@@ -57,17 +52,9 @@ export function triggerTouchAbility(player: Player): boolean {
   return player.ship.activateAbility();
 }
 
-export function triggerTouchShield(player: Player): boolean {
-  if (player.lives <= 0 || player.ship.exploding) {
-    return false;
-  }
-  return player.ship.requestShieldToggle();
-}
-
 export function tickTouchControls(player: Player): void {
   if (isTouchChromeVisible()) {
     syncAbilityChrome(player);
-    syncShieldChrome(player);
   }
   if (player.lives <= 0 || player.ship.exploding) {
     resetTouchInteraction(player);
@@ -100,7 +87,6 @@ export function syncTouchChrome(
   if (!use) {
     resetTouchInteraction(requireLocalPlayer());
     lastAbilityChromeKey = '';
-    lastShieldChromeKey = '';
     return;
   }
 
@@ -108,19 +94,13 @@ export function syncTouchChrome(
   if (player) {
     reconcilePlayerInput(player);
     syncAbilityChrome(player);
-    syncShieldChrome(player);
   } else {
     lastAbilityChromeKey = '';
-    lastShieldChromeKey = '';
   }
 }
 
 function setAbilityPressed(pressed: boolean): void {
   document.getElementById(ABILITY_ID)?.classList.toggle('is-pressed', pressed);
-}
-
-function setShieldPressed(pressed: boolean): void {
-  document.getElementById(SHIELD_ID)?.classList.toggle('is-pressed', pressed);
 }
 
 function getAbilityButton(): HTMLElement | null {
@@ -134,17 +114,6 @@ function getAbilityButton(): HTMLElement | null {
   return abilityButton;
 }
 
-function getShieldButton(): HTMLElement | null {
-  if (!shieldButton?.isConnected) {
-    const next = document.getElementById(SHIELD_ID);
-    if (next !== shieldButton) {
-      shieldButton = next;
-      lastShieldChromeKey = '';
-    }
-  }
-  return shieldButton;
-}
-
 function syncAbilityChrome(player: Player): void {
   const button = getAbilityButton();
   if (!button) {
@@ -156,27 +125,6 @@ function syncAbilityChrome(player: Player): void {
     return;
   }
   lastAbilityChromeKey = key;
-  button.textContent = state.label;
-  button.setAttribute('aria-label', state.name);
-  button.setAttribute('aria-disabled', state.ready ? 'false' : 'true');
-  button.classList.toggle('is-ready', state.ready);
-  button.classList.toggle('is-cooling', state.cooling && !state.active);
-  button.classList.toggle('is-unavailable', state.unavailable);
-  button.classList.toggle('is-active', state.active);
-  button.style.setProperty('--action-cool', state.cooldownRatio.toFixed(3));
-}
-
-function syncShieldChrome(player: Player): void {
-  const button = getShieldButton();
-  if (!button) {
-    return;
-  }
-  const state = readShieldChrome(player.ship);
-  const key = `${state.ready}|${state.active}|${state.cooling}|${state.unavailable}|${state.cooldownRatio.toFixed(3)}`;
-  if (key === lastShieldChromeKey) {
-    return;
-  }
-  lastShieldChromeKey = key;
   button.textContent = state.label;
   button.setAttribute('aria-label', state.name);
   button.setAttribute('aria-disabled', state.ready ? 'false' : 'true');
@@ -204,23 +152,18 @@ function clearSteerHoldTimer(): void {
 function resetTouchInteraction(player: Player | null): void {
   const canvas = canvasManager.getCanvas();
   const ability = document.getElementById(ABILITY_ID);
-  const shield = document.getElementById(SHIELD_ID);
   const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
-  const activeShieldPointerId = shieldPointerId;
   steerPointerId = null;
   clearSteerHoldTimer();
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
-  shieldPointerId = null;
   abilityPointerClickPending = false;
-  shieldPointerClickPending = false;
   releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(canvas, activeFirePointerId);
   releasePointerCapture(ability, activeAbilityPointerId);
-  releasePointerCapture(shield, activeShieldPointerId);
   if (player) {
     setTouchHeading(player, null);
     setTouchFire(player, false);
@@ -228,7 +171,6 @@ function resetTouchInteraction(player: Player | null): void {
     resetControlSources();
   }
   setAbilityPressed(false);
-  setShieldPressed(false);
 }
 
 function requireLocalPlayer(): Player | null {
@@ -238,7 +180,6 @@ function requireLocalPlayer(): Player | null {
 function ensureTouchDom(): {
   root: HTMLElement;
   ability: HTMLElement;
-  shield: HTMLElement;
 } {
   let root = document.getElementById(ROOT_ID);
   if (!root) {
@@ -266,23 +207,7 @@ function ensureTouchDom(): {
     ability.setAttribute('aria-label', 'Ability');
   }
 
-  let shield = document.getElementById(SHIELD_ID);
-  if (!shield) {
-    shield = document.createElement('button');
-    shield.id = SHIELD_ID;
-    shield.className = 'touch-shield';
-    shield.setAttribute('type', 'button');
-    shield.setAttribute('aria-label', 'Shield bubble');
-    shield.setAttribute('aria-disabled', 'true');
-    shield.textContent = 'SHIELD';
-    root.appendChild(shield);
-  }
-  shield.setAttribute('type', 'button');
-  if (!shield.getAttribute('aria-label')) {
-    shield.setAttribute('aria-label', 'Shield bubble');
-  }
-
-  return { root, ability, shield };
+  return { root, ability };
 }
 
 function onPlayfieldPointerDown(ev: PointerEvent): void {
@@ -463,57 +388,6 @@ function onAbilityClick(ev: MouseEvent): void {
   ev.stopPropagation();
 }
 
-function onShieldPointerDown(ev: PointerEvent, shield: HTMLElement): void {
-  if (shieldPointerId !== null) {
-    return;
-  }
-  ev.preventDefault();
-  // Pointer activation already performs the action. Consume the follow-up
-  // native click so a touch tap cannot toggle F twice.
-  if (steerTap) {
-    steerTap.canFire = false;
-  }
-  shieldPointerClickPending = true;
-  shieldPointerId = ev.pointerId;
-  shield.setPointerCapture(ev.pointerId);
-  setShieldPressed(true);
-  const player = requireLocalPlayer();
-  if (player) {
-    triggerTouchShield(player);
-    syncShieldChrome(player);
-  }
-}
-
-function onShieldPointerUp(ev: PointerEvent, shield: HTMLElement): void {
-  if (ev.pointerId !== shieldPointerId) {
-    return;
-  }
-  ev.preventDefault();
-  shieldPointerId = null;
-  releasePointerCapture(shield, ev.pointerId);
-  setShieldPressed(false);
-  if (ev.type === 'pointercancel') {
-    shieldPointerClickPending = false;
-  } else {
-    window.setTimeout(() => {
-      shieldPointerClickPending = false;
-    }, 0);
-  }
-}
-
-function onShieldClick(ev: MouseEvent): void {
-  if (shieldPointerClickPending) {
-    shieldPointerClickPending = false;
-    return;
-  }
-  const player = requireLocalPlayer();
-  if (player) {
-    triggerTouchShield(player);
-    syncShieldChrome(player);
-  }
-  ev.stopPropagation();
-}
-
 function resetIfPageIsInactive(): void {
   if (typeof document === 'undefined' || document.visibilityState === 'hidden') {
     resetTouchInteraction(requireLocalPlayer());
@@ -525,9 +399,8 @@ export function initializeTouchControls(): void {
     return;
   }
 
-  const { ability, shield } = ensureTouchDom();
+  const { ability } = ensureTouchDom();
   abilityButton = ability;
-  shieldButton = shield;
 
   document.addEventListener('pointerdown', onPlayfieldPointerDown, {
     passive: false,
@@ -548,18 +421,11 @@ export function initializeTouchControls(): void {
     }
   });
 
-  shield.addEventListener('pointerdown', (ev) => onShieldPointerDown(ev, shield));
-  shield.addEventListener('pointerup', (ev) => onShieldPointerUp(ev, shield));
-  shield.addEventListener('pointercancel', (ev) => onShieldPointerUp(ev, shield));
-  shield.addEventListener('click', onShieldClick);
-  shield.addEventListener('lostpointercapture', () => {
-    if (shieldPointerId !== null) {
-      resetTouchInteraction(requireLocalPlayer());
-    }
-  });
-
   window.addEventListener('playViewOn', () => syncTouchChrome(true));
   window.addEventListener('playViewOff', () => syncTouchChrome(false));
+  // A modal universe map can cover the playfield while the game keeps cruising.
+  // Drop any active touch gesture before the dialog takes pointer ownership.
+  window.addEventListener('gameMapOpen', () => resetTouchInteraction(requireLocalPlayer()));
   window.addEventListener('resize', () => syncTouchChrome());
   window.addEventListener('orientationchange', () => {
     resetTouchInteraction(requireLocalPlayer());

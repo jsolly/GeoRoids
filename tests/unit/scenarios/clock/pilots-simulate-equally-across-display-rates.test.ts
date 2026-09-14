@@ -28,7 +28,6 @@ function arrangeFlight() {
   ship.angle = 0;
   ship.angularVelocity = 0.005;
   ship.thrusting = true;
-  ship.shieldCooldown = 240;
   ship.lasers = [new Laser({ x: 500, y: 500 }, { x: 2, y: 0 }, 0, 0)];
   const asteroid = new Roid({ x: -500, y: -500 }, 20, 'clock-asteroid');
   asteroid.velocity = { x: 0.2, y: -0.1 };
@@ -43,7 +42,6 @@ function flightSnapshot() {
     position: { ...ship.position },
     velocity: { ...ship.velocity },
     angle: ship.angle,
-    shieldCooldown: ship.shieldCooldown,
     lasers: ship.lasers.map((laser) => ({ ...laser.position, distance: laser.distTraveled })),
     asteroids: game.getCurrRoidBelt().roids.map((asteroid) => ({ ...asteroid.position })),
   };
@@ -57,7 +55,6 @@ test.each([30, 60, 120, 144])(
       game.updateGame(GAME_TICK_MS);
     }
     const reference = flightSnapshot();
-    expect(reference.shieldCooldown).toBe(180);
     expect(reference.lasers).toEqual([{ x: 620, y: 500, distance: 120 }]);
 
     const ship = arrangeFlight();
@@ -70,7 +67,7 @@ test.each([30, 60, 120, 144])(
   }
 );
 
-test('a resumed or sub-tick frame does not advance motion, shield time, or projectiles', () => {
+test('a resumed or sub-tick frame does not advance motion or projectiles', () => {
   const ship = arrangeFlight();
   const steps = vi.spyOn(ship, 'update');
   const before = flightSnapshot();
@@ -84,7 +81,6 @@ test('a resumed or sub-tick frame does not advance motion, shield time, or proje
   expect(flightSnapshot()).toEqual(before);
   game.updateGame(GAME_TICK_MS / 2);
   expect(steps).toHaveBeenCalledTimes(1);
-  expect(flightSnapshot().shieldCooldown).toBe(239);
 });
 
 test('a long hitch simulates the bounded second once and discards older movement debt', () => {

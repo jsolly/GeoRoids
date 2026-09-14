@@ -1,5 +1,5 @@
-import type { PingMessage, Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
-import { parseSoftFactionId } from '../../src/entities/player/softFactions';
+import { WORLD } from '../../shared/world';
+import type { PingMessage, Position, ShipKitId, Velocity } from '../../shared-types';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
@@ -21,7 +21,6 @@ export type ClientCommand =
       name: string;
       position: Position;
       kitId?: ShipKitId;
-      factionId?: SoftFactionId;
       snapshotVersion: 1;
       asteroidInteractions: 1;
       resumeRequested: boolean;
@@ -34,7 +33,6 @@ export type ClientCommand =
       id: string;
       kitId?: ShipKitId;
       abilityId?: string;
-      latchView: { playfieldScale?: number; canvas?: { width: number; height: number } };
     }
   | {
       type: 'update';
@@ -50,7 +48,6 @@ export type ClientCommand =
       laserDirection: Velocity;
       requestId?: string;
     }
-  | { type: 'shield'; id: string; active: boolean }
   | { type: 'chat'; id: string; message: string }
   | { type: 'collisionDamage'; targetPlayerId: string; attackerId: string }
   | { type: 'initAsteroids'; id: string }
@@ -99,15 +96,22 @@ function readFinitePosition(value: unknown): Position | undefined {
   return x === undefined || y === undefined ? undefined : { x, y };
 }
 
-function readJoinPosition(value: unknown): Position {
-  if (!isRecord(value)) {
+function readJoinPosition(value: unknown): Position | undefined {
+  if (value === undefined) {
     return { x: 0, y: 0 };
+  }
+  if (!isRecord(value)) {
+    return undefined;
   }
   const rawX = value['x'];
   const rawY = value['y'];
   const x = typeof rawX === 'number' ? rawX : typeof rawX === 'string' ? parseFloat(rawX) : NaN;
   const y = typeof rawY === 'number' ? rawY : typeof rawY === 'string' ? parseFloat(rawY) : NaN;
-  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : { x: 0, y: 0 };
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return undefined;
+  }
+  const position = { x, y };
+  return Math.hypot(position.x, position.y) <= WORLD.radius ? position : undefined;
 }
 
 function invalid(messageType: string, error?: string): ClientCommandDecodeResult {
@@ -171,9 +175,6 @@ function decodeUseAbility(id: string, fields: WireRecord): ClientCommandDecodeRe
   if (rawKitId !== undefined && !isShipKitId(rawKitId)) {
     return invalid('useAbility');
   }
-  const canvasWidth = Number(fields['canvasWidth']);
-  const canvasHeight = Number(fields['canvasHeight']);
-  const playfieldScale = Number(fields['playfieldScale']);
   const abilityId = readString(fields['abilityId']);
   return {
     ok: true,
@@ -182,15 +183,6 @@ function decodeUseAbility(id: string, fields: WireRecord): ClientCommandDecodeRe
       id: playerId,
       ...(rawKitId !== undefined ? { kitId: rawKitId } : {}),
       ...(abilityId !== undefined ? { abilityId } : {}),
-      latchView: {
-        ...(Number.isFinite(playfieldScale) && playfieldScale > 0 ? { playfieldScale } : {}),
-        ...(Number.isFinite(canvasWidth) &&
-        Number.isFinite(canvasHeight) &&
-        canvasWidth > 0 &&
-        canvasHeight > 0
-          ? { canvas: { width: canvasWidth, height: canvasHeight } }
-          : {}),
-      },
     },
   };
 }
@@ -225,7 +217,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         return invalid(type, 'Player ID or name is missing or invalid');
       }
       const kitOffer = message['kitId'] ?? payload['kitId'];
-      const factionOffer = message['factionId'] ?? payload['factionId'];
       const snapshotOffer = message['snapshotVersion'] ?? payload['snapshotVersion'];
       const asteroidInteractionsOffer =
         message['asteroidInteractions'] ?? payload['asteroidInteractions'];
@@ -233,18 +224,18 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       if (snapshotOffer !== 1 || asteroidInteractionsOffer !== 1) {
         return invalid(type, 'Client update required; refresh GeoRoids');
       }
+      const position = readJoinPosition(fields['position']);
+      if (!position) {
+        return invalid(type, 'Join position is outside the world or invalid');
+      }
       return {
         ok: true,
         command: {
           type,
           id,
           name,
-          position: readJoinPosition(fields['position']),
+          position,
           ...(isShipKitId(kitOffer) ? { kitId: kitOffer } : {}),
-          ...(() => {
-            const factionId = parseSoftFactionId(factionOffer);
-            return factionId === undefined ? {} : { factionId };
-          })(),
           snapshotVersion: 1,
           asteroidInteractions: 1,
           resumeRequested: rawToken !== undefined,
@@ -300,13 +291,6 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
           }
         : invalid(type, 'Missing finite laser coordinates for shoot');
     }
-    case 'shield':
-      if (!id) {
-        return invalid(type, 'Missing player ID for shield');
-      }
-      return typeof fields['active'] === 'boolean'
-        ? { ok: true, command: { type, id, active: fields['active'] } }
-        : invalid(type, 'Missing active flag for shield');
     case 'chat': {
       if (!id || typeof fields['message'] !== 'string') {
         return invalid(type, 'Missing player ID or message');
@@ -319,8 +303,7 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
     case 'collisionDamage': {
       const targetPlayerId = readNonEmptyString(fields['targetPlayerId']);
       const attackerId = readNonEmptyString(fields['attackerId']);
-      const damage = readFiniteNumber(fields['damage']);
-      return targetPlayerId && attackerId && damage !== undefined
+      return targetPlayerId && attackerId
         ? { ok: true, command: { type, targetPlayerId, attackerId } }
         : invalid(type, 'Missing required fields for collisionDamage');
     }

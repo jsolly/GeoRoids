@@ -67,7 +67,7 @@ describe('Wall or roid hit explodes then respawns without freeze-stick', () => {
     assert.ok(bot, 'Expected the newly created bot');
     world.engine.entityManager.updateEntity(bot.id, { spawnProtectionTimer: 0 });
 
-    world.engine.handleBotDamage(bot.id, 'asteroid', bot.health);
+    world.engine.handleShipDamage(bot.id, 'asteroid', bot.health);
     expect(world.ship(bot.id).respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
 
     world.tick(EXPLOSION_FRAMES);

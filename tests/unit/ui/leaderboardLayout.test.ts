@@ -48,39 +48,26 @@ function normalizedColor(ctx: CanvasRenderingContext2D, color: string) {
   return normalized;
 }
 
-function player(
-  id: string,
-  name: string,
-  type: Player['type'],
-  score: number,
-  factionId: NonNullable<Player['factionId']>
-) {
+function player(id: string, name: string, type: Player['type'], score: number) {
   const participant = entityFactory.createPlayer({
     id,
     name,
     type,
-    factionId,
     position: { x: 0, y: 0 },
   });
   participant.score = score;
   return participant;
 }
 
-test('rejoined pilots occupy one row while ties, current-player emphasis and compact row limits survive sorting', () => {
+test('crew scores sort stably while current-player emphasis and compact row limits stay readable', () => {
   const { calls, strokes, ctx } = recordingContext();
-  const current = player('current', 'Pilot', 'remote', 80, 'ion');
+  const current = player('current', 'Pilot', 'remote', 80);
   const players = [
-    player('stale-current', 'Pilot', 'remote', 999, 'ember'),
-    player('first-tie', 'Echo', 'remote', 90, 'ember'),
+    player('first-tie', 'Echo', 'remote', 90),
     current,
-    player('relay-old', 'Relay', 'remote', 40, 'ion'),
-    player('relay-improved', 'Relay', 'remote', 90, 'ion'),
-    player('relay-latest-tie', 'Relay', 'bot', 90, 'ember'),
-    player('local-stale', 'Local', 'remote', 900, 'ember'),
-    player('local', 'Local', 'local', 70, 'ion'),
-    player('local-ghost', 'Local', 'remote', 800, 'ember'),
-    player('current-ghost', 'Pilot', 'remote', 1000, 'ember'),
-    player('off-board', 'Below', 'bot', 10, 'ember'),
+    player('relay-latest-tie', 'Relay', 'bot', 90),
+    player('local', 'Local', 'local', 70),
+    player('off-board', 'Below', 'bot', 10),
   ];
   const inputOrder = players.map((participant) => participant.id);
   const layout = computeHudLayout({ width: 844, height: 390 }, { touchControls: true });
@@ -108,13 +95,13 @@ test('rejoined pilots occupy one row while ties, current-player emphasis and com
   const names = calls.filter((_, index) => index % 3 === 1);
   expect(names).toEqual(
     [
-      ['Echo', 18, 'rgba(251, 146, 60, 0.78)'],
+      ['Echo', 18, 'rgba(125, 211, 252, 0.78)'],
       ['Relay (bot)', 34, 'rgba(251, 146, 60, 0.78)'],
       ['Pilot', 50, 'rgba(125, 211, 252, 0.92)'],
-      ['Local', 66, 'rgba(125, 211, 252, 0.78)'],
+      ['Local', 66, 'rgba(94, 234, 212, 0.78)'],
     ].map(([text, y, color]) => ({
       text,
-      x: 692,
+      x: 684,
       y,
       textAlign: 'left',
       fillStyle: normalizedColor(ctx, String(color)),
@@ -124,7 +111,7 @@ test('rejoined pilots occupy one row while ties, current-player emphasis and com
   expect(
     calls.filter((_, index) => index % 3 === 2).map(({ x, textAlign }) => ({ x, textAlign }))
   ).toEqual(Array.from({ length: 4 }, () => ({ x: 828, textAlign: 'right' })));
-  expect(strokes).toEqual(['#fb923c', '#fb923c', '#7dd3fc', '#7dd3fc']);
+  expect(strokes).toHaveLength(0);
   expect(ctx.textAlign).toBe('center');
   expect(ctx.font).toBe('18px serif');
   expect(ctx.fillStyle).toBe('#123456');
@@ -134,7 +121,7 @@ test('long mobile leaderboard names fit before a wide right-aligned score', () =
   const { calls, ctx } = recordingContext();
   const longName = 'QA7skirmisherportrait';
   const wideScore = 987654321;
-  const local = player('local', longName, 'bot', wideScore, 'ion');
+  const local = player('local', longName, 'bot', wideScore);
   const layout = computeHudLayout({ width: 390, height: 844 }, { touchControls: true });
   drawLeaderboard(ctx, layout, [local], local.id);
 

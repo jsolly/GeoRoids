@@ -4,10 +4,14 @@ import type { Position, ServerGameSnapshot } from '../shared-types';
 export function quantizeSnapshotKinematics(state: ServerGameSnapshot): void {
   const factor = 10_000;
   const maximum = Number.MAX_SAFE_INTEGER / factor;
-  const rounded = (value: number): number =>
-    Number.isInteger(value) || Math.abs(value) > maximum
-      ? value
-      : Math.round(value * factor) / factor;
+  const rounded = (value: number): number => {
+    const result =
+      Number.isInteger(value) || Math.abs(value) > maximum
+        ? value
+        : Math.round(value * factor) / factor;
+    // JSON encodes negative zero as zero; retain the same canonical value in baselines.
+    return result === 0 ? 0 : result;
+  };
   const vector = (value: Position): void => {
     value.x = rounded(value.x);
     value.y = rounded(value.y);

@@ -11,12 +11,10 @@ import type {
   PlayerMotionState,
   Position,
   ShipKitId,
-  SoftFactionId,
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
-import { playHarpoonRelease, playShieldActivation } from '../../audio/interactionSounds';
-import { DAMAGE, GAME, PALETTE, SHIP } from '../../constants';
+import { GAME, PALETTE, SHIP } from '../../constants';
 import { NetworkManager } from '../../network/networkManager';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { isGenericDeathCause } from '../../utils/deathCause';
@@ -26,7 +24,6 @@ import { AuthoritativeProjectileField } from '../laser/AuthoritativeProjectileFi
 import type { Laser } from '../laser/Laser';
 import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
-import { getHarpoonFieldCanvas, getHarpoonFieldScale } from './harpoonField';
 import {
   type AbilityWorld,
   activateAbilityOnHost,
@@ -34,13 +31,11 @@ import {
   tickAbilityHost,
 } from './shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
-import { activateShield, clearShield, deactivateShield, updateShield } from './shipShield';
 import {
   applyShipSpawnProtection,
   applyThrustOrFriction,
   calculateHealthAfterDamage,
   calculateHealthAfterHeal,
-  canTakeCollisionDamage,
   shouldStartHealthRegeneration,
   tickShipImpactFlash,
 } from './shipUtils';
@@ -67,22 +62,16 @@ class Ship {
   explodeTime = 0;
   angularVelocity = 0;
   thrusting = false;
-  shieldActive = false;
-  shieldTime = 0;
-  shieldCooldown = 0;
-  shieldFlashTime = 0;
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
 
   lastDamageTime: number = 0;
   healthRegenTimer: number = 0;
-  lastCollisionTime: number = 0;
   impactFlashFrames: number = 0;
   blinkOn: boolean; // Will be set in constructor based on blinkCount
   lastShotTime: number = 0;
   shotCooldown: number = 250;
   color: string = PALETTE.LOCAL;
-  factionId?: SoftFactionId;
   isBot: boolean = false; // Flag to identify if this ship belongs to a bot
   frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
   isLocalPlayer: boolean = false; // Track if this is the local player
@@ -93,16 +82,9 @@ class Ship {
   abilityCooldownFrames: number = 0;
   abilityActiveFrames: number = 0;
 
-  harpoonTimer: number = 0;
-  harpoonTargetId?: string;
+  harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
-
-  // Player collision damage-over-time tracking
-  isCollidingWithPlayer: boolean = false;
-  playerCollisionStartTime: number = 0;
-  lastPlayerCollisionDamageTime: number = 0;
-  collidingPlayerId?: string;
-  /** Last non-generic explode token (boundary, asteroid, attacker id). */
+  /** Last specific environmental cause (boundary or asteroid). */
   lastExplodeCause?: string;
 
   constructor(options?: {
@@ -162,7 +144,7 @@ class Ship {
     this.blinkOn = this.blinkCount % 2 === 0;
   }
 
-  explode(cause?: string, killerName?: string): void {
+  explode(cause?: string): void {
     if (this.exploding) {
       return;
     }
@@ -177,8 +159,6 @@ class Ship {
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
     this.angularVelocity = 0;
-    clearShield(this);
-
     playExplosionSound(this.position);
 
     // Dispatch event to notify that ship has exploded with cause information
@@ -188,7 +168,6 @@ class Ship {
           shipId: this.id,
           position: { x: this.position.x, y: this.position.y },
           cause,
-          killerName,
         },
       })
     );
@@ -249,16 +228,12 @@ class Ship {
     if (this.isLocalPlayer && !this.isBot && canTry) {
       const networkManager = NetworkManager.getInstance();
       if (networkManager.isConnected) {
-        const canvas = getHarpoonFieldCanvas();
         networkManager.sendMessage({
           type: 'useAbility',
           id: networkManager.getLocalPlayerId(),
           data: {
             kitId: this.kitId,
             abilityId: result.abilityId ?? kit.abilityId,
-            playfieldScale: getHarpoonFieldScale(),
-            canvasWidth: canvas?.width,
-            canvasHeight: canvas?.height,
           },
         });
       }
@@ -305,43 +280,7 @@ class Ship {
     }
   }
 
-  requestShieldToggle(): boolean {
-    if (this.exploding) {
-      return false;
-    }
-    if (this.shieldActive) {
-      deactivateShield(this);
-      this.sendShieldEvent(false);
-      return true;
-    }
-    if (!activateShield(this, this.exploding)) {
-      return false;
-    }
-    playShieldActivation(this.position);
-    this.sendShieldEvent(true);
-    return true;
-  }
-
-  private sendShieldEvent(active: boolean): void {
-    if (this.isBot) {
-      return;
-    }
-    const networkManager = NetworkManager.getInstance();
-    if (!networkManager.isConnected) {
-      return;
-    }
-    const id = networkManager.getLocalPlayerId();
-    if (!id) {
-      return;
-    }
-    networkManager.sendMessage({
-      type: 'shield',
-      id,
-      data: { active },
-    });
-  }
-
-  takeDamage(amount: number, cause?: string, killerName?: string): void {
+  takeDamage(amount: number, cause?: string): void {
     if (this.exploding) {
       return;
     }
@@ -352,48 +291,7 @@ class Ship {
 
     if (this.health <= 0) {
       this.health = 0;
-      this.explode(cause, killerName);
-    }
-  }
-
-  canTakeCollisionDamage(cooldownMs: number = 500): boolean {
-    return canTakeCollisionDamage(this.lastCollisionTime, cooldownMs);
-  }
-
-  startPlayerCollision(collidingPlayerId?: string): void {
-    if (!this.isCollidingWithPlayer) {
-      this.isCollidingWithPlayer = true;
-      this.playerCollisionStartTime = Date.now();
-      this.lastPlayerCollisionDamageTime = Date.now();
-    }
-    if (collidingPlayerId) {
-      this.collidingPlayerId = collidingPlayerId;
-    }
-  }
-
-  stopPlayerCollision(): void {
-    this.isCollidingWithPlayer = false;
-    this.playerCollisionStartTime = 0;
-    this.lastPlayerCollisionDamageTime = 0;
-    delete this.collidingPlayerId;
-  }
-
-  updatePlayerCollisionDamage(): void {
-    if (!this.isCollidingWithPlayer || this.exploding) {
-      return;
-    }
-
-    const now = Date.now();
-    const timeSinceLastDamage = now - this.lastPlayerCollisionDamageTime;
-    const damageInterval = DAMAGE.PLAYER_COLLISION_INTERVAL_MS;
-
-    if (timeSinceLastDamage >= damageInterval) {
-      const networkManager = NetworkManager.getInstance();
-      if (!networkManager.isConnected) {
-        logger.debug('COLLISION', 'Applying local collision damage', { damage: 1 });
-        this.takeDamage(1, 'player');
-      }
-      this.lastPlayerCollisionDamageTime = now;
+      this.explode(cause);
     }
   }
 
@@ -436,9 +334,6 @@ class Ship {
         this.healthRegenTimer--;
       }
     }
-
-    // Update player collision damage-over-time
-    this.updatePlayerCollisionDamage();
   }
 
   updateExplosion(): void {
@@ -496,14 +391,7 @@ class Ship {
     for (let i = 0; i < steps; i++) {
       this.updateInvincibility();
       tickShipImpactFlash(this);
-      const wasHarpoonActive = this.harpoonTimer > 0;
-      const harpoonReleasePosition = this.harpoonLatchPos
-        ? { ...this.harpoonLatchPos }
-        : { ...this.position };
       tickAbilityHost(this);
-      if (wasHarpoonActive && this.harpoonTimer <= 0) {
-        playHarpoonRelease(harpoonReleasePosition);
-      }
       this.updateHealth();
     }
   }
@@ -521,7 +409,6 @@ class Ship {
     if (!this.serverOwnsMotion) {
       this.updateMovement();
     }
-    updateShield(this);
     this.updateShootCooldown();
     this.moveLasers();
   }

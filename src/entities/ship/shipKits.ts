@@ -41,30 +41,14 @@ export const SHIP_HULL_TOPOLOGY = {
 
 export const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;
 
-/** Hauler cable. Game Director PASS: cream line, not a faction/hull stroke. */
+/** Hauler cable. Cream line separates the cable from the hull. */
 export const HAULER_TETHER_COLOR = '#E8D5A3';
 /** Latch tip / hook head. Game Director PASS: amber tip on the cream cable. */
 export const HAULER_TETHER_TIP_COLOR = '#FDE68A';
 
 export const SHIP_ABILITY = {
   HARPOON_RANGE: 280,
-  /** Fallback "nearby" disk when the canvas size is unknown. */
-  HARPOON_VISUAL_PX: 720,
-  /**
-   * Pull slack only. Latch reach is on-screen (half-diagonal / scale).
-   * #480/#481 caps (1600 then 8000) still dropped a 1080p rock that sat
-   * on-canvas under deep zoom (scale < 0.14).
-   */
-  HARPOON_RANGE_MAX: 1_000_000,
-  HARPOON_FRAMES: 90,
-  HARPOON_PULL: 0.42 * GAME.MOTION_SCALE,
-  HARPOON_SLING_SPEED: 12 * GAME.MOTION_SCALE,
-  /** Keep the same reachable targets at the slower sling speed. */
-  HARPOON_INTERCEPT_FRAMES: Math.ceil(120 / GAME.MOTION_SCALE),
-  HARPOON_PATH_ALIGNMENT: Math.cos(Math.PI / 12),
-  HARPOON_REEL_SPEED: 16 * GAME.MOTION_SCALE,
-  HARPOON_REEL_ACCELERATION: 1.2 * GAME.MOTION_SCALE,
-  HARPOON_RELEASE_GAP: 16,
+  /** Cable separation tolerance before cargo detaches. */
   HARPOON_SLACK: 1.25,
   SCAN_RANGE: 1200,
   SCAN_FRAMES: 6 * GAME.FPS,
@@ -81,7 +65,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     name: 'Surveyor',
     abilityId: 'surveyScan',
     abilityName: 'Mineral scan',
-    abilityHint: 'Nimble flight and mineral scanning',
+    abilityHint: 'Scan minerals for the crew. Earn points when a Hauler delivers them.',
     maxHealth: SHIP.MAX_HEALTH,
     size: SHIP.SIZE,
     thrust: SHIP.THRUST,
@@ -94,7 +78,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     name: 'Hauler',
     abilityId: 'harpoon',
     abilityName: 'Harpoon',
-    abilityHint: 'Tow, throw, and mine asteroids',
+    abilityHint: 'Tow surveyed asteroids to a furnace. E releases the cable.',
     maxHealth: 140,
     size: 38,
     thrust: 4.5 * GAME.MOTION_SCALE,

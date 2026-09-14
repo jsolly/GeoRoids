@@ -1,4 +1,3 @@
-import { FACTION_COLORS } from '../shared/factions';
 import type { ShipKitId } from '../shared-types';
 import { scannedMaterial } from '../src/entities/ship/surveyScan';
 import './wiki-media-node-shim';
@@ -26,8 +25,9 @@ import {
   previewChargedReflections,
   segmentCircleContact,
 } from '../shared/asteroidPhenomena';
-import { asteroidRamDamage, circlesOverlap } from '../shared/combat';
+import { circlesOverlap } from '../shared/combat';
 import { SATELLITE_PROFILES } from '../shared/eoSatellites';
+import { FURNACES, furnaceReward } from '../shared/furnaces';
 import {
   blastPush,
   inBlastRadius,
@@ -35,7 +35,6 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../shared/lootBlast';
-import { findNearestShieldImpact, reflectProjectileVelocity } from '../shared/shieldReflection';
 import { cruiseSpeed } from '../shared/shipFlight';
 import {
   applyLootMass,
@@ -44,38 +43,24 @@ import {
   sizeScaleFromMass,
 } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
-import {
-  DAMAGE,
-  GAME,
-  PALETTE,
-  SATELLITE_PICKUP,
-  SHIELD,
-  SHIP,
-  TITLE,
-  VISUAL,
-} from '../src/constants';
+import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
 import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRenderer';
 import { drawAsteroidMaterialDetails } from '../src/entities/roid/materialArt';
 import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
 import { advanceCruiseVelocity } from '../src/entities/ship/cruiseMotion';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
+import { Ship } from '../src/entities/ship/Ship';
 import {
-  type AbilityBody,
   type AbilityHost,
   type AbilityWorld,
   activateAbilityOnHost,
   pullHarpoonTarget,
   tickAbilityHost,
 } from '../src/entities/ship/shipAbilities';
-import { getShipKit, SHIP_ABILITY } from '../src/entities/ship/shipKits';
+import { getShipKit } from '../src/entities/ship/shipKits';
 import { strokeKitHullOutline, strokePhosphorSegment } from '../src/entities/ship/shipRenderer';
-import {
-  activateShield,
-  createShieldState,
-  isShieldBlockingLasers,
-  updateShield,
-} from '../src/entities/ship/shipShield';
+import { applyShipImpactFlash, tickShipImpactFlash } from '../src/entities/ship/shipUtils';
 import { steeringTurn } from '../src/input/pointerSteering';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
 import {
@@ -106,10 +91,10 @@ type MediaId =
   | 'terrain'
   | 'loot'
   | 'reflection'
-  | 'shield'
   | 'split'
   | 'satellites'
-  | 'pickups';
+  | 'pickups'
+  | 'survival';
 
 const MEDIA_IDS: readonly MediaId[] = [
   'surveyor',
@@ -118,10 +103,10 @@ const MEDIA_IDS: readonly MediaId[] = [
   'terrain',
   'loot',
   'reflection',
-  'shield',
   'split',
   'satellites',
   'pickups',
+  'survival',
 ];
 
 const WIDTH = 640;
@@ -336,7 +321,7 @@ function drawShip(
   kitId: ShipKitId,
   position: Position,
   angle: number,
-  color: string = FACTION_COLORS.ion,
+  color: string = PALETTE.LOCAL,
   radius = getShipKit(kitId).size / 2,
   thrusting = false
 ): void {
@@ -478,8 +463,8 @@ function drawRing(
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
   ctx.shadowColor = color;
-  ctx.shadowBlur = VISUAL.SHIELD_GLOW;
-  ctx.lineWidth = VISUAL.SHIELD_STROKE_WIDTH;
+  ctx.shadowBlur = VISUAL.LASER_GLOW;
+  ctx.lineWidth = VISUAL.LASER_STROKE_WIDTH;
   ctx.beginPath();
   ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
   ctx.stroke();
@@ -516,7 +501,7 @@ function makeAbilityHost(kitId: ShipKitId, position: Position, angle = 0): Abili
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
 
-    harpoonTimer: 0,
+    harpoonTargetId: null,
     r: getShipKit(kitId).size / 2,
   };
 }
@@ -552,10 +537,11 @@ function makeAsteroid(
 
 function makeSurveyorDemo(): Demo {
   const host = makeAbilityHost('surveyor', { x: 0, y: 0 });
+  const teammate = makeAbilityHost('hauler', { x: 210, y: 35 });
   const rocks = [
-    { position: { x: -100, y: -50 }, material: 'ice' as const, health: 75 },
-    { position: { x: 100, y: -35 }, material: 'metal' as const, health: 75 },
-    { position: { x: 40, y: 75 }, material: 'rubble' as const, health: 75 },
+    makeAsteroid('scan-ice', { x: -100, y: -50 }, 26, 'ice'),
+    makeAsteroid('scan-metal', { x: 100, y: -35 }, 26, 'metal'),
+    makeAsteroid('scan-rubble', { x: 40, y: 75 }, 26, 'rubble'),
   ];
   const activated = activateAbilityOnHost(host);
   invariant(
@@ -563,29 +549,52 @@ function makeSurveyorDemo(): Demo {
     'Surveyor scan must activate'
   );
   let classified = false;
-  let expired = false;
+  let sharedClassification = false;
+  let tagged = false;
   return {
     id: 'surveyor',
     posterFrame: 10,
     verify: () => {
-      invariant(classified && expired, 'Scan must classify minerals then expire');
+      invariant(
+        classified && sharedClassification && tagged,
+        'Scan must classify and share minerals'
+      );
+      runSimulationTicks(host.abilityActiveFrames + 1, () => tickAbilityHost(host));
+      const scannedRock = rocks[0];
+      if (scannedRock === undefined) {
+        throw new Error('Survey fixture must retain its first rock');
+      }
+      invariant(
+        scannedMaterial(host, scannedRock) === undefined &&
+          rocks[0]?.surveyedBy?.includes(host.id ?? '') === true,
+        'Survey tag did not persist after the visual scan ended'
+      );
     },
     render: (ctx, frame) => {
       if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME * 2, () => tickAbilityHost(host));
+        runSimulationTicks(SIM_TICKS_PER_FRAME, () => tickAbilityHost(host));
       }
       drawFrameChrome(
         ctx,
         'SURVEYOR · MINERAL SCAN',
-        'E scan → identify nearby minerals → fade',
+        'E scan → shared crew radar → persistent delivery tag',
         frame
       );
-      drawRing(ctx, host.position, 122, PALETTE.HUD_MUTED, 0.4);
-      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, FACTION_COLORS.ion, 15);
+      drawRing(ctx, host.position, 190, PALETTE.HUD_MUTED, 0.18);
+      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL, 15);
+      drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE, 17);
       for (const rock of rocks) {
         const material = scannedMaterial(host, rock);
         classified ||= material !== undefined;
-        expired ||= material === undefined;
+        const teammateMaterial = material;
+        sharedClassification ||= teammateMaterial !== undefined;
+        if (material !== undefined) {
+          rock.surveyedBy ??= [];
+          if (!rock.surveyedBy.includes(host.id ?? '')) {
+            rock.surveyedBy.push(host.id ?? '');
+          }
+          tagged = true;
+        }
         const point = screenPoint(rock.position);
         ctx.fillStyle =
           material === 'metal'
@@ -611,154 +620,129 @@ function makeSurveyorDemo(): Demo {
           drawTag(ctx, material, point.x + 15, point.y + 8, PALETTE.HUD);
         }
       }
-      drawTag(ctx, host.abilityActiveFrames > 0 ? 'SCAN ACTIVE' : 'SCAN EXPIRED', 210, 325);
+      drawTag(
+        ctx,
+        host.abilityActiveFrames > 0 ? 'SCAN ACTIVE · CREW RADAR' : 'SCAN EXPIRED · TAG KEPT',
+        210,
+        325
+      );
+      drawTag(ctx, 'Surveyor + teammate see the same marks', 330, 110, PALETTE.REMOTE);
     },
   };
 }
 
 function makeHaulerDemo(): Demo {
-  const host = makeAbilityHost('hauler', { x: 120, y: 16 });
-  const target: AbilityBody = {
-    id: 'demo-rock',
-    kind: 'asteroid',
-    position: { x: -100, y: 16 },
-    velocity: { x: 0, y: 0 },
-    size: 34,
+  const furnace = FURNACES[0];
+  if (furnace === undefined) {
+    throw new Error('wiki-media verification failed: no furnace destination');
+  }
+  const anchor = furnace.position;
+  const host = makeAbilityHost('hauler', { x: anchor.x - 140, y: anchor.y });
+  const target = {
+    ...makeAsteroid('demo-rock', { x: anchor.x - 220, y: anchor.y }, 34, 'metal'),
+    kind: 'asteroid' as const,
+    surveyedBy: ['surveyor-demo'],
   };
-  const victim: AbilityBody = {
-    id: 'demo-victim',
-    kind: 'ship',
-    position: { x: -300, y: 16 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-    r: getShipKit('surveyor').size / 2,
-  };
+  const surveyor = makeAbilityHost('surveyor', { x: anchor.x - 235, y: anchor.y - 62 });
+  const scan = activateAbilityOnHost(surveyor);
+  invariant(
+    scan.activated && scan.abilityId === 'surveyScan',
+    'Surveyor scan did not tag the haul'
+  );
+  invariant(scannedMaterial(surveyor, target) === 'metal', 'Surveyor scan missed the hauled metal');
   const world: AbilityWorld = {
     asteroids: [target],
-    entities: [victim],
-    canvas: { width: WIDTH, height: HEIGHT },
-    playfieldScale: 1,
   };
-  const bodies = [...world.asteroids, ...world.entities];
+  const bodies = world.asteroids;
   const result = activateAbilityOnHost(host, world);
   invariant(
     result.activated && result.abilityId === 'harpoon',
     'Hauler E did not latch a nearby rock'
   );
   invariant(host.harpoonTargetId === target.id, 'Hauler selected the wrong target');
-  let reelTicks = 0;
-  let sawRightwardReel = false;
+  let attachedTicks = 0;
+  let sawMomentumPreserved = false;
+  let delivered = false;
   let releasedFrame: number | undefined;
-  let releaseGap: number | undefined;
-  let sawLeftwardRelease = false;
   let targetRotation = 0;
   const targetAngularVelocity = 0.14;
-  let targetDestroyed = false;
-  let impactFrame: number | undefined;
+  const targetSpeed = 0.49;
+  host.velocity.x = targetSpeed;
+  target.velocity.x = targetSpeed;
   return {
     id: 'hauler',
     posterFrame: 4,
     verify: () => {
-      invariant(reelTicks > 0, 'Hauler rock did not reel toward its owner');
-      invariant(sawRightwardReel, 'Hauler rock did not show the rightward reel');
-      invariant(releasedFrame !== undefined, 'Hauler rock did not release near the hull');
-      invariant(sawLeftwardRelease, 'Hauler rock did not reverse toward the predicted enemy');
+      invariant(attachedTicks > 0, 'Hauler tow cable did not stay attached');
+      invariant(sawMomentumPreserved, 'towed asteroid did not preserve its momentum');
+      invariant(delivered, 'towed asteroid did not reach a furnace');
       invariant(
-        releaseGap !== undefined &&
-          releaseGap <=
-            (host.r ?? 20) + (target.r ?? target.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP + 1,
-        'Hauler rock released outside the hull safety gap'
+        releasedFrame !== undefined && host.harpoonTargetId === null,
+        'E did not release after delivery'
       );
       invariant(
-        impactFrame !== undefined && targetDestroyed,
-        'released rock did not hit the second ship'
+        target.surveyedBy?.includes('surveyor-demo') === true,
+        'delivery lost the Surveyor tag'
       );
+      const recipients = new Set(['hauler-demo', ...(target.surveyedBy ?? [])]);
+      const reward = furnaceReward(target);
       invariant(
-        victim.health === 100 - asteroidRamDamage(),
-        'rock impact did not apply collision damage'
+        reward > 0 && recipients.size === 2,
+        'delivery reward did not include both contributors'
       );
-      invariant(Math.abs(targetRotation) > 1, 'rock did not visibly spin after launch');
+      invariant(Math.abs(targetRotation) > 1, 'towed rock did not visibly spin');
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'HAULER · HARPOON',
-        'E trigger → reel toward hull → release → impact',
+        'HAULER · TOW CABLE',
+        'E attach → keep momentum → tow to furnace → shared score',
         frame,
         '#FDE68A'
       );
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          const activeBeforeTick = host.harpoonTimer > 0;
-          if (activeBeforeTick) {
+          if (!delivered) {
             pullHarpoonTarget(host, bodies);
-            const gap = Math.hypot(
-              target.position.x - host.position.x,
-              target.position.y - host.position.y
-            );
-            const releaseRadius =
-              (host.r ?? 20) + (target.r ?? target.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP;
-            if (target.velocity.x > 0 && releasedFrame === undefined) {
-              sawRightwardReel = true;
-            }
+            attachedTicks += host.harpoonTargetId === target.id ? 1 : 0;
+            sawMomentumPreserved ||= Math.abs(target.velocity.x - targetSpeed) < 0.02;
+            host.position.x += host.velocity.x;
+            target.position.x += target.velocity.x;
             if (
-              releasedFrame === undefined &&
-              gap <= releaseRadius + 1 &&
-              Math.hypot(target.velocity.x, target.velocity.y) >=
-                SHIP_ABILITY.HARPOON_SLING_SPEED - 0.01
+              Math.hypot(
+                target.position.x - furnace.position.x,
+                target.position.y - furnace.position.y
+              ) <= furnace.radius
             ) {
+              delivered = true;
+              const released = activateAbilityOnHost(host, world);
+              invariant(
+                released.activated && host.harpoonTargetId === null,
+                'E did not release the tow cable'
+              );
               releasedFrame = frame;
-              releaseGap = gap;
-              sawLeftwardRelease = target.velocity.x < 0;
             }
           }
-          target.position.x += target.velocity.x;
-          target.position.y += target.velocity.y;
           targetRotation += targetAngularVelocity;
-          if (activeBeforeTick && releasedFrame === undefined) {
-            reelTicks += 1;
-          }
-          if (
-            !targetDestroyed &&
-            circlesOverlap(target.position, target.size ?? 0, victim.position, victim.r ?? 0)
-          ) {
-            targetDestroyed = true;
-            impactFrame = frame;
-            victim.health = Math.max(0, (victim.health ?? 0) - asteroidRamDamage());
-          }
           tickAbilityHost(host);
         });
       }
       const displayScale = 0.62;
-      const displayHost = {
-        x: host.position.x * displayScale,
-        y: host.position.y * displayScale,
+      const toScene = (position: Position): Position => ({
+        x: (position.x - anchor.x) * displayScale,
+        y: (position.y - anchor.y) * displayScale,
+      });
+      const displayHost = toScene(host.position);
+      const sceneTarget = {
+        x: target.position.x - anchor.x,
+        y: target.position.y - anchor.y,
       };
-      const displayTarget = {
-        x: target.position.x * displayScale,
-        y: target.position.y * displayScale,
-      };
-      const displayVictim = {
-        x: victim.position.x * displayScale,
-        y: victim.position.y * displayScale,
-      };
-      if (!targetDestroyed) {
-        drawRoid(
-          ctx,
-          {
-            position: target.position,
-            size: target.size ?? 34,
-            rotation: targetRotation,
-            vertices: 8,
-            offsets: [1, 0.8, 1.05, 0.92, 1, 0.78, 1.04, 0.88],
-            material: 'metal',
-            health: 75,
-            maxHealth: 75,
-          },
-          displayScale
-        );
+      const displayTarget = toScene(target.position);
+      const displaySurveyor = toScene(surveyor.position);
+      if (!delivered) {
+        drawRoid(ctx, { ...target, position: sceneTarget, rotation: targetRotation }, displayScale);
       }
-      if (host.harpoonTimer > 0 && !targetDestroyed) {
+      if (host.harpoonTargetId === target.id && !delivered) {
         drawCable(ctx, displayHost, displayTarget);
       }
       drawShip(
@@ -766,51 +750,31 @@ function makeHaulerDemo(): Demo {
         'hauler',
         displayHost,
         0,
-        FACTION_COLORS.ion,
+        PALETTE.LOCAL,
         (getShipKit('hauler').size / 2) * displayScale
       );
-      drawShip(
-        ctx,
-        'surveyor',
-        displayVictim,
-        Math.PI,
-        FACTION_COLORS.ember,
-        (victim.r ?? 0) * displayScale
-      );
-      if (releasedFrame === undefined && host.harpoonTimer > 0) {
-        drawRing(
-          ctx,
-          displayHost,
-          ((host.r ?? 20) + (target.r ?? target.size ?? 20) + SHIP_ABILITY.HARPOON_RELEASE_GAP) *
-            displayScale,
-          PALETTE.SHIELD,
-          0.5
-        );
-      }
-      if (impactFrame !== undefined && frame >= impactFrame && frame < impactFrame + 8) {
-        const impactAge = frame - impactFrame;
-        drawRing(
-          ctx,
-          displayVictim,
-          18 + impactAge * 8,
-          PALETTE.DANGER,
-          Math.max(0.12, 0.9 - impactAge * 0.1)
-        );
-      }
+      drawShip(ctx, 'surveyor', displaySurveyor, Math.PI / 2, PALETTE.REMOTE, 15);
+      const furnaceScreen = screenPoint({ x: 0, y: 0 });
+      drawRing(ctx, { x: 0, y: 0 }, furnace.radius * displayScale, PALETTE.SATELLITE, 0.55);
+      drawTag(ctx, furnace.name, furnaceScreen.x + 35, furnaceScreen.y - 20, PALETTE.SATELLITE);
       drawTag(
         ctx,
-        targetDestroyed
-          ? 'impact · target ship loses 25 hull'
-          : releasedFrame !== undefined
-            ? 'released at hull safety gap · bounce left'
-            : host.harpoonTimer > 0
-              ? 'cable active · reeling toward Hauler'
-              : 'timer ended · rock coasts',
+        delivered
+          ? `DELIVERED · ${furnaceReward(target)} points each`
+          : host.harpoonTargetId === target.id
+            ? 'tow cable active · rock trails behind'
+            : 'E · attach an asteroid',
         310,
         110,
         '#FDE68A'
       );
-      drawTag(ctx, 'E · reel right → bounce left → impact', 400, 286, PALETTE.HUD_MUTED);
+      drawTag(
+        ctx,
+        'Surveyor scan → Hauler tow → furnace → both score',
+        400,
+        286,
+        PALETTE.HUD_MUTED
+      );
     },
   };
 }
@@ -859,20 +823,20 @@ function makeMovementDemo(): Demo {
         'MOVEMENT · ALWAYS-ON THRUST',
         'steer → turn · release → keep flying',
         frame,
-        FACTION_COLORS.ion
+        PALETTE.LOCAL
       );
       const position = positions[frame + 1] ?? state.position;
       const trailStart = positions[Math.max(0, frame - 9)] ?? position;
       const displayScale = 0.3;
       const a = screenPoint(trailStart, displayScale);
       const b = screenPoint(position, displayScale);
-      renderSegment(ctx, a.x, a.y, b.x, b.y, FACTION_COLORS.ion, 1, 2);
+      renderSegment(ctx, a.x, a.y, b.x, b.y, PALETTE.LOCAL, 1, 2);
       drawShip(
         ctx,
         'surveyor',
         { x: position.x * displayScale, y: position.y * displayScale },
         angles[frame + 1] ?? 0,
-        FACTION_COLORS.ion,
+        PALETTE.LOCAL,
         getShipKit('surveyor').size / 2,
         true
       );
@@ -885,7 +849,7 @@ function makeMovementDemo(): Demo {
             : 'released · still flying',
         350,
         112,
-        FACTION_COLORS.ion
+        PALETTE.LOCAL
       );
       drawTag(ctx, `speed ${speeds[frame + 1]?.toFixed(2) ?? '0.00'}`, 470, 286, PALETTE.HUD_MUTED);
     },
@@ -1000,7 +964,7 @@ function makeTerrainDemo(): Demo {
         'surveyor',
         { x: 0, y: 0 },
         0,
-        FACTION_COLORS.ion,
+        PALETTE.LOCAL,
         getShipKit('surveyor').size / 2,
         true
       );
@@ -1227,7 +1191,7 @@ function makeLootDemo(): Demo {
         'surveyor',
         { x: shooter.x * displayScale, y: shooter.y * displayScale },
         0,
-        FACTION_COLORS.ion,
+        PALETTE.LOCAL,
         shipRadius,
         frame >= 8 && frame <= 12
       );
@@ -1327,64 +1291,6 @@ function makeReflectionDemo(): Demo {
   };
 }
 
-function makeShieldDemo(): Demo {
-  const state = createShieldState();
-  invariant(activateShield(state), 'F shield must activate');
-  const position = { x: -80, y: 20 };
-  const attacker = { x: 150, y: 20 };
-  const radius = (getShipKit('surveyor').size / 2) * SHIELD.RADIUS_RATIO;
-  const hit = findNearestShieldImpact(
-    attacker,
-    position,
-    [{ id: 'shield-demo', position, radius }],
-    'enemy'
-  );
-  if (!hit) {
-    throw new Error('F shield must intercept the incoming laser');
-  }
-  const reflected = reflectProjectileVelocity({ x: -10, y: 0 }, hit.normal);
-  let expired = false;
-  return {
-    id: 'shield',
-    posterFrame: 12,
-    verify: () => {
-      invariant(reflected.x > 0 && expired, 'F shield must reflect and then expire');
-    },
-    render: (ctx, frame) => {
-      if (frame > 0) {
-        runSimulationTicks(SIM_TICKS_PER_FRAME, () => updateShield(state));
-      }
-      drawFrameChrome(
-        ctx,
-        'F · REFLECTIVE SHIELD',
-        'Raise shield → reflect incoming laser → cooldown',
-        frame
-      );
-      drawShip(ctx, 'surveyor', position, 0, FACTION_COLORS.ion, 15);
-      drawShip(ctx, 'hauler', attacker, Math.PI, FACTION_COLORS.ember, 19);
-      if (isShieldBlockingLasers(state)) {
-        drawRing(ctx, position, radius, PALETTE.SHIELD);
-      } else {
-        expired = true;
-      }
-      const x =
-        frame <= 10
-          ? attacker.x + ((hit.point.x - attacker.x) * frame) / 10
-          : hit.point.x + reflected.x * (frame - 10);
-      if (x <= attacker.x) {
-        drawLaser(ctx, { x, y: position.y }, { x: frame <= 10 ? -10 : reflected.x, y: 0 });
-      }
-      drawTag(
-        ctx,
-        state.shieldActive ? 'SHIELD ACTIVE' : 'SHIELD COOLDOWN',
-        200,
-        310,
-        PALETTE.SHIELD
-      );
-    },
-  };
-}
-
 function makeSplitDemo(): Demo {
   const manager = new AsteroidManager(new RNGService(0x1234abcd));
   const original = makeAsteroid('split-target', { x: 0, y: 0 }, 60, 'ice');
@@ -1430,7 +1336,7 @@ function makeSplitDemo(): Demo {
       if (frame < splitFrame) {
         drawRoid(ctx, original);
         drawLaser(ctx, { x: -150 + frame * 16, y: 0 }, { x: 5, y: 0 });
-        drawLaser(ctx, { x: 150 - frame * 16, y: 0 }, { x: -5, y: 0 }, PALETTE.LASER_ENEMY);
+        drawLaser(ctx, { x: 150 - frame * 16, y: 0 }, { x: -5, y: 0 }, PALETTE.LASER_LOCAL);
         drawTag(ctx, frame < 4 ? 'pilot A hits' : 'pilot B hits', 365, 112, PALETTE.LASER_LOCAL);
       } else {
         if (!fastWaveApplied) {
@@ -1500,7 +1406,7 @@ function makeSplitDemo(): Demo {
           if (progress === null) {
             continue;
           }
-          const color = wave.id === 'fast' ? PALETTE.LASER_LOCAL : FACTION_COLORS.ion;
+          const color = wave.id === 'fast' ? PALETTE.LASER_LOCAL : PALETTE.LOCAL;
           drawRing(
             ctx,
             { x: -center.x, y: -center.y },
@@ -1624,6 +1530,113 @@ function drawPickup(ctx: RenderContext, pickup: PickupView, scale = 1): void {
   ctx.restore();
 }
 
+function drawShipHealthCapsule(ctx: RenderContext, ship: Ship): void {
+  const screen = screenPoint(ship.position);
+  const width = ship.r * 2.4;
+  const y = screen.y - ship.r - 10;
+  const left = screen.x - width / 2;
+  const fraction = Math.max(0, Math.min(1, ship.health / ship.maxHealth));
+  ctx.save();
+  ctx.lineWidth = VISUAL.HEALTH_CAPSULE_HEIGHT;
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = PALETTE.HUD_MUTED;
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.moveTo(left, y);
+  ctx.lineTo(left + width, y);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = PALETTE.HEALTH;
+  ctx.beginPath();
+  ctx.moveTo(left, y);
+  ctx.lineTo(left + width * fraction, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function makeSurvivalDemo(): Demo {
+  const ship = new Ship({ position: { x: -92, y: 0 }, kitId: 'surveyor' });
+  ship.angle = 0;
+  const rock = makeAsteroid('survival-rock', { x: 130, y: 0 }, 32, 'rubble', 0.35);
+  rock.velocity = { x: -1.4, y: 0 };
+  let impacted = false;
+  let impactFrame = -1;
+  let postImpactTicks = 0;
+  const initialHealth = ship.health;
+
+  return {
+    id: 'survival',
+    posterFrame: 34,
+    verify: () => {
+      invariant(impacted && impactFrame >= 0, 'asteroid never reached the survival ship');
+      invariant(
+        ship.health === initialHealth - DAMAGE.ASTEROID_COLLISION,
+        'environmental impact used the wrong damage amount'
+      );
+      invariant(!ship.exploding, 'one environmental impact should leave the ship alive');
+      invariant(postImpactTicks > 0, 'survival scene did not continue after impact');
+    },
+    render: (ctx, frame) => {
+      drawFrameChrome(
+        ctx,
+        'SURVIVAL · ASTEROID IMPACT',
+        'environmental hit → 25 HP → keep flying',
+        frame,
+        PALETTE.DANGER
+      );
+      runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
+        if (!impacted) {
+          const next = stepAsteroidMotion(rock.position, rock.velocity);
+          rock.position = next.position;
+          rock.velocity = next.velocity;
+          if (circlesOverlap(ship.position, ship.r, rock.position, rock.size)) {
+            ship.takeDamage(DAMAGE.ASTEROID_COLLISION, 'asteroid');
+            applyShipImpactFlash(ship);
+            ship.velocity = { x: 0.85, y: 0 };
+            impacted = true;
+            impactFrame = frame;
+            // Keep the rock in view after contact while the ship clears the hazard.
+            rock.velocity = { x: -0.15, y: 0 };
+          }
+        } else {
+          ship.position.x += ship.velocity.x;
+          const next = stepAsteroidMotion(rock.position, rock.velocity);
+          rock.position = next.position;
+          rock.velocity = next.velocity;
+          postImpactTicks += 1;
+          tickShipImpactFlash(ship);
+        }
+      });
+      drawRoid(ctx, rock);
+      drawShip(ctx, 'surveyor', ship.position, ship.angle, PALETTE.LOCAL, ship.r, impacted);
+      drawShipHealthCapsule(ctx, ship);
+      if (ship.impactFlashFrames > 0) {
+        const progress = 1 - ship.impactFlashFrames / SHIP.IMPACT_FLASH_FRAMES;
+        drawRing(ctx, ship.position, ship.r * (1.15 + progress * 0.55), PALETTE.DANGER, 0.85);
+      }
+      if (impacted) {
+        drawArrow(ctx, ship.position, ship.velocity, PALETTE.LOCAL, 22);
+      }
+      drawTag(
+        ctx,
+        impacted ? `SURVIVES · ${ship.health}/${ship.maxHealth} HP` : 'asteroid approaching',
+        365,
+        112,
+        impacted ? PALETTE.HEALTH : PALETTE.DANGER
+      );
+      drawTag(
+        ctx,
+        impacted
+          ? `asteroid impact · ${DAMAGE.ASTEROID_COLLISION} HP · flight continues`
+          : 'environmental hazard · steer clear or take one hit',
+        340,
+        286,
+        PALETTE.HUD_MUTED
+      );
+    },
+  };
+}
+
 function makePickupsDemo(): Demo {
   const manager = new SatellitePickupManager(new RNGService(0x7a11ce55));
   const created = manager.createPickups(2);
@@ -1653,7 +1666,7 @@ function makePickupsDemo(): Demo {
     verify: () => {
       const current = manager.getPickup(first.id);
       invariant(sawOrbiting, 'pickup orbit did not run');
-      invariant(interceptedShot && sawDamaged, 'pickup did not intercept a hostile shot');
+      invariant(interceptedShot && sawDamaged, 'pickup did not intercept a laser shot');
       invariant(
         current !== undefined && current.state === 'orbiting',
         'damaged pickup stopped orbiting'
@@ -1707,7 +1720,7 @@ function makePickupsDemo(): Demo {
             ctx,
             { x: shotPosition.x * pickupScale, y: shotPosition.y * pickupScale },
             { x: 1, y: 0 },
-            PALETTE.LASER_ENEMY
+            PALETTE.LASER_LOCAL
           );
         }
         drawPickup(ctx, firstPickup, pickupScale);
@@ -1716,14 +1729,7 @@ function makePickupsDemo(): Demo {
       if (loose) {
         drawPickup(ctx, loose, 0.35);
       }
-      drawShip(
-        ctx,
-        'surveyor',
-        { x: 0, y: 0 },
-        0,
-        FACTION_COLORS.ion,
-        getShipKit('surveyor').size / 2
-      );
+      drawShip(ctx, 'surveyor', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('surveyor').size / 2);
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'
@@ -1735,13 +1741,7 @@ function makePickupsDemo(): Demo {
         112,
         PALETTE.SATELLITE
       );
-      drawTag(
-        ctx,
-        'auto-collect ≤ 140 wu · hostile shot removes 25 HP',
-        320,
-        286,
-        PALETTE.HUD_MUTED
-      );
+      drawTag(ctx, 'auto-collect ≤ 140 wu · laser removes 25 HP', 320, 286, PALETTE.HUD_MUTED);
     },
   };
 }
@@ -1754,10 +1754,10 @@ function buildDemos(): Demo[] {
     makeTerrainDemo(),
     makeLootDemo(),
     makeReflectionDemo(),
-    makeShieldDemo(),
     makeSplitDemo(),
     makeSatellitesDemo(),
     makePickupsDemo(),
+    makeSurvivalDemo(),
   ];
 }
 

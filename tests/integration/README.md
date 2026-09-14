@@ -19,7 +19,7 @@ test under a different implementation-oriented name.
 
 ## Write a scenario
 
-1. Arrange known participants, factions, positions, and starting state. Use the
+1. Arrange known crew participants, positions, and starting state. Use the
    shared lifecycle hooks to reset the world and close every browser page.
 2. Perform the real action under test. Fixture controls arrange a scene; they
    must not assign the health, score, death, or other outcome being asserted.

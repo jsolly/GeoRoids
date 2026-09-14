@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { createServerInstance } from '../../../server/createServer';
+import { nearbyWorldRows } from '../../../shared/world';
 import type { AsteroidData, Position } from '../../../shared-types';
 
 import { WireClient, type WireMessage } from '../../support/wireClient';
@@ -175,13 +176,15 @@ describe('Server initAsteroids sync', () => {
     expect(firstBatch.length).toBeGreaterThan(0);
 
     const playerTwo = await openGameSocket();
-    await join(playerTwo, 'player-two', { x: 100, y: 100 });
+    await join(playerTwo, 'player-two', { x: 0, y: 0 });
     const secondBatch = await requestAsteroids(playerTwo, 'player-two');
 
     expect(secondBatch).toEqual(firstBatch);
-    expect(current.gameEngine.getAllAsteroids().map((asteroid) => asteroid.id)).toEqual(
-      firstBatch.map((asteroid) => asteroid.id)
-    );
+    expect(
+      nearbyWorldRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 }).map(
+        (asteroid) => asteroid.id
+      )
+    ).toEqual(firstBatch.map((asteroid) => asteroid.id));
     playerOne.assertHealthy();
     playerTwo.assertHealthy();
   });
@@ -210,11 +213,11 @@ describe('Server initAsteroids sync', () => {
     expect(liveBeforeJoin.position).not.toEqual(arranged.position);
 
     const playerTwo = await openGameSocket();
-    await join(playerTwo, 'motion-two', { x: 50, y: 50 });
+    await join(playerTwo, 'motion-two', { x: 0, y: 0 });
     const lateBatch = await requestAsteroids(playerTwo, 'motion-two');
     const liveAfterJoin = snapshotField(current);
 
-    expect(lateBatch).toEqual(liveAfterJoin);
+    expect(lateBatch).toEqual(nearbyWorldRows(liveAfterJoin, { x: 0, y: 0 }));
     const lateTracked = lateBatch.find((asteroid) => asteroid.id === tracked.id);
     if (!lateTracked) {
       throw new Error(`Late batch omitted tracked asteroid ${tracked.id}`);
@@ -232,10 +235,9 @@ describe('Server initAsteroids sync', () => {
     await join(playerOne, 'stay-one', { x: 0, y: 0 });
     const initialBatch = await requestAsteroids(playerOne, 'stay-one');
     expect(initialBatch.length).toBeGreaterThan(0);
-    const fieldIds = initialBatch.map((asteroid) => asteroid.id).sort();
 
     const playerTwo = await openGameSocket();
-    await join(playerTwo, 'leave-two', { x: 20, y: 20 });
+    await join(playerTwo, 'leave-two', { x: 0, y: 0 });
     const leftStart = playerOne.mark();
     playerTwo.send({ type: 'leave', data: {} });
     await playerTwo.barrier();
@@ -247,11 +249,10 @@ describe('Server initAsteroids sync', () => {
     expect(current.gameEngine.getPlayerCount()).toBe(1);
     expect(current.gameEngine.isGamePaused()).toBe(false);
     expect(
-      current.gameEngine
-        .getAllAsteroids()
+      nearbyWorldRows(current.gameEngine.getAllAsteroids(), { x: 0, y: 0 })
         .map((asteroid) => asteroid.id)
         .sort()
-    ).toEqual(fieldIds);
+    ).toEqual(initialBatch.map((asteroid) => asteroid.id).sort());
     playerOne.assertHealthy();
     playerTwo.assertHealthy();
   });

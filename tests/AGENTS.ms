@@ -8,9 +8,9 @@ and test count are not goals.
 
 Name the player or system event and its outcome. Good examples:
 
-- An enemy laser removes 25 health without costing a life.
+- An asteroid impact removes health while crew lasers pass through ships.
 - Both pilots see the same shot, then remove it when it expires.
-- A credited bot kill appears in the HUD and updates the score.
+- A furnace delivery gives the Surveyor and Hauler the same points.
 - An asteroid collision costs one life, then the ship respawns inside the arena.
 - A failed connection returns to the menu and a retry joins successfully.
 
@@ -20,7 +20,7 @@ of that story belong together; unrelated features need separate setup.
 
 ## Arrange, act, observe
 
-1. Arrange explicit participants, IDs, factions, positions, health preconditions,
+1. Arrange explicit participants, IDs, roles, positions, health preconditions,
    protection state, and clocks. Use a fresh world or object graph for each test.
 2. Perform the action through the boundary being tested: input, a socket message,
    the collision resolver, a lifecycle tick, or a public API.

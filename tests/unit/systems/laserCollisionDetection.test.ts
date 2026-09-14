@@ -3,7 +3,6 @@ import { LASER } from '../../../src/constants';
 import {
   asteroidPointsForRadius,
   checkLaserHit,
-  checkLaserShipCollision,
 } from '../../../src/physics/collision/collisionDetection';
 
 describe('Laser Collision Detection Functions', () => {
@@ -77,62 +76,6 @@ describe('Laser Collision Detection Functions', () => {
       expect(asteroidPointsForRadius(50)).toBe(20);
       expect(asteroidPointsForRadius(20)).toBe(50);
       expect(asteroidPointsForRadius(10)).toBe(100);
-    });
-  });
-
-  describe('checkLaserShipCollision', () => {
-    test('returns true when laser and ship positions overlap', () => {
-      const laserPos = { x: 100, y: 100 };
-      const shipPos = { x: 100, y: 100 };
-      const shipRadius = 15;
-
-      const result = checkLaserShipCollision(laserPos, shipPos, shipRadius);
-      expect(result).toBe(true);
-    });
-
-    test('returns false when laser and ship are far apart', () => {
-      const laserPos = { x: 200, y: 200 };
-      const shipPos = { x: 100, y: 100 };
-      const shipRadius = 15;
-
-      const result = checkLaserShipCollision(laserPos, shipPos, shipRadius);
-      expect(result).toBe(false);
-    });
-
-    test('returns true when laser is just inside collision boundary', () => {
-      const laserPos = { x: 100 + 15 + LASER.HIT_RADIUS - 0.1, y: 100 };
-      const shipPos = { x: 100, y: 100 };
-      const shipRadius = 15;
-
-      const result = checkLaserShipCollision(laserPos, shipPos, shipRadius);
-      expect(result).toBe(true);
-    });
-
-    test('returns false when laser is just outside collision boundary', () => {
-      const laserPos = { x: 100 + 15 + LASER.HIT_RADIUS + 0.1, y: 100 };
-      const shipPos = { x: 100, y: 100 };
-      const shipRadius = 15;
-
-      const result = checkLaserShipCollision(laserPos, shipPos, shipRadius);
-      expect(result).toBe(false);
-    });
-
-    test('works with different ship sizes', () => {
-      const shipPos = { x: 100, y: 100 };
-
-      const largeResult = checkLaserShipCollision(
-        { x: 100 + 25 + LASER.HIT_RADIUS - 0.1, y: 100 },
-        shipPos,
-        25
-      );
-      expect(largeResult).toBe(true);
-
-      const smallResult = checkLaserShipCollision(
-        { x: 100 + 8 + LASER.HIT_RADIUS - 0.1, y: 100 },
-        shipPos,
-        8
-      );
-      expect(smallResult).toBe(true);
     });
   });
 });

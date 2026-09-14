@@ -1,10 +1,9 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { nearbyWorldRows } from '../../shared/world';
 import type { PlayerShotAcknowledgement } from '../../shared-types';
-import { DAMAGE } from '../../src/constants';
 import { getShipKit } from '../../src/entities/ship/shipKits';
-import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
 import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
 import type { MotionOutcome } from '../core/PlayerMotionService';
@@ -34,6 +33,10 @@ export class MessageHandler {
   }
 
   public handleMessage(message: unknown, ws: WebSocket): void {
+    if (!this.gameEngine.isPersistenceHealthy()) {
+      this.broadcaster.sendError(ws, 'World storage unavailable; server restarting');
+      return;
+    }
     const decoded = decodeClientCommand(message);
     if (!decoded.ok) {
       if (decoded.logUnknown) {
@@ -78,10 +81,6 @@ export class MessageHandler {
 
         case 'shoot':
           this.handlePlayerShoot(ws, command);
-          break;
-
-        case 'shield':
-          this.handleShield(ws, command);
           break;
 
         case 'chat':
@@ -135,7 +134,6 @@ export class MessageHandler {
       id,
       position: command.position,
       kitId: command.kitId,
-      factionId: command.factionId,
     });
 
     let resumeToken: string | undefined;
@@ -149,11 +147,7 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
         return;
       }
-      const resumed = this.gameEngine.playerMotion.resume(
-        command.resumeToken ?? '',
-        ws,
-        this.gameEngine.getServerTime()
-      );
+      const resumed = this.gameEngine.resumePilot(command.resumeToken ?? '', ws, command.kitId);
       if (!resumed.ok) {
         this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
         return;
@@ -175,39 +169,17 @@ export class MessageHandler {
         .find(
           (candidate) => candidate.id === id || candidate.name.toLowerCase() === name.toLowerCase()
         );
-      if (conflictingPilot?.asteroidInteractions === 1) {
+      if (conflictingPilot || this.gameEngine.hasSavedPilot(id)) {
         this.broadcaster.sendError(ws, 'This pilot requires its private resume token');
         return;
       }
-      const reusableHuman = this.gameEngine
-        .getAllPlayers()
-        .find(
-          (candidate) =>
-            candidate.type === 'human' && (candidate.id === id || candidate.name === name)
-        );
-      if (
-        !reusableHuman &&
-        this.gameEngine.getAllPlayers().filter((actor) => actor.type === 'human').length >= 100
-      ) {
+      if (this.gameEngine.getAllPlayers().filter((actor) => actor.type === 'human').length >= 100) {
         this.broadcaster.sendError(ws, 'The game server is full');
         return;
       }
-      player = this.gameEngine.addPlayer(
-        id,
-        name,
-        ws,
-        command.position,
-        undefined,
-        command.kitId,
-        command.factionId
-      );
+      player = this.gameEngine.addPlayer(id, name, ws, command.position, command.kitId);
       player.asteroidInteractions = 1;
-      const registered = this.gameEngine.playerMotion.register(
-        player,
-        ws,
-        1,
-        this.gameEngine.getServerTime()
-      );
+      const registered = this.gameEngine.registerPilot(player, ws);
       if (!registered.ok) {
         this.gameEngine.removePlayer(player.id);
         this.broadcaster.sendError(ws, registered.error);
@@ -215,10 +187,6 @@ export class MessageHandler {
       }
       resumeToken = registered.resumeToken;
       this.gameEngine.enableAsteroidInteractions(player);
-    }
-    const replacedId = this.gameEngine.consumeReplacedHumanId();
-    if (replacedId) {
-      this.broadcaster.broadcastPlayerLeft(replacedId);
     }
 
     const snapshotVersion = this.broadcaster.negotiateSnapshot(ws);
@@ -235,7 +203,6 @@ export class MessageHandler {
         shotAcknowledgements: true,
         color: player.color,
         kitId: player.kitId,
-        ...(player.factionId !== undefined ? { factionId: player.factionId } : {}),
         terrainSeed: this.gameEngine.getTerrainSeed(),
         serverReleaseId: SERVER_RELEASE_ID,
         snapshotVersion,
@@ -359,16 +326,6 @@ export class MessageHandler {
     this.broadcastAppliedAsteroidHits(this.gameEngine.resolveSpawnedLaserHits(laser.id));
   }
 
-  private handleShield(ws: WebSocket, command: CommandOf<'shield'>): void {
-    const { id, active } = command;
-    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type !== 'human' || socketPlayer.id !== id) {
-      return;
-    }
-    this.gameEngine.requestShield(id, active);
-    this.broadcaster.broadcastGameState();
-  }
-
   private handleChat(ws: WebSocket, command: CommandOf<'chat'>): void {
     const { id, message } = command;
     const player = this.gameEngine.getPlayerBySocket(ws);
@@ -385,18 +342,14 @@ export class MessageHandler {
     targetId: string,
     attackerId: string,
     damage: number,
-    healthBefore: number | undefined,
-    source?: CombatDamageSource
+    healthBefore: number | undefined
   ): void {
-    const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage, source);
+    const outcome = this.gameEngine.handleShipDamage(targetId, attackerId, damage);
     if (!outcome.applied || !outcome.entity) {
       return;
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
     if (!outcome.isDestroyed && !healthDropped) {
-      if (outcome.entity.shieldActive) {
-        this.broadcaster.broadcastGameState();
-      }
       return;
     }
     this.broadcaster.broadcastCombatResult({
@@ -407,15 +360,6 @@ export class MessageHandler {
       remainingLives: outcome.entity.lives,
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
-      targetName: outcome.entity.name,
-      ...(outcome.isDestroyed
-        ? (() => {
-            const attacker = this.gameEngine.entityManager.getEntity(attackerId);
-            return attacker
-              ? { awardedScore: { playerId: attackerId, score: attacker.score } }
-              : {};
-          })()
-        : {}),
     });
   }
 
@@ -423,8 +367,7 @@ export class MessageHandler {
     const { targetPlayerId, attackerId } = command;
     logger.debug('handleCollisionDamage', { targetPlayerId });
 
-    // Ship↔asteroid and ship↔ship damage are resolved in the
-    // server game loop. This path is reserved for the client's boundary hit.
+    // Asteroid impacts are resolved by the server. Clients report only their boundary hit.
     if (!isClientOwnedCollisionAttacker(attackerId)) {
       return;
     }
@@ -435,7 +378,9 @@ export class MessageHandler {
     }
 
     const before = this.gameEngine.getPlayer(targetPlayerId);
-    this.emitShipDamage(targetPlayerId, 'boundary', DAMAGE.BOUNDARY_COLLISION, before?.health);
+    if (before) {
+      this.emitShipDamage(targetPlayerId, 'boundary', before.health, before.health);
+    }
   }
 
   private handleUseAbility(ws: WebSocket, command: CommandOf<'useAbility'>): void {
@@ -450,7 +395,7 @@ export class MessageHandler {
     if (command.kitId !== undefined && command.kitId !== socketPlayer.kitId) {
       return;
     }
-    const activated = this.gameEngine.useAbility(playerId, command.kitId, command.latchView);
+    const activated = this.gameEngine.useAbility(playerId, command.kitId);
     if (!activated) {
       return;
     }
@@ -465,7 +410,6 @@ export class MessageHandler {
         id: playerId,
         kitId: entity.kitId,
         abilityId: getShipKit(entity.kitId).abilityId,
-        harpoonTimer: entity.harpoonTimer,
         ...(entity.harpoonTargetId !== undefined
           ? { harpoonTargetId: entity.harpoonTargetId }
           : {}),
@@ -501,7 +445,7 @@ export class MessageHandler {
 
       const scorer = this.gameEngine.getPlayer(hit.playerId);
       if (scorer) {
-        this.broadcaster.broadcastScoreUpdate(hit.playerId, scorer.score);
+        this.broadcaster.broadcastScoreUpdate(scorer.id, scorer.score);
       }
 
       this.broadcaster.broadcastAsteroidDestruction(
@@ -544,7 +488,10 @@ export class MessageHandler {
       return;
     }
 
-    const existingAsteroids = this.gameEngine.getAllAsteroids();
+    const existingAsteroids = nearbyWorldRows(
+      this.gameEngine.getAllAsteroids(),
+      socketPlayer.position
+    );
     this.broadcaster.sendToWebSocket(ws, {
       type: 'asteroidCreateBatch',
       data: {

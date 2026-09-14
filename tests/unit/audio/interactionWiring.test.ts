@@ -23,27 +23,15 @@ afterEach(() => {
 });
 
 describe('game interaction sound wiring', () => {
-  test('a regular shield activation sounds once and deactivation stays quiet', () => {
-    const playSpy = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
-    const ship = new Ship({ isLocalPlayer: true });
-
-    expect(ship.requestShieldToggle()).toBe(true);
-    expect(playSpy).toHaveBeenCalledTimes(1);
-
-    expect(ship.requestShieldToggle()).toBe(true);
-    expect(playSpy).toHaveBeenCalledTimes(1);
-  });
-
-  test('a harpoon timer crossing to zero sounds once per release', () => {
+  test('a persistent Hauler latch releases without a timer-driven sound', () => {
     const playSpy = vi.spyOn(Sound.prototype, 'play').mockResolvedValue(undefined);
     const ship = new Ship({ kitId: 'hauler' });
-    ship.harpoonTimer = 1;
+    ship.harpoonTargetId = 'rock-1';
     ship.harpoonLatchPos = { x: 420, y: 300 };
 
-    ship.updateLifecycle(1);
-    expect(playSpy).toHaveBeenCalledTimes(1);
-
-    ship.updateLifecycle(1);
-    expect(playSpy).toHaveBeenCalledTimes(1);
+    expect(ship.activateAbility()).toBe(true);
+    expect(ship.harpoonTargetId).toBeNull();
+    expect(ship.harpoonLatchPos).toBeUndefined();
+    expect(playSpy).not.toHaveBeenCalled();
   });
 });

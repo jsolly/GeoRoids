@@ -223,16 +223,29 @@ describe('current pilots share the production handler and broadcaster', () => {
   });
 
   test('late joins, exclusions, backpressure, rejoin and reconnect have independent baselines', () => {
-    const expectedWorld = () =>
-      JSON.parse(
-        JSON.stringify(
-          new SnapshotEncoder({
-            ...engine.getGameState(),
-            playerProjectiles: engine.getPlayerProjectiles(),
-            collabTags: engine.getActiveCollabTags().map((tag) => ({ id: tag.asteroidId, ...tag })),
-          }).state
-        )
-      );
+    const expectedWorld = (id = 'a') => {
+      const viewer = engine.getPlayer(id);
+      assert(viewer);
+      const state = engine.getGameState();
+      const nearby = <T extends { position: { x: number; y: number } }>(rows: T[]) =>
+        rows.filter(
+          (row) =>
+            Math.abs(row.position.x - viewer.position.x) <= 2800 &&
+            Math.abs(row.position.y - viewer.position.y) <= 2800
+        );
+      const asteroids = nearby(state.asteroids);
+      return new SnapshotEncoder({
+        ...state,
+        asteroids,
+        loot: nearby(state.loot),
+        satellitePickups: nearby(state.satellitePickups),
+        playerProjectiles: nearby(engine.getPlayerProjectiles()),
+        collabTags: engine
+          .getActiveCollabTags()
+          .filter((tag) => asteroids.some((rock) => rock.id === tag.asteroidId))
+          .map((tag) => ({ id: tag.asteroidId, ...tag })),
+      }).state;
+    };
     const a = socket();
     join(handler, a.ws, 'a');
     const joinedA = a.messages.find((message) => message.type === 'joined');
@@ -248,7 +261,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       return decodedSnapshots(pilot).at(-1);
     };
     expect(reconstruct(a)).toEqual(expectedWorld());
-    expect(reconstruct(b)).toEqual(reconstruct(a));
+    expect(reconstruct(b)).toEqual(expectedWorld('b'));
     const count = a.messages.length;
     broadcaster.broadcastGameState('a');
     expect(a.messages).toHaveLength(count);
@@ -264,7 +277,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     assert.ok(pilotAKeyframe, 'pilot a keyframe');
     expect(pilotAKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
     expect(reconstruct(a)).toEqual(expectedWorld());
-    expect(reconstruct(b)).toEqual(reconstruct(a));
+    expect(reconstruct(b)).toEqual(expectedWorld('b'));
     join(handler, a.ws, 'a', resumeTokenA as string);
     const rejoinedKeyframe = a.messages.at(-1);
     assert.ok(rejoinedKeyframe, 'rejoined pilot a keyframe');
@@ -274,7 +287,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     });
     engine.removePlayer('a');
     const reconnected = socket();
-    join(handler, reconnected.ws, 'a');
+    join(handler, reconnected.ws, 'a', resumeTokenA as string);
     const reconnectedKeyframe = reconnected.messages.at(-1);
     assert.ok(reconnectedKeyframe, 'reconnected keyframe');
     expect(reconnectedKeyframe.data).toMatchObject({
@@ -330,7 +343,8 @@ describe('current pilots share the production handler and broadcaster', () => {
     const bDecoder = new SnapshotDecoder();
     const aWorld = aSnapshots.map(({ raw }) => decodeSnapshotMessage(aDecoder, raw)).at(-1);
     const bWorld = bSnapshots.map(({ raw }) => decodeSnapshotMessage(bDecoder, raw)).at(-1);
-    expect(aWorld).toEqual(bWorld);
+    expect(aWorld?.entities).toEqual(bWorld?.entities);
+    expect(aWorld?.mapAssets).toEqual(bWorld?.mapAssets);
     expect(aWorld).toMatchObject({ entities: expect.any(Array) });
   });
 
@@ -341,7 +355,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     join(handler, peer.ws, 'peer');
     engine.addAsteroid({
       id: 'core-rock',
-      position: { x: 5000, y: 5000 },
+      position: { x: 500, y: 500 },
       velocity: { x: 0, y: 0 },
       size: 32,
       vertices: 4,
@@ -782,9 +796,17 @@ describe('current pilots share the production handler and broadcaster', () => {
       }
       const staleMetadata = snapshotSummary(oldFrame.data);
 
+      const joined = pilot.messages.find((message) => message.type === 'joined');
+      const joinedData = joined?.data;
+      assert(
+        joinedData &&
+          typeof joinedData === 'object' &&
+          'resumeToken' in joinedData &&
+          typeof joinedData.resumeToken === 'string'
+      );
       handler.handleMessage({ type: 'leave', data: {} }, pilot.ws);
       pilot.fake.defer = false;
-      join(handler, pilot.ws, 'pilot');
+      join(handler, pilot.ws, 'pilot', joinedData.resumeToken);
       const freshActor = engine.getPlayer('pilot');
       assert.ok(freshActor?.playerMotion, 'fresh actor registration');
       expect(freshActor.playerMotion.epoch).toBe(1);

@@ -117,9 +117,8 @@ export function partitionAsteroidSnapshot(
     }
   }
 
-  // An empty snapshot is not a wipe — last-player reset + a dropped packet
-  // must not clear the remaining tab's local belt.
-  if (complete || asteroids.length > 0) {
+  // Creation batches add fragments; only a complete local snapshot can evict rocks.
+  if (complete) {
     for (const id of seenIds) {
       if (!snapshotIds.has(id)) {
         removed.push(id);
@@ -146,6 +145,7 @@ export function writeAsteroidKinematicUpdates(
   writeOptionalField(into, 'maxHealth', asteroid.maxHealth);
   writeOptionalField(into, 'size', asteroid.size);
   writeOptionalField(into, 'isCollabTarget', asteroid.isCollabTarget);
+  writeOptionalField(into, 'miningContributors', asteroid.miningContributors);
   writeOptionalField(into, 'phenomenon', asteroid.phenomenon);
   if (asteroid.material === undefined || isAsteroidMaterial(asteroid.material)) {
     writeOptionalField(into, 'material', asteroid.material);
@@ -193,6 +193,8 @@ const ASTEROID_POSE_SNAP_PX = 12;
 
 /** Local belt object that can receive an authoritative kinematic snapshot. */
 export interface AsteroidKinematicTarget {
+  surveyedBy?: string[];
+  miningContributors?: string[];
   position: { x: number; y: number };
   velocity: { x: number; y: number };
   angle: number;
@@ -235,6 +237,16 @@ export function applyAsteroidKinematics(
       delete roid.material;
     }
     roid.isCollabTarget = updates.isCollabTarget ?? false;
+    if (updates.surveyedBy) {
+      roid.surveyedBy = [...updates.surveyedBy];
+    } else {
+      delete roid.surveyedBy;
+    }
+    if (updates.miningContributors) {
+      roid.miningContributors = [...updates.miningContributors];
+    } else {
+      delete roid.miningContributors;
+    }
     if (updates.offsets) {
       roid.offsets = [...updates.offsets];
     }
@@ -276,6 +288,13 @@ export function applyAsteroidKinematics(
   }
   if (updates.isCollabTarget !== undefined) {
     roid.isCollabTarget = updates.isCollabTarget;
+  }
+  if ('miningContributors' in updates) {
+    if (updates.miningContributors) {
+      roid.miningContributors = [...updates.miningContributors];
+    } else {
+      delete roid.miningContributors;
+    }
   }
   if ('phenomenon' in updates) {
     roid.phenomenon = updates.phenomenon;

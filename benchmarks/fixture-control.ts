@@ -8,7 +8,6 @@ import { serverPerformanceMetrics } from '../server/performanceMetrics';
 import { radiusFromMass, resetShipMass } from '../shared/shipGrowth';
 import type { AsteroidData } from '../shared-types';
 import { applyShipKitStats } from '../src/entities/ship/shipKits';
-import { clearShield } from '../src/entities/ship/shipShield';
 
 export function normalizeFixtureAsteroids(asteroids: AsteroidData[]) {
   const slots = new Map(asteroids.map((asteroid, index) => [asteroid.id, `asteroid-${index}`]));
@@ -113,7 +112,6 @@ export async function startFixtureControl(
         for (const [index, actor] of actors.entries()) {
           resetShipMass(actor);
           applyShipKitStats(actor, actor.kitId);
-          clearShield(actor);
           // Network-facing updatePlayer deliberately ignores these authority-owned fields.
 
           actor.healthRegenTimer = 0;
@@ -121,7 +119,7 @@ export async function startFixtureControl(
           delete actor.explodeTime;
           delete actor.deathCause;
           delete actor.laserUpgrade;
-          delete actor.harpoonTargetId;
+          actor.harpoonTargetId = null;
           delete actor.harpoonLatchPos;
           const angle = (index * Math.PI * 2) / actors.length;
           const position = { x: Math.cos(angle) * 100, y: Math.sin(angle) * 100 };
@@ -141,8 +139,6 @@ export async function startFixtureControl(
             score: 0,
             abilityCooldownFrames: 0,
             abilityActiveFrames: 0,
-
-            harpoonTimer: 0,
           });
         }
         if (request.scenario === 'combat') {

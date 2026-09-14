@@ -6,11 +6,6 @@ export class GameStateManager {
   private text = '';
   private isGameRunning = false;
 
-  // Kill message system
-  private killMessage = '';
-  private killMessageTimer = 0;
-  private readonly KILL_MESSAGE_DURATION_FRAMES = 120; // 2 seconds at 60 FPS
-
   private pickupMessage = '';
   private pickupMessageTimer = 0;
   private readonly PICKUP_MESSAGE_DURATION_FRAMES = 120;
@@ -44,7 +39,6 @@ export class GameStateManager {
   clearOverlay(): void {
     this.text = '';
     this.textAlpha = 0;
-    this.clearKillMessage();
     this.clearPickupMessage();
   }
 
@@ -53,36 +47,14 @@ export class GameStateManager {
     logger.debug('GAME_STATE', 'Game running state set', { isGameRunning: running });
   }
 
-  // Kill message methods
-  setKillMessage(playerName: string): void {
-    this.killMessage = `You killed ${playerName}`;
-    this.killMessageTimer = this.KILL_MESSAGE_DURATION_FRAMES;
-  }
-
-  clearKillMessage(): void {
-    this.killMessage = '';
-    this.killMessageTimer = 0;
-  }
-
-  getKillMessage(): string {
-    return this.killMessage;
-  }
-
-  hasKillMessage(): boolean {
-    return this.killMessageTimer > 0;
-  }
-
-  updateKillMessageTimer(): void {
-    if (this.killMessageTimer > 0) {
-      this.killMessageTimer--;
-      if (this.killMessageTimer <= 0) {
-        this.killMessage = '';
-      }
-    }
-  }
-
   setPickupMessage(pickupName: string, scoreBonus: number): void {
     this.pickupMessage = `${pickupName} acquired +${scoreBonus}`;
+    this.pickupMessageTimer = this.PICKUP_MESSAGE_DURATION_FRAMES;
+  }
+
+  setDeliveryMessage(points: number, collaborators: number): void {
+    this.pickupMessage =
+      collaborators > 1 ? `Team delivery +${points} each` : `Delivery +${points}`;
     this.pickupMessageTimer = this.PICKUP_MESSAGE_DURATION_FRAMES;
   }
 

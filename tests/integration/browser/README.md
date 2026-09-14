@@ -26,18 +26,20 @@ through the local `/test/place-player` control and waits for the client's motion
 epoch acknowledgment. Ordinary gameplay packets still obey movement validation.
 The fixture route is loopback-only and returns 404 in production.
 
-Choose explicit hostile/friendly participants and isolate the interaction from
-unrelated actors. After setup, use real input and the normal simulation. Do not
-write the expected damage, score, death, or pickup into the fixture.
+Choose explicit crew participants and isolate the interaction from unrelated
+actors. After setup, use real input and the normal simulation. Do not write the
+expected health, score, death, delivery, or pickup into the fixture.
 
-Observe a specific target and result: the same shot on both clients, the exact
-victim's health change, a credited kill, or the matched drop disappearing on
-collection. Watch transient banners/events before triggering the action. Poll
-for snapshots with deadlines instead of assuming an arbitrary delay is enough.
+Observe a specific target and result: a teammate's health remaining unchanged
+after a shot or overlap, the same projectile on both clients, a rock's
+Surveyor tag reaching the Hauler, or a matched delivery banner and score on
+every contributor. Watch transient banners/events before triggering the
+action. Poll for snapshots with deadlines instead of assuming an arbitrary
+delay is enough.
 
 ## Organization and evidence
 
-- `sanity/`: startup, controls, responsive UI, release changes, basic Hauler harpoons, and reflective asteroids.
+- `sanity/`: startup, controls, responsive UI, release changes, Hauler tow input, and reflective asteroids.
 - `e2e/`: complete player and multiplayer scenarios.
 - `collision/`: browser-visible combat outcomes.
 - `laser/`: real firing input and shared projectile trajectories and cleanup.

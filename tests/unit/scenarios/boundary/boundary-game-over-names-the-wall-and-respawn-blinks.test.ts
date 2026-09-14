@@ -3,11 +3,12 @@ import { GAME } from '../../../../src/constants';
 import { Player } from '../../../../src/entities/player/Player';
 import {
   applyShipBoundaryDeath,
-  formatDeathCauseForOverlay,
   isShipCollisionImmune,
   resolveCombatDeathCause,
 } from '../../../../src/entities/ship/shipUtils';
 import { MockPlayerInput } from '../../../../src/input/MockPlayerInput';
+import { getGameBoundary } from '../../../../src/physics/boundary';
+import { formatDeathCauseForOverlay } from '../../../../src/utils/deathCause';
 
 function localPilot(): Player {
   return new Player({
@@ -18,26 +19,25 @@ function localPilot(): Player {
   });
 }
 
+function outsideWallPosition(): { x: number; y: number } {
+  return { x: getGameBoundary().radius + 100, y: 0 };
+}
+
 describe('Boundary game-over and respawn cues', () => {
   test('a hull past the arena edge is a wall death, never unknown', () => {
     expect(formatDeathCauseForOverlay('unknown')).toBeUndefined();
     expect(formatDeathCauseForOverlay('boundary')).toBe('the arena wall');
-    expect(resolveCombatDeathCause(undefined, { position: { x: 4000, y: 0 }, r: 20 })).toBe(
-      'boundary'
-    );
-    expect(resolveCombatDeathCause('server-damage', { position: { x: 4000, y: 0 }, r: 20 })).toBe(
-      'boundary'
-    );
-    expect(resolveCombatDeathCause('unknown', { position: { x: 4000, y: 0 }, r: 20 })).toBe(
-      'boundary'
-    );
+    const outside = outsideWallPosition();
+    expect(resolveCombatDeathCause(undefined, { position: outside, r: 20 })).toBe('boundary');
+    expect(resolveCombatDeathCause('server-damage', { position: outside, r: 20 })).toBe('boundary');
+    expect(resolveCombatDeathCause('unknown', { position: outside, r: 20 })).toBe('boundary');
   });
 
   test('last-life wall contact flashes, explodes, and names the wall on playerDied', () => {
     const player = localPilot();
     player.lives = 1;
     player.score = 210;
-    player.ship.position = { x: 4000, y: 0 };
+    player.ship.position = outsideWallPosition();
 
     const deaths: Array<{ deathCause: string; isGameOver: boolean }> = [];
     const onDied = (event: Event): void => {
@@ -45,7 +45,7 @@ describe('Boundary game-over and respawn cues', () => {
     };
     window.addEventListener('playerDied', onDied);
 
-    applyShipBoundaryDeath(player.ship, 'boundary');
+    applyShipBoundaryDeath(player.ship);
     player.onShipExploded({ cause: 'boundary' });
     player.updateFromServer({
       lives: 0,
@@ -64,7 +64,7 @@ describe('Boundary game-over and respawn cues', () => {
   test('a snapshot life loss at the wall without a cause field is still the wall', () => {
     const player = localPilot();
     player.lives = 1;
-    player.ship.position = { x: 4000, y: 0 };
+    player.ship.position = outsideWallPosition();
 
     const deaths: string[] = [];
     const onDied = (event: Event): void => {
@@ -81,8 +81,8 @@ describe('Boundary game-over and respawn cues', () => {
   test('a lagged inside pose does not turn a wall death into generic GO', () => {
     const player = localPilot();
     player.lives = 1;
-    player.ship.position = { x: 4000, y: 0 };
-    applyShipBoundaryDeath(player.ship, 'boundary');
+    player.ship.position = outsideWallPosition();
+    applyShipBoundaryDeath(player.ship);
 
     const deaths: string[] = [];
     const onDied = (event: Event): void => {
@@ -128,8 +128,8 @@ describe('Boundary game-over and respawn cues', () => {
   test('death then alive after a wall hit arms blink so the next graze is ignored', () => {
     const player = localPilot();
     player.lives = 2;
-    player.ship.position = { x: 4000, y: 0 };
-    applyShipBoundaryDeath(player.ship, 'boundary');
+    player.ship.position = outsideWallPosition();
+    applyShipBoundaryDeath(player.ship);
 
     player.updateFromServer({
       lives: 1,

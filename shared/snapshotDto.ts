@@ -5,6 +5,7 @@ import type {
   LaserUpgrade,
   LootData,
   LootKind,
+  MapAsset,
   PlayerMotionState,
   PlayerProjectileState,
   SatellitePickupData,
@@ -15,8 +16,8 @@ import type {
   ServerGameState,
   ShipKitId,
   SnapshotCollabTag,
-  SoftFactionId,
 } from '../shared-types';
+import { validExploration } from './exploration';
 
 type Rule = (value: unknown) => boolean;
 /** Every DTO key must have a validator; additions cannot silently escape validation. */
@@ -41,7 +42,6 @@ const kit = enumeration<ShipKitId>({
   surveyor: true,
   hauler: true,
 });
-const faction = enumeration<SoftFactionId>({ ion: true, ember: true });
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,
@@ -97,18 +97,12 @@ const entity = shape<ServerEntityData>({
   respawnTimer: optional(number),
   spawnProtectionTimer: optional(number),
   kitId: optional(kit),
-  factionId: optional(faction),
   abilityCooldownFrames: optional(number),
   abilityActiveFrames: optional(number),
 
-  harpoonTimer: optional(number),
-  harpoonTargetId: optional(string),
+  harpoonTargetId: optional((value) => value === null || string(value)),
   harpoonLatchPos: optional(position),
   deathCause: optional(string),
-  shieldActive: optional(boolean),
-  shieldTime: optional(number),
-  shieldCooldown: optional(number),
-  shieldFlashTime: optional(number),
   playerMotion: optional(motion),
   laserUpgrade: optional(upgrade),
 });
@@ -126,6 +120,8 @@ const asteroid = shape<AsteroidData>({
   offsets: array(number),
   isCollabTarget: optional(boolean),
   material: optional(material),
+  surveyedBy: optional(array(string)),
+  miningContributors: optional(array(string)),
   phenomenon: optional(reflective),
 });
 const loot = shape<LootData>({
@@ -175,7 +171,15 @@ const collabTag = shape<SnapshotCollabTag>({
     shape<SnapshotCollabTag['hits'][number]>({ shooterId: string, at: number, points: number })
   ),
 });
+const mapAsset = shape<MapAsset>({
+  id: string,
+  kind: choice('furnace', 'laserCore', 'wreckage', 'satellite'),
+  position,
+  name: string,
+});
 const worldRules = {
+  exploration: validExploration,
+  mapAssets: array(mapAsset),
   entities: array(entity),
   asteroids: array(asteroid),
   loot: array(loot),
@@ -189,6 +193,12 @@ const world = shape<ServerGameSnapshot>({
   collabTags: array(collabTag),
   playerProjectiles: array(playerProjectile),
 });
+/** Validate one persisted asteroid with the same metadata rules used on the wire. */
+export function validateAsteroidDto(value: unknown): asserts value is AsteroidData {
+  if (!asteroid(value)) {
+    throw new Error('Invalid asteroid DTO');
+  }
+}
 /** Unknown JSON fields are preserved by the codec, never discarded by this validation. */
 export function validateSnapshotDto(value: unknown): asserts value is ServerGameSnapshot {
   if (!world(value)) {

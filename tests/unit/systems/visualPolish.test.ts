@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import type { ShipKitId } from '../../../shared-types';
-import { PALETTE, SHIELD, SHIP, VISUAL } from '../../../src/constants';
+import { PALETTE, SHIP, VISUAL } from '../../../src/constants';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 import { Player } from '../../../src/entities/player/Player';
@@ -13,7 +13,6 @@ import {
 import {
   drawLaserBolts,
   drawShipExplosion,
-  drawShipShield,
   drawThruster,
   drawThrusterAtPosition,
   strokeKitHullOutline,
@@ -166,34 +165,20 @@ test('every playable kit draws its outlined hull and retained details without fi
   expect(fill).not.toHaveBeenCalled();
 });
 
-test('shield impact renders a phosphor ring without filling the ship', () => {
-  const player = pilot('visual-shield');
-  player.ship.shieldActive = true;
-  player.ship.shieldTime = 30;
-  player.ship.shieldFlashTime = 4;
-  const { ctx, strokes, fill } = recordingContext();
-  drawShipShield(ctx, player.ship, 100, 80, 24);
-  expect(strokes).toHaveLength(1);
-  expect(strokes.flatMap((path) => path.arcs)).toHaveLength(1);
-  expect(strokes[0]?.arcs[0]?.slice(0, 2)).toEqual([100, 80]);
-  expect(strokes[0]?.color).toBe(canvasColor(ctx, hexToRgba(PALETTE.SHIELD, SHIELD.FLASH_ALPHA)));
-  expect(fill).not.toHaveBeenCalled();
-});
-
-test('local and enemy shots draw short thicker trails, then the identified hit draws a ring and ticks', () => {
+test('local and remote shots draw short thicker trails, then the identified hit draws a ring and ticks', () => {
   const { ctx, strokes, fill } = recordingContext();
   const local = new Laser({ x: 30, y: 60 }, { x: 3, y: 4 }, 0, 0);
   local.serverId = 'local-diagonal';
-  const enemy = new Laser({ x: -20, y: 80 }, { x: 0, y: -5 }, 0, 0);
-  enemy.serverId = 'enemy-vertical';
+  const remote = new Laser({ x: -20, y: 80 }, { x: 0, y: -5 }, 0, 0);
+  remote.serverId = 'remote-vertical';
   const viewer = { x: 10, y: 20 };
   const scale = canvasManager.getPlayfieldScale();
   const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
   const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
   const localScreen = canvasManager.worldToScreen(local.position, viewer);
-  const enemyScreen = canvasManager.worldToScreen(enemy.position, viewer);
+  const remoteScreen = canvasManager.worldToScreen(remote.position, viewer);
   const localOffsets = laserBoltOffsets(local.velocity.x, local.velocity.y, bolt, trailLength);
-  const enemyOffsets = laserBoltOffsets(enemy.velocity.x, enemy.velocity.y, bolt, trailLength);
+  const remoteOffsets = laserBoltOffsets(remote.velocity.x, remote.velocity.y, bolt, trailLength);
   ctx.save();
   const expectedBlur = [VISUAL.LASER_GLOW * 0.55, 0, VISUAL.LASER_GLOW, 0].map((blur) => {
     ctx.shadowBlur = blur;
@@ -202,7 +187,7 @@ test('local and enemy shots draw short thicker trails, then the identified hit d
   ctx.restore();
   for (const { shot, color, screen, offsets } of [
     { shot: local, color: PALETTE.LASER_LOCAL, screen: localScreen, offsets: localOffsets },
-    { shot: enemy, color: PALETTE.LASER_ENEMY, screen: enemyScreen, offsets: enemyOffsets },
+    { shot: remote, color: PALETTE.LASER_LOCAL, screen: remoteScreen, offsets: remoteOffsets },
   ]) {
     const trail = [
       {

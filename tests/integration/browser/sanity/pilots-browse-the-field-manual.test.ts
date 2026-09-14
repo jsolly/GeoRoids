@@ -40,7 +40,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.screenshot({ path: resolve(output, 'wiki-desktop.png'), fullPage: true });
     await page.locator('.comparison summary').click();
     expect(await page.locator('tbody tr').count()).toBe(2);
-    await page.locator('#wiki-search').fill('shield');
+    await page.locator('#wiki-search').fill('furnace');
     expect(await page.locator('#search-status').textContent()).toBe(
       `${await page.locator('.topic-card').count()} matching entries`
     );
@@ -99,12 +99,13 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
       .toMatch(/\.gif$/);
-    expect(await page.locator('#content').textContent()).toContain(
-      'E attaches to the nearest valid asteroid'
+    const haulerContent = ((await page.locator('#content').textContent()) ?? '').replace(
+      /\s+/g,
+      ' '
     );
-    expect(await page.locator('#content').textContent()).not.toMatch(
-      /Q latches|winch|couple a second/
-    );
+    expect(haulerContent).toContain('E attaches a tow cable to the nearest living asteroid');
+    expect(haulerContent).toContain('never reels a rock into the hull or throws it');
+    expect(haulerContent).not.toMatch(/Q latches|winch|couple a second/);
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');

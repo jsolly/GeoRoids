@@ -26,7 +26,15 @@ export function initTitleTerrain(): void {
     return;
   }
 
-  const bounds = getGameBoundary();
+  // The live world can span tens of thousands of units. The title is a local
+  // composition, so sample a compact preview window instead of extracting the
+  // entire world and cropping its lines down to nothing.
+  const worldBounds = getGameBoundary();
+  const bounds = {
+    cx: worldBounds.cx,
+    cy: worldBounds.cy,
+    radius: Math.min(3100, worldBounds.radius),
+  };
   const contours = extractIsoContours(
     createHeightfield(TERRAIN.DEFAULT_SEED, bounds),
     VISUAL.TITLE_TERRAIN_GRID_SIZE,

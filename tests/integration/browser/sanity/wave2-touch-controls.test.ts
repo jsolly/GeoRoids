@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs';
-import type { CDPSession, Page } from 'playwright';
+import type { CDPSession } from 'playwright';
 import { expect, test } from 'vitest';
 
+import { watchBrowserDiagnostics } from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 import {
   canvasPoint,
   centerOf,
@@ -33,20 +35,6 @@ async function tapTouchPoint(
   await dispatchTouch(session, 'touchMove', heldPoints);
 }
 
-function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      errors.push(message.text());
-    } else if (message.type() === 'warning') {
-      warnings.push(message.text());
-    }
-  });
-  page.on('pageerror', (error) => errors.push(error.message));
-  return { errors, warnings };
-}
-
 test(
   'touch steering turns toward the finger and keeps flying after release',
   async () => {
@@ -55,7 +43,7 @@ test(
       throw new Error('Page not available');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    const diagnostics = collectConsole(page);
+    const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'hauler' });
     const center = await centerOf(page, '#gameCanvas');
@@ -128,7 +116,7 @@ test(
       throw new Error('Page not available');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    const diagnostics = collectConsole(page);
+    const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
@@ -164,19 +152,19 @@ test(
   TestConfig.DEFAULT_TIMEOUT
 );
 
-test.each(['ability', 'shield'] as const)(
-  'a %s button tap consumes a pending steering tap without firing',
-  async (action) => {
+test(
+  'the ability button consumes a pending steering tap without firing',
+  async () => {
     const page = await browserManager.recreatePage({ hasTouch: true });
     if (!page) {
       throw new Error('Page not available');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    const diagnostics = collectConsole(page);
+    const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const steerPoint = await canvasPoint(page, 0.75, 0.5);
-    const actionPoint = await centerOf(page, `#touch-${action}`);
+    const actionPoint = await centerOf(page, '#touch-ability');
     const session = await page.context().newCDPSession(page);
     let touchActive = false;
     try {
@@ -189,11 +177,7 @@ test.each(['ability', 'shield'] as const)(
       await game.waitForAnimationFrames(2);
       const duringAction = await readLocalTouchState(page);
       expect(duringAction.lastShotTime).toBe(beforeAction.lastShotTime);
-      if (action === 'ability') {
-        expect(duringAction.abilityCooldownFrames).toBeGreaterThan(0);
-      } else {
-        expect(duringAction.shieldActive).toBe(true);
-      }
+      expect(duringAction.abilityCooldownFrames).toBeGreaterThan(0);
 
       await dispatchTouch(session, 'touchEnd', []);
       touchActive = false;
@@ -223,7 +207,7 @@ test(
       throw new Error('Page not available');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    const diagnostics = collectConsole(page);
+    const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const steer = await centerOf(page, '#gameCanvas');
@@ -272,7 +256,7 @@ test(
 );
 
 test.each(KITS)(
-  'touch E and F support movement, firing, cancellation, and cooldown for $kitId',
+  'touch E supports movement, firing, cancellation, and the kit action for $kitId',
   async ({ kitId, label, name }) => {
     await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
@@ -280,10 +264,11 @@ test.each(KITS)(
       throw new Error('Page not available');
     }
 
-    const consoleState = collectConsole(page);
+    const consoleState = watchBrowserDiagnostics(page);
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId });
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
@@ -293,13 +278,11 @@ test.each(KITS)(
 
     expect(await page.locator('#touch-ability').textContent()).toBe(label);
     expect(await page.locator('#touch-ability').getAttribute('aria-label')).toBe(name);
-    expect(await page.locator('#touch-shield').getAttribute('aria-label')).toBe('Shield bubble');
-    expect(await page.locator('#touch-controls button').count()).toBe(2);
+    expect(await page.locator('#touch-controls button').count()).toBe(1);
 
     const stick = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const ability = await centerOf(page, '#touch-ability');
-    const shield = await centerOf(page, '#touch-shield');
     const session = await page.context().newCDPSession(page);
     const heldTouchPoints: TouchPoint[] = [
       { x: stick.x + 42, y: stick.y - 4, id: 11 },
@@ -323,8 +306,7 @@ test.each(KITS)(
     expect(duringTouch.lastShotTime).toBeGreaterThan(beforeMove.lastShotTime);
     expect(await page.locator('#touch-stick').count()).toBe(0);
 
-    // E and F must remain usable while the two continuous canvas touch sources are
-    // held. The E action is kit-specific; the F bubble is shared.
+    // E must remain usable while the two continuous canvas touch sources are held.
     await tapTouchPoint(session, heldTouchPoints, {
       x: ability.x,
       y: ability.y,
@@ -332,44 +314,27 @@ test.each(KITS)(
     });
     await game.waitForAnimationFrames(2);
     const abilityWhileHeld = await readLocalTouchState(page);
-    expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
     expect(abilityWhileHeld.thrusting).toBe(true);
-    await tapTouchPoint(session, heldTouchPoints, {
-      x: ability.x,
-      y: ability.y,
-      id: 13,
-    });
-    await game.waitForAnimationFrames(1);
-    const abilityAfterCoolingTap = await readLocalTouchState(page);
-    expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeLessThanOrEqual(
-      abilityWhileHeld.abilityCooldownFrames
-    );
-    expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeGreaterThan(0);
-    expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('true');
-
-    await tapTouchPoint(session, heldTouchPoints, {
-      x: shield.x,
-      y: shield.y,
-      id: 14,
-    });
-    await game.waitForAnimationFrames(2);
-    const shieldWhileHeld = await readLocalTouchState(page);
-    expect(shieldWhileHeld.shieldActive).toBe(true);
-    expect(shieldWhileHeld.thrusting).toBe(true);
-    expect(
-      await page.locator('#touch-shield').evaluate((el) => el.classList.contains('is-active'))
-    ).toBe(true);
-
-    await tapTouchPoint(session, heldTouchPoints, {
-      x: shield.x,
-      y: shield.y,
-      id: 14,
-    });
-    await game.waitForAnimationFrames(1);
-    const shieldDownWhileHeld = await readLocalTouchState(page);
-    expect(shieldDownWhileHeld.shieldActive).toBe(false);
-    expect(shieldDownWhileHeld.shieldCooldown).toBeGreaterThan(0);
-    expect(await page.locator('#touch-shield').getAttribute('aria-disabled')).toBe('true');
+    if (kitId === 'hauler') {
+      // A miss leaves the persistent tow action ready: there is no scan-style
+      // cooldown when no cargo was attached.
+      expect(abilityWhileHeld.abilityCooldownFrames).toBe(0);
+      expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('false');
+    } else {
+      expect(abilityWhileHeld.abilityCooldownFrames).toBeGreaterThan(0);
+      await tapTouchPoint(session, heldTouchPoints, {
+        x: ability.x,
+        y: ability.y,
+        id: 13,
+      });
+      await game.waitForAnimationFrames(1);
+      const abilityAfterCoolingTap = await readLocalTouchState(page);
+      expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeLessThanOrEqual(
+        abilityWhileHeld.abilityCooldownFrames
+      );
+      expect(abilityAfterCoolingTap.abilityCooldownFrames).toBeGreaterThan(0);
+      expect(await page.locator('#touch-ability').getAttribute('aria-disabled')).toBe('true');
+    }
 
     // Browser backgrounding releases held firing and steering; automatic thrust stays enabled.
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
@@ -441,12 +406,7 @@ test(
           () => {
             const player = window.gameController?.getCurrPlayer();
             const ability = document.getElementById('touch-ability');
-            const shield = document.getElementById('touch-shield');
-            if (
-              !player?.ship.exploding ||
-              !ability?.classList.contains('is-unavailable') ||
-              !shield?.classList.contains('is-unavailable')
-            ) {
+            if (!player?.ship.exploding || !ability?.classList.contains('is-unavailable')) {
               return false;
             }
             return {
@@ -454,7 +414,6 @@ test(
               thrusting: player.ship.thrusting,
               canShoot: player.ship.canShoot,
               abilityDisabled: ability.getAttribute('aria-disabled'),
-              shieldDisabled: shield.getAttribute('aria-disabled'),
             };
           },
           undefined,
@@ -473,7 +432,6 @@ test(
         thrusting: false,
         canShoot: true,
         abilityDisabled: 'true',
-        shieldDisabled: 'true',
       });
       await page.waitForFunction(() => {
         const player = window.gameController?.getCurrPlayer();
@@ -504,7 +462,7 @@ test(
       throw new Error('Page not available');
     }
 
-    const consoleState = collectConsole(page);
+    const consoleState = watchBrowserDiagnostics(page);
     await page.setViewportSize({ width: 1280, height: 900 });
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
@@ -549,7 +507,7 @@ test(
 );
 
 test(
-  'semantic E and F controls activate from keyboard and programmatic clicks',
+  'semantic E control activates from keyboard and programmatic clicks',
   async () => {
     await browserManager.recreatePage({ hasTouch: true });
     const page = browserManager.getCurrentPage();
@@ -557,7 +515,7 @@ test(
       throw new Error('Page not available');
     }
 
-    const consoleState = collectConsole(page);
+    const consoleState = watchBrowserDiagnostics(page);
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
@@ -569,7 +527,6 @@ test(
     );
 
     const ability = page.locator('#touch-ability');
-    const shield = page.locator('#touch-shield');
     await ability.focus();
     await page.keyboard.press('Enter');
     await game.waitForAnimationFrames(2);
@@ -587,18 +544,7 @@ test(
     await game.waitForAnimationFrames(2);
     expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
 
-    await shield.focus();
-    await page.keyboard.press('Space');
-    await game.waitForAnimationFrames(2);
-    expect((await readLocalTouchState(page)).shieldActive).toBe(true);
-    await shield.evaluate((element) => (element as HTMLButtonElement).click());
-    await game.waitForAnimationFrames(1);
-    const afterProgrammaticShield = await readLocalTouchState(page);
-    expect(afterProgrammaticShield.shieldActive).toBe(false);
-    expect(afterProgrammaticShield.shieldCooldown).toBeGreaterThan(0);
-
     expect(await ability.getAttribute('aria-disabled')).toBe('true');
-    expect(await shield.getAttribute('aria-disabled')).toBe('true');
     expect(consoleState.errors).toEqual([]);
     expect(consoleState.warnings).toEqual([]);
   },

@@ -29,7 +29,7 @@ describe('server-authoritative health regeneration', () => {
 
   test('human damage waits for the delay, then heals and caps at max health', () => {
     const ship = world.entity(pilot);
-    world.engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     expect(ship.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
     expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
@@ -49,11 +49,11 @@ describe('server-authoritative health regeneration', () => {
 
   test('a repeated hit resets the same regeneration timer', () => {
     const ship = world.entity(pilot);
-    world.engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     world.tick(calculateHealthRegenDelayFrames() - 1);
     const healthBeforeSecondHit = ship.health;
 
-    world.engine.handlePlayerDamage(pilot.id, 'asteroid', 1);
+    world.engine.handleShipDamage(pilot.id, 'asteroid', 1);
     expect(ship.health).toBe(healthBeforeSecondHit - 1);
     expect(ship.healthRegenTimer).toBe(calculateHealthRegenDelayFrames());
 
@@ -65,7 +65,7 @@ describe('server-authoritative health regeneration', () => {
 
   test('a client update cannot clear the server timer and a last-life ship stays dead', () => {
     const ship = world.entity(pilot);
-    world.engine.handlePlayerDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     const delay = ship.healthRegenTimer;
 
     world.send(pilot, {
@@ -76,7 +76,7 @@ describe('server-authoritative health regeneration', () => {
     expect(ship.healthRegenTimer).toBe(delay);
 
     ship.lives = 0;
-    world.engine.handlePlayerDamage(pilot.id, 'asteroid', ship.health);
+    world.engine.handleShipDamage(pilot.id, 'asteroid', ship.health);
     expect(ship.health).toBe(0);
     world.tick(SHIP.EXPLODE_DURATION_FRAMES + SHIP.RESPAWN_DELAY_FRAMES + 1);
     expect(ship.health).toBe(0);
@@ -87,7 +87,7 @@ describe('server-authoritative health regeneration', () => {
     const bot = world.engine.createBots(1)?.[0];
     assert.ok(bot, 'Expected the newly created bot');
     delete bot.spawnProtectionTimer;
-    world.engine.handleBotDamage(bot.id, 'asteroid', DAMAGE.LASER_HIT);
+    world.engine.handleShipDamage(bot.id, 'asteroid', DAMAGE.LASER_HIT);
     const damagedHealth = bot.health;
 
     world.tick(calculateHealthRegenDelayFrames());

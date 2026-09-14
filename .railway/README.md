@@ -2,12 +2,10 @@
 
 `.railway/railway.ts` is the single tracked Railway project definition. It
 describes the `geoasteroids` service, its GitHub source, Railpack build, server
-start command, healthcheck, replica placement, and the two
-existing service variables through `preserve()`. Client admission is always
+start command, healthcheck, replica placement, persistent world volume, and environment. The two existing service variables use `preserve()`; `GEOROIDS_WORLD_PATH` points at `/data/world.sqlite`. Client admission is always
 current-protocol-only in server code; no service variable controls it.
 
-The definition has been compared with an authenticated full-project pull and
-plan. Railway's documented restart defaults are `ON_FAILURE` with 10 retries;
+The earlier service definition was compared with an authenticated full-project pull and plan. The new world volume and path require a fresh reviewed plan before deployment. Railway's documented restart defaults are `ON_FAILURE` with 10 retries;
 these values are verified on the service and omitted from the definition because
 Railway omits them from its imported graph. Compare the complete live graph before
 applying, and preserve unrelated staged dashboard changes.
@@ -37,3 +35,5 @@ running `railway config apply`; applying changes the live service and may deploy
 it. Never use `--include-variables` for
 this project. Generated Railway service domains are platform-managed and are
 intentionally absent from the authoring file.
+
+The `world-data` volume mounts at `/data` on the single `iad` replica. Apply this mount and the database path before deploying the persistent-world server. The service requires that mount before startup. Configure daily and weekly Railway volume backups and verify the live schedule after creating the volume; the SQLite WAL and database belong on the same volume. See [world operations](../docs/persistent-world.md).

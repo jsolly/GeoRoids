@@ -4,14 +4,14 @@ import { expect, test } from 'vitest';
 
 const gameInfoSrc = readFileSync(resolve(process.cwd(), 'src/rendering/hud/gameInfo.ts'), 'utf8');
 
-test('kill toast does not replace the score', () => {
+test('delivery toast does not replace the score', () => {
   const scoreDraw = gameInfoSrc.indexOf('fillText(score.toString()');
-  const killDraw = gameInfoSrc.indexOf('hasKillMessage()');
+  const deliveryDraw = gameInfoSrc.indexOf('hasPickupMessage()');
   expect(scoreDraw).toBeGreaterThan(0);
-  expect(killDraw).toBeGreaterThan(scoreDraw);
+  expect(deliveryDraw).toBeGreaterThan(scoreDraw);
 });
 
-test('HUD shows personal score and side label, not a team score', () => {
-  expect(gameInfoSrc).toMatch(/FACTION_LABELS\[faction\]/);
+test('HUD shows personal score without a faction or team label', () => {
+  expect(gameInfoSrc).not.toMatch(/FACTION_LABELS|getSideColor|faction/i);
   expect(gameInfoSrc).not.toMatch(/teamScore|team win|TEAM SCORE/i);
 });

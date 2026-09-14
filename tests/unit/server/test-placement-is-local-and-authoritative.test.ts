@@ -7,13 +7,10 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import {
-  handleTestArrangeBotShot,
+  handleTestArrangeCrewField,
   handleTestPlacePlayer,
   handleTestResetWorld,
 } from '../../../server/testHttpHandlers';
-import { radiusFromMass } from '../../../shared/shipGrowth';
-import { GAME, LASER } from '../../../src/constants';
-import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 
 const servers: ReturnType<typeof createServerInstance>[] = [];
 const sockets: WebSocket[] = [];
@@ -78,18 +75,9 @@ async function post(origin: string, body: unknown) {
   });
 }
 
-async function arrange(origin: string, playerId: string, botId: string) {
-  return fetch(`${origin}/test/arrange-bot-shot`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId, botId }),
-    signal: AbortSignal.timeout(5000),
-  });
-}
-
-test('production never exposes player placement, bot arrangement, or world reset', async () => {
+test('production never exposes placement, crew fixtures or world reset', async () => {
   const { origin } = await start('production');
-  for (const path of ['/test/place-player', '/test/arrange-bot-shot', '/test/reset-world']) {
+  for (const path of ['/test/place-player', '/test/reset-world', '/test/arrange-crew-field']) {
     const response = await fetch(`${origin}${path}`, {
       method: 'POST',
       signal: AbortSignal.timeout(3000),
@@ -100,7 +88,7 @@ test('production never exposes player placement, bot arrangement, or world reset
 
 test('development fixture controls reject a non-loopback peer', async () => {
   const { server } = await start('development');
-  for (const control of ['place', 'arrange', 'reset'] as const) {
+  for (const control of ['place', 'reset', 'crew'] as const) {
     const peer = new Socket();
     Object.defineProperty(peer, 'remoteAddress', { value: '192.0.2.10' });
     const req = new IncomingMessage(peer);
@@ -108,10 +96,10 @@ test('development fixture controls reject a non-loopback peer', async () => {
     const res = new ServerResponse(req);
     if (control === 'place') {
       handleTestPlacePlayer(req, res, 'development', server.gameEngine, server.wsCore);
-    } else if (control === 'arrange') {
-      handleTestArrangeBotShot(req, res, 'development', server.gameEngine, server.wsCore);
-    } else {
+    } else if (control === 'reset') {
       handleTestResetWorld(req, res, 'development', server.gameEngine);
+    } else {
+      handleTestArrangeCrewField(req, res, 'development', server.gameEngine, server.wsCore);
     }
     expect(res.statusCode).toBe(404);
     expect(res.writableEnded).toBe(true);
@@ -119,113 +107,26 @@ test('development fixture controls reject a non-loopback peer', async () => {
   }
 });
 
-test('bot arrangement rejects invalid ownership without moving either actor', async () => {
-  const { server, origin, player } = await pilot();
-  const bots = server.gameEngine.getAllBots();
-  const hostile = bots.find((bot) => bot.factionId !== player.factionId);
-  const friendly = bots.find((bot) => bot.factionId === player.factionId);
-  expect(hostile).toBeDefined();
-  expect(friendly).toBeDefined();
-  if (!hostile || !friendly) {
-    throw new Error('Expected both hostile and friendly fixture bots');
+test('an invalid crew fixture leaves the connected pilot and world intact', async () => {
+  const { origin, server, player } = await pilot();
+  const position = { ...player.position };
+  const asteroids = server.gameEngine.getAllAsteroids().map((rock) => rock.id);
+  for (const body of [
+    { playerIds: [], scenario: 'delivery' },
+    { playerIds: [player.id], scenario: 'unknown' },
+    { playerIds: [player.id], scenario: 'delivery', score: 9999 },
+    { playerIds: [player.id, player.id], scenario: 'delivery' },
+    { playerIds: ['missing-pilot'], scenario: 'delivery' },
+  ]) {
+    const response = await fetch(`${origin}/test/arrange-crew-field`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(3000),
+    });
+    expect(response.ok).toBe(false);
+    expect(player.position).toEqual(position);
+    expect(server.gameEngine.getAllAsteroids().map((rock) => rock.id)).toEqual(asteroids);
   }
-  const playerPosition = { ...player.position };
-  const hostilePosition = { ...hostile.position };
-  const friendlyPosition = { ...friendly.position };
-
-  expect((await arrange(origin, hostile.id, player.id)).status).toBe(404);
-  expect((await arrange(origin, player.id, friendly.id)).status).toBe(409);
-  expect((await arrange(origin, player.id, 'missing-bot')).status).toBe(404);
-  expect(player.position).toEqual(playerPosition);
-  expect(hostile.position).toEqual(hostilePosition);
-  expect(friendly.position).toEqual(friendlyPosition);
-});
-
-test('bot arrangement changes only poses before a real authoritative laser hit', async () => {
-  const { server, origin, player, socket } = await pilot();
-  const bot = server.gameEngine
-    .getAllBots()
-    .find((candidate) => candidate.factionId !== player.factionId);
-  expect(bot).toBeDefined();
-  if (!bot) {
-    throw new Error('Expected a hostile fixture bot');
-  }
-  const playerCombat = {
-    health: player.health,
-    lives: player.lives,
-    score: player.score,
-    factionId: player.factionId,
-    spawnProtectionTimer: player.spawnProtectionTimer,
-  };
-  const botCombat = {
-    health: bot.health,
-    lives: bot.lives,
-    score: bot.score,
-    factionId: bot.factionId,
-    spawnProtectionTimer: bot.spawnProtectionTimer,
-    shieldActive: bot.shieldActive,
-    shieldTime: bot.shieldTime,
-  };
-
-  const response = await arrange(origin, player.id, bot.id);
-  expect(response.status).toBe(200);
-  const result = (await response.json()) as {
-    status: string;
-    playerId: string;
-    botId: string;
-    playerPosition: { x: number; y: number };
-    botPosition: { x: number; y: number };
-  };
-  expect(result).toMatchObject({ status: 'arranged', playerId: player.id, botId: bot.id });
-  expect(player.position).toEqual(result.playerPosition);
-  expect(bot.position).toEqual(result.botPosition);
-  expect(player.velocity).toEqual({ x: 0, y: 0 });
-  expect(bot.velocity).toEqual({ x: 0, y: 0 });
-  expect(playerCombat).toEqual({
-    health: player.health,
-    lives: player.lives,
-    score: player.score,
-    factionId: player.factionId,
-    spawnProtectionTimer: player.spawnProtectionTimer,
-  });
-  expect(botCombat).toEqual({
-    health: bot.health,
-    lives: bot.lives,
-    score: bot.score,
-    factionId: bot.factionId,
-    spawnProtectionTimer: bot.spawnProtectionTimer,
-    shieldActive: bot.shieldActive,
-    shieldTime: bot.shieldTime,
-  });
-
-  const dx = bot.position.x - player.position.x;
-  const dy = bot.position.y - player.position.y;
-  const angle = Math.atan2(-dy, dx);
-  socket.send(
-    JSON.stringify({
-      type: 'shoot',
-      id: player.id,
-      data: {
-        laserStart: calculateLaserStartPosition(
-          player.position,
-          angle,
-          radiusFromMass(player.mass)
-        ),
-        laserDirection: {
-          x: (Math.cos(angle) * LASER.SPEED) / GAME.FPS,
-          y: (-Math.sin(angle) * LASER.SPEED) / GAME.FPS,
-        },
-      },
-    })
-  );
-  const pong = once(socket, 'pong');
-  socket.ping();
-  await pong;
-  for (let frame = 0; frame < 30 && bot.health === botCombat.health; frame++) {
-    server.gameEngine.advanceOneFrame();
-  }
-  expect(bot.health).toBe(botCombat.health - 25);
-  expect(player.score).toBe(playerCombat.score);
 });
 
 test('invalid or oversized placement cannot change a connected pilot', async () => {
@@ -236,7 +137,7 @@ test('invalid or oversized placement cannot change a connected pilot', async () 
     null,
     [],
     { ...valid, playerId: '' },
-    { ...valid, position: { x: 10001, y: 0 } },
+    { ...valid, position: { x: 100001, y: 0 } },
     { ...valid, position: { x: '1600', y: 0 } },
     { ...valid, position: { x: 1600 } },
     { ...valid, health: 0 },

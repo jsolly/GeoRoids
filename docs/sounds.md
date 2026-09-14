@@ -12,7 +12,6 @@ crack and descending tones.
 | Shipped file in `public/sounds` | Kenney source in `Audio` |
 | --- | --- |
 | `survey-scan.m4a` | `thrusterFire_000.ogg` |
-| `ability-shield.m4a` | `forceField_001.ogg` |
 | `asteroid-explode.m4a` | `explosionCrunch_001.ogg` |
 | `core-pickup.m4a` | `laserRetro_004.ogg` |
 | `explode.m4a` | `explosionCrunch_000.ogg` |

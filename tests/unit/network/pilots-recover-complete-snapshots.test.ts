@@ -127,15 +127,10 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       for (const ship of world.entities) {
         ship.abilityActiveFrames = tick < 25 ? 25 - tick : 0;
         ship.abilityCooldownFrames = tick < 50 ? 50 - tick : 0;
-
-        ship.shieldCooldown = tick < 50 ? 50 - tick : 0;
       }
       if (tick < 20) {
         pilot.harpoonTargetId = 'asteroid-1';
         pilot.harpoonLatchPos = { x: 90, y: 60 };
-        pilot.harpoonTimer = 30 - tick;
-        pilot.shieldActive = true;
-        pilot.shieldTime = 30 - tick;
       }
       if (tick >= 30 && tick < 60) {
         pilot.health = 0;
@@ -286,6 +281,8 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       satellitePickups: [],
       playerProjectiles: [],
       collabTags: [],
+      exploration: [],
+      mapAssets: [],
       gameTime: 1,
       isPaused: false,
       terrainSeed: 2345,

@@ -12,23 +12,10 @@ import {
 } from '../../../src/entities/ship/shipRenderer';
 
 test('tether VFX is Hauler-only while latched', () => {
-  expect(
-    canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTimer: 40, harpoonTargetId: 'rock-1' })
-  ).toBe(true);
-  expect(
-    canDrawHaulerHarpoon({ kitId: 'surveyor', harpoonTimer: 40, harpoonTargetId: 'rock-1' })
-  ).toBe(false);
-  expect(
-    canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTimer: 0, harpoonTargetId: 'rock-1' })
-  ).toBe(false);
-  expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTimer: 40 })).toBe(false);
-  expect(
-    canDrawHaulerHarpoon({
-      kitId: 'hauler',
-      harpoonTimer: 40,
-      harpoonLatchPos: { x: 40, y: 0 },
-    })
-  ).toBe(true);
+  expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: 'rock-1' })).toBe(true);
+  expect(canDrawHaulerHarpoon({ kitId: 'surveyor', harpoonTargetId: 'rock-1' })).toBe(false);
+  expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: null })).toBe(false);
+  expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: null })).toBe(false);
 });
 
 test('PASS bar cream line and amber tip are exact hex', () => {
@@ -55,19 +42,16 @@ test('tethers stay solid and hairline in screen space at every zoom', () => {
   expect(harpoonTetherStyle().tipRadius).toBe(3.5);
 });
 
-test('tether VFX can resolve a latched ship from the shared field', () => {
+test('tether VFX can resolve a latched asteroid from the shared field', () => {
   publishHarpoonField([
     {
-      id: 'bob',
+      id: 'rock-1',
       position: { x: 80, y: 0 },
       velocity: { x: 0, y: 0 },
-      kind: 'ship',
       health: 100,
     },
   ]);
-  expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTimer: 40, harpoonTargetId: 'bob' })).toBe(
-    true
-  );
+  expect(canDrawHaulerHarpoon({ kitId: 'hauler', harpoonTargetId: 'rock-1' })).toBe(true);
 });
 
 function paintRecorder(): {
@@ -150,13 +134,12 @@ function paintRecorder(): {
   return { ctx, strokes, fills, strokeWidths, arcRadii, lines };
 }
 
-test('tether VFX still resolves a server asteroid id suffix', () => {
+test('tether VFX resolves the exact server asteroid id', () => {
   publishHarpoonField([
     { id: 'server-asteroid-10', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } },
   ]);
   const hauler = new Ship({ kitId: 'hauler' });
-  hauler.harpoonTimer = 40;
-  hauler.harpoonTargetId = 'asteroid-10';
+  hauler.harpoonTargetId = 'server-asteroid-10';
   const { ctx, strokes, fills, strokeWidths, arcRadii } = paintRecorder();
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
@@ -166,12 +149,10 @@ test('tether VFX still resolves a server asteroid id suffix', () => {
   expect(arcRadii).toEqual([3.5]);
 });
 
-test('timer-only Hauler still paints cream from the nearest field rock', () => {
-  publishHarpoonField([
-    { id: 'near', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 }, kind: 'asteroid' },
-  ]);
+test('a Hauler target paints cream from the live field rock', () => {
+  publishHarpoonField([{ id: 'near', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
   const hauler = new Ship({ kitId: 'hauler' });
-  hauler.harpoonTimer = 40;
+  hauler.harpoonTargetId = 'near';
   const { ctx, strokes, fills, strokeWidths, arcRadii } = paintRecorder();
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
   expect(strokes).toContain('#E8D5A3');
@@ -185,7 +166,6 @@ test('timer-only Hauler still paints cream from the nearest field rock', () => {
 test('tether VFX still paints from a stored latch pose when the field id is stale', () => {
   publishHarpoonField([]);
   const hauler = new Ship({ kitId: 'hauler' });
-  hauler.harpoonTimer = 40;
   hauler.harpoonTargetId = 'server-asteroid-0';
   hauler.harpoonLatchPos = { x: 40, y: 0 };
   const { ctx, strokes, fills, strokeWidths, arcRadii } = paintRecorder();
@@ -200,7 +180,6 @@ test('tether VFX still paints from a stored latch pose when the field id is stal
 test('cream cable still paints while the Hauler hull is exploding', () => {
   publishHarpoonField([{ id: 'rock-1', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
   const hauler = new Ship({ kitId: 'hauler' });
-  hauler.harpoonTimer = 40;
   hauler.harpoonTargetId = 'rock-1';
   hauler.exploding = true;
   hauler.health = 0;
@@ -213,7 +192,6 @@ test('cream cable still paints while the Hauler hull is exploding', () => {
 test('Hauler latch paints opaque cream line and amber tip', () => {
   publishHarpoonField([{ id: 'rock-1', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
   const hauler = new Ship({ kitId: 'hauler' });
-  hauler.harpoonTimer = 40;
   hauler.harpoonTargetId = 'rock-1';
   const { ctx, strokes, fills } = paintRecorder();
   drawHaulerHarpoonVfx(ctx, hauler, 0, 0, { x: 0, y: 0 });
@@ -237,7 +215,6 @@ test('non-Hauler draw is a no-op even if a latch is spoofed', () => {
   } as unknown as CanvasRenderingContext2D;
   publishHarpoonField([{ id: 'rock-1', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } }]);
   const surveyor = new Ship({ kitId: 'surveyor' });
-  surveyor.harpoonTimer = 40;
   surveyor.harpoonTargetId = 'rock-1';
   drawHaulerHarpoonVfx(ctx, surveyor, 0, 0, { x: 0, y: 0 });
   expect(calls).toEqual([]);

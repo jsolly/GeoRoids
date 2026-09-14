@@ -7,7 +7,6 @@ export interface ClientMessage {
     | 'shoot'
     | 'collisionDamage'
     | 'initAsteroids'
-    | 'shield'
     | 'clientLog'
     | 'useAbility';
   id?: string; // Optional ID field for messages that need it

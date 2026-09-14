@@ -50,6 +50,31 @@ describe('Collaborative asteroid split', () => {
     }
   });
 
+  test('a split keeps every laser contributor before the source hit window is cleared', () => {
+    asteroidManager.addAsteroid(makeAsteroid({ id: 'big-contributors', size: ROID.SIZE }));
+
+    asteroidManager.registerLaserHit('big-contributors', 'player-a', 0);
+    const result = asteroidManager.registerLaserHit('big-contributors', 'player-b', 100);
+
+    expect(result.contributors).toEqual(['player-a', 'player-b']);
+    expect(asteroidManager.getActiveCollabTags()).toEqual([]);
+  });
+
+  test('expiry retains every miner and recorded Surveyor exactly once', () => {
+    asteroidManager.addAsteroid(
+      makeAsteroid({
+        id: 'big-expiry-contributors',
+        size: ROID.SIZE,
+        surveyedBy: ['surveyor', 'player-a', 'surveyor'],
+      })
+    );
+
+    asteroidManager.registerLaserHit('big-expiry-contributors', 'player-a', 0);
+    const expired = asteroidManager.expireStaleHits(ROID.COLLAB_SPLIT_WINDOW_MS + 1);
+
+    expect(expired[0]?.contributors).toEqual(['player-a', 'surveyor']);
+  });
+
   test('player and bot hitting a big roid within 1s also splits', () => {
     asteroidManager.addAsteroid(makeAsteroid({ id: 'big-bot', size: ROID.SIZE }));
 

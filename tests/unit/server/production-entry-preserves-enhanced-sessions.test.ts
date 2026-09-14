@@ -1,12 +1,16 @@
 /* @vitest-environment node */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRailwayContext, project, type ServiceNode } from 'railway/iac';
 import { afterEach, expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 import railwayConfig from '../../../.railway/railway';
+import { WorldStore } from '../../../server/world/WorldStore';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
 
@@ -21,6 +25,7 @@ const railwayService = railwayProject.resources
 let child: ChildProcess | undefined;
 let output = '';
 const sockets: WebSocket[] = [];
+const directories: string[] = [];
 
 async function waitFor<T>(read: () => T | undefined, label: string, timeout = 5000): Promise<T> {
   const deadline = Date.now() + timeout;
@@ -37,7 +42,7 @@ async function waitFor<T>(read: () => T | undefined, label: string, timeout = 50
   throw new Error(`Timed out waiting for ${label}: ${output.slice(-6000)}`);
 }
 
-async function start(port = 0): Promise<number> {
+async function start(port = 0, worldPath: string | null = ':memory:'): Promise<number> {
   const railwayStartCommand = railwayService?.deploy?.startCommand;
   if (!railwayStartCommand) {
     throw new Error('Railway IaC service start command is missing');
@@ -47,15 +52,20 @@ async function start(port = 0): Promise<number> {
   if (!command) {
     throw new Error('Railway start command is empty');
   }
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    NODE_ENV: 'production',
+    VITEST: 'false',
+    PORT: String(port),
+    SERVER_LOG_LEVEL: 'info',
+  };
+  delete env['GEOROIDS_WORLD_PATH'];
+  if (worldPath !== null) {
+    env['GEOROIDS_WORLD_PATH'] = worldPath;
+  }
   child = spawn(command, args, {
     cwd: repo,
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      VITEST: 'false',
-      PORT: String(port),
-      SERVER_LOG_LEVEL: 'info',
-    },
+    env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout?.on('data', (data) => {
@@ -124,7 +134,6 @@ class Pilot {
       id,
       name: id,
       kitId: 'hauler',
-      factionId: 'ion',
       position: { x: id === 'observer' ? -2000 : 2000, y: 0 },
       snapshotVersion: 1,
       asteroidInteractions: 1,
@@ -163,7 +172,7 @@ async function disconnect(ws: WebSocket): Promise<void> {
   await closed;
 }
 
-afterEach(async () => {
+async function stopProduction(): Promise<void> {
   for (const ws of sockets.splice(0)) {
     if (ws.readyState !== WebSocket.CLOSED) {
       ws.terminate();
@@ -182,6 +191,62 @@ afterEach(async () => {
   } finally {
     clearTimeout(force);
   }
+}
+
+afterEach(async () => {
+  try {
+    await stopProduction();
+  } finally {
+    for (const directory of directories.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test('the production entry restores the same pilot and explored world from its configured database after restart', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-production-world-'));
+  directories.push(directory);
+  const path = join(directory, 'world.sqlite');
+  const firstPort = await start(0, path);
+  const first = await pilot(firstPort);
+  const joined = await first.join('persisted-pilot');
+  const snapshot = await first.state();
+  expect(snapshot.entities.some((entity) => entity.id === 'persisted-pilot')).toBe(true);
+  await stopProduction();
+  expect(output).toContain('Server closed');
+  const store = new WorldStore(path);
+  const savedWorld = store.loadWorld();
+  const savedPilot = store.loadPilots().find((row) => row.id === 'persisted-pilot');
+  store.close();
+  expect(savedWorld?.exploration.length).toBeGreaterThan(0);
+  expect(savedPilot?.id).toBe('persisted-pilot');
+
+  const nextPort = await start(0, path);
+  const returning = await pilot(nextPort);
+  const resumed = await returning.join('new-connection', joined['resumeToken']);
+  expect(resumed['id']).toBe('persisted-pilot');
+  const restored = (await returning.state()).entities.find(
+    (entity) => entity.id === 'persisted-pilot'
+  );
+  expect(restored?.score).toBe(savedPilot?.score);
+  expect(restored?.lives).toBe(savedPilot?.lives);
+  await stopProduction();
+  const reopened = new WorldStore(path);
+  try {
+    expect(reopened.loadWorld()?.seed).toBe(savedWorld?.seed);
+    expect(reopened.loadWorld()?.startedAt).toBe(savedWorld?.startedAt);
+    expect(reopened.loadWorld()?.exploration.length).toBeGreaterThanOrEqual(
+      savedWorld?.exploration.length ?? 0
+    );
+  } finally {
+    reopened.close();
+  }
+}, 25_000);
+
+test('the production entry refuses to start without a persistent world path', async () => {
+  await expect(start(0, null)).rejects.toThrow('Production entry exited');
+  expect(child?.exitCode).not.toBe(0);
+  expect(output).toContain('GEOROIDS_WORLD_PATH must point to the mounted persistent world volume');
 });
 
 test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and resumes pilots through transport grace', async () => {

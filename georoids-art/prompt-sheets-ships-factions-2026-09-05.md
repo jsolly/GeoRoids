@@ -1,7 +1,7 @@
 # Prompt sheets — Ships & soft factions (2026-09-05)
 
 Historical source-pack record. Current ship definitions and assets are in
-[ships-and-factions.md](ships-and-factions.md); retired kit entries below are
+[cooperative-ships.md](cooperative-ships.md); retired kit entries below are
 provenance only and are not current gameplay or asset instructions.
 
 Tool-agnostic. Generate stills for art review; code remains the source of truth for in-game vectors. No Freepik asset invention — prompts describe original outline shapes only.
@@ -130,8 +130,8 @@ Labels: tiny phosphor HUD text `#E2E8F0` or `#64748B`, never larger than the sma
 
 ## Related
 
-- `ships-and-factions.md` — art rules + acceptance
-- `palette-ships-factions.md` — additive hex roles
+- `cooperative-ships.md` — art rules + acceptance
+- `ship-world-palette.md` — additive hex roles
 - `style-guide.md` — locked playfield + beauty bar
 
 ---

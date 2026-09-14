@@ -8,10 +8,12 @@ import {
   SnapshotEncoder,
 } from '../../shared/snapshotProtocol';
 import { captureDiagnosticActorState, shouldSampleSnapshot } from '../../shared/stateDiagnostics';
+import { nearbyWorldRows, WORLD } from '../../shared/world';
 import type { AsteroidData, SatellitePickupCollected } from '../../shared-types';
 import type { CombatBroadcast, GameEngine } from '../core/GameEngine';
 import { type OutboundOutcome, serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
+import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 
 interface SnapshotRecipient {
   baseline?: SnapshotBaseline;
@@ -118,13 +120,17 @@ export class GameStateBroadcaster {
   }
 
   private broadcastGameStateInternal(excludeId?: string): void {
-    // Covers destruction paths invoked outside the frame loop (for example a
-    // client asteroid report) before publishing the authoritative snapshot.
-    this.gameEngine.ensureAsteroidField();
     for (const id of this.gameEngine.drainDepartedPlayers()) {
       this.broadcastPlayerLeft(id);
     }
     this.flushSatellitePickupCollections();
+    for (const delivery of this.gameEngine.drainFurnaceDeliveries()) {
+      for (const reward of delivery.rewards) {
+        this.broadcastScoreUpdate(reward.playerId, reward.score);
+      }
+      this.broadcastAsteroidDestruction(delivery.asteroidId);
+      this.broadcastToAll({ type: 'furnaceDelivery', data: delivery, timestamp: Date.now() });
+    }
     for (const data of this.gameEngine.drainShotSounds()) {
       this.broadcastToAll({ type: 'playerShotFired', data, timestamp: Date.now() }, data.ownerId);
     }
@@ -132,13 +138,13 @@ export class GameStateBroadcaster {
       this.broadcastToAll({ type: 'lootCollected', data, timestamp: Date.now() });
     }
     const gameState = this.gameEngine.getGameState();
+    const asteroidIndex = new AsteroidSpatialIndex(gameState.asteroids);
     const timestamp = Date.now();
 
     for (const blast of this.gameEngine.drainLootBlasts()) {
       this.broadcastLootExploded(blast);
     }
     const players = this.gameEngine.entityManager.getHumanPlayers();
-    let canonical: SnapshotEncoder | undefined;
     for (const player of players) {
       const ws = player.ws;
       if (!ws || (excludeId && player.id === excludeId)) {
@@ -165,11 +171,28 @@ export class GameStateBroadcaster {
         continue;
       }
       try {
-        canonical ??= new SnapshotEncoder({
+        const asteroids = nearbyWorldRows(
+          asteroidIndex.query({
+            minX: player.position.x - WORLD.interestRadius,
+            minY: player.position.y - WORLD.interestRadius,
+            maxX: player.position.x + WORLD.interestRadius,
+            maxY: player.position.y + WORLD.interestRadius,
+          }),
+          player.position
+        );
+        const asteroidIds = new Set(asteroids.map((rock) => rock.id));
+        const canonical = new SnapshotEncoder({
           ...gameState,
-          playerProjectiles: this.gameEngine.getPlayerProjectiles(),
+          asteroids,
+          loot: nearbyWorldRows(gameState.loot, player.position),
+          satellitePickups: nearbyWorldRows(gameState.satellitePickups, player.position),
+          playerProjectiles: nearbyWorldRows(
+            this.gameEngine.getPlayerProjectiles(),
+            player.position
+          ),
           collabTags: this.gameEngine
             .getActiveCollabTags()
+            .filter((tag) => asteroidIds.has(tag.asteroidId))
             .map((tag) => ({ id: tag.asteroidId, ...tag })),
         });
         const sequence = recipient.sequence + 1;
@@ -311,13 +334,6 @@ export class GameStateBroadcaster {
       );
     }
 
-    if (result.isDestroyed) {
-      this.broadcastPlayerKilled(result.targetId, result.targetName, result.attackerId);
-      if (result.awardedScore) {
-        this.broadcastScoreUpdate(result.awardedScore.playerId, result.awardedScore.score);
-      }
-    }
-
     if (result.destroyedAsteroidId) {
       this.broadcastAsteroidDestruction(
         result.destroyedAsteroidId,
@@ -358,24 +374,6 @@ export class GameStateBroadcaster {
     this.broadcastToAll(message);
   }
 
-  public broadcastPlayerKilled(
-    targetPlayerId: string,
-    targetPlayerName: string,
-    attackerId: string
-  ): void {
-    const message = {
-      type: 'playerKilled',
-      data: {
-        targetPlayerId,
-        targetPlayerName,
-        attackerId,
-      },
-      timestamp: Date.now(),
-    };
-
-    this.broadcastToAll(message);
-  }
-
   public broadcastScoreUpdate(playerId: string, score: number): void {
     const message = {
       type: 'scoreUpdate',
@@ -408,18 +406,19 @@ export class GameStateBroadcaster {
   }
 
   public broadcastAsteroidCreation(asteroids: readonly AsteroidData[]): void {
-    const message = {
-      type: 'asteroidCreateBatch',
-      data: {
-        asteroids: asteroids,
-      },
-      timestamp: Date.now(),
-    };
-
-    logger.debug('Broadcasting asteroid creation batch', {
-      asteroidCount: asteroids.length,
-    });
-    this.broadcastToAll(message);
+    for (const player of this.gameEngine.entityManager.getHumanPlayers()) {
+      if (!player.ws) {
+        continue;
+      }
+      const nearby = nearbyWorldRows(asteroids, player.position);
+      if (nearby.length > 0) {
+        this.sendToWebSocket(player.ws, {
+          type: 'asteroidCreateBatch',
+          data: { asteroids: nearby },
+          timestamp: Date.now(),
+        });
+      }
+    }
   }
 
   public broadcastLootExploded(event: {

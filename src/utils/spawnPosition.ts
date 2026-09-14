@@ -21,7 +21,7 @@ export function resolveSpawnPosition(explicit?: Position): Position {
   return getRandomPositionNearPoint(WORLD_ORIGIN, SPAWN.NEAR_CENTER_RADIUS);
 }
 
-/** Local placeholder rocks spawn in the shared belt, not the 3100 kill wall. */
+/** Local placeholder positions use the same world bounds as the server. */
 export function getRandomPositionInAsteroidField(): Position {
   const { cx, cy } = getGameBoundary();
   const maxR = getAsteroidFieldRadius();

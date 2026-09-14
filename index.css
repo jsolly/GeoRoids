@@ -92,6 +92,312 @@ body {
   touch-action: none;
 }
 
+/* The map button is part of the playfield chrome, above the local radar. */
+.universe-map-toggle {
+  position: absolute;
+  left: var(--map-toggle-x);
+  top: var(--map-toggle-y);
+  z-index: 25;
+  min-width: 74px;
+  height: 44px;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 75%, transparent);
+  border-radius: 6px;
+  color: var(--palette-accent, #a78bfa);
+  background: color-mix(in srgb, var(--palette-bg, #000011) 82%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--palette-accent, #a78bfa) 25%, transparent);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+
+.universe-map-toggle:hover,
+.universe-map-toggle:focus-visible {
+  color: var(--palette-hud, #e2e8f0);
+  border-color: var(--palette-hud, #e2e8f0);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
+}
+
+.universe-map-toggle kbd,
+.universe-map-dialog kbd {
+  padding: 0.08rem 0.25rem;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.8em;
+}
+
+/* Full-screen native dialog used for the shared universe map. */
+.universe-map-dialog {
+  width: 100dvw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(14px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  border: 0;
+  color: var(--palette-hud, #e2e8f0);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(23, 46, 70, 0.35), transparent 52%),
+    var(--palette-bg, #000011);
+  overflow: hidden;
+}
+
+.universe-map-dialog,
+.universe-map-dialog * {
+  box-sizing: border-box;
+}
+
+.universe-map-dialog::backdrop {
+  background: rgba(0, 0, 17, 0.93);
+  backdrop-filter: blur(5px);
+}
+
+.universe-map-header,
+.universe-map-footer {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1320px);
+  margin: 0 auto;
+}
+
+.universe-map-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 70px;
+}
+
+.universe-map-eyebrow {
+  margin: 0 0 0.25rem;
+  color: var(--palette-accent, #a78bfa);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.universe-map-header h2 {
+  margin: 0;
+  color: var(--palette-hud, #e2e8f0);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: clamp(1rem, 2.2vw, 1.6rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.universe-map-subtitle,
+.universe-map-help,
+#universe-map-status {
+  margin: 0.3rem 0 0;
+  color: var(--palette-hud-muted, #64748b);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.05em;
+}
+
+.universe-map-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.universe-map-actions button,
+.universe-map-actions output {
+  min-height: 32px;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 70%, transparent);
+  border-radius: 4px;
+  color: var(--palette-hud, #e2e8f0);
+  background: color-mix(in srgb, var(--palette-bg, #000011) 76%, transparent);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.universe-map-actions button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.universe-map-actions button:hover,
+.universe-map-actions button:focus-visible {
+  border-color: var(--palette-accent, #a78bfa);
+  color: var(--palette-accent, #a78bfa);
+}
+
+.universe-map-actions output {
+  display: inline-flex;
+  min-width: 52px;
+  align-items: center;
+  justify-content: center;
+  color: var(--palette-accent, #a78bfa);
+}
+
+.universe-map-stage {
+  position: relative;
+  width: min(100%, 1320px);
+  height: calc(100dvh - 164px);
+  min-height: 180px;
+  margin: 0 auto;
+}
+
+#universe-map-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+#universe-map-canvas:active {
+  cursor: grabbing;
+}
+
+.universe-map-accessible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.universe-map-compass {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 28px;
+  justify-items: center;
+  gap: 2px;
+  color: var(--palette-hud-muted, #64748b);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.55rem;
+  pointer-events: none;
+}
+
+.universe-map-compass i {
+  display: block;
+  width: 1px;
+  height: 22px;
+  background: linear-gradient(var(--palette-accent, #a78bfa), transparent);
+}
+
+.universe-map-footer {
+  min-height: 64px;
+  padding-top: 0.45rem;
+  border-top: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 35%, transparent);
+}
+
+.universe-map-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  color: var(--palette-hud, #e2e8f0);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.57rem;
+  letter-spacing: 0.04em;
+}
+
+.map-key {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 0.3rem;
+  border: 1px solid currentColor;
+  vertical-align: 0.02em;
+}
+
+.map-key-local {
+  color: var(--palette-local, #5eead4);
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.map-key-crew {
+  color: var(--palette-remote, #7dd3fc);
+  transform: rotate(45deg);
+}
+
+.map-key-furnace {
+  color: #c4b5fd;
+}
+
+.map-key-discovery {
+  color: #e8d5a3;
+  transform: rotate(45deg);
+}
+
+.map-key-fog {
+  border-color: var(--palette-hud-muted, #64748b);
+  background: #050914;
+}
+
+#universe-map-status {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.45;
+}
+
+@media (max-height: 560px) {
+  .universe-map-header {
+    min-height: 52px;
+  }
+
+  .universe-map-stage {
+    height: calc(100dvh - 128px);
+  }
+
+  .universe-map-subtitle,
+  .universe-map-help {
+    display: none;
+  }
+
+  .universe-map-footer {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 560px) {
+  .universe-map-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .universe-map-actions {
+    justify-content: flex-start;
+  }
+
+  .universe-map-stage {
+    height: calc(100dvh - 234px);
+  }
+
+  .universe-map-footer {
+    min-height: 90px;
+  }
+
+  .universe-map-legend {
+    gap: 0.45rem;
+    font-size: 0.5rem;
+  }
+}
+
 /* Attribution positioning */
 #attribution {
   position: fixed;
@@ -604,16 +910,14 @@ body.touch-play .touch-controls:not([hidden]) {
 }
 
 body.touch-play #gameCanvas,
-.touch-ability,
-.touch-shield {
+.touch-ability {
   pointer-events: auto;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.touch-ability,
-.touch-shield {
+.touch-ability {
   --action-cool: 0;
   position: absolute;
   bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 8px);
@@ -632,28 +936,17 @@ body.touch-play #gameCanvas,
   text-shadow: 0 0 8px color-mix(in srgb, var(--palette-hud, #e2e8f0) 35%, transparent);
 }
 
-.touch-shield {
-  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 66px);
-  color: var(--palette-shield, #7dd3c8);
-  border-color: var(--palette-shield, #7dd3c8);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--palette-shield, #7dd3c8) 28%, transparent);
-  text-shadow: 0 0 8px color-mix(in srgb, var(--palette-shield, #7dd3c8) 35%, transparent);
-}
-
 .touch-ability {
   right: max(16px, env(safe-area-inset-right, 0px));
 }
 
 .touch-ability.is-pressed,
-.touch-ability.is-active,
-.touch-shield.is-pressed,
-.touch-shield.is-active {
+.touch-ability.is-active {
   background: color-mix(in srgb, currentColor 16%, transparent);
   box-shadow: 0 0 14px color-mix(in srgb, currentColor 45%, transparent);
 }
 
-.touch-ability.is-cooling,
-.touch-shield.is-cooling {
+.touch-ability.is-cooling {
   opacity: 0.58;
   background: conic-gradient(
     color-mix(in srgb, currentColor 45%, transparent) calc(var(--action-cool) * 360deg),
@@ -661,22 +954,16 @@ body.touch-play #gameCanvas,
   );
 }
 
-.touch-ability.is-unavailable,
-.touch-shield.is-unavailable {
+.touch-ability.is-unavailable {
   opacity: 0.42;
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
-  .touch-ability,
-  .touch-shield {
+  .touch-ability {
     width: 48px;
     height: 48px;
     bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 8px);
     font-size: 0.48rem;
-  }
-
-  .touch-shield {
-    right: calc(max(20px, env(safe-area-inset-right, 0px)) + 58px);
   }
 
   .touch-ability {

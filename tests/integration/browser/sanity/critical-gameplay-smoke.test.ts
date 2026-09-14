@@ -75,7 +75,7 @@ function observeAuthoritativeProjectiles(page: Page): {
 }
 
 test(
-  'a pilot boots the arena, moves with a key, and fires an owned laser',
+  'a pilot boots the world, cruises, and fires an owned laser',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {

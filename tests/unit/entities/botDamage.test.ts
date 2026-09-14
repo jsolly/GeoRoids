@@ -20,7 +20,7 @@ describe('Bot Damage System', () => {
     const initialHealth = botShip.health;
     const damage = DAMAGE.LASER_HIT;
 
-    botShip.takeDamage(damage, 'laser', 'test-player');
+    botShip.takeDamage(damage, 'asteroid');
 
     expect(botShip.health).toBe(initialHealth - damage);
   });
@@ -29,11 +29,11 @@ describe('Bot Damage System', () => {
     const damage = botShip.health; // Damage equal to current health
     const explodeSpy = vi.spyOn(botShip, 'explode');
 
-    botShip.takeDamage(damage, 'laser', 'test-player');
+    botShip.takeDamage(damage, 'asteroid');
 
     expect(botShip.health).toBe(0);
     expect(botShip.exploding).toBe(true);
-    expect(explodeSpy).toHaveBeenCalledWith('laser', 'test-player');
+    expect(explodeSpy).toHaveBeenCalledWith('asteroid');
   });
 
   it('should not take damage when exploding', () => {
@@ -41,7 +41,7 @@ describe('Bot Damage System', () => {
     const initialHealth = botShip.health;
     const damage = DAMAGE.LASER_HIT;
 
-    botShip.takeDamage(damage, 'laser', 'test-player');
+    botShip.takeDamage(damage, 'asteroid');
 
     expect(botShip.health).toBe(initialHealth); // Health should not change
   });
@@ -51,18 +51,17 @@ describe('Bot Damage System', () => {
     const damage2 = 30;
     const initialHealth = botShip.health;
 
-    botShip.takeDamage(damage1, 'laser', 'test-player');
+    botShip.takeDamage(damage1, 'asteroid');
     expect(botShip.health).toBe(initialHealth - damage1);
 
-    botShip.takeDamage(damage2, 'laser', 'test-player');
+    botShip.takeDamage(damage2, 'asteroid');
     expect(botShip.health).toBe(initialHealth - damage1 - damage2);
   });
 
   it('should not reduce health below zero', () => {
     const excessiveDamage = 200;
-    // const initialHealth = botShip.health;
 
-    botShip.takeDamage(excessiveDamage, 'laser', 'test-player');
+    botShip.takeDamage(excessiveDamage, 'asteroid');
 
     expect(botShip.health).toBe(0);
     expect(botShip.exploding).toBe(true);

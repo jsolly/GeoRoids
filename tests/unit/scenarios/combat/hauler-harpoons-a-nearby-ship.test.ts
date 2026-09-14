@@ -3,114 +3,47 @@ import { GameServerWorld, type Pilot, useQuietServerConsole } from '../support/g
 
 useQuietServerConsole();
 
-describe('A Hauler fires harpoon at a nearby ship', () => {
+describe('A Hauler cannot harpoon a teammate ship', () => {
   let world: GameServerWorld;
   let alice: Pilot;
   let bob: Pilot;
 
   beforeEach(() => {
     world = new GameServerWorld();
+    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor' });
+    world.parkBots();
+    world.clearAsteroids();
   });
 
   afterEach(() => {
     world.dispose();
   });
 
-  test('only the Hauler latches and the foe is hauled in', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor', factionId: 'ember' });
-    world.parkBots();
-    world.clearAsteroids();
+  test('a nearby teammate is ignored and both ships remain unharmed', () => {
+    const bobHealth = world.entity(bob).health;
+    const bobVelocity = { ...world.entity(bob).velocity };
 
     world.send(alice, {
       type: 'useAbility',
       id: alice.id,
       data: { kitId: 'hauler', abilityId: 'harpoon' },
     });
-
-    expect(world.entity(alice).harpoonTargetId).toBe(bob.id);
-    expect(world.entity(alice).harpoonTimer).toBeGreaterThan(0);
-
-    const before = world.entity(bob).velocity.x;
     world.tick(4);
-    expect(world.entity(bob).velocity.x).toBeLessThan(before);
+
+    expect(world.entity(alice).harpoonTargetId).toBeNull();
+    expect(world.entity(alice).health).toBe(world.entity(alice).maxHealth);
+    expect(world.entity(bob).health).toBe(bobHealth);
+    expect(world.entity(bob).velocity).toEqual(bobVelocity);
   });
 
-  test('a target whose id contains the Hauler id is still pulled by the server tick', () => {
-    const host = world.joinWithId(
-      'host',
-      'Host',
-      { x: 0, y: 0 },
-      { kitId: 'hauler', factionId: 'ion' }
-    );
-    const target = world.joinWithId(
-      'target-host',
-      'Target',
-      { x: 80, y: 0 },
-      { kitId: 'surveyor', factionId: 'ember' }
-    );
-    const hostEntity = world.entity(host);
-    const targetEntity = world.entity(target);
-    hostEntity.harpoonTimer = 2;
-    hostEntity.harpoonTargetId = target.id;
+  test('a stale ship target is cleared by the authoritative asteroid tick', () => {
+    world.engine.updatePlayer(alice.id, { harpoonTargetId: bob.id });
+    expect(world.entity(alice).harpoonTargetId).toBe(bob.id);
 
-    const before = targetEntity.velocity.x;
     world.tick();
 
-    expect(targetEntity.velocity.x).toBeLessThan(before);
-  });
-
-  test('same-side mates are never latched', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor', factionId: 'ion' });
-    world.parkBots();
-    world.clearAsteroids();
-
-    world.send(alice, {
-      type: 'useAbility',
-      id: alice.id,
-      data: { kitId: 'hauler', abilityId: 'harpoon' },
-    });
-
-    expect(world.entity(alice).harpoonTargetId).toBeUndefined();
-    expect(world.entity(alice).harpoonTimer).toBe(0);
-  });
-
-  test('timed ship shield blocks a Hauler latch', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor', factionId: 'ember' });
-    world.parkBots();
-    world.clearAsteroids();
-    expect(world.engine.requestShield(bob.id, true)).toBe(true);
-    expect(world.entity(bob).shieldActive).toBe(true);
-
-    world.send(alice, {
-      type: 'useAbility',
-      id: alice.id,
-      data: { kitId: 'hauler', abilityId: 'harpoon' },
-    });
-
-    expect(world.entity(alice).harpoonTargetId).toBeUndefined();
-    expect(world.entity(alice).harpoonTimer).toBe(0);
-    expect(world.entity(bob).shieldActive).toBe(true);
-  });
-
-  test('an active F shield blocks a Hauler latch', () => {
-    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler', factionId: 'ion' });
-    bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'hauler', factionId: 'ember' });
-    world.parkBots();
-    world.clearAsteroids();
-    expect(world.engine.requestShield(bob.id, true)).toBe(true);
-    expect(world.entity(bob).shieldActive).toBe(true);
-
-    world.send(alice, {
-      type: 'useAbility',
-      id: alice.id,
-      data: { kitId: 'hauler', abilityId: 'harpoon' },
-    });
-
-    expect(world.entity(alice).harpoonTargetId).toBeUndefined();
-    expect(world.entity(alice).harpoonTimer).toBe(0);
-    expect(world.entity(bob).shieldActive).toBe(true);
+    expect(world.entity(alice).harpoonTargetId).toBeNull();
+    expect(world.entity(bob).health).toBe(world.entity(bob).maxHealth);
   });
 });

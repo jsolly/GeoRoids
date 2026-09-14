@@ -1,20 +1,11 @@
-import { areAllied } from '../../../shared/factions';
-import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../../shared-types';
-import {
-  findHarpoonFieldBody,
-  getHarpoonField,
-  getHarpoonFieldCanvas,
-  getHarpoonFieldScale,
-  harpoonTargetIdsMatch,
-  syncHarpoonFieldFromPlay,
-} from './harpoonField';
-import { slingHarpoonAsteroid, tickHarpoonSling } from './harpoonSling';
+import type { Position, ShipKitId, Velocity } from '../../../shared-types';
+import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
+import { attachTowCable, tickTowCable } from './towCable';
 
 export interface AbilityHost {
   id?: string;
   kitId: ShipKitId;
-  factionId?: SoftFactionId;
   position: Position;
   velocity: Velocity;
   angle: number;
@@ -23,34 +14,24 @@ export interface AbilityHost {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
 
-  harpoonTimer: number;
-  harpoonTargetId?: string;
+  harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   r?: number;
 }
 
+/** Asteroid geometry shared by the client latch preview and authoritative towing. */
 export interface AbilityBody {
-  id?: string;
+  id: string;
   position: Position;
   velocity: Velocity;
-  kind?: 'asteroid' | 'ship';
-  factionId?: SoftFactionId;
   exploding?: boolean;
   health?: number;
   r?: number;
   size?: number;
-
-  /** Timed F shield. */
-  shieldActive?: boolean;
-  respawnTimer?: number;
-  spawnProtectionTimer?: number;
 }
 
 export interface AbilityWorld {
-  asteroids: AbilityBody[];
-  entities: AbilityBody[];
-  playfieldScale?: number;
-  canvas?: { width: number; height: number };
+  asteroids: readonly AbilityBody[];
 }
 
 interface AbilityActivation {
@@ -59,13 +40,9 @@ interface AbilityActivation {
 }
 
 interface HarpoonLatchSnapshot {
-  harpoonTimer?: number;
-  harpoonTargetId?: string;
+  harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
 }
-
-/** Used when KeyE fires before the first render publishes a canvas. */
-const DEFAULT_LATCH_CANVAS = { width: 1920, height: 1080 };
 
 function rememberLatchPos(
   host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>,
@@ -85,62 +62,17 @@ export function canActivateAbility(host: AbilityHost): boolean {
   return !host.exploding && host.health > 0 && host.abilityCooldownFrames <= 0;
 }
 
-function clearHarpoonLatch(
-  host: Pick<AbilityHost, 'harpoonTimer' | 'harpoonTargetId' | 'harpoonLatchPos'>
-): void {
-  host.harpoonTimer = 0;
-  delete host.harpoonTargetId;
+function clearHarpoonLatch(host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>): void {
+  host.harpoonTargetId = null;
   delete host.harpoonLatchPos;
 }
 
-/** Rocks + ships share one latch list. Server and client use the same helper. */
-function listHarpoonCandidates(world?: AbilityWorld): AbilityBody[] {
-  if (world) {
-    return [...world.asteroids, ...world.entities];
-  }
-  return [...getHarpoonField()];
+function listHarpoonCandidates(world?: AbilityWorld): readonly AbilityBody[] {
+  return world?.asteroids ?? getHarpoonField();
 }
 
-/** Rocks are environment. Ship combat filters must not reject a visible belt row. */
-export function isEnvironmentLatchBody(body: AbilityBody): boolean {
-  if (body.kind === 'asteroid') {
-    return !body.exploding;
-  }
-  if (body.kind === 'ship' || body.factionId !== undefined) {
-    return false;
-  }
-  if (body.shieldActive) {
-    return false;
-  }
-  return true;
-}
-
-function isHarpoonableBody(
-  host: Pick<AbilityHost, 'id' | 'factionId'>,
-  body: AbilityBody
-): boolean {
-  if (body.id && body.id === host.id) {
-    return false;
-  }
-  if (isEnvironmentLatchBody(body)) {
-    return !body.exploding;
-  }
-  // A Hauler can pull neutral rocks and hostile ships, but must never latch
-  // onto a same-faction mate. Keep this in the shared predicate so client
-  // prediction and the authoritative server make the same choice.
-  if (areAllied(host.factionId, body.factionId)) {
-    return false;
-  }
-  if (!body.id) {
-    return false;
-  }
-  if (body.exploding || (body.health !== undefined && body.health <= 0)) {
-    return false;
-  }
-  if (body.shieldActive) {
-    return false;
-  }
-  return true;
+function isHarpoonableBody(body: AbilityBody): boolean {
+  return !body.exploding && (body.health === undefined || body.health > 0);
 }
 
 export function tickAbilityHost(host: AbilityHost): void {
@@ -150,73 +82,29 @@ export function tickAbilityHost(host: AbilityHost): void {
   if (host.abilityActiveFrames > 0) {
     host.abilityActiveFrames -= 1;
   }
-  if (host.harpoonTimer > 0) {
-    host.harpoonTimer -= 1;
-    if (host.harpoonTimer <= 0 || host.kitId !== 'hauler') {
-      clearHarpoonLatch(host);
-    }
-  } else if (host.kitId !== 'hauler' && host.harpoonTargetId) {
+  if (host.kitId !== 'hauler' || host.exploding || host.health <= 0) {
     clearHarpoonLatch(host);
   }
 }
 
-/**
- * Local predicts; remotes stay snapshot-driven. A later server latch
- * (timer > 0) wins so both clients draw the same tether.
- */
+/** Explicit null detaches the tow on every client. */
 export function applySharedHarpoonLatch(
-  host: Pick<AbilityHost, 'kitId' | 'harpoonTimer' | 'harpoonTargetId' | 'harpoonLatchPos'>,
-  snapshot: HarpoonLatchSnapshot,
-  role: 'predicting' | 'authoritative' = 'authoritative'
+  host: Pick<AbilityHost, 'kitId' | 'harpoonTargetId' | 'harpoonLatchPos'>,
+  snapshot: HarpoonLatchSnapshot
 ): void {
   if (host.kitId !== 'hauler') {
     clearHarpoonLatch(host);
     return;
   }
-  if (snapshot.harpoonTimer === undefined && snapshot.harpoonTargetId === undefined) {
+  if (snapshot.harpoonTargetId === undefined) {
     return;
   }
-  if (snapshot.harpoonTimer !== undefined && snapshot.harpoonTimer > 0) {
-    host.harpoonTimer = snapshot.harpoonTimer;
-    if (snapshot.harpoonTargetId !== undefined) {
-      const harpoonTargetIdValue = snapshot.harpoonTargetId || undefined;
-      if (harpoonTargetIdValue !== undefined) {
-        host.harpoonTargetId = harpoonTargetIdValue;
-      } else {
-        delete host.harpoonTargetId;
-      }
-    }
+  host.harpoonTargetId = snapshot.harpoonTargetId;
+  if (host.harpoonTargetId === null) {
+    delete host.harpoonLatchPos;
+  } else {
     rememberLatchPos(host, snapshot);
-    return;
   }
-  if (role === 'predicting') {
-    return;
-  }
-  if (snapshot.harpoonTimer !== undefined) {
-    host.harpoonTimer = snapshot.harpoonTimer;
-  }
-  if (snapshot.harpoonTargetId !== undefined) {
-    const harpoonTargetIdValue = snapshot.harpoonTargetId || undefined;
-    if (harpoonTargetIdValue !== undefined) {
-      host.harpoonTargetId = harpoonTargetIdValue;
-    } else {
-      delete host.harpoonTargetId;
-    }
-  }
-  if (host.harpoonTimer <= 0) {
-    delete host.harpoonTargetId;
-  }
-}
-
-function pullBody(body: AbilityBody, toward: Position, force: number): void {
-  const dx = toward.x - body.position.x;
-  const dy = toward.y - body.position.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1) {
-    return;
-  }
-  body.velocity.x += (dx / dist) * force;
-  body.velocity.y += (dy / dist) * force;
 }
 
 function bodyRadius(body: Pick<AbilityBody, 'r' | 'size'>): number {
@@ -233,31 +121,11 @@ export function harpoonSurfaceGap(
   return dist - bodyRadius(host) - bodyRadius(body);
 }
 
-/**
- * World-unit latch reach from what the pilot can see.
- * #480 used max(280, 320px / scale) capped at 1600wu. On a 1:1 1080p view
- * that is 320wu — a rock 400–900px from the ship looks adjacent and misses.
- * Deep zoom (scale 0.1) turned a 200px-near rock into 2000wu and the cap
- * dropped it. Reach is the on-screen half-diagonal / scale so "near on
- * this canvas" latches at 1:1 and zoomed.
- */
-export function harpoonLatchRange(
-  playfieldScale = 1,
-  canvas?: { width: number; height: number }
-): number {
-  const scale = Number.isFinite(playfieldScale) && playfieldScale > 0 ? playfieldScale : 1;
-  const view = canvas && canvas.width > 0 && canvas.height > 0 ? canvas : DEFAULT_LATCH_CANVAS;
-  const onScreen = Math.hypot(view.width, view.height) / 2 / scale;
-  // Any hull on this canvas is in reach. Do not clip to HARPOON_RANGE_MAX —
-  // that cap is pull slack, not latch.
-  return Math.max(SHIP_ABILITY.HARPOON_RANGE, onScreen, SHIP_ABILITY.HARPOON_VISUAL_PX / scale);
-}
-
 const NEAREST_GAP_TIE_WU = 24;
 
 function pickNearestHarpoonBody(
   host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
-  bodies: AbilityBody[],
+  bodies: readonly AbilityBody[],
   range: number
 ): AbilityBody | undefined {
   const hx = Math.cos(host.angle);
@@ -273,8 +141,7 @@ function pickNearestHarpoonBody(
       continue;
     }
     const facing = dist < 1 ? 1 : (dx * hx + dy * hy) / dist;
-    // QA "next to a rock" is hull gap, not nose-forward. A distant bot
-    // ahead used to steal the latch, then pull-clear left activation-only.
+    // Prefer the closest hull gap, using facing to choose between neighboring rocks.
     if (
       !best ||
       gap < best.gap - NEAREST_GAP_TIE_WU ||
@@ -289,32 +156,18 @@ function pickNearestHarpoonBody(
 }
 
 export function findHarpoonTarget(
-  host: Pick<AbilityHost, 'id' | 'factionId' | 'position' | 'angle' | 'r'>,
-  bodies: AbilityBody[],
+  host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
+  bodies: readonly AbilityBody[],
   range: number = SHIP_ABILITY.HARPOON_RANGE
 ): AbilityBody | undefined {
-  const valid = bodies.filter((body) => isHarpoonableBody(host, body));
-  // A rock on this canvas is the product target. Hostile ships stay valid
-  // when no environment body is in reach — same-side mates never do.
-  return (
-    pickNearestHarpoonBody(
-      host,
-      valid.filter((body) => isEnvironmentLatchBody(body)),
-      range
-    ) ??
-    pickNearestHarpoonBody(
-      host,
-      valid.filter((body) => !isEnvironmentLatchBody(body)),
-      range
-    )
-  );
+  const valid = bodies.filter(isHarpoonableBody);
+  return pickNearestHarpoonBody(host, valid, range);
 }
 
 interface HarpoonDiagnosis {
   kitId: ShipKitId;
   canActivate: boolean;
   fieldCount: number;
-  scale: number;
   range: number;
   targetId?: string;
   nearest?: { id?: string; dist: number; gap: number; reason: string };
@@ -325,17 +178,14 @@ export function diagnoseHarpoonLatch(host: AbilityHost, world?: AbilityWorld): H
   if (!world) {
     syncHarpoonFieldFromPlay();
   }
-  const resolved = resolveAbilityWorld(world);
-  const scale = world?.playfieldScale ?? getHarpoonFieldScale();
-  const canvas = world?.canvas ?? getHarpoonFieldCanvas();
-  const range = harpoonLatchRange(scale, canvas);
-  const candidates = listHarpoonCandidates(resolved);
+  const range = SHIP_ABILITY.HARPOON_RANGE;
+  const candidates = listHarpoonCandidates(world);
   let nearest: HarpoonDiagnosis['nearest'];
   for (const body of candidates) {
     const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
     const gap = dist - bodyRadius(host) - bodyRadius(body);
     let reason = 'ok';
-    if (!isHarpoonableBody(host, body)) {
+    if (!isHarpoonableBody(body)) {
       reason = 'rejected';
     } else if (gap > range) {
       reason = 'out-of-range';
@@ -349,7 +199,6 @@ export function diagnoseHarpoonLatch(host: AbilityHost, world?: AbilityWorld): H
     kitId: host.kitId,
     canActivate: canActivateAbility(host),
     fieldCount: candidates.length,
-    scale,
     range,
     ...(targetId !== undefined ? { targetId } : {}),
     ...(nearest !== undefined ? { nearest: nearest } : {}),
@@ -361,75 +210,34 @@ function latchStillValid(
   target: AbilityBody,
   range: number = SHIP_ABILITY.HARPOON_RANGE
 ): boolean {
-  if (!isHarpoonableBody(host, target)) {
+  if (!isHarpoonableBody(target)) {
     return false;
   }
   return harpoonSurfaceGap(host, target) <= range * SHIP_ABILITY.HARPOON_SLACK;
 }
 
-function bodyMatchesLatchId(body: AbilityBody, id: string): boolean {
-  if (!body.id) {
-    return false;
-  }
-  return harpoonTargetIdsMatch(body.id, id);
-}
-
-/** Hauler-only: haul ships or advance an authoritative asteroid reel. */
-export function pullHarpoonTarget(host: AbilityHost, bodies: AbilityBody[]): void {
+/** Hauler-only: advance the authoritative tow cable. */
+export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBody[]): void {
   if (host.kitId !== 'hauler') {
-    tickHarpoonSling(host, undefined, bodies);
+    tickTowCable(host, undefined);
     clearHarpoonLatch(host);
     return;
   }
-  if (host.harpoonTimer <= 0 || !host.harpoonTargetId) {
-    tickHarpoonSling(host, undefined, bodies);
+  if (!host.harpoonTargetId) {
+    tickTowCable(host, undefined);
     return;
   }
 
   const targetId = host.harpoonTargetId;
-  const target =
-    bodies.find((body) => body.id === targetId && body.id !== host.id) ??
-    bodies.find((body) => body.id !== host.id && bodyMatchesLatchId(body, targetId)) ??
-    findHarpoonFieldBody(targetId);
-  // Keep cream VFX (timer + latchPos) if the field id is mid-sync. #481
-  // cleared here and left abilityActiveFrames — activation ring, no tether.
-  if (!target || !latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE_MAX)) {
-    tickHarpoonSling(host, undefined, bodies);
+  const target = bodies.find((body) => body.id === targetId);
+  // A missing authoritative target detaches the cable.
+  if (!target || !latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE * 3)) {
+    tickTowCable(host, undefined);
+    clearHarpoonLatch(host);
     return;
   }
 
-  if (isEnvironmentLatchBody(target)) {
-    tickHarpoonSling(
-      host,
-      target,
-      bodies.filter((body) => !isEnvironmentLatchBody(body))
-    );
-    return;
-  }
-
-  const dist = Math.hypot(target.position.x - host.position.x, target.position.y - host.position.y);
-  const falloff = 1 - Math.min(dist, SHIP_ABILITY.HARPOON_RANGE) / SHIP_ABILITY.HARPOON_RANGE;
-  pullBody(target, host.position, SHIP_ABILITY.HARPOON_PULL * Math.max(0.25, falloff));
-}
-
-function resolveAbilityWorld(world?: AbilityWorld): AbilityWorld | undefined {
-  if (world) {
-    return world;
-  }
-  const field = getHarpoonField();
-  if (field.length === 0) {
-    return undefined;
-  }
-  const asteroids: AbilityBody[] = [];
-  const entities: AbilityBody[] = [];
-  for (const body of field) {
-    if (body.kind === 'ship') {
-      entities.push(body);
-    } else {
-      asteroids.push(body);
-    }
-  }
-  return { asteroids, entities };
+  tickTowCable(host, target);
 }
 
 /**
@@ -437,6 +245,10 @@ function resolveAbilityWorld(world?: AbilityWorld): AbilityWorld | undefined {
  * when a world is passed — server is authoritative for those.
  */
 export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): AbilityActivation {
+  if (host.kitId === 'hauler' && host.harpoonTargetId && !host.exploding && host.health > 0) {
+    clearHarpoonLatch(host);
+    return { activated: true, abilityId: 'harpoon' };
+  }
   if (!canActivateAbility(host)) {
     return { activated: false };
   }
@@ -450,33 +262,23 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
   if (!world) {
     syncHarpoonFieldFromPlay();
   }
-  const resolved = resolveAbilityWorld(world);
 
   if (kit.abilityId === 'harpoon') {
     if (host.kitId !== 'hauler') {
       return { activated: false };
     }
-    const latchRange = harpoonLatchRange(
-      world?.playfieldScale ?? getHarpoonFieldScale(),
-      world?.canvas ?? getHarpoonFieldCanvas()
-    );
-    const target = findHarpoonTarget(host, listHarpoonCandidates(resolved), latchRange);
+    const latchRange = SHIP_ABILITY.HARPOON_RANGE;
+    const target = findHarpoonTarget(host, listHarpoonCandidates(world), latchRange);
     if (!target) {
       return { activated: false };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
-    if (target.id !== undefined) {
-      host.harpoonTargetId = target.id;
-    } else {
-      delete host.harpoonTargetId;
-    }
-    host.harpoonTimer = SHIP_ABILITY.HARPOON_FRAMES;
-    host.abilityActiveFrames = SHIP_ABILITY.HARPOON_FRAMES;
+    host.harpoonTargetId = target.id;
+
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
-    // Local prediction only paints the latch. Launch using the authoritative
-    // world, whose enemy rows include complete protection and respawn state.
+    // Local prediction paints the latch; the authoritative world supplies towing forces.
     if (world?.asteroids.includes(target)) {
-      slingHarpoonAsteroid(host, target, world.entities);
+      attachTowCable(host, target);
     }
     return { activated: true, abilityId: 'harpoon' };
   }

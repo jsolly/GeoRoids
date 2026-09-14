@@ -7,7 +7,6 @@ import { GAME } from '../src/constants';
  */
 export const LOOT_BLAST = {
   RADIUS: 80,
-  DAMAGE: 40,
   PUSH: 4 * GAME.MOTION_SCALE,
   /** Matches AsteroidManager "small" spawn band (size < 25). */
   SMALL_ROID_MAX: 24,

@@ -1,3 +1,4 @@
+import { WORLD } from '../../shared/world';
 /**
  * Unified Constants - Consolidated from all constant files
  * Organized by domain for better maintainability
@@ -28,7 +29,7 @@ export const GAME = {
 // ============================================================================
 export const SPAWN = {
   // Radius (px) around the arena center within which human players spawn.
-  // The arena boundary radius is ~3100px, so spawning anywhere inside it puts
+  // The open world is large, so spawning anywhere inside it puts
   // players thousands of px apart — far outside each other's viewport, so two
   // people joining the same server never see one another. Clustering spawns
   // near the center keeps freshly-joined players within view of each other
@@ -75,16 +76,13 @@ export const PALETTE = {
   /** Canonical terrain slate; subdued beneath ships, lasers, and pickups. */
   CONTOUR: '#5A6B7D',
   LASER_LOCAL: '#FDE68A',
-  LASER_ENEMY: '#FCA5A5',
   HUD: '#E2E8F0',
   HUD_MUTED: '#64748B',
   DANGER: '#F43F5E',
   HEALTH: '#4ADE80',
   /** Locked cream — wreckage/shard pickups + contour-laser blush. Same hex as Hauler tether. */
   LOOT: '#E8D5A3',
-  /** F-key laser bubble ring. Mint, distinct from local teal and remote sky. */
-  SHIELD: '#7DD3C8',
-  /** Collectible EO hardware; deliberately independent of ION/EMBER. */
+  /** Collectible EO hardware. */
   SATELLITE: '#C4B5FD',
 } as const;
 
@@ -128,7 +126,6 @@ export const VISUAL = {
   EXPLOSION_RING_RATIO: 2.35,
   EXPLOSION_HIT_TICKS: 4,
   // Sparse world-anchored star points seeded deterministically so they never twinkle or shift.
-  STAR_COUNT: 900,
   STAR_SIZE: 1,
   STAR_SEED: 0x9e3779b9,
   STAR_ALPHA_MIN: 0.3,
@@ -179,9 +176,6 @@ export const VISUAL = {
   CONTOUR_LASER_LENGTH: 42,
   CONTOUR_LASER_STROKE_WIDTH: 2,
   CONTOUR_LASER_ALPHA: 0.5,
-  // Hairline shield ring; glow capped to stroke so it stays a vector outline.
-  SHIELD_STROKE_WIDTH: 1.25,
-  SHIELD_GLOW: 1.25,
 } as const;
 
 // ============================================================================
@@ -220,14 +214,7 @@ export const SHIP = {
 export const DAMAGE = {
   // Instant damage (applied immediately)
   LASER_HIT: 25, // Damage dealt by a single laser hit
-  BOUNDARY_COLLISION: 100, // Instant kill when hitting game boundary
-  ASTEROID_COLLISION: 100, // Instant kill — same flash/explode path as the wall
-
-  // Damage over time (applied per second while colliding)
-  PLAYER_COLLISION_PER_SECOND: 20, // Damage per second when colliding with another player
-
-  // Damage intervals (calculated from DPS)
-  PLAYER_COLLISION_INTERVAL_MS: 50, // 1000ms / 20 DPS = 50ms per damage tick
+  ASTEROID_COLLISION: 25, // One server-authoritative asteroid impact
 } as const;
 
 // ============================================================================
@@ -239,7 +226,7 @@ export const LASER = {
   TRAVEL_DISTANCE_RATIO: 0.6, // fraction of screen width
   EXPLODE_DURATION: 0.1, // seconds
   PREDICTION_TIMEOUT_MS: 2000, // Bound unacknowledged local shots during connection loss
-  /** Projectile thickness for hits. Ship hull and shield radii stay independent. */
+  /** Projectile thickness for hits. Ship hull radii stay independent. */
   HIT_RADIUS: 4,
 } as const;
 
@@ -273,16 +260,11 @@ export const ROID = {
   // when debug mode is explicitly enabled.
   INITIAL_ROID_COUNT: 20,
 
-  // Shared moving belt. The ship-kill wall is ~3100px; a 1080p camera around a
-  // center-spawned ship only sees ~960×540. Opposite-side wrap at the wall
-  // parked every roid at ~3000px, leaving the canvas empty. Keep the belt
-  // inside the same "nearby" radius the audio/network layer already uses.
-  FIELD_RADIUS: 1200,
-  FIELD_INNER_SCALE: 0.96,
+  // Procedural deposits fill nearby sectors throughout the playable world.
+  FIELD_RADIUS: WORLD.radius,
 } as const;
 
-// Collectible Earth-observation hardware. This is a pickup effect, not a sixth
-// ship kit, a faction, or a hostile NPC.
+// Collectible Earth-observation hardware.
 export const SATELLITE_PICKUP = {
   SIZE: 24,
   ORBIT_RADIUS: 48,
@@ -329,16 +311,6 @@ export const SHOCKWAVE = {
 } as const;
 
 // ============================================================================
-export const SHIELD = {
-  DURATION_SECONDS: 2,
-  COOLDOWN_SECONDS: 6,
-  RADIUS_RATIO: 1.55,
-  FLASH_SECONDS: 0.12,
-  IDLE_ALPHA: 0.78,
-  FLASH_ALPHA: 0.98,
-  BOT_HEALTH_THRESHOLD: 0.7,
-  BOT_ACTIVATE_CHANCE: 0.02,
-} as const;
 
 // ============================================================================
 // AUDIO CONFIGURATION
@@ -354,7 +326,6 @@ export const AUDIO = {
   LOOT_PICKUP: ['/sounds/loot-pickup.m4a', 4, 0.04],
   CORE_PICKUP: ['/sounds/core-pickup.m4a', 4, 0.04],
   SURVEY_SCAN: ['/sounds/survey-scan.m4a', 3, 0.035],
-  ABILITY_SHIELD: ['/sounds/ability-shield.m4a', 3, 0.035],
   RESPAWN: ['/sounds/respawn.m4a', 3, 0.035],
   ASTEROID_EXPLODE: ['/sounds/asteroid-explode.m4a', 5, 0.045],
   SATELLITE_EXPLODE: ['/sounds/satellite-explode.m4a', 4, 0.045],

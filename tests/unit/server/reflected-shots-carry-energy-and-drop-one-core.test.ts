@@ -10,21 +10,13 @@ import {
 } from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
-import { DAMAGE, GAME, LASER } from '../../../src/constants';
+import { GAME, LASER } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function arena() {
   const engine = new GameEngine(419);
   const ws = new RecordingSocket();
-  const pilot = engine.addPlayer(
-    'pilot',
-    'Pilot',
-    ws,
-    { x: -500, y: 0 },
-    undefined,
-    'surveyor',
-    'ion'
-  );
+  const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, 'surveyor');
   delete pilot.spawnProtectionTimer;
   engine.enableAsteroidInteractions(pilot);
   for (const rock of engine.getAllAsteroids()) {
@@ -58,57 +50,6 @@ function snapshot(engine: GameEngine) {
 }
 
 describe('reflected shots remain authoritative across snapshots and resource collection', () => {
-  test('an enhanced shot damages the nearest tied ship by stable id order', () => {
-    const { engine, pilot } = arena();
-    engine.removeAsteroid('reflector');
-    for (const bot of engine.getAllBots()) {
-      engine.removeBot(bot.id);
-    }
-    const beta = engine.addPlayer(
-      'beta',
-      'Beta',
-      new RecordingSocket(),
-      { x: 10, y: 0 },
-      undefined,
-      'surveyor',
-      'ember'
-    );
-    const alpha = engine.addPlayer(
-      'alpha',
-      'Alpha',
-      new RecordingSocket(),
-      { x: 10, y: 0 },
-      undefined,
-      'surveyor',
-      'ember'
-    );
-    const zeta = engine.addPlayer(
-      'zeta',
-      'Zeta',
-      new RecordingSocket(),
-      { x: 30, y: 0 },
-      undefined,
-      'surveyor',
-      'ember'
-    );
-    for (const player of [alpha, beta, zeta]) {
-      delete player.spawnProtectionTimer;
-    }
-    engine.parkSatellitePickups();
-
-    const alphaHealth = alpha.health;
-    const betaHealth = beta.health;
-    const zetaHealth = zeta.health;
-    const shot = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 100, y: 0 });
-    assert.ok(shot, 'nearest-contact shot');
-    engine.advanceLasersAndResolveHits();
-
-    expect(alpha.health).toBe(alphaHealth - DAMAGE.LASER_HIT);
-    expect(beta.health).toBe(betaHealth);
-    expect(zeta.health).toBe(zetaHealth);
-    expect(shot.hasExploded).toBe(true);
-  });
-
   test('a flat face reverses one shot and fractional energy survives the actual snapshot validator', () => {
     const { engine, reflector } = arena();
     const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
@@ -194,71 +135,6 @@ describe('reflected shots remain authoritative across snapshots and resource col
     }
     expect(pilot.laserUpgrade).toBeUndefined();
     expect(engine.spawnLaser(pilot.id, { x: 500, y: 500 }, { x: 1, y: 0 })?.energy).toBe(1);
-  });
-
-  test('a charged reflected shot can hit its shooter while an ordinary direct shot cannot', () => {
-    const { engine, pilot } = arena();
-    pilot.position = { x: -100, y: 0 };
-    const initial = pilot.health;
-    const direct = engine.spawnLaser(pilot.id, pilot.position, { x: 10, y: 0 });
-    assert.ok(direct, 'direct self shot');
-    engine.advanceLasersAndResolveHits();
-    expect(pilot.health).toBe(initial);
-    direct.hasExploded = true;
-    const reflected = engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
-    assert.ok(reflected, 'reflected self shot');
-    for (let index = 0; index < 4; index++) {
-      engine.advanceLasersAndResolveHits();
-    }
-    expect(reflected.hasExploded).toBe(true);
-    expect(pilot.health).toBe(initial - 25 * 1.5);
-  });
-
-  test("a departed pilot's direct shot still protects allies but becomes dangerous after a real reflection", () => {
-    const { engine, pilot, ws } = arena();
-    const ally = engine.addPlayer(
-      'ally',
-      'Ally',
-      ws,
-      { x: -100, y: 0 },
-      undefined,
-      'surveyor',
-      'ion'
-    );
-    const enemy = engine.addPlayer(
-      'enemy',
-      'Enemy',
-      ws,
-      { x: -100, y: 200 },
-      undefined,
-      'surveyor',
-      'ember'
-    );
-    delete ally.spawnProtectionTimer;
-    delete enemy.spawnProtectionTimer;
-    const allyHealth = ally.health;
-    const enemyHealth = enemy.health;
-    const returning = engine.spawnLaser(pilot.id, { x: -150, y: 0 }, { x: 40, y: 0 });
-    assert.ok(returning, 'returning direct shot');
-    const hostile = engine.spawnLaser(pilot.id, { x: -150, y: 200 }, { x: 40, y: 0 });
-    assert.ok(hostile, 'hostile direct shot');
-    engine.removePlayer(pilot.id);
-    engine.advanceLasersAndResolveHits();
-    expect(ally.health).toBe(allyHealth);
-    expect(returning.hasExploded).toBe(false);
-    expect(returning.bounces).toBe(0);
-    expect(enemy.health).toBe(enemyHealth - 25);
-    expect(hostile.hasExploded).toBe(true);
-    expect(
-      snapshot(engine).playerProjectiles?.find((row) => row.id === returning.id)
-    ).not.toHaveProperty('ownerFaction');
-    for (let frame = 0; frame < 6; frame++) {
-      engine.advanceLasersAndResolveHits();
-    }
-    expect(returning.bounces).toBe(1);
-    expect(returning.hasExploded).toBe(true);
-    expect(ally.health).toBe(allyHealth - 25 * 1.5);
-    expect(ally.score).toBe(0);
   });
 
   test('the aim preview ends at the same energy threshold as the actual upgraded shot', () => {

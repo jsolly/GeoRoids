@@ -158,7 +158,6 @@ describe('contour lasers stay a terrain blush, not a new authority path', () => 
   test('cream terrain response stays subordinate to a short bolt', () => {
     expect(PALETTE.LOOT).toBe('#E8D5A3');
     expect(PALETTE.LOOT).toBe(HAULER_TETHER_COLOR);
-    expect(PALETTE.SHIELD).toBe('#7DD3C8');
     expect(VISUAL.CONTOUR_LASER_LENGTH).toBeLessThanOrEqual(2 * VISUAL.LASER_LENGTH);
     expect(VISUAL.CONTOUR_LASER_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH);
     expect(VISUAL.CONTOUR_LASER_ALPHA).toBeGreaterThan(VISUAL.CONTOUR_INDEX_ALPHA);

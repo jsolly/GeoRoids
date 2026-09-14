@@ -31,12 +31,10 @@ named optional fields. An omitted field is unchanged. Collection patches contain
 `add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
 `order` (complete ID order when membership/order changes). Empty arrays are
 complete empty collections. Removed bots/remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
-Acknowledged harpoon expiry clears both target and cached latch position,
-including on the predicting local ship. An unacknowledged local harpoon prediction
-may survive a brief reconnect only for its remaining, locally ticking lifetime
-while its target still exists. Acknowledged expiry, target removal, death or
-natural timer expiry clears it. Reconnect neither extends that timer nor replays
-an ability request; this prediction does not restore server ability state.
+Harpoon attachments persist until release, delivery, target removal, death or
+excessive cable separation. An explicit null target clears the client's cached
+latch. Reconnection uses authoritative attachment state and never replays an
+ability request.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
@@ -47,7 +45,8 @@ so an event and subsequent keyframe repair one shot instead of creating two.
 Tags include asteroid ID, shooter hit records and expiry. Keyframes restore active
 shots and cooperative windows after reconnect without replaying old events.
 All six EO pickup types, asteroid
-shape/material/health, kits, factions and E/F timers use the shared DTO contract. Public state must be finite JSON;
+shape/material/health, kits, E cooldowns, cable targets, survey contributors and
+shared exploration tiles use the shared DTO contract. Public state must be finite JSON;
 unsupported values fail loudly and close the negotiated socket instead of
 silently dropping state. Unknown valid JSON fields remain intact.
 
@@ -74,10 +73,16 @@ Baselines advance only in a successful WebSocket send callback. This acknowledge
 the local transport write, **not remote application receipt**. WebSocket ordering
 plus client sequence validation protects that distinction. An offer skipped while
 a write is pending leaves its baseline alone: a successful callback permits the
-next delta. Backpressure above 256 KiB, failed writes and explicitly requested
+next delta. Backpressure above 1 MiB, failed writes and explicitly requested
 resynchronization force the next send to be full.
-Excluded recipients keep their own baseline. One detached canonical world is
-shared across recipients; no baseline points at mutable game engine state.
+Excluded recipients keep their own baseline. Each recipient receives nearby
+asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
+The crew roster, shared exploration and revealed `mapAssets` remain global.
+These lightweight furnace and valuable-drop markers supply the universe map;
+they do not require distant asteroid geometry. The outbound budget accommodates
+a fully explored 120,000-unit-wide atlas on late joins and resynchronization.
+Each detached view has
+its own encoder; no baseline points at mutable game engine state.
 
 The production `ConnectionManager` invokes `SnapshotDecoder` before normal state
 application. Deltas require both the exact baseline and consecutive sequence.
@@ -194,9 +199,12 @@ recreate this archived table.
 
 The required `asteroidInteractions:1` join capability requires snapshot v1 and an
 explicit matching acknowledgment. The joined socket alone receives its private resume token.
-A physical gameplay socket close gives that token a two-second neutral-input grace;
-a same-socket rejoin is idempotent, a valid token can atomically supersede an old
-socket, and expiry/leave/reset invalidates it. Unsupported joins are rejected before a pilot is created.
+A physical gameplay socket close gives the live session a two-second neutral-input
+grace. A same-socket rejoin is idempotent, and a valid token can atomically
+supersede an old socket. After the live session expires, its persisted token hash
+can restore the pilot and rotates on successful recovery. Leaving preserves
+progress; resetting the test world invalidates it. The browser stores the private
+token locally. Unsupported joins are rejected before a pilot is created.
 
 Optional asteroid `phenomenon` metadata is preserved on first creation and
 complete/delta updates. `playerProjectiles` carries stable process-unique shot

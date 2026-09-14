@@ -4,8 +4,8 @@ import type { BotShot } from '../../../server/ai/botController';
 import { ARENA_RADIUS, CONTAIN_RADIUS } from '../../../server/ai/shipMotion';
 import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
+import type { AsteroidData } from '../../../shared-types';
 import { SHIP } from '../../../src/constants';
-import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: {
@@ -23,17 +23,28 @@ function firstBot(bots: GameEntity[] | null): GameEntity {
   return bot;
 }
 
-function parkHumanInFront(engine: GameEngine, bot: GameEntity, range = 220): GameEntity {
-  const human = engine.entityManager.addHumanPlayer('human-pilot', 'Pilot', new RecordingSocket(), {
-    x: bot.position.x + Math.cos(bot.angle) * range,
-    y: bot.position.y - Math.sin(bot.angle) * range,
-  });
-  delete human.spawnProtectionTimer;
-  human.velocity = { x: 0, y: 0 };
-  human.factionId = bot.factionId === 'ion' ? 'ember' : 'ion';
+function parkAsteroidInFront(engine: GameEngine, bot: GameEntity, range = 220): AsteroidData {
+  const rock: AsteroidData = {
+    id: `bot-target-${bot.id}`,
+    position: {
+      x: bot.position.x + Math.cos(bot.angle) * range,
+      y: bot.position.y - Math.sin(bot.angle) * range,
+    },
+    velocity: { x: 0, y: 0 },
+    size: 25,
+    jaggedness: 0.5,
+    rotation: 0,
+    angularVelocity: 0,
+    health: 100,
+    maxHealth: 100,
+    vertices: 8,
+    offsets: [1, 1, 1, 1, 1, 1, 1, 1],
+    material: 'metal',
+  };
+  engine.addAsteroid(rock);
   delete bot.spawnProtectionTimer;
   bot.velocity = { x: 0, y: 0 };
-  return human;
+  return rock;
 }
 
 describe('bot combat feel on the shared ship hull', () => {
@@ -52,7 +63,7 @@ describe('bot combat feel on the shared ship hull', () => {
     const bot = firstBot(bots);
     bot.position = { x: 0, y: 0 };
     bot.angle = 0;
-    parkHumanInFront(engine, bot);
+    parkAsteroidInFront(engine, bot);
 
     let shots: BotShot[] = [];
     for (let i = 0; i < 20; i++) {
@@ -79,7 +90,7 @@ describe('bot combat feel on the shared ship hull', () => {
     const bot = firstBot(bots);
     bot.position = { x: 0, y: 0 };
     bot.angle = 0;
-    parkHumanInFront(engine, bot);
+    parkAsteroidInFront(engine, bot);
     for (let i = 0; i < 20; i++) {
       engine.updateBotMovement();
     }
@@ -89,9 +100,9 @@ describe('bot combat feel on the shared ship hull', () => {
   test('exploding bots do not move or shoot', () => {
     const bots = engine.createBots(1);
     const bot = firstBot(bots);
-    parkHumanInFront(engine, bot);
+    parkAsteroidInFront(engine, bot);
     const origin = { ...bot.position };
-    engine.handleBotDamage(bot.id, 'test', bot.health);
+    engine.handleShipDamage(bot.id, 'asteroid', bot.health);
     expect(bot.exploding).toBe(true);
 
     const shots = engine.updateBotMovement();

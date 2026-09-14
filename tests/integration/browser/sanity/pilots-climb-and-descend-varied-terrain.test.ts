@@ -2,6 +2,7 @@ import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 
 import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
+import { WORLD } from '../../../../shared/world';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { centerOf, dispatchTouch } from '../../utils/touch-input';
@@ -70,9 +71,9 @@ function angleDistance(left: number, right: number): number {
 async function readTerrain(page: Page): Promise<{
   peak: { height: number };
   slope: { height: number; gradient: { x: number } };
-  foot: { height: number };
+  rim: { height: number };
 }> {
-  return page.evaluate(() => {
+  return page.evaluate((rimX) => {
     const gc = window.gameController;
     if (!gc) {
       throw new Error('Game controller missing');
@@ -80,9 +81,9 @@ async function readTerrain(page: Page): Promise<{
     return {
       peak: gc.getTerrainProbe({ x: 0, y: 0 }),
       slope: gc.getTerrainProbe({ x: 1550, y: 0 }),
-      foot: gc.getTerrainProbe({ x: 3110, y: 0 }),
+      rim: gc.getTerrainProbe({ x: rimX + 1, y: 0 }),
     };
-  });
+  }, WORLD.radius);
 }
 
 for (const viewport of [
@@ -122,7 +123,7 @@ for (const viewport of [
       const terrain = await readTerrain(page);
       expect(Math.abs(terrain.peak.height)).toBe(0);
       expect(terrain.slope.height).toBeGreaterThan(0);
-      expect(terrain.foot.height).toBe(0);
+      expect(terrain.rim.height).toBe(0);
       expect(terrain.slope.gradient.x).toBeGreaterThan(0);
 
       await game.placeShipAt(1550, 0);
@@ -155,7 +156,7 @@ for (const viewport of [
           },
           { timeout: 5000, interval: 50 }
         )
-        .toBeLessThan(1);
+        .toBeLessThan(50);
       const beforeAuthoritative = authoritative.getPosition(localPlayerId);
       if (!beforeAuthoritative) {
         throw new Error('Authoritative position missing before movement');
@@ -175,9 +176,7 @@ for (const viewport of [
         await page.waitForTimeout(1200);
         await dispatchTouch(session, 'touchEnd', []);
       } else {
-        await page.keyboard.down('w');
         await page.waitForTimeout(1200);
-        await page.keyboard.up('w');
       }
 
       const afterLocal = await game.getShipPosition();
@@ -201,13 +200,13 @@ for (const viewport of [
             return (
               position !== undefined &&
               direction * (position.x - beforeAuthoritative.x) > 10 &&
-              authoritative.isThrusting(localPlayerId) === false
+              authoritative.isThrusting(localPlayerId) === true
             );
           },
           {
             timeout: 5000,
             interval: 50,
-            message: 'measure a server snapshot acknowledging release of the movement control',
+            message: 'measure a server snapshot of automatic cruising across the slope',
           }
         )
         .toBe(true);

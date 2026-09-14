@@ -181,10 +181,9 @@ test(
       throw new Error('Target disappeared while preparing both pilots');
     }
     const liveObstacles = [...liveField, ...liveLoot];
-    // Opposing firing lanes make a missed projectile continue directly into
-    // the other pilot. Put both hulls on the same side in close, separate
-    // lanes so each real shot reaches the moving rock within a few frames and
-    // neither pilot can intercept the other's projectile.
+    // Put both crew hulls on one side in close, separate lanes so each real
+    // shot reaches the moving rock within a few frames without a pilot or
+    // another asteroid intercepting the firing lane.
     const radialGap = liveTarget.radius + Math.max(shipRadius1, shipRadius2) + 20;
     const tangentOffset = (shipRadius1 + shipRadius2 + 20) / 2;
     const firingFixture = Array.from({ length: 16 }, (_, index) => (index * Math.PI) / 8)
@@ -226,16 +225,13 @@ test(
           });
         })
       );
-    expect(
-      firingFixture,
-      'both hulls and laser paths need clear same-side firing lanes'
-    ).toBeDefined();
+    expect(firingFixture, 'both hulls and laser paths need clear crew firing lanes').toBeDefined();
     if (!firingFixture) {
-      throw new Error('No clear same-side firing lanes');
+      throw new Error('No clear crew firing lanes');
     }
     const [position1, position2] = firingFixture.positions;
     if (!position1 || !position2) {
-      throw new Error('Same-side firing fixture did not contain both pilots');
+      throw new Error('Crew firing fixture did not contain both pilots');
     }
 
     // Park both hulls outside the target and acknowledge each pose before the

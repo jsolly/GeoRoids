@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
-import { harpoonLatchRange } from '../../../src/entities/ship/shipAbilities';
 import { reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { handleMouseMove } from '../../../src/input/mouse';
 import { Point } from '../../../src/physics/Point';
 import { canvasManager } from '../../../src/rendering/canvas';
-import { PLAYFIELD_CLOSE_SCALE } from '../../../src/rendering/playfieldCamera';
 
 let canvas: HTMLCanvasElement;
 let originalInnerWidth: PropertyDescriptor | undefined;
@@ -168,8 +166,6 @@ describe('the playfield viewport stays in CSS-logical coordinates', () => {
       player.ship.update();
     }
     expect(player.ship.angle).toBeCloseTo(Math.atan2(150, 50), 10);
-
-    expect(harpoonLatchRange(PLAYFIELD_CLOSE_SCALE, canvasManager.getViewportSize())).toBe(750);
   });
 
   test('same-size resize and same-DOM reinitialization preserve the high-DPI contract', () => {

@@ -16,7 +16,7 @@ export type HudLayout = {
   padBottom: number;
   lives: { x: number; y: number };
   score: { x: number; y: number };
-  killMessageY: number;
+  notificationY: number;
   leaderboard: {
     x: number;
     y: number;
@@ -27,7 +27,6 @@ export type HudLayout = {
   miniMap: { x: number; y: number; size: number };
   overlayFontScale: number;
   hudTypeScale: number;
-  factionY: number;
   kitNameY: number;
 };
 
@@ -83,7 +82,7 @@ export function computeHudLayout(
 
   if (!touch) {
     const lives = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
-    const factionY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+    const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
     return {
       padTop: 0,
       padLeft: 0,
@@ -91,7 +90,7 @@ export function computeHudLayout(
       padBottom: 0,
       lives,
       score: { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET },
-      killMessageY: 12,
+      notificationY: 12,
       leaderboard: {
         x: viewport.width - 180 - DESKTOP_EDGE,
         y: DESKTOP_EDGE,
@@ -106,8 +105,7 @@ export function computeHudLayout(
       },
       overlayFontScale,
       hudTypeScale,
-      factionY,
-      kitNameY: factionY + 14,
+      kitNameY,
     };
   }
 
@@ -121,8 +119,7 @@ export function computeHudLayout(
   const maxRows = compactHeight ? 4 : 6;
   const miniMapSize = compactHeight ? 64 : 80;
   const lives = { x: padLeft, y: padTop };
-  const factionY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
-  const kitNameY = factionY + Math.round(14 * hudTypeScale);
+  const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
   const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
@@ -143,7 +140,7 @@ export function computeHudLayout(
     padBottom,
     lives,
     score: { x: padLeft, y: padTop },
-    killMessageY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12,
+    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
@@ -154,7 +151,6 @@ export function computeHudLayout(
     miniMap,
     overlayFontScale,
     hudTypeScale,
-    factionY,
     kitNameY,
   };
 }

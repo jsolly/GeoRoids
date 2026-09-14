@@ -1282,12 +1282,7 @@ try {
         if (scenario.hasTouch && values.browser === 'chromium') {
           touchSession ??= await context.newCDPSession(page);
           const playfield = await page.locator('#gameCanvas').boundingBox();
-          const extra =
-            inputSteps % 40 === 0
-              ? '#touch-shield'
-              : inputSteps % 20 === 0
-                ? '#touch-ability'
-                : undefined;
+          const extra = inputSteps % 20 === 0 ? '#touch-ability' : undefined;
           const extraBox =
             extra && (await page.locator(extra).getAttribute('aria-disabled')) !== 'true'
               ? await page.locator(extra).boundingBox()

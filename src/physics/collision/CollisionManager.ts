@@ -1,12 +1,8 @@
-import { DAMAGE } from '../../constants';
-import type { Player } from '../../entities/player/Player';
-import { PlayerManager } from '../../entities/player/PlayerManager';
-import { canDealCombatDamage } from '../../entities/player/softFactions';
 import type { Ship } from '../../entities/ship/Ship';
 import { applyShipBoundaryDeath, isShipCollisionImmune } from '../../entities/ship/shipUtils';
 import { NetworkManager } from '../../network/networkManager';
 import { logger } from '../../utils/Logger';
-import { checkBoundaryCollision, checkShipCollision } from './collisionDetection';
+import { checkBoundaryCollision } from './collisionDetection';
 
 export class CollisionManager {
   private static instance: CollisionManager;
@@ -28,7 +24,7 @@ export class CollisionManager {
    */
   checkBoundaryCollisions(ships: Ship[], localPlayerId: string): void {
     for (const ship of ships) {
-      // Same immunity as asteroid / ship-ship: exploding, dead, or blinking.
+      // Same immunity as asteroid impacts: exploding, dead, or blinking.
       // Boundary previously skipped only exploding, so a dead or freshly
       // respawned hull kept sending 100-damage collisionDamage at 60 Hz.
       if (isShipCollisionImmune(ship)) {
@@ -53,7 +49,7 @@ export class CollisionManager {
 
     // Shared player+bot path: visible wall flash + explode, then the server
     // confirms the life loss. Waiting for the packet alone looked like a silent reset.
-    applyShipBoundaryDeath(ship, 'boundary');
+    applyShipBoundaryDeath(ship);
 
     const serverPlayerId = this.networkManager.getLocalPlayerId();
     this.networkManager.sendMessage({
@@ -61,88 +57,7 @@ export class CollisionManager {
       data: {
         targetPlayerId: serverPlayerId,
         attackerId: 'boundary',
-        damage: DAMAGE.BOUNDARY_COLLISION,
       },
     });
-  }
-
-  /**
-   * Check ship collisions with other ships (players/bots)
-   */
-  checkShipShipCollisions(
-    localShip: Ship,
-    otherShips: { ship: Ship; id: string }[],
-    localPlayerId: string
-  ): void {
-    // Skip if local ship cannot collide: exploding, dead, or under spawn protection
-    if (!localShip || isShipCollisionImmune(localShip)) {
-      return;
-    }
-
-    let isColliding = false;
-
-    for (const other of otherShips) {
-      const otherShip = other.ship;
-      if (isShipCollisionImmune(otherShip)) {
-        continue;
-      }
-
-      if (
-        canDealCombatDamage(this.factionForId(localPlayerId), this.factionForShip(otherShip)) &&
-        checkShipCollision(localShip.position, localShip.r, otherShip.position, otherShip.r)
-      ) {
-        this.handleShipShipCollision(localShip, otherShip, other.id, localPlayerId);
-        isColliding = true;
-        break;
-      }
-    }
-
-    // If not colliding with any ship, stop collision damage
-    if (!isColliding && localShip.isCollidingWithPlayer) {
-      localShip.stopPlayerCollision();
-    }
-  }
-
-  private factionForId(playerId: string): Player['factionId'] {
-    if (!playerId) {
-      return undefined;
-    }
-    const fromNet = this.networkManager.getPlayer(playerId);
-    if (fromNet) {
-      return fromNet.factionId;
-    }
-    const local = PlayerManager.getInstance().getLocalPlayer();
-    if (local && (local.id === playerId || this.networkManager.getLocalPlayerId() === playerId)) {
-      return local.factionId;
-    }
-    return undefined;
-  }
-
-  private factionForShip(ship: Ship): Player['factionId'] {
-    const match = this.networkManager.getAllPlayers().find((player) => player.ship === ship);
-    return match?.factionId;
-  }
-
-  /**
-   * Handle ship hitting another ship
-   */
-  private handleShipShipCollision(
-    localShip: Ship,
-    otherShip: Ship,
-    otherPlayerId: string,
-    localPlayerId: string
-  ): void {
-    logger.debug('COLLISION', 'Ship hit ship', {
-      localShipPos: localShip.position,
-      otherShipPos: otherShip.position,
-      localShipId: localShip.id,
-      otherShipId: otherShip.id,
-      otherPlayerId,
-      localPlayerId,
-    });
-
-    // Visual / offline overlap only. Ship↔ship DOT is applied on the server
-    // from last-known positions so both tabs share one health timeline.
-    localShip.startPlayerCollision(otherPlayerId);
   }
 }

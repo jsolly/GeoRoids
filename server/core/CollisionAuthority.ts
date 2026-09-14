@@ -1,14 +1,7 @@
-import {
-  type CombatCircle,
-  circlesOverlap,
-  findShipAsteroidOverlaps,
-  findShipShipPairs,
-  isCombatantImmune,
-  shipShipPairKey,
-  shouldApplyShipShipTick,
-} from '../../shared/combat';
+import { type CombatCircle, circlesOverlap, isCombatantImmune } from '../../shared/combat';
 import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import type { AsteroidData, SatellitePickupData } from '../../shared-types';
+import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { GameEntity } from './EntityManager';
 
 function toCombatCircle(entity: GameEntity): CombatCircle {
@@ -25,26 +18,34 @@ function asteroidCollisionRadius(asteroid: AsteroidData): number {
 }
 
 export class CollisionAuthority {
-  private shipShipLastTick = new Map<string, number>();
-
-  public reset(): void {
-    this.shipShipLastTick.clear();
-  }
-
   public collectShipAsteroidHits(
     entities: GameEntity[],
     asteroids: AsteroidData[],
     shouldSkip?: (shipId: string, asteroidId: string) => boolean
   ): Array<{ shipId: string; asteroidId: string }> {
-    return findShipAsteroidOverlaps(
-      entities.map(toCombatCircle),
-      asteroids.map((asteroid) => ({
-        id: asteroid.id,
-        position: asteroid.position,
-        radius: asteroidCollisionRadius(asteroid),
-      })),
-      shouldSkip
-    );
+    const index = new AsteroidSpatialIndex(asteroids);
+    const hits: Array<{ shipId: string; asteroidId: string }> = [];
+    for (const entity of entities) {
+      const ship = toCombatCircle(entity);
+      if (ship.immune) {
+        continue;
+      }
+      const nearby = index.query({
+        minX: ship.position.x - ship.radius,
+        minY: ship.position.y - ship.radius,
+        maxX: ship.position.x + ship.radius,
+        maxY: ship.position.y + ship.radius,
+      });
+      const rock = nearby.find(
+        (candidate) =>
+          !shouldSkip?.(ship.id, candidate.id) &&
+          circlesOverlap(ship.position, ship.radius, candidate.position, candidate.size)
+      );
+      if (rock) {
+        hits.push({ shipId: ship.id, asteroidId: rock.id });
+      }
+    }
+    return hits;
   }
 
   public collectAsteroidPickupHits(
@@ -67,21 +68,5 @@ export class CollisionAuthority {
       }
     }
     return hits;
-  }
-
-  public collectShipShipTicks(
-    entities: GameEntity[],
-    now: number
-  ): Array<{ a: string; b: string }> {
-    const pairs = findShipShipPairs(entities.map(toCombatCircle));
-    const due: Array<{ a: string; b: string }> = [];
-    for (const pair of pairs) {
-      const key = shipShipPairKey(pair.a, pair.b);
-      if (shouldApplyShipShipTick(this.shipShipLastTick.get(key), now)) {
-        this.shipShipLastTick.set(key, now);
-        due.push(pair);
-      }
-    }
-    return due;
   }
 }

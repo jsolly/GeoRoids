@@ -31,8 +31,8 @@ describe('kill loot and growth', () => {
     applyShipMass(bot, 4);
 
     const expected = planKillLoot(4).pelletMasses.length;
-    engine.handlePlayerDamage('p1', 'asteroid', human.health);
-    engine.handleBotDamage(bot.id, 'asteroid', bot.health);
+    engine.handleShipDamage('p1', 'asteroid', human.health);
+    engine.handleShipDamage(bot.id, 'asteroid', bot.health);
 
     const loot = engine.getLoot();
     expect(loot.length).toBe(expected * 2);
@@ -44,7 +44,7 @@ describe('kill loot and growth', () => {
     const ws = new RecordingSocket();
     const victim = engine.addPlayer('victim', 'Victim', ws, { x: 50, y: 25 });
     engine.entityManager.updateEntity('victim', { spawnProtectionTimer: 0 });
-    engine.handlePlayerDamage('victim', 'boundary', victim.health);
+    engine.handleShipDamage('victim', 'boundary', victim.health);
 
     const first = engine.getGameState();
     const second = engine.getGameState();
@@ -59,7 +59,7 @@ describe('kill loot and growth', () => {
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
 
-    engine.handlePlayerDamage('p2', 'p1', victim.health);
+    engine.handleShipDamage('p2', 'boundary', victim.health);
     const loot = engine.getLoot();
     const pellet = loot[0];
     assert.ok(pellet);
@@ -85,7 +85,7 @@ describe('kill loot and growth', () => {
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p3', { spawnProtectionTimer: 0 });
 
-    engine.handlePlayerDamage('p3', 'boundary', victim.health);
+    engine.handleShipDamage('p3', 'boundary', victim.health);
     const pellet = engine.getLoot()[0];
     assert.ok(pellet);
 
@@ -106,7 +106,7 @@ describe('kill loot and growth', () => {
     applyShipMass(player, 5);
     expect(player.maxHealth).toBeGreaterThan(100);
 
-    engine.handlePlayerDamage('p1', 'boundary', player.health);
+    engine.handleShipDamage('p1', 'boundary', player.health);
     for (let i = 0; i < 200; i++) {
       engine.entityManager.updateExplosions();
       engine.entityManager.updateRespawns();

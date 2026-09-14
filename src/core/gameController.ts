@@ -1,14 +1,15 @@
-import { areAllied } from '../../shared/factions';
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import type {
   AsteroidData,
+  FurnaceDelivery,
   LootData,
   Position,
   SatellitePickupCollected,
   ShipKitId,
 } from '../../shared-types';
 import { playDestructionSound } from '../audio/destructionSounds';
+import { playOrbitalPickup } from '../audio/interactionSounds';
 import { bindGameAudio } from '../audio/spatialAudio';
 import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
@@ -22,14 +23,7 @@ import { advanceRemotePlayerShips } from '../entities/player/remoteLasers';
 import type { RoidBelt } from '../entities/roid/Roid';
 import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
-import {
-  bindHarpoonFieldSource,
-  collectPlayHarpoonField,
-  harpoonBodiesFromRocks,
-  harpoonBodyFromShip,
-  publishHarpoonField,
-} from '../entities/ship/harpoonField';
-import type { Ship } from '../entities/ship/Ship';
+import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
 import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
 import { shockwaveManager } from '../fx/ShockwaveManager';
 import { tickTouchControls } from '../input/touchControls';
@@ -51,7 +45,6 @@ import {
 } from '../physics/terrain/terrainSession';
 import { canvasManager } from '../rendering/canvas';
 import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
-import { PLAYFIELD_CLOSE_SCALE } from '../rendering/playfieldCamera';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { setPlayView } from '../ui/uiUtils';
@@ -71,7 +64,6 @@ export class GameController {
 
   private currRoidBelt: RoidBelt;
   private recentShockwaveKeys = new Set<string>();
-  private readonly otherShips: { ship: Ship; id: string }[] = [];
   private readonly localFirstPlayers: Player[] = [];
   private gameOverInProgress = false;
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -103,7 +95,7 @@ export class GameController {
 
     // Initialize with empty asteroid belt - will be populated by server
     this.currRoidBelt = entityFactory.createEmptyRoidBelt();
-    bindHarpoonFieldSource(() => this.snapshotHarpoonField());
+    bindHarpoonFieldSource(() => this.currRoidBelt?.roids ?? []);
 
     // Set up network disconnection handler
     this.setupNetworkDisconnectionHandler();
@@ -198,18 +190,6 @@ export class GameController {
   // Event handler methods for server asteroid synchronization
   private applyServerAsteroidCreated = (asteroid: AsteroidData): void => {
     logger.debug('GAME', 'Adding server asteroid to local belt', { asteroidId: asteroid.id });
-
-    // Clear local asteroids only once when receiving the first server asteroid (server-authoritative)
-    if (
-      this.currRoidBelt &&
-      this.currRoidBelt.roids.length > 0 &&
-      !this.currRoidBelt.roids.some((r) => r.id.startsWith('server-asteroid-'))
-    ) {
-      logger.debug('GAME', 'Clearing local asteroids, server is authoritative', {
-        localAsteroidCount: this.currRoidBelt.roids.length,
-      });
-      this.currRoidBelt.roids.length = 0;
-    }
 
     // Duplicate create (late join / rejoined snapshot) must still take the
     // live pose — skipping here left a private static copy on prod.
@@ -395,6 +375,18 @@ export class GameController {
     this.gameStateManager.setPickupMessage(detail.pickupName, detail.scoreBonus);
   };
 
+  private handleFurnaceDelivery = (event: Event): void => {
+    const delivery = (event as CustomEvent<FurnaceDelivery>).detail;
+    const reward = delivery.rewards.find(
+      (item) => item.playerId === this.networkManager.getLocalPlayerId()
+    );
+    if (!reward) {
+      return;
+    }
+    this.gameStateManager.setDeliveryMessage(reward.points, delivery.rewards.length);
+    playOrbitalPickup(delivery.position);
+  };
+
   private setupServerAsteroidListeners(): void {
     this.cleanupServerAsteroidListeners();
     bindAsteroidFieldApply({
@@ -406,12 +398,14 @@ export class GameController {
     });
     window.addEventListener('serverShockwave', this.handleServerShockwave);
     window.addEventListener('satellitePickupCollected', this.handleSatellitePickupCollected);
+    window.addEventListener('furnaceDelivery', this.handleFurnaceDelivery);
   }
 
   private cleanupServerAsteroidListeners(): void {
     unbindAsteroidFieldApply();
     window.removeEventListener('serverShockwave', this.handleServerShockwave);
     window.removeEventListener('satellitePickupCollected', this.handleSatellitePickupCollected);
+    window.removeEventListener('furnaceDelivery', this.handleFurnaceDelivery);
   }
 
   /** Drop a pending return-to-menu so Start (or a test) can open a new session. */
@@ -445,8 +439,7 @@ export class GameController {
       localPlayer?.deathCause,
       localPlayer?.ship.lastExplodeCause
     );
-    const resolveName = (id: string): string | undefined => this.networkManager.getPlayer(id)?.name;
-    this.gameStateManager.updateTextProperties(formatGameOverText(raw, resolveName), 1.0);
+    this.gameStateManager.updateTextProperties(formatGameOverText(raw), 1.0);
 
     this.cleanupServerAsteroidListeners();
     PlayerNetwork.getInstance().stopNetworkUpdates();
@@ -464,7 +457,6 @@ export class GameController {
       const customEvent = event as CustomEvent<{
         shipId: string;
         cause?: string;
-        killerName?: string;
       }>;
       const cause = customEvent.detail.cause;
       if (!cause) {
@@ -512,51 +504,7 @@ export class GameController {
             playerId: customEvent.detail.playerId,
           });
         }
-      } else {
-        // Handle other player deaths - check if local player killed them
-        const { deathCause } = customEvent.detail;
-        if (deathCause.includes('laser') && deathCause.includes(localPlayer?.name || '')) {
-          // Extract the killed player's name from the death cause
-          // The death cause format is typically "PlayerName's laser" or similar
-          const deathCauseText = deathCause.toLowerCase();
-          const localPlayerName = localPlayer?.name.toLowerCase() || '';
-
-          // Check if this death was caused by the local player's laser
-          if (deathCauseText.includes(localPlayerName) && deathCauseText.includes('laser')) {
-            // Get the killed player's name from the event
-            const killedPlayerId = customEvent.detail.playerId;
-
-            // Try to find the player in the network manager (remote players only)
-            const networkManager = this.networkManager;
-            const remotePlayers = networkManager.getRemotePlayers();
-
-            // Check remote players
-            const killedPlayer = remotePlayers.find((p) => p.id === killedPlayerId);
-
-            if (killedPlayer) {
-              this.setKillMessage(killedPlayer.name);
-            }
-          }
-        }
       }
-    });
-
-    // Listen for remote player deaths
-    window.addEventListener('remotePlayerDied', (event) => {
-      const customEvent = event as CustomEvent<{
-        playerId: string;
-        playerName: string;
-        deathCause: string;
-      }>;
-
-      // Set kill message for remote player death
-      this.setKillMessage(customEvent.detail.playerName);
-
-      logger.debug('GAME', 'Remote player killed', {
-        playerId: customEvent.detail.playerId,
-        playerName: customEvent.detail.playerName,
-        deathCause: customEvent.detail.deathCause,
-      });
     });
   }
 
@@ -576,22 +524,20 @@ export class GameController {
   diagnoseHarpoon():
     | (ReturnType<typeof diagnoseHarpoonLatch> & {
         connected: boolean;
-        harpoonTimer: number;
         abilityActiveFrames: number;
         latchPos?: { x: number; y: number };
-        liveTargetId?: string;
+        liveTargetId?: string | null;
       })
     | null {
     const local = this.playerManager.getLocalPlayer();
     if (!local) {
       return null;
     }
-    this.publishLiveHarpoonField(local);
+    this.publishLiveHarpoonField();
     const probe = diagnoseHarpoonLatch(local.ship);
     return {
       ...probe,
       connected: this.networkManager.isConnected,
-      harpoonTimer: local.ship.harpoonTimer,
       abilityActiveFrames: local.ship.abilityActiveFrames,
       ...(local.ship.harpoonLatchPos !== undefined ? { latchPos: local.ship.harpoonLatchPos } : {}),
       ...(local.ship.harpoonTargetId !== undefined
@@ -616,11 +562,6 @@ export class GameController {
 
   getText(): string {
     return this.gameStateManager.getText();
-  }
-
-  // Kill message methods
-  setKillMessage(playerName: string): void {
-    this.gameStateManager.setKillMessage(playerName);
   }
 
   getIsGameRunning(): boolean {
@@ -813,43 +754,18 @@ export class GameController {
     // Update asteroids
     if (this.currRoidBelt) {
       this.currRoidBelt.moveRoids();
-      this.publishLiveHarpoonField(currPlayer);
+      this.publishLiveHarpoonField();
     }
-
-    this.checkShipShipCollisions(allPlayers);
 
     // Check boundary collisions for ships
     this.checkBoundaryCollisions();
 
     // Update game state manager
-    this.gameStateManager.updateKillMessageTimer();
     this.gameStateManager.updatePickupMessageTimer();
   }
 
-  private snapshotHarpoonField(localPlayer?: Player | null) {
-    const local = localPlayer ?? this.playerManager.getLocalPlayer();
-    const allPlayers = this.networkManager.getAllPlayers();
-    const ships = allPlayers
-      .filter((player) => player.id && player.id !== local?.id && player.ship)
-      .map((player) =>
-        harpoonBodyFromShip(player.id, player.ship, player.factionId ?? player.ship.factionId)
-      );
-    const rocks = harpoonBodiesFromRocks(this.currRoidBelt?.roids ?? []);
-    const canvas = canvasManager.getCanvas();
-    const viewport = canvasManager.getViewportSize();
-    // KeyE runs outside the render loop. Keep latch range at the same fixed
-    // close/play scale as the renderer, even before the first frame publishes.
-    const playfieldScale = PLAYFIELD_CLOSE_SCALE;
-    return {
-      bodies: collectPlayHarpoonField(rocks, ships),
-      playfieldScale,
-      ...(canvas ? { canvas: { width: viewport.width, height: viewport.height } } : {}),
-    };
-  }
-
-  private publishLiveHarpoonField(localPlayer?: Player | null): void {
-    const snapshot = this.snapshotHarpoonField(localPlayer);
-    publishHarpoonField(snapshot.bodies, snapshot.playfieldScale, snapshot.canvas);
+  private publishLiveHarpoonField(): void {
+    publishHarpoonField(this.currRoidBelt?.roids ?? []);
   }
 
   private playersWithLocal(local: Player, allPlayers: Player[]): Player[] {
@@ -873,32 +789,6 @@ export class GameController {
     // local ship, and boundary damage is always attributed to the local
     // player. Bots are kept in-bounds server-side; remote players self-report.
     this.collisionManager.checkBoundaryCollisions([currPlayer.ship], currPlayer.id);
-  }
-
-  // Check ship collisions with other ships
-  private checkShipShipCollisions(allPlayers: Player[]): void {
-    const currPlayer = this.playerManager.getLocalPlayer();
-    if (!currPlayer) {
-      return;
-    }
-
-    let count = 0;
-    for (const player of allPlayers) {
-      if (player.id === currPlayer.id || areAllied(currPlayer.factionId, player.factionId)) {
-        continue;
-      }
-      const existing = this.otherShips[count];
-      if (existing) {
-        existing.ship = player.ship;
-        existing.id = player.id;
-      } else {
-        this.otherShips[count] = { ship: player.ship, id: player.id };
-      }
-      count += 1;
-    }
-    this.otherShips.length = count;
-
-    this.collisionManager.checkShipShipCollisions(currPlayer.ship, this.otherShips, currPlayer.id);
   }
 
   // Simple render method - no game logic, just rendering

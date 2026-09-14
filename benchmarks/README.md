@@ -236,7 +236,7 @@ and respawns mean initial counts alone cannot establish comparable rendering
 work. Runtime gameplay remains live and is not deterministic replay.
 
 The browser alternates trusted steering/fire presses on anchored one-second slots and attempts
-available ability/shield controls. Reports require authoritative movement and
+available ability controls. Reports require authoritative movement and
 new projectile witnesses. A five-minute run additionally requires at least 300
 input steps. Skipped slots are accepted only when their scheduled instant falls
 inside a recorded browser game-over recovery of at most ten seconds. Peer setup

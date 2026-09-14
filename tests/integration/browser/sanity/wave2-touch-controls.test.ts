@@ -424,7 +424,6 @@ test(
               return false;
             }
             return {
-              lives: player.lives,
               thrusting: player.ship.thrusting,
               canShoot: player.ship.canShoot,
               abilityDisabled: ability.getAttribute('aria-disabled'),
@@ -442,11 +441,13 @@ test(
         });
       const [observed] = await Promise.all([deadControls, game.dieOnceViaBoundary()]);
       expect(observed).toEqual({
-        lives: livesBefore - 1,
         thrusting: false,
         canShoot: true,
         abilityDisabled: 'true',
       });
+      // Local death disables controls before the server confirms the lost life.
+      // dieOnceViaBoundary waits for that confirmation and the respawn placement.
+      expect(await game.getLives()).toBe(livesBefore - 1);
       await page.waitForFunction(() => {
         const player = window.gameController?.getCurrPlayer();
         return player && !player.ship.exploding && player.ship.health > 0 && player.ship.thrusting;

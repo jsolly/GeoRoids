@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('disconnecting one of two humans does not clear or pause the shared field', () => {
+test('disconnecting one of two players does not clear or pause the shared field', () => {
   const engine = new GameEngine(3);
   engine.createAsteroids(10);
   engine.addPlayer('peer-a', 'PeerA', new RecordingSocket());
@@ -42,7 +42,7 @@ test('a depleted active field stays empty instead of regenerating harvested depo
   const firstField = engine.getAllAsteroids();
   const firstIds = new Set(firstField.map((asteroid) => asteroid.id));
 
-  expect(player.type).toBe('human');
+  expect(player.type).toBe('player');
   expect(firstField.length).toBeGreaterThan(0);
   expect(engine.isGamePaused()).toBe(false);
 

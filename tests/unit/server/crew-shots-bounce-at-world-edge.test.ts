@@ -48,7 +48,7 @@ test('a pilot cannot inject an inward laser from beyond the world wall', () => {
   const { engine, shooter } = crew();
   shooter.position = { x: WORLD.radius - 30, y: 0 };
   expect(
-    engine.spawnHumanLaser(shooter.id, { x: WORLD.radius + 1, y: 0 }, { x: -3, y: 0 })
+    engine.spawnPlayerLaser(shooter.id, { x: WORLD.radius + 1, y: 0 }, { x: -3, y: 0 })
   ).toBeNull();
   expect(engine.getServerLasers()).toEqual([]);
 });
@@ -56,7 +56,7 @@ test('a pilot cannot inject an inward laser from beyond the world wall', () => {
 test('a muzzle exactly on the wall still fires a reflected shot into the world', () => {
   const { engine, shooter } = crew();
   shooter.position = { x: WORLD.radius - 30, y: 0 };
-  const shot = engine.spawnHumanLaser(shooter.id, { x: WORLD.radius, y: 0 }, { x: 3, y: 0 });
+  const shot = engine.spawnPlayerLaser(shooter.id, { x: WORLD.radius, y: 0 }, { x: 3, y: 0 });
   assert(shot);
   engine.advanceLasersAndResolveHits();
   expect(shot.bounces).toBe(1);

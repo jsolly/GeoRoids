@@ -6,7 +6,7 @@ import {
 } from '../../../shared/combat';
 
 describe('shared combat helpers', () => {
-  test('treats exploding, dead, blinking, and protected humans as immune', () => {
+  test('treats exploding, dead, blinking, and protected players as immune', () => {
     expect(isCombatantImmune({ exploding: true, health: 100 })).toBe(true);
     expect(isCombatantImmune({ exploding: false, health: 0 })).toBe(true);
     expect(isCombatantImmune({ exploding: false, health: 100, blinkCount: 2 })).toBe(true);

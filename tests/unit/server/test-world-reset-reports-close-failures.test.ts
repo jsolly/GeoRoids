@@ -43,7 +43,7 @@ describe('test-world reset lifecycle failures', () => {
     expect((failure.errors[0] as Error).cause).toMatchObject({ message: 'socket close failed' });
     expect(close).toHaveBeenCalledWith(1000, 'Test world reset');
     expect(engine.getPlayer('pilot')).toBeDefined();
-    expect(engine.getDiagnostics().humanPlayers).toBe(1);
+    expect(engine.getDiagnostics().players).toBe(1);
   });
 
   test('returns HTTP 500 when the reset endpoint cannot close a live socket', () => {

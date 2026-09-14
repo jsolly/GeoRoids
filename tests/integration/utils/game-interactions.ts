@@ -1000,8 +1000,8 @@ export class GameInteractions {
     });
   }
 
-  /** Wait until at least `minCount` remote human players are visible. */
-  async waitForRemoteHumanPlayers(minCount = 1, timeoutMs = 20000): Promise<void> {
+  /** Wait until at least `minCount` remote players are visible. */
+  async waitForRemotePlayers(minCount = 1, timeoutMs = 20000): Promise<void> {
     await this.page.waitForFunction(
       (expected) => {
         const gc = window.gameController;
@@ -1017,8 +1017,8 @@ export class GameInteractions {
     );
   }
 
-  /** Remote human player ids visible to this client. */
-  async getRemoteHumanPlayerIds(): Promise<string[]> {
+  /** Remote player ids visible to this client. */
+  async getRemotePlayerIds(): Promise<string[]> {
     return await this.page.evaluate(() => {
       const gc = window.gameController;
       if (!gc) {

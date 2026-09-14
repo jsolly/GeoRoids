@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { applyShipMotionFrame } from '../../../server/ai/shipMotion';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
@@ -152,8 +151,8 @@ describe('ships feel the slope', () => {
     expect(velocity.y).toBeCloseTo(1, 6);
   });
 
-  test('terrain still pushes an automatically thrusting pilot and an idle hull downhill', () => {
-    const field = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
+  test('terrain still pushes an idle hull downhill', () => {
+    ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
     const start = { x: BOUNDS.radius / 2, y: 0 };
     const player = new Ship({ position: { ...start }, isLocalPlayer: true });
     player.mass = 1;
@@ -161,24 +160,11 @@ describe('ships feel the slope', () => {
     player.thrusting = false;
     player.blinkCount = 0;
     player.spawnProtectionTimer = 0;
-    const idleHull = {
-      kitId: player.kitId,
-      position: { ...start },
-      velocity: { x: 0, y: 0 },
-      angle: player.angle,
-      thrusting: false,
-      mass: player.mass,
-    };
 
     for (let frame = 0; frame < 60; frame++) {
       player.update();
-      applyShipMotionFrame(idleHull);
     }
 
-    expect(sampleHeight(field, idleHull.position.x, idleHull.position.y)).toBeLessThan(
-      sampleHeight(field, start.x, start.y)
-    );
-    expect(Math.hypot(idleHull.velocity.x, idleHull.velocity.y)).toBeGreaterThan(0);
     expect(player.position.x).not.toBeCloseTo(start.x, 5);
     expect(player.position.y).toBeLessThan(start.y);
     expect(Math.abs(player.velocity.x)).toBeGreaterThan(0);

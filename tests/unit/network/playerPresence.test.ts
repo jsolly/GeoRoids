@@ -33,14 +33,16 @@ test('an empty remote list against a populated snapshot is a no-op', () => {
   expect(staleRemotePlayerIds([], new Set(['anyone']))).toEqual([]);
 });
 
-test('a same-name human snapshot is treated as the local pilot', () => {
+test('a same-name player snapshot is treated as the local pilot', () => {
   const local = { clientId: 'client-a', localPlayerId: 'client-a', localPlayerName: 'PilotB' };
-  expect(isLocalGameEntity({ id: 'client-a', type: 'human', name: 'PilotB' }, local)).toBe(true);
-  expect(isLocalGameEntity({ id: 'client-z', type: 'human', name: 'PilotB' }, local)).toBe(true);
-  expect(isLocalGameEntity({ id: 'client-z', type: 'human', name: 'NeonLightning' }, local)).toBe(
+  expect(isLocalGameEntity({ id: 'client-a', type: 'player', name: 'PilotB' }, local)).toBe(true);
+  expect(isLocalGameEntity({ id: 'client-z', type: 'player', name: 'PilotB' }, local)).toBe(true);
+  expect(isLocalGameEntity({ id: 'client-z', type: 'player', name: 'NeonLightning' }, local)).toBe(
     false
   );
-  expect(isLocalGameEntity({ id: 'other-human', type: 'human', name: 'Other' }, local)).toBe(false);
+  expect(isLocalGameEntity({ id: 'other-player', type: 'player', name: 'Other' }, local)).toBe(
+    false
+  );
 });
 
 test('remote copies of the local name are duplicates', () => {

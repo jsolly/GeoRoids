@@ -57,7 +57,7 @@ export class MessageHandler {
 
         case 'leave': {
           const owner = this.gameEngine.getPlayerBySocket(ws);
-          if (owner?.type === 'human') {
+          if (owner) {
             this.gameEngine.removePlayer(owner.id);
             this.broadcaster.broadcastPlayerLeft(owner.id);
           }
@@ -65,7 +65,7 @@ export class MessageHandler {
         }
 
         case 'snapshotResync':
-          if (this.gameEngine.getPlayerBySocket(ws)?.type === 'human') {
+          if (this.gameEngine.getPlayerBySocket(ws)) {
             this.logSnapshotResync(ws, Date.now(), this.gameEngine.getServerTime());
             this.broadcaster.requestSnapshotKeyframe(ws);
           }
@@ -173,7 +173,7 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'This pilot requires its private resume token');
         return;
       }
-      if (this.gameEngine.getAllPlayers().filter((actor) => actor.type === 'human').length >= 100) {
+      if (this.gameEngine.getAllPlayers().length >= 100) {
         this.broadcaster.sendError(ws, 'The game server is full');
         return;
       }
@@ -236,7 +236,7 @@ export class MessageHandler {
   private handlePlayerUpdate(ws: WebSocket, command: CommandOf<'update'>): void {
     const { id, update } = command;
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type !== 'human' || socketPlayer.id !== id) {
+    if (!socketPlayer || socketPlayer.id !== id) {
       return;
     }
 
@@ -303,11 +303,11 @@ export class MessageHandler {
     logger.debug('DEBUG: Server received shoot message', { id, laserStart, laserDirection });
 
     const shooter = this.gameEngine.getPlayerBySocket(ws);
-    if (shooter?.type !== 'human' || shooter.id !== id) {
+    if (!shooter || shooter.id !== id) {
       return;
     }
 
-    const laser = this.gameEngine.spawnHumanLaser(shooter.id, laserStart, laserDirection);
+    const laser = this.gameEngine.spawnPlayerLaser(shooter.id, laserStart, laserDirection);
     if (requestId !== undefined) {
       const acknowledgement: PlayerShotAcknowledgement = {
         requestId,
@@ -329,13 +329,13 @@ export class MessageHandler {
   private handleChat(ws: WebSocket, command: CommandOf<'chat'>): void {
     const { id, message } = command;
     const player = this.gameEngine.getPlayerBySocket(ws);
-    if (player?.type === 'human' && player.id === id) {
+    if (player && player.id === id) {
       this.broadcaster.broadcastChatMessage(player.id, player.name, message);
     }
   }
 
   private getReporterId(ws: WebSocket): string | undefined {
-    return this.gameEngine.entityManager.getHumanBySocket(ws)?.id;
+    return this.gameEngine.getPlayerBySocket(ws)?.id;
   }
 
   private emitShipDamage(
@@ -386,7 +386,7 @@ export class MessageHandler {
   private handleUseAbility(ws: WebSocket, command: CommandOf<'useAbility'>): void {
     const playerId = command.id;
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type !== 'human' || socketPlayer.id !== playerId) {
+    if (!socketPlayer || socketPlayer.id !== playerId) {
       return;
     }
     // The join payload selects the kit. An ability request may echo that
@@ -474,7 +474,7 @@ export class MessageHandler {
     logger.debug('Handling initAsteroids message', { id });
 
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (socketPlayer?.type !== 'human' || socketPlayer.id !== id) {
+    if (!socketPlayer || socketPlayer.id !== id) {
       return;
     }
 

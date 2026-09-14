@@ -54,7 +54,7 @@ describe('server-authoritative combat', () => {
     vi.restoreAllMocks();
   });
 
-  test('overlapping human and asteroid apply one ram and destroy the roid', () => {
+  test('overlapping player and asteroid apply one ram and destroy the roid', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     clearProtection(engine, 'p1');
     clearAsteroidField(engine);
@@ -147,7 +147,7 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid('attached')).toBeUndefined();
   });
 
-  test('two humans share the same asteroid ram path', () => {
+  test('two players share the same asteroid ram path', () => {
     engine.addPlayer('p2', 'Partner', new RecordingSocket(), { x: 10, y: 0 });
     engine.entityManager.updateEntity('p2', {
       spawnProtectionTimer: 0,
@@ -159,7 +159,7 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid('server-asteroid-partner')).toBeUndefined();
   });
 
-  test('spawn protection blocks server ram for humans', () => {
+  test('spawn protection blocks server ram for players', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.addAsteroid(testAsteroid());
 
@@ -267,7 +267,7 @@ describe('server-authoritative combat', () => {
     });
   });
 
-  test('human state mutations stay bound to their joined sockets', () => {
+  test('player state mutations stay bound to their joined sockets', () => {
     const wsCore = new WebSocketCore(engine);
     const alphaWs = new RecordingSocket();
     const betaWs = new RecordingSocket();

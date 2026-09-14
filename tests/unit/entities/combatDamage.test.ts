@@ -14,7 +14,7 @@ describe('Crew survival against world hazards', () => {
     engine.stopGameLoop();
   });
 
-  test('human pilots cannot damage one another', () => {
+  test('players cannot damage one another', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.addPlayer('p2', 'Partner', new RecordingSocket(), { x: 40, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
@@ -27,7 +27,7 @@ describe('Crew survival against world hazards', () => {
     expect(engine.getPlayer('p1')?.health).toBe(100);
   });
 
-  test('environmental damage destroys a human, spends a life, and schedules respawn', () => {
+  test('environmental damage destroys a player, spends a life, and schedules respawn', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
 

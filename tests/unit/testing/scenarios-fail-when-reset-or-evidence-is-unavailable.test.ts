@@ -8,7 +8,7 @@ import {
 const cleanWorld = {
   isPaused: true,
   gameTime: 0,
-  humanPlayers: 0,
+  players: 0,
   asteroids: 0,
   loot: 0,
   satellitePickups: 0,
@@ -37,7 +37,7 @@ test.each([
   { players: 0 },
   { world: { ...cleanWorld, asteroids: -1 } },
   { world: { ...cleanWorld, gameTime: 'unknown' } },
-  { world: { ...cleanWorld, humanPlayers: null } },
+  { world: { ...cleanWorld, players: null } },
 ])('missing or corrupt world evidence cannot be treated as a clean arena: %j', async (body) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(body));
   await expect(getWorldDiagnostics()).rejects.toThrow('valid world diagnostics');

@@ -6,6 +6,7 @@ import {
   findSectorWallImpact,
   isInsideCompletedSector,
   isSectorExplorationComplete,
+  readCompletedSectorIds,
   sectorBounds,
   shipOverlapsCompletedSector,
 } from '../../../shared/sectors';
@@ -77,5 +78,32 @@ describe('open-world sector helpers', () => {
   test('a ship overlapping a completed wall is treated as inside the closed sector', () => {
     expect(shipOverlapsCompletedSector({ x: 3_990, y: 1_000 }, 15, new Set(['2,0']))).toBe(true);
     expect(shipOverlapsCompletedSector({ x: 3_900, y: 1_000 }, 15, new Set(['2,0']))).toBe(false);
+  });
+
+  test('invalid saved completed-sector payloads fail closed', () => {
+    expect(() => readCompletedSectorIds(null)).toThrow('Saved completed sectors are invalid');
+    expect(() => readCompletedSectorIds('2,0')).toThrow('Saved completed sectors are invalid');
+    expect(() => readCompletedSectorIds(['2,0', '2,0'])).toThrow(
+      'Saved completed sectors are invalid'
+    );
+    expect(() => readCompletedSectorIds(['not-a-sector'])).toThrow(
+      'Saved completed sectors are invalid'
+    );
+  });
+
+  test('spawn throws when every world-overlapping sector is complete', () => {
+    const span = Math.ceil(WORLD.radius / WORLD.sectorSize) + 1;
+    const completed = new Set<string>();
+    for (let y = -span; y <= span; y++) {
+      for (let x = -span; x <= span; x++) {
+        completed.add(`${x},${y}`);
+      }
+    }
+    expect(() =>
+      chooseOpenSectorSpawn({
+        completed,
+        random: () => 0.5,
+      })
+    ).toThrow('No open sector remains for spawn');
   });
 });

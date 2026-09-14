@@ -126,7 +126,7 @@ Compare run-level results, not thousands of autocorrelated frames as independent
 | --- | --- | --- |
 | Cold arrival and menu | Cold cache, font loading, animated title terrain, nickname entry, Play, successful and failed joins | Startup work, input delay, first-use stalls |
 | Ordinary arena | One local pilot, configured asteroids/satellite pickups, moving camera across mountain and boundary | Typical frame cost and gameplay correctness |
-| Loaded battle | Ten humans, 80 asteroids, 15 initial drops, configured satellite pickups; sustained shots and explosions | Render/decode cost, combat interactions, allocation |
+| Loaded battle | Ten players, 80 asteroids, 15 initial drops, configured satellite pickups; sustained shots and explosions | Render/decode cost, combat interactions, allocation |
 | Dense visible battle | Concentrate entities and effects inside the viewport and sweep the camera | Offscreen fixtures can conceal expensive visible work |
 | Recovery burst | Disconnect, same-socket rejoin, resync, keyframe after pressure, background/resume | Baseline correctness, catch-up bursts, duplicate effects |
 | Long play | 30-minute desktop and mobile sessions, repeated death/respawn and join/leave | Memory leaks, thermal degradation, stale subscriptions |
@@ -135,7 +135,7 @@ Compare run-level results, not thousands of autocorrelated frames as independent
 
 Reuse existing fixture builders, but version their scenario parameters. The current
 runner uses a compiled diagnostic scene for client work, a seeded evolving engine
-with two humans for direct server ticks, the original snapshot
+with two players for direct server ticks, the original snapshot
 fixtures for codec work, and a real loopback session for transport. Client and
 direct-server clocks and random streams
 are controlled where the runner owns them; transport scheduling remains native and

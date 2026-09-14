@@ -1404,7 +1404,7 @@ try {
                 camera.width / 2 &&
               Math.abs(position.y - camera.position.y) * PLAYFIELD_CLOSE_SCALE <= camera.height / 2;
             const populations = {
-              humans: state.entities.filter((entity) => entity.type === 'human'),
+              players: state.entities,
               asteroids: state.asteroids,
               pickups: state.satellitePickups,
               projectiles: state.playerProjectiles,
@@ -1853,7 +1853,7 @@ try {
       }
       try {
         const deadline = performance.now() + 10_000;
-        const samples: Array<{ at: string; humanPlayers: number }> = [];
+        const samples: Array<{ at: string; players: number }> = [];
         departure['samples'] = samples;
         let empty = false;
         while (performance.now() < deadline) {
@@ -1865,11 +1865,11 @@ try {
           assert(
             world &&
               typeof world === 'object' &&
-              'humanPlayers' in world &&
-              typeof world.humanPlayers === 'number'
+              'players' in world &&
+              typeof world.players === 'number'
           );
-          samples.push({ at: new Date().toISOString(), humanPlayers: world.humanPlayers });
-          if (world.humanPlayers === 0) {
+          samples.push({ at: new Date().toISOString(), players: world.players });
+          if (world.players === 0) {
             empty = true;
             break;
           }

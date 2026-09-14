@@ -2,7 +2,7 @@
 
 ## Thesis
 
-**Beautiful retro** Atari Asteroids for Canvas 2D multiplayer — not brutal, not ugly, not “programmer CRT.” Stark elegant void, crisp hairline vectors with soft luminous phosphor, calm sparse stars, almost no chrome. Ownership colors keep local and remote humans readable at a glance. Polish bar stays “Matt would blush”: authored, premium, and pretty — never glossy UI fills, never harsh raw arcade grit, never a 3D remake.
+**Beautiful retro** Atari Asteroids for Canvas 2D multiplayer — not brutal, not ugly, not “programmer CRT.” Stark elegant void, crisp hairline vectors with soft luminous phosphor, calm sparse stars, almost no chrome. Ownership colors keep local and remote players readable at a glance. Polish bar stays “Matt would blush”: authored, premium, and pretty — never glossy UI fills, never harsh raw arcade grit, never a 3D remake.
 
 ## Pillars
 
@@ -35,7 +35,7 @@ Top-down 2D Canvas orthographic playfield. Emulate vector-monitor language on a 
 | bg | `#000011` | Stark playfield void |
 | stars | `#8BA3C7` | Sparse star *points* (not soft blobs) |
 | local | `#5EEAD4` | Local ship outline + thruster |
-| remote | `#7DD3FC` | Remote human ship outline |
+| remote | `#7DD3FC` | Remote player ship outline |
 | roid | `#94A3B8` | Roid outlines (subordinate to ships) |
 | laser_local | `#FDE68A` | All crew shots — short segments / dots, not beams |
 | hud | `#E2E8F0` | Primary HUD (phosphor near-white) |
@@ -76,7 +76,7 @@ At a glance: local cyan-mint vs remote sky. Roids quieter. HUD never larger than
 
 **Kill:** giant top-center score; yellow DEBUG MODE; laser bloom; “Game Server” under radar; dense opaque leaderboard; any filled HUD panel.
 
-**Keep / rework:** lives as tiny outline ship glyphs (local color); score as small phosphor text top-left; leaderboard as sparse translucent list (human sky names); radar as a hairline muted ring with pin-dot contacts; health as a thin tick or 2px capsule — show `100/100` only on damage or settings.
+**Keep / rework:** lives as tiny outline ship glyphs (local color); score as small phosphor text top-left; leaderboard as sparse translucent list (player sky names); radar as a hairline muted ring with pin-dot contacts; health as a thin tick or 2px capsule — show `100/100` only on damage or settings.
 
 ## Collectible EO satellites
 

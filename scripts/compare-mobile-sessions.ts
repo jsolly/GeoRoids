@@ -231,8 +231,12 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
       .map(record)
       .filter((sample) => sample['measured'] === true);
     assert(measuredPopulation.length > 0, 'Missing measured population evidence');
+    const firstSample = measuredPopulation[0];
+    assert(firstSample, 'Missing measured population evidence');
     const distributions: Record<string, object> = {};
-    for (const entity of ['humans', 'asteroids', 'pickups', 'projectiles']) {
+    const firstCounts = record(firstSample['counts']);
+    const peopleKey = 'players' in firstCounts ? 'players' : 'humans';
+    for (const entity of [peopleKey, 'asteroids', 'pickups', 'projectiles']) {
       for (const count of ['total', 'visibleCenters']) {
         const values = measuredPopulation.map((sample) =>
           number(record(record(sample['counts'])[entity])[count])

@@ -16,7 +16,7 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
       return {
         id: `pilot-${i}`,
         name: `Pilot ${i}`,
-        type: 'human',
+        type: 'player',
         position: { x: 500 + i * 90 + tick * 0.7, y: 100 + i * 30 + tick * 0.4 },
         velocity: { x: 0.7, y: 0.4 },
         angle: i + tick * 0.01,

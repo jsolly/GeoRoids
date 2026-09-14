@@ -11,10 +11,10 @@ test(
   async () => {
     const { game1, game2 } = await bootTwoClientGames(browserManager);
 
-    const remoteIdsOnClient1 = await game1.getRemoteHumanPlayerIds();
+    const remoteIdsOnClient1 = await game1.getRemotePlayerIds();
     expect(
       remoteIdsOnClient1.length,
-      'client 1 should see client 2 as a remote human'
+      'client 1 should see client 2 as a remote player'
     ).toBeGreaterThan(0);
     const targetId = remoteIdsOnClient1[0];
     assert.ok(targetId, 'Remote pilot missing');

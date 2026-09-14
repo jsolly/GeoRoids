@@ -125,10 +125,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
               state.sequence + 1,
               'Snapshot sequence did not advance'
             );
-            state.decodedParticipantIds = result.state.entities
-              .filter((entity) => entity.type === 'human')
-              .map((entity) => entity.id)
-              .sort();
+            state.decodedParticipantIds = result.state.entities.map((entity) => entity.id).sort();
             state.sequence++;
             state.snapshotPackets++;
             if (measuring) {

@@ -145,7 +145,7 @@ describe('Server laser↔asteroid authority', () => {
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
-  test('two humans share the same apply-once helper', () => {
+  test('two players share the same apply-once helper', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
     engine.addPlayer('p2', 'Two', {} as never, { x: 40, y: 0 });

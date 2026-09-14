@@ -73,7 +73,7 @@ export class SatellitePickupManager {
     return created;
   }
 
-  /** Attach a loose pickup to one authoritative living human. */
+  /** Attach a loose pickup to one living player. */
   public collect(
     pickupId: string,
     owner: PickupOwnerPose,

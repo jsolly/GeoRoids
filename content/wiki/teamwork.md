@@ -1,7 +1,7 @@
 ---
 title: Teamwork
 category: Systems
-summary: Every human pilot shares one crew. Scan, tow, and deliver together
+summary: Every player shares one crew. Scan, tow, and deliver together
   while ship weapons and collisions leave teammates unharmed. Completing a
   sector walls it off for later expeditions.
 order: 140
@@ -16,7 +16,7 @@ media: []
 
 ## One crew
 
-Every human pilot is on the same crew. The scoreboard keeps a row for every
+Every player is on the same crew. The scoreboard keeps a row for every
 active player so asteroid work and delivery points are visible across the whole
 field. The match has one shared crew.
 

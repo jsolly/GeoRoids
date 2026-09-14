@@ -128,7 +128,7 @@ UTF-8 application payload bytes from the JSON snapshot envelope, not WebSocket
 transport framing. The transport measurement uses two real loopback clients and
 an owned child server; its native scheduling is nondeterministic and its server
 seed belongs to the server factory. The direct server runner uses two loopback
-humans.
+players.
 
 These measurements describe a fixture and its machine. They do not establish an
 optimization result, a supported device or a supported server capacity.

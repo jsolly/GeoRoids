@@ -26,10 +26,10 @@ and pickup-break sounds differ from ship lasers. Laser cores and
 material pickups have separate cues, as do kit abilities and respawning.
 
 The HUD shows lives as kit hull icons, score, kit name, and the current ability.
-Desktop layouts include a leaderboard of every active human row and a
+Desktop layouts include a leaderboard of every active player row and a
 local minimap; touch layouts use a compact leaderboard and an adaptive local
 minimap. The local minimap follows the ship's nearby radar: it shows your ship,
-other human pilots, explored asteroids, loot drops, loose satellite
+other players, explored asteroids, loot drops, loose satellite
 pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
 marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;

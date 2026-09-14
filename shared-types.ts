@@ -29,7 +29,7 @@ export interface Velocity {
 }
 
 // Network update interface - only what needs to be synced
-/** Chosen at join. Shared by every human ship. */
+/** Chosen at join. Shared by every player ship. */
 export type ShipKitId = 'surveyor' | 'hauler';
 
 export interface PlayerUpdate {
@@ -252,7 +252,7 @@ export interface ServerGameSnapshot extends ServerGameState {
 export interface ServerEntityData {
   id: string;
   name: string;
-  type: 'human';
+  type: 'player';
   position: Position;
   velocity: Velocity;
   angle: number;

@@ -50,13 +50,14 @@ function sectorOverlapsWorld(x: number, y: number): boolean {
 
 export function readCompletedSectorIds(value: unknown): string[] {
   if (!Array.isArray(value)) {
-    return [];
+    throw new Error('Saved completed sectors are invalid');
   }
   const ids = new Set<string>();
   for (const entry of value) {
-    if (typeof entry !== 'string' || !parseSectorId(entry) || !ids.add(entry)) {
+    if (typeof entry !== 'string' || !parseSectorId(entry) || ids.has(entry)) {
       throw new Error('Saved completed sectors are invalid');
     }
+    ids.add(entry);
   }
   return [...ids].sort();
 }
@@ -207,12 +208,14 @@ export function findSectorWallImpact(
   return nearest;
 }
 
+const OPEN_SECTOR_SEARCH_RADIUS = Math.ceil(WORLD.radius / WORLD.sectorSize) + 1;
+
 function nearestOpenNeighbor(
   x: number,
   y: number,
   completed: ReadonlySet<string>
 ): { x: number; y: number } | null {
-  for (let radius = 1; radius <= 8; radius++) {
+  for (let radius = 1; radius <= OPEN_SECTOR_SEARCH_RADIUS; radius++) {
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) {
@@ -297,7 +300,14 @@ function randomPointInSector(
       return candidate;
     }
   }
-  return clampInsideWorld(sectorCenter(x, y));
+  const fallback = clampInsideWorld(sectorCenter(x, y));
+  if (
+    !isInsideCompletedSector(fallback, completed) &&
+    Math.hypot(fallback.x, fallback.y) <= WORLD.radius
+  ) {
+    return fallback;
+  }
+  throw new Error('No open sector remains for spawn');
 }
 
 function nearestOpenSector(
@@ -312,7 +322,7 @@ function nearestOpenSector(
   if (found) {
     return found;
   }
-  return { x: 0, y: 0 };
+  throw new Error('No open sector remains for spawn');
 }
 
 export function chooseOpenSectorSpawn(options: {

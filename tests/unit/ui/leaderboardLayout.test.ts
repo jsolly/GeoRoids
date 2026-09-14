@@ -138,7 +138,6 @@ test('long mobile leaderboard names fit before a wide right-aligned score', () =
   const scoreWidth = ctx.measureText(score.text).width;
   expect(nameWidth).toBeLessThanOrEqual(score.x - name.x - scoreWidth - 6);
   expect(name.text.length).toBeLessThan(longName.length);
-  expect(name.text.endsWith(' (bot)')).toBe(false);
 });
 
 test('leaderboard name fitting preserves names and Unicode boundaries when there is room', () => {

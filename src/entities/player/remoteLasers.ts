@@ -1,7 +1,7 @@
 import type { Player } from './Player';
 
 /**
- * Advance remote human ships on the shared 60 Hz lifecycle clock.
+ * Advance remote player ships on the shared 60 Hz lifecycle clock.
  *
  * Pose stays server-driven (`updateLifecycle` does not predict movement).
  * Explode / blink must still tick or remotes freeze at the first death frame

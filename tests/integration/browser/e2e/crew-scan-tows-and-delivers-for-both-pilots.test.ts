@@ -166,7 +166,7 @@ test(
 
     const haulerId = await hauler.getLocalPlayerId();
     const surveyorId = await surveyor.getLocalPlayerId();
-    await Promise.all([hauler.waitForRemoteHumanPlayers(1), surveyor.waitForRemoteHumanPlayers(1)]);
+    await Promise.all([hauler.waitForRemotePlayers(1), surveyor.waitForRemotePlayers(1)]);
 
     await arrangeCrewField([haulerId, surveyorId], 'delivery');
     await Promise.all([hauler.placeShipAt(0, -360), surveyor.placeShipAt(220, -460)]);

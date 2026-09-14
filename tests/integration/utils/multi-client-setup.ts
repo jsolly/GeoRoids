@@ -20,8 +20,8 @@ export async function bootTwoClientGames(browserManager: BrowserManager): Promis
 
   await game1.bootGame();
   await game2.bootGame();
-  await game1.waitForRemoteHumanPlayers(1);
-  await game2.waitForRemoteHumanPlayers(1);
+  await game1.waitForRemotePlayers(1);
+  await game2.waitForRemotePlayers(1);
 
   return { page1, page2, game1, game2 };
 }

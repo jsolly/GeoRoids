@@ -10,7 +10,7 @@ test(
   async () => {
     const { page2, game1 } = await bootTwoClientGames(browserManager);
 
-    const departingId = (await game1.getRemoteHumanPlayerIds())[0];
+    const departingId = (await game1.getRemotePlayerIds())[0];
     expect(departingId, 'client 1 should see client 2 before close').toBeTruthy();
     if (!departingId) {
       throw new Error('Client 2 did not join client 1 remote-player state');
@@ -19,7 +19,7 @@ test(
     await page2.close();
 
     await expect
-      .poll(async () => !(await game1.getRemoteHumanPlayerIds()).includes(departingId), {
+      .poll(async () => !(await game1.getRemotePlayerIds()).includes(departingId), {
         timeout: 10000,
         message: 'closed tab should leave client 1 remote-player state',
       })

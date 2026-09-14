@@ -52,7 +52,7 @@ describe('Satellite pickups', () => {
     return collected;
   }
 
-  test('pickups appear with authoritative health in the game state when a human joins', () => {
+  test('pickups appear with authoritative health in the game state when a player joins', () => {
     addPilot();
     const state = gameEngine.getGameState();
 
@@ -83,7 +83,7 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getDiagnostics().satellitePickups).toBe(6);
   });
 
-  test('a reasonably close human is collected automatically and receives only the score bonus', () => {
+  test('a reasonably close player is collected automatically and receives only the score bonus', () => {
     addPilot();
     const attached = collectNearest('pilot', 110);
     const pilot = gameEngine.getPlayer('pilot');
@@ -103,7 +103,7 @@ describe('Satellite pickups', () => {
     expect(dist).toBeCloseTo(orbitRadiusForOwner(radiusFromMass(pilot.mass), later.radius), 6);
   });
 
-  test('the nearest competing human wins once and a later tick cannot duplicate the score', () => {
+  test('the nearest competing player wins once and a later tick cannot duplicate the score', () => {
     addPilot('first');
     addPilot('second');
     const pickup = gameEngine.getAllSatellitePickups()[0];
@@ -205,7 +205,7 @@ describe('Satellite pickups', () => {
     expect(distance).toBeCloseTo(expected, 6);
   });
 
-  test('distant and dead humans are never automatic collectors', () => {
+  test('distant and dead players are never automatic collectors', () => {
     addPilot();
     const pickup = gameEngine.getAllSatellitePickups()[0];
     assert.ok(pickup);

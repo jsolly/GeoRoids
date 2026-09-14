@@ -43,8 +43,8 @@ async function expectPilotsAliveWithUnchangedLives(
     game2.isShipExploding(),
     game1.getPlayerHealthById(id2),
     game2.getPlayerHealthById(id1),
-    game1.getRemoteHumanPlayerIds(),
-    game2.getRemoteHumanPlayerIds(),
+    game1.getRemotePlayerIds(),
+    game2.getRemotePlayerIds(),
   ]);
 
   expect(lives1).toBe(expectedLives[0]);

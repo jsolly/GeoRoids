@@ -1,11 +1,11 @@
 /**
  * Remote-player presence helpers.
  *
- * The server removes a human on socket close and now also broadcasts
+ * The server removes a player on socket close and now also broadcasts
  * `playerLeft`. `handleSnapshotState` still updates entities in place, so snapshot
  * pruning remains the fallback if a `playerLeft` is dropped.
  *
- * These helpers drop only `type === 'remote'` humans missing from the latest
+ * These helpers drop only `type === 'remote'` players missing from the latest
  * authoritative snapshot. Local entries stay.
  */
 
@@ -18,7 +18,7 @@ export function isLocalGameEntity(
     return true;
   }
   return Boolean(
-    local.localPlayerName && entity.type === 'human' && entity.name === local.localPlayerName
+    local.localPlayerName && entity.type === 'player' && entity.name === local.localPlayerName
   );
 }
 

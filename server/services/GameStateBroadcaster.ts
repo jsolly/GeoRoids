@@ -144,7 +144,7 @@ export class GameStateBroadcaster {
     for (const blast of this.gameEngine.drainLootBlasts()) {
       this.broadcastLootExploded(blast);
     }
-    const players = this.gameEngine.entityManager.getHumanPlayers();
+    const players = this.gameEngine.getAllPlayers();
     for (const player of players) {
       const ws = player.ws;
       if (!ws || (excludeId && player.id === excludeId)) {
@@ -404,7 +404,7 @@ export class GameStateBroadcaster {
   }
 
   public broadcastAsteroidCreation(asteroids: readonly AsteroidData[]): void {
-    for (const player of this.gameEngine.entityManager.getHumanPlayers()) {
+    for (const player of this.gameEngine.getAllPlayers()) {
       if (!player.ws) {
         continue;
       }
@@ -525,7 +525,7 @@ export class GameStateBroadcaster {
   private closeSocketForRecovery(ws: WebSocket, code: number, reason: string): void {
     const player = this.gameEngine.getPlayerBySocket(ws);
     const resumable = this.gameEngine.transportClosed(ws);
-    if (!resumable && player?.type === 'human') {
+    if (!resumable && player) {
       const removed = this.gameEngine.removePlayer(player.id);
       if (removed) {
         this.broadcastPlayerLeft(player.id);
@@ -636,9 +636,9 @@ export class GameStateBroadcaster {
       });
       return;
     }
-    const humanPlayers = this.gameEngine.entityManager.getHumanPlayers();
+    const players = this.gameEngine.getAllPlayers();
 
-    for (const player of humanPlayers) {
+    for (const player of players) {
       if (excludeId && player.id === excludeId) {
         continue;
       }

@@ -3,9 +3,9 @@
  *
  * The browser does not always surface a half-open ("zombie") socket as closed:
  * the tab can believe it is still connected while the server has already torn
- * the player down (observed live as /health humanPlayers dropping 2 -> 1 while
+ * the player down (observed live as /health players dropping 2 -> 1 while
  * both UIs kept "playing"). Because the server broadcasts game state ~30x/sec
- * to every connected human and answers our pings with a pong, a simple
+ * to every connected player and answers our pings with a pong, a simple
  * client-side rule — "have we heard anything at all recently?" — reliably
  * detects a dead link without any server change.
  */

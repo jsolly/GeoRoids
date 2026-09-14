@@ -195,7 +195,7 @@ export const SHIP = {
   // Movement
   TURN_SPEED: 450, // degrees per second
   THRUST: 5 * GAME.MOTION_SCALE, // pixels per second² (acceleration)
-  MAX_VELOCITY: 8 * GAME.MOTION_SCALE, // pixels per second
+  MAX_VELOCITY: 2 * GAME.MOTION_SCALE, // pixels per frame; one-quarter of the former cruise speed
   BOT_FRICTION: 2.0, // higher = more friction for bots
   SIZE: 30, // height in pixels
 

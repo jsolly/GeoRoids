@@ -11,8 +11,8 @@ beforeEach(() => {
 afterEach(() => world.dispose());
 
 test.each([
-  { mass: 1, normalSpeed: 4.5 },
-  { mass: 8, normalSpeed: 2.7 },
+  { mass: 1, normalSpeed: 1.125 },
+  { mass: 8, normalSpeed: 0.675 },
 ])('Dart at mass $mass can report burst speed only during its ability', ({ mass, normalSpeed }) => {
   const pilot = world.join('Dart pilot', { x: 0, y: 0 }, { kitId: 'dart' });
   world.clearAsteroids();
@@ -20,7 +20,7 @@ test.each([
   const actor = world.entity(pilot);
   actor.mass = mass;
   actor.velocity = { x: normalSpeed, y: 0 };
-  const burstSpeed = normalSpeed + 3.375;
+  const burstSpeed = normalSpeed + 0.84375;
   actor.angle = 0;
   const now = world.engine.getServerTime();
   const pose = {
@@ -80,8 +80,8 @@ test('a grown Hauler reports its reduced cruise speed and retains a server knock
   const pose = {
     epoch: actor.playerMotion?.epoch ?? 0,
     sequence: 1,
-    position: { x: 3.9375, y: 0 },
-    velocity: { x: 3.9375, y: 0 },
+    position: { x: 0.984375, y: 0 },
+    velocity: { x: 0.984375, y: 0 },
     angle: 0,
     thrusting: true,
   };
@@ -89,7 +89,7 @@ test('a grown Hauler reports its reduced cruise speed and retains a server knock
   expect(
     world.engine.playerMotion.acceptFreePose(
       pilot.socket,
-      { ...pose, velocity: { x: 2.3625, y: 0 } },
+      { ...pose, velocity: { x: 0.590625, y: 0 } },
       now + 17
     ).ok
   ).toBe(true);
@@ -101,7 +101,7 @@ test('a grown Hauler reports its reduced cruise speed and retains a server knock
       {
         ...pose,
         epoch: actor.playerMotion?.epoch ?? 0,
-        position: { x: 3.9375, y: 8 },
+        position: { x: 0.984375, y: 8 },
         velocity: { x: 0, y: 8 },
       },
       now + 34

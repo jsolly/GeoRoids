@@ -68,7 +68,7 @@ test('Hauler keeps a heavy hull with quicker thrust and a Warden-class speed cap
   const hauler = getShipKit('hauler');
   const warden = getShipKit('warden');
   expect(hauler.thrust).toBe(4.5 * GAME.MOTION_SCALE);
-  expect(hauler.maxVelocity).toBe(7 * GAME.MOTION_SCALE);
+  expect(hauler.maxVelocity).toBe(1.75 * GAME.MOTION_SCALE);
   expect(hauler.maxVelocity).toBe(warden.maxVelocity);
   expect(hauler.thrust).toBeLessThan(dart.thrust);
   expect(hauler.maxVelocity).toBeLessThan(dart.maxVelocity);

@@ -1,4 +1,5 @@
 import type { Position } from '../../../shared-types';
+import { LASER } from '../../constants';
 import { pointsForRoidSize } from '../../entities/roid/roidScore';
 import { getGameBoundary } from '../boundary';
 
@@ -6,9 +7,6 @@ import { getGameBoundary } from '../boundary';
 function flooredDistance(ax: number, ay: number, bx: number, by: number): number {
   return Math.floor(Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2));
 }
-
-/** Discrete laser radius used by point and swept laser tests. */
-const LASER_HIT_RADIUS = 2;
 
 /**
  * Check if two circular objects are colliding
@@ -40,7 +38,7 @@ export function checkLaserHit(
   targetPos: Position,
   targetRadius: number
 ): boolean {
-  return checkCircularCollision(laserPos, LASER_HIT_RADIUS, targetPos, targetRadius);
+  return checkCircularCollision(laserPos, LASER.HIT_RADIUS, targetPos, targetRadius);
 }
 
 /** Server-authoritative score for a destroyed roid. Do not trust client points. */

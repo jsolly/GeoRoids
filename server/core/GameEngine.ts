@@ -310,7 +310,7 @@ export class GameEngine {
     this.tickAbilities(serverNow);
     this.entityManager.updateShields();
     this.entityManager.updateHealthRegeneration();
-    this.lootManager.expire(this.gameTime);
+    this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
     this.collectLoot(serverNow);
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion();

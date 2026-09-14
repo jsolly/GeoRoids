@@ -211,6 +211,6 @@ test('Quake sends a bot flying faster than its normal steering cap', () => {
     data: { kitId: 'quake', abilityId: 'shockPulse' },
   });
   world.engine.entityManager.updateBotMovement();
-  expect(bot.position.x).toBeGreaterThan(130);
+  expect(bot.position.x).toBeGreaterThan(100 + 40 * GAME.MOTION_SCALE);
   expect(Math.hypot(bot.velocity.x, bot.velocity.y)).toBeGreaterThan(10);
 });

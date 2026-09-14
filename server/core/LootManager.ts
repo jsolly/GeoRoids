@@ -1,5 +1,11 @@
 import { createFuelLootData, isFuelLoot, shouldReleaseFuel } from '../../shared/fuel';
-import { canCollectLoot, GROWTH, lootOverlap, planKillLoot } from '../../shared/shipGrowth';
+import {
+  addLootMagnetPull,
+  canCollectLoot,
+  GROWTH,
+  lootOverlap,
+  planKillLoot,
+} from '../../shared/shipGrowth';
 import type { AsteroidData, LootData, Position, Velocity } from '../../shared-types';
 import { FUEL } from '../../src/constants';
 import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';
@@ -134,8 +140,15 @@ export class LootManager {
     return collected;
   }
 
-  public expire(gameTime: number): void {
+  public expire(gameTime: number, collectors: readonly GameEntity[] = []): void {
+    const liveCollectors = collectors.filter((entity) => canCollectLoot(entity));
+    const magnetPositions = liveCollectors.map((entity) => entity.position);
+    const fuelMagnetPositions = liveCollectors
+      .filter((entity) => (entity.fuel ?? FUEL.START) < (entity.maxFuel ?? FUEL.MAX))
+      .map((entity) => entity.position);
+
     for (const [id, drop] of this.loot) {
+      addLootMagnetPull(drop, isFuelLoot(drop) ? fuelMagnetPositions : magnetPositions);
       drop.position.x += drop.velocity.x;
       drop.position.y += drop.velocity.y;
       drop.velocity.x *= QUAKE_KNOCKBACK_DECAY;

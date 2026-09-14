@@ -19,7 +19,7 @@ export const GAME = {
   // Physics
   FPS: 60,
   /** Spatial pace multiplier; simulation cadence and cooldowns stay fixed. */
-  MOTION_SCALE: 0.75,
+  MOTION_SCALE: 0.5625, // 0.75 × 0.75 — extra 25% slowdown on the existing pace
   FRICTION: 0.6,
 } as const;
 
@@ -90,12 +90,12 @@ export const TITLE = {
 export const VISUAL = {
   SHIP_STROKE_WIDTH: 1.25,
   SHIP_GLOW: 1.25,
-  // Short cream dash plus a faint heading ghost — still a shot, never a beam.
-  LASER_STROKE_WIDTH: 2,
-  LASER_LENGTH: 15,
-  LASER_TRAIL_LENGTH: 8,
-  LASER_EXPLODE_RADIUS: 10,
-  LASER_GLOW: 3.5,
+  // Thicker short cream dash plus a faint heading ghost — still a shot, never a beam.
+  LASER_STROKE_WIDTH: 3.5,
+  LASER_LENGTH: 24,
+  LASER_TRAIL_LENGTH: 13,
+  LASER_EXPLODE_RADIUS: 16,
+  LASER_GLOW: 6,
   LASER_HIT_TICKS: 4,
   HEALTH_CAPSULE_HEIGHT: 1.5,
   BOUNDARY_STROKE_WIDTH: 1.25,
@@ -126,13 +126,13 @@ export const VISUAL = {
   STAR_SEED: 0x9e3779b9,
   STAR_ALPHA_MIN: 0.3,
   STAR_ALPHA_MAX: 0.8,
-  LOOT_STROKE_WIDTH: 1.5,
-  LOOT_GLOW: 1.5,
-  LOOT_UNDERSTROKE: 2.75,
+  LOOT_STROKE_WIDTH: 2,
+  LOOT_GLOW: 2,
+  LOOT_UNDERSTROKE: 3.5,
   LOOT_SHARD_INNER: 0.42,
   LOOT_SHARD_DENSE_INNER: 0.68,
   /** Positive screen-space radius keeps tiny world drops visible at deep zoom. */
-  LOOT_MIN_SCREEN_PX: 3.25,
+  LOOT_MIN_SCREEN_PX: 5,
   FUEL_BAR_WIDTH: 72,
   FUEL_BAR_HEIGHT: 2,
   MINIMAP_SIZE: 96,
@@ -171,8 +171,8 @@ export const VISUAL = {
   CONTOUR_LABEL_MARGIN_X: 28,
   CONTOUR_LABEL_MARGIN_Y: 18,
   // Cream iso-tangent under each live shot. Terrain answers; shots stay amber on top.
-  CONTOUR_LASER_LENGTH: 28,
-  CONTOUR_LASER_STROKE_WIDTH: 1.25,
+  CONTOUR_LASER_LENGTH: 42,
+  CONTOUR_LASER_STROKE_WIDTH: 2,
   CONTOUR_LASER_ALPHA: 0.5,
   // Hairline shield ring; glow capped to stroke so it stays a vector outline.
   SHIELD_STROKE_WIDTH: 1.25,
@@ -234,6 +234,8 @@ export const LASER = {
   TRAVEL_DISTANCE_RATIO: 0.6, // fraction of screen width
   EXPLODE_DURATION: 0.1, // seconds
   PREDICTION_TIMEOUT_MS: 2000, // Bound unacknowledged local shots during connection loss
+  /** Projectile thickness for hits. Ship hull and shield radii stay independent. */
+  HIT_RADIUS: 4,
 } as const;
 
 // ============================================================================
@@ -331,7 +333,7 @@ export const FUEL = {
   START: 50,
   EMP_COST: 25,
   DROP_AMOUNT: 25,
-  DROP_RADIUS: 8,
+  DROP_RADIUS: 14,
   MIN_ROID_SIZE_TO_DROP: ROID.COLLAB_SPLIT_MIN_SIZE,
 } as const;
 

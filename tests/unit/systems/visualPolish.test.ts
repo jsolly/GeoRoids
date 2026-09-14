@@ -24,7 +24,12 @@ import { ensureTerrain, getTerrainField } from '../../../src/physics/terrain/ter
 import { canvasManager } from '../../../src/rendering/canvas';
 import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRenderer';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
-import { burstTick, driftSegment, easeOutCubic } from '../../../src/rendering/vectorJuice';
+import {
+  burstTick,
+  driftSegment,
+  easeOutCubic,
+  laserBoltOffsets,
+} from '../../../src/rendering/vectorJuice';
 import { hexToRgba } from '../../../src/utils/colorUtils';
 import { TestPath2D } from '../../support/TestPath2D';
 import { setWindowViewport } from '../../support/viewport';
@@ -178,45 +183,41 @@ test('shield impact renders a phosphor ring without filling the ship', () => {
   expect(fill).not.toHaveBeenCalled();
 });
 
-test('local and enemy shots draw short narrow trails, then the identified hit draws a ring and ticks', () => {
+test('local and enemy shots draw short thicker trails, then the identified hit draws a ring and ticks', () => {
   const { ctx, strokes, fill } = recordingContext();
   const local = new Laser({ x: 30, y: 60 }, { x: 3, y: 4 }, 0, 0);
   local.serverId = 'local-diagonal';
   const enemy = new Laser({ x: -20, y: 80 }, { x: 0, y: -5 }, 0, 0);
   enemy.serverId = 'enemy-vertical';
   const viewer = { x: 10, y: 20 };
+  const scale = canvasManager.getPlayfieldScale();
+  const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
+  const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
+  const localScreen = canvasManager.worldToScreen(local.position, viewer);
+  const enemyScreen = canvasManager.worldToScreen(enemy.position, viewer);
+  const localOffsets = laserBoltOffsets(local.velocity.x, local.velocity.y, bolt, trailLength);
+  const enemyOffsets = laserBoltOffsets(enemy.velocity.x, enemy.velocity.y, bolt, trailLength);
   ctx.save();
   const expectedBlur = [VISUAL.LASER_GLOW * 0.55, 0, VISUAL.LASER_GLOW, 0].map((blur) => {
     ctx.shadowBlur = blur;
     return ctx.shadowBlur;
   });
   ctx.restore();
-  for (const { shot, color, trail, body } of [
-    {
-      shot: local,
-      color: PALETTE.LASER_LOCAL,
-      trail: [
-        { x: 410.7, y: 327.6 },
-        { x: 415.5, y: 334 },
-      ],
-      body: [
-        { x: 415.5, y: 334 },
-        { x: 424.5, y: 346 },
-      ],
-    },
-    {
-      shot: enemy,
-      color: PALETTE.LASER_ENEMY,
-      trail: [
-        { x: 370, y: 375.5 },
-        { x: 370, y: 367.5 },
-      ],
-      body: [
-        { x: 370, y: 367.5 },
-        { x: 370, y: 352.5 },
-      ],
-    },
+  for (const { shot, color, screen, offsets } of [
+    { shot: local, color: PALETTE.LASER_LOCAL, screen: localScreen, offsets: localOffsets },
+    { shot: enemy, color: PALETTE.LASER_ENEMY, screen: enemyScreen, offsets: enemyOffsets },
   ]) {
+    const trail = [
+      {
+        x: screen.x - offsets.halfX - offsets.trailX,
+        y: screen.y - offsets.halfY - offsets.trailY,
+      },
+      { x: screen.x - offsets.halfX, y: screen.y - offsets.halfY },
+    ];
+    const body = [
+      { x: screen.x - offsets.halfX, y: screen.y - offsets.halfY },
+      { x: screen.x + offsets.halfX, y: screen.y + offsets.halfY },
+    ];
     strokes.length = 0;
     drawLaserBolts([shot], color, viewer);
     expect(strokes.map((path) => path.points)).toEqual([trail, trail, body, body]);
@@ -231,9 +232,11 @@ test('local and enemy shots draw short narrow trails, then the identified hit dr
     );
     expect(strokes.map((path) => path.blur)).toEqual(expectedBlur);
     expect(strokes.every((path) => path.shadow === canvasColor(ctx, color))).toBe(true);
-    expect(strokes.every((path) => !path.closed && path.width <= 2.25 && path.alpha === 1)).toBe(
-      true
-    );
+    expect(
+      strokes.every(
+        (path) => !path.closed && path.width <= VISUAL.LASER_STROKE_WIDTH && path.alpha === 1
+      )
+    ).toBe(true);
     expect(strokes.flatMap((path) => path.arcs)).toEqual([]);
   }
   expect(fill).not.toHaveBeenCalled();
@@ -241,12 +244,27 @@ test('local and enemy shots draw short narrow trails, then the identified hit dr
   local.updateExplodeTime();
   strokes.length = 0;
   drawLaserBolts([local], PALETTE.LASER_LOCAL, viewer);
+  const ringRadius = VISUAL.LASER_EXPLODE_RADIUS * 0.55;
+  const firstTick = burstTick(
+    localScreen.x,
+    localScreen.y,
+    0,
+    ringRadius * 0.35,
+    ringRadius * 1.35
+  );
   expect(strokes).toHaveLength(5);
-  expect(strokes[0]?.arcs[0]).toEqual([420, 340, 5.5, 0, Math.PI * 2, false]);
+  expect(strokes[0]?.arcs[0]).toEqual([
+    localScreen.x,
+    localScreen.y,
+    ringRadius,
+    0,
+    Math.PI * 2,
+    false,
+  ]);
   expect(strokes.slice(1).map((path) => path.points.length)).toEqual([2, 2, 2, 2]);
   expect(strokes[1]?.points).toEqual([
-    { x: 421.925, y: 340 },
-    { x: 427.425, y: 340 },
+    { x: firstTick.x1, y: firstTick.y1 },
+    { x: firstTick.x2, y: firstTick.y2 },
   ]);
   expect(strokes.map((path) => path.width)).toEqual([1.25, 1, 1, 1, 1]);
   expect(strokes.every((path) => path.color === canvasColor(ctx, PALETTE.LASER_LOCAL))).toBe(true);

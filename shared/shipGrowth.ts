@@ -1,4 +1,5 @@
-import { SHIP } from '../src/constants';
+import type { Position } from '../shared-types';
+import { GAME, SHIP } from '../src/constants';
 
 /**
  * Slither-style size/mass growth shared by humans and bots.
@@ -17,7 +18,10 @@ export const GROWTH = {
   SHARD_MASS: 0.25,
   SHARD_SCORE: 5,
   MAX_PELLETS: 7,
-  LOOT_RADIUS: 7,
+  LOOT_RADIUS: 12,
+  /** Pull loot toward living ships from beyond hull overlap without inflating the hull. */
+  LOOT_MAGNET_RANGE: 96,
+  LOOT_MAGNET_ACCEL: 0.24 * GAME.MOTION_SCALE,
   SCATTER_MIN: 16,
   SCATTER_MAX: 40,
   MAX_LOOT: 48,
@@ -127,4 +131,31 @@ export function lootOverlap(
   const dx = shipPosition.x - lootPosition.x;
   const dy = shipPosition.y - lootPosition.y;
   return dx * dx + dy * dy <= reach * reach;
+}
+
+/** Add magnet acceleration toward the nearest collector. Leaves existing velocity intact. */
+export function addLootMagnetPull(
+  drop: { position: Position; velocity: { x: number; y: number } },
+  collectorPositions: readonly Position[]
+): boolean {
+  const rangeSq = GROWTH.LOOT_MAGNET_RANGE * GROWTH.LOOT_MAGNET_RANGE;
+  let best: { dx: number; dy: number; distSq: number } | undefined;
+  for (const collector of collectorPositions) {
+    const dx = collector.x - drop.position.x;
+    const dy = collector.y - drop.position.y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq > rangeSq || distSq < 1e-12) {
+      continue;
+    }
+    if (!best || distSq < best.distSq) {
+      best = { dx, dy, distSq };
+    }
+  }
+  if (!best) {
+    return false;
+  }
+  const scale = GROWTH.LOOT_MAGNET_ACCEL / Math.sqrt(best.distSq);
+  drop.velocity.x += best.dx * scale;
+  drop.velocity.y += best.dy * scale;
+  return true;
 }

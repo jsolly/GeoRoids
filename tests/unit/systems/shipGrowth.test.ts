@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  addLootMagnetPull,
   applyLootMass,
   canCollectLoot,
   GROWTH,
@@ -68,5 +69,17 @@ describe('ship growth math', () => {
     const far = { x: radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS + 4, y: 0 };
     expect(lootOverlap(origin, GROWTH.BASE_MASS, nearby, GROWTH.LOOT_RADIUS)).toBe(true);
     expect(lootOverlap(origin, GROWTH.BASE_MASS, far, GROWTH.LOOT_RADIUS)).toBe(false);
+  });
+
+  test('loot magnet adds pull toward the nearest ship without replacing velocity', () => {
+    const drop = { position: { x: 80, y: 0 }, velocity: { x: 4, y: 1 } };
+    expect(
+      addLootMagnetPull(drop, [{ x: drop.position.x + GROWTH.LOOT_MAGNET_RANGE + 10, y: 0 }])
+    ).toBe(false);
+    expect(drop.velocity).toEqual({ x: 4, y: 1 });
+
+    expect(addLootMagnetPull(drop, [{ x: 0, y: 0 }])).toBe(true);
+    expect(drop.velocity.x).toBeCloseTo(4 - GROWTH.LOOT_MAGNET_ACCEL);
+    expect(drop.velocity.y).toBeCloseTo(1);
   });
 });

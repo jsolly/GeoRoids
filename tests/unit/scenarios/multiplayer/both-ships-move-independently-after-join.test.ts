@@ -20,10 +20,10 @@ describe('Both ships move independently after join', () => {
   });
 
   test('each pilot can sit in a different place without dragging the other', () => {
-    world.move(alice, { x: -40, y: 20 });
-    world.move(bob, { x: 40, y: -20 });
+    world.move(alice, { x: -32, y: 16 });
+    world.move(bob, { x: 32, y: -16 });
 
-    expect(world.entity(alice).position).toEqual({ x: -40, y: 20 });
-    expect(world.entity(bob).position).toEqual({ x: 40, y: -20 });
+    expect(world.entity(alice).position).toEqual({ x: -32, y: 16 });
+    expect(world.entity(bob).position).toEqual({ x: 32, y: -16 });
   });
 });

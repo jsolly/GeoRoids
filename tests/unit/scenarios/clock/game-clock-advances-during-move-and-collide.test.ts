@@ -30,7 +30,7 @@ describe('The game clock keeps ticking', () => {
     expect(timeBefore).toBeGreaterThan(0);
 
     world.startClock();
-    world.move(ace, { x: 40, y: 20 });
+    world.move(ace, { x: 32, y: 16 });
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
 
@@ -40,7 +40,7 @@ describe('The game clock keeps ticking', () => {
     expect(timeAfter).toBeGreaterThan(timeBefore);
     expect(timeAfter - timeBefore).toBeGreaterThanOrEqual(50);
     expect(timeAfter - timeBefore).toBeLessThanOrEqual(80);
-    expect(world.entity(ace).position).toEqual({ x: 40, y: 20 });
+    expect(world.entity(ace).position).toEqual({ x: 32, y: 16 });
     // Destroy-drop can leave a shard on the hull; the 1s clock may collect it.
     // This scenario is about the clock, not post-ram loot HP.
   });

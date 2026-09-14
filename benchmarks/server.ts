@@ -16,7 +16,7 @@ import type { Measurement } from './results';
 const LOOPBACK_TIMEOUT_MS = 5_000;
 const SOCKET_CLOSE_TIMEOUT_MS = 2_000;
 const SERVER_CLOCK_START_MS = 1_700_000_000_000;
-const MAX_HUMAN_PLAYERS = 25;
+const MAX_PLAYERS = 25;
 
 type Diagnostics = ReturnType<GameEngine['getDiagnostics']>;
 
@@ -24,14 +24,14 @@ export interface ServerSampleOptions {
   readonly seed: number;
   readonly warmupTicks: number;
   readonly measuredTicks: number;
-  readonly humanPlayers: number;
+  readonly players: number;
 }
 
 export const DEFAULT_SERVER_SAMPLE_OPTIONS: ServerSampleOptions = {
   seed: 42,
   warmupTicks: 60,
   measuredTicks: 120,
-  humanPlayers: 2,
+  players: 2,
 };
 
 function asError(value: unknown): Error {
@@ -50,9 +50,9 @@ function validateOptions(options: ServerSampleOptions): void {
   }
   requirePositiveInteger('warmupTicks', options.warmupTicks);
   requirePositiveInteger('measuredTicks', options.measuredTicks);
-  requirePositiveInteger('humanPlayers', options.humanPlayers);
-  if (options.humanPlayers > MAX_HUMAN_PLAYERS) {
-    throw new Error(`humanPlayers must be no greater than ${MAX_HUMAN_PLAYERS}`);
+  requirePositiveInteger('players', options.players);
+  if (options.players > MAX_PLAYERS) {
+    throw new Error(`players must be no greater than ${MAX_PLAYERS}`);
   }
 }
 
@@ -108,9 +108,7 @@ function validateParticipantPresence(
   const observedIds = players.map((player) => player.id).toSorted();
   const expectedSorted = [...expectedIds].toSorted();
   if (observedIds.length !== expectedSorted.length) {
-    throw new Error(
-      `Expected ${expectedSorted.length} human participants, observed ${observedIds.length}`
-    );
+    throw new Error(`Expected ${expectedSorted.length} players, observed ${observedIds.length}`);
   }
   for (const [index, id] of expectedSorted.entries()) {
     if (observedIds[index] !== id) {
@@ -126,18 +124,18 @@ function validateParticipantPresence(
       throw new Error(`Loopback peer for ${id} is not open`);
     }
     const player = engine.getPlayerBySocket(peer);
-    if (!player || player.id !== id || player.type !== 'human') {
+    if (!player || player.id !== id) {
       throw new Error(`Participant ${id} is not attached to its live loopback peer`);
     }
   }
 }
 
-function validateDiagnostics(diagnostics: Diagnostics, humanPlayers: number): void {
+function validateDiagnostics(diagnostics: Diagnostics, players: number): void {
   if (diagnostics.isPaused) {
-    throw new Error('Seeded server fixture is paused while human players are present');
+    throw new Error('Seeded server fixture is paused while players are present');
   }
-  if (diagnostics.humanPlayers !== humanPlayers) {
-    throw new Error(`Expected ${humanPlayers} human players, observed ${diagnostics.humanPlayers}`);
+  if (diagnostics.players !== players) {
+    throw new Error(`Expected ${players} players, observed ${diagnostics.players}`);
   }
   if (diagnostics.asteroids < 0 || diagnostics.satellitePickups < 0) {
     throw new Error('Server diagnostics contained an invalid negative entity count');
@@ -145,12 +143,12 @@ function validateDiagnostics(diagnostics: Diagnostics, humanPlayers: number): vo
 }
 
 function validateStateScene(state: ServerGameState, diagnostics: Diagnostics): void {
-  const humanEntities = state.entities.filter((entity) => entity.type === 'human').length;
+  const playerEntities = state.entities.length;
   if (state.isPaused !== diagnostics.isPaused || state.gameTime !== diagnostics.gameTime) {
     throw new Error('Public game state disagreed with server diagnostics');
   }
   const counts = [
-    ['human players', humanEntities, diagnostics.humanPlayers],
+    ['players', playerEntities, diagnostics.players],
     ['asteroids', state.asteroids.length, diagnostics.asteroids],
     ['loot', state.loot.length, diagnostics.loot],
     ['satellite pickups', state.satellitePickups.length, diagnostics.satellitePickups],
@@ -300,7 +298,7 @@ export async function runServerSample(
     if (!address || typeof address === 'string') {
       throw new Error('Loopback listener did not expose an address');
     }
-    for (let index = 0; index < options.humanPlayers; index++) {
+    for (let index = 0; index < options.players; index++) {
       const connection = once(listener, 'connection', {
         signal: AbortSignal.timeout(LOOPBACK_TIMEOUT_MS),
       });
@@ -328,8 +326,8 @@ export async function runServerSample(
     // state, then the first public addPlayer call resumes and seeds the scene.
     engine.updatePauseState();
     const participantIds: string[] = [];
-    for (let index = 0; index < options.humanPlayers; index++) {
-      const id = `benchmark-human-${index}`;
+    for (let index = 0; index < options.players; index++) {
+      const id = `benchmark-player-${index}`;
       const peer = peers[index];
       if (!peer) {
         throw new Error(`Missing accepted loopback peer for ${id}`);
@@ -338,14 +336,14 @@ export async function runServerSample(
         id,
         `Benchmark Pilot ${index}`,
         peer,
-        participantPosition(index, options.humanPlayers),
+        participantPosition(index, options.players),
         'surveyor'
       );
       participantIds.push(id);
     }
     validateParticipantPresence(engine, peers, participantIds);
     const before = structuredClone(engine.getDiagnostics());
-    validateDiagnostics(before, options.humanPlayers);
+    validateDiagnostics(before, options.players);
     assert.equal(before.loot, 0, 'Server fixture must begin with no fabricated loot');
     const beforeState = stateSnapshot(engine);
     validateStateScene(beforeState, before);
@@ -371,7 +369,7 @@ export async function runServerSample(
       'Server fixture must follow its controlled simulation clock'
     );
     const after = structuredClone(engine.getDiagnostics());
-    validateDiagnostics(after, options.humanPlayers);
+    validateDiagnostics(after, options.players);
     validateParticipantPresence(engine, peers, participantIds);
     const afterState = stateSnapshot(engine);
     validateStateScene(afterState, after);
@@ -397,8 +395,8 @@ export async function runServerSample(
       counts: {
         warmupTicks: options.warmupTicks,
         measuredTicks: options.measuredTicks,
-        humanPlayersBefore: before.humanPlayers,
-        humanPlayersAfter: after.humanPlayers,
+        playersBefore: before.players,
+        playersAfter: after.players,
         asteroidsBefore: before.asteroids,
         asteroidsAfter: after.asteroids,
         lootBefore: before.loot,

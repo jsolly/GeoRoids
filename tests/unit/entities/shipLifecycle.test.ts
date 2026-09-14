@@ -334,7 +334,7 @@ describe('server ship respawn lifecycle', () => {
     engine.stopGameLoop();
   });
 
-  test('human explosion end does not reset an already-scheduled respawn timer', () => {
+  test('player explosion end does not reset an already-scheduled respawn timer', () => {
     const ws = new RecordingSocket();
     const player = engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });

@@ -1,6 +1,6 @@
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { seedAsteroidPhenomena } from '../../shared/asteroidPhenomena';
-import { sectorAt, WORLD } from '../../shared/world';
+import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, Position } from '../../shared-types';
 import { ROID } from '../../src/constants';
 import type { AsteroidManager } from '../core/AsteroidManager';
@@ -85,17 +85,17 @@ export class RegionalAsteroidField {
     if (cached) {
       return cached;
     }
-    const [x, y] = id.split(',').map(Number);
-    if (x === undefined || y === undefined) {
+    const parsed = parseSectorId(id);
+    if (!parsed) {
       throw new Error('Invalid sector identity');
     }
-    return this.generate(x, y);
+    return this.generate(parsed.x, parsed.y);
   }
 
   update(
     manager: AsteroidManager,
     observers: readonly Position[],
-    completed: ReadonlySet<string> = new Set()
+    completed: ReadonlySet<string>
   ): AsteroidData[] {
     const wanted = new Map<string, { x: number; y: number }>();
     for (const observer of observers) {

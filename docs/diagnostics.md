@@ -160,7 +160,7 @@ measure presented frames or GPU completion. The observation context wraps native
 including HUD and environment probes. Those counts describe API submissions, not
 GPU draws, and remain outside the timed context.
 
-The server runner directly advances `GameEngine` with two real loopback human
+The server runner directly advances `GameEngine` with two real loopback player
 connections created by the seeded engine. It fixes `Date.now()` and
 seeds `Math.random()` while using native `performance.now()` for tick samples.
 Natural authoritative simulation remains active, so asteroid, loot, satellite and

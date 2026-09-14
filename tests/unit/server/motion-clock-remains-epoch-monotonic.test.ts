@@ -2,7 +2,7 @@
 import { performance as nodePerformance } from 'node:perf_hooks';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WebSocket } from 'ws';
-import { GameEngine, HUMAN_LASER_MAX_LIFETIME_MS } from '../../../server/core/GameEngine';
+import { GameEngine, PLAYER_LASER_MAX_LIFETIME_MS } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import type { AsteroidData } from '../../../shared-types';
@@ -55,21 +55,21 @@ describe('server motion clock', () => {
 
     advanceElapsed(30_001);
     vi.setSystemTime(9_999);
-    expect(engine.entityManager.getStaleHumanIds()).toEqual(['pilot']);
+    expect(engine.entityManager.getStalePlayerIds()).toEqual(['pilot']);
   });
 
-  test('human laser expiry follows elapsed time after a wall rollback', () => {
+  test('player laser expiry follows elapsed time after a wall rollback', () => {
     const socket = {} as WebSocket;
     const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 });
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
     }
 
-    const laser = engine.spawnHumanLaser(pilot.id, pilot.position, { x: 0, y: 0 });
+    const laser = engine.spawnPlayerLaser(pilot.id, pilot.position, { x: 0, y: 0 });
     expect(laser).not.toBeNull();
     expect(engine.getServerLasers()).toHaveLength(1);
 
-    advanceElapsed(HUMAN_LASER_MAX_LIFETIME_MS + 1);
+    advanceElapsed(PLAYER_LASER_MAX_LIFETIME_MS + 1);
     vi.setSystemTime(9_999);
     expect(engine.advanceLasersAndResolveHits()).toEqual([]);
     expect(engine.getServerLasers()).toHaveLength(0);

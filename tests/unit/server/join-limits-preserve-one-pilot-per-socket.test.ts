@@ -43,12 +43,7 @@ test('a socket cannot create a second pilot and repeat flooding closes the trans
   for (let i = 0; i < 5; i++) {
     join(socket, `extra-${i}`);
   }
-  expect(
-    engine
-      .getAllPlayers()
-      .filter((player) => player.type === 'human')
-      .map((p) => p.id)
-  ).toEqual(['pilot']);
+  expect(engine.getAllPlayers().map((player) => player.id)).toEqual(['pilot']);
   expect(replies().filter((reply) => reply.type === 'joined')).toHaveLength(1);
   expect(socket.close).toHaveBeenCalledWith(1008, 'Too many join requests');
 });

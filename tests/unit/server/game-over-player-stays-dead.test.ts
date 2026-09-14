@@ -19,7 +19,7 @@ function finishExplosion(engine: GameEngine): void {
   }
 }
 
-describe('human game-over stay-dead', () => {
+describe('player game-over stay-dead', () => {
   let gameEngine: GameEngine;
   let player: GameEntity;
 
@@ -48,7 +48,7 @@ describe('human game-over stay-dead', () => {
     expect(player.health).toBe(0);
   });
 
-  test('a leftover respawn timer does not resurrect a 0-life human', () => {
+  test('a leftover respawn timer does not resurrect a 0-life player', () => {
     player.lives = 0;
     player.health = 0;
     player.respawnTimer = 1;

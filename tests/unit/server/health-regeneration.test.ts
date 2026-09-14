@@ -26,7 +26,7 @@ describe('server-authoritative health regeneration', () => {
     expect(calculateHealthRegenDelayFrames()).toBe(Math.ceil(SHIP.HEALTH_REGEN_DELAY * GAME.FPS));
   });
 
-  test('human damage waits for the delay, then heals and caps at max health', () => {
+  test('player damage waits for the delay, then heals and caps at max health', () => {
     const ship = world.entity(pilot);
     world.engine.handleShipDamage(pilot.id, 'asteroid', DAMAGE.LASER_HIT);
     expect(ship.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);

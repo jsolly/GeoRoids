@@ -81,7 +81,7 @@ const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
 const entity = shape<ServerEntityData>({
   id: string,
   name: string,
-  type: choice('human'),
+  type: choice('player'),
   position,
   velocity: position,
   angle: number,

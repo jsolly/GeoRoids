@@ -27,7 +27,7 @@ not fire or damage a ship on contact.
 
 The field holds a limited number of loose satellite pickups. They spawn
 separately from asteroid destruction and drift inside the pickup field. The
-nearest living human within collection range claims a loose pickup
+nearest living player within collection range claims a loose pickup
 automatically and earns a score bonus. Collection does not grant a combat
 ability or spawn protection.
 

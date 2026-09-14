@@ -15,17 +15,17 @@ describe('kill loot and growth', () => {
     engine.stopGameLoop();
   });
 
-  test('two human deaths drop the same pellet count for the same mass', () => {
-    const human = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 0 });
+  test('two player deaths drop the same pellet count for the same mass', () => {
+    const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
-    applyShipMass(human, 4);
+    applyShipMass(player, 4);
 
     const partner = engine.addPlayer('p2', 'Partner', new RecordingSocket(), { x: -20, y: 0 });
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
     applyShipMass(partner, 4);
 
     const expected = planKillLoot(4).pelletMasses.length;
-    engine.handleShipDamage('p1', 'asteroid', human.health);
+    engine.handleShipDamage('p1', 'asteroid', player.health);
     engine.handleShipDamage('p2', 'asteroid', partner.health);
 
     const loot = engine.getLoot();

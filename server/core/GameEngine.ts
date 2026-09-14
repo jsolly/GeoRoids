@@ -111,7 +111,7 @@ export interface CombatBroadcast {
   remainingHealth: number;
   remainingLives: number;
   isDestroyed: boolean;
-  targetType: 'human';
+  targetType: 'player';
   destroyedAsteroidId?: string;
   newAsteroids?: AsteroidData[];
   asteroidScore?: { playerId: string; score: number };
@@ -124,11 +124,11 @@ type CombatSink = (result: CombatBroadcast) => void;
 /** Matches client Laser.isExpired when the canvas is the internal playfield. */
 const SERVER_LASER_MAX_DISTANCE = LASER.TRAVEL_DISTANCE_RATIO + CANVAS.INTERNAL_WIDTH;
 /** 250 ms covers a delayed position packet at 30 Hz plus a brief browser/network hitch. */
-export const HUMAN_SHOOT_POSE_ALLOWANCE_MS = 250;
+export const PLAYER_SHOOT_POSE_ALLOWANCE_MS = 250;
 /** Bounded positional rounding/muzzle disagreement in addition to the movement allowance. */
-const HUMAN_SHOOT_MUZZLE_SLOP = 8;
+const PLAYER_SHOOT_MUZZLE_SLOP = 8;
 /** Stationary/counter-thrust shots must not remain in the authoritative list forever. */
-export const HUMAN_LASER_MAX_LIFETIME_MS = Math.ceil(5000 / GAME.MOTION_SCALE);
+export const PLAYER_LASER_MAX_LIFETIME_MS = Math.ceil(5000 / GAME.MOTION_SCALE);
 const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 const MAX_PENDING_LOOT_COLLECTIONS = 256;
 
@@ -184,8 +184,8 @@ export class GameEngine {
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
   private pendingLootCollections: LootCollected[] = [];
   private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
-  private readonly humanShootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
-  private readonly humanLaserExpiry = new WeakMap<ServerLaser, number>();
+  private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
+  private readonly laserExpiry = new WeakMap<ServerLaser, number>();
   private readonly damageStateLogs = new WeakMap<GameEntity, number>();
 
   constructor(
@@ -195,6 +195,10 @@ export class GameEngine {
   ) {
     let saved = worldStore?.loadWorld();
     if (worldStore && saved && saved.generation !== WORLD.generation) {
+      logger.warn('WORLD', 'Saved world generation does not match; resetting world', {
+        savedGeneration: saved.generation,
+        currentGeneration: WORLD.generation,
+      });
       worldStore.reset();
       saved = undefined;
     }
@@ -300,7 +304,7 @@ export class GameEngine {
     return frames;
   }
 
-  /** One 60 Hz frame: clock always ticks; combat/field only while a human is in. */
+  /** One 60 Hz frame: clock always ticks; combat/field only while a player is in. */
   public advanceOneFrame(nowMs?: number): void {
     const serverNow = this.simulationNow(nowMs);
     if (!serverPerformanceMetrics.enabled) {
@@ -323,7 +327,7 @@ export class GameEngine {
     if (this.isPaused) {
       return;
     }
-    for (const id of this.entityManager.getStaleHumanIds()) {
+    for (const id of this.entityManager.getStalePlayerIds()) {
       this.removePlayer(id);
       this.departedPlayers.push(id);
     }
@@ -386,18 +390,18 @@ export class GameEngine {
 
   // Pause/resume functionality
   public updatePauseState(): void {
-    const humanPlayerCount = this.entityManager.getHumanPlayerCount();
+    const playerCount = this.getPlayerCount();
 
-    if (humanPlayerCount === 0 && !this.isPaused) {
+    if (playerCount === 0 && !this.isPaused) {
       this.isPaused = true;
-      logger.info('🔄 Game paused - no human players online');
+      logger.info('🔄 Game paused - no players online');
       this.lasers = [];
       this.checkpointWorld();
-    } else if (humanPlayerCount > 0 && this.isPaused) {
+    } else if (playerCount > 0 && this.isPaused) {
       this.isPaused = false;
-      logger.info('▶️ Game resumed - human players are back online');
+      logger.info('▶️ Game resumed - players are back online');
       this.ensureAmbientWorld();
-    } else if (humanPlayerCount > 0) {
+    } else if (playerCount > 0) {
       this.ensureAmbientWorld();
     }
   }
@@ -418,7 +422,7 @@ export class GameEngine {
   public getDiagnostics(): {
     isPaused: boolean;
     gameTime: number;
-    humanPlayers: number;
+    players: number;
     asteroids: number;
     loot: number;
     satellitePickups: number;
@@ -426,7 +430,7 @@ export class GameEngine {
     return {
       isPaused: this.isPaused,
       gameTime: this.gameTime,
-      humanPlayers: this.entityManager.getHumanPlayerCount(),
+      players: this.getPlayerCount(),
       asteroids: this.asteroidManager.getAsteroidCount(),
       loot: this.lootManager.getCount(),
       satellitePickups: this.satellitePickupManager.getCount(),
@@ -440,7 +444,7 @@ export class GameEngine {
   public resetForTesting(): void {
     const closeErrors: Error[] = [];
     for (const entity of this.entityManager.getAllEntities()) {
-      if (entity.type === 'human' && entity.ws) {
+      if (entity.ws) {
         if (entity.ws.readyState === entity.ws.CLOSED) {
           continue;
         }
@@ -454,7 +458,7 @@ export class GameEngine {
       }
     }
     if (closeErrors.length > 0) {
-      throw new AggregateError(closeErrors, 'Test world reset could not close every human socket');
+      throw new AggregateError(closeErrors, 'Test world reset could not close every player socket');
     }
     this.worldStore?.reset();
     this.resetGameState();
@@ -462,7 +466,7 @@ export class GameEngine {
     this.rngService.reset();
   }
 
-  // Clear ambient entities and pending combat without replacing human sessions.
+  // Clear ambient entities and pending combat without replacing player sessions.
   private clearWorldObjects(): void {
     // Clear all asteroids and pending collab resolutions
     this.asteroidManager.clearAsteroids();
@@ -521,7 +525,7 @@ export class GameEngine {
     kitId?: ShipKitId
   ): GameEntity {
     const spawn = this.choosePilotSpawn(position);
-    const entity = this.entityManager.addHumanPlayer(id, name, ws, spawn, kitId);
+    const entity = this.entityManager.addPlayer(id, name, ws, spawn, kitId);
     this.updatePauseState();
     return entity;
   }
@@ -536,7 +540,7 @@ export class GameEngine {
 
   private choosePilotSpawn(requested?: Position): Position {
     const allies = this.entityManager
-      .getHumanPlayers()
+      .getAllEntities()
       .filter((actor) => actor.health > 0 && !actor.exploding && actor.respawnTimer === undefined)
       .map((actor) => actor.position);
     const spawn = chooseOpenSectorSpawn({
@@ -790,11 +794,11 @@ export class GameEngine {
   }
 
   public getAllPlayers(): GameEntity[] {
-    return this.entityManager.getHumanPlayers();
+    return this.entityManager.getAllEntities();
   }
 
   public getPlayerCount(): number {
-    return this.entityManager.getHumanPlayerCount();
+    return this.entityManager.getAllEntities().length;
   }
 
   // Asteroid operations
@@ -881,7 +885,7 @@ export class GameEngine {
    * Return newly loaded rows so joining pilots can receive them immediately.
    */
   public ensureAsteroidField(): AsteroidData[] {
-    if (this.isPaused || this.entityManager.getHumanPlayerCount() === 0) {
+    if (this.isPaused || this.getPlayerCount() === 0) {
       return [];
     }
     if (!this.managedField) {
@@ -941,7 +945,7 @@ export class GameEngine {
 
   /** Keep the pickup field alive for every active arena. */
   public ensureSatellitePickups(): SatellitePickupData[] {
-    if (this.isPaused || this.entityManager.getHumanPlayerCount() === 0) {
+    if (this.isPaused || this.getPlayerCount() === 0) {
       return [];
     }
     if (this.satellitePickupManager.getCount() > 0) {
@@ -967,8 +971,8 @@ export class GameEngine {
   }
 
   private collectNearbySatellitePickups(): void {
-    const humans = this.entityManager
-      .getHumanPlayers()
+    const players = this.entityManager
+      .getAllEntities()
       .filter(
         (entity) => entity.health > 0 && !entity.exploding && entity.respawnTimer === undefined
       )
@@ -980,7 +984,7 @@ export class GameEngine {
       .sort((a, b) => a.id.localeCompare(b.id));
 
     for (const pickup of loosePickups) {
-      const collector = humans
+      const collector = players
         .map((entity) => ({
           entity,
           distance: Math.hypot(
@@ -1080,7 +1084,7 @@ export class GameEngine {
     }
 
     this.applyShipDeath(damaged, attackerId);
-    if (damaged.type === 'human' && damaged.lives === 0) {
+    if (damaged.lives === 0) {
       this.checkpointWorld();
     }
     this.logDamageState(damaged, attackerId, damage, healthBefore, livesBefore, true);
@@ -1243,9 +1247,7 @@ export class GameEngine {
     delete entity.laserUpgrade;
     this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
-    if (entity.type === 'human') {
-      entity.lives = Math.max(0, entity.lives - 1);
-    }
+    entity.lives = Math.max(0, entity.lives - 1);
     this.entityManager.scheduleShipRespawn(entity);
   }
 
@@ -1361,10 +1363,10 @@ export class GameEngine {
   }
 
   /**
-   * Untrusted human wire entry point. Tests use spawnLaser for server-authored shots.
+   * Untrusted player wire entry point. Tests use spawnLaser for server-authored shots.
    * Aim remains client-predicted, but ownership alone is not proof of a valid muzzle.
    */
-  public spawnHumanLaser(
+  public spawnPlayerLaser(
     ownerId: string,
     start: Position,
     velocity: Velocity,
@@ -1372,7 +1374,7 @@ export class GameEngine {
   ): ServerLaser | null {
     const shooter = this.entityManager.getEntity(ownerId);
     if (
-      shooter?.type !== 'human' ||
+      !shooter ||
       shooter.health <= 0 ||
       shooter.exploding ||
       shooter.respawnTimer !== undefined ||
@@ -1395,8 +1397,8 @@ export class GameEngine {
     const muzzleRadius = (4 / 3) * Math.max(kit.size / 2, radiusFromMass(shooter.mass));
     const maxOriginDistance =
       muzzleRadius +
-      HUMAN_SHOOT_MUZZLE_SLOP +
-      maxShipSpeed * GAME.FPS * (HUMAN_SHOOT_POSE_ALLOWANCE_MS / 1000);
+      PLAYER_SHOOT_MUZZLE_SLOP +
+      maxShipSpeed * GAME.FPS * (PLAYER_SHOOT_POSE_ALLOWANCE_MS / 1000);
     if (
       Math.hypot(start.x - shooter.position.x, start.y - shooter.position.y) > maxOriginDistance ||
       // Match pose validation tolerance for floating-point mass-scaled caps.
@@ -1406,7 +1408,7 @@ export class GameEngine {
       return null;
     }
     // Sustained fire follows the kit cooldown.
-    const previous = this.humanShootBudgets.get(shooter);
+    const previous = this.shootBudgets.get(shooter);
     const rate = 1 / kit.shotCooldown;
     const available = previous
       ? Math.min(SHIP.MAX_LASERS, previous.tokens + Math.max(0, now - previous.at) * rate)
@@ -1418,12 +1420,12 @@ export class GameEngine {
     if (!laser) {
       return null;
     }
-    this.humanShootBudgets.set(shooter, { tokens: available - 1, at: now });
-    this.humanLaserExpiry.set(laser, now + HUMAN_LASER_MAX_LIFETIME_MS);
+    this.shootBudgets.set(shooter, { tokens: available - 1, at: now });
+    this.laserExpiry.set(laser, now + PLAYER_LASER_MAX_LIFETIME_MS);
     return laser;
   }
 
-  /** Spawn a simulated shot for a human `shoot` or a server-authored test. */
+  /** Spawn a simulated shot for a player `shoot` or a server-authored test. */
   public spawnLaser(
     ownerId: string,
     start: Position,
@@ -1497,7 +1499,7 @@ export class GameEngine {
       if (laser === undefined) {
         continue;
       }
-      if (laser.hasExploded || now >= (this.humanLaserExpiry.get(laser) ?? Infinity)) {
+      if (laser.hasExploded || now >= (this.laserExpiry.get(laser) ?? Infinity)) {
         this.lasers.splice(i, 1);
         continue;
       }

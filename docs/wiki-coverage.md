@@ -98,14 +98,14 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   health, enforced by `server/core/GameEngine.ts` and verified in
   `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager
-  and spawn separately from asteroid destruction. A nearest living human within
+  and spawn separately from asteroid destruction. A nearest living player within
   the automatic collection range claims one; the hardware orbits indefinitely,
   intercepts laser shots and asteroid collisions, preserves health on owner
   release, and respawns loose and healthy after breaking.
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
   lives, score, current ability, and kit. The leaderboard includes every active
-  human.
+  player.
 - A laser detonation of any loot kind removes the drop and leaves every nearby
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
   pickups intercept laser shots and rocks for their owner.

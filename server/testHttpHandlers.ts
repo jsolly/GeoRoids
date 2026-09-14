@@ -176,7 +176,7 @@ export function handleTestResetWorld(
         : error;
     logger.error('TEST_RESET_FAILED', {
       operation: 'reset test world',
-      action: 'close or replace the failing human socket, then retry',
+      action: 'close or replace the failing player socket, then retry',
       error: failure,
     });
     res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -231,7 +231,7 @@ export function handleTestPlacePlayer(
       return;
     }
     const player = gameEngine.getPlayer(parsed['playerId']);
-    if (player?.type !== 'human' || player.health <= 0 || player.exploding) {
+    if (!player || player.health <= 0 || player.exploding) {
       respond(404, { error: 'Live fixture player not found' });
       return;
     }
@@ -289,7 +289,7 @@ export function handleTestArrangeCrewField(
     const players = ids.map((id) => gameEngine.getPlayer(id));
     if (
       new Set(ids).size !== ids.length ||
-      players.some((player) => player?.type !== 'human' || player.exploding || player.health <= 0)
+      players.some((player) => !player || player.exploding || player.health <= 0)
     ) {
       respond(404, { error: 'Live fixture crew unavailable' });
       return;

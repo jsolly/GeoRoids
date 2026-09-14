@@ -23,7 +23,7 @@ import type { RNGService } from './RNGService';
 export interface GameEntity {
   id: string;
   name: string;
-  type: 'human';
+  type: 'player';
   position: Position;
   velocity: Velocity;
   knockbackVelocityLimit?: number;
@@ -42,7 +42,7 @@ export interface GameEntity {
   lastUpdate: number;
   respawnTimer?: number;
   spawnProtectionTimer?: number;
-  ws?: WebSocket; // Only for human players
+  ws?: WebSocket;
   explodeTime?: number;
   kitId: ShipKitId;
   abilityCooldownFrames: number;
@@ -81,10 +81,6 @@ export class EntityManager {
     return Array.from(this.entities.values());
   }
 
-  public getHumanPlayers(): GameEntity[] {
-    return Array.from(this.entities.values()).filter((entity) => entity.type === 'human');
-  }
-
   public getEntityBySocket(ws: WebSocket): GameEntity | undefined {
     for (const entity of this.entities.values()) {
       if (entity.ws === ws) {
@@ -92,14 +88,6 @@ export class EntityManager {
       }
     }
     return undefined;
-  }
-
-  public getHumanBySocket(ws: WebSocket): GameEntity | undefined {
-    return this.getHumanPlayers().find((entity) => entity.ws === ws);
-  }
-
-  public getHumanPlayerCount(): number {
-    return this.getHumanPlayers().length;
   }
 
   /** Kick living ships away from a collab-split origin. Smaller ships move more. */
@@ -177,8 +165,7 @@ export class EntityManager {
     return entity;
   }
 
-  // Human player management
-  public addHumanPlayer(
+  public addPlayer(
     id: string,
     name: string,
     ws: WebSocket,
@@ -192,7 +179,7 @@ export class EntityManager {
     const entity: GameEntity = {
       id,
       name,
-      type: 'human',
+      type: 'player',
       position: position || { x: 0, y: 0 },
       velocity: { x: 0, y: 0 },
       angle: 0,
@@ -299,7 +286,7 @@ export class EntityManager {
         }
 
         if (entity.respawnTimer === 0) {
-          // A leftover timer must not resurrect a human who already spent their last life.
+          // A leftover timer must not resurrect a player who already spent their last life.
           if (!this.shouldScheduleRespawn(entity)) {
             delete entity.respawnTimer;
             continue;
@@ -397,21 +384,21 @@ export class EntityManager {
   }
 
   /**
-   * Return stale human IDs for the engine to remove through its lifecycle.
+   * Return stale player IDs for the engine to remove through its lifecycle.
    * EntityManager cannot perform that removal itself because the engine owns
    * motion sessions, persistence capture, and pause transitions.
    */
-  public getStaleHumanIds(): string[] {
+  public getStalePlayerIds(): string[] {
     const now = this.now();
-    const staleHumanIds: string[] = [];
+    const staleIds: string[] = [];
 
     for (const [entityId, entity] of this.entities) {
       if (now - entity.lastUpdate > 30000) {
-        staleHumanIds.push(entityId);
+        staleIds.push(entityId);
       }
     }
 
-    return staleHumanIds;
+    return staleIds;
   }
 
   public tickAbilityState(): void {

@@ -169,7 +169,7 @@ test('new deposits and reflective clusters stay inside their saved world sectors
       const angle = (index / 64) * Math.PI * 2;
       return { x: Math.cos(angle) * (WORLD.radius - 50), y: Math.sin(angle) * (WORLD.radius - 50) };
     });
-    field.update(manager, observers);
+    field.update(manager, observers, new Set());
     expect(manager.getAllAsteroids().length).toBeGreaterThan(1000);
     expect(() =>
       store.checkpoint(
@@ -192,11 +192,11 @@ test('new deposits and reflective clusters stay inside their saved world sectors
 test('stale collection reports the engine-owned removal without deleting the entity', () => {
   let now = 0;
   const manager = new EntityManager(new RNGService(1), () => now);
-  const player = manager.addHumanPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
+  const player = manager.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
 
   now = 30_001;
 
-  expect(manager.getStaleHumanIds()).toEqual(['pilot']);
+  expect(manager.getStalePlayerIds()).toEqual(['pilot']);
   expect(manager.getEntity('pilot')).toBe(player);
 });
 

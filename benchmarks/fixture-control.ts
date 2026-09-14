@@ -123,12 +123,10 @@ export async function startFixtureControl(
           delete actor.harpoonLatchPos;
           const angle = (index * Math.PI * 2) / actors.length;
           const position = { x: Math.cos(angle) * 100, y: Math.sin(angle) * 100 };
-          if (actor.type === 'human') {
-            assert(
-              engine.playerMotion.placeActorForTesting(actor.id, position, engine.getServerTime()),
-              'Human fixture motion session absent'
-            );
-          }
+          assert(
+            engine.playerMotion.placeActorForTesting(actor.id, position, engine.getServerTime()),
+            'Fixture motion session absent'
+          );
           engine.updatePlayer(actor.id, {
             position,
             velocity: { x: 0, y: 0 },
@@ -183,13 +181,13 @@ export async function startFixtureControl(
         }
         const state = engine.getGameState();
         const counts = {
-          humans: players.length,
+          players: players.length,
           asteroids: engine.getAsteroidCount(),
           pickups: engine.getSatellitePickupCount(),
         };
         if (request.scenario === 'combat') {
           assert.deepEqual(counts, {
-            humans: 5,
+            players: 5,
             asteroids: 80,
             pickups: 6,
           });

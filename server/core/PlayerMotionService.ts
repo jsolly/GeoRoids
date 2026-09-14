@@ -34,7 +34,7 @@ interface Session {
 }
 
 /**
- * Authoritative lifecycle and pose ownership for enhanced human players.
+ * Authoritative lifecycle and pose ownership for players.
  *
  * The service owns only the player transform/session boundary. Ordinary ship
  * flight, asteroid physics, combat, and the Hauler's short combat harpoon stay
@@ -53,7 +53,6 @@ export class PlayerMotionService {
 
   private alive(actor: GameEntity): boolean {
     return (
-      actor.type === 'human' &&
       actor.health > 0 &&
       Number.isFinite(actor.health) &&
       !actor.exploding &&

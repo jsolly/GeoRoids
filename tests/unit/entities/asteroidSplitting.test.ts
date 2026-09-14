@@ -78,8 +78,8 @@ describe('Collaborative asteroid split', () => {
   test('two distinct pilots hitting a big roid within 1s also splits', () => {
     asteroidManager.addAsteroid(makeAsteroid({ id: 'big-coop', size: ROID.SIZE }));
 
-    asteroidManager.registerLaserHit('big-coop', 'human-1', 0);
-    const result = asteroidManager.registerLaserHit('big-coop', 'human-2', 400);
+    asteroidManager.registerLaserHit('big-coop', 'pilot-1', 0);
+    const result = asteroidManager.registerLaserHit('big-coop', 'pilot-2', 400);
 
     expect(result.split).toBe(true);
     expect(result.newAsteroids).toHaveLength(2);

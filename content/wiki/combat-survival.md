@@ -38,7 +38,7 @@ back into the world.
 
 ## Lives and respawn
 
-A human starts with lives and score. A death decrements one life; the last life
+A player starts with lives and score. A death decrements one life; the last life
 reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary

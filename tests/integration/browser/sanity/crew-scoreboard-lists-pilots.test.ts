@@ -59,7 +59,7 @@ async function captureScoreboard(page: import('playwright').Page): Promise<Score
 }
 
 test.each([1280, 390])(
-  'one shared crew keeps every active human pilot on the scoreboard at %i pixels',
+  'one shared crew keeps every active pilot on the scoreboard at %i pixels',
   async (width) => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -74,7 +74,6 @@ test.each([1280, 390])(
     expect(capture.hasFactionFields).toBe(false);
     expect(capture.playerNames).toContain('Crew pilot');
     expect(capture.drawnText).toContain('Crew pilot');
-    expect(capture.drawnText.some((text) => text.includes('(bot)'))).toBe(false);
 
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`crew-scoreboard-${width}.png`),

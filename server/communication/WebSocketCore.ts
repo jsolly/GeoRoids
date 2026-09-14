@@ -41,7 +41,7 @@ export class WebSocketCore {
 
   public removePlayer(id: string) {
     const removed = this.gameEngine.removePlayer(id);
-    if (removed?.type === 'human') {
+    if (removed) {
       this.broadcaster.broadcastPlayerLeft(id);
     }
     return removed;

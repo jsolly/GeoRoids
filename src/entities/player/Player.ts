@@ -75,11 +75,10 @@ export class Player {
     this.input = params.input;
     this.color = getPlayerColor(this.type);
 
-    // Create ship with player's color and friction coefficient
     this.ship = new Ship({
       color: this.color,
       isLocalPlayer: this.type === 'local',
-      frictionCoefficient: this.getFrictionCoefficient(),
+      frictionCoefficient: 0.01,
       ...(params.kitId !== undefined ? { kitId: params.kitId } : {}),
     });
     this.networkState = {
@@ -444,13 +443,6 @@ export class Player {
 
     // The respawn will be handled by the server
     // Client just needs to wait for server updates
-  }
-
-  /**
-   * Get friction coefficient based on player type
-   */
-  getFrictionCoefficient(): number {
-    return 0.01;
   }
 
   // Get current state for network transmission

@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import {
   GameEngine,
-  HUMAN_LASER_MAX_LIFETIME_MS,
-  HUMAN_SHOOT_POSE_ALLOWANCE_MS,
+  PLAYER_LASER_MAX_LIFETIME_MS,
+  PLAYER_SHOOT_POSE_ALLOWANCE_MS,
 } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { GAME, LASER, SHIP } from '../../../src/constants';
@@ -16,7 +16,7 @@ vi.mock('../../../setup/serverLogger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-describe('server-authoritative human shooting', () => {
+describe('server-authoritative player shooting', () => {
   let engine: GameEngine;
   let handler: MessageHandler;
   let broadcaster: GameStateBroadcaster;
@@ -116,7 +116,7 @@ describe('server-authoritative human shooting', () => {
   });
 
   test('finite speed bounds and live ownership reject malformed, unjoined and respawning shots', () => {
-    expect(engine.spawnHumanLaser('missing', { x: 20, y: 0 }, { x: 5, y: 0 })).toBeNull();
+    expect(engine.spawnPlayerLaser('missing', { x: 20, y: 0 }, { x: 5, y: 0 })).toBeNull();
     shoot({ x: Number.POSITIVE_INFINITY, y: 0 });
     shoot({ x: 20, y: 0 }, { x: 1e10, y: 0 });
     shoot({ x: 20, y: 0 }, { x: Number.NaN, y: 0 });
@@ -139,7 +139,7 @@ describe('server-authoritative human shooting', () => {
     const kit = getShipKit(player.kitId);
     player.velocity = { x: kit.maxVelocity, y: 0 };
     const delayedPosition = {
-      x: (-kit.maxVelocity * GAME.FPS * HUMAN_SHOOT_POSE_ALLOWANCE_MS) / 1000,
+      x: (-kit.maxVelocity * GAME.FPS * PLAYER_SHOOT_POSE_ALLOWANCE_MS) / 1000,
       y: 0,
     };
     const muzzle = calculateLaserStartPosition(delayedPosition, 0, kit.size / 2);
@@ -167,7 +167,7 @@ describe('server-authoritative human shooting', () => {
     shoot({ x: 20, y: 0 }, { x: 0, y: 0 });
     expect(engine.getServerLasers()).toHaveLength(1);
     expect(socket.received('shotAcknowledged')).toHaveLength(0);
-    clock.mockReturnValue(1000 + HUMAN_LASER_MAX_LIFETIME_MS);
+    clock.mockReturnValue(1000 + PLAYER_LASER_MAX_LIFETIME_MS);
     engine.advanceLasersAndResolveHits();
     expect(engine.getServerLasers()).toHaveLength(0);
   });

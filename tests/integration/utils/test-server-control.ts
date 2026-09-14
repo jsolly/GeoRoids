@@ -16,7 +16,7 @@ function isWorldDiagnostics(value: unknown): value is ServerWorldDiagnostics {
     typeof world['gameTime'] === 'number' &&
     Number.isFinite(world['gameTime']) &&
     world['gameTime'] >= 0 &&
-    ['humanPlayers', 'asteroids', 'loot', 'satellitePickups'].every(
+    ['players', 'asteroids', 'loot', 'satellitePickups'].every(
       (field) =>
         typeof world[field] === 'number' && Number.isSafeInteger(world[field]) && world[field] >= 0
     )
@@ -45,7 +45,7 @@ export async function getWorldDiagnostics(): Promise<ServerWorldDiagnostics> {
 export function isWorldClean(world: ServerWorldDiagnostics): boolean {
   return (
     world.isPaused &&
-    world.humanPlayers === 0 &&
+    world.players === 0 &&
     world.asteroids === 0 &&
     world.loot === 0 &&
     world.satellitePickups === 0

@@ -100,7 +100,7 @@ test('towing preserves attachment momentum, follows the moving Hauler, and relea
   expect(rock.velocity).toEqual(releasedVelocity);
 });
 
-test('an owned human motion session still pulls cargo on the authoritative server', () => {
+test('an owned player motion session still pulls cargo on the authoritative server', () => {
   const hauler = actor('hauler');
   const ws = hauler.ws;
   assert(ws);
@@ -155,18 +155,18 @@ test('scans retain map discoveries after expiry without crediting distant Survey
   expect(snapshot.exploration).toEqual(state.exploration);
 });
 
-test('human hulls ignore crew lasers and ship overlap while asteroid impacts still hurt', () => {
+test('player hulls ignore crew lasers and ship overlap while asteroid impacts still hurt', () => {
   engine.addPlayer('third', 'Third', new RecordingSocket(), { x: 200, y: 0 });
   engine.entityManager.updateEntity('third', { spawnProtectionTimer: 0 });
   const hauler = actor('hauler');
-  const humans = [actor('scout'), hauler, actor('third')];
-  const health = humans.map((player) => player.health);
-  for (const shooter of humans) {
+  const players = [actor('scout'), hauler, actor('third')];
+  const health = players.map((player) => player.health);
+  for (const shooter of players) {
     engine.spawnLaser(shooter.id, { x: -100, y: 0 }, { x: 300, y: 0 });
   }
   engine.advanceLasersAndResolveHits();
   engine.resolveAuthoritativeCombat();
-  expect(humans.map((player) => player.health)).toEqual(health);
+  expect(players.map((player) => player.health)).toEqual(health);
   expect(engine.handleShipDamage(hauler.id, 'scout', 100).applied).toBe(false);
   expect(engine.handleShipDamage(hauler.id, 'asteroid', 25).applied).toBe(true);
   expect(hauler.health).toBe(hauler.maxHealth - 25);

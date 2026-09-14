@@ -667,7 +667,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     ).toBe(true);
     expect(actor.playerMotion?.epoch).toBe(oldEpoch + 1);
     expect(engine.getDiagnostics()).toMatchObject({
-      humanPlayers: 1,
+      players: 1,
       asteroids: 80,
       satellitePickups: 6,
     });

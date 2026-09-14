@@ -162,7 +162,7 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     );
 
     expect(pilot.ws).toBe(owner);
-    expect(pilot.type).toBe('human');
+    expect(pilot.type).toBe('player');
     expect(pilot.name).toBe('Pilot');
     expect(pilot.harpoonTargetId).toBe(rock.id);
     expect(pilot.harpoonLatchPos).toEqual(latch);

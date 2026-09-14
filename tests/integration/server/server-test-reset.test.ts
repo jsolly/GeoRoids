@@ -21,7 +21,7 @@ class TrackingSocket extends RecordingSocket {
 
 const emptyWorld = {
   isPaused: true,
-  humanPlayers: 0,
+  players: 0,
   asteroids: 0,
   loot: 0,
   satellitePickups: 0,
@@ -40,7 +40,7 @@ test('resetting a populated test world closes its pilot and health reports the e
     server.gameEngine.createAsteroids(5);
     const populated = server.gameEngine.getDiagnostics();
     expect(populated.gameTime).toBeGreaterThan(0);
-    expect(populated.humanPlayers).toBe(1);
+    expect(populated.players).toBe(1);
     expect(populated.asteroids).toBeGreaterThan(0);
 
     const reset = await fetch(`${url}/test/reset-world`, {
@@ -94,9 +94,9 @@ test('a reset attempts every pilot close and reports a socket cleanup failure', 
     expect(healthySocket.readyState).toBe(healthySocket.CLOSED);
     expect(errorLog).toHaveBeenCalledExactlyOnceWith('TEST_RESET_FAILED', {
       operation: 'reset test world',
-      action: 'close or replace the failing human socket, then retry',
+      action: 'close or replace the failing player socket, then retry',
       error: {
-        message: 'Test world reset could not close every human socket',
+        message: 'Test world reset could not close every player socket',
         failures: [
           {
             message: 'Failed to close socket for player pilot-a',

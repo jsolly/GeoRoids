@@ -138,7 +138,7 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
   const store = database(':memory:');
   const field = new RegionalAsteroidField(82, store);
   const manager = new AsteroidManager(new RNGService(82));
-  field.update(manager, [{ x: 0, y: 0 }]);
+  field.update(manager, [{ x: 0, y: 0 }], new Set());
   const drift = manager.getAllAsteroids()[0];
   assert(drift);
   const originalPosition = { ...drift.position };
@@ -165,14 +165,14 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
   expect(sleeping.filter((rock) => rock.id === drift.id)).toHaveLength(1);
   expect(sleeping).toHaveLength(25);
 
-  field.update(manager, [{ x: 8_200, y: 200 }]);
+  field.update(manager, [{ x: 8_200, y: 200 }], new Set());
   const arrived = manager.getAsteroid(drift.id);
   assert(arrived);
   arrived.position = { x: 16_200, y: 200 };
   save();
   expect(store.loadSector('4,0')?.some((rock) => rock.id === drift.id)).toBe(false);
   expect(store.loadSector('8,0')?.filter((rock) => rock.id === drift.id)).toHaveLength(1);
-  field.update(manager, [originalPosition]);
+  field.update(manager, [originalPosition], new Set());
   expect(manager.getAsteroid(drift.id)).toBeUndefined();
 });
 

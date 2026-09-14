@@ -188,25 +188,6 @@ test('overlapping shots vary pitch and volume independently', async () => {
   expect(howl().voices.get(2)?.rate).toBeCloseTo(1.1);
 });
 
-test('thrust volume updates preserve one loop and its pitch across loop boundaries', async () => {
-  const sound = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
-  setSound(true);
-  await settle();
-  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
-  await sound.play();
-  howl().end(1);
-  await sound.play(0.4);
-  expect(howl().play).toHaveBeenCalledTimes(1);
-  expect(howl().voices.get(1)?.volume).toBeCloseTo(0.02);
-  expect(howl().voices.get(1)?.rate).toBeCloseTo(0.95);
-  expect(random).toHaveBeenCalledTimes(1);
-  sound.stop();
-  sound.stop();
-  expect(howl().stop).toHaveBeenCalledTimes(1);
-  await sound.play();
-  expect(howl().voices.get(2)?.rate).toBeCloseTo(1.05);
-});
-
 test('unloaded and interrupted shots are dropped without replay or hot-loop resumes', async () => {
   const sound = new Sound('sounds/laser.m4a', 2);
   setSound(true);

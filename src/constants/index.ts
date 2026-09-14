@@ -55,6 +55,13 @@ export const TOUCH = {
   TABLET_MIN_SIDE: 820,
 } as const;
 
+export const STEERING = {
+  DEAD_ZONE_PX: 24,
+  ARROW_DISTANCE_PX: 64,
+  ARROW_LENGTH_PX: 14,
+  ARROW_HALF_WIDTH_PX: 9,
+} as const;
+
 // ============================================================================
 // LOCKED PLAYFIELD PALETTE
 // ============================================================================
@@ -380,16 +387,13 @@ export const AUDIO = {
   EXPLOSION_PATH: 'sounds/explode.m4a',
   LASER_PATH: 'sounds/laser.m4a',
   HIT_PATH: 'sounds/hit.m4a',
-  THRUST_PATH: 'sounds/thrust.m4a',
   EXPLOSION_MAX_STREAMS: 5,
   LASER_MAX_STREAMS: 5,
   HIT_MAX_STREAMS: 5,
-  THRUST_MAX_STREAMS: 2,
-  // Soft matt-blush levels — quieter than arcade default, loops stay under one-shots.
+  // Quiet effects keep repeated combat cues comfortable.
   EXPLOSION_VOLUME: 0.055,
   LASER_VOLUME: 0.04,
   HIT_VOLUME: 0.035,
-  THRUST_VOLUME: 0.03,
   // Used when the canvas size is unknown (matches PlayerNetwork nearby radius).
   FALLBACK_MAX_DISTANCE: 1200,
   // Floor so an on-screen source at the viewport edge stays a soft blush, not silent.

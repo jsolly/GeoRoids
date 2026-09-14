@@ -1,16 +1,15 @@
-import { upsertThrustSource } from '../audio/gameSounds';
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../entities/ship/shipKits';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
+import { steeringTurn } from './pointerSteering';
 
 interface KeyStates {
   ArrowLeft: boolean;
   ArrowRight: boolean;
   Space: boolean;
-  ArrowUp: boolean;
   [key: string]: boolean;
 }
 
@@ -18,7 +17,6 @@ export const keys: KeyStates = {
   ArrowLeft: false,
   ArrowRight: false,
   Space: false,
-  ArrowUp: false,
 };
 
 // Track pressed keys per-player to avoid cross-player/global interference (e.g., parallel tests)
@@ -33,49 +31,10 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
   return set;
 }
 
-// Helper function to update thrust state based on aggregate input.
-// Thrust sources: ArrowUp / KeyW, right-mouse, and touch steering.
-function updateThrustFromKeys(player: Player): void {
-  const pressed = getPressedKeysForPlayer(player);
-  const shouldThrust =
-    player.lives > 0 &&
-    player.ship.health > 0 &&
-    !player.ship.exploding &&
-    (pressed.has('ArrowUp') ||
-      pressed.has('KeyW') ||
-      controlSources.mouseThrust ||
-      controlSources.touchThrust);
-  const currentlyThrusting = player.ship.thrusting;
-
-  logger.debug('KEYBINDINGS', 'updateThrustFromKeys', {
-    pressedKeys: Array.from(pressed),
-    shouldThrust,
-    currentlyThrusting,
-    hasArrowUp: pressed.has('ArrowUp'),
-    hasKeyW: pressed.has('KeyW'),
-    mouseThrust: controlSources.mouseThrust,
-    touchThrust: controlSources.touchThrust,
-    playerId: player.id,
-    playerName: player.name,
-  });
-
-  // Only update if the aggregate state has changed
-  if (shouldThrust !== currentlyThrusting) {
-    logger.debug('KEYBINDINGS', 'Updating thrust state', {
-      from: currentlyThrusting,
-      to: shouldThrust,
-    });
-    player.ship.thrusting = shouldThrust;
-    upsertThrustSource({
-      id: player.id,
-      thrusting: shouldThrust,
-      position: player.ship.position,
-    });
-  } else {
-    logger.debug('KEYBINDINGS', 'Thrust state unchanged', {
-      thrusting: shouldThrust,
-    });
-  }
+/** The live local ship cruises regardless of which controls are held. */
+function updateCruise(player: Player): void {
+  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
+  player.ship.thrusting = alive;
 }
 
 // Helper to set angular velocity from the aggregate turn-key state. Supports
@@ -105,18 +64,17 @@ function updateTurnFromKeys(player: Player): void {
     player.ship.angularVelocity = 0;
   }
 
-  // Touch aims like the mouse. A held turn key still wins so WASD on a
-  // touchscreen laptop is unchanged.
-  if (controlSources.touchHeading !== null && !turningLeft && !turningRight) {
-    player.ship.angle = controlSources.touchHeading;
-    player.ship.angularVelocity = 0;
+  if (!turningLeft && !turningRight) {
+    const heading = controlSources.pointerHeading;
+    player.ship.angularVelocity =
+      heading === null ? 0 : steeringTurn(player.ship.angle, heading, turnSpeed);
   }
 }
 
-/** Re-apply thrust, turn, and touch heading from every live input source. */
+/** Reconcile steering and cruise once per simulation step, also after input changes. */
 export function reconcilePlayerInput(player: Player): void {
   updateTurnFromKeys(player);
-  updateThrustFromKeys(player);
+  updateCruise(player);
 }
 
 export function keyDown(ev: KeyboardEvent, player: Player): void {
@@ -134,8 +92,7 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     getPressedKeysForPlayer(player).add(ev.code);
     switch (ev.code) {
       case 'Space':
-        // Space fires (classic Asteroids + the documented control scheme).
-        // Thrust is ArrowUp / KeyW / right-mouse; see updateThrustFromKeys.
+        // Space fires while automatic cruise continues.
         player.ship.shoot();
         break;
       case 'KeyE':
@@ -158,12 +115,8 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
       case 'KeyA':
       case 'ArrowRight':
       case 'KeyD':
+        controlSources.pointerHeading = null;
         logger.debug('KEYBINDINGS', 'Updating rotation', { key: ev.code });
-        reconcilePlayerInput(player);
-        break;
-      case 'ArrowUp':
-      case 'KeyW':
-        logger.debug('KEYBINDINGS', 'Setting thrust', { key: ev.code });
         reconcilePlayerInput(player);
         break;
     }
@@ -197,13 +150,11 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
     return;
   }
 
-  // Reconcile thrust/turn from the remaining held keys. Done regardless of
+  // Reconcile cruise/turn from the remaining held keys. Done regardless of
   // lives/exploding so releasing a key never leaves a dead ship stuck
   // thrusting or spinning. Both arrows and WASD funnel through the same
   // aggregate helpers.
   switch (ev.code) {
-    case 'ArrowUp':
-    case 'KeyW':
     case 'ArrowLeft':
     case 'KeyA':
     case 'ArrowRight':

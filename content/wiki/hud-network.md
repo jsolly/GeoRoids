@@ -19,9 +19,8 @@ checkbox on the title screen to enable or mute audio. Muting stops sounds alread
 playing too. Starting with Sound off skips loading sound files. When you enable
 audio, effects become available as they load; missed sounds do not play later.
 
-Shots, impacts, explosions, and thrust vary their pitch slightly each time they
-start, keeping repeated actions from sounding identical. A held thrust keeps a
-steady pitch until the next burst. Nearby action is louder; off-screen combat
+Shots, impacts, and explosions vary their pitch slightly each time they
+start, keeping repeated actions from sounding identical. Automatic thrust is silent. Nearby action is louder; off-screen combat
 cues stay silent. Harpoons have launch, latch, and release cues. Orbital pickup
 and pickup-break sounds differ from ship lasers. Fuel, laser cores, and
 material pickups have separate cues, as do kit abilities and respawning.

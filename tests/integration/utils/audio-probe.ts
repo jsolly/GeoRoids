@@ -15,9 +15,6 @@ export async function installAudioProbe(page: Page, enabled = true): Promise<voi
     const publish = () => {
       document.documentElement.dataset['audioEvents'] = JSON.stringify(events);
       document.documentElement.dataset['activeAudio'] = String(active.size);
-      document.documentElement.dataset['activeAudioLoop'] = String(
-        [...active].some((source) => source.loop)
-      );
       document.documentElement.dataset['audioContexts'] = String(contexts);
       document.documentElement.dataset['audioMedia'] = String(media);
       document.documentElement.dataset['decodedAudio'] = String(decoded);

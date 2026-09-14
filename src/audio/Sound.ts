@@ -13,16 +13,13 @@ export class Sound {
   private howl: Howl | undefined;
   private readonly voices = new Set<number>();
   private readonly maxVoices: number;
-  private readonly loop: boolean;
 
   constructor(
     readonly src: string,
     maxStreams: number,
-    private readonly baseVolume = 0.05,
-    options?: { loop?: boolean }
+    private readonly baseVolume = 0.05
   ) {
     this.maxVoices = Number.isFinite(maxStreams) ? Math.max(1, Math.floor(maxStreams)) : 1;
-    this.loop = options?.loop === true;
     registerAudioSound(
       (audio) => {
         this.howl ??= new audio.Howl({
@@ -30,13 +27,11 @@ export class Sound {
           html5: false,
           preload: true,
           autoplay: false,
-          loop: this.loop,
+          loop: false,
           pool: this.maxVoices,
           volume: baseVolume,
           onend: (id) => {
-            if (!this.loop) {
-              this.voices.delete(id);
-            }
+            this.voices.delete(id);
           },
           onstop: (id) => this.voices.delete(id),
           onload: () => {
@@ -69,10 +64,6 @@ export class Sound {
     if (!howl || !canPlayAudio(howl) || scale <= 0) {
       return;
     }
-    if (this.loop && this.isPlaying()) {
-      this.setVolumeScale(scale);
-      return;
-    }
     // Howler's pool only bounds idle nodes, not simultaneous playback.
     if (this.voices.size >= this.maxVoices) {
       return;
@@ -81,12 +72,6 @@ export class Sound {
     this.voices.add(id);
     howl.volume(Math.min(1, this.baseVolume * scale), id);
     howl.rate(randomPlaybackRate(), id);
-  }
-
-  setVolumeScale(volumeScale: number): void {
-    for (const id of this.voices) {
-      this.howl?.volume(Math.min(1, this.baseVolume * boundedScale(volumeScale)), id);
-    }
   }
 
   stop(): void {

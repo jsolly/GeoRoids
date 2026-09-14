@@ -92,7 +92,7 @@ test.each([false, true])(
         await session.detach();
       }
     } else {
-      await game.holdMovementKey('ArrowUp', 600);
+      await game.waitForAnimationFrames(36);
       await page.keyboard.press('Space');
     }
     await game.waitForAnimationFrames(60);

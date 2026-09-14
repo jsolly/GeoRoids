@@ -1,27 +1,10 @@
-type ControlSources = {
-  mouseThrust: boolean;
-  touchThrust: boolean;
-  touchHeading: number | null;
-  touchFire: boolean;
-  touchSteeringActive: boolean;
-};
-
-export const controlSources: ControlSources = {
-  mouseThrust: false,
-  touchThrust: false,
-  touchHeading: null,
+export const controlSources: { pointerHeading: number | null; touchFire: boolean } = {
+  pointerHeading: null,
   touchFire: false,
-  touchSteeringActive: false,
 };
 
+/** Release held controls; automatic cruise is a flight rule, not an input source. */
 export function resetControlSources(): void {
-  controlSources.mouseThrust = false;
-  resetTouchSources();
-}
-
-export function resetTouchSources(): void {
-  controlSources.touchThrust = false;
-  controlSources.touchHeading = null;
+  controlSources.pointerHeading = null;
   controlSources.touchFire = false;
-  controlSources.touchSteeringActive = false;
 }

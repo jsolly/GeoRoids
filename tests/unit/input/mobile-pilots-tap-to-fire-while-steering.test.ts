@@ -53,16 +53,16 @@ function pointer(
   target.dispatchEvent(event);
 }
 
-test('a quick playfield tap fires once and leaves neither thrust nor fire held', () => {
+test('a quick playfield tap fires once while cruise continues', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
   const heading = player.ship.angle;
   pointer('pointerdown', 1, 0);
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
   expect(player.ship.angle).toBe(heading);
   pointer('pointerup', 1, 100);
   expect(player.ship.angle).toBe(heading);
   expect(shoot).toHaveBeenCalledTimes(1);
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
   expect(controlSources.touchFire).toBe(false);
 });
 
@@ -88,7 +88,7 @@ test('lifting the movement finger preserves held fire until the firing finger li
   pointer('pointerdown', 1, 0);
   pointer('pointerdown', 2, 50, 320, 400);
   pointer('pointerup', 1, 100);
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
   expect(controlSources.touchFire).toBe(true);
   pointer('pointerup', 2, 150, 320, 400);
   expect(controlSources.touchFire).toBe(false);
@@ -124,7 +124,7 @@ test('an interrupted tap never fires, and losing focus clears both held fingers'
   pointer('pointerdown', 2, 150, 320, 400);
   window.dispatchEvent(new Event('blur'));
   expect(controlSources.touchFire).toBe(false);
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
 });
 
 test('ability buttons do not create playfield shots or change steering', () => {
@@ -144,19 +144,23 @@ test('ability buttons do not create playfield shots or change steering', () => {
   expect(player.ship.thrusting).toBe(true);
 });
 
-test('holding a finger starts steering, and release cancels a pending hold', () => {
+test('holding a finger starts steering, and release cancels its target without stopping cruise', () => {
   vi.useFakeTimers();
   try {
     pointer('pointerdown', 1, 0);
-    expect(player.ship.thrusting).toBe(false);
+    expect(player.ship.thrusting).toBe(true);
+    expect(controlSources.pointerHeading).toBeNull();
     vi.advanceTimersByTime(250);
+    expect(controlSources.pointerHeading).not.toBeNull();
     expect(player.ship.thrusting).toBe(true);
     pointer('pointerup', 1, 300);
-    expect(player.ship.thrusting).toBe(false);
+    expect(controlSources.pointerHeading).toBeNull();
+    expect(player.ship.thrusting).toBe(true);
     pointer('pointerdown', 2, 400);
     pointer('pointercancel', 2, 450);
     vi.advanceTimersByTime(250);
-    expect(player.ship.thrusting).toBe(false);
+    expect(controlSources.pointerHeading).toBeNull();
+    expect(player.ship.thrusting).toBe(true);
   } finally {
     vi.useRealTimers();
   }
@@ -172,11 +176,30 @@ test('an action tap during a pending hold still lets a second canvas finger star
   pointer('pointerdown', 1, 0);
   pointer('pointerdown', 2, 30, 320, 780, ability);
   pointer('pointerup', 2, 50, 320, 780, ability);
-  expect(player.ship.thrusting).toBe(false);
+  expect(player.ship.thrusting).toBe(true);
   pointer('pointerdown', 3, 80, 320, 400);
   expect(player.ship.thrusting).toBe(true);
   expect(controlSources.touchFire).toBe(true);
   pointer('pointerup', 3, 100, 320, 400);
   expect(controlSources.touchFire).toBe(false);
   expect(player.ship.thrusting).toBe(true);
+});
+
+test('resting on a grown hull cancels the target and tiny finger jitter cannot whip the nose', () => {
+  player.ship.r = 33;
+  pointer('pointerdown', 1, 0, 295, 422);
+  pointer('pointermove', 1, 20, 300, 402);
+  expect(controlSources.pointerHeading).not.toBeNull();
+  for (const [x, y] of [
+    [195, 422],
+    [197, 420],
+    [193, 424],
+    [225, 422],
+  ]) {
+    pointer('pointermove', 1, 40, x, y);
+    expect(controlSources.pointerHeading).toBeNull();
+    expect(player.ship.angularVelocity).toBe(0);
+    expect(player.ship.thrusting).toBe(true);
+  }
+  pointer('pointerup', 1, 300, 195, 422);
 });

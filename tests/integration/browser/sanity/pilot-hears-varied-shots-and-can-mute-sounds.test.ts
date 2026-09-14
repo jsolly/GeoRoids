@@ -13,16 +13,16 @@ import {
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
-async function holdInput(page: Page, mobile: boolean, input: 'thrust' | 'fire') {
+async function holdInput(page: Page, mobile: boolean, input: 'steer' | 'fire') {
   if (!mobile) {
-    const key = input === 'thrust' ? 'ArrowUp' : 'Space';
+    const key = input === 'steer' ? 'ArrowLeft' : 'Space';
     await page.keyboard.down(key);
     return () => page.keyboard.up(key);
   }
   const session = await page.context().newCDPSession(page);
   const center = await centerOf(page, '#gameCanvas');
   const point =
-    input === 'thrust' ? { x: center.x + 40, y: center.y } : await canvasPoint(page, 0.75, 0.5);
+    input === 'steer' ? { x: center.x + 40, y: center.y } : await canvasPoint(page, 0.75, 0.5);
   await dispatchTouch(session, 'touchStart', [{ ...point, id: 1 }]);
   return async () => {
     await dispatchTouch(session, 'touchEnd', []);
@@ -65,14 +65,14 @@ for (const viewport of [
         await session.detach();
       }
     } else {
-      await page.keyboard.down('ArrowUp');
+      await page.keyboard.down('ArrowLeft');
       await page.keyboard.down('Space');
       await page.waitForTimeout(1200);
       const duringInput = await readTouchControlState(page);
       expect(duringInput.thrusting).toBe(true);
       expect(duringInput.lastShotTime).toBeGreaterThan(beforeInput.lastShotTime);
       await page.keyboard.up('Space');
-      await page.keyboard.up('ArrowUp');
+      await page.keyboard.up('ArrowLeft');
     }
     const state = await page.evaluate(() => ({
       contexts: document.documentElement.dataset['audioContexts'],
@@ -83,7 +83,7 @@ for (const viewport of [
     expect(requests).toEqual([]);
   }, 60000);
 
-  test(`${viewport.name} pilot hears varied shots and thrust, then mutes every cue`, async () => {
+  test(`${viewport.name} pilot cruises silently, hears varied shots, then mutes every cue`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.name === 'mobile' });
     await page.setViewportSize(viewport);
     const errors: string[] = [];
@@ -113,20 +113,16 @@ for (const viewport of [
       await release();
       await page.waitForTimeout(500);
     }
-    const releaseThrust = await holdInput(page, viewport.name === 'mobile', 'thrust');
-    await expect
-      .poll(() =>
-        page.evaluate(() => {
-          const events = JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]');
-          return events.some((event: { loop: boolean }) => event.loop);
-        })
-      )
-      .toBe(true);
-    await releaseThrust();
+    const releaseSteering = await holdInput(page, viewport.name === 'mobile', 'steer');
+    await game.waitForAnimationFrames(20);
+    expect((await readTouchControlState(page)).thrusting).toBe(true);
+    await releaseSteering();
     const events: Array<{ duration: number; rate: number; loop: boolean; bufferId: number }> =
       await page.evaluate(() =>
         JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
       );
+    expect(events.every((event) => !event.loop)).toBe(true);
+    expect(assets).not.toContain('thrust.m4a');
     expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe('1');
 
     // Decode every shipped sample with the real browser's codec, not a media mock.
@@ -166,12 +162,10 @@ for (const viewport of [
     }
     expect(new Set(lasers.map((event) => event.rate)).size).toBeGreaterThan(1);
     // Mute while native sample and synthesized sources are still active.
-    const releaseMutedThrust = await holdInput(page, viewport.name === 'mobile', 'thrust');
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.dataset['activeAudioLoop']))
-      .toBe('true');
     await page.evaluate(`(async () => {
       const { synthesizeSplitCrack } = await import('/src/audio/splitSound.ts');
+      const { getLaserSound } = await import('/src/audio/gameSounds.ts');
+      await getLaserSound().play();
       if (!synthesizeSplitCrack(1)) throw new Error('Live split synthesis unavailable');
     })()`);
     expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe('1');
@@ -191,7 +185,6 @@ for (const viewport of [
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
       .toBe('suspended');
-    await releaseMutedThrust();
     const countAfterMute = await page.evaluate(
       () => document.documentElement.dataset['audioEvents']
     );

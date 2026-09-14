@@ -51,8 +51,9 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
   return query.maxTouchPoints > 0 && Math.min(query.width, query.height) <= TOUCH.TABLET_MIN_SIDE;
 }
 
-export const DESKTOP_CONTROLS_HINT = 'WASD + Space · E ability · F shield';
-export const TOUCH_CONTROLS_HINT = 'Hold screen to steer + thrust · Fire · Ability · Shield';
+export const DESKTOP_CONTROLS_HINT =
+  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · E ability · F shield';
+export const TOUCH_CONTROLS_HINT = 'Always thrust · Drag to steer · Tap to fire · Ability · Shield';
 
 export function controlsHintFor(query: ViewportQuery = queryViewport()): string {
   return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;

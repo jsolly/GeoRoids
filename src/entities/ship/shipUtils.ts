@@ -259,13 +259,8 @@ export function calculateLaserStartPosition(
   return addPositions(shipPosition, noseOffset);
 }
 
-/** Friction used by the standalone wiki motion demonstrations. */
-export function moveFrictionForShip(isBot: boolean): number {
-  return isBot ? SHIP.BOT_FRICTION : GAME.FRICTION;
-}
-
 /**
- * Shared thrust / friction step for local ships, remotes, and bots.
+ * Thrust / friction step for bots and ships carrying combat knockback.
  * Callers pass their own friction so local and server-owned policies stay explicit.
  * Scalar mass/kit arguments keep loot growth and Hauler thrust on the same
  * formula without allocating an options object on every frame.

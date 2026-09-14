@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
+import { cruiseSpeed, dashSpeedBonus } from '../../shared/shipFlight';
 import { radiusFromMass } from '../../shared/shipGrowth';
 import type { PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
@@ -79,7 +80,9 @@ export class PlayerMotionService {
   }
 
   public legalSpeed(actor: GameEntity, now: number): number {
-    const normal = getShipKit(actor.kitId).maxVelocity;
+    const normal =
+      cruiseSpeed(actor.mass, getShipKit(actor.kitId).maxVelocity) +
+      dashSpeedBonus(actor.kitId, actor.abilityActiveFrames ?? 0);
     const impulse = this.sessions.get(actor.id)?.knockback;
     if (!impulse) {
       return normal;
@@ -352,7 +355,6 @@ export class PlayerMotionService {
       return;
     }
     const speed = Math.hypot(session.actor.velocity.x, session.actor.velocity.y);
-    const normal = getShipKit(session.actor.kitId).maxVelocity;
     session.knockback = { speed, at: now };
     session.epoch += 1;
     session.mode = 'free';
@@ -361,7 +363,7 @@ export class PlayerMotionService {
     session.anchor = undefined;
     session.poseAt = now;
     session.anchorAt = now;
-    session.poseCredit = Math.max(normal, speed) * PLAYER_MOTION.poseLeadFrames;
+    session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
     this.publish(session);
   }
 

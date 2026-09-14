@@ -34,6 +34,7 @@ import {
   LOOT_BLAST,
 } from '../shared/lootBlast';
 import { findNearestShieldImpact, reflectProjectileVelocity } from '../shared/shieldReflection';
+import { cruiseSpeed, cruiseVelocity, dashSpeedBonus } from '../shared/shipFlight';
 import {
   applyLootMass,
   lootOverlap,
@@ -56,6 +57,7 @@ import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRend
 import { drawAsteroidMaterialDetails } from '../src/entities/roid/materialArt';
 import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
+import { advanceCruiseVelocity } from '../src/entities/ship/cruiseMotion';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
 import { applyQuakeImpulse } from '../src/entities/ship/quakeImpulse';
 import { paintQuakePulse } from '../src/entities/ship/quakePulseRenderer';
@@ -75,13 +77,12 @@ import {
   isShieldBlockingLasers,
   updateShield,
 } from '../src/entities/ship/shipShield';
-import { applyThrustOrFriction, moveFrictionForShip } from '../src/entities/ship/shipUtils';
 import {
   createSkirmisherRingShots,
   SKIRMISHER_RING_COUNT,
 } from '../src/entities/ship/skirmisherRing';
+import { steeringTurn } from '../src/input/pointerSteering';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
-import { getGameBoundary } from '../src/physics/boundary';
 import {
   applyShockwaveToBody,
   easedRingRadius,
@@ -90,12 +91,8 @@ import {
   waveVisualProgress,
 } from '../src/physics/shockwave';
 import { extractIsoContours } from '../src/physics/terrain/contours';
-import {
-  createHeightfield,
-  sampleGradient,
-  sampleHeight,
-} from '../src/physics/terrain/heightfield';
-import { applySlopeForce } from '../src/physics/terrain/slopeForce';
+import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield';
+import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import {
@@ -571,7 +568,8 @@ function makeAsteroid(
 }
 
 function makeDartDemo(): Demo {
-  const host = makeAbilityHost('dart', { x: -150, y: 28 });
+  const host = makeAbilityHost('dart', { x: -600, y: 28 });
+  host.velocity = cruiseVelocity(host.angle, SHIP.MAX_VELOCITY);
   const start = copyPosition(host.position);
   const result = activateAbilityOnHost(host);
   invariant(
@@ -582,7 +580,9 @@ function makeDartDemo(): Demo {
     host.velocity.x > 0 && host.velocity.y === 0,
     'Dart boost did not add forward velocity'
   );
-  const movingHost: AbilityHost = {
+  const movingHost = {
+    mass: 1,
+    thrust: SHIP.THRUST,
     ...host,
     position: copyPosition(host.position),
     velocity: { ...host.velocity },
@@ -592,18 +592,13 @@ function makeDartDemo(): Demo {
   const activeFrames: number[] = [movingHost.abilityActiveFrames];
   const totalTicks = (FRAME_COUNT - 1) * SIM_TICKS_PER_FRAME;
   for (let tick = 0; tick < totalTicks; tick += 1) {
+    tickAbilityHost(movingHost);
+    advanceCruiseVelocity(
+      movingHost,
+      cruiseSpeed(1, SHIP.MAX_VELOCITY) + dashSpeedBonus('dart', movingHost.abilityActiveFrames)
+    );
     movingHost.position.x += movingHost.velocity.x;
     movingHost.position.y += movingHost.velocity.y;
-    movingHost.velocity = applyThrustOrFriction(
-      movingHost.velocity,
-      movingHost.angle,
-      false,
-      moveFrictionForShip(false),
-      SHIP.THRUST,
-      1,
-      SHIP.MAX_VELOCITY
-    );
-    tickAbilityHost(movingHost);
     if ((tick + 1) % SIM_TICKS_PER_FRAME === 0) {
       positions.push(copyPosition(movingHost.position));
       speeds.push(Math.hypot(movingHost.velocity.x, movingHost.velocity.y));
@@ -619,11 +614,11 @@ function makeDartDemo(): Demo {
         positions.some((position, index) => position.x > start.x && (index ?? 0) > 0),
         'Dart did not advance after the boost'
       );
-      invariant((speeds.at(-1) ?? 0) < (speeds[0] ?? 0), 'Dart drift did not slow under friction');
+      invariant((speeds.at(-1) ?? 0) < (speeds[0] ?? 0), 'Dart did not return below burst speed');
     },
     render: (ctx, frame) => {
-      drawFrameChrome(ctx, 'DART · BOOST DASH', 'E trigger → burst → coast', frame);
-      const displayScale = 0.5;
+      drawFrameChrome(ctx, 'DART · BOOST DASH', 'E trigger → burst → automatic thrust', frame);
+      const displayScale = 0.3;
       const position = positions[frame] ?? positions[0] ?? start;
       const pathStart = screenPoint(positions[Math.max(0, frame - 8)] ?? start, displayScale);
       const pathEnd = screenPoint(position, displayScale);
@@ -639,7 +634,7 @@ function makeDartDemo(): Demo {
       );
       drawTag(
         ctx,
-        (activeFrames[frame] ?? 0) > 0 ? 'E · boost active' : 'dash complete · coast',
+        (activeFrames[frame] ?? 0) > 0 ? 'E · boost active' : 'dash complete · automatic thrust',
         380,
         112,
         FACTION_COLORS.ion
@@ -1354,50 +1349,53 @@ function makeQuakeDemo(): Demo {
 
 function makeMovementDemo(): Demo {
   const state = {
-    position: { x: -165, y: 58 },
+    position: { x: -500, y: 160 },
     velocity: { x: 0, y: 0 },
+    angle: 0,
+    mass: 1,
+    thrust: SHIP.THRUST,
   };
   const positions: Position[] = [copyPosition(state.position)];
   const speeds: number[] = [0];
+  const angles: number[] = [0];
   const totalTicks = FRAME_COUNT * SIM_TICKS_PER_FRAME;
-  for (let tick = 0; tick < totalTicks; tick += 1) {
-    state.velocity = applyThrustOrFriction(
-      state.velocity,
-      0,
-      tick < 12 * SIM_TICKS_PER_FRAME,
-      moveFrictionForShip(false),
-      SHIP.THRUST,
-      1,
-      SHIP.MAX_VELOCITY
-    );
+  for (let tick = 0; tick < totalTicks; tick++) {
+    if (tick >= 12 * SIM_TICKS_PER_FRAME && tick < 18 * SIM_TICKS_PER_FRAME) {
+      state.angle += steeringTurn(
+        state.angle,
+        Math.PI / 6,
+        (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS)
+      );
+    }
+    advanceCruiseVelocity(state, cruiseSpeed(1, SHIP.MAX_VELOCITY));
     state.position.x += state.velocity.x;
     state.position.y += state.velocity.y;
     if ((tick + 1) % SIM_TICKS_PER_FRAME === 0) {
       positions.push(copyPosition(state.position));
       speeds.push(Math.hypot(state.velocity.x, state.velocity.y));
+      angles.push(state.angle);
     }
   }
-  const initialSpeed = speeds[0] ?? 0;
-  const thrustSpeed = speeds[10] ?? 0;
-  const releaseSpeed = speeds[12] ?? 0;
-  const finalSpeed = speeds[47] ?? 0;
-  invariant(thrustSpeed > initialSpeed, 'movement thrust did not accelerate');
-  invariant(finalSpeed < releaseSpeed, 'movement friction did not slow drift');
   return {
     id: 'movement',
-    posterFrame: 12,
-    verify: () => invariant(positions.length === FRAME_COUNT + 1, 'movement frame count changed'),
+    posterFrame: 20,
+    verify: () => {
+      invariant(positions.length === FRAME_COUNT + 1, 'movement frame count changed');
+      invariant((speeds[10] ?? 0) > 0, 'automatic thrust did not accelerate');
+      invariant((angles[20] ?? 0) > 0, 'steering did not turn the nose');
+      invariant((speeds.at(-1) ?? 0) > 0, 'releasing steering stopped propulsion');
+    },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'MOVEMENT · THRUST + DRIFT',
-        'hold thrust → accelerate · release → friction coasts',
+        'MOVEMENT · ALWAYS-ON THRUST',
+        'steer → turn · release → keep flying',
         frame,
         FACTION_COLORS.ion
       );
-      const position = positions[frame + 1] ?? positions[0] ?? { x: 0, y: 0 };
+      const position = positions[frame + 1] ?? state.position;
       const trailStart = positions[Math.max(0, frame - 9)] ?? position;
-      const displayScale = 0.4;
+      const displayScale = 0.3;
       const a = screenPoint(trailStart, displayScale);
       const b = screenPoint(position, displayScale);
       renderSegment(ctx, a.x, a.y, b.x, b.y, FACTION_COLORS.ion, 1, 2);
@@ -1405,14 +1403,18 @@ function makeMovementDemo(): Demo {
         ctx,
         'dart',
         { x: position.x * displayScale, y: position.y * displayScale },
-        0,
+        angles[frame + 1] ?? 0,
         FACTION_COLORS.ion,
         getShipKit('dart').size / 2,
-        frame < 12
+        true
       );
       drawTag(
         ctx,
-        frame < 12 ? 'ArrowUp held · thrust' : 'released · friction',
+        frame < 12
+          ? 'automatic thrust'
+          : frame < 18
+            ? 'steer · turning'
+            : 'released · still flying',
         350,
         112,
         FACTION_COLORS.ion
@@ -1423,7 +1425,7 @@ function makeMovementDemo(): Demo {
 }
 
 function makeTerrainDemo(): Demo {
-  const field = createHeightfield(0x7ec01d, { radius: getGameBoundary().radius });
+  const field = getTerrainField();
   const candidates: Position[] = [
     { x: 720, y: 410 },
     { x: -720, y: 410 },
@@ -1441,6 +1443,9 @@ function makeTerrainDemo(): Demo {
   const state = {
     position: copyPosition(start),
     velocity: { x: 0, y: 0 },
+    angle: 0,
+    mass: 1,
+    thrust: SHIP.THRUST,
   };
   const initialGradient = sampleGradient(field, state.position.x, state.position.y);
   const gradients: number[] = [Math.hypot(initialGradient.x, initialGradient.y)];
@@ -1460,23 +1465,13 @@ function makeTerrainDemo(): Demo {
       drawFrameChrome(
         ctx,
         'TERRAIN · SLOPE FORCE',
-        'contours → downhill acceleration',
+        'automatic thrust + downhill force',
         frame,
         PALETTE.CONTOUR
       );
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          const kit = getShipKit('dart');
-          state.velocity = applyThrustOrFriction(
-            state.velocity,
-            0,
-            false,
-            moveFrictionForShip(false),
-            kit.thrust,
-            1,
-            kit.maxVelocity
-          );
-          applySlopeForce(state.velocity, state.position, field);
+          advanceCruiseVelocity(state, cruiseSpeed(1, SHIP.MAX_VELOCITY));
           state.position.x += state.velocity.x;
           state.position.y += state.velocity.y;
           if (Math.hypot(state.velocity.x, state.velocity.y) > 0) {
@@ -1539,7 +1534,7 @@ function makeTerrainDemo(): Demo {
         0,
         FACTION_COLORS.ion,
         getShipKit('dart').size / 2,
-        false
+        true
       );
       drawArrow(
         ctx,

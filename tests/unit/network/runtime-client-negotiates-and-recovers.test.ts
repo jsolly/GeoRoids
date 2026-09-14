@@ -354,7 +354,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       release: (player: Player) => setTouchHeading(player, null),
     },
   ])(
-    'late Hauler snapshots preserve held and released $source thrust',
+    'late Hauler snapshots preserve cruise across $source press and release',
     async ({ press, release }) => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
       const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'hauler');
@@ -401,7 +401,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
       manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
-        thrusting: false,
+        thrusting: true,
       });
 
       press(player);
@@ -414,7 +414,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     }
   );
 
-  test('held thrust and turn resume after authoritative respawn', async () => {
+  test('cruise and held turn resume after authoritative respawn', async () => {
     const player = entityFactory.createLocalPlayer('Returning pilot', { x: 0, y: 0 }, 'dart');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
@@ -458,7 +458,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     keyUp(new KeyboardEvent('keyup', { code: 'KeyW' }), player);
     keyUp(new KeyboardEvent('keyup', { code: 'KeyA' }), player);
     receive(4);
-    expect(player.ship.thrusting).toBe(false);
+    expect(player.ship.thrusting).toBe(true);
     expect(player.ship.angularVelocity).toBe(0);
   });
 

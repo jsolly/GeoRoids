@@ -3,8 +3,9 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvas';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
-import { controlSources, resetTouchSources } from './controlSources';
+import { controlSources, resetControlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
+import { pointerHeadingFromCenter } from './pointerSteering';
 import { readAbilityChrome, readShieldChrome } from './touchAbility';
 
 const ABILITY_ID = 'touch-ability';
@@ -28,9 +29,7 @@ let abilityPointerClickPending = false;
 let shieldPointerClickPending = false;
 
 export function setTouchHeading(player: Player, heading: number | null): void {
-  controlSources.touchSteeringActive = heading !== null;
-  controlSources.touchHeading = heading;
-  controlSources.touchThrust = heading !== null;
+  controlSources.pointerHeading = heading;
   reconcilePlayerInput(player);
 }
 
@@ -77,9 +76,7 @@ export function tickTouchControls(player: Player): void {
   if (controlSources.touchFire) {
     player.ship.shoot();
   }
-  if (controlSources.touchSteeringActive) {
-    reconcilePlayerInput(player);
-  }
+  reconcilePlayerInput(player);
 }
 
 function isTouchChromeVisible(): boolean {
@@ -109,6 +106,7 @@ export function syncTouchChrome(
 
   const player = requireLocalPlayer();
   if (player) {
+    reconcilePlayerInput(player);
     syncAbilityChrome(player);
     syncShieldChrome(player);
   } else {
@@ -227,7 +225,7 @@ function resetTouchInteraction(player: Player | null): void {
     setTouchHeading(player, null);
     setTouchFire(player, false);
   } else {
-    resetTouchSources();
+    resetControlSources();
   }
   setAbilityPressed(false);
   setShieldPressed(false);
@@ -297,6 +295,7 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
     return;
   }
   ev.preventDefault();
+  reconcilePlayerInput(player);
   if (steerPointerId !== null) {
     if (steerTap) {
       moveSteering({ clientX: steerTap.x, clientY: steerTap.y });
@@ -363,9 +362,7 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
       setTouchFire(player, false);
     }
   } else {
-    controlSources.touchHeading = null;
-    controlSources.touchThrust = false;
-    controlSources.touchSteeringActive = false;
+    controlSources.pointerHeading = null;
   }
 }
 
@@ -376,11 +373,10 @@ function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
     return;
   }
   const rect = canvas.getBoundingClientRect();
-  const viewport = canvasManager.getViewportSize();
-  const dx = ((ev.clientX - rect.left) * viewport.width) / rect.width - viewport.width / 2;
-  const dy = ((ev.clientY - rect.top) * viewport.height) / rect.height - viewport.height / 2;
-  // A touch exactly on the ship thrusts along its current heading.
-  setTouchHeading(player, dx === 0 && dy === 0 ? player.ship.angle : Math.atan2(-dy, dx));
+  // CSS pixels keep the resting zone the same physical size at every device DPR.
+  const dx = ev.clientX - rect.left - rect.width / 2;
+  const dy = ev.clientY - rect.top - rect.height / 2;
+  setTouchHeading(player, pointerHeadingFromCenter(dx, dy, player.ship.r));
 }
 
 function onFirePointerDown(ev: PointerEvent, canvas: HTMLCanvasElement): void {

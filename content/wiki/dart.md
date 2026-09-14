@@ -15,7 +15,7 @@ media:
 
 ## Boost dash
 
-E adds a forward burst to the ship's current velocity. Release the input and
-friction carries the ship into a short coast. The regular F shield remains a
+E adds a short forward burst above normal cruising speed. When the burst ends,
+the ship returns to its normal speed limit and keeps thrusting automatically. The regular F shield remains a
 separate control: it is timed, has its own cooldown, and blocks laser damage
 while active.

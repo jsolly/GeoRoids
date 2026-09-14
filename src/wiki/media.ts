@@ -14,7 +14,7 @@ export const media: Record<string, WikiMediaEntry> = {
     title: 'Dart boost dash',
     alt: 'A Dart hull gains a short forward burst and leaves a bright motion trail.',
     caption:
-      'Controlled demonstration: press E for a forward boost, then coast as friction slows the ship.',
+      'Controlled demonstration: press E for a forward boost, then return to automatic thrust at normal speed.',
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/shipKits.ts',
@@ -78,9 +78,10 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   movement: {
-    title: 'Thrust and drift',
-    alt: 'A Dart accelerates while thrusting, then coasts as friction slows it.',
-    caption: 'Controlled demonstration: hold thrust to accelerate, then release it to coast.',
+    title: 'Automatic thrust and steering',
+    alt: 'A Dart accelerates automatically, turns its nose, and keeps flying after steering is released.',
+    caption:
+      'Controlled demonstration: thrust stays on while steering turns the ship; releasing steering keeps it flying.',
     sources: [
       'src/entities/ship/shipUtils.ts',
       'src/constants/index.ts',
@@ -89,9 +90,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   terrain: {
     title: 'Terrain slope force',
-    alt: 'A Dart coasts across the contour map while an arrow shows the downhill pull.',
+    alt: 'A Dart thrusts across the contour map while an arrow shows the downhill pull.',
     caption:
-      'Controlled demonstration: contour lines show the landscape while an arrow marks the downhill pull on a coasting ship.',
+      'Controlled demonstration: contour lines show the landscape while an arrow marks the downhill pull on a ship with automatic thrust.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',

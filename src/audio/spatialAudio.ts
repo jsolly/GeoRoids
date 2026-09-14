@@ -16,7 +16,6 @@ type ViewportProvider = () => ViewportSize | undefined;
 
 let getListenerPosition: ListenerProvider = () => undefined;
 let getViewportSize: ViewportProvider = () => undefined;
-const resetHooks: Array<() => void> = [];
 let worldAudioSuppressed = false;
 
 /** Applying a connection baseline updates retained entities without replaying missed events. */
@@ -30,10 +29,6 @@ export function withoutWorldAudio(apply: () => void): void {
   }
 }
 
-export function registerAudioResetHook(hook: () => void): void {
-  resetHooks.push(hook);
-}
-
 export function bindGameAudio(options: {
   getListenerPosition: ListenerProvider;
   getViewport: ViewportProvider;
@@ -45,9 +40,6 @@ export function bindGameAudio(options: {
 export function resetGameAudio(): void {
   getListenerPosition = () => undefined;
   getViewportSize = () => undefined;
-  for (const hook of resetHooks) {
-    hook();
-  }
 }
 
 /**

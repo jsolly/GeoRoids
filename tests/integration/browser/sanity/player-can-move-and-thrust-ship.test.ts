@@ -6,7 +6,7 @@ import { TestConfig } from '../../utils/test-config';
 const { browserManager } = createBrowserScenarioHooks();
 
 test(
-  'player can move and thrust ship',
+  'player moves automatically and can steer with the keyboard',
   async () => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -19,7 +19,7 @@ test(
     const startPos = await game.getShipPosition();
     const startAngle = await game.getShipAngle();
 
-    await game.holdMovementKey('ArrowUp', 800);
+    await game.waitForAnimationFrames(24);
     const afterThrust = await game.getShipPosition();
     expect(Math.hypot(afterThrust.x - startPos.x, afterThrust.y - startPos.y)).toBeGreaterThan(5);
 

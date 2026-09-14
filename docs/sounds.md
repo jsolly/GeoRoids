@@ -6,8 +6,8 @@ The supplied license is in `public/sounds/Kenney-License.txt`.
 
 The table maps shipped AAC files to the original Ogg files. Conversion uses
 macOS `afconvert -f m4af -d aac -b 96000`; no pitch variants are stored.
-The existing `thrust.m4a` is retained. Asteroid splits also use the game's
-original synthesized crack and descending tones.
+Automatic thrust is silent. Asteroid splits use the game's original synthesized
+crack and descending tones.
 
 | Shipped file in `public/sounds` | Kenney source in `Audio` |
 | --- | --- |
@@ -35,9 +35,8 @@ original synthesized crack and descending tones.
 
 Every sample trigger uses a fresh random playback rate in the range 0.9–1.1.
 Web Audio playback rate changes the audible pitch as well as duration.
-Thrust picks its pitch when the loop starts and keeps it while held. Volume
-updates do not restart or retune a running loop. Split synthesis applies the
-same range to its tone frequencies and noise playback rate.
+Split synthesis applies the same range to its tone frequencies and noise
+playback rate.
 
 World cues retain viewport culling and distance attenuation. Sound-off stops
 active effects and prevents new cues. Each effect retains its configured
@@ -53,8 +52,8 @@ another copy. Cues that occur before an asset is ready are skipped, not replayed
 later in a burst. Audio failures must not block simulation or networking.
 
 One realtime audio context serves sample effects and the synthesized split cue.
-Loop volume changes preserve the playing source and pitch. Muting stops active
-sources and suspends audio work; delayed loads or resumes cannot undo a mute.
+Muting stops active sources and suspends audio work; delayed loads or resumes
+cannot undo a mute.
 Tab visibility and mobile interruptions are lifecycle events rather than work
 repeated by the simulation loop.
 

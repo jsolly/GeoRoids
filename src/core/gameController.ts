@@ -9,11 +9,6 @@ import type {
   ShipKitId,
 } from '../../shared-types';
 import { playDestructionSound } from '../audio/destructionSounds';
-import {
-  replaceThrustSources,
-  resetThrustSources,
-  thrustSourcesFromPlayers,
-} from '../audio/gameSounds';
 import { bindGameAudio } from '../audio/spatialAudio';
 import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
@@ -187,7 +182,6 @@ export class GameController {
       clientPerformance.joinFailed();
       this.gameStateManager.setIsGameRunning(false);
       this.networkManager.disconnect();
-      resetThrustSources();
       setPlayView(false);
       const reportedError = boundedDiagnosticError(error, 'Unknown connection failure');
       const errorMessage = reportedError.message;
@@ -434,7 +428,6 @@ export class GameController {
     this.laserUpgradeReadout?.update(undefined);
     this.gameStateManager.clearOverlay();
     canvasManager.clearPlayfield();
-    resetThrustSources();
     PlayerNetwork.getInstance().stopNetworkUpdates();
     this.networkManager.disconnect({ newSession: true });
   }
@@ -462,7 +455,6 @@ export class GameController {
     this.gameOverTimer = setTimeout(() => {
       this.gameOverTimer = null;
       this.gameStateManager.setIsGameRunning(false);
-      resetThrustSources();
       setPlayView(false);
     }, GameController.GAME_OVER_MENU_DELAY_MS);
   }
@@ -773,7 +765,6 @@ export class GameController {
 
       // Only stop the game when reconnection has permanently failed
       this.gameStateManager.setIsGameRunning(false);
-      resetThrustSources();
       setPlayView(false);
 
       // Show permanent disconnection message
@@ -818,13 +809,6 @@ export class GameController {
       }
     }
     advanceRemotePlayerShips(allPlayers);
-
-    // One thrust loop for local + bot + remote ships; volume is the loudest in-range source.
-    replaceThrustSources(
-      thrustSourcesFromPlayers(
-        allPlayers.includes(currPlayer) ? allPlayers : this.playersWithLocal(currPlayer, allPlayers)
-      )
-    );
 
     // Update asteroids
     if (this.currRoidBelt) {

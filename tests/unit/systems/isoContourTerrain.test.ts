@@ -152,7 +152,7 @@ describe('ships feel the slope', () => {
     expect(velocity.y).toBeCloseTo(1, 6);
   });
 
-  test('a coasting pilot and authoritative bot drift equally downhill', () => {
+  test('terrain still pushes an automatically thrusting pilot and an idle bot downhill', () => {
     const field = ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
     const start = { x: BOUNDS.radius / 2, y: 0 };
     const player = new Ship({ position: { ...start }, isLocalPlayer: true });
@@ -174,14 +174,13 @@ describe('ships feel the slope', () => {
       applyShipMotionFrame(bot);
     }
 
-    expect(sampleHeight(field, player.position.x, player.position.y)).toBeLessThan(
+    expect(sampleHeight(field, bot.position.x, bot.position.y)).toBeLessThan(
       sampleHeight(field, start.x, start.y)
     );
-    expect(Math.hypot(player.velocity.x, player.velocity.y)).toBeGreaterThan(0);
-    expect(bot.position.x).toBeCloseTo(player.position.x, 10);
-    expect(bot.position.y).toBeCloseTo(player.position.y, 10);
-    expect(bot.velocity.x).toBeCloseTo(player.velocity.x, 10);
-    expect(bot.velocity.y).toBeCloseTo(player.velocity.y, 10);
+    expect(Math.hypot(bot.velocity.x, bot.velocity.y)).toBeGreaterThan(0);
+    expect(player.position.x).not.toBeCloseTo(start.x, 5);
+    expect(player.position.y).toBeLessThan(start.y);
+    expect(Math.abs(player.velocity.x)).toBeGreaterThan(0);
   });
 });
 
@@ -268,7 +267,7 @@ test('translated arenas retain the same terrain and a stable flat spawn', () => 
 });
 
 test.each([1, 8])(
-  'a mass-%s pilot travels farther downhill but can still thrust uphill',
+  'a mass-%s pilot accelerates faster downhill but automatic thrust can still climb uphill',
   (mass) => {
     ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
     const startX = BOUNDS.radius / 2;
@@ -281,18 +280,9 @@ test.each([1, 8])(
     }
     downhill.angle = Math.PI;
     uphill.angle = 0;
-    const bot = {
-      position: { x: startX, y: 0 },
-      velocity: { x: 0, y: 0 },
-      angle: Math.PI,
-      thrusting: true,
-      mass,
-    };
     for (let frame = 0; frame < 120; frame++) {
       downhill.update();
       uphill.update();
-      applyShipMotionFrame(bot);
-      // Compare acceleration before either ship reaches its speed cap or crosses a new slope.
       if (frame === 14) {
         expect(Math.hypot(downhill.velocity.x, downhill.velocity.y)).toBeGreaterThan(
           Math.hypot(uphill.velocity.x, uphill.velocity.y)
@@ -303,7 +293,5 @@ test.each([1, 8])(
     const upDistance = uphill.position.x - startX;
     expect(upDistance).toBeGreaterThan(50);
     expect(downDistance).toBeGreaterThan(upDistance * 1.05);
-    expect(bot.position.x).toBeCloseTo(downhill.position.x, 8);
-    expect(bot.velocity.x).toBeCloseTo(downhill.velocity.x, 8);
   }
 );

@@ -33,6 +33,7 @@ import {
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
 import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
+import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
@@ -406,6 +407,8 @@ class CanvasManager {
       }
       drawLasers(player.ship, enemyLaserColor, currShip.position);
     }
+
+    drawHeadingCue(ctx, viewport, currShip);
 
     const hudLayout = hudLayoutForCanvas(viewport);
     drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups);

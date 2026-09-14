@@ -19,7 +19,7 @@ export interface AbilityHost {
   r?: number;
 }
 
-/** Asteroid geometry shared by the client latch preview and authoritative towing. */
+/** Asteroid geometry shared by offline ability simulation and authoritative towing. */
 export interface AbilityBody {
   id: string;
   position: Position;
@@ -59,7 +59,11 @@ function rememberLatchPos(
 }
 
 export function canActivateAbility(host: AbilityHost): boolean {
-  return !host.exploding && host.health > 0 && host.abilityCooldownFrames <= 0;
+  return (
+    !host.exploding &&
+    host.health > 0 &&
+    (host.abilityCooldownFrames <= 0 || (host.kitId === 'hauler' && !!host.harpoonTargetId))
+  );
 }
 
 function clearHarpoonLatch(host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>): void {
@@ -245,12 +249,12 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBod
  * when a world is passed — server is authoritative for those.
  */
 export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): AbilityActivation {
-  if (host.kitId === 'hauler' && host.harpoonTargetId && !host.exploding && host.health > 0) {
-    clearHarpoonLatch(host);
-    return { activated: true, abilityId: 'harpoon' };
-  }
   if (!canActivateAbility(host)) {
     return { activated: false };
+  }
+  if (host.kitId === 'hauler' && host.harpoonTargetId) {
+    clearHarpoonLatch(host);
+    return { activated: true, abilityId: 'harpoon' };
   }
 
   const kit = getShipKit(host.kitId);
@@ -276,7 +280,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     host.harpoonTargetId = target.id;
 
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
-    // Local prediction paints the latch; the authoritative world supplies towing forces.
+    // Only a supplied simulation world owns towing forces.
     if (world?.asteroids.includes(target)) {
       attachTowCable(host, target);
     }

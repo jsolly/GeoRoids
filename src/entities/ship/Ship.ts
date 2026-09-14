@@ -211,29 +211,28 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
+  /** Returns request submission when connected, or activation in offline play. */
   activateAbility(world?: AbilityWorld): boolean {
-    if (this.exploding) {
+    if (!canActivateAbility(this)) {
       return false;
     }
     const kit = getShipKit(this.kitId);
-    const canTry = canActivateAbility(this);
-    const result = activateAbilityOnHost(this, world);
-    // Always tell the server on a legal E. Do not start the Hauler cooldown
-    // on a miss — that 3s lock was why a later in-range tap stayed dead.
-    if (this.isLocalPlayer && canTry) {
+    if (this.isLocalPlayer) {
       const networkManager = NetworkManager.getInstance();
       if (networkManager.isConnected) {
-        networkManager.sendMessage({
+        // The server owns the ability result and cooldown. An optimistic toggle
+        // can be undone by an older snapshot or disagree about eligible cargo.
+        return networkManager.sendMessage({
           type: 'useAbility',
           id: networkManager.getLocalPlayerId(),
           data: {
             kitId: this.kitId,
-            abilityId: result.abilityId ?? kit.abilityId,
+            abilityId: kit.abilityId,
           },
         });
       }
     }
-    return result.activated;
+    return activateAbilityOnHost(this, world).activated;
   }
 
   moveLasers(): void {

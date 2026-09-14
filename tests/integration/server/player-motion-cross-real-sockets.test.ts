@@ -152,6 +152,35 @@ afterEach(async () => {
 });
 
 describe('Enhanced player motion cross real gameplay WebSockets', () => {
+  it('publishes a correction after rejected movement and accepts the recovered pilot', async () => {
+    const { pilot, observer } = await world();
+    const initial = entity(await pilot.state(), 'pilot');
+    const epoch = initial.playerMotion?.epoch;
+    const pose = {
+      id: 'pilot',
+      motionEpoch: epoch,
+      motionSequence: 1,
+      position: { x: initial.position.x + 1000, y: initial.position.y },
+      velocity: { x: 0, y: 0 },
+      angle: 0,
+      thrusting: false,
+    };
+    pilot.send('update', pose);
+    const correction = entity(await pilot.state(), 'pilot');
+    expect(correction.position).toEqual(initial.position);
+    expect(correction.playerMotion).toMatchObject({ mode: 'handoff', epoch: (epoch ?? 0) + 1 });
+    pilot.send('update', { ...pose, motionSequence: 2 });
+    expect(entity(await pilot.state(), 'pilot').playerMotion).toEqual(correction.playerMotion);
+    pilot.send('update', {
+      ...pose,
+      motionEpoch: correction.playerMotion?.epoch,
+      position: correction.position,
+    });
+    const recovered = entity(await pilot.state(), 'pilot');
+    expect(recovered.playerMotion).toMatchObject({ mode: 'free', ack: 1 });
+    expect(entity(await observer.state(), 'pilot').playerMotion).toEqual(recovered.playerMotion);
+  });
+
   it('retains a free session through a physical flap and accepts only its private token', async () => {
     const { pilot, observer, joined, engine } = await world();
     expect(joined['snapshotVersion']).toBe(1);

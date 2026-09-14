@@ -17,18 +17,19 @@ type Viewport = {
 };
 
 type Position = { x: number; y: number };
+type TimedPosition = Position & { at: number };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function observeAuthoritativePositions(page: Page): {
-  getPosition: (playerId: string) => Position | undefined;
+  getPosition: (playerId: string) => TimedPosition | undefined;
   getAngle: (playerId: string) => number | undefined;
   isThrusting: (playerId: string) => boolean | undefined;
 } {
   const decoder = new SnapshotDecoder();
-  const positions = new Map<string, Position>();
+  const positions = new Map<string, TimedPosition>();
   const angles = new Map<string, number>();
   const thrusting = new Map<string, boolean>();
 
@@ -50,7 +51,7 @@ function observeAuthoritativePositions(page: Page): {
       }
       const snapshot = result.state;
       for (const entity of snapshot.entities) {
-        positions.set(entity.id, { ...entity.position });
+        positions.set(entity.id, { ...entity.position, at: snapshot.gameTime });
         angles.set(entity.id, entity.angle);
         thrusting.set(entity.id, entity.thrusting);
       }
@@ -68,6 +69,19 @@ function angleDistance(left: number, right: number): number {
   return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
 }
 
+async function sampleLocalPosition(page: Page, startAtRest = false): Promise<TimedPosition> {
+  return page.evaluate((startAtRest) => {
+    const ship = window.gameController?.getCurrPlayer()?.ship;
+    if (!ship) {
+      throw new Error('Local pilot missing during terrain measurement');
+    }
+    if (startAtRest) {
+      ship.velocity = { x: 0, y: 0 };
+    }
+    return { ...ship.position, at: performance.now() };
+  }, startAtRest);
+}
+
 async function readTerrain(page: Page): Promise<{
   peak: { height: number };
   slope: { height: number; gradient: { x: number } };
@@ -80,7 +94,7 @@ async function readTerrain(page: Page): Promise<{
     }
     return {
       peak: gc.getTerrainProbe({ x: 0, y: 0 }),
-      slope: gc.getTerrainProbe({ x: 1550, y: 0 }),
+      slope: gc.getTerrainProbe({ x: 2250, y: 0 }),
       rim: gc.getTerrainProbe({ x: rimX + 1, y: 0 }),
     };
   }, WORLD.radius);
@@ -91,8 +105,8 @@ for (const viewport of [
   { name: 'mobile', width: 390, height: 844, hasTouch: true },
 ] satisfies Viewport[]) {
   test(`a pilot climbs slower than descending the varied terrain on ${viewport.name}`, async () => {
-    const localDistances: number[] = [];
-    const authoritativeDistances: number[] = [];
+    const localSpeeds: number[] = [];
+    const authoritativeSpeeds: number[] = [];
 
     for (const angle of [Math.PI, 0]) {
       const page = await browserManager.recreatePage({ hasTouch: viewport.hasTouch });
@@ -124,9 +138,9 @@ for (const viewport of [
       expect(Math.abs(terrain.peak.height)).toBe(0);
       expect(terrain.slope.height).toBeGreaterThan(0);
       expect(terrain.rim.height).toBe(0);
-      expect(terrain.slope.gradient.x).toBeGreaterThan(0);
+      expect(terrain.slope.gradient.x).toBeGreaterThan(0.002);
 
-      await game.placeShipAt(1550, 0);
+      await game.placeShipAt(2250, 0);
       await game.armSpawnProtection();
       await page.evaluate((heading) => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -152,7 +166,7 @@ for (const viewport of [
         .poll(
           () => {
             const position = authoritative.getPosition(localPlayerId);
-            return position ? Math.hypot(position.x - 1550, position.y) : Number.POSITIVE_INFINITY;
+            return position ? Math.hypot(position.x - 2250, position.y) : Number.POSITIVE_INFINITY;
           },
           { timeout: 5000, interval: 50 }
         )
@@ -162,7 +176,9 @@ for (const viewport of [
         throw new Error('Authoritative position missing before movement');
       }
 
-      const beforeLocal = await game.getShipPosition();
+      // Heading acknowledgement takes a variable number of cruising frames.
+      // Start both slope runs with the same velocity after that setup completes.
+      const beforeLocal = await sampleLocalPosition(page, true);
       if (viewport.hasTouch) {
         const session = await page.context().newCDPSession(page);
         const stick = await centerOf(page, '#gameCanvas');
@@ -179,7 +195,7 @@ for (const viewport of [
         await page.waitForTimeout(1200);
       }
 
-      const afterLocal = await game.getShipPosition();
+      const afterLocal = await sampleLocalPosition(page);
       const afterLocalState = await page.evaluate(() => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
         if (!ship) {
@@ -191,7 +207,10 @@ for (const viewport of [
       const direction = angle === 0 ? 1 : -1;
       const localDistance = direction * (afterLocal.x - beforeLocal.x);
       expect(localDistance).toBeGreaterThan(10);
-      localDistances.push(localDistance);
+      expect(afterLocal.at).toBeGreaterThan(beforeLocal.at);
+      // Touch/CDP and test-process scheduling add variable time around the
+      // nominal wait. Compare speed over the observed interval, not raw distance.
+      localSpeeds.push(localDistance / (afterLocal.at - beforeLocal.at));
 
       await expect
         .poll(
@@ -215,20 +234,23 @@ for (const viewport of [
         throw new Error('Authoritative position missing after movement');
       }
       const authoritativeDistance = direction * (afterAuthoritative.x - beforeAuthoritative.x);
-      authoritativeDistances.push(authoritativeDistance);
+      expect(afterAuthoritative.at).toBeGreaterThan(beforeAuthoritative.at);
+      authoritativeSpeeds.push(
+        authoritativeDistance / (afterAuthoritative.at - beforeAuthoritative.at)
+      );
 
       await page.screenshot({ path: `/tmp/georoids-varied-terrain-${viewport.name}.png` });
       expect(pageErrors).toEqual([]);
       expect(warnings).toEqual([]);
     }
 
-    const [downhill, uphill] = localDistances;
+    const [downhill, uphill] = localSpeeds;
     if (downhill === undefined || uphill === undefined) {
       throw new Error('Both local directions must be measured');
     }
     expect(downhill).toBeGreaterThan(uphill * 1.08);
 
-    const [authoritativeDownhill, authoritativeUphill] = authoritativeDistances;
+    const [authoritativeDownhill, authoritativeUphill] = authoritativeSpeeds;
     if (authoritativeDownhill === undefined || authoritativeUphill === undefined) {
       throw new Error('Both authoritative directions must be measured');
     }

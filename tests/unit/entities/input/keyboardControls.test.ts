@@ -81,14 +81,17 @@ test('held KeyE repeat does not re-fire the ability', () => {
   expect(activateSpy).not.toHaveBeenCalled();
 });
 
-test('KeyE reapplies the title Hauler kit before activate', () => {
+test('KeyE preserves the joined Surveyor when the title menu has a stale Hauler selection', () => {
   setSelectedShipKitId('hauler');
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
   expect(player.ship.kitId).toBe('surveyor');
+  const health = player.ship.health;
+  const speed = player.ship.maxVelocity;
   press('KeyE');
-  expect(player.ship.kitId).toBe('hauler');
-  expect(player.ship.harpoonTargetId).toBe('rock-1');
-  expect(player.ship.harpoonLatchPos).toBeTruthy();
+  expect(player.ship.kitId).toBe('surveyor');
+  expect(player.ship.health).toBe(health);
+  expect(player.ship.maxVelocity).toBe(speed);
+  expect(player.ship.harpoonTargetId).toBeNull();
 });
 
 test('WASD is ignored while dead', () => {

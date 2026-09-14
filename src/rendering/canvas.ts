@@ -410,9 +410,7 @@ class CanvasManager {
       drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);
     }
 
-    if (allPlayers.length > 1) {
-      drawLeaderboard(ctx, hudLayout, allPlayers, currPlayer.id);
-    }
+    drawLeaderboard(ctx, hudLayout, allPlayers, currPlayer.id);
 
     const roidCount = currRoidBelt.roids.length;
     drawDebugInfo(ctx, viewport, roidCount, isDebugMode());

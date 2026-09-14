@@ -30,7 +30,7 @@ test('a grown Hauler reports its reduced cruise speed and retains a server knock
   expect(
     world.engine.playerMotion.acceptFreePose(
       pilot.socket,
-      { ...pose, velocity: { x: grownCruise, y: 0 } },
+      { ...pose, epoch: actor.playerMotion?.epoch ?? 0, velocity: { x: grownCruise, y: 0 } },
       now + 17
     ).ok
   ).toBe(true);

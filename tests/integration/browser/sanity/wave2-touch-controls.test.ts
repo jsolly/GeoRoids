@@ -174,7 +174,9 @@ test(
       await game.waitForAnimationFrames(1);
       await dispatchTouch(session, 'touchStart', [{ ...actionPoint, id: 22 }]);
       await dispatchTouch(session, 'touchEnd', [{ ...actionPoint, id: 22 }]);
-      await game.waitForAnimationFrames(2);
+      await expect
+        .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
+        .toBeGreaterThan(0);
       const duringAction = await readLocalTouchState(page);
       expect(duringAction.lastShotTime).toBe(beforeAction.lastShotTime);
       expect(duringAction.abilityCooldownFrames).toBeGreaterThan(0);
@@ -312,6 +314,11 @@ test.each(KITS)(
       y: ability.y,
       id: 13,
     });
+    if (kitId === 'surveyor') {
+      await expect
+        .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
+        .toBeGreaterThan(0);
+    }
     await game.waitForAnimationFrames(2);
     const abilityWhileHeld = await readLocalTouchState(page);
     expect(abilityWhileHeld.thrusting).toBe(true);
@@ -529,20 +536,18 @@ test(
     const ability = page.locator('#touch-ability');
     await ability.focus();
     await page.keyboard.press('Enter');
-    await game.waitForAnimationFrames(2);
-    expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
-
-    await page.evaluate(() => {
-      const ship = window.gameController?.getCurrPlayer()?.ship;
-      if (!ship) {
-        throw new Error('Local ship unavailable');
-      }
-      ship.abilityCooldownFrames = 0;
-      ship.abilityActiveFrames = 0;
-    });
+    await expect
+      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
+      .toBeGreaterThan(0);
+    // Wait for the real cooldown. Resetting only the client can make the next
+    // snapshot look like a successful second activation even if no click is sent.
+    await expect
+      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames, { timeout: 15000 })
+      .toBe(0);
     await ability.evaluate((element) => (element as HTMLButtonElement).click());
-    await game.waitForAnimationFrames(2);
-    expect((await readLocalTouchState(page)).abilityCooldownFrames).toBeGreaterThan(0);
+    await expect
+      .poll(async () => (await readLocalTouchState(page)).abilityCooldownFrames)
+      .toBeGreaterThan(0);
 
     expect(await ability.getAttribute('aria-disabled')).toBe('true');
     expect(consoleState.errors).toEqual([]);

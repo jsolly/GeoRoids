@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
+import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { cruiseSpeed } from '../../shared/shipFlight';
 import { radiusFromMass } from '../../shared/shipGrowth';
@@ -37,7 +38,7 @@ interface Session {
  * Authoritative lifecycle and pose ownership for players.
  *
  * The service owns only the player transform/session boundary. Ordinary ship
- * flight, asteroid physics, combat, and the Hauler's short combat harpoon stay
+ * flight, asteroid physics, combat, and the Hauler's persistent tow cable stay
  * on their existing systems.
  */
 export class PlayerMotionService {
@@ -216,7 +217,11 @@ export class PlayerMotionService {
     delete actor.harpoonLatchPos;
   }
 
-  private handoff(session: Session, now: number): void {
+  private handoff(
+    session: Session,
+    now: number,
+    poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames
+  ): void {
     session.epoch += 1;
     session.mode = 'handoff';
     session.ack = 0;
@@ -224,7 +229,7 @@ export class PlayerMotionService {
     session.anchor = { ...session.actor.position };
     session.anchorAt = now;
     session.poseAt = now;
-    session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
+    session.poseCredit = poseCredit;
     session.actor.thrusting = false;
     this.publish(session);
   }
@@ -301,11 +306,11 @@ export class PlayerMotionService {
       return { ok: false, error: 'Invalid or stale enhanced movement pose' };
     }
     const speed = this.legalSpeed(session.actor, now);
-    const elapsedFrames = ((now - session.poseAt) * GAME.FPS) / 1000;
-    const credit = Math.min(
-      speed * PLAYER_MOTION.poseLeadFrames,
-      session.poseCredit + elapsedFrames * speed
-    );
+    // Match the client's bounded catch-up; silence cannot bank an arbitrary jump.
+    const elapsedFrames = Math.min(MAX_CATCH_UP_TICKS, ((now - session.poseAt) * GAME.FPS) / 1000);
+    // Spend elapsed travel before capping unused jitter credit. Capping first
+    // rejects ordinary flight whenever updates are more than 150 ms apart.
+    const credit = session.poseCredit + elapsedFrames * speed;
     const displacement = Math.hypot(
       pose.position.x - session.actor.position.x,
       pose.position.y - session.actor.position.y
@@ -321,9 +326,16 @@ export class PlayerMotionService {
         Math.hypot(pose.position.x - session.anchor.x, pose.position.y - session.anchor.y) >
           anchorReach)
     ) {
+      session.actor.velocity = capMotionVelocity(session.actor.velocity, speed);
+      // A fresh epoch makes the client adopt the last accepted pose. Preserve
+      // the earned budget so rejected commands cannot mint more movement credit.
+      this.handoff(session, now, Math.min(speed * PLAYER_MOTION.poseLeadFrames, credit));
       return { ok: false, error: 'Enhanced movement exceeds its server-time envelope' };
     }
-    session.poseCredit = Math.max(0, credit - displacement);
+    session.poseCredit = Math.min(
+      speed * PLAYER_MOTION.poseLeadFrames,
+      Math.max(0, credit - displacement)
+    );
     session.poseAt = now;
     session.poseSequence = pose.sequence;
     session.mode = 'free';

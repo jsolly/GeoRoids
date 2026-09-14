@@ -57,7 +57,7 @@ browser contexts, sockets, and servers are closed before a result can be complet
 | Runner | Workload and primary observation |
 | --- | --- |
 | `client` | A compiled diagnostic scene in Chromium at the selected viewport. Timing and observation use fresh contexts. |
-| `server` | Direct `GameEngine` ticks with two real loopback human peers and two seeded engine-created bots. |
+| `server` | Direct `GameEngine` ticks with two real loopback human peers. |
 | `codec` | Seeded snapshot fixtures across shared and staggered recipient baselines, with 1, 2, 5, 10, and 25 recipients. |
 | `transport` | Two real loopback clients against an owned child server for the default two-second window. |
 
@@ -71,7 +71,7 @@ are kept outside the timed result.
 
 The server runner fixes `Date.now()` and seeds `Math.random()` while retaining
 native `performance.now()` for tick timing. It creates two actual loopback human
-connections and two bots through the seeded engine. Natural authoritative
+connections through the seeded engine. Natural authoritative
 simulation continues during warmup and measurement, so asteroid, loot, and
 satellite-pickup counts before and after are part of the result.
 
@@ -211,8 +211,8 @@ connection, not aggregate cellular bandwidth. Runner status and final proxy
 statistics survive in `.performance/runner-*`, including build failures.
 
 Traversal prepares one human with the current ambient populations. Combat
-prepares five human pilots (one browser plus four real-protocol peers), two
-observed bots, 80 asteroids, and six Earth-observation satellite pickups. A private Unix
+prepares five human pilots (one browser plus four real-protocol peers),
+80 asteroids, and six Earth-observation satellite pickups. A private Unix
 socket in the runner's temporary session directory validates the complete
 participant set before synchronous between-tick arrangement. It preserves human
 motion sessions, advances placement epochs through the existing authoritative

@@ -1,5 +1,4 @@
 import type { Position } from '../shared-types';
-import { DEBUG } from '../src/constants';
 
 interface CombatantState {
   exploding: boolean;
@@ -7,7 +6,6 @@ interface CombatantState {
   blinkCount?: number;
   spawnProtectionTimer?: number;
   respawnTimer?: number;
-  type?: 'human' | 'bot';
 }
 
 export interface CombatCircle {
@@ -26,9 +24,6 @@ export function isCombatantImmune(state: CombatantState): boolean {
     return true;
   }
   if (state.spawnProtectionTimer !== undefined && state.spawnProtectionTimer > 0) {
-    if (state.type === 'bot') {
-      return DEBUG.BOT_PLAYER.SPAWN_PROTECTION;
-    }
     return true;
   }
   return false;

@@ -5,7 +5,7 @@ import type { Ship } from '../ship/Ship';
 import { calculateLaserStartPosition } from '../ship/shipUtils';
 import { Laser } from './Laser';
 
-export function generateLaserVelocity(shipAngle: number, shipVelocity: Velocity): Velocity {
+function generateLaserVelocity(shipAngle: number, shipVelocity: Velocity): Velocity {
   const baseVelocity: Velocity = {
     x: (Math.cos(shipAngle) * LASER.SPEED) / GAME.FPS,
     y: (-Math.sin(shipAngle) * LASER.SPEED) / GAME.FPS,

@@ -57,8 +57,8 @@ async function captureLeaderboardRow(page: import('playwright').Page): Promise<R
         }
         const local = gameController.getCurrPlayer();
         const players = gameController.getNetworkManager().getAllPlayers();
-        if (!local || players.length < 2) {
-          throw new Error('Leaderboard fixture requires a local player and at least one bot');
+        if (!local) {
+          throw new Error('Leaderboard fixture requires a local player');
         }
 
         local.name = longName;
@@ -143,7 +143,6 @@ test(
 
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
-    await game.waitForBots(1);
 
     const wasRunning = await page.evaluate(() => {
       const gameController = window.gameController;

@@ -1,5 +1,4 @@
 /* @vitest-environment node */
-import { strict as assert } from 'node:assert';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   calculateHealthRegenDelayFrames,
@@ -81,19 +80,5 @@ describe('server-authoritative health regeneration', () => {
     world.tick(SHIP.EXPLODE_DURATION_FRAMES + SHIP.RESPAWN_DELAY_FRAMES + 1);
     expect(ship.health).toBe(0);
     expect(ship.respawnTimer).toBeUndefined();
-  });
-
-  test('bots use the same delay and rate as humans', () => {
-    const bot = world.engine.createBots(1)?.[0];
-    assert.ok(bot, 'Expected the newly created bot');
-    delete bot.spawnProtectionTimer;
-    world.engine.handleShipDamage(bot.id, 'asteroid', DAMAGE.LASER_HIT);
-    const damagedHealth = bot.health;
-
-    world.tick(calculateHealthRegenDelayFrames());
-    expect(bot.health).toBe(damagedHealth);
-
-    world.tick(1);
-    expect(bot.health).toBeCloseTo(damagedHealth + calculateHealthRegenPerFrame());
   });
 });

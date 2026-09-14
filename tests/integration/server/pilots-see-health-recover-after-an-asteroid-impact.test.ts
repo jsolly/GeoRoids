@@ -43,9 +43,6 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
     for (const asteroid of engine.getAllAsteroids()) {
       engine.updateAsteroid(asteroid.id, { position: { x: 1000, y: -1000 } });
     }
-    for (const bot of engine.getAllBots()) {
-      engine.removeBot(bot.id);
-    }
     engine.parkSatellitePickups({ x: 1000, y: 1000 });
     const lives = target.lives;
     const maxHealth = target.maxHealth;

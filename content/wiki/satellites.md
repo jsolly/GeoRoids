@@ -34,7 +34,7 @@ ability or spawn protection.
 ## Orbiting interceptors
 
 Collected hardware orbits its owner indefinitely, staying outside the hull.
-It has its own health and intercepts player and bot laser shots and asteroid
+It has its own health and intercepts player laser shots and asteroid
 collisions. Damage reduces its health; at zero it breaks and
 respawns healthy as a loose pickup after its recovery delay. Owner death
 or leaving releases it at its current position without restoring health.

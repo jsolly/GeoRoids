@@ -135,10 +135,10 @@ export class AsteroidManager {
   /**
    * Advance every asteroid one simulation frame (same units as client `moveRoids`:
    * velocity is pixels per 60 FPS tick). Debug placement modes stay frozen so
-   * collision tests that pin roids on ships/bots do not drift.
+   * collision tests that pin roids on ships do not drift.
    */
   public updateMotion(): void {
-    if (DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER || DEBUG.ROIDS.PLACE_ON_BOT) {
+    if (DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER) {
       return;
     }
 
@@ -170,7 +170,6 @@ export class AsteroidManager {
   public createAsteroids(
     count: number,
     bounds = { radius: getAsteroidFieldRadius() },
-    botPositions: Position[] = [],
     playerPositions: Position[] = []
   ): AsteroidData[] {
     // If we already have asteroids and no player positions are provided, return them instead of recreating
@@ -224,11 +223,6 @@ export class AsteroidManager {
           };
         }
         logger.debug('Placing asteroid on player', { index: i, position });
-      } else if (DEBUG.ROIDS.PLACE_ON_BOT && botPositions.length > 0) {
-        // Place all asteroids on bots when PLACE_ON_BOT is true
-        const botPos = botPositions[i % botPositions.length];
-        position = botPos ?? this.rng.randomPosition(bounds);
-        logger.debug('Placing asteroid on bot', { index: i, position });
       } else {
         position = this.rng.randomPosition(bounds);
         logger.debug('Placing asteroid randomly', { index: i, position });
@@ -302,7 +296,7 @@ export class AsteroidManager {
   }
 
   /**
-   * Record a laser hit from any ship (player or bot). Biggest asteroids only
+   * Record a laser hit from a crew ship. Biggest asteroids only
    * split when two distinct shooters land within COLLAB_SPLIT_WINDOW_MS.
    * A second hit from the same shooter destroys without splitting.
    * Same-shooter echoes inside COLLAB_HIT_DEDUPE_MS are ignored.

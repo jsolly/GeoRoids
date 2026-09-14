@@ -54,7 +54,12 @@ import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { getStoredItem, removeStoredItem, setStoredItem } from '../../utils/safeStorage';
 import type { ClientMessage } from '../types';
-import { resetWorldExploration, setWorldExploration, setWorldMapAssets } from '../worldExploration';
+import {
+  resetWorldExploration,
+  setCompletedSectors,
+  setWorldExploration,
+  setWorldMapAssets,
+} from '../worldExploration';
 import {
   applyAsteroidFieldPartition,
   asteroidHasSpawnPose,
@@ -1248,6 +1253,7 @@ export class ConnectionManager {
   private handleSnapshotState(data: ServerGameSnapshot): void {
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
+    setCompletedSectors(data.completedSectors);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
     }
@@ -1257,7 +1263,7 @@ export class ConnectionManager {
       const localPlayer = PlayerManager.getInstance().getLocalPlayer();
       fillSnapshotEntityIds(data.entities, this.snapshotEntityIds);
 
-      // Update entities in place - no clearing to prevent bot disappearance!
+      // Update entities in place so remotes stay attached across snapshots.
       for (const entityData of data.entities) {
         const isLocalPlayer = isLocalGameEntity(entityData, {
           clientId: this.clientId,
@@ -1291,7 +1297,7 @@ export class ConnectionManager {
             entity = entityFactory.createPlayer({
               id: entityData.id,
               name: entityData.name,
-              type: entityData.type === 'bot' ? 'bot' : 'remote',
+              type: 'remote',
               color: entityData.color,
               ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
               position: entityData.position,
@@ -1354,7 +1360,7 @@ export class ConnectionManager {
       }
 
       // Drop remotes that vanished from the snapshot so a closed tab leaves
-      // the leaderboard even if `playerLeft` was missed. Bots are left alone.
+      // the leaderboard even if `playerLeft` was missed.
       for (const [id, entity] of this.allPlayers) {
         if (entity.type !== 'local' && !this.snapshotEntityIds.has(id)) {
           this.forgetPlayer(id);

@@ -1,6 +1,8 @@
+import { shipOverlapsCompletedSector } from '../../../shared/sectors';
 import type { Ship } from '../../entities/ship/Ship';
 import { applyShipBoundaryDeath, isShipCollisionImmune } from '../../entities/ship/shipUtils';
 import { NetworkManager } from '../../network/networkManager';
+import { getCompletedSectors } from '../../network/worldExploration';
 import { logger } from '../../utils/Logger';
 import { checkBoundaryCollision } from './collisionDetection';
 
@@ -31,7 +33,10 @@ export class CollisionManager {
         continue;
       }
 
-      if (checkBoundaryCollision(ship.position, ship.r)) {
+      if (
+        checkBoundaryCollision(ship.position, ship.r) ||
+        shipOverlapsCompletedSector(ship.position, ship.r, getCompletedSectors())
+      ) {
         this.handleBoundaryCollision(ship, localPlayerId);
       }
     }
@@ -47,7 +52,7 @@ export class CollisionManager {
       localPlayerId,
     });
 
-    // Shared player+bot path: visible wall flash + explode, then the server
+    // Shared player path: visible wall flash + explode, then the server
     // confirms the life loss. Waiting for the packet alone looked like a silent reset.
     applyShipBoundaryDeath(ship);
 

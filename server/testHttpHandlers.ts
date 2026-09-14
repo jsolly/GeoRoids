@@ -278,7 +278,7 @@ export function handleTestArrangeCrewField(
       !body['playerIds'].every(
         (id: unknown) => typeof id === 'string' && id.length > 0 && id.length < 128
       ) ||
-      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'reflection', 'bot-mining'].includes(
+      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'reflection'].includes(
         String(body['scenario'])
       )
     ) {
@@ -294,8 +294,7 @@ export function handleTestArrangeCrewField(
       respond(404, { error: 'Live fixture crew unavailable' });
       return;
     }
-    const botMining = body['scenario'] === 'bot-mining';
-    gameEngine.prepareDiagnosticWorld(botMining ? 'combat' : 'traversal');
+    gameEngine.prepareDiagnosticWorld('traversal');
     const poses: { playerId: string; position: { x: number; y: number }; motionEpoch?: number }[] =
       [];
     for (const [index, player] of players.entries()) {
@@ -311,9 +310,7 @@ export function handleTestArrangeCrewField(
               : { x: 220, y: -460 }
             : body['scenario'] === 'reflection'
               ? { x: -220, y: -460 }
-              : botMining
-                ? { x: index * 120, y: 1000 }
-                : { x: index * 120, y: -360 };
+              : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -341,17 +338,6 @@ export function handleTestArrangeCrewField(
     gameEngine.ensureAsteroidField();
     for (const rock of gameEngine.getAllAsteroids()) {
       gameEngine.removeAsteroid(rock.id);
-    }
-    for (const [index, bot] of gameEngine.getAllBots().entries()) {
-      if (botMining) {
-        bot.position = { x: index === 0 ? -500 : 500, y: -460 };
-        bot.velocity = { x: 0, y: 0 };
-        bot.angle = index === 0 ? 0 : Math.PI;
-        bot.spawnProtectionTimer = 0;
-        bot.abilityCooldownFrames = 0;
-      } else {
-        gameEngine.removeBot(bot.id);
-      }
     }
     gameEngine.parkSatellitePickups();
     const first = poses[0];
@@ -382,26 +368,9 @@ export function handleTestArrangeCrewField(
         position: body['scenario'] === 'impact' ? { ...first.position } : { x: 0, y: -460 },
         velocity: { x: 0, y: 0 },
         size: 25,
-        health: body['scenario'] === 'mining' || botMining ? 25 : 75,
-        maxHealth: body['scenario'] === 'mining' || botMining ? 25 : 75,
-        material: body['scenario'] === 'mining' || botMining ? 'ice' : 'metal',
-        rotation: 0,
-        angularVelocity: 0,
-        jaggedness: 0.25,
-        vertices: 4,
-        offsets: [1, 1, 1, 1],
-      });
-    }
-    if (botMining) {
-      gameEngine.addAsteroid({
-        id: 'crew-fixture-survey-deposit',
-        position: { x: 0, y: -800 },
-        velocity: { x: 0, y: 0 },
-        size: 100,
-        health: 300,
-        maxHealth: 300,
-        material: 'metal',
-        isCollabTarget: true,
+        health: body['scenario'] === 'mining' ? 25 : 75,
+        maxHealth: body['scenario'] === 'mining' ? 25 : 75,
+        material: body['scenario'] === 'mining' ? 'ice' : 'metal',
         rotation: 0,
         angularVelocity: 0,
         jaggedness: 0.25,

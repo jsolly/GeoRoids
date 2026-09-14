@@ -2,7 +2,7 @@
 
 A cooperative open-world spaceship game with surveying, asteroid towing, and shared mineral deliveries. Play at [www.georoids.com](https://www.georoids.com).
 
-The Vite + TypeScript client renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, bots, NPCs and rewards.
+The Vite + TypeScript client renders and predicts the local ship. A Node WebSocket server owns the shared world, combat, asteroid field, NPCs and rewards.
 
 ## Local development
 
@@ -20,7 +20,7 @@ Vite serves the client at `http://localhost:5173`; the game server listens on po
 
 Choose a ship, enter the game, steer with the mouse or left/right arrow keys while thrust stays on, Space to fire, E to scan as Surveyor or attach/release cargo as Hauler. Mobile players use the on-screen controls. The minimap follows your ship through the 120,000-unit-wide world. Shared fog records discoveries; Surveyors reveal more terrain, and discovered furnaces remain marked.
 
-Every player and scoreboard bot belongs to the crew. Crew lasers pass through ships. Tow a scanned asteroid into a furnace to give both the Hauler and its Surveyors the full reward, including Surveyors who are offline.
+Every player belongs to the crew. Crew lasers pass through ships. Tow a scanned asteroid into a furnace to give both the Hauler and its Surveyors the full reward, including Surveyors who are offline.
 
 Reflective asteroid clusters can bounce lasers and release laser-core upgrades. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, core charges and the shared snapshot behavior.
 

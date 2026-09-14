@@ -2,7 +2,7 @@
 
 New hex roles only. **Do not rename** locked playfield hexes in `style-guide.md`.
 
-**Ownership first:** `local` / `remote` / `bot` still own player identity on the hull. Loot, furnace and terrain accents support navigation without overpowering ships.
+**Ownership first:** `local` / `remote` still own player identity on the hull. Loot, furnace and terrain accents support navigation without overpowering ships.
 
 ## New roles
 
@@ -19,7 +19,6 @@ New hex roles only. **Do not rename** locked playfield hexes in `style-guide.md`
 | stars | `#8BA3C7` |
 | local | `#5EEAD4` |
 | remote | `#7DD3FC` |
-| bot | `#FB923C` |
 | roid | `#94A3B8` |
 | laser_local | `#FDE68A` |
 | hud | `#E2E8F0` |
@@ -30,7 +29,7 @@ New hex roles only. **Do not rename** locked playfield hexes in `style-guide.md`
 
 ## Hierarchy reminder
 
-1. Ownership stroke (local / remote / bot)
+1. Ownership stroke (local / remote)
 2. Kit silhouette
 3. Cargo, furnace and survey marks
 4. Terrain contours

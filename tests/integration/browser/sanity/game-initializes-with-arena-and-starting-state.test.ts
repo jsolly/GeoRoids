@@ -25,29 +25,21 @@ test(
     const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);
     expect(health).toBe(maxHealth);
     expect(await game.getAsteroidCount()).toBeGreaterThanOrEqual(20);
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () =>
-            (window.gameController?.getNetworkManager().getAllPlayers() ?? []).filter(
-              (player) => player.type === 'bot'
-            ).length
-        )
-      )
-      .toBe(2);
-    const bots = await page.evaluate(() =>
-      (window.gameController?.getNetworkManager().getAllPlayers() ?? [])
-        .filter((player) => player.type === 'bot')
-        .map((player) => ({
-          id: player.id,
-          name: player.name,
-          kitId: player.ship.kitId,
-          hasLegacyTeamField: 'factionId' in player || 'factionId' in player.ship,
-        }))
+    const humans = await page.evaluate(() =>
+      (window.gameController?.getNetworkManager().getAllPlayers() ?? []).map((player) => ({
+        id: player.id,
+        name: player.name,
+        type: player.type,
+        kitId: player.ship.kitId,
+        hasLegacyTeamField: 'factionId' in player || 'factionId' in player.ship,
+      }))
     );
-    expect(bots.every((bot) => bot.id.length > 0 && bot.name.length > 0)).toBe(true);
-    expect(bots.every((bot) => bot.kitId === 'surveyor' || bot.kitId === 'hauler')).toBe(true);
-    expect(bots.every((bot) => bot.hasLegacyTeamField === false)).toBe(true);
+    expect(humans.every((pilot) => pilot.id.length > 0 && pilot.name.length > 0)).toBe(true);
+    expect(humans.every((pilot) => pilot.kitId === 'surveyor' || pilot.kitId === 'hauler')).toBe(
+      true
+    );
+    expect(humans.every((pilot) => pilot.hasLegacyTeamField === false)).toBe(true);
+    expect(humans.every((pilot) => pilot.type === 'local' || pilot.type === 'remote')).toBe(true);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

@@ -44,7 +44,7 @@ describe('local player game-over state', () => {
   test.each([
     ['asteroid', 'asteroid'],
     ['boundary', 'boundary'],
-    ['server-bot-0', 'server-bot-0'],
+    ['peer-pilot', 'peer-pilot'],
     ['client-friend', 'client-friend'],
   ] as const)('snapshot token %s is kept on playerDied', (token, expected) => {
     deaths.length = 0;

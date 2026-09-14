@@ -27,7 +27,7 @@ Each linked report retains its workload, comparison, correctness and limitations
 | [Snapshot field validation](snapshot-validation-results.md) | Validation CPU fell 50.1%; complete parse/decode work fell 24.2%, with identical accepted/rejected worlds. |
 | [Decoder ownership](decoder-owned-input-results.md) | Removes duplicate validation and retains a detached baseline; representative delta parse/decode/retention CPU fell 14.0%. |
 | [Snapshot JSON reuse](snapshot-json-reuse-results.md) | Ten-recipient encode/serialize work fell 41.0% with shared baselines and 26.8% with staggered baselines; exact wire bytes match. |
-| [Selected world precision](snapshot-precision-results.md) | Four-decimal world kinematics cut fixed mixed-stream bytes by 15.9%. Every player/bot field remains exact; authoritative state is never rounded. |
+| [Selected world precision](snapshot-precision-results.md) | Four-decimal world kinematics cut mixed-stream bytes by 15.9%. Every player field remains exact; authoritative state is never rounded. |
 | [Pending snapshot handling](pending-snapshot-results.md) | Successful pending sends no longer force unnecessary full snapshots. Selected stalled-sequence bytes fell 45.8%; noisy live candidates delivered 26–28 versus 23–24 states/s. |
 
 The precision decision explicitly accepts a bandwidth/CPU tradeoff. Its

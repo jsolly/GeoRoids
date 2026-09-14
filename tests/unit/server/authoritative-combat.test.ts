@@ -147,20 +147,16 @@ describe('server-authoritative combat', () => {
     expect(engine.getAsteroid('attached')).toBeUndefined();
   });
 
-  test('player and bot share the same asteroid ram path', () => {
-    const bots = engine.createBots(1);
-    assert.ok(bots, 'created bot list');
-    const bot = bots[0];
-    assert.ok(bot, 'created bot');
-    engine.entityManager.updateEntity(bot.id, {
-      position: { x: 10, y: 0 },
+  test('two humans share the same asteroid ram path', () => {
+    engine.addPlayer('p2', 'Partner', new RecordingSocket(), { x: 10, y: 0 });
+    engine.entityManager.updateEntity('p2', {
       spawnProtectionTimer: 0,
     });
-    engine.addAsteroid(testAsteroid({ id: 'server-asteroid-bot', position: { x: 10, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'server-asteroid-partner', position: { x: 10, y: 0 } }));
 
     engine.resolveAuthoritativeCombat();
-    expect(engine.getBot(bot.id)?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
-    expect(engine.getAsteroid('server-asteroid-bot')).toBeUndefined();
+    expect(engine.getPlayer('p2')?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
+    expect(engine.getAsteroid('server-asteroid-partner')).toBeUndefined();
   });
 
   test('spawn protection blocks server ram for humans', () => {
@@ -349,11 +345,11 @@ describe('server-authoritative combat', () => {
     wsCore.handleClientMessage(
       {
         type: 'shoot',
-        id: 'server-bot-0',
+        id: 'other-pilot',
         data: {
           laserStart: { x: 0, y: 0 },
           laserDirection: { x: 1, y: 0 },
-          requestId: 'forged-bot',
+          requestId: 'forged-foreign',
         },
       },
       pilotWs

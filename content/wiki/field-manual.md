@@ -19,8 +19,8 @@ its E ability, then read the arena entries for the rules that every pilot
 shares.
 
 The world remains available between sessions, so a month-long expedition keeps
-its shared chart and delivered progress. There is currently no automatic
-monthly reset.
+its shared chart and delivered progress unless a world generation bump resets
+saved sectors on the next server start.
 
 Choose Surveyor for nimble exploration and shared mineral scanning, or Hauler
 for asteroid towing and stronger mining lasers. Their
@@ -31,7 +31,7 @@ life, while a respawn resets that growth.
 ## Start a life
 
 Choose a ship on the title screen, then press Enter Game. You share the field
-with other pilots and bots. Scan minerals, tow asteroids to a furnace, collect
+with other pilots. Scan minerals, tow asteroids to a furnace, collect
 rewards, and protect your lives. Your score carries across respawns, but the
 mass and upgrades gathered during a life do not. After game over, start a fresh
 run with 3 lives and 0 score; the persistent universe and shared progress

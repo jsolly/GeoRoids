@@ -13,19 +13,19 @@ describe('shared laser spawn helper', () => {
     expect(start.y).toBeCloseTo(shipPos.y - (4 / 3) * radius * Math.sin(angle));
   });
 
-  test('createLaser uses the same start for player and bot ships', () => {
-    const player = new Ship({ position: { x: 40, y: 8 }, isBot: false });
-    const bot = new Ship({ position: { x: 40, y: 8 }, isBot: true });
+  test('createLaser uses the shared start helper for every ship', () => {
+    const player = new Ship({ position: { x: 40, y: 8 } });
+    const remote = new Ship({ position: { x: 40, y: 8 } });
     player.angle = 0.4;
-    bot.angle = 0.4;
+    remote.angle = 0.4;
     player.r = 15;
-    bot.r = 15;
+    remote.r = 15;
 
     const playerLaser = createLaser(player);
-    const botLaser = createLaser(bot);
+    const remoteLaser = createLaser(remote);
     const expected = calculateLaserStartPosition(player.position, player.angle, player.r);
 
     expect(playerLaser.position).toEqual(expected);
-    expect(botLaser.position).toEqual(expected);
+    expect(remoteLaser.position).toEqual(expected);
   });
 });

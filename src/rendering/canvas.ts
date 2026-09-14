@@ -44,6 +44,7 @@ import {
   projectWorldToScreenInto,
 } from './playfieldCamera';
 import { configureRenderQuality } from './renderQuality';
+import { drawSectorBoundaries } from './sectorRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawStarfield } from './starfield';
 
@@ -329,6 +330,7 @@ class CanvasManager {
 
     // Draw fiery boundary using actual ship position for proper world coordinates
     drawFieryBoundary(currShip.position);
+    drawSectorBoundaries(currShip.position);
 
     if (roids.length > 0) {
       drawRoidsRelative(currShip, roids);
@@ -365,7 +367,7 @@ class CanvasManager {
           ship,
           currShip.position,
           shipColor,
-          player.type === 'bot' ? `${player.name} (bot)` : isLocal ? currPlayer.name : player.name
+          isLocal ? currPlayer.name : player.name
         );
       }
     }

@@ -6,7 +6,6 @@ import { TERRAIN } from './terrainConfig';
 
 /**
  * Apply the same downslope acceleration + uphill drag to any ship velocity.
- * Players and bots must both call this — terrain is not visual-only.
  */
 export function applySlopeForce(
   velocity: Velocity,

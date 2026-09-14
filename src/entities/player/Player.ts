@@ -26,7 +26,7 @@ function copyVec2(dest: { x: number; y: number }, src: { x: number; y: number })
 export class Player {
   id: string;
   name: string;
-  type: 'local' | 'remote' | 'bot';
+  type: 'local' | 'remote';
   ship: Ship;
   score: number = 0;
   lastUpdate: number = Date.now();
@@ -65,7 +65,7 @@ export class Player {
   constructor(params: {
     id: string;
     name: string;
-    type: 'local' | 'remote' | 'bot';
+    type: 'local' | 'remote';
     input: PlayerInput;
     kitId?: ShipKitId;
   }) {
@@ -78,7 +78,6 @@ export class Player {
     // Create ship with player's color and friction coefficient
     this.ship = new Ship({
       color: this.color,
-      isBot: this.type === 'bot',
       isLocalPlayer: this.type === 'local',
       frictionCoefficient: this.getFrictionCoefficient(),
       ...(params.kitId !== undefined ? { kitId: params.kitId } : {}),
@@ -133,7 +132,7 @@ export class Player {
     }
     // The local player predicts its own ship for responsiveness: while alive it
     // owns its position/velocity/angle and must NOT snap to the (lagging) server
-    // echo. Remote players and bots are always server-driven.
+    // echo. Remote players are always server-driven.
     //
     // The exception is the death→respawn window: once the local player dies we
     // latch `adoptServerPosition` so every server update (including the respawn
@@ -451,7 +450,7 @@ export class Player {
    * Get friction coefficient based on player type
    */
   getFrictionCoefficient(): number {
-    return this.type === 'bot' ? 0.02 : 0.01; // Bot-specific friction
+    return 0.01;
   }
 
   // Get current state for network transmission

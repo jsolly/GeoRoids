@@ -3,26 +3,13 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { validExploration } from '../../shared/exploration';
 import { finiteMotionVector } from '../../shared/playerMotion';
+import { readCompletedSectorIds } from '../../shared/sectors';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { sectorAt, WORLD } from '../../shared/world';
+import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, ExplorationTile, Position, ShipKitId } from '../../shared-types';
 
-const SECTOR_ID_PATTERN = /^-?\d+,-?\d+$/;
-
 function validSectorId(id: string): boolean {
-  if (!SECTOR_ID_PATTERN.test(id)) {
-    return false;
-  }
-  const [rawX, rawY] = id.split(',');
-  const x = Number(rawX);
-  const y = Number(rawY);
-  return (
-    rawX !== undefined &&
-    rawY !== undefined &&
-    Number.isSafeInteger(x) &&
-    Number.isSafeInteger(y) &&
-    `${x},${y}` === id
-  );
+  return parseSectorId(id) !== null;
 }
 
 function validWorldPosition(position: Position): boolean {
@@ -46,7 +33,9 @@ export interface PersistentPilot {
 interface SavedWorld {
   seed: number;
   startedAt: number;
+  generation: number;
   exploration: ExplorationTile[];
+  completedSectors: string[];
 }
 
 function validPilot(value: unknown): value is PersistentPilot {
@@ -172,7 +161,19 @@ export class WorldStore {
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
-    return { seed: value.seed, startedAt: value.startedAt, exploration: value.exploration };
+    return {
+      seed: value.seed,
+      startedAt: value.startedAt,
+      generation:
+        'generation' in value &&
+        typeof value.generation === 'number' &&
+        Number.isSafeInteger(value.generation)
+          ? value.generation
+          : 0,
+      exploration: value.exploration,
+      completedSectors:
+        'completedSectors' in value ? readCompletedSectorIds(value.completedSectors) : [],
+    };
   }
 
   loadPilots(): PersistentPilot[] {
@@ -186,6 +187,19 @@ export class WorldStore {
         }
         this.pilotJson.set(value.id, String(row['json']));
         return value;
+      });
+  }
+
+  listSectorIds(): string[] {
+    return this.db
+      .prepare('SELECT id FROM sectors')
+      .all()
+      .map((row) => {
+        const id = row['id'];
+        if (typeof id !== 'string' || !validSectorId(id)) {
+          throw new Error('Saved sector has an invalid identity');
+        }
+        return id;
       });
   }
 

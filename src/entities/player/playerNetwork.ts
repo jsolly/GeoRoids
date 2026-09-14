@@ -42,8 +42,6 @@ export class PlayerNetwork {
   public updatePlayerState(): void {
     // Update local player state for network (network-only)
     this.gameController.updateNetworkPlayerState();
-
-    // Bot data updates are handled by the network manager's bot sync manager
   }
 
   public getOtherPlayers(): Player[] {

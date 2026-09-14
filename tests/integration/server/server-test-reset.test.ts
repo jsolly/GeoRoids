@@ -22,7 +22,6 @@ class TrackingSocket extends RecordingSocket {
 const emptyWorld = {
   isPaused: true,
   humanPlayers: 0,
-  bots: 0,
   asteroids: 0,
   loot: 0,
   satellitePickups: 0,
@@ -39,12 +38,10 @@ test('resetting a populated test world closes its pilot and health reports the e
     const socket = new RecordingSocket();
     server.gameEngine.addPlayer('pilot', 'Pilot', socket);
     server.gameEngine.createAsteroids(5);
-    server.gameEngine.createBots(2);
     const populated = server.gameEngine.getDiagnostics();
     expect(populated.gameTime).toBeGreaterThan(0);
     expect(populated.humanPlayers).toBe(1);
     expect(populated.asteroids).toBeGreaterThan(0);
-    expect(populated.bots).toBeGreaterThan(0);
 
     const reset = await fetch(`${url}/test/reset-world`, {
       method: 'POST',

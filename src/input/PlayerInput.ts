@@ -1,5 +1,5 @@
 /**
- * Input contract shared by local players, remote players, and bots.
+ * Input contract shared by local and remote players.
  * Production input is applied through keybindings/mouse; tests use MockPlayerInput.
  */
 export interface PlayerInput {

@@ -287,7 +287,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const worldStore = options.worldPath ? new WorldStore(options.worldPath) : undefined;
   const gameEngine = new GameEngine(options.seed, undefined, worldStore);
   acquireServerPerformanceMetrics();
-  // Ensure server-side game loop (including bot regen) runs
+  // Ensure the server-side game loop runs
   gameEngine.startGameLoop();
   gameEngine.updatePauseState();
   const wsCore = new WebSocketCore(gameEngine);

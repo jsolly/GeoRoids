@@ -132,39 +132,25 @@ function validateParticipantPresence(
   }
 }
 
-function validateDiagnostics(
-  diagnostics: Diagnostics,
-  humanPlayers: number,
-  expectedBots?: number
-): void {
+function validateDiagnostics(diagnostics: Diagnostics, humanPlayers: number): void {
   if (diagnostics.isPaused) {
     throw new Error('Seeded server fixture is paused while human players are present');
   }
   if (diagnostics.humanPlayers !== humanPlayers) {
     throw new Error(`Expected ${humanPlayers} human players, observed ${diagnostics.humanPlayers}`);
   }
-  if (diagnostics.bots <= 0) {
-    throw new Error('Seeded server fixture did not create an active bot population');
-  }
-  if (expectedBots !== undefined && diagnostics.bots !== expectedBots) {
-    throw new Error(
-      `Expected ${expectedBots} bots after measurement, observed ${diagnostics.bots}`
-    );
-  }
-  if (diagnostics.bots < 0 || diagnostics.asteroids < 0 || diagnostics.satellitePickups < 0) {
+  if (diagnostics.asteroids < 0 || diagnostics.satellitePickups < 0) {
     throw new Error('Server diagnostics contained an invalid negative entity count');
   }
 }
 
 function validateStateScene(state: ServerGameState, diagnostics: Diagnostics): void {
   const humanEntities = state.entities.filter((entity) => entity.type === 'human').length;
-  const botEntities = state.entities.filter((entity) => entity.type === 'bot').length;
   if (state.isPaused !== diagnostics.isPaused || state.gameTime !== diagnostics.gameTime) {
     throw new Error('Public game state disagreed with server diagnostics');
   }
   const counts = [
     ['human players', humanEntities, diagnostics.humanPlayers],
-    ['bots', botEntities, diagnostics.bots],
     ['asteroids', state.asteroids.length, diagnostics.asteroids],
     ['loot', state.loot.length, diagnostics.loot],
     ['satellite pickups', state.satellitePickups.length, diagnostics.satellitePickups],
@@ -385,7 +371,7 @@ export async function runServerSample(
       'Server fixture must follow its controlled simulation clock'
     );
     const after = structuredClone(engine.getDiagnostics());
-    validateDiagnostics(after, options.humanPlayers, before.bots);
+    validateDiagnostics(after, options.humanPlayers);
     validateParticipantPresence(engine, peers, participantIds);
     const afterState = stateSnapshot(engine);
     validateStateScene(afterState, after);
@@ -413,8 +399,6 @@ export async function runServerSample(
         measuredTicks: options.measuredTicks,
         humanPlayersBefore: before.humanPlayers,
         humanPlayersAfter: after.humanPlayers,
-        botsBefore: before.bots,
-        botsAfter: after.bots,
         asteroidsBefore: before.asteroids,
         asteroidsAfter: after.asteroids,
         lootBefore: before.loot,

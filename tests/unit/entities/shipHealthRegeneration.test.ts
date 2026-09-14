@@ -53,8 +53,8 @@ describe('client ship health regeneration', () => {
     expect(ship.health).toBeCloseTo(healthAfterSecondHit + calculateHealthRegenPerFrame());
   });
 
-  test.each([false, true])('player and bot hulls cap regeneration at max health (%s)', (isBot) => {
-    const testedShip = new Ship({ isBot });
+  test('hulls cap regeneration at max health', () => {
+    const testedShip = new Ship();
     testedShip.health = testedShip.maxHealth - calculateHealthRegenPerFrame() / 2;
     testedShip.lastDamageTime = 0;
     testedShip.healthRegenTimer = 0;
@@ -85,11 +85,11 @@ describe('client ship health regeneration', () => {
     expect(shouldStartHealthRegeneration(0, 50, SHIP.MAX_HEALTH)).toBe(true);
   });
 
-  test('a remote bot accepts ordered server health echoes through Player.updateFromServer', () => {
+  test('a remote hull accepts ordered server health echoes through Player.updateFromServer', () => {
     const player = new Player({
-      id: 'bot-player',
-      name: 'Bot Player',
-      type: 'bot',
+      id: 'remote-player',
+      name: 'Remote Player',
+      type: 'remote',
       input: new MockPlayerInput(),
     });
     player.ship.health = 80;

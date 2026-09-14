@@ -41,7 +41,7 @@ provenance only and are not current gameplay or asset instructions.
 
 - ION mark `#A8A0C8` chevron · EMBER mark `#D4B896` diamond
 - Marks only — never full-hull paint
-- Ownership strokes stay: local `#5EEAD4` · remote `#7DD3FC` · bot `#FB923C`
+- Ownership strokes stay: local `#5EEAD4` · remote `#7DD3FC`
 
 ### Retired hostile NPC art (historical)
 
@@ -97,7 +97,7 @@ The following bars remain the product checks for the combined client/server rele
 ### Hauler harpoon (blocks Wave 2 merges)
 
 - PASS only if live: cream tether `#E8D5A3` + tip `#FDE68A` both readable at play zoom
-- Latch rock/bot; hold across brief WS flap
+- Latch rock; hold across brief WS flap
 - Same-side mates and ships protected by a projected E shield or F shield must **not** latch
 - #486 merged; live still FAIL as of last Pilot smoke — Codex owns fresh fix
 

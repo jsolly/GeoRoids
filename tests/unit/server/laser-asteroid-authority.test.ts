@@ -145,21 +145,19 @@ describe('Server laser↔asteroid authority', () => {
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
-  test('bot and player share the same apply-once helper', () => {
+  test('two humans share the same apply-once helper', () => {
     const engine = new GameEngine();
     engine.addPlayer('p1', 'One', {} as never, { x: 0, y: 0 });
-    const bots = engine.createBots(1);
-    const bot = bots?.[0];
-    assert.ok(bot);
+    engine.addPlayer('p2', 'Two', {} as never, { x: 40, y: 0 });
 
-    engine.addAsteroid(mediumAsteroid('roid-bot'));
-    const botHit = engine.applyLaserAsteroidHit('roid-bot', bot.id);
-    const playerHit = engine.applyLaserAsteroidHit('roid-bot', 'p1');
+    engine.addAsteroid(mediumAsteroid('roid-shared'));
+    const firstHit = engine.applyLaserAsteroidHit('roid-shared', 'p2');
+    const playerHit = engine.applyLaserAsteroidHit('roid-shared', 'p1');
 
-    expect(botHit.applied).toBe(true);
-    expect(botHit.points).toBe(ROID.POINTS_MEDIUM);
+    expect(firstHit.applied).toBe(true);
+    expect(firstHit.points).toBe(ROID.POINTS_MEDIUM);
     expect(playerHit.applied).toBe(false);
-    expect(engine.getBot(bot.id)?.score).toBe(ROID.POINTS_MEDIUM);
+    expect(engine.getPlayer('p2')?.score).toBe(ROID.POINTS_MEDIUM);
     expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 });
@@ -236,9 +234,6 @@ describe('Asteroid destruction over real sockets', () => {
       expect(received.filter((message) => message.type === 'joined')).toHaveLength(1);
       const pilot = server.gameEngine.getPlayer('shooter');
       assert.ok(pilot);
-      for (const bot of server.gameEngine.getAllBots()) {
-        server.gameEngine.removeBot(bot.id);
-      }
       // Keep the stopped world's other laser targets far from the shot corridor.
       server.gameEngine.parkSatellitePickups({ x: -2400, y: -2400 });
       expect(server.gameEngine.getLoot()).toEqual([]);

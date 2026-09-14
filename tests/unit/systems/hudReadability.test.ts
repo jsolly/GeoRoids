@@ -342,12 +342,12 @@ describe('painted HUD composition', () => {
       y: 0,
     });
     remote.ship.angle = 0;
-    const bot = entityFactory.createBotPlayer('Radar Bot', {
+    const peer = entityFactory.createRemotePlayer('radar-peer', 'Radar Peer', {
       x: WORLD.minimapRadius / 2,
       y: 0,
     });
-    bot.ship.angle = 0;
-    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, bot]);
+    peer.ship.angle = 0;
+    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, peer]);
     SatellitePickupManager.getInstance().syncFromServer([
       {
         id: 'radar-pickup',
@@ -478,11 +478,11 @@ describe('painted HUD composition', () => {
     ]);
     // One arena ring, three batched world marks, then three two-pass pilot hulls.
     expect(strokes).toHaveLength(10);
-    const botHeading = strokes.filter(
-      (call) => call.style === normalizedCanvasColor(ctx, bot.color) && call.points[0]?.[0] === 765
+    const peerHeading = strokes.filter(
+      (call) => call.style === normalizedCanvasColor(ctx, peer.color) && call.points[0]?.[0] === 765
     );
-    expect(botHeading).toHaveLength(1);
-    expect(botHeading[0]?.points).toEqual([
+    expect(peerHeading).toHaveLength(1);
+    expect(peerHeading[0]?.points).toEqual([
       [765, 536],
       [756, 538.5],
       [756, 533.5],
@@ -582,7 +582,6 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
     STARS: '#8BA3C7',
     LOCAL: '#5EEAD4',
     REMOTE: '#7DD3FC',
-    BOT: '#FB923C',
     ROID: '#94A3B8',
     CONTOUR: '#5A6B7D',
     LASER_LOCAL: '#FDE68A',

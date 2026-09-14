@@ -5,7 +5,7 @@ import { checkBoundaryCollision } from '../../physics/collision/collisionDetecti
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { addPositions, createPositionFromAngle } from '../../utils/mathUtils';
 
-/** Minimal ship shape shared by local players, remotes, and bots. */
+/** Minimal ship shape shared by local and remote players. */
 interface ShipCollisionState {
   exploding: boolean;
   health: number;
@@ -60,7 +60,7 @@ export function isSilentHudReset(
   return established && nextLives === GAME.START_LIVES && nextScore === GAME.STARTING_SCORE;
 }
 
-/** Explode / clear the exploding flag. Shared by local, remote, and bot ships. */
+/** Explode / clear the exploding flag. Shared by local and remote ships. */
 export function applySharedShipExplodingFlag(
   ship: Pick<SharedShipCombatVisuals, 'exploding' | 'health' | 'explode'>,
   exploding: boolean | undefined,
@@ -137,7 +137,7 @@ export function isShipCollisionImmune(ship: ShipCollisionState): boolean {
   return ship.exploding || ship.health <= 0 || ship.blinkCount > 0;
 }
 
-/** Arm the client blink window used by players and bots. */
+/** Arm the client blink window used after respawn. */
 export function applyShipSpawnProtection(ship: ShipSpawnProtectionState): void {
   applyShipSpawnProtectionForRemainingFrames(ship, SHIP.INVINCIBILITY_DURATION_FRAMES);
 }
@@ -226,7 +226,7 @@ export function calculateLaserStartPosition(
 }
 
 /**
- * Thrust / friction step for bots and ships carrying combat knockback.
+ * Thrust / friction step for ships carrying combat knockback.
  * Callers pass their own friction so local and server-owned policies stay explicit.
  * Scalar mass/kit arguments keep loot growth and Hauler thrust on the same
  * formula without allocating an options object on every frame.

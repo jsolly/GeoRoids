@@ -1405,7 +1405,6 @@ try {
               Math.abs(position.y - camera.position.y) * PLAYFIELD_CLOSE_SCALE <= camera.height / 2;
             const populations = {
               humans: state.entities.filter((entity) => entity.type === 'human'),
-              bots: state.entities.filter((entity) => entity.type === 'bot'),
               asteroids: state.asteroids,
               pickups: state.satellitePickups,
               projectiles: state.playerProjectiles,

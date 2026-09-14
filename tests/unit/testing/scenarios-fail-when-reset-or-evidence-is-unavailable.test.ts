@@ -9,7 +9,6 @@ const cleanWorld = {
   isPaused: true,
   gameTime: 0,
   humanPlayers: 0,
-  bots: 0,
   asteroids: 0,
   loot: 0,
   satellitePickups: 0,
@@ -53,7 +52,7 @@ test('successful reset waits for verified empty world diagnostics', async () => 
   expect(fetchSpy).toHaveBeenCalledTimes(2);
 });
 
-test.each(['bots', 'asteroids', 'loot', 'satellitePickups'] as const)(
+test.each(['asteroids', 'loot', 'satellitePickups'] as const)(
   'remaining %s prevents a clean-world verdict',
   (field) => {
     expect(isWorldClean({ ...cleanWorld, [field]: 1 })).toBe(false);

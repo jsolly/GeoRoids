@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
+import { cruiseSpeed } from '../../../../shared/shipFlight';
+import { getShipKit } from '../../../../src/entities/ship/shipKits';
 import { GameServerWorld, useQuietServerConsole } from '../support/gameServerWorld';
 
 useQuietServerConsole();
@@ -11,15 +13,16 @@ afterEach(() => world.dispose());
 test('a grown Hauler reports its reduced cruise speed and retains a server knockback grant', () => {
   const pilot = world.join('Grown Hauler', { x: 0, y: 0 }, { kitId: 'hauler' });
   world.clearAsteroids();
-  world.parkBots();
   const actor = world.entity(pilot);
   actor.mass = 8;
   const now = world.engine.getServerTime();
+  const kit = getShipKit('hauler');
+  const grownCruise = cruiseSpeed(8, kit.maxVelocity);
   const pose = {
     epoch: actor.playerMotion?.epoch ?? 0,
     sequence: 1,
-    position: { x: 0.984375, y: 0 },
-    velocity: { x: 0.984375, y: 0 },
+    position: { x: kit.maxVelocity, y: 0 },
+    velocity: { x: kit.maxVelocity, y: 0 },
     angle: 0,
     thrusting: true,
   };
@@ -27,7 +30,7 @@ test('a grown Hauler reports its reduced cruise speed and retains a server knock
   expect(
     world.engine.playerMotion.acceptFreePose(
       pilot.socket,
-      { ...pose, velocity: { x: 0.590625, y: 0 } },
+      { ...pose, velocity: { x: grownCruise, y: 0 } },
       now + 17
     ).ok
   ).toBe(true);
@@ -39,7 +42,7 @@ test('a grown Hauler reports its reduced cruise speed and retains a server knock
       {
         ...pose,
         epoch: actor.playerMotion?.epoch ?? 0,
-        position: { x: 0.984375, y: 8 },
+        position: { x: kit.maxVelocity, y: 8 },
         velocity: { x: 0, y: 8 },
       },
       now + 34

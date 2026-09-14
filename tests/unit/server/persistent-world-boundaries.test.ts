@@ -172,7 +172,17 @@ test('new deposits and reflective clusters stay inside their saved world sectors
     field.update(manager, observers);
     expect(manager.getAllAsteroids().length).toBeGreaterThan(1000);
     expect(() =>
-      store.checkpoint({ seed: 82, startedAt: 1, exploration: [] }, field.checkpoint(manager), [])
+      store.checkpoint(
+        {
+          seed: 82,
+          startedAt: 1,
+          generation: WORLD.generation,
+          exploration: [],
+          completedSectors: [],
+        },
+        field.checkpoint(manager),
+        []
+      )
     ).not.toThrow();
   } finally {
     store.close();
@@ -238,7 +248,13 @@ test('checkpoint rejects duplicate asteroid identities before writing sectors', 
     const first = asteroid('duplicate', { x: 20, y: 20 });
     expect(() =>
       store.checkpoint(
-        { seed: 1, startedAt: 1, exploration: [] },
+        {
+          seed: 1,
+          startedAt: 1,
+          generation: WORLD.generation,
+          exploration: [],
+          completedSectors: [],
+        },
         new Map([['0,0', [first, { ...first }]]]),
         []
       )
@@ -252,7 +268,13 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
   const store = new WorldStore(':memory:');
   try {
     store.checkpoint(
-      { seed: 1, startedAt: 1, exploration: [] },
+      {
+        seed: 1,
+        startedAt: 1,
+        generation: WORLD.generation,
+        exploration: [],
+        completedSectors: [],
+      },
       new Map([
         ['0,0', [asteroid('first', { x: 20, y: 20 })]],
         ['1,0', [asteroid('second', { x: 2_020, y: 20 })]],
@@ -262,7 +284,13 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
 
     expect(() =>
       store.checkpoint(
-        { seed: 1, startedAt: 1, exploration: [] },
+        {
+          seed: 1,
+          startedAt: 1,
+          generation: WORLD.generation,
+          exploration: [],
+          completedSectors: [],
+        },
         new Map([
           ['1,0', [asteroid('first', { x: 2_020, y: 20 })]],
           ['0,0', [asteroid('second', { x: 20, y: 20 })]],

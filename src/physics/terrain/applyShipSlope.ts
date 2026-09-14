@@ -3,8 +3,7 @@ import { applySlopeForce } from './slopeForce';
 import { getTerrainField } from './terrainSession';
 
 /**
- * Single entry used by the local player ship and server bots so both feel
- * the same slope field.
+ * Single entry used by the local player ship so it feels the same slope field.
  */
 export function applySharedShipSlope(velocity: Velocity, position: Position): void {
   applySlopeForce(velocity, position, getTerrainField());

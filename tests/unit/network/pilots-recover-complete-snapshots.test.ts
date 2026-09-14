@@ -283,6 +283,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       collabTags: [],
       exploration: [],
       mapAssets: [],
+      completedSectors: [],
       gameTime: 1,
       isPaused: false,
       terrainSeed: 2345,

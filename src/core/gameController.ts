@@ -1,5 +1,7 @@
 import { consumeTickAccumulator } from '../../shared/gameClock';
+import { formatSectorLabel } from '../../shared/sectors';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
+import { sectorAt } from '../../shared/world';
 import type {
   AsteroidData,
   FurnaceDelivery,
@@ -69,6 +71,7 @@ export class GameController {
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
   private simulationAccumulatorMs = 0;
+  private lastSectorId: string | null = null;
   private laserUpgradeReadout: LaserUpgradeReadout | undefined;
 
   private constructor() {
@@ -121,6 +124,7 @@ export class GameController {
   newGame(playerName?: string, kitId?: ShipKitId): void {
     clearAsteroidShatters();
     this.simulationAccumulatorMs = 0;
+    this.lastSectorId = null;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
     this.laserUpgradeReadout?.update(undefined);
@@ -741,14 +745,15 @@ export class GameController {
     currPlayer.ship.update();
     shockwaveManager.update();
 
+    const sector = sectorAt(currPlayer.ship.position);
+    if (this.lastSectorId !== null && this.lastSectorId !== sector.id) {
+      this.gameStateManager.setNotice(`Entering sector ${formatSectorLabel(sector)}`);
+    }
+    this.lastSectorId = sector.id;
+
     // Remote pose remains server-driven; their projectiles and lifecycle
     // advance on the same simulation clock as the local ship.
     const allPlayers = this.networkManager.getAllPlayers();
-    for (const player of allPlayers) {
-      if (player.type === 'bot' && player.ship) {
-        player.ship.update();
-      }
-    }
     advanceRemotePlayerShips(allPlayers);
 
     // Update asteroids
@@ -787,7 +792,7 @@ export class GameController {
     // Only check the locally-controlled ship. The network player list holds
     // server-synced copies (which lag at 30 FPS) rather than the predicted
     // local ship, and boundary damage is always attributed to the local
-    // player. Bots are kept in-bounds server-side; remote players self-report.
+    // player. Remote players self-report.
     this.collisionManager.checkBoundaryCollisions([currPlayer.ship], currPlayer.id);
   }
 

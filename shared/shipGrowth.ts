@@ -2,7 +2,7 @@ import type { Position } from '../shared-types';
 import { GAME, SHIP } from '../src/constants';
 
 /**
- * Slither-style size/mass growth shared by humans and bots.
+ * Slither-style size/mass growth shared by every ship.
  * Soft max keeps multiplayer readable: extra mass still collects, but size
  * and HP approach a cap instead of growing without bound.
  */

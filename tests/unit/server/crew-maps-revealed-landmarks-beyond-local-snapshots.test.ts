@@ -6,6 +6,7 @@ import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ExplorationMap } from '../../../shared/exploration';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
+import { WORLD } from '../../../shared/world';
 import type { LootData } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -84,7 +85,13 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
   const store = new WorldStore(':memory:');
   try {
     store.checkpoint(
-      { seed: 82, startedAt: 1, exploration: exploration.snapshot() },
+      {
+        seed: 82,
+        startedAt: 1,
+        generation: WORLD.generation,
+        exploration: exploration.snapshot(),
+        completedSectors: [],
+      },
       new Map(),
       []
     );

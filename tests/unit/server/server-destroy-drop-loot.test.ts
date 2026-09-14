@@ -118,9 +118,6 @@ async function startWorld(): Promise<{
   decodeLatestSnapshot(playerA, decoderA);
   decodeLatestSnapshot(playerB, decoderB);
 
-  for (const bot of server.gameEngine.getAllBots()) {
-    server.gameEngine.removeBot(bot.id);
-  }
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
     server.gameEngine.removeAsteroid(asteroid.id);
   }

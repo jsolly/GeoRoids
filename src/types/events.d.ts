@@ -4,7 +4,6 @@ import type {
   Position,
   SatellitePickupCollected,
   ShockwaveEvent,
-  Velocity,
 } from '../../shared-types';
 
 declare global {
@@ -23,10 +22,6 @@ declare global {
     serverAsteroidTagged: CustomEvent<AsteroidTaggedEvent>;
     serverAsteroidDestroyed: CustomEvent<AsteroidDestroyEvent>;
     serverShockwave: CustomEvent<ShockwaveEvent>;
-    botShoot: CustomEvent<{
-      laserStart: Position;
-      laserDirection: Velocity;
-    }>;
     satellitePickupCollected: CustomEvent<SatellitePickupCollected>;
   }
 }

@@ -35,7 +35,6 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
     world.clearAsteroids();
     addRock();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
-    world.parkBots();
     world.send(alice, {
       type: 'useAbility',
       id: alice.id,
@@ -61,7 +60,6 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
     world.clearAsteroids();
     addRock();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
-    world.parkBots();
     world.send(alice, {
       type: 'useAbility',
       id: alice.id,
@@ -84,7 +82,6 @@ describe('A Hauler tows a nearby asteroid to a furnace', () => {
   test('a Surveyor cannot attach the Hauler tow to the same asteroid', () => {
     addRock();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'surveyor' });
-    world.parkBots();
     world.send(alice, {
       type: 'useAbility',
       id: alice.id,

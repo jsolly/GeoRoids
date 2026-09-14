@@ -12,7 +12,6 @@ describe('A Hauler cannot harpoon a teammate ship', () => {
     world = new GameServerWorld();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
     bob = world.join('Bob', { x: 80, y: 0 }, { kitId: 'surveyor' });
-    world.parkBots();
     world.clearAsteroids();
   });
 

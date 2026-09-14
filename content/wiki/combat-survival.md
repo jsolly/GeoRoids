@@ -42,9 +42,8 @@ A human starts with lives and score. A death decrements one life; the last life
 reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
-spawn protection. Human and bot respawns use the same placement rule: the
-nearest furnace to the death location, 180 world units from its center at a
-random angle.
+spawn protection. Respawns use the nearest furnace to the death location, 180
+world units from its center at a random angle, skipping completed sectors.
 
 After game over, a fresh run starts with 3 lives and 0 score. The persistent
 universe, shared exploration chart, and delivered progress remain available.

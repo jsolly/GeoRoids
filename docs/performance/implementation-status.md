@@ -126,7 +126,7 @@ shot-witness paths. The corrected five-pilot load driver completed 30 seconds of
 warmup and 180 seconds of measurement with no failures and complete cleanup:
 26,405 states, 29.34 states/second per pilot and all 180 measured RTT replies.
 Negotiated pilots witnessed authoritative measured shots; legacy protocol lacks
-that witness. The default world starts with 20 asteroids and two bots, so this
+that witness. The default world starts with 20 asteroids, so this
 does not validate the proposed loaded-battle or capacity target. Raw evidence is
 `.performance/load-completion-audit.json`; [optimization decisions](optimization-decisions.md)
 records tail timings and workload limits. Guard

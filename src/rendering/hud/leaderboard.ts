@@ -83,13 +83,8 @@ export function drawLeaderboard(
     ctx.fillText(rankText, rankX, y);
 
     ctx.fillStyle = hexToRgba(nameColor, alpha);
-    const suffix = entry.type === 'bot' ? ' (bot)' : '';
-    const fittedName = fitLeaderboardName(
-      ctx,
-      entry.name,
-      Math.max(0, nameMaxWidth - ctx.measureText(suffix).width)
-    );
-    ctx.fillText(fittedName + suffix, nameX, y);
+    const fittedName = fitLeaderboardName(ctx, entry.name, nameMaxWidth);
+    ctx.fillText(fittedName, nameX, y);
 
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.55);
     ctx.textAlign = 'right';

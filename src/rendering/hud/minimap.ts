@@ -5,7 +5,8 @@ import {
   isCellExplored,
 } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
-import { sectorAt, WORLD } from '../../../shared/world';
+import { sectorBounds } from '../../../shared/sectors';
+import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
 import type { ExplorationTile, LootData, LootKind, Position } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { lootStrokeColor } from '../../entities/loot/lootRenderer';
@@ -15,7 +16,7 @@ import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePi
 import type { Ship } from '../../entities/ship/Ship';
 import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
 import { activeScanners, scannedMaterial } from '../../entities/ship/surveyScan';
-import { getWorldExploration } from '../../network/worldExploration';
+import { getCompletedSectors, getWorldExploration } from '../../network/worldExploration';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { resolveGlow } from '../renderQuality';
@@ -122,6 +123,32 @@ function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeom
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;
     const size = bounds.size * cellScale + 0.5;
     ctx.fillRect(x, y, size, size);
+  }
+  ctx.restore();
+}
+
+function drawCompletedSectors(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
+  const completed = getCompletedSectors();
+  if (completed.size === 0) {
+    return;
+  }
+  const cellScale = geometry.size / (geometry.radius * 2);
+  ctx.save();
+  ctx.fillStyle = hexToRgba(PALETTE.DANGER, 0.22);
+  ctx.strokeStyle = hexToRgba(PALETTE.DANGER, 0.7);
+  ctx.lineWidth = 1;
+  for (const id of completed) {
+    const parsed = parseSectorId(id);
+    if (!parsed) {
+      continue;
+    }
+    const bounds = sectorBounds(parsed.x, parsed.y);
+    const x = geometry.x + geometry.size / 2 + (bounds.minX - geometry.center.x) * cellScale;
+    const y = geometry.y + geometry.size / 2 + (bounds.minY - geometry.center.y) * cellScale;
+    const width = WORLD.sectorSize * cellScale;
+    const height = WORLD.sectorSize * cellScale;
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeRect(x, y, width, height);
   }
   ctx.restore();
 }
@@ -570,6 +597,7 @@ export function drawMiniMap(
 
   try {
     drawExplorationFog(ctx, geometry);
+    drawCompletedSectors(ctx, geometry);
     drawAsteroidMarks(ctx, roids, geometry, scanners);
     drawLootMarks(ctx, loot, geometry);
     drawLoosePickupMarks(ctx, pickups, geometry);

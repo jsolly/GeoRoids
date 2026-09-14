@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GAME, LASER, SHIP } from '../../../src/constants';
 import { createLaser } from '../../../src/entities/laser/laserUtils';
 import { Ship } from '../../../src/entities/ship/Ship';
@@ -78,15 +79,12 @@ describe('shared ship motion helper', () => {
 
     const capped = applyThrustOrFriction({ x: 20, y: 0 }, 0, true, GAME.FRICTION);
     const speed = Math.sqrt(capped.x * capped.x + capped.y * capped.y);
-    expect(SHIP.MAX_VELOCITY).toBe(1.125);
+    expect(SHIP.MAX_VELOCITY).toBe(2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });
 
-  test.each([
-    ['surveyor', 1.125],
-    ['hauler', 0.984375],
-  ] as const)('%s cruises at one-quarter of its former speed', (kitId, cap) => {
-    expect(getShipKit(kitId).maxVelocity).toBe(cap);
+  test.each(['surveyor', 'hauler'] as const)('%s cruises at its kit velocity cap', (kitId) => {
+    const cap = getShipKit(kitId).maxVelocity;
     const ship = new Ship({ kitId, position: { x: 0, y: 0 }, isLocalPlayer: true });
     ship.angle = 0;
     ship.angularVelocity = 0;
@@ -123,7 +121,7 @@ describe('shared ship motion helper', () => {
     ship.velocity = { x: 10, y: 0 };
     ship.angle = 0;
     ship.update();
-    expect(ship.velocity.x).toBeCloseTo(0.590625);
+    expect(ship.velocity.x).toBeCloseTo(cruiseSpeed(8, getShipKit('hauler').maxVelocity));
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
@@ -139,7 +137,7 @@ describe('shared ship motion helper', () => {
     for (let frame = 0; frame < 60; frame++) {
       ship.update();
     }
-    expect(ship.velocity.x).toBeCloseTo(1.125);
+    expect(ship.velocity.x).toBeCloseTo(SHIP.MAX_VELOCITY);
     // Terrain can still deflect travel slightly after the blast has decayed.
     expect(Math.abs(Math.atan2(-ship.velocity.y, ship.velocity.x) - ship.angle)).toBeLessThan(
       Math.PI / 180

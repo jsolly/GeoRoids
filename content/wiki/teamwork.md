@@ -1,8 +1,9 @@
 ---
 title: Teamwork
 category: Systems
-summary: Every pilot and bot shares one crew. Scan, tow, and deliver together
-  while ship weapons and collisions leave teammates unharmed.
+summary: Every human pilot shares one crew. Scan, tow, and deliver together
+  while ship weapons and collisions leave teammates unharmed. Completing a
+  sector walls it off for later expeditions.
 order: 140
 related:
   - content/wiki/surveyor.md
@@ -15,16 +16,15 @@ media: []
 
 ## One crew
 
-Every human pilot and server bot is on the same crew. The scoreboard keeps a
-row for every active player, including the existing bots, so asteroid work and
-delivery points are visible across the whole field. The match has one shared
-crew and no enemy bots.
+Every human pilot is on the same crew. The scoreboard keeps a row for every
+active player so asteroid work and delivery points are visible across the whole
+field. The match has one shared crew.
 
 Ship lasers, ship-to-ship ramming, and the Hauler tow cable never damage a
 teammate. The Hauler ability attaches only to asteroids; it cannot select,
-pull, or throw a ship. Asteroids and the arena boundary remain world hazards;
-shot-triggered loot blasts only push nearby small rocks and leave crew hulls
-safe.
+pull, or throw a ship. Asteroids, completed-sector walls, and the arena
+boundary remain world hazards; shot-triggered loot blasts only push nearby
+small rocks and leave crew hulls safe.
 
 ## Scan, tow, deliver
 
@@ -53,8 +53,8 @@ a shared material score.
 
 The local minimap follows the ship's nearby radar. The full-screen universe map
 opens with M or the Map button and shows the crew's shared overview of the
-world. Every pilot and bot adds the area around its ship, and explored cells
-remain revealed for the crew after that ship moves away. Surveyor passive reveal
+world. Every pilot adds the area around its ship, and explored cells remain
+revealed for the crew after that ship moves away. Surveyor passive reveal
 reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
 scan reaches 1,200 world units and also classifies minerals in that range on
 every teammate's radar. Uncharted asteroid, loot, and furnace positions stay
@@ -62,10 +62,15 @@ hidden until a crew member reveals their area. Discovered furnace landmarks and
 other important assets stay marked on the universe map, and pilots stay
 readable on both maps. Close the overview with M, Escape, or the Close control.
 
-## Bots
+## Completing sectors
 
-Bots use the same shared field, exploration chart, and scoreboard as humans.
-They mine asteroids with their normal lasers and automatically run Surveyor
-scans when they have that kit, making their mineral classifications visible to
-the crew and eligible for shared delivery credit. Bots do not hunt or target
-human ships.
+The world is divided into 2,000-unit sectors. A sector completes when the crew
+has visited it, mapped every explorable cell, and removed every asteroid there,
+including rocks that drifted to sleep in that sector. Completed sectors stay
+empty: they do not regenerate deposits, and their walls are lethal to ships the
+same way the outer world boundary is. Lasers bounce off those walls. Anyone
+already inside when a sector completes is relocated into an open sector
+without losing a life. New spawns skip completed sectors. Crossing into a new
+open sector shows a brief HUD notice with that sector's coordinates. The local
+radar and universe map hatch completed sectors so the closed ground stays
+obvious.

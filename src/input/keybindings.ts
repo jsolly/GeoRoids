@@ -1,7 +1,5 @@
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID } from '../entities/ship/shipKits';
-import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { steeringTurn } from './pointerSteering';
@@ -97,12 +95,6 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
         break;
       case 'KeyE':
         if (!ev.repeat) {
-          const selectedKit = getSelectedShipKitId();
-          // Title kit only wins when the live ship is still the default Surveyor.
-          // A stale menu selection must not replace a live Hauler mid-match.
-          if (player.ship.kitId === DEFAULT_SHIP_KIT_ID && selectedKit !== player.ship.kitId) {
-            applyShipKitToShip(player.ship, selectedKit);
-          }
           player.ship.activateAbility();
         }
         break;

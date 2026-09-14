@@ -155,21 +155,17 @@ test(
       beforeTap.lastShotTime
     );
 
-    await page.locator('#touch-ability').click();
-    const abilityUsed = await page.evaluate(() => {
-      const gc = window as unknown as {
-        gameController?: {
-          getPlayerManager: () => {
-            getLocalPlayer: () => {
-              ship: { abilityCooldownFrames: number; abilityActiveFrames: number };
-            } | null;
-          };
-        };
-      };
-      const ship = gc.gameController?.getPlayerManager().getLocalPlayer()?.ship;
-      return Boolean(ship && (ship.abilityCooldownFrames > 0 || ship.abilityActiveFrames > 0));
-    });
-    expect(abilityUsed).toBe(true);
+    await page.locator('#touch-ability').tap();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const ship = window.gameController?.getCurrPlayer()?.ship;
+            return Boolean(ship && ship.abilityCooldownFrames > 0 && ship.abilityActiveFrames > 0);
+          }),
+        { message: 'Surveyor scan and cooldown should arrive from the server' }
+      )
+      .toBe(true);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

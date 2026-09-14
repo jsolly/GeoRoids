@@ -40,11 +40,19 @@ jobs:
           set -o pipefail
           GEOROIDS_TEST_MAX_DURATION_SECONDS=300 ./scripts/test-runner.sh \
             tests/integration/browser/sanity/critical-gameplay-smoke.test.ts \
+            tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts \
+            tests/integration/browser/sanity/pilots-climb-and-descend-varied-terrain.test.ts \
+            tests/integration/browser/roid/two-players-hit-big-roid-within-one-second-splits.test.ts \
+            tests/integration/browser/sanity/mobile-viewport-fits-and-shows-touch-controls.test.ts \
+            tests/integration/browser/sanity/wave2-touch-controls.test.ts \
+            tests/integration/browser/sanity/crew-scoreboard-lists-pilots.test.ts \
+            tests/integration/browser/sanity/leaderboard-long-names-fit-score-column.test.ts \
             tests/integration/browser/sanity/sustained-mobile-controls.test.ts \
             tests/integration/browser/sanity/mobile-quality-and-phone-recording.test.ts \
             tests/integration/browser/sanity/mobile-recovers-under-cpu-constraint.test.ts \
             tests/integration/browser/sanity/rejected-joins-return-to-menu-and-can-retry.test.ts \
             tests/integration/server/current-pilots-recover-after-reconnect.test.ts \
+            tests/integration/server/player-motion-cross-real-sockets.test.ts \
             --reporter=verbose 2>&1 | tee behavioral-artifacts/test-run.log
           pipeline_statuses=("${PIPESTATUS[@]}")
           status=${pipeline_statuses[0]}

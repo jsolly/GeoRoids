@@ -92,7 +92,9 @@ test(
     ];
     await dispatchTouch(session, 'touchStart', [...held, { ...ability, id: 13 }]);
     await dispatchTouch(session, 'touchMove', held);
-    await game.waitForAnimationFrames(2);
+    await expect
+      .poll(async () => (await readTouchControlState(page)).abilityCooldownFrames)
+      .toBeGreaterThan(0);
     const afterAbility = await readTouchControlState(page);
     expect(afterAbility.abilityCooldownFrames).toBeGreaterThan(0);
     expect(afterAbility.thrusting).toBe(true);

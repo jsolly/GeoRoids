@@ -278,7 +278,7 @@ export function handleTestArrangeCrewField(
       !body['playerIds'].every(
         (id: unknown) => typeof id === 'string' && id.length > 0 && id.length < 128
       ) ||
-      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'reflection'].includes(
+      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'cooperative', 'reflection'].includes(
         String(body['scenario'])
       )
     ) {
@@ -367,10 +367,10 @@ export function handleTestArrangeCrewField(
         id: 'crew-fixture-ore',
         position: body['scenario'] === 'impact' ? { ...first.position } : { x: 0, y: -460 },
         velocity: { x: 0, y: 0 },
-        size: 25,
+        size: body['scenario'] === 'cooperative' ? 50 : 25,
         health: body['scenario'] === 'mining' ? 25 : 75,
         maxHealth: body['scenario'] === 'mining' ? 25 : 75,
-        material: body['scenario'] === 'mining' ? 'ice' : 'metal',
+        material: ['mining', 'cooperative'].includes(String(body['scenario'])) ? 'ice' : 'metal',
         rotation: 0,
         angularVelocity: 0,
         jaggedness: 0.25,

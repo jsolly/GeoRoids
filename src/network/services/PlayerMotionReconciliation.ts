@@ -11,7 +11,7 @@ interface PlayerPose {
   thrusting: boolean;
 }
 
-/** Reconcile authoritative respawns and reconnects; ordinary flight stays client-predicted. */
+/** Reconcile authoritative corrections, respawns and reconnects; ordinary flight stays predicted. */
 export class PlayerMotionReconciliation {
   private actorId?: string;
   private motion?: PlayerMotionState;

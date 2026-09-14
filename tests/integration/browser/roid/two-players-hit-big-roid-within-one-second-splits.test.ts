@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { isAsteroidMaterial } from '../../../../shared/asteroidMaterials';
-import { segmentCircleContact } from '../../../../shared/asteroidPhenomena';
 import type { AsteroidData, AsteroidDestroyEvent } from '../../../../shared-types';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager } = createBrowserScenarioHooks(__dirname);
 
@@ -126,120 +126,19 @@ test(
       });
     }
     await game1.bootGame({ waitForCombatReady: false });
-    await game1.placeShipAt(-1700, 0);
     await game2.bootGame({ waitForCombatReady: false });
-    await game2.placeShipAt(1700, 0);
+    const playerIds = await Promise.all([game1.getLocalPlayerId(), game2.getLocalPlayerId()]);
+    await arrangeCrewField(playerIds, 'cooperative');
+    await Promise.all([game1.placeShipAt(-35, -340), game2.placeShipAt(35, -340)]);
     await Promise.all([game1.waitForCombatReady(), game2.waitForCombatReady()]);
-
-    await game1.waitForAsteroids(1, 30000);
-    const initialFields = await Promise.all([
-      game1.getAsteroidPositions(),
-      game2.getAsteroidPositions(),
-    ]);
-    const loot = await game1.getLoot();
-    // An arbitrary first rock may overlap another rock or a loot drop, which
-    // legitimately intercepts one pilot's shot. Use the most isolated live
-    // target so both pilots exercise the intended cooperative collision.
-    const obstacles = [...initialFields[0], ...loot];
-    const clearance = (target: (typeof initialFields)[0][number]) =>
-      Math.min(
-        ...obstacles
-          .filter((other) => other.id !== target.id)
-          .map(
-            (other) =>
-              Math.hypot(other.x - target.x, other.y - target.y) - other.radius - target.radius
-          )
-      );
-    const collaborative = initialFields[0]
-      .filter(
-        (asteroid) =>
-          !asteroid.isCollabTarget && asteroid.material === 'ice' && asteroid.radius >= 40
-      )
-      .sort((left, right) => clearance(right) - clearance(left))[0];
-    expect(
-      collaborative,
-      'expected an ordinary large ice asteroid; the marked kits target uses shared HP instead'
-    ).toBeDefined();
+    await expect
+      .poll(async () => (await game1.getAsteroidPositions()).map((rock) => rock.id))
+      .toEqual(['crew-fixture-ore']);
+    const [collaborative] = await game1.getAsteroidPositions();
     if (!collaborative) {
-      throw new Error('Large ice asteroid missing');
+      throw new Error('Controlled cooperative asteroid missing');
     }
-
-    const [shipRadius1, shipRadius2] = await Promise.all([
-      game1.getShipRadius(),
-      game2.getShipRadius(),
-    ]);
-    const [liveField, liveLoot] = await Promise.all([
-      game1.getAsteroidPositions(),
-      game1.getLoot(),
-    ]);
-    const liveTarget = liveField.find((asteroid) => asteroid.id === collaborative.id);
-    expect(
-      liveTarget,
-      'the selected target should remain alive while preparing both pilots'
-    ).toBeDefined();
-    if (!liveTarget) {
-      throw new Error('Target disappeared while preparing both pilots');
-    }
-    const liveObstacles = [...liveField, ...liveLoot];
-    // Put both crew hulls on one side in close, separate lanes so each real
-    // shot reaches the moving rock within a few frames without a pilot or
-    // another asteroid intercepting the firing lane.
-    const radialGap = liveTarget.radius + Math.max(shipRadius1, shipRadius2) + 20;
-    const tangentOffset = (shipRadius1 + shipRadius2 + 20) / 2;
-    const firingFixture = Array.from({ length: 16 }, (_, index) => (index * Math.PI) / 8)
-      .map((angle) => {
-        const normal = { x: Math.cos(angle), y: Math.sin(angle) };
-        const tangent = { x: -normal.y, y: normal.x };
-        return {
-          positions: [
-            {
-              x: liveTarget.x - normal.x * radialGap + tangent.x * tangentOffset,
-              y: liveTarget.y - normal.y * radialGap + tangent.y * tangentOffset,
-              radius: shipRadius1,
-            },
-            {
-              x: liveTarget.x - normal.x * radialGap - tangent.x * tangentOffset,
-              y: liveTarget.y - normal.y * radialGap - tangent.y * tangentOffset,
-              radius: shipRadius2,
-            },
-          ],
-        };
-      })
-      .find(({ positions }) =>
-        positions.every(({ x, y, radius }) => {
-          return liveObstacles.every((other) => {
-            if (other.id === collaborative.id) {
-              return true;
-            }
-            if (Math.hypot(other.x - x, other.y - y) <= other.radius + radius + 12) {
-              return false;
-            }
-            return (
-              segmentCircleContact(
-                { x, y },
-                { x: liveTarget.x, y: liveTarget.y },
-                { x: other.x, y: other.y },
-                other.radius + 8
-              ) === undefined
-            );
-          });
-        })
-      );
-    expect(firingFixture, 'both hulls and laser paths need clear crew firing lanes').toBeDefined();
-    if (!firingFixture) {
-      throw new Error('No clear crew firing lanes');
-    }
-    const [position1, position2] = firingFixture.positions;
-    if (!position1 || !position2) {
-      throw new Error('Crew firing fixture did not contain both pilots');
-    }
-
-    // Park both hulls outside the target and acknowledge each pose before the
-    // concurrent shots.
-    await Promise.all([
-      game1.placeShipAt(position1.x, position1.y),
-      game2.placeShipAt(position2.x, position2.y),
-    ]);
+    expect(collaborative).toMatchObject({ material: 'ice', radius: 50, isCollabTarget: false });
 
     const [current1, current2] = await Promise.all([
       game1

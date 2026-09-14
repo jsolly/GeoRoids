@@ -58,6 +58,10 @@ cooldowns. After a visible stall, the client catches up only within its
 bounded simulation window; switching back from a hidden tab instead resumes
 from current server state.
 
+If your predicted flight drifts beyond the server's movement limits, your ship
+returns to its last accepted position and resumes flight there. This correction
+keeps the visible ship, shots, and asteroid impacts in the same place.
+
 ## Connection interruptions
 
 Keep the game tab up to date. If the server asks you to update the client,

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { getExplosionSound, playExplosionSound } from '../../../src/audio/explosionSound';
 import {
   getLaserSound,
+  getThrustSound,
   playLaserSound,
   replaceThrustSources,
   thrustSourcesFromPlayers,
@@ -267,4 +268,16 @@ test('health drop and exploding flag together still play only one explosion', ()
   remote.updateFromServer({ health: 0, exploding: true });
 
   expect(playSpy).toHaveBeenCalledTimes(1);
+});
+
+test('muted steering and firing leave idle media untouched across simulation steps', () => {
+  setSound(false);
+  const stop = vi.spyOn(getThrustSound(), 'stop');
+  const laserPlay = vi.spyOn(getLaserSound(), 'play');
+  for (let frame = 0; frame < 60; frame++) {
+    replaceThrustSources([{ id: 'local', thrusting: frame % 2 === 0, position: listener }]);
+    playLaserSound();
+  }
+  expect(stop).not.toHaveBeenCalled();
+  expect(laserPlay).not.toHaveBeenCalled();
 });

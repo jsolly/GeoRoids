@@ -69,6 +69,7 @@
     "@types/ws": "^8.18.1",
     "@vercel/functions": "^3.9.5",
     "echarts": "^6.1.0",
+    "howler": "^2.2.4",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "uuid": "^14.0.2",
@@ -77,6 +78,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
+    "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",
     "@vitest/coverage-v8": "5.0.0",
     "canvas": "^3.2.3",

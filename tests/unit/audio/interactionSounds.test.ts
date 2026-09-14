@@ -56,7 +56,7 @@ describe('interaction sound cues', () => {
 
     expect(played).toHaveLength(13);
     expect(new Set(played).size).toBe(13);
-    expect(played.map((sound) => sound.streams[0]?.src.split('/').pop())).toEqual([
+    expect(played.map((sound) => sound.src.split('/').pop())).toEqual([
       'harpoon-launch.m4a',
       'harpoon-latch.m4a',
       'harpoon-release.m4a',

@@ -117,7 +117,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     const played: string[] = [];
     vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
-      played.push(this.streams[0]?.src ?? 'missing source');
+      played.push(this.src);
       return Promise.resolve();
     });
     try {
@@ -127,7 +127,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
         position: { x: 30, y: 0 },
       });
       expect(played).toHaveLength(1);
-      expect(played[0]).toMatch(/\/sounds\/laser\.m4a$/);
+      expect(played[0]).toMatch(/sounds\/laser\.m4a$/);
       ws.receive('playerShotFired', {
         id: 'self-shot',
         ownerId: player.id,
@@ -149,7 +149,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('lootCollected', collection);
       ws.receive('lootCollected', collection);
       expect(played).toHaveLength(2);
-      expect(played[1]).toMatch(/\/sounds\/fuel-pickup\.m4a$/);
+      expect(played[1]).toMatch(/sounds\/fuel-pickup\.m4a$/);
       ws.receive('lootCollected', { ...collection, lootId: 'invalid-kind', kind: 'unknown' });
       ws.receive('lootCollected', {
         ...collection,
@@ -230,7 +230,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
     const paths: string[] = [];
     vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
-      paths.push(this.streams[0]?.src ?? 'missing');
+      paths.push(this.src);
       return Promise.resolve();
     });
     try {

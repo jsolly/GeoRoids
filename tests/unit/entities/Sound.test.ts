@@ -1,235 +1,325 @@
-import assert from 'node:assert/strict';
+import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { Sound, setSound } from '../../../src/audio/Sound';
-import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 
-let testSound: Sound;
-const mockPlay = vi.fn();
-const mockPause = vi.fn();
+class FakeHowl {
+  static instances: FakeHowl[] = [];
+  readonly voices = new Map<number, { volume: number; rate: number }>();
+  private nextId = 0;
+  loaded = true;
+  _webAudio = true;
+  constructor(readonly options: HowlOptions) {
+    FakeHowl.instances.push(this);
+  }
+  state() {
+    return this.loaded ? 'loaded' : 'loading';
+  }
+  play = vi.fn(() => {
+    const id = ++this.nextId;
+    this.voices.set(id, { volume: 1, rate: 1 });
+    return id;
+  });
+  stop = vi.fn((id: number) => {
+    this.voices.delete(id);
+    this.options.onstop?.(id);
+  });
+  volume(value: number, id: number) {
+    const voice = this.voices.get(id);
+    if (voice) {
+      voice.volume = value;
+    }
+  }
+  rate(value: number, id: number) {
+    const voice = this.voices.get(id);
+    if (voice) {
+      voice.rate = value;
+    }
+  }
+  end(id: number) {
+    if (!this.options.loop) {
+      this.voices.delete(id);
+    }
+    this.options.onend?.(id);
+  }
+}
 
-beforeEach(() => {
-  localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
+class FakeContext extends EventTarget {
+  static instances: FakeContext[] = [];
+  state = 'suspended';
+  currentTime = 0;
+  sampleRate = 48000;
+  destination = {};
+  resume = vi.fn(async () => {
+    this.changeState('running');
+  });
+  suspend = vi.fn(async () => {
+    this.changeState('suspended');
+  });
+  constructor() {
+    super();
+    FakeContext.instances.push(this);
+  }
+  changeState(state: string) {
+    this.state = state;
+    this.dispatchEvent(new Event('statechange'));
+  }
+  createGain() {
+    return { connect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
+  }
+  createBuffer() {
+    return {};
+  }
+  createBufferSource() {
+    return { connect: vi.fn(), start: vi.fn(), stop: vi.fn(), disconnect: vi.fn() };
+  }
+}
 
-  testSound = new Sound('../public/sounds/thrust.m4a', 1);
-  const stream = testSound.streams[0];
-  assert.ok(stream);
-  stream.play = mockPlay;
-  stream.pause = mockPause;
+let Sound: typeof import('../../../src/audio/Sound').Sound;
+let setSound: typeof import('../../../src/audio/Sound').setSound;
+let activateAudio: typeof import('../../../src/audio/audioRuntime').activateAudio;
+let loadLibrary = vi.fn();
+let globalAudio: { state: string; mute: ReturnType<typeof vi.fn> };
+let removeListeners: Array<() => void> = [];
+
+async function settle() {
+  await vi.dynamicImportSettled();
+  for (let i = 0; i < 12; i++) {
+    await Promise.resolve();
+  }
+}
+function context() {
+  const ctx = FakeContext.instances[0];
+  if (!ctx) {
+    throw new Error('Expected context');
+  }
+  return ctx;
+}
+function howl() {
+  const sound = FakeHowl.instances[0];
+  if (!sound) {
+    throw new Error('Expected howl');
+  }
+  return sound;
+}
+
+beforeEach(async () => {
+  vi.resetModules();
+  localStorage.clear();
+  FakeHowl.instances = [];
+  FakeContext.instances = [];
+  vi.stubGlobal('AudioContext', FakeContext);
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  const addEventListener = document.addEventListener.bind(document);
+  vi.spyOn(document, 'addEventListener').mockImplementation((...args) => {
+    addEventListener(...args);
+    removeListeners.push(() => document.removeEventListener(...args));
+  });
+  globalAudio = { state: 'suspended', mute: vi.fn() };
+  loadLibrary = vi.fn(() => ({ Howl: FakeHowl, Howler: globalAudio }));
+  vi.doMock('howler', () => loadLibrary());
+  ({ Sound, setSound } = await import('../../../src/audio/Sound'));
+  ({ activateAudio } = await import('../../../src/audio/audioRuntime'));
 });
 
 afterEach(() => {
-  // Restore the original functions after each test
+  setSound(false);
+  for (const remove of removeListeners) {
+    remove();
+  }
+  removeListeners = [];
   vi.restoreAllMocks();
-
-  localStorage.removeItem(LOCAL_STORAGE_KEYS.soundOn);
+  vi.unstubAllGlobals();
+  vi.doUnmock('howler');
 });
 
-test('Sound', () => {
-  expect(testSound).toBeInstanceOf(Sound);
-  expect(testSound.streams.length).toBe(1);
+test('cold muted construction and simulation allocate no library, context or media', async () => {
+  const media = vi.spyOn(window, 'Audio');
+  const sound = new Sound('sounds/laser.m4a', 8);
+  for (let frame = 0; frame < 60; frame++) {
+    await sound.play();
+    sound.stop();
+    activateAudio();
+  }
+  expect(loadLibrary).not.toHaveBeenCalled();
+  expect(FakeContext.instances).toHaveLength(0);
+  expect(FakeHowl.instances).toHaveLength(0);
+  expect(media).not.toHaveBeenCalled();
 });
 
-test('Set Sound', () => {
+test('enabled gesture synchronously creates one context shared with lazy Howler', async () => {
+  new Sound('sounds/laser.m4a', 8);
   setSound(true);
-  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.soundOn)).toBe('true');
-  setSound(false);
-  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.soundOn)).toBe('false');
+  expect(FakeContext.instances).toHaveLength(1);
+  expect(context().resume).toHaveBeenCalledTimes(1);
+  await settle();
+  activateAudio();
+  expect(FakeContext.instances).toHaveLength(1);
+  expect(globalAudio).toMatchObject({
+    ctx: context(),
+    state: 'running',
+    autoUnlock: false,
+    autoSuspend: false,
+  });
+  expect(howl().options).toMatchObject({ html5: false, autoplay: false, pool: 8 });
 });
 
-test('Sound play skips when Sound is off', async () => {
-  setSound(false);
-  const initialStreamNum = testSound.streamNum;
-  await testSound.play(1);
-  expect(testSound.streamNum).toBe(initialStreamNum);
-  expect(mockPlay).not.toHaveBeenCalled();
-});
-
-test('setSound(false) stops every stream that is already playing', () => {
+test('active voice cap drops overflow and releases capacity when a shot ends', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
   setSound(true);
-  const extra = new Sound('../public/sounds/laser.m4a', 2);
-  const [firstStream, secondStream] = extra.streams;
-  assert.ok(firstStream);
-  assert.ok(secondStream);
-  firstStream.pause = mockPause;
-  secondStream.pause = mockPause;
-  extra.playing = true;
-  testSound.playing = true;
-
-  setSound(false);
-
-  expect(mockPause).toHaveBeenCalled();
-  expect(testSound.playing).toBe(false);
-  expect(extra.playing).toBe(false);
+  await settle();
+  await sound.play();
+  await sound.play();
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(2);
+  howl().end(1);
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(3);
+  expect(howl().voices.size).toBe(2);
 });
 
-test('loop option marks every stream as looping', () => {
-  const looped = new Sound('../public/sounds/thrust.m4a', 2, 0.03, { loop: true });
-  expect(looped.streams[0]?.loop).toBe(true);
-  expect(looped.streams[1]?.loop).toBe(true);
+test('overlapping shots vary pitch and volume independently', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2, 0.1);
+  setSound(true);
+  await settle();
+  vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
+  await sound.play(1);
+  await sound.play(0.5);
+  expect(howl().voices.get(1)).toEqual({ volume: 0.1, rate: 0.9 });
+  expect(howl().voices.get(2)?.volume).toBe(0.05);
+  expect(howl().voices.get(2)?.rate).toBeCloseTo(1.1);
 });
 
-test('Sound play applies volume scale to the stream', async () => {
-  const initialStreamNum = testSound.streamNum;
-  await testSound.play(0.5);
-  expect(testSound.streamNum).toBe((initialStreamNum + 1) % testSound.streams.length);
-  expect(testSound.streams[testSound.streamNum]?.volume).toBeCloseTo(0.025);
-});
-
-test('Sound play skips when volume scale is zero', async () => {
-  const initialStreamNum = testSound.streamNum;
-  await testSound.play(0);
-  expect(testSound.streamNum).toBe(initialStreamNum);
-});
-
-test('Sound stop functionality', () => {
-  testSound.stop();
-  expect(mockPause).toHaveBeenCalled();
-});
-
-test('Sound isPlaying check', () => {
-  // Mock the paused property
-  Object.defineProperty(testSound.streams[0], 'paused', {
-    value: false,
-    writable: true,
-  });
-
-  expect(testSound.isPlaying()).toBe(true);
-
-  Object.defineProperty(testSound.streams[0], 'paused', {
-    value: true,
-    writable: true,
-  });
-
-  expect(testSound.isPlaying()).toBe(false);
-});
-
-test('Sound with multiple streams', () => {
-  const multiSound = new Sound('../public/sounds/thrust.m4a', 3);
-  expect(multiSound.streams.length).toBe(3);
-  expect(multiSound.streamNum).toBe(0);
-
-  // Test stream cycling without calling play (which fails in jsdom)
-  multiSound.streamNum = 1;
-  expect(multiSound.streamNum).toBe(1);
-
-  multiSound.streamNum = 2;
-  expect(multiSound.streamNum).toBe(2);
-
-  multiSound.streamNum = 0; // Should wrap around
-  expect(multiSound.streamNum).toBe(0);
-});
-
-test('repeated shots restart with independently varied audible pitch', async () => {
-  const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
-  const stream = testSound.streams[0];
-  assert.ok(stream);
-  stream.currentTime = 0.3;
-  await testSound.play();
-  expect(stream.preservesPitch).toBe(false);
-  expect(stream.playbackRate).toBeCloseTo(0.9);
-  expect(stream.currentTime).toBe(0);
-  await testSound.play();
-  expect(stream.playbackRate).toBeCloseTo(1.1);
-  expect(random).toHaveBeenCalledTimes(2);
-});
-
-test('thrust keeps a stable pitch during volume updates and rerolls on restart', async () => {
-  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
-  const stream = loop.streams[0];
-  assert.ok(stream);
-  stream.play = mockPlay;
+test('thrust volume updates preserve one loop and its pitch across loop boundaries', async () => {
+  const sound = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
+  setSound(true);
+  await settle();
   const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
-  await loop.play();
-  loop.setVolumeScale(0.4);
-  expect(stream.playbackRate).toBeCloseTo(0.95);
+  await sound.play();
+  howl().end(1);
+  await sound.play(0.4);
+  expect(howl().play).toHaveBeenCalledTimes(1);
+  expect(howl().voices.get(1)?.volume).toBeCloseTo(0.02);
+  expect(howl().voices.get(1)?.rate).toBeCloseTo(0.95);
   expect(random).toHaveBeenCalledTimes(1);
-  loop.stop();
-  await loop.play();
-  expect(stream.playbackRate).toBeCloseTo(1.05);
+  sound.stop();
+  sound.stop();
+  expect(howl().stop).toHaveBeenCalledTimes(1);
+  await sound.play();
+  expect(howl().voices.get(2)?.rate).toBeCloseTo(1.05);
 });
 
-test('thrust updates do not restart a loop while browser playback is pending', async () => {
-  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
-  const stream = loop.streams[0];
-  assert.ok(stream);
+test('unloaded and interrupted shots are dropped without replay or hot-loop resumes', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  howl().loaded = false;
+  await sound.play();
+  howl().loaded = true;
+  expect(howl().play).not.toHaveBeenCalled();
+  await sound.play();
+  context().changeState('interrupted');
+  expect(sound.isPlaying()).toBe(false);
+  for (let frame = 0; frame < 60; frame++) {
+    await sound.play();
+  }
+  expect(context().resume).toHaveBeenCalledTimes(1);
+  expect(howl().play).toHaveBeenCalledTimes(1);
+  document.dispatchEvent(new Event('pointerdown'));
+  await settle();
+  expect(context().resume).toHaveBeenCalledTimes(2);
+  expect(howl().play).toHaveBeenCalledTimes(1);
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(2);
+});
+
+test('muting before lazy initialization completes prevents sample loads', async () => {
+  new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  setSound(false);
+  await settle();
+  expect(FakeHowl.instances).toHaveLength(0);
+  expect(context().state).toBe('suspended');
+  expect(globalAudio.mute).toHaveBeenLastCalledWith(true);
+});
+
+test('late load completion after mute never replays old cues', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  howl().loaded = false;
+  await sound.play();
+  setSound(false);
+  howl().loaded = true;
+  howl().options.onload?.(0);
+  await settle();
+  expect(howl().play).not.toHaveBeenCalled();
+  expect(context().state).toBe('suspended');
+});
+
+test('a pending resume that finishes after mute is suspended again', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  context().changeState('interrupted');
   let finish = () => {};
-  stream.play = vi.fn(
+  context().resume.mockImplementationOnce(
     () =>
       new Promise<void>((resolve) => {
-        finish = resolve;
+        finish = () => {
+          context().changeState('running');
+          resolve();
+        };
       })
   );
-  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
-  const starting = loop.play();
-  await loop.play(0.5);
-  expect(stream.play).toHaveBeenCalledTimes(1);
-  expect(random).toHaveBeenCalledTimes(1);
-  expect(stream.volume).toBeCloseTo(0.025);
-  finish();
-  await starting;
-});
-
-test('a stopped pending thrust cannot suppress its restart or overwrite the new attempt', async () => {
-  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
-  const stream = loop.streams[0];
-  assert.ok(stream);
-  let finishFirst = () => {};
-  let finishSecond = () => {};
-  stream.play = vi
-    .fn()
-    .mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishFirst = resolve;
-        })
-    )
-    .mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishSecond = resolve;
-        })
-    );
-  const first = loop.play();
+  activateAudio();
   setSound(false);
-  finishFirst();
-  await first;
-  expect(loop.playing).toBe(false);
-  setSound(true);
-  const second = loop.play();
-  await loop.play(0.5);
-  expect(stream.play).toHaveBeenCalledTimes(2);
-  finishSecond();
-  await second;
+  await settle();
+  finish();
+  await settle();
+  expect(context().state).toBe('suspended');
+  await sound.play();
+  expect(howl().play).not.toHaveBeenCalled();
 });
 
-test('restarting thrust before an old play settles keeps the new pending guard', async () => {
-  const loop = new Sound('sounds/thrust.m4a', 1, 0.05, { loop: true });
-  const stream = loop.streams[0];
-  assert.ok(stream);
-  let finishFirst = () => {};
-  let finishSecond = () => {};
-  stream.play = vi
-    .fn()
-    .mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishFirst = resolve;
-        })
-    )
-    .mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishSecond = resolve;
-        })
-    );
-  const first = loop.play();
-  loop.stop();
-  const second = loop.play();
-  finishFirst();
-  await first;
-  expect(loop.playing).toBe(false);
-  await loop.play(0.5);
-  expect(stream.play).toHaveBeenCalledTimes(2);
-  finishSecond();
-  await second;
+test('hiding the page stops sources and foreground resumes without replaying cues', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  await sound.play();
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  expect(sound.isPlaying()).toBe(false);
+  expect(context().state).toBe('suspended');
+  hidden.mockReturnValue(false);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  expect(context().state).toBe('running');
+  expect(howl().play).toHaveBeenCalledTimes(1);
+});
+
+test('mute stops every active voice once and repeated muted frames do no native work', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  await sound.play();
+  await sound.play();
+  setSound(false);
+  await settle();
+  expect(howl().stop).toHaveBeenCalledTimes(2);
+  expect(localStorage.getItem('soundOn')).toBe('false');
+  for (let frame = 0; frame < 60; frame++) {
+    sound.stop();
+    await sound.play();
+  }
+  expect(howl().stop).toHaveBeenCalledTimes(2);
+  expect(context().suspend).toHaveBeenCalledTimes(1);
+});
+
+test('a Howler transport fallback never starts HTML media playback', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  howl()._webAudio = false;
+  await sound.play();
+  expect(howl().play).not.toHaveBeenCalled();
 });

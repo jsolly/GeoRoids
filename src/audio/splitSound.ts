@@ -1,41 +1,24 @@
 import type { Position } from '../../shared-types';
 import { soundIsOn } from '../constants/user-preferences';
+import { getRunningAudioContext, registerSoundStopHook } from './audioRuntime';
 import { playExplosionSound } from './explosionSound';
 import { randomPlaybackRate } from './pitch';
-import { registerSoundStopHook } from './Sound';
 import { planBoundPlayback } from './spatialAudio';
 
-type WebAudioWindow = Window & {
-  AudioContext?: typeof AudioContext;
-  webkitAudioContext?: typeof AudioContext;
-};
-
-let sharedContext: AudioContext | null = null;
-const activeMasters = new Set<GainNode>();
+const MAX_SPLIT_VOICES = 4;
+const activeSources = new Map<GainNode, AudioScheduledSourceNode[]>();
 registerSoundStopHook(() => {
-  for (const master of activeMasters) {
+  for (const [master, sources] of activeSources) {
+    for (const source of sources) {
+      source.stop();
+    }
     master.disconnect();
   }
-  activeMasters.clear();
+  activeSources.clear();
 });
 
-function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const view = window as WebAudioWindow;
-  const Ctor = view.AudioContext ?? view.webkitAudioContext;
-  if (!Ctor) {
-    return null;
-  }
-  if (!sharedContext) {
-    sharedContext = new Ctor();
-  }
-  return sharedContext;
-}
-
 function startTone(
-  ctx: AudioContext,
+  ctx: BaseAudioContext,
   destination: GainNode,
   options: {
     type: OscillatorType;
@@ -68,8 +51,11 @@ function startTone(
  * Phosphor crack + descending split whoosh. Layered on the existing explosion
  * so the collab break still reads as an impact.
  */
-export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext()): boolean {
-  if (!ctx || !(volumeScale > 0)) {
+export function synthesizeSplitCrack(
+  volumeScale: number,
+  ctx: BaseAudioContext | null = getRunningAudioContext()
+): boolean {
+  if (!ctx || !(volumeScale > 0) || activeSources.size >= MAX_SPLIT_VOICES) {
     return false;
   }
 
@@ -78,7 +64,6 @@ export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext(
   const master = ctx.createGain();
   master.gain.value = 0.22 * volumeScale;
   master.connect(ctx.destination);
-  activeMasters.add(master);
 
   const noiseDuration = 0.055;
   const noiseBuffer = ctx.createBuffer(
@@ -104,7 +89,7 @@ export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext(
   noiseGain.connect(master);
   noise.start(now);
 
-  startTone(ctx, master, {
+  const crack = startTone(ctx, master, {
     type: 'sawtooth',
     startHz: 880 * pitch,
     endHz: 220 * pitch,
@@ -121,11 +106,13 @@ export function synthesizeSplitCrack(volumeScale: number, ctx = getAudioContext(
     peak: 0.55,
   });
 
+  activeSources.set(master, [noise, crack, tail]);
+
   tail.addEventListener(
     'ended',
     () => {
       master.disconnect();
-      activeMasters.delete(master);
+      activeSources.delete(master);
     },
     { once: true }
   );

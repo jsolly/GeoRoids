@@ -111,7 +111,9 @@ function applyThrustPlayback(): void {
   }
 
   if (!soundIsOn() || bestScale <= 0) {
-    fxThrust.stop();
+    if (fxThrust.isPlaying()) {
+      fxThrust.stop();
+    }
     return;
   }
 

@@ -1,15 +1,88 @@
 import { readdirSync, writeFileSync } from 'node:fs';
+import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 import { installAudioProbe } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
+import {
+  canvasPoint,
+  centerOf,
+  dispatchTouch,
+  readTouchControlState,
+} from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+
+async function holdInput(page: Page, mobile: boolean, input: 'thrust' | 'fire') {
+  if (!mobile) {
+    const key = input === 'thrust' ? 'ArrowUp' : 'Space';
+    await page.keyboard.down(key);
+    return () => page.keyboard.up(key);
+  }
+  const session = await page.context().newCDPSession(page);
+  const center = await centerOf(page, '#gameCanvas');
+  const point =
+    input === 'thrust' ? { x: center.x + 40, y: center.y } : await canvasPoint(page, 0.75, 0.5);
+  await dispatchTouch(session, 'touchStart', [{ ...point, id: 1 }]);
+  return async () => {
+    await dispatchTouch(session, 'touchEnd', []);
+    await session.detach();
+  };
+}
 
 for (const viewport of [
   { name: 'desktop', width: 1280, height: 900 },
   { name: 'mobile', width: 390, height: 844 },
 ]) {
+  test(`${viewport.name} muted pilot steers and fires without initializing audio`, async () => {
+    const page = await browserManager.recreatePage({ hasTouch: viewport.name === 'mobile' });
+    await page.setViewportSize(viewport);
+    await installAudioProbe(page, false);
+    const requests: string[] = [];
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.endsWith('.m4a')) {
+        requests.push(request.url());
+      }
+    });
+    const game = new GameInteractions(page);
+    await game.bootGame();
+    const beforeInput = await readTouchControlState(page);
+    if (viewport.name === 'mobile') {
+      const session = await page.context().newCDPSession(page);
+      try {
+        const steer = await centerOf(page, '#gameCanvas');
+        const fire = await canvasPoint(page, 0.75, 0.5);
+        await dispatchTouch(session, 'touchStart', [
+          { x: steer.x + 40, y: steer.y, id: 1 },
+          { ...fire, id: 2 },
+        ]);
+        await page.waitForTimeout(1200);
+        const duringInput = await readTouchControlState(page);
+        expect(duringInput.thrusting).toBe(true);
+        expect(duringInput.lastShotTime).toBeGreaterThan(beforeInput.lastShotTime);
+      } finally {
+        await dispatchTouch(session, 'touchCancel', []);
+        await session.detach();
+      }
+    } else {
+      await page.keyboard.down('ArrowUp');
+      await page.keyboard.down('Space');
+      await page.waitForTimeout(1200);
+      const duringInput = await readTouchControlState(page);
+      expect(duringInput.thrusting).toBe(true);
+      expect(duringInput.lastShotTime).toBeGreaterThan(beforeInput.lastShotTime);
+      await page.keyboard.up('Space');
+      await page.keyboard.up('ArrowUp');
+    }
+    const state = await page.evaluate(() => ({
+      contexts: document.documentElement.dataset['audioContexts'],
+      media: document.documentElement.dataset['audioMedia'],
+      events: document.documentElement.dataset['audioEvents'],
+    }));
+    expect(state).toEqual({ contexts: '0', media: '0', events: '[]' });
+    expect(requests).toEqual([]);
+  }, 60000);
+
   test(`${viewport.name} pilot hears varied shots and thrust, then mutes every cue`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.name === 'mobile' });
     await page.setViewportSize(viewport);
@@ -27,88 +100,104 @@ for (const viewport of [
     await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame();
-    for (let shot = 0; shot < 3; shot++) {
-      await page.keyboard.press('Space');
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['audioContexts']))
+      .toBe('1');
+    const assets = readdirSync('public/sounds').filter((name) => name.endsWith('.m4a'));
+    await expect
+      .poll(() => page.evaluate(() => Number(document.documentElement.dataset['decodedAudio'])))
+      .toBe(assets.length);
+    for (let shot = 0; shot < 4; shot++) {
+      const release = await holdInput(page, viewport.name === 'mobile', 'fire');
+      await page.waitForTimeout(100);
+      await release();
       await page.waitForTimeout(500);
     }
+    const releaseThrust = await holdInput(page, viewport.name === 'mobile', 'thrust');
     await expect
-      .poll(async () =>
+      .poll(() =>
         page.evaluate(() => {
           const events = JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]');
-          return events.filter((event: { src: string }) => event.src.endsWith('/laser.m4a')).length;
-        })
-      )
-      .toBeGreaterThanOrEqual(3);
-    await page.keyboard.up('Space');
-    await page.keyboard.down('ArrowUp');
-    await expect
-      .poll(async () =>
-        page.evaluate(() => {
-          return (document.documentElement.dataset['audioEvents'] ?? '').includes('/thrust.m4a');
+          return events.some((event: { loop: boolean }) => event.loop);
         })
       )
       .toBe(true);
-    await page.keyboard.up('ArrowUp');
-    const events: Array<{ src: string; rate: number; preservesPitch: boolean }> =
+    await releaseThrust();
+    const events: Array<{ duration: number; rate: number; loop: boolean; bufferId: number }> =
       await page.evaluate(() =>
         JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
       );
-    for (const event of events) {
-      expect(event.rate).toBeGreaterThanOrEqual(0.9);
-      expect(event.rate).toBeLessThanOrEqual(1.1);
-      expect(event.preservesPitch).toBe(false);
-    }
-    expect(
-      new Set(events.filter((event) => event.src.endsWith('/laser.m4a')).map((event) => event.rate))
-        .size
-    ).toBeGreaterThan(1);
+    expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe('1');
 
     // Decode every shipped sample with the real browser's codec, not a media mock.
-    const assets = readdirSync('public/sounds').filter((name) => name.endsWith('.m4a'));
     const decoded = await page.evaluate(async (names) => {
-      const context = new AudioContext();
-      try {
-        return await Promise.all(
-          names.map(async (name) => {
-            const response = await fetch(`/sounds/${name}`);
-            if (!response.ok) {
-              throw new Error(`Missing sound ${name}`);
-            }
-            const buffer = await context.decodeAudioData(await response.arrayBuffer());
-            return {
-              name,
-              duration: buffer.duration,
-              peak: buffer
-                .getChannelData(0)
-                .reduce((peak, value) => Math.max(peak, Math.abs(value)), 0),
-            };
-          })
-        );
-      } finally {
-        await context.close();
-      }
+      const context = new OfflineAudioContext(1, 1, 48000);
+      return await Promise.all(
+        names.map(async (name) => {
+          const response = await fetch(`/sounds/${name}`);
+          if (!response.ok) {
+            throw new Error(`Missing sound ${name}`);
+          }
+          const buffer = await context.decodeAudioData(await response.arrayBuffer());
+          return {
+            name,
+            duration: buffer.duration,
+            peak: buffer
+              .getChannelData(0)
+              .reduce((peak, value) => Math.max(peak, Math.abs(value)), 0),
+          };
+        })
+      );
     }, assets);
     for (const sample of decoded) {
       expect(sample.duration).toBeGreaterThan(0);
       expect(sample.peak).toBeGreaterThan(0);
     }
+    const laserDuration = decoded.find((sample) => sample.name === 'laser.m4a')?.duration;
+    expect(laserDuration).toBeDefined();
+    const lasers = events.filter(
+      (event) => Math.abs(event.duration - (laserDuration ?? 0)) < 0.002
+    );
+    expect(lasers.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(lasers.map((event) => event.bufferId)).size).toBe(1);
+    for (const laser of lasers) {
+      expect(laser.rate).toBeGreaterThanOrEqual(0.8999);
+      expect(laser.rate).toBeLessThanOrEqual(1.1001);
+    }
+    expect(new Set(lasers.map((event) => event.rate)).size).toBeGreaterThan(1);
+    // Mute while native sample and synthesized sources are still active.
+    const releaseMutedThrust = await holdInput(page, viewport.name === 'mobile', 'thrust');
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['activeAudioLoop']))
+      .toBe('true');
+    await page.evaluate(`(async () => {
+      const { synthesizeSplitCrack } = await import('/src/audio/splitSound.ts');
+      if (!synthesizeSplitCrack(1)) throw new Error('Live split synthesis unavailable');
+    })()`);
+    expect(await page.evaluate(() => document.documentElement.dataset['audioContexts'])).toBe('1');
     // The title-screen checkbox is hidden during play; exercise its real change handler.
-    await page.locator('#soundPref').evaluate((input) => {
+    const immediatelyAfterMute = await page.locator('#soundPref').evaluate((input) => {
       if (!(input instanceof HTMLInputElement)) {
         throw new Error('Sound preference checkbox missing');
       }
       input.checked = false;
       input.dispatchEvent(new Event('change', { bubbles: true }));
+      return document.documentElement.dataset['activeAudio'];
     });
+    expect(immediatelyAfterMute).toBe('0');
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset['activeAudio']))
       .toBe('0');
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
+      .toBe('suspended');
+    await releaseMutedThrust();
     const countAfterMute = await page.evaluate(
       () => document.documentElement.dataset['audioEvents']
     );
-    await page.keyboard.down('Space');
+    const releaseMutedFire = await holdInput(page, viewport.name === 'mobile', 'fire');
     await page.waitForTimeout(500);
-    await page.keyboard.up('Space');
+    await releaseMutedFire();
     expect(await page.evaluate(() => document.documentElement.dataset['audioEvents'])).toBe(
       countAfterMute
     );
@@ -175,5 +264,6 @@ for (const viewport of [
       JSON.stringify({ events, decoded, splits, mutedSplitPeak, errors, warnings }, null, 2)
     );
     expect(errors).toEqual([]);
+    expect(warnings).toEqual([]);
   }, 60000);
 }

@@ -34,11 +34,33 @@ original synthesized crack and descending tones.
 ## Playback
 
 Every sample trigger uses a fresh random playback rate in the range 0.9–1.1.
-Pitch preservation is disabled so changing the rate changes the audible pitch.
+Web Audio playback rate changes the audible pitch as well as duration.
 Thrust picks its pitch when the loop starts and keeps it while held. Volume
 updates do not restart or retune a running loop. Split synthesis applies the
 same range to its tone frequencies and noise playback rate.
 
-World cues use the existing viewport and distance attenuation. Sound-off stops
-all registered sample streams and prevents new cues. Pools bound simultaneous
-voices; reusing a voice restarts its sample at the beginning.
+World cues retain viewport culling and distance attenuation. Sound-off stops
+active effects and prevents new cues. Each effect retains its configured
+simultaneous-voice limit; finished voices release their resources.
+
+## Mobile audio lifecycle
+
+Short effects use shared Web Audio rather than pools of HTML media elements.
+The audio backend initializes only after an enabled user interaction. Entering
+with Sound off does not create audio resources or request sound files. The
+backend loads and decodes samples once for reuse; firing does not fetch or decode
+another copy. Cues that occur before an asset is ready are skipped, not replayed
+later in a burst. Audio failures must not block simulation or networking.
+
+One realtime audio context serves sample effects and the synthesized split cue.
+Loop volume changes preserve the playing source and pitch. Muting stops active
+sources and suspends audio work; delayed loads or resumes cannot undo a mute.
+Tab visibility and mobile interruptions are lifecycle events rather than work
+repeated by the simulation loop.
+
+These choices follow [MDN's short-sample guidance](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices)
+and [shared-context recommendation](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext).
+Decoded [buffers can be reused across inexpensive playback nodes](https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode).
+Mobile testing includes [interrupted context states](https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state),
+muted starts, repeated firing, enable/mute transitions, and returning from another
+app. Desktop mobile emulation is not evidence of physical-phone frame pacing.

@@ -16,7 +16,8 @@ media: []
 
 Before entering a game, set your pilot name, choose a kit, and use the Sound
 checkbox on the title screen to enable or mute audio. Muting stops sounds already
-playing too.
+playing too. Starting with Sound off skips loading sound files. When you enable
+audio, effects become available as they load; missed sounds do not play later.
 
 Shots, impacts, explosions, and thrust vary their pitch slightly each time they
 start, keeping repeated actions from sounding identical. A held thrust keeps a

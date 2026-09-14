@@ -1,3 +1,4 @@
+import { activateAudio } from '../audio/audioRuntime';
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
 import { initTitleTerrain } from '../rendering/titleTerrain';
@@ -122,6 +123,7 @@ async function startGameWithName(): Promise<void> {
   if (startingGame) {
     return;
   }
+  activateAudio();
   let playerName = '';
 
   logger.debug('UI', 'startGameWithName called');

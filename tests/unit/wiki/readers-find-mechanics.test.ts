@@ -7,14 +7,14 @@ import { searchArticles } from '../../../src/wiki/search';
 
 describe('readers find mechanics in the field manual', () => {
   it('finds rules in article bodies even when they are absent from the title', () => {
-    const results = searchArticles(articles, 'fuel');
-    expect(results.some((article) => article.id === 'quake')).toBe(true);
+    const results = searchArticles(articles, 'minerals');
+    expect(results.some((article) => article.id === 'surveyor')).toBe(true);
   });
 
   it.each([
-    ['Dart', 'dart'],
+    ['Surveyor', 'surveyor'],
     ['Systems', 'hud-network'],
-    ['balanced', 'dart'],
+    ['nimble', 'surveyor'],
     ['materials', 'asteroids'],
   ])('finds %s in the published reference', (query, id) => {
     expect(searchArticles(articles, query).some((article) => article.id === id)).toBe(true);

@@ -183,7 +183,14 @@ describe('server-authoritative combat', () => {
       undefined,
       'hauler'
     );
-    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, undefined, 'dart');
+    engine.addPlayer(
+      'pilot',
+      'Pilot',
+      new RecordingSocket(),
+      { x: 39, y: 0 },
+      undefined,
+      'surveyor'
+    );
     clearProtection(engine, 'hauler');
     clearProtection(engine, 'pilot');
     clearAsteroidField(engine);
@@ -357,20 +364,20 @@ describe('server-authoritative combat', () => {
     join(wsCore, alphaWs, {
       id: 'alpha',
       name: 'Alpha',
-      kitId: 'dart',
+      kitId: 'surveyor',
       position: { x: 0, y: 0 },
     });
     join(wsCore, betaWs, {
       id: 'beta',
       name: 'Beta',
-      kitId: 'dart',
+      kitId: 'surveyor',
       position: { x: 100, y: 0 },
     });
 
     const alpha = engine.getPlayer('alpha');
     const beta = engine.getPlayer('beta');
-    expect(alpha?.kitId).toBe('dart');
-    expect(beta?.kitId).toBe('dart');
+    expect(alpha?.kitId).toBe('surveyor');
+    expect(beta?.kitId).toBe('surveyor');
 
     wsCore.handleClientMessage(
       { type: 'update', id: 'beta', data: { position: { x: 999, y: 999 } } },
@@ -400,12 +407,12 @@ describe('server-authoritative combat', () => {
       {
         type: 'useAbility',
         id: 'alpha',
-        data: { kitId: 'quake', abilityId: 'shockPulse' },
+        data: { kitId: 'surveyor', abilityId: 'surveyScan' },
       },
       unjoinedWs
     );
-    expect(engine.getPlayer('beta')?.kitId).toBe('dart');
-    expect(engine.getPlayer('alpha')?.kitId).toBe('dart');
+    expect(engine.getPlayer('beta')?.kitId).toBe('surveyor');
+    expect(engine.getPlayer('alpha')?.kitId).toBe('surveyor');
   });
 
   test('shoot reports bind to the socket before creating a server laser', () => {

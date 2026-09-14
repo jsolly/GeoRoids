@@ -1,16 +1,11 @@
 import type { ShipKitId } from '../../../shared-types';
 import { GAME, SHIP } from '../../constants';
 
-export type { ShipKitId };
+export const SHIP_KIT_IDS = ['surveyor', 'hauler'] as const;
 
-export const SHIP_KIT_IDS = ['dart', 'hauler', 'warden', 'skirmisher', 'quake'] as const;
+export const DEFAULT_SHIP_KIT_ID: ShipKitId = 'surveyor';
 
-export const DEFAULT_SHIP_KIT_ID: ShipKitId = 'dart';
-
-/** Ability flavor — geo is optional spice, not a kit requirement. */
-type ShipAbilityFlavor = 'combat' | 'utility' | 'geo';
-
-export type ShipAbilityId = 'boostDash' | 'harpoon' | 'shieldFocus' | 'ringFire' | 'shockPulse';
+export type ShipAbilityId = 'surveyScan' | 'harpoon';
 
 export interface HullProfile {
   nose: number;
@@ -24,7 +19,6 @@ interface ShipKit {
   abilityId: ShipAbilityId;
   abilityName: string;
   abilityHint: string;
-  flavor: ShipAbilityFlavor;
   maxHealth: number;
   size: number;
   thrust: number;
@@ -40,38 +34,12 @@ export const CLASSIC_HULL: HullProfile = {
   beam: 0.5,
 };
 
-export const KIT_HULLS_ARE_PLACEHOLDERS = false;
-
-/**
- * John lock 2026-09-06 via Game Director. Bake against v2 sheets only
- * (`ship-silhouettes-contact-v2` / `ship-silhouettes-play-scale-v2`).
- */
-export const AD_V2_HULL_BAKE_LOCKED = true;
-
-export const AD_V2_HULL_TOPOLOGY = {
-  dart: 'needle',
+export const SHIP_HULL_TOPOLOGY = {
+  surveyor: 'needle',
   hauler: 'barge-hex',
-  warden: 'delta-shield-arc',
-  skirmisher: 'y-fork',
-  quake: 'terraced-mountain',
 } as const;
 
-/** Sheet notes for the bake after lock. Not consumed by the renderer. */
-export const AD_V2_HULL_SHEET = {
-  stroke: '#5EEAD4',
-  background: '#000011',
-  playScalePx: 32,
-  packDir: 'georoids-art/ships-v2',
-  sheets: ['ship-silhouettes-contact-v2', 'ship-silhouettes-play-scale-v2'],
-  topology: AD_V2_HULL_TOPOLOGY,
-  notes: {
-    dart: 'needle — tall thin isosceles, inverted-V notch at aft',
-    hauler: 'barge hex — wide low polygon, flat keel, faceted bow',
-    warden: 'delta + detached forward shield arc above the apex',
-    skirmisher: 'Y-fork — two forward prongs, notched aft',
-    quake: 'terraced mountain — triangular peak, cross ledges, narrow rear stem',
-  },
-} as const;
+export const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;
 
 /** Hauler cable. Game Director PASS: cream line, not a faction/hull stroke. */
 export const HAULER_TETHER_COLOR = '#E8D5A3';
@@ -79,7 +47,6 @@ export const HAULER_TETHER_COLOR = '#E8D5A3';
 export const HAULER_TETHER_TIP_COLOR = '#FDE68A';
 
 export const SHIP_ABILITY = {
-  DASH_BOOST: 1.5 * GAME.MOTION_SCALE,
   HARPOON_RANGE: 280,
   /** Fallback "nearby" disk when the canvas size is unknown. */
   HARPOON_VISUAL_PX: 720,
@@ -99,34 +66,27 @@ export const SHIP_ABILITY = {
   HARPOON_REEL_ACCELERATION: 1.2 * GAME.MOTION_SCALE,
   HARPOON_RELEASE_GAP: 16,
   HARPOON_SLACK: 1.25,
-  /** Warden's projected E shield duration. F uses the longer regular bubble. */
-  SHIELD_PROJECTION_FRAMES: 180,
-  SHIELD_PROJECTION_RANGE: 600,
-  SHOCK_RADIUS: 420,
-  SHOCK_FORCE: 24 * GAME.MOTION_SCALE,
-  SHOCK_EDGE_FORCE_RATIO: 0.5,
+  SCAN_RANGE: 1200,
+  SCAN_FRAMES: 6 * GAME.FPS,
+  ASTEROID_DAMAGE_MULTIPLIER: 2,
   COOLDOWN_FRAMES: {
-    dart: 90,
+    surveyor: 10 * GAME.FPS,
     hauler: 180,
-    warden: 150,
-    skirmisher: 150,
-    quake: 180,
   },
 } as const;
 
 const KITS: Record<ShipKitId, ShipKit> = {
-  dart: {
-    id: 'dart',
-    name: 'Dart',
-    abilityId: 'boostDash',
-    abilityName: 'Boost dash',
-    abilityHint: 'Short burst of speed',
-    flavor: 'combat',
+  surveyor: {
+    id: 'surveyor',
+    name: 'Surveyor',
+    abilityId: 'surveyScan',
+    abilityName: 'Mineral scan',
+    abilityHint: 'Nimble flight and mineral scanning',
     maxHealth: SHIP.MAX_HEALTH,
     size: SHIP.SIZE,
     thrust: SHIP.THRUST,
     maxVelocity: SHIP.MAX_VELOCITY,
-    turnSpeed: SHIP.TURN_SPEED,
+    turnSpeed: 540,
     shotCooldown: 250,
   },
   hauler: {
@@ -134,56 +94,13 @@ const KITS: Record<ShipKitId, ShipKit> = {
     name: 'Hauler',
     abilityId: 'harpoon',
     abilityName: 'Harpoon',
-    abilityHint: 'Sling a rock at an enemy or haul a hostile ship',
-    flavor: 'utility',
+    abilityHint: 'Tow, throw, and mine asteroids',
     maxHealth: 140,
     size: 38,
     thrust: 4.5 * GAME.MOTION_SCALE,
     maxVelocity: 1.75 * GAME.MOTION_SCALE,
     turnSpeed: 380,
     shotCooldown: 280,
-  },
-  warden: {
-    id: 'warden',
-    name: 'Warden',
-    abilityId: 'shieldFocus',
-    abilityName: 'Shield',
-    abilityHint: 'Project a shield onto a nearby ally',
-    flavor: 'combat',
-    maxHealth: 120,
-    size: 32,
-    thrust: SHIP.THRUST,
-    maxVelocity: 1.75 * GAME.MOTION_SCALE,
-    turnSpeed: SHIP.TURN_SPEED,
-    shotCooldown: 260,
-  },
-  skirmisher: {
-    id: 'skirmisher',
-    name: 'Skirmisher',
-    abilityId: 'ringFire',
-    abilityName: 'Ring fire',
-    abilityHint: 'Fire a full ring of bullets outward',
-    flavor: 'combat',
-    maxHealth: 80,
-    size: 28,
-    thrust: 5.4 * GAME.MOTION_SCALE,
-    maxVelocity: 2.125 * GAME.MOTION_SCALE,
-    turnSpeed: 540,
-    shotCooldown: 200,
-  },
-  quake: {
-    id: 'quake',
-    name: 'Quake',
-    abilityId: 'shockPulse',
-    abilityName: 'Shock pulse',
-    abilityHint: 'Blast everything nearby violently outward',
-    flavor: 'geo',
-    maxHealth: 110,
-    size: 34,
-    thrust: SHIP.THRUST,
-    maxVelocity: SHIP.MAX_VELOCITY,
-    turnSpeed: SHIP.TURN_SPEED,
-    shotCooldown: 270,
   },
 };
 

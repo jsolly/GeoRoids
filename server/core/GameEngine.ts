@@ -11,7 +11,6 @@ import {
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
 import { asteroidRamDamage, shipShipTickDamage } from '../../shared/combat';
 import { calculateHealthRegenDelayFrames } from '../../shared/constants/health';
-import { applyFuelPickup, ensureFuelTank, isFuelLoot } from '../../shared/fuel';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
@@ -42,19 +41,17 @@ import type {
 import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
-import { applyQuakeImpulse } from '../../src/entities/ship/quakeImpulse';
 import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import {
   type CombatDamageSource,
-  isReadableShieldUp,
+  isShieldBlockingLasers,
   laserCollisionRadius,
-  noteReadableShieldLaserHit,
+  noteShieldLaserHit,
   requestShield,
   resolveCombatDamageSource,
   shieldSnapshot,
 } from '../../src/entities/ship/shipShield';
-import { createSkirmisherRingShots } from '../../src/entities/ship/skirmisherRing';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/physics/shockwave';
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
@@ -79,11 +76,11 @@ import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 
 interface ServerLaser {
-  abilityShot?: boolean;
   id: string;
   ownerId: string;
   /** Firing allegiance survives owner departure; never serialized to clients. */
   readonly ownerFaction?: SoftFactionId;
+  readonly miningDamage: number;
   position: Position;
   prevPosition: Position;
   velocity: Velocity;
@@ -594,7 +591,7 @@ export class GameEngine {
       .map((laser) => ({
         id: laser.id,
         ownerId: laser.ownerId,
-        ...(laser.abilityShot ? { abilityShot: true } : {}),
+
         position: { ...laser.position },
         prevPosition: { ...laser.prevPosition },
         velocity: { ...laser.velocity },
@@ -607,7 +604,6 @@ export class GameEngine {
   public drainShotSounds(): PlayerShotFired[] {
     return this.pendingShotSounds
       .splice(0)
-      .filter(({ laser }) => !laser.abilityShot)
       .map(({ laser, position }) => ({ id: laser.id, ownerId: laser.ownerId, position }));
   }
 
@@ -835,7 +831,7 @@ export class GameEngine {
     if (!entity || entity.exploding || entity.health <= 0 || entity.respawnTimer !== undefined) {
       return false;
     }
-    const changed = requestShield(entity, active, entity.exploding, entity.kitId);
+    const changed = requestShield(entity, active, entity.exploding);
     if (changed) {
       entity.lastUpdate = this.getServerTime();
     }
@@ -1112,23 +1108,29 @@ export class GameEngine {
     this.entityManager.scheduleShipRespawn(entity);
   }
 
+  private miningDamage(playerId: string): number {
+    const kitId = this.entityManager.getEntity(playerId)?.kitId;
+    return DAMAGE.LASER_HIT * (kitId === 'hauler' ? SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER : 1);
+  }
+
   public handleAsteroidHit(
     asteroidId: string,
     playerId: string,
     cause: AsteroidHitCause = 'laser',
-    now = this.getServerTime()
+    now = this.getServerTime(),
+    miningDamage = this.miningDamage(playerId)
   ): AsteroidHitOutcome {
     const target = this.getAsteroid(asteroidId);
     const coreSource = target?.phenomenon?.kind === 'reflective';
     const result =
       cause === 'collision'
         ? this.asteroidManager.destroyFromCollision(asteroidId)
-        : this.asteroidManager.registerLaserHit(asteroidId, playerId, now);
+        : this.asteroidManager.registerLaserHit(asteroidId, playerId, now, miningDamage);
 
     if (result.outcome === 'destroyed' && result.destroyed) {
       this.awardPoints(playerId, pointsForRoidSize(result.destroyed.size));
       this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
-      this.maybeDropFuel(result.destroyed);
+
       if (coreSource) {
         this.lootManager.spawnLaserCore(result.destroyed.position, this.gameTime);
       }
@@ -1142,7 +1144,8 @@ export class GameEngine {
     asteroidId: string,
     playerId: string,
     cause: AsteroidHitCause = 'laser',
-    now = this.getServerTime()
+    now = this.getServerTime(),
+    miningDamage = this.miningDamage(playerId)
   ): AppliedAsteroidHit {
     const empty: AppliedAsteroidHit = {
       applied: false,
@@ -1159,7 +1162,7 @@ export class GameEngine {
       return empty;
     }
 
-    const result = this.handleAsteroidHit(asteroidId, playerId, cause, now);
+    const result = this.handleAsteroidHit(asteroidId, playerId, cause, now, miningDamage);
     if (result.outcome === 'missing' || result.outcome === 'ignored') {
       return { ...empty, outcome: result.outcome };
     }
@@ -1186,7 +1189,7 @@ export class GameEngine {
     for (const item of expired) {
       this.awardPoints(item.playerId, item.points);
       this.dropShardAt(item.destroyed.position, asteroidShardMass(item.destroyed.material));
-      this.maybeDropFuel(item.destroyed);
+
       this.resolvedCollabHits.push(item);
     }
     return expired;
@@ -1234,7 +1237,7 @@ export class GameEngine {
       return null;
     }
     const kit = getShipKit(shooter.kitId);
-    // Only server-granted knockback or an active Dart dash expands the normal envelope.
+    // Only server-granted knockback expands the normal envelope.
     const maxShipSpeed = this.playerMotion.legalSpeed(shooter, now);
     const maxLaserSpeed = maxShipSpeed + LASER.SPEED / GAME.FPS;
     const muzzleRadius = (4 / 3) * Math.max(kit.size / 2, radiusFromMass(shooter.mass));
@@ -1250,8 +1253,7 @@ export class GameEngine {
     ) {
       return null;
     }
-    // Sustained regular-fire rate follows the kit cooldown. The Skirmisher E ring
-    // is spawned by the authoritative ability path and never uses this bucket.
+    // Sustained fire follows the kit cooldown.
     const previous = this.humanShootBudgets.get(shooter);
     const rate = 1 / kit.shotCooldown;
     const available = previous
@@ -1288,6 +1290,7 @@ export class GameEngine {
     const laser: ServerLaser = {
       id: `server-laser-${this.laserNonce}-${ownerId}-${this.laserSeq}`,
       ownerId,
+      miningDamage: this.miningDamage(ownerId),
       ...(owner?.factionId !== undefined ? { ownerFaction: owner.factionId } : {}),
       position: { x: position.x, y: position.y },
       prevPosition: { x: position.x, y: position.y },
@@ -1404,7 +1407,7 @@ export class GameEngine {
           entity.health <= 0 ||
           entity.exploding ||
           entity.respawnTimer !== undefined ||
-          !isReadableShieldUp(entity)
+          !isShieldBlockingLasers(entity)
         ) {
           return false;
         }
@@ -1568,7 +1571,7 @@ export class GameEngine {
         }
         const shieldedEntity = this.entityManager.getEntity(shieldImpact.shieldId);
         if (shieldedEntity) {
-          noteReadableShieldLaserHit(shieldedEntity);
+          noteShieldLaserHit(shieldedEntity);
         }
         laser.position = { ...shieldImpact.point };
         laser.velocity = reflectProjectileVelocity(laser.velocity, shieldImpact.normal);
@@ -1657,7 +1660,7 @@ export class GameEngine {
       }
       laser.hasExploded = true;
       if (rock.isCollabTarget) {
-        const result = this.handleAsteroidDamage(rock.id, laser.ownerId);
+        const result = this.handleAsteroidDamage(rock.id, laser.ownerId, laser.miningDamage);
         if (!result.destroyed) {
           return null;
         }
@@ -1674,9 +1677,15 @@ export class GameEngine {
       }
       // Core charges double one physical shot's metal chip; each logical shot
       // is still consumed once and terminal drops/score happen only once.
-      let hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now);
+      let hit = this.applyLaserAsteroidHit(
+        rock.id,
+        laser.ownerId,
+        'laser',
+        now,
+        laser.miningDamage
+      );
       if (laser.energy >= 2 && rock.material === 'metal' && this.getAsteroid(rock.id)) {
-        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now);
+        hit = this.applyLaserAsteroidHit(rock.id, laser.ownerId, 'laser', now, laser.miningDamage);
       }
       return hit.applied ? hit : null;
     }
@@ -1759,8 +1768,7 @@ export class GameEngine {
             score: entity.score,
             health: entity.health,
             maxHealth: entity.maxHealth,
-            fuel: ensureFuelTank(entity).fuel,
-            maxFuel: entity.maxFuel,
+
             mass: entity.mass ?? GROWTH.BASE_MASS,
             ...(entity.respawnTimer !== undefined ? { respawnTimer: entity.respawnTimer } : {}),
             ...(entity.spawnProtectionTimer !== undefined
@@ -1770,13 +1778,7 @@ export class GameEngine {
             ...(entity.factionId !== undefined ? { factionId: entity.factionId } : {}),
             abilityCooldownFrames: entity.abilityCooldownFrames,
             abilityActiveFrames: entity.abilityActiveFrames,
-            shieldTimer: entity.shieldTimer,
-            ...(entity.shieldTargetId !== undefined
-              ? { shieldTargetId: entity.shieldTargetId }
-              : {}),
-            ...(entity.shieldSourceId !== undefined
-              ? { shieldSourceId: entity.shieldSourceId }
-              : {}),
+
             harpoonTimer: entity.harpoonTimer,
             ...(entity.harpoonTargetId !== undefined
               ? { harpoonTargetId: entity.harpoonTargetId }
@@ -1833,6 +1835,9 @@ export class GameEngine {
     if (requestedKitId !== undefined && requestedKitId !== entity.kitId) {
       return false;
     }
+    if (entity.kitId === 'surveyor') {
+      return activateAbilityOnHost(entity).activated;
+    }
     const world = {
       asteroids: this.asteroidManager.getAllAsteroids().map((asteroid) => ({
         ...asteroid,
@@ -1846,44 +1851,6 @@ export class GameEngine {
       ...(latchView?.canvas !== undefined ? { canvas: latchView.canvas } : {}),
     };
     const activation = activateAbilityOnHost(entity, world);
-    if (activation.activated && activation.abilityId === 'shockPulse') {
-      const now = this.getServerTime();
-      for (const other of world.entities) {
-        if (
-          !other.exploding &&
-          other.health > 0 &&
-          (other.respawnTimer ?? 0) <= 0 &&
-          Math.hypot(other.position.x - entity.position.x, other.position.y - entity.position.y) <=
-            SHIP_ABILITY.SHOCK_RADIUS
-        ) {
-          if (other.type === 'bot') {
-            other.knockbackVelocityLimit = Math.hypot(other.velocity.x, other.velocity.y);
-          }
-          this.playerMotion.applyExternalImpulse(other.id, now);
-        }
-      }
-      this.lootManager.applyQuakePulse(entity.position, entity.angle);
-      this.satellitePickupManager.applyQuakePulse(entity.position, entity.angle);
-      for (const laser of this.lasers) {
-        if (!laser.hasExploded) {
-          applyQuakeImpulse(laser, entity.position, entity.angle);
-        }
-      }
-    }
-    if (activation.activated && entity.kitId === 'skirmisher') {
-      const shots = createSkirmisherRingShots(
-        entity.position,
-        entity.angle,
-        radiusFromMass(entity.mass),
-        entity.velocity
-      );
-      for (const shot of shots) {
-        const laser = this.spawnLaser(entity.id, shot.position, shot.velocity);
-        if (laser) {
-          laser.abilityShot = true;
-        }
-      }
-    }
     return activation.activated;
   }
 
@@ -1919,16 +1886,17 @@ export class GameEngine {
 
   public handleAsteroidDamage(
     asteroidId: string,
-    playerId: string
+    playerId: string,
+    miningDamage = this.miningDamage(playerId)
   ): { destroyed: boolean; asteroid: AsteroidData | null; newAsteroids: AsteroidData[] } {
     const current = this.asteroidManager.getAsteroid(asteroidId);
     if (!current?.isCollabTarget) {
       return { destroyed: false, asteroid: null, newAsteroids: [] };
     }
 
-    // Collaborative chip damage is deliberately fixed to one canonical
-    // laser hit. Client-supplied damage and points are never authoritative.
-    const asteroid = this.asteroidManager.damageAsteroid(asteroidId, DAMAGE.LASER_HIT);
+    // Mining strength comes from the authoritative kit. Client-supplied
+    // damage and points are never authoritative.
+    const asteroid = this.asteroidManager.damageAsteroid(asteroidId, miningDamage);
     if (!asteroid) {
       return { destroyed: false, asteroid: null, newAsteroids: [] };
     }
@@ -1940,7 +1908,6 @@ export class GameEngine {
     if (result.destroyed) {
       this.awardPoints(playerId, pointsForRoidSize(result.destroyed.size));
       this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
-      this.maybeDropFuel(result.destroyed);
     }
     return {
       destroyed: result.outcome === 'destroyed',
@@ -1978,17 +1945,7 @@ export class GameEngine {
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
         continue;
       }
-      if (isFuelLoot(loot)) {
-        applyFuelPickup(ensureFuelTank(collector), loot.fuel ?? 0);
-        collector.lastUpdate = this.getServerTime();
-        results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
-        logger.debug('LOOT', 'Collected fuel drop', {
-          collectorId: collector.id,
-          lootId: loot.id,
-          fuel: collector.fuel,
-        });
-        continue;
-      }
+
       applyShipMass(collector, applyLootMass(collector.mass ?? GROWTH.BASE_MASS, loot.mass));
       if (loot.kind === 'shard') {
         this.awardPoints(collector.id, GROWTH.SHARD_SCORE);
@@ -2087,13 +2044,6 @@ export class GameEngine {
       return 'killed';
     }
     return 'hit';
-  }
-
-  private maybeDropFuel(asteroid?: AsteroidData): void {
-    if (!asteroid) {
-      return;
-    }
-    this.lootManager.spawnFuelFromAsteroid(asteroid, this.gameTime);
   }
 
   // Award points to an entity

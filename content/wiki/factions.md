@@ -31,7 +31,7 @@ pickups intercept shots and rocks for their owner; they do not deal faction
 damage. A reflected laser is marked as a ricochet and
 can damage its originating pilot or a same-faction pilot after it bounces.
 Exploding loot also hurts allies and the shooter. Hauler E skips allied ships,
-but Quake can push allies without damaging them.
+while ordinary environmental hazards can still hurt allies.
 
 ## Bots
 

@@ -14,20 +14,19 @@ test(
     }
 
     const game = new GameInteractions(page);
-    // Warden's real E absorb keeps the local hull alive while the hostile bot
-    // is approached and its server-authoritative laser shield cycles.
-    await game.bootGame({ kitId: 'warden' });
+    // Raise the normal shield while approaching the hostile bot.
+    await game.bootGame({ kitId: 'hauler' });
     await game.waitForBots(1);
 
-    await page.keyboard.press('e');
+    await page.keyboard.press('f');
     await expect
       .poll(
         () =>
           page.evaluate(() => {
             const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-            return ship?.shieldTimer ?? 0;
+            return ship?.shieldTime ?? 0;
           }),
-        { timeout: 5000, message: 'Warden E should activate the real absorb shield' }
+        { timeout: 5000, message: 'F should activate the timed shield' }
       )
       .toBeGreaterThan(0);
 

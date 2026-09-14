@@ -1,4 +1,3 @@
-import { applyFuelSnapshot } from '../../../shared/fuel';
 import { radiusFromMass } from '../../../shared/shipGrowth';
 import type { Position, ShipKitId, SoftFactionId } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
@@ -8,7 +7,7 @@ import { getFactionColor } from '../../utils/colorUtils';
 import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
-import { applySharedHarpoonLatch, clearShieldProjection } from '../ship/shipAbilities';
+import { applySharedHarpoonLatch } from '../ship/shipAbilities';
 import { applyShipKitToShip } from '../ship/shipKits';
 import { applyShieldSnapshot, clearShield } from '../ship/shipShield';
 import {
@@ -128,8 +127,7 @@ export class Player {
     deathCause?: string;
     health?: number;
     maxHealth?: number;
-    fuel?: number;
-    maxFuel?: number;
+
     mass?: number;
     respawnTimer?: number;
     spawnProtectionTimer?: number;
@@ -137,9 +135,7 @@ export class Player {
     factionId?: SoftFactionId;
     abilityCooldownFrames?: number;
     abilityActiveFrames?: number;
-    shieldTimer?: number;
-    shieldTargetId?: string;
-    shieldSourceId?: string;
+
     harpoonTimer?: number;
     harpoonTargetId?: string;
     harpoonLatchPos?: { x: number; y: number };
@@ -148,8 +144,7 @@ export class Player {
     shieldCooldown?: number;
     shieldFlashTime?: number;
   }): void {
-    // Local kit is client-owned. A stale Railway dart echo must not strip
-    // a selected Hauler (and clear the latch on the next snapshot).
+    // Local selection is established at join. Preserve it during runtime reconciliation.
     if (data.kitId && data.kitId !== this.ship.kitId && this.type !== 'local') {
       const color = this.ship.color;
       applyShipKitToShip(this.ship, data.kitId);
@@ -353,22 +348,13 @@ export class Player {
     if (data.maxHealth !== undefined) {
       this.ship.maxHealth = data.maxHealth;
     }
-    applyFuelSnapshot(this.ship, data);
+
     if (this.type !== 'local') {
       if (data.abilityCooldownFrames !== undefined) {
         this.ship.abilityCooldownFrames = data.abilityCooldownFrames;
       }
       if (data.abilityActiveFrames !== undefined) {
         this.ship.abilityActiveFrames = data.abilityActiveFrames;
-      }
-      if (data.shieldTimer !== undefined) {
-        this.ship.shieldTimer = data.shieldTimer;
-      }
-      if (data.shieldTargetId !== undefined) {
-        this.ship.shieldTargetId = data.shieldTargetId;
-      }
-      if (data.shieldSourceId !== undefined) {
-        this.ship.shieldSourceId = data.shieldSourceId;
       }
     }
     applyShieldSnapshot(this.ship, data);
@@ -434,7 +420,7 @@ export class Player {
     this.ship.explodeTime = 0;
     this.ship.blinkCount = 0;
     this.ship.spawnProtectionTimer = 0;
-    clearShieldProjection(this.ship);
+
     this.ship.velocity.x = 0;
     this.ship.velocity.y = 0;
   }
@@ -463,7 +449,7 @@ export class Player {
     delete this.ship.lastExplodeCause;
     applyShipSpawnProtection(this.ship);
     clearShield(this.ship);
-    clearShieldProjection(this.ship);
+
     if (wasDeadOrExploding) {
       playRespawn(this.ship.position);
     }

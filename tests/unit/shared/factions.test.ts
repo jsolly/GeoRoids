@@ -30,15 +30,15 @@ test('countFactions ignores unset sides', () => {
 test('side assignment ignores ship kit fields on the same hull', () => {
   expect(
     pickBalancedFactionFromShips([
-      { faction: 'ion', kit: 'quake' },
-      { faction: 'ember', kit: 'dart' },
+      { faction: 'ion', kit: 'surveyor' },
+      { faction: 'ember', kit: 'surveyor' },
     ])
   ).toBe('ion');
   expect(
     pickBalancedFactionFromShips([
       { faction: 'ion', kit: 'hauler' },
-      { faction: 'ion', kit: 'warden' },
-      { faction: 'ember', kit: 'skirmisher' },
+      { faction: 'ion', kit: 'surveyor' },
+      { faction: 'ember', kit: 'hauler' },
     ])
   ).toBe('ember');
 });

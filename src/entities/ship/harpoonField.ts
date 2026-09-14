@@ -11,9 +11,7 @@ interface HarpoonFieldBody {
   health?: number;
   r?: number;
   size?: number;
-  shieldTimer?: number;
-  shieldSourceId?: string;
-  shieldTargetId?: string;
+
   shieldActive?: boolean;
 }
 
@@ -175,9 +173,7 @@ export function harpoonBodyFromShip(
     exploding?: boolean;
     health?: number;
     r?: number;
-    shieldTimer?: number;
-    shieldSourceId?: string;
-    shieldTargetId?: string;
+
     shieldActive?: boolean;
   },
   factionId?: SoftFactionId
@@ -192,9 +188,7 @@ export function harpoonBodyFromShip(
     ...(ship.exploding !== undefined ? { exploding: ship.exploding } : {}),
     ...(ship.health !== undefined ? { health: ship.health } : {}),
     ...(ship.r !== undefined ? { r: ship.r } : {}),
-    ...(ship.shieldTimer !== undefined ? { shieldTimer: ship.shieldTimer } : {}),
-    ...(ship.shieldSourceId !== undefined ? { shieldSourceId: ship.shieldSourceId } : {}),
-    ...(ship.shieldTargetId !== undefined ? { shieldTargetId: ship.shieldTargetId } : {}),
+
     ...(ship.shieldActive !== undefined ? { shieldActive: ship.shieldActive } : {}),
   };
 }

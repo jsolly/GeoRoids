@@ -29,7 +29,6 @@ export type HudLayout = {
   hudTypeScale: number;
   factionY: number;
   kitNameY: number;
-  fuel: { x: number; y: number; width: number; height: number };
 };
 
 /** Scale a canvas font such as `14px Arial` for the compact touch HUD. */
@@ -109,12 +108,6 @@ export function computeHudLayout(
       hudTypeScale,
       factionY,
       kitNameY: factionY + 14,
-      fuel: {
-        x: lives.x,
-        y: factionY + 32,
-        width: VISUAL.FUEL_BAR_WIDTH,
-        height: VISUAL.FUEL_BAR_HEIGHT,
-      },
     };
   }
 
@@ -130,15 +123,7 @@ export function computeHudLayout(
   const lives = { x: padLeft, y: padTop };
   const factionY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
   const kitNameY = factionY + Math.round(14 * hudTypeScale);
-  const fuel = {
-    x: lives.x,
-    y: factionY + Math.round(32 * hudTypeScale),
-    width: Math.round(VISUAL.FUEL_BAR_WIDTH * Math.max(1, hudTypeScale)),
-    height: 3,
-  };
-
-  // Compact cluster + faction + kit + fuel sit under lives; park radar below that stack.
-  const clusterClear = fuel.y + 16;
+  const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
         x: padLeft,
@@ -158,7 +143,7 @@ export function computeHudLayout(
     padBottom,
     lives,
     score: { x: padLeft, y: padTop },
-    killMessageY: Math.max(fuel.y + fuel.height, padTop + rowHeight * maxRows) + 12,
+    killMessageY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
@@ -171,7 +156,6 @@ export function computeHudLayout(
     hudTypeScale,
     factionY,
     kitNameY,
-    fuel,
   };
 }
 

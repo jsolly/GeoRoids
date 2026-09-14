@@ -17,9 +17,9 @@ test('rejoin and same-name takeover apply the requested Hauler kit', () => {
     new RecordingSocket(),
     { x: 8, y: 9 },
     '#abc',
-    'dart'
+    'surveyor'
   );
-  expect(first.kitId).toBe('dart');
+  expect(first.kitId).toBe('surveyor');
 
   const rejoined = manager.addHumanPlayer(
     'pilot-1',

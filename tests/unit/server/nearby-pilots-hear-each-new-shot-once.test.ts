@@ -28,13 +28,9 @@ test('a shot tells other pilots its muzzle position once and does not echo to it
   }
 });
 
-test('ability-marked shots stay silent and resetting a world clears queued shot sounds', () => {
+test('resetting a world clears queued shot sounds', () => {
   const engine = new GameEngine(525);
   try {
-    const shot = engine.spawnLaser('ring-pilot', { x: 0, y: 0 }, { x: 5, y: 0 });
-    assert.ok(shot);
-    shot.abilityShot = true;
-    expect(engine.drainShotSounds()).toEqual([]);
     engine.spawnLaser('pilot', { x: 0, y: 0 }, { x: 5, y: 0 });
     engine.resetForTesting();
     expect(engine.drainShotSounds()).toEqual([]);

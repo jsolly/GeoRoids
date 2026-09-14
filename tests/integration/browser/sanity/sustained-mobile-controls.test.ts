@@ -51,7 +51,7 @@ test(
     const game = new GameInteractions(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await game.bootGame({ waitForCombatReady: false, kitId: 'dart' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&

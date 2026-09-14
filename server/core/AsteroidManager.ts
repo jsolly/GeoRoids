@@ -306,17 +306,18 @@ export class AsteroidManager {
   public registerLaserHit(
     asteroidId: string,
     shooterId: string,
-    now = Date.now()
+    now = Date.now(),
+    miningDamage: number = DAMAGE.LASER_HIT
   ): AsteroidHitOutcome {
     const asteroid = this.asteroids.get(asteroidId);
     if (!asteroid) {
       return { outcome: 'missing', newAsteroids: [], split: false };
     }
 
-    // Metal chips remain present until three canonical hits have landed. This
+    // Metal chips remain present until their mining HP is exhausted. This
     // does not enter the cooperative tag-expiry table: waiting never kills it.
     if (asteroid.material === 'metal') {
-      asteroid.health = Math.max(0, asteroid.health - DAMAGE.LASER_HIT);
+      asteroid.health = Math.max(0, asteroid.health - miningDamage);
       if (asteroid.health > 0) {
         return { outcome: 'tagged', newAsteroids: [], split: false, expiresAt: now + 150 };
       }

@@ -1,7 +1,9 @@
 import { PLAYER_MOTION } from '../../shared/playerMotion';
-import { GROWTH, maxVelocityFromMass, thrustScaleFromMass } from '../../shared/shipGrowth';
-import type { Position, Velocity } from '../../shared-types';
-import { GAME, LASER, SHIP } from '../../src/constants';
+import { cruiseSpeed } from '../../shared/shipFlight';
+import { GROWTH, thrustScaleFromMass } from '../../shared/shipGrowth';
+import type { Position, ShipKitId, Velocity } from '../../shared-types';
+import { GAME, LASER } from '../../src/constants';
+import { getShipKit } from '../../src/entities/ship/shipKits';
 import { containAsteroidPosition, getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { getGameBoundary } from '../../src/physics/boundary';
 import { applySharedShipSlope } from '../../src/physics/terrain/applyShipSlope';
@@ -14,6 +16,7 @@ export const CONTAIN_RADIUS = getAsteroidFieldRadius();
 export const STEER_IN_RADIUS = Math.max(0, CONTAIN_RADIUS - 200);
 
 interface MovableShip {
+  kitId: ShipKitId;
   position: Position;
   velocity: Velocity;
   angle: number;
@@ -28,14 +31,15 @@ interface MovableShip {
  * angle + thrusting.
  */
 export function applyShipMotionFrame(ship: MovableShip): void {
+  const kit = getShipKit(ship.kitId);
   const mass = ship.mass ?? GROWTH.BASE_MASS;
   const thrustScale = thrustScaleFromMass(mass);
   const blastLimit = ship.knockbackVelocityLimit ?? 0;
-  const maxVelocity = Math.max(maxVelocityFromMass(mass), blastLimit);
+  const maxVelocity = Math.max(cruiseSpeed(mass, kit.maxVelocity), blastLimit);
 
   if (ship.thrusting) {
-    ship.velocity.x += (Math.cos(ship.angle) * SHIP.THRUST * thrustScale) / GAME.FPS;
-    ship.velocity.y -= (Math.sin(ship.angle) * SHIP.THRUST * thrustScale) / GAME.FPS;
+    ship.velocity.x += (Math.cos(ship.angle) * kit.thrust * thrustScale) / GAME.FPS;
+    ship.velocity.y -= (Math.sin(ship.angle) * kit.thrust * thrustScale) / GAME.FPS;
     const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
     if (speed > maxVelocity) {
       const scale = maxVelocity / speed;
@@ -50,7 +54,7 @@ export function applyShipMotionFrame(ship: MovableShip): void {
 
   applySharedShipSlope(ship.velocity, ship.position);
   const afterSlope = Math.hypot(ship.velocity.x, ship.velocity.y);
-  const absoluteLimit = Math.max(SHIP.MAX_VELOCITY, blastLimit);
+  const absoluteLimit = Math.max(kit.maxVelocity, blastLimit);
   if (afterSlope > absoluteLimit) {
     const scale = absoluteLimit / afterSlope;
     ship.velocity.x *= scale;
@@ -119,8 +123,8 @@ export function turnToward(current: number, desired: number, maxTurn: number): n
 }
 
 /** Player turn rate in radians per client frame. */
-export function shipTurnPerFrame(): number {
-  return (SHIP.TURN_SPEED * Math.PI) / 180 / GAME.FPS;
+export function shipTurnPerFrame(kitId: ShipKitId): number {
+  return (getShipKit(kitId).turnSpeed * Math.PI) / 180 / GAME.FPS;
 }
 
 /** Laser speed in pixels per client frame (same as `generateLaserVelocity`). */

@@ -16,7 +16,15 @@ import { RecordingSocket } from '../../support/recordingSocket';
 function arena() {
   const engine = new GameEngine(419);
   const ws = new RecordingSocket();
-  const pilot = engine.addPlayer('pilot', 'Pilot', ws, { x: -500, y: 0 }, undefined, 'dart', 'ion');
+  const pilot = engine.addPlayer(
+    'pilot',
+    'Pilot',
+    ws,
+    { x: -500, y: 0 },
+    undefined,
+    'surveyor',
+    'ion'
+  );
   delete pilot.spawnProtectionTimer;
   engine.enableAsteroidInteractions(pilot);
   for (const rock of engine.getAllAsteroids()) {
@@ -62,7 +70,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
       new RecordingSocket(),
       { x: 10, y: 0 },
       undefined,
-      'dart',
+      'surveyor',
       'ember'
     );
     const alpha = engine.addPlayer(
@@ -71,7 +79,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
       new RecordingSocket(),
       { x: 10, y: 0 },
       undefined,
-      'dart',
+      'surveyor',
       'ember'
     );
     const zeta = engine.addPlayer(
@@ -80,7 +88,7 @@ describe('reflected shots remain authoritative across snapshots and resource col
       new RecordingSocket(),
       { x: 30, y: 0 },
       undefined,
-      'dart',
+      'surveyor',
       'ember'
     );
     for (const player of [alpha, beta, zeta]) {
@@ -208,14 +216,22 @@ describe('reflected shots remain authoritative across snapshots and resource col
 
   test("a departed pilot's direct shot still protects allies but becomes dangerous after a real reflection", () => {
     const { engine, pilot, ws } = arena();
-    const ally = engine.addPlayer('ally', 'Ally', ws, { x: -100, y: 0 }, undefined, 'dart', 'ion');
+    const ally = engine.addPlayer(
+      'ally',
+      'Ally',
+      ws,
+      { x: -100, y: 0 },
+      undefined,
+      'surveyor',
+      'ion'
+    );
     const enemy = engine.addPlayer(
       'enemy',
       'Enemy',
       ws,
       { x: -100, y: 200 },
       undefined,
-      'dart',
+      'surveyor',
       'ember'
     );
     delete ally.spawnProtectionTimer;

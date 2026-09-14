@@ -76,7 +76,7 @@ content:
             type: select
             required: true
             options:
-              values: [dart, hauler, warden, skirmisher, quake, movement, shield, loot, split, reflection, terrain, satellites, pickups]
+              values: [surveyor, hauler, movement, shield, loot, split, reflection, terrain, satellites, pickups]
           - name: heading
             label: Section heading
             type: string

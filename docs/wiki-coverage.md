@@ -8,14 +8,11 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 | ID | Category | Coverage |
 | --- | --- | --- |
-| field-manual | Start here | Arena orientation, five kits, starting a life |
+| field-manual | Start here | Arena orientation, two kits, starting a life |
 | controls | Start here | Automatic thrust, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
-| dart | Ships | Stats scorecard, boost dash |
+| surveyor | Ships | Stats scorecard, nimble movement, temporary radar mineral scan |
 | hauler | Ships | Stats scorecard, combat harpoon reel, collision-course sling, and fallback bounce |
-| warden | Ships | Stats scorecard, automatic friendly E projection, reflective F shield |
-| skirmisher | Ships | Stats scorecard, normal fire, E full outward laser ring |
-| quake | Ships | Stats scorecard, fuel-gated physical-object shock pulse |
-| fuel-growth | Systems | Fuel tank, fuel drops, loot mass, reflective core, shoot-a-drop blast |
+| loot-growth | Systems | Loot mass, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
@@ -28,10 +25,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Player question | Article | Primary source families |
 | --- | --- | --- |
 | How do I move, aim, fire, or use E/F? | controls | src/input/, src/constants/index.ts, input tests |
-| Which of the five kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
+| Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
-| How do fuel, mass, shards, cores, and kill loot work? | fuel-growth | shared/fuel.ts, shared/shipGrowth.ts, server/core/LootManager.ts |
-| What happens when I shoot a loot drop? | fuel-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
+| How do mass, shards, cores, and kill loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
+| What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
 | How does a Hauler pull, sling, or bounce a nearby target? | hauler | src/entities/ship/harpoonField.ts, harpoonSling.ts, ship ability tests |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
@@ -42,8 +39,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 ## Maintenance rules
 
-- Keep article IDs and related IDs resolvable. The five kit IDs must remain
-  dart, hauler, warden, skirmisher, and quake; controls is the getting-started
+- Keep article IDs and related IDs resolvable. The two kit IDs must remain
+  surveyor and hauler; controls is the getting-started
   entry used by the home page.
 - Keep every article sources array as plain text paths that exist in the
   checkout. Include the definition that owns an exact value and the test or
@@ -80,12 +77,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   pilots keep normal collision damage, and the target collides normally again
   after the tether expires. A rock with no eligible enemy at release bounces
   away from the Hauler.
-- Warden E automatically projects a 3-second shield to the nearest living ally
-  in reach, preferring the forward hemisphere and then the nearest fallback. It
-  reflects hostile lasers but does not stop collisions. Warden F is a separate
-  4-second reflective laser shield; other kits' F shield lasts 2 seconds, with a
-  6-second cooldown. A shoot-a-drop environmental blast bypasses both; spawn
-  protection blocks that blast.
+- Surveyor E classifies nearby minerals temporarily on radar; both kits keep the
+  regular F reflective shield. Hauler mining damage is doubled for metal and
+  collaborative HP targets while PvP laser damage remains unchanged.
 - The authoritative ship-to-asteroid ram currently applies the shared 25-point
   laser hit value. A stale DAMAGE.ASTEROID_COLLISION comment says 100, so the
   manual follows shared/combat.ts and GameEngine.resolveAuthoritativeCombat.
@@ -97,14 +91,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   release, and respawns loose and healthy after breaking.
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
-  lives, score, faction, kit, and fuel.
-- The current KeyE Quake path is the fuel-gated shock pulse. It applies a strong
-  outward impulse to nearby ships, rocks, loot, satellite pickups, and shots;
-  the pulse itself deals no direct damage, though the resulting motion can still
-  cause ordinary collisions. Legacy EMP helpers remain in the source and should
-  not be used to invent a second player action.
+  lives, score, faction, and kit.
 - A laser detonation of any loot kind reaches every nearby live hull, including
-  the shooter and allies, and bypasses faction filtering and both shield lanes.
+  the shooter and allies, and bypasses faction filtering and the F shield.
   It deals 40 damage within an 80-unit radius, while spawn protection is the
   exception. It pushes only rocks of size 24 or smaller.
 - Normal ship-to-ship collision ticks use the faction damage gate. Satellite
@@ -117,7 +106,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.
-  Fuel and laser cores take separate collection paths and do not add mass.
+  Laser cores take a separate collection path and do not add mass.
 - Cooperative splits automatically expire without a second qualifying hit.
   Their fast and heavy shockwaves push ships and asteroids without direct
   damage; metal and rubble follow their own break rules.

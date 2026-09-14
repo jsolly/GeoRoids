@@ -1,5 +1,9 @@
 # Prompt sheets — Ships & soft factions (2026-09-05)
 
+Historical source-pack record. Current ship definitions and assets are in
+[ships-and-factions.md](ships-and-factions.md); retired kit entries below are
+provenance only and are not current gameplay or asset instructions.
+
 Tool-agnostic. Generate stills for art review; code remains the source of truth for in-game vectors. No Freepik asset invention — prompts describe original outline shapes only.
 
 ---

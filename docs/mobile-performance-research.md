@@ -116,7 +116,7 @@ Contour drawing already rejects offscreen segments, but only after visiting and 
 
 If rasterizing terrain dominates instead, compare bounded raster tiles. Define invalidation for terrain identity, zoom, effective DPR, and palette before adopting the cache. Inspect seams, label clipping, and sharpness during diagonal movement. A whole-world high-resolution bitmap is a poor default because its memory grows with world area and squared scale.
 
-The first small HUD experiment is cached label width by text and font, since contour anchors are already cached. Then test static HUD geometry or leaderboard refresh on data changes. Keep health, fuel, ability availability, damage, and urgent warnings responsive. For a slower minimap refresh experiment, preserve or interpolate the local marker separately and verify that approaching threats remain legible.
+The first small HUD experiment is cached label width by text and font, since contour anchors are already cached. Then test static HUD geometry or leaderboard refresh on data changes. Keep health, ability availability, damage, and urgent warnings responsive. For a slower minimap refresh experiment, preserve or interpolate the local marker separately and verify that approaching threats remain legible.
 
 Do not change all rendering layers at once. A lower-DPR comparison, a blur comparison, and a contour comparison should each report independent results. Once individual effects are understood, test the combined candidate because improvements need not add linearly.
 

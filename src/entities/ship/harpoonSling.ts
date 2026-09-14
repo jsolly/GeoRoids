@@ -47,8 +47,7 @@ function chooseAim(
       (enemy.health !== undefined && enemy.health <= 0) ||
       (enemy.respawnTimer ?? 0) > 0 ||
       (enemy.spawnProtectionTimer ?? 0) > 0 ||
-      enemy.shieldActive ||
-      (enemy.shieldTimer ?? 0) > 0
+      enemy.shieldActive
     ) {
       continue;
     }

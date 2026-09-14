@@ -12,13 +12,6 @@ import {
   spawnRingPosition,
   velocityFromDelta,
 } from '../../src/entities/satellitePickup/satellitePickupMath';
-import {
-  advanceQuakeMotion,
-  applyQuakeMotion,
-  clearQuakeMotion,
-  createQuakeMotion,
-  type QuakeMotion,
-} from './quakeMotion';
 import type { RNGService } from './RNGService';
 
 interface PickupOwnerPose {
@@ -35,7 +28,6 @@ interface SatellitePickupInternal extends SatellitePickupData {
   orbitPhase: number;
   driftAngle: number;
   respawnTimer: number;
-  quakeMotion: QuakeMotion;
 }
 
 export class SatellitePickupManager {
@@ -60,21 +52,6 @@ export class SatellitePickupManager {
 
   public clear(): void {
     this.pickups.clear();
-  }
-
-  /** Apply Quake to every live pickup, including orbiting pickups. */
-  public applyQuakePulse(origin: Position, fallbackAngle = 0): number {
-    let affected = 0;
-    for (const pickup of this.pickups.values()) {
-      if (
-        pickup.state === 'broken' ||
-        !applyQuakeMotion(pickup, pickup.quakeMotion, origin, fallbackAngle)
-      ) {
-        continue;
-      }
-      affected += 1;
-    }
-    return affected;
   }
 
   public createPickups(count: number = SATELLITE_PICKUP.MAX_COUNT): SatellitePickupData[] {
@@ -119,7 +96,7 @@ export class SatellitePickupManager {
     );
     pickup.velocity = velocityFromDelta(prev, pickup.position);
     pickup.angle = pickup.orbitPhase;
-    clearQuakeMotion(pickup.quakeMotion);
+
     return this.toPublic(pickup);
   }
 
@@ -143,7 +120,6 @@ export class SatellitePickupManager {
       pickup.respawnTimer = SATELLITE_PICKUP.RESPAWN_FRAMES;
       pickup.orbitCenter = { ...pickup.position };
       pickup.velocity = { x: 0, y: 0 };
-      clearQuakeMotion(pickup.quakeMotion);
     }
     return this.toPublic(pickup);
   }
@@ -181,8 +157,6 @@ export class SatellitePickupManager {
         this.updateBroken(pickup);
       } else if (!DEBUG.ENABLED || DEBUG.SATELLITE_PICKUP.MOVEMENT) {
         this.updateLoose(pickup);
-      } else {
-        this.updateKnockbackOnly(pickup);
       }
     }
   }
@@ -203,10 +177,10 @@ export class SatellitePickupManager {
       pickup.orbitPhase,
       orbitRadiusForOwner(owner.radius, pickup.radius)
     );
-    advanceQuakeMotion(pickup.quakeMotion);
+
     pickup.position = {
-      x: orbitPosition.x + pickup.quakeMotion.offset.x,
-      y: orbitPosition.y + pickup.quakeMotion.offset.y,
+      x: orbitPosition.x,
+      y: orbitPosition.y,
     };
     pickup.velocity = velocityFromDelta(prev, pickup.position);
     pickup.orbitCenter = { ...owner.position };
@@ -232,11 +206,11 @@ export class SatellitePickupManager {
     pickup.driftAngle = drifted.driftAngle;
     pickup.orbitPhase += SATELLITE_PICKUP.ORBIT_SPEED * 0.45;
     const offset = orbitOffset(pickup.orbitPhase, SATELLITE_PICKUP.LOOSE_ORBIT_RADIUS);
-    advanceQuakeMotion(pickup.quakeMotion);
+
     pickup.position = clampToRadius(
       {
-        x: pickup.orbitCenter.x + offset.x + pickup.quakeMotion.offset.x,
-        y: pickup.orbitCenter.y + offset.y + pickup.quakeMotion.offset.y,
+        x: pickup.orbitCenter.x + offset.x,
+        y: pickup.orbitCenter.y + offset.y,
       },
       SATELLITE_PICKUP.FIELD_RADIUS
     );
@@ -244,28 +218,11 @@ export class SatellitePickupManager {
     pickup.angle = pickup.orbitPhase;
   }
 
-  private updateKnockbackOnly(pickup: SatellitePickupInternal): void {
-    const prev = { ...pickup.position };
-    const dx = pickup.quakeMotion.velocity.x;
-    const dy = pickup.quakeMotion.velocity.y;
-    advanceQuakeMotion(pickup.quakeMotion);
-    pickup.position = clampToRadius(
-      {
-        x: pickup.position.x + dx,
-        y: pickup.position.y + dy,
-      },
-      SATELLITE_PICKUP.FIELD_RADIUS
-    );
-    pickup.quakeMotion.offset = { x: 0, y: 0 };
-    pickup.velocity = velocityFromDelta(prev, pickup.position);
-  }
-
   private makeLooseAtCurrentPose(pickup: SatellitePickupInternal): void {
     pickup.state = 'loose';
     pickup.ownerId = null;
     pickup.orbitCenter = { ...pickup.position };
-    pickup.quakeMotion.offset = { x: 0, y: 0 };
-    pickup.velocity = { ...pickup.quakeMotion.velocity };
+    pickup.velocity = { x: 0, y: 0 };
     pickup.respawnTimer = 0;
   }
 
@@ -310,7 +267,6 @@ export class SatellitePickupManager {
       driftAngle: this.rng.random() * Math.PI * 2,
       rosterIndex: index,
       respawnTimer: 0,
-      quakeMotion: createQuakeMotion(),
     };
   }
 

@@ -3,6 +3,7 @@ import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import type { PlayerShotAcknowledgement } from '../../shared-types';
 import { DAMAGE } from '../../src/constants';
+import { getShipKit } from '../../src/entities/ship/shipKits';
 import type { CombatDamageSource } from '../../src/entities/ship/shipShield';
 import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
@@ -393,7 +394,7 @@ export class MessageHandler {
     }
     const healthDropped = healthBefore !== undefined && outcome.entity.health < healthBefore;
     if (!outcome.isDestroyed && !healthDropped) {
-      if (outcome.entity.shieldActive || outcome.entity.shieldTimer > 0) {
+      if (outcome.entity.shieldActive) {
         this.broadcaster.broadcastGameState();
       }
       return;
@@ -458,14 +459,12 @@ export class MessageHandler {
       return;
     }
     const sentAt = Date.now();
-    const quakePulse =
-      entity.kitId === 'quake' ? { origin: { ...entity.position }, startedAt: sentAt } : undefined;
     this.broadcaster.broadcastToAll({
       type: 'abilityUsed',
       data: {
         id: playerId,
         kitId: entity.kitId,
-        ...(command.abilityId !== undefined ? { abilityId: command.abilityId } : {}),
+        abilityId: getShipKit(entity.kitId).abilityId,
         harpoonTimer: entity.harpoonTimer,
         ...(entity.harpoonTargetId !== undefined
           ? { harpoonTargetId: entity.harpoonTargetId }
@@ -473,10 +472,8 @@ export class MessageHandler {
         ...(entity.harpoonLatchPos !== undefined
           ? { harpoonLatchPos: entity.harpoonLatchPos }
           : {}),
-        ...(entity.shieldTargetId !== undefined ? { shieldTargetId: entity.shieldTargetId } : {}),
-        ...(entity.shieldSourceId !== undefined ? { shieldSourceId: entity.shieldSourceId } : {}),
+
         abilityActiveFrames: entity.abilityActiveFrames,
-        ...(quakePulse !== undefined ? { quakePulse } : {}),
       },
       timestamp: sentAt,
     });

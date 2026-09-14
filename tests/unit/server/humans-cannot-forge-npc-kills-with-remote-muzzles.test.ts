@@ -7,14 +7,9 @@ import {
   HUMAN_SHOOT_POSE_ALLOWANCE_MS,
 } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import { radiusFromMass } from '../../../shared/shipGrowth';
 import { GAME, LASER, SHIP } from '../../../src/constants';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
-import {
-  createSkirmisherRingShots,
-  SKIRMISHER_RING_COUNT,
-} from '../../../src/entities/ship/skirmisherRing';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
@@ -31,7 +26,7 @@ describe('server-authoritative human shooting', () => {
     broadcaster = new GameStateBroadcaster(engine);
     handler = new MessageHandler(engine, broadcaster);
     socket = new RecordingSocket();
-    engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, undefined, 'dart');
+    engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, undefined, 'surveyor');
     for (const asteroid of engine.getAllAsteroids()) {
       engine.removeAsteroid(asteroid.id);
     }
@@ -132,7 +127,7 @@ describe('server-authoritative human shooting', () => {
     expect(engine.getServerLasers()).toHaveLength(0);
   });
 
-  test('an unpulsed pilot cannot borrow Quake speed or distant muzzle allowance', () => {
+  test('a pilot cannot claim ungranted speed or distant muzzle allowance', () => {
     shoot({ x: 20, y: 0 }, { x: 37, y: 0 });
     shoot({ x: 400, y: 0 });
     expect(engine.getServerLasers()).toHaveLength(0);
@@ -152,50 +147,19 @@ describe('server-authoritative human shooting', () => {
     expect(engine.getServerLasers()).toHaveLength(1);
   });
 
-  test('normal Skirmisher firing stays bounded by the regular shot cadence', () => {
+  test('normal Surveyor firing stays bounded by the regular shot cadence', () => {
     const clock = vi.spyOn(engine, 'getServerTime').mockReturnValue(1000);
     const player = engine.getPlayer('pilot');
-    assert.ok(player, 'skirmisher pilot');
-    player.kitId = 'skirmisher';
+    assert.ok(player, 'surveyor pilot');
+    player.kitId = 'surveyor';
     for (let i = 0; i < SHIP.MAX_LASERS; i++) {
       shoot();
     }
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS);
-    clock.mockReturnValue(1000 + getShipKit('skirmisher').shotCooldown);
+    clock.mockReturnValue(1000 + getShipKit('surveyor').shotCooldown);
     shoot();
     expect(engine.getServerLasers()).toHaveLength(SHIP.MAX_LASERS + 1);
-  });
-
-  test('Skirmisher E creates one authoritative projectile for every ring heading', () => {
-    const pilot = engine.getPlayer('pilot');
-    assert.ok(pilot, 'skirmisher pilot');
-    pilot.kitId = 'skirmisher';
-    pilot.position = { x: 140, y: -90 };
-    pilot.angle = Math.PI / 5;
-    pilot.velocity = { x: 1.5, y: -0.75 };
-
-    expect(engine.useAbility('pilot', 'skirmisher')).toBe(true);
-    const actual = engine.getServerLasers();
-    const expected = createSkirmisherRingShots(
-      pilot.position,
-      pilot.angle,
-      radiusFromMass(pilot.mass),
-      pilot.velocity
-    );
-
-    expect(actual).toHaveLength(SKIRMISHER_RING_COUNT);
-    expect(new Set(actual.map((laser) => laser.velocity.x.toFixed(6))).size).toBeGreaterThan(1);
-    for (const [index, laser] of actual.entries()) {
-      const shot = expected[index];
-      expect(shot).toBeDefined();
-      if (shot) {
-        expect(laser.position.x).toBeCloseTo(shot.position.x, 8);
-        expect(laser.position.y).toBeCloseTo(shot.position.y, 8);
-        expect(laser.velocity.x).toBeCloseTo(shot.velocity.x, 8);
-        expect(laser.velocity.y).toBeCloseTo(shot.velocity.y, 8);
-      }
-    }
   });
 
   test('counter-thrust stationary shots have a finite server lifetime', () => {

@@ -60,7 +60,7 @@ type TouchControlState = {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
   shieldActive: boolean;
-  shieldTimer: number;
+
   shieldCooldown: number;
   shieldFlashTime: number;
 };
@@ -80,7 +80,7 @@ export async function readTouchControlState(page: Page): Promise<TouchControlSta
       abilityCooldownFrames: ship.abilityCooldownFrames,
       abilityActiveFrames: ship.abilityActiveFrames,
       shieldActive: ship.shieldActive,
-      shieldTimer: ship.shieldTimer,
+
       shieldCooldown: ship.shieldCooldown,
       shieldFlashTime: ship.shieldFlashTime,
     };

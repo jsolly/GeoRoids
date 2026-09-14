@@ -47,7 +47,6 @@ import {
   harpoonTargetIdsMatch,
   setHoldEmptyHarpoonField,
 } from '../../entities/ship/harpoonField';
-import { startQuakePulse } from '../../entities/ship/quakePulseRenderer';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
@@ -124,7 +123,7 @@ function isFinitePosition(value: unknown): value is Position {
 }
 
 function isLootKind(value: unknown): value is LootKind {
-  return value === 'shard' || value === 'wreckage' || value === 'fuel' || value === 'laserCore';
+  return value === 'shard' || value === 'wreckage' || value === 'laserCore';
 }
 
 function isLootCollectedEvent(value: unknown): value is LootCollected {
@@ -1030,12 +1029,9 @@ export class ConnectionManager {
             harpoonTimer?: number;
             harpoonTargetId?: string;
             harpoonLatchPos?: Position;
-            shieldTargetId?: string;
-            shieldSourceId?: string;
+
             abilityActiveFrames?: number;
-            quakePulse?: { origin: Position; startedAt: number };
-          },
-          message.timestamp
+          }
         );
         break;
       case 'error':
@@ -1215,21 +1211,16 @@ export class ConnectionManager {
     }
   }
 
-  private handleAbilityUsed(
-    data: {
-      id?: string;
-      kitId?: unknown;
-      abilityId?: unknown;
-      harpoonTimer?: number;
-      harpoonTargetId?: string;
-      harpoonLatchPos?: Position;
-      shieldTargetId?: string;
-      shieldSourceId?: string;
-      abilityActiveFrames?: number;
-      quakePulse?: { origin: Position; startedAt: number };
-    },
-    sentAt: unknown
-  ): void {
+  private handleAbilityUsed(data: {
+    id?: string;
+    kitId?: unknown;
+    abilityId?: unknown;
+    harpoonTimer?: number;
+    harpoonTargetId?: string;
+    harpoonLatchPos?: Position;
+
+    abilityActiveFrames?: number;
+  }): void {
     if (!data.id) {
       return;
     }
@@ -1259,27 +1250,8 @@ export class ConnectionManager {
       ...(data.harpoonTimer !== undefined ? { harpoonTimer: data.harpoonTimer } : {}),
       ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
       ...(data.harpoonLatchPos !== undefined ? { harpoonLatchPos: data.harpoonLatchPos } : {}),
-      ...(data.shieldTargetId !== undefined ? { shieldTargetId: data.shieldTargetId } : {}),
-      ...(data.shieldSourceId !== undefined ? { shieldSourceId: data.shieldSourceId } : {}),
     };
     entity.updateFromServer(latch);
-    const pulse = data.quakePulse;
-    if (
-      entity.ship.kitId === 'quake' &&
-      pulse &&
-      Number.isFinite(pulse.startedAt) &&
-      Number.isFinite(pulse.origin?.x) &&
-      Number.isFinite(pulse.origin?.y)
-    ) {
-      const elapsedMs =
-        typeof sentAt === 'number' && Number.isFinite(sentAt)
-          ? Math.max(0, sentAt - pulse.startedAt)
-          : 0;
-      startQuakePulse(entity.ship, pulse.origin, elapsedMs, performance.now());
-      if (localPlayer && localPlayer !== entity && localPlayer.id === data.id) {
-        startQuakePulse(localPlayer.ship, pulse.origin, elapsedMs, performance.now());
-      }
-    }
     if (localPlayer && localPlayer !== entity && localPlayer.id === data.id) {
       localPlayer.updateFromServer(latch);
     }
@@ -1429,17 +1401,7 @@ export class ConnectionManager {
         } else {
           delete entity.ship.laserUpgrade;
         }
-        entity.ship.shieldTimer = entityData.shieldTimer ?? 0;
-        if (entityData.shieldTargetId !== undefined) {
-          entity.ship.shieldTargetId = entityData.shieldTargetId;
-        } else {
-          delete entity.ship.shieldTargetId;
-        }
-        if (entityData.shieldSourceId !== undefined) {
-          entity.ship.shieldSourceId = entityData.shieldSourceId;
-        } else {
-          delete entity.ship.shieldSourceId;
-        }
+
         if (
           entity.type !== 'local' &&
           shieldStateWasKnown &&

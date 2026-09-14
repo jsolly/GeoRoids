@@ -10,19 +10,9 @@ import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { GROWTH } from '../../shared/shipGrowth';
-import {
-  DAMAGE,
-  FUEL,
-  GAME,
-  LASER,
-  ROID,
-  SATELLITE_PICKUP,
-  SHIELD,
-  SHIP,
-  SHOCKWAVE,
-} from '../constants';
-import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS, type ShipKitId } from '../entities/ship/shipKits';
-import { SKIRMISHER_RING_COUNT } from '../entities/ship/skirmisherRing';
+import type { ShipKitId } from '../../shared-types';
+import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIELD, SHIP, SHOCKWAVE } from '../constants';
+import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
 
 function seconds(frames: number): string {
@@ -64,15 +54,15 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       ],
     },
   ],
-  dart: [
+  surveyor: [
     {
-      heading: 'Dart values',
-      paragraphs: [shipStats('dart')],
+      heading: 'Surveyor values',
+      paragraphs: [shipStats('surveyor')],
     },
     {
       heading: 'Ability and shield values',
       paragraphs: [
-        `E adds ${SHIP_ABILITY.DASH_BOOST} forward velocity. The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds and its cooldown is ${SHIELD.COOLDOWN_SECONDS} seconds.`,
+        `E identifies minerals within ${SHIP_ABILITY.SCAN_RANGE} units for ${seconds(SHIP_ABILITY.SCAN_FRAMES)}. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}. The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds and its cooldown is ${SHIELD.COOLDOWN_SECONDS} seconds.`,
       ],
     },
   ],
@@ -82,61 +72,20 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [shipStats('hauler')],
     },
     {
-      heading: 'Harpoon values',
+      heading: 'Harpoon and mining values',
       paragraphs: [
+        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal and collaborative HP targets. Damage to ships is unchanged.`,
         `The combat harpoon has a minimum range of ${SHIP_ABILITY.HARPOON_RANGE} units, lasts ${frameValue(SHIP_ABILITY.HARPOON_FRAMES)} for nearby catches, and applies pull strength ${SHIP_ABILITY.HARPOON_PULL} with distance falloff.`,
         `A clear momentum collision course is accepted within a ${Math.round((Math.acos(SHIP_ABILITY.HARPOON_PATH_ALIGNMENT) * 180) / Math.PI)}-degree path and keeps the rock's heading, boosting it to at least ${SHIP_ABILITY.HARPOON_SLING_SPEED} units per frame while preserving faster momentum. Other rocks reel toward the Hauler at a relative target of ${SHIP_ABILITY.HARPOON_REEL_SPEED} units per frame with ${SHIP_ABILITY.HARPOON_REEL_ACCELERATION} units per-frame acceleration, then release near the hull with a ${SHIP_ABILITY.HARPOON_RELEASE_GAP} unit safety gap toward a predicted enemy within ${frameValue(SHIP_ABILITY.HARPOON_INTERCEPT_FRAMES)}.`,
       ],
     },
   ],
-  warden: [
-    {
-      heading: 'Warden values',
-      paragraphs: [shipStats('warden')],
-    },
-    {
-      heading: 'Ability and shield values',
-      paragraphs: [
-        `E projects a reflective shield to an ally for ${frameValue(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES)}, within ${SHIP_ABILITY.SHIELD_PROJECTION_RANGE} units between hull edges. The Warden E cooldown is ${frameValue(SHIP_ABILITY.COOLDOWN_FRAMES.warden)}. The Warden F shield lasts ${SHIELD.WARDEN_DURATION_SECONDS} seconds and its cooldown is ${SHIELD.COOLDOWN_SECONDS} seconds.`,
-      ],
-    },
-  ],
-  skirmisher: [
-    {
-      heading: 'Skirmisher values',
-      paragraphs: [shipStats('skirmisher')],
-    },
-    {
-      heading: 'Ring values',
-      paragraphs: [
-        `E creates ${SKIRMISHER_RING_COUNT} evenly spaced shots around the hull. The local laser cap for regular Space shots is ${SHIP.MAX_LASERS}.`,
-      ],
-    },
-  ],
-  quake: [
-    {
-      heading: 'Quake values',
-      paragraphs: [shipStats('quake')],
-    },
-    {
-      heading: 'Pulse and fuel values',
-      paragraphs: [
-        `E costs ${FUEL.EMP_COST} fuel, reaches ${SHIP_ABILITY.SHOCK_RADIUS} units, and applies force ${SHIP_ABILITY.SHOCK_FORCE} with distance falloff and an edge force ratio of ${SHIP_ABILITY.SHOCK_EDGE_FORCE_RATIO}. It pushes nearby physical objects without direct damage. A life starts with ${FUEL.START} fuel and the tank maximum is ${FUEL.MAX}.`,
-      ],
-    },
-  ],
-  'fuel-growth': [
-    {
-      heading: 'Fuel values',
-      paragraphs: [
-        `Fuel per life: ${FUEL.START} start and ${FUEL.MAX} maximum. A rock at least ${FUEL.MIN_ROID_SIZE_TO_DROP} units in size can drop ${FUEL.DROP_AMOUNT} fuel. Quake E costs ${FUEL.EMP_COST}.`,
-      ],
-    },
+  'loot-growth': [
     {
       heading: 'Growth and loot values',
       paragraphs: [
         `Growth starts at mass ${GROWTH.BASE_MASS}, soft-caps at ${GROWTH.SOFT_MAX_MASS}, caps size scaling at ${GROWTH.MAX_SIZE_SCALE}, and bottoms out at thrust scale ${GROWTH.MIN_THRUST_SCALE} and speed scale ${GROWTH.MIN_SPEED_SCALE}. A kill always contributes at least ${GROWTH.BASE_KILL_MASS} mass, converts ${GROWTH.DROP_FRACTION * 100}% of excess mass, targets ${GROWTH.PELLET_MASS} mass per pellet, allows at most ${GROWTH.MAX_PELLETS} pellets, and caps live loot at ${GROWTH.MAX_LOOT}. Loot lasts ${seconds(GROWTH.LOOT_TTL_FRAMES)}.`,
-        `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}; fuel drops have radius ${FUEL.DROP_RADIUS}. A living ship magnetizes drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL} added to the drop's current velocity. Pickup overlap uses the ship's mass-scaled hull radius plus the drop radius.`,
+        `Wreckage and shard drops have radius ${GROWTH.LOOT_RADIUS}. A living ship magnetizes drops within ${GROWTH.LOOT_MAGNET_RANGE} units with acceleration ${GROWTH.LOOT_MAGNET_ACCEL} added to the drop's current velocity. Pickup overlap uses the ship's mass-scaled hull radius plus the drop radius.`,
         `Shard score: ${GROWTH.SHARD_SCORE}. A reflective core grants ${ASTEROID_INTERACTIONS.coreCharges} charges, scores ${ASTEROID_INTERACTIONS.coreScore}, lasts ${ASTEROID_INTERACTIONS.coreLifetimeMs / 1000} seconds, and uses a maximum laser energy of ${ASTEROID_INTERACTIONS.maxLaserEnergy}.`,
       ],
     },
@@ -193,13 +142,13 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Combat values',
       paragraphs: [
         `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; ship hull and shield radii stay independent of that projectile size. A normal laser hit deals ${DAMAGE.LASER_HIT}; player collision damage is ${DAMAGE.PLAYER_COLLISION_PER_SECOND} per second in ${DAMAGE.PLAYER_COLLISION_INTERVAL_MS} millisecond ticks (${shipShipTickDamage()} damage per tick); an asteroid collision deals ${DAMAGE.ASTEROID_COLLISION}; a boundary impact deals ${DAMAGE.BOUNDARY_COLLISION}; and exploding loot deals ${LOOT_BLAST.DAMAGE}.`,
-        `The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds with a ${SHIELD.COOLDOWN_SECONDS} second cooldown. Warden F lasts ${SHIELD.WARDEN_DURATION_SECONDS} seconds and its E projection lasts ${frameValue(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES)}. Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
+        `The regular F shield lasts ${SHIELD.DURATION_SECONDS} seconds with a ${SHIELD.COOLDOWN_SECONDS} second cooldown. Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Humans start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; human respawns use the asteroid field radius. Respawn restores ${FUEL.START} fuel out of ${FUEL.MAX}.`,
+        `Humans start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; human respawns use the asteroid field radius.`,
         `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },

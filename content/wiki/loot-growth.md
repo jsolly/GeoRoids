@@ -1,11 +1,9 @@
 ---
-title: Fuel, loot, and growth
+title: Loot and growth
 category: Systems
-summary: Fuel powers Quake's shock pulse. Collect loot to grow, or shoot a drop
-  to create a dangerous blast.
+summary: Collect loot to grow, or shoot a drop to create a dangerous blast.
 order: 80
 related:
-  - content/wiki/quake.md
   - content/wiki/hauler.md
   - content/wiki/asteroids.md
   - content/wiki/satellites.md
@@ -15,26 +13,19 @@ media:
     demo: loot
 ---
 
-## Fuel
-
-Every kit starts a life with fuel and has a fixed fuel maximum. An asteroid
-above the fuel-drop size threshold can drop a fuel pickup. A pilot at full fuel
-cannot collect it. Quake E is refused when the tank cannot pay its cost.
-
 ## Loot and mass
 
 Growth uses the same base health curve for every kit. When a pickup raises
 maximum health, it adds the same amount to current health; it does not fully
 repair existing damage. For a heavy kit such as Hauler, the first small mass
-pickup can lower its starting maximum health to the shared growth value. Fuel
-and laser cores do not add mass.
+pickup can lower its starting maximum health to the shared growth value. Laser cores do not add mass.
 
 Asteroid breaks can release shards, and a ship kill releases wreckage. A kill
 converts a base amount plus a fraction of the destroyed ship's excess mass into
 pellets, subject to per-pellet and global limits. Loot expires after its
 configured lifetime. A nearby drop is pulled toward a living ship once it comes
 within magnet range. The pull adds to whatever motion the drop already has,
-including a Quake knockback. Collecting still happens when the drop overlaps
+including motion from its existing velocity. Collecting still happens when the drop overlaps
 the hull, not an inflated ship hitbox. Mass follows a shared growth curve:
 greater mass raises radius and health capacity while reducing thrust and speed;
 the growth model soft-caps mass, caps size scaling, and enforces minimum thrust

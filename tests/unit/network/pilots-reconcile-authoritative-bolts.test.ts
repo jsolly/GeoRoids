@@ -151,7 +151,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('a local muzzle flash stays a moving bolt while older snapshots arrive before its acknowledgement', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('dart');
+    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
     const ws = await connect();
     const empty = frame([]);
     const entity = empty.entities[0];
@@ -192,7 +192,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('rejected, timed-out and disconnected predictions leave no ghost and receipts cannot claim another shot', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('dart');
+    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
     const ws = await connect();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
     local.ship.fireLaser();
@@ -228,7 +228,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('a stalled connection expires a stationary prediction without another snapshot or trigger', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('dart');
+    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
     const ws = await connect();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
     vi.spyOn(canvasManager, 'getCanvas').mockReturnValue(document.createElement('canvas'));
@@ -261,7 +261,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
   });
 
   test('a client joining a server without shot receipts does not duplicate its authoritative bolt', async () => {
-    const local = PlayerManager.getInstance().createLocalPlayer('dart');
+    const local = PlayerManager.getInstance().createLocalPlayer('surveyor');
     const ws = await connect();
     acknowledge(ws, false);
     local.ship.fireLaser();

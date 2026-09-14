@@ -1,12 +1,12 @@
 ---
 title: Read the field
 category: Start here
-summary: Learn the five ships, read the hazards, and understand what happens
+summary: Learn the two ships, read the hazards, and understand what happens
   when you fire, collide, collect, and respawn.
 order: 10
 related:
   - content/wiki/controls.md
-  - content/wiki/dart.md
+  - content/wiki/surveyor.md
   - content/wiki/asteroids.md
   - content/wiki/hud-network.md
 ---
@@ -17,7 +17,8 @@ pickups, sloping terrain, and pilots who can be assigned to
 the ION or EMBER side. Choose a kit, learn its E ability, then read the arena
 entries for the rules that every pilot shares.
 
-The starting kits are Dart, Hauler, Warden, Skirmisher, and Quake. Their
+Choose Surveyor for nimble exploration and mineral scanning, or Hauler for
+asteroid towing, throwing, and stronger mining lasers. Their
 starting health, handling, shot interval, and ability cooldowns are fixed by
 the kit data; loot changes a living ship's mass and health curve during a
 life, while a respawn resets that growth.

@@ -1,5 +1,6 @@
+import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
-import { DEFAULT_SHIP_KIT_ID, type ShipKitId } from '../../entities/ship/shipKits';
+import { DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
 import { strokeKitHullOutline } from '../../entities/ship/shipRenderer';
 
 import { layoutHudCluster } from './cluster';

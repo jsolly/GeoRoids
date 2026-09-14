@@ -1,10 +1,5 @@
-import { FUEL } from '../constants';
-import {
-  getShipKit,
-  SHIP_ABILITY,
-  type ShipAbilityId,
-  type ShipKitId,
-} from '../entities/ship/shipKits';
+import type { ShipKitId } from '../../shared-types';
+import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
 import {
   canActivateShield,
   isShieldBlockingLasers,
@@ -12,13 +7,7 @@ import {
   shieldCooldownFrames,
 } from '../entities/ship/shipShield';
 
-const ABILITY_LABEL: Record<ShipAbilityId, string> = {
-  boostDash: 'DASH',
-  harpoon: 'HOOK',
-  shieldFocus: 'GUARD',
-  ringFire: 'RING',
-  shockPulse: 'PULSE',
-};
+const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
 
 type AbilityChromeHost = {
   kitId: ShipKitId | string;
@@ -26,7 +15,6 @@ type AbilityChromeHost = {
   health: number;
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
-  fuel?: number;
 };
 
 type AbilityChromeState = {
@@ -61,10 +49,10 @@ export function touchAbilityLabel(kitId: unknown): string {
 
 export function touchAbilityName(kitId: unknown): string {
   const kit = getShipKit(kitId);
-  return kit.abilityId === 'shieldFocus' ? 'Projected ally shield' : kit.abilityName;
+  return kit.abilityName;
 }
 
-export function abilityCooldownRatio(
+function abilityCooldownRatio(
   kitId: unknown,
   cooldownFrames: number,
   maxFrames: number = SHIP_ABILITY.COOLDOWN_FRAMES[getShipKit(kitId).id]
@@ -75,22 +63,11 @@ export function abilityCooldownRatio(
   return Math.min(1, Math.max(0, cooldownFrames / maxFrames));
 }
 
-export function canAffordTouchAbility(host: AbilityChromeHost): boolean {
-  const kit = getShipKit(host.kitId);
-  if (kit.abilityId !== 'shockPulse') {
-    return true;
-  }
-  if (host.fuel === undefined) {
-    return true;
-  }
-  return Number.isFinite(host.fuel) && host.fuel >= FUEL.EMP_COST;
-}
-
 export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const kit = getShipKit(host.kitId);
   const alive = !host.exploding && Number.isFinite(host.health) && host.health > 0;
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
-  const unavailable = !alive || !canAffordTouchAbility(host);
+  const unavailable = !alive;
   const active = Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0;
   return {
     label: ABILITY_LABEL[kit.abilityId],

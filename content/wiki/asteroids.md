@@ -5,7 +5,7 @@ summary: Asteroid material, size, shooter history, and reflection state
   determine damage, splits, rewards, and projectile behavior.
 order: 90
 related:
-  - content/wiki/fuel-growth.md
+  - content/wiki/loot-growth.md
   - content/wiki/factions.md
   - content/wiki/combat-survival.md
 media:

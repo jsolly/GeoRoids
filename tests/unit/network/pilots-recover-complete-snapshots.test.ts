@@ -18,7 +18,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     ship.position = { x: 1.23456789, y: -2.34567891 };
     ship.velocity = { x: 0.00001234, y: -0.00002345 };
     ship.angle = 2 * Math.PI;
-    ship.fuel = 45.12345678;
+
     ship.playerMotion = { epoch: 7, mode: 'handoff', ack: 101, anchor: ship.position };
     asteroid.position = Object.assign(
       { x: 1.23456789, y: -2.34567891 },
@@ -127,7 +127,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       for (const ship of world.entities) {
         ship.abilityActiveFrames = tick < 25 ? 25 - tick : 0;
         ship.abilityCooldownFrames = tick < 50 ? 50 - tick : 0;
-        ship.shieldTimer = tick < 10 ? 10 - tick : 0;
+
         ship.shieldCooldown = tick < 50 ? 50 - tick : 0;
       }
       if (tick < 20) {
@@ -144,7 +144,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         pilot.respawnTimer = 60 - tick;
         pilot.deathCause = 'boundary';
       }
-      pilot.fuel = tick < 70 ? 50 - tick / 2 : 80;
+
       if (tick >= 80) {
         world.entities.pop();
         world.loot = [];

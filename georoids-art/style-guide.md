@@ -20,7 +20,7 @@ Also: collectible **EO satellite** pickups (six distinct hardware silhouettes, l
 
 Ship classes and soft faction marks are detailed in [`ships-and-factions.md`](ships-and-factions.md). Beauty bar and locked playfield palette above still rule.
 
-**Locked roster v1:** Dart (boost dash, glass) · Hauler (loot magnet, slow) · Warden (longer shield) · Skirmisher (burst/ricochet, glass cannon) · Quake (local contour bump).
+**Current roster:** Surveyor (nimble mineral scanner) and Hauler (asteroid towing, throwing, and mining).
 
 **Soft-faction rule:** Two calm space factions (ION / EMBER) auto-balance for friendly-fire-off + collab readability. Marks only — tiny chevron/dot/arc or thruster tip (2–4px). **Not** team mode: no team scoreboards, shared win banners, or full-hull team paints. Personal score still; ownership colors (local / remote / bot) stay primary.
 

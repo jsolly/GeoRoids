@@ -281,12 +281,11 @@ body.in-play {
   color: var(--palette-hud-muted, #64748b);
 }
 
-.ship-kit-placeholder-note {
-  margin: 0.45em 0 0;
-  font-size: 0.5rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--palette-hud-muted, #64748b);
+.ship-kit-role {
+  font-size: 0.6rem;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--palette-hud, #e2e8f0);
 }
 
 /* Game modes section */

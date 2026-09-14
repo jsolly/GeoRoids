@@ -71,8 +71,7 @@ describe('player motion recovery', () => {
     );
     expect(prediction.shouldSuppressShipMove()).toBe(false);
     ship.position.x += 4;
-    ship.fuel = 5;
-    ship.lastLocalFuelWriteMs = 49;
+
     prediction.rebase(
       row({
         position: { x: 100, y: 50 },
@@ -83,8 +82,6 @@ describe('player motion recovery', () => {
       50
     );
     expect(ship.position.x).toBe(104); // Ordinary client prediction remains local.
-    expect(ship.fuel).toBe(5); // Motion reconciliation preserves local fuel prediction.
-    expect(ship.lastLocalFuelWriteMs).toBe(49);
   });
 
   it('rejects older epochs and acknowledgments and never resurrects local predicted death', () => {

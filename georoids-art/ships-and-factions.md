@@ -1,35 +1,15 @@
-# GeoRoids — ships and factions (AD v2 bake)
+# GeoRoids ships and factions
 
-Art-box replica of AD v2 **topology**. John locked silhouette v2 on 2026-09-06
-via Game Director. `AD_V2_HULL_BAKE_LOCKED` is **true**. Bake against v2 only —
-no v1 silhouettes.
+The playable roster is Surveyor and Hauler. Surveyor reuses the established
+needle geometry; Hauler keeps the barge geometry and cream harpoon cable.
+Runtime and SVG geometry live in `src/entities/ship/hullOutlines.ts`.
+The current pack is `georoids-art/ships-v2/{surveyor,hauler}.svg`.
+Stroke is `#5EEAD4` on `#000011`, with a play-scale target around 32px.
 
-Stroke `#5EEAD4` on `#000011`. Play-scale target ~32px. Matt-blush outline Asteroids.
-
-Canonical sheets (John lock): `ship-silhouettes-contact-v2.png` /
-`ship-silhouettes-play-scale-v2.png`. Runtime + SVG source:
-`src/entities/ship/hullOutlines.ts`. Pack copies:
-`georoids-art/ships-v2/{dart,hauler,warden,skirmisher,quake}.svg`.
-
-Sheet construction (play-scale must still read class at a glance):
-
-- Dart — 6-point needle; two downward tail fins; small inverted-V notch
-- Hauler — squat barge; flat keel; vertical sides; single bow apex
-- Warden — tall delta with flat aft edges, a shallow triangular notch and detached shield arc
-- Skirmisher — tall forked prongs; deep inner valley; two aft tips around a second notch
-- Quake — triangular peak, stepped cross ledges and a narrower flat rear stem
-
-## Kits (John lock — exactly five)
-
-There is **no Hook sixth ship class**. Harpoon is a **Hauler-only** ability.
-
-| Kit | Topology | Ability |
+| Kit | Hull | Role |
 | --- | --- | --- |
-| Dart | needle — tall thin isosceles; inverted-V notch at aft | Boost dash |
-| Hauler | barge hex — wide low polygon; flat keel; faceted bow | **Harpoon** (tether / latch) |
-| Warden | Δ + forward shield arc — detached arc above the apex | Shield |
-| Skirmisher | Y-fork — two forward prongs; notched aft | Ring fire |
-| Quake | terraced mountain — triangular peak, cross ledges, narrow rear stem | Shock pulse |
+| Surveyor | Six-point needle with an aft notch | Nimble exploration and radar mineral scan |
+| Hauler | Seven-point barge with a flat keel | Tow and throw rocks; stronger mining lasers |
 
 Soft factions stay on the factions stream (#465). Names stay **ION** / **EMBER**.
 Hull, label and minimap colors indicate faction; marks also use `FACTION_MARK_PAINTERS`:
@@ -44,22 +24,19 @@ Ion hulls and names are blue; Ember hulls and names are orange. Bot labels appen
 
 ## Harpoon (Hauler only)
 
-John lock via Game Director. This **is** the Hauler ability — latch, haul, and
-tether VFX. It is not a sixth class and not “VFX-only until Hook.”
-
 - Only the Hauler kit may activate or draw harpoon
 - Latch one nearby rock (forward hemisphere preferred, else nearest in range)
 - While latched, haul that rock toward the Hauler
 - Tether VFX is Hauler only — cream line `#E8D5A3` + amber tip `#FDE68A`
-- Never draw the cream harpoon cable on Dart / Warden / Skirmisher / Quake
+- Never draw the cream harpoon cable on Surveyor
 
 See `src/entities/ship/shipAbilities.ts` and `drawHaulerHarpoonVfx`.
 
-## Warden shield projection
+## Surveyor scan
 
-Warden links to a nearby friendly with a thin mint line (`#7DD3C8`). The recipient
-shows the same transparent shield ring as F. Keep the link distinct from the
-Hauler's cream cable and amber tip; never fill the shield disc.
+Nearby radar asteroids temporarily use circles for ice, squares for metal,
+and triangles for rubble, with a text legend. The hull shows a scan ring.
+The normal F shield remains a separate mint ring for both ships.
 
 ## EO satellite pickups
 
@@ -69,6 +46,6 @@ The source pack contained briefs but no EO vector assets. Codex completed the ha
 
 ## Mineral asteroids
 
-Ice has clean crystal facets and straight spreading shards. Metal has compact plated facets, survives three ordinary shots, shows progressive cracks and yields a denser shard. Rubble has a broken perimeter and separates into three unequal fragments when large enough. Fragment size and the field cap bound growth. All three retain neutral asteroid ink; none uses faction paint.
+Ice has clean crystal facets and straight spreading shards. Metal has compact plated facets, survives three Surveyor shots or two Hauler shots, shows progressive cracks and yields a denser shard. Rubble has a broken perimeter and separates into three unequal fragments when large enough. Fragment size and the field cap bound growth. All three retain neutral asteroid ink; none uses faction paint.
 
 `personality-roids/` contains the matching SVGs and a play-scale contact sheet. The server owns composition, health, fragments and rewards; clients render the same material after join or reconnect.

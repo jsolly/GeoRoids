@@ -339,7 +339,7 @@ main:focus {
 }
 .ship-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 .ship-card {
@@ -880,9 +880,6 @@ tbody th {
   }
   .hero-links .primary-link {
     gap: 18px;
-  }
-  .ship-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .ship-card svg {
     width: 66px;

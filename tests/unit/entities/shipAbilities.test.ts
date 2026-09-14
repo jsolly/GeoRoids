@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
-import { FUEL, GAME } from '../../../src/constants';
+import { GAME } from '../../../src/constants';
 import {
   bindHarpoonFieldSource,
   harpoonBodyFromRock,
@@ -11,10 +11,7 @@ import {
   type AbilityHost,
   activateAbilityOnHost,
   applySharedHarpoonLatch,
-  applyShockPulse,
-  canActivateAbility,
   diagnoseHarpoonLatch,
-  findFriendlyShieldTarget,
   findHarpoonTarget,
   harpoonLatchRange,
   harpoonSurfaceGap,
@@ -34,22 +31,10 @@ function host(kitId: AbilityHost['kitId']): AbilityHost {
     health: 100,
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
-    shieldTimer: 0,
+
     harpoonTimer: 0,
-    fuel: FUEL.START,
-    maxFuel: FUEL.MAX,
   };
 }
-
-test('Dart boost dash adds forward velocity', () => {
-  const dart = host('dart');
-  const result = activateAbilityOnHost(dart);
-  expect(result.activated).toBe(true);
-  expect(result.abilityId).toBe('boostDash');
-  expect(dart.velocity.x).toBeCloseTo(SHIP_ABILITY.DASH_BOOST);
-  expect(canActivateAbility(dart)).toBe(false);
-  expect(dart.harpoonTimer).toBe(0);
-});
 
 test('Hauler reels only the latched rock toward itself when no enemy or momentum exists', () => {
   const hauler = host('hauler');
@@ -74,16 +59,16 @@ test('harpoon latches the nearer rock even if a farther rock is ahead', () => {
 });
 
 test('non-Hauler kits never latch or haul', () => {
-  const dart = host('dart');
+  const surveyor = host('surveyor');
   const rock = { id: 'rock', position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } };
-  activateAbilityOnHost(dart, { asteroids: [rock], entities: [] });
-  expect(dart.harpoonTargetId).toBeUndefined();
-  dart.harpoonTimer = 90;
-  dart.harpoonTargetId = 'rock';
-  dart.kitId = 'dart';
-  pullHarpoonTarget(dart, [rock]);
+  activateAbilityOnHost(surveyor, { asteroids: [rock], entities: [] });
+  expect(surveyor.harpoonTargetId).toBeUndefined();
+  surveyor.harpoonTimer = 90;
+  surveyor.harpoonTargetId = 'rock';
+  surveyor.kitId = 'surveyor';
+  pullHarpoonTarget(surveyor, [rock]);
   expect(rock.velocity.x).toBe(0);
-  expect(dart.harpoonTimer).toBe(0);
+  expect(surveyor.harpoonTimer).toBe(0);
 });
 
 test('unpublished canvas still reaches a 1080p-near rock', () => {
@@ -188,21 +173,21 @@ test('Hauler harpoon latches a nearby ship and hauls only that ship', () => {
   hauler.id = 'hauler-1';
   const near: AbilityBody = {
     kind: 'ship',
-    id: 'dart-1',
+    id: 'surveyor-1',
     position: { x: 80, y: 0 },
     velocity: { x: 0, y: 0 },
     health: 100,
   };
   const far: AbilityBody = {
     kind: 'ship',
-    id: 'dart-2',
+    id: 'surveyor-2',
     position: { x: 200, y: 0 },
     velocity: { x: 0, y: 0 },
     health: 100,
   };
   const result = activateAbilityOnHost(hauler, { asteroids: [], entities: [near, far] });
   expect(result.activated).toBe(true);
-  expect(hauler.harpoonTargetId).toBe('dart-1');
+  expect(hauler.harpoonTargetId).toBe('surveyor-1');
   pullHarpoonTarget(hauler, [near, far]);
   expect(near.velocity.x).toBeLessThan(0);
   expect(far.velocity.x).toBe(0);
@@ -318,7 +303,7 @@ test('diagnoseHarpoonLatch reports kit, nearest gap, and chosen target', () => {
   expect(probe.nearest?.reason).toBe('ok');
 });
 
-test('harpoon skips self, same-side mates, and a Warden shield', () => {
+test('harpoon skips self, same-side mates, and an active shield', () => {
   const hauler = host('hauler');
   hauler.id = 'hauler-1';
   hauler.factionId = 'ion';
@@ -331,12 +316,12 @@ test('harpoon skips self, same-side mates, and a Warden shield', () => {
     health: 100,
   };
   const shielded = {
-    id: 'warden',
+    id: 'shielded',
+    shieldActive: true,
     position: { x: 50, y: 0 },
     velocity: { x: 0, y: 0 },
     factionId: 'ember' as const,
     health: 100,
-    shieldTimer: 40,
   };
   const foe = {
     id: 'foe',
@@ -353,14 +338,19 @@ test('harpoon skips a timed ship shield', () => {
   const hauler = host('hauler');
   hauler.id = 'hauler-1';
   const shielded = {
-    id: 'dart-1',
+    id: 'surveyor-1',
     position: { x: 50, y: 0 },
     velocity: { x: 0, y: 0 },
     health: 100,
     shieldActive: true,
   };
-  const foe = { id: 'dart-2', position: { x: 90, y: 0 }, velocity: { x: 0, y: 0 }, health: 100 };
-  expect(findHarpoonTarget(hauler, [shielded, foe])?.id).toBe('dart-2');
+  const foe = {
+    id: 'surveyor-2',
+    position: { x: 90, y: 0 },
+    velocity: { x: 0, y: 0 },
+    health: 100,
+  };
+  expect(findHarpoonTarget(hauler, [shielded, foe])?.id).toBe('surveyor-2');
 });
 
 test('server latch copies the field pose so the cream tip has a world point', () => {
@@ -396,197 +386,12 @@ test('local and remote adopt the same server latch', () => {
   expect(remote.harpoonTargetId).toBeUndefined();
 });
 
-test('Warden E projects a reflecting shield onto a nearby friendly ship', () => {
-  const warden = host('warden');
-  warden.id = 'warden-1';
-  warden.factionId = 'ion';
-  const friendly: AbilityBody = {
-    id: 'friendly-1',
-    kind: 'ship' as const,
-    factionId: 'ion' as const,
-    position: { x: 100, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const enemy: AbilityBody = {
-    id: 'enemy-1',
-    kind: 'ship' as const,
-    factionId: 'ember' as const,
-    position: { x: 40, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const result = activateAbilityOnHost(warden, { asteroids: [], entities: [friendly, enemy] });
-  expect(result).toEqual({ activated: true, abilityId: 'shieldFocus' });
-  expect(warden.shieldTargetId).toBe('friendly-1');
-  expect(warden.shieldTimer).toBe(0);
-  expect(warden.abilityActiveFrames).toBe(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES);
-  expect(friendly.shieldTimer).toBe(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES);
-  expect(friendly.shieldSourceId).toBe('warden-1');
-  expect(enemy.shieldTimer).toBeUndefined();
-});
-
-test('Warden E prefers any forward teammate before a nearer rear teammate', () => {
-  const warden = host('warden');
-  warden.id = 'warden-1';
-  warden.factionId = 'ion';
-  const rear = {
-    id: 'rear',
-    kind: 'ship' as const,
-    factionId: 'ion' as const,
-    position: { x: -20, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const forward = {
-    id: 'forward',
-    kind: 'ship' as const,
-    factionId: 'ion' as const,
-    position: { x: 100, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  expect(findFriendlyShieldTarget(warden, [rear, forward])?.id).toBe('forward');
-});
-
-test('Warden E falls back to the nearest valid rear teammate with a stable tie break', () => {
-  const warden = host('warden');
-  warden.id = 'warden-1';
-  warden.factionId = 'ion';
-  const farther = {
-    id: 'z-friend',
-    kind: 'ship' as const,
-    factionId: 'ion' as const,
-    position: { x: -100, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const nearer = {
-    id: 'a-friend',
-    kind: 'ship' as const,
-    factionId: 'ion' as const,
-    position: { x: -60, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  expect(findFriendlyShieldTarget(warden, [farther, nearer])?.id).toBe('a-friend');
-  const tieB = { ...farther, id: 'b-friend' };
-  const tieA = { ...farther, id: 'a-friend' };
-  expect(findFriendlyShieldTarget(warden, [tieB, tieA])?.id).toBe('a-friend');
-});
-
-test('Warden ignores forged viewport reach and falls back from an out-of-range forward ally', () => {
-  const warden = host('warden');
-  warden.id = 'warden-1';
-  warden.factionId = 'ion';
-  const far: AbilityBody = {
-    id: 'far-forward',
-    kind: 'ship',
-    factionId: 'ion',
-    position: { x: 1000, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  const viewport = {
-    playfieldScale: Number.MIN_VALUE,
-    canvas: { width: Number.MAX_VALUE, height: Number.MAX_VALUE },
-  };
-  expect(activateAbilityOnHost(warden, { asteroids: [], entities: [far], ...viewport })).toEqual({
-    activated: false,
-  });
-  expect(warden.abilityCooldownFrames).toBe(0);
-  expect(far.shieldTimer).toBeUndefined();
-  const near: AbilityBody = {
-    ...far,
-    id: 'near-rear',
-    position: { x: -100, y: 0 },
-  };
-  expect(
-    activateAbilityOnHost(warden, { asteroids: [], entities: [far, near], ...viewport }).activated
-  ).toBe(true);
-  expect(warden.shieldTargetId).toBe('near-rear');
-  expect(near.shieldTimer).toBe(SHIP_ABILITY.SHIELD_PROJECTION_FRAMES);
-  expect(far.shieldTimer).toBeUndefined();
-});
-
-test('Warden E whiffs without a live same-faction teammate and keeps cooldown ready', () => {
-  const warden = host('warden');
-  warden.id = 'warden-1';
-  warden.factionId = 'ion';
-  const result = activateAbilityOnHost(warden, {
-    asteroids: [],
-    entities: [
-      {
-        id: 'enemy',
-        kind: 'ship',
-        factionId: 'ember',
-        position: { x: 40, y: 0 },
-        velocity: { x: 0, y: 0 },
-        health: 100,
-      },
-      {
-        id: 'dead-mate',
-        kind: 'ship',
-        factionId: 'ion',
-        position: { x: 40, y: 0 },
-        velocity: { x: 0, y: 0 },
-        health: 0,
-      },
-    ],
-  });
-  expect(result).toEqual({ activated: false });
-  expect(warden.abilityCooldownFrames).toBe(0);
-  expect(warden.abilityActiveFrames).toBe(0);
-  expect(warden.shieldTargetId).toBeUndefined();
-});
-
-test('projected shield timers expire on both the caster and recipient', () => {
-  const warden = host('warden');
-  warden.id = 'warden-1';
-  warden.factionId = 'ion';
-  const friend = {
-    ...host('dart'),
-    id: 'friend-1',
-    kind: 'ship' as const,
-    factionId: 'ion' as const,
-    position: { x: 80, y: 0 },
-    velocity: { x: 0, y: 0 },
-    health: 100,
-  };
-  expect(activateAbilityOnHost(warden, { asteroids: [], entities: [friend] }).activated).toBe(true);
-  for (let frame = 0; frame < SHIP_ABILITY.SHIELD_PROJECTION_FRAMES; frame += 1) {
-    tickAbilityHost(warden);
-    tickAbilityHost(friend);
-  }
-  expect(warden.abilityActiveFrames).toBe(0);
-  expect(warden.shieldTargetId).toBeUndefined();
-  expect(friend.shieldTimer).toBe(0);
-  expect(friend.shieldSourceId).toBeUndefined();
-});
-
-test('Skirmisher E marks a full ring volley', () => {
-  const skirmisher = host('skirmisher');
-  const result = activateAbilityOnHost(skirmisher);
-  expect(result.abilityId).toBe('ringFire');
-});
-
-test('Quake shock pulse knocks nearby rocks and ships without terrain', () => {
-  const quake = host('quake');
-  const rock = { position: { x: 40, y: 0 }, velocity: { x: 0, y: 0 } };
-  const other = { position: { x: -40, y: 0 }, velocity: { x: 0, y: 0 } };
-  const result = activateAbilityOnHost(quake, { asteroids: [rock], entities: [other] });
-  expect(result.abilityId).toBe('shockPulse');
-  expect(rock.velocity.x).toBeGreaterThan(0);
-  expect(other.velocity.x).toBeLessThan(0);
-  applyShockPulse(quake, { asteroids: [], entities: [] });
-});
-
 test('ability cooldown ticks down', () => {
-  const dart = host('dart');
-  activateAbilityOnHost(dart);
-  const start = dart.abilityCooldownFrames;
-  tickAbilityHost(dart);
-  expect(dart.abilityCooldownFrames).toBe(start - 1);
+  const surveyor = host('surveyor');
+  activateAbilityOnHost(surveyor);
+  const start = surveyor.abilityCooldownFrames;
+  tickAbilityHost(surveyor);
+  expect(surveyor.abilityCooldownFrames).toBe(start - 1);
 });
 
 test('deep-zoom on-screen rock past the old 8000wu cap still latches', () => {
@@ -707,7 +512,6 @@ test('Hauler ignores allies, self, dead, respawning, shielded, and unreachable e
     { ...enemy('respawning', 180, 0), respawnTimer: 30 },
     { ...enemy('spawn', 180, 0), spawnProtectionTimer: 30 },
     { ...enemy('shield', 180, 0), shieldActive: true },
-    { ...enemy('projection', 180, 0), shieldTimer: 30 },
     { ...enemy('escaping', 180, 0), velocity: { x: 20, y: 0 } },
     enemy('distant', 10000, 0),
     hauler,

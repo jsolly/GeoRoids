@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import { GAME, SHIP } from '../../../src/constants';
+import { GAME } from '../../../src/constants';
 import { Player } from '../../../src/entities/player/Player';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp, reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { setTouchFire, setTouchHeading, tickTouchControls } from '../../../src/input/touchControls';
 
-const TURN = ((SHIP.TURN_SPEED / 180) * Math.PI) / GAME.FPS;
+const TURN = ((540 / 180) * Math.PI) / GAME.FPS;
 
 let player: Player;
 

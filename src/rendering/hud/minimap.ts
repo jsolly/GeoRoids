@@ -8,6 +8,7 @@ import type { Roid } from '../../entities/roid/Roid';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
 import type { Ship } from '../../entities/ship/Ship';
 import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
+import { scannedMaterial } from '../../entities/ship/surveyScan';
 import type { CircleBoundary } from '../../physics/boundary';
 import { getGameBoundary } from '../../physics/boundary';
 import { getFactionColor, hexToRgba } from '../../utils/colorUtils';
@@ -25,7 +26,7 @@ type RadarMark =
       factionId?: SoftFactionId;
     };
 
-const LOOT_MARK_KINDS = ['wreckage', 'shard', 'fuel', 'laserCore'] satisfies readonly LootKind[];
+const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore'] satisfies readonly LootKind[];
 
 // These marks stay visible at the radar's world scale without borrowing the
 // much larger playfield silhouettes.
@@ -157,35 +158,67 @@ function canDrawAsteroidOnMiniMap(roid: Roid): boolean {
 function drawAsteroidMarks(
   ctx: CanvasRenderingContext2D,
   roids: readonly Roid[],
-  geometry: MiniMapGeometry
+  geometry: MiniMapGeometry,
+  ship: Ship
 ): void {
   if (roids.length === 0) {
     return;
   }
 
   const { projection } = geometry;
-  let painted = false;
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = hexToRgba(PALETTE.ROID, 0.55);
+  for (const roid of roids) {
+    if (canDrawAsteroidOnMiniMap(roid) && projectPosition(geometry, roid.position)) {
+      ctx.rect(
+        projection.x - MINIMAP_ROID_SIZE / 2,
+        projection.y - MINIMAP_ROID_SIZE / 2,
+        MINIMAP_ROID_SIZE,
+        MINIMAP_ROID_SIZE
+      );
+    }
+  }
+  ctx.fill();
+  if (
+    ship.kitId !== 'surveyor' ||
+    ship.abilityActiveFrames <= 0 ||
+    ship.exploding ||
+    ship.health <= 0
+  ) {
+    ctx.restore();
+    return;
+  }
   for (const roid of roids) {
     if (!canDrawAsteroidOnMiniMap(roid) || !projectPosition(geometry, roid.position)) {
       continue;
     }
-    if (!painted) {
-      ctx.save();
-      ctx.fillStyle = hexToRgba(PALETTE.ROID, 0.55);
-      ctx.beginPath();
+    const material = scannedMaterial(ship, roid);
+    const x = projection.x,
+      y = projection.y;
+    ctx.beginPath();
+    switch (material) {
+      case 'ice':
+        ctx.fillStyle = '#A5F3FC';
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        break;
+      case 'metal':
+        ctx.fillStyle = '#FDE68A';
+        ctx.rect(x - 3, y - 3, 6, 6);
+        break;
+      case 'rubble':
+        ctx.fillStyle = '#FDBA74';
+        ctx.moveTo(x, y - 4);
+        ctx.lineTo(x + 3.5, y + 3);
+        ctx.lineTo(x - 3.5, y + 3);
+        ctx.closePath();
+        break;
+      case undefined:
+        continue;
     }
-    ctx.rect(
-      projection.x - MINIMAP_ROID_SIZE / 2,
-      projection.y - MINIMAP_ROID_SIZE / 2,
-      MINIMAP_ROID_SIZE,
-      MINIMAP_ROID_SIZE
-    );
-    painted = true;
-  }
-  if (painted) {
     ctx.fill();
-    ctx.restore();
   }
+  ctx.restore();
 }
 
 function addDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
@@ -198,12 +231,6 @@ function addDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, radius:
 
 function addLootMark(ctx: CanvasRenderingContext2D, drop: LootData, x: number, y: number): void {
   switch (drop.kind) {
-    case 'fuel':
-      ctx.moveTo(x - MINIMAP_LOOT_SIZE, y);
-      ctx.lineTo(x + MINIMAP_LOOT_SIZE, y);
-      ctx.moveTo(x, y - MINIMAP_LOOT_SIZE);
-      ctx.lineTo(x, y + MINIMAP_LOOT_SIZE);
-      return;
     case 'laserCore':
       addDiamond(ctx, x, y, MINIMAP_LOOT_SIZE);
       ctx.moveTo(x - 1, y + 1);
@@ -345,6 +372,24 @@ export function drawMiniMap(
     projection: { x: 0, y: 0 },
   };
 
+  if (
+    ship.kitId === 'surveyor' &&
+    ship.abilityActiveFrames > 0 &&
+    !ship.exploding &&
+    ship.health > 0
+  ) {
+    ctx.save();
+    ctx.fillStyle = PALETTE.HUD;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const legendX = miniMapX >= 70 ? miniMapX - 64 : miniMapX + miniMapSize + 6;
+    for (const [index, label] of ['○ Ice', '□ Metal', '△ Rubble'].entries()) {
+      ctx.fillText(label, legendX, miniMapY + index * 13);
+    }
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.beginPath();
   ctx.arc(centerX, centerY, miniMapSize / 2, 0, Math.PI * 2);
@@ -357,7 +402,7 @@ export function drawMiniMap(
   ctx.clip();
 
   try {
-    drawAsteroidMarks(ctx, roids, geometry);
+    drawAsteroidMarks(ctx, roids, geometry, ship);
     drawLootMarks(ctx, loot, geometry);
     drawLoosePickupMarks(ctx, pickups, geometry);
     drawOrbiterMarks(ctx, pickups, geometry);

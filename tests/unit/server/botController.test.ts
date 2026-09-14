@@ -19,17 +19,23 @@ import {
   shortestAngleDelta,
   turnToward,
 } from '../../../server/ai/shipMotion';
-import { GAME, LASER, SHIP } from '../../../src/constants';
+import { radiusFromMass } from '../../../shared/shipGrowth';
+import type { ShipKitId } from '../../../shared-types';
+import { GAME, LASER } from '../../../src/constants';
 import { generateLaserVelocity } from '../../../src/entities/laser/laserUtils';
 import { calculateLaserStartPosition } from '../../../src/entities/ship/shipUtils';
 
 const fixedRng = { random: () => 0.5 };
 
-function combatant(overrides: Partial<Combatant> & { angle?: number } = {}): Combatant & {
+function combatant(
+  overrides: Partial<Combatant> & { angle?: number; kitId?: ShipKitId } = {}
+): Combatant & {
   angle: number;
+  kitId: ShipKitId;
 } {
   return {
     id: overrides.id ?? 'bot',
+    kitId: overrides.kitId ?? 'surveyor',
     position: overrides.position ?? { x: 0, y: 0 },
     velocity: overrides.velocity ?? { x: 0, y: 0 },
     health: overrides.health ?? 100,
@@ -58,7 +64,7 @@ describe('bot aim math', () => {
   });
 
   test('turnToward caps at the shared ship turn rate', () => {
-    const maxTurn = shipTurnPerFrame() * BOT_AI.MOTION_STEPS;
+    const maxTurn = shipTurnPerFrame('surveyor') * BOT_AI.MOTION_STEPS;
     const next = turnToward(0, Math.PI, maxTurn);
     expect(Math.abs(shortestAngleDelta(0, next))).toBeCloseTo(maxTurn, 5);
     expect(Math.abs(next)).toBeLessThan(Math.PI / 2);
@@ -197,22 +203,55 @@ describe('bot fire cadence and thrust', () => {
 });
 
 describe('shared ship motion and shot spawn', () => {
-  test('bot motion never exceeds player max velocity', () => {
-    const ship = {
-      position: { x: 0, y: 0 },
-      velocity: { x: 0, y: 0 },
-      angle: 0,
-      thrusting: true,
-    };
-    applyShipMotionSteps(ship, 120);
-    expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(
-      SHIP.MAX_VELOCITY + 1e-9
-    );
-  });
+  test.each([
+    { kitId: 'surveyor' as const, speed: 1.125, turn: 540, acceleration: 0.046875 },
+    { kitId: 'hauler' as const, speed: 0.984375, turn: 380, acceleration: 0.0421875 },
+  ])(
+    '$kitId bots obey their advertised cruise cap and turn rate',
+    ({ kitId, speed, turn, acceleration }) => {
+      const ship = {
+        kitId,
+        position: { x: 0, y: 0 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: true,
+      };
+      const idle = {
+        ...ship,
+        position: { ...ship.position },
+        velocity: { ...ship.velocity },
+        thrusting: false,
+      };
+      applyShipMotionSteps(idle, 1);
+      applyShipMotionSteps(ship, 1);
+      expect(ship.velocity.x - idle.velocity.x).toBeCloseTo(acceleration, 10);
+      expect(ship.velocity.y).toBeCloseTo(idle.velocity.y, 10);
+      applyShipMotionSteps(ship, 119);
+      expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(speed + 1e-9);
+      expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(speed * 0.9);
+      const bot = combatant({ kitId });
+      const decision = decideBotAction(
+        bot,
+        combatant({ id: 'target', position: { x: -200, y: 0 } }),
+        memoryReadyToFire(),
+        fixedRng
+      );
+      expect(Math.abs(decision.angle)).toBeCloseTo(
+        ((turn * Math.PI) / 180 / GAME.FPS) * BOT_AI.MOTION_STEPS,
+        10
+      );
+    }
+  );
 
-  test('bot lasers spawn from the same muzzle math as players', () => {
+  test.each([
+    { kitId: 'surveyor' as const, radius: 15, mass: 1 },
+    { kitId: 'hauler' as const, radius: 19, mass: 1 },
+    { kitId: 'hauler' as const, radius: radiusFromMass(8), mass: 8 },
+  ])('$kitId bot at mass $mass fires from its hull muzzle', ({ kitId, radius, mass }) => {
     const bot = {
       id: 'server-bot-0',
+      kitId,
+      mass,
       name: 'Crimson Falcon',
       type: 'bot' as const,
       position: { x: 10, y: -4 },
@@ -227,8 +266,11 @@ describe('shared ship motion and shot spawn', () => {
       maxHealth: 100,
       lastUpdate: 0,
     };
+    if (mass > 1) {
+      expect(radius).toBeGreaterThan(19);
+    }
     const shot = makeBotShot(bot);
-    const muzzle = calculateLaserStartPosition(bot.position, bot.angle, SHIP.SIZE / 2);
+    const muzzle = calculateLaserStartPosition(bot.position, bot.angle, radius);
     const velocity = generateLaserVelocity(bot.angle, bot.velocity);
     expect(shot.laserStart.x).toBeCloseTo(muzzle.x, 10);
     expect(shot.laserStart.y).toBeCloseTo(muzzle.y, 10);

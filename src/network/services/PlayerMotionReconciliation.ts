@@ -58,10 +58,6 @@ export class PlayerMotionReconciliation {
       !finiteMotionVector(snapshot.position) ||
       !finiteMotionVector(snapshot.velocity) ||
       !Number.isFinite(snapshot.angle) ||
-      !Number.isFinite(snapshot.fuel) ||
-      !Number.isFinite(snapshot.maxFuel) ||
-      snapshot.fuel < 0 ||
-      snapshot.fuel > snapshot.maxFuel ||
       !Number.isFinite(snapshot.mass) ||
       snapshot.mass <= 0 ||
       (state.mode === 'handoff' && (!state.anchor || !finiteMotionVector(state.anchor)))
@@ -98,9 +94,6 @@ export class PlayerMotionReconciliation {
     // to Player.updateFromServer; motion/resources are reconciled here, while
     // ship.thrusting remains owned by local keyboard, mouse, and touch intent.
     if (state.mode !== 'free' || newEpoch || resumed || wasConstrained) {
-      ship.fuel = snapshot.fuel;
-      ship.maxFuel = snapshot.maxFuel;
-      ship.lastLocalFuelWriteMs = 0;
       ship.position = { ...snapshot.position };
       ship.velocity = { ...snapshot.velocity };
       ship.knockbackVelocityLimit = Math.hypot(snapshot.velocity.x, snapshot.velocity.y);

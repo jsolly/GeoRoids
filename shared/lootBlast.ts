@@ -3,7 +3,7 @@ import { GAME } from '../src/constants';
 
 /**
  * Shoot-a-drop blast (GH #313 / Todoist destroy-drop).
- * Applies to every loot kind so fuel can reuse the same arm later.
+ * Applies to every loot kind.
  */
 export const LOOT_BLAST = {
   RADIUS: 80,

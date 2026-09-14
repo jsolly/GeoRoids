@@ -138,7 +138,7 @@ describe('painted HUD composition', () => {
     vi.resetModules();
   });
 
-  test('three upright life hulls accompany the score, faction, kit and half-full fuel bar', async () => {
+  test('three upright life hulls accompany the score, faction, kit', async () => {
     expect(VISUAL.HUD_LIFE_SIZE).toBe(14);
     expect(VISUAL.HUD_LIFE_SIZE).toBeLessThan(SHIP.SIZE / 2);
     expect(VISUAL.HUD_INSET).toBe(16);
@@ -148,8 +148,8 @@ describe('painted HUD composition', () => {
     const { drawLivesIndicator } = await import('../../../src/rendering/hud/lives');
     const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
-    const player = PlayerManager.getInstance().createLocalPlayer('dart');
-    player.ship.fuel = player.ship.maxFuel / 2;
+    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+
     const ctx = canvasContext();
     const { strokes, texts } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
@@ -193,7 +193,7 @@ describe('painted HUD composition', () => {
         align: 'left',
       },
       {
-        text: 'Dart',
+        text: 'Surveyor',
         x: 16,
         y: 52,
         style: normalizedCanvasColor(ctx, 'rgba(100,116,139,0.85)'),
@@ -201,26 +201,70 @@ describe('painted HUD composition', () => {
         align: 'left',
       },
     ]);
-    expect(strokes.slice(-2)).toEqual([
-      {
-        points: [
-          [16, 70],
-          [88, 70],
-        ],
-        closed: false,
-        style: normalizedCanvasColor(ctx, '#64748B'),
-        width: 2,
-      },
-      {
-        points: [
-          [16, 70],
-          [52, 70],
-        ],
-        closed: false,
-        style: normalizedCanvasColor(ctx, '#E8D5A3'),
-        width: 2,
-      },
-    ]);
+  });
+
+  test('Surveyor radar classifies minerals during a scan and restores generic marks on expiry', async () => {
+    const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
+    const { Roid } = await import('../../../src/entities/roid/Roid');
+    const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
+    const { drawMiniMap, projectWorldToMiniMap } = await import(
+      '../../../src/rendering/hud/minimap'
+    );
+    const { getGameBoundary } = await import('../../../src/physics/boundary');
+    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
+    player.ship.position = { x: 0, y: 0 };
+    player.ship.abilityActiveFrames = 1;
+    const roids = (['ice', 'metal', 'rubble'] as const).map((material, index) => {
+      const rock = new Roid({ x: (index - 1) * 800, y: 0 }, 20, material);
+      rock.material = material;
+      return rock;
+    });
+    const ctx = canvasContext();
+    const { texts, filledPaths } = recordCanvas(ctx);
+    const arc = vi.spyOn(ctx, 'arc');
+    const line = vi.spyOn(ctx, 'lineTo');
+    const layout = computeHudLayout(ctx.canvas, { touchControls: false });
+    const centers = roids.map((rock) => {
+      const point = projectWorldToMiniMap(
+        getGameBoundary(),
+        layout.miniMap.x,
+        layout.miniMap.y,
+        layout.miniMap.size,
+        rock.position.x,
+        rock.position.y
+      );
+      if (!point) {
+        throw new Error('Mineral fixture must be inside radar');
+      }
+      return point;
+    });
+    const [ice, metal, rubble] = centers;
+    if (!ice || !metal || !rubble) {
+      throw new Error('All three mineral fixtures must project');
+    }
+    drawMiniMap(ctx, layout, player.ship, roids, [], []);
+    expect(texts.map(({ text }) => text)).toEqual(['○ Ice', '□ Metal', '△ Rubble']);
+    expect(arc).toHaveBeenCalledWith(ice.x, ice.y, 3, 0, Math.PI * 2);
+    expect(
+      filledPaths.find(({ style }) => style === normalizedCanvasColor(ctx, '#FDE68A'))?.rectangles
+    ).toEqual([{ x: metal.x - 3, y: metal.y - 3, width: 6, height: 6 }]);
+    expect(line).toHaveBeenCalledWith(rubble.x + 3.5, rubble.y + 3);
+    expect(line).toHaveBeenCalledWith(rubble.x - 3.5, rubble.y + 3);
+    expect(filledPaths.some(({ style }) => style === normalizedCanvasColor(ctx, '#FDBA74'))).toBe(
+      true
+    );
+    player.ship.abilityActiveFrames = 0;
+    texts.length = 0;
+    filledPaths.length = 0;
+    arc.mockClear();
+    drawMiniMap(ctx, layout, player.ship, roids, [], []);
+    expect(texts).toEqual([]);
+    expect(arc.mock.calls.every((call) => call[2] !== 3)).toBe(true);
+    expect(filledPaths).toHaveLength(2);
+    expect(filledPaths[1]?.rectangles).toHaveLength(3);
+    expect(
+      filledPaths[1]?.rectangles.every(({ width, height }) => width === 1.5 && height === 1.5)
+    ).toBe(true);
   });
 
   test('radar paints moving world marks and keeps pilots above live objects', async () => {
@@ -242,7 +286,7 @@ describe('painted HUD composition', () => {
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
     const { drawMiniMap } = await import('../../../src/rendering/hud/minimap');
     const { getGameBoundary } = await import('../../../src/physics/boundary');
-    const player = PlayerManager.getInstance().createLocalPlayer('dart');
+    const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
     player.ship.position = { x: 0, y: 0 };
     player.ship.angle = Math.PI / 2;
     const boundary = getGameBoundary();

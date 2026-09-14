@@ -1,6 +1,8 @@
-import type { Position, SoftFactionId, Velocity } from '../../shared-types';
-import { DEBUG, SHIP } from '../../src/constants';
+import { radiusFromMass } from '../../shared/shipGrowth';
+import type { Position, ShipKitId, SoftFactionId, Velocity } from '../../shared-types';
+import { DEBUG } from '../../src/constants';
 import { canDealCombatDamage } from '../../src/entities/player/softFactions';
+import { getShipKit } from '../../src/entities/ship/shipKits';
 import { calculateLaserStartPosition } from '../../src/entities/ship/shipUtils';
 import type { GameEntity } from '../core/EntityManager';
 import type { RNGService } from '../core/RNGService';
@@ -174,7 +176,7 @@ export function createBotMemory(rng: Pick<RNGService, 'random'>, heading: number
 }
 
 export function decideBotAction(
-  bot: Combatant & { angle: number },
+  bot: Combatant & { angle: number; kitId: ShipKitId },
   target: Combatant | null,
   memory: BotMemory,
   rng: Pick<RNGService, 'random'>
@@ -199,7 +201,7 @@ export function decideBotAction(
     desired = memory.wanderAngle;
   }
 
-  const maxTurn = shipTurnPerFrame() * BOT_AI.MOTION_STEPS;
+  const maxTurn = shipTurnPerFrame(bot.kitId) * BOT_AI.MOTION_STEPS;
   const nextAngle = turnToward(bot.angle, desired, maxTurn);
   angleError = shortestAngleDelta(nextAngle, desired);
   const facing = Math.abs(angleError) < BOT_AI.THRUST_ALIGN;
@@ -252,12 +254,16 @@ export function decideBotAction(
 }
 
 export function makeBotShot(
-  bot: Pick<GameEntity, 'id' | 'position' | 'velocity' | 'angle'>
+  bot: Pick<GameEntity, 'id' | 'position' | 'velocity' | 'angle' | 'kitId' | 'mass'>
 ): BotShot {
   const speed = laserSpeedPerFrame();
   return {
     botId: bot.id,
-    laserStart: calculateLaserStartPosition(bot.position, bot.angle, SHIP.SIZE / 2),
+    laserStart: calculateLaserStartPosition(
+      bot.position,
+      bot.angle,
+      Math.max(getShipKit(bot.kitId).size / 2, radiusFromMass(bot.mass))
+    ),
     laserDirection: {
       x: bot.velocity.x + Math.cos(bot.angle) * speed,
       y: bot.velocity.y - Math.sin(bot.angle) * speed,

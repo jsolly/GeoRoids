@@ -21,6 +21,7 @@ export const GROWTH = {
   LOOT_RADIUS: 12,
   /** Pull loot toward living ships from beyond hull overlap without inflating the hull. */
   LOOT_MAGNET_RANGE: 96,
+  LOOT_DRAG: 0.92,
   LOOT_MAGNET_ACCEL: 0.24 * GAME.MOTION_SCALE,
   SCATTER_MIN: 16,
   SCATTER_MAX: 40,

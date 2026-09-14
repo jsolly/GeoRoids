@@ -12,7 +12,6 @@ export default defineRailway(() => {
       startCommand: 'node --import tsx server.ts',
       healthcheckPath: '/health',
       healthcheckTimeout: 300,
-      requiredMountPath: '/data',
       multiRegionConfig: {
         iad: { numReplicas: 1 },
       },

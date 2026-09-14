@@ -1,17 +1,29 @@
+import { realpathSync } from 'node:fs';
+import { dirname, isAbsolute } from 'node:path';
+import { readServerConfiguration } from './server/configuration';
 import { createServerInstance } from './server/createServer';
 import { SERVER_RELEASE_ID } from './server/release';
 import { flushServerLogs, logger } from './setup/serverLogger';
 import { boundedDiagnosticError } from './shared/stateDiagnostics';
 
+const configuration = readServerConfiguration();
+const localWorld = configuration.nodeEnv === 'development' || configuration.nodeEnv === 'test';
 const worldPath =
-  process.env['GEOROIDS_WORLD_PATH'] ??
-  (process.env['NODE_ENV'] === 'development' || process.env['NODE_ENV'] === 'test'
-    ? '.data/world.sqlite'
-    : undefined);
+  process.env['GEOROIDS_WORLD_PATH'] ?? (localWorld ? '.data/world.sqlite' : undefined);
 if (!worldPath) {
   throw new Error('GEOROIDS_WORLD_PATH must point to the mounted persistent world volume');
 }
-const server = createServerInstance({ worldPath });
+if (!localWorld) {
+  const mountPath = process.env['RAILWAY_VOLUME_MOUNT_PATH'];
+  if (
+    !mountPath ||
+    !isAbsolute(worldPath) ||
+    realpathSync(dirname(worldPath)) !== realpathSync(mountPath)
+  ) {
+    throw new Error('Production world database must be directly inside RAILWAY_VOLUME_MOUNT_PATH');
+  }
+}
+const server = createServerInstance({ ...configuration, worldPath });
 let shuttingDown = false;
 let requestedExitCode = 0;
 

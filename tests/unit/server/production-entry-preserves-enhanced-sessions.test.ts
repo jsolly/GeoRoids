@@ -1,10 +1,10 @@
 /* @vitest-environment node */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRailwayContext, project, type ServiceNode } from 'railway/iac';
 import { afterEach, expect, test } from 'vitest';
@@ -42,7 +42,18 @@ async function waitFor<T>(read: () => T | undefined, label: string, timeout = 50
   throw new Error(`Timed out waiting for ${label}: ${output.slice(-6000)}`);
 }
 
-async function start(port = 0, worldPath: string | null = ':memory:'): Promise<number> {
+function worldDirectory(): string {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-production-world-'));
+  directories.push(directory);
+  return directory;
+}
+
+async function start(
+  port = 0,
+  worldPath: string | null = join(worldDirectory(), 'world.sqlite'),
+  mountPath: string | null = worldPath === null ? null : dirname(worldPath),
+  nodeEnv: string | null = 'production'
+): Promise<number> {
   const railwayStartCommand = railwayService?.deploy?.startCommand;
   if (!railwayStartCommand) {
     throw new Error('Railway IaC service start command is missing');
@@ -54,14 +65,21 @@ async function start(port = 0, worldPath: string | null = ':memory:'): Promise<n
   }
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    NODE_ENV: 'production',
     VITEST: 'false',
     PORT: String(port),
     SERVER_LOG_LEVEL: 'info',
   };
   delete env['GEOROIDS_WORLD_PATH'];
+  delete env['RAILWAY_VOLUME_MOUNT_PATH'];
+  delete env['NODE_ENV'];
+  if (nodeEnv !== null) {
+    env['NODE_ENV'] = nodeEnv;
+  }
   if (worldPath !== null) {
     env['GEOROIDS_WORLD_PATH'] = worldPath;
+  }
+  if (mountPath !== null) {
+    env['RAILWAY_VOLUME_MOUNT_PATH'] = mountPath;
   }
   child = spawn(command, args, {
     cwd: repo,
@@ -248,6 +266,34 @@ test('the production entry refuses to start without a persistent world path', as
   expect(child?.exitCode).not.toBe(0);
   expect(output).toContain('GEOROIDS_WORLD_PATH must point to the mounted persistent world volume');
 });
+
+test.each(['missing mount', 'different directory', 'in-memory database'])(
+  'the production entry refuses an ephemeral world with %s',
+  async (scenario) => {
+    const directory = worldDirectory();
+    const path = scenario === 'in-memory database' ? ':memory:' : join(directory, 'world.sqlite');
+    const mount = scenario === 'missing mount' ? null : worldDirectory();
+    await expect(start(0, path, mount)).rejects.toThrow('Production entry exited');
+    expect(child?.exitCode).toBe(1);
+    expect(output).toContain(
+      'Production world database must be directly inside RAILWAY_VOLUME_MOUNT_PATH'
+    );
+    expect(existsSync(join(directory, 'world.sqlite'))).toBe(false);
+  }
+);
+
+test.each([null, '', 'staging'])(
+  'a non-development deployment refuses an unmounted database with NODE_ENV=%s',
+  async (nodeEnv) => {
+    const path = join(worldDirectory(), 'world.sqlite');
+    await expect(start(0, path, null, nodeEnv)).rejects.toThrow('Production entry exited');
+    expect(child?.exitCode).toBe(1);
+    expect(output).toContain(
+      'Production world database must be directly inside RAILWAY_VOLUME_MOUNT_PATH'
+    );
+    expect(existsSync(path)).toBe(false);
+  }
+);
 
 test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and resumes pilots through transport grace', async () => {
   const port = await start();

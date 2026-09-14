@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed cooperative crew safety, persistent surveying and towing rewards, local fog radar and accessible universe landmarks, lethal ship boundary contact, crew-safe laser ricochets and retained asteroid bounces. Updated server/world source ownership and operational storage/mount/backup documentation. Actual desktop/mobile map and Wiki browser checks passed; all ten demonstrations and posters were visually reviewed during regeneration and the final Pillow 12.3.0 reproducibility check passed. Targeted boundary, storage rollback, production file restart and lifecycle tests passed; lint and types passed.",
+  "note": "Reviewed production startup mount enforcement and removed the Railway IaC property that live apply discarded. Operational docs identify server.ts as the enforcement point. Only explicit development/test modes may use local storage; production, unset/empty NODE_ENV and staging enforce the mount. No player-facing Wiki article, controls, rendering or demonstration behavior changed. Eleven actual production-entry scenarios passed, including mounted-file restart, missing mount, outside-directory and in-memory refusal; TypeScript, lint and Markdown checks passed. The cooperative gameplay and desktop/mobile Wiki review from PR 573 remains applicable.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:ec815fc7a20f349da173e60a9e599fb0b99cefc1ae31f0cd9d1588607c422547",
@@ -53,7 +53,7 @@
     "scripts/wiki-media.ts": "sha256:dcf9f70598527a6b16b7c4bc7473eafc171c32677aa6003f8b4d09afabffe05d",
     "scripts/wiki-satellite-demo.ts": "sha256:6338357a413986dc8aaa97cd41c26bffeb1faadd208b415a91e57aea8c238edc",
     "scripts/wiki-vite.ts": "sha256:0937b564c8d8a739553b0b4ce5fced88501c2f859bc21879aa3b83de7283a0b4",
-    "server.ts": "sha256:a94a76ee7823e1cdc109e31752ce63e90f5908b244641841eb9b135d1313c70a",
+    "server.ts": "sha256:c8d47500f85398da433088d9809f288d930623eab75d14449c19b325c182f430",
     "server/ai/botController.ts": "sha256:1688905937a27d054fc4c43cd2214a3f0701cc7c76ea8cf23bb736fa91b68292",
     "server/ai/shipMotion.ts": "sha256:1cd08dc04580aafbdd99a59acd9a39fa22d088f6c31000ad9b40545eab752a3b",
     "server/communication/MessageHandler.ts": "sha256:83a04bf8cd37f9392a344ca3aa521f2e7e350f77d04b3cadd98e9653a7dad7ff",

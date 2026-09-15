@@ -649,6 +649,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     assert.ok(initialJoinData, 'initial join data');
     expect(initialJoinData.snapshotVersion).toBe(1);
     expect(initialJoinData.asteroidInteractions).toBe(1);
+    expect(initialJoinData['clientReleaseId']).toMatch(/^(dev|[a-f0-9]{40})$/);
     expect(new URL(ws.url).searchParams.get('snapshotVersion')).toBe('1');
     expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
     if (initialJoinData.resumeToken !== undefined) {

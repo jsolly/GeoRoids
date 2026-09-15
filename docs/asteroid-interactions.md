@@ -35,11 +35,15 @@ Reflective phenomena are generated with each world sector and persist with its
 deposits during the current UTC month. Private resume tokens recover a
 browser's current score across disconnects and server restarts while the ship
 still has lives. They appear only on the joined socket, not in the common
-public world. A live reconnect while the ship still has lives keeps the current
-pose. After the socket is gone, Enter Game returns you to that ship for 30
-seconds; a longer gap starts a new flight with that score. Game over zeros the
-score and starts a new flight. At UTC month rollover, scores and the shared
-world both reset.
+public world. Join also records the client and server Git identities that
+issued that token and last wrote the score, plus the server times of those
+writes, so a later deploy can migrate saved progress. Server-only score writes
+omit a client identity. Those stamps do not replace the snapshot-v1 join gate.
+A live reconnect while the ship still has lives keeps the current pose. After
+the socket is gone, Enter Game returns you to that ship for 30 seconds; a
+longer gap starts a new flight with that score. Game over zeros the score and
+starts a new flight. At UTC month rollover, scores and the shared world both
+reset.
 
 ## Updating open clients
 

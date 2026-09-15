@@ -1,4 +1,5 @@
 import { validExploration } from '../../../shared/exploration';
+import { releaseField } from '../../../shared/releaseId';
 import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import {
   SNAPSHOT_VERSION,
@@ -50,6 +51,7 @@ import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
+import { getClientReleaseId } from '../../utils/buildInfo';
 import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
@@ -87,6 +89,7 @@ import { bindPageHideDisconnect, fillSnapshotEntityIds, isLocalGameEntity } from
 import {
   clearResumeCredential,
   isValidResumeToken,
+  readStoredResumeProvenance,
   readStoredResumeToken,
   storeResumeCredential,
 } from './resumeCredential';
@@ -858,6 +861,7 @@ export class ConnectionManager {
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         snapshotVersion: SNAPSHOT_VERSION,
         asteroidInteractions: 1,
+        clientReleaseId: getClientReleaseId(),
         ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),
       },
       timestamp: Date.now(),
@@ -866,6 +870,8 @@ export class ConnectionManager {
     logger.debug('NETWORK', 'Sending join message', {
       id: this.clientId,
       resumable: !!this.resumeToken,
+      clientReleaseId: getClientReleaseId(),
+      ...readStoredResumeProvenance(),
     });
     this.motionReconciliation.awaitAuthoritativePose();
     this.armJoinCompletionTimer();
@@ -1493,7 +1499,11 @@ export class ConnectionManager {
     this.shotAcknowledgements = data.shotAcknowledgements === true;
     this.currentProtocolReady = true;
     this.resumeToken = data.resumeToken;
-    storeResumeCredential(data.resumeToken, data.name);
+    storeResumeCredential(data.resumeToken, data.name, {
+      ...releaseField('credentialReleaseId', data.credentialReleaseId ?? data.serverReleaseId),
+      ...releaseField('scoreReleaseId', data.scoreReleaseId),
+      ...releaseField('clientReleaseId', getClientReleaseId()),
+    });
     if (data.serverReleaseId) {
       this.serverReleaseId = data.serverReleaseId;
       clientPerformance.serverReleaseId = data.serverReleaseId;
@@ -1509,6 +1519,12 @@ export class ConnectionManager {
       asteroidInteractions: 1,
       snapshotVersion: SNAPSHOT_VERSION,
       ...(data.serverReleaseId ? { serverReleaseId: data.serverReleaseId } : {}),
+      ...(data.credentialReleaseId ? { credentialReleaseId: data.credentialReleaseId } : {}),
+      ...(data.credentialIssuedAt !== undefined
+        ? { credentialIssuedAt: data.credentialIssuedAt }
+        : {}),
+      ...(data.scoreReleaseId ? { scoreReleaseId: data.scoreReleaseId } : {}),
+      ...(data.scoreUpdatedAt !== undefined ? { scoreUpdatedAt: data.scoreUpdatedAt } : {}),
     });
 
     const keepField = shouldPreserveSeenAsteroidsOnJoin(this.seenAsteroidIds.size);

@@ -61,6 +61,7 @@ export default defineConfig(() => {
     throw new Error('Cannot build client without a valid Git commit SHA');
   }
   define['import.meta.env.VITE_COMMIT_HASH'] = JSON.stringify(commitHash.slice(0, 7));
+  define['import.meta.env.VITE_COMMIT_SHA'] = JSON.stringify(commitHash.toLowerCase());
 
   // VITE_WEBSOCKET_URL comes from .env.local (dev) or Vercel env (production).
   // Do not define it here — vite `define` overrides env and breaks production builds.

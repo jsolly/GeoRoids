@@ -1,3 +1,4 @@
+import { readReleaseId } from '../../shared/releaseId';
 import { WORLD } from '../../shared/world';
 import type { PingMessage, Position, ShipKitId, Velocity } from '../../shared-types';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
@@ -26,6 +27,7 @@ export type ClientCommand =
       asteroidInteractions: 1;
       resumeRequested: boolean;
       resumeToken?: string;
+      clientReleaseId?: string;
     }
   | { type: 'leave' }
   | { type: 'snapshotResync' }
@@ -233,6 +235,9 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       if (!position) {
         return invalid(type, 'Join position is outside the world or invalid');
       }
+      const clientReleaseId = readReleaseId(
+        message['clientReleaseId'] ?? payload['clientReleaseId']
+      );
       return {
         ok: true,
         command: {
@@ -245,6 +250,7 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
           asteroidInteractions: 1,
           resumeRequested: rawToken !== undefined,
           ...(typeof rawToken === 'string' ? { resumeToken: rawToken } : {}),
+          ...(clientReleaseId ? { clientReleaseId } : {}),
         },
       };
     }

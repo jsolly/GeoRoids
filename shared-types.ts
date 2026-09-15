@@ -62,6 +62,18 @@ export interface PlayerJoin {
   resumeToken: string;
   /** Private server build identifier for correlating client and server diagnostics. */
   serverReleaseId?: string;
+  /** Server release that issued this resume token. */
+  credentialReleaseId?: string;
+  /** Client release present when this resume token was issued. */
+  credentialClientReleaseId?: string;
+  /** Server clock when this resume token was issued. */
+  credentialIssuedAt?: number;
+  /** Server release that last wrote this pilot's score. */
+  scoreReleaseId?: string;
+  /** Client release present for a live score write. Omitted for server-only writes. */
+  scoreClientReleaseId?: string;
+  /** Server clock when this pilot's score was last written. */
+  scoreUpdatedAt?: number;
   id: string;
   name: string;
   position: Position;

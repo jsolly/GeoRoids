@@ -273,7 +273,7 @@ export interface ServerEntityData {
 
   harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
-  /** Last environmental cause (boundary or asteroid). Omitted after respawn. */
+  /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;
   laserUpgrade?: LaserUpgrade;

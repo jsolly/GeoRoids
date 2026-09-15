@@ -9,6 +9,7 @@ import {
   segmentCircleContact,
 } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
+import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
 import { FURNACES, furnaceReward } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
@@ -1073,8 +1074,9 @@ export class GameEngine {
     damage: number
   ): { applied: boolean; isDestroyed: boolean; entity?: GameEntity } {
     logger.debug('handleShipDamage called', { targetId, attackerId, damage });
-    // Every ship in this world is a teammate. Only world hazards remove health.
-    if (attackerId !== 'asteroid' && attackerId !== 'boundary') {
+    // Direct crew shots and rams never apply. World hazards, including bounced
+    // lasers, still remove health.
+    if (!isWorldHazard(attackerId)) {
       return { applied: false, isDestroyed: false };
     }
 
@@ -1253,6 +1255,13 @@ export class GameEngine {
       targetType: outcome.entity.type,
     };
     return broadcast;
+  }
+
+  private applyRicochetHullHit(targetId: string, damage: number): void {
+    const result = this.applyDirectedHit(targetId, 'ricochet', damage);
+    if (result) {
+      this.combatSink?.(result);
+    }
   }
 
   /** One death path: loot, lives, and shared respawn. */
@@ -1575,7 +1584,7 @@ export class GameEngine {
     return hit ? [hit] : [];
   }
 
-  /** Resolve mining shots against nearby world objects; teammate hulls never block them. */
+  /** Resolve mining shots against nearby world objects; unbounced shots ignore hulls. */
   private resolveEnhancedLaser(
     laser: ServerLaser,
     now: number,
@@ -1606,6 +1615,18 @@ export class GameEngine {
           : (worldWall ?? sectorWall);
       const distance = Math.hypot(end.x - start.x, end.y - start.y);
       const owner = this.getPlayer(laser.ownerId);
+      const hulls = laserDamagesShips(laser.bounces)
+        ? this.entityManager
+            .getAllEntities()
+            .filter((entity) => !isCombatantImmune(entity))
+            .map((entity) => ({
+              id: entity.id,
+              position: entity.position,
+              radius: radiusFromMass(entity.mass) + LASER.HIT_RADIUS,
+              ownerId: undefined,
+              kind: 'ship' as const,
+            }))
+        : [];
       const auxiliary = [
         ...this.satellitePickupManager
           .getAllPickups()
@@ -1626,6 +1647,7 @@ export class GameEngine {
             ownerId: undefined,
             kind: 'loot' as const,
           })),
+        ...hulls,
       ]
         .filter((target) => target.kind !== 'satellitePickup' || !target.ownerId)
         .flatMap((target) => {
@@ -1641,7 +1663,7 @@ export class GameEngine {
         laser.hasExploded = true;
         if (auxiliary.kind === 'satellitePickup') {
           this.handleSatellitePickupDamage(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
-        } else {
+        } else if (auxiliary.kind === 'loot') {
           const blast = this.handleLootExplode(laser.ownerId, auxiliary.id);
           if (blast.success && blast.origin) {
             this.pendingLootBlasts.push({
@@ -1651,6 +1673,8 @@ export class GameEngine {
               shooterId: laser.ownerId,
             });
           }
+        } else {
+          this.applyRicochetHullHit(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         }
         return null;
       }

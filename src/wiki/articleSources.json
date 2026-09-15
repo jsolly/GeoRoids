@@ -60,6 +60,7 @@
     "tests/unit/entities/mineral-asteroids-break-with-distinct-rewards.test.ts",
     "tests/unit/entities/asteroidSplitting.test.ts",
     "tests/unit/physics/lasers-bounce-on-asteroid-faces.test.ts",
+    "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/server/collaborative-asteroid-split.test.ts",
     "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts"
   ],
@@ -93,6 +94,7 @@
     "tests/unit/systems/isoContourTerrain.test.ts",
     "shared/worldBoundary.ts",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts",
+    "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts"
   ],
   "combat-survival": [
@@ -117,6 +119,7 @@
     "tests/integration/browser/e2e/ship-respawns-near-furnace-after-asteroid-death.test.ts",
     "shared/worldBoundary.ts",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts",
+    "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts"
   ],
   "hud-network": [
@@ -207,6 +210,7 @@
     "src/ui/universeMap.ts",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts",
+    "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts",

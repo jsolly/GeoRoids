@@ -79,7 +79,7 @@ export const media: Record<string, WikiMediaEntry> = {
     title: 'Reflective asteroid',
     alt: 'An amber laser strikes a faceted metal asteroid and reflects from its polygon face.',
     caption:
-      'Controlled demonstration: a laser bounces from a metal face along the predicted path. Reflection remains a bounded asteroid interaction and never hurts a crew member.',
+      'Controlled demonstration: a laser bounces from a metal face along the predicted path. After that bounce the shot is a hull hazard while remaining a bounded asteroid interaction.',
     sources: [
       'shared/asteroidReflection.ts',
       'shared/asteroidPhenomena.ts',

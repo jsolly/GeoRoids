@@ -9,9 +9,10 @@ import {
 } from '../../../src/utils/deathCause';
 
 describe('death cause attribution', () => {
-  test('maps asteroid and boundary tokens to readable phrases', () => {
+  test('maps asteroid, boundary, and ricochet tokens to readable phrases', () => {
     expect(describeDeathCause('asteroid')).toBe('an asteroid');
     expect(describeDeathCause('boundary')).toBe('the arena wall');
+    expect(describeDeathCause('ricochet')).toBe('a ricochet');
   });
 
   test('unknown is only used when the attacker id is missing', () => {
@@ -30,6 +31,7 @@ describe('game over copy', () => {
   test('includes a readable environmental cause', () => {
     expect(formatGameOverText('an asteroid')).toBe('Game Over: You were killed by an asteroid');
     expect(formatGameOverText('boundary')).toBe('Game Over: You were killed by the arena wall');
+    expect(formatGameOverText('ricochet')).toBe('Game Over: You were killed by a ricochet');
   });
 
   test('overlay never prints unknown or a raw entity id', () => {

@@ -9,11 +9,11 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField, getWorldDiagnostics } from '../../utils/test-server-control';
 
-const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const { browserManager } = createBrowserScenarioHooks(__dirname);
 
-test.each(['empty', 'boundary'] as const)(
-  'crew lasers, overlap, and tow input leave teammates unharmed in the %s field',
-  async (scenario) => {
+test(
+  'direct crew lasers, overlap, and tow input leave teammates unharmed in an empty field',
+  async () => {
     const shooterPage = browserManager.getCurrentPage();
     if (!shooterPage) {
       throw new Error('Shooter page unavailable');
@@ -29,7 +29,7 @@ test.each(['empty', 'boundary'] as const)(
     const shooterId = await shooter.getLocalPlayerId();
     const teammateId = await teammate.getLocalPlayerId();
     await Promise.all([shooter.waitForRemotePlayers(1), teammate.waitForRemotePlayers(1)]);
-    await arrangeCrewField([shooterId, teammateId], scenario);
+    await arrangeCrewField([shooterId, teammateId], 'empty');
     await Promise.all([shooter.waitForCombatReady(), teammate.waitForCombatReady()]);
 
     // With no asteroid in the field, a Hauler E press has no valid target and
@@ -54,7 +54,7 @@ test.each(['empty', 'boundary'] as const)(
       .poll(
         () =>
           field.evaluate(
-            (projectiles, { id, targetId, reflected }) => {
+            (projectiles, { id, targetId }) => {
               const shot = projectiles.getProjectiles().find((row) => row.id === id);
               const target = window.gameController
                 ?.getNetworkManager()
@@ -63,22 +63,16 @@ test.each(['empty', 'boundary'] as const)(
               return Boolean(
                 shot &&
                   target &&
-                  (reflected
-                    ? shot.bounces > 0 && shot.position.x < target.ship.position.x - target.ship.r
-                    : shot.position.x > target.ship.position.x + target.ship.r)
+                  shot.bounces === 0 &&
+                  shot.position.x > target.ship.position.x + target.ship.r
               );
             },
-            { id: shotId, targetId: teammateId, reflected: scenario === 'boundary' }
+            { id: shotId, targetId: teammateId }
           ),
         { timeout: 5000 }
       )
       .toBe(true);
     await field.dispose();
-    if (scenario === 'boundary') {
-      await shooterPage.screenshot({
-        path: screenshotManager.getScreenshotPath('crew-wall-ricochet.png'),
-      });
-    }
 
     expect(await teammate.getShipHealth()).toBe(beforeHealth);
     expect(await teammate.getLives()).toBe(beforeLives);
@@ -87,7 +81,7 @@ test.each(['empty', 'boundary'] as const)(
     expect(await shooter.getPlayerHealthById(teammateId)).toBe(beforeHealth);
     expect(await teammate.getPlayerHealthById(shooterId)).toBeGreaterThan(0);
 
-    // The same crew safety rule applies to physical overlap. Put the live
+    // Unbounced crew safety still applies to physical overlap. Put the live
     // shooter on the teammate through the server placement boundary, then let
     // the normal collision loop run without granting either pilot damage.
     const teammatePosition = await teammate.getShipPosition();

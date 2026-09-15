@@ -67,3 +67,13 @@ export function findShipAsteroidOverlaps(
 export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
   return attackerId === 'boundary';
 }
+
+/** World hazards the server may apply to crew hulls. */
+export function isWorldHazard(attackerId: string): boolean {
+  return attackerId === 'asteroid' || attackerId === 'boundary' || attackerId === 'ricochet';
+}
+
+/** Direct crew shots pass through hulls; a bounce arms the bolt as a hazard. */
+export function laserDamagesShips(bounces: number): boolean {
+  return bounces > 0;
+}

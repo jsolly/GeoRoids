@@ -14,17 +14,16 @@ describe('Crew survival against world hazards', () => {
     engine.stopGameLoop();
   });
 
-  test('players cannot damage one another', () => {
+  test('a ricochet damages a hull while a teammate laser still does not', () => {
     engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
     engine.addPlayer('p2', 'Partner', new RecordingSocket(), { x: 40, y: 0 });
     engine.entityManager.updateEntity('p1', { spawnProtectionTimer: 0 });
     engine.entityManager.updateEntity('p2', { spawnProtectionTimer: 0 });
 
-    expect(engine.handleShipDamage('p2', 'p1', 25).isDestroyed).toBe(false);
+    expect(engine.handleShipDamage('p2', 'p1', 25).applied).toBe(false);
     expect(engine.getPlayer('p2')?.health).toBe(100);
-
-    expect(engine.handleShipDamage('p1', 'p2', 25).isDestroyed).toBe(false);
-    expect(engine.getPlayer('p1')?.health).toBe(100);
+    expect(engine.handleShipDamage('p2', 'ricochet', 25).applied).toBe(true);
+    expect(engine.getPlayer('p2')?.health).toBe(75);
   });
 
   test('environmental damage destroys a player, spends a life, and schedules respawn', () => {

@@ -19,8 +19,9 @@ when its stored energy fills, or when a shot reaches its energy, bounce, or
 lifetime limit. Reflection follows the server's authoritative collision result;
 the client does not offer a selection-dependent path preview.
 
-Direct and reflected crew shots leave every crew ship unharmed, including
-the shooter. A broken reflector leaves one laser core: collect
+Direct crew shots leave every crew ship unharmed, including
+the shooter. After a bounce off a wall or reflective face, the same shot
+becomes a ricochet that damages any hull it then hits and is consumed. A broken reflector leaves one laser core: collect
 it for 150 points and six stronger shots, usable for 60 seconds. The upgrade
 expires on death. Shots, damage, charge use, and collection belong to the shared
 world, so reconnecting does not replay rewards.

@@ -231,6 +231,10 @@ test('the production entry restores the same pilot and explored world from its c
   const joined = await first.join('persisted-pilot');
   const snapshot = await first.state();
   expect(snapshot.entities.some((entity) => entity.id === 'persisted-pilot')).toBe(true);
+  await waitFor(
+    () => first.states.find((state) => state.exploration.length > 0),
+    'shared exploration after join'
+  );
   await stopProduction();
   expect(output).toContain('Server closed');
   const store = new WorldStore(path);

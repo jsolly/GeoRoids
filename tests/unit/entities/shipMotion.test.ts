@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { shipOverlapsCompletedSector } from '../../../shared/sectors';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GAME, LASER, SHIP } from '../../../src/constants';
 import { createLaser } from '../../../src/entities/laser/laserUtils';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { applyThrustOrFriction } from '../../../src/entities/ship/shipUtils';
+import {
+  getCompletedSectors,
+  resetWorldExploration,
+  setCompletedSectors,
+} from '../../../src/network/worldExploration';
 import { canvasManager } from '../../../src/rendering/canvas';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  resetWorldExploration();
+});
 
 describe('shared ship motion helper', () => {
   test('automatic thrust accelerates at the existing pace and shots keep their speed', () => {
@@ -153,5 +162,19 @@ describe('shared ship motion helper', () => {
     ship.health = 0;
     ship.update();
     expect(ship.position).toEqual({ x: 0, y: 0 });
+  });
+
+  test('local cruise stops at a completed-sector wall instead of flying through it', () => {
+    setCompletedSectors(['2,0']);
+    const ship = new Ship({ isLocalPlayer: true, position: { x: 3_950, y: 1_000 } });
+    ship.angle = 0;
+    ship.velocity = { x: 8, y: 0 };
+    ship.blinkCount = 0;
+    ship.spawnProtectionTimer = 0;
+    for (let frame = 0; frame < 30; frame++) {
+      ship.update();
+    }
+    expect(ship.position.x).toBeLessThan(4_000);
+    expect(shipOverlapsCompletedSector(ship.position, ship.r, getCompletedSectors())).toBe(false);
   });
 });

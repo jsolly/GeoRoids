@@ -75,6 +75,54 @@ describe('open-world sector helpers', () => {
     expect(body.velocity.x).toBeLessThan(0);
   });
 
+  test('an asteroid near the far wall leaves through that wall instead of teleporting back', () => {
+    const body = {
+      position: { x: 5_990, y: 1_000 },
+      velocity: { x: 4, y: 0 },
+    };
+    expect(containBodyOutOfCompletedSectors(body, new Set(['2,0']))).toBe(true);
+    expect(body.position.x).toBeGreaterThan(6_000);
+    expect(body.velocity.x).toBeGreaterThan(0);
+  });
+
+  test('a ship flying east is placed ahead of a completed sector instead of behind it', () => {
+    const body = {
+      position: { x: 5_000, y: 1_000 },
+      velocity: { x: 4, y: 0 },
+    };
+    expect(
+      containBodyOutOfCompletedSectors(body, new Set(['2,0']), {
+        radius: 15,
+        bias: { x: 4, y: 0 },
+      })
+    ).toBe(true);
+    expect(body.position.x).toBeGreaterThan(6_000);
+    expect(shipOverlapsCompletedSector(body.position, 15, new Set(['2,0']))).toBe(false);
+    expect(body.velocity.x).toBeGreaterThan(0);
+  });
+
+  test('predicted flight that nicks a completed wall is pushed back out', () => {
+    const body = {
+      position: { x: 3_990, y: 1_000 },
+      velocity: { x: 4, y: 0 },
+    };
+    expect(containBodyOutOfCompletedSectors(body, new Set(['2,0']), { radius: 15 })).toBe(true);
+    expect(body.position.x).toBeLessThan(4_000);
+    expect(shipOverlapsCompletedSector(body.position, 15, new Set(['2,0']))).toBe(false);
+    expect(body.velocity.x).toBeLessThan(0);
+  });
+
+  test('a hull that already crossed the east grid is pushed farther out, not back in', () => {
+    const body = {
+      position: { x: 6_010, y: 1_000 },
+      velocity: { x: 4, y: 0 },
+    };
+    expect(containBodyOutOfCompletedSectors(body, new Set(['2,0']), { radius: 15 })).toBe(true);
+    expect(body.position.x).toBeGreaterThan(6_010);
+    expect(shipOverlapsCompletedSector(body.position, 15, new Set(['2,0']))).toBe(false);
+    expect(body.velocity.x).toBeGreaterThan(0);
+  });
+
   test('a ship overlapping a completed wall is treated as inside the closed sector', () => {
     expect(shipOverlapsCompletedSector({ x: 3_990, y: 1_000 }, 15, new Set(['2,0']))).toBe(true);
     expect(shipOverlapsCompletedSector({ x: 3_900, y: 1_000 }, 15, new Set(['2,0']))).toBe(false);

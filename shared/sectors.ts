@@ -210,12 +210,58 @@ export function findSectorWallImpact(
 
 const OPEN_SECTOR_SEARCH_RADIUS = Math.ceil(WORLD.radius / WORLD.sectorSize) + 1;
 
+function nearestWallNormal(position: Position, bounds: SectorBounds): Position {
+  const distMinX = position.x - bounds.minX;
+  const distMaxX = bounds.maxX - position.x;
+  const distMinY = position.y - bounds.minY;
+  const distMaxY = bounds.maxY - position.y;
+  const nearest = Math.min(distMinX, distMaxX, distMinY, distMaxY);
+  if (nearest === distMinX) {
+    return { x: -1, y: 0 };
+  }
+  if (nearest === distMaxX) {
+    return { x: 1, y: 0 };
+  }
+  if (nearest === distMinY) {
+    return { x: 0, y: -1 };
+  }
+  return { x: 0, y: 1 };
+}
+
+function overlappedCompletedBounds(
+  position: Position,
+  radius: number,
+  completed: ReadonlySet<string>
+): SectorBounds | null {
+  const current = sectorAt(position);
+  if (completed.has(current.id)) {
+    return sectorBounds(current.x, current.y);
+  }
+  if (radius <= 0) {
+    return null;
+  }
+  for (let y = current.y - 1; y <= current.y + 1; y++) {
+    for (let x = current.x - 1; x <= current.x + 1; x++) {
+      const bounds = sectorBounds(x, y);
+      if (completed.has(bounds.id) && circleOverlapsBounds(position, radius, bounds)) {
+        return bounds;
+      }
+    }
+  }
+  return null;
+}
+
 function nearestOpenNeighbor(
   x: number,
   y: number,
-  completed: ReadonlySet<string>
+  completed: ReadonlySet<string>,
+  bias: Position
 ): { x: number; y: number } | null {
+  const length = Math.hypot(bias.x, bias.y);
+  const bx = length > WALL_EPSILON ? bias.x / length : 1;
+  const by = length > WALL_EPSILON ? bias.y / length : 0;
   for (let radius = 1; radius <= OPEN_SECTOR_SEARCH_RADIUS; radius++) {
+    let best: { x: number; y: number; score: number } | null = null;
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) {
@@ -223,51 +269,136 @@ function nearestOpenNeighbor(
         }
         const nx = x + dx;
         const ny = y + dy;
-        if (!completed.has(sectorId(nx, ny)) && sectorOverlapsWorld(nx, ny)) {
-          return { x: nx, y: ny };
+        if (completed.has(sectorId(nx, ny)) || !sectorOverlapsWorld(nx, ny)) {
+          continue;
+        }
+        const score = dx * bx + dy * by - (Math.abs(dx) + Math.abs(dy)) * 0.01;
+        if (!best || score > best.score) {
+          best = { x: nx, y: ny, score };
         }
       }
+    }
+    if (best) {
+      return best;
     }
   }
   return null;
 }
 
-export function containBodyOutOfCompletedSectors(
-  body: { position: Position; velocity: Velocity },
+function exitNormal(
+  current: { x: number; y: number },
+  neighbor: { x: number; y: number },
   completed: ReadonlySet<string>
-): boolean {
-  if (completed.size === 0 || !isInsideCompletedSector(body.position, completed)) {
-    return false;
-  }
-  const current = sectorAt(body.position);
-  const neighbor = nearestOpenNeighbor(current.x, current.y, completed);
-  const bounds = sectorBounds(current.x, current.y);
-  let nx = 0;
-  let ny = 0;
-  if (neighbor) {
-    nx = Math.sign(neighbor.x - current.x);
-    ny = Math.sign(neighbor.y - current.y);
-    if (nx !== 0 && ny !== 0) {
-      if (Math.abs(neighbor.x - current.x) >= Math.abs(neighbor.y - current.y)) {
-        ny = 0;
-      } else {
-        nx = 0;
-      }
+): Position {
+  let nx = Math.sign(neighbor.x - current.x);
+  let ny = Math.sign(neighbor.y - current.y);
+  if (nx !== 0 && ny !== 0) {
+    const eastWestOpen =
+      !completed.has(sectorId(current.x + nx, current.y)) &&
+      sectorOverlapsWorld(current.x + nx, current.y);
+    const northSouthOpen =
+      !completed.has(sectorId(current.x, current.y + ny)) &&
+      sectorOverlapsWorld(current.x, current.y + ny);
+    if (eastWestOpen && !northSouthOpen) {
+      ny = 0;
+    } else if (northSouthOpen && !eastWestOpen) {
+      nx = 0;
     }
   }
-  if (nx === 0 && ny === 0) {
-    nx = body.position.x >= 0 ? -1 : 1;
+  return { x: nx, y: ny };
+}
+
+function keepInsideWorld(position: Position, hull: number): Position {
+  const limit = WORLD.radius - hull - WALL_EPSILON;
+  const radius = Math.hypot(position.x, position.y);
+  if (limit <= 0 || radius <= limit || radius === 0) {
+    return position;
   }
+  const scale = limit / radius;
+  return { x: position.x * scale, y: position.y * scale };
+}
+
+function ejectOnce(
+  body: { position: Position; velocity: Velocity },
+  completed: ReadonlySet<string>,
+  radius: number,
+  bias?: Position
+): Position | null {
+  const bounds = overlappedCompletedBounds(body.position, radius, completed);
+  if (!bounds) {
+    return null;
+  }
+  const inside =
+    body.position.x > bounds.minX &&
+    body.position.x < bounds.maxX &&
+    body.position.y > bounds.minY &&
+    body.position.y < bounds.maxY;
+  let nx = 0;
+  let ny = 0;
+  if (inside) {
+    const searchBias =
+      bias && Math.hypot(bias.x, bias.y) >= WALL_EPSILON
+        ? bias
+        : nearestWallNormal(body.position, bounds);
+    const neighbor = nearestOpenNeighbor(bounds.x, bounds.y, completed, searchBias);
+    if (neighbor) {
+      const normal = exitNormal(bounds, neighbor, completed);
+      nx = normal.x;
+      ny = normal.y;
+    }
+  } else {
+    nx = body.position.x < bounds.minX ? -1 : body.position.x > bounds.maxX ? 1 : 0;
+    ny = body.position.y < bounds.minY ? -1 : body.position.y > bounds.maxY ? 1 : 0;
+  }
+  if (nx === 0 && ny === 0) {
+    const fallback = nearestWallNormal(body.position, bounds);
+    nx = fallback.x;
+    ny = fallback.y;
+  }
+  const clearance = radius + WALL_EPSILON;
   if (nx !== 0) {
-    body.position.x = nx > 0 ? bounds.maxX + WALL_EPSILON : bounds.minX - WALL_EPSILON;
+    body.position.x = nx > 0 ? bounds.maxX + clearance : bounds.minX - clearance;
   }
   if (ny !== 0) {
-    body.position.y = ny > 0 ? bounds.maxY + WALL_EPSILON : bounds.minY - WALL_EPSILON;
+    body.position.y = ny > 0 ? bounds.maxY + clearance : bounds.minY - clearance;
   }
-  const vDotN = body.velocity.x * nx + body.velocity.y * ny;
-  if (vDotN < 0) {
-    body.velocity.x -= 2 * vDotN * nx;
-    body.velocity.y -= 2 * vDotN * ny;
+  const clamped = keepInsideWorld(body.position, radius);
+  body.position.x = clamped.x;
+  body.position.y = clamped.y;
+  return { x: nx, y: ny };
+}
+
+export function containBodyOutOfCompletedSectors(
+  body: { position: Position; velocity: Velocity },
+  completed: ReadonlySet<string>,
+  options?: { radius?: number; bias?: Position }
+): boolean {
+  const radius = Math.max(0, options?.radius ?? 0);
+  if (completed.size === 0) {
+    return false;
+  }
+  let moved = false;
+  let reflected = { x: 0, y: 0 };
+  for (let step = 0; step < 8; step++) {
+    const normal = ejectOnce(body, completed, radius, options?.bias);
+    if (!normal) {
+      break;
+    }
+    moved = true;
+    reflected = { x: reflected.x + normal.x, y: reflected.y + normal.y };
+  }
+  if (!moved) {
+    return false;
+  }
+  const length = Math.hypot(reflected.x, reflected.y);
+  if (length > 0) {
+    const nx = reflected.x / length;
+    const ny = reflected.y / length;
+    const vDotN = body.velocity.x * nx + body.velocity.y * ny;
+    if (vDotN < 0) {
+      body.velocity.x -= 2 * vDotN * nx;
+      body.velocity.y -= 2 * vDotN * ny;
+    }
   }
   return true;
 }
@@ -318,7 +449,7 @@ function nearestOpenSector(
   if (!completed.has(start.id) && sectorOverlapsWorld(start.x, start.y)) {
     return start;
   }
-  const found = nearestOpenNeighbor(start.x, start.y, completed);
+  const found = nearestOpenNeighbor(start.x, start.y, completed, origin);
   if (found) {
     return found;
   }

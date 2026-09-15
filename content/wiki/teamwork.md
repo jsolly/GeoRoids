@@ -72,7 +72,10 @@ including rocks that drifted to sleep in that sector. Completed sectors stay
 empty: they do not regenerate deposits, and their walls are lethal to ships the
 same way the outer world boundary is. Lasers bounce off those walls and then
 become ricochets that can damage ships. Anyone already inside when a sector
-completes is relocated into an open sector without losing a life. New spawns
+completes is moved just outside its walls in the direction they were flying,
+without losing a life. A hull that has already crossed the grid but still
+overlaps the new wall is nudged the rest of the way out the same way, so
+finishing a sector cannot yank a crew backward or spend a life. New spawns
 skip completed sectors. Crossing into a new open sector shows a brief HUD
 notice with that sector's coordinates. The local radar and universe map hatch
 completed sectors so the closed ground stays obvious.

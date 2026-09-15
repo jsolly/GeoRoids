@@ -115,9 +115,12 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   pickups intercept laser shots and rocks for their owner.
 - Completing a visited sector (every explorable cell mapped and every asteroid
   gone) walls it off. Completed-sector walls kill ships like the outer boundary,
-  bounce lasers, and relocate anyone already inside without taking a life.
-  New spawns skip those sectors. Crossing into a new open sector shows a HUD
-  notice, and both maps hatch finished ground.
+  bounce lasers that then become ricochets, and move anyone already inside
+  just outside along their heading
+  without taking a life. A hull that already crossed the grid but still overlaps
+  the new wall is nudged out the same way. New spawns skip those sectors.
+  Crossing into a new open sector shows a HUD notice, and both maps hatch
+  finished ground.
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.

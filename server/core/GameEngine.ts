@@ -169,7 +169,7 @@ export class GameEngine {
   private lasers: ServerLaser[] = [];
   private laserSeq = 0;
   private readonly laserNonce = randomUUID();
-  public readonly playerMotion = new PlayerMotionService();
+  public readonly playerMotion = new PlayerMotionService(this.completedSectors);
   private departedPlayers: string[] = [];
   private decoratedFieldId?: string | undefined;
   private pendingLootBlasts: Array<{
@@ -554,14 +554,31 @@ export class GameEngine {
   }
 
   private ensurePilotInOpenSector(entity: GameEntity): boolean {
-    if (!isInsideCompletedSector(entity.position, this.completedSectors)) {
+    const radius = radiusFromMass(entity.mass);
+    if (
+      !isInsideCompletedSector(entity.position, this.completedSectors) &&
+      !shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
+    ) {
       return false;
     }
     entity.harpoonTargetId = null;
     delete entity.harpoonLatchPos;
-    entity.velocity = { x: 0, y: 0 };
-    delete entity.knockbackVelocityLimit;
-    entity.position = this.choosePilotSpawn(entity.position);
+    const heading =
+      Math.hypot(entity.velocity.x, entity.velocity.y) > 1e-4
+        ? entity.velocity
+        : { x: Math.cos(entity.angle), y: Math.sin(entity.angle) };
+    containBodyOutOfCompletedSectors(entity, this.completedSectors, {
+      radius,
+      bias: heading,
+    });
+    if (
+      isInsideCompletedSector(entity.position, this.completedSectors) ||
+      shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
+    ) {
+      entity.velocity = { x: 0, y: 0 };
+      delete entity.knockbackVelocityLimit;
+      entity.position = this.choosePilotSpawn(entity.position);
+    }
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
     this.playerMotion.invalidateLife(entity.id, this.getServerTime());
     return true;

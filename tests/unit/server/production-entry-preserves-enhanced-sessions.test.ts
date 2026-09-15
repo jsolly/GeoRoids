@@ -13,6 +13,7 @@ import railwayConfig from '../../../.railway/railway';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
+import { GAME } from '../../../src/constants';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const railwayProject = await railwayConfig(createRailwayContext({ command: 'test' }), project);
@@ -230,6 +231,10 @@ test('the production entry restores the same pilot and explored world from its c
   const joined = await first.join('persisted-pilot');
   const snapshot = await first.state();
   expect(snapshot.entities.some((entity) => entity.id === 'persisted-pilot')).toBe(true);
+  await waitFor(
+    () => first.states.find((state) => state.exploration.length > 0),
+    'shared exploration after join'
+  );
   await stopProduction();
   expect(output).toContain('Server closed');
   const store = new WorldStore(path);
@@ -247,7 +252,7 @@ test('the production entry restores the same pilot and explored world from its c
     (entity) => entity.id === 'persisted-pilot'
   );
   expect(restored?.score).toBe(savedPilot?.score);
-  expect(restored?.lives).toBe(savedPilot?.lives);
+  expect(restored?.lives).toBe(GAME.START_LIVES);
   await stopProduction();
   const reopened = new WorldStore(path);
   try {

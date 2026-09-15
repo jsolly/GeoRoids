@@ -31,6 +31,19 @@ describe('Rejoin after a dropped socket', () => {
     expect(ship.spawnProtectionTimer ?? 0).toBe(0);
   });
 
+  test('leaving then entering again keeps monthly score on a new flight', () => {
+    const ship = world.entity(ace);
+    ship.position = { x: 2_400, y: 1_800 };
+    world.disconnect(ace);
+    ace = world.resume(ace, { x: 0, y: 0 });
+
+    const next = world.entity(ace);
+    expect(next.lives).toBe(3);
+    expect(next.score).toBe(210);
+    expect(next.health).toBe(next.maxHealth);
+    expect(next.position).not.toEqual({ x: 2_400, y: 1_800 });
+  });
+
   test('a new client id with the same name does not leave a second Ace at 3/0', () => {
     const cloneSocket = world.attemptJoin('ace-clone', ace.name, { x: 1, y: 1 });
 

@@ -30,7 +30,7 @@ import {
 } from '../../shared/sectors';
 import { applyLootMass, applyShipMass, GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import { captureDiagnosticActorState } from '../../shared/stateDiagnostics';
-import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { parseSectorId, sectorAt, utcScoreSeason, WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
@@ -58,6 +58,7 @@ import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/p
 import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
 import { ensureTerrain, getTerrainSeed } from '../../src/physics/terrain/terrainSession';
 import { getVelocityMagnitude } from '../../src/utils/mathUtils';
+import { sanitizePlayerName } from '../../src/utils/playerName';
 import { serverPerformanceMetrics } from '../performanceMetrics';
 import { SERVER_RELEASE_ID } from '../release';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
@@ -145,7 +146,8 @@ export class GameEngine {
   private mapAssets = new MapAssets();
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
-  private readonly worldStartedAt: number;
+  private worldStartedAt: number;
+  private scoreSeason: string;
   private readonly pilots = new Map<string, PersistentPilot>();
   private readonly completedSectors = new Set<string>();
   private managedField = true;
@@ -194,17 +196,28 @@ export class GameEngine {
     private readonly serverClock = new ServerClock(),
     private readonly worldStore?: WorldStore
   ) {
+    this.scoreSeason = utcScoreSeason(this.serverClock.now());
     let saved = worldStore?.loadWorld();
-    if (worldStore && saved && saved.generation !== WORLD.generation) {
-      logger.warn('WORLD', 'Saved world generation does not match; resetting world', {
-        savedGeneration: saved.generation,
-        currentGeneration: WORLD.generation,
-      });
+    if (
+      worldStore &&
+      saved &&
+      (saved.generation !== WORLD.generation || saved.scoreSeason !== this.scoreSeason)
+    ) {
+      logger.warn(
+        'WORLD',
+        'Saved world generation or score season does not match; resetting world',
+        {
+          savedGeneration: saved.generation,
+          currentGeneration: WORLD.generation,
+          savedScoreSeason: saved.scoreSeason,
+          currentScoreSeason: this.scoreSeason,
+        }
+      );
       worldStore.reset();
       saved = undefined;
     }
     this.worldSeed = saved?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
-    this.worldStartedAt = saved?.startedAt ?? this.getServerTime();
+    this.worldStartedAt = saved?.startedAt ?? this.serverClock.now();
     this.rngService = new RNGService(this.worldSeed);
     this.regionalField = new RegionalAsteroidField(this.worldSeed, worldStore);
     if (saved) {
@@ -324,6 +337,7 @@ export class GameEngine {
     if (this.persistenceFailure) {
       throw this.persistenceFailure;
     }
+    this.ensureScoreSeason();
     this.gameTime++;
     if (this.isPaused) {
       return;
@@ -662,14 +676,7 @@ export class GameEngine {
       id,
       tokenHash: previous.tokenHash,
       name: actor.name,
-      kitId: actor.kitId,
-      position: { ...actor.position },
-      angle: actor.angle,
       score: actor.score,
-      lives: actor.lives,
-      mass: actor.mass,
-      health: actor.health,
-      maxHealth: actor.maxHealth,
     });
   }
 
@@ -685,14 +692,7 @@ export class GameEngine {
       id: actor.id,
       tokenHash: createHash('sha256').update(result.resumeToken).digest('hex'),
       name: actor.name,
-      kitId: actor.kitId,
-      position: { ...actor.position },
-      angle: actor.angle,
       score: actor.score,
-      lives: actor.lives,
-      mass: actor.mass,
-      health: actor.health,
-      maxHealth: actor.maxHealth,
     });
     this.checkpointWorld();
     return result;
@@ -705,28 +705,23 @@ export class GameEngine {
   public resumePilot(
     token: string,
     socket: WebSocket,
-    requestedKit?: ShipKitId
+    requestedKit?: ShipKitId,
+    requestedName?: string
   ): ReturnType<PlayerMotionService['resume']> {
     if (!/^[a-f0-9]{64}$/.test(token)) {
       return { ok: false, error: 'Invalid pilot resume token' };
     }
     const hash = createHash('sha256').update(token).digest('hex');
     let saved = [...this.pilots.values()].find((pilot) => pilot.tokenHash === hash);
-    if (saved && (this.getPlayer(saved.id)?.lives ?? saved.lives) <= 0) {
-      this.removePlayer(saved.id);
-      this.checkpointWorld();
-      return { ok: false, error: 'This pilot has no lives remaining; start a new run' };
-    }
     const live = this.playerMotion.resume(token, socket, this.getServerTime());
-    if (live.ok) {
-      if (requestedKit && requestedKit !== live.actor.kitId) {
-        applyShipKitStats(live.actor, requestedKit);
-        live.actor.harpoonTargetId = null;
-        delete live.actor.harpoonLatchPos;
-        this.playerMotion.invalidateLife(live.actor.id, this.getServerTime());
-      }
+    if (live.ok && live.actor.lives > 0) {
+      this.applyRequestedPilotIdentity(live.actor, requestedKit, requestedName, true);
       this.ensurePilotInOpenSector(live.actor);
       return live;
+    }
+    if (live.ok) {
+      this.removePlayer(live.actor.id);
+      saved = this.pilots.get(live.actor.id) ?? saved;
     }
     if (!saved || this.getPlayerBySocket(socket)) {
       return live;
@@ -736,16 +731,9 @@ export class GameEngine {
       this.removePlayer(saved.id);
       saved = this.pilots.get(saved.id) ?? saved;
     }
-    const actor = this.addPlayer(saved.id, saved.name, socket, saved.position, saved.kitId);
-    actor.angle = saved.angle;
+    const actor = this.addPlayer(saved.id, saved.name, socket, undefined, requestedKit);
+    this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
     actor.score = saved.score;
-    actor.lives = saved.lives;
-    applyShipMass(actor, saved.mass);
-    actor.maxHealth = saved.maxHealth;
-    actor.health = saved.health > 0 ? Math.min(saved.health, actor.maxHealth) : actor.maxHealth;
-    if (requestedKit && requestedKit !== actor.kitId) {
-      applyShipKitStats(actor, requestedKit);
-    }
     actor.asteroidInteractions = 1;
     const registered = this.registerPilot(actor, socket);
     if (!registered.ok) {
@@ -756,10 +744,71 @@ export class GameEngine {
     return { ok: true, actor, resumeToken: registered.resumeToken };
   }
 
+  private applyRequestedPilotIdentity(
+    actor: GameEntity,
+    requestedKit: ShipKitId | undefined,
+    requestedName: string | undefined,
+    invalidateMotionOnKitChange: boolean
+  ): void {
+    if (requestedKit && requestedKit !== actor.kitId) {
+      applyShipKitStats(actor, requestedKit);
+      actor.harpoonTargetId = null;
+      delete actor.harpoonLatchPos;
+      if (invalidateMotionOnKitChange) {
+        this.playerMotion.invalidateLife(actor.id, this.getServerTime());
+      }
+    }
+    const name = sanitizePlayerName(requestedName ?? '');
+    if (!name || name === actor.name) {
+      return;
+    }
+    const taken = this.getAllPlayers().some(
+      (candidate) =>
+        candidate.id !== actor.id && candidate.name.toLowerCase() === name.toLowerCase()
+    );
+    if (taken) {
+      return;
+    }
+    actor.name = name;
+  }
+
+  private ensureScoreSeason(): void {
+    const season = utcScoreSeason(this.getServerTime());
+    if (season === this.scoreSeason) {
+      return;
+    }
+    this.beginScoreSeason(season);
+  }
+
+  private beginScoreSeason(season: string): void {
+    logger.warn('WORLD', 'Score season rolled over; resetting world and monthly scores', {
+      previousScoreSeason: this.scoreSeason,
+      currentScoreSeason: season,
+    });
+    this.scoreSeason = season;
+    this.worldStartedAt = this.getServerTime();
+    this.worldStore?.reset();
+    this.regionalField.reset();
+    this.exploration.reset();
+    this.mapAssets.reset();
+    this.completedSectors.clear();
+    this.clearWorldObjects();
+    this.pendingFurnaceDeliveries = [];
+    for (const pilot of this.pilots.values()) {
+      pilot.score = 0;
+    }
+    for (const actor of this.getAllPlayers()) {
+      actor.score = 0;
+    }
+    this.ensureAsteroidField();
+    this.checkpointWorld();
+  }
+
   public checkpointWorld(): void {
     if (this.persistenceFailure) {
       throw this.persistenceFailure;
     }
+    this.ensureScoreSeason();
     if (!this.worldStore) {
       return;
     }
@@ -772,6 +821,7 @@ export class GameEngine {
           seed: this.worldSeed,
           startedAt: this.worldStartedAt,
           generation: WORLD.generation,
+          scoreSeason: this.scoreSeason,
           exploration: this.exploration.snapshot(),
           completedSectors: [...this.completedSectors].sort(),
         },

@@ -75,7 +75,11 @@ The game automatically tries to reconnect after a lost connection. During an
 interruption, the local view may lag behind the shared world; wait for the
 connection to recover before relying on a pickup or hit result. If joining
 fails or reconnect attempts are exhausted, the game returns to the title
-screen. Select Enter Game to try again. A full reload can start a new session.
+screen. Select Enter Game to try again. Reloading the page continues this
+browser's monthly score; it does not restore your last ship location or start a
+new score. You can change your nickname on the title screen before Enter Game.
+The playfield stays on the title screen until the server acknowledges join and
+sends the first world snapshot.
 
 ## Surveyor scan
 

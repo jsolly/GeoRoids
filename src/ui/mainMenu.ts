@@ -1,11 +1,13 @@
 import { activateAudio } from '../audio/audioRuntime';
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
+import { readStoredResumeName } from '../network/services/resumeCredential';
 import { initTitleTerrain } from '../rendering/titleTerrain';
 import { getBuildInfoString } from '../utils/buildInfo';
 import { applyLockedPaletteCss } from '../utils/colorUtils';
 import { attachEventListener, getElementById } from '../utils/dom';
 import { logger } from '../utils/Logger';
+import { sanitizePlayerName } from '../utils/playerName';
 import { getSelectedShipKitId, mountShipKitSelect } from './shipKitSelect';
 import { controlsHintFor } from './viewportChrome';
 
@@ -129,13 +131,7 @@ async function startGameWithName(): Promise<void> {
 
   if (playerNameInput?.value.trim()) {
     const playerNameRaw = playerNameInput.value.trim();
-
-    // Apply name validation
-    const MAX_LEN = 20;
-    const validatedName = playerNameRaw.slice(0, MAX_LEN);
-
-    // Validate player name (alphanumeric only)
-    playerName = validatedName.replace(/[^A-Za-z0-9]/g, '');
+    playerName = sanitizePlayerName(playerNameRaw);
 
     logger.debug('UI', 'Using validated player name', { source: 'user' });
   }
@@ -225,9 +221,13 @@ window.visualViewport?.addEventListener('resize', syncControlsHint);
 
 // Generate a nickname once and use it consistently
 const generatedNickname = generateFunNickname();
+const rememberedName = readStoredResumeName();
 
-// Set the generated nickname as placeholder
 if (playerNameInput) {
-  playerNameInput.placeholder = generatedNickname;
+  if (rememberedName) {
+    playerNameInput.value = rememberedName;
+  } else {
+    playerNameInput.placeholder = generatedNickname;
+  }
   logger.debug('UI', 'Set generated name placeholder');
 }

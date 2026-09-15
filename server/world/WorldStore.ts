@@ -5,8 +5,8 @@ import { validExploration } from '../../shared/exploration';
 import { finiteMotionVector } from '../../shared/playerMotion';
 import { readCompletedSectorIds } from '../../shared/sectors';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
-import type { AsteroidData, ExplorationTile, Position, ShipKitId } from '../../shared-types';
+import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import type { AsteroidData, ExplorationTile, Position } from '../../shared-types';
 
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
@@ -16,45 +16,43 @@ function validWorldPosition(position: Position): boolean {
   return finiteMotionVector(position) && Math.hypot(position.x, position.y) <= WORLD.radius;
 }
 
+/** Browser credential plus this UTC month's score. Placement is never stored. */
 export interface PersistentPilot {
   id: string;
   tokenHash: string;
   name: string;
-  kitId: ShipKitId;
-  position: Position;
-  angle: number;
   score: number;
-  lives: number;
-  mass: number;
-  health: number;
-  maxHealth: number;
 }
 
 interface SavedWorld {
   seed: number;
   startedAt: number;
   generation: number;
+  scoreSeason?: string;
   exploration: ExplorationTile[];
   completedSectors: string[];
 }
 
-function validPilot(value: unknown): value is PersistentPilot {
+function readPilot(value: unknown): PersistentPilot | undefined {
   if (!value || typeof value !== 'object') {
-    return false;
+    return undefined;
   }
-  const pilot = value as Partial<PersistentPilot>;
-  return (
-    typeof pilot.id === 'string' &&
-    typeof pilot.name === 'string' &&
-    typeof pilot.tokenHash === 'string' &&
-    /^[a-f0-9]{64}$/.test(pilot.tokenHash) &&
-    (pilot.kitId === 'hauler' || pilot.kitId === 'surveyor') &&
-    !!pilot.position &&
-    validWorldPosition(pilot.position) &&
-    [pilot.angle, pilot.score, pilot.lives, pilot.mass, pilot.health, pilot.maxHealth].every(
-      (number) => typeof number === 'number' && Number.isFinite(number)
-    )
-  );
+  const pilot = value as Record<string, unknown>;
+  const id = pilot['id'];
+  const name = pilot['name'];
+  const tokenHash = pilot['tokenHash'];
+  const score = pilot['score'];
+  if (
+    typeof id !== 'string' ||
+    typeof name !== 'string' ||
+    typeof tokenHash !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(tokenHash) ||
+    typeof score !== 'number' ||
+    !Number.isFinite(score)
+  ) {
+    return undefined;
+  }
+  return { id, tokenHash, name, score };
 }
 
 /** Single-writer SQLite transactions keep cargo consumption, shared scores and discoveries together. */
@@ -170,6 +168,9 @@ export class WorldStore {
         Number.isSafeInteger(value.generation)
           ? value.generation
           : 0,
+      ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
+        ? { scoreSeason: value.scoreSeason }
+        : {}),
       exploration: value.exploration,
       completedSectors:
         'completedSectors' in value ? readCompletedSectorIds(value.completedSectors) : [],
@@ -182,11 +183,12 @@ export class WorldStore {
       .all()
       .map((row) => {
         const value: unknown = JSON.parse(String(row['json']));
-        if (!validPilot(value)) {
+        const pilot = readPilot(value);
+        if (!pilot) {
           throw new Error('Saved pilot is invalid; refusing to replace player progress');
         }
-        this.pilotJson.set(value.id, String(row['json']));
-        return value;
+        this.pilotJson.set(pilot.id, String(row['json']));
+        return pilot;
       });
   }
 

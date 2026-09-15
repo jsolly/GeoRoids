@@ -4,6 +4,7 @@ import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { nearbyWorldRows } from '../../shared/world';
 import type { PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
+import { sanitizePlayerName } from '../../src/utils/playerName';
 import type { GameEntity } from '../core/EntityManager';
 import type { AppliedAsteroidHit, GameEngine } from '../core/GameEngine';
 import type { MotionOutcome } from '../core/PlayerMotionService';
@@ -130,6 +131,12 @@ export class MessageHandler {
       return;
     }
 
+    name = sanitizePlayerName(name);
+    if (!name) {
+      this.broadcaster.sendError(ws, 'Player ID or name is missing or invalid');
+      return;
+    }
+
     logger.debug('Player join', {
       id,
       position: command.position,
@@ -147,7 +154,12 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'Resume requires a dedicated gameplay socket');
         return;
       }
-      const resumed = this.gameEngine.resumePilot(command.resumeToken ?? '', ws, command.kitId);
+      const resumed = this.gameEngine.resumePilot(
+        command.resumeToken ?? '',
+        ws,
+        command.kitId,
+        name
+      );
       if (!resumed.ok) {
         this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
         return;

@@ -13,6 +13,21 @@ export const WORLD = {
   spawnInset: 220,
 } as const;
 
+const SCORE_SEASON_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** UTC calendar month used to wipe scores and the shared world. */
+export function utcScoreSeason(nowMs: number): string {
+  if (!Number.isFinite(nowMs) || nowMs < 0) {
+    throw new RangeError('Score season requires a finite non-negative time');
+  }
+  const date = new Date(nowMs);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function isScoreSeason(value: unknown): value is string {
+  return typeof value === 'string' && SCORE_SEASON_PATTERN.test(value);
+}
+
 const SECTOR_ID_PATTERN = /^-?\d+,-?\d+$/;
 
 export function sectorId(x: number, y: number): string {

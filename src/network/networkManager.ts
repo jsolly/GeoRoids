@@ -82,6 +82,10 @@ export class NetworkManager {
     this.connectionManager.initializeAsteroidSync();
   }
 
+  joinAndWaitForWorld(): Promise<boolean> {
+    return this.connectionManager.joinAndWaitForWorld();
+  }
+
   // Send a generic message to the server
   sendMessage(message: Record<string, unknown>): boolean {
     return this.connectionManager.sendMessage(message);

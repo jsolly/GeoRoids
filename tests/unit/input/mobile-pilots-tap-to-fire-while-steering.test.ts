@@ -144,6 +144,25 @@ test('ability buttons do not create playfield shots or change steering', () => {
   expect(player.ship.thrusting).toBe(true);
 });
 
+test('Boost tap starts a stronger cruise and a second tap returns to cruise', () => {
+  const boost = document.getElementById('touch-boost');
+  expect(boost).toBeTruthy();
+  if (!boost) {
+    throw new Error('Missing boost button');
+  }
+  boost.setPointerCapture = vi.fn();
+  boost.hasPointerCapture = () => false;
+  expect(player.ship.boosting).toBe(false);
+  pointer('pointerdown', 1, 0, 195, 780, boost);
+  pointer('pointerup', 1, 80, 195, 780, boost);
+  expect(player.ship.boosting).toBe(true);
+  expect(boost.getAttribute('aria-pressed')).toBe('true');
+  pointer('pointerdown', 2, 200, 195, 780, boost);
+  pointer('pointerup', 2, 280, 195, 780, boost);
+  expect(player.ship.boosting).toBe(false);
+  expect(boost.getAttribute('aria-pressed')).toBe('false');
+});
+
 test('a delayed pointer click cannot repeat an ability, while a following semantic click still works', () => {
   vi.useFakeTimers();
   try {

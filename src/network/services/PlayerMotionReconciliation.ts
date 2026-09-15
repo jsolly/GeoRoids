@@ -9,6 +9,7 @@ interface PlayerPose {
   velocity: Position;
   angle: number;
   thrusting: boolean;
+  boosting: boolean;
 }
 
 /** Reconcile authoritative corrections, respawns and reconnects; ordinary flight stays predicted. */
@@ -132,6 +133,7 @@ export class PlayerMotionReconciliation {
       velocity: { ...ship.velocity },
       angle: Math.atan2(Math.sin(ship.angle), Math.cos(ship.angle)),
       thrusting: ship.thrusting,
+      boosting: ship.boosting,
     };
   }
 

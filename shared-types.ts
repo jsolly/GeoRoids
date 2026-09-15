@@ -258,6 +258,7 @@ export interface ServerEntityData {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
+  boosting?: boolean;
   color: string;
   lives: number;
   score: number;

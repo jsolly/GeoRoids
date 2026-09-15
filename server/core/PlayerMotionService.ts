@@ -16,6 +16,7 @@ export type MotionOutcome = { ok: true } | { ok: false; error: string };
 type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
   epoch: number;
   sequence: number;
+  boosting?: boolean;
 };
 
 interface Session {
@@ -77,8 +78,9 @@ export class PlayerMotionService {
     );
   }
 
-  public legalSpeed(actor: GameEntity, now: number): number {
-    const normal = cruiseSpeed(actor.mass, getShipKit(actor.kitId).maxVelocity);
+  public legalSpeed(actor: GameEntity, now: number, boosting = actor.boosting): number {
+    const kit = getShipKit(actor.kitId);
+    const normal = cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1);
     const impulse = this.sessions.get(actor.id)?.knockback;
     if (!impulse) {
       return normal;
@@ -211,6 +213,7 @@ export class PlayerMotionService {
     delete session.actor.ws;
     session.disconnectedUntil = now + PLAYER_MOTION.reconnectGraceMs;
     session.actor.thrusting = false;
+    session.actor.boosting = false;
     return true;
   }
 
@@ -234,6 +237,7 @@ export class PlayerMotionService {
     session.poseAt = now;
     session.poseCredit = poseCredit;
     session.actor.thrusting = false;
+    session.actor.boosting = false;
     this.publish(session);
   }
 
@@ -301,14 +305,19 @@ export class PlayerMotionService {
       !Number.isFinite(pose.angle) ||
       Math.abs(pose.angle) > Math.PI * 2 ||
       typeof pose.thrusting !== 'boolean' ||
+      (pose.boosting !== undefined && typeof pose.boosting !== 'boolean') ||
       Object.keys(pose).some(
-        (key) => !['epoch', 'sequence', 'position', 'velocity', 'angle', 'thrusting'].includes(key)
+        (key) =>
+          !['epoch', 'sequence', 'position', 'velocity', 'angle', 'thrusting', 'boosting'].includes(
+            key
+          )
       ) ||
       now < session.poseAt
     ) {
       return { ok: false, error: 'Invalid or stale enhanced movement pose' };
     }
-    const speed = this.legalSpeed(session.actor, now);
+    const boosting = pose.boosting === true;
+    const speed = this.legalSpeed(session.actor, now, boosting);
     // Match the client's bounded catch-up; silence cannot bank an arbitrary jump.
     const elapsedFrames = Math.min(MAX_CATCH_UP_TICKS, ((now - session.poseAt) * GAME.FPS) / 1000);
     // Spend elapsed travel before capping unused jitter credit. Capping first
@@ -350,6 +359,7 @@ export class PlayerMotionService {
     session.actor.velocity = { x: pose.velocity.x, y: pose.velocity.y };
     session.actor.angle = pose.angle;
     session.actor.thrusting = pose.thrusting;
+    session.actor.boosting = boosting;
     session.actor.lastUpdate = now;
     this.publish(session);
     return { ok: true };
@@ -397,6 +407,7 @@ export class PlayerMotionService {
     session.actor.position = { ...position };
     session.actor.velocity = { x: 0, y: 0 };
     session.actor.thrusting = false;
+    session.actor.boosting = false;
     session.actor.lastUpdate = now;
     this.publish(session);
     return true;

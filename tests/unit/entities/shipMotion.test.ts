@@ -134,6 +134,37 @@ describe('shared ship motion helper', () => {
     expect(ship.velocity.y).toBeCloseTo(0);
   });
 
+  test('Boost raises cruise, and Surveyor outruns a boosting Hauler', () => {
+    const surveyor = new Ship({ kitId: 'surveyor', isLocalPlayer: true });
+    const hauler = new Ship({ kitId: 'hauler', isLocalPlayer: true });
+    surveyor.angle = 0;
+    hauler.angle = 0;
+    surveyor.velocity = { x: 20, y: 0 };
+    hauler.velocity = { x: 20, y: 0 };
+    surveyor.toggleBoost();
+    hauler.toggleBoost();
+    surveyor.update();
+    hauler.update();
+    const surveyorBoost = cruiseSpeed(
+      surveyor.mass,
+      surveyor.maxVelocity,
+      getShipKit('surveyor').boostMultiplier
+    );
+    const haulerBoost = cruiseSpeed(
+      hauler.mass,
+      hauler.maxVelocity,
+      getShipKit('hauler').boostMultiplier
+    );
+    expect(surveyorBoost).toBeGreaterThan(haulerBoost);
+    expect(Math.hypot(surveyor.velocity.x, surveyor.velocity.y)).toBeCloseTo(surveyorBoost);
+    expect(Math.hypot(hauler.velocity.x, hauler.velocity.y)).toBeCloseTo(haulerBoost);
+    surveyor.toggleBoost();
+    surveyor.update();
+    expect(Math.hypot(surveyor.velocity.x, surveyor.velocity.y)).toBeCloseTo(
+      cruiseSpeed(surveyor.mass, surveyor.maxVelocity)
+    );
+  });
+
   test('an authoritative blast pushes the pilot before cruise regains the heading', () => {
     const ship = new Ship({ isLocalPlayer: true });
     ship.angle = 0;

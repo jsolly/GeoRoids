@@ -107,6 +107,7 @@ test(
       const root = document.getElementById('touch-controls');
       const stick = document.getElementById('touch-stick');
       const ability = document.getElementById('touch-ability');
+      const boost = document.getElementById('touch-boost');
       const canvas = document.getElementById('gameCanvas');
       const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
       const box = (el: Element | null) => {
@@ -127,7 +128,9 @@ test(
         canvas: box(canvas),
         stick: box(stick),
         ability: box(ability),
+        boost: box(boost),
         abilityDisabled: ability?.getAttribute('aria-disabled'),
+        boostPressed: boost?.getAttribute('aria-pressed'),
       };
     });
 
@@ -146,6 +149,25 @@ test(
     expect(chrome.abilityDisabled).toBe('false');
     expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
     expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
+    expect(chrome.boost).toBeTruthy();
+    expect(chrome.boostPressed).toBe('false');
+    expect(chrome.boost?.left).toBeGreaterThanOrEqual(-1);
+    expect(chrome.boost?.right).toBeLessThanOrEqual(chrome.innerWidth + 1);
+    expect(chrome.boost?.bottom).toBeLessThanOrEqual(chrome.innerHeight + 1);
+
+    expect((await readTouchControlState(page)).boosting).toBe(false);
+    await page.locator('#touch-boost').tap();
+    await expect
+      .poll(async () => (await readTouchControlState(page)).boosting, {
+        message: 'Boost tap should start a stronger cruise',
+      })
+      .toBe(true);
+    await page.locator('#touch-boost').tap();
+    await expect
+      .poll(async () => (await readTouchControlState(page)).boosting, {
+        message: 'A second Boost tap should return to cruise',
+      })
+      .toBe(false);
 
     const beforeTap = await readTouchControlState(page);
     const tapPoint = await canvasPoint(page, 0.75, 0.5);

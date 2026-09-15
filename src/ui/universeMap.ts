@@ -37,7 +37,16 @@ const CELL_SIZE = WORLD.sectorSize / CELLS_PER_SECTOR;
 const WORLD_DIAMETER = WORLD.radius * 2;
 const EXPLORATION_GRID_SIZE = WORLD_DIAMETER / CELL_SIZE;
 const RASTER_CELL_SIZE = MAP_RASTER_SIZE / EXPLORATION_GRID_SIZE;
-const BLOCKED_GAMEPLAY_KEYS = new Set(['Space', 'KeyE', 'KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight']);
+const BLOCKED_GAMEPLAY_KEYS = new Set([
+  'Space',
+  'KeyE',
+  'KeyA',
+  'KeyD',
+  'ArrowLeft',
+  'ArrowRight',
+  'ShiftLeft',
+  'ShiftRight',
+]);
 const MAP_LABEL_ZOOM = 2.8;
 const MAP_DEFAULT_LABEL_LIMIT = 1;
 

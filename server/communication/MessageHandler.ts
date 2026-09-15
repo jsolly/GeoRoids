@@ -276,6 +276,7 @@ export class MessageHandler {
         velocity: update.velocity,
         angle: update.angle,
         thrusting: update.thrusting,
+        boosting: update.boosting === true,
       },
       motionNow
     );

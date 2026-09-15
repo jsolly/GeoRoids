@@ -16,6 +16,7 @@ const invalidMovements: Array<{ label: string; movement: Record<string, unknown>
   { label: 'non-finite angle', movement: { angle: Number.POSITIVE_INFINITY } },
   { label: 'non-finite angular velocity', movement: { angularVelocity: Number.NaN } },
   { label: 'non-boolean thrust', movement: { thrusting: 'true' } },
+  { label: 'non-boolean boost', movement: { boosting: 'true' } },
 ];
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {

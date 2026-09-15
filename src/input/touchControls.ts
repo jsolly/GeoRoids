@@ -9,6 +9,7 @@ import { pointerHeadingFromCenter } from './pointerSteering';
 import { readAbilityChrome } from './touchAbility';
 
 const ABILITY_ID = 'touch-ability';
+const BOOST_ID = 'touch-boost';
 const ROOT_ID = 'touch-controls';
 
 let initialized = false;
@@ -19,8 +20,11 @@ let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
+let boostPointerId: number | null = null;
 let abilityButton: HTMLElement | null = null;
+let boostButton: HTMLElement | null = null;
 let lastAbilityChromeKey = '';
+let lastBoostChromeKey = '';
 
 export function setTouchHeading(player: Player, heading: number | null): void {
   controlSources.pointerHeading = heading;
@@ -51,9 +55,18 @@ export function triggerTouchAbility(player: Player): boolean {
   return player.ship.activateAbility();
 }
 
+function triggerTouchBoost(player: Player): boolean {
+  if (player.lives <= 0 || player.ship.exploding) {
+    player.ship.boosting = false;
+    return false;
+  }
+  return player.ship.toggleBoost();
+}
+
 export function tickTouchControls(player: Player): void {
   if (isTouchChromeVisible()) {
     syncAbilityChrome(player);
+    syncBoostChrome(player);
   }
   if (player.lives <= 0 || player.ship.exploding) {
     resetTouchInteraction(player);
@@ -86,6 +99,7 @@ export function syncTouchChrome(
   if (!use) {
     resetTouchInteraction(requireLocalPlayer());
     lastAbilityChromeKey = '';
+    lastBoostChromeKey = '';
     return;
   }
 
@@ -93,13 +107,19 @@ export function syncTouchChrome(
   if (player) {
     reconcilePlayerInput(player);
     syncAbilityChrome(player);
+    syncBoostChrome(player);
   } else {
     lastAbilityChromeKey = '';
+    lastBoostChromeKey = '';
   }
 }
 
 function setAbilityPressed(pressed: boolean): void {
   document.getElementById(ABILITY_ID)?.classList.toggle('is-pressed', pressed);
+}
+
+function setBoostPressed(pressed: boolean): void {
+  document.getElementById(BOOST_ID)?.classList.toggle('is-pressed', pressed);
 }
 
 function getAbilityButton(): HTMLElement | null {
@@ -111,6 +131,17 @@ function getAbilityButton(): HTMLElement | null {
     }
   }
   return abilityButton;
+}
+
+function getBoostButton(): HTMLElement | null {
+  if (!boostButton?.isConnected) {
+    const next = document.getElementById(BOOST_ID);
+    if (next !== boostButton) {
+      boostButton = next;
+      lastBoostChromeKey = '';
+    }
+  }
+  return boostButton;
 }
 
 function syncAbilityChrome(player: Player): void {
@@ -134,6 +165,26 @@ function syncAbilityChrome(player: Player): void {
   button.style.setProperty('--action-cool', state.cooldownRatio.toFixed(3));
 }
 
+function syncBoostChrome(player: Player): void {
+  const button = getBoostButton();
+  if (!button) {
+    return;
+  }
+  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
+  const active = alive && player.ship.boosting;
+  const key = `${alive}|${active}`;
+  if (key === lastBoostChromeKey) {
+    return;
+  }
+  lastBoostChromeKey = key;
+  button.textContent = 'BOOST';
+  button.setAttribute('aria-label', active ? 'Stop boost' : 'Boost');
+  button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  button.setAttribute('aria-disabled', alive ? 'false' : 'true');
+  button.classList.toggle('is-active', active);
+  button.classList.toggle('is-unavailable', !alive);
+}
+
 function releasePointerCapture(element: HTMLElement | null, pointerId: number | null): void {
   if (element && pointerId !== null && element.hasPointerCapture(pointerId)) {
     element.releasePointerCapture(pointerId);
@@ -151,17 +202,21 @@ function clearSteerHoldTimer(): void {
 function resetTouchInteraction(player: Player | null): void {
   const canvas = canvasManager.getCanvas();
   const ability = document.getElementById(ABILITY_ID);
+  const boost = document.getElementById(BOOST_ID);
   const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
+  const activeBoostPointerId = boostPointerId;
   steerPointerId = null;
   clearSteerHoldTimer();
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
+  boostPointerId = null;
   releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(canvas, activeFirePointerId);
   releasePointerCapture(ability, activeAbilityPointerId);
+  releasePointerCapture(boost, activeBoostPointerId);
   if (player) {
     setTouchHeading(player, null);
     setTouchFire(player, false);
@@ -169,6 +224,7 @@ function resetTouchInteraction(player: Player | null): void {
     resetControlSources();
   }
   setAbilityPressed(false);
+  setBoostPressed(false);
 }
 
 function requireLocalPlayer(): Player | null {
@@ -178,6 +234,7 @@ function requireLocalPlayer(): Player | null {
 function ensureTouchDom(): {
   root: HTMLElement;
   ability: HTMLElement;
+  boost: HTMLElement;
 } {
   let root = document.getElementById(ROOT_ID);
   if (!root) {
@@ -205,7 +262,24 @@ function ensureTouchDom(): {
     ability.setAttribute('aria-label', 'Ability');
   }
 
-  return { root, ability };
+  let boost = document.getElementById(BOOST_ID);
+  if (!boost) {
+    boost = document.createElement('button');
+    boost.id = BOOST_ID;
+    boost.className = 'touch-boost';
+    boost.setAttribute('type', 'button');
+    boost.setAttribute('aria-label', 'Boost');
+    boost.setAttribute('aria-pressed', 'false');
+    boost.setAttribute('aria-disabled', 'true');
+    boost.textContent = 'BOOST';
+    root.appendChild(boost);
+  }
+  boost.setAttribute('type', 'button');
+  if (!boost.getAttribute('aria-label')) {
+    boost.setAttribute('aria-label', 'Boost');
+  }
+
+  return { root, ability, boost };
 }
 
 function onPlayfieldPointerDown(ev: PointerEvent): void {
@@ -374,6 +448,46 @@ function onAbilityClick(ev: MouseEvent): void {
   ev.stopPropagation();
 }
 
+function onBoostPointerDown(ev: PointerEvent, boost: HTMLElement): void {
+  if (boostPointerId !== null) {
+    return;
+  }
+  ev.preventDefault();
+  if (steerTap) {
+    steerTap.canFire = false;
+  }
+  boostPointerId = ev.pointerId;
+  boost.setPointerCapture(ev.pointerId);
+  setBoostPressed(true);
+  const player = requireLocalPlayer();
+  if (player) {
+    triggerTouchBoost(player);
+    syncBoostChrome(player);
+  }
+}
+
+function onBoostPointerUp(ev: PointerEvent, boost: HTMLElement): void {
+  if (ev.pointerId !== boostPointerId) {
+    return;
+  }
+  ev.preventDefault();
+  boostPointerId = null;
+  releasePointerCapture(boost, ev.pointerId);
+  setBoostPressed(false);
+}
+
+function onBoostClick(ev: MouseEvent): void {
+  if (ev.detail !== 0) {
+    return;
+  }
+  const player = requireLocalPlayer();
+  if (player) {
+    triggerTouchBoost(player);
+    syncBoostChrome(player);
+  }
+  ev.stopPropagation();
+}
+
 function resetIfPageIsInactive(): void {
   if (typeof document === 'undefined' || document.visibilityState === 'hidden') {
     resetTouchInteraction(requireLocalPlayer());
@@ -385,8 +499,9 @@ export function initializeTouchControls(): void {
     return;
   }
 
-  const { ability } = ensureTouchDom();
+  const { ability, boost } = ensureTouchDom();
   abilityButton = ability;
+  boostButton = boost;
 
   document.addEventListener('pointerdown', onPlayfieldPointerDown, {
     passive: false,
@@ -403,6 +518,16 @@ export function initializeTouchControls(): void {
   ability.addEventListener('click', onAbilityClick);
   ability.addEventListener('lostpointercapture', () => {
     if (abilityPointerId !== null) {
+      resetTouchInteraction(requireLocalPlayer());
+    }
+  });
+
+  boost.addEventListener('pointerdown', (ev) => onBoostPointerDown(ev, boost));
+  boost.addEventListener('pointerup', (ev) => onBoostPointerUp(ev, boost));
+  boost.addEventListener('pointercancel', (ev) => onBoostPointerUp(ev, boost));
+  boost.addEventListener('click', onBoostClick);
+  boost.addEventListener('lostpointercapture', () => {
+    if (boostPointerId !== null) {
       resetTouchInteraction(requireLocalPlayer());
     }
   });

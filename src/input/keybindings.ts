@@ -33,6 +33,9 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 function updateCruise(player: Player): void {
   const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
   player.ship.thrusting = alive;
+  if (!alive) {
+    player.ship.boosting = false;
+  }
 }
 
 // Helper to set angular velocity from the aggregate turn-key state. Supports
@@ -96,6 +99,12 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
       case 'KeyE':
         if (!ev.repeat) {
           player.ship.activateAbility();
+        }
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        if (!ev.repeat) {
+          player.ship.toggleBoost();
         }
         break;
       case 'ArrowLeft':

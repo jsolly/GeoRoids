@@ -2,7 +2,7 @@
 title: Controls
 category: Start here
 summary: Automatic thrust on every device, with keyboard or pointer steering,
-  firing, and kit abilities.
+  firing, Boost, and kit abilities.
 order: 20
 related:
   - content/wiki/field-manual.md
@@ -16,12 +16,15 @@ media:
 ## Keyboard
 
 The thrusters stay on while you are alive. ArrowLeft or A and ArrowRight or D
-turn the ship; opposing turn inputs cancel. Space fires. E activates the
-selected kit ability and is edge-triggered, so holding the key does not
-repeatedly activate it. F is unbound.
+turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
+on the first press and off on the next; holding the key does not retrigger it.
+E activates the selected kit ability and is edge-triggered, so holding the key
+does not repeatedly activate it. F is unbound.
 
-Your kit, mass, and terrain affect acceleration and speed. Each kit page lists
-its handling values. Turns have a capped rate; the arrow ahead of the hull shows
+Your kit, mass, and terrain affect acceleration and speed. Surveyor and Hauler
+share the same cruise speed. Boost multiplies that cruise and thrust, and
+Surveyor's multiplier is stronger than Hauler's. Each kit page lists its
+handling values. Turns have a capped rate; the arrow ahead of the hull shows
 the current heading. Releasing steering keeps the attained heading and automatic
 thrust. Steering redirects momentum toward the nose; terrain forces and combat
 knockback can still push the ship. W and ArrowUp are unbound.
@@ -49,5 +52,7 @@ movements cannot whip the ship around. Watch the arrow ahead of the hull when
 your finger covers the ship. A quick one-finger tap fires once on release. While holding
 one finger to steer, tap anywhere on the playfield with another finger to fire
 immediately, or hold that second finger for continuous fire until it is lifted.
-Use the ability button for the same action as E. The action button does not
-steer the ship or create a pending playfield tap shot.
+Use the ability button for the same action as E. Use the Boost button at the
+bottom of the screen for the same action as Shift: tap once to start boosting,
+tap again to stop. The action buttons do not steer the ship or create a pending
+playfield tap shot.

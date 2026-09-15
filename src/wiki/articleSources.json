@@ -25,9 +25,14 @@
     "tests/integration/browser/sanity/wave2-touch-controls.test.ts",
     "src/input/pointerSteering.ts",
     "src/entities/ship/cruiseMotion.ts",
+    "src/entities/ship/shipKits.ts",
+    "src/entities/ship/Ship.ts",
     "shared/shipFlight.ts",
     "src/rendering/headingCueRenderer.ts",
     "src/ui/universeMap.ts",
+    "tests/unit/entities/input/keyboardControls.test.ts",
+    "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts",
+    "tests/integration/browser/sanity/boost-toggle-raises-cruise-then-returns-to-shared-speed.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts"
   ],
   "hauler": [

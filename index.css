@@ -910,14 +910,16 @@ body.touch-play .touch-controls:not([hidden]) {
 }
 
 body.touch-play #gameCanvas,
-.touch-ability {
+.touch-ability,
+.touch-boost {
   pointer-events: auto;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.touch-ability {
+.touch-ability,
+.touch-boost {
   --action-cool: 0;
   position: absolute;
   bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 8px);
@@ -940,8 +942,15 @@ body.touch-play #gameCanvas,
   right: max(16px, env(safe-area-inset-right, 0px));
 }
 
+.touch-boost {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .touch-ability.is-pressed,
-.touch-ability.is-active {
+.touch-ability.is-active,
+.touch-boost.is-pressed,
+.touch-boost.is-active {
   background: color-mix(in srgb, currentColor 16%, transparent);
   box-shadow: 0 0 14px color-mix(in srgb, currentColor 45%, transparent);
 }
@@ -954,12 +963,14 @@ body.touch-play #gameCanvas,
   );
 }
 
-.touch-ability.is-unavailable {
+.touch-ability.is-unavailable,
+.touch-boost.is-unavailable {
   opacity: 0.42;
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
-  .touch-ability {
+  .touch-ability,
+  .touch-boost {
     width: 48px;
     height: 48px;
     bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 8px);

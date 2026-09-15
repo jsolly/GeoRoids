@@ -433,3 +433,35 @@ test('a restart loads a legacy placement record as monthly score only', () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('a restart loads a recent flight only when lastSeenAt is present', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-flight-'));
+  const path = join(directory, 'world.sqlite');
+  try {
+    const initial = new WorldStore(path);
+    initial.close();
+    const flight = {
+      ...scorePilot(321),
+      lastSeenAt: 1_700_000_000_000,
+      kitId: 'hauler' as const,
+      position: { x: 400, y: 800 },
+      velocity: { x: 3, y: -1 },
+      angle: 0.5,
+      lives: 2,
+      mass: 8,
+      health: 40,
+    };
+    const db = new DatabaseSync(path);
+    db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run('pilot', JSON.stringify(flight));
+    db.close();
+
+    const store = new WorldStore(path);
+    try {
+      expect(store.loadPilots()).toEqual([flight]);
+    } finally {
+      store.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

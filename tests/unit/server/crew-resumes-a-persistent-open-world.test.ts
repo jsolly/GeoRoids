@@ -202,11 +202,13 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
   engine.stopGameLoop();
 });
 
-test('leaving then entering again keeps monthly score on a fresh spawn', () => {
+test('leaving then entering again returns to the same ship with monthly score', () => {
   const engine = new GameEngine(82);
   const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
   original.actor.lives = 2;
   original.actor.score = 450;
+  original.actor.health = 40;
+  original.actor.angle = 1.25;
   engine.removePlayer('scout');
   const resumed = engine.resumePilot(original.token, new RecordingSocket(), 'hauler', 'Bob');
   assert(resumed.ok);
@@ -214,26 +216,35 @@ test('leaving then entering again keeps monthly score on a fresh spawn', () => {
     id: 'scout',
     name: 'Bob',
     kitId: 'hauler',
-    lives: 3,
+    lives: 2,
     score: 450,
-    health: resumed.actor.maxHealth,
+    position: { x: 200, y: 300 },
+    angle: 1.25,
   });
-  expect(resumed.actor.position).not.toEqual({ x: 200, y: 300 });
+  expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
   expect(engine.getPlayerCount()).toBe(1);
   engine.stopGameLoop();
 });
 
-test('checkpoints store monthly score without ship placement', () => {
+test('checkpoints store monthly score and a recent flight', () => {
   const store = database(':memory:');
   const engine = new GameEngine(82, undefined, store);
   const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
   original.actor.score = 450;
+  original.actor.lives = 2;
   engine.checkpointWorld();
   const saved = store.loadPilots()[0];
   assert(saved);
-  expect(Object.keys(saved).sort()).toEqual(['id', 'name', 'score', 'tokenHash']);
-  expect(saved).toMatchObject({ id: 'scout', name: 'scout', score: 450 });
+  expect(saved).toMatchObject({
+    id: 'scout',
+    name: 'scout',
+    score: 450,
+    kitId: 'surveyor',
+    position: { x: 200, y: 300 },
+    lives: 2,
+  });
   expect(saved.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+  expect(saved.lastSeenAt).toEqual(expect.any(Number));
   engine.stopGameLoop();
 });
 

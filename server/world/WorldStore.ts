@@ -2,11 +2,18 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { validExploration } from '../../shared/exploration';
-import { finiteMotionVector } from '../../shared/playerMotion';
+import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { readCompletedSectorIds } from '../../shared/sectors';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
-import type { AsteroidData, ExplorationTile, Position } from '../../shared-types';
+import type {
+  AsteroidData,
+  ExplorationTile,
+  Position,
+  ShipKitId,
+  Velocity,
+} from '../../shared-types';
+import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
@@ -16,12 +23,31 @@ function validWorldPosition(position: Position): boolean {
   return finiteMotionVector(position) && Math.hypot(position.x, position.y) <= WORLD.radius;
 }
 
-/** Browser credential plus this UTC month's score. Placement is never stored. */
+/** Browser credential plus this UTC month's score and optional recent flight. */
 export interface PersistentPilot {
   id: string;
   tokenHash: string;
   name: string;
   score: number;
+  lastSeenAt?: number;
+  kitId?: ShipKitId;
+  position?: Position;
+  velocity?: Velocity;
+  angle?: number;
+  lives?: number;
+  mass?: number;
+  health?: number;
+}
+
+/** Flight fields that a brief disconnect may restore. Missing `lastSeenAt` never restores pose. */
+export interface RestorableFlight extends PersistentPilot {
+  lastSeenAt: number;
+  kitId: ShipKitId;
+  position: Position;
+  angle: number;
+  lives: number;
+  mass: number;
+  health: number;
 }
 
 interface SavedWorld {
@@ -31,6 +57,67 @@ interface SavedWorld {
   scoreSeason?: string;
   exploration: ExplorationTile[];
   completedSectors: string[];
+}
+
+function readVector(value: unknown): Position | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const vector = value as Record<string, unknown>;
+  const x = vector['x'];
+  const y = vector['y'];
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    return undefined;
+  }
+  return { x, y };
+}
+
+function readOptionalFlight(
+  pilot: Record<string, unknown>
+): Omit<PersistentPilot, 'id' | 'tokenHash' | 'name' | 'score'> | undefined {
+  if (!('lastSeenAt' in pilot)) {
+    return undefined;
+  }
+  const lastSeenAt = pilot['lastSeenAt'];
+  const position = readVector(pilot['position']);
+  const angle = pilot['angle'];
+  const lives = pilot['lives'];
+  const mass = pilot['mass'];
+  const health = pilot['health'];
+  const kitId = pilot['kitId'];
+  if (
+    typeof lastSeenAt !== 'number' ||
+    !Number.isFinite(lastSeenAt) ||
+    lastSeenAt < 0 ||
+    !position ||
+    !validWorldPosition(position) ||
+    typeof angle !== 'number' ||
+    !Number.isFinite(angle) ||
+    typeof lives !== 'number' ||
+    !Number.isInteger(lives) ||
+    lives < 0 ||
+    lives > 99 ||
+    typeof mass !== 'number' ||
+    !Number.isFinite(mass) ||
+    mass <= 0 ||
+    typeof health !== 'number' ||
+    !Number.isFinite(health) ||
+    health < 0 ||
+    !isShipKitId(kitId)
+  ) {
+    return undefined;
+  }
+  const velocity = readVector(pilot['velocity']);
+  return {
+    lastSeenAt,
+    kitId,
+    position,
+    angle,
+    lives,
+    mass,
+    health,
+    ...(velocity && finiteMotionVector(velocity) ? { velocity } : {}),
+  };
 }
 
 function readPilot(value: unknown): PersistentPilot | undefined {
@@ -52,7 +139,44 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   ) {
     return undefined;
   }
-  return { id, tokenHash, name, score };
+  return { id, tokenHash, name, score, ...readOptionalFlight(pilot) };
+}
+
+/** Restore pose only when last-seen is present, recent, and the ship still has lives. */
+export function restorableFlight(
+  pilot: PersistentPilot,
+  now: number
+): RestorableFlight | undefined {
+  const lastSeenAt = pilot.lastSeenAt;
+  const kitId = pilot.kitId;
+  const position = pilot.position;
+  const angle = pilot.angle;
+  const lives = pilot.lives;
+  const mass = pilot.mass;
+  const health = pilot.health;
+  if (
+    lastSeenAt === undefined ||
+    !flightReturnWindowOpen(lastSeenAt, now) ||
+    !isShipKitId(kitId) ||
+    position === undefined ||
+    angle === undefined ||
+    lives === undefined ||
+    lives <= 0 ||
+    mass === undefined ||
+    health === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    ...pilot,
+    lastSeenAt,
+    kitId,
+    position,
+    angle,
+    lives,
+    mass,
+    health,
+  };
 }
 
 /** Single-writer SQLite transactions keep cargo consumption, shared scores and discoveries together. */

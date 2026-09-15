@@ -65,7 +65,7 @@ describe('server-authoritative combat', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.attackerId).toBe('asteroid');
-    expect(player?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
+    expect(player?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.ASTEROID_COLLISION);
     expect(engine.getAsteroid('server-asteroid-0')).toBeUndefined();
   });
 
@@ -101,7 +101,7 @@ describe('server-authoritative combat', () => {
     const healthBefore = hauler.health;
     engine.resolveAuthoritativeCombat();
 
-    expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
+    expect(hauler.health).toBe(healthBefore - DAMAGE.ASTEROID_COLLISION);
     expect(engine.getAsteroid('attached')).toBeDefined();
     expect(engine.getAsteroid('unrelated')).toBeUndefined();
   });
@@ -110,18 +110,130 @@ describe('server-authoritative combat', () => {
     engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
     clearProtection(engine, 'hauler');
     clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 28, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: -28, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    assert.ok(hauler, 'hauler');
+    expect(hauler.harpoonTargetId).toBe('attached');
+    const healthBefore = hauler.health;
+    engine.resolveAuthoritativeCombat();
+
+    expect(hauler.health).toBe(healthBefore - DAMAGE.ASTEROID_COLLISION);
+    expect(hauler.harpoonTargetId).toBe('attached');
+    expect(engine.getAsteroid('attached')).toBeDefined();
+    expect(engine.getAsteroid('unrelated')).toBeUndefined();
+  });
+
+  test('towed cargo that overlaps another asteroid breaks both rocks and drops the cable', () => {
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 80, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 80, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    assert.ok(hauler, 'hauler');
+    expect(hauler.harpoonTargetId).toBe('attached');
+    const healthBefore = hauler.health;
+
+    engine.resolveAuthoritativeCombat();
+
+    expect(hauler.health).toBe(healthBefore);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(engine.getAsteroid('attached')).toBeUndefined();
+    expect(engine.getAsteroid('field-rock')).toBeUndefined();
+  });
+
+  test('towed cargo that overlaps another asteroid shields its Hauler from that rock', () => {
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
     engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
-    engine.addAsteroid(testAsteroid({ id: 'unrelated', position: { x: 0, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
 
     expect(engine.useAbility('hauler', 'hauler')).toBe(true);
     const hauler = engine.getPlayer('hauler');
     assert.ok(hauler, 'hauler');
     const healthBefore = hauler.health;
+
     engine.resolveAuthoritativeCombat();
 
-    expect(hauler.health).toBe(healthBefore - DAMAGE.LASER_HIT);
-    expect(engine.getAsteroid('attached')).toBeDefined();
-    expect(engine.getAsteroid('unrelated')).toBeUndefined();
+    expect(hauler.health).toBe(healthBefore);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(engine.getAsteroid('attached')).toBeUndefined();
+    expect(engine.getAsteroid('field-rock')).toBeUndefined();
+  });
+
+  test('towed cargo that hits another rock and another ship still damages that ship', () => {
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 39, y: 0 }, 'surveyor');
+    clearProtection(engine, 'hauler');
+    clearProtection(engine, 'pilot');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'field-rock', position: { x: 0, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    const pilot = engine.getPlayer('pilot');
+    assert.ok(hauler, 'hauler');
+    assert.ok(pilot, 'pilot');
+    const haulerHealth = hauler.health;
+    const pilotHealth = pilot.health;
+
+    engine.resolveAuthoritativeCombat();
+
+    expect(hauler.health).toBe(haulerHealth);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(pilot.health).toBe(pilotHealth - DAMAGE.ASTEROID_COLLISION);
+    expect(engine.getAsteroid('attached')).toBeUndefined();
+    expect(engine.getAsteroid('field-rock')).toBeUndefined();
+  });
+
+  test('two Haulers whose cargo overlaps break both rocks and drop both cables', () => {
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    engine.addPlayer('hauler-2', 'Hauler Two', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
+    clearProtection(engine, 'hauler');
+    clearProtection(engine, 'hauler-2');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'attached', position: { x: 0, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'other-cargo', position: { x: 0, y: 0 } }));
+
+    expect(engine.useAbility('hauler', 'hauler')).toBe(true);
+    expect(engine.useAbility('hauler-2', 'hauler')).toBe(true);
+    const hauler = engine.getPlayer('hauler');
+    const partner = engine.getPlayer('hauler-2');
+    assert.ok(hauler, 'hauler');
+    assert.ok(partner, 'hauler-2');
+    expect(hauler.harpoonTargetId).toBe('attached');
+    expect(partner.harpoonTargetId).toBe('other-cargo');
+    const haulerHealth = hauler.health;
+    const partnerHealth = partner.health;
+
+    engine.resolveAuthoritativeCombat();
+
+    expect(hauler.health).toBe(haulerHealth);
+    expect(partner.health).toBe(partnerHealth);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(partner.harpoonTargetId).toBeNull();
+    expect(engine.getAsteroid('attached')).toBeUndefined();
+    expect(engine.getAsteroid('other-cargo')).toBeUndefined();
+  });
+
+  test('untowed overlapping asteroids do not break each other', () => {
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 400, y: 0 }, 'hauler');
+    clearProtection(engine, 'hauler');
+    clearAsteroidField(engine);
+    engine.addAsteroid(testAsteroid({ id: 'loose-a', position: { x: 0, y: 0 } }));
+    engine.addAsteroid(testAsteroid({ id: 'loose-b', position: { x: 0, y: 0 } }));
+
+    engine.resolveAuthoritativeCombat();
+
+    expect(engine.getAsteroid('loose-a')).toBeDefined();
+    expect(engine.getAsteroid('loose-b')).toBeDefined();
   });
 
   test('an attached asteroid still damages and breaks for another overlapping pilot', () => {
@@ -143,7 +255,8 @@ describe('server-authoritative combat', () => {
     engine.resolveAuthoritativeCombat();
 
     expect(hauler.health).toBe(haulerHealth);
-    expect(pilot.health).toBe(pilotHealth - DAMAGE.LASER_HIT);
+    expect(hauler.harpoonTargetId).toBeNull();
+    expect(pilot.health).toBe(pilotHealth - DAMAGE.ASTEROID_COLLISION);
     expect(engine.getAsteroid('attached')).toBeUndefined();
   });
 
@@ -155,7 +268,7 @@ describe('server-authoritative combat', () => {
     engine.addAsteroid(testAsteroid({ id: 'server-asteroid-partner', position: { x: 10, y: 0 } }));
 
     engine.resolveAuthoritativeCombat();
-    expect(engine.getPlayer('p2')?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.LASER_HIT);
+    expect(engine.getPlayer('p2')?.health).toBe(SHIP.MAX_HEALTH - DAMAGE.ASTEROID_COLLISION);
     expect(engine.getAsteroid('server-asteroid-partner')).toBeUndefined();
   });
 

@@ -48,6 +48,44 @@ export class CollisionAuthority {
     return hits;
   }
 
+  public collectTowedAsteroidHits(
+    towed: readonly AsteroidData[],
+    asteroids: readonly AsteroidData[]
+  ): Array<{ towedId: string; otherId: string }> {
+    if (towed.length === 0) {
+      return [];
+    }
+    const index = new AsteroidSpatialIndex(asteroids);
+    const hits: Array<{ towedId: string; otherId: string }> = [];
+    const seen = new Set<string>();
+    for (const cargo of towed) {
+      const radius = asteroidCollisionRadius(cargo);
+      const nearby = index.query({
+        minX: cargo.position.x - radius,
+        minY: cargo.position.y - radius,
+        maxX: cargo.position.x + radius,
+        maxY: cargo.position.y + radius,
+      });
+      for (const other of nearby) {
+        if (other.id === cargo.id || cargo.health <= 0 || other.health <= 0) {
+          continue;
+        }
+        if (
+          !circlesOverlap(cargo.position, radius, other.position, asteroidCollisionRadius(other))
+        ) {
+          continue;
+        }
+        const pairKey = cargo.id < other.id ? `${cargo.id}|${other.id}` : `${other.id}|${cargo.id}`;
+        if (seen.has(pairKey)) {
+          continue;
+        }
+        seen.add(pairKey);
+        hits.push({ towedId: cargo.id, otherId: other.id });
+      }
+    }
+    return hits;
+  }
+
   public collectAsteroidPickupHits(
     asteroids: AsteroidData[],
     pickups: SatellitePickupData[]

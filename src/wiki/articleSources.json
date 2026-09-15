@@ -43,11 +43,14 @@
     "src/entities/ship/towCable.ts",
     "shared/furnaces.ts",
     "server/core/GameEngine.ts",
+    "server/core/CollisionAuthority.ts",
     "tests/unit/entities/shipKits.test.ts",
     "tests/unit/entities/shipAbilities.test.ts",
     "tests/integration/browser/sanity/hauler-flies-with-one-ability.test.ts",
     "server/core/AsteroidManager.ts",
-    "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts"
+    "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts",
+    "tests/unit/server/authoritative-combat.test.ts",
+    "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -59,6 +62,7 @@
     "src/entities/roid/roidRenderer.ts",
     "src/physics/shockwave.ts",
     "server/core/GameEngine.ts",
+    "server/core/CollisionAuthority.ts",
     "src/constants/index.ts",
     "tests/unit/entities/asteroids.test.ts",
     "tests/unit/entities/asteroidPoints.test.ts",
@@ -67,6 +71,7 @@
     "tests/unit/physics/lasers-bounce-on-asteroid-faces.test.ts",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/server/collaborative-asteroid-split.test.ts",
+    "tests/unit/server/authoritative-combat.test.ts",
     "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts"
   ],
   "satellites": [
@@ -118,6 +123,7 @@
     "tests/unit/entities/shipLifecycle.test.ts",
     "tests/unit/entities/combatDamage.test.ts",
     "tests/unit/network/pilots-reconcile-authoritative-bolts.test.ts",
+    "tests/unit/server/authoritative-combat.test.ts",
     "tests/unit/scenarios/combat/wall-or-roid-hit-explodes-then-respawns-without-freeze.test.ts",
     "tests/unit/scenarios/combat/an-asteroid-impact-at-low-health-explodes-the-ship-immediately.test.ts",
     "tests/integration/browser/e2e/ship-respawns-near-furnace-after-boundary-death.test.ts",
@@ -202,6 +208,7 @@
     "shared/world.ts",
     "server/core/GameEngine.ts",
     "server/core/PlayerMotionService.ts",
+    "server/core/CollisionAuthority.ts",
     "shared/sectors.ts",
     "server/services/GameStateBroadcaster.ts",
     "src/entities/ship/shipAbilities.ts",
@@ -216,6 +223,7 @@
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
+    "tests/unit/server/authoritative-combat.test.ts",
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts",

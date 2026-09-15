@@ -44,6 +44,9 @@ test('distant sectors do not become collision candidates and large rocks retain 
       (_pilot, id) => id === 'spanning'
     )
   ).toEqual([{ shipId: pilot.id, asteroidId: 'small' }]);
+  expect(collisions.collectTowedAsteroidHits([small], [spanning, small, ...distant])).toEqual([
+    { towedId: 'small', otherId: 'spanning' },
+  ]);
 });
 
 test('a swept query covers every crossed cell and fragments enter the current frame', () => {

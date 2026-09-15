@@ -11,7 +11,7 @@ import {
   strokePhosphorPolyline as strokeJuicePolyline,
   thrusterFlameGeometry,
 } from '../../rendering/vectorJuice';
-import { hexToRgba } from '../../utils/colorUtils';
+import { hexToRgba, laserBoltColor } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
 import { findHarpoonFieldBody } from './harpoonField';
 import {
@@ -419,7 +419,12 @@ export function drawShipExplosionAtPosition(
 }
 
 export function drawLaserBolts(
-  lasers: Array<{ position: Position; velocity: Velocity; explodeTime: number }>,
+  lasers: Array<{
+    position: Position;
+    velocity: Velocity;
+    explodeTime: number;
+    bounceCount?: number;
+  }>,
   color: string,
   viewerPosition: Position
 ): void {
@@ -446,6 +451,7 @@ export function drawLaserBolts(
       continue;
     }
 
+    const boltColor = laserBoltColor(color, laser.bounceCount);
     if (laser.explodeTime === 0) {
       const scale = canvasManager.getPlayfieldScale();
       const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
@@ -461,7 +467,7 @@ export function drawLaserBolts(
         screenPos.y - halfY - trailY,
         screenPos.x - halfX,
         screenPos.y - halfY,
-        color,
+        boltColor,
         VISUAL.LASER_STROKE_WIDTH * 0.7,
         VISUAL.LASER_GLOW * 0.55,
         0.38
@@ -472,7 +478,7 @@ export function drawLaserBolts(
         screenPos.y - halfY,
         screenPos.x + halfX,
         screenPos.y + halfY,
-        color,
+        boltColor,
         VISUAL.LASER_STROKE_WIDTH,
         VISUAL.LASER_GLOW
       );
@@ -481,9 +487,9 @@ export function drawLaserBolts(
       const ringRadius = VISUAL.LASER_EXPLODE_RADIUS * (0.55 + t * 1.15);
       const alpha = 1 - t * 0.7;
       ctx.save();
-      ctx.shadowColor = color;
+      ctx.shadowColor = boltColor;
       ctx.shadowBlur = resolveGlow(VISUAL.LASER_GLOW);
-      ctx.strokeStyle = hexToRgba(color, alpha);
+      ctx.strokeStyle = hexToRgba(boltColor, alpha);
       ctx.lineWidth = 1.25;
       ctx.beginPath();
       ctx.arc(screenPos.x, screenPos.y, ringRadius, 0, Math.PI * 2, false);
@@ -497,7 +503,7 @@ export function drawLaserBolts(
         t * 0.5,
         ringRadius * 0.35,
         ringRadius * 1.35,
-        color,
+        boltColor,
         alpha,
         1,
         VISUAL.LASER_GLOW

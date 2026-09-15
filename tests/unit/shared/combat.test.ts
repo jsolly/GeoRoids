@@ -3,6 +3,8 @@ import {
   findShipAsteroidOverlaps,
   isClientOwnedCollisionAttacker,
   isCombatantImmune,
+  isWorldHazard,
+  laserDamagesShips,
 } from '../../../shared/combat';
 
 describe('shared combat helpers', () => {
@@ -46,5 +48,19 @@ describe('shared combat helpers', () => {
   test('only boundary collisions may be reported by clients', () => {
     expect(isClientOwnedCollisionAttacker('boundary')).toBe(true);
     expect(isClientOwnedCollisionAttacker('asteroid')).toBe(false);
+    expect(isClientOwnedCollisionAttacker('ricochet')).toBe(false);
+  });
+
+  test('world hazards include bounced lasers but not crew pilots', () => {
+    expect(isWorldHazard('asteroid')).toBe(true);
+    expect(isWorldHazard('boundary')).toBe(true);
+    expect(isWorldHazard('ricochet')).toBe(true);
+    expect(isWorldHazard('p1')).toBe(false);
+  });
+
+  test('only bounced lasers become hull hazards', () => {
+    expect(laserDamagesShips(0)).toBe(false);
+    expect(laserDamagesShips(1)).toBe(true);
+    expect(laserDamagesShips(8)).toBe(true);
   });
 });

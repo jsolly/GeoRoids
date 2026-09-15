@@ -25,8 +25,8 @@ before the slope force acts. Terrain itself does not deal damage.
 
 The world is circular. Asteroids bounce inward at the outer boundary, keeping
 the remaining deposits in the world. Lasers reflect off the wall and can mine
-asteroids on their returning path; reflected crew lasers remain harmless to
-ships. Crossing the boundary destroys a vulnerable ship regardless of its
+asteroids on their returning path; after that bounce they damage any live ship
+they hit. Crossing the boundary destroys a vulnerable ship regardless of its
 health or mass and costs one life. Regional terrain and furnace landmarks
 remain available between sessions.
 

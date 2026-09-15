@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
+import { DAMAGE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function crew() {
@@ -64,18 +65,23 @@ test('a muzzle exactly on the wall still fires a reflected shot into the world',
   expect(shot.position.x).toBeLessThan(WORLD.radius);
 });
 
-test('a wall ricochet travels its remaining distance through a crew hull without hurting it', () => {
+test('a wall ricochet damages the crew hull it meets and is consumed', () => {
   const { engine, shooter, teammate } = crew();
-  const before = { health: teammate.health, lives: teammate.lives, score: teammate.score };
+  const beforeShooter = { health: shooter.health, lives: shooter.lives, score: shooter.score };
+  const beforeTeammate = { health: teammate.health, lives: teammate.lives, score: teammate.score };
   const shot = engine.spawnLaser(shooter.id, { x: WORLD.radius - 10, y: 0 }, { x: 100, y: 0 });
   assert(shot);
   expect(engine.advanceLasersAndResolveHits()).toEqual([]);
   engine.resolveAuthoritativeCombat();
   expect(shot.bounces).toBe(1);
-  expect(shot.velocity).toEqual({ x: -100, y: 0 });
-  expect(shot.position.x).toBeCloseTo(WORLD.radius - 90, 3);
-  expect(shot.energy).toBe(1);
-  expect({ health: teammate.health, lives: teammate.lives, score: teammate.score }).toEqual(before);
+  expect(shot.hasExploded).toBe(true);
+  expect(engine.getServerLasers()).toEqual([]);
+  expect(teammate.health).toBe(beforeTeammate.health - DAMAGE.LASER_HIT);
+  expect(teammate.lives).toBe(beforeTeammate.lives);
+  expect(teammate.score).toBe(beforeTeammate.score);
+  expect({ health: shooter.health, lives: shooter.lives, score: shooter.score }).toEqual(
+    beforeShooter
+  );
 });
 
 test('a reflected crew shot mines the asteroid on its returning path exactly once', () => {

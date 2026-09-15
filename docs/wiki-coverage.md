@@ -92,11 +92,15 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   collaboration score. Every miner and recorded Surveyor receives the full
   mining reward; partial-rock contributor history survives saved-region reloads
   and server restarts, and offline pilots retain their credit.
-- Ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
-  never damage crew hulls. Asteroid impacts remain world hazards and remove 25
-  health per impact. Boundary contact destroys a vulnerable ship regardless of
-  health, enforced by `server/core/GameEngine.ts` and verified in
-  `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts`.
+- Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
+  never damage crew hulls. After a bounce off the arena wall, a completed-sector
+  wall, or a reflective asteroid, a laser becomes a ricochet: it deals the
+  configured laser hit times its energy to the first live hull it meets,
+  including its owner, and is consumed. Asteroid impacts remain world hazards
+  and remove 25 health per impact. Boundary contact destroys a vulnerable ship
+  regardless of health, enforced by `server/core/GameEngine.ts` and verified in
+  `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts` and
+  `tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager
   and spawn separately from asteroid destruction. A nearest living player within
   the automatic collection range claims one; the hardware orbits indefinitely,

@@ -4,7 +4,12 @@ import { Player } from '../../../src/entities/player/Player';
 import { getRoidStrokeWidth } from '../../../src/entities/roid/roidRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { applyLockedPaletteCss, getLaserColor, hexToRgba } from '../../../src/utils/colorUtils';
+import {
+  applyLockedPaletteCss,
+  getLaserColor,
+  hexToRgba,
+  laserBoltColor,
+} from '../../../src/utils/colorUtils';
 import { isDebugMode } from '../../../src/utils/debugUtils';
 
 test('locked palette hexes match the art-direction swatch', () => {
@@ -29,6 +34,9 @@ test('locked palette hexes match the art-direction swatch', () => {
 test('laser colors never use white', () => {
   expect(getLaserColor()).toBe(PALETTE.LASER_LOCAL);
   expect(getLaserColor().toLowerCase()).not.toBe('#ffffff');
+  expect(laserBoltColor(PALETTE.LASER_LOCAL, 0)).toBe(PALETTE.LASER_LOCAL);
+  expect(laserBoltColor(PALETTE.LASER_LOCAL, 1)).toBe(PALETTE.DANGER);
+  expect(laserBoltColor(PALETTE.LASER_LOCAL, 1).toLowerCase()).not.toBe('#ffffff');
 });
 
 test('players and ships use the role palette instead of white', () => {

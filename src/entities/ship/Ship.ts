@@ -83,7 +83,7 @@ class Ship {
 
   harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
-  /** Last specific environmental cause (boundary or asteroid). */
+  /** Last specific environmental cause (boundary, asteroid, or ricochet). */
   lastExplodeCause?: string;
 
   constructor(options?: {

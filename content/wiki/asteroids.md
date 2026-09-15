@@ -65,5 +65,6 @@ the configured cap. Reflection stops when the rock fills its charge, the laser
 reaches its energy cap, or the shot reaches the bounce limit; the laser also
 has a lifetime cap. A rock that reaches its terminal reflection state breaks
 and can release the core reward. Reflected projectiles keep their speed
-magnitude and remain a bounded asteroid interaction. Ship lasers mine rocks
-and never damage a crew member, whether a shot is direct or reflected.
+magnitude and remain a bounded asteroid interaction. Direct ship lasers mine
+rocks and pass through crew hulls; after a bounce, the same shot becomes a
+ricochet that damages any live ship it then hits.

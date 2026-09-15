@@ -207,7 +207,7 @@ export class EntityManager {
     return entity;
   }
 
-  // Environmental damage is authoritative; crew lasers never enter this path.
+  // Environmental damage is authoritative; unbounced crew lasers never enter this path.
   public damageEntity(entityId: string, damage: number): GameEntity | null {
     const entity = this.entities.get(entityId);
     if (!entity || entity.exploding || entity.health <= 0) {

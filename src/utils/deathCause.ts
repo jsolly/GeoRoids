@@ -25,6 +25,9 @@ export function describeDeathCause(cause: string | undefined): string {
     case 'boundary':
     case 'the arena wall':
       return 'the arena wall';
+    case 'ricochet':
+    case 'a ricochet':
+      return 'a ricochet';
     default:
       return 'unknown';
   }

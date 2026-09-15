@@ -10,6 +10,7 @@ import {
 } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
+import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
 import { FURNACES, furnaceReward } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
@@ -679,12 +680,13 @@ export class GameEngine {
   ): PersistentPilot {
     const previous = this.pilots.get(actor.id);
     const lastClientReleaseId = readReleaseId(clientReleaseId) ?? previous?.lastClientReleaseId;
+    const now = this.getServerTime();
     const flight = {
       id: actor.id,
       tokenHash,
       name: actor.name,
       score: actor.score,
-      lastSeenAt: this.getServerTime(),
+      lastSeenAt: now,
       kitId: actor.kitId,
       position: { x: actor.position.x, y: actor.position.y },
       velocity: { x: actor.velocity.x, y: actor.velocity.y },
@@ -699,6 +701,8 @@ export class GameEngine {
         ...flight,
         credentialReleaseId: SERVER_RELEASE_ID,
         scoreReleaseId: SERVER_RELEASE_ID,
+        credentialIssuedAt: now,
+        scoreUpdatedAt: now,
         ...releaseField('credentialClientReleaseId', lastClientReleaseId),
         ...releaseField('scoreClientReleaseId', lastClientReleaseId),
       };
@@ -710,20 +714,24 @@ export class GameEngine {
       ...(issuedCredential
         ? {
             credentialReleaseId: SERVER_RELEASE_ID,
+            credentialIssuedAt: now,
             ...releaseField('credentialClientReleaseId', lastClientReleaseId),
           }
         : {
             ...releaseField('credentialReleaseId', previous.credentialReleaseId),
             ...releaseField('credentialClientReleaseId', previous.credentialClientReleaseId),
+            ...epochField('credentialIssuedAt', previous.credentialIssuedAt),
           }),
       ...(wroteScore
         ? {
             scoreReleaseId: SERVER_RELEASE_ID,
+            scoreUpdatedAt: now,
             ...releaseField('scoreClientReleaseId', lastClientReleaseId),
           }
         : {
             ...releaseField('scoreReleaseId', previous.scoreReleaseId),
             ...releaseField('scoreClientReleaseId', previous.scoreClientReleaseId),
+            ...epochField('scoreUpdatedAt', previous.scoreUpdatedAt),
           }),
     };
   }
@@ -738,19 +746,23 @@ export class GameEngine {
   }
 
   private writePilotScore(pilot: PersistentPilot, score: number): PersistentPilot {
-    return {
+    const next: PersistentPilot = {
       ...pilot,
       score,
       scoreReleaseId: SERVER_RELEASE_ID,
-      ...releaseField('scoreClientReleaseId', pilot.lastClientReleaseId),
+      scoreUpdatedAt: this.getServerTime(),
     };
+    delete next.scoreClientReleaseId;
+    return next;
   }
 
   public getPilotReleaseProvenance(id: string): {
     credentialReleaseId?: string;
     credentialClientReleaseId?: string;
+    credentialIssuedAt?: number;
     scoreReleaseId?: string;
     scoreClientReleaseId?: string;
+    scoreUpdatedAt?: number;
   } {
     const saved = this.pilots.get(id);
     if (!saved) {
@@ -759,8 +771,10 @@ export class GameEngine {
     return {
       ...releaseField('credentialReleaseId', saved.credentialReleaseId),
       ...releaseField('credentialClientReleaseId', saved.credentialClientReleaseId),
+      ...epochField('credentialIssuedAt', saved.credentialIssuedAt),
       ...releaseField('scoreReleaseId', saved.scoreReleaseId),
       ...releaseField('scoreClientReleaseId', saved.scoreClientReleaseId),
+      ...epochField('scoreUpdatedAt', saved.scoreUpdatedAt),
     };
   }
 
@@ -912,7 +926,8 @@ export class GameEngine {
       currentScoreSeason: season,
     });
     this.scoreSeason = season;
-    this.worldStartedAt = this.getServerTime();
+    const now = this.getServerTime();
+    this.worldStartedAt = now;
     this.worldStore?.reset();
     this.regionalField.reset();
     this.exploration.reset();
@@ -928,8 +943,9 @@ export class GameEngine {
         score: 0,
         ...releaseField('credentialReleaseId', pilot.credentialReleaseId),
         ...releaseField('credentialClientReleaseId', pilot.credentialClientReleaseId),
+        ...epochField('credentialIssuedAt', pilot.credentialIssuedAt),
         scoreReleaseId: SERVER_RELEASE_ID,
-        ...releaseField('scoreClientReleaseId', pilot.lastClientReleaseId),
+        scoreUpdatedAt: now,
         ...releaseField('lastClientReleaseId', pilot.lastClientReleaseId),
       });
     }

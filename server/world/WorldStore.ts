@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
@@ -42,10 +43,14 @@ export interface PersistentPilot {
   credentialReleaseId?: string;
   /** Client release present when the current token digest was issued. */
   credentialClientReleaseId?: string;
+  /** Server clock when the current token digest was issued. */
+  credentialIssuedAt?: number;
   /** Server release that last wrote `score`. */
   scoreReleaseId?: string;
-  /** Client release last known when `score` was written. */
+  /** Client release present for a live score write. Omitted for server-only writes. */
   scoreClientReleaseId?: string;
+  /** Server clock when `score` was last written. */
+  scoreUpdatedAt?: number;
   /** Client release from the most recent join that reached this row. */
   lastClientReleaseId?: string;
 }
@@ -138,15 +143,19 @@ function readReleaseProvenance(
   PersistentPilot,
   | 'credentialReleaseId'
   | 'credentialClientReleaseId'
+  | 'credentialIssuedAt'
   | 'scoreReleaseId'
   | 'scoreClientReleaseId'
+  | 'scoreUpdatedAt'
   | 'lastClientReleaseId'
 > {
   return {
     ...releaseField('credentialReleaseId', pilot['credentialReleaseId']),
     ...releaseField('credentialClientReleaseId', pilot['credentialClientReleaseId']),
+    ...epochField('credentialIssuedAt', pilot['credentialIssuedAt']),
     ...releaseField('scoreReleaseId', pilot['scoreReleaseId']),
     ...releaseField('scoreClientReleaseId', pilot['scoreClientReleaseId']),
+    ...epochField('scoreUpdatedAt', pilot['scoreUpdatedAt']),
     ...releaseField('lastClientReleaseId', pilot['lastClientReleaseId']),
   };
 }

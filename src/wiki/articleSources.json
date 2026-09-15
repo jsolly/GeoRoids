@@ -162,6 +162,7 @@
     "src/network/services/ConnectionManager.ts",
     "src/network/services/resumeCredential.ts",
     "shared/releaseId.ts",
+    "shared/epochField.ts",
     "src/network/services/PlayerMotionReconciliation.ts",
     "src/network/services/asteroidFieldSync.ts",
     "src/network/worldExploration.ts",

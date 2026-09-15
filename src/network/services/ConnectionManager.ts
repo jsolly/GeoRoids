@@ -1520,7 +1520,11 @@ export class ConnectionManager {
       snapshotVersion: SNAPSHOT_VERSION,
       ...(data.serverReleaseId ? { serverReleaseId: data.serverReleaseId } : {}),
       ...(data.credentialReleaseId ? { credentialReleaseId: data.credentialReleaseId } : {}),
+      ...(data.credentialIssuedAt !== undefined
+        ? { credentialIssuedAt: data.credentialIssuedAt }
+        : {}),
       ...(data.scoreReleaseId ? { scoreReleaseId: data.scoreReleaseId } : {}),
+      ...(data.scoreUpdatedAt !== undefined ? { scoreUpdatedAt: data.scoreUpdatedAt } : {}),
     });
 
     const keepField = shouldPreserveSeenAsteroidsOnJoin(this.seenAsteroidIds.size);

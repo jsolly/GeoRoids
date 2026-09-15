@@ -66,10 +66,14 @@ export interface PlayerJoin {
   credentialReleaseId?: string;
   /** Client release present when this resume token was issued. */
   credentialClientReleaseId?: string;
+  /** Server clock when this resume token was issued. */
+  credentialIssuedAt?: number;
   /** Server release that last wrote this pilot's score. */
   scoreReleaseId?: string;
-  /** Client release last known when this pilot's score was written. */
+  /** Client release present for a live score write. Omitted for server-only writes. */
   scoreClientReleaseId?: string;
+  /** Server clock when this pilot's score was last written. */
+  scoreUpdatedAt?: number;
   id: string;
   name: string;
   position: Position;

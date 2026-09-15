@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
+import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { cruiseSpeed } from '../../shared/shipFlight';
 import { radiusFromMass } from '../../shared/shipGrowth';
 import type { PlayerMotionState, Position } from '../../shared-types';
@@ -45,6 +46,8 @@ export class PlayerMotionService {
   private readonly sessions = new Map<string, Session>();
   private readonly tokens = new Map<string, Session>();
   private readonly sockets = new Map<WebSocket, Session>();
+
+  constructor(private readonly completedSectors: ReadonlySet<string> = new Set()) {}
 
   private assertTime(now: number): void {
     if (!Number.isFinite(now) || now < 0) {
@@ -317,10 +320,12 @@ export class PlayerMotionService {
     );
     const anchorReach =
       (speed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
+    const hullRadius = radiusFromMass(session.actor.mass);
     if (
       Math.hypot(pose.velocity.x, pose.velocity.y) > speed + 1e-6 ||
       displacement > credit + 1e-6 ||
-      checkBoundaryCollision(pose.position, radiusFromMass(session.actor.mass)) ||
+      checkBoundaryCollision(pose.position, hullRadius) ||
+      shipOverlapsCompletedSector(pose.position, hullRadius, this.completedSectors) ||
       (session.mode === 'handoff' &&
         session.anchor &&
         Math.hypot(pose.position.x - session.anchor.x, pose.position.y - session.anchor.y) >

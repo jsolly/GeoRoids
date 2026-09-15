@@ -1,4 +1,5 @@
 import { validExploration } from '../../../shared/exploration';
+import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import {
   SNAPSHOT_VERSION,
   SnapshotDecoder,
@@ -55,6 +56,7 @@ import { logger } from '../../utils/Logger';
 import { getStoredItem, removeStoredItem, setStoredItem } from '../../utils/safeStorage';
 import type { ClientMessage } from '../types';
 import {
+  getCompletedSectors,
   resetWorldExploration,
   setCompletedSectors,
   setWorldExploration,
@@ -1366,6 +1368,11 @@ export class ConnectionManager {
           this.forgetPlayer(id);
         }
       }
+    }
+
+    const localHull = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    if (localHull) {
+      containBodyOutOfCompletedSectors(localHull, getCompletedSectors(), { radius: localHull.r });
     }
 
     // Apply the authoritative field: create unseen roids, then keep pose in sync

@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { validExploration } from '../../shared/exploration';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
+import { releaseField } from '../../shared/releaseId';
 import { readCompletedSectorIds } from '../../shared/sectors';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
@@ -37,6 +38,16 @@ export interface PersistentPilot {
   lives?: number;
   mass?: number;
   health?: number;
+  /** Server release that issued the current token digest. */
+  credentialReleaseId?: string;
+  /** Client release present when the current token digest was issued. */
+  credentialClientReleaseId?: string;
+  /** Server release that last wrote `score`. */
+  scoreReleaseId?: string;
+  /** Client release last known when `score` was written. */
+  scoreClientReleaseId?: string;
+  /** Client release from the most recent join that reached this row. */
+  lastClientReleaseId?: string;
 }
 
 /** Flight fields that a brief disconnect may restore. Missing `lastSeenAt` never restores pose. */
@@ -55,6 +66,7 @@ interface SavedWorld {
   startedAt: number;
   generation: number;
   scoreSeason?: string;
+  writtenReleaseId?: string;
   exploration: ExplorationTile[];
   completedSectors: string[];
 }
@@ -120,6 +132,25 @@ function readOptionalFlight(
   };
 }
 
+function readReleaseProvenance(
+  pilot: Record<string, unknown>
+): Pick<
+  PersistentPilot,
+  | 'credentialReleaseId'
+  | 'credentialClientReleaseId'
+  | 'scoreReleaseId'
+  | 'scoreClientReleaseId'
+  | 'lastClientReleaseId'
+> {
+  return {
+    ...releaseField('credentialReleaseId', pilot['credentialReleaseId']),
+    ...releaseField('credentialClientReleaseId', pilot['credentialClientReleaseId']),
+    ...releaseField('scoreReleaseId', pilot['scoreReleaseId']),
+    ...releaseField('scoreClientReleaseId', pilot['scoreClientReleaseId']),
+    ...releaseField('lastClientReleaseId', pilot['lastClientReleaseId']),
+  };
+}
+
 function readPilot(value: unknown): PersistentPilot | undefined {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -139,7 +170,14 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   ) {
     return undefined;
   }
-  return { id, tokenHash, name, score, ...readOptionalFlight(pilot) };
+  return {
+    id,
+    tokenHash,
+    name,
+    score,
+    ...readOptionalFlight(pilot),
+    ...readReleaseProvenance(pilot),
+  };
 }
 
 /** Restore pose only when last-seen is present, recent, and the ship still has lives. */
@@ -295,6 +333,10 @@ export class WorldStore {
       ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
         ? { scoreSeason: value.scoreSeason }
         : {}),
+      ...releaseField(
+        'writtenReleaseId',
+        'writtenReleaseId' in value ? value.writtenReleaseId : undefined
+      ),
       exploration: value.exploration,
       completedSectors:
         'completedSectors' in value ? readCompletedSectorIds(value.completedSectors) : [],

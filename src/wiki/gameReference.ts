@@ -177,7 +177,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Connection and protocol values',
       paragraphs: [
-        `The client allows at most ${MAX_CATCH_UP_TICKS} catch-up frames after a stall. Live socket grace is ${PLAYER_MOTION.reconnectGraceMs / 1000} seconds; after the socket is gone, Enter Game returns you to the same ship for ${PLAYER_MOTION.returnToShipMs / 1000} seconds.`,
+        `The client allows at most ${MAX_CATCH_UP_TICKS} catch-up frames after a stall. Live socket grace is ${PLAYER_MOTION.reconnectGraceMs / 1000} seconds; after the socket is gone, Enter Game returns you to the same ship for ${PLAYER_MOTION.returnToShipMs / 1000} seconds. Join records the client and server releases that issued the resume token and last wrote the score.`,
       ],
     },
   ],

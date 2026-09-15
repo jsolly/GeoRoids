@@ -35,6 +35,7 @@ test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA'])(
     expect(built.define?.['import.meta.env.VITE_COMMIT_HASH']).toBe(
       JSON.stringify(release.slice(0, 7))
     );
+    expect(built.define?.['import.meta.env.VITE_COMMIT_SHA']).toBe(JSON.stringify(release));
     expect(execFileSync).not.toHaveBeenCalled();
   }
 );
@@ -48,6 +49,7 @@ test('local builds embed their Git identity and bound the lookup', async () => {
   expect(built.define?.['import.meta.env.VITE_COMMIT_HASH']).toBe(
     JSON.stringify(release.slice(0, 7))
   );
+  expect(built.define?.['import.meta.env.VITE_COMMIT_SHA']).toBe(JSON.stringify(release));
   expect(execFileSync).toHaveBeenCalledWith('git', ['rev-parse', 'HEAD'], {
     encoding: 'utf8',
     timeout: 5000,

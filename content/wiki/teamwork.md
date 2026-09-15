@@ -25,8 +25,8 @@ damage a teammate. After a laser bounces off a wall or reflective asteroid, it
 becomes a ricochet that can hurt you or another pilot. The Hauler ability
 attaches only to asteroids; it cannot select, pull, or throw a ship.
 Asteroids, completed-sector walls, and the arena boundary remain world
-hazards; shot-triggered loot blasts only push nearby small rocks and leave
-crew hulls safe.
+hazards, including a towed rock that hits another ship; shot-triggered loot
+blasts only push nearby small rocks and leave crew hulls safe.
 
 ## Scan, tow, deliver
 
@@ -38,7 +38,10 @@ Surveyor's player ID, so several Surveyors can contribute to one delivery.
 
 The Hauler presses E near an asteroid to attach its tow cable. The asteroid
 keeps its motion and trails behind the Hauler as the Hauler flies; the cable
-does not reel a rock into the hull or launch it at anything. Bring the rock to
+does not reel a rock into the hull or launch it at anything. Dragging that
+cargo into another asteroid breaks both rocks and drops the cable. Dragging
+it into another ship deals an asteroid impact to that hull, then breaks the
+cargo and drops the cable. Bring the rock to
 an arena furnace to deliver it. The Hauler and every Surveyor recorded on the
 rock receive the same delivery points. A rock with no Surveyor tag still pays
 the Hauler for the delivery.

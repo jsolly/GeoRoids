@@ -5,6 +5,8 @@ summary: A heavy hull that tows asteroids to arena furnaces and mines metal effi
 order: 40
 related:
   - content/wiki/controls.md
+  - content/wiki/asteroids.md
+  - content/wiki/combat-survival.md
   - content/wiki/loot-growth.md
   - content/wiki/teamwork.md
 media:
@@ -28,7 +30,12 @@ The cable and ability display update when the server confirms the action. If no 
 rock is in range, the attempt leaves the cable detached and does not start a
 cooldown. While towing, the touch button reads Release and stays available.
 After release, a new attachment waits for any remaining cooldown. A dead or
-removed rock detaches automatically.
+removed rock detaches automatically. If the towed asteroid overlaps another
+asteroid, both rocks use the ordinary collision break and the cable detaches.
+If it overlaps another ship, that ship takes a normal asteroid impact, the cargo
+breaks, and the cable detaches. The Hauler stays unharmed by its own cargo,
+including when that cargo is the rock that hits another deposit. Spawn protection
+still prevents the ship impact. Untowed rocks pass through each other.
 
 Fly the towed asteroid into an arena furnace to deliver it. Delivery consumes
 the rock and awards the Hauler. If a Surveyor scanned the rock, the Hauler and

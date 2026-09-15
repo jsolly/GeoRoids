@@ -11,7 +11,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | field-manual | Start here | Arena orientation, two kits, starting a life |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
-| hauler | Ships | Stats scorecard, shared cruise, weaker Boost, momentum-preserving tow cable, furnace delivery, and double metal mining damage |
+| hauler | Ships | Stats scorecard, shared cruise, weaker Boost, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
@@ -31,6 +31,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | src/entities/ship/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |
+| What happens when towed cargo hits another rock or ship? | hauler, asteroids, combat-survival | server/core/CollisionAuthority.ts, GameEngine.ts, authoritative combat tests |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
@@ -76,7 +77,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   releases the cable immediately; an out-of-range attempt leaves the cooldown
   unchanged. A towed rock delivered inside a furnace's
   85-unit intake is consumed and awards the Hauler plus every recorded Surveyor
-  the full material reward.
+  the full material reward. Towed cargo that overlaps another asteroid uses the
+  ordinary collision break on both rocks and drops the cable; towed cargo that
+  overlaps another ship deals an asteroid impact, then breaks and drops the
+  cable. The Hauler remains unharmed by its own cargo.
 - Surveyor E classifies nearby minerals on every teammate radar for the active
   1,200-unit scan range; each qualifying rock keeps that classification while
   it remains in the nearby radar and records the Surveyor player ID for delivery.
@@ -97,8 +101,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   wall, or a reflective asteroid, a laser becomes a ricochet: it deals the
   configured laser hit times its energy to the first live hull it meets,
   including its owner, and is consumed. Asteroid impacts remain world hazards
-  and remove 25 health per impact. Boundary contact destroys a vulnerable ship
-  regardless of health, enforced by `server/core/GameEngine.ts` and verified in
+  and remove 25 health per impact, including a towed rock that hits another ship.
+  Boundary contact destroys a vulnerable ship regardless of health, enforced by
+  `server/core/GameEngine.ts` and verified in
   `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts` and
   `tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager

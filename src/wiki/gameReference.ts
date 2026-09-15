@@ -82,7 +82,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Tow and mining values',
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids and cooperative large rocks. The ability has no ship-targeting mode.`,
-        `E attaches the persistent tow cable within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. The rock keeps its velocity and the cable corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the cable immediately.`,
+        `E attaches the persistent tow cable within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. The rock keeps its velocity and the cable corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the cable immediately. Towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable.`,
         `Furnace intakes are ${starterFurnaces[0]?.radius ?? 0} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor.`,
       ],
     },
@@ -148,7 +148,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; boundary contact destroys a vulnerable ship regardless of hull health.`,
+        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; a towed rock uses that same impact against another ship and then breaks. Boundary contact destroys a vulnerable ship regardless of hull health.`,
         `Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },

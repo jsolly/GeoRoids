@@ -47,7 +47,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
         `Starter furnaces: ${starterFurnaces.map((furnace) => furnace.name).join(', ')}; ${FURNACES.length - starterFurnaces.length} regional Works sites fill the ${WORLD.radius.toLocaleString('en-US')}-unit world.`,
-        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and the same monthly score. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight. The persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
+        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
       ],
     },
   ],
@@ -156,7 +156,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Players start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest furnace with a 180-unit offset and skip completed sectors. Score survives respawn, leave, and game over until the UTC calendar month ends. A brief disconnect of up to ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap or game over starts a new flight with that score.`,
+        `Players start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest furnace with a 180-unit offset and skip completed sectors. Score survives respawn and leave until game over or the UTC calendar month ends. A brief disconnect of up to ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with that score; game over starts a new flight at score ${GAME.STARTING_SCORE}.`,
         `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },

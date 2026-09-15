@@ -755,7 +755,7 @@ export class GameEngine {
       requestedKit ?? flight?.kitId
     );
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
-    actor.score = saved.score;
+    actor.score = saved.lives === 0 ? GAME.STARTING_SCORE : saved.score;
     if (flight) {
       this.restoreRecentFlight(actor, flight, requestedKit);
     }
@@ -1437,6 +1437,9 @@ export class GameEngine {
     this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
     entity.lives = Math.max(0, entity.lives - 1);
+    if (entity.lives === 0) {
+      entity.score = GAME.STARTING_SCORE;
+    }
     this.entityManager.scheduleShipRespawn(entity);
   }
 
@@ -2362,11 +2365,17 @@ export class GameEngine {
   private awardPilotPoints(entityId: string, points: number): number | undefined {
     const entity = this.getPlayer(entityId);
     if (entity) {
+      if (entity.lives <= 0) {
+        return entity.score;
+      }
       this.awardPoints(entityId, points);
       return entity.score;
     }
     const saved = this.pilots.get(entityId);
     if (saved) {
+      if (saved.lives !== undefined && saved.lives <= 0) {
+        return saved.score;
+      }
       saved.score += points;
       return saved.score;
     }

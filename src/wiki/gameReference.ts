@@ -27,7 +27,7 @@ function frameValue(frames: number): string {
 function shipStats(id: ShipKitId): string {
   const kit = getShipKit(id);
   const cooldown = SHIP_ABILITY.COOLDOWN_FRAMES[id];
-  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
+  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, boost multiplier ${kit.boostMultiplier}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
 }
 
 function satelliteProfiles(): string[] {
@@ -55,6 +55,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Movement values',
       paragraphs: [
         `Automatic movement defaults: thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, and turn rate ${SHIP.TURN_SPEED} degrees per second. Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
+        `Shift or the Boost button multiplies cruise speed and thrust by ${getShipKit('surveyor').boostMultiplier} for Surveyor and ${getShipKit('hauler').boostMultiplier} for Hauler. Tap or press again to return to the shared cruise speed.`,
         `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },

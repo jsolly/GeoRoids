@@ -11,6 +11,7 @@ interface PlayerMovementUpdate {
   velocity?: Velocity;
   angle?: number;
   thrusting?: boolean;
+  boosting?: boolean;
   angularVelocity?: number;
 }
 
@@ -128,11 +129,13 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawAngle = fields['angle'];
   const rawAngularVelocity = fields['angularVelocity'];
   const rawThrusting = fields['thrusting'];
+  const rawBoosting = fields['boosting'];
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
   const angularVelocity = readFiniteNumber(rawAngularVelocity);
   const thrusting = typeof rawThrusting === 'boolean' ? rawThrusting : undefined;
+  const boosting = typeof rawBoosting === 'boolean' ? rawBoosting : undefined;
 
   if (
     !id ||
@@ -140,7 +143,8 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     (rawVelocity !== undefined && velocity === undefined) ||
     (rawAngle !== undefined && angle === undefined) ||
     (rawAngularVelocity !== undefined && angularVelocity === undefined) ||
-    (rawThrusting !== undefined && thrusting === undefined)
+    (rawThrusting !== undefined && thrusting === undefined) ||
+    (rawBoosting !== undefined && boosting === undefined)
   ) {
     return invalid('update', !id ? 'Missing player ID' : 'Invalid player movement update');
   }
@@ -150,6 +154,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(velocity !== undefined ? { velocity } : {}),
     ...(angle !== undefined ? { angle } : {}),
     ...(thrusting !== undefined ? { thrusting } : {}),
+    ...(boosting !== undefined ? { boosting } : {}),
     ...(angularVelocity !== undefined ? { angularVelocity } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);

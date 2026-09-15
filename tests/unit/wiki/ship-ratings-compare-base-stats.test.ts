@@ -7,7 +7,9 @@ test('Hauler rates highest for hull while Surveyor rates highest for quick, comp
   const surveyor = shipRatings('surveyor');
   expect(hauler.find((stat) => stat.label === 'Hull')?.rating).toBe(5);
   expect(surveyor.find((stat) => stat.label === 'Hull')?.rating).toBe(1);
-  for (const label of ['Size', 'Thrust', 'Speed cap', 'Turn rate', 'Shot interval']) {
+  expect(surveyor.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
+  expect(hauler.find((stat) => stat.label === 'Speed cap')?.rating).toBe(3);
+  for (const label of ['Size', 'Thrust', 'Turn rate', 'Shot interval']) {
     expect(surveyor.find((stat) => stat.label === label)?.rating).toBe(5);
   }
   expect(shipRatings('surveyor').find((stat) => stat.label === 'E cooldown')?.rating).toBe(1);

@@ -8,7 +8,7 @@ if (typeof window !== 'undefined') {
     <div id="gameWrapper">
       <div id="start-screen" class="screen">
         <h1 class="text-center">GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · E ability · M map</p>
+        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map</p>
         <div class="game-modes">
           <div class="mb-3">
             <label for="playerNameInput" class="form-label">Your Nickname</label>

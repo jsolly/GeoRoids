@@ -14,7 +14,9 @@ media:
 
 ## Mineral scan
 
-Surveyor turns more quickly than Hauler and cruises automatically. Press E or
+Surveyor turns more quickly than Hauler and cruises automatically at the same
+speed. Press Shift or tap Boost for a stronger burst than Hauler's boost; tap
+or press again to return to cruise. Press E or
 tap Scan to run a range-limited mineral scan on every teammate's radar for a
 limited time. The range is centered on the active Surveyor. Teammates see the
 shared classification when the rock is inside their own local radar. Circles mark ice,

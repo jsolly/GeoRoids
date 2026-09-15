@@ -18,10 +18,12 @@ E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
 hull gap. The ability never targets a ship, and it cannot deal ship damage.
 
 The asteroid keeps its existing motion and trails behind the Hauler as the
-Hauler flies under normal thrust and steering. The cable only applies a small
-correction when it is stretched; it never reels a rock into the hull or throws
-it toward a target. A successful attachment starts the three-second ability
-cooldown, while pressing E again releases the cable without waiting for cooldown.
+Hauler flies under normal thrust and steering. Surveyor and Hauler share the
+same cruise speed; Hauler Boost is weaker than Surveyor Boost. The cable only
+applies a small correction when it is stretched; it never reels a rock into the
+hull or throws it toward a target. A successful attachment starts the
+three-second ability cooldown, while pressing E again releases the cable without
+waiting for cooldown.
 The cable and ability display update when the server confirms the action. If no eligible
 rock is in range, the attempt leaves the cable detached and does not start a
 cooldown. While towing, the touch button reads Release and stays available.

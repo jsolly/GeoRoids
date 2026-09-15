@@ -1857,6 +1857,7 @@ export class GameEngine {
             angle: entity.angle,
             exploding: entity.exploding,
             thrusting: entity.thrusting,
+            boosting: entity.boosting,
             color: entity.color,
             lives: entity.lives,
             score: entity.score,

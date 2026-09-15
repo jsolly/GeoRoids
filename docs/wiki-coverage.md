@@ -9,9 +9,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life |
-| controls | Start here | Automatic thrust, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
-| surveyor | Ships | Stats scorecard, passive exploration reveal, shared active radar mineral scan, and delivery tags |
-| hauler | Ships | Stats scorecard, momentum-preserving tow cable, furnace delivery, and double metal mining damage |
+| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
+| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
+| hauler | Ships | Stats scorecard, shared cruise, weaker Boost, momentum-preserving tow cable, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
@@ -24,7 +24,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 | Player question | Article | Primary source families |
 | --- | --- | --- |
-| How do I move, aim, fire, or use E? | controls | src/input/, src/constants/index.ts, input tests |
+| How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |

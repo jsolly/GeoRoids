@@ -105,6 +105,7 @@ export class Player {
     score?: number;
     exploding?: boolean;
     thrusting?: boolean;
+    boosting?: boolean;
     color?: string;
     deathCause?: string;
     health?: number;
@@ -226,6 +227,9 @@ export class Player {
     // The server echo lacks thrusting when updates omit it, which flickers the flame.
     if (data.thrusting !== undefined && this.type !== 'local') {
       this.ship.thrusting = data.thrusting;
+    }
+    if (data.boosting !== undefined && this.type !== 'local') {
+      this.ship.boosting = data.boosting;
     }
     if (data.color !== undefined && this.type !== 'local') {
       this.color = data.color;

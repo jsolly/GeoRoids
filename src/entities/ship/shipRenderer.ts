@@ -178,7 +178,8 @@ export function drawGenericThruster(
   angle: number,
   radius: number,
   color: string = PALETTE.LOCAL,
-  kitId?: ShipKitId
+  kitId?: ShipKitId,
+  boosting = false
 ): void {
   const ctx = canvasManager.getContext();
   if (!ctx) {
@@ -191,7 +192,9 @@ export function drawGenericThruster(
   rearCenter.x = rear.x;
   rearCenter.y = rear.y;
   const flicker = Math.floor(performance.now() / VISUAL.THRUSTER_FLICKER_MS) % 2 === 0;
-  const lengthRatio = flicker ? VISUAL.THRUSTER_LENGTH_RATIO : VISUAL.THRUSTER_FLICKER_RATIO;
+  const lengthRatio =
+    (flicker ? VISUAL.THRUSTER_LENGTH_RATIO : VISUAL.THRUSTER_FLICKER_RATIO) *
+    (boosting ? 1.45 : 1);
   const flame = thrusterFlameGeometry(
     x,
     y,
@@ -235,7 +238,8 @@ export function drawThruster(ship: Ship, color: string = ship.color): void {
       ship.angle,
       ship.r,
       color,
-      ship.kitId
+      ship.kitId,
+      ship.boosting
     );
   }
 }
@@ -263,7 +267,15 @@ export function drawThrusterAtPosition(
     ) {
       return;
     }
-    drawGenericThruster(screen.x, screen.y, ship.angle, ship.r * scale, color, ship.kitId);
+    drawGenericThruster(
+      screen.x,
+      screen.y,
+      ship.angle,
+      ship.r * scale,
+      color,
+      ship.kitId,
+      ship.boosting
+    );
   }
 }
 

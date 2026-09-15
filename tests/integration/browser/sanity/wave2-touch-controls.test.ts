@@ -287,7 +287,7 @@ test.each(KITS)(
 
     expect(await page.locator('#touch-ability').textContent()).toBe(label);
     expect(await page.locator('#touch-ability').getAttribute('aria-label')).toBe(name);
-    expect(await page.locator('#touch-controls button').count()).toBe(1);
+    expect(await page.locator('#touch-controls button').count()).toBe(2);
 
     const stick = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);

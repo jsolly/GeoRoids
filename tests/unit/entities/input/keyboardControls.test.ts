@@ -81,6 +81,18 @@ test('held KeyE repeat does not re-fire the ability', () => {
   expect(activateSpy).not.toHaveBeenCalled();
 });
 
+test('Shift toggles Boost on and off without holding', () => {
+  expect(player.ship.boosting).toBe(false);
+  press('ShiftLeft');
+  expect(player.ship.boosting).toBe(true);
+  release('ShiftLeft');
+  expect(player.ship.boosting).toBe(true);
+  press('ShiftRight');
+  expect(player.ship.boosting).toBe(false);
+  keyDown(new KeyboardEvent('keydown', { code: 'ShiftLeft', repeat: true }), player);
+  expect(player.ship.boosting).toBe(false);
+});
+
 test('KeyE preserves the joined Surveyor when the title menu has a stale Hauler selection', () => {
   setSelectedShipKitId('hauler');
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);

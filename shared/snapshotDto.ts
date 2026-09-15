@@ -87,6 +87,7 @@ const entity = shape<ServerEntityData>({
   angle: number,
   exploding: boolean,
   thrusting: boolean,
+  boosting: optional(boolean),
   color: string,
   lives: number,
   score: number,

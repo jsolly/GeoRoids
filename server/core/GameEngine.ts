@@ -20,6 +20,7 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../../shared/lootBlast';
+import { readReleaseId, releaseField } from '../../shared/releaseId';
 import {
   chooseOpenSectorSpawn,
   containBodyOutOfCompletedSectors,
@@ -671,8 +672,14 @@ export class GameEngine {
     return entity;
   }
 
-  private snapshotPilot(actor: GameEntity, tokenHash: string): PersistentPilot {
-    return {
+  private snapshotPilot(
+    actor: GameEntity,
+    tokenHash: string,
+    clientReleaseId?: string
+  ): PersistentPilot {
+    const previous = this.pilots.get(actor.id);
+    const lastClientReleaseId = readReleaseId(clientReleaseId) ?? previous?.lastClientReleaseId;
+    const flight = {
       id: actor.id,
       tokenHash,
       name: actor.name,
@@ -685,6 +692,75 @@ export class GameEngine {
       lives: actor.lives,
       mass: actor.mass,
       health: actor.health,
+      ...releaseField('lastClientReleaseId', lastClientReleaseId),
+    };
+    if (previous === undefined) {
+      return {
+        ...flight,
+        credentialReleaseId: SERVER_RELEASE_ID,
+        scoreReleaseId: SERVER_RELEASE_ID,
+        ...releaseField('credentialClientReleaseId', lastClientReleaseId),
+        ...releaseField('scoreClientReleaseId', lastClientReleaseId),
+      };
+    }
+    const issuedCredential = previous.tokenHash !== tokenHash;
+    const wroteScore = previous.score !== actor.score;
+    return {
+      ...flight,
+      ...(issuedCredential
+        ? {
+            credentialReleaseId: SERVER_RELEASE_ID,
+            ...releaseField('credentialClientReleaseId', lastClientReleaseId),
+          }
+        : {
+            ...releaseField('credentialReleaseId', previous.credentialReleaseId),
+            ...releaseField('credentialClientReleaseId', previous.credentialClientReleaseId),
+          }),
+      ...(wroteScore
+        ? {
+            scoreReleaseId: SERVER_RELEASE_ID,
+            ...releaseField('scoreClientReleaseId', lastClientReleaseId),
+          }
+        : {
+            ...releaseField('scoreReleaseId', previous.scoreReleaseId),
+            ...releaseField('scoreClientReleaseId', previous.scoreClientReleaseId),
+          }),
+    };
+  }
+
+  private rememberClientRelease(id: string, clientReleaseId?: string): void {
+    const releaseId = readReleaseId(clientReleaseId);
+    const saved = this.pilots.get(id);
+    if (!saved || releaseId === undefined) {
+      return;
+    }
+    this.pilots.set(id, { ...saved, lastClientReleaseId: releaseId });
+  }
+
+  private writePilotScore(pilot: PersistentPilot, score: number): PersistentPilot {
+    return {
+      ...pilot,
+      score,
+      scoreReleaseId: SERVER_RELEASE_ID,
+      ...releaseField('scoreClientReleaseId', pilot.lastClientReleaseId),
+    };
+  }
+
+  public getPilotReleaseProvenance(id: string): {
+    credentialReleaseId?: string;
+    credentialClientReleaseId?: string;
+    scoreReleaseId?: string;
+    scoreClientReleaseId?: string;
+  } {
+    const saved = this.pilots.get(id);
+    if (!saved) {
+      return {};
+    }
+    return {
+      ...releaseField('credentialReleaseId', saved.credentialReleaseId),
+      ...releaseField('credentialClientReleaseId', saved.credentialClientReleaseId),
+      ...releaseField('scoreReleaseId', saved.scoreReleaseId),
+      ...releaseField('scoreClientReleaseId', saved.scoreClientReleaseId),
     };
   }
 
@@ -699,7 +775,8 @@ export class GameEngine {
 
   public registerPilot(
     actor: GameEntity,
-    socket: WebSocket
+    socket: WebSocket,
+    clientReleaseId?: string
   ): ReturnType<PlayerMotionService['register']> {
     const result = this.playerMotion.register(actor, socket, 1, this.getServerTime());
     if (!result.ok) {
@@ -707,7 +784,11 @@ export class GameEngine {
     }
     this.pilots.set(
       actor.id,
-      this.snapshotPilot(actor, createHash('sha256').update(result.resumeToken).digest('hex'))
+      this.snapshotPilot(
+        actor,
+        createHash('sha256').update(result.resumeToken).digest('hex'),
+        clientReleaseId
+      )
     );
     this.checkpointWorld();
     return result;
@@ -721,7 +802,8 @@ export class GameEngine {
     token: string,
     socket: WebSocket,
     requestedKit?: ShipKitId,
-    requestedName?: string
+    requestedName?: string,
+    clientReleaseId?: string
   ): ReturnType<PlayerMotionService['resume']> {
     if (!/^[a-f0-9]{64}$/.test(token)) {
       return { ok: false, error: 'Invalid pilot resume token' };
@@ -730,6 +812,7 @@ export class GameEngine {
     let saved = [...this.pilots.values()].find((pilot) => pilot.tokenHash === hash);
     const live = this.playerMotion.resume(token, socket, this.getServerTime());
     if (live.ok && live.actor.lives > 0) {
+      this.rememberClientRelease(live.actor.id, clientReleaseId);
       this.applyRequestedPilotIdentity(live.actor, requestedKit, requestedName, true);
       this.ensurePilotInOpenSector(live.actor);
       return live;
@@ -760,7 +843,7 @@ export class GameEngine {
       this.restoreRecentFlight(actor, flight, requestedKit);
     }
     actor.asteroidInteractions = 1;
-    const registered = this.registerPilot(actor, socket);
+    const registered = this.registerPilot(actor, socket, clientReleaseId);
     if (!registered.ok) {
       this.removePlayer(actor.id);
       return registered;
@@ -843,6 +926,11 @@ export class GameEngine {
         tokenHash: pilot.tokenHash,
         name: pilot.name,
         score: 0,
+        ...releaseField('credentialReleaseId', pilot.credentialReleaseId),
+        ...releaseField('credentialClientReleaseId', pilot.credentialClientReleaseId),
+        scoreReleaseId: SERVER_RELEASE_ID,
+        ...releaseField('scoreClientReleaseId', pilot.lastClientReleaseId),
+        ...releaseField('lastClientReleaseId', pilot.lastClientReleaseId),
       });
     }
     for (const actor of this.getAllPlayers()) {
@@ -870,6 +958,7 @@ export class GameEngine {
           startedAt: this.worldStartedAt,
           generation: WORLD.generation,
           scoreSeason: this.scoreSeason,
+          writtenReleaseId: SERVER_RELEASE_ID,
           exploration: this.exploration.snapshot(),
           completedSectors: [...this.completedSectors].sort(),
         },
@@ -2376,8 +2465,9 @@ export class GameEngine {
       if (saved.lives !== undefined && saved.lives <= 0) {
         return saved.score;
       }
-      saved.score += points;
-      return saved.score;
+      const next = this.writePilotScore(saved, saved.score + points);
+      this.pilots.set(entityId, next);
+      return next.score;
     }
     return undefined;
   }

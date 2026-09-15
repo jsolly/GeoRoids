@@ -184,6 +184,8 @@ describe('current pilots share the production handler and broadcaster', () => {
         asteroidInteractions: 1,
         resumeToken: expect.stringMatching(/^[a-f0-9]{64}$/),
         serverReleaseId: expect.any(String),
+        credentialReleaseId: expect.any(String),
+        scoreReleaseId: expect.any(String),
       },
     });
     expect(pilot.messages[0]?.type).toBe('joined');

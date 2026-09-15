@@ -158,7 +158,8 @@ export class MessageHandler {
         command.resumeToken ?? '',
         ws,
         command.kitId,
-        name
+        name,
+        command.clientReleaseId
       );
       if (!resumed.ok) {
         this.broadcaster.sendToWebSocket(ws, { type: 'sessionExpired', timestamp: Date.now() });
@@ -191,7 +192,7 @@ export class MessageHandler {
       }
       player = this.gameEngine.addPlayer(id, name, ws, command.position, command.kitId);
       player.asteroidInteractions = 1;
-      const registered = this.gameEngine.registerPilot(player, ws);
+      const registered = this.gameEngine.registerPilot(player, ws, command.clientReleaseId);
       if (!registered.ok) {
         this.gameEngine.removePlayer(player.id);
         this.broadcaster.sendError(ws, registered.error);
@@ -202,6 +203,7 @@ export class MessageHandler {
     }
 
     const snapshotVersion = this.broadcaster.negotiateSnapshot(ws);
+    const provenance = this.gameEngine.getPilotReleaseProvenance(id);
 
     // Send confirmation to the joining player
     this.broadcaster.sendToWebSocket(ws, {
@@ -218,9 +220,22 @@ export class MessageHandler {
         terrainSeed: this.gameEngine.getTerrainSeed(),
         serverReleaseId: SERVER_RELEASE_ID,
         snapshotVersion,
+        ...provenance,
       },
       timestamp: Date.now(),
     });
+    if (
+      provenance.credentialReleaseId !== undefined &&
+      provenance.credentialReleaseId !== SERVER_RELEASE_ID
+    ) {
+      logger.info('STATE', 'pilot_credential_from_prior_release', {
+        releaseId: SERVER_RELEASE_ID,
+        playerId: id,
+        credentialReleaseId: provenance.credentialReleaseId,
+        ...(provenance.scoreReleaseId ? { scoreReleaseId: provenance.scoreReleaseId } : {}),
+        ...(command.clientReleaseId ? { clientReleaseId: command.clientReleaseId } : {}),
+      });
+    }
     logger.info('STATE', 'player_joined', {
       releaseId: SERVER_RELEASE_ID,
       playerId: id,
@@ -229,6 +244,8 @@ export class MessageHandler {
       resumed: resumedSession,
       enhanced: player.asteroidInteractions === 1,
       snapshotVersion,
+      ...provenance,
+      ...(command.clientReleaseId ? { clientReleaseId: command.clientReleaseId } : {}),
       ...(player.playerMotion
         ? {
             motionEpoch: player.playerMotion.epoch,

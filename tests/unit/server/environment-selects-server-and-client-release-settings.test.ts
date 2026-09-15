@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { readServerConfiguration } from '../../../server/configuration';
-import { getBuildInfoString } from '../../../src/utils/buildInfo';
+import { getBuildInfoString, getClientReleaseId } from '../../../src/utils/buildInfo';
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -43,7 +43,14 @@ test('deployed client build information uses the injected release identity', () 
 
 test('a local client without injected release metadata stays labeled dev', () => {
   vi.stubEnv('VITE_COMMIT_HASH', undefined);
+  vi.stubEnv('VITE_COMMIT_SHA', undefined);
   vi.stubEnv('VITE_BUILD_TIME', undefined);
   vi.stubEnv('MODE', 'development');
   expect(getBuildInfoString()).toBe('dev');
+  expect(getClientReleaseId()).toBe('dev');
+});
+
+test('join provenance uses the full injected Git SHA', () => {
+  vi.stubEnv('VITE_COMMIT_SHA', 'A'.repeat(40));
+  expect(getClientReleaseId()).toBe('a'.repeat(40));
 });

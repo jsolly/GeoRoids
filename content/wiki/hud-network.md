@@ -65,7 +65,10 @@ keeps the visible ship, shots, and asteroid impacts in the same place.
 ## Connection interruptions
 
 Keep the game tab up to date. If the server asks you to update the client,
-reload the page before joining again. Older game versions cannot join.
+reload the page before joining again. Older game versions cannot join. The
+browser and server remember which game versions issued this tab's resume token
+and last saved its score, so a later update can migrate that progress instead
+of guessing.
 
 Switching away from the game releases held movement and fire controls. On
 return, the client requests current server state and resumes drawing without

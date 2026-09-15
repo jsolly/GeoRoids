@@ -16,7 +16,8 @@ media:
 
 ## Tow cable E
 
-E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
+Hauler is the U-shaped cargo yoke with twin forward towers and two engine
+bells. E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
 hull gap. The ability never targets a ship, and it cannot deal ship damage.
 
 The asteroid keeps its existing motion and trails behind the Hauler as the

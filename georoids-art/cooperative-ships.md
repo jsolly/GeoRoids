@@ -1,15 +1,16 @@
 # GeoRoids cooperative ships
 
-The playable roster is Surveyor and Hauler. Surveyor reuses the established
-needle geometry; Hauler keeps the barge geometry and cream harpoon cable.
-Runtime and SVG geometry live in `src/entities/ship/hullOutlines.ts`.
+The playable roster is Surveyor and Hauler. Surveyor uses the delta-wing
+scout with a forward dish; Hauler uses the cargo yoke with twin towers
+and two engine bells. Runtime and SVG geometry live in
+`src/entities/ship/hullOutlines.ts`.
 The current pack is `georoids-art/ships-v2/{surveyor,hauler}.svg`.
 Stroke is `#5EEAD4` on `#000011`, with a play-scale target around 32px.
 
 | Kit | Hull | Role |
 | --- | --- | --- |
-| Surveyor | Six-point needle with an aft notch | Nimble exploration and radar mineral scan |
-| Hauler | Seven-point barge with a flat keel | Tow cargo to furnaces; stronger mining lasers |
+| Surveyor | Delta-wing scout with a forward dish | Nimble exploration and radar mineral scan |
+| Hauler | U-shaped cargo yoke with twin towers | Tow cargo to furnaces; stronger mining lasers |
 
 All players share one crew. Ownership colors identify the
 local pilot (teal) and other players (sky). Kit silhouettes identify

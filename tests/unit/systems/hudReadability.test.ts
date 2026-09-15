@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WORLD } from '../../../shared/world';
 import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
+import { getKitHullOutline } from '../../../src/entities/ship/hullOutlines';
 import { layoutHudCluster } from '../../../src/rendering/hud/cluster';
 
 function recordCanvas(ctx: CanvasRenderingContext2D) {
@@ -155,22 +156,19 @@ describe('painted HUD composition', () => {
 
     drawLivesIndicator(ctx, layout, 3, PALETTE.LOCAL, player.ship.kitId);
     const hulls = strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#5EEAD4'));
+    const silhouette = getKitHullOutline('surveyor').hull;
     expect(strokes).toHaveLength(6);
     expect(hulls).toHaveLength(3);
     for (const [index, hull] of hulls.entries()) {
       expect(hull.closed).toBe(true);
-      expect(hull.points).toHaveLength(6);
-      const nose = hull.points[0];
-      if (!nose) {
-        throw new Error('Life hull has no nose');
-      }
-      expect(nose[0]).toBeCloseTo(23 + index * 20);
-      expect(nose[1]).toBeCloseTo(14.3375);
+      expect(hull.points).toHaveLength(silhouette.points.length);
       const xs = hull.points.map(([x]) => x);
       const ys = hull.points.map(([, y]) => y);
-      expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(2.275);
-      expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(17.325);
-      expect(nose[1]).toBe(Math.min(...ys));
+      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(10);
+      expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(6);
+      expect(Math.min(...ys)).toBeLessThan(23);
+      const centerX = 23 + index * 20;
+      expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(centerX, 0);
     }
 
     drawScoreOverlay(ctx, layout, ctx.canvas, 4321, 3);

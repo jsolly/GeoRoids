@@ -1,7 +1,8 @@
 import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
+import { getKitHullOutline, projectHullPolyline } from '../../entities/ship/hullOutlines';
 import { DEFAULT_SHIP_KIT_ID } from '../../entities/ship/shipKits';
-import { strokeKitHullOutline } from '../../entities/ship/shipRenderer';
+import { strokePhosphorPolyline } from '../../entities/ship/shipRenderer';
 
 import { layoutHudCluster } from './cluster';
 import type { HudLayout } from './hudLayout';
@@ -18,17 +19,15 @@ export function drawLivesIndicator(
   const dy = layout.lives.y - VISUAL.HUD_INSET;
   const radius = VISUAL.HUD_LIFE_SIZE / 2;
   const color = shipColor || PALETTE.LOCAL;
+  const hull = getKitHullOutline(kitId).hull;
 
   ctx.save();
   for (const center of lifeCenters) {
-    strokeKitHullOutline(
+    strokePhosphorPolyline(
       ctx,
-      center.x + dx,
-      center.y + dy,
-      radius,
-      VISUAL.HUD_LIFE_HEADING,
+      projectHullPolyline(center.x + dx, center.y + dy, radius, VISUAL.HUD_LIFE_HEADING, hull),
       color,
-      kitId
+      hull.closed
     );
   }
   ctx.restore();

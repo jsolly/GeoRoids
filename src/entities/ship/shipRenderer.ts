@@ -186,42 +186,44 @@ export function drawGenericThruster(
     return;
   }
 
-  const aft = getKitHullOutline(kitId).thruster;
-  const rear = projectHullPoint(x, y, radius, angle, aft);
-  const rearCenter = thrusterGeom.rearCenter;
-  rearCenter.x = rear.x;
-  rearCenter.y = rear.y;
+  const outline = getKitHullOutline(kitId);
   const flicker = Math.floor(performance.now() / VISUAL.THRUSTER_FLICKER_MS) % 2 === 0;
   const lengthRatio =
     (flicker ? VISUAL.THRUSTER_LENGTH_RATIO : VISUAL.THRUSTER_FLICKER_RATIO) *
     (boosting ? 1.45 : 1);
-  const flame = thrusterFlameGeometry(
-    x,
-    y,
-    angle,
-    radius,
-    lengthRatio,
-    VISUAL.THRUSTER_CORE_RATIO,
-    rearCenter
-  );
+  const rearCenter = thrusterGeom.rearCenter;
+  for (const aft of outline.nozzles) {
+    const rear = projectHullPoint(x, y, radius, angle, aft);
+    rearCenter.x = rear.x;
+    rearCenter.y = rear.y;
+    const flame = thrusterFlameGeometry(
+      x,
+      y,
+      angle,
+      radius,
+      lengthRatio,
+      VISUAL.THRUSTER_CORE_RATIO,
+      rearCenter
+    );
 
-  strokeJuicePolyline(
-    ctx,
-    [flame.left, flame.tip, flame.right],
-    color,
-    VISUAL.THRUSTER_STROKE_WIDTH,
-    VISUAL.THRUSTER_GLOW,
-    false
-  );
-  strokeJuicePolyline(
-    ctx,
-    [flame.coreLeft, flame.coreTip, flame.coreRight],
-    color,
-    VISUAL.THRUSTER_STROKE_WIDTH * 0.75,
-    VISUAL.THRUSTER_GLOW * 0.55,
-    false,
-    0.7
-  );
+    strokeJuicePolyline(
+      ctx,
+      [flame.left, flame.tip, flame.right],
+      color,
+      VISUAL.THRUSTER_STROKE_WIDTH,
+      VISUAL.THRUSTER_GLOW,
+      false
+    );
+    strokeJuicePolyline(
+      ctx,
+      [flame.coreLeft, flame.coreTip, flame.coreRight],
+      color,
+      VISUAL.THRUSTER_STROKE_WIDTH * 0.75,
+      VISUAL.THRUSTER_GLOW * 0.55,
+      false,
+      0.7
+    );
+  }
 }
 
 export function drawThruster(ship: Ship, color: string = ship.color): void {

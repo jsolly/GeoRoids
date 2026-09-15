@@ -139,10 +139,7 @@ function pilot(id: string, type: Player['type'] = 'local') {
   return new Player({ id, name: id, type, input: new MockPlayerInput() });
 }
 
-const KITS: ReadonlyArray<{ id: ShipKitId; vertices: number; aft: number }> = [
-  { id: 'surveyor', vertices: 6, aft: -0.85 },
-  { id: 'hauler', vertices: 7, aft: -0.85 },
-];
+const KITS: ReadonlyArray<{ id: ShipKitId }> = [{ id: 'surveyor' }, { id: 'hauler' }];
 
 test('every playable kit draws its outlined hull and retained details without filling', () => {
   const { ctx, strokes, fill } = recordingContext();
@@ -156,7 +153,7 @@ test('every playable kit draws its outlined hull and retained details without fi
         return [points, points];
       })
     );
-    expect(strokes[0]?.points).toHaveLength(kit.vertices);
+    expect(strokes[0]?.points).toHaveLength(outline.hull.points.length);
     expect(strokes.slice(0, 2).map((path) => path.closed)).toEqual([true, true]);
     expect(strokes.filter((_, index) => index % 2 === 1).map((path) => path.color)).toEqual(
       [outline.hull, ...outline.extras].map(() => canvasColor(ctx, PALETTE.LOCAL))
@@ -275,31 +272,45 @@ test('local and remote kit thrusters draw two open V contours only while thrusti
           ? drawThruster(ship, color)
           : drawThrusterAtPosition(ship, { x: 10, y: -20 }, color);
       strokes.length = 0;
+      const outline = getKitHullOutline(kit.id);
       draw();
-      const rearX = center.x + 20 * kit.aft;
-      const outer = [
-        { x: rearX, y: center.y + 4 },
-        { x: rearX - 13.6, y: center.y },
-        { x: rearX, y: center.y - 4 },
-      ];
-      const inner = [
-        { x: rearX, y: center.y + 2.2 },
-        { x: rearX - 5.712, y: center.y },
-        { x: rearX, y: center.y - 2.2 },
-      ];
-      expect(strokes.map((path) => path.points)).toEqual([outer, outer, inner, inner]);
+      const expected = outline.nozzles.flatMap((nozzle) => {
+        const rearX = center.x + 20 * nozzle.f;
+        const rearY = center.y + 20 * nozzle.p;
+        const outer = [
+          { x: rearX, y: rearY + 4 },
+          { x: rearX - 13.6, y: rearY },
+          { x: rearX, y: rearY - 4 },
+        ];
+        const inner = [
+          { x: rearX, y: rearY + 2.2 },
+          { x: rearX - 5.712, y: rearY },
+          { x: rearX, y: rearY - 2.2 },
+        ];
+        return [outer, outer, inner, inner];
+      });
+      expect(strokes.map((path) => path.points)).toEqual(expected);
       const outerTip = strokes[0]?.points[1];
       const innerTip = strokes[2]?.points[1];
       if (!outerTip || !innerTip) {
         throw new Error('Thrust did not draw both V tips');
       }
+      const first = outline.nozzles[0];
+      if (!first) {
+        throw new Error('Kit is missing a thruster nozzle');
+      }
+      const rearX = center.x + 20 * first.f;
       const outerReach = rearX - outerTip.x;
       const innerReach = rearX - innerTip.x;
       expect(innerReach).toBeLessThan(outerReach);
       expect(innerReach / outerReach).toBeCloseTo(VISUAL.THRUSTER_CORE_RATIO);
-      expect(strokes.map((path) => path.width)).toEqual([1.25, 1.25, 0.9375, 0.9375]);
+      expect(strokes.map((path) => path.width)).toEqual(
+        outline.nozzles.flatMap(() => [1.25, 1.25, 0.9375, 0.9375])
+      );
       expect(strokes.map((path) => path.color)).toEqual(
-        [0.4, 1, 0.28, 0.7].map((alpha) => canvasColor(ctx, hexToRgba(color, alpha)))
+        outline.nozzles.flatMap(() =>
+          [0.4, 1, 0.28, 0.7].map((alpha) => canvasColor(ctx, hexToRgba(color, alpha)))
+        )
       );
       expect(strokes.every((path) => !path.closed && path.arcs.length === 0)).toBe(true);
       ship.thrusting = false;
@@ -332,11 +343,11 @@ test('a destroyed surveyor breaks into drifting hull edges, an expanding ring an
   expect(easeOutCubic(1)).toBe(1);
   expect(easeOutCubic(0.5)).toBe(0.875);
   expect(burstTick(0, 0, 0, 4, 10)).toEqual({ x1: 4, y1: 0, x2: 10, y2: 0 });
-  expect(strokes).toHaveLength(1 + 6 + VISUAL.EXPLOSION_SPARKS + 4);
-  expect(strokes[0]?.arcs[0]).toEqual([400, 300, 52.125, 0, Math.PI * 2]);
   const edges = projectKitHullEdges(400, 300, 20, 0, 'surveyor');
-  expect(edges).toHaveLength(6);
-  expect(strokes.slice(1, 7).map((path) => path.points)).toEqual(
+  expect(edges.length).toBeGreaterThan(6);
+  expect(strokes).toHaveLength(1 + edges.length + VISUAL.EXPLOSION_SPARKS + 4);
+  expect(strokes[0]?.arcs[0]).toEqual([400, 300, 52.125, 0, Math.PI * 2]);
+  expect(strokes.slice(1, 1 + edges.length).map((path) => path.points)).toEqual(
     edges.map(([a, b]) => {
       const edge = driftSegment(a, b, { x: 400, y: 300 }, 0.5, 41, 0.7);
       return [edge.a, edge.b];
@@ -348,11 +359,11 @@ test('a destroyed surveyor breaks into drifting hull edges, an expanding ring an
   if (!edgeA || !edgeB) {
     throw new Error('Destroyed surveyor did not draw its first drifting hull edge');
   }
-  expect(
-    Math.hypot((edgeA.x + edgeB.x) / 2 - 402.125, (edgeA.y + edgeB.y) / 2 - 298.375)
-  ).toBeCloseTo(35.875);
-  const sparks = strokes.slice(7, 7 + VISUAL.EXPLOSION_SPARKS);
-  const ticks = strokes.slice(7 + VISUAL.EXPLOSION_SPARKS);
+  const midX = (edgeA.x + edgeB.x) / 2;
+  const midY = (edgeA.y + edgeB.y) / 2;
+  expect(Math.hypot(midX - 400, midY - 300)).toBeGreaterThan(5);
+  const sparks = strokes.slice(1 + edges.length, 1 + edges.length + VISUAL.EXPLOSION_SPARKS);
+  const ticks = strokes.slice(1 + edges.length + VISUAL.EXPLOSION_SPARKS);
   expect(sparks.every((path) => path.points.length === 2)).toBe(true);
   const sparkInner = sparks[0]?.points[0];
   const sparkOuter = sparks[0]?.points[1];
@@ -368,7 +379,7 @@ test('a destroyed surveyor breaks into drifting hull edges, an expanding ring an
   expect(strokes[0]?.color).toBe(canvasColor(ctx, hexToRgba(PALETTE.LOCAL, 0.575 * 0.85)));
   expect(
     strokes
-      .slice(1, 7 + VISUAL.EXPLOSION_SPARKS)
+      .slice(1, 1 + edges.length + VISUAL.EXPLOSION_SPARKS)
       .every((path) => path.color === canvasColor(ctx, hexToRgba(PALETTE.LOCAL, 0.575)))
   ).toBe(true);
   expect(

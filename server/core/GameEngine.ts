@@ -64,7 +64,12 @@ import { SERVER_RELEASE_ID } from '../release';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
-import type { PersistentPilot, WorldStore } from '../world/WorldStore';
+import {
+  type PersistentPilot,
+  type RestorableFlight,
+  restorableFlight,
+  type WorldStore,
+} from '../world/WorldStore';
 import {
   type AsteroidHitCause,
   type AsteroidHitOutcome,
@@ -666,18 +671,30 @@ export class GameEngine {
     return entity;
   }
 
+  private snapshotPilot(actor: GameEntity, tokenHash: string): PersistentPilot {
+    return {
+      id: actor.id,
+      tokenHash,
+      name: actor.name,
+      score: actor.score,
+      lastSeenAt: this.getServerTime(),
+      kitId: actor.kitId,
+      position: { x: actor.position.x, y: actor.position.y },
+      velocity: { x: actor.velocity.x, y: actor.velocity.y },
+      angle: actor.angle,
+      lives: actor.lives,
+      mass: actor.mass,
+      health: actor.health,
+    };
+  }
+
   private capturePilot(id: string): void {
     const previous = this.pilots.get(id);
     const actor = this.getPlayer(id);
     if (!previous || !actor) {
       return;
     }
-    this.pilots.set(id, {
-      id,
-      tokenHash: previous.tokenHash,
-      name: actor.name,
-      score: actor.score,
-    });
+    this.pilots.set(id, this.snapshotPilot(actor, previous.tokenHash));
   }
 
   public registerPilot(
@@ -688,12 +705,10 @@ export class GameEngine {
     if (!result.ok) {
       return result;
     }
-    this.pilots.set(actor.id, {
-      id: actor.id,
-      tokenHash: createHash('sha256').update(result.resumeToken).digest('hex'),
-      name: actor.name,
-      score: actor.score,
-    });
+    this.pilots.set(
+      actor.id,
+      this.snapshotPilot(actor, createHash('sha256').update(result.resumeToken).digest('hex'))
+    );
     this.checkpointWorld();
     return result;
   }
@@ -731,9 +746,19 @@ export class GameEngine {
       this.removePlayer(saved.id);
       saved = this.pilots.get(saved.id) ?? saved;
     }
-    const actor = this.addPlayer(saved.id, saved.name, socket, undefined, requestedKit);
+    const flight = restorableFlight(saved, this.getServerTime());
+    const actor = this.addPlayer(
+      saved.id,
+      saved.name,
+      socket,
+      flight?.position,
+      requestedKit ?? flight?.kitId
+    );
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
-    actor.score = saved.score;
+    actor.score = saved.lives === 0 ? GAME.STARTING_SCORE : saved.score;
+    if (flight) {
+      this.restoreRecentFlight(actor, flight, requestedKit);
+    }
     actor.asteroidInteractions = 1;
     const registered = this.registerPilot(actor, socket);
     if (!registered.ok) {
@@ -772,6 +797,24 @@ export class GameEngine {
     actor.name = name;
   }
 
+  private restoreRecentFlight(
+    actor: GameEntity,
+    flight: RestorableFlight,
+    requestedKit: ShipKitId | undefined
+  ): void {
+    actor.angle = flight.angle;
+    actor.lives = flight.lives;
+    if (!requestedKit || requestedKit === flight.kitId) {
+      actor.mass = flight.mass;
+      actor.health = flight.health > 0 ? Math.min(flight.health, actor.maxHealth) : actor.maxHealth;
+    }
+    if (flight.velocity) {
+      actor.velocity = { x: flight.velocity.x, y: flight.velocity.y };
+    }
+    delete actor.spawnProtectionTimer;
+    this.ensurePilotInOpenSector(actor);
+  }
+
   private ensureScoreSeason(): void {
     const season = utcScoreSeason(this.getServerTime());
     if (season === this.scoreSeason) {
@@ -794,8 +837,13 @@ export class GameEngine {
     this.completedSectors.clear();
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
-    for (const pilot of this.pilots.values()) {
-      pilot.score = 0;
+    for (const [id, pilot] of this.pilots) {
+      this.pilots.set(id, {
+        id: pilot.id,
+        tokenHash: pilot.tokenHash,
+        name: pilot.name,
+        score: 0,
+      });
     }
     for (const actor of this.getAllPlayers()) {
       actor.score = 0;
@@ -1389,6 +1437,9 @@ export class GameEngine {
     this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
     entity.lives = Math.max(0, entity.lives - 1);
+    if (entity.lives === 0) {
+      entity.score = GAME.STARTING_SCORE;
+    }
     this.entityManager.scheduleShipRespawn(entity);
   }
 
@@ -2314,11 +2365,17 @@ export class GameEngine {
   private awardPilotPoints(entityId: string, points: number): number | undefined {
     const entity = this.getPlayer(entityId);
     if (entity) {
+      if (entity.lives <= 0) {
+        return entity.score;
+      }
       this.awardPoints(entityId, points);
       return entity.score;
     }
     const saved = this.pilots.get(entityId);
     if (saved) {
+      if (saved.lives !== undefined && saved.lives <= 0) {
+        return saved.score;
+      }
       saved.score += points;
       return saved.score;
     }

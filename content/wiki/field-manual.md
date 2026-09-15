@@ -34,13 +34,14 @@ life, while a respawn resets that growth.
 
 Choose a ship on the title screen, then press Enter Game. You share the field
 with other pilots. Scan minerals, tow asteroids to a furnace, collect
-rewards, and protect your lives. Your score carries across respawns and later
-Enter Game presses during the same UTC month, but the mass and upgrades
-gathered during a life do not. The server tracks that monthly score, not your
-last ship location. After game over, start a fresh flight with 3 lives and the
-same monthly score; the persistent universe and shared progress remain until
+rewards, and protect your lives. Your score carries across respawns and brief
+disconnects during the same UTC month, but the mass and upgrades gathered during
+a life do not. After game over, start a fresh flight with 3 lives and score 0.
+A brief disconnect or a quick return to Enter Game puts you back on the same
+ship. After about 30 seconds away, start a fresh flight with 3 lives and the
+score you still have. The persistent universe and shared progress remain until
 month rollover, when scores and the shared world both reset. A title-screen
 nickname can include spaces. The playfield waits for the server to place your
-ship so a later Enter Game does not snap you back to an old location. The
+ship so a later Enter Game uses the server pose instead of a local guess. The
 manual explains current rules; practical tips are brief because new ways to
 combine these mechanics can emerge.

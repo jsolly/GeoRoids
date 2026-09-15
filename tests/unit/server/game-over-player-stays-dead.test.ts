@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { SHIP } from '../../../src/constants';
+import { GAME, SHIP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 vi.mock('../../../setup/serverLogger', () => ({
@@ -36,9 +36,11 @@ describe('player game-over stay-dead', () => {
 
   test('last life does not schedule a respawn and health stays at 0', () => {
     player.lives = 1;
+    player.score = 880;
     const destroyed = gameEngine.handleShipDamage('pilot-1', 'asteroid', player.health).isDestroyed;
     expect(destroyed).toBe(true);
     expect(player.lives).toBe(0);
+    expect(player.score).toBe(GAME.STARTING_SCORE);
     expect(player.exploding).toBe(true);
 
     finishExplosion(gameEngine);
@@ -62,9 +64,11 @@ describe('player game-over stay-dead', () => {
 
   test('spare lives still get a respawn timer after the explosion', () => {
     player.lives = 2;
+    player.score = 880;
     const destroyed = gameEngine.handleShipDamage('pilot-1', 'asteroid', player.health).isDestroyed;
     expect(destroyed).toBe(true);
     expect(player.lives).toBe(1);
+    expect(player.score).toBe(880);
 
     finishExplosion(gameEngine);
 

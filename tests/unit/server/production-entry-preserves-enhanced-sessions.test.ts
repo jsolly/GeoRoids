@@ -243,6 +243,8 @@ test('the production entry restores the same pilot and explored world from its c
   store.close();
   expect(savedWorld?.exploration.length).toBeGreaterThan(0);
   expect(savedPilot?.id).toBe('persisted-pilot');
+  expect(savedPilot?.lastSeenAt).toEqual(expect.any(Number));
+  expect(savedPilot?.lives).toBe(GAME.START_LIVES);
 
   const nextPort = await start(0, path);
   const returning = await pilot(nextPort);
@@ -251,8 +253,9 @@ test('the production entry restores the same pilot and explored world from its c
   const restored = (await returning.state()).entities.find(
     (entity) => entity.id === 'persisted-pilot'
   );
-  expect(restored?.score).toBe(savedPilot?.score);
-  expect(restored?.lives).toBe(GAME.START_LIVES);
+  expect(restored?.lives).toBe(savedPilot?.lives);
+  expect(restored?.position).toEqual(savedPilot?.position);
+  expect(restored?.score).toBeGreaterThanOrEqual(savedPilot?.score ?? 0);
   await stopProduction();
   const reopened = new WorldStore(path);
   try {

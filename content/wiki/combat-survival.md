@@ -52,8 +52,9 @@ kit's health, resets mass growth, clears upgrade state, and grants temporary
 spawn protection. Respawns use the nearest furnace to the death location, 180
 world units from its center at a random angle, skipping completed sectors.
 
-After game over, a fresh flight starts with 3 lives and the same monthly
-score. The persistent universe, shared exploration chart, and delivered
+After game over, a fresh flight starts with 3 lives and score 0. A brief
+disconnect still returns you to the same ship; a long absence does not.
+The persistent universe, shared exploration chart, and delivered
 progress remain available until the UTC calendar month ends, when scores and
 the shared world both reset.
 

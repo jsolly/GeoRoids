@@ -76,8 +76,11 @@ interruption, the local view may lag behind the shared world; wait for the
 connection to recover before relying on a pickup or hit result. If joining
 fails or reconnect attempts are exhausted, the game returns to the title
 screen. Select Enter Game to try again. Reloading the page continues this
-browser's monthly score; it does not restore your last ship location or start a
-new score. You can change your nickname on the title screen before Enter Game.
+browser's current score if you still have lives. A brief disconnect, including
+a quick return from the title screen, puts you back on the same ship. After
+about 30 seconds away, Enter Game starts a new flight with that score instead of
+the old location. After game over, Enter Game starts at score 0. You can change
+your nickname on the title screen before Enter Game.
 The playfield stays on the title screen until the server acknowledges join and
 sends the first world snapshot.
 

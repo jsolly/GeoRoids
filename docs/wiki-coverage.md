@@ -8,7 +8,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 | ID | Category | Coverage |
 | --- | --- | --- |
-| field-manual | Start here | Arena orientation, two kits, starting a life, monthly score |
+| field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
 | hauler | Ships | Stats scorecard, shared cruise, weaker Boost, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
@@ -16,9 +16,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
-| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, and score |
+| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
-| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, reconnect |
+| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, reconnect, brief-disconnect return |
 
 ## Coverage matrix
 

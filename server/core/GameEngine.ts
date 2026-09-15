@@ -676,14 +676,7 @@ export class GameEngine {
       id,
       tokenHash: previous.tokenHash,
       name: actor.name,
-      kitId: actor.kitId,
-      position: { ...actor.position },
-      angle: actor.angle,
       score: actor.score,
-      lives: actor.lives,
-      mass: actor.mass,
-      health: actor.health,
-      maxHealth: actor.maxHealth,
     });
   }
 
@@ -699,14 +692,7 @@ export class GameEngine {
       id: actor.id,
       tokenHash: createHash('sha256').update(result.resumeToken).digest('hex'),
       name: actor.name,
-      kitId: actor.kitId,
-      position: { ...actor.position },
-      angle: actor.angle,
       score: actor.score,
-      lives: actor.lives,
-      mass: actor.mass,
-      health: actor.health,
-      maxHealth: actor.maxHealth,
     });
     this.checkpointWorld();
     return result;
@@ -745,13 +731,7 @@ export class GameEngine {
       this.removePlayer(saved.id);
       saved = this.pilots.get(saved.id) ?? saved;
     }
-    const actor = this.addPlayer(
-      saved.id,
-      saved.name,
-      socket,
-      undefined,
-      requestedKit ?? saved.kitId
-    );
+    const actor = this.addPlayer(saved.id, saved.name, socket, undefined, requestedKit);
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
     actor.score = saved.score;
     actor.asteroidInteractions = 1;

@@ -46,7 +46,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
         `Starter furnaces: ${starterFurnaces.map((furnace) => furnace.name).join(', ')}; ${FURNACES.length - starterFurnaces.length} regional Works sites fill the ${WORLD.radius.toLocaleString('en-US')}-unit world.`,
-        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and the same monthly score; the persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends.`,
+        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and the same monthly score; the persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
       ],
     },
   ],

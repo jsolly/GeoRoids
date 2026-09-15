@@ -14,7 +14,7 @@ import { createServerInstance } from '../../../server/createServer';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import type { PersistentPilot } from '../../../server/world/WorldStore';
 import { WorldStore } from '../../../server/world/WorldStore';
-import { WORLD } from '../../../shared/world';
+import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -131,19 +131,12 @@ function asteroid(id: string, position: { x: number; y: number }): AsteroidData 
   };
 }
 
-function pilot(position: { x: number; y: number }): PersistentPilot {
+function scorePilot(score: number): PersistentPilot {
   return {
     id: 'pilot',
     tokenHash: 'a'.repeat(64),
     name: 'Pilot',
-    kitId: 'surveyor',
-    position,
-    angle: 0,
-    score: 0,
-    lives: 3,
-    mass: 1,
-    health: 100,
-    maxHealth: 100,
+    score,
   };
 }
 
@@ -364,7 +357,7 @@ test('a restart refuses one asteroid identity stored in two sectors', () => {
   }
 });
 
-test('a restart refuses a saved pilot outside the persistent world', () => {
+test('a restart refuses a saved pilot without a finite monthly score', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-validation-'));
   const path = join(directory, 'world.sqlite');
   try {
@@ -373,7 +366,7 @@ test('a restart refuses a saved pilot outside the persistent world', () => {
     const db = new DatabaseSync(path);
     db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(
       'pilot',
-      JSON.stringify(pilot({ x: WORLD.radius + 1, y: 0 }))
+      JSON.stringify({ ...scorePilot(0), score: Number.NaN })
     );
     db.close();
 
@@ -382,6 +375,59 @@ test('a restart refuses a saved pilot outside the persistent world', () => {
       expect(() => store.loadPilots()).toThrow(/Saved pilot is invalid/);
     } finally {
       store.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a restart loads a legacy placement record as monthly score only', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-legacy-'));
+  const path = join(directory, 'world.sqlite');
+  try {
+    const initial = new WorldStore(path);
+    initial.close();
+    const db = new DatabaseSync(path);
+    db.prepare('INSERT INTO pilots(id,json) VALUES(?,?)').run(
+      'pilot',
+      JSON.stringify({
+        ...scorePilot(777),
+        kitId: 'surveyor',
+        position: { x: WORLD.radius - 1, y: 0 },
+        angle: 1.5,
+        lives: 1,
+        mass: 9,
+        health: 1,
+        maxHealth: 100,
+      })
+    );
+    db.close();
+
+    const store = new WorldStore(path);
+    try {
+      const pilots = store.loadPilots();
+      expect(pilots).toEqual([scorePilot(777)]);
+      store.checkpoint(
+        {
+          seed: 1,
+          startedAt: 1,
+          generation: WORLD.generation,
+          scoreSeason: utcScoreSeason(1),
+          exploration: [],
+          completedSectors: [],
+        },
+        new Map(),
+        pilots
+      );
+    } finally {
+      store.close();
+    }
+    const rewritten = new DatabaseSync(path);
+    try {
+      const row = rewritten.prepare('SELECT json FROM pilots').get();
+      expect(JSON.parse(String(row?.['json']))).toEqual(scorePilot(777));
+    } finally {
+      rewritten.close();
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -34,9 +34,10 @@ owns projectile collisions, and clients render keyed projectile snapshots.
 Reflective phenomena are generated with each world sector and persist with its
 deposits during the current UTC month. Private resume tokens recover a
 browser's monthly score across disconnects, game over, and server restarts;
-they never appear in the common public world. Enter Game after leaving starts
-a new flight with that score. A live reconnect while the ship still has lives
-keeps the current pose.
+they never restore ship placement or appear in the common public world. Enter
+Game after leaving starts a new flight with that score. A live reconnect while
+the ship still has lives keeps the current pose. At UTC month rollover, scores
+and the shared world both reset.
 
 ## Updating open clients
 

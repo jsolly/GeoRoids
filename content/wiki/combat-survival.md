@@ -54,7 +54,8 @@ world units from its center at a random angle, skipping completed sectors.
 
 After game over, a fresh flight starts with 3 lives and the same monthly
 score. The persistent universe, shared exploration chart, and delivered
-progress remain available until the UTC calendar month ends.
+progress remain available until the UTC calendar month ends, when scores and
+the shared world both reset.
 
 Health regenerates after a real-damage delay. Score survives a respawn.
 Wreckage is emitted from a destroyed ship. The visible death message includes

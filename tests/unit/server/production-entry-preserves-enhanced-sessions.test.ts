@@ -13,6 +13,7 @@ import railwayConfig from '../../../.railway/railway';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
+import { GAME } from '../../../src/constants';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const railwayProject = await railwayConfig(createRailwayContext({ command: 'test' }), project);
@@ -247,7 +248,7 @@ test('the production entry restores the same pilot and explored world from its c
     (entity) => entity.id === 'persisted-pilot'
   );
   expect(restored?.score).toBe(savedPilot?.score);
-  expect(restored?.lives).toBe(savedPilot?.lives);
+  expect(restored?.lives).toBe(GAME.START_LIVES);
   await stopProduction();
   const reopened = new WorldStore(path);
   try {

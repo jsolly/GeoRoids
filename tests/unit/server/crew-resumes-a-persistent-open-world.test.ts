@@ -223,6 +223,20 @@ test('leaving then entering again keeps monthly score on a fresh spawn', () => {
   engine.stopGameLoop();
 });
 
+test('checkpoints store monthly score without ship placement', () => {
+  const store = database(':memory:');
+  const engine = new GameEngine(82, undefined, store);
+  const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
+  original.actor.score = 450;
+  engine.checkpointWorld();
+  const saved = store.loadPilots()[0];
+  assert(saved);
+  expect(Object.keys(saved).sort()).toEqual(['id', 'name', 'score', 'tokenHash']);
+  expect(saved).toMatchObject({ id: 'scout', name: 'scout', score: 450 });
+  expect(saved.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+  engine.stopGameLoop();
+});
+
 test('resuming during an explosion keeps the pending life loss until the server respawns', () => {
   const engine = new GameEngine(82);
   const original = pilot(engine, 'scout', 'surveyor');

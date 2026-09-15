@@ -34,6 +34,7 @@
     "src/entities/ship/shipKits.ts",
     "src/entities/ship/shipAbilities.ts",
     "src/entities/ship/shipRenderer.ts",
+    "src/entities/ship/hullOutlines.ts",
     "src/entities/ship/harpoonField.ts",
     "src/entities/ship/towCable.ts",
     "shared/furnaces.ts",
@@ -164,6 +165,7 @@
   "surveyor": [
     "src/entities/ship/shipKits.ts",
     "src/entities/ship/shipAbilities.ts",
+    "src/entities/ship/hullOutlines.ts",
     "src/constants/index.ts",
     "tests/unit/entities/shipKits.test.ts",
     "tests/unit/entities/shipAbilities.test.ts",

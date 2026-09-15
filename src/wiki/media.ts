@@ -35,6 +35,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/towCable.ts',
       'src/entities/ship/shipKits.ts',
       'src/entities/ship/shipRenderer.ts',
+      'src/entities/ship/hullOutlines.ts',
       'shared/furnaces.ts',
       'server/core/GameEngine.ts',
     ],

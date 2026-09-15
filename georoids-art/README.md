@@ -4,7 +4,8 @@ The source pack was recovered from Game Director on September 7, 2026. Its ZIP S
 
 Current direction lives in `style-guide.md`, `ship-world-palette.md`, `cooperative-ships.md`, and `eo-satellites/roster-and-briefs.md`. The existing repository's ship implementation notes take precedence over the older source pack's contradictory optional-Hook and temporary-saucer language. There are exactly two player kits, Surveyor and Hauler.
 
-`src/entities/ship/hullOutlines.ts` traces the recovered contact sheet. The two `ships-v2/*.svg` files and the runtime use the surviving needle and barge contours.
+`src/entities/ship/hullOutlines.ts` traces the hangar yoke and delta-wing
+drawings. The two `ships-v2/*.svg` files and the runtime use those contours.
 
 Wave 1 passed on production release `5139af1` on September 7, including a real WebSocket reconnect and more than five minutes of simultaneous two-pilot play. Implementation remains owned by Codex; the Grok Developer bot is idle until September 9.
 

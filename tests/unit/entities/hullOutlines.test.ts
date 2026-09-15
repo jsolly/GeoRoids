@@ -26,13 +26,13 @@ const EO_SVG_FILE_NAMES: Record<EoOutlineId, string> = {
   'worldview-3': 'worldview-3.svg',
 };
 
-test('each kit bakes a unique v2 topology', () => {
+test('each kit bakes a unique hangar topology', () => {
   const outlines = listKitHullOutlines();
   expect(outlines.map((outline) => outline.kitId)).toEqual([...SHIP_KIT_IDS]);
   expect(new Set(outlines.map((outline) => outline.topology)).size).toBe(2);
   expect(SHIP_HULL_TOPOLOGY).toEqual({
-    surveyor: 'needle',
-    hauler: 'barge-hex',
+    surveyor: 'delta-wing',
+    hauler: 'cargo-yoke',
   });
   const fingerprints = outlines.map((outline) =>
     outline.hull.points.map((point) => `${point.f}:${point.p}`).join('|')
@@ -40,36 +40,40 @@ test('each kit bakes a unique v2 topology', () => {
   expect(new Set(fingerprints).size).toBe(2);
 });
 
-test('Surveyor needle keeps two tail fins around its inverted-V aft notch', () => {
+test('Surveyor delta-wing keeps a forward dish, wide wings, and one aft nozzle', () => {
   const surveyor = getKitHullOutline('surveyor');
-  expect(surveyor.topology).toBe('needle');
-  expect(surveyor.hull.points).toHaveLength(6);
-  const minF = Math.min(...surveyor.hull.points.map((point) => point.f));
-  const wings = surveyor.hull.points.filter((point) => point.f === minF);
-  expect(wings).toHaveLength(2);
-  const notch = surveyor.hull.points.find(
-    (point) => point.p === 0 && point.f > minF && point.f < 0
-  );
-  expect(notch).toBeTruthy();
+  expect(surveyor.topology).toBe('delta-wing');
+  expect(surveyor.nozzles).toHaveLength(1);
+  const hullF = surveyor.hull.points.map((point) => point.f);
+  const hullP = surveyor.hull.points.map((point) => point.p);
+  const maxF = Math.max(...hullF);
+  const minF = Math.min(...hullF);
+  const spanP = Math.max(...hullP) - Math.min(...hullP);
+  expect(spanP).toBeGreaterThan(maxF - minF);
+  const nose = surveyor.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
+  expect(Math.abs(nose.p)).toBeLessThan(0.05);
+  const wings = surveyor.hull.points.filter((point) => Math.abs(point.p) > 1);
+  expect(wings.length).toBeGreaterThan(4);
+  expect(surveyor.extras.length).toBeGreaterThan(3);
 });
 
-test('Hauler barge is squat with a pointed bow, bevelled sides, and a flat keel', () => {
+test('Hauler yoke keeps twin forward towers, a cargo bay, and two aft engine bells', () => {
   const hauler = getKitHullOutline('hauler');
-  expect(hauler.topology).toBe('barge-hex');
-  const minF = Math.min(...hauler.hull.points.map((point) => point.f));
+  expect(hauler.topology).toBe('cargo-yoke');
+  expect(hauler.nozzles).toHaveLength(2);
   const maxF = Math.max(...hauler.hull.points.map((point) => point.f));
-  const maxP = Math.max(...hauler.hull.points.map((point) => Math.abs(point.p)));
-  const keel = hauler.hull.points.filter((point) => point.f === minF);
-  expect(keel).toHaveLength(2);
-  const bow = hauler.hull.points.reduce((best, point) => (point.f > best.f ? point : best));
-  expect(bow.p).toBe(0);
-  expect(maxP * 2).toBeGreaterThan(maxF - minF);
-  const widest = hauler.hull.points.filter((point) => Math.abs(point.p) > 1);
-  expect(widest).toHaveLength(2);
-  expect(widest.every((point) => point.f > minF && point.f < maxF)).toBe(true);
+  const towers = hauler.hull.points.filter((point) => point.f > maxF - 0.05);
+  expect(towers.some((point) => point.p < 0)).toBe(true);
+  expect(towers.some((point) => point.p > 0)).toBe(true);
+  const midForward = hauler.hull.points
+    .filter((point) => Math.abs(point.p) < 0.2)
+    .map((point) => point.f);
+  expect(Math.max(...midForward)).toBeLessThan(maxF - 0.4);
+  expect(hauler.nozzles.every((nozzle) => nozzle.f < 0 && Math.abs(nozzle.p) > 0.5)).toBe(true);
+  expect(hauler.extras.length).toBeGreaterThan(5);
 });
 
-test('v2 SVG pack matches the outline bake and names no v1 sheets', () => {
+test('hangar SVG pack matches the outline bake and names no v1 sheets', () => {
   for (const outline of listKitHullOutlines()) {
     const fileName = kitHullSvgFileName(outline.kitId);
     const onDisk = readFileSync(resolve(process.cwd(), HULL_SVG_PACK_DIR, fileName), 'utf8');

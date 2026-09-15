@@ -35,8 +35,8 @@ export const CLASSIC_HULL: HullProfile = {
 };
 
 export const SHIP_HULL_TOPOLOGY = {
-  surveyor: 'needle',
-  hauler: 'barge-hex',
+  surveyor: 'delta-wing',
+  hauler: 'cargo-yoke',
 } as const;
 
 export const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;

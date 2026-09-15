@@ -331,18 +331,20 @@ function drawShip(
   if (!thrusting) {
     return;
   }
-  const aft = getKitHullOutline(kitId).thruster;
-  const rear = projectHullPoint(screen.x, screen.y, radius, angle, aft);
-  const flame = thrusterFlameGeometry(screen.x, screen.y, angle, radius, 0.72, 0.42, rear);
-  renderPolyline(ctx, [flame.left, flame.tip, flame.right], PALETTE.LASER_LOCAL, 1.2, 3, false);
-  renderPolyline(
-    ctx,
-    [flame.coreLeft, flame.coreTip, flame.coreRight],
-    PALETTE.HUD,
-    0.9,
-    1.5,
-    false
-  );
+  const outline = getKitHullOutline(kitId);
+  for (const aft of outline.nozzles) {
+    const rear = projectHullPoint(screen.x, screen.y, radius, angle, aft);
+    const flame = thrusterFlameGeometry(screen.x, screen.y, angle, radius, 0.72, 0.42, rear);
+    renderPolyline(ctx, [flame.left, flame.tip, flame.right], PALETTE.LASER_LOCAL, 1.2, 3, false);
+    renderPolyline(
+      ctx,
+      [flame.coreLeft, flame.coreTip, flame.coreRight],
+      PALETTE.HUD,
+      0.9,
+      1.5,
+      false
+    );
+  }
 }
 
 function drawRoid(

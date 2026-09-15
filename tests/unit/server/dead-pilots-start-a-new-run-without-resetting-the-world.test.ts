@@ -1,10 +1,11 @@
+/* @vitest-environment node */
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('a final-life death cannot resume in memory or after restart, and a new run preserves crew exploration', () => {
+test('a final-life death starts a new flight with the monthly score and keeps crew exploration', () => {
   const store = new WorldStore(':memory:');
   try {
     const engine = new GameEngine(82, undefined, store);
@@ -20,15 +21,27 @@ test('a final-life death cannot resume in memory or after restart, and a new run
     const revealed = engine.getGameState().exploration;
     expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
     expect(actor.lives).toBe(0);
+
+    const continued = engine.resumePilot(
+      registered.resumeToken,
+      new RecordingSocket(),
+      undefined,
+      'Bob'
+    );
+    assert(continued.ok);
+    expect(continued.actor.lives).toBe(3);
+    expect(continued.actor.score).toBe(1200);
+    expect(continued.actor.name).toBe('Bob');
+    expect(continued.actor.health).toBe(continued.actor.maxHealth);
+    expect(continued.actor.position).not.toEqual({ x: 4000, y: 0 });
     expect(engine.resumePilot(registered.resumeToken, new RecordingSocket()).ok).toBe(false);
-    expect(engine.getPlayer(actor.id)).toBeUndefined();
 
     const restarted = new GameEngine(0, undefined, store);
-    expect(restarted.resumePilot(registered.resumeToken, new RecordingSocket()).ok).toBe(false);
-    const fresh = restarted.addPlayer('new-run', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
-    expect(fresh.lives).toBe(3);
-    expect(fresh.score).toBe(0);
-    expect(fresh.health).toBe(fresh.maxHealth);
+    const resumed = restarted.resumePilot(continued.resumeToken, new RecordingSocket());
+    assert(resumed.ok);
+    expect(resumed.actor.lives).toBe(3);
+    expect(resumed.actor.score).toBe(1200);
+    expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
     expect(restarted.getGameState().exploration).toEqual(revealed);
   } finally {
     store.close();

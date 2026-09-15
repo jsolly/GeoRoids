@@ -1,3 +1,4 @@
+/* @vitest-environment node */
 import { strict as assert } from 'node:assert';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,7 @@ import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidFie
 import { WorldStore } from '../../../server/world/WorldStore';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
-import { nearbyWorldRows, WORLD } from '../../../shared/world';
+import { nearbyWorldRows, utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -94,12 +95,14 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
 
   const second = new GameEngine(999, undefined, database(path));
   expect(second.getTerrainSeed()).toBe(82);
-  const resumed = second.resumePilot(scout.token, new RecordingSocket());
+  const resumed = second.resumePilot(scout.token, new RecordingSocket(), undefined, 'Bob');
   assert(resumed.ok);
   expect(resumed.actor.id).toBe('scout');
+  expect(resumed.actor.name).toBe('Bob');
   expect(resumed.actor.score).toBe(points);
+  expect(resumed.actor.lives).toBe(3);
+  expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
   expect(second.getAsteroid('delivery')).toBeUndefined();
-  expect(second.getAllAsteroids()).toHaveLength(0);
   const cell = explorationCellAt({ x: 900, y: 0 });
   assert(cell !== null);
   expect(isCellExplored(second.getGameState().exploration, cell)).toBe(true);
@@ -149,6 +152,7 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
+        scoreSeason: utcScoreSeason(1),
         exploration: [],
         completedSectors: [],
       },
@@ -182,17 +186,39 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
   original.actor.lives = 2;
   original.actor.score = 450;
   const replacement = new RecordingSocket();
-  const resumed = engine.resumePilot(original.token, replacement, 'hauler');
+  const resumed = engine.resumePilot(original.token, replacement, 'hauler', 'Bob');
   assert(resumed.ok);
   expect(resumed.actor).toBe(original.actor);
   expect(resumed.actor).toMatchObject({
     id: 'scout',
+    name: 'Bob',
     kitId: 'hauler',
     lives: 2,
     score: 450,
     ws: replacement,
     position: { x: 200, y: 300 },
   });
+  expect(engine.getPlayerCount()).toBe(1);
+  engine.stopGameLoop();
+});
+
+test('leaving then entering again keeps monthly score on a fresh spawn', () => {
+  const engine = new GameEngine(82);
+  const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
+  original.actor.lives = 2;
+  original.actor.score = 450;
+  engine.removePlayer('scout');
+  const resumed = engine.resumePilot(original.token, new RecordingSocket(), 'hauler', 'Bob');
+  assert(resumed.ok);
+  expect(resumed.actor).toMatchObject({
+    id: 'scout',
+    name: 'Bob',
+    kitId: 'hauler',
+    lives: 3,
+    score: 450,
+    health: resumed.actor.maxHealth,
+  });
+  expect(resumed.actor.position).not.toEqual({ x: 200, y: 300 });
   expect(engine.getPlayerCount()).toBe(1);
   engine.stopGameLoop();
 });

@@ -5,7 +5,7 @@ import { validExploration } from '../../shared/exploration';
 import { finiteMotionVector } from '../../shared/playerMotion';
 import { readCompletedSectorIds } from '../../shared/sectors';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, ExplorationTile, Position, ShipKitId } from '../../shared-types';
 
 function validSectorId(id: string): boolean {
@@ -34,6 +34,7 @@ interface SavedWorld {
   seed: number;
   startedAt: number;
   generation: number;
+  scoreSeason?: string;
   exploration: ExplorationTile[];
   completedSectors: string[];
 }
@@ -170,6 +171,9 @@ export class WorldStore {
         Number.isSafeInteger(value.generation)
           ? value.generation
           : 0,
+      ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
+        ? { scoreSeason: value.scoreSeason }
+        : {}),
       exploration: value.exploration,
       completedSectors:
         'completedSectors' in value ? readCompletedSectorIds(value.completedSectors) : [],

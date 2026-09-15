@@ -144,11 +144,9 @@ export class GameController {
       this.resetSessionForNewGame();
       clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
-      setPlayView(true);
       this.laserUpgradeReadout ??= new LaserUpgradeReadout(
         document.getElementById('gameArea') ?? document.body
       );
-      this.gameStateManager.setIsGameRunning(true);
 
       // Reset button text to default state
       this.inputManager.resetButtonText();
@@ -162,7 +160,14 @@ export class GameController {
       this.currRoidBelt = entityFactory.createEmptyRoidBelt();
       shockwaveManager.clear();
       this.setupServerAsteroidListeners();
-      this.networkManager.initializeAsteroidSync();
+      const joined = await this.networkManager.joinAndWaitForWorld();
+      if (!joined) {
+        this.gameStateManager.setIsGameRunning(false);
+        setPlayView(false);
+        return;
+      }
+      setPlayView(true);
+      this.gameStateManager.setIsGameRunning(true);
 
       if (!this.playerManager.getLocalPlayer()) {
         throw new Error('Cannot initialize input listeners without a local player');

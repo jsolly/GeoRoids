@@ -53,7 +53,6 @@ import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
-import { getStoredItem, removeStoredItem, setStoredItem } from '../../utils/safeStorage';
 import type { ClientMessage } from '../types';
 import {
   getCompletedSectors,
@@ -85,6 +84,12 @@ import { nextReconnectDelayMs } from './connectionReconnect';
 import { PlayerMotionReconciliation } from './PlayerMotionReconciliation';
 import { PlayerListCache } from './playerListCache';
 import { bindPageHideDisconnect, fillSnapshotEntityIds, isLocalGameEntity } from './playerPresence';
+import {
+  clearResumeCredential,
+  isValidResumeToken,
+  readStoredResumeToken,
+  storeResumeCredential,
+} from './resumeCredential';
 
 interface ConnectionState {
   isConnected: boolean;
@@ -99,11 +104,6 @@ interface ServerMessageEnvelope {
 }
 
 let nextConnectionId = 0;
-const RESUME_TOKEN_STORAGE_KEY = 'georoids-resume-token';
-
-function isValidResumeToken(value: unknown): value is string {
-  return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
-}
 
 function isServerMessageEnvelope(value: unknown): value is ServerMessageEnvelope {
   return (
@@ -204,6 +204,7 @@ export class ConnectionManager {
   private joinCompletionPending = false;
   private joinAcknowledged = false;
   private shotAcknowledgements = false;
+  private joinWait?: { resolve: (ok: boolean) => void };
 
   // Only unexpected closes retry; terminal join failures already report an error.
   private disconnectReason: 'requested' | 'join-failed' | null = null;
@@ -225,8 +226,8 @@ export class ConnectionManager {
     this.clientId = readOrCreateClientId(
       typeof sessionStorage === 'undefined' ? null : sessionStorage
     );
-    const storedResumeToken = getStoredItem(RESUME_TOKEN_STORAGE_KEY);
-    if (isValidResumeToken(storedResumeToken)) {
+    const storedResumeToken = readStoredResumeToken();
+    if (storedResumeToken) {
       this.resumeToken = storedResumeToken;
     }
     // Tab close / bfcache must tear the socket down so the server drops us
@@ -521,6 +522,7 @@ export class ConnectionManager {
     }
 
     this.resetSnapshotSession();
+    this.settleJoinWait(false);
     this.state.isConnected = false;
     this.state.socket = null;
     this.allPlayers.clear();
@@ -617,6 +619,22 @@ export class ConnectionManager {
     this.joinCompletionPending = false;
   }
 
+  private settleJoinWait(ok: boolean): void {
+    const wait = this.joinWait;
+    delete this.joinWait;
+    wait?.resolve(ok);
+  }
+
+  joinAndWaitForWorld(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.joinWait = { resolve };
+      this.initializeAsteroidSync();
+      if (!this.joinCompletionPending) {
+        this.settleJoinWait(false);
+      }
+    });
+  }
+
   private armJoinCompletionTimer(): void {
     this.clearJoinCompletionTimer();
     this.joinCompletionPending = true;
@@ -636,6 +654,7 @@ export class ConnectionManager {
       return;
     }
     this.clearJoinCompletionTimer();
+    this.settleJoinWait(false);
     // Settle recovery before intentional teardown clears it. disconnect()
     // settles any pending join and leaves both methods idempotent when idle.
     clientPerformance.recoveryFailed();
@@ -848,6 +867,7 @@ export class ConnectionManager {
       id: this.clientId,
       resumable: !!this.resumeToken,
     });
+    this.motionReconciliation.awaitAuthoritativePose();
     this.armJoinCompletionTimer();
     if (!this.sendPayload(joinMessage)) {
       this.failJoinCompletion(new Error('Failed to send join message'), true);
@@ -955,7 +975,7 @@ export class ConnectionManager {
         // The server explicitly rejected this credential; discard it so the
         // next menu join creates a fresh pilot instead of retrying forever.
         delete this.resumeToken;
-        removeStoredItem(RESUME_TOKEN_STORAGE_KEY);
+        clearResumeCredential();
         this.motionReconciliation.reset();
         this.joinAcknowledged = false;
         this.currentProtocolReady = false;
@@ -1189,6 +1209,7 @@ export class ConnectionManager {
     }
     if (this.joinCompletionPending && this.joinAcknowledged && localStateApplied) {
       this.clearJoinCompletionTimer();
+      this.settleJoinWait(true);
     }
     if (!wasDead) {
       return;
@@ -1472,7 +1493,7 @@ export class ConnectionManager {
     this.shotAcknowledgements = data.shotAcknowledgements === true;
     this.currentProtocolReady = true;
     this.resumeToken = data.resumeToken;
-    setStoredItem(RESUME_TOKEN_STORAGE_KEY, data.resumeToken);
+    storeResumeCredential(data.resumeToken, data.name);
     if (data.serverReleaseId) {
       this.serverReleaseId = data.serverReleaseId;
       clientPerformance.serverReleaseId = data.serverReleaseId;
@@ -1507,6 +1528,10 @@ export class ConnectionManager {
     const localPlayer = PlayerManager.getInstance().getLocalPlayer();
     if (localPlayer) {
       localPlayer.resetCombatLifecycle();
+      if (data.position) {
+        localPlayer.ship.position.x = data.position.x;
+        localPlayer.ship.position.y = data.position.y;
+      }
       if (data.name) {
         localPlayer.name = data.name;
         this.localPlayerName = data.name;

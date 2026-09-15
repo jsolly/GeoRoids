@@ -18,9 +18,11 @@ satellite pickups, sloping terrain, and one crew of pilots. Choose a kit, learn
 its E ability, then read the arena entries for the rules that every pilot
 shares.
 
-The world remains available between sessions, so a month-long expedition keeps
-its shared chart and delivered progress unless a world generation bump resets
-saved sectors on the next server start.
+The world remains available between sessions during the current UTC calendar
+month, so a month-long expedition keeps its shared chart and delivered
+progress. At the end of the month the server clears scores and the shared
+world. A world generation bump also resets saved sectors on the next server
+start.
 
 Choose Surveyor for nimble exploration and shared mineral scanning, or Hauler
 for asteroid towing and stronger mining lasers. Their
@@ -32,8 +34,12 @@ life, while a respawn resets that growth.
 
 Choose a ship on the title screen, then press Enter Game. You share the field
 with other pilots. Scan minerals, tow asteroids to a furnace, collect
-rewards, and protect your lives. Your score carries across respawns, but the
-mass and upgrades gathered during a life do not. After game over, start a fresh
-run with 3 lives and 0 score; the persistent universe and shared progress
-remain. The manual explains current rules; practical tips are brief because
-new ways to combine these mechanics can emerge.
+rewards, and protect your lives. Your score carries across respawns and later
+Enter Game presses during the same UTC month, but the mass and upgrades
+gathered during a life do not. After game over, start a fresh flight with 3
+lives and the same monthly score; the persistent universe and shared progress
+remain until month rollover. A title-screen nickname can include spaces. The
+playfield waits for the server to place your ship so a later Enter Game does
+not snap you back to an old location. The manual explains current rules;
+practical tips are brief because new ways to combine these mechanics can
+emerge.

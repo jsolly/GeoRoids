@@ -7,7 +7,12 @@
     "shared/exploration.ts",
     "shared/furnaces.ts",
     "shared/world.ts",
+    "src/utils/playerName.ts",
+    "src/network/services/resumeCredential.ts",
     "tests/integration/browser/sanity/game-initializes-with-arena-and-starting-state.test.ts",
+    "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts",
+    "tests/unit/server/monthly-score-season-clears-world-and-scores.test.ts",
+    "tests/unit/utils/player-name.test.ts",
     "shared/sectors.ts"
   ],
   "controls": [
@@ -120,6 +125,7 @@
     "server/core/GameEngine.ts",
     "server/core/LootManager.ts",
     "src/utils/deathCause.ts",
+    "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts",
     "tests/unit/entities/shipDamage.test.ts",
     "tests/unit/entities/shipLifecycle.test.ts",
     "tests/unit/entities/combatDamage.test.ts",
@@ -147,6 +153,8 @@
     "src/rendering/hud/hudLayout.ts",
     "src/ui/universeMap.ts",
     "src/network/services/ConnectionManager.ts",
+    "src/network/services/resumeCredential.ts",
+    "src/network/services/PlayerMotionReconciliation.ts",
     "src/network/services/asteroidFieldSync.ts",
     "src/network/worldExploration.ts",
     "server/services/GameStateBroadcaster.ts",
@@ -160,6 +168,9 @@
     "tests/unit/rendering/hudLayout.test.ts",
     "tests/unit/systems/hudReadability.test.ts",
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
+    "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts",
+    "tests/unit/network/failed-connections-settle-and-recover.test.ts",
+    "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-lives-and-score.test.ts",
     "tests/unit/network/asteroidFieldSync.test.ts",
     "tests/integration/browser/sanity/crew-scoreboard-lists-pilots.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
@@ -223,6 +234,7 @@
     "src/network/worldExploration.ts",
     "src/ui/universeMap.ts",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
+    "tests/unit/server/monthly-score-season-clears-world-and-scores.test.ts",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/server/authoritative-combat.test.ts",
@@ -239,6 +251,7 @@
     "tests/unit/server/persistent-world-boundaries.test.ts",
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts",
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts",
-    "tests/unit/shared/sectors.test.ts"
+    "tests/unit/shared/sectors.test.ts",
+    "tests/unit/shared/utc-score-season.test.ts"
   ]
 }

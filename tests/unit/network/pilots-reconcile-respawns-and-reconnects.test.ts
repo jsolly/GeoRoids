@@ -113,6 +113,28 @@ describe('player motion recovery', () => {
     expect(ship.exploding).toBe(true);
   });
 
+  it('holds predicted flight until the first authoritative pose after join', () => {
+    const ship = new Ship({ kitId: 'hauler' });
+    ship.position = { x: 12, y: 34 };
+    const prediction = new PlayerMotionReconciliation();
+    prediction.awaitAuthoritativePose();
+    expect(prediction.shouldSuppressShipMove()).toBe(true);
+    expect(prediction.buildHandoffPose(ship)).toBeNull();
+    expect(
+      prediction.rebase(
+        row({
+          position: { x: 80, y: 20 },
+          velocity: { x: 3, y: 0 },
+          playerMotion: { epoch: 2, mode: 'free', ack: 0 },
+        }),
+        ship,
+        0
+      )
+    ).toBe(true);
+    expect(ship.position).toEqual({ x: 80, y: 20 });
+    expect(prediction.shouldSuppressShipMove()).toBe(false);
+  });
+
   it('discards old socket predictions and resumes at the fresh authoritative pose without a stale snapback', () => {
     const { ship, prediction } = fixture();
     prediction.transportClosed();

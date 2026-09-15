@@ -27,6 +27,10 @@ export class PlayerMotionReconciliation {
     }
   }
 
+  public awaitAuthoritativePose(): void {
+    this.waitingForResume = true;
+  }
+
   public shouldSuppressPose(): boolean {
     return this.waitingForResume || (!!this.motion && this.motion.mode !== 'free');
   }

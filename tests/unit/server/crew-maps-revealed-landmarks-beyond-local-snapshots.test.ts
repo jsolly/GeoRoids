@@ -1,3 +1,4 @@
+/* @vitest-environment node */
 import { strict as assert } from 'node:assert';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -6,7 +7,7 @@ import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ExplorationMap } from '../../../shared/exploration';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
-import { WORLD } from '../../../shared/world';
+import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { LootData } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -89,6 +90,7 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
+        scoreSeason: utcScoreSeason(Date.now()),
         exploration: exploration.snapshot(),
         completedSectors: [],
       },

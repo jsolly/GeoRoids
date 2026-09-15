@@ -59,7 +59,8 @@ a shared material score.
 The local minimap follows the ship's nearby radar. The full-screen universe map
 opens with M or the Map button and shows the crew's shared overview of the
 world. Every pilot adds the area around its ship, and explored cells remain
-revealed for the crew after that ship moves away. Surveyor passive reveal
+revealed for the crew after that ship moves away until the UTC calendar month
+ends and the shared world resets. Surveyor passive reveal
 reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
 scan reaches 1,200 world units and also classifies minerals in that range on
 every teammate's radar. Uncharted asteroid, loot, and furnace positions stay

@@ -52,8 +52,9 @@ kit's health, resets mass growth, clears upgrade state, and grants temporary
 spawn protection. Respawns use the nearest furnace to the death location, 180
 world units from its center at a random angle, skipping completed sectors.
 
-After game over, a fresh run starts with 3 lives and 0 score. The persistent
-universe, shared exploration chart, and delivered progress remain available.
+After game over, a fresh flight starts with 3 lives and the same monthly
+score. The persistent universe, shared exploration chart, and delivered
+progress remain available until the UTC calendar month ends.
 
 Health regenerates after a real-damage delay. Score survives a respawn.
 Wreckage is emitted from a destroyed ship. The visible death message includes

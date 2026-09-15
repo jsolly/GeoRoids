@@ -279,6 +279,42 @@ test('a pre-join server error fails the attempt while a post-join error leaves t
   }
 });
 
+test('join waits for the joined pose and first snapshot before play can start', async () => {
+  const player = entityFactory.createLocalPlayer('Bob', { x: 12, y: 34 });
+  vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+  manager.setLocalPlayerName('Bob');
+  const socket = await open();
+  const waiting = manager.joinAndWaitForWorld();
+  socket.receive('joined', {
+    id: manager.getClientId(),
+    name: 'Bob',
+    position: { x: 500, y: 600 },
+    color: '#fff',
+    snapshotVersion: 1,
+    asteroidInteractions: 1,
+    resumeToken: 'a'.repeat(64),
+  });
+  expect(player.ship.position).toEqual({ x: 500, y: 600 });
+  let settled: boolean | undefined;
+  void waiting.then((ok) => {
+    settled = ok;
+  });
+  await Promise.resolve();
+  expect(settled).toBeUndefined();
+
+  const state = snapshotFixture();
+  const local = state.entities[0];
+  if (!local) {
+    throw new Error('Expected a local snapshot fixture entity');
+  }
+  local.id = manager.getClientId();
+  local.name = 'Bob';
+  local.position = { x: 500, y: 600 };
+  socket.receive('snapshot', new SnapshotEncoder(state).encode(1));
+  expect(await waiting).toBe(true);
+  expect(settled).toBe(true);
+});
+
 test('the first local authoritative state clears the join completion deadline', async () => {
   const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 });
   vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);

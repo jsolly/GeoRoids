@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { GAME, SHIP } from '../../../src/constants';
+import { SHIP } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
   applyShipKitToShip,
@@ -19,14 +19,15 @@ test('pilots choose exactly Surveyor or Hauler and retired selections fall back 
   }
 });
 
-test('Surveyor handles more nimbly while Hauler keeps its heavy hull and slow cruise', () => {
+test('Surveyor handles more nimbly while Hauler keeps its heavy hull at the same cruise speed', () => {
   const surveyor = getShipKit('surveyor'),
     hauler = getShipKit('hauler');
   expect(surveyor.turnSpeed).toBe(540);
   expect(surveyor.turnSpeed).toBeGreaterThan(hauler.turnSpeed);
   expect(surveyor.size).toBeLessThan(hauler.size);
   expect(surveyor.maxVelocity).toBe(SHIP.MAX_VELOCITY);
-  expect(hauler.maxVelocity).toBe(1.75 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
+  expect(hauler.maxVelocity).toBe(surveyor.maxVelocity);
+  expect(surveyor.boostMultiplier).toBeGreaterThan(hauler.boostMultiplier);
   expect(hauler.maxHealth).toBeGreaterThan(surveyor.maxHealth);
   expect(surveyor.abilityId).toBe('surveyScan');
   expect(hauler.abilityId).toBe('harpoon');

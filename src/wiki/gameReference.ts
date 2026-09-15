@@ -27,7 +27,7 @@ function frameValue(frames: number): string {
 function shipStats(id: ShipKitId): string {
   const kit = getShipKit(id);
   const cooldown = SHIP_ABILITY.COOLDOWN_FRAMES[id];
-  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
+  return `${kit.name}: ${kit.maxHealth} maximum health, size ${kit.size}, thrust ${kit.thrust}, maximum velocity ${kit.maxVelocity}, boost multiplier ${kit.boostMultiplier}, ${kit.turnSpeed} degree per second turn rate, ${kit.shotCooldown} millisecond shot interval, and E cooldown ${frameValue(cooldown)}.`;
 }
 
 function satelliteProfiles(): string[] {
@@ -55,6 +55,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Movement values',
       paragraphs: [
         `Automatic movement defaults: thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, and turn rate ${SHIP.TURN_SPEED} degrees per second. Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
+        `Shift or the Boost button multiplies cruise speed and thrust by ${getShipKit('surveyor').boostMultiplier} for Surveyor and ${getShipKit('hauler').boostMultiplier} for Hauler. Tap or press again to return to the shared cruise speed.`,
         `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },
@@ -81,7 +82,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Tow and mining values',
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids and cooperative large rocks. The ability has no ship-targeting mode.`,
-        `E attaches the persistent tow cable within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. The rock keeps its velocity and the cable corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the cable immediately.`,
+        `E attaches the persistent tow cable within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. The rock keeps its velocity and the cable corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the cable immediately. Towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable.`,
         `Furnace intakes are ${starterFurnaces[0]?.radius ?? 0} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor.`,
       ],
     },
@@ -147,7 +148,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; boundary contact destroys a vulnerable ship regardless of hull health.`,
+        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; a towed rock uses that same impact against another ship and then breaks. Boundary contact destroys a vulnerable ship regardless of hull health.`,
         `Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },

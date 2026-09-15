@@ -30,6 +30,7 @@ test('title menu presents the keyboard and ability control hint', () => {
   expect(hint?.closest('#start-screen')).toBeTruthy();
   expect(hint?.textContent).toContain('Always thrust');
   expect(hint?.textContent).toContain('Space fires');
+  expect(hint?.textContent).toContain('Shift boost');
   expect(hint?.textContent).toContain('E ability');
   expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
 });
@@ -72,5 +73,8 @@ test('play shell creates the touch ability overlay with a semantic action button
   expect(action?.tagName).toBe('BUTTON');
   expect(action?.getAttribute('type')).toBe('button');
   expect(action?.getAttribute('aria-label')).toBeTruthy();
+  const boost = document.getElementById('touch-boost');
+  expect(boost?.tagName).toBe('BUTTON');
+  expect(boost?.textContent).toBe('BOOST');
   expect(document.getElementById('touch-shield')).toBeNull();
 });

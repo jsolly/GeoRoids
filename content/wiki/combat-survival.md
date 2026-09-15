@@ -34,12 +34,14 @@ hits and removal.
 ## Damage and protection
 
 Normal lasers, asteroid impacts, and boundary impacts use different damage
-rules. A ship-to-asteroid impact removes 25 health. Unbounced ship lasers,
-ship-to-ship ramming, the Hauler tow cable, and a shot-triggered loot blast
-never damage a crew hull. A bounced laser deals the configured laser hit
-times its energy and is consumed on the first live hull it meets. The
-boundary destroys a vulnerable ship on contact, even at full health;
-asteroids bounce back into the world.
+rules. A ship-to-asteroid impact removes 25 health. A towed asteroid that hits
+another ship uses that same impact and then breaks, dropping the Hauler cable.
+Unbounced ship lasers, ship-to-ship ramming, the Hauler tow cable, and a
+shot-triggered loot blast never damage a crew hull. A bounced laser deals the
+configured laser hit times its energy and is consumed on the first live hull it
+meets. The boundary destroys a vulnerable ship on contact, even at full health;
+asteroids bounce back into the world. Untowed asteroids pass through each other;
+only towed cargo turns an asteroid-to-asteroid overlap into a collision break.
 
 ## Lives and respawn
 

@@ -30,6 +30,7 @@ export interface GameEntity {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
+  boosting: boolean;
   color: string;
   lives: number;
   score: number;
@@ -185,6 +186,7 @@ export class EntityManager {
       angle: 0,
       exploding: false,
       thrusting: false,
+      boosting: false,
       color: PALETTE.REMOTE,
       lives: 3,
       score: 0,
@@ -228,6 +230,7 @@ export class EntityManager {
     if (entity.health <= 0 && wasAlive) {
       entity.exploding = true;
       entity.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
+      entity.boosting = false;
     }
 
     entity.lastUpdate = this.now();
@@ -358,6 +361,7 @@ export class EntityManager {
     entity.healthRegenTimer = 0;
 
     entity.exploding = false;
+    entity.boosting = false;
     delete entity.explodeTime;
     delete entity.deathCause;
 

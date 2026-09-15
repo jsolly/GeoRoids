@@ -27,7 +27,9 @@ Metal shards carry more mass than ice and rubble shards.
 
 Rubble can fragment into three uneven pieces when it breaks above size 20.
 Those fragments are below size 20 and do not multiply again. Ship collisions
-destroy an asteroid without using the laser split path. Splits and fragments
+destroy an asteroid without using the laser split path. A towed asteroid that
+overlaps another asteroid uses that same collision break on both rocks and
+drops the Hauler cable. Splits and fragments
 are part of the active sector's current population; sector loading does not
 impose a global asteroid cap.
 
@@ -54,7 +56,8 @@ Asteroid score is based on the rock size at the break. Every miner who damaged
 that rock and every Surveyor who identified it receives the full mining reward,
 including contributors who disconnected before the final hit. Chipped deposits
 retain their contributor history with the saved world. A collision break does
-not produce the collaboration split behavior.
+not produce the collaboration split behavior. Towed cargo that hits another
+rock uses this collision break rather than the laser split path.
 
 ## Reflection and charge
 

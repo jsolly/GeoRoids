@@ -64,6 +64,7 @@ class Ship {
   explodeTime = 0;
   angularVelocity = 0;
   thrusting = false;
+  boosting = false;
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
 
@@ -155,6 +156,7 @@ class Ship {
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
+    this.boosting = false;
     this.angularVelocity = 0;
     playExplosionSound(this.position);
 
@@ -211,6 +213,16 @@ class Ship {
 
     // Send shooting event to network system
     this.sendShootEvent(laser);
+  }
+
+  /** Tap or Shift toggles a stronger cruise; a dead hull always drops boost. */
+  toggleBoost(): boolean {
+    if (this.exploding || this.health <= 0) {
+      this.boosting = false;
+      return false;
+    }
+    this.boosting = !this.boosting;
+    return this.boosting;
   }
 
   /** Returns request submission when connected, or activation in offline play. */
@@ -392,19 +404,20 @@ class Ship {
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
     this.angle += this.angularVelocity;
-    const speed = cruiseSpeed(this.mass, this.maxVelocity);
+    const boost = this.boosting ? getShipKit(this.kitId).boostMultiplier : 1;
+    const speed = cruiseSpeed(this.mass, this.maxVelocity, boost);
     const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);
     if (this.knockbackVelocityLimit <= speed) {
       // Steering redirects normal momentum before thrust and terrain forces act.
       // A server-granted blast keeps its motion until the excess speed decays.
-      advanceCruiseVelocity(this, speed);
+      advanceCruiseVelocity(this, speed, boost);
     } else {
       this.velocity = applyThrustOrFriction(
         this.velocity,
         this.angle,
         this.thrusting,
         this.frictionCoefficient,
-        this.thrust,
+        this.thrust * boost,
         this.mass,
         velocityLimit
       );

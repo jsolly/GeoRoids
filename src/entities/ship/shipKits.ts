@@ -23,6 +23,8 @@ interface ShipKit {
   size: number;
   thrust: number;
   maxVelocity: number;
+  /** Multiplier on cruise speed and thrust while the Boost toggle is on. */
+  boostMultiplier: number;
   turnSpeed: number;
   shotCooldown: number;
 }
@@ -70,6 +72,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     size: SHIP.SIZE,
     thrust: SHIP.THRUST,
     maxVelocity: SHIP.MAX_VELOCITY,
+    boostMultiplier: 1.8,
     turnSpeed: 540,
     shotCooldown: 250,
   },
@@ -82,7 +85,8 @@ const KITS: Record<ShipKitId, ShipKit> = {
     maxHealth: 140,
     size: 38,
     thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
-    maxVelocity: 1.75 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
+    maxVelocity: SHIP.MAX_VELOCITY,
+    boostMultiplier: 1.35,
     turnSpeed: 380,
     shotCooldown: 280,
   },

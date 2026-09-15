@@ -1191,13 +1191,18 @@ export class GameEngine {
       this.handleSatellitePickupDamage(hit.pickupId, DAMAGE.LASER_HIT);
     }
 
+    const asteroids = this.asteroidManager.getAllAsteroids();
     const ramHits = this.collisionAuthority.collectShipAsteroidHits(
       entities,
-      this.asteroidManager.getAllAsteroids(),
+      asteroids,
       (shipId, asteroidId) => this.isActiveHarpoonTarget(shipId, asteroidId)
     );
     const destroyedAsteroids = new Set<string>();
+    const bumperKeys = this.resolveTowedAsteroidImpacts(entities, asteroids, destroyedAsteroids);
     for (const hit of ramHits) {
+      if (bumperKeys.has(`${hit.shipId}:${hit.asteroidId}`)) {
+        continue;
+      }
       const result = this.applyDirectedHit(hit.shipId, 'asteroid', DAMAGE.ASTEROID_COLLISION);
       if (!result) {
         continue;
@@ -1234,6 +1239,66 @@ export class GameEngine {
   private isActiveHarpoonTarget(shipId: string, asteroidId: string): boolean {
     const ship = this.entityManager.getEntity(shipId);
     return ship?.kitId === 'hauler' && ship.harpoonTargetId === asteroidId;
+  }
+
+  /**
+   * Towed cargo that overlaps another rock uses the ordinary collision break
+   * on both bodies and drops the cable. The Hauler is not rammed by a rock
+   * its cargo is already breaking this frame.
+   */
+  private resolveTowedAsteroidImpacts(
+    entities: GameEntity[],
+    asteroids: AsteroidData[],
+    destroyedAsteroids: Set<string>
+  ): Set<string> {
+    const towedOwners = new Map<string, string>();
+    const towedRocks: AsteroidData[] = [];
+    for (const entity of entities) {
+      if (entity.kitId !== 'hauler' || !entity.harpoonTargetId) {
+        continue;
+      }
+      const rock = this.asteroidManager.getAsteroid(entity.harpoonTargetId);
+      if (!rock || rock.health <= 0) {
+        continue;
+      }
+      towedOwners.set(rock.id, entity.id);
+      towedRocks.push(rock);
+    }
+    const bumperKeys = new Set<string>();
+    const cargoBreaks: AppliedAsteroidHit[] = [];
+    for (const hit of this.collisionAuthority.collectTowedAsteroidHits(towedRocks, asteroids)) {
+      const haulerId = towedOwners.get(hit.towedId);
+      if (!haulerId) {
+        continue;
+      }
+      bumperKeys.add(`${haulerId}:${hit.otherId}`);
+      const otherHaulerId = towedOwners.get(hit.otherId);
+      if (otherHaulerId) {
+        bumperKeys.add(`${otherHaulerId}:${hit.towedId}`);
+      }
+      for (const asteroidId of [hit.towedId, hit.otherId]) {
+        if (destroyedAsteroids.has(asteroidId)) {
+          continue;
+        }
+        const applied = this.applyLaserAsteroidHit(asteroidId, haulerId, 'collision');
+        if (!applied.applied || applied.outcome !== 'destroyed') {
+          continue;
+        }
+        destroyedAsteroids.add(asteroidId);
+        cargoBreaks.push(applied);
+      }
+    }
+    this.emitAsteroidHits(cargoBreaks);
+    return bumperKeys;
+  }
+
+  private releaseTowsAttachedTo(asteroidId: string): void {
+    for (const player of this.entityManager.getAllEntities()) {
+      if (player.harpoonTargetId === asteroidId) {
+        player.harpoonTargetId = null;
+        delete player.harpoonLatchPos;
+      }
+    }
   }
 
   private applyDirectedHit(
@@ -1295,6 +1360,7 @@ export class GameEngine {
         : this.asteroidManager.registerLaserHit(asteroidId, playerId, now, miningDamage);
 
     if (result.outcome === 'destroyed' && result.destroyed) {
+      this.releaseTowsAttachedTo(asteroidId);
       const points = pointsForRoidSize(result.destroyed.size);
       this.awardMiningPoints(
         playerId,
@@ -1363,6 +1429,7 @@ export class GameEngine {
   public flushExpiredCollabHits(now = this.getServerTime()): ExpiredCollabHit[] {
     const expired = this.asteroidManager.expireStaleHits(now);
     for (const item of expired) {
+      this.releaseTowsAttachedTo(item.destroyed.id);
       this.awardMiningPoints(item.playerId, item.points, item.contributors, []);
       this.dropShardAt(item.destroyed.position, asteroidShardMass(item.destroyed.material));
     }
@@ -1857,6 +1924,7 @@ export class GameEngine {
             angle: entity.angle,
             exploding: entity.exploding,
             thrusting: entity.thrusting,
+            boosting: entity.boosting,
             color: entity.color,
             lives: entity.lives,
             score: entity.score,
@@ -2023,12 +2091,7 @@ export class GameEngine {
           score,
         });
       }
-      for (const player of this.entityManager.getAllEntities()) {
-        if (player.harpoonTargetId === rock.id) {
-          player.harpoonTargetId = null;
-          delete player.harpoonLatchPos;
-        }
-      }
+      this.releaseTowsAttachedTo(rock.id);
       const delivery: FurnaceDelivery = {
         furnaceId: furnace.id,
         asteroidId: rock.id,
@@ -2071,6 +2134,7 @@ export class GameEngine {
     // Chip-to-zero is kits coop HP, not the 1s split window.
     const result = this.asteroidManager.destroyFromCollision(asteroidId);
     if (result.destroyed) {
+      this.releaseTowsAttachedTo(asteroidId);
       const points = pointsForRoidSize(result.destroyed.size);
       this.awardMiningPoints(
         playerId,

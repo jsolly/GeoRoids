@@ -33,11 +33,12 @@ server with a private resume token. Unsupported clients cannot join. The server
 owns projectile collisions, and clients render keyed projectile snapshots.
 Reflective phenomena are generated with each world sector and persist with its
 deposits during the current UTC month. Private resume tokens recover a
-browser's monthly score across disconnects, game over, and server restarts;
-they never restore ship placement or appear in the common public world. Enter
-Game after leaving starts a new flight with that score. A live reconnect while
-the ship still has lives keeps the current pose. At UTC month rollover, scores
-and the shared world both reset.
+browser's monthly score across disconnects, game over, and server restarts.
+They appear only on the joined socket, not in the common public world. A live
+reconnect while the ship still has lives keeps the current pose. After the
+socket is gone, Enter Game returns you to that ship for 30 seconds; a longer
+gap or game over starts a new flight with the monthly score. At UTC month
+rollover, scores and the shared world both reset.
 
 ## Updating open clients
 

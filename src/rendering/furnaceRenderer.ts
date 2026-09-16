@@ -38,7 +38,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 1.28,
     halfWidthScale: 0.62,
     lean: 0,
-    sway: 0.06,
+    sway: 0.087,
     speed: 0.85,
     phase: 0,
     color: PALETTE.LOOT,
@@ -50,7 +50,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 1.14,
     halfWidthScale: 0.44,
     lean: -0.02,
-    sway: 0.08,
+    sway: 0.116,
     speed: 1.2,
     phase: 0.8,
     color: PALETTE.LASER_LOCAL,
@@ -62,7 +62,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.94,
     halfWidthScale: 0.26,
     lean: -0.28,
-    sway: 0.13,
+    sway: 0.189,
     speed: 1.65,
     phase: 2.1,
     color: PALETTE.LASER_LOCAL,
@@ -74,7 +74,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.86,
     halfWidthScale: 0.24,
     lean: 0.3,
-    sway: 0.14,
+    sway: 0.203,
     speed: 1.5,
     phase: 3.9,
     color: PALETTE.LASER_LOCAL,
@@ -86,7 +86,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.74,
     halfWidthScale: 0.18,
     lean: -0.13,
-    sway: 0.12,
+    sway: 0.174,
     speed: 1.9,
     phase: 4.6,
     color: PALETTE.LASER_LOCAL,
@@ -98,7 +98,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.68,
     halfWidthScale: 0.17,
     lean: 0.14,
-    sway: 0.12,
+    sway: 0.174,
     speed: 2.15,
     phase: 0.4,
     color: PALETTE.LASER_LOCAL,
@@ -110,7 +110,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.6,
     halfWidthScale: 0.4,
     lean: 0.01,
-    sway: 0.05,
+    sway: 0.072,
     speed: 2.05,
     phase: 1.3,
     color: PALETTE.LASER_LOCAL,
@@ -122,7 +122,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.58,
     halfWidthScale: 0.14,
     lean: -0.47,
-    sway: 0.17,
+    sway: 0.246,
     speed: 2.3,
     phase: 5.2,
     color: PALETTE.LOOT,
@@ -134,7 +134,7 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     heightScale: 0.5,
     halfWidthScale: 0.13,
     lean: 0.49,
-    sway: 0.18,
+    sway: 0.261,
     speed: 2.5,
     phase: 6.4,
     color: PALETTE.LOOT,
@@ -266,10 +266,11 @@ function strokeFlames(
   seconds: number
 ): void {
   for (const tongue of FLAME_TONGUES) {
+    // Two detuned breaths per tongue: the fire surges and gutters instead of pulsing evenly.
     const roar =
-      0.86 +
-      Math.sin(seconds * 6.1 + tongue.phase) * 0.1 +
-      Math.sin(seconds * 11.3 + tongue.phase * 1.9) * 0.06;
+      0.82 +
+      Math.sin(seconds * 5.2 + tongue.phase) * 0.17 +
+      Math.sin(seconds * 9.7 + tongue.phase * 1.9) * 0.09;
     const contour = flameContour(
       x + radius * tongue.lean,
       mouthY,
@@ -316,7 +317,11 @@ function flameContour(
     const lateral = height * tongue.sway * rise * drift;
     const y = rootY - height * along;
     left.push({
-      x: rootX + lateral - width + width * 0.18 * Math.sin(along * 11 + seconds * 3 + tongue.phase),
+      x:
+        rootX +
+        lateral -
+        width +
+        width * 0.26 * Math.sin(along * 11 + seconds * 4.4 + tongue.phase),
       y,
     });
     right.push({
@@ -324,7 +329,7 @@ function flameContour(
         rootX +
         lateral +
         width +
-        width * 0.18 * Math.sin(along * 9.5 - seconds * 3.6 + tongue.phase * 2.3),
+        width * 0.26 * Math.sin(along * 9.5 - seconds * 5.1 + tongue.phase * 2.3),
       y,
     });
   }

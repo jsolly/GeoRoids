@@ -158,12 +158,10 @@ test('a discovered furnace burns a towering fire that fills the delivery zone', 
   expect(contours.some((path) => path.color === cream)).toBe(true);
 
   const tallest = contours.reduce((best, path) => (apexOf(path).y < apexOf(best).y ? path : best));
-  const apex = apexOf(tallest);
   const root = rootOf(tallest);
-  // Rises from the fire bed below center, up through most of the intake radius.
+  // Rises from a fire bed below center, up through the intake radius.
   expect(root.y).toBeGreaterThan(300);
-  expect(300 - apex.y).toBeGreaterThan(70);
-  expect(300 - apex.y).toBeLessThan(110);
+  expect(300 - apexOf(tallest).y).toBeGreaterThan(50);
 
   // The fire spreads across the hearth, and every tongue narrows at root and tip.
   expect(Math.max(...contours.map((path) => spanAt(path, 4)))).toBeGreaterThan(90);
@@ -176,6 +174,22 @@ test('a discovered furnace burns a towering fire that fills the delivery zone', 
     Math.abs(centerAt(tallest, step) - centerAt(tallest, 0))
   );
   expect(Math.max(...mirrored)).toBeGreaterThan(0.5);
+});
+
+test('the fire surges up the intake without escaping the delivery zone', () => {
+  const { ctx, strokes } = recordingContext();
+  const peaks: number[] = [];
+  for (let frame = 0; frame < 24; frame += 1) {
+    strokes.length = 0;
+    drawFurnaceArtwork(ctx, 300, 300, 100, frame * 50);
+    const contours = flameContours(strokes);
+    peaks.push(Math.max(...contours.map((path) => 300 - apexOf(path).y)));
+  }
+  // A surge climbs most of the 100-unit intake radius; nothing spills past the ring.
+  expect(Math.max(...peaks)).toBeGreaterThan(85);
+  expect(Math.max(...peaks)).toBeLessThan(110);
+  // It guts back down between surges rather than standing at one height.
+  expect(Math.min(...peaks)).toBeLessThan(Math.max(...peaks) - 15);
 });
 
 test('the furnace fire licks and breathes from frame to frame', () => {
@@ -199,8 +213,8 @@ test('the furnace fire licks and breathes from frame to frame', () => {
   const tipTravel = first.map((path, index) =>
     Math.abs(path.tipX - (second[index]?.tipX ?? path.tipX))
   );
-  expect(Math.max(...heightChange)).toBeGreaterThan(1);
-  expect(Math.max(...tipTravel)).toBeGreaterThan(1);
+  expect(Math.max(...heightChange)).toBeGreaterThan(4);
+  expect(Math.max(...tipTravel)).toBeGreaterThan(4);
   // The fire breathes rather than teleporting: it stays inside the intake.
   for (const { apex } of second) {
     expect(300 - apex).toBeLessThan(110);

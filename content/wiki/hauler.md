@@ -38,9 +38,11 @@ breaks, and the cable detaches. The Hauler stays unharmed by its own cargo,
 including when that cargo is the rock that hits another deposit. Spawn protection
 still prevents the ship impact. Untowed rocks pass through each other.
 
-Fly the towed asteroid into an arena furnace to deliver it. Delivery consumes
-the rock and awards the Hauler. If a Surveyor scanned the rock, the Hauler and
-each Surveyor contributor receive identical delivery points.
+Fly the towed asteroid into an arena furnace to deliver it. The furnace is a
+dashed delivery ring with a large ship-style hearth flame in the middle.
+Delivery consumes the rock and awards the Hauler. If a Surveyor scanned the
+rock, the Hauler and each Surveyor contributor receive identical delivery
+points.
 
 Hauler passive exploration reaches 260 world units and contributes to the same
 persistent crew chart as Surveyor. Use the shared chart to follow discovered

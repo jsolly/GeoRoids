@@ -75,6 +75,7 @@ import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
+import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
 import {
   polygonPoints,
   strokePhosphorPolyline,
@@ -757,7 +758,13 @@ function makeHaulerDemo(): Demo {
       );
       drawShip(ctx, 'surveyor', displaySurveyor, Math.PI / 2, PALETTE.REMOTE, 15);
       const furnaceScreen = screenPoint({ x: 0, y: 0 });
-      drawRing(ctx, { x: 0, y: 0 }, furnace.radius * displayScale, PALETTE.SATELLITE, 0.55);
+      drawFurnaceArtwork(
+        ctx,
+        furnaceScreen.x,
+        furnaceScreen.y,
+        furnace.radius * displayScale,
+        frame * VISUAL.THRUSTER_FLICKER_MS
+      );
       drawTag(ctx, furnace.name, furnaceScreen.x + 35, furnaceScreen.y - 20, PALETTE.SATELLITE);
       drawTag(
         ctx,

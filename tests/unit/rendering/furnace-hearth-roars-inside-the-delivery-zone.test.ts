@@ -1,9 +1,17 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { PALETTE, VISUAL } from '../../../src/constants';
+import { PALETTE } from '../../../src/constants';
 import { canvasManager } from '../../../src/rendering/canvas';
 import { drawFurnaceArtwork } from '../../../src/rendering/furnaceRenderer';
 import { hexToRgba } from '../../../src/utils/colorUtils';
 import { setWindowViewport } from '../../support/viewport';
+
+interface RecordedPath {
+  points: Array<{ x: number; y: number }>;
+  arcs: Array<Parameters<CanvasRenderingContext2D['arc']>>;
+  closed: boolean;
+  color: string;
+  width: number;
+}
 
 let restoreViewport = () => {};
 let canvas: HTMLCanvasElement | undefined;
@@ -39,13 +47,7 @@ function recordingContext() {
   let arcs: Array<Parameters<CanvasRenderingContext2D['arc']>> = [];
   let closed = false;
   const dashes: number[][] = [];
-  const strokes: Array<{
-    points: typeof points;
-    arcs: typeof arcs;
-    closed: boolean;
-    color: typeof ctx.strokeStyle;
-    width: number;
-  }> = [];
+  const strokes: RecordedPath[] = [];
   const begin = ctx.beginPath.bind(ctx);
   const move = ctx.moveTo.bind(ctx);
   const line = ctx.lineTo.bind(ctx);
@@ -84,7 +86,7 @@ function recordingContext() {
       points: [...points],
       arcs: [...arcs],
       closed,
-      color: ctx.strokeStyle,
+      color: String(ctx.strokeStyle),
       width: ctx.lineWidth,
     });
     Reflect.apply(stroke, ctx, args);
@@ -95,92 +97,112 @@ function recordingContext() {
 function canvasColor(ctx: CanvasRenderingContext2D, color: string): string {
   ctx.save();
   ctx.strokeStyle = color;
-  const normalized = ctx.strokeStyle;
+  const normalized = String(ctx.strokeStyle);
   ctx.restore();
   return normalized;
 }
 
-function openVStrokes(
-  strokes: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; color: unknown }>,
-  ctx: CanvasRenderingContext2D,
-  color: string
-) {
-  const ink = canvasColor(ctx, color);
-  return strokes.filter(
-    (path) => path.points.length === 3 && path.closed === false && path.color === ink
-  );
+/** Each tongue is a closed teardrop: left edge root→tip, then right edge tip→root. */
+function flameContours(strokes: RecordedPath[]): RecordedPath[] {
+  return strokes.filter((path) => path.closed && path.points.length >= 21);
 }
 
-function flameReach(path: { points: Array<{ x: number; y: number }> }): number {
-  const left = path.points[0];
-  const tip = path.points[1];
-  const right = path.points[2];
-  if (!left || !tip || !right) {
-    return 0;
+function apexOf(path: RecordedPath): { x: number; y: number } {
+  return path.points.reduce((highest, point) => (point.y < highest.y ? point : highest));
+}
+
+function rootOf(path: RecordedPath): { x: number; y: number } {
+  return path.points.reduce((lowest, point) => (point.y > lowest.y ? point : lowest));
+}
+
+/** Horizontal span between the two edges at the same height along the tongue. */
+function spanAt(path: RecordedPath, step: number): number {
+  const left = path.points[step];
+  const right = path.points[path.points.length - 1 - step];
+  if (!left || !right) {
+    throw new Error('flame contour is missing an edge sample');
   }
-  const rearX = (left.x + right.x) / 2;
-  const rearY = (left.y + right.y) / 2;
-  return Math.hypot(tip.x - rearX, tip.y - rearY);
+  return right.x - left.x;
 }
 
-test('a discovered furnace roars a ship-style hearth flame inside the delivery zone', () => {
+function centerAt(path: RecordedPath, step: number): number {
+  const left = path.points[step];
+  const right = path.points[path.points.length - 1 - step];
+  if (!left || !right) {
+    throw new Error('flame contour is missing an edge sample');
+  }
+  return (left.x + right.x) / 2;
+}
+
+test('a discovered furnace burns a towering fire that fills the delivery zone', () => {
   const { ctx, strokes, dashes } = recordingContext();
   const fill = vi.spyOn(ctx, 'fill');
-  drawFurnaceArtwork(ctx, 200, 220, 100, 0);
+  drawFurnaceArtwork(ctx, 300, 300, 100, 0);
 
   expect(
     dashes.some((segments) => segments.length === 2 && segments[0] === 10 && segments[1] === 6)
   ).toBe(true);
   expect(
     strokes.some((path) =>
-      path.arcs.some((arc) => arc[0] === 200 && arc[1] === 220 && arc[2] === 88)
+      path.arcs.some((arc) => arc[0] === 300 && arc[1] === 300 && arc[2] === 88)
     )
   ).toBe(true);
-
-  const laserFlames = openVStrokes(strokes, ctx, hexToRgba(PALETTE.LASER_LOCAL, 1));
-  const innerFlames = openVStrokes(strokes, ctx, hexToRgba(PALETTE.LASER_LOCAL, 0.95));
-  const haloFlames = openVStrokes(strokes, ctx, hexToRgba(PALETTE.LOOT, 0.46));
-  expect(laserFlames).toHaveLength(1);
-  expect(innerFlames).toHaveLength(1);
-  expect(haloFlames).toHaveLength(1);
-  const main = laserFlames[0];
-  if (!main) {
-    throw new Error('Hearth flame did not draw a center plume');
-  }
-  const left = main.points[0];
-  const tip = main.points[1];
-  const right = main.points[2];
-  if (!left || !tip || !right) {
-    throw new Error('Hearth flame did not draw an open V');
-  }
-  const rearY = (left.y + right.y) / 2;
-  expect(flameReach(main)).toBeGreaterThan(85);
-  expect(Math.hypot(left.x - right.x, left.y - right.y) / 2).toBeGreaterThan(35);
-  expect(tip.y).toBeLessThan(rearY);
-  expect(tip.y).toBeLessThan(220);
-
-  const coreInk = canvasColor(ctx, hexToRgba(PALETTE.LASER_LOCAL, 0.7));
-  const cores = strokes.filter(
-    (path) => path.points.length === 3 && path.closed === false && path.color === coreInk
-  );
-  const core = cores.reduce((longest, path) =>
-    flameReach(path) > flameReach(longest) ? path : longest
-  );
-  expect(flameReach(core) / flameReach(main)).toBeCloseTo(VISUAL.THRUSTER_CORE_RATIO, 5);
   expect(fill.mock.calls.length).toBeGreaterThan(0);
-  expect(laserFlames.every((path) => path.points.length === 3)).toBe(true);
+
+  const contours = flameContours(strokes);
+  expect(contours.length).toBeGreaterThanOrEqual(9);
+
+  const yellow = canvasColor(ctx, hexToRgba(PALETTE.LASER_LOCAL, 1));
+  const cream = canvasColor(ctx, hexToRgba(PALETTE.LOOT, 0.34));
+  expect(contours.some((path) => path.color === yellow)).toBe(true);
+  expect(contours.some((path) => path.color === cream)).toBe(true);
+
+  const tallest = contours.reduce((best, path) => (apexOf(path).y < apexOf(best).y ? path : best));
+  const apex = apexOf(tallest);
+  const root = rootOf(tallest);
+  // Rises from the fire bed below center, up through most of the intake radius.
+  expect(root.y).toBeGreaterThan(300);
+  expect(300 - apex.y).toBeGreaterThan(70);
+  expect(300 - apex.y).toBeLessThan(110);
+
+  // The fire spreads across the hearth, and every tongue narrows at root and tip.
+  expect(Math.max(...contours.map((path) => spanAt(path, 4)))).toBeGreaterThan(90);
+  const belly = spanAt(tallest, 4);
+  expect(spanAt(tallest, 0)).toBeLessThan(belly);
+  expect(spanAt(tallest, 16)).toBeLessThan(belly / 3);
+
+  // Real fire is not a mirrored chevron: the two edges ripple independently.
+  const mirrored = Array.from({ length: 17 }, (_, step) =>
+    Math.abs(centerAt(tallest, step) - centerAt(tallest, 0))
+  );
+  expect(Math.max(...mirrored)).toBeGreaterThan(0.5);
 });
 
-test('the hearth plume flickers shorter on the same clock as ship thrust', () => {
+test('the furnace fire licks and breathes from frame to frame', () => {
   const { ctx, strokes } = recordingContext();
-  drawFurnaceArtwork(ctx, 200, 220, 100, 0);
-  const longFlames = openVStrokes(strokes, ctx, hexToRgba(PALETTE.LASER_LOCAL, 1));
-  const longReach = Math.max(...longFlames.map((path) => flameReach(path)));
+  drawFurnaceArtwork(ctx, 300, 300, 100, 0);
+  const first = flameContours(strokes).map((path) => ({
+    apex: apexOf(path).y,
+    tipX: centerAt(path, 17),
+  }));
   strokes.length = 0;
-  drawFurnaceArtwork(ctx, 200, 220, 100, VISUAL.THRUSTER_FLICKER_MS);
-  const shortFlames = openVStrokes(strokes, ctx, hexToRgba(PALETTE.LASER_LOCAL, 1));
-  const shortReach = Math.max(...shortFlames.map((path) => flameReach(path)));
-  expect(shortReach).toBeLessThan(longReach);
-  expect(shortReach / longReach).toBeGreaterThan(0.65);
-  expect(shortReach / longReach).toBeLessThan(0.85);
+  drawFurnaceArtwork(ctx, 300, 300, 100, 420);
+  const second = flameContours(strokes).map((path) => ({
+    apex: apexOf(path).y,
+    tipX: centerAt(path, 17),
+  }));
+
+  expect(second).toHaveLength(first.length);
+  const heightChange = first.map((path, index) =>
+    Math.abs(path.apex - (second[index]?.apex ?? path.apex))
+  );
+  const tipTravel = first.map((path, index) =>
+    Math.abs(path.tipX - (second[index]?.tipX ?? path.tipX))
+  );
+  expect(Math.max(...heightChange)).toBeGreaterThan(1);
+  expect(Math.max(...tipTravel)).toBeGreaterThan(1);
+  // The fire breathes rather than teleporting: it stays inside the intake.
+  for (const { apex } of second) {
+    expect(300 - apex).toBeLessThan(110);
+  }
 });

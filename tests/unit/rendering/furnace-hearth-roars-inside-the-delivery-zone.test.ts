@@ -150,7 +150,8 @@ test('a discovered furnace burns a towering fire that fills the delivery zone', 
   expect(fill.mock.calls.length).toBeGreaterThan(0);
 
   const contours = flameContours(strokes);
-  expect(contours.length).toBeGreaterThanOrEqual(9);
+  const tongues = new Set(contours.map((path) => JSON.stringify(path.points)));
+  expect(tongues.size).toBeGreaterThanOrEqual(4);
 
   const yellow = canvasColor(ctx, hexToRgba(PALETTE.LASER_LOCAL, 1));
   const cream = canvasColor(ctx, hexToRgba(PALETTE.LOOT, 0.34));

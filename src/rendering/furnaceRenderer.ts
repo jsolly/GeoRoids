@@ -32,14 +32,17 @@ interface FlameTongue {
   readonly glowScale: number;
 }
 
-/** Overlapping tongues of different heights read as fire rather than one chevron. */
+/**
+ * A few big tongues, not a thicket: each one has to surge and gutter far enough
+ * that the outline of the whole fire changes, or the blaze reads as a decal.
+ */
 const FLAME_TONGUES: readonly FlameTongue[] = [
   {
-    heightScale: 1.28,
-    halfWidthScale: 0.62,
+    heightScale: 1.05,
+    halfWidthScale: 0.66,
     lean: 0,
-    sway: 0.087,
-    speed: 0.85,
+    sway: 0.1,
+    speed: 0.9,
     phase: 0,
     color: PALETTE.LOOT,
     alpha: 0.34,
@@ -47,100 +50,52 @@ const FLAME_TONGUES: readonly FlameTongue[] = [
     glowScale: 1.7,
   },
   {
-    heightScale: 1.14,
-    halfWidthScale: 0.44,
-    lean: -0.02,
-    sway: 0.116,
-    speed: 1.2,
-    phase: 0.8,
+    heightScale: 1,
+    halfWidthScale: 0.34,
+    lean: -0.05,
+    sway: 0.19,
+    speed: 1.35,
+    phase: 1.15,
     color: PALETTE.LASER_LOCAL,
     alpha: 0.95,
-    widthScale: 1.15,
-    glowScale: 1.3,
+    widthScale: 1.2,
+    glowScale: 1.35,
   },
   {
-    heightScale: 0.94,
-    halfWidthScale: 0.26,
-    lean: -0.28,
-    sway: 0.189,
-    speed: 1.65,
-    phase: 2.1,
+    heightScale: 0.92,
+    halfWidthScale: 0.27,
+    lean: -0.36,
+    sway: 0.26,
+    speed: 1.75,
+    phase: 3.2,
     color: PALETTE.LASER_LOCAL,
-    alpha: 0.82,
-    widthScale: 0.95,
-    glowScale: 1,
+    alpha: 0.85,
+    widthScale: 1,
+    glowScale: 1.1,
   },
   {
-    heightScale: 0.86,
-    halfWidthScale: 0.24,
-    lean: 0.3,
-    sway: 0.203,
-    speed: 1.5,
-    phase: 3.9,
+    heightScale: 0.88,
+    halfWidthScale: 0.25,
+    lean: 0.37,
+    sway: 0.28,
+    speed: 1.55,
+    phase: 5.1,
     color: PALETTE.LASER_LOCAL,
-    alpha: 0.82,
-    widthScale: 0.95,
-    glowScale: 1,
+    alpha: 0.85,
+    widthScale: 1,
+    glowScale: 1.1,
   },
   {
-    heightScale: 0.74,
-    halfWidthScale: 0.18,
-    lean: -0.13,
-    sway: 0.174,
-    speed: 1.9,
-    phase: 4.6,
-    color: PALETTE.LASER_LOCAL,
-    alpha: 0.7,
-    widthScale: 0.85,
-    glowScale: 0.95,
-  },
-  {
-    heightScale: 0.68,
-    halfWidthScale: 0.17,
-    lean: 0.14,
-    sway: 0.174,
-    speed: 2.15,
-    phase: 0.4,
-    color: PALETTE.LASER_LOCAL,
-    alpha: 0.7,
-    widthScale: 0.85,
-    glowScale: 0.95,
-  },
-  {
-    heightScale: 0.6,
-    halfWidthScale: 0.4,
+    heightScale: 0.52,
+    halfWidthScale: 0.44,
     lean: 0.01,
-    sway: 0.072,
-    speed: 2.05,
-    phase: 1.3,
+    sway: 0.08,
+    speed: 2.2,
+    phase: 2.4,
     color: PALETTE.LASER_LOCAL,
     alpha: 1,
-    widthScale: 0.9,
-    glowScale: 1.15,
-  },
-  {
-    heightScale: 0.58,
-    halfWidthScale: 0.14,
-    lean: -0.47,
-    sway: 0.246,
-    speed: 2.3,
-    phase: 5.2,
-    color: PALETTE.LOOT,
-    alpha: 0.5,
-    widthScale: 0.8,
-    glowScale: 0.9,
-  },
-  {
-    heightScale: 0.5,
-    halfWidthScale: 0.13,
-    lean: 0.49,
-    sway: 0.261,
-    speed: 2.5,
-    phase: 6.4,
-    color: PALETTE.LOOT,
-    alpha: 0.5,
-    widthScale: 0.8,
-    glowScale: 0.9,
+    widthScale: 0.95,
+    glowScale: 1.2,
   },
 ];
 
@@ -268,9 +223,9 @@ function strokeFlames(
   for (const tongue of FLAME_TONGUES) {
     // Two detuned breaths per tongue: the fire surges and gutters instead of pulsing evenly.
     const roar =
-      0.82 +
-      Math.sin(seconds * 5.2 + tongue.phase) * 0.17 +
-      Math.sin(seconds * 9.7 + tongue.phase * 1.9) * 0.09;
+      0.84 +
+      Math.sin(seconds * 4.6 + tongue.phase) * 0.28 +
+      Math.sin(seconds * 8.1 + tongue.phase * 1.7) * 0.13;
     const contour = flameContour(
       x + radius * tongue.lean,
       mouthY,
@@ -312,8 +267,8 @@ function flameContour(
     const width = halfWidth * (1 - along) ** 0.72 * belly;
     const rise = along ** 1.45;
     const drift =
-      Math.sin(rise * 3.1 + seconds * tongue.speed * 2 + tongue.phase) * 0.62 +
-      Math.sin(rise * 6.3 - seconds * tongue.speed * 3.1 + tongue.phase * 1.7) * 0.26;
+      Math.sin(rise * 3.1 + seconds * tongue.speed * 3.1 + tongue.phase) * 0.68 +
+      Math.sin(rise * 6.3 - seconds * tongue.speed * 4.7 + tongue.phase * 1.7) * 0.3;
     const lateral = height * tongue.sway * rise * drift;
     const y = rootY - height * along;
     left.push({

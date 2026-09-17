@@ -1,7 +1,12 @@
-import type { ShipKitId } from '../../shared-types';
+import type { HaulerUtilityId, ShipKitId } from '../../shared-types';
+import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
+const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
+  resource_tap: 'TAP',
+  tow_cable: 'HOOK',
+};
 
 type AbilityChromeHost = {
   kitId: ShipKitId | string;
@@ -10,6 +15,7 @@ type AbilityChromeHost = {
   abilityCooldownFrames: number;
   abilityActiveFrames: number;
   harpoonTargetId?: string | null;
+  haulerUtility?: HaulerUtilityId | null;
 };
 
 type AbilityChromeState = {
@@ -49,10 +55,12 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
   const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
+  const readyLabel =
+    kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
     towing || (Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0);
   return {
-    label: towing ? 'RELEASE' : ABILITY_LABEL[kit.abilityId],
+    label: towing ? 'RELEASE' : readyLabel,
     name: towing ? 'Release asteroid' : touchAbilityName(kit.id),
     ready: alive && (towing || !cooling),
     active,

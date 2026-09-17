@@ -11,8 +11,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
-| hauler | Ships | Stats scorecard, shared cruise, weaker Boost, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
-| loot-growth | Systems | Loot mass, reflective core, shoot-a-drop blast |
+| hauler | Ships | Stats scorecard, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
+| loot-growth | Systems | Loot mass, Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
 | satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
@@ -25,6 +25,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Player question | Article | Primary source families |
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
+| How do I open the Hauler schematic and swap Tap vs Tow? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
@@ -70,7 +71,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 ## Known rule discrepancies and maintenance notes
 
 - Hauler E uses a fixed 280-unit hull-gap reach and selects only a living
-  asteroid. E again releases the persistent tow cable. The asteroid
+  asteroid. The equipped utility is Resource Tap or Tow Cable. Resource Tap
+  extracts a canister after 90 frames and leaves the rock intact. E again
+  releases the persistent tow cable. The asteroid
   keeps its momentum and trails behind normal Hauler movement; the cable applies
   a correction only while stretched and never reels or throws the rock. A towed
   successful attachment starts the three-second ability cooldown, but E again

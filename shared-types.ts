@@ -32,6 +32,9 @@ export interface Velocity {
 /** Chosen at join. Shared by every player ship. */
 export type ShipKitId = 'surveyor' | 'hauler';
 
+/** Hauler v1 utility slot. Same E key; one option active. */
+export type HaulerUtilityId = 'resource_tap' | 'tow_cable';
+
 export interface PlayerUpdate {
   id: string;
   name: string;
@@ -151,8 +154,8 @@ export interface AsteroidData {
   phenomenon?: AsteroidPhenomenon;
 }
 
-/** Shared world pickups. Kill loot is wreckage; destroy-drop is shard. */
-export type LootKind = 'shard' | 'wreckage' | 'laserCore';
+/** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
+export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -286,6 +289,8 @@ export interface ServerEntityData {
 
   harpoonTargetId?: string | null;
   harpoonLatchPos?: Position;
+  /** Equipped Hauler utility. Omitted on other kits. Missing means tow cable. */
+  haulerUtility?: HaulerUtilityId;
   /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;

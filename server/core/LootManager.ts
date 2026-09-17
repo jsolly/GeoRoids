@@ -69,6 +69,22 @@ export class LootManager {
     return drop ? this.toPublic(drop) : undefined;
   }
 
+  /** One canister from a finished Resource Tap. The rock stays in the field. */
+  public spawnTap(position: Position, gameTime: number): LootData {
+    const drop: TrackedLoot = {
+      id: `tap-${this.nextId++}`,
+      position: { x: position.x, y: position.y },
+      mass: GROWTH.TAP_LOOT_MASS,
+      radius: GROWTH.TAP_LOOT_RADIUS,
+      kind: 'tap',
+      expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+      velocity: { x: 0, y: 0 },
+    };
+    this.loot.set(drop.id, drop);
+    this.enforceCap();
+    return this.toPublic(drop);
+  }
+
   public spawnLaserCore(position: Position, gameTime: number): LootData {
     const drop: TrackedLoot = {
       id: `core-${this.nextId++}`,
@@ -123,9 +139,19 @@ export class LootManager {
   public expire(gameTime: number, collectors: readonly GameEntity[] = []): void {
     const liveCollectors = collectors.filter((entity) => canCollectLoot(entity));
     const magnetPositions = liveCollectors.map((entity) => entity.position);
+    const haulerPositions = liveCollectors
+      .filter((entity) => entity.kitId === 'hauler')
+      .map((entity) => entity.position);
 
     for (const [id, drop] of this.loot) {
-      addLootMagnetPull(drop, magnetPositions);
+      if (drop.kind === 'tap' && haulerPositions.length > 0) {
+        addLootMagnetPull(drop, haulerPositions, {
+          range: GROWTH.TAP_LOOT_MAGNET_RANGE,
+          accel: GROWTH.TAP_LOOT_MAGNET_ACCEL,
+        });
+      } else {
+        addLootMagnetPull(drop, magnetPositions);
+      }
       drop.position.x += drop.velocity.x;
       drop.position.y += drop.velocity.y;
       drop.velocity.x *= GROWTH.LOOT_DRAG;

@@ -161,7 +161,11 @@ test(
 
     await haulerPage.setViewportSize({ width: 1280, height: 900 });
     await surveyorPage.setViewportSize({ width: 390, height: 844 });
-    await hauler.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    await hauler.bootGame({
+      kitId: 'hauler',
+      haulerUtility: 'tow_cable',
+      waitForCombatReady: false,
+    });
     await surveyor.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
 
     const haulerId = await hauler.getLocalPlayerId();

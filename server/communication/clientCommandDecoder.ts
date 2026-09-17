@@ -1,6 +1,13 @@
 import { readReleaseId } from '../../shared/releaseId';
 import { WORLD } from '../../shared/world';
-import type { PingMessage, Position, ShipKitId, Velocity } from '../../shared-types';
+import type {
+  HaulerUtilityId,
+  PingMessage,
+  Position,
+  ShipKitId,
+  Velocity,
+} from '../../shared-types';
+import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
@@ -36,6 +43,11 @@ export type ClientCommand =
       id: string;
       kitId?: ShipKitId;
       abilityId?: string;
+    }
+  | {
+      type: 'setHaulerUtility';
+      id: string;
+      utilityId: HaulerUtilityId;
     }
   | {
       type: 'update';
@@ -273,6 +285,15 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return decodeUpdate(id, fields);
     case 'useAbility':
       return decodeUseAbility(id, fields);
+    case 'setHaulerUtility': {
+      if (!id) {
+        return invalid(type, 'Missing player ID for setHaulerUtility');
+      }
+      const utilityId = fields['utilityId'];
+      return isHaulerUtilityId(utilityId)
+        ? { ok: true, command: { type, id, utilityId } }
+        : invalid(type, 'Invalid Hauler utility');
+    }
     case 'shoot': {
       if (!id) {
         return invalid(type, 'Missing player ID for shoot');

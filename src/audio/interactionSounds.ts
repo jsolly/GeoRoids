@@ -51,6 +51,7 @@ export function playLootPickup(kind: LootKind, position?: Position): void {
       return;
     case 'shard':
     case 'wreckage':
+    case 'tap':
       playInteraction(fxLootPickup, position);
       return;
   }

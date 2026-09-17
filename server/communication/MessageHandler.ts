@@ -76,6 +76,10 @@ export class MessageHandler {
           this.handleUseAbility(ws, command);
           break;
 
+        case 'setHaulerUtility':
+          this.handleSetHaulerUtility(ws, command);
+          break;
+
         case 'update':
           this.handlePlayerUpdate(ws, command);
           break;
@@ -411,6 +415,17 @@ export class MessageHandler {
     if (before) {
       this.emitShipDamage(targetPlayerId, 'boundary', before.health, before.health);
     }
+  }
+
+  private handleSetHaulerUtility(ws: WebSocket, command: CommandOf<'setHaulerUtility'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id || socketPlayer.kitId !== 'hauler') {
+      return;
+    }
+    if (!this.gameEngine.setHaulerUtility(command.id, command.utilityId)) {
+      return;
+    }
+    this.broadcaster.broadcastGameState();
   }
 
   private handleUseAbility(ws: WebSocket, command: CommandOf<'useAbility'>): void {

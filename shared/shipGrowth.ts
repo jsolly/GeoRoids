@@ -19,6 +19,12 @@ export const GROWTH = {
   SHARD_SCORE: 5,
   MAX_PELLETS: 7,
   LOOT_RADIUS: 12,
+  /** Outline canister from a Resource Tap extract. ~2.3× normal loot. */
+  TAP_LOOT_RADIUS: 28,
+  TAP_LOOT_MASS: 0.4,
+  TAP_LOOT_SCORE: 8,
+  TAP_LOOT_MAGNET_RANGE: 160,
+  TAP_LOOT_MAGNET_ACCEL: 0.4 * GAME.MOTION_SCALE,
   /** Pull loot toward living ships from beyond hull overlap without inflating the hull. */
   LOOT_MAGNET_RANGE: 96,
   LOOT_DRAG: 0.92,
@@ -137,9 +143,12 @@ export function lootOverlap(
 /** Add magnet acceleration toward the nearest collector. Leaves existing velocity intact. */
 export function addLootMagnetPull(
   drop: { position: Position; velocity: { x: number; y: number } },
-  collectorPositions: readonly Position[]
+  collectorPositions: readonly Position[],
+  options?: { range?: number; accel?: number }
 ): boolean {
-  const rangeSq = GROWTH.LOOT_MAGNET_RANGE * GROWTH.LOOT_MAGNET_RANGE;
+  const range = options?.range ?? GROWTH.LOOT_MAGNET_RANGE;
+  const accel = options?.accel ?? GROWTH.LOOT_MAGNET_ACCEL;
+  const rangeSq = range * range;
   let best: { dx: number; dy: number; distSq: number } | undefined;
   for (const collector of collectorPositions) {
     const dx = collector.x - drop.position.x;
@@ -155,7 +164,7 @@ export function addLootMagnetPull(
   if (!best) {
     return false;
   }
-  const scale = GROWTH.LOOT_MAGNET_ACCEL / Math.sqrt(best.distSq);
+  const scale = accel / Math.sqrt(best.distSq);
   drop.velocity.x += best.dx * scale;
   drop.velocity.y += best.dy * scale;
   return true;

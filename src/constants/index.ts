@@ -130,6 +130,9 @@ export const VISUAL = {
   STAR_ALPHA_MAX: 0.8,
   LOOT_STROKE_WIDTH: 2,
   LOOT_GLOW: 2,
+  /** Tap canister aura is slightly larger than stroke, still hairline-adjacent. */
+  TAP_LOOT_GLOW: 2.5,
+  TAP_LOOT_PULSE_MS: 1200,
   LOOT_UNDERSTROKE: 3.5,
   LOOT_SHARD_INNER: 0.42,
   LOOT_SHARD_DENSE_INNER: 0.68,

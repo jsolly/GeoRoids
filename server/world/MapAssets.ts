@@ -18,14 +18,15 @@ export class MapAssets {
       name: furnace.name,
     }));
     for (const drop of loot) {
-      if (drop.kind !== 'shard') {
-        candidates.push({
-          id: `loot:${drop.id}`,
-          kind: drop.kind,
-          position: drop.position,
-          name: drop.kind === 'laserCore' ? 'Laser core' : 'Salvage',
-        });
+      if (drop.kind === 'shard' || drop.kind === 'tap') {
+        continue;
       }
+      candidates.push({
+        id: `loot:${drop.id}`,
+        kind: drop.kind,
+        position: drop.position,
+        name: drop.kind === 'laserCore' ? 'Laser core' : 'Salvage',
+      });
     }
     for (const pickup of pickups) {
       if (pickup.state === 'loose') {

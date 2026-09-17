@@ -1,5 +1,5 @@
 import { radiusFromMass } from '../../../shared/shipGrowth';
-import type { Position, ShipKitId } from '../../../shared-types';
+import type { HaulerUtilityId, Position, ShipKitId } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
 import type { PlayerInput } from '../../input/PlayerInput';
@@ -120,6 +120,7 @@ export class Player {
 
     harpoonTargetId?: string | null;
     harpoonLatchPos?: { x: number; y: number };
+    haulerUtility?: HaulerUtilityId;
   }): void {
     // Local selection is established at join. Preserve it during runtime reconciliation.
     if (data.kitId && data.kitId !== this.ship.kitId && this.type !== 'local') {
@@ -330,6 +331,9 @@ export class Player {
       ...(data.harpoonTargetId !== undefined ? { harpoonTargetId: data.harpoonTargetId } : {}),
       ...(data.harpoonLatchPos !== undefined ? { harpoonLatchPos: data.harpoonLatchPos } : {}),
     });
+    if (data.haulerUtility !== undefined && this.type !== 'local') {
+      this.ship.haulerUtility = data.haulerUtility;
+    }
     // Handle respawn timer from server
     if (data.respawnTimer !== undefined) {
       // When respawnTimer is 0, the server has finished the countdown. Remote

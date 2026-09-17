@@ -1,5 +1,7 @@
 import type { Page } from 'playwright';
 import { WORLD } from '../../../shared/world';
+import type { HaulerUtilityId } from '../../../shared-types';
+import { HAULER_UTILITY_STORAGE_KEY } from '../../../src/entities/ship/haulerUtility';
 import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
 import { getWorldDiagnostics, placePlayer } from './test-server-control';
@@ -1254,8 +1256,17 @@ export class GameInteractions {
   async bootGame(options?: {
     waitForCombatReady?: boolean;
     kitId?: 'surveyor' | 'hauler';
+    haulerUtility?: HaulerUtilityId;
   }): Promise<void> {
     await this.navigateToGame();
+    if (options?.haulerUtility) {
+      await this.page.evaluate(
+        ({ key, utility }) => {
+          localStorage.setItem(key, utility);
+        },
+        { key: HAULER_UTILITY_STORAGE_KEY, utility: options.haulerUtility }
+      );
+    }
     if (options?.kitId) {
       const kitButton = this.page.locator(`[data-kit-id="${options.kitId}"]`);
       await kitButton.waitFor({ state: 'visible', timeout: 5000 });
@@ -1265,6 +1276,13 @@ export class GameInteractions {
     await this.waitForGameReady();
     await this.waitForServerJoin();
     await this.waitForNetworkAsteroids(1);
+    if (options?.haulerUtility) {
+      await this.page.waitForFunction(
+        (utility) => window.gameController?.getCurrPlayer()?.ship.haulerUtility === utility,
+        options.haulerUtility,
+        { timeout: 5000 }
+      );
+    }
     if (options?.waitForCombatReady !== false) {
       await this.waitForCombatReady();
     }

@@ -1,6 +1,12 @@
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvas';
+import {
+  isPointerOnLocalHauler,
+  isShipSchematicOpen,
+  openShipSchematic,
+  SHIP_SCHEMATIC_LONG_PRESS_MS,
+} from '../ui/shipSchematic';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
@@ -17,6 +23,7 @@ const TAP_MAX_MS = 220;
 const TAP_SLOP_PX = 12;
 let steerPointerId: number | null = null;
 let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
+let schematicHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
@@ -32,6 +39,11 @@ export function setTouchHeading(player: Player, heading: number | null): void {
 }
 
 export function setTouchFire(player: Player, held: boolean): void {
+  if (isShipSchematicOpen()) {
+    controlSources.touchFire = false;
+    player.ship.canShoot = true;
+    return;
+  }
   if (!held) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
@@ -49,7 +61,7 @@ export function setTouchFire(player: Player, held: boolean): void {
 }
 
 export function triggerTouchAbility(player: Player): boolean {
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (isShipSchematicOpen() || player.lives <= 0 || player.ship.exploding) {
     return false;
   }
   return player.ship.activateAbility();
@@ -198,6 +210,13 @@ function clearSteerHoldTimer(): void {
   }
 }
 
+function clearSchematicHoldTimer(): void {
+  if (schematicHoldTimer !== null) {
+    clearTimeout(schematicHoldTimer);
+    schematicHoldTimer = null;
+  }
+}
+
 /** Clear every pointer source when the browser takes the gesture away. */
 function resetTouchInteraction(player: Player | null): void {
   const canvas = canvasManager.getCanvas();
@@ -209,6 +228,7 @@ function resetTouchInteraction(player: Player | null): void {
   const activeBoostPointerId = boostPointerId;
   steerPointerId = null;
   clearSteerHoldTimer();
+  clearSchematicHoldTimer();
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
@@ -314,6 +334,17 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
       steerTap = null;
       moveSteering(ev);
     }, TAP_MAX_MS);
+    if (isPointerOnLocalHauler(ev.clientX, ev.clientY)) {
+      schematicHoldTimer = setTimeout(() => {
+        schematicHoldTimer = null;
+        if (steerTap) {
+          steerTap.canFire = false;
+        }
+        if (openShipSchematic()) {
+          resetTouchInteraction(player);
+        }
+      }, SHIP_SCHEMATIC_LONG_PRESS_MS);
+    }
   } else {
     moveSteering(ev);
   }
@@ -328,6 +359,7 @@ function onSteerPointerMove(ev: PointerEvent): void {
     return;
   }
   clearSteerHoldTimer();
+  clearSchematicHoldTimer();
   steerTap = null;
   moveSteering(ev);
 }
@@ -349,6 +381,7 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
     Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX;
   steerPointerId = null;
   clearSteerHoldTimer();
+  clearSchematicHoldTimer();
   steerTap = null;
   releasePointerCapture(canvasManager.getCanvas(), ev.pointerId);
   const player = requireLocalPlayer();
@@ -537,6 +570,7 @@ export function initializeTouchControls(): void {
   // A modal universe map can cover the playfield while the game keeps cruising.
   // Drop any active touch gesture before the dialog takes pointer ownership.
   window.addEventListener('gameMapOpen', () => resetTouchInteraction(requireLocalPlayer()));
+  window.addEventListener('gameSchematicOpen', () => resetTouchInteraction(requireLocalPlayer()));
   window.addEventListener('resize', () => syncTouchChrome());
   window.addEventListener('orientationchange', () => {
     resetTouchInteraction(requireLocalPlayer());

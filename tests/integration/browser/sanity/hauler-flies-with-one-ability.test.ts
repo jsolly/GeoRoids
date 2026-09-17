@@ -67,7 +67,11 @@ test.each([
       });
     });
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    await game.bootGame({
+      kitId: 'hauler',
+      haulerUtility: 'tow_cable',
+      waitForCombatReady: false,
+    });
     const playerId = await game.getLocalPlayerId();
     await arrangeCrewField([playerId], 'delivery');
     await page.waitForFunction(

@@ -31,7 +31,9 @@ named optional fields. An omitted field is unchanged. Collection patches contain
 `add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
 `order` (complete ID order when membership/order changes). Empty arrays are
 complete empty collections. Removed remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
-Harpoon attachments persist until release, delivery, target removal, death or
+Hauler snapshots include optional `haulerUtility` (`resource_tap` or
+`tow_cable`; missing means tow cable). Loot kind `tap` is a Resource Tap
+canister. Harpoon attachments persist until release, delivery, target removal, death or
 excessive cable separation. An explicit null target clears the client's cached
 latch. Reconnection uses authoritative attachment state and never replays an
 ability request.

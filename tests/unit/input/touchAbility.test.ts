@@ -63,6 +63,20 @@ test('touch E routes through the live ship action', () => {
   expect(surveyor.ship.abilityCooldownFrames).toBeGreaterThan(0);
 });
 
+test('Hauler ready chrome follows the equipped utility', () => {
+  const host = {
+    kitId: 'hauler' as const,
+    exploding: false,
+    health: 140,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    harpoonTargetId: null,
+  };
+  expect(readAbilityChrome(host).label).toBe('HOOK');
+  expect(readAbilityChrome({ ...host, haulerUtility: 'tow_cable' }).label).toBe('HOOK');
+  expect(readAbilityChrome({ ...host, haulerUtility: 'resource_tap' }).label).toBe('TAP');
+});
+
 test('a Hauler can release cargo while the attachment cooldown is running', () => {
   const host = {
     kitId: 'hauler',

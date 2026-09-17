@@ -149,13 +149,16 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('lootCollected', collection);
       expect(played).toHaveLength(2);
       expect(played[1]).toMatch(/sounds\/loot-pickup\.m4a$/);
+      ws.receive('lootCollected', { ...collection, lootId: 'tap-canister', kind: 'tap' });
+      expect(played).toHaveLength(3);
+      expect(played[2]).toMatch(/sounds\/loot-pickup\.m4a$/);
       ws.receive('lootCollected', { ...collection, lootId: 'invalid-kind', kind: 'unknown' });
       ws.receive('lootCollected', {
         ...collection,
         lootId: 'distant-loot',
         position: { x: 10000, y: 0 },
       });
-      expect(played).toHaveLength(2);
+      expect(played).toHaveLength(3);
       setSound(false);
       ws.receive('playerShotFired', {
         id: 'muted-shot',
@@ -163,13 +166,13 @@ describe('actual ConnectionManager WebSocket message path', () => {
         position: { x: 30, y: 0 },
       });
       ws.receive('lootCollected', { ...collection, lootId: 'muted-loot' });
-      expect(played).toHaveLength(2);
+      expect(played).toHaveLength(3);
       manager.disconnect();
       const reconnected = await connect();
       acknowledge(reconnected);
       setSound(true);
       reconnected.receive('lootCollected', collection);
-      expect(played).toHaveLength(3);
+      expect(played).toHaveLength(4);
     } finally {
       resetGameAudio();
       setSound(false);

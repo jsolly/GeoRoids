@@ -14,6 +14,7 @@ import {
 import { hexToRgba, laserBoltColor } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
 import { findHarpoonFieldBody } from './harpoonField';
+import { isResourceTapUtility } from './haulerUtility';
 import {
   getKitHullOutline,
   projectHullPoint,
@@ -655,6 +656,19 @@ export function drawHaulerHarpoonVfx(
   ctx.arc(latch.x, latch.y, style.tipRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  if (isResourceTapUtility(ship)) {
+    const now = typeof performance !== 'undefined' ? performance.now() : 0;
+    const cycle = (now / 1000) % 1;
+    for (let i = 0; i < 5; i++) {
+      const u = (cycle + i / 5) % 1;
+      const x = latch.x + (screenX - latch.x) * u;
+      const y = latch.y + (screenY - latch.y) * u;
+      ctx.fillStyle = i === 4 ? '#FDE68A' : '#E8D5A3';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 

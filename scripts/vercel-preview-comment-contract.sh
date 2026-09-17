@@ -39,7 +39,10 @@ assert_skip() {
 }
 
 assert_match 'bare command' '/preview'
+assert_match 'leading space' ' /preview'
+assert_match 'trailing space' '/preview '
 assert_match 'leading blank line' $'\n\n/preview\n'
+assert_match 'spaces-only then command' $'   \n/preview'
 assert_match 'trailing notes' $'/preview\n\nplease build this PR\n'
 assert_match 'windows newlines' $'/preview\r\nnext line\r\n'
 

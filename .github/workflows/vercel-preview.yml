@@ -30,15 +30,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (
-        github.event.issue.pull_request &&
-        github.event.comment.user.type == 'User' &&
-        contains(github.event.comment.body, '/preview') &&
+        github.event_name == 'workflow_dispatch' ||
         (
-          github.event.comment.author_association == 'OWNER' ||
-          github.event.comment.author_association == 'MEMBER' ||
-          github.event.comment.author_association == 'COLLABORATOR'
+          github.event.issue.pull_request &&
+          github.event.comment.user.type == 'User' &&
+          contains(github.event.comment.body, '/preview') &&
+          (
+            github.event.comment.author_association == 'OWNER' ||
+            github.event.comment.author_association == 'MEMBER' ||
+            github.event.comment.author_association == 'COLLABORATOR'
+          )
         )
       )
     env:
@@ -61,6 +64,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          fail_resolve() {
+            {
+              echo "error<<PREVIEW_ERROR_EOF"
+              printf '%s\n' "$1"
+              echo "PREVIEW_ERROR_EOF"
+              echo "skip=false"
+            } >>"$GITHUB_OUTPUT"
+            echo "$1" >&2
+            exit 1
+          }
+
           if [[ "$EVENT_NAME" == "issue_comment" ]]; then
             if [[ ! -x scripts/vercel-preview-comment.sh ]]; then
               echo "scripts/vercel-preview-comment.sh is missing or not executable" >&2
@@ -75,17 +89,22 @@ jobs:
               echo "skip=true" >>"$GITHUB_OUTPUT"
               exit 0
             fi
-            if [[ "$matcher_status" -ne 0 ]]; then
-              echo "Preview comment matcher failed with exit ${matcher_status}" >&2
+            pr_number="$ISSUE_NUMBER"
+            if [[ ! "$pr_number" =~ ^[1-9][0-9]*$ ]]; then
+              echo "Invalid pull request number: ${pr_number:-empty}" >&2
               exit 1
             fi
-            pr_number="$ISSUE_NUMBER"
+            echo "pr_number=${pr_number}" >>"$GITHUB_OUTPUT"
+            if [[ "$matcher_status" -ne 0 ]]; then
+              fail_resolve "Preview comment matcher failed with exit ${matcher_status}"
+            fi
           else
             pr_number="$DISPATCH_PR"
-          fi
-          if [[ ! "$pr_number" =~ ^[1-9][0-9]*$ ]]; then
-            echo "Invalid pull request number: ${pr_number:-empty}" >&2
-            exit 1
+            if [[ ! "$pr_number" =~ ^[1-9][0-9]*$ ]]; then
+              echo "Invalid pull request number: ${pr_number:-empty}" >&2
+              exit 1
+            fi
+            echo "pr_number=${pr_number}" >>"$GITHUB_OUTPUT"
           fi
 
           pr_json="$(gh api "repos/${REPO}/pulls/${pr_number}")"
@@ -95,49 +114,44 @@ jobs:
           head_repo="$(printf '%s\n' "$pr_json" | jq -r '.head.repo.full_name // empty')"
 
           if [[ "$state" != "open" ]]; then
-            echo "PR ${pr_number} is ${state}; not deploying." >&2
-            exit 1
+            fail_resolve "PR ${pr_number} is ${state}; not deploying."
           fi
           if [[ "$head_repo" != "$REPO" ]]; then
-            echo "PR ${pr_number} head repo ${head_repo} is not ${REPO}; not deploying forks." >&2
-            exit 1
+            fail_resolve "PR ${pr_number} head repo ${head_repo} is not ${REPO}; not deploying forks."
           fi
           if [[ ! "$head_sha" =~ ^[a-f0-9]{40}$ ]]; then
-            echo "PR head SHA is not a 40-character hex commit: ${head_sha}" >&2
-            exit 1
+            fail_resolve "PR head SHA is not a 40-character hex commit: ${head_sha}"
           fi
           if [[ ! "$head_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "PR head ref is not an allowed branch name: ${head_ref}" >&2
-            exit 1
+            fail_resolve "PR head ref is not an allowed branch name: ${head_ref}"
           fi
 
           {
-            echo "pr_number=${pr_number}"
             echo "head_sha=${head_sha}"
             echo "head_ref=${head_ref}"
             echo "skip=false"
           } >>"$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v7
-        if: ${{ steps.pr.outputs.skip != 'true' }}
+        if: ${{ steps.pr.outputs.skip != 'true' && steps.pr.outputs.head_sha != '' }}
         with:
           ref: ${{ steps.pr.outputs.head_sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v6
-        if: ${{ steps.pr.outputs.skip != 'true' }}
+        if: ${{ steps.pr.outputs.skip != 'true' && steps.pr.outputs.head_sha != '' }}
         with:
           node-version-file: .nvmrc
 
       - name: Install Vercel CLI
-        if: ${{ steps.pr.outputs.skip != 'true' }}
+        if: ${{ steps.pr.outputs.skip != 'true' && steps.pr.outputs.head_sha != '' }}
         working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/vercel-cli" --omit=dev --no-fund --ignore-scripts vercel@59.20.0
 
       - name: Deploy the Preview
-        if: ${{ steps.pr.outputs.skip != 'true' }}
+        if: ${{ steps.pr.outputs.skip != 'true' && steps.pr.outputs.head_sha != '' }}
         id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -217,6 +231,7 @@ jobs:
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
           DEPLOY_ERROR: ${{ steps.deploy.outputs.error }}
+          RESOLVE_ERROR: ${{ steps.pr.outputs.error }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         run: |
           set -euo pipefail
@@ -235,7 +250,7 @@ jobs:
             exit 0
           fi
 
-          reason="${DEPLOY_ERROR:-Preview deploy failed.}"
+          reason="${DEPLOY_ERROR:-${RESOLVE_ERROR:-Preview deploy failed.}}"
           comment "$(
             printf '%s\n\n%s\n' \
               "Preview for \`${HEAD_REF:-unknown}\` (\`${HEAD_SHA:-unknown}\`) failed." \

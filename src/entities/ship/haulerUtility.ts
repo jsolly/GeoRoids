@@ -8,7 +8,7 @@ export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'resource_tap';
 /** Missing snapshot / legacy host keeps the existing tow cable. */
 export const UNSET_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 
-const HAULER_UTILITY_STORAGE_KEY = 'georoids.haulerUtility';
+export const HAULER_UTILITY_STORAGE_KEY = 'georoids.haulerUtility';
 
 export const HAULER_UTILITY = {
   resource_tap: {

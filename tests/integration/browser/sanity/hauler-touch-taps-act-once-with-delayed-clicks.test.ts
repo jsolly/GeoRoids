@@ -79,7 +79,11 @@ for (const browserType of [chromium, webkit]) {
         });
 
         const game = new GameInteractions(page);
-        await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+        await game.bootGame({
+          kitId: 'hauler',
+          haulerUtility: 'tow_cable',
+          waitForCombatReady: false,
+        });
         await arrangeCrewField([await game.getLocalPlayerId()], 'delivery');
         await page.waitForFunction(() =>
           window.gameController

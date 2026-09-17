@@ -1,5 +1,5 @@
 {
-  "note": "dependabot: vite 8.2.2→8.3.0. package.json digest only. Changelog is additive (preload perf, CRLF frames, node_modules path segments, proxy matcher compile); no wiki copy or media change.",
+  "note": "dependabot: vite 8.2.2→8.3.0 after main (@vercel/functions 3.9.7). package.json digest only; no wiki copy or media change.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:b9cda885acb38a36c3954535bcce181c6c5a755e654cf3b98b155cd5a0e0da69",
@@ -7,7 +7,7 @@
     "index.css": "sha256:8957f9cf386430c1ae82e04db90e4f1bd014b8b5a23f826aa22b1915ce045756",
     "index.html": "sha256:e06f209466b4d28eecdc26b7f1013ac8268f12275e9c8e4c39e3b19995e6eb72",
     "middleware.ts": "sha256:c095e1d7e225b2725485b594f70882a24dfd5c1a54ba0bfa9838c6bab4398e50",
-    "package.json": "sha256:819e399aaf7e555cc497c772dbde8e43ee5c43d3529487ca38fdde0cd0044952",
+    "package.json": "sha256:7a83837708a4384a73e8d863b968be82eba089d152c47bc0b61c53479f050163",
     "public/sounds/Kenney-License.txt": "sha256:7d6d3ccf1142669b7ea8629ed2b9eccda9c2d5d38841ff9ed6b50892651a5857",
     "public/sounds/asteroid-explode.m4a": "sha256:aae69e29c401ef1d153898a22d658c927b08577e6e79ac317d721d51fc9156d6",
     "public/sounds/core-pickup.m4a": "sha256:a2e319a7c5501c7d946ef02fa39aa7f2f84655dd71cddd3343cda46ed1260393",

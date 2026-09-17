@@ -49,8 +49,8 @@ the Hauler for the delivery.
 Three starter furnace landmarks sit around the field: North Works, Southeast
 Works, and Southwest Works. Regional Works sites then continue on a 4,000-unit
 grid through the open field. On the playfield each Works site is a dashed
-delivery ring around an open fire bed, where licking tongues of flame and
-rising embers fill the intake. A furnace appears on the local minimap after the
+delivery ring around a burning grate, where a column of flame roars up the
+intake and throws embers past it. A furnace appears on the local minimap after the
 crew discovers its area and remains visible there while it is nearby. When it
 moves beyond the local radar, use the universe map to find the exact landmark.
 A delivery consumes the towed rock, so the crew can turn a scan and a haul into

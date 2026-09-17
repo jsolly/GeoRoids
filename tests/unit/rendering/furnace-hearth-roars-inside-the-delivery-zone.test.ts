@@ -134,7 +134,7 @@ function centerAt(path: RecordedPath, step: number): number {
   return (left.x + right.x) / 2;
 }
 
-test('a discovered furnace burns a towering fire that fills the delivery zone', () => {
+test('a discovered furnace draws a blast column roaring off its grate', () => {
   const { ctx, strokes, dashes } = recordingContext();
   const fill = vi.spyOn(ctx, 'fill');
   drawFurnaceArtwork(ctx, 300, 300, 100, 0);
@@ -154,21 +154,27 @@ test('a discovered furnace burns a towering fire that fills the delivery zone', 
   expect(tongues.size).toBeGreaterThanOrEqual(4);
 
   const yellow = canvasColor(ctx, hexToRgba(PALETTE.LASER_LOCAL, 1));
-  const cream = canvasColor(ctx, hexToRgba(PALETTE.LOOT, 0.34));
+  const cream = canvasColor(ctx, hexToRgba(PALETTE.LOOT, 0.3));
   expect(contours.some((path) => path.color === yellow)).toBe(true);
   expect(contours.some((path) => path.color === cream)).toBe(true);
 
   const tallest = contours.reduce((best, path) => (apexOf(path).y < apexOf(best).y ? path : best));
   const root = rootOf(tallest);
-  // Rises from a fire bed below center, up through the intake radius.
+  // Rises from a grate below center, up through the intake radius.
   expect(root.y).toBeGreaterThan(300);
+  const reach = root.y - apexOf(tallest).y;
   expect(300 - apexOf(tallest).y).toBeGreaterThan(50);
 
-  // The fire spreads across the hearth, and every tongue narrows at root and tip.
-  expect(Math.max(...contours.map((path) => spanAt(path, 4)))).toBeGreaterThan(90);
+  // A column, not a bonfire: the draft is far taller than the grate is wide.
   const belly = spanAt(tallest, 4);
+  expect(reach).toBeGreaterThan(belly * 2);
   expect(spanAt(tallest, 0)).toBeLessThan(belly);
   expect(spanAt(tallest, 16)).toBeLessThan(belly / 3);
+
+  // Vortices curl off the base to either side of the column.
+  const centers = contours.map((path) => centerAt(path, 0));
+  expect(Math.min(...centers)).toBeLessThan(290);
+  expect(Math.max(...centers)).toBeGreaterThan(310);
 
   // Real fire is not a mirrored chevron: the two edges ripple independently.
   const mirrored = Array.from({ length: 17 }, (_, step) =>
@@ -219,5 +225,26 @@ test('the furnace fire licks and breathes from frame to frame', () => {
   // The fire breathes rather than teleporting: it stays inside the intake.
   for (const { apex } of second) {
     expect(300 - apex).toBeLessThan(110);
+  }
+});
+
+test('the draft never falls back into the same pose on a short loop', () => {
+  const { ctx, strokes } = recordingContext();
+  const poseAt = (now: number) => {
+    strokes.length = 0;
+    drawFurnaceArtwork(ctx, 300, 300, 100, now);
+    return flameContours(strokes).flatMap((path) => path.points.map((point) => [point.x, point.y]));
+  };
+  const opening = poseAt(0);
+  // Fire that repeats on a short cycle reads as a looping decal; sample a long
+  // stretch and require every later pose to stay visibly different.
+  for (let now = 500; now <= 20000; now += 500) {
+    const later = poseAt(now);
+    expect(later).toHaveLength(opening.length);
+    const drift = opening.map((point, index) => {
+      const other = later[index] ?? point;
+      return Math.hypot((point[0] ?? 0) - (other[0] ?? 0), (point[1] ?? 0) - (other[1] ?? 0));
+    });
+    expect(Math.max(...drift)).toBeGreaterThan(2);
   }
 });

@@ -1,5 +1,5 @@
 {
-  "note": "Hauler v1: local schematic (V / long-press) swaps one E-key slot between Resource Tap and Tow Cable; successful Tap extract spawns a cream/amber canister; lootCollected accepts kind tap so the pickup cue plays; Hauler GIF remains the tow-and-furnace demo.",
+  "note": "Hauler v1 schematic + Tap loot; rebase digest after @types/node 26.5.1. Hauler GIF remains the tow-and-furnace demo.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
@@ -7,7 +7,7 @@
     "index.css": "sha256:e282123f56bf7a427820dd1ee491555fb771941611b6af10fd7e2cb97a1ad31e",
     "index.html": "sha256:0c7e14062332b9b56c26039a3a31aabc1cea158da552a4ec52984ade0ff9b6a3",
     "middleware.ts": "sha256:c095e1d7e225b2725485b594f70882a24dfd5c1a54ba0bfa9838c6bab4398e50",
-    "package.json": "sha256:fd88492aa0b680f7d03a94787da2168148cf9a5fdc0ae70339a864ca4cabbd59",
+    "package.json": "sha256:b814d2e2d7572cfff6b9a9ae826afcdd68243e805d06b1d898a0464499d85cbc",
     "public/sounds/Kenney-License.txt": "sha256:7d6d3ccf1142669b7ea8629ed2b9eccda9c2d5d38841ff9ed6b50892651a5857",
     "public/sounds/asteroid-explode.m4a": "sha256:aae69e29c401ef1d153898a22d658c927b08577e6e79ac317d721d51fc9156d6",
     "public/sounds/core-pickup.m4a": "sha256:a2e319a7c5501c7d946ef02fa39aa7f2f84655dd71cddd3343cda46ed1260393",

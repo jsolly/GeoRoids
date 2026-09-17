@@ -593,6 +593,7 @@ export class MessageHandler {
       ...(motion
         ? { motionEpoch: motion.epoch, motionAck: motion.ack, motionMode: motion.mode }
         : {}),
+      ...(outcome.envelope ? { envelope: outcome.envelope } : {}),
       ...(previous?.suppressed ? { suppressed: previous.suppressed } : {}),
     });
     this.motionRejections.set(ws, { lastThrottleAt: throttleAt, suppressed: 0 });

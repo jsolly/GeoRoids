@@ -1,4 +1,7 @@
 import type { Position } from '../../../shared-types';
+import { VISUAL } from '../../constants';
+import { warmElevationLabels } from '../../rendering/contourLabels';
+import { warmContourSpatialIndex } from '../../rendering/contourSpatialIndex';
 import { getGameBoundary } from '../boundary';
 import { type ContourBounds, type ContourLevel, extractIsoContours } from './contours';
 import { createHeightfield, type Heightfield } from './heightfield';
@@ -76,11 +79,18 @@ function touchContourPatch(patch: ContourPatch): ContourPatch {
   return patch;
 }
 
+function warmPatchDrawCaches(levels: ContourLevel[]): void {
+  warmContourSpatialIndex(levels);
+  warmElevationLabels(levels, VISUAL.CONTOUR_LABEL_SPACING);
+}
+
 function buildContourPatch(field: Heightfield, region: ContourRegion): ContourPatch {
   contourPatchBuilds += 1;
+  const levels = extractIsoContours(field, region.gridSize, TERRAIN.LEVELS, region);
+  warmPatchDrawCaches(levels);
   return touchContourPatch({
     region,
-    levels: extractIsoContours(field, region.gridSize, TERRAIN.LEVELS, region),
+    levels,
     usedAt: 0,
   });
 }

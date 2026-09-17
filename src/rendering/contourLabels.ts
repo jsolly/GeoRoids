@@ -95,6 +95,22 @@ function getLabels(levels: readonly ContourLevel[], spacing: number): ElevationL
   return labels;
 }
 
+/** Fill the per-patch label cache off the crossing frame. */
+export function warmElevationLabels(
+  levels: readonly ContourLevel[],
+  spacing: number = VISUAL.CONTOUR_LABEL_SPACING
+): void {
+  getLabels(levels, spacing);
+}
+
+/** Test helper: true when this contour set already has spaced labels. */
+export function elevationLabelsAreCached(
+  levels: readonly ContourLevel[],
+  spacing: number = VISUAL.CONTOUR_LABEL_SPACING
+): boolean {
+  return labelCache.get(levels)?.has(spacing) === true;
+}
+
 export function drawContourLabels(
   ctx: DrawingContext,
   levels: readonly ContourLevel[],

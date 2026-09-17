@@ -107,6 +107,7 @@
     "src/physics/terrain/contours.ts",
     "src/physics/terrain/terrainSession.ts",
     "src/rendering/contourLabels.ts",
+    "src/rendering/contourSpatialIndex.ts",
     "src/physics/boundary.ts",
     "server/world/WorldStore.ts",
     "server/world/RegionalAsteroidField.ts",

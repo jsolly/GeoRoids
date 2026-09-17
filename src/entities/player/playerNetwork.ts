@@ -1,8 +1,7 @@
 export class PlayerNetwork {
   private static instance: PlayerNetwork;
   private tick: (() => void) | null = null;
-  private updateInterval: ReturnType<typeof setInterval> | null = null;
-  private readonly UPDATE_FREQUENCY = 60; // 60 FPS
+  private sending = false;
 
   private constructor() {}
 
@@ -18,19 +17,17 @@ export class PlayerNetwork {
   }
 
   public startNetworkUpdates(): void {
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-    }
-
-    this.updateInterval = setInterval(() => {
-      this.updatePlayerState();
-    }, 1000 / this.UPDATE_FREQUENCY);
+    this.sending = true;
   }
 
   public stopNetworkUpdates(): void {
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-      this.updateInterval = null;
+    this.sending = false;
+  }
+
+  /** Report one pose per simulation burst so HTML 16ms timers cannot drift from 60 Hz. */
+  public notifySimulationFrames(frames: number): void {
+    if (this.sending && frames > 0) {
+      this.updatePlayerState();
     }
   }
 

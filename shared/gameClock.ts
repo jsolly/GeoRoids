@@ -28,6 +28,24 @@ export function ticksForElapsed(elapsedMs: number): number {
   return Math.min(MAX_CATCH_UP_TICKS, Math.floor(elapsedMs / GAME_TICK_MS + 1e-9));
 }
 
+/**
+ * Convert a wall-clock gap into credited 60 Hz travel frames.
+ *
+ * Integer `Date.now` / `ServerClock` values and HTML timers both truncate a
+ * 16.666ms tick to 16ms (0.96 frames). Crediting that truncated tick as a full
+ * frame keeps ordinary 60 Hz pose reports inside the envelope. Sub-tick gaps
+ * stay fractional so a burst of same-millisecond packets cannot mint travel.
+ */
+export function framesForMotionCredit(elapsedMs: number): number {
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) {
+    return 0;
+  }
+  const exact = (elapsedMs * GAME.FPS) / 1000;
+  const truncatedTickMs = Math.floor(GAME_TICK_MS);
+  const frames = elapsedMs >= truncatedTickMs ? Math.max(exact, Math.round(exact)) : exact;
+  return Math.min(MAX_CATCH_UP_TICKS, frames);
+}
+
 /** Drain a millisecond accumulator into whole frames, leaving the remainder. */
 export function consumeTickAccumulator(accumulatorMs: number): {
   frames: number;

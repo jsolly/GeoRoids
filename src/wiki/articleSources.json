@@ -163,6 +163,7 @@
     "shared/playerMotion.ts",
     "src/core/eventLoop.ts",
     "src/core/gameController.ts",
+    "src/entities/player/playerNetwork.ts",
     "src/rendering/hud/gameInfo.ts",
     "src/ui/mainMenu.ts",
     "src/entities/ship/shipRenderer.ts",

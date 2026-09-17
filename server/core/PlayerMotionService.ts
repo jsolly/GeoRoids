@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
+import { framesForMotionCredit } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { cruiseSpeed } from '../../shared/shipFlight';
@@ -318,7 +318,7 @@ export class PlayerMotionService {
     const boosting = pose.boosting === true;
     const speed = this.legalSpeed(session.actor, now, boosting);
     // Match the client's bounded catch-up; silence cannot bank an arbitrary jump.
-    const elapsedFrames = Math.min(MAX_CATCH_UP_TICKS, ((now - session.poseAt) * GAME.FPS) / 1000);
+    const elapsedFrames = framesForMotionCredit(now - session.poseAt);
     // Spend elapsed travel before capping unused jitter credit. Capping first
     // rejects ordinary flight whenever updates are more than 150 ms apart.
     const credit = session.poseCredit + elapsedFrames * speed;

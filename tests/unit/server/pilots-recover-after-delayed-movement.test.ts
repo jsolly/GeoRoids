@@ -3,6 +3,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import type { ShipKitId } from '../../../shared-types';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
@@ -15,17 +16,19 @@ afterEach(() => {
   }
 });
 
-function flight() {
+function flight(options?: { kitId?: ShipKitId; tickMs?: number; cruise?: boolean }) {
+  const kitId = options?.kitId ?? 'hauler';
+  const tickMs = options?.tickMs ?? 1000 / 60;
   let elapsed = 0;
   const clock = new ServerClock({ wallNow: () => 10_000, monotonicNow: () => elapsed });
   const engine = new GameEngine(42, clock);
   engines.push(engine);
   const socket = new RecordingSocket();
-  const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'hauler');
+  const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, kitId);
   actor.asteroidInteractions = 1;
   actor.spawnProtectionTimer = 0;
   expect(engine.playerMotion.register(actor, socket, 1, clock.now()).ok).toBe(true);
-  const ship = new Ship({ kitId: 'hauler' });
+  const ship = new Ship({ kitId });
   const prediction = new PlayerMotionReconciliation();
   const reconcile = () => {
     const entityRow = engine
@@ -40,7 +43,9 @@ function flight() {
   reconcile();
   ship.angle = 0;
   ship.thrusting = true;
-  ship.velocity = { x: cruiseSpeed(ship.mass, getShipKit('hauler').maxVelocity), y: 0 };
+  if (options?.cruise !== false) {
+    ship.velocity = { x: cruiseSpeed(ship.mass, getShipKit(kitId).maxVelocity), y: 0 };
+  }
   const report = () => {
     const pose = prediction.buildHandoffPose(ship);
     if (!pose) {
@@ -53,13 +58,33 @@ function flight() {
       clock.now()
     );
   };
-  const advance = (frames: number) => {
+  const simulate = (frames: number) => {
     for (let i = 0; i < frames; i++) {
-      elapsed += 1000 / 60;
       ship.update();
     }
   };
-  return { engine, actor, ship, prediction, clock, socket, reconcile, report, advance };
+  const wait = (ms: number) => {
+    elapsed += ms;
+  };
+  const advance = (frames: number) => {
+    for (let i = 0; i < frames; i++) {
+      wait(tickMs);
+      simulate(1);
+    }
+  };
+  return {
+    engine,
+    actor,
+    ship,
+    prediction,
+    clock,
+    socket,
+    reconcile,
+    report,
+    advance,
+    simulate,
+    wait,
+  };
 }
 
 test.each([12, 30, 60])(
@@ -170,4 +195,45 @@ test.each([120, 3600])('a silent pilot cannot bank %i frames of travel into one 
   f.reconcile();
   f.advance(12);
   expect(f.report().ok).toBe(true);
+});
+
+test.each(['surveyor', 'hauler'] as const)(
+  'a %s that joins then cruises on 16ms ticks is not rewound to spawn',
+  (kitId) => {
+    const f = flight({ kitId, tickMs: 16 });
+    const spawn = { ...f.actor.position };
+    for (let tick = 0; tick < 250; tick++) {
+      f.advance(1);
+      const result = f.report();
+      if (!result.ok) {
+        f.reconcile();
+        expect(f.ship.position).not.toEqual(spawn);
+      }
+      expect(result.ok).toBe(true);
+      f.reconcile();
+    }
+    expect(f.actor.playerMotion?.mode).toBe('free');
+    expect(f.actor.position).toEqual(f.ship.position);
+    expect(Math.hypot(f.ship.position.x - spawn.x, f.ship.position.y - spawn.y)).toBeGreaterThan(
+      40
+    );
+  }
+);
+
+test('a two-frame hitch over 33ms does not rewind a joined Hauler to spawn', () => {
+  const f = flight({ kitId: 'hauler' });
+  const spawn = { ...f.actor.position };
+  for (let hitch = 0; hitch < 30; hitch++) {
+    f.wait(33);
+    f.simulate(2);
+    const result = f.report();
+    if (!result.ok) {
+      f.reconcile();
+      expect(f.ship.position).not.toEqual(spawn);
+    }
+    expect(result.ok).toBe(true);
+    f.reconcile();
+  }
+  expect(f.actor.position).toEqual(f.ship.position);
+  expect(Math.hypot(f.ship.position.x - spawn.x, f.ship.position.y - spawn.y)).toBeGreaterThan(20);
 });

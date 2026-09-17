@@ -731,6 +731,7 @@ export class GameController {
     for (let frame = 0; frame < frames; frame++) {
       this.advanceSimulationFrame(currPlayer);
     }
+    PlayerNetwork.getInstance().notifySimulationFrames(frames);
   }
 
   /** Movement, timers, and swept collisions share one 60 Hz step. */

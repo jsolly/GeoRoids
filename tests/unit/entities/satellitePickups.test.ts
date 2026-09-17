@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
-import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
 import { SATELLITE_PICKUP } from '../../../src/constants';
 import { orbitRadiusForOwner } from '../../../src/entities/satellitePickup/satellitePickupMath';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const SERVER_PICKUP_ID_PREFIX_PATTERN = /^server-pickup-/u;
@@ -30,8 +31,12 @@ describe('Satellite pickups', () => {
     vi.clearAllMocks();
   });
 
-  function addPilot(id = 'pilot', position = { x: 0, y: 0 }) {
-    const pilot = gameEngine.addPlayer(id, id, new RecordingSocket(), position);
+  function addPilot(
+    id = 'pilot',
+    position = { x: 0, y: 0 },
+    kitId: 'surveyor' | 'hauler' = 'surveyor'
+  ) {
+    const pilot = gameEngine.addPlayer(id, id, new RecordingSocket(), position, kitId);
     gameEngine.updatePlayer(id, { spawnProtectionTimer: 0 });
     return pilot;
   }
@@ -102,7 +107,10 @@ describe('Satellite pickups', () => {
     const later = gameEngine.getSatellitePickup(attached.id);
     assert.ok(later);
     const dist = Math.hypot(later.position.x - 80, later.position.y - 40);
-    expect(dist).toBeCloseTo(orbitRadiusForOwner(radiusFromMass(pilot.mass), later.radius), 6);
+    expect(dist).toBeCloseTo(
+      orbitRadiusForOwner(hullRadiusForKit(pilot.kitId, pilot.mass), later.radius),
+      6
+    );
   });
 
   test('the nearest competing player wins once and a later tick cannot duplicate the score', () => {
@@ -197,7 +205,10 @@ describe('Satellite pickups', () => {
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
     const attached = collectNearest('pilot', 110);
-    const expected = orbitRadiusForOwner(radiusFromMass(pilot.mass), attached.radius);
+    const expected = orbitRadiusForOwner(
+      hullRadiusForKit(pilot.kitId, pilot.mass),
+      attached.radius
+    );
     const distance = Math.hypot(
       attached.position.x - pilot.position.x,
       attached.position.y - pilot.position.y
@@ -205,6 +216,45 @@ describe('Satellite pickups', () => {
 
     expect(expected).toBeGreaterThan(SATELLITE_PICKUP.ORBIT_RADIUS);
     expect(distance).toBeCloseTo(expected, 6);
+  });
+
+  test('a Hauler satellite orbits farther than a same-mass Surveyor and clears the barge hull', () => {
+    addPilot('scout', { x: 0, y: 0 }, 'surveyor');
+    addPilot('barge', { x: 4000, y: 0 }, 'hauler');
+    const [scoutPickup, bargePickup] = gameEngine.getAllSatellitePickups();
+    assert.ok(scoutPickup);
+    assert.ok(bargePickup);
+    moveNearPickup('scout', scoutPickup.id, 110);
+    moveNearPickup('barge', bargePickup.id, 110);
+    gameEngine.tickSatellitePickups();
+
+    const scout = gameEngine.getPlayer('scout');
+    const barge = gameEngine.getPlayer('barge');
+    const scoutSat = gameEngine.getSatellitePickup(scoutPickup.id);
+    const bargeSat = gameEngine.getSatellitePickup(bargePickup.id);
+    assert.ok(scout);
+    assert.ok(barge);
+    assert.ok(scoutSat);
+    assert.ok(bargeSat);
+    expect(scoutSat.ownerId).toBe('scout');
+    expect(bargeSat.ownerId).toBe('barge');
+
+    const scoutDist = Math.hypot(
+      scoutSat.position.x - scout.position.x,
+      scoutSat.position.y - scout.position.y
+    );
+    const bargeDist = Math.hypot(
+      bargeSat.position.x - barge.position.x,
+      bargeSat.position.y - barge.position.y
+    );
+    const bargeClearance = hullRadiusForKit('hauler', barge.mass) + bargeSat.radius;
+    expect(scoutDist).toBeCloseTo(SATELLITE_PICKUP.ORBIT_RADIUS, 6);
+    expect(bargeDist).toBeGreaterThan(scoutDist);
+    expect(bargeDist).toBeGreaterThanOrEqual(bargeClearance + SATELLITE_PICKUP.ORBIT_GAP - 1e-6);
+    expect(bargeDist).toBeCloseTo(
+      orbitRadiusForOwner(hullRadiusForKit('hauler', barge.mass), bargeSat.radius),
+      6
+    );
   });
 
   test('distant and dead players are never automatic collectors', () => {

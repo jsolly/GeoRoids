@@ -1,3 +1,4 @@
+import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type { ShipKitId } from '../../../shared-types';
 import { GAME, SHIP } from '../../constants';
 
@@ -43,6 +44,9 @@ export const SHIP_HULL_TOPOLOGY = {
 
 export const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;
 
+/** Linear playfield size vs Surveyor (`SHIP.SIZE`). Product bar: ~2× barge. */
+export const HAULER_TO_SURVEYOR_SIZE = 2;
+
 /** Hauler cable. Cream line separates the cable from the hull. */
 export const HAULER_TETHER_COLOR = '#E8D5A3';
 /** Latch tip / hook head. Game Director PASS: amber tip on the cream cable. */
@@ -85,7 +89,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     abilityName: 'Harpoon',
     abilityHint: 'E latches the equipped tool — Resource Tap or Tow Cable. V opens the schematic.',
     maxHealth: 140,
-    size: 38,
+    size: SHIP.SIZE * HAULER_TO_SURVEYOR_SIZE,
     thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
     maxVelocity: SHIP.MAX_VELOCITY,
     boostMultiplier: 1.35,
@@ -118,10 +122,16 @@ interface KitStatTarget {
 
 interface KitShipTarget extends KitStatTarget {
   r: number;
+  mass?: number;
   shotCooldown: number;
   thrust: number;
   maxVelocity: number;
   turnSpeed: number;
+}
+
+/** Draw, collision, latch, and loot all use this kit+mass hull radius. */
+export function hullRadiusForKit(kitId: unknown, mass: number = GROWTH.BASE_MASS): number {
+  return radiusFromMass(mass, getShipKit(kitId).size);
 }
 
 /** Shared kit application. Does not touch playfield colors. */
@@ -135,7 +145,7 @@ export function applyShipKitStats(target: KitStatTarget, kitId: unknown): ShipKi
 
 export function applyShipKitToShip(ship: KitShipTarget, kitId: unknown): ShipKit {
   const kit = applyShipKitStats(ship, kitId);
-  ship.r = kit.size / 2;
+  ship.r = hullRadiusForKit(kit.id, ship.mass ?? GROWTH.BASE_MASS);
   ship.shotCooldown = kit.shotCooldown;
   ship.thrust = kit.thrust;
   ship.maxVelocity = kit.maxVelocity;

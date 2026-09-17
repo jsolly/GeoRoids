@@ -100,7 +100,6 @@ test('physical reach keeps an intake-bound rock near enough to tow', () => {
 
 test('a large rock whose surface is within range latches even if its center is farther', () => {
   const hauler = host('hauler');
-  hauler.r = 19;
   const rock = {
     id: 'big-rock',
     position: { x: 330, y: 0 },
@@ -225,6 +224,32 @@ test('attaching a tow cable preserves the rock pose and momentum', () => {
 
   expect(rock.position).toEqual(position);
   expect(rock.velocity).toEqual(velocity);
+});
+
+test('an overlapping Tow Cable rest length uses the Hauler barge hull, not a 20-unit floor', () => {
+  const rock = {
+    id: 'rock',
+    position: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    size: 10,
+  };
+  const stretchPastSurveyorFloor = 20 + 10 + 16 + 1;
+
+  const surveyor = host('surveyor');
+  surveyor.harpoonTargetId = rock.id;
+  attachTowCable(surveyor, rock);
+  surveyor.position.x = stretchPastSurveyorFloor;
+  tickTowCable(surveyor, rock);
+  expect(rock.velocity.x).toBeGreaterThan(0);
+
+  rock.velocity.x = 0;
+  rock.velocity.y = 0;
+  const hauler = host('hauler');
+  hauler.harpoonTargetId = rock.id;
+  attachTowCable(hauler, rock);
+  hauler.position.x = stretchPastSurveyorFloor;
+  tickTowCable(hauler, rock);
+  expect(rock.velocity.x).toBe(0);
 });
 
 test('a Hauler E release detaches the tow without a delayed launch', () => {

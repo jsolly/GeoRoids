@@ -37,12 +37,7 @@ import {
   LOOT_BLAST,
 } from '../shared/lootBlast';
 import { cruiseSpeed } from '../shared/shipFlight';
-import {
-  applyLootMass,
-  lootOverlap,
-  radiusFromMass,
-  sizeScaleFromMass,
-} from '../shared/shipGrowth';
+import { applyLootMass, GROWTH, lootOverlap, sizeScaleFromMass } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
 import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRenderer';
@@ -59,7 +54,7 @@ import {
   pullHarpoonTarget,
   tickAbilityHost,
 } from '../src/entities/ship/shipAbilities';
-import { getShipKit } from '../src/entities/ship/shipKits';
+import { getShipKit, hullRadiusForKit } from '../src/entities/ship/shipKits';
 import { strokeKitHullOutline, strokePhosphorSegment } from '../src/entities/ship/shipRenderer';
 import { applyShipImpactFlash, tickShipImpactFlash } from '../src/entities/ship/shipUtils';
 import { steeringTurn } from '../src/input/pointerSteering';
@@ -506,7 +501,7 @@ function makeAbilityHost(kitId: ShipKitId, position: Position, angle = 0): Abili
     abilityActiveFrames: 0,
 
     harpoonTargetId: null,
-    r: getShipKit(kitId).size / 2,
+    mass: GROWTH.BASE_MASS,
   };
 }
 
@@ -585,8 +580,8 @@ function makeSurveyorDemo(): Demo {
         frame
       );
       drawRing(ctx, host.position, 190, PALETTE.HUD_MUTED, 0.18);
-      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL, 15);
-      drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE, 17);
+      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL);
+      drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE);
       for (const rock of rocks) {
         const material = scannedMaterial(host, rock);
         classified ||= material !== undefined;
@@ -755,9 +750,16 @@ function makeHaulerDemo(): Demo {
         displayHost,
         0,
         PALETTE.LOCAL,
-        (getShipKit('hauler').size / 2) * displayScale
+        hullRadiusForKit('hauler') * displayScale
       );
-      drawShip(ctx, 'surveyor', displaySurveyor, Math.PI / 2, PALETTE.REMOTE, 15);
+      drawShip(
+        ctx,
+        'surveyor',
+        displaySurveyor,
+        Math.PI / 2,
+        PALETTE.REMOTE,
+        hullRadiusForKit('surveyor') * displayScale
+      );
       const furnaceScreen = screenPoint({ x: 0, y: 0 });
       drawFurnaceArtwork(
         ctx,
@@ -1132,7 +1134,15 @@ function makeLootDemo(): Demo {
         if (liveSecond && liveSecond.position.x < secondDrop.position.x) {
           magnetized = true;
         }
-        if (liveSecond && lootOverlap(shooter, mass, liveSecond.position, liveSecond.radius)) {
+        if (
+          liveSecond &&
+          lootOverlap(
+            shooter,
+            hullRadiusForKit('surveyor', mass),
+            liveSecond.position,
+            liveSecond.radius
+          )
+        ) {
           const removed = lootManager.remove(secondDrop.id);
           if (removed !== undefined) {
             collected = true;
@@ -1195,7 +1205,7 @@ function makeLootDemo(): Demo {
           Math.max(0, 0.8 - blastAge * 0.06)
         );
       }
-      const shipRadius = radiusFromMass(mass);
+      const shipRadius = hullRadiusForKit('surveyor', mass);
       drawShip(
         ctx,
         'surveyor',
@@ -1657,7 +1667,7 @@ function makePickupsDemo(): Demo {
   const owner = {
     id: 'pilot',
     position: { x: 0, y: 0 },
-    radius: radiusFromMass(100),
+    radius: hullRadiusForKit('surveyor', GROWTH.SOFT_MAX_MASS),
     health: 100,
     exploding: false,
   };

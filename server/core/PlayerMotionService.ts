@@ -4,10 +4,9 @@ import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { cruiseSpeed } from '../../shared/shipFlight';
-import { radiusFromMass } from '../../shared/shipGrowth';
 import type { PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
-import { getShipKit } from '../../src/entities/ship/shipKits';
+import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import type { GameEntity } from './EntityManager';
 
@@ -329,7 +328,7 @@ export class PlayerMotionService {
     );
     const anchorReach =
       (speed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
-    const hullRadius = radiusFromMass(session.actor.mass);
+    const hullRadius = hullRadiusForKit(session.actor.kitId, session.actor.mass);
     if (
       Math.hypot(pose.velocity.x, pose.velocity.y) > speed + 1e-6 ||
       displacement > credit + 1e-6 ||

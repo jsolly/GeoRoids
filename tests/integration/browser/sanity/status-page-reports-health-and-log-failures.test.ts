@@ -24,23 +24,23 @@ test('status controls show actual log writes and reject unhealthy responses on b
     await page.setViewportSize(viewport);
     await page.goto(`${TestConfig.SERVER_URL}/status`);
     await page.waitForFunction(() =>
-      document.getElementById('serverHealth')?.textContent?.includes('Server is healthy')
+      document.querySelector('#serverHealth')?.textContent?.includes('Server is healthy')
     );
     await page.waitForFunction(() =>
-      document.getElementById('loggingHealth')?.textContent?.includes('Connected log clients:')
+      document.querySelector('#loggingHealth')?.textContent?.includes('Connected log clients:')
     );
     await page.getByRole('button', { name: 'Connect Game', exact: true }).click();
     await page.getByRole('button', { name: 'Connect Logs', exact: true }).click();
     await page.waitForFunction(() =>
-      document.getElementById('overallStatus')?.textContent?.includes('Both WebSockets Connected')
+      document.querySelector('#overallStatus')?.textContent?.includes('Both WebSockets Connected')
     );
     await page.getByRole('button', { name: 'Send Client Log', exact: true }).click();
     await page.waitForFunction(
-      () => document.getElementById('clientLogBtn')?.textContent === 'Sent!'
+      () => document.querySelector('#clientLogBtn')?.textContent === 'Sent!'
     );
     await page.getByRole('button', { name: 'Send Server Log', exact: true }).click();
     await page.waitForFunction(() =>
-      document.getElementById('serverLogBtn')?.textContent?.includes('Written')
+      document.querySelector('#serverLogBtn')?.textContent?.includes('Written')
     );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
@@ -53,7 +53,7 @@ test('status controls show actual log writes and reject unhealthy responses on b
     await page.getByRole('button', { name: 'Disconnect Logs', exact: true }).click();
     await page.waitForFunction(() =>
       document
-        .getElementById('overallStatus')
+        .querySelector('#overallStatus')
         ?.textContent?.includes('Both WebSockets Disconnected')
     );
   }
@@ -66,7 +66,7 @@ test('status controls show actual log writes and reject unhealthy responses on b
   );
   await page.reload();
   await page.waitForFunction(() =>
-    document.getElementById('serverHealth')?.textContent?.includes('HTTP 503')
+    document.querySelector('#serverHealth')?.textContent?.includes('HTTP 503')
   );
   expect(await page.locator('#serverHealth').textContent()).not.toContain('Server is healthy');
   await page.route('**/test-server-log', (route) =>
@@ -74,7 +74,7 @@ test('status controls show actual log writes and reject unhealthy responses on b
   );
   await page.getByRole('button', { name: 'Send Server Log', exact: true }).click();
   await page.waitForFunction(() =>
-    document.getElementById('serverLogBtn')?.textContent?.includes('Failed')
+    document.querySelector('#serverLogBtn')?.textContent?.includes('Failed')
   );
   expect(await page.locator('#messageLog').textContent()).toContain('HTTP 500');
   await page.waitForFunction(
@@ -119,7 +119,7 @@ test('logging losses stay visible and missing counters never look like zero loss
   );
   await page.goto(`${TestConfig.SERVER_URL}/status`);
   await page.waitForFunction(() =>
-    document.getElementById('loggingHealth')?.textContent?.includes('Connected log clients: 3')
+    document.querySelector('#loggingHealth')?.textContent?.includes('Connected log clients: 3')
   );
   const panel = page.locator('#loggingHealth');
   expect(await panel.textContent()).toContain('Queued bytes: client 40, server 20');
@@ -132,7 +132,7 @@ test('logging losses stay visible and missing counters never look like zero loss
     'Rejected client records: invalid 4, rate limited 5',
   ]);
   const repeatedAnnouncements = await page.evaluate(async () => {
-    const region = document.getElementById('loggingHealth');
+    const region = document.querySelector('#loggingHealth');
     if (!region) {
       throw new Error('Logging health region missing');
     }
@@ -154,7 +154,7 @@ test('logging losses stay visible and missing counters never look like zero loss
   logging = undefined;
   await page.reload();
   await page.waitForFunction(() =>
-    document.getElementById('loggingHealth')?.textContent?.includes('invalid or missing counters')
+    document.querySelector('#loggingHealth')?.textContent?.includes('invalid or missing counters')
   );
   expect(await panel.textContent()).not.toContain('since startup: 0');
 });

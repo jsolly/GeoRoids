@@ -10,6 +10,7 @@ import { resetSafeStorage } from '../../../src/utils/safeStorage';
 const TOKEN = 'a'.repeat(64);
 const SERVER = 'b'.repeat(40);
 const CLIENT = 'c'.repeat(40);
+const CLIENT_RELEASE_ID_PATTERN = /^(dev|[a-f0-9]{40})$/u;
 
 afterEach(() => {
   clearResumeCredential();
@@ -38,7 +39,7 @@ test('malformed stored provenance is ignored instead of blocking resume', () => 
 
   expect(readStoredResumeProvenance()).toEqual({
     scoreReleaseId: SERVER,
-    clientReleaseId: expect.stringMatching(/^(dev|[a-f0-9]{40})$/),
+    clientReleaseId: expect.stringMatching(CLIENT_RELEASE_ID_PATTERN),
   });
 });
 

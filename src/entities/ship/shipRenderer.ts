@@ -1,6 +1,6 @@
 import type { Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, TITLE, VISUAL } from '../../constants';
-import { canvasManager } from '../../rendering/canvas';
+import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import { resolveGlow } from '../../rendering/renderQuality';
 import {
@@ -402,7 +402,7 @@ export function drawShipExplosion(ship: Ship, color?: string): void {
     ship.r * canvasManager.getPlayfieldScale(),
     ship.angle,
     explosionProgress(ship),
-    color || ship.color || PALETTE.LOCAL,
+    color ?? ship.color ?? PALETTE.LOCAL,
     ship.kitId
   );
 }
@@ -427,7 +427,7 @@ export function drawShipExplosionAtPosition(
     ship.r * scale,
     ship.angle,
     explosionProgress(ship),
-    color || ship.color || PALETTE.REMOTE,
+    color ?? ship.color ?? PALETTE.REMOTE,
     ship.kitId
   );
 }
@@ -531,7 +531,7 @@ export function drawLasers(
   color?: string,
   viewerShipPosition?: { x: number; y: number }
 ): void {
-  drawLaserBolts(ship.lasers, color || PALETTE.LASER_LOCAL, viewerShipPosition || ship.position);
+  drawLaserBolts(ship.lasers, color ?? PALETTE.LASER_LOCAL, viewerShipPosition ?? ship.position);
 }
 
 // Ship rendering with world coordinates (for other players)
@@ -568,7 +568,7 @@ export function drawShipAtPosition(
     return;
   }
 
-  const shipColor = color || ship.color;
+  const shipColor = color ?? ship.color;
 
   strokeKitHullOutline(ctx, screenX, screenY, shipR, ship.angle, shipColor, ship.kitId);
   drawAbilityFx(ctx, ship, screenX, screenY, shipR);
@@ -631,8 +631,8 @@ export function drawHaulerHarpoonVfx(
   }
   if (target) {
     ship.harpoonLatchPos = { x: target.position.x, y: target.position.y };
-  } else if (!ship.harpoonLatchPos) {
-    ship.harpoonLatchPos = { x: latchWorld.x, y: latchWorld.y };
+  } else {
+    ship.harpoonLatchPos ??= { x: latchWorld.x, y: latchWorld.y };
   }
 
   const latch = canvasManager.worldToScreen(latchWorld, cameraShipPosition);

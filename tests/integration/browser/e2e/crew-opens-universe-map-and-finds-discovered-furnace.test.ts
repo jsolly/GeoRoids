@@ -11,6 +11,7 @@ import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const REVEALED_ASSETS_STATUS_PATTERN = /\d+ revealed assets/u;
 
 const FAR_FURNACE = (() => {
   const furnace = FURNACES.find((candidate) => candidate.id === 'works-1-0');
@@ -97,7 +98,7 @@ async function openAndCaptureMap(
   const frame = await readMapFrame(page);
   expect(frame.canvas.width).toBeGreaterThan(0);
   expect(frame.canvas.height).toBeGreaterThan(0);
-  expect(frame.status).toMatch(/\d+ revealed assets/u);
+  expect(frame.status).toMatch(REVEALED_ASSETS_STATUS_PATTERN);
   expect(frame.labels).toContain(FAR_FURNACE.name);
   return frame;
 }

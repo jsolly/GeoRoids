@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it as test } from 'vitest';
 import type { ServerEntityData } from '../../../shared-types';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { PlayerMotionReconciliation } from '../../../src/network/services/PlayerMotionReconciliation';
 import { snapshotFixture } from './snapshotFixture';
+
+const OMITTED_MOTION_PATTERN = /omitted/u;
 
 function row(overrides: Partial<ServerEntityData> = {}): ServerEntityData {
   const entity = snapshotFixture().entities[0];
@@ -19,7 +21,7 @@ function fixture() {
 }
 
 describe('player motion recovery', () => {
-  it('a server blast survives the flight cap and then decays back to normal control speed', () => {
+  test('a server blast survives the flight cap and then decays back to normal control speed', () => {
     const { ship, prediction } = fixture();
     prediction.rebase(
       row({
@@ -40,7 +42,7 @@ describe('player motion recovery', () => {
     expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(ship.maxVelocity);
   });
 
-  it('keeps handoff movement suppressed until a free-mode snapshot confirms the anchored acknowledgment', () => {
+  test('keeps handoff movement suppressed until a free-mode snapshot confirms the anchored acknowledgment', () => {
     const { ship, prediction } = fixture();
     prediction.rebase(
       row({
@@ -84,7 +86,7 @@ describe('player motion recovery', () => {
     expect(ship.position.x).toBe(104); // Ordinary client prediction remains local.
   });
 
-  it('rejects older epochs and acknowledgments and never resurrects local predicted death', () => {
+  test('rejects older epochs and acknowledgments and never resurrects local predicted death', () => {
     const { ship, prediction } = fixture();
     prediction.rebase(row({ playerMotion: { epoch: 2, mode: 'free', ack: 5 } }), ship, 10);
     const before = { ...ship.position };
@@ -113,7 +115,7 @@ describe('player motion recovery', () => {
     expect(ship.exploding).toBe(true);
   });
 
-  it('holds predicted flight until the first authoritative pose after join', () => {
+  test('holds predicted flight until the first authoritative pose after join', () => {
     const ship = new Ship({ kitId: 'hauler' });
     ship.position = { x: 12, y: 34 };
     const prediction = new PlayerMotionReconciliation();
@@ -135,7 +137,7 @@ describe('player motion recovery', () => {
     expect(prediction.shouldSuppressShipMove()).toBe(false);
   });
 
-  it('discards old socket predictions and resumes at the fresh authoritative pose without a stale snapback', () => {
+  test('discards old socket predictions and resumes at the fresh authoritative pose without a stale snapback', () => {
     const { ship, prediction } = fixture();
     prediction.transportClosed();
     expect(prediction.buildHandoffPose(ship)).toBeNull();
@@ -156,7 +158,7 @@ describe('player motion recovery', () => {
     expect(prediction.buildHandoffPose(ship)).toBeNull();
   });
 
-  it('fails loudly on malformed snapshots and input without applying a corrupt transform', () => {
+  test('fails loudly on malformed snapshots and input without applying a corrupt transform', () => {
     const { ship, prediction } = fixture();
     const position = { ...ship.position };
     expect(() => prediction.rebase(row({ position: { x: NaN, y: 0 } }), ship, 1)).toThrow(
@@ -168,6 +170,6 @@ describe('player motion recovery', () => {
     ).toThrow(RangeError);
     const missingMotion = row();
     delete missingMotion.playerMotion;
-    expect(() => prediction.rebase(missingMotion, ship, 1)).toThrow(/omitted/);
+    expect(() => prediction.rebase(missingMotion, ship, 1)).toThrow(OMITTED_MOTION_PATTERN);
   });
 });

@@ -18,6 +18,6 @@ export function asteroidMaterialAt(slot: number): AsteroidMaterial {
   return ASTEROID_MATERIALS[slot % ASTEROID_MATERIALS.length] ?? 'ice';
 }
 
-export function asteroidShardMass(material?: AsteroidMaterial): number {
+export function asteroidShardMass(material?: AsteroidMaterial): 0.25 | 0.75 {
   return material === 'metal' ? 0.75 : 0.25;
 }

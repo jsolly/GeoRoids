@@ -402,7 +402,7 @@ const isSoundEnabled = (): boolean =>
 
 // Initialize sound preference checkbox after DOM is ready
 function initializeSoundPreference() {
-  const soundCheckbox = document.getElementById('soundPref') as HTMLInputElement;
+  const soundCheckbox = document.querySelector('#soundPref') as HTMLInputElement;
   if (soundCheckbox) {
     soundCheckbox.checked = isSoundEnabled();
   }

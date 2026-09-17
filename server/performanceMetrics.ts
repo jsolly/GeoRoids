@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { monitorEventLoopDelay, PerformanceObserver, performance } from 'node:perf_hooks';
+import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { SERVER_RELEASE_ID } from './release';
 

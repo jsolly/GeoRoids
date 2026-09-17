@@ -1,6 +1,5 @@
 import type { Position } from '../../shared-types';
 import { PALETTE } from '../constants';
-import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
@@ -18,19 +17,16 @@ import {
   drawThrusterAtPosition,
 } from '../entities/ship/shipRenderer';
 import { shouldDrawShipHull } from '../entities/ship/shipUtils';
-import { NetworkManager } from '../network/networkManager';
-import { Point } from '../physics/Point';
-import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
 import { drawFieryBoundary } from './boundaryRenderer';
+import { canvasManager } from './canvasSurface';
 import {
   drawContourLaserTicks,
   type LiveLaserSource,
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
-import { watchDevicePixelRatio } from './devicePixelRatioWatcher';
 import { drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
@@ -38,387 +34,142 @@ import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
-import {
-  PLAYFIELD_CLOSE_SCALE,
-  type PlayfieldSize,
-  projectWorldToScreenInto,
-} from './playfieldCamera';
-import { configureRenderQuality } from './renderQuality';
 import { drawSectorBoundaries } from './sectorRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawStarfield } from './starfield';
 
-// Canvas manager class for handling dynamic canvas operations and game rendering
-class CanvasManager {
-  private canvas: HTMLCanvasElement | null = null;
-  private context: CanvasRenderingContext2D | null = null;
-  private resizeHandler: (() => void) | null = null;
-  private resizeFrame: number | null = null;
-  private stopDevicePixelRatioWatcher: (() => void) | null = null;
-  private readonly viewport = { width: 1, height: 1 };
-  private devicePixelRatio = 1;
-  private readonly screenPos = { x: 0, y: 0 };
-  private readonly laserHosts: LiveLaserSource[] = [{ lasers: [] }];
-  private readonly liveLaserPositions: Position[] = [];
+const laserHosts: LiveLaserSource[] = [{ lasers: [] }];
+const liveLaserScratch: Position[] = [];
 
-  // Initialize canvas with proper scaling
-  initialize(): void {
-    this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
-    this.context = this.canvas?.getContext('2d', { alpha: false }) || null;
+export function drawGame(
+  currPlayer: Player,
+  currRoidBelt: RoidBelt,
+  currScore: number,
+  textAlpha: number,
+  text: string,
+  lives: number,
+  allPlayers: Player[]
+): void {
+  const currShip = currPlayer.ship;
+  const ctx = canvasManager.getContext();
+  const canvas = canvasManager.getCanvas();
 
-    if (this.canvas && this.context) {
-      // Add resize handler to maintain full-screen coverage
-      this.resizeHandler = () => {
-        if (this.resizeFrame !== null) {
-          return;
-        }
-        if (typeof window.requestAnimationFrame !== 'function') {
-          this.handleCanvasResize();
-          return;
-        }
-        this.resizeFrame = window.requestAnimationFrame(() => {
-          this.resizeFrame = null;
-          this.handleCanvasResize();
-        });
-      };
-      window.addEventListener('resize', this.resizeHandler);
-      window.visualViewport?.addEventListener('resize', this.resizeHandler);
-      window.visualViewport?.addEventListener('scroll', this.resizeHandler);
-
-      this.stopDevicePixelRatioWatcher = watchDevicePixelRatio(() => {
-        this.handleCanvasResize();
-      });
-
-      // Run the same boundary used for later resizes once at startup.
-      this.handleCanvasResize();
-    }
+  if (!ctx || !canvas) {
+    return;
   }
 
-  private viewportSize(): { width: number; height: number } {
-    const vv = window.visualViewport;
-    return {
-      width: Math.max(1, Math.round(vv?.width ?? window.innerWidth)),
-      height: Math.max(1, Math.round(vv?.height ?? window.innerHeight)),
-    };
+  const viewport = canvasManager.getViewportSize();
+  ctx.fillStyle = PALETTE.BG;
+  ctx.fillRect(0, 0, viewport.width, viewport.height);
+
+  const roids = currRoidBelt.getRoids();
+
+  drawStarfield(currShip.position);
+  drawIsoContours(currShip.position);
+
+  const localId = currPlayer.id;
+  let laserHostCount = 1;
+  const localLaserHost = laserHosts[0];
+  if (localLaserHost) {
+    localLaserHost.lasers = currShip.lasers;
   }
-
-  private currentDevicePixelRatio(): number {
-    const dpr = window.devicePixelRatio;
-    return Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
-  }
-
-  private applyViewportSize(): boolean {
-    if (!this.canvas) {
-      return false;
-    }
-    const { width, height } = this.viewportSize();
-    const deviceDpr = this.currentDevicePixelRatio();
-    const touchControls = shouldUseTouchControls();
-    const quality = configureRenderQuality(window.location.search, touchControls);
-    const dpr = quality.maxDpr === 'native' ? deviceDpr : Math.min(deviceDpr, quality.maxDpr);
-    const backingWidth = Math.max(1, Math.round(width * dpr));
-    const backingHeight = Math.max(1, Math.round(height * dpr));
-    const backingSizeChanged =
-      this.canvas.width !== backingWidth || this.canvas.height !== backingHeight;
-    const devicePixelRatioChanged = this.devicePixelRatio !== dpr;
-
-    this.viewport.width = width;
-    this.viewport.height = height;
-
-    // The DOM Map button shares the canvas radar's layout, including touch and safe areas.
-    const { miniMap } = hudLayoutForCanvas(this.viewport);
-    const chrome = this.canvas.parentElement;
-    chrome?.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
-    chrome?.style.setProperty(
-      '--map-toggle-y',
-      `${touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84}px`
-    );
-
-    if (this.canvas.width !== backingWidth) {
-      this.canvas.width = backingWidth;
-    }
-    if (this.canvas.height !== backingHeight) {
-      this.canvas.height = backingHeight;
-    }
-
-    const cssWidth = `${width}px`;
-    const cssHeight = `${height}px`;
-    if (this.canvas.style.width !== cssWidth) {
-      this.canvas.style.width = cssWidth;
-    }
-    if (this.canvas.style.height !== cssHeight) {
-      this.canvas.style.height = cssHeight;
-    }
-
-    if (backingSizeChanged || devicePixelRatioChanged) {
-      this.context?.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    this.devicePixelRatio = dpr;
-    clientPerformance.setGraphicsSettings({
-      deviceDpr,
-      effectiveDpr: dpr,
-      maxDpr: quality.maxDpr,
-      glow: quality.glow,
-      source: quality.source,
-      touchControls,
-      cssWidth: width,
-      cssHeight: height,
-      backingWidth,
-      backingHeight,
-    });
-    return backingSizeChanged || devicePixelRatioChanged;
-  }
-
-  // Handle canvas resizing to maintain full-screen coverage
-  private handleCanvasResize(): void {
-    if (this.canvas && this.context) {
-      const changed = this.applyViewportSize();
-
-      // Re-enable crisp rendering after resize
-      if (changed) {
-        this.context.imageSmoothingEnabled = true;
-        this.context.imageSmoothingQuality = 'high';
-      }
-    }
-  }
-
-  // Cleanup method
-  destroy(): void {
-    this.stopDevicePixelRatioWatcher?.();
-    this.stopDevicePixelRatioWatcher = null;
-    if (this.resizeFrame !== null) {
-      window.cancelAnimationFrame(this.resizeFrame);
-      this.resizeFrame = null;
-    }
-    if (this.resizeHandler) {
-      window.removeEventListener('resize', this.resizeHandler);
-      window.visualViewport?.removeEventListener('resize', this.resizeHandler);
-      window.visualViewport?.removeEventListener('scroll', this.resizeHandler);
-      this.resizeHandler = null;
-    }
-    this.canvas = null;
-    this.context = null;
-    this.viewport.width = 1;
-    this.viewport.height = 1;
-    this.devicePixelRatio = 1;
-    configureRenderQuality('', false);
-  }
-
-  // Safe accessor methods for canvas and context
-  getCanvas(): HTMLCanvasElement | null {
-    return this.canvas;
-  }
-
-  getContext(): CanvasRenderingContext2D | null {
-    return this.context;
-  }
-
-  getViewportSize(): Readonly<PlayfieldSize> {
-    return this.viewport;
-  }
-
-  clearPlayfield(): void {
-    const ctx = this.context;
-    const canvas = this.canvas;
-    if (!ctx || !canvas) {
-      return;
-    }
-    ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
-  }
-
-  requireCanvas(): HTMLCanvasElement {
-    if (!this.canvas) {
-      throw new Error('Canvas not initialized');
-    }
-    return this.canvas;
-  }
-
-  requireContext(): CanvasRenderingContext2D {
-    if (!this.context) {
-      throw new Error('Canvas context not initialized');
-    }
-    return this.context;
-  }
-
-  getPlayfieldScale(): number {
-    return PLAYFIELD_CLOSE_SCALE;
-  }
-
-  worldToScreenInto(
-    out: { x: number; y: number },
-    worldPos: Position,
-    shipPos: Position
-  ): { x: number; y: number } {
-    const scale = PLAYFIELD_CLOSE_SCALE;
-    if (!this.canvas) {
-      out.x = (worldPos.x - shipPos.x) * scale;
-      out.y = (worldPos.y - shipPos.y) * scale;
-      return out;
-    }
-    return projectWorldToScreenInto(out, worldPos, shipPos, this.viewport, scale);
-  }
-
-  // Viewport transformation methods
-  worldToScreen(worldPos: Position, shipPos: Position): Point {
-    const pos = this.worldToScreenInto(this.screenPos, worldPos, shipPos);
-    return new Point(pos.x, pos.y);
-  }
-
-  screenToWorld(screenPos: Point, shipPos: Position): Position {
-    const scale = PLAYFIELD_CLOSE_SCALE;
-    if (!this.canvas) {
-      return { x: screenPos.x / scale + shipPos.x, y: screenPos.y / scale + shipPos.y };
-    }
-
-    return {
-      x: (screenPos.x - this.viewport.width / 2) / scale + shipPos.x,
-      y: (screenPos.y - this.viewport.height / 2) / scale + shipPos.y,
-    };
-  }
-
-  // Game rendering method that draws all game elements
-  drawGame(
-    currPlayer: Player,
-    currRoidBelt: RoidBelt,
-    currScore: number,
-    textAlpha: number,
-    text: string,
-    lives: number,
-    allPlayers: Player[]
-  ): void {
-    const currShip = currPlayer.ship;
-    const ctx = this.getContext();
-    const canvas = this.getCanvas();
-
-    if (!ctx || !canvas) {
-      return;
-    }
-
-    // Clear the canvas
-    ctx.fillStyle = PALETTE.BG;
-    ctx.fillRect(0, 0, this.viewport.width, this.viewport.height);
-
-    const roids = currRoidBelt.getRoids();
-    const viewport = this.getViewportSize();
-
-    drawStarfield(currShip.position);
-    drawIsoContours(currShip.position);
-
-    const localId = NetworkManager.getInstance().getLocalPlayerId();
-    let laserHostCount = 1;
-    const localLaserHost = this.laserHosts[0];
-    if (localLaserHost) {
-      localLaserHost.lasers = currShip.lasers;
-    }
-    for (const player of allPlayers) {
-      if (player.id !== localId && shouldDrawShipHull(player.ship)) {
-        const host = this.laserHosts[laserHostCount];
-        if (host) {
-          host.lasers = player.ship.lasers;
-        } else {
-          this.laserHosts.push({ lasers: player.ship.lasers });
-        }
-        laserHostCount++;
-      }
-    }
-    this.laserHosts.length = laserHostCount;
-    drawContourLaserTicks(
-      currShip.position,
-      liveLaserPositions(this.laserHosts, this.liveLaserPositions)
-    );
-
-    // Draw fiery boundary using actual ship position for proper world coordinates
-    drawFieryBoundary(currShip.position);
-    drawSectorBoundaries(currShip.position);
-
-    if (roids.length > 0) {
-      drawRoidsRelative(currShip, roids);
-    }
-    drawFurnacesRelative(currShip.position);
-
-    const loot = LootField.getInstance().getAll();
-    const satellitePickups = SatellitePickupManager.getInstance().getAll();
-    drawLootRelative(currShip, loot);
-    drawSatellitePickups(satellitePickups, currShip.position);
-
-    const laserColor = getLaserColor();
-
-    // Cable first — a dying or blinking hull must not hide the cream tether.
-    for (const player of allPlayers) {
-      const isLocal = player.id === localId;
-      const ship = isLocal ? currShip : player.ship;
-      drawHaulerHarpoonRelative(ship, currShip.position);
-    }
-
-    for (const player of allPlayers) {
-      const isLocal = player.id === localId;
-      const ship = isLocal ? currShip : player.ship;
-      const shipColor = isLocal ? currPlayer.color : player.color;
-
-      if (ship.exploding) {
-        if (isLocal) {
-          drawShipExplosion(currShip, shipColor);
-        } else {
-          drawShipExplosionAtPosition(ship, currShip.position, shipColor);
-        }
-      } else if (shouldDrawShipHull(ship)) {
-        drawShipAtPosition(
-          ship,
-          currShip.position,
-          shipColor,
-          isLocal ? currPlayer.name : player.name
-        );
-      }
-    }
-
-    for (const player of allPlayers) {
-      const isLocal = player.id === localId;
-      const ship = isLocal ? currShip : player.ship;
-      if (!shouldDrawShipHull(ship) || !ship.thrusting) {
-        continue;
-      }
-      const shipColor = isLocal ? currPlayer.color : player.color;
-      if (isLocal) {
-        drawThruster(currShip, shipColor);
+  for (const player of allPlayers) {
+    if (player.id !== localId && shouldDrawShipHull(player.ship)) {
+      const host = laserHosts[laserHostCount];
+      if (host) {
+        host.lasers = player.ship.lasers;
       } else {
-        drawThrusterAtPosition(ship, currShip.position, shipColor);
+        laserHosts.push({ lasers: player.ship.lasers });
       }
+      laserHostCount++;
     }
-
-    drawShockwaves(currShip.position);
-
-    drawLasers(currShip, laserColor);
-
-    for (const player of allPlayers) {
-      if (player.id === localId || !shouldDrawShipHull(player.ship)) {
-        continue;
-      }
-      drawLasers(player.ship, laserColor, currShip.position);
-    }
-
-    drawHeadingCue(ctx, viewport, currShip);
-
-    const hudLayout = hudLayoutForCanvas(viewport);
-    drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups);
-
-    drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives);
-
-    drawLivesIndicator(ctx, hudLayout, lives, currPlayer.color, currShip.kitId);
-
-    if (text && textAlpha > 0) {
-      drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);
-    }
-
-    drawLeaderboard(ctx, hudLayout, allPlayers, currPlayer.id);
-
-    const roidCount = currRoidBelt.roids.length;
-    drawDebugInfo(ctx, viewport, roidCount, isDebugMode());
   }
+  laserHosts.length = laserHostCount;
+  drawContourLaserTicks(currShip.position, liveLaserPositions(laserHosts, liveLaserScratch));
+
+  drawFieryBoundary(currShip.position);
+  drawSectorBoundaries(currShip.position);
+
+  if (roids.length > 0) {
+    drawRoidsRelative(currShip, roids);
+  }
+  drawFurnacesRelative(currShip.position);
+
+  const loot = LootField.getInstance().getAll();
+  const satellitePickups = SatellitePickupManager.getInstance().getAll();
+  drawLootRelative(currShip, loot);
+  drawSatellitePickups(satellitePickups, currShip.position);
+
+  const laserColor = getLaserColor();
+
+  for (const player of allPlayers) {
+    const isLocal = player.id === localId;
+    const ship = isLocal ? currShip : player.ship;
+    drawHaulerHarpoonRelative(ship, currShip.position);
+  }
+
+  for (const player of allPlayers) {
+    const isLocal = player.id === localId;
+    const ship = isLocal ? currShip : player.ship;
+    const shipColor = isLocal ? currPlayer.color : player.color;
+
+    if (ship.exploding) {
+      if (isLocal) {
+        drawShipExplosion(currShip, shipColor);
+      } else {
+        drawShipExplosionAtPosition(ship, currShip.position, shipColor);
+      }
+    } else if (shouldDrawShipHull(ship)) {
+      drawShipAtPosition(
+        ship,
+        currShip.position,
+        shipColor,
+        isLocal ? currPlayer.name : player.name
+      );
+    }
+  }
+
+  for (const player of allPlayers) {
+    const isLocal = player.id === localId;
+    const ship = isLocal ? currShip : player.ship;
+    if (!shouldDrawShipHull(ship) || !ship.thrusting) {
+      continue;
+    }
+    const shipColor = isLocal ? currPlayer.color : player.color;
+    if (isLocal) {
+      drawThruster(currShip, shipColor);
+    } else {
+      drawThrusterAtPosition(ship, currShip.position, shipColor);
+    }
+  }
+
+  drawShockwaves(currShip.position);
+
+  drawLasers(currShip, laserColor);
+
+  for (const player of allPlayers) {
+    if (player.id === localId || !shouldDrawShipHull(player.ship)) {
+      continue;
+    }
+    drawLasers(player.ship, laserColor, currShip.position);
+  }
+
+  drawHeadingCue(ctx, viewport, currShip);
+
+  const hudLayout = hudLayoutForCanvas(viewport);
+  const otherPlayers = allPlayers.filter((player) => player.id !== localId);
+  drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups, otherPlayers);
+
+  drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives);
+
+  drawLivesIndicator(ctx, hudLayout, lives, currPlayer.color, currShip.kitId);
+
+  if (text && textAlpha > 0) {
+    drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);
+  }
+
+  drawLeaderboard(ctx, hudLayout, allPlayers, currPlayer.id);
+
+  const roidCount = currRoidBelt.roids.length;
+  drawDebugInfo(ctx, viewport, roidCount, isDebugMode());
 }
-
-// Singleton instance
-const canvasManager = new CanvasManager();
-
-// Export the singleton instance
-export { canvasManager };

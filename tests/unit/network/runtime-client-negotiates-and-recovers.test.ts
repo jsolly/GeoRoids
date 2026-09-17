@@ -28,6 +28,14 @@ import { setSelectedShipKitId } from '../../../src/ui/shipKitSelect';
 import { logger } from '../../../src/utils/Logger';
 import { snapshotFixture } from './snapshotFixture';
 
+const LASER_SOUND_PATH_PATTERN = /sounds\/laser\.m4a$/u;
+const LOOT_PICKUP_SOUND_PATH_PATTERN = /sounds\/loot-pickup\.m4a$/u;
+const SURVEY_SCAN_SOUND_PATH_PATTERN = /survey-scan\.m4a$/u;
+const ORBITAL_PICKUP_SOUND_PATH_PATTERN = /orbital-pickup\.m4a$/u;
+const CLIENT_RELEASE_ID_PATTERN = /^(dev|[a-f0-9]{40})$/u;
+const RESUME_TOKEN_PATTERN = /^[a-z0-9]{64}$/u;
+const JOIN_ACK_ORDER_ERROR_PATTERN = /before.*join ack/u;
+
 type TransportMessage = {
   type: string;
   id?: string;
@@ -126,7 +134,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
         position: { x: 30, y: 0 },
       });
       expect(played).toHaveLength(1);
-      expect(played[0]).toMatch(/sounds\/laser\.m4a$/);
+      expect(played[0]).toMatch(LASER_SOUND_PATH_PATTERN);
       ws.receive('playerShotFired', {
         id: 'self-shot',
         ownerId: player.id,
@@ -148,7 +156,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ws.receive('lootCollected', collection);
       ws.receive('lootCollected', collection);
       expect(played).toHaveLength(2);
-      expect(played[1]).toMatch(/sounds\/loot-pickup\.m4a$/);
+      expect(played[1]).toMatch(LOOT_PICKUP_SOUND_PATH_PATTERN);
       ws.receive('lootCollected', { ...collection, lootId: 'invalid-kind', kind: 'unknown' });
       ws.receive('lootCollected', {
         ...collection,
@@ -237,7 +245,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       expect(paths).toEqual([]);
       ws.receive('abilityUsed', { id: player.id, kitId: 'surveyor', abilityId: 'surveyScan' });
       expect(paths).toHaveLength(1);
-      expect(paths[0]).toMatch(/survey-scan\.m4a$/);
+      expect(paths[0]).toMatch(SURVEY_SCAN_SOUND_PATH_PATTERN);
       const pickup = {
         pickupId: 'uncached',
         playerId: 'uncached-pilot',
@@ -250,7 +258,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       expect(paths).toHaveLength(1);
       ws.receive('satellitePickupCollected', { ...pickup, position: { x: 30, y: 0 } });
       expect(paths).toHaveLength(2);
-      expect(paths[1]).toMatch(/orbital-pickup\.m4a$/);
+      expect(paths[1]).toMatch(ORBITAL_PICKUP_SOUND_PATH_PATTERN);
     } finally {
       resetGameAudio();
       setSound(false);
@@ -649,11 +657,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     assert.ok(initialJoinData, 'initial join data');
     expect(initialJoinData.snapshotVersion).toBe(1);
     expect(initialJoinData.asteroidInteractions).toBe(1);
-    expect(initialJoinData['clientReleaseId']).toMatch(/^(dev|[a-f0-9]{40})$/);
+    expect(initialJoinData['clientReleaseId']).toMatch(CLIENT_RELEASE_ID_PATTERN);
     expect(new URL(ws.url).searchParams.get('snapshotVersion')).toBe('1');
     expect(new URL(ws.url).searchParams.get('asteroidInteractions')).toBe('1');
     if (initialJoinData.resumeToken !== undefined) {
-      expect(initialJoinData.resumeToken).toMatch(/^[a-z0-9]{64}$/);
+      expect(initialJoinData.resumeToken).toMatch(RESUME_TOKEN_PATTERN);
     }
     acknowledge(ws);
   });
@@ -696,7 +704,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(errorLog).toHaveBeenCalledWith(
       'STATE',
       'snapshot_rejected',
-      expect.objectContaining({ message: expect.stringMatching(/before.*join ack/) }),
+      expect.objectContaining({ message: expect.stringMatching(JOIN_ACK_ORDER_ERROR_PATTERN) }),
       expect.objectContaining({
         lastAcceptedSequence: 0,
         expectedSequence: 1,

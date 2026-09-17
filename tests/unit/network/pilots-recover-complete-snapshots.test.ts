@@ -9,6 +9,14 @@ import {
 import { decodeSnapshotMessage, snapshotMessage } from '../../support/decodeSnapshotMessage';
 import { snapshotFixture } from './snapshotFixture';
 
+const NON_JSON_ERROR_PATTERN = /Non-JSON/u;
+const BASELINE_ERROR_PATTERN = /baseline/u;
+const DTO_ERROR_PATTERN = /DTO/u;
+const REFERENCES_ERROR_PATTERN = /references/u;
+const STALE_SNAPSHOT_ERROR_PATTERN = /Stale/u;
+const UNSAFE_SNAPSHOT_ERROR_PATTERN = /Unsafe/u;
+const JOIN_ACK_ORDER_ERROR_PATTERN = /before.*join ack/u;
+
 describe('pilots reconstruct complete authoritative worlds', () => {
   test('compact world coordinates preserve precise ship handoffs, resources and future fields', () => {
     const world = snapshotFixture();
@@ -105,7 +113,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     }
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       asteroid.position.x = value;
-      expect(() => new SnapshotEncoder(world)).toThrow(/Non-JSON/u);
+      expect(() => new SnapshotEncoder(world)).toThrow(NON_JSON_ERROR_PATTERN);
       expect(Object.is(asteroid.position.x, value)).toBe(true);
     }
   });
@@ -223,7 +231,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const delta = nextEncoder.encode(2, { sequence: 1, state: first.state });
     expect(() =>
       decodeSnapshotMessage(decoder, snapshotMessage({ ...delta, sequence: 3 }))
-    ).toThrow(/baseline/u);
+    ).toThrow(BASELINE_ERROR_PATTERN);
     expect(() =>
       decodeSnapshotMessage(
         decoder,
@@ -248,7 +256,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
           },
         })
       )
-    ).toThrow(/DTO/u);
+    ).toThrow(DTO_ERROR_PATTERN);
     const invalidReference = captureSnapshot(snapshotFixture(2));
     const collabTag = invalidReference.collabTags[0];
     assert.ok(collabTag, 'collab tag');
@@ -258,18 +266,22 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         decoder,
         snapshotMessage({ version: 1, sequence: 2, kind: 'keyframe', state: invalidReference })
       )
-    ).toThrow(/references/u);
+    ).toThrow(REFERENCES_ERROR_PATTERN);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(delta))).toEqual(nextEncoder.state);
-    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/Stale/u);
+    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(
+      STALE_SNAPSHOT_ERROR_PATTERN
+    );
     expect(() =>
       decodeSnapshotMessage(
         decoder,
         '{"type":"snapshot","data":{"version":1,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}}'
       )
-    ).toThrow(/Unsafe/u);
+    ).toThrow(UNSAFE_SNAPSHOT_ERROR_PATTERN);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(50)))).toEqual(first.state);
     decoder.reset();
-    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/baseline/u);
+    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(
+      BASELINE_ERROR_PATTERN
+    );
     expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)))).toEqual(first.state);
   });
 
@@ -416,7 +428,9 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const rejected = decoder.readMessage(keyframe, { acceptSnapshots: false });
     expect(rejected).toMatchObject({
       kind: 'snapshot-rejected',
-      error: expect.objectContaining({ message: expect.stringMatching(/before.*join ack/u) }),
+      error: expect.objectContaining({
+        message: expect.stringMatching(JOIN_ACK_ORDER_ERROR_PATTERN),
+      }),
       metadata: { kind: 'keyframe', sequence: 1 },
     });
 

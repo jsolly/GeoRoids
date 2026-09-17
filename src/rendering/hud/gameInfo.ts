@@ -7,6 +7,8 @@ import type { PlayfieldSize } from '../playfieldCamera';
 import { layoutHudCluster } from './cluster';
 import { type HudLayout, scaleHudFont } from './hudLayout';
 
+const GAME_OVER_PREFIX_PATTERN = /^Game Over:\s*/iu;
+
 export function drawScoreOverlay(
   ctx: CanvasRenderingContext2D,
   layout: HudLayout,
@@ -116,7 +118,7 @@ export function drawTextOverlay(
     ctx.fillText('GAME OVER', centerX, centerY - 80 * scale);
 
     if (isDeathMessage) {
-      const deathCause = text.replace(/^Game Over:\s*/i, '');
+      const deathCause = text.replace(GAME_OVER_PREFIX_PATTERN, '');
       ctx.fillStyle = hexToRgba(PALETTE.HUD, alpha);
       ctx.font = `${Math.round(24 * scale)}px Arial`;
       ctx.textAlign = 'center';

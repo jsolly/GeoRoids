@@ -4,6 +4,9 @@ import process from 'node:process';
 import type { Writable } from 'node:stream';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
+const SERVER_LOG_ROTATED_PATTERN = /server\.log\.1$/u;
+const SERVER_LOG_PATTERN = /server\.log$/u;
+
 const state = vi.hoisted(() => ({
   callbacks: [] as Array<(error?: Error | null) => void>,
   failure: null as Error | null,
@@ -303,10 +306,12 @@ test('server.log rotates before a record would exceed its disk bound', async () 
   state.statSize = 10 * 1024 * 1024;
   const { writeServerDiagnostic } = await import('../../../setup/serverLogger');
   await expect(writeServerDiagnostic('after rotation')).resolves.toBe(true);
-  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(/server\.log\.1$/u), { force: true });
+  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(SERVER_LOG_ROTATED_PATTERN), {
+    force: true,
+  });
   expect(state.rename).toHaveBeenCalledWith(
-    expect.stringMatching(/server\.log$/u),
-    expect.stringMatching(/server\.log\.1$/u)
+    expect.stringMatching(SERVER_LOG_PATTERN),
+    expect.stringMatching(SERVER_LOG_ROTATED_PATTERN)
   );
 });
 

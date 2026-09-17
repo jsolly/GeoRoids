@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import process from 'node:process';
 import { expect, test } from 'vitest';
 import {
   EO_OUTLINES,
@@ -15,6 +16,8 @@ import {
   serializeKitHullSvg,
 } from '../../../src/entities/ship/hullOutlines';
 import { SHIP_HULL_TOPOLOGY, SHIP_KIT_IDS } from '../../../src/entities/ship/shipKits';
+
+const V1_VERSION_PATTERN = /v1/iu;
 
 const EO_SVG_PACK_DIR = 'georoids-art/eo-satellites';
 const EO_SVG_FILE_NAMES: Record<EoOutlineId, string> = {
@@ -79,7 +82,7 @@ test('hangar SVG pack matches the outline bake and names no v1 sheets', () => {
     const onDisk = readFileSync(resolve(process.cwd(), HULL_SVG_PACK_DIR, fileName), 'utf8');
     expect(onDisk).toBe(serializeKitHullSvg(outline.kitId));
     expect(onDisk).toContain(outline.topology);
-    expect(onDisk).not.toMatch(/v1/i);
+    expect(onDisk).not.toMatch(V1_VERSION_PATTERN);
     expect(onDisk).toContain('#5EEAD4');
     expect(onDisk).toContain('#000011');
   }

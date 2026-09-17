@@ -1,5 +1,5 @@
 import type { Player } from '../entities/player/Player';
-import { canvasManager } from '../rendering/canvas';
+import { canvasManager } from '../rendering/canvasSurface';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';

@@ -595,7 +595,12 @@ export class GameStateBroadcaster {
       recordOutbound(outboundClass(message), 'failed');
       logger.error('Failed to serialize direct message', {
         type: messageType(message),
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       return;
     }
@@ -632,7 +637,12 @@ export class GameStateBroadcaster {
       // flap every client into the Reconnecting banner (#485 live miss).
       logger.error('Failed to serialize broadcast', {
         type: messageType(message),
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       return;
     }

@@ -9,6 +9,8 @@ import { radiusFromMass, resetShipMass } from '../shared/shipGrowth';
 import type { AsteroidData } from '../shared-types';
 import { applyShipKitStats } from '../src/entities/ship/shipKits';
 
+const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+
 export function normalizeFixtureAsteroids(asteroids: AsteroidData[]) {
   const slots = new Map(asteroids.map((asteroid, index) => [asteroid.id, `asteroid-${index}`]));
   return asteroids.map(({ id, phenomenon, ...asteroid }) => ({
@@ -309,7 +311,9 @@ export async function prepareFixture(path: string, request: FixtureRequest) {
     assert(new Set(missing).size === missing.length, 'Duplicate pending participant');
     return { kind: 'pending' as const, missing };
   }
-  assert('hash' in value && typeof value.hash === 'string' && /^[a-f0-9]{64}$/.test(value.hash));
+  assert(
+    'hash' in value && typeof value.hash === 'string' && PILOT_TOKEN_HASH_PATTERN.test(value.hash)
+  );
   assert('epoch' in value && typeof value.epoch === 'number');
   assert('gameTime' in value && typeof value.gameTime === 'number');
   assert('manifest' in value && 'baselines' in value && Array.isArray(value.baselines));

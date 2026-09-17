@@ -6,6 +6,15 @@ import { readWikiArticles } from '../../../scripts/wiki-content';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { searchArticles } from '../../../src/wiki/search';
 
+const BROKEN_LINK_PATTERN = /broken or unsupported link/u;
+const MISSING_IMAGE_PATTERN = /missing image/u;
+const ALT_TEXT_REQUIRED_PATTERN = /alternative text/u;
+const TITLE_LINE_PATTERN = /title:.*\n/u;
+const TRAILING_NEWLINE_PATTERN = /\n$/u;
+const HEADING_MATCH_PATTERN = /heading must match exactly one Heading 2/u;
+const RESERVED_WIKI_ID_PATTERN = /Reserved wiki ID/u;
+const REQUIRED_WIKI_ARTICLE_PATTERN = /Missing required wiki article/u;
+
 const fixtures: string[] = [];
 afterEach(() => {
   for (const root of fixtures.splice(0)) {
@@ -49,22 +58,25 @@ test('an editor adds a formatted searchable article without changing application
 test('an editor cannot publish a broken article link or a missing image', () => {
   const root = fixture();
   addArticle(root, '[Missing](/wiki/#does-not-exist)');
-  expect(() => readWikiArticles(root)).toThrow(/broken or unsupported link/);
+  expect(() => readWikiArticles(root)).toThrow(BROKEN_LINK_PATTERN);
   addArticle(root, '![A practice orbit](/wiki/uploads/orbit.png)');
-  expect(() => readWikiArticles(root)).toThrow(/missing image/);
+  expect(() => readWikiArticles(root)).toThrow(MISSING_IMAGE_PATTERN);
   mkdirSync(join(root, 'public/wiki/uploads'), { recursive: true });
   cpSync('public/wiki/media/movement.png', join(root, 'public/wiki/uploads/orbit.png'));
   expect(readWikiArticles(root).find((entry) => entry.id === 'practice')?.html).toContain(
     'alt="A practice orbit"'
   );
   addArticle(root, '![](/wiki/uploads/orbit.png)');
-  expect(() => readWikiArticles(root)).toThrow(/alternative text/);
+  expect(() => readWikiArticles(root)).toThrow(ALT_TEXT_REQUIRED_PATTERN);
 });
 
 test('an editor keeps the old URL when renaming an article title', () => {
   const root = fixture();
   const file = join(root, 'content/wiki/controls.md');
-  writeFileSync(file, readFileSync(file, 'utf8').replace(/title:.*\n/, 'title: Pilot controls\n'));
+  writeFileSync(
+    file,
+    readFileSync(file, 'utf8').replace(TITLE_LINE_PATTERN, 'title: Pilot controls\n')
+  );
   expect(readWikiArticles(root).find((entry) => entry.id === 'controls')?.title).toBe(
     'Pilot controls'
   );
@@ -76,7 +88,7 @@ test('the compiler accepts Pages CMS frontmatter serialization', () => {
   const saved = readFileSync(file, 'utf8')
     .replace('\nmedia: []', '')
     .replace('---\n\n## What the manual covers', '---\n## What the manual covers')
-    .replace(/\n$/, '');
+    .replace(TRAILING_NEWLINE_PATTERN, '');
   writeFileSync(file, saved);
   expect(readWikiArticles(root).find((entry) => entry.id === 'field-manual')?.title).toBe(
     'Read the field'
@@ -97,7 +109,7 @@ test('an editor places a demonstration beside its section and repairs renamed he
   expect(article?.html).toContain('class="topic-demo-card"');
   expect(article?.html).toContain('data-media="movement"');
   writeFileSync(file, raw.replace('## First flight', '## Practice flight'));
-  expect(() => readWikiArticles(root)).toThrow(/heading must match exactly one Heading 2/);
+  expect(() => readWikiArticles(root)).toThrow(HEADING_MATCH_PATTERN);
   writeFileSync(file, raw.replaceAll('First flight', 'Practice flight'));
   expect(readWikiArticles(root).find((entry) => entry.id === 'practice')?.media).toEqual([
     'movement',
@@ -108,8 +120,8 @@ test('an editor cannot replace a reserved route or remove a required manual entr
   const root = fixture();
   addArticle(root, 'Practice docking.');
   cpSync(join(root, 'content/wiki/practice.md'), join(root, 'content/wiki/ships.md'));
-  expect(() => readWikiArticles(root)).toThrow(/Reserved wiki ID/);
+  expect(() => readWikiArticles(root)).toThrow(RESERVED_WIKI_ID_PATTERN);
   rmSync(join(root, 'content/wiki/ships.md'));
   rmSync(join(root, 'content/wiki/field-manual.md'));
-  expect(() => readWikiArticles(root)).toThrow(/Missing required wiki article/);
+  expect(() => readWikiArticles(root)).toThrow(REQUIRED_WIKI_ARTICLE_PATTERN);
 });

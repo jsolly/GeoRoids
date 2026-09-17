@@ -8,7 +8,7 @@ import {
   drawRoidsRelative,
   recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import * as vectorJuice from '../../../src/rendering/vectorJuice';
 import { setWindowViewport } from '../../support/viewport';
 
@@ -43,7 +43,7 @@ function asteroidScene() {
   canvasManager.destroy();
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
-  previousCanvas = document.getElementById('gameCanvas');
+  previousCanvas = document.querySelector('#gameCanvas');
   if (previousCanvas) {
     previousCanvas.replaceWith(canvas);
   } else {

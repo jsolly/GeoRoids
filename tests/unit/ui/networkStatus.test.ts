@@ -44,7 +44,7 @@ test('a reconnecting event shows a temporary banner that hides on reconnect', ()
 
   window.dispatchEvent(new CustomEvent('networkReconnecting'));
   expect(isNetworkBannerVisible()).toBe(true);
-  expect(document.getElementById('network-status-banner')?.textContent).toBe(
+  expect(document.querySelector('#network-status-banner')?.textContent).toBe(
     RECONNECTING_BANNER_TEXT
   );
 
@@ -53,7 +53,7 @@ test('a reconnecting event shows a temporary banner that hides on reconnect', ()
 
   window.dispatchEvent(new CustomEvent('networkPermanentlyDisconnected', { detail: {} }));
   expect(isNetworkBannerVisible()).toBe(true);
-  expect(document.getElementById('network-status-banner')?.textContent).toBe(
+  expect(document.querySelector('#network-status-banner')?.textContent).toBe(
     DISCONNECT_BANNER_TEXT
   );
 });

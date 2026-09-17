@@ -36,11 +36,12 @@ export function scaleHudFont(font: string, scale: number): string {
     return font;
   }
   return font.replace(
-    /(\d+(?:\.\d+)?)px/,
+    HUD_FONT_SIZE_PATTERN,
     (_, px: string) => `${Math.max(1, Math.round(Number(px) * scale))}px`
   );
 }
 
+const HUD_FONT_SIZE_PATTERN = /(\d+(?:\.\d+)?)px/u;
 const ZERO_SAFE: SafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DESKTOP_EDGE = VISUAL.HUD_INSET;
 
@@ -48,7 +49,7 @@ function readSafeAreaInsets(): SafeAreaInsets {
   if (typeof document === 'undefined') {
     return { ...ZERO_SAFE };
   }
-  const probe = document.getElementById('safe-area-probe');
+  const probe = document.querySelector('#safe-area-probe');
   if (!probe) {
     return { ...ZERO_SAFE };
   }

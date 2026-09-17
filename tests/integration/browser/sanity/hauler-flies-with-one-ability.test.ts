@@ -12,6 +12,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 const FIXTURE_ASTEROID_ID = 'crew-fixture-ore';
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 test.each([
   { width: 1280, height: 900 },
@@ -32,7 +33,7 @@ test.each([
     let snapshot: ServerGameSnapshot | undefined;
     let snapshotCount = 0;
     page.on('websocket', (socket) => {
-      if (!/\/ws(?:\?|$)/.test(socket.url())) {
+      if (!WS_PATH_PATTERN.test(socket.url())) {
         return;
       }
       socket.on('framereceived', ({ payload }) => {

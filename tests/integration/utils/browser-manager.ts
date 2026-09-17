@@ -62,11 +62,9 @@ export class BrowserManager {
         await context.close();
         this.contexts.delete(context);
       } catch (closeError: unknown) {
-        throw new AggregateError(
-          [error, closeError],
-          'Browser context failed while creating a scenario page',
-          { cause: error }
-        );
+        throw new Error('Browser context failed while creating a scenario page', {
+          cause: closeError,
+        });
       }
       throw error;
     }

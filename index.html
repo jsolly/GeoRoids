@@ -35,13 +35,13 @@
     <main id="gameWrapper">
       <div id="start-screen" class="screen">
         <p class="terrain-eyebrow">Read the terrain. Explore together.</p>
-        <h1 class="text-center">GeoRoids</h1>
+        <h1>GeoRoids</h1>
         <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map</p>
         <p class="manual-entry"><a href="/wiki/">Open field manual →</a></p>
 
         <!-- Join the multiplayer session -->
         <div class="game-modes">
-          <div class="mb-3">
+          <div>
             <label for="playerNameInput" class="form-label">Your Nickname</label>
             <input
               type="text"
@@ -57,9 +57,9 @@
             <div id="ship-kit-grid" class="ship-kit-grid"></div>
 
           </fieldset>
-          <ul class="nav flex-column">
+          <ul class="nav">
             <li class="nav-item">
-              <button id="start-game" type="button" class="btn btn-lg btn-phosphor">
+              <button id="start-game" type="button" class="btn btn-phosphor">
                 Enter Game
               </button>
             </li>
@@ -68,7 +68,7 @@
 
         <!-- Settings -->
         <div class="settings">
-          <ul class="nav flex-column">
+          <ul class="nav">
             <li class="nav-item">
               <input
                 class="form-check-input"
@@ -89,7 +89,7 @@
 
       </div>
 
-      <div id="gameArea" style="display: none">
+      <div id="gameArea" >
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button
           id="universe-map-toggle"

@@ -56,6 +56,8 @@ export const DESKTOP_CONTROLS_HINT =
 export const TOUCH_CONTROLS_HINT =
   'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Map button';
 
-export function controlsHintFor(query: ViewportQuery = queryViewport()): string {
+export function controlsHintFor(
+  query: ViewportQuery = queryViewport()
+): typeof DESKTOP_CONTROLS_HINT | typeof TOUCH_CONTROLS_HINT {
   return shouldUseTouchControls(query) ? TOUCH_CONTROLS_HINT : DESKTOP_CONTROLS_HINT;
 }

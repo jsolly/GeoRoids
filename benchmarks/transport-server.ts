@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import process from 'node:process';
 import { createServerInstance } from '../server/createServer';
 
 const eventLoopDelay = monitorEventLoopDelay({ resolution: 10 });

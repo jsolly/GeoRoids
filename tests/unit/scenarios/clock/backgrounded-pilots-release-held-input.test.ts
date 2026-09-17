@@ -6,7 +6,7 @@ import { PlayerManager } from '../../../../src/entities/player/PlayerManager';
 import { controlSources } from '../../../../src/input/controlSources';
 import { getPressedKeysForPlayer, keys } from '../../../../src/input/keybindings';
 import { NetworkManager } from '../../../../src/network/networkManager';
-import { canvasManager } from '../../../../src/rendering/canvas';
+import { canvasManager } from '../../../../src/rendering/canvasSurface';
 
 afterEach(() => {
   canvasManager.destroy();

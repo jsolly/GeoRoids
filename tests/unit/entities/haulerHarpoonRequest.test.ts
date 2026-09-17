@@ -1,46 +1,50 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { Ship } from '../../../src/entities/ship/Ship';
+import {
+  bindShipCombatNetwork,
+  resetShipCombatNetwork,
+} from '../../../src/entities/ship/shipCombatNetwork';
 import { GameServerWorld } from '../scenarios/support/gameServerWorld';
 
-const mockSendMessage = vi.fn<(message: Record<string, unknown>) => boolean>(() => true);
-vi.mock('../../../src/network/networkManager', () => ({
-  NetworkManager: {
-    getInstance: vi.fn(() => ({
-      isConnected: true,
-      getLocalPlayerId: () => 'alice',
-      sendMessage: mockSendMessage,
-    })),
-  },
-}));
+const mockSendAbility = vi.fn<(data: { kitId: string; abilityId: string }) => boolean>(() => true);
 afterEach(() => {
-  mockSendMessage.mockReset();
-  mockSendMessage.mockReturnValue(true);
+  mockSendAbility.mockReset();
+  mockSendAbility.mockReturnValue(true);
+  resetShipCombatNetwork();
   publishHarpoonField([]);
 });
 
+function bindTestCombatNetwork(): void {
+  bindShipCombatNetwork({
+    isConnected: true,
+    localPlayerId: 'alice',
+    sendShoot: () => undefined,
+    sendAbility: (data) => mockSendAbility(data),
+  });
+}
+
 test('a Hauler asks the server even when its visible field has no eligible target', () => {
+  bindTestCombatNetwork();
   const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
   expect(ship.activateAbility()).toBe(true);
-  expect(mockSendMessage).toHaveBeenCalledWith({
-    type: 'useAbility',
-    id: 'alice',
-    data: { kitId: 'hauler', abilityId: 'harpoon' },
-  });
+  expect(mockSendAbility).toHaveBeenCalledWith({ kitId: 'hauler', abilityId: 'harpoon' });
   expect(ship.abilityCooldownFrames).toBe(0);
   expect(ship.harpoonTargetId).toBeNull();
 });
 
 test('a rejected send cannot invent a local attachment or start its cooldown', () => {
+  bindTestCombatNetwork();
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
   const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
-  mockSendMessage.mockReturnValue(false);
+  mockSendAbility.mockReturnValue(false);
   expect(ship.activateAbility()).toBe(false);
   expect(ship.harpoonTargetId).toBeNull();
   expect(ship.abilityCooldownFrames).toBe(0);
 });
 
 test('two rapid presses reach the server in order without a predicted cooldown dropping release', () => {
+  bindTestCombatNetwork();
   const world = new GameServerWorld();
   try {
     const pilot = world.joinWithId('alice', 'Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
@@ -61,8 +65,12 @@ test('two rapid presses reach the server in order without a predicted cooldown d
     const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
     expect(ship.activateAbility()).toBe(true);
     expect(ship.activateAbility()).toBe(true);
-    expect(mockSendMessage).toHaveBeenCalledTimes(2);
-    const requests = mockSendMessage.mock.calls.map((call) => call[0]);
+    expect(mockSendAbility).toHaveBeenCalledTimes(2);
+    const requests = mockSendAbility.mock.calls.map((call) => ({
+      type: 'useAbility',
+      id: 'alice',
+      data: call[0],
+    }));
     const first = requests[0];
     const second = requests[1];
     if (!first || !second) {
@@ -80,21 +88,23 @@ test('two rapid presses reach the server in order without a predicted cooldown d
 });
 
 test('an acknowledged Hauler tow releases during cooldown while a detached hull stays cooling', () => {
+  bindTestCombatNetwork();
   const ship = new Ship({ kitId: 'hauler', isLocalPlayer: true });
   ship.harpoonTargetId = 'acknowledged-rock';
   ship.abilityCooldownFrames = 170;
   expect(ship.activateAbility()).toBe(true);
-  expect(mockSendMessage).toHaveBeenCalledOnce();
+  expect(mockSendAbility).toHaveBeenCalledOnce();
   // Keep the visible result authoritative until its release is confirmed.
   expect(ship.harpoonTargetId).toBe('acknowledged-rock');
   ship.harpoonTargetId = null;
   expect(ship.activateAbility()).toBe(false);
-  expect(mockSendMessage).toHaveBeenCalledOnce();
+  expect(mockSendAbility).toHaveBeenCalledOnce();
 });
 
 test('Surveyor does not send a failed ability request', () => {
+  bindTestCombatNetwork();
   const ship = new Ship({ kitId: 'surveyor', isLocalPlayer: true });
   ship.abilityCooldownFrames = 40;
   expect(ship.activateAbility()).toBe(false);
-  expect(mockSendMessage).not.toHaveBeenCalled();
+  expect(mockSendAbility).not.toHaveBeenCalled();
 });

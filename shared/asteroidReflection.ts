@@ -200,7 +200,7 @@ function prepare(asteroids: readonly ReflectionAsteroid[]): PreparedAsteroid[] {
 }
 
 /** -1 outside, 0 on the boundary, 1 inside (including concave radial contours). */
-function containment(point: Position, polygon: readonly Position[]): number {
+function containment(point: Position, polygon: readonly Position[]): -1 | 0 | 1 {
   let inside = false;
   for (let index = 0; index < polygon.length; index += 1) {
     const a = polygon[index];

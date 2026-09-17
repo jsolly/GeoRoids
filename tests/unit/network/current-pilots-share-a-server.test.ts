@@ -18,6 +18,8 @@ import type { ServerGameSnapshot } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+
 type SendCallback = (error?: Error) => void;
 type SendOptions = {
   mask?: boolean;
@@ -188,7 +190,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       data: {
         snapshotVersion: 1,
         asteroidInteractions: 1,
-        resumeToken: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        resumeToken: expect.stringMatching(RESUME_TOKEN_PATTERN),
         serverReleaseId: expect.any(String),
         credentialReleaseId: expect.any(String),
         scoreReleaseId: expect.any(String),

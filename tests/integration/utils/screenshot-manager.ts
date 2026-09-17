@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import process from 'node:process';
 
 export class ScreenshotManager {
   private readonly screenshotsDir: string;
@@ -20,7 +21,7 @@ export class ScreenshotManager {
    * Generate a timestamped filename
    */
   getTimestampedFilename(prefix: string): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/gu, '-');
     return `${prefix}-${timestamp}.png`;
   }
 

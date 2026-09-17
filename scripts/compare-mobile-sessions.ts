@@ -49,8 +49,10 @@ assert(
   experiment['kind'] === 'quality' || experiment['kind'] === 'product',
   'Declare quality or product experiment'
 );
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+
 function hash(value: unknown) {
-  assert(typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value), 'Missing SHA-256 provenance');
+  assert(typeof value === 'string' && SHA256_PATTERN.test(value), 'Missing SHA-256 provenance');
   return value;
 }
 const harnessHash = hash(experiment['harnessSha256']);

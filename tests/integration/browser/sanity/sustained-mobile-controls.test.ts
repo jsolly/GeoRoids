@@ -54,7 +54,7 @@ test(
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
-        document.getElementById('touch-controls')?.hidden === false,
+        document.querySelector<HTMLElement>('#touch-controls')?.hidden === false,
       undefined,
       { timeout: 5000 }
     );

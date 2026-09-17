@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { projectWorldToScreenInto } from '../../../src/rendering/playfieldCamera';
 import { setWindowViewport } from '../../support/viewport';
 
@@ -28,7 +28,7 @@ test.each([
   ({ width, height, center, target }) => {
     canvas = document.createElement('canvas');
     canvas.id = 'gameCanvas';
-    previousCanvas = document.getElementById('gameCanvas');
+    previousCanvas = document.querySelector('#gameCanvas');
     if (previousCanvas) {
       previousCanvas.replaceWith(canvas);
     } else {

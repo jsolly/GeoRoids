@@ -275,6 +275,78 @@ async function stopAndSaveTrace(session: CDPSession, outputPath: string): Promis
   return artifact;
 }
 
+type ActiveTraceSession = {
+  session: CDPSession | undefined;
+  started: boolean;
+};
+
+function assignTraceArtifact(artifact: TraceArtifact): void {
+  traceArtifact = artifact;
+}
+
+function createTraceStopper(
+  runtime: ActiveTraceSession,
+  outputPath: string | undefined,
+  onArtifact: (artifact: TraceArtifact) => void
+) {
+  return async () => {
+    const artifact = await stopActiveTraceSession(runtime, outputPath);
+    if (artifact) {
+      onArtifact(artifact);
+    }
+  };
+}
+
+async function stopActiveTraceSession(
+  runtime: ActiveTraceSession,
+  outputPath: string | undefined
+): Promise<TraceArtifact | undefined> {
+  if (!runtime.session) {
+    return undefined;
+  }
+  let capturedArtifact: TraceArtifact | undefined;
+  const session = runtime.session;
+  runtime.session = undefined;
+  let stopFailure: unknown;
+  let stopFailed = false;
+  try {
+    if (runtime.started) {
+      assert(outputPath);
+      try {
+        const artifact = await stopAndSaveTrace(session, outputPath);
+        capturedArtifact = artifact;
+        assert(!artifact.dataLossOccurred, 'Chromium tracing reported data loss');
+      } catch (error) {
+        if (error instanceof TraceCaptureError) {
+          capturedArtifact = error.artifact;
+        }
+        stopFailed = true;
+        stopFailure = error;
+      }
+    }
+  } finally {
+    runtime.started = false;
+  }
+  let detachFailure: unknown;
+  let detachFailed = false;
+  try {
+    await withTimeout(session.detach(), TRACE_COMPLETION_TIMEOUT_MS, 'Chromium tracing CDP detach');
+  } catch (error) {
+    detachFailed = true;
+    detachFailure = error;
+  }
+  if (stopFailed) {
+    if (detachFailed) {
+      throw new AggregateError([stopFailure, detachFailure], 'Trace stop or detach failed');
+    }
+    throw stopFailure;
+  }
+  if (detachFailed) {
+    throw detachFailure;
+  }
+  return capturedArtifact;
+}
+
 function advertisedContentLength(response: PlaywrightResponse): number | undefined {
   const value = response.headers()['content-length'];
   if (value === undefined) {
@@ -823,14 +895,13 @@ try {
       await writeFile(values['cpu-profile'], JSON.stringify(profile));
       await session.detach();
     }
-    let traceSession: CDPSession | undefined;
-    let traceStarted = false;
-    async function startTrace() {
+    const traceRuntime: ActiveTraceSession = { session: undefined, started: false };
+    const startTrace = async () => {
       if (!tracePath) {
         return;
       }
       const session = await context.newCDPSession(page);
-      traceSession = session;
+      traceRuntime.session = session;
       await session.send('Tracing.start', {
         transferMode: 'ReturnAsStream',
         streamFormat: 'json',
@@ -843,55 +914,9 @@ try {
           includedCategories: TRACE_CATEGORIES.split(','),
         },
       });
-      traceStarted = true;
-    }
-    async function stopTrace() {
-      if (!traceSession) {
-        return;
-      }
-      const session = traceSession;
-      traceSession = undefined;
-      let stopFailure: unknown;
-      let stopFailed = false;
-      try {
-        if (traceStarted) {
-          assert(tracePath);
-          try {
-            traceArtifact = await stopAndSaveTrace(session, tracePath);
-            assert(!traceArtifact.dataLossOccurred, 'Chromium tracing reported data loss');
-          } catch (error) {
-            if (error instanceof TraceCaptureError) {
-              traceArtifact = error.artifact;
-            }
-            stopFailed = true;
-            stopFailure = error;
-          }
-        }
-      } finally {
-        traceStarted = false;
-      }
-      let detachFailure: unknown;
-      let detachFailed = false;
-      try {
-        await withTimeout(
-          session.detach(),
-          TRACE_COMPLETION_TIMEOUT_MS,
-          'Chromium tracing CDP detach'
-        );
-      } catch (error) {
-        detachFailed = true;
-        detachFailure = error;
-      }
-      if (stopFailed) {
-        if (detachFailed) {
-          throw new AggregateError([stopFailure, detachFailure], 'Trace stop or detach failed');
-        }
-        throw stopFailure;
-      }
-      if (detachFailed) {
-        throw detachFailure;
-      }
-    }
+      traceRuntime.started = true;
+    };
+    const stopTrace = createTraceStopper(traceRuntime, tracePath, assignTraceArtifact);
     async function markTraceMeasurementEnd(): Promise<void> {
       if (!traceMeasurementStarted || traceMeasurementEndAttempted || !tracePath) {
         return;
@@ -1093,18 +1118,25 @@ try {
           }),
         'Browser gameplay did not use owned endpoint'
       );
+      const protocolPeerFail = (error: unknown) => {
+        errors.push(String(error));
+      };
+      const protocolPeerOptions = (_index: number) => ({
+        url: new URL(`${socketUrl}?asteroidInteractions=1`),
+        measuring: () => measuring,
+        fail: protocolPeerFail,
+        deliveryBudget: () => delivery,
+        repeatMeasuredPings: false,
+      });
       for (let index = 0; index < (workload === 'combat' ? 4 : 0); index++) {
         await delay(1500);
-        const peer = new Pilot(index, {
-          url: new URL(`${socketUrl}?asteroidInteractions=1`),
-          measuring: () => measuring,
-          fail: (error) => errors.push(String(error)),
-          deliveryBudget: () => delivery,
-          repeatMeasuredPings: false,
-        });
+        const peer = new Pilot(index, protocolPeerOptions(index));
         peers.push(peer);
         const deadline = performance.now() + 10_000;
-        while (!peer.state && performance.now() < deadline) {
+        while (!peer.state) {
+          if (performance.now() >= deadline) {
+            break;
+          }
           await delay(25);
         }
         assert(peer.state, 'Protocol peer failed admission');
@@ -1369,11 +1401,17 @@ try {
           // Keep offered work on the clock, independent of the previous frame's
           // observation cost. Missed slots are reported, never replayed in bursts.
           nextSlot += (missedSlots + 1) * 1000;
-          if (peers.some((peer, index) => peer.gameJoins !== preparedJoins[index])) {
+          const peerJoinsChanged = (expectedJoins: number[]) =>
+            peers.some((peer, index) => peer.gameJoins !== expectedJoins[index]);
+          const awaitingPeerState = () => peers.some((peer) => !peer.state);
+          if (peerJoinsChanged(preparedJoins)) {
             const restartAt = performance.now();
             await releaseInput();
             const deadline = performance.now() + 10_000;
-            while (peers.some((peer) => !peer.state) && performance.now() < deadline) {
+            while (awaitingPeerState()) {
+              if (performance.now() >= deadline) {
+                break;
+              }
               await delay(25);
             }
             assert(

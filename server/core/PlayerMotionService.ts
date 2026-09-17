@@ -438,7 +438,10 @@ export class PlayerMotionService {
 
   public ownsActorMotion(actorId: string): boolean {
     const session = this.sessions.get(actorId);
-    return !!session && (session.mode !== 'free' || !session.socket);
+    if (!session) {
+      return false;
+    }
+    return session.mode !== 'free' || !session.socket;
   }
 
   public getState(actorId: string): PlayerMotionState | undefined {

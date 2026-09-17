@@ -115,6 +115,8 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
         logger.debug('KEYBINDINGS', 'Updating rotation', { key: ev.code });
         reconcilePlayerInput(player);
         break;
+      default:
+        break;
     }
   }
 }
@@ -156,6 +158,8 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
     case 'ArrowRight':
     case 'KeyD':
       reconcilePlayerInput(player);
+      break;
+    default:
       break;
   }
 }

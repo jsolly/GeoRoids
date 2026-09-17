@@ -129,7 +129,7 @@ for (const viewport of [
         await page.waitForFunction(
           () =>
             document.body.classList.contains('touch-play') &&
-            !document.querySelector('#touch-controls')?.hidden,
+            !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
           { timeout: 5000 }
         );
       }

@@ -3,12 +3,16 @@ import { PALETTE, TITLE } from '../constants';
 
 type PlayerColorType = 'local' | 'remote';
 
-export function getPlayerColor(type: PlayerColorType): string {
+export function getPlayerColor(
+  type: PlayerColorType
+): typeof PALETTE.LOCAL | typeof PALETTE.REMOTE {
   switch (type) {
     case 'local':
       return PALETTE.LOCAL;
     case 'remote':
       return PALETTE.REMOTE;
+    default:
+      throw new Error(`Unexpected player color type: ${type}`);
   }
 }
 

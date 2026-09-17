@@ -4,7 +4,7 @@ import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { getWorldExploration } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
 import type { DrawingContext } from './drawingContext';
 import { resolveGlow } from './renderQuality';
 import { strokePhosphorPolyline, type Vec2 } from './vectorJuice';

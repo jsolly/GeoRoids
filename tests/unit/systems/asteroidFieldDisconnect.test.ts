@@ -11,7 +11,7 @@ test('disconnecting one of two players does not clear or pause the shared field'
   const idsBefore = engine
     .getAllAsteroids()
     .map((asteroid) => asteroid.id)
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
   expect(idsBefore.length).toBeGreaterThan(0);
   expect(engine.isGamePaused()).toBe(false);
 
@@ -23,7 +23,7 @@ test('disconnecting one of two players does not clear or pause the shared field'
     engine
       .getAllAsteroids()
       .map((asteroid) => asteroid.id)
-      .sort()
+      .sort((left, right) => left.localeCompare(right))
   ).toEqual(idsBefore);
 
   engine.removePlayer('peer-a');
@@ -32,7 +32,7 @@ test('disconnecting one of two players does not clear or pause the shared field'
     engine
       .getAllAsteroids()
       .map((asteroid) => asteroid.id)
-      .sort()
+      .sort((left, right) => left.localeCompare(right))
   ).toEqual(idsBefore);
 });
 

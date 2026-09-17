@@ -178,7 +178,9 @@ const mapAsset = shape<MapAsset>({
   position,
   name: string,
 });
-const sectorIdentity: Rule = (value) => typeof value === 'string' && /^-?\d+,-?\d+$/.test(value);
+const SECTOR_IDENTITY_PATTERN = /^-?\d+,-?\d+$/u;
+const sectorIdentity: Rule = (value) =>
+  typeof value === 'string' && SECTOR_IDENTITY_PATTERN.test(value);
 const worldRules = {
   exploration: validExploration,
   completedSectors: array(sectorIdentity),

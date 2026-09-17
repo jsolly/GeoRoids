@@ -124,7 +124,7 @@ export class SatellitePickupManager {
     return this.toPublic(pickup);
   }
 
-  public countOrbitingFor(ownerId: string): number {
+  public countOrbitingFor(ownerId: string) {
     let count = 0;
     for (const pickup of this.pickups.values()) {
       if (pickup.state === 'orbiting' && pickup.ownerId === ownerId) {

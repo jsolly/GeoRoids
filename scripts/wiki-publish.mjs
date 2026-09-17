@@ -12,7 +12,12 @@ export const ALLOWED_ROOTS = ['content/wiki', 'public/wiki/uploads'];
 export const RASTER_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/iu;
+const REFS_HEADS_PREFIX_PATTERN = /^refs\/heads\//u;
+const REMOTE_BRANCH_SHA_PATTERN = /^([0-9a-f]{40})\s+refs\/heads\/[^\n]+$/mu;
+const TRAILING_NEWLINES_PATTERN = /\n+$/u;
+const LINE_BREAK_PATTERN = /\r?\n/u;
 const WIKI_SNAPSHOT_MARKER = 'GeoRoids wiki draft snapshot:';
+const REGEX_METACHARACTER_PATTERN = /[.*+?^${}()|[\]\\]/gu;
 const MAX_SYNC_ATTEMPTS = 3;
 const CI_WORKFLOW = 'ci.yml';
 const CI_POLL_INTERVAL_MS = 15_000;
@@ -52,7 +57,7 @@ function normalizeRef(value) {
   if (typeof value !== 'string') {
     return value;
   }
-  return value.replace(/^refs\/heads\//u, '');
+  return value.replace(REFS_HEADS_PREFIX_PATTERN, '');
 }
 
 function pathHasUnsafeSegment(path) {
@@ -284,7 +289,7 @@ function ghJson(args, options = {}) {
 
 function remoteBranchSha(branch) {
   const output = git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`]);
-  const match = output.match(/^([0-9a-f]{40})\s+refs\/heads\/[^\n]+$/mu);
+  const match = output.match(REMOTE_BRANCH_SHA_PATTERN);
   return match ? match[1] : undefined;
 }
 
@@ -354,7 +359,7 @@ function entryMap(ref) {
 }
 
 function normalizeWikiMarkdownText(source) {
-  return `${source.replace(/\r\n/gu, '\n').replace(/\n+$/u, '')}\n`;
+  return `${source.replace(/\r\n/gu, '\n').replace(TRAILING_NEWLINES_PATTERN, '')}\n`;
 }
 
 function isWikiMarkdownPath(path) {
@@ -394,7 +399,7 @@ function publishedSnapshotTrees(mainSha, overlaySha) {
     const message = fields[index + 1];
     const marker = message.match(
       new RegExp(
-        `^${WIKI_SNAPSHOT_MARKER.replace(/[.*+?^${}()|[\\]\\\\]/gu, '\\\\$&')} ([0-9a-f]{40})$`,
+        `^${WIKI_SNAPSHOT_MARKER.replace(REGEX_METACHARACTER_PATTERN, '\\$&')} ([0-9a-f]{40})$`,
         'imu'
       )
     );
@@ -872,7 +877,7 @@ function snapshotMarkerLine(draftSha) {
 export function hasSnapshotMarker(message, draftSha) {
   return (
     typeof message === 'string' &&
-    message.split(/\r?\n/u).some((line) => line.trim() === snapshotMarkerLine(draftSha))
+    message.split(LINE_BREAK_PATTERN).some((line) => line.trim() === snapshotMarkerLine(draftSha))
   );
 }
 

@@ -1,8 +1,10 @@
 import type { WikiArticle } from './article';
 
+const WHITESPACE_SPLIT_PATTERN = /\s+/u;
+
 /** Match every query word, including words in rule details and linked topics. */
 export function searchArticles(articles: WikiArticle[], query: string): WikiArticle[] {
-  const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+  const terms = query.toLocaleLowerCase().trim().split(WHITESPACE_SPLIT_PATTERN).filter(Boolean);
   if (terms.length === 0) {
     return articles;
   }

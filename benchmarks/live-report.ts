@@ -4,10 +4,12 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { cpus, platform, release } from 'node:os';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type Measurement, validateMeasurement } from './results';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const TRAILING_SLASH_PATTERN = /\/$/u;
 const GIT_TIMEOUT_MS = 10_000;
 const GIT_PATH_ENVIRONMENT = [
   'GIT_DIR',
@@ -137,7 +139,9 @@ function liveInputHashes(root = ROOT) {
     ? readdirSync(join(root, 'dist'), { recursive: true, withFileTypes: true })
         .filter((entry) => entry.isFile())
         .map((entry) =>
-          join(entry.parentPath, entry.name).slice(root.replace(/\/$/, '').length + 1)
+          join(entry.parentPath, entry.name).slice(
+            root.replace(TRAILING_SLASH_PATTERN, '').length + 1
+          )
         )
     : [];
   const isHarness = (path: string) =>

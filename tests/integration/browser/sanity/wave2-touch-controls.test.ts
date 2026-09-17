@@ -281,7 +281,7 @@ test.each(KITS)(
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
-        !document.getElementById('touch-controls')?.hidden,
+        !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
       { timeout: 5000 }
     );
 
@@ -419,7 +419,7 @@ test(
         .waitForFunction(
           () => {
             const player = window.gameController?.getCurrPlayer();
-            const ability = document.getElementById('touch-ability');
+            const ability = document.querySelector('#touch-ability');
             if (!player?.ship.exploding || !ability?.classList.contains('is-unavailable')) {
               return false;
             }
@@ -537,7 +537,7 @@ test(
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
-        !document.getElementById('touch-controls')?.hidden,
+        !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
       { timeout: 5000 }
     );
 

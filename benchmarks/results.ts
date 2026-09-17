@@ -103,7 +103,7 @@ function pairedInterval(pairs: readonly MeasurementPair[], seed: number) {
   const estimates: number[] = [];
   for (let sample = 0; sample < 2000; sample++) {
     let sum = 0;
-    for (let draw = 0; draw < ratios.length; draw++) {
+    for (const _ratio of ratios) {
       state = (Math.imul(1664525, state) + 1013904223) >>> 0;
       const value = ratios[Math.floor((state / 2 ** 32) * ratios.length)];
       assert(value !== undefined);

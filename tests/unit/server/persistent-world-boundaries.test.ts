@@ -18,6 +18,11 @@ import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
+const DUPLICATE_ASTEROID_IDENTITY_PATTERN = /duplicate asteroid identity/u;
+const INVALID_SAVED_ASTEROID_PATTERN = /Saved sector 0,0 asteroid 0 is invalid/u;
+const DUPLICATE_SECTOR_ASTEROID_PATTERN = /appears in sectors/u;
+const INVALID_SAVED_PILOT_PATTERN = /Saved pilot is invalid/u;
+
 test('a mid-checkpoint write failure rolls back the whole world and stops further gameplay', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-rollback-'));
   const path = join(directory, 'world.sqlite');
@@ -251,7 +256,7 @@ test('checkpoint rejects duplicate asteroid identities before writing sectors', 
         new Map([['0,0', [first, { ...first }]]]),
         []
       )
-    ).toThrow(/duplicate asteroid identity/);
+    ).toThrow(DUPLICATE_ASTEROID_IDENTITY_PATTERN);
   } finally {
     store.close();
   }
@@ -310,7 +315,7 @@ test('a restart refuses invalid asteroid metadata in saved sectors', () => {
     db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run('0,0', JSON.stringify([malformed]));
     db.close();
 
-    expect(() => new WorldStore(path)).toThrow(/Saved sector 0,0 asteroid 0 is invalid/);
+    expect(() => new WorldStore(path)).toThrow(INVALID_SAVED_ASTEROID_PATTERN);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -328,7 +333,7 @@ test('a restart refuses invalid mining contributor metadata in saved sectors', (
     db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run('0,0', JSON.stringify([malformed]));
     db.close();
 
-    expect(() => new WorldStore(path)).toThrow(/Saved sector 0,0 asteroid 0 is invalid/);
+    expect(() => new WorldStore(path)).toThrow(INVALID_SAVED_ASTEROID_PATTERN);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -351,7 +356,7 @@ test('a restart refuses one asteroid identity stored in two sectors', () => {
     );
     db.close();
 
-    expect(() => new WorldStore(path)).toThrow(/appears in sectors/);
+    expect(() => new WorldStore(path)).toThrow(DUPLICATE_SECTOR_ASTEROID_PATTERN);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -372,7 +377,7 @@ test('a restart refuses a saved pilot without a finite monthly score', () => {
 
     const store = new WorldStore(path);
     try {
-      expect(() => store.loadPilots()).toThrow(/Saved pilot is invalid/);
+      expect(() => store.loadPilots()).toThrow(INVALID_SAVED_PILOT_PATTERN);
     } finally {
       store.close();
     }

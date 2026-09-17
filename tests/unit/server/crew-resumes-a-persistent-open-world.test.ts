@@ -15,6 +15,8 @@ import { nearbyWorldRows, utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
+const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+
 const directories: string[] = [];
 const stores: WorldStore[] = [];
 afterEach(() => {
@@ -243,7 +245,7 @@ test('checkpoints store monthly score and a recent flight', () => {
     position: { x: 200, y: 300 },
     lives: 2,
   });
-  expect(saved.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+  expect(saved.tokenHash).toMatch(PILOT_TOKEN_HASH_PATTERN);
   expect(saved.lastSeenAt).toEqual(expect.any(Number));
   engine.stopGameLoop();
 });

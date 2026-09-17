@@ -4,7 +4,7 @@ import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../../shared/gameClock';
 import { GameController } from '../../../../src/core/gameController';
 import { Laser } from '../../../../src/entities/laser/Laser';
 import { Roid } from '../../../../src/entities/roid/Roid';
-import { canvasManager } from '../../../../src/rendering/canvas';
+import { canvasManager } from '../../../../src/rendering/canvasSurface';
 
 const game = GameController.getInstance();
 

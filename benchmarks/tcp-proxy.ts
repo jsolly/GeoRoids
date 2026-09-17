@@ -194,13 +194,14 @@ export async function startTcpProxy(options: {
       sockets.delete(client);
       sockets.delete(upstream);
     };
+    const onSocketError = () => {
+      if (!closing) {
+        failures++;
+      }
+      close();
+    };
     for (const socket of [client, upstream]) {
-      socket.on('error', () => {
-        if (!closing) {
-          failures++;
-        }
-        close();
-      });
+      socket.on('error', onSocketError);
       socket.on('close', close);
     }
     up.on('error', close);

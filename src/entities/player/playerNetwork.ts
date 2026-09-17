@@ -1,25 +1,20 @@
-import { GameController } from '../../core/gameController';
-import type { Player } from './Player';
-import { PlayerManager } from './PlayerManager';
-
 export class PlayerNetwork {
   private static instance: PlayerNetwork;
-  private gameController: GameController;
-  private playerManager: PlayerManager;
+  private tick: (() => void) | null = null;
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private readonly UPDATE_FREQUENCY = 60; // 60 FPS
 
-  private constructor() {
-    this.playerManager = PlayerManager.getInstance();
-    // Eagerly initialize gameController to prevent race conditions
-    this.gameController = GameController.getInstance();
-  }
+  private constructor() {}
 
   public static getInstance(): PlayerNetwork {
     if (!PlayerNetwork.instance) {
       PlayerNetwork.instance = new PlayerNetwork();
     }
     return PlayerNetwork.instance;
+  }
+
+  public bindTick(tick: () => void): void {
+    this.tick = tick;
   }
 
   public startNetworkUpdates(): void {
@@ -40,12 +35,6 @@ export class PlayerNetwork {
   }
 
   public updatePlayerState(): void {
-    // Update local player state for network (network-only)
-    this.gameController.updateNetworkPlayerState();
-  }
-
-  public getOtherPlayers(): Player[] {
-    // Return all non-local players via unified manager
-    return this.playerManager.getNonLocalPlayers();
+    this.tick?.();
   }
 }

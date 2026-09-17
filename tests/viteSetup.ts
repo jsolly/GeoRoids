@@ -7,10 +7,10 @@ if (typeof window !== 'undefined') {
     <canvas id="title-terrain"></canvas>
     <div id="gameWrapper">
       <div id="start-screen" class="screen">
-        <h1 class="text-center">GeoRoids</h1>
+        <h1>GeoRoids</h1>
         <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map</p>
         <div class="game-modes">
-          <div class="mb-3">
+          <div>
             <label for="playerNameInput" class="form-label">Your Nickname</label>
             <input
               type="text"
@@ -25,16 +25,16 @@ if (typeof window !== 'undefined') {
             <div id="ship-kit-grid" class="ship-kit-grid"></div>
             <p class="ship-kit-placeholder-note">AD v2 silhouettes</p>
           </fieldset>
-          <ul class="nav flex-column">
+          <ul class="nav">
             <li class="nav-item">
-              <button id="start-game" class="btn btn-lg btn-phosphor">
+              <button id="start-game" class="btn btn-phosphor">
                 Enter Game
               </button>
             </li>
           </ul>
         </div>
         <div class="settings">
-          <ul class="nav flex-column">
+          <ul class="nav">
             <li class="nav-item">
               <input
                 class="form-check-input"

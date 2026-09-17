@@ -94,13 +94,16 @@ function validateOptions(options: CodecSampleOptions): void {
 
 function decodeSnapshot(text: string, decoder: SnapshotDecoder) {
   const result = decoder.readMessage(text, { acceptSnapshots: true });
-  switch (result.kind) {
+  const { kind } = result;
+  switch (kind) {
     case 'snapshot':
       return result;
     case 'snapshot-rejected':
       throw result.error;
     case 'message':
       throw new Error('Serialized codec fixture was not a snapshot message');
+    default:
+      throw new Error(`Unexpected snapshot decode result: ${kind}`);
   }
 }
 

@@ -5,7 +5,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { getCompletedSectors } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 
 const NEIGHBOR_RANGE = 1;

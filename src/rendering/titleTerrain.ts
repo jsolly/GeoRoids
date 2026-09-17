@@ -17,7 +17,7 @@ export function initTitleTerrain(): void {
   stopResizeListener?.();
   stopResizeListener = null;
 
-  const canvas = document.getElementById('title-terrain');
+  const canvas = document.querySelector('#title-terrain');
   if (!(canvas instanceof HTMLCanvasElement)) {
     return;
   }

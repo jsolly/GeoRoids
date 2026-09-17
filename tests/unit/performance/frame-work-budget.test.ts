@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it as test } from 'vitest';
 import { evaluateFrameWorkBudget } from '../../../benchmarks/frame-work-budget';
 
 describe('performance budgets inform development without blocking it', () => {
   const budget = { viewport: 'touch-portrait', maximumPerFrame: { reads: 1000 } };
-  it('retains an exceeded budget and its magnitude without throwing', () => {
+  test('retains an exceeded budget and its magnitude without throwing', () => {
     expect(
       evaluateFrameWorkBudget(budget, 'touch-portrait', [{ reads: 1388 }, { reads: 900 }])
     ).toEqual([
@@ -17,13 +17,13 @@ describe('performance budgets inform development without blocking it', () => {
       },
     ]);
   });
-  it('retains headroom below the budget', () => {
+  test('retains headroom below the budget', () => {
     expect(evaluateFrameWorkBudget(budget, 'touch-portrait', [{ reads: 900 }])[0]).toMatchObject({
       delta: -100,
       exceededFrames: 0,
     });
   });
-  it('records an observed zero when a warm cache eliminates the measured work', () => {
+  test('records an observed zero when a warm cache eliminates the measured work', () => {
     expect(evaluateFrameWorkBudget(budget, 'touch-portrait', [{ reads: 0 }])[0]).toEqual({
       metric: 'reads',
       maximum: 1000,
@@ -33,7 +33,7 @@ describe('performance budgets inform development without blocking it', () => {
       measuredFrames: 1,
     });
   });
-  it('rejects missing and invalid measurements instead of calling them passing', () => {
+  test('rejects missing and invalid measurements instead of calling them passing', () => {
     for (const frames of [[], [{}], [{ reads: Number.NaN }], [{ reads: -1 }]]) {
       expect(() => evaluateFrameWorkBudget(budget, 'touch-portrait', frames)).toThrow();
     }

@@ -6,6 +6,37 @@ import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
 import { getWorldDiagnostics, placePlayer } from './test-server-control';
 
+type CrashAsteroidCandidate = {
+  x: number;
+  y: number;
+  id: string;
+  radius: number;
+};
+
+function compareCrashTargets(
+  left: CrashAsteroidCandidate,
+  right: CrashAsteroidCandidate,
+  hazards: Array<{ x: number; y: number; radius: number }>,
+  impact: { x: number; y: number }
+): number {
+  const actorClearance = (candidate: CrashAsteroidCandidate) =>
+    hazards.length
+      ? Math.min(
+          ...hazards.map(
+            (hazard) =>
+              Math.hypot(candidate.x - hazard.x, candidate.y - hazard.y) -
+              candidate.radius -
+              hazard.radius
+          )
+        )
+      : Number.POSITIVE_INFINITY;
+  return (
+    actorClearance(right) - actorClearance(left) ||
+    Math.hypot(left.x - impact.x, left.y - impact.y) -
+      Math.hypot(right.x - impact.x, right.y - impact.y)
+  );
+}
+
 export class GameInteractions {
   constructor(private page: Page) {}
 
@@ -773,6 +804,17 @@ export class GameInteractions {
    * ship. A ram destroys its asteroid, so repeatedly using one stale position
    * cannot produce sustained damage. Returns the final impact position.
    */
+  private selectCrashTarget(
+    field: CrashAsteroidCandidate[],
+    hazards: Array<{ x: number; y: number; radius: number }>,
+    lastImpact: { x: number; y: number },
+    usedAsteroids: Set<string>
+  ) {
+    const candidates = field.filter((candidate) => !usedAsteroids.has(candidate.id));
+    candidates.sort((left, right) => compareCrashTargets(left, right, hazards, lastImpact));
+    return candidates[0];
+  }
+
   async crashShipIntoAsteroidUntilDestroyed(): Promise<{ x: number; y: number }> {
     const startLives = await this.getLives();
     await this.observeNextDeathCause();
@@ -797,25 +839,7 @@ export class GameInteractions {
             }));
         }),
       ]);
-      const actorClearance = (candidate: (typeof field)[number]) =>
-        hazards.length
-          ? Math.min(
-              ...hazards.map(
-                (hazard) =>
-                  Math.hypot(candidate.x - hazard.x, candidate.y - hazard.y) -
-                  candidate.radius -
-                  hazard.radius
-              )
-            )
-          : Number.POSITIVE_INFINITY;
-      const target = field
-        .filter((candidate) => !usedAsteroids.has(candidate.id))
-        .sort(
-          (left, right) =>
-            actorClearance(right) - actorClearance(left) ||
-            Math.hypot(left.x - lastImpact.x, left.y - lastImpact.y) -
-              Math.hypot(right.x - lastImpact.x, right.y - lastImpact.y)
-        )[0];
+      const target = this.selectCrashTarget(field, hazards, lastImpact, usedAsteroids);
       if (!target) {
         usedAsteroids.clear();
         await this.waitForAnimationFrames(3);
@@ -972,7 +996,7 @@ export class GameInteractions {
   /** Whether the start screen is visible again. */
   async isStartScreenVisible(): Promise<boolean> {
     return await this.page.evaluate(() => {
-      const el = document.querySelector('#start-screen');
+      const el = document.querySelector<HTMLElement>('#start-screen');
       return el ? el.style.display !== 'none' : false;
     });
   }

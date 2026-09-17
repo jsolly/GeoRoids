@@ -4,7 +4,8 @@ import { Laser } from '../../../src/entities/laser/Laser';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { RoidBelt } from '../../../src/entities/roid/Roid';
 import { NetworkManager } from '../../../src/network/networkManager';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { drawGame } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import * as contourLasers from '../../../src/rendering/contourLaserRenderer';
 
 import { TestPath2D } from '../../support/TestPath2D';
@@ -34,7 +35,7 @@ test('successive frames reuse shot sources and remove a departed pilot without r
   const collect = vi.spyOn(contourLasers, 'liveLaserPositions');
   const paint = vi.spyOn(contourLasers, 'drawContourLaserTicks');
   const belt = new RoidBelt();
-  const draw = () => canvasManager.drawGame(local, belt, 0, 0, '', local.lives, players);
+  const draw = () => drawGame(local, belt, 0, 0, '', local.lives, players);
   const observedPositions = () => paint.mock.calls.at(-1)?.[1].map(({ x, y }) => ({ x, y }));
 
   draw();

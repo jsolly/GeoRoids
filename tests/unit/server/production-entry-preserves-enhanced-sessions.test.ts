@@ -17,6 +17,9 @@ import type { ServerGameSnapshot } from '../../../shared-types';
 import { GAME } from '../../../src/constants';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
+const WHITESPACE_SPLIT_PATTERN = /\s+/u;
+const SERVER_LISTENING_PORT_PATTERN = /Server listening on port (\d+)/u;
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 const railwayProject = await railwayConfig(createRailwayContext({ command: 'test' }), project);
 const railwayService = railwayProject.resources
   ?.flat()
@@ -61,7 +64,7 @@ function start(
     throw new Error('Railway IaC service start command is missing');
   }
   output = '';
-  const [command, ...args] = railwayStartCommand.split(/\s+/u);
+  const [command, ...args] = railwayStartCommand.split(WHITESPACE_SPLIT_PATTERN);
   if (!command) {
     throw new Error('Railway start command is empty');
   }
@@ -96,7 +99,7 @@ function start(
   });
   return waitFor(
     () => {
-      const match = output.match(/Server listening on port (\d+)/u);
+      const match = output.match(SERVER_LISTENING_PORT_PATTERN);
       return match ? Number(match[1]) : undefined;
     },
     'actual production listener',
@@ -344,7 +347,7 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   const original = await pilot(port);
   const joined = await original.join('entry-pilot');
   expect(joined).toMatchObject({ id: 'entry-pilot', snapshotVersion: 1, asteroidInteractions: 1 });
-  expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/u);
+  expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
   const before = await observer.state();
   const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch;
   expect(epoch).toBeGreaterThan(0);

@@ -8,7 +8,7 @@ import {
   waveVisualProgress,
 } from '../physics/shockwave';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
 import { resolveGlow } from './renderQuality';
 
 const WAVE_COLOR: Record<ShockwaveWaveId, string> = {

@@ -52,7 +52,7 @@ export function countRocksOnCanvas(
   canvas: PlayfieldSize,
   scale = 1,
   margin = 0
-): number {
+) {
   let count = 0;
   for (const roid of roids) {
     if (isRockOnCanvas(roid.position, ship, canvas, scale, margin)) {

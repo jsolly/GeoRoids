@@ -84,7 +84,7 @@ export class InputManager {
     });
 
     // Mouse listeners on canvas
-    const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
+    const canvas = document.querySelector('#gameCanvas') as HTMLCanvasElement | null;
     if (canvas) {
       canvas.addEventListener('mousemove', (ev) => {
         const localPlayer = getLocalPlayer();
@@ -152,10 +152,10 @@ export class InputManager {
   }
 
   resetButtonText(): void {
-    const gameBtn = document.getElementById('start-game') as HTMLButtonElement;
+    const gameBtn = document.querySelector('#start-game') as HTMLButtonElement;
 
     if (gameBtn) {
-      gameBtn.innerText = 'Enter Game';
+      gameBtn.textContent = 'Enter Game';
     }
   }
 }

@@ -21,7 +21,7 @@ function normalizeFailureCause(error: unknown): string {
         cause = `code-${String(candidate['code'])}`;
       }
     }
-    return cause.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 64) || 'unknown-error';
+    return cause.replace(/[^a-zA-Z0-9_.:-]/gu, '_').slice(0, 64) || 'unknown-error';
   } catch {
     return 'unknown-error';
   }

@@ -4,7 +4,7 @@ import { setPlayView } from '../../../src/ui/uiUtils';
 
 afterEach(() => {
   document.body.classList.remove('in-play', 'touch-play');
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   if (root) {
     root.hidden = true;
   }
@@ -38,14 +38,14 @@ test('phone-sized play view unhides the full touch control overlay', () => {
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
   document.body.classList.add('in-play');
   syncTouchChrome(true);
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   expect(document.body.classList.contains('touch-play')).toBe(true);
   expect(root?.hidden).toBe(false);
-  expect(document.getElementById('touch-stick')).toBeNull();
-  expect(document.getElementById('touch-fire')).toBeNull();
-  expect(document.getElementById('touch-ability')).toBeTruthy();
-  expect(document.getElementById('touch-boost')).toBeTruthy();
-  expect(document.getElementById('touch-shield')).toBeNull();
+  expect(document.querySelector('#touch-stick')).toBeNull();
+  expect(document.querySelector('#touch-fire')).toBeNull();
+  expect(document.querySelector('#touch-ability')).toBeTruthy();
+  expect(document.querySelector('#touch-boost')).toBeTruthy();
+  expect(document.querySelector('#touch-shield')).toBeNull();
 });
 
 test('desktop-sized play view keeps the overlay hidden', () => {
@@ -55,5 +55,5 @@ test('desktop-sized play view keeps the overlay hidden', () => {
   document.body.classList.add('in-play');
   syncTouchChrome(true);
   expect(document.body.classList.contains('touch-play')).toBe(false);
-  expect(document.getElementById('touch-controls')?.hidden).toBe(true);
+  expect(document.querySelector<HTMLElement>('#touch-controls')?.hidden).toBe(true);
 });

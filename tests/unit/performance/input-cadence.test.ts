@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest';
 import { inspectInputCadence } from '../../../benchmarks/input-cadence';
 
+const MISSED_ACTIVE_PLAY_ERROR_PATTERN = /Missed active-play/u;
+const INCORRECT_MISSED_ERROR_PATTERN = /Incorrect missed/u;
+const THREE_HUNDRED_MS_ERROR_PATTERN = /300/u;
+const ANCHORED_ERROR_PATTERN = /anchored/u;
+
 function schedule() {
   return Array.from({ length: 300 }, (_, index) => ({
     measured: true,
@@ -20,7 +25,9 @@ test('unexplained delays and peer setup cannot excuse missed active-play inputs'
     [{ ...recovery, durationMs: 1000 }],
     [{ ...recovery, startedAt: 10001 }],
   ]) {
-    expect(() => inspectInputCadence(schedule(), restarts)).toThrow(/Missed active-play/);
+    expect(() => inspectInputCadence(schedule(), restarts)).toThrow(
+      MISSED_ACTIVE_PLAY_ERROR_PATTERN
+    );
   }
 });
 test('cadence evidence rejects invented slot counts, shifted clocks and incomplete runs', () => {
@@ -30,8 +37,10 @@ test('cadence evidence rejects invented slot counts, shifted clocks and incomple
     throw new Error('Missing fixture slot');
   }
   missed.missedSlots = 0;
-  expect(() => inspectInputCadence(slots, [recovery])).toThrow(/Incorrect missed/);
-  expect(() => inspectInputCadence(schedule().slice(1), [recovery])).toThrow(/300/);
+  expect(() => inspectInputCadence(slots, [recovery])).toThrow(INCORRECT_MISSED_ERROR_PATTERN);
+  expect(() => inspectInputCadence(schedule().slice(1), [recovery])).toThrow(
+    THREE_HUNDRED_MS_ERROR_PATTERN
+  );
   const shifted = schedule();
   const offset = shifted[20];
   if (!offset) {
@@ -39,5 +48,5 @@ test('cadence evidence rejects invented slot counts, shifted clocks and incomple
   }
   offset.scheduledAt += 100;
   offset.startedAt += 100;
-  expect(() => inspectInputCadence(shifted, [recovery])).toThrow(/anchored/);
+  expect(() => inspectInputCadence(shifted, [recovery])).toThrow(ANCHORED_ERROR_PATTERN);
 });

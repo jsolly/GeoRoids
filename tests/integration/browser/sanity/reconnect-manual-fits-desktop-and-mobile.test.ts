@@ -7,6 +7,7 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const GIF_SRC_SUFFIX_PATTERN = /\.gif$/u;
 
 for (const viewport of [
   { name: 'desktop', width: 1280, height: 900 },
@@ -28,7 +29,9 @@ for (const viewport of [
     );
     await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
     expect(await page.locator('.demo button').count()).toBe(0);
-    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(/\.gif$/);
+    expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
+      GIF_SRC_SUFFIX_PATTERN
+    );
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`performance-wiki-${viewport.name}.png`),
     });

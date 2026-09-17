@@ -10,7 +10,7 @@ import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
 import type { ExplorationTile, LootData, LootKind, Position } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { lootStrokeColor } from '../../entities/loot/lootRenderer';
-import { PlayerNetwork } from '../../entities/player/playerNetwork';
+import type { Player } from '../../entities/player/Player';
 import type { Roid } from '../../entities/roid/Roid';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
 import type { Ship } from '../../entities/ship/Ship';
@@ -154,7 +154,8 @@ function drawCompletedSectors(ctx: CanvasRenderingContext2D, geometry: MiniMapGe
 }
 
 function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
-  switch (mark.kind) {
+  const { kind } = mark;
+  switch (kind) {
     case 'local': {
       const hull = calculateShipTrianglePoints(
         mark.x,
@@ -170,6 +171,8 @@ function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
       strokePhosphorHull(ctx, hull, mark.color);
       return;
     }
+    default:
+      throw new Error(`Unexpected radar mark kind: ${kind}`);
   }
 }
 
@@ -274,6 +277,8 @@ function drawAsteroidMarks(
         break;
       case undefined:
         continue;
+      default:
+        throw new Error(`Unexpected minimap material: ${material}`);
     }
     ctx.fill();
   }
@@ -562,7 +567,8 @@ export function drawMiniMap(
   ship: Ship,
   roids: readonly Roid[],
   loot: readonly LootData[],
-  pickups: readonly SatellitePickup[]
+  pickups: readonly SatellitePickup[],
+  otherPlayers: readonly Player[]
 ): void {
   const { x: miniMapX, y: miniMapY, size: miniMapSize } = layout.miniMap;
   const centerX = miniMapX + miniMapSize / 2;
@@ -577,7 +583,6 @@ export function drawMiniMap(
     projection: { x: 0, y: 0 },
   };
 
-  const otherPlayers = PlayerNetwork.getInstance().getOtherPlayers();
   const scanners = activeScanners(
     ship,
     otherPlayers.map((player) => player.ship)

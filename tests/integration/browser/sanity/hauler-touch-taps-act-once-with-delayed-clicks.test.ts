@@ -9,6 +9,8 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
+
 for (const browserType of [chromium, webkit]) {
   describe(browserType.name(), () => {
     const { browserManager, screenshotManager } = createBrowserScenarioHooks(
@@ -28,7 +30,7 @@ for (const browserType of [chromium, webkit]) {
         let requests = 0;
         let snapshots = 0;
         page.on('websocket', (socket) => {
-          if (!/\/ws(?:\?|$)/.test(socket.url())) {
+          if (!WS_PATH_PATTERN.test(socket.url())) {
             return;
           }
           socket.on('framesent', ({ payload }) => {

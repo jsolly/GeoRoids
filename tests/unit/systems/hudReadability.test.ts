@@ -208,14 +208,14 @@ describe('painted HUD composition', () => {
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const stationFill = normalizedCanvasColor(ctx, 'rgba(196,181,253,0.2)');
     const stationInk = normalizedCanvasColor(ctx, PALETTE.SATELLITE);
-    drawMiniMap(ctx, layout, player.ship, [], [], []);
+    drawMiniMap(ctx, layout, player.ship, [], [], [], []);
     expect(
       filledPaths.filter(({ style }) => style === stationFill || style === stationInk)
     ).toEqual([]);
     exploration.reveal({ x: 0, y: -660 }, 100);
     setWorldExploration(exploration.snapshot());
     filledPaths.length = 0;
-    drawMiniMap(ctx, layout, player.ship, [], [], []);
+    drawMiniMap(ctx, layout, player.ship, [], [], [], []);
     const stations = filledPaths.filter(({ style }) => style === stationFill);
     expect(stations).toHaveLength(1);
     expect(stations[0]?.rectangles).toEqual([
@@ -268,7 +268,7 @@ describe('painted HUD composition', () => {
       exploration.reveal(rock.position, 100);
     }
     setWorldExploration(exploration.snapshot());
-    drawMiniMap(ctx, layout, player.ship, roids, [], []);
+    drawMiniMap(ctx, layout, player.ship, roids, [], [], []);
     expect(texts.map(({ text }) => text)).toEqual([
       '○ Ice',
       '□ Metal',
@@ -289,7 +289,7 @@ describe('painted HUD composition', () => {
     texts.length = 0;
     filledPaths.length = 0;
     arc.mockClear();
-    drawMiniMap(ctx, layout, player.ship, roids, [], []);
+    drawMiniMap(ctx, layout, player.ship, roids, [], [], []);
     expect(texts.map(({ text }) => text)).toEqual(['X +0', 'Y +0 · S0,0']);
     expect(arc.mock.calls.every((call) => call[2] !== 3)).toBe(true);
     expect(filledPaths).toHaveLength(2);
@@ -413,7 +413,8 @@ describe('painted HUD composition', () => {
         player.ship,
         roids,
         LootField.getInstance().getAll(),
-        SatellitePickupManager.getInstance().getAll()
+        SatellitePickupManager.getInstance().getAll(),
+        [remote, peer]
       );
     };
 

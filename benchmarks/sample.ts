@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { validateMeasurement } from './results';
+
+const UNSIGNED_INT_PATTERN = /^\d+$/u;
 
 export function sampleOptions(kind: string | undefined, seedText = '42', viewport = 'desktop') {
   assert(
     kind === 'client' || kind === 'server' || kind === 'codec' || kind === 'transport',
     'Expected client, server, codec, or transport'
   );
-  assert(/^\d+$/.test(seedText), 'seed must be an unsigned 32-bit integer');
+  assert(UNSIGNED_INT_PATTERN.test(seedText), 'seed must be an unsigned 32-bit integer');
   const seed = Number(seedText);
   assert(
     Number.isSafeInteger(seed) && seed <= 0xffff_ffff,
@@ -43,8 +46,16 @@ function parseSampleArguments(argv: readonly string[]) {
   };
 }
 
+type SerializedError = {
+  message: string;
+  name?: string;
+  stack?: string;
+  cause?: SerializedError;
+  errors?: SerializedError[];
+};
+
 /** Preserve every cleanup failure, including AggregateError entries and nested causes. */
-export function errorRecord(value: unknown, seen = new Set<unknown>()): object {
+export function errorRecord(value: unknown, seen = new Set<unknown>()): SerializedError {
   if (!(value instanceof Error)) {
     return { message: String(value) };
   }
@@ -55,7 +66,7 @@ export function errorRecord(value: unknown, seen = new Set<unknown>()): object {
   return {
     name: value.name,
     message: value.message,
-    stack: value.stack,
+    ...(value.stack === undefined ? {} : { stack: value.stack }),
     ...(value.cause === undefined ? {} : { cause: errorRecord(value.cause, seen) }),
     ...(value instanceof AggregateError
       ? { errors: Array.from(value.errors, (error: unknown) => errorRecord(error, seen)) }
@@ -112,7 +123,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)) {
         error: errorRecord(error),
       });
     } catch (artifactError) {
-      throw new AggregateError([error, artifactError], 'Sample and failure artifact write failed');
+      throw new Error('Sample and failure artifact write failed', { cause: artifactError });
     }
     throw error;
   }

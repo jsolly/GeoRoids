@@ -12,7 +12,7 @@ import { isShipKitId } from '../../src/entities/ship/shipKits';
 
 type WireRecord = Record<string, unknown>;
 
-const SHOT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const SHOT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]+$/u;
 
 interface PlayerMovementUpdate {
   position?: Position;
@@ -186,7 +186,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
 }
 
 function decodeUseAbility(id: string, fields: WireRecord): ClientCommandDecodeResult {
-  const playerId = id || readString(fields['id']) || '';
+  const playerId = id ? id : (readString(fields['id']) ?? '');
   if (!playerId) {
     return invalid('useAbility', 'Missing player ID for useAbility');
   }

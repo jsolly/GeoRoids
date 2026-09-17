@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import process from 'node:process';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 import { wikiContentPlugin } from './scripts/wiki-vite';
 
 const HAULER_TETHER_HEXES = ['#E8D5A3', '#FDE68A'] as const;
+const GIT_COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
 /** Fail the client build if Rolldown drops or cross-chunk-aliases the cream/tip hexes. */
 function requireHaulerTetherHexes(): Plugin {
@@ -57,7 +59,7 @@ export default defineConfig(() => {
       encoding: 'utf8',
       timeout: 5000,
     }).trim();
-  if (!/^[a-f0-9]{40}$/i.test(commitHash)) {
+  if (!GIT_COMMIT_SHA_PATTERN.test(commitHash)) {
     throw new Error('Cannot build client without a valid Git commit SHA');
   }
   define['import.meta.env.VITE_COMMIT_HASH'] = JSON.stringify(commitHash.slice(0, 7));

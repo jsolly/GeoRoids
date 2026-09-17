@@ -4,7 +4,7 @@ import { reconcilePlayerInput } from '../../../src/input/keybindings';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { handleMouseMove } from '../../../src/input/mouse';
 import { Point } from '../../../src/physics/Point';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 let canvas: HTMLCanvasElement;
 let originalInnerWidth: PropertyDescriptor | undefined;
@@ -88,7 +88,7 @@ function installControlledMatchMedia(): void {
 
 beforeEach(() => {
   canvasManager.destroy();
-  const element = document.getElementById('gameCanvas');
+  const element = document.querySelector('#gameCanvas');
   if (element?.tagName !== 'CANVAS') {
     throw new Error('expected the playfield canvas in the test shell');
   }

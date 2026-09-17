@@ -5,6 +5,7 @@
     "noImplicitAny": true,
     "exactOptionalPropertyTypes": true,
     "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": true,
     "noUncheckedSideEffectImports": true,
     "target": "ESNext",
     "useDefineForClassFields": true,

@@ -12,6 +12,7 @@ const clients: WireClient[] = [];
 type DecoderRead = ReturnType<SnapshotDecoder['readMessage']>;
 const streams = new WeakMap<WireClient, { decoder: SnapshotDecoder; cursor: number }>();
 const resumeTokens = new WeakMap<WireClient, string>();
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 
 beforeEach(async () => {
   server = createServerInstance({ port: 0, nodeEnv: 'test' });
@@ -40,7 +41,7 @@ function asteroidIds(message: WireMessage): string[] {
       assert(rock && typeof rock === 'object' && 'id' in rock && typeof rock.id === 'string');
       return rock.id;
     })
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
 }
 
 async function waitForMessage(
@@ -121,7 +122,7 @@ async function join(id: string, resumeToken?: string): Promise<WireClient> {
   expect(ack['snapshotVersion']).toBe(1);
   expect(ack['asteroidInteractions']).toBe(1);
   const token = ack['resumeToken'];
-  assert(typeof token === 'string' && /^[a-f0-9]{64}$/.test(token));
+  assert(typeof token === 'string' && RESUME_TOKEN_PATTERN.test(token));
   if (resumeToken) {
     expect(token).toBe(resumeToken);
   }
@@ -160,7 +161,7 @@ test('a pilot briefly disconnects and resumes the same live field while its peer
     server.gameEngine.getPlayer('rejoin-pilot-a')?.position ?? { x: 0, y: 0 }
   )
     .map((asteroid) => asteroid.id)
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
   const token = resumeTokens.get(first);
   assert(token);
   await first.close();

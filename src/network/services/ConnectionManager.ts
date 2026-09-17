@@ -423,7 +423,11 @@ export class ConnectionManager {
           }
         };
       } catch (cause) {
-        finish(cause instanceof Error ? cause : new Error(String(cause)));
+        finish(
+          cause instanceof Error
+            ? cause
+            : new Error(typeof cause === 'string' ? cause : JSON.stringify(cause), { cause })
+        );
         if (this.state.socket) {
           this.retireSocket(this.state.socket);
         }
@@ -480,7 +484,9 @@ export class ConnectionManager {
       logger.error(
         'NETWORK',
         'Failed to close retired WebSocket',
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error
+          ? error
+          : new Error(typeof error === 'string' ? error : JSON.stringify(error), { cause: error })
       );
     }
   }
@@ -498,7 +504,9 @@ export class ConnectionManager {
       logger.error(
         'NETWORK',
         'Failed to send gameplay message',
-        error instanceof Error ? error : new Error(String(error))
+        error instanceof Error
+          ? error
+          : new Error(typeof error === 'string' ? error : JSON.stringify(error), { cause: error })
       );
       this.retireSocket(socket);
       return false;

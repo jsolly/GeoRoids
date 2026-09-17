@@ -22,7 +22,7 @@ export function getRandomPositionNearPoint(center: Position, maxDistance: number
 
   // Ensure the position is within the boundary
   const boundaryRadius = boundary.radius - shipRadius;
-  const distanceFromCenter = Math.sqrt((newX - boundary.cx) ** 2 + (newY - boundary.cy) ** 2);
+  const distanceFromCenter = Math.hypot(newX - boundary.cx, newY - boundary.cy);
 
   if (distanceFromCenter > boundaryRadius) {
     // If outside boundary, clamp to boundary edge

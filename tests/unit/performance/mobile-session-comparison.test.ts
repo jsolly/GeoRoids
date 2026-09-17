@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it as test } from 'vitest';
 import { compareMobileSessions } from '../../../benchmarks/mobile-comparison';
 
 const session = {
@@ -18,17 +18,17 @@ const control = () => [
 ];
 const improved = () => control().map(([a]) => [a, { ...session, frameOver25Ratio: 0.005 }]);
 describe('paired mobile performance evidence', () => {
-  it('accepts a repeatable improvement beyond baseline noise', () => {
+  test('accepts a repeatable improvement beyond baseline noise', () => {
     expect(compareMobileSessions({ aa: control(), ab: improved() }).relativeResult).toBe(
       'improved'
     );
   });
-  it('keeps overlapping baseline variation inconclusive', () => {
+  test('keeps overlapping baseline variation inconclusive', () => {
     expect(compareMobileSessions({ aa: improved(), ab: improved() }).relativeResult).toBe(
       'inconclusive'
     );
   });
-  it('separates relative improvement from unmet absolute targets', () => {
+  test('separates relative improvement from unmet absolute targets', () => {
     const ab = improved();
     ab[1] = [session, { ...session, frameOver25Ratio: 0.011 }];
     expect(compareMobileSessions({ aa: control(), ab })).toMatchObject({
@@ -37,7 +37,7 @@ describe('paired mobile performance evidence', () => {
       physicalAcceptance: false,
     });
   });
-  it('refuses to pool a different phone or incomplete input collection', () => {
+  test('refuses to pool a different phone or incomplete input collection', () => {
     const ab = improved();
     ab[1] = [session, { ...session, cohort: 'Android' }];
     expect(() => compareMobileSessions({ aa: control(), ab })).toThrow('cohorts');

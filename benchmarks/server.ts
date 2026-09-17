@@ -85,7 +85,7 @@ function outcomeWitness(value: object): object {
       return item;
     }
     return item.replace(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu,
       (uuid) => {
         const key = uuid.toLowerCase();
         const alias = aliases.get(key) ?? `runtime-id-${aliases.size + 1}`;
@@ -105,8 +105,10 @@ function validateParticipantPresence(
   expectedIds: readonly string[]
 ): void {
   const players = engine.getAllPlayers();
-  const observedIds = players.map((player) => player.id).toSorted();
-  const expectedSorted = [...expectedIds].toSorted();
+  const observedIds = players
+    .map((player) => player.id)
+    .toSorted((left, right) => left.localeCompare(right));
+  const expectedSorted = [...expectedIds].toSorted((left, right) => left.localeCompare(right));
   if (observedIds.length !== expectedSorted.length) {
     throw new Error(`Expected ${expectedSorted.length} players, observed ${observedIds.length}`);
   }

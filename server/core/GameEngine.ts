@@ -93,6 +93,8 @@ import { RNGService } from './RNGService';
 import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 
+const PILOT_RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+
 interface ServerLaser {
   id: string;
   ownerId: string;
@@ -841,7 +843,7 @@ export class GameEngine {
     requestedName?: string,
     clientReleaseId?: string
   ): ReturnType<PlayerMotionService['resume']> {
-    if (!/^[a-f0-9]{64}$/u.test(token)) {
+    if (!PILOT_RESUME_TOKEN_PATTERN.test(token)) {
       return { ok: false, error: 'Invalid pilot resume token' };
     }
     const hash = createHash('sha256').update(token).digest('hex');
@@ -1878,6 +1880,22 @@ export class GameEngine {
     return hit ? [hit] : [];
   }
 
+  private laserSegmentTargets(
+    target: {
+      id: string;
+      position: Position;
+      radius: number;
+      ownerId?: string;
+      kind: 'ship' | 'satellitePickup' | 'loot';
+    },
+    segmentStart: Position,
+    segmentEnd: Position,
+    segmentDistance: number
+  ) {
+    const fraction = segmentCircleContact(segmentStart, segmentEnd, target.position, target.radius);
+    return fraction === undefined ? [] : [{ ...target, distance: fraction * segmentDistance }];
+  }
+
   /** Resolve mining shots against nearby world objects; unbounced shots ignore hulls. */
   private resolveEnhancedLaser(
     laser: ServerLaser,
@@ -1920,11 +1938,10 @@ export class GameEngine {
               id: entity.id,
               position: entity.position,
               radius: radiusFromMass(entity.mass) + LASER.HIT_RADIUS,
-              ownerId: undefined,
               kind: 'ship' as const,
             }))
         : [];
-      const auxiliary = [
+      const auxiliaryTargets = [
         ...this.satellitePickupManager
           .getAllPickups()
           .filter((pickup) => pickup.state !== 'broken' && pickup.health > 0)
@@ -1932,7 +1949,7 @@ export class GameEngine {
             id: pickup.id,
             position: pickup.position,
             radius: pickup.radius,
-            ownerId: pickup.ownerId,
+            ...(pickup.ownerId === null ? {} : { ownerId: pickup.ownerId }),
             kind: 'satellitePickup' as const,
           })),
         ...this.getLoot()
@@ -1941,17 +1958,24 @@ export class GameEngine {
             id: loot.id,
             position: loot.position,
             radius: loot.radius,
-            ownerId: undefined,
             kind: 'loot' as const,
           })),
         ...hulls,
-      ]
-        .filter((target) => target.kind !== 'satellitePickup' || !target.ownerId)
-        .flatMap((target) => {
-          const fraction = segmentCircleContact(start, end, target.position, target.radius);
-          return fraction === undefined ? [] : [{ ...target, distance: fraction * distance }];
-        })
-        .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id))[0];
+      ].filter((target) => target.kind !== 'satellitePickup' || !target.ownerId);
+      const auxiliaryHits: Array<{
+        id: string;
+        position: Position;
+        radius: number;
+        ownerId?: string;
+        kind: 'ship' | 'satellitePickup' | 'loot';
+        distance: number;
+      }> = [];
+      for (const target of auxiliaryTargets) {
+        auxiliaryHits.push(...this.laserSegmentTargets(target, start, end, distance));
+      }
+      const auxiliary = auxiliaryHits.sort(
+        (a, b) => a.distance - b.distance || a.id.localeCompare(b.id)
+      )[0];
       if (
         auxiliary &&
         (!impact || auxiliary.distance < impact.distance) &&

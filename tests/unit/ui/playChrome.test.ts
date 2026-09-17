@@ -6,7 +6,7 @@ import { setPlayView } from '../../../src/ui/uiUtils';
 afterEach(() => {
   setPlayView(false);
   document.body.classList.remove('touch-play');
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   if (root) {
     root.hidden = true;
     root.setAttribute('aria-hidden', 'true');
@@ -14,19 +14,19 @@ afterEach(() => {
 });
 
 test('title shell exposes a terrain canvas and keeps stock credit empty', () => {
-  expect(document.getElementById('title-terrain')?.tagName).toBe('CANVAS');
-  expect(document.getElementById('attribution')?.textContent?.trim()).toBe('');
+  expect(document.querySelector('#title-terrain')?.tagName).toBe('CANVAS');
+  expect(document.querySelector('#attribution')?.textContent?.trim()).toBe('');
 });
 
 test('Enter Game is an outline phosphor control in the title menu', () => {
-  const start = document.getElementById('start-game');
+  const start = document.querySelector('#start-game');
   expect(start?.tagName).toBe('BUTTON');
   expect(start?.classList.contains('btn-phosphor')).toBe(true);
   expect(start?.classList.contains('btn-success')).toBe(false);
 });
 
 test('title menu presents the keyboard and ability control hint', () => {
-  const hint = document.getElementById('controls-hint');
+  const hint = document.querySelector('#controls-hint');
   expect(hint?.closest('#start-screen')).toBeTruthy();
   expect(hint?.textContent).toContain('Always thrust');
   expect(hint?.textContent).toContain('Space fires');
@@ -36,7 +36,7 @@ test('title menu presents the keyboard and ability control hint', () => {
 });
 
 test('title menu exposes the ship kit picker before entering play', () => {
-  const grid = document.getElementById('ship-kit-grid');
+  const grid = document.querySelector('#ship-kit-grid');
   expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Ship kit');
   expect(document.querySelector('.ship-kit-placeholder-note')?.textContent).toContain(
     'AD v2 silhouettes'
@@ -44,18 +44,18 @@ test('title menu exposes the ship kit picker before entering play', () => {
 });
 
 test('play view keeps the controls hint in title chrome and toggles the game area', () => {
-  const hint = document.getElementById('controls-hint');
-  const gameArea = document.getElementById('gameArea');
+  const hint = document.querySelector('#controls-hint');
+  const gameArea = document.querySelector<HTMLElement>('#gameArea');
   expect(hint?.closest('#gameArea')).toBeNull();
 
   setPlayView(true);
   expect(document.body.classList.contains('in-play')).toBe(true);
-  expect(document.getElementById('start-screen')?.style.display).toBe('none');
+  expect(document.querySelector<HTMLElement>('#start-screen')?.style.display).toBe('none');
   expect(gameArea?.style.display).toBe('block');
 
   setPlayView(false);
   expect(document.body.classList.contains('in-play')).toBe(false);
-  expect(document.getElementById('start-screen')?.style.display).toBe('block');
+  expect(document.querySelector<HTMLElement>('#start-screen')?.style.display).toBe('block');
   expect(gameArea?.style.display).toBe('none');
 });
 
@@ -67,14 +67,14 @@ test('play shell creates the touch ability overlay with a semantic action button
   syncTouchChrome(true);
 
   expect(document.body.classList.contains('touch-play')).toBe(true);
-  const root = document.getElementById('touch-controls');
+  const root = document.querySelector<HTMLElement>('#touch-controls');
   expect(root?.hidden).toBe(false);
-  const action = document.getElementById('touch-ability');
+  const action = document.querySelector('#touch-ability');
   expect(action?.tagName).toBe('BUTTON');
   expect(action?.getAttribute('type')).toBe('button');
   expect(action?.getAttribute('aria-label')).toBeTruthy();
-  const boost = document.getElementById('touch-boost');
+  const boost = document.querySelector('#touch-boost');
   expect(boost?.tagName).toBe('BUTTON');
   expect(boost?.textContent).toBe('BOOST');
-  expect(document.getElementById('touch-shield')).toBeNull();
+  expect(document.querySelector('#touch-shield')).toBeNull();
 });

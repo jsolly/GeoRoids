@@ -8,6 +8,7 @@ import { canvasPoint } from '../../utils/touch-input';
 import { localPlayerId, observeLaser, parkLaserClient } from './laser-observation';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 /** Observe the real animation loop and real core strokes while the shoot packet is in flight. */
 function paintedShotFrames(page: Page) {
@@ -127,7 +128,7 @@ for (const touch of [false, true]) {
       const delayedShots: Array<() => void> = [];
       let holdShots = true;
       let snapshots = 0;
-      await page.routeWebSocket(/\/ws(?:\?|$)/u, (socket) => {
+      await page.routeWebSocket(WS_PATH_PATTERN, (socket) => {
         const server = socket.connectToServer();
         socket.onMessage((message) => {
           const packet = JSON.parse(String(message));

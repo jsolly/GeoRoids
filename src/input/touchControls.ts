@@ -1,6 +1,6 @@
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
-import { canvasManager } from '../rendering/canvas';
+import { canvasManager } from '../rendering/canvasSurface';
 import {
   isPointerOnLocalHauler,
   isShipSchematicOpen,

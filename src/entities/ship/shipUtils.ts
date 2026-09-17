@@ -245,7 +245,7 @@ export function applyThrustOrFriction(
     const massMax = maxVelocityFromMass(mass);
     const nextX = velocity.x + (Math.cos(angle) * thrust * thrustScale) / GAME.FPS;
     const nextY = velocity.y - (Math.sin(angle) * thrust * thrustScale) / GAME.FPS;
-    const currentSpeed = Math.sqrt(nextX * nextX + nextY * nextY);
+    const currentSpeed = Math.hypot(nextX, nextY);
     const speedCap = maxVelocity * (massMax / SHIP.MAX_VELOCITY);
     if (currentSpeed > speedCap) {
       const scale = speedCap / currentSpeed;

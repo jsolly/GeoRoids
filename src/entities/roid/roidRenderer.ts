@@ -1,7 +1,7 @@
 import type { AsteroidMaterial } from '../../../shared-types';
 import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
-import { canvasManager } from '../../rendering/canvas';
+import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import { drawingOffsets } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
@@ -30,7 +30,12 @@ export function clearAsteroidShatters(): void {
   shatterBursts.length = 0;
 }
 
-export function getRoidStrokeWidth(radius: number): number {
+export function getRoidStrokeWidth(
+  radius: number
+):
+  | typeof VISUAL.ROID_STROKE_LARGE
+  | typeof VISUAL.ROID_STROKE_MEDIUM
+  | typeof VISUAL.ROID_STROKE_SMALL {
   if (radius >= ROID.SIZE * 0.8) {
     return VISUAL.ROID_STROKE_LARGE;
   }

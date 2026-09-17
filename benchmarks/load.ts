@@ -110,8 +110,8 @@ try {
     const client = new Pilot(i, pilotOptions());
     clients.push(client);
     const deadline = performance.now() + 10000;
-    while (client.firstStateAt === undefined && !totalFailures) {
-      if (performance.now() >= deadline) {
+    while (client.firstStateAt === undefined) {
+      if (totalFailures || performance.now() >= deadline) {
         break;
       }
       await delay(25);

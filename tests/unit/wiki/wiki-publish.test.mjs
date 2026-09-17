@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { expect, test } from 'vitest';
 import {
@@ -23,6 +24,19 @@ import {
 } from '../../../scripts/wiki-publish.mjs';
 
 const SOURCE_SHA = '0123456789abcdef0123456789abcdef01234567';
+const WORKFLOW_REPOSITORY_MISMATCH = /does not match this workflow repository/u;
+const FULL_SHA_REQUIRED = /full 40-character/u;
+const SOURCE_REF_REQUIRED = /source ref/u;
+const OUTSIDE_WIKI_SCOPE = /outside the wiki publish scope/u;
+const INVALID_WIKI_FILE = /invalid file/u;
+const FULL_DRAFT_SHA_REQUIRED = /full draft SHA/u;
+const WHITESPACE_SPLIT = /\s+/u;
+const CHANGED_INDEPENDENTLY_ON_MAIN = /changed independently on main/u;
+const NEW_CMS_DRAFT_COMMIT = /new CMS draft commit/u;
+const MISSING_SNAPSHOT_MARKER = /missing the marker/u;
+const WITHOUT_SQUASH = /without squash/u;
+const EXPECTED_DRAFT_MARKER = /expected draft marker/u;
+const CHANGED_AFTER_LAST_SNAPSHOT = /changed on main after its last published snapshot/u;
 const GIT_PATH_ENVIRONMENT = [
   'GIT_DIR',
   'GIT_WORK_TREE',
@@ -76,7 +90,7 @@ function materializeInFixture(cwd, parent, main, overlay, options = {}) {
       encoding: 'utf8',
     }).trim();
   } catch (error) {
-    throw new Error(error.stderr?.toString() || error.message);
+    throw new Error(error.stderr?.toString() || error.message, { cause: error });
   }
 }
 
@@ -143,7 +157,7 @@ test('the Pages CMS payload validates the draft ref and workflow SHA', () => {
       eventRef: 'refs/heads/main',
       repositoryName: 'other/georoids',
     })
-  ).toThrow(/does not match this workflow repository/);
+  ).toThrow(WORKFLOW_REPOSITORY_MISMATCH);
   expect(() =>
     parsePagesCmsPayload(
       JSON.stringify({
@@ -152,7 +166,7 @@ test('the Pages CMS payload validates the draft ref and workflow SHA', () => {
         repository: { ref: 'codex/wiki-drafts', sha: '0123456' },
       })
     )
-  ).toThrow(/full 40-character/);
+  ).toThrow(FULL_SHA_REQUIRED);
   expect(() =>
     parsePagesCmsPayload(
       JSON.stringify({
@@ -161,7 +175,7 @@ test('the Pages CMS payload validates the draft ref and workflow SHA', () => {
         repository: { ref: 'main', sha: SOURCE_SHA },
       })
     )
-  ).toThrow(/source ref/);
+  ).toThrow(SOURCE_REF_REQUIRED);
 });
 
 test('the path boundary permits only Markdown and safe raster uploads', () => {
@@ -175,7 +189,7 @@ test('the path boundary permits only Markdown and safe raster uploads', () => {
       { status: 'M', path: 'content/wiki/field-manual.md' },
       { status: 'A', path: 'src/wiki/main.ts' },
     ])
-  ).toThrow(/outside the wiki publish scope/);
+  ).toThrow(OUTSIDE_WIKI_SCOPE);
 });
 
 test('tree validation rejects symlinks and executable or non-raster files', () => {
@@ -183,16 +197,16 @@ test('tree validation rejects symlinks and executable or non-raster files', () =
   expect(validateWikiTree(valid)).toEqual(valid);
   expect(() =>
     validateWikiTree(parseGitTree('120000 blob abcdef\tpublic/wiki/uploads/current.webp\0'))
-  ).toThrow(/invalid file/);
+  ).toThrow(INVALID_WIKI_FILE);
   expect(() =>
     validateWikiTree(parseGitTree('100755 blob abcdef\tcontent/wiki/field-manual.md\0'))
-  ).toThrow(/invalid file/);
+  ).toThrow(INVALID_WIKI_FILE);
 });
 
 test('the immutable snapshot identity is stable across retries', () => {
   expect(snapshotBranchName(SOURCE_SHA)).toBe(`codex/wiki-publish/${SOURCE_SHA}`);
   expect(snapshotBranchName(SOURCE_SHA)).toBe(snapshotBranchName(SOURCE_SHA));
-  expect(() => snapshotBranchName('0123456')).toThrow(/full draft SHA/);
+  expect(() => snapshotBranchName('0123456')).toThrow(FULL_DRAFT_SHA_REQUIRED);
 });
 
 test('a squash merge plus a newer same-file draft edit stays conflict-free and preserves both snapshots', () => {
@@ -234,9 +248,9 @@ test('a squash merge plus a newer same-file draft edit stays conflict-free and p
     expect(git(fixture, ['show', `${refreshedDraft}:content/wiki/other.md`])).toBe(
       'developer update\n'
     );
-    expect(git(fixture, ['show', '-s', '--format=%P', refreshedDraft]).trim().split(/\s+/)).toEqual(
-      expect.arrayContaining([newerDraft, squashedMain])
-    );
+    expect(
+      git(fixture, ['show', '-s', '--format=%P', refreshedDraft]).trim().split(WHITESPACE_SPLIT)
+    ).toEqual(expect.arrayContaining([newerDraft, squashedMain]));
 
     const exactFirstSnapshot = materializeInFixture(fixture, firstDraft, squashedMain, firstDraft);
     expect(git(fixture, ['show', `${exactFirstSnapshot}:content/wiki/article.md`])).toBe(
@@ -268,7 +282,7 @@ test('distinct raster bytes remain a conflict even when text normalization would
 
     expect(git(fixture, ['show', `${base}:public/wiki/uploads/image.webp`])).toBe('base\n');
     expect(() => materializeInFixture(fixture, draft, main, draft)).toThrow(
-      /changed independently on main/
+      CHANGED_INDEPENDENTLY_ON_MAIN
     );
   } finally {
     rmSync(fixture, { recursive: true, force: true });
@@ -434,7 +448,7 @@ test('a closed snapshot PR requires a new draft identity instead of reopening', 
       },
       { branch, snapshotSha: SOURCE_SHA }
     )
-  ).toThrow(/new CMS draft commit/);
+  ).toThrow(NEW_CMS_DRAFT_COMMIT);
 });
 
 test('merged snapshot verification requires the exact marker and squash auto-merge', () => {
@@ -442,20 +456,20 @@ test('merged snapshot verification requires the exact marker and squash auto-mer
   expect(hasSnapshotMarker(`subject\n\n${marker}\n`, SOURCE_SHA)).toBe(true);
   expect(hasSnapshotMarker(`subject\n\n${marker}\n`, `${SOURCE_SHA.slice(0, -1)}8`)).toBe(false);
   expect(() => validateMergedSnapshotCommit('subject\n\nwithout marker\n', SOURCE_SHA)).toThrow(
-    /missing the marker/
+    MISSING_SNAPSHOT_MARKER
   );
   expect(validateMergedSnapshotCommit(`subject\n\n${marker}\n`, SOURCE_SHA)).toBe(true);
   expect(validateSnapshotAutoMerge(null, SOURCE_SHA)).toBe(true);
   expect(validateSnapshotAutoMerge({ mergeMethod: 'SQUASH', commitBody: marker }, SOURCE_SHA)).toBe(
     true
   );
-  expect(() => validateSnapshotAutoMerge({ mergeMethod: 'MERGE' })).toThrow(/without squash/);
+  expect(() => validateSnapshotAutoMerge({ mergeMethod: 'MERGE' })).toThrow(WITHOUT_SQUASH);
   expect(() => validateSnapshotAutoMerge({ mergeMethod: 'SQUASH' }, SOURCE_SHA)).toThrow(
-    /expected draft marker/
+    EXPECTED_DRAFT_MARKER
   );
   expect(() =>
     validateSnapshotAutoMerge({ mergeMethod: 'SQUASH', commitBody: 'wrong body' }, SOURCE_SHA)
-  ).toThrow(/expected draft marker/);
+  ).toThrow(EXPECTED_DRAFT_MARKER);
 });
 
 test('the snapshot normalizes CMS Markdown that omits its final newline', () => {
@@ -537,7 +551,7 @@ test('an independent same-file main edit stops publication instead of being over
     const main = commit(fixture, 'developer main edit');
 
     expect(() => materializeInFixture(fixture, draft, main, draft)).toThrow(
-      /changed independently on main/
+      CHANGED_INDEPENDENTLY_ON_MAIN
     );
   } finally {
     rmSync(fixture, { recursive: true, force: true });
@@ -573,7 +587,7 @@ test('a main rollback after publication is not mistaken for an unchanged publish
     const unchangedDraft = materializeInFixture(fixture, publishedDraft, rollback, publishedDraft);
     expect(git(fixture, ['show', `${unchangedDraft}:content/wiki/article.md`])).toBe('base\n');
     expect(() => materializeInFixture(fixture, draft, rollback, draft)).toThrow(
-      /changed on main after its last published snapshot/
+      CHANGED_AFTER_LAST_SNAPSHOT
     );
     expect(git(fixture, ['show', '-s', '--format=%s', publication]).trim()).toBe(
       'squash: publish v1'

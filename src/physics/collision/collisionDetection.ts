@@ -3,7 +3,7 @@ import { getGameBoundary } from '../boundary';
 
 /** Same rounding as `Point.distance` — keep combat feel, drop Point allocs. */
 function flooredDistance(ax: number, ay: number, bx: number, by: number): number {
-  return Math.floor(Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2));
+  return Math.floor(Math.hypot(ax - bx, ay - by));
 }
 
 /**

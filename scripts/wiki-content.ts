@@ -1,10 +1,11 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import process from 'node:process';
 import MarkdownIt from 'markdown-it';
 import { parse } from 'yaml';
 import { isShipKitId } from '../src/entities/ship/shipKits';
 import type { WikiArticle } from '../src/wiki/article';
-import articleSources from '../src/wiki/articleSources.json';
+import articleSources from '../src/wiki/articleSources.json' with { type: 'json' };
 import { gameReference } from '../src/wiki/gameReference';
 import { media } from '../src/wiki/media';
 
@@ -40,20 +41,29 @@ function walk(tokens: Token[]): Token[] {
   return tokens.flatMap((token) => [token, ...walk(token.children ?? [])]);
 }
 
+const WIKI_ARTICLE_FILENAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.md$/u;
+const WIKI_FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u;
+const WIKI_RELATED_ARTICLE_PATH_PATTERN = /^content\/wiki\/([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/u;
+const WIKI_UPLOAD_IMAGE_PATTERN =
+  /^\/wiki\/uploads\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(png|jpe?g|webp)$/u;
+const EXTERNAL_OR_MAILTO_LINK_PATTERN = /^(https?:\/\/|mailto:)/u;
+const WIKI_ARTICLE_ANCHOR_PATTERN = /^(?:\/wiki\/?)?#([a-z0-9-]+)$/u;
+const CRLF_PATTERN = /\r\n/gu;
+
 /** Compile trusted application code and untrusted editorial files at one boundary. */
 export function readWikiArticles(root = process.cwd()): WikiArticle[] {
   const directory = resolve(root, 'content/wiki');
   const entries = readdirSync(directory, { withFileTypes: true });
   const drafts = entries.map((entry) => {
-    if (!entry.isFile() || !/^[a-z0-9]+(?:-[a-z0-9]+)*\.md$/.test(entry.name)) {
+    if (!entry.isFile() || !WIKI_ARTICLE_FILENAME_PATTERN.test(entry.name)) {
       throw new Error(`Wiki articles must be flat Markdown files with stable slugs: ${entry.name}`);
     }
     const id = entry.name.slice(0, -3);
     if (reservedIds.has(id)) {
       throw new Error(`Reserved wiki ID: ${id}`);
     }
-    const raw = readFileSync(resolve(directory, entry.name), 'utf8').replace(/\r\n/g, '\n');
-    const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(raw);
+    const raw = readFileSync(resolve(directory, entry.name), 'utf8').replace(CRLF_PATTERN, '\n');
+    const match = WIKI_FRONTMATTER_PATTERN.exec(raw);
     if (!match) {
       throw new Error(`${id}: expected YAML frontmatter and Markdown body`);
     }
@@ -74,7 +84,7 @@ export function readWikiArticles(root = process.cwd()): WikiArticle[] {
     }
     const body = text(match[2], `${id}.body`);
     const related = strings(get('related'), `${id}.related`).map((path) => {
-      const reference = /^content\/wiki\/([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/.exec(path);
+      const reference = WIKI_RELATED_ARTICLE_PATH_PATTERN.exec(path);
       if (!reference?.[1]) {
         throw new Error(`${id}: invalid related article path ${path}`);
       }
@@ -200,7 +210,7 @@ export function readWikiArticles(root = process.cwd()): WikiArticle[] {
     for (const token of tokens) {
       if (token.type === 'image') {
         const src = String(token.attrGet('src') ?? '');
-        if (!/^\/wiki\/uploads\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(png|jpe?g|webp)$/.test(src)) {
+        if (!WIKI_UPLOAD_IMAGE_PATTERN.test(src)) {
           throw new Error(
             `${article.id}: images must use PNG, JPEG or WebP from wiki uploads: ${src}`
           );
@@ -217,14 +227,14 @@ export function readWikiArticles(root = process.cwd()): WikiArticle[] {
       }
       const href = String(token.attrGet('href') ?? '');
       if (
-        /^(https?:\/\/|mailto:)/.test(href) ||
+        EXTERNAL_OR_MAILTO_LINK_PATTERN.test(href) ||
         href === '/' ||
         href === '/wiki/' ||
         href === '/wiki'
       ) {
         continue;
       }
-      const target = /^(?:\/wiki\/?)?#([a-z0-9-]+)$/.exec(href)?.[1];
+      const target = WIKI_ARTICLE_ANCHOR_PATTERN.exec(href)?.[1];
       if (!target || (!ids.has(target) && !reservedIds.has(target))) {
         throw new Error(
           `${article.id}: broken or unsupported link ${href}; use /wiki/#article-id for articles`

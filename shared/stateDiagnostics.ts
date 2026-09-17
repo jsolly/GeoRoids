@@ -41,7 +41,7 @@ export function shouldSampleSnapshot(sequence: number): boolean {
 }
 
 function boundedText(value: string, max = MAX_ERROR_TEXT): string {
-  return Array.from(value.replace(/(https?:\/\/[^\s?#)]+)[?#][^\s)]*/g, '$1'), (character) => {
+  return Array.from(value.replace(/(https?:\/\/[^\s?#)]+)[?#][^\s)]*/gu, '$1'), (character) => {
     const code = character.codePointAt(0) ?? 0;
     return code <= 31 || (code >= 127 && code <= 159) ? ' ' : character;
   })

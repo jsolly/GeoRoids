@@ -13,6 +13,8 @@ const serverLogging = vi.hoisted(() => ({
   error: vi.fn(),
   emitExternal: vi.fn(),
 }));
+const CLIENT_LOG_ROTATED_PATTERN = /client\.log\.1$/u;
+const CLIENT_LOG_PATTERN = /client\.log$/u;
 
 vi.mock('../../../setup/serverLogger', () => ({
   logger: { error: serverLogging.error },
@@ -73,7 +75,7 @@ test('forwarded client logs accept only the bounded schema and neutralize forged
   expect(await ClientLogger.flushPending()).toBe(true);
   expect(state.writes).toHaveLength(1);
   expect(state.writes[0]).not.toContain('\r');
-  expect(state.writes[0]?.match(/\n/g)).toHaveLength(1);
+  expect(state.writes[0]?.match(/\n/gu)).toHaveLength(1);
   expect(state.writes[0]).toContain('legacy_client_log_redacted');
   expect(state.writes[0]).not.toContain('first');
   expect(state.writes[0]).toContain('legacyByteLength');
@@ -197,10 +199,12 @@ test('the client log rotates before a write would exceed its disk bound', async 
     'accepted'
   );
   expect(await ClientLogger.flushPending()).toBe(true);
-  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(/client\.log\.1$/), { force: true });
+  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(CLIENT_LOG_ROTATED_PATTERN), {
+    force: true,
+  });
   expect(state.rename).toHaveBeenCalledWith(
-    expect.stringMatching(/client\.log$/),
-    expect.stringMatching(/client\.log\.1$/)
+    expect.stringMatching(CLIENT_LOG_PATTERN),
+    expect.stringMatching(CLIENT_LOG_ROTATED_PATTERN)
   );
   expect(state.writes).toHaveLength(1);
 });

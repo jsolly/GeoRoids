@@ -8,6 +8,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false
   }

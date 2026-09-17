@@ -105,9 +105,13 @@ describe('server motion clock', () => {
   });
 
   test('explicit simulation times reject invalid or backwards values while allowing repeats', () => {
-    for (const invalid of [Number.NaN, -1, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    const invalidTimes = [Number.NaN, -1, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    const expectInvalidClock = (invalid: number) => {
       expect(() => engine.stepClock(invalid)).toThrow(RangeError);
       expect(() => engine.advanceOneFrame(invalid)).toThrow(RangeError);
+    };
+    for (const invalid of invalidTimes) {
+      expectInvalidClock(invalid);
     }
 
     expect(engine.stepClock(100)).toBe(0);

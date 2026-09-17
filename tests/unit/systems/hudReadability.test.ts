@@ -309,7 +309,6 @@ describe('painted HUD composition', () => {
 
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { entityFactory } = await import('../../../src/entities/EntityFactory');
-    const { NetworkManager } = await import('../../../src/network/networkManager');
     const { LootField } = await import('../../../src/entities/loot/LootField');
     const { Roid } = await import('../../../src/entities/roid/Roid');
     const { SatellitePickupManager } = await import(
@@ -345,7 +344,6 @@ describe('painted HUD composition', () => {
       y: 0,
     });
     peer.ship.angle = 0;
-    vi.spyOn(NetworkManager.getInstance(), 'getAllPlayers').mockReturnValue([player, remote, peer]);
     SatellitePickupManager.getInstance().syncFromServer([
       {
         id: 'radar-pickup',

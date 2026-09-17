@@ -510,17 +510,22 @@ async function main(argv: readonly string[] = process.argv.slice(2)) {
       runtimes: 'runtimes.json',
     });
   } catch (error) {
+    let artifactError: unknown;
     try {
       await writeJson(join(directory, 'failure.json'), {
         status: 'failed',
         argv,
         error: errorRecord(error),
       });
-    } catch (artifactError) {
-      const failure = new Error('Benchmark and failure artifact write failed', {
-        cause: artifactError,
+    } catch (writeError) {
+      artifactError = writeError;
+    }
+    if (artifactError) {
+      const artifactMessage =
+        artifactError instanceof Error ? artifactError.message : 'unknown artifact failure';
+      throw new Error(`Benchmark and failure artifact write failed (${artifactMessage})`, {
+        cause: error,
       });
-      throw failure;
     }
     throw error;
   } finally {

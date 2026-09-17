@@ -116,14 +116,22 @@ async function main(argv: readonly string[] = process.argv.slice(2)) {
     validateMeasurement(result);
     await writeJson(options.outputPath, result);
   } catch (error) {
+    let artifactError: unknown;
     try {
       await writeJson(options.failurePath, {
         status: 'failed',
         options,
         error: errorRecord(error),
       });
-    } catch (artifactError) {
-      throw new Error('Sample and failure artifact write failed', { cause: artifactError });
+    } catch (writeError) {
+      artifactError = writeError;
+    }
+    if (artifactError) {
+      const artifactMessage =
+        artifactError instanceof Error ? artifactError.message : 'unknown artifact failure';
+      throw new Error(`Sample and failure artifact write failed (${artifactMessage})`, {
+        cause: error,
+      });
     }
     throw error;
   }

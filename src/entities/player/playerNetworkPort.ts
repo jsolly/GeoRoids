@@ -13,6 +13,10 @@ export function bindPlayerNetworkPort(port: PlayerNetworkPort): void {
   playerNetworkPort = port;
 }
 
+export function resetPlayerNetworkPort(): void {
+  playerNetworkPort = null;
+}
+
 export function requirePlayerNetworkPort(): PlayerNetworkPort {
   if (!playerNetworkPort) {
     throw new Error('Player network port is not bound');

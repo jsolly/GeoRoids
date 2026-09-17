@@ -8,6 +8,8 @@ class PlayerManager {
   private static instance: PlayerManager;
   private localPlayer: Player | null = null;
 
+  private constructor() {}
+
   public static getInstance(): PlayerManager {
     if (!PlayerManager.instance) {
       PlayerManager.instance = new PlayerManager();

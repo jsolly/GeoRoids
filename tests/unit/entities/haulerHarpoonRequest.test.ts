@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { resetPlayerNetworkPort } from '../../../src/entities/player/playerNetworkPort';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
@@ -12,6 +13,7 @@ afterEach(() => {
   mockSendAbility.mockReset();
   mockSendAbility.mockReturnValue(true);
   resetShipCombatNetwork();
+  resetPlayerNetworkPort();
   publishHarpoonField([]);
 });
 

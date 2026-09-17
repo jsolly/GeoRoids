@@ -1,5 +1,5 @@
 {
-  "note": "Biome 2.5.14 pin in package.json only. No player-facing wiki rules, GIFs, or article copy changed.",
+  "note": "Restore PlayerManager private constructor and add a unit test for the player-network port. No player-facing wiki rules or GIFs changed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:b9cda885acb38a36c3954535bcce181c6c5a755e654cf3b98b155cd5a0e0da69",
@@ -120,9 +120,9 @@
     "src/entities/loot/LootField.ts": "sha256:9f3a0c49c907ea92e2d10e7f665a5e65085b7dccba840fdb99dea0635d003579",
     "src/entities/loot/lootRenderer.ts": "sha256:5433e384a6722a4f171b22a445ff9b27aa61e5112920c4babb75a4317f4bafea",
     "src/entities/player/Player.ts": "sha256:4d7a5dde3b6f23934c0a7608263ff213cdc9c82060fa3730fd8a5fca27ebc999",
-    "src/entities/player/PlayerManager.ts": "sha256:a13bf917a83f2b7b38245a326abac7217567409060ce0124762297b2ed4ffe9b",
+    "src/entities/player/PlayerManager.ts": "sha256:a83e98f9ac49646f470435c230b888c22e42e59d8a065779f562c2bcbe703249",
     "src/entities/player/playerNetwork.ts": "sha256:e33312cfcc53c09e9ee19a992aabe6ea721ccf5fca5145b011077ed7010e0431",
-    "src/entities/player/playerNetworkPort.ts": "sha256:2174712d00d24a4bea64a71090cc10a33dd501af99b58ecb2ba6531b655369b3",
+    "src/entities/player/playerNetworkPort.ts": "sha256:34fc1839dede486dfa1c74c591f7de53969c7ade64ea4ba139e5022f38422022",
     "src/entities/player/remoteLasers.ts": "sha256:6ef9ad31cdf368d4ec8d14c51a3a0d778d8b84a0cf708f93d9b46a4a77cb00f5",
     "src/entities/roid/Roid.ts": "sha256:3dc01858aedbc684a7e64fcc1ae1cf8cf0ca61d61ec0716067e1777b9261a937",
     "src/entities/roid/materialArt.ts": "sha256:79f1558270a0b87f9d5240477526894b32987a75ea5b11a5ae6fdc1d6daddf11",
@@ -305,7 +305,7 @@
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts": "sha256:d1f4b03ddc100ffa3738864dd723a70fd8bc022b92e9c411beefa3695e839848",
     "tests/unit/shared/utc-score-season.test.ts": "sha256:fb5bb4bf9b2efa293e6ae5624df9c12d73ce1b14545536d279bf909e4c2815d6",
     "tests/unit/systems/contourLaser.test.ts": "sha256:22d1c84ba91d08cbca213c0b69d683d147087e07cf3358b2aa0621487ff4ef5f",
-    "tests/unit/systems/hudReadability.test.ts": "sha256:cd2136c97337afbb029aac895759101e2cb33170ed8c7554a090b98fcc5ad3eb",
+    "tests/unit/systems/hudReadability.test.ts": "sha256:6ba20e061c0617e159bfcb999227dca756c3e33695a482e2171df0f83900544f",
     "tests/unit/systems/isoContourTerrain.test.ts": "sha256:c259490e53530a1e7e722fa79f708c5b948833ee8472e5ea2e44914afef27591",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts": "sha256:ee8dc109344bdd51f01e99fa733b0e2af2c492060fb5fc213bb389cbed43392c",
     "tests/unit/systems/lootBlast.test.ts": "sha256:5bb4035d9b7552a86ad303404bef34961c944552225393ad6be5d10f171db59e",

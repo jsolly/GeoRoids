@@ -58,12 +58,18 @@ export class BrowserManager {
     try {
       page = await context.newPage();
     } catch (error: unknown) {
+      let closeError: unknown;
       try {
         await context.close();
         this.contexts.delete(context);
-      } catch (closeError: unknown) {
-        throw new Error('Browser context failed while creating a scenario page', {
-          cause: closeError,
+      } catch (writeError: unknown) {
+        closeError = writeError;
+      }
+      if (closeError) {
+        const closeMessage =
+          closeError instanceof Error ? closeError.message : 'unknown close failure';
+        throw new Error(`Browser context failed while creating a scenario page (${closeMessage})`, {
+          cause: error,
         });
       }
       throw error;

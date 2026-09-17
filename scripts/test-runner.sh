@@ -217,14 +217,24 @@ stop_watchdog() {
     return 1
 }
 
+# Signal a process tree without waiting. `wait` inside this ALRM trap restarts as
+# waitpid(-1) in bash 5.2 and then hangs on still-running owned servers.
+signal_tree_nowait() {
+    local root="${1:-}"
+    local signal="${2:-KILL}"
+    local child
+    local children=""
+    valid_pid "$root" || return 0
+    children="$(pgrep -P "$root" 2>/dev/null || true)"
+    for child in $children; do
+        signal_tree_nowait "$child" "$signal"
+    done
+    kill "-$signal" "$root" 2>/dev/null || true
+}
+
 on_test_timeout() {
     TEST_TIMED_OUT=true
-    if [ -n "${TEST_PID:-}" ]; then
-        terminate_process_tree "$TEST_PID" || true
-        # Fail closed: never resume waiting after the deadline has fired.
-        kill -KILL "$TEST_PID" 2>/dev/null || true
-        TEST_PID=""
-    fi
+    signal_tree_nowait "${TEST_PID:-}" KILL
 }
 
 cleanup() {
@@ -525,20 +535,20 @@ run_tests() {
     WATCHDOG_PID=$!
 
     local exit_code=0
-    local wait_status=0
-    while :; do
-        wait "$test_wait_pid"
-        wait_status=$?
+    while kill -0 "$test_wait_pid" 2>/dev/null; do
         if [ "$TEST_TIMED_OUT" = true ]; then
-            exit_code=124
             break
         fi
-        if [ "$wait_status" -gt 128 ] && kill -0 "$test_wait_pid" 2>/dev/null; then
-            continue
-        fi
-        exit_code="$wait_status"
-        break
+        sleep 0.05 || true
     done
+
+    if [ "$TEST_TIMED_OUT" = true ]; then
+        exit_code=124
+    else
+        wait "$test_wait_pid"
+        exit_code=$?
+    fi
+    wait "$test_wait_pid" 2>/dev/null || true
 
     if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
         exit_code=1

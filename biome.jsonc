@@ -229,8 +229,16 @@
         "noDangerouslySetInnerHtmlWithChildren": "error",
         "noGlobalEval": "error",
         "noScriptUrl": "error",
-        // HOLD: entropy pass flags identifiers such as `performance.now`.
-        "noSecrets": "off"
+        // Default severity is info (slips past --error-on-warnings). Default
+        // entropyThreshold 41 flags camelCase metric names, CSS/HTML, and
+        // 40-char git SHA fixtures. Pattern detectors (AKIA, JWT, PEM, ghp_)
+        // still fire at 48; Biome 2.5.14 has no allowedPatterns option.
+        "noSecrets": {
+          "level": "error",
+          "options": {
+            "entropyThreshold": 48
+          }
+        }
       },
       "style": {
         "noCommonJs": "error",

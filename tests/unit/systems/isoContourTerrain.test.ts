@@ -21,8 +21,12 @@ import {
   getTerrainSeed,
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
-import { collectElevationLabels } from '../../../src/rendering/contourLabels';
+import {
+  collectElevationLabels,
+  elevationLabelsAreCached,
+} from '../../../src/rendering/contourLabels';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
+import { contourSpatialIndexIsCached } from '../../../src/rendering/contourSpatialIndex';
 import { TestPath2D } from '../../support/TestPath2D';
 
 const ISO_CONTOUR_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
@@ -328,4 +332,6 @@ test('crossing into the next contour patch reuses a warmed neighbor instead of r
   const levels = getTerrainContours({ x: CONTOUR_REGION_STEP, y: 0 }, 800);
   expect(builtContourPatchCount()).toBe(warmed);
   expect(contourSegmentCount(levels)).toBeGreaterThan(100);
+  expect(elevationLabelsAreCached(levels, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
+  expect(contourSpatialIndexIsCached(levels)).toBe(true);
 });

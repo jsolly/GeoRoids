@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { WORLD } from '../../../shared/world';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
@@ -12,10 +13,15 @@ import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import {
   applyTerrainSeed,
+  builtContourPatchCount,
+  CONTOUR_REGION_STEP,
   ensureTerrain,
+  flushContourPrefetch,
+  getTerrainContours,
   getTerrainSeed,
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvas';
+import { collectElevationLabels } from '../../../src/rendering/contourLabels';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { TestPath2D } from '../../support/TestPath2D';
 
@@ -24,6 +30,7 @@ const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
 });
 
 function steepestSample(seed: number): { x: number; y: number; steep: number } {
@@ -283,3 +290,40 @@ test.each([1, 8])(
     expect(downDistance).toBeGreaterThan(upDistance);
   }
 );
+
+test('elevation labels stay a spacing apart on a dense contour patch', () => {
+  const field = createHeightfield(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+  const levels = extractIsoContours(field, 96, TERRAIN.LEVELS, {
+    cx: 0,
+    cy: 0,
+    radius: 2048,
+  });
+  const spacing = VISUAL.CONTOUR_LABEL_SPACING;
+  const labels = collectElevationLabels(levels, spacing);
+  expect(labels.length).toBeGreaterThan(20);
+  for (let i = 0; i < labels.length; i++) {
+    const left = labels[i];
+    if (!left) {
+      continue;
+    }
+    for (let j = i + 1; j < labels.length; j++) {
+      const right = labels[j];
+      if (!right) {
+        continue;
+      }
+      expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeGreaterThanOrEqual(spacing);
+    }
+  }
+});
+
+test('crossing into the next contour patch reuses a warmed neighbor instead of remarching', () => {
+  ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+  getTerrainContours({ x: 0, y: 0 }, 800);
+  expect(builtContourPatchCount()).toBe(1);
+  flushContourPrefetch();
+  const warmed = builtContourPatchCount();
+  expect(warmed).toBeGreaterThan(1);
+  const levels = getTerrainContours({ x: CONTOUR_REGION_STEP, y: 0 }, 800);
+  expect(builtContourPatchCount()).toBe(warmed);
+  expect(contourSegmentCount(levels)).toBeGreaterThan(100);
+});

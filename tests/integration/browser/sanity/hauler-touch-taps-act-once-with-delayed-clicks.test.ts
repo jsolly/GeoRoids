@@ -12,26 +12,12 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 const FIXTURE_ORE_ID = 'crew-fixture-ore';
 
-/** Production fires the kit on pointerdown. Playwright WebKit tap() after a long idle can miss. */
+/**
+ * Fire the kit without Playwright tap() hit-testing. `click` with detail 0 is the
+ * programmatic path; delayed pointer clicks use detail 1 and are ignored.
+ */
 async function pressTouchAbility(ability: Locator): Promise<void> {
-  await ability.dispatchEvent('pointerdown', {
-    bubbles: true,
-    cancelable: true,
-    pointerType: 'touch',
-    pointerId: 2,
-    isPrimary: true,
-    button: 0,
-    buttons: 1,
-  });
-  await ability.dispatchEvent('pointerup', {
-    bubbles: true,
-    cancelable: true,
-    pointerType: 'touch',
-    pointerId: 2,
-    isPrimary: true,
-    button: 0,
-    buttons: 0,
-  });
+  await ability.dispatchEvent('click', { bubbles: true, cancelable: true, detail: 0 });
 }
 
 for (const browserType of [chromium, webkit]) {

@@ -12,7 +12,7 @@ import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
 import { pointerHeadingFromCenter } from './pointerSteering';
-import { readAbilityChrome } from './touchAbility';
+import { readAbilityChrome, TOUCH_ABILITY_CHROME_EVENT } from './touchAbility';
 
 const ABILITY_ID = 'touch-ability';
 const BOOST_ID = 'touch-boost';
@@ -565,6 +565,12 @@ export function initializeTouchControls(): void {
     }
   });
 
+  window.addEventListener(TOUCH_ABILITY_CHROME_EVENT, () => {
+    const player = requireLocalPlayer();
+    if (player) {
+      syncAbilityChrome(player);
+    }
+  });
   window.addEventListener('playViewOn', () => syncTouchChrome(true));
   window.addEventListener('playViewOff', () => syncTouchChrome(false));
   // A modal universe map can cover the playfield while the game keeps cruising.

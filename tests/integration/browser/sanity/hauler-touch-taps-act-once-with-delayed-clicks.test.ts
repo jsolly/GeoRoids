@@ -107,7 +107,14 @@ for (const browserType of [chromium, webkit]) {
         const ability = page.locator('#touch-ability');
         await ability.tap();
         await expect.poll(() => targets).toEqual([FIXTURE_ORE_ID]);
-        await expect.poll(() => ability.textContent()).toBe('RELEASE');
+        await expect
+          .poll(async () =>
+            page.evaluate(() => ({
+              target: window.gameController?.getCurrPlayer()?.ship.harpoonTargetId ?? null,
+              label: document.querySelector('#touch-ability')?.textContent,
+            }))
+          )
+          .toEqual({ target: FIXTURE_ORE_ID, label: 'RELEASE' });
         // Emulate the follow-up pointer click independently of the browser's tap
         // heuristic. It may arrive in a later task after the server confirms Hook.
         await page.waitForTimeout(delay);
@@ -143,10 +150,8 @@ for (const browserType of [chromium, webkit]) {
               }))
             )
             .toEqual({ target: FIXTURE_ORE_ID, label: 'RELEASE' });
-          await pressTouchAbility(ability);
-        } else {
-          await ability.tap();
         }
+        await pressTouchAbility(ability);
         await expect.poll(() => targets).toEqual([FIXTURE_ORE_ID, null]);
         await page.waitForTimeout(delay);
         await ability.dispatchEvent('click', { bubbles: true, detail: 1 });

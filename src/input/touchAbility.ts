@@ -2,6 +2,9 @@ import type { HaulerUtilityId, ShipKitId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
 
+/** Window event: touch E chrome should match the last server abilityUsed. */
+export const TOUCH_ABILITY_CHROME_EVENT = 'touchAbilityChrome';
+
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',

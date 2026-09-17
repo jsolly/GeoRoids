@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
+import { TOUCH_ABILITY_CHROME_EVENT } from '../../../src/input/touchAbility';
 import { initializeTouchControls, tickTouchControls } from '../../../src/input/touchControls';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 
@@ -244,4 +246,11 @@ test('resting on a grown hull cancels the target and tiny finger jitter cannot w
     expect(player.ship.thrusting).toBe(true);
   }
   pointer('pointerup', 1, 300, 195, 422);
+});
+
+test('a confirmed Hauler hook paints RELEASE without waiting for the next frame', () => {
+  applyShipKitToShip(player.ship, 'hauler');
+  player.ship.harpoonTargetId = 'crew-fixture-ore';
+  window.dispatchEvent(new Event(TOUCH_ABILITY_CHROME_EVENT));
+  expect(document.querySelector('#touch-ability')?.textContent).toBe('RELEASE');
 });

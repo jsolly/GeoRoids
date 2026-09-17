@@ -50,6 +50,7 @@ import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
+import { TOUCH_ABILITY_CHROME_EVENT } from '../../input/touchAbility';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { getClientReleaseId } from '../../utils/buildInfo';
@@ -1289,6 +1290,9 @@ export class ConnectionManager {
     entity.updateFromServer(latch);
     if (localPlayer && localPlayer !== entity && localPlayer.id === data.id) {
       localPlayer.updateFromServer(latch);
+    }
+    if (typeof window !== 'undefined' && localPlayer?.id === data.id) {
+      window.dispatchEvent(new Event(TOUCH_ABILITY_CHROME_EVENT));
     }
   }
 

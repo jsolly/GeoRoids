@@ -105,6 +105,7 @@ test('juice bloom stays modest and ships stay crisp', () => {
   expect(VISUAL.LASER_GLOW).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH * 2);
   expect(VISUAL.ROID_GLOW).toBeLessThanOrEqual(VISUAL.ROID_STROKE_LARGE * 1.25);
   expect(VISUAL.THRUSTER_GLOW).toBeLessThanOrEqual(VISUAL.THRUSTER_STROKE_WIDTH * 2);
+  expect(VISUAL.FURNACE_FLAME_GLOW).toBeLessThanOrEqual(VISUAL.FURNACE_FLAME_STROKE_WIDTH * 2);
   expect(VISUAL.BOUNDARY_GLOW).toBeLessThanOrEqual(VISUAL.BOUNDARY_STROKE_WIDTH);
 });
 

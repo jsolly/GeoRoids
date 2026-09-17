@@ -9,6 +9,8 @@ npm-debug.log
 # Other
 /screenshots
 tests/integration/browser/screenshots/
+/debug-*.png
+/*-test-result.png
 
 # Vite
 dist/*

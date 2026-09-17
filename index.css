@@ -1,8 +1,3 @@
-@layer bootstrap, georoids;
-
-/* Bundle Bootstrap so phosphor chrome stays layered and CI/benchmarks stay same-origin. */
-@import "bootstrap/dist/css/bootstrap.min.css" layer(bootstrap);
-
 @layer georoids {
   :root {
     --palette-bg: #000011;
@@ -41,6 +36,10 @@
     min-height: 100dvh;
     position: relative;
     -webkit-tap-highlight-color: transparent;
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   #safe-area-probe {
@@ -617,49 +616,44 @@
     color: var(--palette-hud, #e2e8f0);
   }
 
-  /* Game modes section */
   .game-modes {
-    margin-bottom: 1.5em; /* Further reduced margin */
+    margin-bottom: 1.5em;
   }
 
-  .game-modes .nav {
+  .start-actions {
     display: flex;
     flex-direction: column;
-    gap: 0.8em; /* Reduced gap */
+    gap: 0.8em;
     align-items: center;
   }
 
-  .game-modes .nav-item {
+  .enter-game {
+    appearance: none;
+    display: inline-block;
     width: 100%;
     max-width: 280px;
-  }
-
-  /* Enhanced button styling */
-  .game-modes .btn {
-    width: 100%;
     padding: 0.8em 1.2em;
+    font-family: inherit;
     font-size: 1.1em;
     font-weight: 600;
-    color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+    user-select: none;
+    cursor: pointer;
+    color: var(--palette-accent, #a78bfa);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent);
+    background: transparent;
+    border: 1.5px solid var(--palette-accent, #a78bfa);
     border-radius: 12px;
-    border: 2px solid transparent;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-accent, #a78bfa) 35%, transparent);
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     position: relative;
     overflow: hidden;
   }
 
-  .game-modes .btn.btn-phosphor {
-    background: transparent;
-    color: var(--palette-accent, #a78bfa);
-    border: 1.5px solid var(--palette-accent, #a78bfa);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-accent, #a78bfa) 35%, transparent);
-    text-shadow: 0 0 8px color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent);
-  }
-
-  .game-modes .btn.btn-phosphor:hover,
-  .game-modes .btn.btn-phosphor:focus-visible {
+  .enter-game:hover,
+  .enter-game:focus-visible {
     background: color-mix(in srgb, var(--palette-accent, #a78bfa) 12%, transparent);
     color: var(--palette-accent, #a78bfa);
     border-color: var(--palette-accent, #a78bfa);
@@ -667,7 +661,7 @@
     transform: translateY(-1px);
   }
 
-  .game-modes .btn::before {
+  .enter-game::before {
     content: "";
     position: absolute;
     top: 0;
@@ -678,30 +672,19 @@
     transition: left 0.5s;
   }
 
-  .game-modes .btn:hover::before {
+  .enter-game:hover::before {
     left: 100%;
   }
 
-  .game-modes .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  }
-
-  /* Settings section */
   .settings {
-    margin-bottom: 1.5em; /* Further reduced margin */
-    text-align: left;
-  }
-
-  .settings .nav {
     display: flex;
     flex-direction: column;
-    gap: 0.8em; /* Reduced gap */
+    gap: 0.8em;
     align-items: center;
+    margin-bottom: 1.5em;
   }
 
-  /* Enhanced settings containers */
-  .settings .nav-item {
+  .sound-toggle-row {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -715,15 +698,14 @@
     position: relative;
   }
 
-  .settings .nav-item:hover {
+  .sound-toggle-row:hover {
     background-color: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.25);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
 
-  /* Better checkbox contrast */
-  .settings .form-check-label {
+  .sound-toggle-label {
     cursor: pointer;
     user-select: none;
     font-weight: 500;
@@ -732,8 +714,7 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 
-  /* Enhanced form check input */
-  .settings .form-check-input {
+  .sound-toggle {
     width: 1.3em;
     height: 1.3em;
     margin: 0;
@@ -742,10 +723,8 @@
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
   }
 
-  /* Active start-button state */
-  .btn.active-mode {
+  .enter-game.active-mode {
     transform: scale(1.02);
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
     border-width: 3px;
   }
 
@@ -781,7 +760,7 @@
       margin-bottom: 1.5em;
     }
 
-    .game-modes .btn {
+    .enter-game {
       padding: 0.6em 1em;
     }
   }
@@ -797,12 +776,12 @@
       font-size: 2.2em;
     }
 
-    .game-modes .btn {
+    .enter-game {
       font-size: 1em;
       padding: 0.7em 1em;
     }
 
-    .settings .nav-item {
+    .sound-toggle-row {
       min-width: 180px;
       padding: 0.3em 0.6em;
     }
@@ -814,13 +793,12 @@
       padding: 50px;
     }
 
-    .game-modes .btn {
+    .enter-game {
       max-width: 320px;
     }
   }
 
-  /* Nickname input styling */
-  .game-modes .form-label {
+  .nickname-label {
     color: #f0f0f0;
     font-size: 1em;
     margin-bottom: 0.5em;
@@ -831,8 +809,12 @@
     text-align: center;
   }
 
-  .game-modes .form-control {
+  .nickname-input {
+    display: block;
     box-sizing: border-box;
+    appearance: none;
+    width: 100%;
+    font-family: inherit;
     background-color: rgba(255, 255, 255, 0.1);
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -845,18 +827,18 @@
     margin-bottom: 1em;
   }
 
-  .game-modes .form-control:focus {
+  .nickname-input:focus {
     background-color: rgba(255, 255, 255, 0.15);
     border-color: var(--palette-accent, #a78bfa);
     box-shadow: 0 0 15px color-mix(in srgb, var(--palette-accent, #a78bfa) 35%, transparent);
     outline: none;
   }
 
-  .game-modes .form-control::placeholder {
+  .nickname-input::placeholder {
     color: rgba(255, 255, 255, 0.6);
   }
 
-  .game-modes .form-control:hover {
+  .nickname-input:hover {
     border-color: rgba(255, 255, 255, 0.3);
     background-color: rgba(255, 255, 255, 0.12);
   }
@@ -1033,14 +1015,12 @@
       letter-spacing: 0.1em;
     }
 
-    .game-modes .nav-item,
-    .game-modes .btn {
+    .enter-game {
       max-width: 100%;
     }
   }
 
-  /* Style for default nickname */
-  .game-modes .form-control.default-nickname {
+  .nickname-input.default-nickname {
     border-color: rgba(79, 195, 247, 0.6);
     background-color: rgba(79, 195, 247, 0.15);
     color: rgba(255, 255, 255, 0.9);
@@ -1049,7 +1029,7 @@
     position: relative;
   }
 
-  .game-modes .form-control.default-nickname::after {
+  .nickname-input.default-nickname::after {
     content: "✨ Generated";
     position: absolute;
     right: 10px;

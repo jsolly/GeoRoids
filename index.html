@@ -36,13 +36,14 @@
         <!-- Join the multiplayer session -->
         <div class="game-modes">
           <div>
-            <label for="playerNameInput" class="form-label">Your Nickname</label>
+            <label for="playerNameInput" class="nickname-label">Your Nickname</label>
             <input
               type="text"
               id="playerNameInput"
               maxlength="20"
               placeholder="Crimson Falcon"
-              class="form-control"
+              class="nickname-input"
+              autocomplete="nickname"
             />
 
           </div>
@@ -51,29 +52,24 @@
             <div id="ship-kit-grid" class="ship-kit-grid"></div>
 
           </fieldset>
-          <ul class="nav">
-            <li class="nav-item">
-              <button id="start-game" type="button" class="btn btn-phosphor">
-                Enter Game
-              </button>
-            </li>
-          </ul>
+          <div class="start-actions">
+            <button id="start-game" type="button" class="enter-game">
+              Enter Game
+            </button>
+          </div>
         </div>
 
         <!-- Settings -->
         <div class="settings">
-          <ul class="nav">
-            <li class="nav-item">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                value=""
-                id="soundPref"
-                checked
-              />
-              <label class="form-check-label" for="soundPref">Sound</label>
-            </li>
-          </ul>
+          <div class="sound-toggle-row">
+            <input
+              class="sound-toggle"
+              type="checkbox"
+              id="soundPref"
+              checked
+            />
+            <label class="sound-toggle-label" for="soundPref">Sound</label>
+          </div>
         </div>
 
         <p class="game-description">A free multiplayer space game. Survey the unknown, tow valuable asteroids, and build shared progress with your crew.</p>

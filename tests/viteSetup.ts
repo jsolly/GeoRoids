@@ -11,13 +11,14 @@ if (typeof window !== 'undefined') {
         <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map</p>
         <div class="game-modes">
           <div>
-            <label for="playerNameInput" class="form-label">Your Nickname</label>
+            <label for="playerNameInput" class="nickname-label">Your Nickname</label>
             <input
               type="text"
               id="playerNameInput"
               maxlength="20"
               placeholder="Crimson Falcon"
-              class="form-control"
+              class="nickname-input"
+              autocomplete="nickname"
             />
           </div>
           <fieldset class="ship-kit-select">
@@ -25,27 +26,22 @@ if (typeof window !== 'undefined') {
             <div id="ship-kit-grid" class="ship-kit-grid"></div>
             <p class="ship-kit-placeholder-note">AD v2 silhouettes</p>
           </fieldset>
-          <ul class="nav">
-            <li class="nav-item">
-              <button id="start-game" class="btn btn-phosphor">
-                Enter Game
-              </button>
-            </li>
-          </ul>
+          <div class="start-actions">
+            <button id="start-game" type="button" class="enter-game">
+              Enter Game
+            </button>
+          </div>
         </div>
         <div class="settings">
-          <ul class="nav">
-            <li class="nav-item">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                value=""
-                id="soundPref"
-                checked
-              />
-              <label class="form-check-label" for="soundPref">Sound</label>
-            </li>
-          </ul>
+          <div class="sound-toggle-row">
+            <input
+              class="sound-toggle"
+              type="checkbox"
+              id="soundPref"
+              checked
+            />
+            <label class="sound-toggle-label" for="soundPref">Sound</label>
+          </div>
         </div>
       </div>
       <div id="gameArea" hidden>

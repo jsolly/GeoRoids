@@ -31,6 +31,10 @@ dist/*
 !.cursor/worktrees.json
 !.cursor/rules/
 !.cursor/rules/**
+!.cursor/CLOUD.md
+!.cursor/environment.json
+!.cursor/install-cloud-skills.sh
+!.cursor/aws-oidc-login.sh
 
 
 # Canonical art references and generated vector assets are versioned in georoids-art/.

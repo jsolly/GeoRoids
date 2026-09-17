@@ -1,23 +1,9 @@
 import type { Position } from '../../../shared-types';
-import { LASER } from '../../constants';
-import { pointsForRoidSize } from '../../entities/roid/roidScore';
 import { getGameBoundary } from '../boundary';
 
 /** Same rounding as `Point.distance` — keep combat feel, drop Point allocs. */
 function flooredDistance(ax: number, ay: number, bx: number, by: number): number {
   return Math.floor(Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2));
-}
-
-/**
- * Check if two circular objects are colliding
- */
-function checkCircularCollision(
-  pos1: Position,
-  radius1: number,
-  pos2: Position,
-  radius2: number
-): boolean {
-  return flooredDistance(pos1.x, pos1.y, pos2.x, pos2.y) < radius1 + radius2;
 }
 
 /**
@@ -30,18 +16,4 @@ export function checkBoundaryCollision(shipPos: Position, shipRadius: number): b
   return (
     flooredDistance(shipPos.x, shipPos.y, boundary.cx, boundary.cy) + shipRadius > boundary.radius
   );
-}
-
-/** Check if a projectile hits a circular target. */
-export function checkLaserHit(
-  laserPos: Position,
-  targetPos: Position,
-  targetRadius: number
-): boolean {
-  return checkCircularCollision(laserPos, LASER.HIT_RADIUS, targetPos, targetRadius);
-}
-
-/** Server-authoritative score for a destroyed roid. Do not trust client points. */
-export function asteroidPointsForRadius(radius: number): number {
-  return pointsForRoidSize(radius);
 }

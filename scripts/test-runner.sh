@@ -217,8 +217,24 @@ stop_watchdog() {
     return 1
 }
 
+# Signal a process tree without waiting. `wait` inside this ALRM trap restarts as
+# waitpid(-1) in bash 5.2 and then hangs on still-running owned servers.
+signal_tree_nowait() {
+    local root="${1:-}"
+    local signal="${2:-KILL}"
+    local child
+    local children=""
+    valid_pid "$root" || return 0
+    children="$(pgrep -P "$root" 2>/dev/null || true)"
+    for child in $children; do
+        signal_tree_nowait "$child" "$signal"
+    done
+    kill "-$signal" "$root" 2>/dev/null || true
+}
+
 on_test_timeout() {
     TEST_TIMED_OUT=true
+    signal_tree_nowait "${TEST_PID:-}" KILL
 }
 
 cleanup() {
@@ -507,6 +523,7 @@ run_tests() {
 
     VITEST_MAX_WORKERS=1 "${vitest_command[@]}" "${test_args[@]}" &
     TEST_PID=$!
+    local test_wait_pid="$TEST_PID"
     TEST_TIMED_OUT=false
     (
         trap 'exit 0' INT TERM
@@ -517,8 +534,21 @@ run_tests() {
     ) &
     WATCHDOG_PID=$!
 
-    wait "$TEST_PID"
-    local exit_code=$?
+    local exit_code=0
+    while kill -0 "$test_wait_pid" 2>/dev/null; do
+        if [ "$TEST_TIMED_OUT" = true ]; then
+            break
+        fi
+        sleep 0.05 || true
+    done
+
+    if [ "$TEST_TIMED_OUT" = true ]; then
+        exit_code=124
+    else
+        wait "$test_wait_pid"
+        exit_code=$?
+    fi
+    wait "$test_wait_pid" 2>/dev/null || true
 
     if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
         exit_code=1
@@ -526,8 +556,10 @@ run_tests() {
 
     if [ "$TEST_TIMED_OUT" = true ]; then
         echo "❌ Tests exceeded ${MAX_TEST_DURATION_SECONDS}s; terminating the owned test process tree" >&2
-        if terminate_process_tree "$TEST_PID"; then
-            TEST_PID=""
+        if [ -n "${TEST_PID:-}" ]; then
+            if terminate_process_tree "$TEST_PID"; then
+                TEST_PID=""
+            fi
         fi
         return 124
     fi

@@ -120,7 +120,7 @@ jobs:
       - run: npm ci
       - run: npm run check:actions
       - run: npm run check:lint-policy
-      - run: npm run lint
+      - run: npm run check:lint
       - run: npm run check:knip
       - run: npm run check:ts-prune
       - run: npm run check:md

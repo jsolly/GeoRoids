@@ -6,15 +6,13 @@ Repo `AGENTS.md` still applies first; this file overlays cloud-specific facts.
 ## Skills package (private checkout)
 
 `.cursor/install-cloud-skills.sh` (via `.cursor/environment.json` `install`) copies
-**skills, agents, and cited rules** from a private `dotagents` checkout into VM
-home paths. Preferred source is a host-local tree (`DOTAGENTS_ROOT`, or this
-repo when the installer is running from it). If none is present it may shallow-
-clone `jsolly/dotagents`. There is no public skills mirror.
-
-`.cursor/environment.json` `repositoryDependencies` puts private
-`github.com/jsolly/dotagents` on the Cloud Agent git token so the installer
-and shared gate can clone or fetch it. It does **not** auto-clone `dotagents`
-into the workspace. The Cursor GitHub App must also allowlist `jsolly/dotagents`.
+**skills, agents, cited rules, the connector catalog, and `gate/gate-lib.sh`** from a
+private `dotagents` checkout into VM home paths. Preferred source is a host-local
+tree (`DOTAGENTS_ROOT`, or this repo when the installer is running from it). If
+none is present it fetches `jsolly/dotagents` in this order: `gh api` tarball,
+`gh repo clone`, then `git clone`. GitHub MCP read access is **not** git clone
+credentials — a child-repo VM often needs `gh` (or `repositoryDependencies`)
+before anonymous HTTPS clone works. There is no public skills mirror.
 
 | Artifact | VM path | Notes |
 | --- | --- | --- |
@@ -22,12 +20,24 @@ into the workspace. The Cursor GitHub App must also allowlist `jsolly/dotagents`
 | Agents | `~/.cursor/agents/` | One `.md` file per reviewer/scanner agent |
 | Cited rules | `~/.cursor/dotagents-package/rules/` | **Read from here** when a skill cites `rules/<name>.md` |
 | Connector catalog | `~/.cursor/dotagents-package/mcps/catalog.json` | The cloud-first canon for MCP servers + marketplace plugins. `/integration-verify` reconciles the live session against it — no laptop checkout needed |
+| Pre-commit gate lib | `~/.cursor/dotagents-package/gate/gate-lib.sh` | Canonical copy. Export `DOTAGENTS_GATE_LIB` to this path. Child `.git-hooks/pre-commit` shims source `${DOTAGENTS_GATE_LIB:-$HOME/code/dotagents/gate/gate-lib.sh}` |
 
 Laptop-only skills (see `skills/laptop-only.txt`) are **not** installed on cloud.
 
-There is **no** `~/code/dotagents` on this VM unless the current repo *is*
-dotagents. Do not look for a laptop home wiring path or claim child repos inherit
-it. Do **not** vendor the private dotagents tree into this repo.
+There is **no** full `~/code/dotagents` checkout on this VM unless the current
+repo *is* dotagents. The installer may plant a **stub symlink** at
+`~/code/dotagents/gate/gate-lib.sh` so child pre-commits' default source path
+resolves when `DOTAGENTS_GATE_LIB` is unset (non-login `bash -c` / git hooks).
+The installer does **not** replace `gate-lib.sh` inside a real `~/code/dotagents`
+checkout. That stub is **not** a laptop tree — do not look for skills there, do not claim
+child repos inherit home wiring, and do **not** hand-copy `gate-lib.sh` into
+this repo. Do **not** vendor the private dotagents tree into this repo.
+
+`.cursor/environment.json` sets `repositoryDependencies` to
+`github.com/jsolly/dotagents` so the generated GitHub token can include that
+private repo (it does **not** auto-clone). The Cursor GitHub App must allowlist
+`jsolly/dotagents`. `install` / `start` also export `DOTAGENTS_GATE_LIB` to the
+canonical package path.
 
 `~/.cursor/rules` from a laptop home is **not** auto-applied on cloud. User Rules + repo
 `AGENTS.md` + this file carry policy; skills that cite rules must read the copies under
@@ -74,7 +84,8 @@ If slash-skill autocomplete is empty on a **follow-up** turn, invoke the skill b
 (known Agents Window bug; typed invoke still works).
 
 `/verify-ui` ships in this package — use it for UI smoke when the skill is present. If it is
-missing, follow this repo's `AGENTS.md` **Local UI verification** stanza instead.
+missing, follow this repo's `AGENTS.md` **Hello-world smoke** and browser integration tests
+instead of a laptop-only UI stanza.
 
 `/remove-feature` ships in this package — load it before substantial code deletion (a feature,
 module, many files, a large deleted-line diff), not only when the user types the slash command.

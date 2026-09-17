@@ -61,7 +61,7 @@ not claim a generic optimization or supported capacity.
 
 ## Production
 
-The static client deploys through Vercel's Git integration when a CI-approved PR merges to `main`. The authoritative game server deploys separately on Railway. A client deployment alone does not publish server changes. The persistent world also requires the Railway volume in `.railway/railway.ts`, mounted at `/data`, with `GEOROIDS_WORLD_PATH=/data/world.sqlite`.
+The static client deploys through Vercel's Git integration when a CI-approved PR merges to `main`. Branch pushes do not create Preview deployments; comment `/preview` as the first non-empty line on a same-repo PR (or run the **Vercel Preview** workflow) for a one-shot Preview. The authoritative game server deploys separately on Railway. A client deployment alone does not publish server changes. The persistent world also requires the Railway volume in `.railway/railway.ts`, mounted at `/data`, with `GEOROIDS_WORLD_PATH=/data/world.sqlite`.
 
 - Client: [www.georoids.com](https://www.georoids.com)
 - Server health: [Railway health endpoint](https://geoasteroids-production-2403.up.railway.app/health)

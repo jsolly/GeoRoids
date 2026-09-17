@@ -15,8 +15,18 @@ describe('deployed client release identity', () => {
 
   test('marks a local runtime without deployment metadata as dev', () => {
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
+    vi.stubEnv('GEOROIDS_COMMIT_SHA', '');
     expect(middleware(new Request('https://www.georoids.com/')).headers.get('x-release-id')).toBe(
       'dev'
+    );
+  });
+
+  test('CLI Preview deploys report GEOROIDS_COMMIT_SHA when Vercel git metadata is absent', () => {
+    const sha = 'c31a8370f09fb452610c2a5721cf6ee7da358241';
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '');
+    vi.stubEnv('GEOROIDS_COMMIT_SHA', sha);
+    expect(middleware(new Request('https://www.georoids.com/')).headers.get('x-release-id')).toBe(
+      sha
     );
   });
 });

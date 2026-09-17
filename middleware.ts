@@ -9,6 +9,9 @@ export default function middleware(request: Request) {
     url.pathname = '/wiki/index.html';
   }
   const response = isWikiEntry ? rewrite(url) : next();
-  response.headers.set('x-release-id', process.env['VERCEL_GIT_COMMIT_SHA'] || 'dev');
+  response.headers.set(
+    'x-release-id',
+    process.env['VERCEL_GIT_COMMIT_SHA'] || process.env['GEOROIDS_COMMIT_SHA'] || 'dev'
+  );
   return response;
 }

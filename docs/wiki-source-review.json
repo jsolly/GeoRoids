@@ -1,13 +1,13 @@
 {
-  "note": "Start-screen chrome is first-party GeoRoids CSS; Bootstrap is no longer bundled. Hauler playfield hull is 2× Surveyor with shared hullRadiusForKit. No player-facing manual copy change for the CSS drop.",
+  "note": "CLI Preview treats an empty VERCEL_GIT_COMMIT_SHA as missing and uses GEOROIDS_COMMIT_SHA. Start-screen chrome is first-party CSS (no Bootstrap). No player-facing manual copy or demonstration change.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
     "docs/sounds.md": "sha256:9cbd052d2da62c1270becfc3bddd11c3b2065fb498a3439102e184ba5631d30a",
     "index.css": "sha256:1a065101b0fc5f6c2728263f2728ad1eb123fdb991467ec9a3d7d756a799c098",
     "index.html": "sha256:f222d1c52db4209fbdef2f53b856285ad3933696d6400200340ec34456945361",
-    "middleware.ts": "sha256:0acf90e66e33c6369a952e09cc281f79b1a0b8239b9c7a0a07f266487dbf08da",
-    "package.json": "sha256:85011f0a62be851879e158f81ee8b147d0f175e82e5e264de1eff6345b4e873b",
+    "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
+    "package.json": "sha256:70af69bb9e5652478668d3e96439641f536495247951ecad8bad0fb305caf90f",
     "public/sounds/Kenney-License.txt": "sha256:7d6d3ccf1142669b7ea8629ed2b9eccda9c2d5d38841ff9ed6b50892651a5857",
     "public/sounds/asteroid-explode.m4a": "sha256:aae69e29c401ef1d153898a22d658c927b08577e6e79ac317d721d51fc9156d6",
     "public/sounds/core-pickup.m4a": "sha256:a2e319a7c5501c7d946ef02fa39aa7f2f84655dd71cddd3343cda46ed1260393",
@@ -320,7 +320,7 @@
     "tests/unit/systems/shipGrowth.test.ts": "sha256:20dbbc566fc4ceb4b3a98f22174e437ad13cac4bd7d6b01ab60e2db937f9bd48",
     "tests/unit/ui/shipSchematic.test.ts": "sha256:63c64ecad6a059867d5939a00e849b8275562e28c3fb72f5f84b484a6786bfe9",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
-    "vite.config.ts": "sha256:cc86a047e79cd94f7b97de9ae429026f0b74ce0c851aca60629085684ebd1da7",
+    "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"
   }
 }

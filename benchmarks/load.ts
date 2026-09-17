@@ -102,14 +102,18 @@ try {
     proxy = await startTcpProxy({ targetPort: Number(url.port), seed: 42, ...networkProfile });
     url.port = String(proxy.port);
   }
+  const pilotOptions = () => ({ url, measuring: () => measuring, fail });
   for (let i = 0; i < pilots; i++) {
     if (i) {
       await delay(admissionMs);
     }
-    const client = new Pilot(i, { url, measuring: () => measuring, fail });
+    const client = new Pilot(i, pilotOptions());
     clients.push(client);
     const deadline = performance.now() + 10000;
-    while (client.firstStateAt === undefined && performance.now() < deadline && !totalFailures) {
+    while (client.firstStateAt === undefined && !totalFailures) {
+      if (performance.now() >= deadline) {
+        break;
+      }
       await delay(25);
     }
     assert(client.firstStateAt !== undefined, `Pilot ${i} failed admission`);

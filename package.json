@@ -62,7 +62,7 @@
     "node": "^24.15.0"
   },
   "dependencies": {
-    "@types/node": "^26.5.0",
+    "@types/node": "^26.5.1",
     "@types/ws": "^8.18.1",
     "@vercel/functions": "^3.9.5",
     "echarts": "^6.1.0",

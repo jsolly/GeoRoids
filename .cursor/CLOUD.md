@@ -11,6 +11,11 @@ home paths. Preferred source is a host-local tree (`DOTAGENTS_ROOT`, or this
 repo when the installer is running from it). If none is present it may shallow-
 clone `jsolly/dotagents`. There is no public skills mirror.
 
+`.cursor/environment.json` `repositoryDependencies` puts private
+`github.com/jsolly/dotagents` on the Cloud Agent git token so the installer
+and shared gate can clone or fetch it. It does **not** auto-clone `dotagents`
+into the workspace. The Cursor GitHub App must also allowlist `jsolly/dotagents`.
+
 | Artifact | VM path | Notes |
 | --- | --- | --- |
 | Skills | `~/.cursor/skills/` | Same discovery as laptop `~/.cursor/skills` |

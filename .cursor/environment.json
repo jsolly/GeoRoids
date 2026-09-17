@@ -1,4 +1,5 @@
 {
   "install": "bash .cursor/install-cloud-skills.sh && bash .cursor/aws-oidc-login.sh",
-  "start": "bash .cursor/aws-oidc-login.sh"
+  "start": "bash .cursor/aws-oidc-login.sh",
+  "repositoryDependencies": ["github.com/jsolly/dotagents"]
 }

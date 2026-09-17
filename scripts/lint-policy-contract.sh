@@ -261,3 +261,40 @@ if ! grep -Eq 'warning|error' "$warning_output"; then
 fi
 
 echo "✓ Biome policy rejects warn/info/on, malformed/unreadable configs, and a real lint warning."
+
+# Known secret patterns must still fail at the configured entropy threshold.
+# Strings are concatenated so this script is not itself a noSecrets hit.
+secret_probe="$tmp_dir/secret-probe.ts"
+node - "$secret_probe" <<'NODE'
+const fs = require('node:fs');
+const aws = `AKIA${'IOSFODNN7EXAMPLE'}`;
+const jwt = [
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+  'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ',
+  'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+].join('.');
+const githubPat = `ghp_${'abcdefghijklmnopqrstuvwxyz0123456789'}`;
+fs.writeFileSync(
+  process.argv[2],
+  [
+    `export const awsExample = '${aws}';`,
+    `export const jwtExample = '${jwt}';`,
+    `export const githubPat = '${githubPat}';`,
+    '',
+  ].join('\n')
+);
+NODE
+
+secret_output="$tmp_dir/secret-output.txt"
+if "$BIOME" lint --error-on-warnings --only=security/noSecrets --reporter=github --config-path "$CONFIG" "$secret_probe" >"$secret_output" 2>&1; then
+  echo "✗ noSecrets accepted known secret patterns; the rule is off or entropyThreshold is too high" >&2
+  cat "$secret_output" >&2
+  exit 1
+fi
+secret_hits="$(grep -c 'lint/security/noSecrets' "$secret_output" || true)"
+if [[ "$secret_hits" -lt 3 ]]; then
+  echo "✗ noSecrets missed known secret patterns (hits=${secret_hits}; expected AKIA, JWT, and ghp_)" >&2
+  cat "$secret_output" >&2
+  exit 1
+fi
+echo "✓ noSecrets still flags known AWS, JWT, and GitHub token patterns (${secret_hits} hits)."

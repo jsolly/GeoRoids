@@ -63,7 +63,9 @@ describe('interaction sound cues', () => {
       'respawn.m4a',
     ]);
     playLootPickup('wreckage', listener);
+    playLootPickup('tap', listener);
     expect(played[9]).toBe(played[5]);
+    expect(played[10]).toBe(played[5]);
   });
 
   test('world interaction cues use viewport culling and distance attenuation', () => {

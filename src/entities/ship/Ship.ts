@@ -8,6 +8,7 @@ import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type {
+  HaulerUtilityId,
   LaserUpgrade,
   PlayerMotionState,
   Position,
@@ -86,6 +87,9 @@ class Ship {
 
   harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
+  haulerUtility?: HaulerUtilityId;
+  tapExtractFrames?: number;
+  tapExtractCompleted?: boolean;
   /** Last specific environmental cause (boundary, asteroid, or ricochet). */
   lastExplodeCause?: string;
 

@@ -32,7 +32,7 @@ type RadarMark =
       color: string;
     };
 
-const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore'] satisfies readonly LootKind[];
+const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore', 'tap'] satisfies readonly LootKind[];
 
 // These marks stay visible at the radar's world scale without borrowing the
 // much larger playfield silhouettes.
@@ -305,6 +305,17 @@ function addLootMark(ctx: CanvasRenderingContext2D, drop: LootData, x: number, y
         MINIMAP_LOOT_SIZE * 2,
         MINIMAP_LOOT_SIZE * 2
       );
+      return;
+    case 'tap':
+      ctx.rect(
+        x - MINIMAP_LOOT_SIZE * 0.7,
+        y - MINIMAP_LOOT_SIZE * 1.15,
+        MINIMAP_LOOT_SIZE * 1.4,
+        MINIMAP_LOOT_SIZE * 2.3
+      );
+      ctx.moveTo(x - MINIMAP_LOOT_SIZE * 0.35, y - MINIMAP_LOOT_SIZE * 1.15);
+      ctx.lineTo(x, y - MINIMAP_LOOT_SIZE * 1.7);
+      ctx.lineTo(x + MINIMAP_LOOT_SIZE * 0.35, y - MINIMAP_LOOT_SIZE * 1.15);
       return;
     default: {
       const _exhaustive: never = drop.kind;

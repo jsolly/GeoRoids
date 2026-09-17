@@ -7,6 +7,7 @@ import {
 import { FURNACES } from '../../shared/furnaces';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
+  HaulerUtilityId,
   LaserUpgrade,
   PlayerMotionState,
   Position,
@@ -51,6 +52,9 @@ export interface GameEntity {
 
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
+  haulerUtility?: HaulerUtilityId;
+  tapExtractFrames?: number;
+  tapExtractCompleted?: boolean;
   /** Environmental cause of the current death (cleared on respawn). */
   deathCause?: string;
   asteroidInteractions?: 1;

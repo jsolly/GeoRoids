@@ -52,6 +52,8 @@ export const SHIP_ABILITY = {
   HARPOON_RANGE: 280,
   /** Cable separation tolerance before cargo detaches. */
   HARPOON_SLACK: 1.25,
+  /** Resource Tap extract completes after this latch duration. */
+  TAP_EXTRACT_FRAMES: 90,
   SCAN_RANGE: 1200,
   SCAN_FRAMES: 6 * GAME.FPS,
   ASTEROID_DAMAGE_MULTIPLIER: 2,
@@ -81,7 +83,7 @@ const KITS: Record<ShipKitId, ShipKit> = {
     name: 'Hauler',
     abilityId: 'harpoon',
     abilityName: 'Harpoon',
-    abilityHint: 'Tow surveyed asteroids to a furnace. E releases the cable.',
+    abilityHint: 'E latches the equipped tool — Resource Tap or Tow Cable. V opens the schematic.',
     maxHealth: 140,
     size: 38,
     thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,

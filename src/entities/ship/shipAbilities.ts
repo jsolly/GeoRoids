@@ -1,5 +1,11 @@
-import type { Position, ShipKitId, Velocity } from '../../../shared-types';
+import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
+import {
+  haulerUtilityOf,
+  isHaulerUtilityId,
+  isResourceTapUtility,
+  isTowCableUtility,
+} from './haulerUtility';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
 import { attachTowCable, tickTowCable } from './towCable';
 
@@ -16,6 +22,9 @@ export interface AbilityHost {
 
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
+  haulerUtility?: HaulerUtilityId;
+  tapExtractFrames?: number;
+  tapExtractCompleted?: boolean;
   r?: number;
 }
 
@@ -66,9 +75,48 @@ export function canActivateAbility(host: AbilityHost): boolean {
   );
 }
 
-function clearHarpoonLatch(host: Pick<AbilityHost, 'harpoonTargetId' | 'harpoonLatchPos'>): void {
+export function clearHaulerLatch(
+  host: Pick<
+    AbilityHost,
+    'harpoonTargetId' | 'harpoonLatchPos' | 'tapExtractFrames' | 'tapExtractCompleted'
+  >
+): void {
   host.harpoonTargetId = null;
   delete host.harpoonLatchPos;
+  delete host.tapExtractFrames;
+  delete host.tapExtractCompleted;
+}
+
+function clearHarpoonLatch(
+  host: Pick<
+    AbilityHost,
+    'harpoonTargetId' | 'harpoonLatchPos' | 'tapExtractFrames' | 'tapExtractCompleted'
+  >
+): void {
+  clearHaulerLatch(host);
+}
+
+export function setHaulerUtilityOnHost(
+  host: Pick<
+    AbilityHost,
+    | 'kitId'
+    | 'haulerUtility'
+    | 'harpoonTargetId'
+    | 'harpoonLatchPos'
+    | 'tapExtractFrames'
+    | 'tapExtractCompleted'
+  >,
+  utilityId: unknown
+): boolean {
+  if (host.kitId !== 'hauler' || !isHaulerUtilityId(utilityId)) {
+    return false;
+  }
+  const changed = haulerUtilityOf(host) !== utilityId;
+  host.haulerUtility = utilityId;
+  if (changed) {
+    clearHaulerLatch(host);
+  }
+  return true;
 }
 
 function listHarpoonCandidates(world?: AbilityWorld): readonly AbilityBody[] {
@@ -220,7 +268,7 @@ function latchStillValid(
   return harpoonSurfaceGap(host, target) <= range * SHIP_ABILITY.HARPOON_SLACK;
 }
 
-/** Hauler-only: advance the authoritative tow cable. */
+/** Hauler-only: advance the authoritative tow cable. Resource Tap holds without haul. */
 export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBody[]): void {
   if (host.kitId !== 'hauler') {
     tickTowCable(host, undefined);
@@ -241,7 +289,31 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBod
     return;
   }
 
+  if (isResourceTapUtility(host)) {
+    tickTowCable(host, undefined);
+    host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
+    return;
+  }
+
   tickTowCable(host, target);
+}
+
+export function tickTapExtract(
+  host: AbilityHost,
+  target?: AbilityBody
+): 'complete' | 'latched' | 'idle' {
+  if (!isResourceTapUtility(host) || !host.harpoonTargetId || !target) {
+    return 'idle';
+  }
+  if (host.tapExtractCompleted) {
+    return 'latched';
+  }
+  host.tapExtractFrames = (host.tapExtractFrames ?? 0) + 1;
+  if (host.tapExtractFrames >= SHIP_ABILITY.TAP_EXTRACT_FRAMES) {
+    host.tapExtractCompleted = true;
+    return 'complete';
+  }
+  return 'latched';
 }
 
 /**
@@ -278,10 +350,12 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;
+    host.tapExtractFrames = 0;
+    host.tapExtractCompleted = false;
 
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
-    // Only a supplied simulation world owns towing forces.
-    if (world?.asteroids.includes(target)) {
+    // Only a supplied simulation world owns towing forces, and only Tow Cable hauls.
+    if (world?.asteroids.includes(target) && isTowCableUtility(host)) {
       attachTowCable(host, target);
     }
     return { activated: true, abilityId: 'harpoon' };

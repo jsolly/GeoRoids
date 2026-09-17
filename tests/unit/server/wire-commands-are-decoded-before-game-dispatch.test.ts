@@ -114,6 +114,30 @@ test('nested current joins keep numeric-string positions and capability offers',
   });
 });
 
+test('Hauler utility slot commands accept only the two equipped tools', () => {
+  expect(
+    decodeClientCommand({
+      type: 'setHaulerUtility',
+      id: 'pilot',
+      data: { utilityId: 'resource_tap' },
+    })
+  ).toEqual({
+    ok: true,
+    command: { type: 'setHaulerUtility', id: 'pilot', utilityId: 'resource_tap' },
+  });
+  expect(
+    decodeClientCommand({
+      type: 'setHaulerUtility',
+      id: 'pilot',
+      data: { utilityId: 'inventory' },
+    })
+  ).toEqual({
+    ok: false,
+    messageType: 'setHaulerUtility',
+    error: 'Invalid Hauler utility',
+  });
+});
+
 test('retired asteroid tool and pickup claim commands are rejected at the wire boundary', () => {
   for (const type of ['asteroidTool', 'asteroidInput', 'satellitePickupCollected']) {
     expect(decodeClientCommand({ type, data: {} })).toEqual({

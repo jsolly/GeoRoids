@@ -19,7 +19,10 @@ The thrusters stay on while you are alive. ArrowLeft or A and ArrowRight or D
 turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
 on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
-does not repeatedly activate it. F is unbound.
+does not repeatedly activate it. On Hauler, E uses the equipped utility from
+the ship schematic. V opens or closes that schematic; Escape, the X control,
+or Return to flight also close it. Firing and E are blocked while it is open.
+F is unbound.
 
 Your kit, mass, and terrain affect acceleration and speed. Surveyor and Hauler
 share the same cruise speed. Boost multiplies that cruise and thrust, and
@@ -35,6 +38,13 @@ Move the mouse to steer from the canvas center toward the pointer. The ship
 turns toward that heading rather than snapping instantly. Hold the left mouse
 button to fire. Right-click is unbound. Arrow keys or A/D take over steering
 until you move the pointer again.
+
+## Ship schematic
+
+Hauler only. V opens the local schematic. On touch, press and hold your own
+hull for a beat; a short rest still only steers. The overlay shows the v2
+cargo-yoke outline, two callout cards, and a looping tool-in-use animation.
+Selecting a card equips that tool immediately.
 
 ## Map
 
@@ -52,7 +62,8 @@ movements cannot whip the ship around. Watch the arrow ahead of the hull when
 your finger covers the ship. A quick one-finger tap fires once on release. While holding
 one finger to steer, tap anywhere on the playfield with another finger to fire
 immediately, or hold that second finger for continuous fire until it is lifted.
-Use the ability button for the same action as E. Use the Boost button at the
+Use the ability button for the same action as E. Press and hold your own hull
+to open the Hauler schematic. Use the Boost button at the
 bottom of the screen for the same action as Shift: tap once to start boosting,
 tap again to stop. The action buttons do not steer the ship or create a pending
 playfield tap shot.

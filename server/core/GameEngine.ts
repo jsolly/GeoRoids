@@ -52,7 +52,14 @@ import type {
 } from '../../shared-types';
 import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
-import { activateAbilityOnHost, pullHarpoonTarget } from '../../src/entities/ship/shipAbilities';
+import { haulerUtilityOf, isTowCableUtility } from '../../src/entities/ship/haulerUtility';
+import {
+  activateAbilityOnHost,
+  clearHaulerLatch,
+  pullHarpoonTarget,
+  setHaulerUtilityOnHost,
+  tickTapExtract,
+} from '../../src/entities/ship/shipAbilities';
 import { applyShipKitStats, getShipKit, SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
@@ -99,6 +106,21 @@ interface ServerLaser {
   bounces: number;
   age: number;
   lastAsteroidId?: string;
+}
+
+function tapLootSpawnPosition(
+  ship: Position,
+  rock: Pick<AsteroidData, 'position' | 'size'>,
+  shipMass: number
+): Position {
+  const dx = rock.position.x - ship.x;
+  const dy = rock.position.y - ship.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const offset = rock.size + GROWTH.TAP_LOOT_RADIUS + radiusFromMass(shipMass) + 8;
+  return {
+    x: rock.position.x + (dx / dist) * offset,
+    y: rock.position.y + (dy / dist) * offset,
+  };
 }
 
 export interface AppliedAsteroidHit {
@@ -1457,7 +1479,7 @@ export class GameEngine {
     const towedOwners = new Map<string, string>();
     const towedRocks: AsteroidData[] = [];
     for (const entity of entities) {
-      if (entity.kitId !== 'hauler' || !entity.harpoonTargetId) {
+      if (entity.kitId !== 'hauler' || !isTowCableUtility(entity) || !entity.harpoonTargetId) {
         continue;
       }
       const rock = this.asteroidManager.getAsteroid(entity.harpoonTargetId);
@@ -1498,8 +1520,7 @@ export class GameEngine {
   private releaseTowsAttachedTo(asteroidId: string): void {
     for (const player of this.entityManager.getAllEntities()) {
       if (player.harpoonTargetId === asteroidId) {
-        player.harpoonTargetId = null;
-        delete player.harpoonLatchPos;
+        clearHaulerLatch(player);
       }
     }
   }
@@ -2152,6 +2173,7 @@ export class GameEngine {
             ...(entity.harpoonLatchPos !== undefined
               ? { harpoonLatchPos: entity.harpoonLatchPos }
               : {}),
+            ...(entity.kitId === 'hauler' ? { haulerUtility: haulerUtilityOf(entity) } : {}),
             ...(entity.playerMotion !== undefined ? { playerMotion: entity.playerMotion } : {}),
             ...(entity.laserUpgrade !== undefined ? { laserUpgrade: entity.laserUpgrade } : {}),
             ...(entity.deathCause !== undefined ? { deathCause: entity.deathCause } : {}),
@@ -2247,7 +2269,22 @@ export class GameEngine {
       }
       const target = entity.harpoonTargetId ? this.getAsteroid(entity.harpoonTargetId) : undefined;
       pullHarpoonTarget(entity, target ? [target] : []);
+      if (tickTapExtract(entity, target) === 'complete' && target) {
+        this.lootManager.spawnTap(
+          tapLootSpawnPosition(entity.position, target, entity.mass ?? GROWTH.BASE_MASS),
+          this.gameTime
+        );
+        clearHaulerLatch(entity);
+      }
     }
+  }
+
+  public setHaulerUtility(entityId: string, utilityId: unknown): boolean {
+    const entity = this.entityManager.getEntity(entityId);
+    if (!entity) {
+      return false;
+    }
+    return setHaulerUtilityOnHost(entity, utilityId);
   }
 
   /** Furnace intake consumes attached cargo once; free-floating rocks remain in the field. */
@@ -2256,6 +2293,7 @@ export class GameEngine {
     for (const hauler of this.entityManager.getAllEntities()) {
       if (
         hauler.kitId !== 'hauler' ||
+        !isTowCableUtility(hauler) ||
         !hauler.harpoonTargetId ||
         hauler.exploding ||
         hauler.health <= 0 ||
@@ -2389,6 +2427,9 @@ export class GameEngine {
       applyShipMass(collector, applyLootMass(collector.mass ?? GROWTH.BASE_MASS, loot.mass));
       if (loot.kind === 'shard') {
         this.awardPoints(collector.id, GROWTH.SHARD_SCORE);
+      }
+      if (loot.kind === 'tap') {
+        this.awardPoints(collector.id, GROWTH.TAP_LOOT_SCORE);
       }
       collector.lastUpdate = this.getServerTime();
       results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });

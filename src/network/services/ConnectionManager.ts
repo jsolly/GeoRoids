@@ -46,6 +46,7 @@ import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
+import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { reconcilePlayerInput } from '../../input/keybindings';
@@ -1566,6 +1567,15 @@ export class ConnectionManager {
       const authoritativeKit = data.kitId ?? getSelectedShipKitId();
       if (localPlayer.ship.kitId !== authoritativeKit) {
         applyShipKitToShip(localPlayer.ship, authoritativeKit);
+      }
+      if (localPlayer.ship.kitId === 'hauler') {
+        const utility = preferredHaulerUtility();
+        localPlayer.ship.haulerUtility = utility;
+        this.sendMessage({
+          type: 'setHaulerUtility',
+          id: localPlayer.id,
+          data: { utilityId: utility },
+        });
       }
     }
     this.initializeAsteroids();

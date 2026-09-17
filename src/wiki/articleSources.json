@@ -40,6 +40,8 @@
     "shared/shipFlight.ts",
     "src/rendering/headingCueRenderer.ts",
     "src/ui/universeMap.ts",
+    "src/ui/shipSchematic.ts",
+    "tests/unit/ui/shipSchematic.test.ts",
     "tests/unit/entities/input/keyboardControls.test.ts",
     "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts",
     "tests/integration/browser/sanity/boost-toggle-raises-cruise-then-returns-to-shared-speed.test.ts",
@@ -52,6 +54,8 @@
     "src/entities/ship/hullOutlines.ts",
     "src/entities/ship/harpoonField.ts",
     "src/entities/ship/towCable.ts",
+    "src/entities/ship/haulerUtility.ts",
+    "src/ui/shipSchematic.ts",
     "shared/furnaces.ts",
     "src/rendering/furnaceRenderer.ts",
     "tests/unit/rendering/furnace-hearth-roars-inside-the-delivery-zone.test.ts",
@@ -63,7 +67,9 @@
     "server/core/AsteroidManager.ts",
     "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts",
     "tests/unit/server/authoritative-combat.test.ts",
-    "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts"
+    "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts",
+    "tests/unit/entities/haulerUtility.test.ts",
+    "tests/unit/server/tap-extract-spawns-tap-loot.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -161,6 +167,7 @@
     "src/rendering/hud/minimap.ts",
     "src/rendering/hud/hudLayout.ts",
     "src/ui/universeMap.ts",
+    "src/ui/shipSchematic.ts",
     "src/network/services/ConnectionManager.ts",
     "src/network/services/resumeCredential.ts",
     "shared/releaseId.ts",
@@ -225,6 +232,11 @@
     "tests/unit/systems/shipGrowth.test.ts",
     "tests/unit/systems/lootBlast.test.ts",
     "tests/unit/server/loot-manager.test.ts",
+    "src/entities/loot/LootField.ts",
+    "src/entities/loot/lootRenderer.ts",
+    "tests/unit/server/tap-extract-spawns-tap-loot.test.ts",
+    "tests/unit/entities/tapLootRenderer.test.ts",
+    "tests/unit/entities/haulerUtility.test.ts",
     "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts"
   ],
   "teamwork": [

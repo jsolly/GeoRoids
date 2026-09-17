@@ -25,7 +25,7 @@ world. A world generation bump also resets saved sectors on the next server
 start.
 
 Choose Surveyor for nimble exploration and shared mineral scanning, or Hauler
-for asteroid towing and stronger mining lasers. Their
+for Resource Tap, Tow Cable, and stronger mining lasers. Their
 starting health, handling, shot interval, and ability cooldowns are fixed by
 the kit data; loot changes a living ship's mass and health curve during a
 life, while a respawn resets that growth.

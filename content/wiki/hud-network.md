@@ -33,11 +33,13 @@ other players, explored asteroids, loot drops, loose satellite
 pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
 marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
-cream squares and diamonds mark wreckage and shards, yellow slashed diamonds
+cream squares and diamonds mark wreckage and shards, larger cream canisters
+with amber tips mark Tap loot, yellow slashed diamonds
 mark laser cores, and lilac circles and diamonds mark loose and orbiting
 satellite pickups. Ship headings and kit colors keep pilots identifiable above
 the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
+V or hold your own Hauler hull to open the local ship schematic.
 M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are

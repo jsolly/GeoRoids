@@ -69,12 +69,14 @@ test('valuable drops appear only after exploration and disappear when collected 
   const drops: LootData[] = [
     { id: 'core', kind: 'laserCore', position: { x: 40_000, y: 24_000 }, radius: 10, mass: 0 },
     { id: 'fragment', kind: 'shard', position: { x: 40_000, y: 24_000 }, radius: 5, mass: 0.25 },
+    { id: 'canister', kind: 'tap', position: { x: 40_000, y: 24_000 }, radius: 28, mass: 0.4 },
   ];
   expect(assets.snapshot(exploration.snapshot(), drops, [])).toEqual([]);
   exploration.reveal(drops[0]?.position ?? { x: 0, y: 0 }, 260);
   const revealed = assets.snapshot(exploration.snapshot(), drops, []);
   expect(revealed.some((asset) => asset.id === 'loot:core')).toBe(true);
   expect(revealed.some((asset) => asset.id === 'loot:fragment')).toBe(false);
+  expect(revealed.some((asset) => asset.id === 'loot:canister')).toBe(false);
   expect(
     assets.snapshot(exploration.snapshot(), [], []).some((asset) => asset.id === 'loot:core')
   ).toBe(false);

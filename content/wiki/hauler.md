@@ -1,7 +1,7 @@
 ---
 title: Hauler
 category: Ships
-summary: A heavy hull that tows asteroids to arena furnaces and mines metal efficiently.
+summary: A heavy hull that swaps Resource Tap and Tow Cable, then mines metal efficiently.
 order: 40
 related:
   - content/wiki/controls.md
@@ -14,10 +14,28 @@ media:
     demo: hauler
 ---
 
-## Tow cable E
+## Utility slot
 
 Hauler is the U-shaped cargo yoke with twin forward towers and two engine
-bells. E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
+bells. It has one utility slot. Open the ship schematic with V on desktop, or
+press and hold your own hull on touch, to swap **Resource Tap** and **Tow
+Cable**. Equip is immediate. E still fires the equipped tool; there is no
+second ability key. Other pilots cannot open your schematic.
+
+New flights start on Resource Tap. A host that never reports a slot keeps the
+legacy Tow Cable so older sessions still haul.
+
+## Resource Tap E
+
+E attaches a tap tether to the nearest living asteroid within a fixed 280-unit
+hull gap. The rock stays whole. After a short extract, a large cream canister
+with an amber tip appears beside the rock and the tether releases. The ability
+never targets a ship. E again releases an unfinished tap without spawning loot.
+Furnaces do not consume a tapped rock.
+
+## Tow cable E
+
+E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
 hull gap. The ability never targets a ship, and it cannot deal ship damage.
 
 The asteroid keeps its existing motion and trails behind the Hauler as the

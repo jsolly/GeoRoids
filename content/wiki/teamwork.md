@@ -36,12 +36,13 @@ rubble, and the classification stays with a scanned rock until the rock is
 delivered or removed. A qualifying scan also tags the asteroid with that
 Surveyor's player ID, so several Surveyors can contribute to one delivery.
 
-The Hauler presses E near an asteroid to attach its tow cable. The asteroid
-keeps its motion and trails behind the Hauler as the Hauler flies; the cable
-does not reel a rock into the hull or launch it at anything. Dragging that
-cargo into another asteroid breaks both rocks and drops the cable. Dragging
-it into another ship deals an asteroid impact to that hull, then breaks the
-cargo and drops the cable. Bring the rock to
+The Hauler presses E near an asteroid to attach its equipped tool. Resource
+Tap extracts a canister and leaves the rock in the field. Tow Cable hauls the
+rock: it keeps its motion and trails behind the Hauler; the cable does not
+reel a rock into the hull or launch it at anything. Dragging towed cargo into
+another asteroid breaks both rocks and drops the cable. Dragging it into
+another ship deals an asteroid impact to that hull, then breaks the cargo and
+drops the cable. Bring a towed rock to
 an arena furnace to deliver it. The Hauler and every Surveyor recorded on the
 rock receive the same delivery points. A rock with no Surveyor tag still pays
 the Hauler for the delivery.

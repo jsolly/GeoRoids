@@ -21,10 +21,12 @@ repair existing damage. For a heavy kit such as Hauler, the first small mass
 pickup can lower its starting maximum health to the shared growth value. Laser cores do not add mass.
 
 Asteroid breaks can release shards, and an environmental ship death releases
-wreckage. A death converts a base amount plus a fraction of the destroyed
+wreckage. A finished Resource Tap extract drops a larger cream canister with an
+amber tip; the asteroid stays intact. That Tap loot is not a diamond chip. A death converts a base amount plus a fraction of the destroyed
 ship's excess mass into pellets, subject to per-pellet and global limits. Loot
 expires after its configured lifetime. A nearby drop is pulled toward a living
-ship once it comes within magnet range. The pull adds to whatever motion the
+ship once it comes within magnet range. Tap canisters use a stronger pull when
+a Hauler is nearby. The pull adds to whatever motion the
 drop already has, including motion from its existing velocity. Collecting still
 happens when the drop overlaps the hull, not an inflated ship hitbox. Mass follows a shared growth curve:
 greater mass raises radius and health capacity while reducing thrust and speed;

@@ -2,6 +2,7 @@ import type {
   AsteroidData,
   AsteroidMaterial,
   AsteroidPhenomenon,
+  HaulerUtilityId,
   LaserUpgrade,
   LootData,
   LootKind,
@@ -42,11 +43,15 @@ const kit = enumeration<ShipKitId>({
   surveyor: true,
   hauler: true,
 });
+const haulerUtility = enumeration<HaulerUtilityId>({
+  resource_tap: true,
+  tow_cable: true,
+});
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,
-
   laserCore: true,
+  tap: true,
 });
 const array =
   (rule: Rule): Rule =>
@@ -103,6 +108,7 @@ const entity = shape<ServerEntityData>({
 
   harpoonTargetId: optional((value) => value === null || string(value)),
   harpoonLatchPos: optional(position),
+  haulerUtility: optional(haulerUtility),
   deathCause: optional(string),
   playerMotion: optional(motion),
   laserUpgrade: optional(upgrade),

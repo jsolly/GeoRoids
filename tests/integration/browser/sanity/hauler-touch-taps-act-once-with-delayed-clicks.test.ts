@@ -1,4 +1,4 @@
-import { chromium, webkit } from 'playwright';
+import { chromium, type Locator, webkit } from 'playwright';
 import { describe, expect, test } from 'vitest';
 import { SnapshotDecoder } from '../../../../shared/snapshotProtocol';
 import {
@@ -10,6 +10,29 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
 const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
+const FIXTURE_ORE_ID = 'crew-fixture-ore';
+
+/** Production fires the kit on pointerdown. Playwright WebKit tap() after a long idle can miss. */
+async function pressTouchAbility(ability: Locator): Promise<void> {
+  await ability.dispatchEvent('pointerdown', {
+    bubbles: true,
+    cancelable: true,
+    pointerType: 'touch',
+    pointerId: 2,
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+  });
+  await ability.dispatchEvent('pointerup', {
+    bubbles: true,
+    cancelable: true,
+    pointerType: 'touch',
+    pointerId: 2,
+    isPrimary: true,
+    button: 0,
+    buttons: 0,
+  });
+}
 
 for (const browserType of [chromium, webkit]) {
   describe(browserType.name(), () => {
@@ -87,15 +110,17 @@ for (const browserType of [chromium, webkit]) {
           waitForCombatReady: false,
         });
         await arrangeCrewField([await game.getLocalPlayerId()], 'delivery');
-        await page.waitForFunction(() =>
-          window.gameController
-            ?.getCurrRoidBelt()
-            .getRoids()
-            .some((rock) => rock.id === 'crew-fixture-ore')
+        await page.waitForFunction(
+          (oreId) =>
+            window.gameController
+              ?.getCurrRoidBelt()
+              .getRoids()
+              .some((rock) => rock.id === oreId),
+          FIXTURE_ORE_ID
         );
         const ability = page.locator('#touch-ability');
         await ability.tap();
-        await expect.poll(() => targets).toEqual(['crew-fixture-ore']);
+        await expect.poll(() => targets).toEqual([FIXTURE_ORE_ID]);
         await expect.poll(() => ability.textContent()).toBe('RELEASE');
         // Emulate the follow-up pointer click independently of the browser's tap
         // heuristic. It may arrive in a later task after the server confirms Hook.
@@ -104,7 +129,7 @@ for (const browserType of [chromium, webkit]) {
         const afterHook = snapshots;
         await expect.poll(() => snapshots).toBeGreaterThan(afterHook + 4);
         expect(requests).toBe(1);
-        expect(targets).toEqual(['crew-fixture-ore']);
+        expect(targets).toEqual([FIXTURE_ORE_ID]);
         expect(await ability.textContent()).toBe('RELEASE');
         expect(
           await page.evaluate(
@@ -123,16 +148,26 @@ for (const browserType of [chromium, webkit]) {
           await page.waitForFunction(
             () => window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames === 0
           );
-          expect(targets).toEqual(['crew-fixture-ore']);
+          expect(targets).toEqual([FIXTURE_ORE_ID]);
+          await expect
+            .poll(async () =>
+              page.evaluate(() => ({
+                target: window.gameController?.getCurrPlayer()?.ship.harpoonTargetId ?? null,
+                label: document.querySelector('#touch-ability')?.textContent,
+              }))
+            )
+            .toEqual({ target: FIXTURE_ORE_ID, label: 'RELEASE' });
+          await pressTouchAbility(ability);
+        } else {
+          await ability.tap();
         }
-        await ability.tap();
-        await expect.poll(() => targets).toEqual(['crew-fixture-ore', null]);
+        await expect.poll(() => targets).toEqual([FIXTURE_ORE_ID, null]);
         await page.waitForTimeout(delay);
         await ability.dispatchEvent('click', { bubbles: true, detail: 1 });
         const afterRelease = snapshots;
         await expect.poll(() => snapshots).toBeGreaterThan(afterRelease + 4);
         expect(requests).toBe(2);
-        expect(targets).toEqual(['crew-fixture-ore', null]);
+        expect(targets).toEqual([FIXTURE_ORE_ID, null]);
         expect(await ability.textContent()).toBe('HOOK');
         expect(
           await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.harpoonTargetId)

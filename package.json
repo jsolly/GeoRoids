@@ -35,7 +35,7 @@
     "fix": "npm run check:fix && npm run check:ts && npm run check:benchmarks && npm run test",
     "format": "biome format --write .",
     "prepare": "if [ -z \"$CI\" ] && git rev-parse --git-dir >/dev/null 2>&1; then git config core.hooksPath .git-hooks; fi",
-    "check:actions": "bash scripts/check-actions-contract.sh && bash scripts/check-actions.sh && bash scripts/vercel-preview-comment-contract.sh",
+    "check:actions": "bash scripts/check-actions-contract.sh && bash scripts/check-actions.sh && bash scripts/vercel-preview-comment-contract.sh && bash scripts/vercel-preview-workflow-contract.sh",
     "gate": "FLEET_DOC_FAST=0 bash .git-hooks/pre-commit",
     "check:lint-policy": "bash scripts/lint-policy-contract.sh",
     "check:knip": "knip --treat-config-hints-as-errors --treat-tag-hints-as-errors",

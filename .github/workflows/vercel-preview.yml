@@ -133,9 +133,26 @@ jobs:
             echo "Checked-out SHA ${local_sha} != PR head ${HEAD_SHA}" >&2
             exit 1
           fi
+          if [[ ! "$HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "PR head SHA is not a 40-character hex commit: ${HEAD_SHA}" >&2
+            exit 1
+          fi
 
+          # --archive=tgz does not upload .git. Vite and middleware need the PR SHA
+          # explicitly: Git-integration system vars are often empty on CLI deploys.
           preview_url="$(
             npx --yes vercel@59.20.0 deploy --yes --archive=tgz --scope jsollys-projects \
+              --build-env "VERCEL_GIT_COMMIT_SHA=${HEAD_SHA}" \
+              --build-env "GEOROIDS_COMMIT_SHA=${HEAD_SHA}" \
+              --env "GEOROIDS_COMMIT_SHA=${HEAD_SHA}" \
+              --meta "githubDeployment=1" \
+              --meta "githubCommitSha=${HEAD_SHA}" \
+              --meta "githubCommitRef=${HEAD_REF}" \
+              --meta "githubCommitOrg=${REPO%%/*}" \
+              --meta "githubCommitRepo=${REPO#*/}" \
+              --meta "githubOrg=${REPO%%/*}" \
+              --meta "githubRepo=${REPO#*/}" \
+              --meta "githubPrId=${PR_NUMBER}" \
               | tee /dev/stderr \
               | grep -E '^https://' \
               | tail -n 1

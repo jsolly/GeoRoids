@@ -52,9 +52,11 @@ export default defineConfig(() => {
   define['import.meta.env.VITE_BUILD_TIME'] = JSON.stringify(new Date().toISOString());
 
   // Hosted builds may omit .git; release polling still needs the deployed identity.
+  // CLI /preview deploys are not Git-integration builds, so they set GEOROIDS_COMMIT_SHA.
   const commitHash =
     process.env['VERCEL_GIT_COMMIT_SHA'] ??
     process.env['RAILWAY_GIT_COMMIT_SHA'] ??
+    process.env['GEOROIDS_COMMIT_SHA'] ??
     execFileSync('git', ['rev-parse', 'HEAD'], {
       encoding: 'utf8',
       timeout: 5000,

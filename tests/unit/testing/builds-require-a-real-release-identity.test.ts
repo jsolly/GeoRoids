@@ -8,6 +8,7 @@ vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 beforeEach(() => {
   vi.stubEnv('VERCEL_GIT_COMMIT_SHA', undefined);
   vi.stubEnv('RAILWAY_GIT_COMMIT_SHA', undefined);
+  vi.stubEnv('GEOROIDS_COMMIT_SHA', undefined);
 });
 
 afterEach(() => {
@@ -22,7 +23,7 @@ function buildConfig() {
   return config({ command: 'build', mode: 'production' });
 }
 
-test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA'])(
+test.each(['VERCEL_GIT_COMMIT_SHA', 'RAILWAY_GIT_COMMIT_SHA', 'GEOROIDS_COMMIT_SHA'])(
   'hosted builds retain %s when the Git checkout is absent',
   async (variable) => {
     const release = 'a'.repeat(40);

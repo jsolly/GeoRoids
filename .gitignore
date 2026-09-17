@@ -37,6 +37,7 @@ dist/*
 !.cursor/environment.json
 !.cursor/install-cloud-skills.sh
 !.cursor/aws-oidc-login.sh
+!.cursor/install-app.sh
 
 
 # Canonical art references and generated vector assets are versioned in georoids-art/.

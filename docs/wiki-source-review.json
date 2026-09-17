@@ -1,5 +1,5 @@
 {
-  "note": "dependabot: yaml 2.9.1 after main (biome 2.5.13). package.json digest only; no wiki copy or media change.",
+  "note": "dependabot: @types/node 26.5.1 after main (yaml 2.9.1 + biome 2.5.13). package.json digest only; no wiki copy or media change.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:b9cda885acb38a36c3954535bcce181c6c5a755e654cf3b98b155cd5a0e0da69",

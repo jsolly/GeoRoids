@@ -5,7 +5,9 @@ scout with a forward dish; Hauler uses the cargo yoke with twin towers
 and two engine bells. Runtime and SVG geometry live in
 `src/entities/ship/hullOutlines.ts`.
 The current pack is `georoids-art/ships-v2/{surveyor,hauler}.svg`.
-Stroke is `#5EEAD4` on `#000011`, with a play-scale target around 32px.
+Stroke is `#5EEAD4` on `#000011`. Surveyor play-scale is `SHIP.SIZE` (30px);
+Hauler is `2×` that barge footprint on the playfield. Hull outlines stay
+normalized; kit `size` plus mass growth set draw, collision, and latch radii.
 
 | Kit | Hull | Role |
 | --- | --- | --- |

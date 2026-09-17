@@ -14,7 +14,8 @@ media:
 
 ## Mineral scan
 
-Surveyor is the winged scout with a dish on the nose. It turns more quickly than
+Surveyor is the winged scout with a dish on the nose. It is the smaller hull
+next to Hauler's barge. It turns more quickly than
 Hauler and cruises automatically at the same speed. Press Shift or tap Boost for
 a stronger burst than Hauler's boost; tap or press again to return to cruise.
 Press E or

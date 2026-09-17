@@ -6,6 +6,7 @@ import {
   planKillLoot,
 } from '../../shared/shipGrowth';
 import type { LootData, Position, Velocity } from '../../shared-types';
+import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import type { GameEntity } from './EntityManager';
 import type { RNGService } from './RNGService';
 
@@ -119,7 +120,12 @@ export class LootManager {
     for (const drop of drops) {
       const winner = collectors.find((entity) => {
         if (
-          !lootOverlap(entity.position, entity.mass ?? GROWTH.BASE_MASS, drop.position, drop.radius)
+          !lootOverlap(
+            entity.position,
+            hullRadiusForKit(entity.kitId, entity.mass ?? GROWTH.BASE_MASS),
+            drop.position,
+            drop.radius
+          )
         ) {
           return false;
         }

@@ -1,6 +1,6 @@
 import { type CombatCircle, circlesOverlap, isCombatantImmune } from '../../shared/combat';
-import { GROWTH, radiusFromMass } from '../../shared/shipGrowth';
 import type { AsteroidData, SatellitePickupData } from '../../shared-types';
+import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { GameEntity } from './EntityManager';
 
@@ -8,7 +8,7 @@ function toCombatCircle(entity: GameEntity): CombatCircle {
   return {
     id: entity.id,
     position: entity.position,
-    radius: radiusFromMass(entity.mass ?? GROWTH.BASE_MASS),
+    radius: hullRadiusForKit(entity.kitId, entity.mass),
     immune: isCombatantImmune(entity),
   };
 }

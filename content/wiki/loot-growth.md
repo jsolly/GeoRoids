@@ -28,7 +28,7 @@ expires after its configured lifetime. A nearby drop is pulled toward a living
 ship once it comes within magnet range. Tap canisters use a stronger pull when
 a Hauler is nearby. The pull adds to whatever motion the
 drop already has, including motion from its existing velocity. Collecting still
-happens when the drop overlaps the hull, not an inflated ship hitbox. Mass follows a shared growth curve:
+happens when the drop overlaps the kit hull, scaled by mass, not an inflated ship hitbox. Mass follows a shared growth curve:
 greater mass raises radius and health capacity while reducing thrust and speed;
 the growth model soft-caps mass, caps size scaling, and enforces minimum thrust
 and speed scales. Death resets the growth.

@@ -1,4 +1,3 @@
-import { radiusFromMass } from '../../../shared/shipGrowth';
 import type { HaulerUtilityId, Position, ShipKitId } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
@@ -8,7 +7,7 @@ import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCaus
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
 import { applySharedHarpoonLatch } from '../ship/shipAbilities';
-import { applyShipKitToShip } from '../ship/shipKits';
+import { applyShipKitToShip, hullRadiusForKit } from '../ship/shipKits';
 import {
   applySharedShipExplodingFlag,
   applySharedShipRespawnCue,
@@ -174,8 +173,8 @@ export class Player {
 
     if (data.mass !== undefined) {
       this.ship.mass = data.mass;
-      this.ship.r = radiusFromMass(data.mass);
     }
+    this.ship.r = hullRadiusForKit(this.ship.kitId, this.ship.mass);
 
     if (data.deathCause) {
       this.deathCause = preferDeathCause(data.deathCause, this.deathCause) ?? data.deathCause;

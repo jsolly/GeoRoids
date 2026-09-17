@@ -17,7 +17,9 @@ media:
 ## Utility slot
 
 Hauler is the U-shaped cargo yoke with twin forward towers and two engine
-bells. It has one utility slot. Open the ship schematic with V on desktop, or
+bells. On the playfield it is about twice Surveyor's linear hull size, so the
+barge reads as a real tug next to the scout. Draw scale, collision, and
+utility latch range share that hull. It has one utility slot. Open the ship schematic with V on desktop, or
 press and hold your own hull on touch, to swap **Resource Tap** and **Tow
 Cable**. Equip is immediate. E still fires the equipped tool; there is no
 second ability key. Other pilots cannot open your schematic.

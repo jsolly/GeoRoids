@@ -75,8 +75,10 @@ export function sizeScaleFromMass(mass: number): number {
   return 1 + (GROWTH.MAX_SIZE_SCALE - 1) * u;
 }
 
-export function radiusFromMass(mass: number): number {
-  return (SHIP.SIZE / 2) * sizeScaleFromMass(mass);
+/** Hull radius for a given mass. `baseSize` is kit length (`SHIP.SIZE` for Surveyor). */
+export function radiusFromMass(mass: number, baseSize: number = SHIP.SIZE): number {
+  const size = Number.isFinite(baseSize) && baseSize > 0 ? baseSize : SHIP.SIZE;
+  return (size / 2) * sizeScaleFromMass(mass);
 }
 
 export function maxHealthFromMass(mass: number): number {
@@ -130,11 +132,12 @@ export function canCollectLoot(entity: {
 
 export function lootOverlap(
   shipPosition: { x: number; y: number },
-  shipMass: number,
+  shipRadius: number,
   lootPosition: { x: number; y: number },
   lootRadius: number
 ): boolean {
-  const reach = radiusFromMass(shipMass) + lootRadius;
+  const hull = Number.isFinite(shipRadius) && shipRadius > 0 ? shipRadius : 0;
+  const reach = hull + lootRadius;
   const dx = shipPosition.x - lootPosition.x;
   const dy = shipPosition.y - lootPosition.y;
   return dx * dx + dy * dy <= reach * reach;

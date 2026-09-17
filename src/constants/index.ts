@@ -189,7 +189,7 @@ export const SHIP = {
   TURN_SPEED: 450, // degrees per second
   THRUST: 5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   MAX_VELOCITY: 2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
-  SIZE: 30, // height in pixels
+  SIZE: 30, // Surveyor / classic hull height in pixels. Hauler uses kit size.
 
   // Combat
   MAX_LASERS: 5, // maximum lasers a ship can have at once

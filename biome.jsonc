@@ -18,16 +18,62 @@
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "types": "all",
+      "project": "all",
+      "test": "all",
+      "playwright": "all"
+    },
     "rules": {
       "preset": "recommended",
+      "a11y": {
+        "noAccessKey": "error",
+        "noAriaHiddenOnFocusable": "error",
+        "noAriaUnsupportedElements": "error",
+        "noAutofocus": "error",
+        "noDistractingElements": "error",
+        "noHeaderScope": "error",
+        "noInteractiveElementToNoninteractiveRole": "error",
+        "noLabelWithoutControl": "error",
+        "noNoninteractiveElementToInteractiveRole": "error",
+        "noNoninteractiveTabindex": "error",
+        "noPositiveTabindex": "error",
+        "noRedundantAlt": "error",
+        "noRedundantRoles": "error",
+        "noStaticElementInteractions": "error",
+        "noSvgWithoutTitle": "error",
+        "useAltText": "error",
+        "useAnchorContent": "error",
+        "useAriaActivedescendantWithTabindex": "error",
+        "useAriaPropsForRole": "error",
+        "useAriaPropsSupportedByRole": "error",
+        "useButtonType": "error",
+        "useFocusableInteractive": "error",
+        "useGenericFontNames": "error",
+        "useHeadingContent": "error",
+        "useHtmlLang": "error",
+        "useIframeTitle": "error",
+        "useKeyWithClickEvents": "error",
+        "useKeyWithMouseEvents": "error",
+        "useMediaCaption": "error",
+        "useSemanticElements": "error",
+        "useValidAnchor": "error",
+        "useValidAriaProps": "error",
+        "useValidAriaRole": "error",
+        "useValidAriaValues": "error",
+        "useValidAutocomplete": "error",
+        "useValidLang": "error"
+      },
       "complexity": {
         "noAdjacentSpacesInRegex": "error",
         "noArguments": "error",
         "noBannedTypes": "error",
         "noCommaOperator": "error",
         "noEmptyTypeParameters": "error",
+        "noExcessiveNestedTestSuites": "error",
         "noExtraBooleanCast": "error",
         "noFlatMapIdentity": "error",
+        "noImplicitCoercions": "error",
         "noImportantStyles": "error",
         "noStaticOnlyClass": "error",
         "noThisInStatic": "error",
@@ -46,34 +92,173 @@
         "noUselessThisAlias": "error",
         "noUselessTypeConstraint": "error",
         "noUselessUndefinedInitialization": "error",
+        "useArrayFind": "error",
         "useArrowFunction": "error",
         "useDateNow": "error",
         "useFlatMap": "error",
         "useIndexOf": "error",
         "useNumericLiterals": "error",
-        // TypeScript requires bracket access for index signatures.
+        // HOLD: TypeScript requires bracket access for index signatures.
         "useLiteralKeys": "off",
         "useOptionalChain": "error",
         "useRegexLiterals": "error",
         "useSimpleNumberKeys": "error"
       },
       "correctness": {
+        "noPrivateImports": "error",
+        "noProcessGlobal": "error",
+        "noUndeclaredDependencies": "error",
+        // HOLD: Biome's scanner does not follow package.json exports, Node 24
+        // builtins, or Vite virtual/query imports. tsc covers resolution.
+        "noUnresolvedImports": "off",
+        // HOLD: Vite + TypeScript bundler resolution omits extensions on purpose.
+        "useImportExtensions": "off",
+        "useJsonImportAttributes": "error",
         "noUnusedFunctionParameters": "error",
         "noUnusedImports": "error",
+        "noUnusedInstantiation": "error",
         "noUnusedLabels": "error",
         "noUnusedPrivateClassMembers": "error",
         "noUnusedVariables": "error",
         "useParseIntRadix": "error"
       },
+      "nursery": {
+        "noBaseToString": "error",
+        "noBunModules": "error",
+        // HOLD: parameterized desktop/touch browser scenarios wrap
+        // desktop-only expects in `if (!touch)`.
+        "noConditionalExpect": "off",
+        "noDuplicateFieldDefinitionNames": "error",
+        "noDuplicateSelectors": "error",
+        "noEmptyObjectKeys": "error",
+        "noExcessiveNestedCallbacks": "error",
+        "noExtendNative": "error",
+        "noFloatingPromises": "error",
+        "noIdenticalTestTitle": "error",
+        "noImpliedEval": "error",
+        "noInlineStyles": "error",
+        "noInvalidFileInputAccept": "error",
+        "noInvalidPropertyInitValue": "error",
+        "noJsonUnsafeValues": "error",
+        "noLoopFunc": "error",
+        "noMisleadingReturnType": "error",
+        "noMisusedPromises": "error",
+        "noNegationInEqualityCheck": "error",
+        "noNonScalableViewport": "error",
+        "noObsoleteTags": "error",
+        "noPlaywrightElementHandle": "error",
+        "noPlaywrightEval": "error",
+        "noPlaywrightForceOption": "error",
+        "noPlaywrightMissingAwait": "error",
+        "noPlaywrightNetworkidle": "error",
+        "noPlaywrightPagePause": "error",
+        "noPlaywrightUselessAwait": "error",
+        "noPlaywrightWaitForNavigation": "error",
+        "noPlaywrightWaitForSelector": "error",
+        // HOLD: duration-based stability assertions are not locator waits.
+        "noPlaywrightWaitForTimeout": "off",
+        "noReturnInFinally": "error",
+        "noThisOutsideOfClass": "error",
+        "noUndeclaredClasses": "error",
+        "noUndeclaredCustomProperties": "error",
+        "noUnmodifiedLoopCondition": "error",
+        "noUnnecessaryTemplateExpression": "error",
+        "noUnsafeIframeSandbox": "error",
+        "noUnsafePlusOperands": "error",
+        // HOLD: Biome 2.5.9 treats every `as T` except `as const` as unsafe.
+        // Snapshot/WS/DOM boundaries are typed assertions, not Zod parsers.
+        "noUnsafeTypeAssertion": "off",
+        "noUntrustedLicenses": "error",
+        // HOLD: Biome 2.5 only sees HTML/JSX class attributes. Game and wiki
+        // class names are applied from TypeScript.
+        "noUnusedClasses": "off",
+        "noUselessTypeConversion": "error",
+        "noXorAsExponentiation": "error",
+        "useArraySome": "error",
+        "useAwaitThenable": "error",
+        "useBetterDomTraversing": "error",
+        "useConsistentTestIt": {
+          "level": "error",
+          "options": {
+            "function": "test",
+            "withinDescribe": "test"
+          }
+        },
+        "useControlLabel": "error",
+        "useDisposables": "error",
+        "useDomNodeTextContent": "error",
+        "useDomQuerySelector": "error",
+        "useExhaustiveSwitchCases": "error",
+        "useExpect": "error",
+        "useFlatMathMinMax": "error",
+        "useIframeSandbox": "error",
+        "useIncludes": "error",
+        "useLayeredStyles": "error",
+        "useMathMinMax": "error",
+        "useModernMathApis": "error",
+        "useNamedLayer": "error",
+        "useNullishCoalescing": "error",
+        "usePlaywrightValidDescribeCallback": "error",
+        "useReduceTypeParameter": "error",
+        "useRegexpExec": "error",
+        "useRegexpTest": "error",
+        "useStringStartsEndsWith": "error",
+        "useTestHooksInOrder": "error",
+        "useTestHooksOnTop": "error",
+        // HOLD: singleton/factory methods often exist for a stable instance API
+        // without reading this.
+        "useThisInClassMethods": "off",
+        "useUnicodeRegex": "error",
+        // HOLD: treats `RegExp.prototype.test` as a Vitest title helper.
+        "useValidTestTitle": "off"
+      },
       "performance": {
         "noAccumulatingSpread": "error",
-        "noDynamicNamespaceImportAccess": "error"
+        // HOLD: ordered WebSocket, Playwright, and benchmark steps must stay
+        // sequential.
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "error",
+        "noDynamicNamespaceImportAccess": "error",
+        "noNamespaceImport": "error",
+        "noReExportAll": "error",
+        "useTopLevelRegex": "error"
+      },
+      "security": {
+        "noBlankTarget": "error",
+        "noDangerouslySetInnerHtml": "error",
+        "noDangerouslySetInnerHtmlWithChildren": "error",
+        "noGlobalEval": "error",
+        "noScriptUrl": "error",
+        // HOLD: entropy pass flags identifiers such as `performance.now`.
+        "noSecrets": "off"
+      },
+      "style": {
+        "noCommonJs": "error",
+        "noDescendingSpecificity": "error",
+        "noNonNullAssertion": "error",
+        "noParameterAssign": "error",
+        "useArrayLiterals": "error",
+        "useConsistentEnumValueType": "error",
+        "useErrorCause": "error",
+        "useConst": "error",
+        "useBlockStatements": "error",
+        "useDefaultSwitchClause": "error",
+        "useDeprecatedReason": "error",
+        "useExponentiationOperator": "error",
+        "useExportType": "error",
+        "useForOf": "error",
+        "useImportType": "error",
+        "useLiteralEnumMembers": "error",
+        "useNodejsImportProtocol": "error",
+        "useShorthandFunctionType": "error",
+        "useTemplate": "error"
       },
       "suspicious": {
         "noApproximativeNumericConstant": "error",
         "noCatchAssign": "error",
         "noConfusingLabels": "error",
         "noConfusingVoidType": "error",
+        "noConstantBinaryExpressions": "error",
         "noExplicitAny": "error",
         "noConsole": {
           "level": "error",
@@ -82,45 +267,46 @@
           }
         },
         "noConstEnum": "error",
+        "noDeprecatedImports": "error",
         "noDeprecatedMediaType": "error",
         "noDocumentCookie": "error",
         "noDuplicateEnumValues": "error",
         "noDuplicateFields": "error",
         "noEmptyBlock": "error",
+        "noEvolvingTypes": "error",
         "noExtraNonNullAssertion": "error",
+        "noForIn": "error",
         "noGlobalIsFinite": "error",
+        "noDuplicateTestHooks": "error",
+        "noExportsInTest": "error",
+        "noFocusedTests": "error",
+        "noSkippedTests": "error",
         "noGlobalIsNan": "error",
+        "noImportCycles": "error",
         "noIrregularWhitespace": "error",
+        "noNestedPromises": "error",
         "noOctalEscape": "error",
         "noProto": "error",
         "noPrototypeBuiltins": "error",
         "noQuickfixBiome": "error",
         "noRedundantUseStrict": "error",
+        "noShadow": "error",
         "noSuspiciousSemicolonInJsx": "error",
         "noTemplateCurlyInString": "error",
         "noTsIgnore": "error",
+        // HOLD: Biome 2.5 types domain false-positives on uninitialized
+        // singleton statics, mutable class fields (biome#11174), compile-time
+        // DEBUG constants, and marching-squares switch narrowing.
+        "noUnnecessaryConditions": "off",
         "noUselessEscapeInString": "error",
         "noUselessRegexBackrefs": "error",
         "useAdjacentOverloadSignatures": "error",
+        "useArraySortCompare": "error",
+        "useAwait": "error",
         "useBiomeIgnoreFolder": "error",
         "useDefaultSwitchClauseLast": "error",
         "useGoogleFontDisplay": "error",
         "useIsArray": "error"
-      },
-      "style": {
-        "noDescendingSpecificity": "error",
-        "noNonNullAssertion": "error",
-        "useArrayLiterals": "error",
-        "useConst": "error",
-        "useBlockStatements": "error",
-        "useDeprecatedReason": "error",
-        "useExponentiationOperator": "error",
-        "useExportType": "error",
-        "useImportType": "error",
-        "useLiteralEnumMembers": "error",
-        "useNodejsImportProtocol": "error",
-        "useShorthandFunctionType": "error",
-        "useTemplate": "error"
       }
     }
   },
@@ -129,12 +315,41 @@
       "includes": ["tests/**", "scripts/*.ts"],
       "linter": {
         "rules": {
+          "performance": {
+            // Vitest spies on modules via `import * as ns`.
+            "noNamespaceImport": "off"
+          },
           "suspicious": {
             "noExplicitAny": "error",
             "noConsole": {
               "level": "error",
               "options": { "allow": ["log", "debug", "info", "warn", "error"] }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tests/**", "benchmarks/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "performance": {
+            // One-shot CLI/test regexes are not hot-path allocations.
+            "useTopLevelRegex": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["benchmarks/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noConditionalExpect": "off",
+            "useConsistentTestIt": "off",
+            "useExpect": "off",
+            "useTestHooksInOrder": "off",
+            "useTestHooksOnTop": "off"
           }
         }
       }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import {
@@ -240,7 +241,10 @@ try {
             completedPilots: clients.filter((client) => client.completedScenario).length,
             measuredStates: clients.reduce((sum, client) => sum + client.measuredStates, 0),
             measuredHealthSamples: health.filter((entry) => isMeasuredHealth(entry)).length,
-            rawSamples: Object.values(samples).reduce((sum, values) => sum + values.length, 0),
+            rawSamples: Object.values(samples).reduce(
+              (sum, sampleValues) => sum + sampleValues.length,
+              0
+            ),
             failures: totalFailures,
           },
           parameters: {

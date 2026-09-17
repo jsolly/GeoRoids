@@ -1,4 +1,6 @@
 /* @vitest-environment node */
+
+import process from 'node:process';
 import type { Writable } from 'node:stream';
 import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
@@ -14,11 +16,11 @@ const state = vi.hoisted(() => ({
   rename: vi.fn(async () => undefined),
 }));
 vi.mock('node:fs', async () => {
-  const { Writable } = await import('node:stream');
+  const { Writable: WritableStream } = await import('node:stream');
   return {
     default: {
       createWriteStream: () => {
-        const stream = new Writable({
+        const stream = new WritableStream({
           write(_chunk, _encoding, callback) {
             state.chunks.push(String(_chunk));
             if (state.manualWrites) {
@@ -301,10 +303,10 @@ test('server.log rotates before a record would exceed its disk bound', async () 
   state.statSize = 10 * 1024 * 1024;
   const { writeServerDiagnostic } = await import('../../../setup/serverLogger');
   await expect(writeServerDiagnostic('after rotation')).resolves.toBe(true);
-  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(/server\.log\.1$/), { force: true });
+  expect(state.rm).toHaveBeenCalledWith(expect.stringMatching(/server\.log\.1$/u), { force: true });
   expect(state.rename).toHaveBeenCalledWith(
-    expect.stringMatching(/server\.log$/),
-    expect.stringMatching(/server\.log\.1$/)
+    expect.stringMatching(/server\.log$/u),
+    expect.stringMatching(/server\.log\.1$/u)
   );
 });
 

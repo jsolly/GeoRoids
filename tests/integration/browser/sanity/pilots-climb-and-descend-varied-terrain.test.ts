@@ -69,20 +69,20 @@ function angleDistance(left: number, right: number): number {
   return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
 }
 
-async function sampleLocalPosition(page: Page, startAtRest = false): Promise<TimedPosition> {
-  return page.evaluate((startAtRest) => {
+function sampleLocalPosition(page: Page, startAtRest = false): Promise<TimedPosition> {
+  return page.evaluate((shouldStartAtRest) => {
     const ship = window.gameController?.getCurrPlayer()?.ship;
     if (!ship) {
       throw new Error('Local pilot missing during terrain measurement');
     }
-    if (startAtRest) {
+    if (shouldStartAtRest) {
       ship.velocity = { x: 0, y: 0 };
     }
     return { ...ship.position, at: performance.now() };
   }, startAtRest);
 }
 
-async function readTerrain(page: Page): Promise<{
+function readTerrain(page: Page): Promise<{
   peak: { height: number };
   slope: { height: number; gradient: { x: number } };
   rim: { height: number };
@@ -129,7 +129,7 @@ for (const viewport of [
         await page.waitForFunction(
           () =>
             document.body.classList.contains('touch-play') &&
-            !document.getElementById('touch-controls')?.hidden,
+            !document.querySelector('#touch-controls')?.hidden,
           { timeout: 5000 }
         );
       }

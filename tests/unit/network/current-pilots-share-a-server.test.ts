@@ -14,6 +14,7 @@ import {
   SnapshotDecoder,
   SnapshotEncoder,
 } from '../../../shared/snapshotProtocol';
+import type { ServerGameSnapshot } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -122,7 +123,7 @@ function snapshotSummary(data: unknown): SnapshotSummary {
 
 function decodedSnapshots(pilot: ReturnType<typeof socket>) {
   const decoder = new SnapshotDecoder();
-  const states = [];
+  const states: ServerGameSnapshot[] = [];
   for (const raw of pilot.fake.sent) {
     const result = decoder.readMessage(raw, { acceptSnapshots: true });
     if (result.kind === 'snapshot-rejected') {
@@ -155,8 +156,13 @@ describe('current pilots share the production handler and broadcaster', () => {
     engine.stopGameLoop();
     broadcaster.stopPeriodicBroadcast();
   });
-  const join = (handler: MessageHandler, ws: WebSocket, id: string, resumeToken?: string) =>
-    handler.handleMessage(
+  const joinPilot = (
+    messageHandler: MessageHandler,
+    ws: WebSocket,
+    id: string,
+    resumeToken?: string
+  ) =>
+    messageHandler.handleMessage(
       {
         type: 'join',
         data: {
@@ -173,7 +179,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('current offers receive a joined acknowledgment before snapshot-v1 frames', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'pilot');
+    joinPilot(handler, pilot.ws, 'pilot');
     broadcaster.broadcastGameState();
     const joined = pilot.messages.find((m) => m.type === 'joined');
     assert.ok(joined, 'joined message');
@@ -182,7 +188,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       data: {
         snapshotVersion: 1,
         asteroidInteractions: 1,
-        resumeToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+        resumeToken: expect.stringMatching(/^[a-f0-9]{64}$/u),
         serverReleaseId: expect.any(String),
         credentialReleaseId: expect.any(String),
         scoreReleaseId: expect.any(String),
@@ -201,7 +207,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const pilot = socket();
     pilot.fake.defer = true;
-    join(handler, pilot.ws, 'sampled-pilot');
+    joinPilot(handler, pilot.ws, 'sampled-pilot');
     expect(
       info.mock.calls.some(
         ([category, event]) => category === 'STATE' && event === 'snapshot_sent_to_transport'
@@ -249,13 +255,13 @@ describe('current pilots share the production handler and broadcaster', () => {
       }).state;
     };
     const a = socket();
-    join(handler, a.ws, 'a');
+    joinPilot(handler, a.ws, 'a');
     const joinedA = a.messages.find((message) => message.type === 'joined');
     assert.ok(joinedA?.data && typeof joinedA.data === 'object' && !Array.isArray(joinedA.data));
     const resumeTokenA = (joinedA.data as Record<string, unknown>)['resumeToken'];
     assert.equal(typeof resumeTokenA, 'string');
     const b = socket();
-    join(handler, b.ws, 'b');
+    joinPilot(handler, b.ws, 'b');
     const pilotBSnapshot = b.messages.find((m) => m.type === 'snapshot');
     assert.ok(pilotBSnapshot, 'pilot b snapshot');
     expect(pilotBSnapshot).toMatchObject({ data: { kind: 'keyframe' } });
@@ -280,7 +286,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     expect(pilotAKeyframe).toMatchObject({ data: { kind: 'keyframe' } });
     expect(reconstruct(a)).toEqual(expectedWorld());
     expect(reconstruct(b)).toEqual(expectedWorld('b'));
-    join(handler, a.ws, 'a', resumeTokenA as string);
+    joinPilot(handler, a.ws, 'a', resumeTokenA as string);
     const rejoinedKeyframe = a.messages.at(-1);
     assert.ok(rejoinedKeyframe, 'rejoined pilot a keyframe');
     expect(rejoinedKeyframe.data).toMatchObject({
@@ -289,7 +295,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     });
     engine.removePlayer('a');
     const reconnected = socket();
-    join(handler, reconnected.ws, 'a', resumeTokenA as string);
+    joinPilot(handler, reconnected.ws, 'a', resumeTokenA as string);
     const reconnectedKeyframe = reconnected.messages.at(-1);
     assert.ok(reconnectedKeyframe, 'reconnected keyframe');
     expect(reconnectedKeyframe.data).toMatchObject({
@@ -302,8 +308,8 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('staggered recipients retain accepted baselines while peers advance independently', () => {
     const a = socket();
     const b = socket();
-    join(handler, a.ws, 'a');
-    join(handler, b.ws, 'b');
+    joinPilot(handler, a.ws, 'a');
+    joinPilot(handler, b.ws, 'b');
 
     a.fake.defer = true;
     broadcaster.broadcastGameState();
@@ -353,8 +359,8 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('a laser core stays collectible while current pilots decode keyframes and deltas', () => {
     const recovery = socket();
     const peer = socket();
-    join(handler, recovery.ws, 'recovery');
-    join(handler, peer.ws, 'peer');
+    joinPilot(handler, recovery.ws, 'recovery');
+    joinPilot(handler, peer.ws, 'peer');
     engine.addAsteroid({
       id: 'core-rock',
       position: { x: 500, y: 500 },
@@ -416,7 +422,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('pending and failed sends do not advance baseline; periodic/resync keyframes heal state', () => {
     const a = socket();
-    join(handler, a.ws, 'a');
+    joinPilot(handler, a.ws, 'a');
     a.fake.defer = true;
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
@@ -456,7 +462,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('a callback send records one terminal outbound outcome', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'callback-pilot');
+    joinPilot(handler, pilot.ws, 'callback-pilot');
     pilot.fake.clear();
     pilot.fake.defer = true;
     const enabled = vi.spyOn(serverPerformanceMetrics, 'enabled', 'get').mockReturnValue(true);
@@ -481,7 +487,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('current snapshots skip a pressured socket and recover on the next keyframe', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'pressured-snapshot');
+    joinPilot(handler, pilot.ws, 'pressured-snapshot');
     pilot.fake.clear();
     pilot.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
 
@@ -499,8 +505,8 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('pressured event recipients reconnect for state recovery instead of growing queues', () => {
     const pressured = socket();
     const peer = socket();
-    join(handler, pressured.ws, 'pressured');
-    join(handler, peer.ws, 'peer');
+    joinPilot(handler, pressured.ws, 'pressured');
+    joinPilot(handler, peer.ws, 'peer');
     pressured.fake.clear();
     peer.fake.clear();
     pressured.fake.bufferedAmount = SNAPSHOT_BACKPRESSURE_BYTES + 1;
@@ -532,13 +538,13 @@ describe('current pilots share the production handler and broadcaster', () => {
   ])('current recipients retain their pilot and resume after $cause', ({ code, reason }) => {
     const pressured = socket();
     const peer = socket();
-    join(handler, pressured.ws, 'current-pressured');
+    joinPilot(handler, pressured.ws, 'current-pressured');
     const joined = pressured.messages.find((message) => message.type === 'joined');
     assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
     const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
     assert.equal(typeof resumeToken, 'string');
 
-    join(handler, peer.ws, 'peer');
+    joinPilot(handler, peer.ws, 'peer');
     pressured.fake.clear();
     peer.fake.clear();
     if (code === 1013) {
@@ -579,9 +585,9 @@ describe('current pilots share the production handler and broadcaster', () => {
     const snapshot = socket();
     const event = socket();
     const control = socket();
-    join(handler, snapshot.ws, 'projected-snapshot');
-    join(handler, event.ws, 'projected-event');
-    join(handler, control.ws, 'projected-control');
+    joinPilot(handler, snapshot.ws, 'projected-snapshot');
+    joinPilot(handler, event.ws, 'projected-event');
+    joinPilot(handler, control.ws, 'projected-control');
     snapshot.fake.clear();
     event.fake.clear();
     control.fake.clear();
@@ -608,7 +614,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('an oversized snapshot closes explicitly instead of retrying forever', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'oversized-snapshot');
+    joinPilot(handler, pilot.ws, 'oversized-snapshot');
     pilot.fake.clear();
 
     broadcaster.sendToWebSocket(pilot.ws, {
@@ -625,8 +631,8 @@ describe('current pilots share the production handler and broadcaster', () => {
   test('serialization and socket-close failures stay contained to recipients', () => {
     const first = socket();
     const second = socket();
-    join(handler, first.ws, 'first');
-    join(handler, second.ws, 'second');
+    joinPilot(handler, first.ws, 'first');
+    joinPilot(handler, second.ws, 'second');
     const broken = engine.getGameState();
     Object.assign(broken, { badField: broken });
     vi.spyOn(engine, 'getGameState').mockReturnValue(broken);
@@ -656,7 +662,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('fixture preparation preserves a pilot session while replacing the ambient world', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'pilot');
+    joinPilot(handler, pilot.ws, 'pilot');
     const actor = engine.getPlayer('pilot');
     assert.ok(actor);
     const oldEpoch = actor.playerMotion?.epoch;
@@ -689,7 +695,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     'fixture readiness rejects a pending old $pendingKind after callback $outcome',
     ({ pendingKind, outcome }) => {
       const pilot = socket();
-      join(handler, pilot.ws, 'pilot');
+      joinPilot(handler, pilot.ws, 'pilot');
       const decoder = new SnapshotDecoder();
       let lastKeyframeSequence = 1;
       let state = decodeSnapshotMessage(decoder, snapshotEnvelopes(pilot)[0]?.raw ?? '');
@@ -769,7 +775,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     'a stale callback %s cannot advance a fresh registration',
     (outcome) => {
       const pilot = socket();
-      join(handler, pilot.ws, 'pilot');
+      joinPilot(handler, pilot.ws, 'pilot');
       const oldActor = engine.getPlayer('pilot');
       assert.ok(oldActor, 'old actor');
       for (let epoch = 0; epoch < 4; epoch++) {
@@ -807,7 +813,7 @@ describe('current pilots share the production handler and broadcaster', () => {
       );
       handler.handleMessage({ type: 'leave', data: {} }, pilot.ws);
       pilot.fake.defer = false;
-      join(handler, pilot.ws, 'pilot', joinedData.resumeToken);
+      joinPilot(handler, pilot.ws, 'pilot', joinedData.resumeToken);
       const freshActor = engine.getPlayer('pilot');
       assert.ok(freshActor?.playerMotion, 'fresh actor registration');
       expect(freshActor.playerMotion.epoch).toBe(1);
@@ -864,7 +870,7 @@ describe('current pilots share the production handler and broadcaster', () => {
 
   test('a resumed motion session keeps its epoch monotonic', () => {
     const original = socket();
-    join(handler, original.ws, 'pilot');
+    joinPilot(handler, original.ws, 'pilot');
     const joined = original.messages.find((message) => message.type === 'joined');
     assert.ok(joined?.data && typeof joined.data === 'object' && !Array.isArray(joined.data));
     const resumeToken = (joined.data as Record<string, unknown>)['resumeToken'];
@@ -878,14 +884,14 @@ describe('current pilots share the production handler and broadcaster', () => {
     assert.ok(preparedEpoch, 'prepared epoch');
 
     const replacement = socket();
-    join(handler, replacement.ws, 'ignored-id', resumeToken);
+    joinPilot(handler, replacement.ws, 'ignored-id', resumeToken);
     expect(engine.getPlayer('pilot')).toBe(actor);
     expect(engine.getPlayer('pilot')?.playerMotion?.epoch).toBe(preparedEpoch);
   });
 
   test('fixture readiness accepts an immediate requested keyframe lower bound', () => {
     const pilot = socket();
-    join(handler, pilot.ws, 'pilot');
+    joinPilot(handler, pilot.ws, 'pilot');
     const sequence = broadcaster.requestSnapshotKeyframe(pilot.ws);
     expect(sequence).toBe(2);
     broadcaster.broadcastGameState();
@@ -898,7 +904,7 @@ describe('current pilots share the production handler and broadcaster', () => {
     'a stale $outcome callback cannot mutate a same-socket rejoin',
     ({ outcome }) => {
       const pilot = socket();
-      join(handler, pilot.ws, 'pilot');
+      joinPilot(handler, pilot.ws, 'pilot');
       pilot.fake.defer = true;
       broadcaster.broadcastGameState();
       const staleCallback = pilot.pending.shift();

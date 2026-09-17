@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 import { isAsteroidMaterial } from '../../../../shared/asteroidMaterials';
 import type { AsteroidData, AsteroidDestroyEvent } from '../../../../shared-types';
@@ -86,6 +87,38 @@ function readSplitEvidence(value: unknown): SplitEvidence | undefined {
       }),
     },
   };
+}
+
+function pageShowsSplitFragments(
+  page: Page,
+  original: string,
+  fragments: string[]
+): Promise<boolean> {
+  return page.evaluate(
+    ({ original: originalId, fragments: fragmentIds }) => {
+      const samples = window.__collabFieldSamples;
+      if (!samples) {
+        throw new Error('Rendered field observer unavailable');
+      }
+      for (const field of samples) {
+        if (field.includes(originalId)) {
+          continue;
+        }
+        let includesEveryFragment = true;
+        for (const fragmentId of fragmentIds) {
+          if (!field.includes(fragmentId)) {
+            includesEveryFragment = false;
+            break;
+          }
+        }
+        if (includesEveryFragment) {
+          return true;
+        }
+      }
+      return false;
+    },
+    { original, fragments }
+  );
 }
 
 // Scenario: two players shoot an ordinary large ice asteroid within
@@ -273,23 +306,10 @@ test(
     await expect
       .poll(
         async () => {
-          const seen = await Promise.all(
-            [page1, page2].map((page) =>
-              page.evaluate(
-                ({ original, fragments }) => {
-                  const samples = window.__collabFieldSamples;
-                  if (!samples) {
-                    throw new Error('Rendered field observer unavailable');
-                  }
-                  return samples.some(
-                    (field) =>
-                      !field.includes(original) && fragments.every((id) => field.includes(id))
-                  );
-                },
-                { original: collaborative.id, fragments: expectedFragments }
-              )
-            )
-          );
+          const seen = await Promise.all([
+            pageShowsSplitFragments(page1, collaborative.id, expectedFragments),
+            pageShowsSplitFragments(page2, collaborative.id, expectedFragments),
+          ]);
           return seen.every(Boolean);
         },
         {

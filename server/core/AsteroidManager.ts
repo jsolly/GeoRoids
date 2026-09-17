@@ -241,11 +241,11 @@ export class AsteroidManager {
       // Determine size based on DEBUG settings
       let size: number;
       // Check if we're in test mode (when PLACE_ON_LOCAL_PLAYER is true, assume test mode)
-      const isTestMode = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
+      const localTestMode = DEBUG.ROIDS.PLACE_ON_LOCAL_PLAYER;
 
-      if (DEBUG.ENABLED && DEBUG.ROIDS.ALL_LARGE && !isTestMode) {
+      if (DEBUG.ENABLED && DEBUG.ROIDS.ALL_LARGE && !localTestMode) {
         size = 50; // Large size
-      } else if (isTestMode) {
+      } else if (localTestMode) {
         // In test mode, create medium asteroids (size 20-30). Only the biggest
         // class (>= COLLAB_SPLIT_MIN_SIZE) can split, and only via collab hits.
         size = this.rng.random() * 10 + 20;

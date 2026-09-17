@@ -63,8 +63,8 @@ test('a constrained mobile pilot releases controls, resumes a frozen page, recon
     const connection = await page.evaluateHandle<ConnectionManager>(
       "import('/src/network/services/ConnectionManager.ts').then(({ ConnectionManager }) => ConnectionManager.getInstance())"
     );
-    await page.evaluate((connection) => {
-      const socket = connection.getSocket();
+    await page.evaluate((transportConnection) => {
+      const socket = transportConnection.getSocket();
       if (!socket) {
         throw new Error('Missing connected transport');
       }

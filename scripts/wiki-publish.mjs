@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 export const DRAFT_BRANCH = 'codex/wiki-drafts';
@@ -10,7 +11,7 @@ export const MAIN_BRANCH = 'main';
 export const ALLOWED_ROOTS = ['content/wiki', 'public/wiki/uploads'];
 export const RASTER_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
-const SHA_PATTERN = /^[0-9a-f]{40}$/i;
+const SHA_PATTERN = /^[0-9a-f]{40}$/iu;
 const WIKI_SNAPSHOT_MARKER = 'GeoRoids wiki draft snapshot:';
 const MAX_SYNC_ATTEMPTS = 3;
 const CI_WORKFLOW = 'ci.yml';
@@ -29,8 +30,8 @@ const GIT_PATH_ENVIRONMENT = [
 ];
 
 export class PublishError extends Error {
-  constructor(message) {
-    super(message);
+  constructor(message, options) {
+    super(message, options);
     this.name = 'PublishError';
   }
 }
@@ -51,7 +52,7 @@ function normalizeRef(value) {
   if (typeof value !== 'string') {
     return value;
   }
-  return value.replace(/^refs\/heads\//, '');
+  return value.replace(/^refs\/heads\//u, '');
 }
 
 function pathHasUnsafeSegment(path) {
@@ -93,7 +94,12 @@ export function parsePagesCmsPayload(rawPayload, { expectedAction = 'publish-wik
   try {
     payload = JSON.parse(rawPayload);
   } catch (error) {
-    throw new PublishError(`Pages CMS payload is not valid JSON: ${String(error)}`);
+    throw new PublishError(
+      `Pages CMS payload is not valid JSON: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
+      {
+        cause: error,
+      }
+    );
   }
 
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -258,7 +264,7 @@ function gh(args, { write = false } = {}) {
     }).trim();
   } catch (error) {
     const detail = error.stderr?.toString().trim() || error.message;
-    throw new PublishError(`gh ${args.join(' ')} failed: ${detail}`);
+    throw new PublishError(`gh ${args.join(' ')} failed: ${detail}`, { cause: error });
   }
 }
 
@@ -267,13 +273,18 @@ function ghJson(args, options = {}) {
   try {
     return JSON.parse(output || 'null');
   } catch (error) {
-    throw new PublishError(`gh returned invalid JSON: ${String(error)}`);
+    throw new PublishError(
+      `gh returned invalid JSON: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
+      {
+        cause: error,
+      }
+    );
   }
 }
 
 function remoteBranchSha(branch) {
   const output = git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`]);
-  const match = output.match(/^([0-9a-f]{40})\s+refs\/heads\/[^\n]+$/m);
+  const match = output.match(/^([0-9a-f]{40})\s+refs\/heads\/[^\n]+$/mu);
   return match ? match[1] : undefined;
 }
 
@@ -334,7 +345,7 @@ function commitTree(treeSha, parents, message) {
     ).trim();
   } catch (error) {
     const detail = error.stderr?.toString().trim() || error.message;
-    throw new PublishError(`git commit-tree failed: ${detail}`);
+    throw new PublishError(`git commit-tree failed: ${detail}`, { cause: error });
   }
 }
 
@@ -343,7 +354,7 @@ function entryMap(ref) {
 }
 
 function normalizeWikiMarkdownText(source) {
-  return `${source.replace(/\r\n/g, '\n').replace(/\n+$/, '')}\n`;
+  return `${source.replace(/\r\n/gu, '\n').replace(/\n+$/u, '')}\n`;
 }
 
 function isWikiMarkdownPath(path) {
@@ -383,8 +394,8 @@ function publishedSnapshotTrees(mainSha, overlaySha) {
     const message = fields[index + 1];
     const marker = message.match(
       new RegExp(
-        `^${WIKI_SNAPSHOT_MARKER.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')} ([0-9a-f]{40})$`,
-        'im'
+        `^${WIKI_SNAPSHOT_MARKER.replace(/[.*+?^${}()|[\\]\\\\]/gu, '\\\\$&')} ([0-9a-f]{40})$`,
+        'imu'
       )
     );
     if (!commitSha || !marker) {
@@ -833,7 +844,7 @@ function latestCiRun(branch, headSha) {
 }
 
 function wait(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  return new Promise((done) => setTimeout(done, milliseconds));
 }
 
 async function waitForCi(branch, headSha) {
@@ -861,7 +872,7 @@ function snapshotMarkerLine(draftSha) {
 export function hasSnapshotMarker(message, draftSha) {
   return (
     typeof message === 'string' &&
-    message.split(/\r?\n/).some((line) => line.trim() === snapshotMarkerLine(draftSha))
+    message.split(/\r?\n/u).some((line) => line.trim() === snapshotMarkerLine(draftSha))
   );
 }
 

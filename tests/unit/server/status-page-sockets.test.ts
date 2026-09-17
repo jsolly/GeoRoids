@@ -163,7 +163,7 @@ function createStatusDocument(): {
 }
 
 function button(window: DOMWindow, id: string): HTMLButtonElement {
-  const element = window.document.getElementById(id);
+  const element = window.document.querySelector(`#${id}`);
   if (!(element instanceof window.HTMLButtonElement)) {
     throw new Error(`Missing status button ${id}`);
   }
@@ -171,7 +171,7 @@ function button(window: DOMWindow, id: string): HTMLButtonElement {
 }
 
 function text(window: DOMWindow, id: string): string {
-  return window.document.getElementById(id)?.textContent ?? '';
+  return window.document.querySelector(`#${id}`)?.textContent ?? '';
 }
 
 async function settleMicrotasks(): Promise<void> {

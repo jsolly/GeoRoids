@@ -32,7 +32,7 @@ const browserApi = await vi.hoisted(async () => {
   const browser = {
     newContext: vi.fn(async () => makeContext()),
     isConnected: () => state.connected,
-    close: vi.fn(async () => {
+    close: vi.fn(() => {
       state.connected = false;
     }),
   };

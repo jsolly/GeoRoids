@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { startTcpProxy, TransmissionSchedule } from '../../../benchmarks/tcp-proxy';
 
 test('a throttled recipient receives the entire byte stream in order and cleanup closes both sides', async () => {
-  const server = createServer((socket) => socket.pipe(socket));
+  const server = createServer((clientSocket) => clientSocket.pipe(clientSocket));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -64,7 +64,7 @@ test('propagation overlaps across queued chunks while bandwidth and FIFO remain 
 
 test('a normal-profile download sustains configured bandwidth without charging latency per chunk', async () => {
   const payload = Buffer.alloc(2 * 1024 * 1024, 0x5a);
-  const server = createServer((socket) => socket.write(payload));
+  const server = createServer((clientSocket) => clientSocket.write(payload));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -112,7 +112,7 @@ test('a normal-profile download sustains configured bandwidth without charging l
 }, 10000);
 
 test('closing a throttled connection cancels and accounts for pending delivery timers', async () => {
-  const server = createServer((socket) => socket.write('pending delivery'));
+  const server = createServer((clientSocket) => clientSocket.write('pending delivery'));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') {

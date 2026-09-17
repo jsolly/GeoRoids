@@ -179,7 +179,7 @@ export class GameEngine {
   private scoreSeason: string;
   private readonly pilots = new Map<string, PersistentPilot>();
   private readonly completedSectors = new Set<string>();
-  private managedField = true;
+  private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
@@ -190,11 +190,11 @@ export class GameEngine {
   private combatSink: CombatSink | null = null;
   private gameTime = 0;
   private gameLoopInterval: NodeJS.Timeout | null = null;
-  private isPaused = false; // Track if game is paused due to no players
+  private isPaused: boolean = false; // Track if game is paused due to no players
   private lastTickAtMs = 0;
   private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
-  private clockPrimed = false;
+  private clockPrimed: boolean = false;
   private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
@@ -841,7 +841,7 @@ export class GameEngine {
     requestedName?: string,
     clientReleaseId?: string
   ): ReturnType<PlayerMotionService['resume']> {
-    if (!/^[a-f0-9]{64}$/.test(token)) {
+    if (!/^[a-f0-9]{64}$/u.test(token)) {
       return { ok: false, error: 'Invalid pilot resume token' };
     }
     const hash = createHash('sha256').update(token).digest('hex');
@@ -1862,7 +1862,7 @@ export class GameEngine {
     laserId: string,
     now = this.getServerTime()
   ): AppliedAsteroidHit[] {
-    const index = this.lasers.findIndex((laser) => laser.id === laserId);
+    const index = this.lasers.findIndex((candidateLaser) => candidateLaser.id === laserId);
     const laser = this.lasers[index];
     if (!laser || laser.hasExploded || laser.age !== 0) {
       return [];
@@ -1897,7 +1897,10 @@ export class GameEngine {
           maxX: Math.max(start.x, end.x),
           maxY: Math.max(start.y, end.y),
         })
-        .filter((rock) => !cargo.has(rock.id) && this.getAsteroid(rock.id) === rock);
+        .filter(
+          (nearbyRock) =>
+            !cargo.has(nearbyRock.id) && this.getAsteroid(nearbyRock.id) === nearbyRock
+        );
       const impact = findNearestAsteroidImpact(start, end, rocks, laser.lastAsteroidId);
       const worldWall = findWorldBoundaryImpact(start, end);
       const sectorWall = findSectorWallImpact(start, end, this.completedSectors);

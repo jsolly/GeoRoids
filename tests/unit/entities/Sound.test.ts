@@ -48,11 +48,13 @@ class FakeContext extends EventTarget {
   currentTime = 0;
   sampleRate = 48000;
   destination = {};
-  resume = vi.fn(async () => {
+  resume = vi.fn((): Promise<void> => {
     this.changeState('running');
+    return Promise.resolve();
   });
-  suspend = vi.fn(async () => {
+  suspend = vi.fn((): Promise<void> => {
     this.changeState('suspended');
+    return Promise.resolve();
   });
   constructor() {
     super();
@@ -146,7 +148,7 @@ test('cold muted construction and simulation allocate no library, context or med
 });
 
 test('enabled gesture synchronously creates one context shared with lazy Howler', async () => {
-  new Sound('sounds/laser.m4a', 8);
+  void new Sound('sounds/laser.m4a', 8);
   setSound(true);
   expect(FakeContext.instances).toHaveLength(1);
   expect(context().resume).toHaveBeenCalledTimes(1);
@@ -213,7 +215,7 @@ test('unloaded and interrupted shots are dropped without replay or hot-loop resu
 });
 
 test('muting before lazy initialization completes prevents sample loads', async () => {
-  new Sound('sounds/laser.m4a', 2);
+  void new Sound('sounds/laser.m4a', 2);
   setSound(true);
   setSound(false);
   await settle();

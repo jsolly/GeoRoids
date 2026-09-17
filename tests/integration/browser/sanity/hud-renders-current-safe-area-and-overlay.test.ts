@@ -38,7 +38,7 @@ async function setViewport(
   await page.setViewportSize({ width, height });
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       return (
         canvas instanceof HTMLCanvasElement &&
         canvas.width === expectedWidth &&
@@ -50,13 +50,13 @@ async function setViewport(
   );
 }
 
-async function captureHudFrame(
+function captureHudFrame(
   page: import('playwright').Page,
   options: CaptureOptions
 ): Promise<HudFrame> {
   return page.evaluate((capture) => {
-    const canvasElement = document.getElementById('gameCanvas');
-    const probeElement = document.getElementById('safe-area-probe');
+    const canvasElement = document.querySelector('#gameCanvas');
+    const probeElement = document.querySelector('#safe-area-probe');
     if (!(canvasElement instanceof HTMLCanvasElement) || !(probeElement instanceof HTMLElement)) {
       throw new Error('HUD fixture requires the game canvas and safe-area probe');
     }
@@ -337,7 +337,7 @@ test(
     } finally {
       if (wasRunning !== undefined) {
         await page.evaluate((running) => {
-          document.getElementById('safe-area-probe')?.removeAttribute('style');
+          document.querySelector('#safe-area-probe')?.removeAttribute('style');
           const gameController = window.gameController;
           if (!gameController) {
             return;

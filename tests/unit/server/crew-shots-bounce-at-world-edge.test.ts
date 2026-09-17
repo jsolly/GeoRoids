@@ -22,8 +22,8 @@ function crew() {
   );
   shooter.spawnProtectionTimer = 0;
   teammate.spawnProtectionTimer = 0;
-  for (const rock of engine.getAllAsteroids()) {
-    engine.removeAsteroid(rock.id);
+  for (const fieldRock of engine.getAllAsteroids()) {
+    engine.removeAsteroid(fieldRock.id);
   }
   return { engine, shooter, teammate };
 }

@@ -105,7 +105,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     }
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       asteroid.position.x = value;
-      expect(() => new SnapshotEncoder(world)).toThrow(/Non-JSON/);
+      expect(() => new SnapshotEncoder(world)).toThrow(/Non-JSON/u);
       expect(Object.is(asteroid.position.x, value)).toBe(true);
     }
   });
@@ -171,20 +171,20 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         futureNpcs: [{ id: 'eo', pattern: 'fan', shots: tick < 60 ? ['a', 'b'] : [] }],
       });
       const encoder = new SnapshotEncoder(extended);
-      for (const [index, pilot] of pilots.entries()) {
+      for (const [index, pilotEntry] of pilots.entries()) {
         // One pilot stalls while the others receive newer baselines.
         if (index === 2 && tick >= 40 && tick < 46) {
           continue;
         }
-        const sequence = pilot.sequence++;
-        const frame = encoder.encode(sequence, tick % 90 ? pilot.baseline : undefined);
+        const sequence = pilotEntry.sequence++;
+        const frame = encoder.encode(sequence, tick % 90 ? pilotEntry.baseline : undefined);
         if (frame.kind === 'delta') {
           deltas++;
         }
-        expect(decodeSnapshotMessage(pilot.decoder, snapshotMessage(frame))).toEqual(
+        expect(decodeSnapshotMessage(pilotEntry.decoder, snapshotMessage(frame))).toEqual(
           JSON.parse(JSON.stringify(encoder.state))
         );
-        pilot.baseline = { sequence, state: encoder.state };
+        pilotEntry.baseline = { sequence, state: encoder.state };
       }
     }
     expect(deltas).toBeGreaterThan(300);
@@ -223,7 +223,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const delta = nextEncoder.encode(2, { sequence: 1, state: first.state });
     expect(() =>
       decodeSnapshotMessage(decoder, snapshotMessage({ ...delta, sequence: 3 }))
-    ).toThrow(/baseline/);
+    ).toThrow(/baseline/u);
     expect(() =>
       decodeSnapshotMessage(
         decoder,
@@ -248,7 +248,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
           },
         })
       )
-    ).toThrow(/DTO/);
+    ).toThrow(/DTO/u);
     const invalidReference = captureSnapshot(snapshotFixture(2));
     const collabTag = invalidReference.collabTags[0];
     assert.ok(collabTag, 'collab tag');
@@ -258,18 +258,18 @@ describe('pilots reconstruct complete authoritative worlds', () => {
         decoder,
         snapshotMessage({ version: 1, sequence: 2, kind: 'keyframe', state: invalidReference })
       )
-    ).toThrow(/references/);
+    ).toThrow(/references/u);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(delta))).toEqual(nextEncoder.state);
-    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/Stale/);
+    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/Stale/u);
     expect(() =>
       decodeSnapshotMessage(
         decoder,
         '{"type":"snapshot","data":{"version":1,"sequence":3,"kind":"delta","baseline":2,"patch":{"set":{"__proto__":{"polluted":true}},"clear":[],"collections":{}}}}'
       )
-    ).toThrow(/Unsafe/);
+    ).toThrow(/Unsafe/u);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(50)))).toEqual(first.state);
     decoder.reset();
-    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/baseline/);
+    expect(() => decodeSnapshotMessage(decoder, snapshotMessage(delta))).toThrow(/baseline/u);
     expect(decodeSnapshotMessage(decoder, snapshotMessage(first.encode(1)))).toEqual(first.state);
   });
 
@@ -416,7 +416,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
     const rejected = decoder.readMessage(keyframe, { acceptSnapshots: false });
     expect(rejected).toMatchObject({
       kind: 'snapshot-rejected',
-      error: expect.objectContaining({ message: expect.stringMatching(/before.*join ack/) }),
+      error: expect.objectContaining({ message: expect.stringMatching(/before.*join ack/u) }),
       metadata: { kind: 'keyframe', sequence: 1 },
     });
 

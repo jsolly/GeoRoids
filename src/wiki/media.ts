@@ -63,6 +63,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/physics/terrain/terrainConfig.ts',
       'src/physics/terrain/slopeForce.ts',
       'src/rendering/contourLabels.ts',
+      'src/rendering/contourSpatialIndex.ts',
     ],
   },
   loot: {

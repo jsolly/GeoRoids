@@ -1,13 +1,13 @@
 {
-  "note": "Hauler playfield hull is 2× Surveyor. Draw, collision, loot overlap, satellite orbit, muzzle, latch gap, laser hitboxes, and Tow Cable rest length share hullRadiusForKit(kit, mass). HARPOON_RANGE stays 280 hull-to-hull. Merged main biome 2.5.14 / TypeScript fleet ladder (exactOptionalPropertyTypes); laser ship hitboxes omit ownerId and use kit hull radius.",
+  "note": "Start-screen chrome is first-party GeoRoids CSS; Bootstrap is no longer bundled. Hauler playfield hull is 2× Surveyor with shared hullRadiusForKit. No player-facing manual copy change for the CSS drop.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
     "docs/sounds.md": "sha256:9cbd052d2da62c1270becfc3bddd11c3b2065fb498a3439102e184ba5631d30a",
-    "index.css": "sha256:5feedbecdc5aa38cb308c47d0fc569780ba9832aeaf8ccd15240d19d09daca7e",
-    "index.html": "sha256:cbfb7378b6117a06db810db59b081ab374bcd0974d799302d31968ea209aab8c",
+    "index.css": "sha256:1a065101b0fc5f6c2728263f2728ad1eb123fdb991467ec9a3d7d756a799c098",
+    "index.html": "sha256:f222d1c52db4209fbdef2f53b856285ad3933696d6400200340ec34456945361",
     "middleware.ts": "sha256:0acf90e66e33c6369a952e09cc281f79b1a0b8239b9c7a0a07f266487dbf08da",
-    "package.json": "sha256:1e058045802cabc19a29c61232968049500e3a26c7290e15e673e3e957beaeed",
+    "package.json": "sha256:85011f0a62be851879e158f81ee8b147d0f175e82e5e264de1eff6345b4e873b",
     "public/sounds/Kenney-License.txt": "sha256:7d6d3ccf1142669b7ea8629ed2b9eccda9c2d5d38841ff9ed6b50892651a5857",
     "public/sounds/asteroid-explode.m4a": "sha256:aae69e29c401ef1d153898a22d658c927b08577e6e79ac317d721d51fc9156d6",
     "public/sounds/core-pickup.m4a": "sha256:a2e319a7c5501c7d946ef02fa39aa7f2f84655dd71cddd3343cda46ed1260393",

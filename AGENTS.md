@@ -213,6 +213,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 
 - **No barrel files / re-exports** — import from the defining module.
 - **Relative paths only** — no `@`-style aliases.
+- **No CDN for app assets** — never load runtime CSS or JS from CDNs. Prefer npm, local files, or same-origin Vite/Railway builds.
 - **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`biome.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. ESLint is gone. Knip and ts-prune check unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
 - **Singletons via `getInstance()`** for the top-level managers (`GameController`, `PlayerManager`, `CollisionManager`, etc.) — wire through these, don't `new` them.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.

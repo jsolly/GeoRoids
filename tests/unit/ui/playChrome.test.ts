@@ -1,7 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 import { initializeTouchControls, syncTouchChrome } from '../../../src/input/touchControls';
 import { setPlayView } from '../../../src/ui/uiUtils';
+
+const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
+const productionCss = readFileSync(resolve(__dirname, '../../../index.css'), 'utf8');
+const productionPackage: { dependencies?: Record<string, string> } = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../package.json'), 'utf8')
+);
+const agentsGuide = readFileSync(resolve(__dirname, '../../../AGENTS.md'), 'utf8');
 
 afterEach(() => {
   setPlayView(false);
@@ -13,6 +22,22 @@ afterEach(() => {
   }
 });
 
+test('play client ships first-party GeoRoids CSS with no Bootstrap package or CDN', () => {
+  expect(productionHtml).not.toMatch(/bootstrap|jsdelivr|cdn\./iu);
+  expect(productionCss).not.toMatch(/bootstrap/iu);
+  expect(productionCss).toContain('@layer georoids');
+  expect(productionCss).not.toContain('@layer bootstrap');
+  expect(productionPackage.dependencies?.['bootstrap']).toBeUndefined();
+  expect(productionHtml).toContain('class="enter-game"');
+  expect(productionHtml).toContain('class="nickname-input"');
+  expect(productionHtml).toContain('class="sound-toggle"');
+});
+
+test('agents guide forbids CDN runtime CSS and JS', () => {
+  expect(agentsGuide).toMatch(/No CDN for app assets/u);
+  expect(agentsGuide).toMatch(/never load runtime CSS or JS from CDNs/u);
+});
+
 test('title shell exposes a terrain canvas and keeps stock credit empty', () => {
   expect(document.querySelector('#title-terrain')?.tagName).toBe('CANVAS');
   expect(document.querySelector('#attribution')?.textContent?.trim()).toBe('');
@@ -21,8 +46,23 @@ test('title shell exposes a terrain canvas and keeps stock credit empty', () => 
 test('Enter Game is an outline phosphor control in the title menu', () => {
   const start = document.querySelector('#start-game');
   expect(start?.tagName).toBe('BUTTON');
-  expect(start?.classList.contains('btn-phosphor')).toBe(true);
+  expect(start?.classList.contains('enter-game')).toBe(true);
+  expect(start?.classList.contains('btn')).toBe(false);
+  expect(start?.classList.contains('btn-phosphor')).toBe(false);
   expect(start?.classList.contains('btn-success')).toBe(false);
+});
+
+test('title menu uses first-party nickname and sound chrome', () => {
+  expect(document.querySelector('.nickname-label')?.getAttribute('for')).toBe('playerNameInput');
+  expect(document.querySelector('#playerNameInput')?.classList.contains('nickname-input')).toBe(
+    true
+  );
+  expect(document.querySelector('#soundPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('.sound-toggle-label')?.getAttribute('for')).toBe('soundPref');
+  expect(document.querySelector('.form-control')).toBeNull();
+  expect(document.querySelector('.form-label')).toBeNull();
+  expect(document.querySelector('.form-check-input')).toBeNull();
+  expect(document.querySelector('.nav-item')).toBeNull();
 });
 
 test('title menu presents the keyboard and ability control hint', () => {

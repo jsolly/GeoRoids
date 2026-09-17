@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { WebSocketCore } from '../../../server/communication/WebSocketCore';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
+import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;
@@ -68,6 +69,53 @@ test('repeated enhanced-motion rejects stay within one bounded socket summary', 
     suppressed: 1,
   });
 });
+test('a pose outside the movement envelope logs which check failed and by how much', () => {
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+  const { socket } = join('enhanced-pilot');
+  const pilot = engine.getPlayer('enhanced-pilot');
+  if (!pilot) {
+    throw new Error('Expected the enhanced pilot to join');
+  }
+  // Half a second of silence earns 30 frames on top of the 9-frame lead; a
+  // jump of 60 frames overshoots that budget the way a stalled client would.
+  const speed = engine.playerMotion.legalSpeed(pilot, engine.getServerTime());
+  const earnedCredit = speed * (PLAYER_MOTION.poseLeadFrames + 30);
+  const jump = speed * 60;
+  advanceElapsed(500);
+  core.handleClientMessage(
+    {
+      type: 'update',
+      id: 'enhanced-pilot',
+      data: {
+        position: { x: pilot.position.x + jump, y: pilot.position.y },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: false,
+        motionEpoch: 1,
+        motionSequence: 0,
+      },
+    },
+    socket
+  );
+  const rejected = warn.mock.calls.filter(
+    ([category, event]) => category === 'STATE' && event === 'motion_command_rejected'
+  );
+  expect(rejected).toHaveLength(1);
+  const logged = rejected[0]?.[2] as
+    | { envelope?: { displacement: number; credit: number } }
+    | undefined;
+  expect(logged).toMatchObject({
+    reason: 'Enhanced movement exceeds its server-time envelope',
+    motionMode: 'handoff',
+    envelope: { check: 'displacement', mode: 'free', elapsedMs: 500, velocity: 0 },
+  });
+  if (!logged?.envelope) {
+    throw new Error('Expected envelope diagnostics in the rejection log');
+  }
+  expect(logged.envelope.displacement).toBeCloseTo(jump, 6);
+  expect(logged.envelope.credit).toBeCloseTo(earnedCredit, 6);
+});
+
 function join(id: string) {
   const socket = new RecordingSocket();
   core.handleClientMessage(

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
+import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { cruiseSpeed } from '../../shared/shipFlight';
@@ -10,7 +10,20 @@ import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import type { GameEntity } from './EntityManager';
 
-export type MotionOutcome = { ok: true } | { ok: false; error: string };
+/** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
+interface MotionEnvelopeRejection {
+  check: 'velocity' | 'displacement' | 'boundary' | 'sector' | 'anchor';
+  mode: PlayerMotionState['mode'];
+  elapsedMs: number;
+  speed: number;
+  velocity: number;
+  displacement: number;
+  credit: number;
+}
+
+export type MotionOutcome =
+  | { ok: true }
+  | { ok: false; error: string; envelope?: MotionEnvelopeRejection };
 
 type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
   epoch: number;
@@ -31,9 +44,19 @@ interface Session {
   anchorAt: number;
   poseAt: number;
   poseCredit: number;
+  /** Earned travel above the lead, spendable only by poses released together. */
+  burstCredit: number;
+  burstAt: number;
   wasAlive: boolean;
   knockback?: { speed: number; at: number };
 }
+
+/**
+ * Buffered 60 Hz poses released after a network hold or server stall land
+ * within the transport jitter window. Credit earned across the gap stays
+ * spendable for that long and then expires, so hovering cannot bank a jump.
+ */
+const BURST_CREDIT_MS = PLAYER_MOTION.poseLeadFrames * GAME_TICK_MS;
 
 /**
  * Authoritative lifecycle and pose ownership for players.
@@ -138,6 +161,8 @@ export class PlayerMotionService {
       anchorAt: now,
       poseAt: now,
       poseCredit: this.legalSpeed(actor, now) * PLAYER_MOTION.poseLeadFrames,
+      burstCredit: 0,
+      burstAt: now,
       wasAlive: true,
     };
     actor.velocity = capMotionVelocity(actor.velocity, this.legalSpeed(actor, now));
@@ -235,6 +260,8 @@ export class PlayerMotionService {
     session.anchorAt = now;
     session.poseAt = now;
     session.poseCredit = poseCredit;
+    session.burstCredit = 0;
+    session.burstAt = now;
     session.actor.thrusting = false;
     session.actor.boosting = false;
     this.publish(session);
@@ -283,6 +310,41 @@ export class PlayerMotionService {
     }
   }
 
+  private failedEnvelopeCheck(
+    session: Session,
+    pose: EnhancedFreePose,
+    limits: {
+      speed: number;
+      velocity: number;
+      displacement: number;
+      credit: number;
+      anchorReach: number;
+      hullRadius: number;
+    }
+  ): MotionEnvelopeRejection['check'] | undefined {
+    if (limits.velocity > limits.speed + 1e-6) {
+      return 'velocity';
+    }
+    if (limits.displacement > limits.credit + 1e-6) {
+      return 'displacement';
+    }
+    if (checkBoundaryCollision(pose.position, limits.hullRadius)) {
+      return 'boundary';
+    }
+    if (shipOverlapsCompletedSector(pose.position, limits.hullRadius, this.completedSectors)) {
+      return 'sector';
+    }
+    if (
+      session.mode === 'handoff' &&
+      session.anchor &&
+      Math.hypot(pose.position.x - session.anchor.x, pose.position.y - session.anchor.y) >
+        limits.anchorReach
+    ) {
+      return 'anchor';
+    }
+    return undefined;
+  }
+
   public acceptFreePose(socket: WebSocket, pose: EnhancedFreePose, now: number): MotionOutcome {
     this.assertTime(now);
     const session = this.owner(socket);
@@ -317,11 +379,16 @@ export class PlayerMotionService {
     }
     const boosting = pose.boosting === true;
     const speed = this.legalSpeed(session.actor, now, boosting);
+    const elapsedMs = now - session.poseAt;
     // Match the client's bounded catch-up; silence cannot bank an arbitrary jump.
-    const elapsedFrames = Math.min(MAX_CATCH_UP_TICKS, ((now - session.poseAt) * GAME.FPS) / 1000);
+    const elapsedFrames = Math.min(MAX_CATCH_UP_TICKS, (elapsedMs * GAME.FPS) / 1000);
+    if (now - session.burstAt > BURST_CREDIT_MS) {
+      session.burstCredit = 0;
+    }
     // Spend elapsed travel before capping unused jitter credit. Capping first
     // rejects ordinary flight whenever updates are more than 150 ms apart.
-    const credit = session.poseCredit + elapsedFrames * speed;
+    const credit = session.poseCredit + session.burstCredit + elapsedFrames * speed;
+    const velocity = Math.hypot(pose.velocity.x, pose.velocity.y);
     const displacement = Math.hypot(
       pose.position.x - session.actor.position.x,
       pose.position.y - session.actor.position.y
@@ -329,26 +396,37 @@ export class PlayerMotionService {
     const anchorReach =
       (speed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
     const hullRadius = hullRadiusForKit(session.actor.kitId, session.actor.mass);
-    if (
-      Math.hypot(pose.velocity.x, pose.velocity.y) > speed + 1e-6 ||
-      displacement > credit + 1e-6 ||
-      checkBoundaryCollision(pose.position, hullRadius) ||
-      shipOverlapsCompletedSector(pose.position, hullRadius, this.completedSectors) ||
-      (session.mode === 'handoff' &&
-        session.anchor &&
-        Math.hypot(pose.position.x - session.anchor.x, pose.position.y - session.anchor.y) >
-          anchorReach)
-    ) {
+    const failed = this.failedEnvelopeCheck(session, pose, {
+      speed,
+      velocity,
+      displacement,
+      credit,
+      anchorReach,
+      hullRadius,
+    });
+    if (failed) {
       session.actor.velocity = capMotionVelocity(session.actor.velocity, speed);
       // A fresh epoch makes the client adopt the last accepted pose. Preserve
       // the earned budget so rejected commands cannot mint more movement credit.
+      const mode = session.mode;
       this.handoff(session, now, Math.min(speed * PLAYER_MOTION.poseLeadFrames, credit));
-      return { ok: false, error: 'Enhanced movement exceeds its server-time envelope' };
+      return {
+        ok: false,
+        error: 'Enhanced movement exceeds its server-time envelope',
+        envelope: { check: failed, mode, elapsedMs, speed, velocity, displacement, credit },
+      };
     }
-    session.poseCredit = Math.min(
-      speed * PLAYER_MOTION.poseLeadFrames,
-      Math.max(0, credit - displacement)
-    );
+    const remaining = Math.max(0, credit - displacement);
+    session.poseCredit = Math.min(speed * PLAYER_MOTION.poseLeadFrames, remaining);
+    // Buffered poses released together all arrive with zero elapsed time, so
+    // the first one must not be the only pose able to spend the gap they were
+    // held for. Excess above the lead stays for one jitter window, bounded by
+    // the client's catch-up, and its clock starts when the excess first appears.
+    const excess = Math.min(speed * MAX_CATCH_UP_TICKS, remaining - session.poseCredit);
+    if (session.burstCredit <= 0 && excess > 0) {
+      session.burstAt = now;
+    }
+    session.burstCredit = excess;
     session.poseAt = now;
     session.poseSequence = pose.sequence;
     session.mode = 'free';
@@ -381,6 +459,8 @@ export class PlayerMotionService {
     session.poseAt = now;
     session.anchorAt = now;
     session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
+    session.burstCredit = 0;
+    session.burstAt = now;
     this.publish(session);
   }
 
@@ -403,6 +483,8 @@ export class PlayerMotionService {
     session.poseAt = now;
     session.anchorAt = now;
     session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
+    session.burstCredit = 0;
+    session.burstAt = now;
     session.actor.position = { ...position };
     session.actor.velocity = { x: 0, y: 0 };
     session.actor.thrusting = false;

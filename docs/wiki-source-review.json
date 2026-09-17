@@ -1,5 +1,5 @@
 {
-  "note": "Hauler v1: local schematic (V / long-press) swaps one E-key slot between Resource Tap and Tow Cable; successful Tap extract spawns a cream/amber canister (not rare wreckage); furnace/tow collisions stay Tow Cable only; Hauler GIF remains the tow-and-furnace demo.",
+  "note": "Hauler v1: local schematic (V / long-press) swaps one E-key slot between Resource Tap and Tow Cable; successful Tap extract spawns a cream/amber canister; lootCollected accepts kind tap so the pickup cue plays; Hauler GIF remains the tow-and-furnace demo.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
@@ -153,7 +153,7 @@
     "src/input/touchAbility.ts": "sha256:41f732f9ea08a14e8de3e843c1200977094f94fad4bdeac47f3d959e51a58091",
     "src/input/touchControls.ts": "sha256:d3cbbe827e915016ad80012d08311e1ac704244d3a9ceae6a57f0707f255b2c8",
     "src/network/networkManager.ts": "sha256:d4f23953fb5cbf98034d5f0e55149fc8d1c21221bfc7ddbf39ecf441fb3a6bf8",
-    "src/network/services/ConnectionManager.ts": "sha256:bdde2f99177224edf07eb34989890192a15296d771505ec97b48d89a7855acd1",
+    "src/network/services/ConnectionManager.ts": "sha256:3107fb187b9298833a1becb3ff8ed9d8b39f3a27f2e6fe9629e4448d8a35b77e",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:dc285e475bd4c996db746c8383f43bb38a2765a954bf072be412d62cc3353190",
     "src/network/services/asteroidFieldSync.ts": "sha256:5090e065693b9c6e046cae9627456993bfd9d53f215f0fb1c28c5c6f239fe24a",
     "src/network/services/clientIdentity.ts": "sha256:8decf593a00a1a4e60c20352eff0ba3817ae93dd87349c9a78415284babe62ab",

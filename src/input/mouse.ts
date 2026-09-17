@@ -1,6 +1,6 @@
 import type { Player } from '../entities/player/Player';
 import { canvasManager } from '../rendering/canvasSurface';
-import { isShipSchematicOpen } from '../ui/shipSchematic';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';

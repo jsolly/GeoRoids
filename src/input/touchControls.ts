@@ -3,10 +3,10 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import {
   isPointerOnLocalHauler,
-  isShipSchematicOpen,
   openShipSchematic,
   SHIP_SCHEMATIC_LONG_PRESS_MS,
 } from '../ui/shipSchematic';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';

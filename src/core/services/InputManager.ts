@@ -14,7 +14,8 @@ import {
   preventContextMenu,
 } from '../../input/mouse';
 import { initializeTouchControls } from '../../input/touchControls';
-import { initializeShipSchematic, isShipSchematicOpen } from '../../ui/shipSchematic';
+import { initializeShipSchematic } from '../../ui/shipSchematic';
+import { isShipSchematicOpen } from '../../ui/shipSchematicState';
 import { initializeUniverseMap, isUniverseMapOpen } from '../../ui/universeMap';
 import { logger } from '../../utils/Logger';
 import { GameStateManager } from './GameStateManager';

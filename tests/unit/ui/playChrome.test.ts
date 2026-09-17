@@ -10,6 +10,7 @@ const productionCss = readFileSync(resolve(__dirname, '../../../index.css'), 'ut
 const productionPackage: { dependencies?: Record<string, string> } = JSON.parse(
   readFileSync(resolve(__dirname, '../../../package.json'), 'utf8')
 );
+const agentsGuide = readFileSync(resolve(__dirname, '../../../AGENTS.md'), 'utf8');
 
 afterEach(() => {
   setPlayView(false);
@@ -30,6 +31,11 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionHtml).toContain('class="enter-game"');
   expect(productionHtml).toContain('class="nickname-input"');
   expect(productionHtml).toContain('class="sound-toggle"');
+});
+
+test('agents guide forbids CDN runtime CSS and JS', () => {
+  expect(agentsGuide).toMatch(/No CDN for app assets/u);
+  expect(agentsGuide).toMatch(/never load runtime CSS or JS from CDNs/u);
 });
 
 test('title shell exposes a terrain canvas and keeps stock credit empty', () => {

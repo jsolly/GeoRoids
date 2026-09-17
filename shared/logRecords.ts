@@ -32,16 +32,19 @@ const MAX_CONTEXT_TEXT = 512;
 const MAX_CONTEXT_KEYS = 24;
 const MAX_ARRAY_ITEMS = 20;
 const MAX_DEPTH = 4;
+const NORMALIZED_KEY_PATTERN = /[^a-z0-9]/giu;
+const SENSITIVE_KEY_SUFFIX_PATTERN = /(?:credential|credentials|password|secret|token)$/u;
+const SENSITIVE_KEY_EXACT_PATTERN = /^(?:apikey|privatekey)$/u;
 
 function cleanText(value: unknown, max = MAX_TEXT): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
   const redacted = value
-    .replace(/((?:https?:\/\/[^\s?#]+|\/[a-z0-9._~!$&'()*+,;=:@%/-]+))[?#][^\s]*/gi, '$1')
-    .replace(/\b(Bearer)\s+\S+/gi, '$1 [redacted]')
+    .replace(/((?:https?:\/\/[^\s?#]+|\/[a-z0-9._~!$&'()*+,;=:@%/-]+))[?#][^\s]*/giu, '$1')
+    .replace(/\b(Bearer)\s+\S+/giu, '$1 [redacted]')
     .replace(
-      /\b(authorization|cookie|password|resumeToken|secret|token)\s*[:=]\s*[^\s,;&]+/gi,
+      /\b(authorization|cookie|password|resumeToken|secret|token)\s*[:=]\s*[^\s,;&]+/giu,
       '$1=[redacted]'
     );
   const cleaned = Array.from(redacted, (character) => {
@@ -54,16 +57,16 @@ function cleanText(value: unknown, max = MAX_TEXT): string | undefined {
 }
 
 function isSensitiveKey(value: string): boolean {
-  const normalized = value.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const normalized = value.replace(NORMALIZED_KEY_PATTERN, '').toLowerCase();
   return (
     SECRET_KEYS.has(normalized) ||
-    /(?:credential|credentials|password|secret|token)$/.test(normalized) ||
-    /^(?:apikey|privatekey)$/.test(normalized)
+    SENSITIVE_KEY_SUFFIX_PATTERN.test(normalized) ||
+    SENSITIVE_KEY_EXACT_PATTERN.test(normalized)
   );
 }
 
 function isPrivateContentKey(value: string): boolean {
-  const normalized = value.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  const normalized = value.replace(/[^a-z0-9]/giu, '').toLowerCase();
   return (
     PRIVATE_CONTENT_KEYS.has(normalized) ||
     normalized.startsWith('raw') ||

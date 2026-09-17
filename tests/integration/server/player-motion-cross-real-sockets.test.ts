@@ -1,5 +1,5 @@
 /* @vitest-environment node */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it as test } from 'vitest';
 import { WebSocket } from 'ws';
 import { createServerInstance } from '../../../server/createServer';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
@@ -10,6 +10,8 @@ interface Packet {
   type: string;
   data?: unknown;
 }
+
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -49,7 +51,11 @@ class PilotSocket {
           this.decoder.reset();
         }
       } catch (error) {
-        this.failures.push(error instanceof Error ? error : new Error(String(error)));
+        this.failures.push(
+          error instanceof Error
+            ? error
+            : new Error(typeof error === 'string' ? error : JSON.stringify(error), { cause: error })
+        );
       }
     });
   }
@@ -85,7 +91,7 @@ class PilotSocket {
     return this.waitFor(() => this.snapshots[after], 'post-command decoded snapshot');
   }
 
-  async join(id: string, x: number, resumeToken?: string): Promise<Record<string, unknown>> {
+  join(id: string, x: number, resumeToken?: string): Promise<Record<string, unknown>> {
     const after = this.messages.length;
     this.send('join', {
       id,
@@ -152,7 +158,7 @@ afterEach(async () => {
 });
 
 describe('Enhanced player motion cross real gameplay WebSockets', () => {
-  it('publishes a correction after rejected movement and accepts the recovered pilot', async () => {
+  test('publishes a correction after rejected movement and accepts the recovered pilot', async () => {
     const { pilot, observer } = await world();
     const initial = entity(await pilot.state(), 'pilot');
     const epoch = initial.playerMotion?.epoch;
@@ -181,11 +187,11 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(entity(await observer.state(), 'pilot').playerMotion).toEqual(recovered.playerMotion);
   });
 
-  it('retains a free session through a physical flap and accepts only its private token', async () => {
+  test('retains a free session through a physical flap and accepts only its private token', async () => {
     const { pilot, observer, joined, engine } = await world();
     expect(joined['snapshotVersion']).toBe(1);
     expect(joined['asteroidInteractions']).toBe(1);
-    expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+    expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
 
     const before = entity(await observer.state(), 'pilot');
     expect(before.playerMotion).toMatchObject({ mode: 'free', epoch: 1, ack: 0 });
@@ -219,7 +225,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(engine.getPlayer('pilot')?.position).toEqual({ x: 100, y: 0 });
   });
 
-  it('rejects a valid resume token on a socket already bound to another current pilot', async () => {
+  test('rejects a valid resume token on a socket already bound to another current pilot', async () => {
     const { joined, engine } = await world();
     const other = await connect();
     await other.join('other', -900);
@@ -253,7 +259,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(engine.getPlayer('pilot')?.ws).toBe(pilotServerSocket);
   });
 
-  it('applies a valid pose only from the owning socket and acknowledges its sequence', async () => {
+  test('applies a valid pose only from the owning socket and acknowledges its sequence', async () => {
     const { pilot, observer, engine } = await world();
     const initial = entity(await pilot.state(), 'pilot');
     const epoch = initial.playerMotion?.epoch;
@@ -307,10 +313,10 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     });
   });
 
-  it('preserves a disconnected pilot after grace, rotates its token, and retires the old token', async () => {
+  test('preserves a disconnected pilot after grace, rotates its token, and retires the old token', async () => {
     const { pilot, observer, joined, engine } = await world();
     const token = String(joined['resumeToken']);
-    expect(token).toMatch(/^[a-f0-9]{64}$/);
+    expect(token).toMatch(RESUME_TOKEN_PATTERN);
     engine.startGameLoop();
     await pilot.close();
     await observer.waitFor(
@@ -331,7 +337,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     const replacement = await connect();
     const resumed = await replacement.join('expired', 100, token);
     expect(resumed).toMatchObject({ id: 'pilot' });
-    expect(resumed['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+    expect(resumed['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
     expect(resumed['resumeToken']).not.toBe(token);
     expect(engine.getPlayer('expired')).toBeUndefined();
     expect(entity(await replacement.state(), 'pilot').playerMotion).toMatchObject({
@@ -356,10 +362,10 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(retired.messages.some((message) => message.type === 'joined')).toBe(false);
   });
 
-  it('preserves a pilot after explicit leave, rotates its token, and retires the old token', async () => {
+  test('preserves a pilot after explicit leave, rotates its token, and retires the old token', async () => {
     const { pilot, observer, joined, engine } = await world();
     const token = String(joined['resumeToken']);
-    expect(token).toMatch(/^[a-f0-9]{64}$/);
+    expect(token).toMatch(RESUME_TOKEN_PATTERN);
     pilot.send('leave');
     expect((await observer.state()).entities.some((row) => row.id === 'pilot')).toBe(false);
     expect(engine.getPlayerCount()).toBe(1);
@@ -367,7 +373,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     const replacement = await connect();
     const resumed = await replacement.join('pilot', 100, token);
     expect(resumed).toMatchObject({ id: 'pilot' });
-    expect(resumed['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+    expect(resumed['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
     expect(resumed['resumeToken']).not.toBe(token);
     expect(engine.getPlayerCount()).toBe(2);
 

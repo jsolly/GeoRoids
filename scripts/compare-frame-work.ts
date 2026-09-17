@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
 
 function record(value: unknown): Record<string, unknown> {
@@ -16,10 +17,20 @@ const { values } = parseArgs({
   },
 });
 assert(values.output, 'Supply --output');
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const FRAME_WORK_PHASE_PATTERN = /^(update|render)\./u;
 const identities = new Set<string>();
+type ArmReport = {
+  path: string;
+  sha256: string;
+  git: Record<string, unknown>;
+  environment: unknown;
+  result: Record<string, unknown>;
+  totals: Record<string, number>;
+};
 async function arm(paths: string[] | undefined) {
   assert(paths && paths.length >= 2, 'Require two independent observations per arm');
-  const reports = [];
+  const reports: ArmReport[] = [];
   for (const path of paths) {
     const raw = await readFile(path, 'utf8');
     const report = record(JSON.parse(raw));
@@ -30,13 +41,13 @@ async function arm(paths: string[] | undefined) {
     const metadata = record(report['metadata']);
     const git = record(metadata['git']);
     for (const key of ['sourceSha256', 'productSha256', 'harnessSha256', 'lockfileSha256']) {
-      assert(typeof git[key] === 'string' && /^[a-f0-9]{64}$/.test(git[key]), `Missing ${key}`);
+      assert(typeof git[key] === 'string' && SHA256_PATTERN.test(git[key]), `Missing ${key}`);
     }
     const result = record(report['result']);
     assert.equal(result['cleanup'], 'complete');
     assert(
       typeof result['frameImageSha256'] === 'string' &&
-        /^[a-f0-9]{64}$/.test(result['frameImageSha256']),
+        SHA256_PATTERN.test(result['frameImageSha256']),
       'Missing pixel witness'
     );
     const frames = result['frameWork'];
@@ -46,7 +57,7 @@ async function arm(paths: string[] | undefined) {
       assert.equal(record(frame)['update.calls'], 1);
       assert.equal(record(frame)['render.calls'], 1);
       for (const [key, count] of Object.entries(record(frame))) {
-        assert(/^(update|render)\./.test(key), 'Use phase counts, not aggregate aliases');
+        assert(FRAME_WORK_PHASE_PATTERN.test(key), 'Use phase counts, not aggregate aliases');
         assert(typeof count === 'number' && Number.isInteger(count) && count >= 0);
         totals[key] = (totals[key] ?? 0) + count;
       }
@@ -69,7 +80,7 @@ async function arm(paths: string[] | undefined) {
   const first = reports[0];
   assert(first);
   for (const next of reports.slice(1)) {
-    assert.notEqual(next.path, first.path, 'Repeat observations, not file references');
+    assert.notEqual(next['path'], first['path'], 'Repeat observations, not file references');
     for (const key of ['frameWork', 'counts', 'witness', 'frameImageSha256', 'parameters']) {
       assert.deepEqual(next.result[key], first.result[key], `Nonrepeatable ${key}`);
     }
@@ -99,14 +110,16 @@ const keys = new Set([
   ...Object.keys(candidate.first.totals),
 ]);
 const changes = Object.fromEntries(
-  [...keys].sort().map((key) => {
-    const before = (baseline.first.totals[key] ?? 0) / 120;
-    const after = (candidate.first.totals[key] ?? 0) / 120;
-    return [
-      key,
-      { baselinePerFrame: before, candidatePerFrame: after, deltaPerFrame: after - before },
-    ];
-  })
+  [...keys]
+    .sort((left, right) => left.localeCompare(right))
+    .map((key) => {
+      const before = (baseline.first.totals[key] ?? 0) / 120;
+      const after = (candidate.first.totals[key] ?? 0) / 120;
+      return [
+        key,
+        { baselinePerFrame: before, candidatePerFrame: after, deltaPerFrame: after - before },
+      ];
+    })
 );
 await writeFile(
   values.output,

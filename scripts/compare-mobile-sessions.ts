@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
 import { inspectInputCadence } from '../benchmarks/input-cadence';
 import { compareMobileSessions } from '../benchmarks/mobile-comparison';
@@ -48,8 +49,10 @@ assert(
   experiment['kind'] === 'quality' || experiment['kind'] === 'product',
   'Declare quality or product experiment'
 );
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+
 function hash(value: unknown) {
-  assert(typeof value === 'string' && /^[a-f0-9]{64}$/.test(value), 'Missing SHA-256 provenance');
+  assert(typeof value === 'string' && SHA256_PATTERN.test(value), 'Missing SHA-256 provenance');
   return value;
 }
 const harnessHash = hash(experiment['harnessSha256']);
@@ -238,13 +241,13 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     const peopleKey = 'players' in firstCounts ? 'players' : 'humans';
     for (const entity of [peopleKey, 'asteroids', 'pickups', 'projectiles']) {
       for (const count of ['total', 'visibleCenters']) {
-        const values = measuredPopulation.map((sample) =>
+        const sampleValues = measuredPopulation.map((sample) =>
           number(record(record(sample['counts'])[entity])[count])
         );
         distributions[`${entity}.${count}`] = {
-          min: Math.min(...values),
-          median: percentile(values, 0.5),
-          max: Math.max(...values),
+          min: Math.min(...sampleValues),
+          median: percentile(sampleValues, 0.5),
+          max: Math.max(...sampleValues),
         };
       }
     }
@@ -453,14 +456,14 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
   return summary;
 }
 const candidateArm = candidate;
-async function loadPairs(value: unknown, candidate: boolean) {
+async function loadPairs(value: unknown, useCandidateArm: boolean) {
   assert(Array.isArray(value) && value.length >= 3, 'At least three pairs are required');
-  const pairs = [];
+  const pairs: Awaited<ReturnType<typeof summarize>>[][] = [];
   for (const pair of value) {
     assert(Array.isArray(pair) && pair.length === 2, 'Each pair contains exactly two report paths');
     pairs.push([
       await summarize(pair[0], baseline),
-      await summarize(pair[1], candidate ? candidateArm : baseline),
+      await summarize(pair[1], useCandidateArm ? candidateArm : baseline),
     ]);
   }
   return pairs;

@@ -7,7 +7,7 @@ import {
   getTerrainContours,
   getTerrainField,
 } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { contourCandidates } from '../../../src/rendering/contourSpatialIndex';
 import { TestPath2D, type TestPathCommand } from '../../support/TestPath2D';

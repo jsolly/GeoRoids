@@ -65,6 +65,7 @@
     "@types/node": "^26.5.1",
     "@types/ws": "^8.18.1",
     "@vercel/functions": "^3.9.7",
+    "bootstrap": "5.2.0",
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
     "tsx": "^4.23.13",
@@ -74,7 +75,7 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.13",
+    "@biomejs/biome": "2.5.14",
     "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",
     "@vitest/coverage-v8": "5.0.0",

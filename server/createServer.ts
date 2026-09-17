@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
@@ -383,9 +384,9 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         if (resumable) {
           return;
         }
-        for (const player of wsCore.getAllPlayers()) {
-          if (player.ws === ws) {
-            wsCore.removePlayer(player.id);
+        for (const connectedPlayer of wsCore.getAllPlayers()) {
+          if (connectedPlayer.ws === ws) {
+            wsCore.removePlayer(connectedPlayer.id);
             break;
           }
         }
@@ -420,7 +421,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
 
   let closing: Promise<void> | undefined;
   function close(): Promise<void> {
-    if (closing) {
+    if (closing !== undefined) {
       return closing;
     }
     clearInterval(cleanupInterval);

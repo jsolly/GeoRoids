@@ -5,8 +5,9 @@ import { LASER } from '../../../src/constants';
 import { AuthoritativeProjectileField } from '../../../src/entities/laser/AuthoritativeProjectileField';
 import { Laser } from '../../../src/entities/laser/Laser';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { NetworkManager } from '../../../src/network/networkManager';
 import { ConnectionManager } from '../../../src/network/services/ConnectionManager';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { snapshotFixture } from './snapshotFixture';
 
 /** Transport seam only: packets still cross the production onmessage handler,
@@ -66,6 +67,7 @@ describe('pilots reconcile complete authoritative bolts through the actual socke
 
   beforeEach(() => {
     vi.stubGlobal('WebSocket', Transport);
+    NetworkManager.getInstance();
     manager = ConnectionManager.getInstance();
     manager.disconnect();
   });

@@ -60,8 +60,8 @@ describe('Game-over returns to the menu', () => {
   test('the game-over menu returns to the start screen', () => {
     setPlayView(false);
 
-    expect(document.getElementById('start-screen')?.style.display).toBe('block');
-    expect(document.getElementById('gameArea')?.style.display).toBe('none');
+    expect(document.querySelector<HTMLElement>('#start-screen')?.style.display).toBe('block');
+    expect(document.querySelector<HTMLElement>('#gameArea')?.style.display).toBe('none');
   });
 
   test('a final death event with a real cause does not become unknown', () => {

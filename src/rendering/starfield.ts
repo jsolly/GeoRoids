@@ -2,7 +2,7 @@ import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { getGameBoundary } from '../physics/boundary';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
 
 const starScreen = { x: 0, y: 0 };
 

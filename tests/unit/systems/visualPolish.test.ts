@@ -20,7 +20,7 @@ import {
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain, getTerrainField } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRenderer';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import {
@@ -55,7 +55,7 @@ function recordingContext() {
   canvasManager.destroy();
   canvas = document.createElement('canvas');
   canvas.id = 'gameCanvas';
-  previousCanvas = document.getElementById('gameCanvas');
+  previousCanvas = document.querySelector('#gameCanvas');
   if (previousCanvas) {
     previousCanvas.replaceWith(canvas);
   } else {
@@ -450,13 +450,13 @@ test('touch input targets the game canvas while the title terrain stays passive'
     add.call(this, type, listener, options);
     listeners.push(() => this.removeEventListener(type, listener, options));
   });
-  const touchControls = document.getElementById('touch-controls');
+  const touchControls = document.querySelector('#touch-controls');
   const oldTouchContent = touchControls?.innerHTML;
   const bodyClass = document.body.className;
   try {
     InputManager.getInstance().initializeListeners();
-    const gameCanvas = document.getElementById('gameCanvas');
-    const titleTerrain = document.getElementById('title-terrain');
+    const gameCanvas = document.querySelector('#gameCanvas');
+    const titleTerrain = document.querySelector('#title-terrain');
     if (!gameCanvas || !titleTerrain) {
       throw new Error('expected both canvases in the play shell');
     }

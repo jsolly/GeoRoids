@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { listShipKits } from '../src/entities/ship/shipKits';
 import { media } from '../src/wiki/media';
@@ -23,7 +24,7 @@ for (const kit of listShipKits()) {
   }
 }
 for (const article of articles) {
-  if (!/^[a-z0-9-]+$/.test(article.id)) {
+  if (!/^[a-z0-9-]+$/u.test(article.id)) {
     failures.push(`Invalid article ID: ${article.id}`);
   }
   if (!article.html.trim()) {
@@ -66,7 +67,7 @@ for (const [id, item] of Object.entries(media)) {
     const bytes = readFileSync(path);
     const valid =
       extension === 'gif'
-        ? /^GIF8[79]a$/.test(bytes.subarray(0, 6).toString())
+        ? /^GIF8[79]a$/u.test(bytes.subarray(0, 6).toString())
         : bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     if (!valid) {
       failures.push(`Invalid ${extension} signature: ${id}`);

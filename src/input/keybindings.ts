@@ -1,6 +1,6 @@
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
-import { isShipSchematicOpen } from '../ui/shipSchematic';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { steeringTurn } from './pointerSteering';
@@ -118,6 +118,8 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
         logger.debug('KEYBINDINGS', 'Updating rotation', { key: ev.code });
         reconcilePlayerInput(player);
         break;
+      default:
+        break;
     }
   }
 }
@@ -159,6 +161,8 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
     case 'ArrowRight':
     case 'KeyD':
       reconcilePlayerInput(player);
+      break;
+    default:
       break;
   }
 }

@@ -54,7 +54,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       const { GameController } = await import('../src/core/gameController');
       const { GameStateManager } = await import('../src/core/services/GameStateManager');
       const { NetworkManager } = await import('../src/network/networkManager');
-      const { canvasManager } = await import('../src/rendering/canvas');
+      const { canvasManager } = await import('../src/rendering/canvasSurface');
       const { Roid } = await import('../src/entities/roid/Roid');
       const { LootField } = await import('../src/entities/loot/LootField');
       const { SatellitePickupManager } = await import(
@@ -145,7 +145,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       ensureTerrain(options.seed);
       setPlayView(true);
       syncTouchChrome(true);
-      const probe = document.getElementById('safe-area-probe');
+      const probe = document.querySelector('#safe-area-probe');
       if (!(probe instanceof HTMLElement)) {
         throw new Error('Safe-area probe is missing');
       }
@@ -243,6 +243,22 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             }
           }
         }
+        const instrumentPrototypeMethod = (
+          prefix: string,
+          key: string,
+          original: (...args: unknown[]) => unknown
+        ) =>
+          function (this: object, ...args: unknown[]) {
+            if (record) {
+              const name = `${prefix}.${key}`;
+              countWork(name);
+              canvasCalls[name] = (canvasCalls[name] ?? 0) + 1;
+              if (key === 'fillText' && typeof args[0] === 'string') {
+                textCalls.push(args[0]);
+              }
+            }
+            return Reflect.apply(original, this, args);
+          };
         for (const [prefix, prototype] of [
           ['canvas', CanvasRenderingContext2D.prototype],
           ['path', Path2D.prototype],
@@ -255,17 +271,11 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             }
             Object.defineProperty(prototype, key, {
               ...descriptor,
-              value: function (this: object, ...args: unknown[]) {
-                if (record) {
-                  const name = `${prefix}.${key}`;
-                  countWork(name);
-                  canvasCalls[name] = (canvasCalls[name] ?? 0) + 1;
-                  if (key === 'fillText' && typeof args[0] === 'string') {
-                    textCalls.push(args[0]);
-                  }
-                }
-                return Reflect.apply(original, this, args);
-              },
+              value: instrumentPrototypeMethod(
+                prefix,
+                key,
+                original as (...args: unknown[]) => unknown
+              ),
             });
             restores.push(() => Object.defineProperty(prototype, key, descriptor));
           }
@@ -440,7 +450,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           local.ship,
           belt.getRoids(),
           LootField.getInstance().getAll(),
-          SatellitePickupManager.getInstance().getAll()
+          SatellitePickupManager.getInstance().getAll(),
+          []
         );
         drawScoreOverlay(ctx, layout, canvas, local.score, local.lives);
         drawLivesIndicator(ctx, layout, local.lives, PALETTE.LOCAL, local.ship.kitId);

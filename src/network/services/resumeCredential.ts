@@ -6,6 +6,7 @@ import { getStoredItem, removeStoredItem, setStoredItem } from '../../utils/safe
 const RESUME_TOKEN_STORAGE_KEY = 'georoids-resume-token';
 const RESUME_NAME_STORAGE_KEY = 'georoids-resume-name';
 const RESUME_PROVENANCE_STORAGE_KEY = 'georoids-resume-provenance';
+const RESUME_TOKEN_PATTERN = /^[0-9a-f]{64}$/iu;
 
 type ResumeReleaseProvenance = {
   credentialReleaseId?: string;
@@ -14,7 +15,7 @@ type ResumeReleaseProvenance = {
 };
 
 export function isValidResumeToken(value: unknown): value is string {
-  return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
+  return typeof value === 'string' && RESUME_TOKEN_PATTERN.test(value);
 }
 
 export function readStoredResumeToken(): string | undefined {

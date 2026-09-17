@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { next, rewrite } from '@vercel/functions';
 
 /** Expose the deployed commit so /ship can prove which client reached production. */

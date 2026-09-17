@@ -49,9 +49,9 @@ describe('universe map play chrome', () => {
   });
 
   test('exposes an accessible native dialog and map toggle', () => {
-    const dialog = document.getElementById(UNIVERSE_MAP_IDS.dialog);
-    const toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle);
-    const mapCanvas = document.getElementById(UNIVERSE_MAP_IDS.canvas);
+    const dialog = document.querySelector(`#${UNIVERSE_MAP_IDS.dialog}`);
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`);
+    const mapCanvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`);
 
     expect(dialog?.tagName).toBe('DIALOG');
     expect(dialog?.getAttribute('aria-labelledby')).toBe('universe-map-title');
@@ -61,8 +61,8 @@ describe('universe map play chrome', () => {
   });
 
   test('opens from the map button, releases gameplay input, and closes with M or Escape', () => {
-    const toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement;
-    const dialog = document.getElementById(UNIVERSE_MAP_IDS.dialog) as HTMLDialogElement;
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
+    const dialog = document.querySelector(`#${UNIVERSE_MAP_IDS.dialog}`) as HTMLDialogElement;
     const opened = vi.fn();
     const closed = vi.fn();
     window.addEventListener('gameMapOpen', opened);
@@ -114,7 +114,7 @@ describe('universe map play chrome', () => {
   });
 
   test('holding M does not toggle repeatedly or capture name entry outside play', () => {
-    const toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement;
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
     toggle.click();
     document.dispatchEvent(
       new KeyboardEvent('keydown', { code: 'KeyM', repeat: true, bubbles: true })
@@ -139,7 +139,7 @@ describe('universe map play chrome', () => {
     });
     const report = vi.spyOn(logger, 'error').mockImplementation(() => {});
     const releasedBefore = releaseInput.mock.calls.length;
-    (document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement).click();
+    (document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement).click();
     expect(isUniverseMapOpen()).toBe(false);
     expect(releaseInput.mock.calls.length).toBe(releasedBefore);
     expect(report).toHaveBeenCalledWith('UI', 'Could not open the universe map', error);

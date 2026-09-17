@@ -84,7 +84,7 @@ async function setViewportAndWait(page: BrowserPage, width: number, height: numb
   await page.setViewportSize({ width, height });
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       return (
         canvas instanceof HTMLCanvasElement &&
         canvas.width === expectedWidth &&
@@ -96,7 +96,7 @@ async function setViewportAndWait(page: BrowserPage, width: number, height: numb
   );
 }
 
-async function pauseGame(page: BrowserPage): Promise<boolean> {
+function pauseGame(page: BrowserPage): Promise<boolean> {
   return page.evaluate(() => {
     const gameController = window.gameController;
     if (!gameController) {
@@ -119,14 +119,11 @@ async function renderFullFrame(page: BrowserPage): Promise<void> {
   });
 }
 
-async function captureAsteroidDraw(
-  page: BrowserPage,
-  targetId: string
-): Promise<AsteroidDrawCapture> {
+function captureAsteroidDraw(page: BrowserPage, targetId: string): Promise<AsteroidDrawCapture> {
   return page.evaluate(
     ({ id, roidColor }) => {
       const gameController = window.gameController;
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       if (!gameController || !(canvas instanceof HTMLCanvasElement)) {
         throw new Error('Asteroid field fixture requires a game controller and canvas');
       }

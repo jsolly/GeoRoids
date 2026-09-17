@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import {
@@ -101,14 +102,18 @@ try {
     proxy = await startTcpProxy({ targetPort: Number(url.port), seed: 42, ...networkProfile });
     url.port = String(proxy.port);
   }
+  const pilotOptions = () => ({ url, measuring: () => measuring, fail });
   for (let i = 0; i < pilots; i++) {
     if (i) {
       await delay(admissionMs);
     }
-    const client = new Pilot(i, { url, measuring: () => measuring, fail });
+    const client = new Pilot(i, pilotOptions());
     clients.push(client);
     const deadline = performance.now() + 10000;
-    while (client.firstStateAt === undefined && performance.now() < deadline && !totalFailures) {
+    while (client.firstStateAt === undefined) {
+      if (totalFailures || performance.now() >= deadline) {
+        break;
+      }
       await delay(25);
     }
     assert(client.firstStateAt !== undefined, `Pilot ${i} failed admission`);
@@ -240,7 +245,10 @@ try {
             completedPilots: clients.filter((client) => client.completedScenario).length,
             measuredStates: clients.reduce((sum, client) => sum + client.measuredStates, 0),
             measuredHealthSamples: health.filter((entry) => isMeasuredHealth(entry)).length,
-            rawSamples: Object.values(samples).reduce((sum, values) => sum + values.length, 0),
+            rawSamples: Object.values(samples).reduce(
+              (sum, sampleValues) => sum + sampleValues.length,
+              0
+            ),
             failures: totalFailures,
           },
           parameters: {

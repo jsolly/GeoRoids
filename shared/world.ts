@@ -13,7 +13,7 @@ export const WORLD = {
   spawnInset: 220,
 } as const;
 
-const SCORE_SEASON_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const SCORE_SEASON_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/u;
 
 /** UTC calendar month used to wipe scores and the shared world. */
 export function utcScoreSeason(nowMs: number): string {
@@ -28,7 +28,7 @@ export function isScoreSeason(value: unknown): value is string {
   return typeof value === 'string' && SCORE_SEASON_PATTERN.test(value);
 }
 
-const SECTOR_ID_PATTERN = /^-?\d+,-?\d+$/;
+const SECTOR_ID_PATTERN = /^-?\d+,-?\d+$/u;
 
 export function sectorId(x: number, y: number): string {
   return `${x},${y}`;

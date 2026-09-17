@@ -10,7 +10,7 @@ import {
 import { createHeightfield, sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import {
   drawContourLaserTicks,
   liveLaserPositions,

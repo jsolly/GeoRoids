@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it as test } from 'vitest';
 import {
   asteroidPolygonPoints,
   findNearestAsteroidImpact,
@@ -24,7 +24,7 @@ function square(id = 'square', x = 0, y = 0): ReflectionAsteroid {
 }
 
 describe('pilots plan laser bounces on the actual asteroid faces', () => {
-  it('follows in-place asteroid pose and contour changes between consecutive shots', () => {
+  test('follows in-place asteroid pose and contour changes between consecutive shots', () => {
     const rock = square();
     const shoot = () => findNearestAsteroidImpact(point(-10, 0.3), point(10, 0.3), [rock]);
     expect(shoot()?.point.x).toBeCloseTo(-1, 10);
@@ -66,7 +66,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     );
   });
 
-  it('uses the same translated, rotated, uneven contour that the canvas strokes', () => {
+  test('uses the same translated, rotated, uneven contour that the canvas strokes', () => {
     const rock = {
       ...square(),
       position: point(52, -18),
@@ -81,7 +81,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     );
   });
 
-  it('sweeps through the nearest flat face instead of the circumcircle', () => {
+  test('sweeps through the nearest flat face instead of the circumcircle', () => {
     const hit = findNearestAsteroidImpact(point(-10, 0.3), point(10, 0.3), [square()]);
     expect(hit?.point.x).toBeCloseTo(-1, 10);
     expect(hit?.point.y).toBeCloseTo(0.3, 10);
@@ -90,7 +90,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(hit?.normal.y).toBeCloseTo(0, 10);
   });
 
-  it('reflects on a rotated face with the analytic normal and keeps speed unchanged', () => {
+  test('reflects on a rotated face with the analytic normal and keeps speed unchanged', () => {
     const diamond = { ...square(), rotation: 0, size: 2 };
     const hit = findNearestAsteroidImpact(point(-4, 1), point(4, 1), [diamond]);
     expect(hit?.point.x).toBeCloseTo(-1, 10);
@@ -102,7 +102,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(Math.hypot(reflected.x, reflected.y)).toBeCloseTo(7, 10);
   });
 
-  it('uses a deterministic corner bisector when both adjacent faces are hit together', () => {
+  test('uses a deterministic corner bisector when both adjacent faces are hit together', () => {
     const hit = findNearestAsteroidImpact(point(-3, -3), point(0, 0), [square()]);
     expect(hit?.point.x).toBeCloseTo(-1, 10);
     expect(hit?.point.y).toBeCloseTo(-1, 10);
@@ -113,7 +113,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(bounced.y).toBeCloseTo(-1, 10);
   });
 
-  it('finds an exit when a projectile starts inside, then reflects back into the contour', () => {
+  test('finds an exit when a projectile starts inside, then reflects back into the contour', () => {
     const hit = findNearestAsteroidImpact(point(0, 0), point(3, 0), [square()]);
     expect(hit?.distance).toBeCloseTo(1, 10);
     expect(hit?.normal.x).toBeCloseTo(1, 10);
@@ -130,7 +130,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(path.termination).toBe('bounce-limit');
   });
 
-  it('does not turn a parallel edge graze or tangent corner touch into a ricochet', () => {
+  test('does not turn a parallel edge graze or tangent corner touch into a ricochet', () => {
     expect(findNearestAsteroidImpact(point(-3, 1), point(3, 1), [square()])).toBeNull();
     expect(findNearestAsteroidImpact(point(-3, 3), point(3, 3), [square()])).toBeNull();
     const diamond = { ...square(), rotation: 0, size: 2 };
@@ -138,7 +138,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(findNearestAsteroidImpact(point(-3, 0), point(-3, 0), [square()])).toBeNull();
   });
 
-  it('still detects a very shallow real crossing rather than treating it as parallel', () => {
+  test('still detects a very shallow real crossing rather than treating it as parallel', () => {
     const hit = findNearestAsteroidImpact(point(-500_000, 1.000005), point(500_000, 0.999995), [
       square(),
     ]);
@@ -147,7 +147,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(hit?.normal.y).toBeCloseTo(1, 9);
   });
 
-  it('accepts a surface entry but does not immediately rehit a departing surface', () => {
+  test('accepts a surface entry but does not immediately rehit a departing surface', () => {
     expect(findNearestAsteroidImpact(point(-1, 0), point(-3, 0), [square()])).toBeNull();
     expect(findNearestAsteroidImpact(point(-1, 0), point(0, 0), [square()])?.distance).toBe(0);
     const path = previewAsteroidReflections(point(-3, 0), point(1, 0), [square()], {
@@ -160,7 +160,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(path.traveledDistance).toBeCloseTo(10, 9);
   });
 
-  it('hits the nearer physical rock regardless of array order, with stable exact-overlap ties', () => {
+  test('hits the nearer physical rock regardless of array order, with stable exact-overlap ties', () => {
     const near = square('near');
     const far = square('far', 5);
     for (const rocks of [
@@ -177,7 +177,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     }
   });
 
-  it('pinballs between distinct cluster faces without epsilon loops or extra distance', () => {
+  test('pinballs between distinct cluster faces without epsilon loops or extra distance', () => {
     const left = square('left', -4);
     const right = square('right', 4);
     const options = { maxDistance: 30, maxBounces: 3 };
@@ -201,7 +201,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(path.termination).toBe('bounce-limit');
   });
 
-  it('ends at the distance budget mid-leg and at an ordinary absorbing rock', () => {
+  test('ends at the distance budget mid-leg and at an ordinary absorbing rock', () => {
     const rocks = [square('left', -4), square('right', 4)];
     const path = previewAsteroidReflections(point(0, 0), point(1, 0), rocks, {
       maxDistance: 5,
@@ -220,7 +220,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(blocked.impacts.map((impact) => impact.asteroidId)).toEqual(['right', 'left']);
   });
 
-  it('handles repeated vertices without NaN normals and reports stationary previews', () => {
+  test('handles repeated vertices without NaN normals and reports stationary previews', () => {
     const repeatedCenter = { ...square(), vertices: 6, offsets: [1, 0, 0, 1, 1, 1] };
     const hit = findNearestAsteroidImpact(point(-4, -0.2), point(4, -0.2), [repeatedCenter]);
     expect(hit).not.toBeNull();
@@ -234,7 +234,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(path.traveledDistance).toBe(0);
   });
 
-  it('does not hit a huge contour when a shallow shot ends outside its bounds', () => {
+  test('does not hit a huge contour when a shallow shot ends outside its bounds', () => {
     const rock: ReflectionAsteroid = {
       id: 'huge-rock',
       position: point(8_900_000, 8_000_000),
@@ -254,7 +254,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     ).toBeNull();
   });
 
-  it('fails loudly on malformed or excessive contours instead of skipping a nearer rock', () => {
+  test('fails loudly on malformed or excessive contours instead of skipping a nearer rock', () => {
     const malformed = [
       { ...square(), position: point(NaN, 0) },
       { ...square(), size: Infinity },
@@ -278,7 +278,7 @@ describe('pilots plan laser bounces on the actual asteroid faces', () => {
     expect(() => reflectVector(point(Infinity, 0), point(1, 0))).toThrow(RangeError);
   });
 
-  it('caps total work and path length rather than truncating the input obstacle list', () => {
+  test('caps total work and path length rather than truncating the input obstacle list', () => {
     for (const options of [
       { maxDistance: Infinity, maxBounces: 1 },
       { maxDistance: -1, maxBounces: 1 },

@@ -6,6 +6,7 @@ import {
   stringifyLogRecord,
 } from '../../../shared/logRecords';
 
+const SESSION_ID_PATTERN = /^session-/u;
 const forwarding = vi.hoisted(() => ({ send: vi.fn() }));
 vi.mock('../../../src/utils/logForwarder', () => ({
   startClientLogForwarder: vi.fn(),
@@ -104,7 +105,7 @@ test('the JSONL serializer enforces its byte bound for multibyte records without
   expect(parseLogRecord(line)).toMatchObject({
     source: 'client',
     level: 'warn',
-    sessionId: expect.stringMatching(/^session-/),
+    sessionId: expect.stringMatching(SESSION_ID_PATTERN),
     playerId: 'pilot-7',
     connectionId: 'socket-3',
   });

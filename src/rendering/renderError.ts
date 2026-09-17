@@ -6,7 +6,7 @@ export function reportRenderError(cause: unknown): void {
   const error = boundedDiagnosticError(cause, 'Unknown game-loop failure');
   logger.error('STATE', 'game_loop_failed', error, { observedAt: Date.now() });
 
-  let notice = document.getElementById('game-error-message');
+  let notice = document.querySelector<HTMLDivElement>('#game-error-message');
   if (!notice) {
     notice = document.createElement('div');
     notice.id = 'game-error-message';

@@ -35,7 +35,7 @@ type CrewState = {
   };
 };
 
-async function readCrewState(page: Page): Promise<CrewState> {
+function readCrewState(page: Page): Promise<CrewState> {
   return page.evaluate((asteroidId) => {
     const controller = window.gameController;
     const local = controller?.getCurrPlayer();
@@ -75,7 +75,7 @@ async function waitForFixture(
   expectedPosition: { x: number; y: number }
 ): Promise<void> {
   await page.waitForFunction(
-    ({ asteroidId, expectedKit, expectedPosition }) => {
+    ({ asteroidId, expectedKit, expectedPosition: targetPosition }) => {
       const controller = window.gameController;
       const local = controller?.getCurrPlayer();
       const asteroid = controller
@@ -87,8 +87,8 @@ async function waitForFixture(
         asteroid?.health === 75 &&
         local !== undefined &&
         Math.hypot(
-          local.ship.position.x - expectedPosition.x,
-          local.ship.position.y - expectedPosition.y
+          local.ship.position.x - targetPosition.x,
+          local.ship.position.y - targetPosition.y
         ) < 20
       );
     },
@@ -107,8 +107,8 @@ async function pointHaulerNorth(page: Page): Promise<void> {
 
 async function assertMapButtonClearOfRadar(page: Page): Promise<void> {
   const actual = await page.evaluate(() => {
-    const gameArea = document.getElementById('gameArea');
-    const mapButton = document.getElementById('universe-map-toggle');
+    const gameArea = document.querySelector('#gameArea');
+    const mapButton = document.querySelector('#universe-map-toggle');
     if (!gameArea || !mapButton) {
       throw new Error('Map button geometry requires the game area and Map button');
     }

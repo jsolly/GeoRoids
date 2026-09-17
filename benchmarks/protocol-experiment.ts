@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, gunzipSync, gzipSync, inflateSync } from 'node:zlib';
 import { SnapshotDecoder, SnapshotEncoder, type SnapshotFrame } from '../shared/snapshotProtocol';
@@ -77,13 +78,16 @@ function parsedData(text: string): unknown {
 
 function decodeSnapshot(text: string, decoder: SnapshotDecoder): ServerGameSnapshot {
   const result = decoder.readMessage(text, { acceptSnapshots: true });
-  switch (result.kind) {
+  const { kind } = result;
+  switch (kind) {
     case 'snapshot':
       return result.state;
     case 'snapshot-rejected':
       throw result.error;
     case 'message':
       throw new Error('Protocol experiment expected a snapshot message');
+    default:
+      throw new Error(`Unexpected snapshot decode result: ${kind}`);
   }
 }
 

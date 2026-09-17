@@ -1,13 +1,13 @@
 import type { LootData, LootKind } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
-import { canvasManager } from '../../rendering/canvas';
+import { canvasManager } from '../../rendering/canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { Ship } from '../ship/Ship';
 import { LootField } from './LootField';
 
-export function lootStrokeColor(kind: LootKind): string {
+export function lootStrokeColor(kind: LootKind): typeof PALETTE.LASER_LOCAL | typeof PALETTE.LOOT {
   if (kind === 'laserCore') {
     return PALETTE.LASER_LOCAL;
   }

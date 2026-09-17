@@ -17,6 +17,8 @@ import type {
 } from '../../shared-types';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
 
+const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
 }
@@ -173,7 +175,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     typeof id !== 'string' ||
     typeof name !== 'string' ||
     typeof tokenHash !== 'string' ||
-    !/^[a-f0-9]{64}$/.test(tokenHash) ||
+    !PILOT_TOKEN_HASH_PATTERN.test(tokenHash) ||
     typeof score !== 'number' ||
     !Number.isFinite(score)
   ) {

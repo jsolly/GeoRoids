@@ -203,7 +203,10 @@ function sendLossTelemetry(socket: WebSocket): boolean {
 }
 
 function flushQueue(socket: WebSocket): void {
-  while (ws === socket && socket.readyState === WebSocket.OPEN && messageQueue.length > 0) {
+  while (messageQueue.length > 0) {
+    if (ws !== socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
     const item = messageQueue[0];
     if (!item || !trySend(socket, item)) {
       return;

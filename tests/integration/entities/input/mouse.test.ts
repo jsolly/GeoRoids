@@ -10,7 +10,7 @@ import {
   handleMouseUp,
   preventContextMenu,
 } from '../../../../src/input/mouse';
-import { canvasManager } from '../../../../src/rendering/canvas';
+import { canvasManager } from '../../../../src/rendering/canvasSurface';
 
 let player: Player;
 let testCanvas: HTMLCanvasElement;
@@ -79,7 +79,7 @@ test('mouse movement turns the ship toward the cursor at a capped rate', () => {
     reconcilePlayerInput(player);
     player.ship.update();
   }
-  expect(Math.abs(player.ship.angle - 0)).toBeLessThan(1e-6);
+  expect(Math.abs(player.ship.angle)).toBeLessThan(1e-6);
 
   // Move above center => angle ~ +PI/2
   const evUp = new MouseEvent('mousemove', { clientX: centerX, clientY: centerY - 50 });

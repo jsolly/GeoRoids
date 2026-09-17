@@ -47,12 +47,12 @@ test.each([false, true])(
       const stroke = CanvasRenderingContext2D.prototype.stroke;
       CanvasRenderingContext2D.prototype.stroke = function (
         this: CanvasRenderingContext2D,
-        path?: Path2D
+        strokePath?: Path2D
       ) {
         if (this.canvas.id === 'gameCanvas') {
           gameStrokes++;
         }
-        Reflect.apply(stroke, this, path ? [path] : []);
+        Reflect.apply(stroke, this, strokePath ? [strokePath] : []);
       };
       Reflect.set(window, 'readQualityWitness', () => ({ positiveBlurWrites, gameStrokes }));
     });
@@ -97,7 +97,7 @@ test.each([false, true])(
     }
     await game.waitForAnimationFrames(60);
     const evidence = await page.evaluate(() => {
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       if (!(canvas instanceof HTMLCanvasElement)) {
         throw new Error('Gameplay canvas missing');
       }

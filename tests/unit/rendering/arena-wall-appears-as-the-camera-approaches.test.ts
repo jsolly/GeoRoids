@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { getGameBoundary } from '../../../src/physics/boundary';
 import { drawFieryBoundary } from '../../../src/rendering/boundaryRenderer';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 afterEach(() => {
   canvasManager.destroy();

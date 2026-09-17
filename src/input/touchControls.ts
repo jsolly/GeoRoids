@@ -1,12 +1,12 @@
 import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
-import { canvasManager } from '../rendering/canvas';
+import { canvasManager } from '../rendering/canvasSurface';
 import {
   isPointerOnLocalHauler,
-  isShipSchematicOpen,
   openShipSchematic,
   SHIP_SCHEMATIC_LONG_PRESS_MS,
 } from '../ui/shipSchematic';
+import { isShipSchematicOpen } from '../ui/shipSchematicState';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
 import { controlSources, resetControlSources } from './controlSources';
@@ -103,7 +103,7 @@ export function syncTouchChrome(
 
   const use = inPlay && shouldUseTouchControls();
   document.body.classList.toggle('touch-play', use);
-  const root = document.getElementById(ROOT_ID);
+  const root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
   if (root) {
     root.hidden = !use;
     root.setAttribute('aria-hidden', use ? 'false' : 'true');
@@ -127,16 +127,16 @@ export function syncTouchChrome(
 }
 
 function setAbilityPressed(pressed: boolean): void {
-  document.getElementById(ABILITY_ID)?.classList.toggle('is-pressed', pressed);
+  document.querySelector(`#${ABILITY_ID}`)?.classList.toggle('is-pressed', pressed);
 }
 
 function setBoostPressed(pressed: boolean): void {
-  document.getElementById(BOOST_ID)?.classList.toggle('is-pressed', pressed);
+  document.querySelector(`#${BOOST_ID}`)?.classList.toggle('is-pressed', pressed);
 }
 
 function getAbilityButton(): HTMLElement | null {
   if (!abilityButton?.isConnected) {
-    const next = document.getElementById(ABILITY_ID);
+    const next = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
     if (next !== abilityButton) {
       abilityButton = next;
       lastAbilityChromeKey = '';
@@ -147,7 +147,7 @@ function getAbilityButton(): HTMLElement | null {
 
 function getBoostButton(): HTMLElement | null {
   if (!boostButton?.isConnected) {
-    const next = document.getElementById(BOOST_ID);
+    const next = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
     if (next !== boostButton) {
       boostButton = next;
       lastBoostChromeKey = '';
@@ -220,8 +220,8 @@ function clearSchematicHoldTimer(): void {
 /** Clear every pointer source when the browser takes the gesture away. */
 function resetTouchInteraction(player: Player | null): void {
   const canvas = canvasManager.getCanvas();
-  const ability = document.getElementById(ABILITY_ID);
-  const boost = document.getElementById(BOOST_ID);
+  const ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
+  const boost = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
   const activeSteerPointerId = steerPointerId;
   const activeFirePointerId = firePointerId;
   const activeAbilityPointerId = abilityPointerId;
@@ -256,7 +256,7 @@ function ensureTouchDom(): {
   ability: HTMLElement;
   boost: HTMLElement;
 } {
-  let root = document.getElementById(ROOT_ID);
+  let root = document.querySelector<HTMLElement>(`#${ROOT_ID}`);
   if (!root) {
     root = document.createElement('div');
     root.id = ROOT_ID;
@@ -266,7 +266,7 @@ function ensureTouchDom(): {
     document.body.appendChild(root);
   }
 
-  let ability = document.getElementById(ABILITY_ID);
+  let ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
   if (!ability) {
     ability = document.createElement('button');
     ability.id = ABILITY_ID;
@@ -282,7 +282,7 @@ function ensureTouchDom(): {
     ability.setAttribute('aria-label', 'Ability');
   }
 
-  let boost = document.getElementById(BOOST_ID);
+  let boost = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
   if (!boost) {
     boost = document.createElement('button');
     boost.id = BOOST_ID;

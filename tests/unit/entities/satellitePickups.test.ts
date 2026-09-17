@@ -6,6 +6,8 @@ import { SATELLITE_PICKUP } from '../../../src/constants';
 import { orbitRadiusForOwner } from '../../../src/entities/satellitePickup/satellitePickupMath';
 import { RecordingSocket } from '../../support/recordingSocket';
 
+const SERVER_PICKUP_ID_PREFIX_PATTERN = /^server-pickup-/u;
+
 vi.mock('../../../setup/serverLogger', () => ({
   logger: {
     debug: vi.fn(),
@@ -57,7 +59,7 @@ describe('Satellite pickups', () => {
     const state = gameEngine.getGameState();
 
     expect(state.satellitePickups).toHaveLength(6);
-    expect(state.satellitePickups?.[0]?.id).toMatch(/^server-pickup-/);
+    expect(state.satellitePickups?.[0]?.id).toMatch(SERVER_PICKUP_ID_PREFIX_PATTERN);
     expect(state.satellitePickups?.map((pickup) => pickup.typeId)).toEqual([
       'landsat-7',
       'terra',

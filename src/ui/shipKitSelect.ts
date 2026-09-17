@@ -20,7 +20,7 @@ export function setSelectedShipKitId(kitId: unknown): ShipKitId {
 }
 
 function syncKitButtons(): void {
-  const grid = document.getElementById('ship-kit-grid');
+  const grid = document.querySelector('#ship-kit-grid');
   if (!grid) {
     return;
   }

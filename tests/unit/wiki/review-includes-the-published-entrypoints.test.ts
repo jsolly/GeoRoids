@@ -10,7 +10,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import process from 'node:process';
 import { expect, test } from 'vitest';
+
+const WIKI_INDEX_ENTRYPOINT_PATTERN = /wiki\/index\.html/u;
+const NEW_GAME_RULE_PATH_PATTERN = /src\/entities\/new-game-rule\.ts/u;
 
 test('a changed wiki entrypoint or newly added game rule requires a new documentation review', () => {
   const root = process.cwd();
@@ -60,14 +64,14 @@ test('a changed wiki entrypoint or newly added game rule requires a new document
     const entry = join(fixture, 'wiki/index.html');
     const original = readFileSync(entry);
     writeFileSync(entry, `${original.toString()}\n<!-- changed entrypoint -->\n`);
-    expect(check).toThrow(/wiki\/index\.html/);
+    expect(check).toThrow(WIKI_INDEX_ENTRYPOINT_PATTERN);
     writeFileSync(entry, original);
     expect(check()).toContain('source review passed');
     writeFileSync(
       join(fixture, 'src/entities/new-game-rule.ts'),
       'export const changedRule = true;\n'
     );
-    expect(check).toThrow(/src\/entities\/new-game-rule\.ts/);
+    expect(check).toThrow(NEW_GAME_RULE_PATH_PATTERN);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

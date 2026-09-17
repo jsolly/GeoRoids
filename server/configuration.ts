@@ -1,3 +1,4 @@
+import process from 'node:process';
 export function readServerConfiguration(env: NodeJS.ProcessEnv = process.env): {
   port: number;
   nodeEnv: string;

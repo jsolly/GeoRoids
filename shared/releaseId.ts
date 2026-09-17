@@ -1,7 +1,7 @@
 /** Git SHA of a deployed build, or `dev` for local/test processes without Railway. */
 export const DEV_RELEASE_ID = 'dev';
 
-const GIT_SHA = /^[a-f0-9]{40}$/i;
+const GIT_SHA = /^[a-f0-9]{40}$/iu;
 
 export function isReleaseId(value: unknown): value is string {
   return value === DEV_RELEASE_ID || (typeof value === 'string' && GIT_SHA.test(value));

@@ -15,9 +15,11 @@ import {
   ensureTerrain,
   getTerrainSeed,
 } from '../../../src/physics/terrain/terrainSession';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
 import { TestPath2D } from '../../support/TestPath2D';
+
+const ISO_CONTOUR_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
 
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
@@ -208,7 +210,7 @@ describe('muted contour chrome', () => {
     const before = rendered.splice(0);
     expect(before.length).toBeGreaterThan(2);
     for (const label of before) {
-      expect(label.text).toMatch(/^-?\d+\.\d{2}$/);
+      expect(label.text).toMatch(ISO_CONTOUR_LABEL_PATTERN);
       expect(label.x).toBeGreaterThan(0);
       expect(label.x).toBeLessThan(canvas.width);
       expect(label.y).toBeGreaterThan(0);

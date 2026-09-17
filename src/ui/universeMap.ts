@@ -263,7 +263,7 @@ function ensureElements(): UniverseMapElements | null {
     return null;
   }
 
-  let dialog = document.getElementById(UNIVERSE_MAP_IDS.dialog) as HTMLDialogElement | null;
+  let dialog = document.querySelector<HTMLDialogElement>(`#${UNIVERSE_MAP_IDS.dialog}`);
   if (!dialog) {
     dialog = document.createElement('dialog');
     dialog.id = UNIVERSE_MAP_IDS.dialog;
@@ -273,9 +273,9 @@ function ensureElements(): UniverseMapElements | null {
   dialog.classList.add('universe-map-dialog');
   createDialogMarkup(dialog);
 
-  let toggle = document.getElementById(UNIVERSE_MAP_IDS.toggle) as HTMLButtonElement | null;
+  let toggle = document.querySelector<HTMLButtonElement>(`#${UNIVERSE_MAP_IDS.toggle}`);
   if (!toggle) {
-    const gameArea = document.getElementById('gameArea') ?? document.body;
+    const gameArea = document.querySelector('#gameArea') ?? document.body;
     toggle = createButton(UNIVERSE_MAP_IDS.toggle, 'Map', 'Open universe map (M)');
     toggle.setAttribute('aria-keyshortcuts', 'M');
     gameArea.appendChild(toggle);
@@ -500,6 +500,8 @@ function drawMapAsset(
       context.lineTo(-size, size * 0.45);
       context.closePath();
       break;
+    default:
+      throw new Error(`Unexpected map asset kind: ${asset.kind}`);
   }
   context.fill();
   context.shadowBlur = 0;
@@ -976,7 +978,7 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
     const wasOpen = mapOpen;
     closeMap();
     if (wasOpen) {
-      document.getElementById('playerNameInput')?.focus({ preventScroll: true });
+      document.querySelector<HTMLInputElement>('#playerNameInput')?.focus({ preventScroll: true });
     }
   });
   updateZoomReadout();

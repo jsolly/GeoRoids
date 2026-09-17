@@ -9,7 +9,7 @@ import {
 } from '../../audio/gameSounds';
 import type { Sound } from '../../audio/Sound';
 import { GAME, LASER } from '../../constants';
-import { canvasManager } from '../../rendering/canvas';
+import { canvasManager } from '../../rendering/canvasSurface';
 import { getVelocityMagnitude } from '../../utils/mathUtils';
 
 interface LaserData {

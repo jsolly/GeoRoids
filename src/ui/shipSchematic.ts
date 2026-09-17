@@ -12,6 +12,7 @@ import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOut
 import { NetworkManager } from '../network/networkManager';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
+import { isShipSchematicOpen, setShipSchematicOpen } from './shipSchematicState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
 
 export const SHIP_SCHEMATIC_IDS = {
@@ -50,7 +51,6 @@ type SchematicElements = {
 };
 
 let initialized = false;
-let schematicOpen = false;
 let closeInProgress = false;
 let frameRequest: number | null = null;
 let openInputRelease: (() => void) | undefined;
@@ -90,20 +90,20 @@ function ensureElements(): SchematicElements | null {
   if (typeof document === 'undefined') {
     return null;
   }
-  let dialog = document.getElementById(SHIP_SCHEMATIC_IDS.dialog) as HTMLDialogElement | null;
+  let dialog = document.querySelector<HTMLDialogElement>(`#${SHIP_SCHEMATIC_IDS.dialog}`);
   if (!dialog) {
     dialog = document.createElement('dialog');
     dialog.id = SHIP_SCHEMATIC_IDS.dialog;
     document.body.appendChild(dialog);
   }
   createDialogMarkup(dialog);
-  const canvas = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.canvas}`) as HTMLCanvasElement | null;
-  const tool = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.tool}`) as HTMLCanvasElement | null;
-  const close = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.close}`) as HTMLButtonElement | null;
-  const title = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.title}`) as HTMLElement | null;
-  const copy = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.copy}`) as HTMLElement | null;
-  const ret = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.return}`) as HTMLButtonElement | null;
-  const cards = dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.cards}`) as HTMLElement | null;
+  const canvas = dialog.querySelector<HTMLCanvasElement>(`#${SHIP_SCHEMATIC_IDS.canvas}`);
+  const tool = dialog.querySelector<HTMLCanvasElement>(`#${SHIP_SCHEMATIC_IDS.tool}`);
+  const close = dialog.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.close}`);
+  const title = dialog.querySelector<HTMLElement>(`#${SHIP_SCHEMATIC_IDS.title}`);
+  const copy = dialog.querySelector<HTMLElement>(`#${SHIP_SCHEMATIC_IDS.copy}`);
+  const ret = dialog.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.return}`);
+  const cards = dialog.querySelector<HTMLElement>(`#${SHIP_SCHEMATIC_IDS.cards}`);
   if (!canvas || !tool || !close || !title || !copy || !ret || !cards) {
     return null;
   }
@@ -158,13 +158,15 @@ export function equipUtility(utilityId: HaulerUtilityId): void {
   if (player?.ship.kitId === 'hauler') {
     player.ship.haulerUtility = utilityId;
   }
-  const network = NetworkManager.getInstance();
-  if (network.isConnected && player) {
-    network.sendMessage({
-      type: 'setHaulerUtility',
-      id: network.getLocalPlayerId() || player.id,
-      data: { utilityId },
-    });
+  if (player) {
+    const network = NetworkManager.getInstance();
+    if (network.isConnected) {
+      network.sendMessage({
+        type: 'setHaulerUtility',
+        id: network.getLocalPlayerId() || player.id,
+        data: { utilityId },
+      });
+    }
   }
   syncCards();
 }
@@ -333,7 +335,7 @@ function drawToolLoop(
 }
 
 function renderOverlay(): void {
-  if (!elements || !schematicOpen) {
+  if (!elements || !isShipSchematicOpen()) {
     return;
   }
   resizeCanvas(elements.canvas, 640, 360);
@@ -369,13 +371,9 @@ function stopRenderLoop(): void {
   }
 }
 
-export function isShipSchematicOpen(): boolean {
-  return schematicOpen;
-}
-
 export function isPointerOnLocalHauler(clientX: number, clientY: number): boolean {
   const player = PlayerManager.getInstance().getLocalPlayer();
-  const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null;
+  const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
   if (!player || !canvas || player.ship.kitId !== 'hauler' || player.lives <= 0) {
     return false;
   }
@@ -387,7 +385,7 @@ export function isPointerOnLocalHauler(clientX: number, clientY: number): boolea
 }
 
 export function openShipSchematic(): boolean {
-  if (!elements || schematicOpen || !canOpenForLocalHauler()) {
+  if (!elements || isShipSchematicOpen() || !canOpenForLocalHauler()) {
     return false;
   }
   if (isUniverseMapOpen()) {
@@ -403,7 +401,7 @@ export function openShipSchematic(): boolean {
     );
     return false;
   }
-  schematicOpen = true;
+  setShipSchematicOpen(true);
   const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
   selectedUtility = ship ? haulerUtilityOf(ship) : preferredHaulerUtility();
   syncCards();
@@ -415,11 +413,11 @@ export function openShipSchematic(): boolean {
 }
 
 export function closeShipSchematic(): void {
-  if (!elements || !schematicOpen || closeInProgress) {
+  if (!elements || !isShipSchematicOpen() || closeInProgress) {
     return;
   }
   closeInProgress = true;
-  schematicOpen = false;
+  setShipSchematicOpen(false);
   stopRenderLoop();
   elements.dialog.close();
   closeInProgress = false;
@@ -427,10 +425,10 @@ export function closeShipSchematic(): void {
 }
 
 function handleDialogClosed(): void {
-  if (closeInProgress || !schematicOpen) {
+  if (closeInProgress || !isShipSchematicOpen()) {
     return;
   }
-  schematicOpen = false;
+  setShipSchematicOpen(false);
   stopRenderLoop();
   window.dispatchEvent(new CustomEvent('gameSchematicClose'));
 }
@@ -439,7 +437,7 @@ function handleSchematicKeydown(ev: KeyboardEvent): void {
   if (ev.code === 'KeyV') {
     const target = ev.target;
     if (
-      !schematicOpen &&
+      !isShipSchematicOpen() &&
       (!document.body.classList.contains('in-play') ||
         (target instanceof HTMLElement &&
           (target.isContentEditable || target.matches('input, textarea, select'))))
@@ -451,18 +449,18 @@ function handleSchematicKeydown(ev: KeyboardEvent): void {
     if (ev.repeat) {
       return;
     }
-    if (schematicOpen) {
+    if (isShipSchematicOpen()) {
       closeShipSchematic();
     } else {
       openShipSchematic();
     }
     return;
   }
-  if (ev.code === 'KeyM' && schematicOpen) {
+  if (ev.code === 'KeyM' && isShipSchematicOpen()) {
     closeShipSchematic();
     return;
   }
-  if (!schematicOpen) {
+  if (!isShipSchematicOpen()) {
     return;
   }
   if (ev.code === 'Escape') {

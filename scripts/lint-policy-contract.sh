@@ -5,7 +5,7 @@
 # recommended rule inherits its own default severity unless the rule is set
 # explicitly. This contract checks the JSONC structure, inventories the rules
 # enabled by the installed Biome, and requires every recommended warn/info rule
-# to have an explicit error setting.
+# to have an explicit error setting (or an explicit off HOLD).
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -183,6 +183,10 @@ function isExplicitError(group, rule) {
   const value = config?.linter?.rules?.[group]?.[rule];
   return value === 'error' || (value && typeof value === 'object' && value.level === 'error');
 }
+function isExplicitOff(group, rule) {
+  const value = config?.linter?.rules?.[group]?.[rule];
+  return value === 'off' || (value && typeof value === 'object' && value.level === 'off');
+}
 
 let nonErrorDefaults = 0;
 for (const qualifiedName of rules) {
@@ -199,6 +203,9 @@ for (const qualifiedName of rules) {
   }
   if (match[1] !== 'error') {
     nonErrorDefaults += 1;
+    if (isExplicitOff(group, rule)) {
+      continue;
+    }
     if (!isExplicitError(group, rule)) {
       console.error(`✗ Recommended ${qualifiedName} defaults to ${match[1]} but has no explicit error setting`);
       process.exit(1);

@@ -147,6 +147,8 @@ class Logger {
       case LogLevel.DEBUG:
         console.debug(line);
         break;
+      default:
+        throw new Error(`Unexpected log level: ${level}`);
     }
   }
 }

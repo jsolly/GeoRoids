@@ -49,9 +49,10 @@ export class MessageHandler {
       return;
     }
     const command = decoded.command;
+    const commandType = command.type;
 
     try {
-      switch (command.type) {
+      switch (commandType) {
         case 'join':
           this.handleJoin(ws, command);
           break;
@@ -107,12 +108,15 @@ export class MessageHandler {
         case 'ping':
           this.handlePing(ws, command.probeId);
           break;
+
+        default:
+          throw new Error(`Unexpected client command type: ${commandType}`);
       }
     } catch (error) {
       logger.error(
         'Error handling message',
         {
-          messageType: command.type,
+          messageType: commandType,
           messageId: 'id' in command ? command.id : '<missing>',
         },
         error

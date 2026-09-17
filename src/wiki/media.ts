@@ -37,6 +37,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/shipRenderer.ts',
       'src/entities/ship/hullOutlines.ts',
       'shared/furnaces.ts',
+      'src/rendering/furnaceRenderer.ts',
       'server/core/GameEngine.ts',
     ],
   },

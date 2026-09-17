@@ -31,7 +31,8 @@
     "vitest*.config.ts"
   ],
   // These dependencies are executed by shell scripts, CI, or deployment
-  // tooling; Knip cannot infer those non-TypeScript consumers.
+  // tooling; Knip cannot infer those non-TypeScript consumers. Bootstrap
+  // CSS is imported from index.css into @layer bootstrap.
   "ignoreBinaries": ["uvx"],
-  "ignoreDependencies": ["concurrently", "markdownlint-cli2", "jsonc-parser"]
+  "ignoreDependencies": ["bootstrap", "concurrently", "markdownlint-cli2", "jsonc-parser"]
 }

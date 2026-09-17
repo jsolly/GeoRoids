@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it as test } from 'vitest';
 import {
   compareMeasurements,
   type Measurement,
@@ -28,7 +28,7 @@ function comparison() {
 }
 
 describe('comparing the same multiplayer workload', () => {
-  it('reports lower measured time and exact byte changes when outcomes stay equal', () => {
+  test('reports lower measured time and exact byte changes when outcomes stay equal', () => {
     const { calibration, pairs } = comparison();
     for (const { b } of pairs) {
       b.counts['encodedBytes'] = 3000;
@@ -43,7 +43,7 @@ describe('comparing the same multiplayer workload', () => {
     });
   });
 
-  it('refuses a faster run that lost a pilot or changed its input workload', () => {
+  test('refuses a faster run that lost a pilot or changed its input workload', () => {
     const { calibration, pairs } = comparison();
     const first = pairs[0];
     if (!first) {
@@ -56,7 +56,7 @@ describe('comparing the same multiplayer workload', () => {
     expect(() => compareMeasurements(calibration, pairs, 42)).toThrow('Workload parameters differ');
   });
 
-  it('labels noisy timing or drifting A/A calibration inconclusive', () => {
+  test('labels noisy timing or drifting A/A calibration inconclusive', () => {
     const { calibration, pairs } = comparison();
     for (const [index, pair] of pairs.entries()) {
       pair.b = sample(index % 2 === 0 ? 8 : 12.5);
@@ -73,7 +73,7 @@ describe('comparing the same multiplayer workload', () => {
     );
   });
 
-  it('rejects incomplete runs and counts that cannot be reproduced', () => {
+  test('rejects incomplete runs and counts that cannot be reproduced', () => {
     const { calibration, pairs } = comparison();
     expect(() => compareMeasurements(calibration, pairs.slice(1), 42)).toThrow('exactly twelve');
     const first = pairs[0];

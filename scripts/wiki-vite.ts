@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import process from 'node:process';
 import type { Plugin } from 'vite';
 import { readWikiArticles } from './wiki-content';
 

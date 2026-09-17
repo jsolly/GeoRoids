@@ -101,7 +101,7 @@ export function drawAsteroidMaterialDetails(
 /** Contact-sheet assets use the same mineral contour and facet data as Canvas. */
 export function serializeAsteroidMaterialSvg(material: AsteroidMaterial): string {
   if (!isAsteroidMaterial(material)) {
-    throw new TypeError(`Unknown asteroid material: ${String(material)}`);
+    throw new TypeError(`Unknown asteroid material: ${material}`);
   }
   const offsets = MATERIAL_OUTLINES[material];
   const points = offsets

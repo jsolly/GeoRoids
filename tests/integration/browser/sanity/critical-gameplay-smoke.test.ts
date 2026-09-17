@@ -12,6 +12,7 @@ import { TestConfig } from '../../utils/test-config';
 import { localPlayerId, observeLaser, parkLaserClient } from '../laser/laser-observation';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -30,7 +31,7 @@ function observeAuthoritativeProjectiles(page: Page): {
   const errors: string[] = [];
 
   page.on('websocket', (socket) => {
-    if (!/\/ws(?:\?|$)/.test(socket.url())) {
+    if (!WS_PATH_PATTERN.test(socket.url())) {
       return;
     }
     socket.on('framereceived', ({ payload }) => {

@@ -19,9 +19,7 @@ export class PlayerListCache<T extends { type: string }> {
   }
 
   allPlayers(players: Map<string, T>): T[] {
-    if (this.all === null) {
-      this.all = Array.from(players.values());
-    }
+    this.all ??= Array.from(players.values());
     return this.all;
   }
 

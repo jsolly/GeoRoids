@@ -55,7 +55,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
     await game.waitForServerJoin();
     expect(
       await page.evaluate(() => {
-        const canvas = document.getElementById('gameCanvas');
+        const canvas = document.querySelector('#gameCanvas');
         if (!(canvas instanceof HTMLCanvasElement)) {
           throw new Error('Game canvas unavailable');
         }
@@ -74,7 +74,7 @@ test('title and gameplay stay sharp through density changes without a viewport r
     );
     expect(
       await page.evaluate(() => {
-        const canvas = document.getElementById('gameCanvas');
+        const canvas = document.querySelector('#gameCanvas');
         if (!(canvas instanceof HTMLCanvasElement)) {
           throw new Error('Game canvas unavailable');
         }
@@ -104,11 +104,11 @@ test(
     await game.bootGame({ waitForCombatReady: false });
 
     const chrome = await page.evaluate(() => {
-      const root = document.getElementById('touch-controls');
-      const stick = document.getElementById('touch-stick');
-      const ability = document.getElementById('touch-ability');
-      const boost = document.getElementById('touch-boost');
-      const canvas = document.getElementById('gameCanvas');
+      const root = document.querySelector<HTMLElement>('#touch-controls');
+      const stick = document.querySelector('#touch-stick');
+      const ability = document.querySelector('#touch-ability');
+      const boost = document.querySelector('#touch-boost');
+      const canvas = document.querySelector('#gameCanvas');
       const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
       const box = (el: Element | null) => {
         if (!el) {

@@ -5,6 +5,8 @@ import type { AsteroidData } from '../../../../shared-types';
 import { SHIP } from '../../../../src/constants';
 import { RecordingSocket } from '../../../support/recordingSocket';
 
+const CLOCK_MOVED_BACKWARDS_PATTERN = /moved backwards/u;
+
 function motionAsteroid(): AsteroidData {
   return {
     id: 'motion-asteroid',
@@ -124,7 +126,7 @@ describe('Game clock catch-up after a hitch', () => {
 
   test('a backward simulation sample fails without moving the clock origin', () => {
     engine.stepClock(1000);
-    expect(() => engine.stepClock(900)).toThrow(/moved backwards/);
+    expect(() => engine.stepClock(900)).toThrow(CLOCK_MOVED_BACKWARDS_PATTERN);
     expect(engine.getDiagnostics().gameTime).toBe(0);
     expect(engine.stepClock(1000 + GAME_TICK_MS)).toBe(1);
     expect(engine.getDiagnostics().gameTime).toBe(1);

@@ -6,6 +6,37 @@ import { describeDeathCause } from '../../../src/utils/deathCause';
 import { TestConfig, TestSelectors } from './test-config';
 import { getWorldDiagnostics, placePlayer } from './test-server-control';
 
+type CrashAsteroidCandidate = {
+  x: number;
+  y: number;
+  id: string;
+  radius: number;
+};
+
+function compareCrashTargets(
+  left: CrashAsteroidCandidate,
+  right: CrashAsteroidCandidate,
+  hazards: Array<{ x: number; y: number; radius: number }>,
+  impact: { x: number; y: number }
+): number {
+  const actorClearance = (candidate: CrashAsteroidCandidate) =>
+    hazards.length
+      ? Math.min(
+          ...hazards.map(
+            (hazard) =>
+              Math.hypot(candidate.x - hazard.x, candidate.y - hazard.y) -
+              candidate.radius -
+              hazard.radius
+          )
+        )
+      : Number.POSITIVE_INFINITY;
+  return (
+    actorClearance(right) - actorClearance(left) ||
+    Math.hypot(left.x - impact.x, left.y - impact.y) -
+      Math.hypot(right.x - impact.x, right.y - impact.y)
+  );
+}
+
 export class GameInteractions {
   constructor(private page: Page) {}
 
@@ -452,12 +483,12 @@ export class GameInteractions {
       if (!gc) {
         throw new Error('Game controller is unavailable');
       }
-      const playerId = gc.getNetworkManager().getLocalPlayerId();
+      const localPlayerId = gc.getNetworkManager().getLocalPlayerId();
       const ship = gc.getPlayerManager().getLocalPlayer()?.ship;
-      if (!playerId || !ship) {
+      if (!localPlayerId || !ship) {
         throw new Error('No connected local ship to place');
       }
-      return playerId;
+      return localPlayerId;
     });
     const placement = await placePlayer(playerId, { x, y });
     await this.waitForFixtureMotionEpoch(placement.motionEpoch);
@@ -484,16 +515,16 @@ export class GameInteractions {
     options: { clearSpawnProtection?: boolean } = {}
   ): Promise<void> {
     await this.page.evaluate(
-      ({ x, y, clearSpawnProtection }) => {
+      ({ x: worldX, y: worldY, clearSpawnProtection: clearProtection }) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!ship) {
           throw new Error('No local ship to align after fixture placement');
         }
-        ship.position = { x, y };
+        ship.position = { x: worldX, y: worldY };
         ship.velocity = { x: 0, y: 0 };
         ship.thrusting = false;
         ship.angularVelocity = 0;
-        if (clearSpawnProtection) {
+        if (clearProtection) {
           ship.blinkCount = 0;
           ship.spawnProtectionTimer = 0;
         }
@@ -520,13 +551,13 @@ export class GameInteractions {
   /** Aim the ship at a world point and fire one laser. */
   async fireLaserToward(targetX: number, targetY: number): Promise<void> {
     await this.page.evaluate(
-      ({ targetX, targetY }) => {
+      ({ targetX: aimX, targetY: aimY }) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!ship) {
           throw new Error('No local ship to fire from');
         }
-        const dx = targetX - ship.position.x;
-        const dy = targetY - ship.position.y;
+        const dx = aimX - ship.position.x;
+        const dy = aimY - ship.position.y;
         // Forward vector is (cos a, -sin a), so invert dy.
         ship.angle = Math.atan2(-dy, dx);
         ship.canShoot = true;
@@ -566,13 +597,13 @@ export class GameInteractions {
       y: number;
     } | null> => {
       return await this.page.evaluate(
-        ({ id, shipRadius, worldRadius }) => {
+        ({ id: asteroidId, shipRadius: localShipRadius, worldRadius }) => {
           const gc = window.gameController;
           if (!gc) {
             throw new Error('gameController is not available');
           }
           const roids = gc.getCurrRoidBelt().getRoids();
-          const target = roids.find((roid) => roid.id === id);
+          const target = roids.find((roid) => roid.id === asteroidId);
           if (!target?.position || !Number.isFinite(target.r)) {
             return null;
           }
@@ -580,14 +611,14 @@ export class GameInteractions {
           // Keep the ship outside both hulls with a small margin. Candidate
           // points are tested against every other asteroid so a shot has a
           // direct path to the live target.
-          const gap = target.r + shipRadius + 12;
+          const gap = target.r + localShipRadius + 12;
           const targetX = target.position.x;
           const targetY = target.position.y;
           for (let index = 0; index < 16; index += 1) {
             const angle = (index * Math.PI * 2) / 16;
             const shipX = targetX - Math.cos(angle) * gap;
             const shipY = targetY - Math.sin(angle) * gap;
-            if (Math.hypot(shipX, shipY) > worldRadius - shipRadius) {
+            if (Math.hypot(shipX, shipY) > worldRadius - localShipRadius) {
               continue;
             }
 
@@ -595,7 +626,7 @@ export class GameInteractions {
             const dy = targetY - shipY;
             const segmentLengthSquared = dx * dx + dy * dy;
             const clear = roids.every((roid) => {
-              if (roid.id === id || !roid.position || !Number.isFinite(roid.r)) {
+              if (roid.id === asteroidId || !roid.position || !Number.isFinite(roid.r)) {
                 return true;
               }
               const projection = Math.max(
@@ -773,6 +804,17 @@ export class GameInteractions {
    * ship. A ram destroys its asteroid, so repeatedly using one stale position
    * cannot produce sustained damage. Returns the final impact position.
    */
+  private selectCrashTarget(
+    field: CrashAsteroidCandidate[],
+    hazards: Array<{ x: number; y: number; radius: number }>,
+    lastImpact: { x: number; y: number },
+    usedAsteroids: Set<string>
+  ) {
+    const candidates = field.filter((candidate) => !usedAsteroids.has(candidate.id));
+    candidates.sort((left, right) => compareCrashTargets(left, right, hazards, lastImpact));
+    return candidates[0];
+  }
+
   async crashShipIntoAsteroidUntilDestroyed(): Promise<{ x: number; y: number }> {
     const startLives = await this.getLives();
     await this.observeNextDeathCause();
@@ -797,25 +839,7 @@ export class GameInteractions {
             }));
         }),
       ]);
-      const actorClearance = (candidate: (typeof field)[number]) =>
-        hazards.length
-          ? Math.min(
-              ...hazards.map(
-                (hazard) =>
-                  Math.hypot(candidate.x - hazard.x, candidate.y - hazard.y) -
-                  candidate.radius -
-                  hazard.radius
-              )
-            )
-          : Number.POSITIVE_INFINITY;
-      const target = field
-        .filter((candidate) => !usedAsteroids.has(candidate.id))
-        .sort(
-          (left, right) =>
-            actorClearance(right) - actorClearance(left) ||
-            Math.hypot(left.x - lastImpact.x, left.y - lastImpact.y) -
-              Math.hypot(right.x - lastImpact.x, right.y - lastImpact.y)
-        )[0];
+      const target = this.selectCrashTarget(field, hazards, lastImpact, usedAsteroids);
       if (!target) {
         usedAsteroids.clear();
         await this.waitForAnimationFrames(3);
@@ -835,7 +859,7 @@ export class GameInteractions {
           if (!ship) {
             throw new Error('No local ship after asteroid impact');
           }
-          const dist = Math.sqrt(x * x + y * y) || 1;
+          const dist = Math.hypot(x, y) || 1;
           const step = Math.min(400, dist);
           ship.position = { x: x - (x / dist) * step, y: y - (y / dist) * step };
           ship.velocity = { x: 0, y: 0 };
@@ -854,7 +878,7 @@ export class GameInteractions {
       if (!ship) {
         throw new Error('No local ship available');
       }
-      return Math.sqrt(ship.position.x * ship.position.x + ship.position.y * ship.position.y);
+      return Math.hypot(ship.position.x, ship.position.y);
     });
   }
 
@@ -867,15 +891,15 @@ export class GameInteractions {
     const minDistance = 75;
     const afterDeath = afterDeathPosition ?? (await this.getShipPosition());
     await this.page.waitForFunction(
-      ({ death, afterDeath, minDist }) => {
+      ({ death, afterDeath: afterDeathPoint, minDist }) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!ship || ship.health <= 0) {
           return false;
         }
         const fromDeath = Math.hypot(ship.position.x - death.x, ship.position.y - death.y);
         const fromAfterDeath = Math.hypot(
-          ship.position.x - afterDeath.x,
-          ship.position.y - afterDeath.y
+          ship.position.x - afterDeathPoint.x,
+          ship.position.y - afterDeathPoint.y
         );
         return fromDeath > minDist && fromAfterDeath > minDist;
       },
@@ -895,16 +919,13 @@ export class GameInteractions {
     while (Date.now() < deadline) {
       await this.waitForAnimationFrames(20);
       const placement = await this.page.evaluate(
-        ({ deathPosition, minDistance }) => {
+        ({ deathPosition: deathPoint, minDistance: minDistThreshold }) => {
           const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
           if (!ship || ship.exploding || ship.health <= 0) {
             return null;
           }
-          const dist = Math.hypot(
-            ship.position.x - deathPosition.x,
-            ship.position.y - deathPosition.y
-          );
-          if (dist <= minDistance) {
+          const dist = Math.hypot(ship.position.x - deathPoint.x, ship.position.y - deathPoint.y);
+          if (dist <= minDistThreshold) {
             return null;
           }
           return { x: ship.position.x, y: ship.position.y };
@@ -916,7 +937,7 @@ export class GameInteractions {
       }
     }
     const debug = await this.page.evaluate(
-      ({ deathPosition }) => {
+      ({ deathPosition: deathPoint }) => {
         const gc = window.gameController;
         const player = gc?.getPlayerManager()?.getLocalPlayer?.();
         const ship = gc?.getPlayerManager()?.getLocalPlayer?.()?.ship;
@@ -925,7 +946,7 @@ export class GameInteractions {
           exploding: ship?.exploding,
           position: ship?.position,
           lives: player?.lives,
-          deathPosition,
+          deathPosition: deathPoint,
         };
       },
       { deathPosition }
@@ -975,7 +996,7 @@ export class GameInteractions {
   /** Whether the start screen is visible again. */
   async isStartScreenVisible(): Promise<boolean> {
     return await this.page.evaluate(() => {
-      const el = document.getElementById('start-screen');
+      const el = document.querySelector<HTMLElement>('#start-screen');
       return el ? el.style.display !== 'none' : false;
     });
   }
@@ -1135,7 +1156,7 @@ export class GameInteractions {
    */
   async fireLaserAtRemotePlayer(targetPlayerId: string, distance = 45): Promise<string> {
     const firingPoint = await this.page.evaluate(
-      ({ targetId, distance }) => {
+      ({ targetId, distance: standoffDistance }) => {
         const gc = window.gameController;
         const players = gc?.getNetworkManager().getAllPlayers() ?? [];
         const target = players.find((p) => p.id === targetId);
@@ -1145,7 +1166,7 @@ export class GameInteractions {
         }
         const tx = target.ship.position.x;
         const ty = target.ship.position.y;
-        return { x: tx - distance, y: ty };
+        return { x: tx - standoffDistance, y: ty };
       },
       { targetId: targetPlayerId, distance }
     );

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
 import { networkProfiles } from '../benchmarks/network-profiles';
 import { startTcpProxy } from '../benchmarks/tcp-proxy';

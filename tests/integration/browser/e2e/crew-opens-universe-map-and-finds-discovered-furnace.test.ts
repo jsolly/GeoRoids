@@ -11,6 +11,7 @@ import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
+const REVEALED_ASSETS_STATUS_PATTERN = /\d+ revealed assets/u;
 
 const FAR_FURNACE = (() => {
   const furnace = FURNACES.find((candidate) => candidate.id === 'works-1-0');
@@ -27,11 +28,11 @@ type MapFrame = {
   labels: string[];
 };
 
-async function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
+function readMapFrame(page: import('playwright').Page): Promise<MapFrame> {
   return page.evaluate(async () => {
-    const dialog = document.getElementById('universe-map-dialog');
-    const canvas = document.getElementById('universe-map-canvas');
-    const status = document.getElementById('universe-map-status');
+    const dialog = document.querySelector('#universe-map-dialog');
+    const canvas = document.querySelector('#universe-map-canvas');
+    const status = document.querySelector('#universe-map-status');
     if (!(dialog instanceof HTMLDialogElement) || !(canvas instanceof HTMLCanvasElement)) {
       throw new Error('Universe map fixture requires its dialog and canvas');
     }
@@ -39,6 +40,7 @@ async function readMapFrame(page: import('playwright').Page): Promise<MapFrame> 
     const labels: string[] = [];
     const originalFillText = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (
+      this: CanvasRenderingContext2D,
       text: string,
       x: number,
       y: number,
@@ -92,11 +94,11 @@ async function openAndCaptureMap(
       interval: 100,
       message: 'the universe map should render the discovered regional furnace label',
     })
-    .toSatisfy((frame: MapFrame) => frame.open && frame.labels.includes(FAR_FURNACE.name));
+    .toSatisfy((mapFrame: MapFrame) => mapFrame.open && mapFrame.labels.includes(FAR_FURNACE.name));
   const frame = await readMapFrame(page);
   expect(frame.canvas.width).toBeGreaterThan(0);
   expect(frame.canvas.height).toBeGreaterThan(0);
-  expect(frame.status).toMatch(/\d+ revealed assets/);
+  expect(frame.status).toMatch(REVEALED_ASSETS_STATUS_PATTERN);
   expect(frame.labels).toContain(FAR_FURNACE.name);
   return frame;
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 
+import process from 'node:process';
 import { checkAllServers } from '../tests/integration/utils/health-checker';
 
 async function main() {
@@ -17,4 +18,4 @@ async function main() {
   }
 }
 
-main();
+void main();

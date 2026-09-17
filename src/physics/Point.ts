@@ -5,6 +5,6 @@ export class Point {
   ) {}
 
   distance(targetPoint: Point): number {
-    return Math.floor(Math.sqrt((this.x - targetPoint.x) ** 2 + (this.y - targetPoint.y) ** 2));
+    return Math.floor(Math.hypot(this.x - targetPoint.x, this.y - targetPoint.y));
   }
 }

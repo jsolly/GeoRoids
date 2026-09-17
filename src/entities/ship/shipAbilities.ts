@@ -71,7 +71,7 @@ export function canActivateAbility(host: AbilityHost): boolean {
   return (
     !host.exploding &&
     host.health > 0 &&
-    (host.abilityCooldownFrames <= 0 || (host.kitId === 'hauler' && !!host.harpoonTargetId))
+    (host.abilityCooldownFrames <= 0 || (host.kitId === 'hauler' && Boolean(host.harpoonTargetId)))
   );
 }
 

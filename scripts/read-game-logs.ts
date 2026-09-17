@@ -1,4 +1,5 @@
 import { createReadStream } from 'node:fs';
+import process from 'node:process';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { parseLogRecord } from '../shared/logRecords';
@@ -16,6 +17,9 @@ interface LogInput {
   path: string;
   optional?: boolean;
 }
+
+const TIMEZONE_SUFFIX_PATTERN = /T.*(?:Z|[+-]\d{2}:\d{2})$/u;
+const UNSIGNED_INT_PATTERN = /^\d+$/u;
 
 const DEFAULT_FILES = [
   'logs/server.log.1',
@@ -62,7 +66,7 @@ export function parseLogArguments(args: string[]): { files: LogInput[]; query: L
         break;
       case '--since': {
         const since = Date.parse(value);
-        if (!Number.isFinite(since) || !/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+        if (!Number.isFinite(since) || !TIMEZONE_SUFFIX_PATTERN.test(value)) {
           throw new Error('--since requires an ISO timestamp with a timezone');
         }
         query.since = since;
@@ -70,7 +74,12 @@ export function parseLogArguments(args: string[]): { files: LogInput[]; query: L
       }
       case '--last': {
         const last = Number(value);
-        if (!/^\d+$/.test(value) || !Number.isInteger(last) || last < 1 || last > 1000) {
+        if (
+          !UNSIGNED_INT_PATTERN.test(value) ||
+          !Number.isInteger(last) ||
+          last < 1 ||
+          last > 1000
+        ) {
           throw new Error('--last must be an integer from 1 to 1000');
         }
         query.last = last;

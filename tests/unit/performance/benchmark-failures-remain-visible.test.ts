@@ -4,12 +4,17 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 import { expect, test, vi } from 'vitest';
 import {
   collectLiveReportMetadata,
   createLiveReport,
   writeLiveReport,
 } from '../../../benchmarks/live-report';
+
+const REV_PARSE_HEAD_ERROR_PATTERN = /rev-parse HEAD/u;
+const LOCKFILE_ENOENT_ERROR_PATTERN = /ENOENT.*package-lock.json/u;
+const NOT_A_GIT_REPOSITORY_ERROR_PATTERN = /not a git repository/u;
 
 test('live sessions require a readable lockfile and a real committed revision', async () => {
   const root = await mkdtemp(join(tmpdir(), 'georoids-provenance-'));
@@ -32,7 +37,7 @@ test('live sessions require a readable lockfile and a real committed revision', 
     git(['init']);
     const lockfile = '{"lockfileVersion":3,"packages":{}}\n';
     await writeFile(join(root, 'package-lock.json'), lockfile);
-    expect(() => collectLiveReportMetadata({ root })).toThrow(/rev-parse HEAD/);
+    expect(() => collectLiveReportMetadata({ root })).toThrow(REV_PARSE_HEAD_ERROR_PATTERN);
 
     const tree = git(['mktree'], '');
     const commit = git(
@@ -63,9 +68,9 @@ test('live sessions require a readable lockfile and a real committed revision', 
     expect(harnessChanged.git.productSha256).toBe(productChanged.git.productSha256);
     expect(harnessChanged.git.harnessSha256).not.toBe(productChanged.git.harnessSha256);
     await rm(join(root, 'package-lock.json'));
-    expect(() => collectLiveReportMetadata({ root })).toThrow(/ENOENT.*package-lock.json/);
+    expect(() => collectLiveReportMetadata({ root })).toThrow(LOCKFILE_ENOENT_ERROR_PATTERN);
     await rm(join(root, '.git'), { recursive: true });
-    expect(() => collectLiveReportMetadata({ root })).toThrow(/not a git repository/);
+    expect(() => collectLiveReportMetadata({ root })).toThrow(NOT_A_GIT_REPOSITORY_ERROR_PATTERN);
   } finally {
     vi.unstubAllEnvs();
     await rm(root, { recursive: true, force: true });

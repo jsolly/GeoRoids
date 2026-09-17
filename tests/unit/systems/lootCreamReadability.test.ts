@@ -11,7 +11,7 @@ import {
 import { Ship } from '../../../src/entities/ship/Ship';
 import { HAULER_TETHER_COLOR } from '../../../src/entities/ship/shipKits';
 import { Point } from '../../../src/physics/Point';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 type TraceContext = CanvasRenderingContext2D & { lineToCount: number };
 

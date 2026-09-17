@@ -4,6 +4,8 @@ import { logger } from '../utils/Logger';
 export const CLIENT_RELEASE_POLL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 8000;
 const RELOAD_GUARD_KEY = 'georoids:client-release-refresh';
+const BUILD_RELEASE_PATTERN = /^[a-f0-9]{7,40}$/iu;
+const PUBLISHED_RELEASE_PATTERN = /^[a-f0-9]{40}$/u;
 
 export interface ClientReleaseEnvironment {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
@@ -21,7 +23,7 @@ export function watchClientRelease(
   buildRelease: unknown,
   environment: ClientReleaseEnvironment
 ): () => void {
-  if (typeof buildRelease !== 'string' || !/^[a-f0-9]{7,40}$/i.test(buildRelease)) {
+  if (typeof buildRelease !== 'string' || !BUILD_RELEASE_PATTERN.test(buildRelease)) {
     return () => undefined;
   }
   const build = buildRelease.toLowerCase();
@@ -65,7 +67,12 @@ export function watchClientRelease(
         return;
       }
       const published = response.headers.get('x-release-id')?.toLowerCase();
-      if (!response.ok || response.redirected || !published || !/^[a-f0-9]{40}$/.test(published)) {
+      if (
+        !response.ok ||
+        response.redirected ||
+        !published ||
+        !PUBLISHED_RELEASE_PATTERN.test(published)
+      ) {
         candidate = undefined;
         const reason = !response.ok
           ? `status=${response.status}`

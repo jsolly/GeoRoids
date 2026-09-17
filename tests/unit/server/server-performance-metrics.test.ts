@@ -20,7 +20,7 @@ class FakeEventLoopDelay implements EventLoopDelaySampler {
   exceeds = 0;
   enabled = false;
 
-  percentile(percentile: number): number {
+  percentile(percentile: number) {
     return percentile >= 95 ? this.max : this.mean;
   }
 
@@ -299,17 +299,17 @@ describe('bounded server performance metrics', () => {
 });
 
 test('health polls expose the same finalized window without counting its observations twice', () => {
-  const metrics = new ServerPerformanceMetrics({ enabled: true, autoStart: false });
-  metrics.recordTransportAcceptance(4);
-  const finalized = metrics.drain();
-  const first = metrics.read();
-  const second = metrics.read();
+  const perfMetrics = new ServerPerformanceMetrics({ enabled: true, autoStart: false });
+  perfMetrics.recordTransportAcceptance(4);
+  const finalized = perfMetrics.drain();
+  const first = perfMetrics.read();
+  const second = perfMetrics.read();
   expect(finalized.window.finalized).toBe(true);
   expect(first.window.finalized).toBe(false);
   expect(first.window.id).not.toBe(finalized.window.id);
   expect(first.closedWindows?.[0]?.window.id).toBe(second.closedWindows?.[0]?.window.id);
   expect(finalized.histograms.transportAcceptanceMs.count).toBe(1);
   expect(second.histograms.transportAcceptanceMs.count).toBe(0);
-  metrics.stop();
-  expect(metrics.read().closedWindows).toEqual([]);
+  perfMetrics.stop();
+  expect(perfMetrics.read().closedWindows).toEqual([]);
 });

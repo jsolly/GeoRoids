@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { type FileHandle, mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import {
@@ -274,6 +275,78 @@ async function stopAndSaveTrace(session: CDPSession, outputPath: string): Promis
   return artifact;
 }
 
+type ActiveTraceSession = {
+  session: CDPSession | undefined;
+  started: boolean;
+};
+
+function assignTraceArtifact(artifact: TraceArtifact): void {
+  traceArtifact = artifact;
+}
+
+function createTraceStopper(
+  runtime: ActiveTraceSession,
+  outputPath: string | undefined,
+  onArtifact: (artifact: TraceArtifact) => void
+) {
+  return async () => {
+    const artifact = await stopActiveTraceSession(runtime, outputPath);
+    if (artifact) {
+      onArtifact(artifact);
+    }
+  };
+}
+
+async function stopActiveTraceSession(
+  runtime: ActiveTraceSession,
+  outputPath: string | undefined
+): Promise<TraceArtifact | undefined> {
+  if (!runtime.session) {
+    return undefined;
+  }
+  let capturedArtifact: TraceArtifact | undefined;
+  const session = runtime.session;
+  runtime.session = undefined;
+  let stopFailure: unknown;
+  let stopFailed = false;
+  try {
+    if (runtime.started) {
+      assert(outputPath);
+      try {
+        const artifact = await stopAndSaveTrace(session, outputPath);
+        capturedArtifact = artifact;
+        assert(!artifact.dataLossOccurred, 'Chromium tracing reported data loss');
+      } catch (error) {
+        if (error instanceof TraceCaptureError) {
+          capturedArtifact = error.artifact;
+        }
+        stopFailed = true;
+        stopFailure = error;
+      }
+    }
+  } finally {
+    runtime.started = false;
+  }
+  let detachFailure: unknown;
+  let detachFailed = false;
+  try {
+    await withTimeout(session.detach(), TRACE_COMPLETION_TIMEOUT_MS, 'Chromium tracing CDP detach');
+  } catch (error) {
+    detachFailed = true;
+    detachFailure = error;
+  }
+  if (stopFailed) {
+    if (detachFailed) {
+      throw new AggregateError([stopFailure, detachFailure], 'Trace stop or detach failed');
+    }
+    throw stopFailure;
+  }
+  if (detachFailed) {
+    throw detachFailure;
+  }
+  return capturedArtifact;
+}
+
 function advertisedContentLength(response: PlaywrightResponse): number | undefined {
   const value = response.headers()['content-length'];
   if (value === undefined) {
@@ -285,7 +358,7 @@ function advertisedContentLength(response: PlaywrightResponse): number | undefin
 
 function bundleFileName(url: string, sha256: string): string {
   const name = new URL(url).pathname.split('/').at(-1) || 'bundle.js';
-  const safeName = name.replace(/[^A-Za-z0-9._-]/g, '_');
+  const safeName = name.replace(/[^A-Za-z0-9._-]/gu, '_');
   return `${safeName}-${sha256}.js`;
 }
 
@@ -450,9 +523,9 @@ function createMeasurement(): Measurement | undefined {
     'recoveryMs',
     'inputToRenderMs',
   ]) {
-    const values = metricSamples(name);
-    if (values.length > 0) {
-      samples[name] = values;
+    const metricValues = metricSamples(name);
+    if (metricValues.length > 0) {
+      samples[name] = metricValues;
     }
   }
   const primaryMetric = samples['frameCpuMs']
@@ -477,7 +550,10 @@ function createMeasurement(): Measurement | undefined {
       successfulScenarios: runs.filter((run) => run['status'] === 'passed').length,
       failedScenarios: runs.filter((run) => run['status'] === 'failed').length,
       measuredIntervals: measuredIntervals.length,
-      rawSamples: Object.values(samples).reduce((sum, values) => sum + values.length, 0),
+      rawSamples: Object.values(samples).reduce(
+        (sum, sampleValues) => sum + sampleValues.length,
+        0
+      ),
     },
     parameters: {
       browser: values.browser,
@@ -506,7 +582,7 @@ function createMeasurement(): Measurement | undefined {
   };
 }
 
-async function drain(page: Page): Promise<Interval> {
+function drain(page: Page): Promise<Interval> {
   return page.evaluate(() => {
     assertAvailable();
     function assertAvailable() {
@@ -551,7 +627,7 @@ try {
         assert(
           typeof renderer === 'string' &&
             renderer.length > 0 &&
-            !/swiftshader|llvmpipe|software/i.test(renderer),
+            !/swiftshader|llvmpipe|software/iu.test(renderer),
           'Requested GPU path lacks an observed hardware renderer'
         );
       }
@@ -819,14 +895,13 @@ try {
       await writeFile(values['cpu-profile'], JSON.stringify(profile));
       await session.detach();
     }
-    let traceSession: CDPSession | undefined;
-    let traceStarted = false;
-    async function startTrace() {
+    const traceRuntime: ActiveTraceSession = { session: undefined, started: false };
+    const startTrace = async () => {
       if (!tracePath) {
         return;
       }
       const session = await context.newCDPSession(page);
-      traceSession = session;
+      traceRuntime.session = session;
       await session.send('Tracing.start', {
         transferMode: 'ReturnAsStream',
         streamFormat: 'json',
@@ -839,55 +914,9 @@ try {
           includedCategories: TRACE_CATEGORIES.split(','),
         },
       });
-      traceStarted = true;
-    }
-    async function stopTrace() {
-      if (!traceSession) {
-        return;
-      }
-      const session = traceSession;
-      traceSession = undefined;
-      let stopFailure: unknown;
-      let stopFailed = false;
-      try {
-        if (traceStarted) {
-          assert(tracePath);
-          try {
-            traceArtifact = await stopAndSaveTrace(session, tracePath);
-            assert(!traceArtifact.dataLossOccurred, 'Chromium tracing reported data loss');
-          } catch (error) {
-            if (error instanceof TraceCaptureError) {
-              traceArtifact = error.artifact;
-            }
-            stopFailed = true;
-            stopFailure = error;
-          }
-        }
-      } finally {
-        traceStarted = false;
-      }
-      let detachFailure: unknown;
-      let detachFailed = false;
-      try {
-        await withTimeout(
-          session.detach(),
-          TRACE_COMPLETION_TIMEOUT_MS,
-          'Chromium tracing CDP detach'
-        );
-      } catch (error) {
-        detachFailed = true;
-        detachFailure = error;
-      }
-      if (stopFailed) {
-        if (detachFailed) {
-          throw new AggregateError([stopFailure, detachFailure], 'Trace stop or detach failed');
-        }
-        throw stopFailure;
-      }
-      if (detachFailed) {
-        throw detachFailure;
-      }
-    }
+      traceRuntime.started = true;
+    };
+    const stopTrace = createTraceStopper(traceRuntime, tracePath, assignTraceArtifact);
     async function markTraceMeasurementEnd(): Promise<void> {
       if (!traceMeasurementStarted || traceMeasurementEndAttempted || !tracePath) {
         return;
@@ -935,7 +964,7 @@ try {
         });
         await cpuSession.send('Network.enable');
       }
-      async function calibrate() {
+      function calibrate() {
         return page.evaluate(() => {
           const start = performance.now();
           let result = 0;
@@ -990,7 +1019,7 @@ try {
       const networkProbes: Array<{ route: string; milliseconds: number; bytes: number }> = [];
       const networkRoutes: string[] = [
         healthUrl,
-        socketUrl.replace(/^ws:/, 'http:').replace(/\/ws$/, '/health'),
+        socketUrl.replace(/^ws:/u, 'http:').replace(/\/ws$/u, '/health'),
       ];
       for (const route of networkRoutes) {
         for (let i = 0; i < 3; i++) {
@@ -1089,18 +1118,25 @@ try {
           }),
         'Browser gameplay did not use owned endpoint'
       );
+      const protocolPeerFail = (error: unknown) => {
+        errors.push(String(error));
+      };
+      const protocolPeerOptions = (_index: number) => ({
+        url: new URL(`${socketUrl}?asteroidInteractions=1`),
+        measuring: () => measuring,
+        fail: protocolPeerFail,
+        deliveryBudget: () => delivery,
+        repeatMeasuredPings: false,
+      });
       for (let index = 0; index < (workload === 'combat' ? 4 : 0); index++) {
         await delay(1500);
-        const peer = new Pilot(index, {
-          url: new URL(`${socketUrl}?asteroidInteractions=1`),
-          measuring: () => measuring,
-          fail: (error) => errors.push(String(error)),
-          deliveryBudget: () => delivery,
-          repeatMeasuredPings: false,
-        });
+        const peer = new Pilot(index, protocolPeerOptions(index));
         peers.push(peer);
         const deadline = performance.now() + 10_000;
-        while (!peer.state && performance.now() < deadline) {
+        while (!peer.state) {
+          if (performance.now() >= deadline) {
+            break;
+          }
           await delay(25);
         }
         assert(peer.state, 'Protocol peer failed admission');
@@ -1365,11 +1401,17 @@ try {
           // Keep offered work on the clock, independent of the previous frame's
           // observation cost. Missed slots are reported, never replayed in bursts.
           nextSlot += (missedSlots + 1) * 1000;
-          if (peers.some((peer, index) => peer.gameJoins !== preparedJoins[index])) {
+          const peerJoinsChanged = (expectedJoins: number[]) =>
+            peers.some((peer, index) => peer.gameJoins !== expectedJoins[index]);
+          const awaitingPeerState = () => peers.some((peer) => !peer.state);
+          if (peerJoinsChanged(preparedJoins)) {
             const restartAt = performance.now();
             await releaseInput();
             const deadline = performance.now() + 10_000;
-            while (peers.some((peer) => !peer.state) && performance.now() < deadline) {
+            while (awaitingPeerState()) {
+              if (performance.now() >= deadline) {
+                break;
+              }
               await delay(25);
             }
             assert(
@@ -1859,9 +1901,11 @@ try {
         while (performance.now() < deadline) {
           const response = await fetch(healthUrl, { signal: AbortSignal.timeout(1_000) });
           assert(response.ok, 'Departure health request failed');
-          const health: unknown = await response.json();
-          assert(health && typeof health === 'object' && 'world' in health);
-          const world = health.world;
+          const departureHealth: unknown = await response.json();
+          assert(
+            departureHealth && typeof departureHealth === 'object' && 'world' in departureHealth
+          );
+          const world = departureHealth.world;
           assert(
             world &&
               typeof world === 'object' &&

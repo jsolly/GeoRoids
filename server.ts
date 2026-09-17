@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
+import process from 'node:process';
 import { readServerConfiguration } from './server/configuration';
 import { createServerInstance } from './server/createServer';
 import { SERVER_RELEASE_ID } from './server/release';

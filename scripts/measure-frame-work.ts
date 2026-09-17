@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import process from 'node:process';
 import { parseArgs } from 'node:util';
 import { runClientSample } from '../benchmarks/client';
 import { evaluateFrameWorkBudget } from '../benchmarks/frame-work-budget';

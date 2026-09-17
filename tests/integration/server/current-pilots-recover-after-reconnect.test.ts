@@ -11,6 +11,8 @@ import type { ServerGameSnapshot } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { snapshotFixture } from '../../unit/network/snapshotFixture';
 
+const RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
+
 let cleanup: (() => Promise<void>) | undefined;
 afterEach(async () => {
   try {
@@ -172,7 +174,7 @@ test('current sockets render matching worlds across late join and reconnect', as
   assert.ok(joined && typeof joined === 'object' && 'resumeToken' in joined);
   assert.equal(typeof joined.resumeToken, 'string');
   const token = joined.resumeToken as string;
-  expect(token).toMatch(/^[a-f0-9]{64}$/);
+  expect(token).toMatch(RESUME_TOKEN_PATTERN);
   const preservedPosition = { ...secondPlayer.position };
   const closed = once(second.socket, 'close', { signal: AbortSignal.timeout(2_000) });
   second.socket.close();

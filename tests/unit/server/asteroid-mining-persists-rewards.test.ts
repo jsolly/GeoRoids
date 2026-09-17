@@ -17,8 +17,8 @@ const stores: WorldStore[] = [];
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {
-  for (const store of stores.splice(0)) {
-    store.close();
+  for (const closedStore of stores.splice(0)) {
+    closedStore.close();
   }
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -153,13 +153,19 @@ test('a collaborative laser break commits fragments and every contributor score 
   expect(firstMiner.score).toBe(ROID.POINTS_LARGE);
   expect(secondMiner.score).toBe(ROID.POINTS_LARGE);
   const saved = worldStore.loadPilots();
-  expect(saved.find((pilot) => pilot.id === firstMiner.id)?.score).toBe(ROID.POINTS_LARGE);
-  expect(saved.find((pilot) => pilot.id === secondMiner.id)?.score).toBe(ROID.POINTS_LARGE);
+  expect(saved.find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
+    ROID.POINTS_LARGE
+  );
+  expect(saved.find((savedPilot) => savedPilot.id === secondMiner.id)?.score).toBe(
+    ROID.POINTS_LARGE
+  );
   const rows = worldStore.loadSector('0,0');
   assert(rows);
-  expect(rows.some((rock) => rock.id === target.id)).toBe(false);
+  expect(rows.some((sectorRock) => sectorRock.id === target.id)).toBe(false);
   expect(
-    result.newAsteroids.every((fragment) => rows.some((rock) => rock.id === fragment.id))
+    result.newAsteroids.every((fragment) =>
+      rows.some((sectorRock) => sectorRock.id === fragment.id)
+    )
   ).toBe(true);
 });
 
@@ -180,10 +186,12 @@ test('expired collaborative mining credits an offline miner and Surveyor before 
   expect(expired[0]?.contributors).toEqual([miner.id, surveyor.id]);
   expect(active.score).toBe(0);
   expect(surveyor.score).toBe(ROID.POINTS_LARGE);
-  expect(worldStore.loadPilots().find((pilot) => pilot.id === miner.id)?.score).toBe(
+  expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === miner.id)?.score).toBe(
     ROID.POINTS_LARGE
   );
-  expect(worldStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
+  expect(worldStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
+  );
 });
 
 test('a high-HP rock credits an offline first Hauler when a second Hauler finishes it', () => {
@@ -201,10 +209,12 @@ test('a high-HP rock credits an offline first Hauler when a second Hauler finish
   expect(engine.handleAsteroidDamage(target.id, terminalMiner.id).destroyed).toBe(true);
 
   expect(terminalMiner.score).toBe(ROID.POINTS_LARGE);
-  expect(worldStore.loadPilots().find((pilot) => pilot.id === firstMiner.id)?.score).toBe(
+  expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_LARGE
   );
-  expect(worldStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
+  expect(worldStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
+  );
 });
 
 test('a regional unload and reload keeps partial mining contributors on the rock', () => {
@@ -230,7 +240,7 @@ test('a regional unload and reload keeps partial mining contributors on the rock
 
   expect(engine.handleAsteroidDamage(reloaded.id, terminalMiner.id).destroyed).toBe(true);
   expect(terminalMiner.score).toBe(ROID.POINTS_LARGE);
-  expect(worldStore.loadPilots().find((pilot) => pilot.id === firstMiner.id)?.score).toBe(
+  expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_LARGE
   );
 });
@@ -250,10 +260,12 @@ test('a metal chip credits an offline first Hauler when a Surveyor lands the ter
   expect(engine.handleAsteroidHit(target.id, terminalMiner.id, 'laser').outcome).toBe('destroyed');
 
   expect(terminalMiner.score).toBe(ROID.POINTS_MEDIUM);
-  expect(worldStore.loadPilots().find((pilot) => pilot.id === firstMiner.id)?.score).toBe(
+  expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_MEDIUM
   );
-  expect(worldStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
+  expect(worldStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
+  );
 });
 
 test('a partially mined high-HP rock keeps its offline contributor after restart', () => {
@@ -282,10 +294,12 @@ test('a partially mined high-HP rock keeps its offline contributor after restart
     true
   );
   expect(terminalMiner.score).toBe(ROID.POINTS_LARGE);
-  expect(resumedStore.loadPilots().find((pilot) => pilot.id === firstMiner.id)?.score).toBe(
-    ROID.POINTS_LARGE
+  expect(
+    resumedStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score
+  ).toBe(ROID.POINTS_LARGE);
+  expect(resumedStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
   );
-  expect(resumedStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
 });
 
 test('a partially mined metal deposit keeps its offline contributor after restart', () => {
@@ -315,10 +329,12 @@ test('a partially mined metal deposit keeps its offline contributor after restar
     'destroyed'
   );
   expect(terminalMiner.score).toBe(ROID.POINTS_MEDIUM);
-  expect(resumedStore.loadPilots().find((pilot) => pilot.id === firstMiner.id)?.score).toBe(
-    ROID.POINTS_MEDIUM
+  expect(
+    resumedStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score
+  ).toBe(ROID.POINTS_MEDIUM);
+  expect(resumedStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
   );
-  expect(resumedStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
 });
 
 test('an accidental hull break preserves credit for an offline miner and Surveyor', () => {
@@ -340,9 +356,13 @@ test('an accidental hull break preserves credit for an offline miner and Surveyo
   expect(result.newAsteroids).toHaveLength(0);
   expect(rammer.score).toBe(ROID.POINTS_LARGE);
   for (const id of [miner.id, surveyor.id]) {
-    expect(worldStore.loadPilots().find((pilot) => pilot.id === id)?.score).toBe(ROID.POINTS_LARGE);
+    expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === id)?.score).toBe(
+      ROID.POINTS_LARGE
+    );
   }
-  expect(worldStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
+  expect(worldStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
+  );
 });
 
 test('a terminal reflected shot credits the offline pilot who first charged the rock', () => {
@@ -374,11 +394,13 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
 
   expect(engine.getAsteroid(target.id)).toBeUndefined();
   expect(second.score).toBe(ROID.POINTS_MEDIUM);
-  expect(worldStore.loadPilots().find((pilot) => pilot.id === first.id)?.score).toBe(
+  expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === first.id)?.score).toBe(
     ROID.POINTS_MEDIUM
   );
   expect(engine.getLoot().filter((drop) => drop.kind === 'laserCore')).toHaveLength(1);
-  expect(worldStore.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
+  expect(worldStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
+    false
+  );
 });
 
 test.each(['ice', 'rubble'] as const)(
@@ -411,7 +433,9 @@ test.each(['ice', 'rubble'] as const)(
       expect(saved?.find((rock) => rock.id === fragment.id)?.position).toEqual(fragment.position);
     }
     expect(
-      worldStore.loadSector(sectorAt(target.position).id)?.some((rock) => rock.id === target.id)
+      worldStore
+        .loadSector(sectorAt(target.position).id)
+        ?.some((sectorRock) => sectorRock.id === target.id)
     ).toBe(false);
     const savedPilots = worldStore.loadPilots();
     for (const miner of [firstMiner, secondMiner]) {

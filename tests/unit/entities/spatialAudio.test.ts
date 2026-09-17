@@ -18,6 +18,17 @@ import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 const listener = { x: 400, y: 300 };
 const viewport = { width: 800, height: 600 };
 
+beforeEach(() => {
+  localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
+  resetGameAudio();
+});
+
+afterEach(() => {
+  resetGameAudio();
+  vi.restoreAllMocks();
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.soundOn);
+});
+
 test('automatic thrust stays silent while firing still plays its sound', () => {
   bindGameAudio({ getListenerPosition: () => listener, getViewport: () => viewport });
   const player = new Player({
@@ -36,17 +47,6 @@ test('automatic thrust stays silent while firing still plays its sound', () => {
   expect(play).not.toHaveBeenCalled();
   player.ship.shoot();
   expect(play).toHaveBeenCalledOnce();
-});
-
-beforeEach(() => {
-  localStorage.setItem(LOCAL_STORAGE_KEYS.soundOn, 'true');
-  resetGameAudio();
-});
-
-afterEach(() => {
-  resetGameAudio();
-  vi.restoreAllMocks();
-  localStorage.removeItem(LOCAL_STORAGE_KEYS.soundOn);
 });
 
 test('sound with no position plays at full volume', () => {
@@ -185,7 +185,7 @@ test('every laser uses the same laser sound instance', () => {
   expect(getLaserSound()).toBeInstanceOf(Sound);
 });
 
-test('server exploding flag plays once for a remote and a second update does not', async () => {
+test('server exploding flag plays once for a remote and a second update does not', () => {
   bindGameAudio({
     getListenerPosition: () => listener,
     getViewport: () => viewport,

@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest';
 import { inspectReleaseEvidence } from '../../../benchmarks/release-evidence';
 
+const IDENTITY_CHANGED_ERROR_PATTERN = /identity changed/u;
+const IDENTITY_WITNESS_ERROR_PATTERN = /identity witness/u;
+
 const interval = {
   clientReleaseId: 'client-a',
   serverReleaseId: 'server-a',
@@ -43,6 +46,8 @@ test('independent server health cannot change even when every client interval ag
       [interval, interval],
       [...health, { measured: true, data: { releaseId: 'server-b' } }]
     )
-  ).toThrow(/identity changed/);
-  expect(() => inspectReleaseEvidence([interval, interval], [])).toThrow(/identity witness/);
+  ).toThrow(IDENTITY_CHANGED_ERROR_PATTERN);
+  expect(() => inspectReleaseEvidence([interval, interval], [])).toThrow(
+    IDENTITY_WITNESS_ERROR_PATTERN
+  );
 });

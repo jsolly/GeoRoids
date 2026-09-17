@@ -4,7 +4,7 @@ import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { PlayerNetwork } from '../../../src/entities/player/playerNetwork';
 import * as shipRenderer from '../../../src/entities/ship/shipRenderer';
 import { NetworkManager } from '../../../src/network/networkManager';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { logger } from '../../../src/utils/Logger';
 
 import { TestPath2D } from '../../support/TestPath2D';

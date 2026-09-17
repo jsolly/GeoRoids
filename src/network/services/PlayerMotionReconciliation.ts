@@ -32,7 +32,8 @@ export class PlayerMotionReconciliation {
   }
 
   public shouldSuppressPose(): boolean {
-    return this.waitingForResume || (!!this.motion && this.motion.mode !== 'free');
+    const motion = this.motion;
+    return this.waitingForResume || (motion !== undefined && motion.mode !== 'free');
   }
 
   public shouldSuppressShipMove(): boolean {
@@ -83,7 +84,7 @@ export class PlayerMotionReconciliation {
     }
     const newEpoch = !previous || state.epoch !== previous.epoch;
     const resumed = this.waitingForResume;
-    const wasConstrained = !!previous && previous.mode !== 'free';
+    const wasConstrained = previous !== undefined && previous.mode !== 'free';
     if (newEpoch || resumed) {
       this.nextPoseSequence = state.ack + 1;
     } else {

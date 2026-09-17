@@ -57,7 +57,7 @@ export class Sound {
     );
   }
 
-  async play(volumeScale = 1): Promise<void> {
+  play(volumeScale = 1): void {
     const howl = this.howl;
     const scale = boundedScale(volumeScale);
     // Howler queues unloaded/suspended play calls. Never submit stale game cues.
@@ -97,11 +97,13 @@ export function setSound(pref: boolean): void {
 
 /** volumeScale is 1 for local/full volume; 0 skips playback. */
 export function playSound(sound: Sound, volumeScale = 1): void {
-  sound.play(volumeScale).catch((error: unknown) => {
+  try {
+    sound.play(volumeScale);
+  } catch (error: unknown) {
     logger.error(
       'SOUND',
       'Unexpected sound playback failure',
       error instanceof Error ? error : new Error(String(error))
     );
-  });
+  }
 }

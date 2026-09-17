@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { initTitleTerrain } from '../../../src/rendering/titleTerrain';
 
+const TITLE_TERRAIN_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
 const originalViewport = { width: window.innerWidth, height: window.innerHeight };
 const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
 
@@ -46,7 +47,7 @@ test.each([
   expect(stroke.mock.calls.length).toBeGreaterThan(10);
   expect(labels.mock.calls.length).toBeGreaterThan(2);
   for (const [label] of labels.mock.calls) {
-    expect(label).toMatch(/^-?\d+\.\d{2}$/);
+    expect(label).toMatch(TITLE_TERRAIN_LABEL_PATTERN);
   }
   expect(arc).not.toHaveBeenCalled();
   const paintCount = stroke.mock.calls.length;

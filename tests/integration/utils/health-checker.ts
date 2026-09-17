@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { TestConfig } from './test-config';
 
 const REQUEST_TIMEOUT_MS = 5000;
+const HTTP_SCHEME_PATTERN = /^http/u;
 
 async function httpGet(url: string): Promise<{ ok: boolean; body: string }> {
   const response = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
@@ -50,9 +51,9 @@ export async function checkViteServer(): Promise<boolean> {
   }
 }
 
-async function checkWebSocketGameplayEndpoint(): Promise<boolean> {
+function checkWebSocketGameplayEndpoint(): Promise<boolean> {
   return new Promise((resolve) => {
-    const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/, 'ws')}/ws?asteroidInteractions=1`;
+    const wsUrl = `${TestConfig.SERVER_URL.replace(HTTP_SCHEME_PATTERN, 'ws')}/ws?asteroidInteractions=1`;
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
       ws.close();
@@ -97,7 +98,7 @@ export async function checkAllServers(): Promise<void> {
   }
 
   if (!wsHealthy || !viteHealthy || !wsEndpointHealthy) {
-    const errors = [];
+    const errors: string[] = [];
     if (!wsHealthy) {
       errors.push('WebSocket server not running');
     }

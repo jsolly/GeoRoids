@@ -17,7 +17,9 @@ export function preferDeathCause(...causes: Array<string | undefined>): string |
 }
 
 /** Human-readable environmental cause; never identify another crew pilot as a killer. */
-export function describeDeathCause(cause: string | undefined): string {
+export function describeDeathCause(
+  cause: string | undefined
+): 'an asteroid' | 'the arena wall' | 'a ricochet' | 'unknown' {
   switch (cause) {
     case 'asteroid':
     case 'an asteroid':
@@ -67,6 +69,7 @@ export function isStaleGameOverSnapshot(params: {
   if (drop <= 1 || params.nextLives > 0) {
     return false;
   }
-  const looksDead = params.exploding || (params.health !== undefined && params.health <= 0);
+  const looksDead =
+    (params.exploding ?? false) || (params.health !== undefined && params.health <= 0);
   return !looksDead;
 }

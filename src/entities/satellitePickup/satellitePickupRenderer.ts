@@ -1,6 +1,6 @@
 import type { Position } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
-import { canvasManager } from '../../rendering/canvas';
+import { canvasManager } from '../../rendering/canvasSurface';
 import { resolveGlow } from '../../rendering/renderQuality';
 import { drawEoSatelliteOutline } from '../satellite/eoOutlines';
 import type { SatellitePickup } from './SatellitePickup';

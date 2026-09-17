@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
+import process from 'node:process';
 import { createServerInstance } from '../server/createServer';
 import { flushServerLogs } from '../setup/serverLogger';
 import { startFixtureControl } from './fixture-control';

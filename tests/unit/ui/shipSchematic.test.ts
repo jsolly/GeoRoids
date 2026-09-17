@@ -4,10 +4,10 @@ import {
   closeShipSchematic,
   equipUtility,
   initializeShipSchematic,
-  isShipSchematicOpen,
   openShipSchematic,
   SHIP_SCHEMATIC_IDS,
 } from '../../../src/ui/shipSchematic';
+import { isShipSchematicOpen } from '../../../src/ui/shipSchematicState';
 
 describe('Hauler ship schematic overlay', () => {
   const releaseInput = vi.fn();
@@ -54,7 +54,9 @@ describe('Hauler ship schematic overlay', () => {
     window.addEventListener('gameSchematicOpen', opened);
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', bubbles: true }));
     expect(isShipSchematicOpen()).toBe(true);
-    expect(document.getElementById(SHIP_SCHEMATIC_IDS.dialog)?.hasAttribute('open')).toBe(true);
+    expect(document.querySelector(`#${SHIP_SCHEMATIC_IDS.dialog}`)?.hasAttribute('open')).toBe(
+      true
+    );
     expect(releaseInput).toHaveBeenCalled();
     expect(opened).toHaveBeenCalledOnce();
 
@@ -66,8 +68,9 @@ describe('Hauler ship schematic overlay', () => {
     document.dispatchEvent(blocked);
     expect(blocked.defaultPrevented).toBe(true);
 
-    const ret = document.getElementById(SHIP_SCHEMATIC_IDS.return) as HTMLButtonElement;
-    ret.click();
+    const ret = document.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.return}`);
+    expect(ret).toBeInstanceOf(HTMLButtonElement);
+    ret?.click();
     expect(isShipSchematicOpen()).toBe(false);
     window.removeEventListener('gameSchematicOpen', opened);
   });
@@ -79,11 +82,11 @@ describe('Hauler ship schematic overlay', () => {
     const tap = document.querySelector('[data-utility-id="resource_tap"]');
     expect(tow?.classList.contains('is-active')).toBe(true);
     expect(tap?.classList.contains('is-active')).toBe(false);
-    expect(document.getElementById(SHIP_SCHEMATIC_IDS.title)?.textContent).toBe('Tow Cable');
+    expect(document.querySelector(`#${SHIP_SCHEMATIC_IDS.title}`)?.textContent).toBe('Tow Cable');
 
     equipUtility('resource_tap');
     expect(tap?.classList.contains('is-active')).toBe(true);
-    expect(document.getElementById(SHIP_SCHEMATIC_IDS.copy)?.textContent).toContain(
+    expect(document.querySelector(`#${SHIP_SCHEMATIC_IDS.copy}`)?.textContent).toContain(
       'Keeps the asteroid intact'
     );
     closeShipSchematic();

@@ -15,10 +15,10 @@ type ScoreboardCapture = {
   hasFactionFields: boolean;
 };
 
-async function captureScoreboard(page: import('playwright').Page): Promise<ScoreboardCapture> {
+function captureScoreboard(page: import('playwright').Page): Promise<ScoreboardCapture> {
   return page.evaluate(() => {
     const controller = window.gameController;
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.querySelector('#gameCanvas');
     if (!controller || !(canvas instanceof HTMLCanvasElement)) {
       throw new Error('Crew scoreboard fixture requires the game controller and canvas');
     }
@@ -35,6 +35,7 @@ async function captureScoreboard(page: import('playwright').Page): Promise<Score
     const drawnText: string[] = [];
     const originalFillText = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (
+      this: CanvasRenderingContext2D,
       text: string,
       x: number,
       y: number,

@@ -72,7 +72,7 @@ export function fillSnapshotEntityIds(
 export function pruneStaleRemotePlayers<T extends { type: string }>(
   players: Map<string, T>,
   snapshotEntityIds: ReadonlySet<string>
-): number {
+) {
   let removed = 0;
   for (const [id, player] of players) {
     if (player.type === 'remote' && !snapshotEntityIds.has(id)) {
@@ -87,7 +87,7 @@ export function pruneStaleRemotePlayers<T extends { type: string }>(
 export function pruneDuplicateOwnRemotes<T extends { name: string; type: string }>(
   players: Map<string, T>,
   localPlayerName: string
-): number {
+) {
   if (!localPlayerName) {
     return 0;
   }

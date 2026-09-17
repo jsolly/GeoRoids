@@ -54,6 +54,8 @@ export function playLootPickup(kind: LootKind, position?: Position): void {
     case 'tap':
       playInteraction(fxLootPickup, position);
       return;
+    default:
+      throw new Error(`Unexpected loot kind: ${kind}`);
   }
 }
 

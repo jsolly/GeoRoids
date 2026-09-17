@@ -61,8 +61,8 @@ class EntityFactory {
   }
 
   createRoid(config: RoidConfig = {}): Roid {
-    const position = config.position || getRandomPositionInAsteroidField();
-    const size = config.size || 15; // Default medium size
+    const position = config.position ?? getRandomPositionInAsteroidField();
+    const size = config.size ?? 15; // Default medium size
     return new Roid(position, size, config.id);
   }
 
@@ -87,7 +87,7 @@ class EntityFactory {
   }
 
   private instantiatePlayer(config: PlayerConfig): Player {
-    const id = config.id || uuidv4();
+    const id = config.id ?? uuidv4();
     return new Player({
       id,
       name: config.name,

@@ -1,8 +1,11 @@
 import fs, { promises as fsPromises } from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
 import { SERVER_RELEASE_ID } from '../server/release';
 import { createLogRecord, stringifyLogRecord } from '../shared/logRecords';
 import type { DiagnosticLogRecord } from '../shared-types';
+
+const CATEGORIZED_LOG_MESSAGE_PATTERN = /^[A-Z][A-Z0-9_]{1,31}$/u;
 
 export enum ServerLogLevel {
   ERROR = 0,
@@ -348,7 +351,7 @@ function splitServerArguments(
   message: string;
   context?: unknown;
 } {
-  const categorized = /^[A-Z][A-Z0-9_]{1,31}$/.test(message) && typeof args[0] === 'string';
+  const categorized = CATEGORIZED_LOG_MESSAGE_PATTERN.test(message) && typeof args[0] === 'string';
   const renderedMessage = categorized ? (args.shift() as string) : message;
   const category = categorized ? message : undefined;
   const context = args.length === 0 ? undefined : args.length === 1 ? args[0] : { arguments: args };

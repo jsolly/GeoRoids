@@ -1,5 +1,5 @@
 import { clientPerformance } from '../diagnostics/performanceMetrics';
-import { canvasManager } from '../rendering/canvas';
+import { canvasManager } from '../rendering/canvasSurface';
 import '../ui/mainMenu'; // wires nickname + Enter Game listeners
 import { reportRenderError } from '../rendering/renderError';
 import { initNetworkStatusUI } from '../ui/networkStatus';

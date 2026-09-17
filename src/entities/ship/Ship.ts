@@ -17,7 +17,6 @@ import type {
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
 import { GAME, PALETTE, SHIP } from '../../constants';
-import { NetworkManager } from '../../network/networkManager';
 import { getCompletedSectors } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { isGenericDeathCause } from '../../utils/deathCause';
@@ -33,6 +32,7 @@ import {
   canActivateAbility,
   tickAbilityHost,
 } from './shipAbilities';
+import { getShipCombatNetwork } from './shipCombatNetwork';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
 import {
   applyShipSpawnProtection,
@@ -54,18 +54,18 @@ class Ship {
   angle: number = (90 / 180) * Math.PI;
   blinkCount: number = 0;
   spawnProtectionTimer: number = 0;
-  canShoot = true;
+  canShoot: boolean = true;
   /** Constrained/released/handoff transforms are advanced by the negotiated predictor. */
-  serverOwnsMotion = false;
+  serverOwnsMotion: boolean = false;
   playerMotion?: PlayerMotionState;
   laserUpgrade?: LaserUpgrade;
 
-  exploding = false;
+  exploding: boolean = false;
   lasers: Laser[] = [];
   explodeTime = 0;
   angularVelocity = 0;
-  thrusting = false;
-  boosting = false;
+  thrusting: boolean = false;
+  boosting: boolean = false;
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
 
@@ -236,17 +236,13 @@ class Ship {
     }
     const kit = getShipKit(this.kitId);
     if (this.isLocalPlayer) {
-      const networkManager = NetworkManager.getInstance();
-      if (networkManager.isConnected) {
+      const network = getShipCombatNetwork();
+      if (network?.isConnected) {
         // The server owns the ability result and cooldown. An optimistic toggle
         // can be undone by an older snapshot or disagree about eligible cargo.
-        return networkManager.sendMessage({
-          type: 'useAbility',
-          id: networkManager.getLocalPlayerId(),
-          data: {
-            kitId: this.kitId,
-            abilityId: kit.abilityId,
-          },
+        return network.sendAbility({
+          kitId: this.kitId,
+          abilityId: kit.abilityId,
         });
       }
     }
@@ -274,13 +270,13 @@ class Ship {
   }
 
   private sendShootEvent(laser: Laser): void {
-    const networkManager = NetworkManager.getInstance();
-    if (networkManager.isConnected) {
+    const network = getShipCombatNetwork();
+    if (network?.isConnected) {
       logger.debug('SHIP', 'Sending shoot event', {
         position: laser.position,
         velocity: laser.velocity,
       });
-      networkManager.sendShootEvent(laser);
+      network.sendShoot(laser);
     } else {
       logger.debug('SHIP', 'Network not connected, cannot send shoot event');
     }

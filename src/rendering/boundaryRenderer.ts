@@ -2,7 +2,7 @@ import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { getGameBoundary } from '../physics/boundary';
 import { logger } from '../utils/Logger';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 import { resolveGlow } from './renderQuality';
 

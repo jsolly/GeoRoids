@@ -31,7 +31,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 function escapeHtml(text: string): string {
   return text.replace(
-    /[&<>"']/g,
+    /[&<>"']/gu,
     (char) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char
   );

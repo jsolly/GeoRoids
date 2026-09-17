@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import process from 'node:process';
+import { describe, expect, it as test, vi } from 'vitest';
 import { PerformanceBudget } from '../../../benchmarks/performance-budget';
 
 describe('network performance observations are reported without notifications', () => {
-  it('retains exceeded thresholds and worse samples without emitting warnings', () => {
+  test('retains exceeded thresholds and worse samples without emitting warnings', () => {
     const output = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     try {
       const budget = new PerformanceBudget();
@@ -38,7 +39,7 @@ describe('network performance observations are reported without notifications', 
       output.mockRestore();
     }
   });
-  it('still rejects invalid measurements or limits', () => {
+  test('still rejects invalid measurements or limits', () => {
     const budget = new PerformanceBudget();
     for (const value of [NaN, Infinity, -1]) {
       expect(() => budget.observe('gap', value, 250)).toThrow();

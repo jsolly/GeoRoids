@@ -11,7 +11,7 @@ import {
   resetWorldExploration,
   setCompletedSectors,
 } from '../../../src/network/worldExploration';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -87,7 +87,7 @@ describe('shared ship motion helper', () => {
     expect(next.y).toBeCloseTo((-Math.sin(angle) * SHIP.THRUST) / GAME.FPS);
 
     const capped = applyThrustOrFriction({ x: 20, y: 0 }, 0, true, GAME.FRICTION);
-    const speed = Math.sqrt(capped.x * capped.x + capped.y * capped.y);
+    const speed = Math.hypot(capped.x, capped.y);
     expect(SHIP.MAX_VELOCITY).toBe(2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });

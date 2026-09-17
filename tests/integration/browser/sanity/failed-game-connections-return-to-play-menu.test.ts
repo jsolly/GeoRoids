@@ -4,6 +4,7 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+const WS_PATH_PATTERN = /\/ws(?:\?|$)/u;
 
 test('a failed initial connection returns to Play and a retry joins the live arena', async () => {
   const page = browserManager.getCurrentPage();
@@ -13,7 +14,7 @@ test('a failed initial connection returns to Play and a retry joins the live are
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   let unavailable = true;
-  await page.routeWebSocket(/\/ws(?:\?|$)/, (socket) => {
+  await page.routeWebSocket(WS_PATH_PATTERN, (socket) => {
     if (unavailable) {
       socket.close({ code: 1013, reason: 'Temporary server outage' });
     } else {
@@ -24,7 +25,7 @@ test('a failed initial connection returns to Play and a retry joins the live are
   await page.locator('#start-game').click();
   await page.waitForFunction(() =>
     document
-      .getElementById('network-status-banner')
+      .querySelector('#network-status-banner')
       ?.textContent?.includes('Select Enter Game to try again')
   );
   expect(await page.locator('#start-game').isVisible()).toBe(true);

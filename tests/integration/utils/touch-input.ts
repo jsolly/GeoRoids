@@ -62,7 +62,7 @@ type TouchControlState = {
   boosting: boolean;
 };
 
-export async function readTouchControlState(page: Page): Promise<TouchControlState> {
+export function readTouchControlState(page: Page): Promise<TouchControlState> {
   return page.evaluate(() => {
     const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
     if (!ship) {
@@ -96,7 +96,7 @@ type TouchControlLayout = {
   boost: TouchControlBox | null;
 };
 
-export async function readTouchControlLayout(page: Page): Promise<TouchControlLayout> {
+export function readTouchControlLayout(page: Page): Promise<TouchControlLayout> {
   return page.evaluate(() => {
     const box = (element: Element | null): TouchControlBox | null => {
       if (!element) {
@@ -115,8 +115,8 @@ export async function readTouchControlLayout(page: Page): Promise<TouchControlLa
       viewport: { width: window.innerWidth, height: window.innerHeight },
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
       canvas: box(canvas),
-      ability: box(document.getElementById('touch-ability')),
-      boost: box(document.getElementById('touch-boost')),
+      ability: box(document.querySelector('#touch-ability')),
+      boost: box(document.querySelector('#touch-boost')),
     };
   });
 }

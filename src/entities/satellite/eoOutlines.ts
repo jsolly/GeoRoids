@@ -153,7 +153,7 @@ export function drawEoSatelliteOutline(
 export function serializeEoSatelliteSvg(typeId: EoOutlineId): string {
   const outline: EoOutline = EO_OUTLINES[typeId];
   const paths = outline.lines.map((line) => {
-    const points = [];
+    const points: string[] = [];
     for (let i = 0; i < line.length; i += 2) {
       points.push(`${line[i]},${line[i + 1]}`);
     }

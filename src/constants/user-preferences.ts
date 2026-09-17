@@ -12,7 +12,7 @@ export function soundIsOn(): boolean {
 
 // Initialize checkbox state from stored preference (only in browser environment)
 if (typeof document !== 'undefined') {
-  const defaultSoundPref = document.getElementById('soundPref') as HTMLInputElement;
+  const defaultSoundPref = document.querySelector('#soundPref') as HTMLInputElement;
   if (defaultSoundPref) {
     defaultSoundPref.checked = soundIsOn();
   }

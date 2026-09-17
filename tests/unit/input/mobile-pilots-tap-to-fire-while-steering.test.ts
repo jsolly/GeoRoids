@@ -4,7 +4,7 @@ import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import { initializeTouchControls, tickTouchControls } from '../../../src/input/touchControls';
-import { canvasManager } from '../../../src/rendering/canvas';
+import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 let player: Player;
 let canvas: HTMLCanvasElement;
@@ -129,7 +129,7 @@ test('an interrupted tap never fires, and losing focus clears both held fingers'
 
 test('ability buttons do not create playfield shots or change steering', () => {
   const shoot = vi.spyOn(player.ship, 'shoot');
-  const ability = document.getElementById('touch-ability');
+  const ability = document.querySelector('#touch-ability');
   expect(ability).toBeTruthy();
   if (!ability) {
     throw new Error('Missing ability button');
@@ -145,7 +145,7 @@ test('ability buttons do not create playfield shots or change steering', () => {
 });
 
 test('Boost tap starts a stronger cruise and a second tap returns to cruise', () => {
-  const boost = document.getElementById('touch-boost');
+  const boost = document.querySelector('#touch-boost');
   expect(boost).toBeTruthy();
   if (!boost) {
     throw new Error('Missing boost button');
@@ -167,7 +167,7 @@ test('a delayed pointer click cannot repeat an ability, while a following semant
   vi.useFakeTimers();
   try {
     const activate = vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
-    const ability = document.getElementById('touch-ability');
+    const ability = document.querySelector<HTMLButtonElement>('#touch-ability');
     if (!ability) {
       throw new Error('Missing ability button');
     }
@@ -209,7 +209,7 @@ test('holding a finger starts steering, and release cancels its target without s
 });
 
 test('an action tap during a pending hold still lets a second canvas finger start steering and fire', () => {
-  const ability = document.getElementById('touch-ability');
+  const ability = document.querySelector('#touch-ability');
   if (!ability) {
     throw new Error('Missing ability button');
   }

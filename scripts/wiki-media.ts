@@ -14,6 +14,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import process from 'node:process';
 import { createCanvas } from 'canvas';
 import { AsteroidManager } from '../server/core/AsteroidManager';
 import type { GameEntity } from '../server/core/EntityManager';
@@ -1895,7 +1896,10 @@ function verifyExistingOutput(output: string, expectedManifest: MediaManifest): 
       readFileSync(join(output, 'manifest.json'), 'utf8')
     ) as MediaManifest;
   } catch (error) {
-    throw new Error(`wiki-media verification failed: unreadable manifest (${String(error)})`);
+    throw new Error(
+      `wiki-media verification failed: unreadable manifest (${error instanceof Error ? error.message : JSON.stringify(error)})`,
+      { cause: error }
+    );
   }
   invariant(
     actualManifest.version === expectedManifest.version &&

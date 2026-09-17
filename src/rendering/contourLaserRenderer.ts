@@ -3,7 +3,7 @@ import { PALETTE, VISUAL } from '../constants';
 import { type ContourLaserTick, contourLaserTickInto } from '../physics/terrain/contourLaser';
 import { getTerrainField } from '../physics/terrain/terrainSession';
 import { hexToRgba } from '../utils/colorUtils';
-import { canvasManager } from './canvas';
+import { canvasManager } from './canvasSurface';
 import { PLAYFIELD_CLOSE_SCALE } from './playfieldCamera';
 
 const viewPad = 40;

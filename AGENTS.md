@@ -57,9 +57,10 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | **Project** | `georoids` (`jsollys-projects`) |
 | **Production URLs** | **Canonical:** <https://www.georoids.com>; **apex:** <https://georoids.com> (redirects to www); **Vercel default:** `https://georoids-jsollys-projects.vercel.app` |
-| **Build** | `npm run build` → `dist/` (Vite; framework auto-detected — no `vercel.json` required) |
-| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration |
-| **Local deploy** | None — no `npm run deploy` or CLI deploy step |
+| **Build** | `npm run build` → `dist/` (Vite; framework auto-detected) |
+| **Trigger** | Merge to `main` after the pre-commit gate and PR CI; Vercel GitHub integration. Branch pushes do **not** create Preview deployments (`vercel.json` `git.deploymentEnabled`). |
+| **Opt-in Preview** | Comment `/preview` on a same-repo PR (owner/member/collaborator User), or run workflow **Vercel Preview** with the PR number. GitHub runs that workflow from `main`. One-shot: new commits do not rebuild until you ask again. Requires GitHub secret `VERCEL_TOKEN`. Agents must not comment `/preview` unless the user asked. |
+| **Local deploy** | None — no `npm run deploy` or CLI deploy step from `/ship` |
 
 **Required Vercel production env vars:**
 

@@ -4,7 +4,7 @@ import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
-import { GROWTH } from '../../../shared/shipGrowth';
+import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function collectorAt(position: { x: number; y: number }): GameEntity {
@@ -69,5 +69,34 @@ describe('LootManager destroy-drop shards', () => {
     manager.expire(21, [collectorAt({ x: 0, y: 0 })]);
     const after = manager.get(shard.id);
     expect(after?.position.x).toBeCloseTo(80 - GROWTH.LOOT_MAGNET_ACCEL * (2 + GROWTH.LOOT_DRAG));
+  });
+
+  test('a Hauler collects a shard that a same-mass Surveyor still misses', () => {
+    const manager = new LootManager(new RNGService(7));
+    const engine = new GameEngine(7);
+    try {
+      const surveyor = engine.addPlayer(
+        'scout',
+        'Scout',
+        new RecordingSocket(),
+        { x: 0, y: 0 },
+        'surveyor'
+      );
+      const hauler = engine.addPlayer(
+        'barge',
+        'Barge',
+        new RecordingSocket(),
+        { x: 0, y: 0 },
+        'hauler'
+      );
+      const justPastSurveyor = radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS + 4;
+      const shard = manager.spawnShard({ x: justPastSurveyor, y: 0 }, 20);
+      const collected = manager.collectOverlaps([surveyor, hauler]);
+      expect(collected).toEqual([
+        { collector: hauler, loot: expect.objectContaining({ id: shard.id }) },
+      ]);
+    } finally {
+      engine.stopGameLoop();
+    }
   });
 });

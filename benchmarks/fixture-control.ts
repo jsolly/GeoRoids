@@ -5,9 +5,9 @@ import { createConnection, createServer, type Socket } from 'node:net';
 import WebSocket from 'ws';
 import type { createServerInstance } from '../server/createServer';
 import { serverPerformanceMetrics } from '../server/performanceMetrics';
-import { radiusFromMass, resetShipMass } from '../shared/shipGrowth';
+import { resetShipMass } from '../shared/shipGrowth';
 import type { AsteroidData } from '../shared-types';
-import { applyShipKitStats } from '../src/entities/ship/shipKits';
+import { applyShipKitStats, hullRadiusForKit } from '../src/entities/ship/shipKits';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -158,7 +158,9 @@ export async function startFixtureControl(
           for (const other of actors.slice(index + 1)) {
             assert(
               Math.hypot(actor.position.x - other.position.x, actor.position.y - other.position.y) >
-                radiusFromMass(actor.mass) + radiusFromMass(other.mass) + 20,
+                hullRadiusForKit(actor.kitId, actor.mass) +
+                  hullRadiusForKit(other.kitId, other.mass) +
+                  20,
               'Fixture hulls overlap'
             );
           }
@@ -171,7 +173,7 @@ export async function startFixtureControl(
                   actor.position.x - asteroid.position.x,
                   actor.position.y - asteroid.position.y
                 ) >
-                radiusFromMass(actor.mass) + asteroid.size + 20
+                hullRadiusForKit(actor.kitId, actor.mass) + asteroid.size + 20
             );
           if (!clearsHulls()) {
             const angle = index * 2.399963229728653;

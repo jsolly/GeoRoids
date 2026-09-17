@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
+import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import { Player } from '../../../src/entities/player/Player';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { canDrawHaulerHarpoon } from '../../../src/entities/ship/shipRenderer';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 
@@ -75,4 +77,28 @@ test('remote Hauler matches the same server latch', () => {
   remote.updateFromServer({ harpoonTargetId: null });
   expect(remote.ship.harpoonTargetId).toBeNull();
   expect(canDrawHaulerHarpoon(remote.ship)).toBe(false);
+});
+
+test('a Hauler snapshot keeps the barge hull instead of the Surveyor growth radius', () => {
+  const local = new Player({
+    id: 'alice',
+    name: 'Alice',
+    type: 'local',
+    input: new MockPlayerInput(),
+    kitId: 'hauler',
+  });
+  local.updateFromServer({ mass: GROWTH.BASE_MASS });
+  expect(local.ship.r).toBe(hullRadiusForKit('hauler', GROWTH.BASE_MASS));
+  expect(local.ship.r).toBeGreaterThan(radiusFromMass(GROWTH.BASE_MASS));
+
+  const remote = new Player({
+    id: 'bob',
+    name: 'Bob',
+    type: 'remote',
+    input: new MockPlayerInput(),
+    kitId: 'surveyor',
+  });
+  remote.updateFromServer({ kitId: 'hauler', mass: GROWTH.SOFT_MAX_MASS });
+  expect(remote.ship.kitId).toBe('hauler');
+  expect(remote.ship.r).toBe(hullRadiusForKit('hauler', GROWTH.SOFT_MAX_MASS));
 });

@@ -16,7 +16,11 @@ import type {
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
-import { applyShipKitStats, DEFAULT_SHIP_KIT_ID } from '../../src/entities/ship/shipKits';
+import {
+  applyShipKitStats,
+  DEFAULT_SHIP_KIT_ID,
+  hullRadiusForKit,
+} from '../../src/entities/ship/shipKits';
 import { applyShockwaveToBody } from '../../src/physics/shockwave';
 import type { RNGService } from './RNGService';
 
@@ -98,13 +102,16 @@ export class EntityManager {
   /** Kick living ships away from a collab-split origin. Smaller ships move more. */
   public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
     let affected = 0;
-    const shipSize = SHIP.SIZE / 2;
     for (const entity of this.entities.values()) {
       if (entity.exploding || entity.health <= 0 || entity.respawnTimer !== undefined) {
         continue;
       }
       const next = applyShockwaveToBody(
-        { position: entity.position, velocity: entity.velocity, size: shipSize },
+        {
+          position: entity.position,
+          velocity: entity.velocity,
+          size: hullRadiusForKit(entity.kitId, entity.mass),
+        },
         origin,
         { radius, impulse }
       );

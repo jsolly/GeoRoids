@@ -13,6 +13,7 @@ import {
   thrustScaleFromMass,
 } from '../../../shared/shipGrowth';
 import { SHIP } from '../../../src/constants';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 
 describe('ship growth math', () => {
   test('base mass matches the stock hull and HP', () => {
@@ -67,8 +68,26 @@ describe('ship growth math', () => {
     const origin = { x: 0, y: 0 };
     const nearby = { x: radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS - 1, y: 0 };
     const far = { x: radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS + 4, y: 0 };
-    expect(lootOverlap(origin, GROWTH.BASE_MASS, nearby, GROWTH.LOOT_RADIUS)).toBe(true);
-    expect(lootOverlap(origin, GROWTH.BASE_MASS, far, GROWTH.LOOT_RADIUS)).toBe(false);
+    expect(lootOverlap(origin, radiusFromMass(GROWTH.BASE_MASS), nearby, GROWTH.LOOT_RADIUS)).toBe(
+      true
+    );
+    expect(lootOverlap(origin, radiusFromMass(GROWTH.BASE_MASS), far, GROWTH.LOOT_RADIUS)).toBe(
+      false
+    );
+  });
+
+  test('a larger kit hull reaches loot that a Surveyor hull still misses', () => {
+    const origin = { x: 0, y: 0 };
+    const justPastSurveyor = {
+      x: radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS + 4,
+      y: 0,
+    };
+    expect(
+      lootOverlap(origin, hullRadiusForKit('surveyor'), justPastSurveyor, GROWTH.LOOT_RADIUS)
+    ).toBe(false);
+    expect(
+      lootOverlap(origin, hullRadiusForKit('hauler'), justPastSurveyor, GROWTH.LOOT_RADIUS)
+    ).toBe(true);
   });
 
   test('loot magnet adds pull toward the nearest ship without replacing velocity', () => {

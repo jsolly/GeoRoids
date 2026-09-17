@@ -6,7 +6,7 @@ import {
   isResourceTapUtility,
   isTowCableUtility,
 } from './haulerUtility';
-import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
+import { getShipKit, hullRadiusForKit, SHIP_ABILITY, type ShipAbilityId } from './shipKits';
 import { attachTowCable, tickTowCable } from './towCable';
 
 export interface AbilityHost {
@@ -25,7 +25,7 @@ export interface AbilityHost {
   haulerUtility?: HaulerUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
-  r?: number;
+  mass?: number;
 }
 
 /** Asteroid geometry shared by offline ability simulation and authoritative towing. */
@@ -164,19 +164,23 @@ function bodyRadius(body: Pick<AbilityBody, 'r' | 'size'>): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
+function hostHullRadius(host: Pick<AbilityHost, 'kitId' | 'mass'>): number {
+  return hullRadiusForKit(host.kitId, host.mass);
+}
+
 /** Gap from hull to hull. Negative means the ship is inside the target. */
 export function harpoonSurfaceGap(
-  host: Pick<AbilityHost, 'position' | 'r'>,
+  host: Pick<AbilityHost, 'position' | 'kitId' | 'mass'>,
   body: AbilityBody
 ): number {
   const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
-  return dist - bodyRadius(host) - bodyRadius(body);
+  return dist - hostHullRadius(host) - bodyRadius(body);
 }
 
 const NEAREST_GAP_TIE_WU = 24;
 
 function pickNearestHarpoonBody(
-  host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
+  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId' | 'mass'>,
   bodies: readonly AbilityBody[],
   range: number
 ): AbilityBody | undefined {
@@ -188,7 +192,7 @@ function pickNearestHarpoonBody(
     const dx = body.position.x - host.position.x;
     const dy = body.position.y - host.position.y;
     const dist = Math.hypot(dx, dy);
-    const gap = dist - bodyRadius(host) - bodyRadius(body);
+    const gap = dist - hostHullRadius(host) - bodyRadius(body);
     if (gap > range) {
       continue;
     }
@@ -208,7 +212,7 @@ function pickNearestHarpoonBody(
 }
 
 export function findHarpoonTarget(
-  host: Pick<AbilityHost, 'position' | 'angle' | 'r'>,
+  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId' | 'mass'>,
   bodies: readonly AbilityBody[],
   range: number = SHIP_ABILITY.HARPOON_RANGE
 ): AbilityBody | undefined {
@@ -235,7 +239,7 @@ export function diagnoseHarpoonLatch(host: AbilityHost, world?: AbilityWorld): H
   let nearest: HarpoonDiagnosis['nearest'];
   for (const body of candidates) {
     const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
-    const gap = dist - bodyRadius(host) - bodyRadius(body);
+    const gap = dist - hostHullRadius(host) - bodyRadius(body);
     let reason = 'ok';
     if (!isHarpoonableBody(body)) {
       reason = 'rejected';

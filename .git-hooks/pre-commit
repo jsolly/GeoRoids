@@ -16,7 +16,7 @@ gate_require_node               # enforce the pinned Node (.nvmrc), not whatever
 # --- Quality gate (run_step: silent on green, full output + abort on red) ---
 run_step "dep grounding" gate_check_dep_grounding .git-hooks/pre-commit scripts/*.sh .railway/railway.ts
 run_step "lint policy" npm run check:lint-policy
-run_step "lint"   npm run lint
+run_step "lint"   npm run check:lint
 run_step "knip"   npm run check:knip
 run_step "ts-prune" npm run check:ts-prune
 run_step "markdown lint" npm run check:md

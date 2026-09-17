@@ -13,4 +13,12 @@ describe('roid score helpers', () => {
     expect(pointsForRoidSize(25)).toBe(ROID.POINTS_MEDIUM);
     expect(pointsForRoidSize(12)).toBe(ROID.POINTS_SMALL);
   });
+
+  test('score buckets change at the medium and collab-split sizes', () => {
+    expect(pointsForRoidSize(0)).toBe(ROID.POINTS_SMALL);
+    expect(pointsForRoidSize(19.9)).toBe(ROID.POINTS_SMALL);
+    expect(pointsForRoidSize(20)).toBe(ROID.POINTS_MEDIUM);
+    expect(pointsForRoidSize(39.9)).toBe(ROID.POINTS_MEDIUM);
+    expect(pointsForRoidSize(ROID.COLLAB_SPLIT_MIN_SIZE)).toBe(ROID.POINTS_LARGE);
+  });
 });

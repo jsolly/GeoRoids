@@ -78,7 +78,7 @@
     "server/core/CollisionAuthority.ts",
     "src/constants/index.ts",
     "tests/unit/entities/asteroids.test.ts",
-    "tests/unit/entities/asteroidPoints.test.ts",
+    "tests/unit/entities/roidScore.test.ts",
     "tests/unit/entities/mineral-asteroids-break-with-distinct-rewards.test.ts",
     "tests/unit/entities/asteroidSplitting.test.ts",
     "tests/unit/physics/lasers-bounce-on-asteroid-faces.test.ts",

@@ -219,6 +219,12 @@ stop_watchdog() {
 
 on_test_timeout() {
     TEST_TIMED_OUT=true
+    if [ -n "${TEST_PID:-}" ]; then
+        terminate_process_tree "$TEST_PID" || true
+        # Fail closed: never resume waiting after the deadline has fired.
+        kill -KILL "$TEST_PID" 2>/dev/null || true
+        TEST_PID=""
+    fi
 }
 
 cleanup() {
@@ -507,6 +513,7 @@ run_tests() {
 
     VITEST_MAX_WORKERS=1 "${vitest_command[@]}" "${test_args[@]}" &
     TEST_PID=$!
+    local test_wait_pid="$TEST_PID"
     TEST_TIMED_OUT=false
     (
         trap 'exit 0' INT TERM
@@ -517,8 +524,21 @@ run_tests() {
     ) &
     WATCHDOG_PID=$!
 
-    wait "$TEST_PID"
-    local exit_code=$?
+    local exit_code=0
+    local wait_status=0
+    while :; do
+        wait "$test_wait_pid"
+        wait_status=$?
+        if [ "$TEST_TIMED_OUT" = true ]; then
+            exit_code=124
+            break
+        fi
+        if [ "$wait_status" -gt 128 ] && kill -0 "$test_wait_pid" 2>/dev/null; then
+            continue
+        fi
+        exit_code="$wait_status"
+        break
+    done
 
     if ! stop_watchdog && [ "$exit_code" -eq 0 ]; then
         exit_code=1
@@ -526,8 +546,10 @@ run_tests() {
 
     if [ "$TEST_TIMED_OUT" = true ]; then
         echo "❌ Tests exceeded ${MAX_TEST_DURATION_SECONDS}s; terminating the owned test process tree" >&2
-        if terminate_process_tree "$TEST_PID"; then
-            TEST_PID=""
+        if [ -n "${TEST_PID:-}" ]; then
+            if terminate_process_tree "$TEST_PID"; then
+                TEST_PID=""
+            fi
         fi
         return 124
     fi

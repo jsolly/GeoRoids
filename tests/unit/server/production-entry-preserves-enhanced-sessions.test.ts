@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRailwayContext, project, type ServiceNode } from 'railway/iac';
 import { afterEach, expect, test } from 'vitest';
@@ -49,7 +50,7 @@ function worldDirectory(): string {
   return directory;
 }
 
-async function start(
+function start(
   port = 0,
   worldPath: string | null = join(worldDirectory(), 'world.sqlite'),
   mountPath: string | null = worldPath === null ? null : dirname(worldPath),
@@ -60,7 +61,7 @@ async function start(
     throw new Error('Railway IaC service start command is missing');
   }
   output = '';
-  const [command, ...args] = railwayStartCommand.split(/\s+/);
+  const [command, ...args] = railwayStartCommand.split(/\s+/u);
   if (!command) {
     throw new Error('Railway start command is empty');
   }
@@ -95,7 +96,7 @@ async function start(
   });
   return waitFor(
     () => {
-      const match = output.match(/Server listening on port (\d+)/);
+      const match = output.match(/Server listening on port (\d+)/u);
       return match ? Number(match[1]) : undefined;
     },
     'actual production listener',
@@ -343,7 +344,7 @@ test('the actual production entry rejects stale upgrades, keeps HTTP/logs, and r
   const original = await pilot(port);
   const joined = await original.join('entry-pilot');
   expect(joined).toMatchObject({ id: 'entry-pilot', snapshotVersion: 1, asteroidInteractions: 1 });
-  expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/);
+  expect(joined['resumeToken']).toMatch(/^[a-f0-9]{64}$/u);
   const before = await observer.state();
   const epoch = before.entities.find((row) => row.id === 'entry-pilot')?.playerMotion?.epoch;
   expect(epoch).toBeGreaterThan(0);

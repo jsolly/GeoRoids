@@ -177,17 +177,17 @@ export class ConnectionManager {
   // A same-socket rejoin may receive already-queued current snapshots before
   // its new joined acknowledgment. This records the protocol established by
   // the prior acknowledgment without reopening compatibility fallback.
-  private currentProtocolReady = false;
+  private currentProtocolReady: boolean = false;
   private resumeToken?: string;
   private readonly motionReconciliation = new PlayerMotionReconciliation();
-  private snapshotResyncPending = false;
+  private snapshotResyncPending: boolean = false;
 
   private clientId: string;
   private localPlayerName: string = '';
   private localPlayerId: string = '';
   private allPlayers: Map<string, Player> = new Map();
   private seenAsteroidIds: Set<string> = new Set(); // Track asteroids we've already seen
-  private hasInitializedAsteroidsForConnection = false;
+  private hasInitializedAsteroidsForConnection: boolean = false;
   private readonly playerListCache = new PlayerListCache<Player>();
   private readonly snapshotEntityIds = new Set<string>();
   private readonly taggedAsteroidIds = new Set<string>();
@@ -204,16 +204,16 @@ export class ConnectionManager {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastServerMessageAt = 0;
   private joinCompletionTimer: ReturnType<typeof setTimeout> | null = null;
-  private joinCompletionPending = false;
-  private joinAcknowledged = false;
-  private shotAcknowledgements = false;
+  private joinCompletionPending: boolean = false;
+  private joinAcknowledged: boolean = false;
+  private shotAcknowledgements: boolean = false;
   private joinWait?: { resolve: (ok: boolean) => void };
 
   // Only unexpected closes retry; terminal join failures already report an error.
   private disconnectReason: 'requested' | 'join-failed' | null = null;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private hasConnectedOnce = false;
+  private hasConnectedOnce: boolean = false;
   private connectPromise: Promise<void> | null = null;
   private cancelPendingConnect: ((error: Error) => void) | null = null;
   private connectionId = '';
@@ -261,7 +261,7 @@ export class ConnectionManager {
     if (this.state.isConnected) {
       return;
     }
-    if (this.connectPromise) {
+    if (this.connectPromise !== null) {
       return this.connectPromise;
     }
     this.disconnectReason = null;
@@ -404,7 +404,11 @@ export class ConnectionManager {
             logger.error(
               'NETWORK',
               'Failed to parse server message',
-              error instanceof Error ? error : new Error(String(error))
+              error instanceof Error
+                ? error
+                : new Error(typeof error === 'string' ? error : JSON.stringify(error), {
+                    cause: error,
+                  })
             );
             clientPerformance.count('messageFailures');
           } finally {
@@ -717,7 +721,7 @@ export class ConnectionManager {
     // Get the local player's color from the player manager
     const playerManager = PlayerManager.getInstance();
     const localPlayer = playerManager.getLocalPlayer();
-    return localPlayer?.color || PALETTE.LOCAL;
+    return localPlayer?.color ?? PALETTE.LOCAL;
   }
 
   private getLocalPlayerPosition(): { x: number; y: number } {
@@ -869,7 +873,7 @@ export class ConnectionManager {
 
     logger.debug('NETWORK', 'Sending join message', {
       id: this.clientId,
-      resumable: !!this.resumeToken,
+      resumable: Boolean(this.resumeToken),
       clientReleaseId: getClientReleaseId(),
       ...readStoredResumeProvenance(),
     });
@@ -1322,16 +1326,14 @@ export class ConnectionManager {
             }
           }
 
-          if (!entity) {
-            entity = entityFactory.createPlayer({
-              id: entityData.id,
-              name: entityData.name,
-              type: 'remote',
-              color: entityData.color,
-              ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
-              position: entityData.position,
-            });
-          }
+          entity ??= entityFactory.createPlayer({
+            id: entityData.id,
+            name: entityData.name,
+            type: 'remote',
+            color: entityData.color,
+            ...(entityData.kitId !== undefined ? { kitId: entityData.kitId } : {}),
+            position: entityData.position,
+          });
 
           this.rememberPlayer(entityData.id, entity);
         } else if (isLocalPlayer && localPlayer && entity !== localPlayer) {

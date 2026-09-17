@@ -10,7 +10,7 @@ import { localPlayerId, observeLaser, parkLaserClient } from './laser-observatio
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 /** Observe the real animation loop and real core strokes while the shoot packet is in flight. */
-async function paintedShotFrames(page: Page) {
+function paintedShotFrames(page: Page) {
   return page.evaluate(
     async ({ coreWidth, coreLength, coreColor }) => {
       const original = CanvasRenderingContext2D.prototype.stroke;
@@ -18,11 +18,19 @@ async function paintedShotFrames(page: Page) {
       const originalLineTo = CanvasRenderingContext2D.prototype.lineTo;
       let from = { x: 0, y: 0 };
       let to = { x: 0, y: 0 };
-      CanvasRenderingContext2D.prototype.moveTo = function (x: number, y: number) {
+      CanvasRenderingContext2D.prototype.moveTo = function (
+        this: CanvasRenderingContext2D,
+        x: number,
+        y: number
+      ) {
         from = { x, y };
         originalMoveTo.call(this, x, y);
       };
-      CanvasRenderingContext2D.prototype.lineTo = function (x: number, y: number) {
+      CanvasRenderingContext2D.prototype.lineTo = function (
+        this: CanvasRenderingContext2D,
+        x: number,
+        y: number
+      ) {
         to = { x, y };
         originalLineTo.call(this, x, y);
       };
@@ -119,7 +127,7 @@ for (const touch of [false, true]) {
       const delayedShots: Array<() => void> = [];
       let holdShots = true;
       let snapshots = 0;
-      await page.routeWebSocket(/\/ws(?:\?|$)/, (socket) => {
+      await page.routeWebSocket(/\/ws(?:\?|$)/u, (socket) => {
         const server = socket.connectToServer();
         socket.onMessage((message) => {
           const packet = JSON.parse(String(message));
@@ -178,7 +186,7 @@ for (const touch of [false, true]) {
         }
         await page.waitForFunction(() => {
           const shots = window.gameController?.getPlayerManager().getLocalShip()?.lasers;
-          return shots?.length === 1 && !!shots[0]?.serverId;
+          return shots?.length === 1 && Boolean(shots[0]?.serverId);
         });
         expect(consoleProblems).toEqual([]);
       } finally {

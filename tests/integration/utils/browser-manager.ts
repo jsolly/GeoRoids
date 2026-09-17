@@ -64,7 +64,8 @@ export class BrowserManager {
       } catch (closeError: unknown) {
         throw new AggregateError(
           [error, closeError],
-          'Browser context failed while creating a scenario page'
+          'Browser context failed while creating a scenario page',
+          { cause: error }
         );
       }
       throw error;
@@ -144,7 +145,7 @@ export class BrowserManager {
   }
 
   /** Open an additional independent browser context for a multi-client scenario. */
-  async createAdditionalPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  createAdditionalPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
     return this.createPage(options);
   }
 

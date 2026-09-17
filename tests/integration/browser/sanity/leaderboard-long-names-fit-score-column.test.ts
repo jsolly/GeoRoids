@@ -21,7 +21,7 @@ type RenderedText = {
   font: string;
 };
 
-async function captureLeaderboardRow(page: import('playwright').Page): Promise<RenderedText[]> {
+function captureLeaderboardRow(page: import('playwright').Page): Promise<RenderedText[]> {
   return page.evaluate(
     ({ longName, wideScore }) => {
       const win = window as typeof window & {
@@ -31,6 +31,7 @@ async function captureLeaderboardRow(page: import('playwright').Page): Promise<R
 
       const originalFillText = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function (
+        this: CanvasRenderingContext2D,
         text: string,
         x: number,
         y: number,
@@ -88,7 +89,7 @@ async function verifyViewport(
   await page.setViewportSize({ width, height });
   await page.waitForFunction(
     ({ expectedWidth, expectedHeight }) => {
-      const canvas = document.getElementById('gameCanvas');
+      const canvas = document.querySelector('#gameCanvas');
       return (
         canvas instanceof HTMLCanvasElement &&
         canvas.width === expectedWidth &&

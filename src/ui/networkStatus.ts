@@ -16,7 +16,7 @@ function getOrCreateBanner(): HTMLElement | null {
   if (typeof document === 'undefined') {
     return null;
   }
-  let el = document.getElementById(BANNER_ID);
+  let el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
   if (!el) {
     el = document.createElement('div');
     el.id = BANNER_ID;
@@ -59,7 +59,7 @@ export function hideNetworkBanner(): void {
   if (typeof document === 'undefined') {
     return;
   }
-  const el = document.getElementById(BANNER_ID);
+  const el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
   if (el) {
     el.style.display = 'none';
   }
@@ -69,7 +69,7 @@ export function isNetworkBannerVisible(): boolean {
   if (typeof document === 'undefined') {
     return false;
   }
-  const el = document.getElementById(BANNER_ID);
+  const el = document.querySelector<HTMLElement>(`#${BANNER_ID}`);
   return el !== null && el.style.display !== 'none';
 }
 

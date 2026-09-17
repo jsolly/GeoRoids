@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { type FileHandle, mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import {
@@ -285,7 +286,7 @@ function advertisedContentLength(response: PlaywrightResponse): number | undefin
 
 function bundleFileName(url: string, sha256: string): string {
   const name = new URL(url).pathname.split('/').at(-1) || 'bundle.js';
-  const safeName = name.replace(/[^A-Za-z0-9._-]/g, '_');
+  const safeName = name.replace(/[^A-Za-z0-9._-]/gu, '_');
   return `${safeName}-${sha256}.js`;
 }
 
@@ -450,9 +451,9 @@ function createMeasurement(): Measurement | undefined {
     'recoveryMs',
     'inputToRenderMs',
   ]) {
-    const values = metricSamples(name);
-    if (values.length > 0) {
-      samples[name] = values;
+    const metricValues = metricSamples(name);
+    if (metricValues.length > 0) {
+      samples[name] = metricValues;
     }
   }
   const primaryMetric = samples['frameCpuMs']
@@ -477,7 +478,10 @@ function createMeasurement(): Measurement | undefined {
       successfulScenarios: runs.filter((run) => run['status'] === 'passed').length,
       failedScenarios: runs.filter((run) => run['status'] === 'failed').length,
       measuredIntervals: measuredIntervals.length,
-      rawSamples: Object.values(samples).reduce((sum, values) => sum + values.length, 0),
+      rawSamples: Object.values(samples).reduce(
+        (sum, sampleValues) => sum + sampleValues.length,
+        0
+      ),
     },
     parameters: {
       browser: values.browser,
@@ -506,7 +510,7 @@ function createMeasurement(): Measurement | undefined {
   };
 }
 
-async function drain(page: Page): Promise<Interval> {
+function drain(page: Page): Promise<Interval> {
   return page.evaluate(() => {
     assertAvailable();
     function assertAvailable() {
@@ -551,7 +555,7 @@ try {
         assert(
           typeof renderer === 'string' &&
             renderer.length > 0 &&
-            !/swiftshader|llvmpipe|software/i.test(renderer),
+            !/swiftshader|llvmpipe|software/iu.test(renderer),
           'Requested GPU path lacks an observed hardware renderer'
         );
       }
@@ -935,7 +939,7 @@ try {
         });
         await cpuSession.send('Network.enable');
       }
-      async function calibrate() {
+      function calibrate() {
         return page.evaluate(() => {
           const start = performance.now();
           let result = 0;
@@ -990,7 +994,7 @@ try {
       const networkProbes: Array<{ route: string; milliseconds: number; bytes: number }> = [];
       const networkRoutes: string[] = [
         healthUrl,
-        socketUrl.replace(/^ws:/, 'http:').replace(/\/ws$/, '/health'),
+        socketUrl.replace(/^ws:/u, 'http:').replace(/\/ws$/u, '/health'),
       ];
       for (const route of networkRoutes) {
         for (let i = 0; i < 3; i++) {
@@ -1859,9 +1863,11 @@ try {
         while (performance.now() < deadline) {
           const response = await fetch(healthUrl, { signal: AbortSignal.timeout(1_000) });
           assert(response.ok, 'Departure health request failed');
-          const health: unknown = await response.json();
-          assert(health && typeof health === 'object' && 'world' in health);
-          const world = health.world;
+          const departureHealth: unknown = await response.json();
+          assert(
+            departureHealth && typeof departureHealth === 'object' && 'world' in departureHealth
+          );
+          const world = departureHealth.world;
           assert(
             world &&
               typeof world === 'object' &&

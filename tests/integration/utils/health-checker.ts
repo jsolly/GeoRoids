@@ -50,9 +50,9 @@ export async function checkViteServer(): Promise<boolean> {
   }
 }
 
-async function checkWebSocketGameplayEndpoint(): Promise<boolean> {
+function checkWebSocketGameplayEndpoint(): Promise<boolean> {
   return new Promise((resolve) => {
-    const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/, 'ws')}/ws?asteroidInteractions=1`;
+    const wsUrl = `${TestConfig.SERVER_URL.replace(/^http/u, 'ws')}/ws?asteroidInteractions=1`;
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
       ws.close();
@@ -97,7 +97,7 @@ export async function checkAllServers(): Promise<void> {
   }
 
   if (!wsHealthy || !viteHealthy || !wsEndpointHealthy) {
-    const errors = [];
+    const errors: string[] = [];
     if (!wsHealthy) {
       errors.push('WebSocket server not running');
     }

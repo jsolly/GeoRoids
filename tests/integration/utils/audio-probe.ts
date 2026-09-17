@@ -51,7 +51,7 @@ export async function installAudioProbe(page: Page, enabled = true): Promise<voi
       }
     };
     const setValueAtTime = AudioParam.prototype.setValueAtTime;
-    AudioParam.prototype.setValueAtTime = function (value, startTime) {
+    AudioParam.prototype.setValueAtTime = function (this: AudioParam, value, startTime) {
       const result = setValueAtTime.call(this, value, startTime);
       const event = rates.get(this);
       if (event) {
@@ -62,7 +62,12 @@ export async function installAudioProbe(page: Page, enabled = true): Promise<voi
     };
     const start = AudioBufferSourceNode.prototype.start;
     const stop = AudioBufferSourceNode.prototype.stop;
-    AudioBufferSourceNode.prototype.start = function (when = 0, offset = 0, duration?: number) {
+    AudioBufferSourceNode.prototype.start = function (
+      this: AudioBufferSourceNode,
+      when = 0,
+      offset = 0,
+      duration?: number
+    ) {
       if (duration === undefined) {
         start.call(this, when, offset);
       } else {
@@ -92,7 +97,7 @@ export async function installAudioProbe(page: Page, enabled = true): Promise<voi
       );
       publish();
     };
-    AudioBufferSourceNode.prototype.stop = function (when = 0) {
+    AudioBufferSourceNode.prototype.stop = function (this: AudioBufferSourceNode, when = 0) {
       stop.call(this, when);
       // Immediate stops release voices now; scheduled synth stops finish through ended.
       if (when <= this.context.currentTime) {

@@ -28,11 +28,13 @@ function flight() {
   const ship = new Ship({ kitId: 'hauler' });
   const prediction = new PlayerMotionReconciliation();
   const reconcile = () => {
-    const row = engine.getGameState().entities.find((row) => row.id === actor.id);
-    if (!row) {
+    const entityRow = engine
+      .getGameState()
+      .entities.find((candidateRow) => candidateRow.id === actor.id);
+    if (!entityRow) {
       throw new Error('Pilot snapshot unavailable');
     }
-    prediction.rebase(row, ship, clock.now());
+    prediction.rebase(entityRow, ship, clock.now());
     ship.serverOwnsMotion = prediction.shouldSuppressShipMove();
   };
   reconcile();

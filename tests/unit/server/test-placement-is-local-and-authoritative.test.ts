@@ -66,7 +66,7 @@ async function pilot() {
   return { ...fixture, socket, player };
 }
 
-async function post(origin: string, body: unknown) {
+function post(origin: string, body: unknown) {
   return fetch(`${origin}/test/place-player`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -100,8 +100,8 @@ test('120 belt motion ticks reuse each roid vector pair', () => {
     { position: { x: 10, y: 4 }, velocity: { x: 1, y: -0.5 } },
     { position: { x: -20, y: 8 }, velocity: { x: -1, y: 0.25 } },
   ];
-  const positions = roids.map((roid) => roid.position);
-  const velocities = roids.map((roid) => roid.velocity);
+  const positions = roids.map((body) => body.position);
+  const velocities = roids.map((body) => body.velocity);
 
   for (let tick = 0; tick < 120; tick++) {
     for (const body of roids) {

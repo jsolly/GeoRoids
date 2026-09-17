@@ -4,10 +4,10 @@ import {
   closeShipSchematic,
   equipUtility,
   initializeShipSchematic,
-  isShipSchematicOpen,
   openShipSchematic,
   SHIP_SCHEMATIC_IDS,
 } from '../../../src/ui/shipSchematic';
+import { isShipSchematicOpen } from '../../../src/ui/shipSchematicState';
 
 describe('Hauler ship schematic overlay', () => {
   const releaseInput = vi.fn();

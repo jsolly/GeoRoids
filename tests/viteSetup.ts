@@ -48,7 +48,7 @@ if (typeof window !== 'undefined') {
           </ul>
         </div>
       </div>
-      <div id="gameArea" style="display: none">
+      <div id="gameArea" hidden>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
         </div>

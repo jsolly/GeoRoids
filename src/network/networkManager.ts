@@ -2,7 +2,6 @@ import type { PlayerUpdate } from '../../shared-types';
 import type { Laser } from '../entities/laser/Laser';
 import type { Player } from '../entities/player/Player';
 import { bindPlayerNetworkPort } from '../entities/player/playerNetworkPort';
-import { bindHaulerUtilityNetwork } from '../entities/ship/haulerUtilityNetwork';
 import { bindShipCombatNetwork } from '../entities/ship/shipCombatNetwork';
 import { logger } from '../utils/Logger';
 import { ConnectionManager } from './services/ConnectionManager';
@@ -39,19 +38,6 @@ export class NetworkManager {
           type: 'useAbility',
           id: network.getLocalPlayerId(),
           data,
-        });
-      },
-    });
-    bindHaulerUtilityNetwork({
-      send(utilityId, playerId) {
-        const network = NetworkManager.getInstance();
-        if (!network.isConnected) {
-          return;
-        }
-        network.sendMessage({
-          type: 'setHaulerUtility',
-          id: network.getLocalPlayerId() || playerId,
-          data: { utilityId },
         });
       },
     });

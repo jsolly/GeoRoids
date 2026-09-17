@@ -8,14 +8,12 @@ import {
   preferredHaulerUtility,
   rememberHaulerUtility,
 } from '../entities/ship/haulerUtility';
-import { sendHaulerUtility } from '../entities/ship/haulerUtilityNetwork';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
+import { NetworkManager } from '../network/networkManager';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { isShipSchematicOpen, setShipSchematicOpen } from './shipSchematicState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
-
-export { isShipSchematicOpen };
 
 export const SHIP_SCHEMATIC_IDS = {
   dialog: 'ship-schematic-dialog',
@@ -161,7 +159,14 @@ export function equipUtility(utilityId: HaulerUtilityId): void {
     player.ship.haulerUtility = utilityId;
   }
   if (player) {
-    sendHaulerUtility(utilityId, player.id);
+    const network = NetworkManager.getInstance();
+    if (network.isConnected) {
+      network.sendMessage({
+        type: 'setHaulerUtility',
+        id: network.getLocalPlayerId() || player.id,
+        data: { utilityId },
+      });
+    }
   }
   syncCards();
 }

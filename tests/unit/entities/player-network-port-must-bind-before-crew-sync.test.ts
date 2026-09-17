@@ -3,7 +3,6 @@ import { entityFactory } from '../../../src/entities/EntityFactory';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import {
   bindPlayerNetworkPort,
-  requirePlayerNetworkPort,
   resetPlayerNetworkPort,
 } from '../../../src/entities/player/playerNetworkPort';
 
@@ -12,7 +11,10 @@ afterEach(() => {
 });
 
 test('crew name sync fails closed until the network port is bound', () => {
-  expect(() => requirePlayerNetworkPort()).toThrow('Player network port is not bound');
+  const manager = PlayerManager.getInstance();
+  expect(() => manager.getNonLocalPlayers()).toThrow('Player network port is not bound');
+  manager.createLocalPlayer();
+  expect(() => manager.setPlayerName('Comet')).toThrow('Player network port is not bound');
 });
 
 test('a bound port lists remote crew for radar and forwards local identity', () => {

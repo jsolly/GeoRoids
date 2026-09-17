@@ -1,5 +1,5 @@
 {
-  "note": "CLI Preview injects GEOROIDS_COMMIT_SHA for Vite identity and x-release-id. Start-screen chrome is first-party CSS (no Bootstrap). No player-facing manual copy or demonstration change.",
+  "note": "CLI Preview treats an empty VERCEL_GIT_COMMIT_SHA as missing and uses GEOROIDS_COMMIT_SHA. Start-screen chrome is first-party CSS (no Bootstrap). No player-facing manual copy or demonstration change.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
@@ -320,7 +320,7 @@
     "tests/unit/systems/shipGrowth.test.ts": "sha256:20dbbc566fc4ceb4b3a98f22174e437ad13cac4bd7d6b01ab60e2db937f9bd48",
     "tests/unit/ui/shipSchematic.test.ts": "sha256:63c64ecad6a059867d5939a00e849b8275562e28c3fb72f5f84b484a6786bfe9",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
-    "vite.config.ts": "sha256:2a63235f409dd53d5d461cf15d6cd62d4f4bffc7424bee9e88dac0385ff1bac4",
+    "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"
   }
 }

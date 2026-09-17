@@ -10,19 +10,31 @@ fail() {
 	exit 1
 }
 
+[[ -x "$MATCHER" ]] || fail "matcher must be executable: $MATCHER"
+
 assert_match() {
 	local label="$1"
 	local body="$2"
-	if ! printf '%s' "$body" | "$MATCHER"; then
-		fail "expected a Preview request: $label"
+	local status=0
+	set +e
+	printf '%s' "$body" | "$MATCHER"
+	status=$?
+	set -e
+	if [[ "$status" -ne 0 ]]; then
+		fail "expected a Preview request (exit 0): $label (got $status)"
 	fi
 }
 
 assert_skip() {
 	local label="$1"
 	local body="$2"
-	if printf '%s' "$body" | "$MATCHER"; then
-		fail "did not expect a Preview request: $label"
+	local status=0
+	set +e
+	printf '%s' "$body" | "$MATCHER"
+	status=$?
+	set -e
+	if [[ "$status" -ne 1 ]]; then
+		fail "expected skip (exit 1) for $label, got $status"
 	fi
 }
 

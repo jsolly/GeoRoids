@@ -68,7 +68,7 @@ Two separate deploy targets — client and server do not share a host.
 | --- | --- |
 | `VITE_WEBSOCKET_URL` | WebSocket endpoint baked into the client at build time. Currently `wss://geoasteroids-production-2403.up.railway.app/ws`. Must match the live Railway public URL + `/ws`. |
 
-`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit comes from `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, or local Git. A missing or invalid commit stops the build because automatic client refresh needs that identity.
+`VITE_BUILD_TIME` and `VITE_COMMIT_HASH` are injected by `vite.config.ts` at build time — do not set on Vercel. The commit is the first valid 40-character SHA among `VERCEL_GIT_COMMIT_SHA`, `RAILWAY_GIT_COMMIT_SHA`, and `GEOROIDS_COMMIT_SHA`, then local Git. Empty hosted values do not block the later fallbacks. A missing or invalid commit stops the build because automatic client refresh needs that identity.
 
 Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManager` uses same-origin `/ws`. Vite proxies `/ws` and `/logs` to the configured local game-server port. This also supports phones using a public HTTPS tunnel to the Vite port. Direct Vite runs can override the endpoint in `.env.local` (see `.env.example`).
 

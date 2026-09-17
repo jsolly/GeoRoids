@@ -8,6 +8,21 @@ import { wikiContentPlugin } from './scripts/wiki-vite';
 const HAULER_TETHER_HEXES = ['#E8D5A3', '#FDE68A'] as const;
 const GIT_COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
+/** Hosted platforms may set an empty SHA; `??` does not fall through that. */
+function firstHostedCommitSha(): string | undefined {
+  const candidates = [
+    process.env['VERCEL_GIT_COMMIT_SHA'],
+    process.env['RAILWAY_GIT_COMMIT_SHA'],
+    process.env['GEOROIDS_COMMIT_SHA'],
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'string' && GIT_COMMIT_SHA_PATTERN.test(value)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 /** Fail the client build if Rolldown drops or cross-chunk-aliases the cream/tip hexes. */
 function requireHaulerTetherHexes(): Plugin {
   return {
@@ -54,9 +69,7 @@ export default defineConfig(() => {
   // Hosted builds may omit .git; release polling still needs the deployed identity.
   // CLI /preview deploys are not Git-integration builds, so they set GEOROIDS_COMMIT_SHA.
   const commitHash =
-    process.env['VERCEL_GIT_COMMIT_SHA'] ??
-    process.env['RAILWAY_GIT_COMMIT_SHA'] ??
-    process.env['GEOROIDS_COMMIT_SHA'] ??
+    firstHostedCommitSha() ??
     execFileSync('git', ['rev-parse', 'HEAD'], {
       encoding: 'utf8',
       timeout: 5000,

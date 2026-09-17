@@ -44,8 +44,6 @@ jobs:
     env:
       VERCEL_ORG_ID: team_T8yHg0aDz7nCbyBgJh5a2saR
       VERCEL_PROJECT_ID: prj_us2dQ4PnjMkxVQ9VVn7NMATi1yuh
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      GH_TOKEN: ${{ github.token }}
       EVENT_NAME: ${{ github.event_name }}
       COMMENT_BODY: ${{ github.event.comment.body }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -58,14 +56,28 @@ jobs:
 
       - name: Resolve the pull request head
         id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
           if [[ "$EVENT_NAME" == "issue_comment" ]]; then
-            if ! printf '%s' "$COMMENT_BODY" | scripts/vercel-preview-comment.sh; then
+            if [[ ! -x scripts/vercel-preview-comment.sh ]]; then
+              echo "scripts/vercel-preview-comment.sh is missing or not executable" >&2
+              exit 1
+            fi
+            set +e
+            printf '%s' "$COMMENT_BODY" | scripts/vercel-preview-comment.sh
+            matcher_status=$?
+            set -e
+            if [[ "$matcher_status" -eq 1 ]]; then
               echo "Comment is not an explicit /preview request; stopping."
               echo "skip=true" >>"$GITHUB_OUTPUT"
               exit 0
+            fi
+            if [[ "$matcher_status" -ne 0 ]]; then
+              echo "Preview comment matcher failed with exit ${matcher_status}" >&2
+              exit 1
             fi
             pr_number="$ISSUE_NUMBER"
           else
@@ -90,6 +102,14 @@ jobs:
             echo "PR ${pr_number} head repo ${head_repo} is not ${REPO}; not deploying forks." >&2
             exit 1
           fi
+          if [[ ! "$head_sha" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "PR head SHA is not a 40-character hex commit: ${head_sha}" >&2
+            exit 1
+          fi
+          if [[ ! "$head_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "PR head ref is not an allowed branch name: ${head_ref}" >&2
+            exit 1
+          fi
 
           {
             echo "pr_number=${pr_number}"
@@ -109,39 +129,59 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - name: Install Vercel CLI
+        if: ${{ steps.pr.outputs.skip != 'true' }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/vercel-cli" --omit=dev --no-fund --ignore-scripts vercel@59.20.0
+
       - name: Deploy the Preview
         if: ${{ steps.pr.outputs.skip != 'true' }}
         id: deploy
         env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
         run: |
           set -euo pipefail
 
-          comment() {
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$1"
+          fail() {
+            {
+              echo "error<<PREVIEW_ERROR_EOF"
+              printf '%s\n' "$1"
+              echo "PREVIEW_ERROR_EOF"
+            } >>"$GITHUB_OUTPUT"
+            echo "$1" >&2
+            exit 1
           }
 
           if [[ -z "${VERCEL_TOKEN:-}" ]]; then
-            comment "Preview deploy skipped: GitHub secret \`VERCEL_TOKEN\` is not set. Create a Vercel token with deploy access and add it as that secret, then comment \`/preview\` again."
-            exit 1
+            fail "Preview deploy skipped: GitHub secret VERCEL_TOKEN is not set. Create a Vercel token with deploy access and add it as that secret, then comment /preview again."
+          fi
+          if [[ ! "$HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            fail "PR head SHA is not a 40-character hex commit: ${HEAD_SHA}"
+          fi
+          if [[ ! "$HEAD_REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            fail "PR head ref is not an allowed branch name: ${HEAD_REF}"
           fi
 
           local_sha="$(git rev-parse HEAD)"
           if [[ "$local_sha" != "$HEAD_SHA" ]]; then
-            echo "Checked-out SHA ${local_sha} != PR head ${HEAD_SHA}" >&2
-            exit 1
+            fail "Checked-out SHA ${local_sha} != PR head ${HEAD_SHA}"
           fi
-          if [[ ! "$HEAD_SHA" =~ ^[a-f0-9]{40}$ ]]; then
-            echo "PR head SHA is not a 40-character hex commit: ${HEAD_SHA}" >&2
-            exit 1
+
+          vercel_bin="$RUNNER_TEMP/vercel-cli/node_modules/.bin/vercel"
+          if [[ ! -x "$vercel_bin" ]]; then
+            fail "Vercel CLI is missing at ${vercel_bin}"
           fi
 
           # --archive=tgz does not upload .git. Vite and middleware need the PR SHA
           # explicitly: Git-integration system vars are often empty on CLI deploys.
-          preview_url="$(
-            npx --yes vercel@59.20.0 deploy --yes --archive=tgz --scope jsollys-projects \
+          set +e
+          deploy_log="$(
+            "$vercel_bin" deploy --yes --archive=tgz --target=preview --scope jsollys-projects \
               --build-env "VERCEL_GIT_COMMIT_SHA=${HEAD_SHA}" \
               --build-env "GEOROIDS_COMMIT_SHA=${HEAD_SHA}" \
               --env "GEOROIDS_COMMIT_SHA=${HEAD_SHA}" \
@@ -153,13 +193,14 @@ jobs:
               --meta "githubOrg=${REPO%%/*}" \
               --meta "githubRepo=${REPO#*/}" \
               --meta "githubPrId=${PR_NUMBER}" \
-              | tee /dev/stderr \
-              | grep -E '^https://' \
-              | tail -n 1
+              2>&1
           )"
-          if [[ ! "$preview_url" =~ ^https:// ]]; then
-            echo "Vercel CLI did not print a Preview URL; last line was: ${preview_url:-empty}" >&2
-            exit 1
+          deploy_status=$?
+          set -e
+          printf '%s\n' "$deploy_log" >&2
+          preview_url="$(printf '%s\n' "$deploy_log" | grep -E '^https://' | tail -n 1 || true)"
+          if [[ "$deploy_status" -ne 0 || ! "$preview_url" =~ ^https:// ]]; then
+            fail "Vercel CLI preview deploy failed (exit ${deploy_status})."
           fi
           {
             echo "url<<PREVIEW_URL_EOF"
@@ -167,9 +208,36 @@ jobs:
             echo "PREVIEW_URL_EOF"
           } >>"$GITHUB_OUTPUT"
 
+      - name: Comment on the pull request
+        if: ${{ always() && steps.pr.outputs.skip != 'true' && steps.pr.outputs.pr_number != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          DEPLOY_ERROR: ${{ steps.deploy.outputs.error }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          set -euo pipefail
+
+          comment() {
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$1"
+          }
+
+          if [[ "$DEPLOY_OUTCOME" == "success" && "$PREVIEW_URL" =~ ^https:// ]]; then
+            comment "$(
+              printf '%s\n\n%s\n%s\n' \
+                "Preview for \`${HEAD_REF}\` (\`${HEAD_SHA}\`): ${PREVIEW_URL}" \
+                "This is a one-shot deploy. New commits do not rebuild until you comment \`/preview\` again." \
+                "Play still needs \`VITE_WEBSOCKET_URL\` on Vercel Preview to reach Railway; the title screen and wiki are enough to check client UI."
+            )"
+            exit 0
+          fi
+
+          reason="${DEPLOY_ERROR:-Preview deploy failed.}"
           comment "$(
-            printf '%s\n\n%s\n%s\n' \
-              "Preview for \`${HEAD_REF}\` (\`${HEAD_SHA}\`): ${preview_url}" \
-              "This is a one-shot deploy. New commits do not rebuild until you comment \`/preview\` again." \
-              "Play still needs \`VITE_WEBSOCKET_URL\` on Vercel Preview to reach Railway; the title screen and wiki are enough to check client UI."
+            printf '%s\n\n%s\n' \
+              "Preview for \`${HEAD_REF:-unknown}\` (\`${HEAD_SHA:-unknown}\`) failed." \
+              "$reason"
           )"

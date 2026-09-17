@@ -21,10 +21,19 @@ require() {
 	fi
 }
 
+require 'printf '\''%s'\'' "$COMMENT_BODY" | scripts/vercel-preview-comment.sh' \
+	'pipe COMMENT_BODY into the first-line /preview matcher'
+require '[[ ! -x scripts/vercel-preview-comment.sh ]]' \
+	'require the matcher to be executable'
+require 'if [[ "$matcher_status" -eq 1 ]]; then' \
+	'treat matcher exit 1 as skip and other non-zero as failure'
 require '--build-env "VERCEL_GIT_COMMIT_SHA=${HEAD_SHA}"' 'pass the PR SHA as a Vite build env'
 require '--build-env "GEOROIDS_COMMIT_SHA=${HEAD_SHA}"' 'pass the PR SHA as a CLI build fallback'
 require '--env "GEOROIDS_COMMIT_SHA=${HEAD_SHA}"' 'pass the PR SHA as middleware runtime env'
 require '--meta "githubDeployment=1"' 'mark the CLI deploy as a GitHub deployment'
 require '--meta "githubCommitSha=${HEAD_SHA}"' 'attach the PR SHA as GitHub commit metadata'
+require '--target=preview' 'force the CLI deploy onto the Preview target'
+require '^[A-Za-z0-9._/-]+$' 'allowlist PR head refs before interpolating them'
+require '$RUNNER_TEMP/vercel-cli' 'install the Vercel CLI outside the PR checkout'
 
 echo "✓ vercel-preview workflow injects the PR commit SHA"

@@ -194,6 +194,7 @@
     "tests/unit/entities/terrain-makes-pilots-choose-their-route.test.ts",
     "src/physics/terrain/contours.ts",
     "src/physics/terrain/terrainSession.ts",
+    "src/rendering/contourLabels.ts",
     "src/physics/boundary.ts",
     "server/world/WorldStore.ts",
     "server/world/RegionalAsteroidField.ts",

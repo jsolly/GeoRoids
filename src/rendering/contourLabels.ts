@@ -16,13 +16,24 @@ const widthCache = new WeakMap<
   { levels: readonly ContourLevel[]; font: string; widths: Map<string, number> }
 >();
 
-/** Select anchors once in world space so labels never swim as the camera moves. */
-function getLabels(levels: readonly ContourLevel[], spacing: number): ElevationLabel[] {
-  const cached = labelCache.get(levels)?.get(spacing);
-  if (cached) {
-    return cached;
+function cellKey(ix: number, iy: number): string {
+  return `${ix},${iy}`;
+}
+
+/**
+ * Place readable elevation marks without scanning every already-accepted label
+ * for each contour segment. A linear scan hitch rebuilt the whole field every
+ * time the ship entered a new terrain patch.
+ */
+export function collectElevationLabels(
+  levels: readonly ContourLevel[],
+  spacing: number
+): ElevationLabel[] {
+  if (!Number.isFinite(spacing) || spacing <= 0) {
+    return [];
   }
   const labels: ElevationLabel[] = [];
+  const buckets = new Map<string, ElevationLabel[]>();
   for (const level of levels) {
     for (const segment of level.segments) {
       const x = (segment.ax + segment.bx) / 2;
@@ -33,16 +44,51 @@ function getLabels(levels: readonly ContourLevel[], spacing: number): ElevationL
       } else if (angle < -Math.PI / 2) {
         angle += Math.PI;
       }
-      if (
-        Math.abs(angle) > Math.PI / 3 ||
-        labels.some((label) => Math.hypot(label.x - x, label.y - y) < spacing)
-      ) {
+      if (Math.abs(angle) > Math.PI / 3) {
+        continue;
+      }
+      const ix = Math.floor(x / spacing);
+      const iy = Math.floor(y / spacing);
+      let tooClose = false;
+      for (let dx = -1; dx <= 1 && !tooClose; dx++) {
+        for (let dy = -1; dy <= 1 && !tooClose; dy++) {
+          const bucket = buckets.get(cellKey(ix + dx, iy + dy));
+          if (!bucket) {
+            continue;
+          }
+          for (const label of bucket) {
+            if (Math.hypot(label.x - x, label.y - y) < spacing) {
+              tooClose = true;
+              break;
+            }
+          }
+        }
+      }
+      if (tooClose) {
         continue;
       }
       // Elevation is relative and unitless, as in the shared heightfield.
-      labels.push({ x, y, angle, text: level.height.toFixed(2) });
+      const label: ElevationLabel = { x, y, angle, text: level.height.toFixed(2) };
+      labels.push(label);
+      const key = cellKey(ix, iy);
+      const bucket = buckets.get(key);
+      if (bucket) {
+        bucket.push(label);
+      } else {
+        buckets.set(key, [label]);
+      }
     }
   }
+  return labels;
+}
+
+/** Select anchors once in world space so labels never swim as the camera moves. */
+function getLabels(levels: readonly ContourLevel[], spacing: number): ElevationLabel[] {
+  const cached = labelCache.get(levels)?.get(spacing);
+  if (cached) {
+    return cached;
+  }
+  const labels = collectElevationLabels(levels, spacing);
   const variants = labelCache.get(levels) ?? new Map<number, ElevationLabel[]>();
   variants.set(spacing, labels);
   labelCache.set(levels, variants);

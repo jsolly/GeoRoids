@@ -329,9 +329,13 @@ export class GameEngine {
     }
     const elapsed = serverNow - this.lastTickAtMs;
     this.lastTickAtMs = serverNow;
-    // Arriving long after the previous step returned means the loop was
-    // blocked elsewhere; queued poses could not be read in that span.
-    this.playerMotion.recordBlockedSpan(this.lastTickFinishedAtMs, serverNow);
+    // Arriving well past the scheduled tick means the loop was blocked
+    // elsewhere and queued poses could not be read. The scheduled idle before
+    // the due time is when the loop normally reads them, so it never counts.
+    this.playerMotion.recordBlockedSpan(
+      Math.max(this.lastTickFinishedAtMs, this.nextTickDueAtMs),
+      serverNow
+    );
     if (elapsed <= 0) {
       if (serverPerformanceMetrics.enabled) {
         serverPerformanceMetrics.recordClock({

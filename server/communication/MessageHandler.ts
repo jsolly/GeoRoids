@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
 import type { PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
@@ -333,6 +334,19 @@ export class MessageHandler {
         receivedAt,
         command.motionSequence
       );
+    }
+    // Only the first pose after a block carries its credit, so this fires once
+    // per session per stall and marks where the old one-second cap would have
+    // rebased an honest pilot.
+    if (outcome.ok && outcome.blockedMs >= MAX_TICK_DEBT_MS) {
+      logger.warn('STATE', 'motion_blocked_time_credited', {
+        releaseId: SERVER_RELEASE_ID,
+        playerId: socketPlayer.id,
+        receivedAt,
+        gameTime: this.gameEngine.getDiagnostics().gameTime,
+        receivedSequence: command.motionSequence,
+        blockedMs: outcome.blockedMs,
+      });
     }
   }
 

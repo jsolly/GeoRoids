@@ -30,7 +30,8 @@ interface BlockedSpan {
 }
 
 export type MotionOutcome =
-  | { ok: true }
+  /** `blockedMs` is the server-blocked time this pose was credited beyond client silence. */
+  | { ok: true; blockedMs: number }
   | { ok: false; error: string; envelope?: MotionEnvelopeRejection };
 
 type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
@@ -69,7 +70,10 @@ const BURST_CREDIT_MS = PLAYER_MOTION.poseLeadFrames * GAME_TICK_MS;
 /** Ordinary timer jitter is not a blocked loop; anything past two ticks is. */
 const BLOCKED_SPAN_MIN_MS = 2 * GAME_TICK_MS;
 
-/** Longer than the 30 s stale-actor timeout, so every live pose gap is covered. */
+/** Spans reported back to back by one blocked stretch join into a single run. */
+const BLOCKED_SPAN_JOIN_MS = 1;
+
+/** Matches the 30 s stale-actor timeout in EntityManager, so every live pose gap is covered. */
 const BLOCKED_SPAN_RETENTION_MS = 30_000;
 
 /**
@@ -109,12 +113,25 @@ export class PlayerMotionService {
     this.blockedSpans.push({ from, to });
   }
 
+  /**
+   * Longest single blocked run inside `(from, to]`. Separate blocks never add
+   * up: the loop read poses between them, so that time is ordinary silence,
+   * and a stream of late ticks cannot accumulate into a multi-second allowance.
+   */
   private blockedMsBetween(from: number, to: number): number {
-    let blocked = 0;
+    let longest = 0;
+    let runFrom = Number.NEGATIVE_INFINITY;
+    let runTo = Number.NEGATIVE_INFINITY;
     for (const span of this.blockedSpans) {
-      blocked += Math.max(0, Math.min(span.to, to) - Math.max(span.from, from));
+      if (span.from - runTo <= BLOCKED_SPAN_JOIN_MS) {
+        runTo = Math.max(runTo, span.to);
+      } else {
+        runFrom = span.from;
+        runTo = span.to;
+      }
+      longest = Math.max(longest, Math.min(runTo, to) - Math.max(runFrom, from));
     }
-    return Math.min(blocked, to - from);
+    return Math.min(Math.max(0, longest), Math.max(0, to - from));
   }
 
   private alive(actor: GameEntity): boolean {
@@ -496,7 +513,7 @@ export class PlayerMotionService {
     session.actor.boosting = boosting;
     session.actor.lastUpdate = now;
     this.publish(session);
-    return { ok: true };
+    return { ok: true, blockedMs };
   }
 
   /** Publish a server impulse as a new epoch so in-flight client poses cannot erase it. */

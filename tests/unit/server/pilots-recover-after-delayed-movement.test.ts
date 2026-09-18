@@ -317,6 +317,27 @@ test('a pilot silent through a blocked server second still cannot claim more tha
   expect(beyond.f.actor.position).toEqual(beyond.held);
 });
 
+test('a server whose every tick runs late still holds a silent pilot to one second of travel', () => {
+  const f = flight();
+  clearAmbientField(f);
+  expect(f.engine.stepClock()).toBe(0);
+  f.advance(2);
+  expect(f.report().ok).toBe(true);
+  const held = { ...f.actor.position };
+  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
+  // Twenty seconds of ticks each firing five frames late. Every late arrival is
+  // a short blocked span, but the loop read poses between them, so those spans
+  // must not add up: the pilot gets one second plus a single span, not twenty.
+  for (let tick = 0; tick < 200; tick++) {
+    f.wait(6);
+    f.engine.stepClock();
+  }
+  const limitFrames = PLAYER_MOTION.poseLeadFrames + MAX_CATCH_UP_TICKS;
+  f.ship.position.x = held.x + speed * (limitFrames + 8);
+  expect(f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
+  expect(f.actor.position).toEqual(held);
+});
+
 test('a pilot silent for two seconds replays at most one second of travel plus the lead in one pose', () => {
   const limitFrames = PLAYER_MOTION.poseLeadFrames + MAX_CATCH_UP_TICKS;
   const within = flight();

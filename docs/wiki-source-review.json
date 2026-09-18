@@ -1,5 +1,5 @@
 {
-  "note": "Review-cycle hardening of write-behind persistence: failed store worker refuses later batches, shutdown flushes on the transport-timeout path, store re-reads after checkpoint/reset, inline adapter and shared commit stats, loop health extracted, world row sent only when changed. Field-manual once-a-second save note and hud-network stall-credit sentence re-read against GameEngine/WorldStore; no wiki article changes needed.",
+  "note": "Worker adapter shutdown deadline and monotonic watchdog clock; no player-facing rule changed, wiki articles re-read and unchanged.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
@@ -75,7 +75,7 @@
     "server/world/InlineWorldPersistence.ts": "sha256:9b222def21ee6e2554c1d54043ccc97edc6d445729f852130452d79af2796767",
     "server/world/MapAssets.ts": "sha256:5a449f68590789775193c4510925007002b717ac61ea9f7a0cc2f291fe69d3fb",
     "server/world/RegionalAsteroidField.ts": "sha256:ea8703d60fca7d88b02883b2fa148dabd95f3224487a669361d014f6dc3c1803",
-    "server/world/WorkerWorldPersistence.ts": "sha256:cbc6904503552a26dcbe238fe6caf9062a6887528134373ea11d2b1c45826270",
+    "server/world/WorkerWorldPersistence.ts": "sha256:c625b538a04f72348fec1f764d98e9cfe1a5e26cc756e4b6351b39b07290c352",
     "server/world/WorldStore.ts": "sha256:89951c7aa1e9412e603efb6a14d33f1633601342468ff8d6db2471a734990983",
     "server/world/openWorldPersistence.ts": "sha256:3aed1f7650463bc093af50086c120568c49a959d6bbd486f5611a729b9a0ecde",
     "server/world/worldPersistence.ts": "sha256:2e3c20a16aa96c1a15dacd8f4227c8c7c02837a3045b684a9e17686e46fd5fde",

@@ -159,7 +159,10 @@ test('a batch the worker cannot commit fails the adapter once, and nothing queue
 });
 
 test('a worker that stops answering fails the adapter instead of leaving the loop trusting memory', () => {
-  vi.useFakeTimers();
+  // The watchdog reads the monotonic clock, so a wall-clock step cannot trip it.
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'],
+  });
   cleanups.push(() => {
     vi.useRealTimers();
   });

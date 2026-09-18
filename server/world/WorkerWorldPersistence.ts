@@ -24,9 +24,26 @@ const STALL_WATCH_INTERVAL_MS = 5_000;
 /** The engine coalesces flushes while one is pending; more than this means it is not draining. */
 const MAX_PENDING_REQUESTS = 4;
 
+/**
+ * `terminate()` cannot interrupt a worker inside a synchronous SQLite call,
+ * so a wedged writer must not be able to hold the process open past its
+ * shutdown budget; the process exit reclaims the thread either way.
+ */
+function terminateWithin(worker: Worker, timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    const deadline = setTimeout(resolve, timeoutMs);
+    deadline.unref();
+    const settle = (): void => {
+      clearTimeout(deadline);
+      resolve();
+    };
+    worker.terminate().then(settle, settle);
+  });
+}
+
 interface PendingRequest {
   type: 'persist' | 'reset';
-  /** Wall time the request was handed over, for the stall watchdog. */
+  /** Monotonic time the request was handed over, for the stall watchdog. */
   postedAt: number;
 }
 
@@ -124,7 +141,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
       return this.closing;
     }
     if (this.failure) {
-      this.closing = worker.terminate().then(failed);
+      this.closing = terminateWithin(worker, SHUTDOWN_TIMEOUT_MS).then(failed);
       return this.closing;
     }
     this.closing = new Promise<void>((resolve, reject) => {
@@ -161,7 +178,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
       this.fail(new Error('World store worker is not keeping up with world batches'));
       throw this.failure;
     }
-    this.pending.set(request.id, { type: request.type, postedAt: Date.now() });
+    this.pending.set(request.id, { type: request.type, postedAt: globalThis.performance.now() });
     this.ensureWorker().postMessage(request);
   }
 
@@ -200,7 +217,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
     for (const { postedAt } of this.pending.values()) {
       oldest = Math.min(oldest, postedAt);
     }
-    const waitedMs = Date.now() - oldest;
+    const waitedMs = globalThis.performance.now() - oldest;
     if (waitedMs <= this.stallTimeoutMs) {
       return;
     }

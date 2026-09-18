@@ -1,5 +1,5 @@
 {
-  "note": "World persistence is write-behind: the saved world is read once at startup into RegionalAsteroidField's dormant map, and the game loop hands one batch per second (plus final departure, season rollover, and shutdown) to WorldPersistence; WorkerWorldPersistence commits it on a worker thread that owns the only writable SQLite connection while the integration runners' in-memory world commits inline. Terminal breaks, deliveries, loot pickups, blasts, deaths, sector completion and credentials no longer commit on the tick; a hard crash loses about the last second and a failed commit still fails closed. Field manual states the once-a-second save and the crash window; asteroid and HUD/network copy re-read and unchanged in effect (saved deposits still load, harvested sectors stay harvested). /health gains world.loop and world.persistence, the test-world reset clears the loop counters, and the clock logs game_loop_stalled at 250 ms. Movement-envelope rules and demonstrations are unchanged.",
+  "note": "World persistence is write-behind: the saved world is read once at startup into RegionalAsteroidField's dormant map, and the game loop hands one batch per second (plus final departure, season rollover, and shutdown) to WorldPersistence; explicit flushes coalesce behind a batch still committing and run when the writer is idle. WorkerWorldPersistence commits on a worker thread that owns the only writable SQLite connection, watches pending batches (a batch unanswered for 30 s or more than four pending fails the adapter closed), and the integration runners' in-memory world commits inline. Shutdown flushes after the transports close so departing pilots are captured, then waits for the commit within a 5 s budget. Terminal breaks, deliveries, loot pickups, blasts, deaths, sector completion and credentials no longer commit on the tick; a hard crash loses about the last second and a failed commit still fails closed. Field manual states the once-a-second save and the crash window; asteroid and HUD/network copy re-read and unchanged in effect. /health gains world.loop and world.persistence, the test-world reset clears the loop counters, and the clock logs game_loop_stalled at 250 ms. Movement-envelope rules and demonstrations are unchanged.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
@@ -62,7 +62,7 @@
     "server/core/AsteroidManager.ts": "sha256:7a1aceb4dec36074bca326bef163d6176aaf20150cc3e77eb96e8a287ef95c46",
     "server/core/CollisionAuthority.ts": "sha256:1270aa6d325845fa28f53b19c61417dfacb03344074ebd94b35ffa0a8f58cd93",
     "server/core/EntityManager.ts": "sha256:1e0431d5fa569f3dc33b6edafb28e25b67097d762e7aaa2254f0e7cf27cdd211",
-    "server/core/GameEngine.ts": "sha256:405e024c7e6e93cbb42915a920647761735948b1d319d363a56970bb6d10a693",
+    "server/core/GameEngine.ts": "sha256:31e8a7104538dfcaaa6c04e48f5d483e2a14d9544ff54b00edeaf5d3a41f5875",
     "server/core/LootManager.ts": "sha256:c4a2a8a86c3a1b5d901348049bcda596f8c639e5212ce3171e083736692f22e8",
     "server/core/PlayerMotionService.ts": "sha256:e2736df27daf719e2c531ea003e9dfd923f4c3172a8be86f6c8c61120185ef7c",
     "server/core/RNGService.ts": "sha256:c6a852821c514621ded484d570859144e6b035de82fb74e6e851ef68358f03eb",
@@ -73,7 +73,7 @@
     "server/world/AsteroidSpatialIndex.ts": "sha256:346012acb37138e7ac3fc317799db3878d78427e5bf7718344139d152388fb18",
     "server/world/MapAssets.ts": "sha256:5a449f68590789775193c4510925007002b717ac61ea9f7a0cc2f291fe69d3fb",
     "server/world/RegionalAsteroidField.ts": "sha256:268437c9d8a3032b901fe250187b84c55fac5cb82721dd86d043c6a43113588e",
-    "server/world/WorkerWorldPersistence.ts": "sha256:42330dc4eade5c232862a084919efaa0ccf16c79e41612b9473afee219bc04cb",
+    "server/world/WorkerWorldPersistence.ts": "sha256:3f543222b844f6ac8572ea1a6184cb12e7b2314c2127016a1e7e66572d0cb5a9",
     "server/world/WorldStore.ts": "sha256:1a2477175a3cd48685aec48e36bc20ff50447a76b260a304b9bad10c49618357",
     "server/world/openWorldPersistence.ts": "sha256:58decbdc41614726b79bc8d57b4fb0cc7fbe20d197886920c6f4a06a32996583",
     "server/world/worldPersistence.ts": "sha256:b344e933a9d3323c9988bc4bdbd4b83126d3d996fe38c09554213590c77ccfa9",

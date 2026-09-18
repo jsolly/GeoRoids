@@ -224,6 +224,7 @@ export class GameEngine {
   private lastStallLoggedAtMs = Number.NEGATIVE_INFINITY;
   /** Pilots whose saved row changed since the last flush; live pilots are captured at flush time. */
   private readonly dirtyPilots = new Set<string>();
+  private flushWaitingForIdle = false;
   private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
@@ -1056,7 +1057,10 @@ export class GameEngine {
   /**
    * Hand everything that changed since the last flush to persistence as one
    * batch. The batch leaves this thread without waiting on the disk; the
-   * inline store used by tests commits before returning instead.
+   * inline store used by tests commits before returning instead. While a
+   * batch is still committing, the request is coalesced into one flush that
+   * runs as soon as the writer is idle, so a slow disk can never queue up
+   * more than one batch behind the one in flight.
    */
   public checkpointWorld(): void {
     if (this.persistenceFailure) {
@@ -1064,6 +1068,10 @@ export class GameEngine {
     }
     this.ensureScoreSeason();
     if (!this.persistence) {
+      return;
+    }
+    if (!this.persistenceIdle()) {
+      this.flushWhenIdle();
       return;
     }
     try {
@@ -1104,17 +1112,52 @@ export class GameEngine {
     return (this.persistence?.diagnostics().pendingBatches ?? 0) === 0;
   }
 
-  /** Resolves once every batch handed over so far has been committed or failed. */
-  public whenPersistenceIdle(): Promise<void> {
-    return this.persistence?.whenIdle() ?? Promise.resolve();
+  private flushWhenIdle(): void {
+    if (this.flushWaitingForIdle || !this.persistence) {
+      return;
+    }
+    this.flushWaitingForIdle = true;
+    void this.persistence.whenIdle().then(() => {
+      this.flushWaitingForIdle = false;
+      if (this.persistenceFailure) {
+        return;
+      }
+      try {
+        this.checkpointWorld();
+      } catch {
+        // checkpointWorld already recorded the failure; the next tick is fatal.
+      }
+    });
   }
 
-  /** Flush what is pending and release the database; the loop must already be stopped. */
+  /**
+   * Resolves once nothing is in flight: every batch handed over has been
+   * committed or failed, including a flush that was waiting for the writer.
+   */
+  public async whenPersistenceIdle(): Promise<void> {
+    while (this.persistence && (this.flushWaitingForIdle || !this.persistenceIdle())) {
+      await this.persistence.whenIdle();
+      // Let a coalesced flush that was waiting on the same idle post its batch.
+      await Promise.resolve();
+    }
+  }
+
+  /**
+   * Flush the final state and release the database. Call after the loop has
+   * stopped and the transports have closed, so departing pilots are captured.
+   */
   public async shutdownPersistence(): Promise<void> {
     if (!this.persistence) {
       return;
     }
-    await this.persistence.shutdown();
+    try {
+      await this.whenPersistenceIdle();
+      if (!this.persistenceFailure) {
+        this.checkpointWorld();
+      }
+    } finally {
+      await this.persistence.shutdown();
+    }
   }
 
   private setPilot(pilot: PersistentPilot): void {

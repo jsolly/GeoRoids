@@ -102,9 +102,11 @@ test('a mining break and its score reach the database on the next one-second flu
   expect(store.loadPilots().find((pilot) => pilot.id === miner.id)?.score).toBe(999);
 });
 
+/** A writer whose commits finish only when the test says so. */
 class InFlightPersistence implements WorldPersistence {
   readonly batches: WorldCheckpoint[] = [];
   pendingBatches = 0;
+  private readonly idleWaiters: Array<() => void> = [];
   load(): LoadedWorld {
     return { world: undefined, sectors: new Map(), pilots: [] };
   }
@@ -114,7 +116,18 @@ class InFlightPersistence implements WorldPersistence {
   reset(): void {}
   onFailure(): void {}
   whenIdle(): Promise<void> {
-    return Promise.resolve();
+    if (this.pendingBatches === 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this.idleWaiters.push(resolve);
+    });
+  }
+  drain(): void {
+    this.pendingBatches = 0;
+    for (const resolve of this.idleWaiters.splice(0)) {
+      resolve();
+    }
   }
   shutdown(): Promise<void> {
     return Promise.resolve();
@@ -129,9 +142,9 @@ class InFlightPersistence implements WorldPersistence {
   }
 }
 
-test('a commit still in flight defers the next flush instead of queueing behind it', () => {
+test('a commit still in flight defers the next flush instead of queueing behind it', async () => {
   const persistence = new InFlightPersistence();
-  const { engine, frame } = world(persistence);
+  const { engine, miner, frame } = world(persistence);
   expect(persistence.batches).toHaveLength(0);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
@@ -145,11 +158,17 @@ test('a commit still in flight defers the next flush instead of queueing behind 
   }
   expect(persistence.batches).toHaveLength(1);
 
-  // Once it drains, the following second carries everything that changed meanwhile.
-  persistence.pendingBatches = 0;
-  for (let tick = 0; tick < GAME.FPS; tick++) {
-    frame();
-  }
+  // Explicit flushes coalesce too: the last pilot leaving and a repeated
+  // request add nothing while the writer is busy...
+  engine.removePlayer(miner.id);
+  expect(engine.getDiagnostics().isPaused).toBe(true);
+  engine.checkpointWorld();
+  expect(persistence.batches).toHaveLength(1);
+
+  // ...and exactly one flush follows as soon as the writer is idle again.
+  persistence.drain();
+  await Promise.resolve();
   expect(persistence.batches).toHaveLength(2);
+  expect(persistence.batches[1]?.pilots.map((pilot) => pilot.id)).toEqual([miner.id]);
   expect(engine.getDiagnostics().persistence).toMatchObject({ mode: 'worker', pendingBatches: 0 });
 });

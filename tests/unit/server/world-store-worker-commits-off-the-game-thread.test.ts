@@ -2,7 +2,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { WorkerWorldPersistence } from '../../../server/world/WorkerWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import type { WorldCheckpoint } from '../../../server/world/worldPersistence';
@@ -115,6 +115,43 @@ test('a batch the worker cannot commit fails the adapter once and rejects its sh
   const saved = reopen(path);
   expect(saved.loadPilots()).toEqual([]);
   expect(saved.loadSector('0,0')).toBeUndefined();
+});
+
+test('a worker that stops answering fails the adapter instead of leaving the loop trusting memory', () => {
+  vi.useFakeTimers();
+  cleanups.push(() => {
+    vi.useRealTimers();
+  });
+  const path = worldFile();
+  const persistence = new WorkerWorldPersistence(path, { stallTimeoutMs: 1_000 });
+  cleanups.push(() => persistence.shutdown().catch(() => undefined));
+  const failures: Error[] = [];
+  persistence.onFailure((error) => failures.push(error));
+  persistence.persist(batch(new Map(), 1));
+  expect(persistence.diagnostics()).toMatchObject({ pendingBatches: 1, failed: false });
+
+  // No reply can have arrived yet; the watchdog sees the batch outlive its limit.
+  vi.advanceTimersByTime(6_000);
+  expect(failures).toHaveLength(1);
+  expect(failures[0]?.message).toContain('World store worker unresponsive');
+  expect(persistence.diagnostics()).toMatchObject({ pendingBatches: 0, failed: true });
+});
+
+test('handing over more batches than the writer could ever be behind by fails closed', () => {
+  const path = worldFile();
+  const persistence = new WorkerWorldPersistence(path);
+  cleanups.push(() => persistence.shutdown().catch(() => undefined));
+  const failures: Error[] = [];
+  persistence.onFailure((error) => failures.push(error));
+  for (let round = 0; round < 4; round++) {
+    persistence.persist(batch(new Map(), round));
+  }
+  expect(persistence.diagnostics()).toMatchObject({ pendingBatches: 4, failed: false });
+  expect(() => persistence.persist(batch(new Map(), 4))).toThrow(
+    'World store worker is not keeping up with world batches'
+  );
+  expect(failures).toHaveLength(1);
+  expect(persistence.diagnostics().failed).toBe(true);
 });
 
 test('an in-memory world refuses the worker adapter because threads cannot share it', () => {

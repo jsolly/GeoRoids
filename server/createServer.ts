@@ -427,12 +427,6 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     clearInterval(cleanupInterval);
     wsCore.stopPeriodicGameStateBroadcast();
     gameEngine.stopGameLoop();
-    let checkpointError: unknown;
-    try {
-      gameEngine.checkpointWorld();
-    } catch (error) {
-      checkpointError = error;
-    }
     releaseServerPerformanceMetrics();
     const stopTransports = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
@@ -469,12 +463,14 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       );
     });
     closing = stopTransports.then(async () => {
-      // The final batch was handed over above; wait for it to commit before
-      // the process can exit. Persistence owns its own shutdown deadline.
+      // Sockets are closed, so departing pilots are captured; flush the final
+      // batch and wait for its commit before the process can exit.
+      // Persistence owns its own shutdown deadline.
+      let checkpointError: Error | undefined;
       try {
         await gameEngine.shutdownPersistence();
       } catch (cause) {
-        checkpointError ??= new Error('Persistent world checkpoint failed', { cause });
+        checkpointError = new Error('Persistent world checkpoint failed', { cause });
       }
       if (!(await ClientLogger.flushPending())) {
         throw new Error('Timed out flushing forwarded client logs');

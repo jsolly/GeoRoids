@@ -12,8 +12,16 @@ import {
   type WorldStoreWorkerRequest,
 } from './worldStoreWorkerProtocol';
 
-/** Railway stops a service ten seconds after SIGTERM; leave room for the sockets to close. */
-const SHUTDOWN_TIMEOUT_MS = 8_000;
+/**
+ * Railway stops a service ten seconds after SIGTERM. Transports get two
+ * seconds before this; leave room after it for the log flush.
+ */
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+/** A batch that has not committed after this long is a hung worker, not a slow disk. */
+const BATCH_STALL_TIMEOUT_MS = 30_000;
+const STALL_WATCH_INTERVAL_MS = 5_000;
+/** The engine coalesces flushes while one is pending; more than this means it is not draining. */
+const MAX_PENDING_BATCHES = 4;
 
 /**
  * `WorldPersistence` whose SQLite writer lives on a worker thread.
@@ -22,11 +30,15 @@ const SHUTDOWN_TIMEOUT_MS = 8_000;
  * ever hands batches to the worker, so a commit and its fsync can never block
  * a simulation frame. Batches are applied in order; a failure is reported once
  * and the adapter stays failed, matching the engine's fail-closed contract.
+ * A worker that stops answering is a failure too: pending batches are
+ * watched, so the loop can never keep trusting memory behind a dead writer.
  */
 export class WorkerWorldPersistence implements WorldPersistence {
   private worker: Worker | undefined;
+  private watchdog: NodeJS.Timeout | undefined;
   private nextRequestId = 1;
-  private readonly pending = new Set<number>();
+  /** Batch id → wall time it was handed over. */
+  private readonly pending = new Map<number, number>();
   private readonly idleWaiters: Array<() => void> = [];
   private committedBatches = 0;
   private lastCommitMs: number | undefined;
@@ -34,11 +46,16 @@ export class WorkerWorldPersistence implements WorldPersistence {
   private failure: Error | undefined;
   private failureHandler: ((error: Error) => void) | undefined;
   private closing: Promise<void> | undefined;
+  private readonly stallTimeoutMs: number;
 
-  constructor(private readonly path: string) {
+  constructor(
+    private readonly path: string,
+    options: { stallTimeoutMs?: number } = {}
+  ) {
     if (path === ':memory:') {
       throw new Error('An in-memory world cannot be shared with a worker thread');
     }
+    this.stallTimeoutMs = options.stallTimeoutMs ?? BATCH_STALL_TIMEOUT_MS;
   }
 
   load(): LoadedWorld {
@@ -85,6 +102,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
     if (this.closing !== undefined) {
       return this.closing;
     }
+    this.stopWatchdog();
     const worker = this.worker;
     const failed = (): Promise<void> =>
       this.failure ? Promise.reject(this.failure) : Promise.resolve();
@@ -134,7 +152,11 @@ export class WorkerWorldPersistence implements WorldPersistence {
       throw new Error('World persistence is shutting down');
     }
     if (request.type === 'persist') {
-      this.pending.add(request.id);
+      if (this.pending.size >= MAX_PENDING_BATCHES) {
+        this.fail(new Error('World store worker is not keeping up with world batches'));
+        throw this.failure;
+      }
+      this.pending.set(request.id, Date.now());
     }
     this.ensureWorker().postMessage(request);
   }
@@ -157,12 +179,38 @@ export class WorkerWorldPersistence implements WorldPersistence {
       )
     );
     worker.on('exit', (code) => {
-      if (this.closing === undefined && code !== 0) {
-        this.fail(new Error(`World store worker exited with code ${code}`));
+      // Only shutdown ends the worker on purpose; any other exit, even a clean
+      // one, leaves batches unanswered.
+      if (this.closing === undefined) {
+        this.fail(new Error(`World store worker exited unexpectedly with code ${code}`));
       }
     });
     this.worker = worker;
+    this.watchdog = setInterval(() => this.failIfStalled(), STALL_WATCH_INTERVAL_MS);
+    this.watchdog.unref();
     return worker;
+  }
+
+  private failIfStalled(): void {
+    let oldest = Number.POSITIVE_INFINITY;
+    for (const postedAt of this.pending.values()) {
+      oldest = Math.min(oldest, postedAt);
+    }
+    const waitedMs = Date.now() - oldest;
+    if (waitedMs <= this.stallTimeoutMs) {
+      return;
+    }
+    this.fail(
+      new Error(`World store worker unresponsive; a batch has waited ${Math.round(waitedMs)} ms`)
+    );
+    void this.worker?.terminate();
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdog) {
+      clearInterval(this.watchdog);
+      this.watchdog = undefined;
+    }
   }
 
   private receive(reply: WorldStoreWorkerReply): void {
@@ -203,6 +251,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
       return;
     }
     this.failure = error;
+    this.stopWatchdog();
     this.pending.clear();
     this.settleIdle();
     this.failureHandler?.(error);

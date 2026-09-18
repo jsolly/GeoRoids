@@ -127,6 +127,7 @@ export class InputManager {
     });
 
     const releaseInput = () => {
+      this.updateMovementLock();
       const localPlayer = getLocalPlayer();
       resetControlSources();
       for (const key of Object.keys(keys)) {
@@ -150,6 +151,20 @@ export class InputManager {
     initializeShipSchematic({ onOpen: releaseInput });
 
     this.listenersInitialized = true;
+  }
+
+  /** Lock only navigation; the simulation and authoritative damage keep running. */
+  updateMovementLock(): void {
+    const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    if (!ship) {
+      return;
+    }
+    ship.movementLocked = isUniverseMapOpen() || isShipSchematicOpen();
+    if (ship.movementLocked) {
+      ship.velocity = { x: 0, y: 0 };
+      ship.angularVelocity = 0;
+      ship.thrusting = false;
+    }
   }
 
   resetButtonText(): void {

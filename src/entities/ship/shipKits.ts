@@ -57,6 +57,7 @@ export const SHIP_ABILITY = {
   HARPOON_SLACK: 1.25,
   /** Resource Tap extract completes after this latch duration. */
   TAP_EXTRACT_FRAMES: 90,
+  TAP_EXTRACT_BURSTS: 4,
   SCAN_RANGE: 1200,
   SCAN_FRAMES: 6 * GAME.FPS,
   ASTEROID_DAMAGE_MULTIPLIER: 2,

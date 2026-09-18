@@ -23,8 +23,9 @@ Laser cores do not add mass. Hull draw size and collision radius stay at the
 kit base; collecting does not enlarge the silhouette.
 
 Asteroid breaks can release shards, and an environmental ship death releases
-wreckage. A finished Resource Tap extract drops a larger cream canister with an
-amber tip; the asteroid stays intact. That Tap loot is not a diamond chip. A death converts a base amount plus a fraction of the destroyed
+wreckage. A Resource Tap ejects cream canisters with amber tips in spaced bursts during
+extraction; the asteroid stays intact. The full reward is split across the
+canisters, and each one can be collected separately. That Tap loot is not a diamond chip. A death converts a base amount plus a fraction of the destroyed
 ship's excess mass into pellets, subject to per-pellet and global limits. Loot
 expires after its configured lifetime. A nearby drop is pulled toward a living
 ship once it comes within magnet range. Tap canisters use a stronger pull when

@@ -83,7 +83,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Tow and mining values',
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids and cooperative large rocks. The ability has no ship-targeting mode.`,
-        `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap finishes after ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable.`,
+        `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable.`,
         `Furnace intakes are ${starterFurnaces[0]?.radius ?? 0} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor.`,
       ],
     },
@@ -133,7 +133,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Pickup values',
       paragraphs: [
-        `Loose pickup maximum: ${SATELLITE_PICKUP.MAX_COUNT}; pickup field radius: ${SATELLITE_PICKUP.FIELD_RADIUS}; collection score: ${SATELLITE_PICKUP.SCORE_BONUS}; automatic collection range: ${SATELLITE_PICKUP.AUTO_COLLECT_RANGE}; health: ${SATELLITE_PICKUP.HEALTH}; minimum owner orbit radius: ${SATELLITE_PICKUP.ORBIT_RADIUS}; hull gap: ${SATELLITE_PICKUP.ORBIT_GAP}; broken pickup respawn: ${frameValue(SATELLITE_PICKUP.RESPAWN_FRAMES)}.`,
+        `Shared hardware maximum: ${SATELLITE_PICKUP.MAX_COUNT}; spawn ring: ${SATELLITE_PICKUP.SPAWN_RING_MIN}–${SATELLITE_PICKUP.SPAWN_RING_MAX}; collection score: ${SATELLITE_PICKUP.SCORE_BONUS}; automatic collection range: ${SATELLITE_PICKUP.AUTO_COLLECT_RANGE}; health: ${SATELLITE_PICKUP.HEALTH}; minimum owner orbit radius: ${SATELLITE_PICKUP.ORBIT_RADIUS}; hull gap: ${SATELLITE_PICKUP.ORBIT_GAP}; scan range: ${SATELLITE_PICKUP.SCAN_RANGE}; full-health lifetime without damage: ${frameValue(SATELLITE_PICKUP.LIFETIME_FRAMES)}; broken or exhausted pickup respawn: ${frameValue(SATELLITE_PICKUP.RESPAWN_FRAMES)}.`,
       ],
     },
   ],

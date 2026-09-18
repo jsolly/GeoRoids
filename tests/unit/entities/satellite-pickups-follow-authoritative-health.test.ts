@@ -28,7 +28,12 @@ test('a collected satellite keeps its identity while damage and breakage arrive 
   const pickup = manager.get(landsat.id);
   manager.syncFromServer([{ ...landsat, state: 'orbiting', ownerId: 'pilot', health: 25 }]);
   expect(manager.get(landsat.id)).toBe(pickup);
-  expect(pickup).toMatchObject({ state: 'orbiting', ownerId: 'pilot', health: 25, maxHealth: 50 });
+  expect(pickup).toMatchObject({
+    state: 'orbiting',
+    ownerId: 'pilot',
+    health: 25,
+    maxHealth: 50,
+  });
   manager.syncFromServer([{ ...landsat, state: 'broken', health: 0 }]);
   expect(pickup).toMatchObject({ state: 'broken', ownerId: null, health: 0 });
   manager.syncFromServer([landsat]);

@@ -44,6 +44,7 @@ import type { Laser } from '../../entities/laser/Laser';
 import { LootField } from '../../entities/loot/LootField';
 import type { Player } from '../../entities/player/Player';
 import { PlayerManager } from '../../entities/player/PlayerManager';
+import { recordAsteroidLatch } from '../../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
@@ -1277,6 +1278,9 @@ export class ConnectionManager {
             ? findHarpoonFieldBody(data.harpoonTargetId)?.position
             : undefined;
         playHarpoonLatch(targetPosition ?? entity.ship.position);
+        if (typeof data.harpoonTargetId === 'string' && data.harpoonTargetId.length > 0) {
+          recordAsteroidLatch(data.harpoonTargetId);
+        }
       }
     }
     const latch = {

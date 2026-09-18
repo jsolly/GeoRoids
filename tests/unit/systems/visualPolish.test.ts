@@ -6,6 +6,7 @@ import { lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 import { Player } from '../../../src/entities/player/Player';
 import { advanceRemotePlayerShips } from '../../../src/entities/player/remoteLasers';
 import {
+  getHaulerEquipment,
   getKitHullOutline,
   projectHullPolyline,
   projectKitHullEdges,
@@ -147,8 +148,13 @@ test('every playable kit draws its outlined hull and retained details without fi
     strokes.length = 0;
     strokeKitHullOutline(ctx, 100, 80, 24, 0.4, PALETTE.LOCAL, kit.id);
     const outline = getKitHullOutline(kit.id);
+    const lines = [
+      outline.hull,
+      ...outline.extras,
+      ...(kit.id === 'hauler' ? getHaulerEquipment('tow_cable') : []),
+    ];
     expect(strokes.map((path) => path.points)).toEqual(
-      [outline.hull, ...outline.extras].flatMap((line) => {
+      lines.flatMap((line) => {
         const points = projectHullPolyline(100, 80, 24, 0.4, line);
         return [points, points];
       })
@@ -156,7 +162,7 @@ test('every playable kit draws its outlined hull and retained details without fi
     expect(strokes[0]?.points).toHaveLength(outline.hull.points.length);
     expect(strokes.slice(0, 2).map((path) => path.closed)).toEqual([true, true]);
     expect(strokes.filter((_, index) => index % 2 === 1).map((path) => path.color)).toEqual(
-      [outline.hull, ...outline.extras].map(() => canvasColor(ctx, PALETTE.LOCAL))
+      lines.map(() => canvasColor(ctx, PALETTE.LOCAL))
     );
   }
   expect(fill).not.toHaveBeenCalled();

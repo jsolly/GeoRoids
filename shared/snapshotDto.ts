@@ -155,7 +155,12 @@ const pickup = shape<SatellitePickupData>({
   angle: number,
   radius: number,
   color: string,
-  state: enumeration<SatellitePickupState>({ loose: true, orbiting: true, broken: true }),
+  state: enumeration<SatellitePickupState>({
+    loose: true,
+    stored: true,
+    orbiting: true,
+    broken: true,
+  }),
   ownerId: (value) => value === null || string(value),
   health: number,
   maxHealth: number,

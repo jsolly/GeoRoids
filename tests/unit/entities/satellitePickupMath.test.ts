@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { SATELLITE_PICKUP } from '../../../src/constants';
 import {
-  advanceDriftCenter,
   attachOrbitPosition,
-  clampToRadius,
   isWithinCollectRange,
   orbitOffset,
   spawnRingPosition,
@@ -30,22 +28,6 @@ describe('satellite pickup orbit math', () => {
   test('isWithinCollectRange accepts nearby ships and rejects distant ones', () => {
     expect(isWithinCollectRange({ x: 0, y: 0 }, { x: 20, y: 0 }, 15, 9, 0)).toBe(true);
     expect(isWithinCollectRange({ x: 0, y: 0 }, { x: 400, y: 0 }, 15, 9, 50)).toBe(false);
-  });
-
-  test('clampToRadius keeps points inside the field', () => {
-    const clamped = clampToRadius({ x: 2000, y: 0 }, SATELLITE_PICKUP.FIELD_RADIUS);
-    expect(Math.hypot(clamped.x, clamped.y)).toBeCloseTo(SATELLITE_PICKUP.FIELD_RADIUS);
-  });
-
-  test('advanceDriftCenter turns inward near the field edge', () => {
-    const { center, driftAngle } = advanceDriftCenter(
-      { x: SATELLITE_PICKUP.FIELD_RADIUS - 10, y: 0 },
-      0,
-      20,
-      SATELLITE_PICKUP.FIELD_RADIUS
-    );
-    expect(Math.hypot(center.x, center.y)).toBeLessThanOrEqual(SATELLITE_PICKUP.FIELD_RADIUS);
-    expect(Math.cos(driftAngle)).toBeCloseTo(-1);
   });
 
   test('velocityFromDelta is the per-frame step', () => {

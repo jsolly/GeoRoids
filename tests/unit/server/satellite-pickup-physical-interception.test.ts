@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import type { AsteroidData } from '../../../shared-types';
-import { DAMAGE, SATELLITE_PICKUP } from '../../../src/constants';
+import { DAMAGE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function clearAsteroids(engine: GameEngine): void {
@@ -52,6 +52,8 @@ describe('satellite pickups intercept physical damage', () => {
       position: { x: pickup.position.x + 110, y: pickup.position.y },
     });
     engine.tickSatellitePickups();
+    expect(engine.getSatellitePickup(pickup.id)?.state).toBe('stored');
+    expect(engine.equipSatellite('owner', pickup.id)).toBe(true);
     expect(engine.getSatellitePickup(pickup.id)?.state).toBe('orbiting');
     engine.updatePlayer('owner', { position: { x: 0, y: 0 } });
     engine.tickSatellitePickups();
@@ -75,11 +77,12 @@ describe('satellite pickups intercept physical damage', () => {
     const pickupId = attachFirstPickup();
     addAttacker();
     const ownerHealth = engine.getPlayer('owner')?.health;
+    const pickupHealth = engine.getSatellitePickup(pickupId)?.health;
 
     engine.spawnLaser('attacker', { x: 120, y: 0 }, { x: -240, y: 0 });
     engine.advanceLasersAndResolveHits(1_000);
 
-    expect(engine.getSatellitePickup(pickupId)?.health).toBe(SATELLITE_PICKUP.HEALTH);
+    expect(engine.getSatellitePickup(pickupId)?.health).toBe(pickupHealth);
     expect(engine.getPlayer('owner')?.health).toBe(ownerHealth);
     expect(engine.getServerLasers()).toHaveLength(1);
   });
@@ -89,12 +92,13 @@ describe('satellite pickups intercept physical damage', () => {
     const pickupId = attachFirstPickup();
     addAttacker();
     const ownerHealth = engine.getPlayer('owner')?.health;
+    const pickupHealth = engine.getSatellitePickup(pickupId)?.health;
 
     engine.spawnLaser('attacker', { x: 0, y: -120 }, { x: 0, y: 240 });
     engine.advanceLasersAndResolveHits(1_000);
 
     expect(engine.getPlayer('owner')?.health).toBe(ownerHealth);
-    expect(engine.getSatellitePickup(pickupId)?.health).toBe(SATELLITE_PICKUP.HEALTH);
+    expect(engine.getSatellitePickup(pickupId)?.health).toBe(pickupHealth);
     expect(engine.getServerLasers()).toHaveLength(1);
   });
 
@@ -116,18 +120,55 @@ describe('satellite pickups intercept physical damage', () => {
     expect(engine.getPlayer('owner')?.health).toBe(ownerHealth);
   });
 
-  test('an asteroid body damages a loose pickup without protecting a ship globally', () => {
+  test('asteroids and shots pass through loose pickups without damaging or moving them', () => {
     addOwner();
     const pickup = engine.getAllSatellitePickups()[0];
     assert.ok(pickup);
     engine.addAsteroid(asteroidAt('pickup-rock', pickup.position));
-
     engine.resolveAuthoritativeCombat();
-    expect(engine.getSatellitePickup(pickup.id)?.health).toBe(
-      SATELLITE_PICKUP.HEALTH - DAMAGE.LASER_HIT
-    );
     engine.resolveAuthoritativeCombat();
-    expect(engine.getSatellitePickup(pickup.id)?.state).toBe('broken');
+    expect(engine.getSatellitePickup(pickup.id)).toEqual(pickup);
     expect(engine.getAsteroid('pickup-rock')).toBeDefined();
+    clearAsteroids(engine);
+    for (const bounces of [0, 1]) {
+      const shot = engine.spawnLaser(
+        'owner',
+        { x: pickup.position.x - 60, y: pickup.position.y },
+        { x: 120, y: 0 }
+      );
+      assert.ok(shot);
+      shot.bounces = bounces;
+      engine.advanceLasersAndResolveHits();
+      expect(shot.hasExploded).toBe(false);
+      expect(engine.getSatellitePickup(pickup.id)).toEqual(pickup);
+    }
+  });
+
+  test('an equipped satellite takes asteroid damage and breaks after two impacts', () => {
+    addOwner();
+    const id = attachFirstPickup();
+    const pickup = engine.getSatellitePickup(id);
+    assert.ok(pickup);
+    engine.addAsteroid(asteroidAt('pickup-rock', pickup.position));
+    engine.resolveAuthoritativeCombat();
+    expect(engine.getSatellitePickup(id)?.health).toBe(pickup.health - DAMAGE.LASER_HIT);
+    engine.resolveAuthoritativeCombat();
+    expect(engine.getSatellitePickup(id)?.state).toBe('broken');
+  });
+
+  test('a ricochet strikes an equipped satellite before reaching its owner', () => {
+    addOwner();
+    const id = attachFirstPickup();
+    addAttacker();
+    const health = engine.getPlayer('owner')?.health;
+    const pickup = engine.getSatellitePickup(id);
+    assert.ok(pickup);
+    const shot = engine.spawnLaser('attacker', { x: 120, y: 0 }, { x: -240, y: 0 });
+    assert.ok(shot);
+    shot.bounces = 1;
+    engine.advanceLasersAndResolveHits();
+    expect(engine.getSatellitePickup(id)?.health).toBe(pickup.health - DAMAGE.LASER_HIT);
+    expect(engine.getPlayer('owner')?.health).toBe(health);
+    expect(shot.hasExploded).toBe(true);
   });
 });

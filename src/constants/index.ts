@@ -269,17 +269,16 @@ export const SATELLITE_PICKUP = {
   SIZE: 24,
   ORBIT_RADIUS: 48,
   ORBIT_SPEED: 0.08 * GAME.MOTION_SCALE,
-  DRIFT_SPEED: 0.28 * GAME.MOTION_SCALE,
-  LOOSE_ORBIT_RADIUS: 70,
   SCORE_BONUS: 50,
   HEALTH: 50,
   AUTO_COLLECT_RANGE: 140,
+  LIFETIME_FRAMES: 120 * GAME.FPS,
+  SCAN_RANGE: 600,
   RESPAWN_FRAMES: 180,
   ORBIT_GAP: 8,
   MAX_COUNT: 6,
   SPAWN_RING_MIN: 380,
   SPAWN_RING_MAX: 480,
-  FIELD_RADIUS: 700,
 } as const;
 
 // ============================================================================
@@ -356,7 +355,6 @@ export const DEBUG = {
 
   SATELLITE_PICKUP: {
     COUNT: 6,
-    MOVEMENT: true,
   },
 
   // Roid settings (overrides ROID.INITIAL_ROID_COUNT when in debug mode)

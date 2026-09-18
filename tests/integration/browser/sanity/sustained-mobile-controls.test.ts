@@ -111,7 +111,7 @@ test(
       if (!controller) {
         throw new Error('Game controller missing before HUD capture');
       }
-      controller.getGameStateManager().setPickupMessage('Landsat 7', 50);
+      controller.getGameStateManager().setPickupMessage('Landsat 7');
     });
     await game.waitForAnimationFrames(2);
     await page.screenshot({

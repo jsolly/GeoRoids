@@ -13,6 +13,7 @@ import type { RNGService } from './RNGService';
 interface TrackedLoot extends LootData {
   expiresAt: number;
   velocity: Velocity;
+  ejectFramesLeft?: number;
 }
 
 export class LootManager {
@@ -70,8 +71,8 @@ export class LootManager {
     return drop ? this.toPublic(drop) : undefined;
   }
 
-  /** One canister from a finished Resource Tap. The rock stays in the field. */
-  public spawnTap(position: Position, gameTime: number): LootData {
+  /** One ejected canister during a Resource Tap extract. The rock stays in the field. */
+  public spawnTap(position: Position, gameTime: number, velocity: Velocity): LootData {
     const drop: TrackedLoot = {
       id: `tap-${this.nextId++}`,
       position: { x: position.x, y: position.y },
@@ -79,7 +80,8 @@ export class LootManager {
       radius: GROWTH.TAP_LOOT_RADIUS,
       kind: 'tap',
       expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
-      velocity: { x: 0, y: 0 },
+      velocity: { ...velocity },
+      ejectFramesLeft: GROWTH.TAP_LOOT_EJECT_FRAMES,
     };
     this.loot.set(drop.id, drop);
     this.enforceCap();
@@ -118,6 +120,9 @@ export class LootManager {
 
     const drops = [...this.loot.values()].sort((a, b) => a.id.localeCompare(b.id));
     for (const drop of drops) {
+      if ((drop.ejectFramesLeft ?? 0) > 0) {
+        continue;
+      }
       const winner = collectors.find((entity) => {
         if (
           !lootOverlap(entity.position, hullRadiusForKit(entity.kitId), drop.position, drop.radius)
@@ -145,7 +150,9 @@ export class LootManager {
       .map((entity) => entity.position);
 
     for (const [id, drop] of this.loot) {
-      if (drop.kind === 'tap' && haulerPositions.length > 0) {
+      if ((drop.ejectFramesLeft ?? 0) > 0) {
+        drop.ejectFramesLeft = (drop.ejectFramesLeft ?? 0) - 1;
+      } else if (drop.kind === 'tap' && haulerPositions.length > 0) {
         addLootMagnetPull(drop, haulerPositions, {
           range: GROWTH.TAP_LOOT_MAGNET_RANGE,
           accel: GROWTH.TAP_LOOT_MAGNET_ACCEL,

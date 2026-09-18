@@ -22,8 +22,11 @@ export const GROWTH = {
   LOOT_RADIUS: 12,
   /** Outline canister from a Resource Tap extract. ~2.3× normal loot. */
   TAP_LOOT_RADIUS: 28,
-  TAP_LOOT_MASS: 0.4,
-  TAP_LOOT_SCORE: 8,
+  /** Four canisters keep the full extract at 0.4 mass and 8 points. */
+  TAP_LOOT_MASS: 0.1,
+  TAP_LOOT_SCORE: 2,
+  /** Let the ejection read before magnetism or pickup can consume it. */
+  TAP_LOOT_EJECT_FRAMES: 18,
   TAP_LOOT_MAGNET_RANGE: 160,
   TAP_LOOT_MAGNET_ACCEL: 0.4 * GAME.MOTION_SCALE,
   /** Pull loot toward living ships from beyond hull overlap without inflating the hull. */

@@ -78,6 +78,16 @@ export class MessageHandler {
           this.handleUseAbility(ws, command);
           break;
 
+        case 'equipSatellite': {
+          const player = this.gameEngine.getPlayerBySocket(ws);
+          if (
+            player?.id === command.id &&
+            this.gameEngine.equipSatellite(command.id, command.pickupId)
+          ) {
+            this.broadcaster.broadcastGameState();
+          }
+          break;
+        }
         case 'setHaulerUtility':
           this.handleSetHaulerUtility(ws, command);
           break;

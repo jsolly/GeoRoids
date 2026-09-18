@@ -1,4 +1,4 @@
-import type { Position, ShipKitId, Velocity } from '../../../shared-types';
+import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, TITLE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
@@ -14,8 +14,9 @@ import {
 import { hexToRgba, laserBoltColor } from '../../utils/colorUtils';
 import { isDebugMode } from '../../utils/debugUtils';
 import { findHarpoonFieldBody } from './harpoonField';
-import { isResourceTapUtility } from './haulerUtility';
+import { haulerUtilityOf, isResourceTapUtility } from './haulerUtility';
 import {
+  getHaulerEquipment,
   getKitHullOutline,
   projectHullPoint,
   projectHullPolyline,
@@ -122,7 +123,8 @@ export function strokeKitHullOutline(
   radius: number,
   angle: number,
   color: string,
-  kitId?: ShipKitId
+  kitId?: ShipKitId,
+  utility: HaulerUtilityId = 'tow_cable'
 ): void {
   const outline = getKitHullOutline(kitId);
   strokePhosphorPolyline(
@@ -131,7 +133,11 @@ export function strokeKitHullOutline(
     color,
     outline.hull.closed
   );
-  for (const extra of outline.extras) {
+  const details =
+    outline.kitId === 'hauler'
+      ? [...outline.extras, ...getHaulerEquipment(utility)]
+      : outline.extras;
+  for (const extra of details) {
     strokePhosphorPolyline(
       ctx,
       projectHullPolyline(centerX, centerY, radius, angle, extra),
@@ -571,7 +577,16 @@ export function drawShipAtPosition(
 
   const shipColor = color ?? ship.color;
 
-  strokeKitHullOutline(ctx, screenX, screenY, shipR, ship.angle, shipColor, ship.kitId);
+  strokeKitHullOutline(
+    ctx,
+    screenX,
+    screenY,
+    shipR,
+    ship.angle,
+    shipColor,
+    ship.kitId,
+    haulerUtilityOf(ship)
+  );
   drawAbilityFx(ctx, ship, screenX, screenY, shipR);
 
   drawShipImpactFlash(ctx, ship, screenX, screenY, shipR);

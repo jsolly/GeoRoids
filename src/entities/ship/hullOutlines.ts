@@ -1,4 +1,4 @@
-import type { ShipKitId } from '../../../shared-types';
+import type { HaulerUtilityId, ShipKitId } from '../../../shared-types';
 import { parseShipKitId, SHIP_HULL_STYLE, type SHIP_HULL_TOPOLOGY } from './shipKits';
 
 /** Local hull space: +f is forward, +p matches the classic triangle's rearLeft axis. */
@@ -85,14 +85,13 @@ const HAULER_CARGO_YOKE: HullOutline = kitOutline(
     true,
     [
       0.898, -0.711, 0.898, -0.54, 0.803, -0.452, 0.063, -0.452, -0.06, -0.332, -0.06, -0.227,
-      0.077, -0.114, 0.07, -0.026, 0.138, -0.026, 0.138, -0.056, 0.162, -0.06, 0.271, -0.009, 0.165,
-      0.06, 0.138, 0.056, 0.138, 0.026, 0.066, 0.029, 0.077, 0.114, -0.06, 0.223, -0.06, 0.329,
-      0.063, 0.452, 0.803, 0.452, 0.898, 0.54, 0.888, 0.721, 0.643, 0.915, 0.107, 0.885, 0.08,
-      0.936, -0.009, 0.936, -0.216, 1.12, -0.547, 1.12, -0.636, 1.011, -0.847, 1.007, -0.898, 0.881,
-      -0.868, 0.697, -0.813, 0.653, -0.632, 0.66, -0.632, 0.588, -0.704, 0.547, -0.704, 0.394,
-      -0.786, 0.319, -0.786, -0.319, -0.704, -0.397, -0.704, -0.547, -0.632, -0.588, -0.632, -0.663,
-      -0.81, -0.653, -0.868, -0.697, -0.898, -0.881, -0.847, -1.007, -0.803, -1.028, -0.636, -1.014,
-      -0.547, -1.12, -0.216, -1.12, -0.009, -0.936, 0.08, -0.936, 0.101, -0.885, 0.643, -0.915,
+      0.077, -0.114, 0.077, 0.114, -0.06, 0.223, -0.06, 0.329, 0.063, 0.452, 0.803, 0.452, 0.898,
+      0.54, 0.888, 0.721, 0.643, 0.915, 0.107, 0.885, 0.08, 0.936, -0.009, 0.936, -0.216, 1.12,
+      -0.547, 1.12, -0.636, 1.011, -0.847, 1.007, -0.898, 0.881, -0.868, 0.697, -0.813, 0.653,
+      -0.632, 0.66, -0.632, 0.588, -0.704, 0.547, -0.704, 0.394, -0.786, 0.319, -0.786, -0.319,
+      -0.704, -0.397, -0.704, -0.547, -0.632, -0.588, -0.632, -0.663, -0.81, -0.653, -0.868, -0.697,
+      -0.898, -0.881, -0.847, -1.007, -0.803, -1.028, -0.636, -1.014, -0.547, -1.12, -0.216, -1.12,
+      -0.009, -0.936, 0.08, -0.936, 0.101, -0.885, 0.643, -0.915,
     ]
   ),
   [
@@ -110,9 +109,6 @@ const HAULER_CARGO_YOKE: HullOutline = kitOutline(
         -0.18, -0.54, -0.26,
       ]
     ),
-    path(true, [0.02, -0.12, 0.14, -0.08, 0.14, 0.08, 0.02, 0.12, -0.08, 0.08, -0.08, -0.08]),
-    path(false, [0.14, 0.0, 0.26, 0.0]),
-    path(false, [0.18, -0.06, 0.26, 0.0, 0.18, 0.06]),
     HAULER_LEFT_TOWER_SLOT,
     flipP(HAULER_LEFT_TOWER_SLOT),
     HAULER_LEFT_ENGINE_INNER,
@@ -125,6 +121,35 @@ const HAULER_CARGO_YOKE: HullOutline = kitOutline(
     { f: -0.9, p: 0.88 },
   ]
 );
+
+/** Interchangeable hardware in the central bay between the Hauler's towers. */
+const HAULER_EQUIPMENT: Record<HaulerUtilityId, readonly HullPolyline[]> = {
+  tow_cable: [
+    // Winch frame and visibly wound cable across its drum.
+    path(true, [0.03, -0.2, 0.25, -0.2, 0.25, 0.2, 0.03, 0.2]),
+    path(
+      false,
+      [
+        0.04, -0.12, 0.24, -0.12, 0.04, -0.04, 0.24, -0.04, 0.04, 0.04, 0.24, 0.04, 0.04, 0.12,
+        0.24, 0.12,
+      ]
+    ),
+    // Exposed cable ending in a curved open tow hook.
+    path(false, [0.25, 0, 0.37, 0, 0.44, 0.03, 0.52, 0.03, 0.58, 0]),
+    path(false, [0.58, 0, 0.67, 0, 0.72, -0.06, 0.7, -0.13, 0.64, -0.16, 0.59, -0.13, 0.59, -0.08]),
+  ],
+  resource_tap: [
+    // Extractor housing and a long toothed probe, on the same mount.
+    path(true, [0.03, -0.2, 0.25, -0.2, 0.31, -0.12, 0.31, 0.12, 0.25, 0.2, 0.03, 0.2]),
+    path(false, [0.14, -0.2, 0.14, 0.2]),
+    path(true, [0.31, -0.09, 0.55, -0.09, 0.72, 0, 0.55, 0.09, 0.31, 0.09]),
+    path(false, [0.36, -0.09, 0.42, 0.09, 0.46, -0.09, 0.52, 0.09, 0.56, -0.08]),
+  ],
+};
+
+export function getHaulerEquipment(utility: HaulerUtilityId): readonly HullPolyline[] {
+  return HAULER_EQUIPMENT[utility];
+}
 
 const SURVEYOR_LEFT_WING_PANEL = path(false, [0.2, -0.95, 0.0, -0.4, -0.22, -0.48]);
 
@@ -319,7 +344,11 @@ export function serializeKitHullSvg(kitId: unknown, options: HullSvgOptions = {}
     midP: (bounds.minP + bounds.maxP) / 2,
     scale: Math.min(usable / spanF, usable / spanP),
   };
-  const paths = [outline.hull, ...outline.extras]
+  const paths = [
+    outline.hull,
+    ...outline.extras,
+    ...(outline.kitId === 'hauler' ? getHaulerEquipment('tow_cable') : []),
+  ]
     .map((line) => `    <path d="${hullPolylineToSvgPath(line, fit)}"/>`)
     .join('\n');
   const title = includeTitle ? `\n  <title>${outline.kitId} — ${outline.topology}</title>` : '';

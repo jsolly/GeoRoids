@@ -1,6 +1,8 @@
 import type { HaulerUtilityId } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
+import { traceTapCanister } from '../entities/loot/lootRenderer';
 import { PlayerManager } from '../entities/player/PlayerManager';
+import { latchShudderOffset } from '../entities/roid/latchShudder';
 import {
   HAULER_UTILITY,
   HAULER_UTILITY_IDS,
@@ -8,10 +10,18 @@ import {
   preferredHaulerUtility,
   rememberHaulerUtility,
 } from '../entities/ship/haulerUtility';
-import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
+import {
+  getHaulerEquipment,
+  getKitHullOutline,
+  projectHullPoint,
+  projectHullPolyline,
+} from '../entities/ship/hullOutlines';
+import { SHIP_ABILITY } from '../entities/ship/shipKits';
+import { strokeKitHullOutline } from '../entities/ship/shipRenderer';
 import { NetworkManager } from '../network/networkManager';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
+import { renderSatelliteInventory, satelliteInventoryDescription } from './satelliteInventory';
 import { isShipSchematicOpen, setShipSchematicOpen } from './shipSchematicState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
 
@@ -24,6 +34,7 @@ export const SHIP_SCHEMATIC_IDS = {
   copy: 'ship-schematic-part-copy',
   return: 'ship-schematic-return',
   cards: 'ship-schematic-cards',
+  inventory: 'ship-schematic-inventory',
 } as const;
 
 export const SHIP_SCHEMATIC_LONG_PRESS_MS = 700;
@@ -48,6 +59,8 @@ type SchematicElements = {
   copy: HTMLElement;
   return: HTMLButtonElement;
   cards: HTMLElement;
+  inventory: HTMLElement;
+  inventoryStatus: HTMLElement;
 };
 
 let initialized = false;
@@ -72,13 +85,29 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       <button id="${SHIP_SCHEMATIC_IDS.close}" type="button" aria-label="Close schematic">×</button>
     </header>
     <div class="ship-schematic-stage">
-      <canvas id="${SHIP_SCHEMATIC_IDS.canvas}" role="img" aria-label="Hauler exploded schematic"></canvas>
+      <canvas id="${SHIP_SCHEMATIC_IDS.canvas}" role="img" aria-label="Hauler equipment schematic"></canvas>
       <div id="${SHIP_SCHEMATIC_IDS.cards}" class="ship-schematic-cards"></div>
     </div>
+    <section class="satellite-inventory" aria-labelledby="satellite-inventory-title">
+      <h3 id="satellite-inventory-title">Inventory</h3>
+      <p>${satelliteInventoryDescription()}</p>
+      <div id="${SHIP_SCHEMATIC_IDS.inventory}"></div>
+      <span id="satellite-inventory-status" class="satellite-inventory-status" role="status" aria-atomic="true"></span>
+    </section>
     <footer class="ship-schematic-footer">
       <div class="ship-schematic-detail">
-        <h3 id="${SHIP_SCHEMATIC_IDS.title}"></h3>
-        <p id="${SHIP_SCHEMATIC_IDS.copy}"></p>
+        <div>
+          <h3 id="${SHIP_SCHEMATIC_IDS.title}"></h3>
+          <p id="${SHIP_SCHEMATIC_IDS.copy}"></p>
+        </div>
+        ${HAULER_UTILITY_IDS.map(
+          (id) => `
+          <div class="ship-schematic-detail-reserve" aria-hidden="true">
+            <h3>${HAULER_UTILITY[id].name}</h3>
+            <p>${HAULER_UTILITY[id].copy}</p>
+          </div>
+        `
+        ).join('')}
       </div>
       <canvas id="${SHIP_SCHEMATIC_IDS.tool}" role="img" aria-label="Tool in use"></canvas>
       <button id="${SHIP_SCHEMATIC_IDS.return}" type="button">Return to flight</button>
@@ -104,18 +133,41 @@ function ensureElements(): SchematicElements | null {
   const copy = dialog.querySelector<HTMLElement>(`#${SHIP_SCHEMATIC_IDS.copy}`);
   const ret = dialog.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.return}`);
   const cards = dialog.querySelector<HTMLElement>(`#${SHIP_SCHEMATIC_IDS.cards}`);
-  if (!canvas || !tool || !close || !title || !copy || !ret || !cards) {
+  const inventory = dialog.querySelector<HTMLElement>(`#${SHIP_SCHEMATIC_IDS.inventory}`);
+  const inventoryStatus = dialog.querySelector<HTMLElement>('#satellite-inventory-status');
+  if (
+    !canvas ||
+    !tool ||
+    !close ||
+    !title ||
+    !copy ||
+    !ret ||
+    !cards ||
+    !inventory ||
+    !inventoryStatus
+  ) {
     return null;
   }
-  return { dialog, canvas, tool, close, title, copy, return: ret, cards };
+  return {
+    dialog,
+    canvas,
+    tool,
+    close,
+    title,
+    copy,
+    return: ret,
+    cards,
+    inventory,
+    inventoryStatus,
+  };
 }
 
-function canOpenForLocalHauler(): boolean {
+function canOpenForLocalShip(): boolean {
   if (!document.body.classList.contains('in-play')) {
     return false;
   }
   const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
-  return ship?.kitId === 'hauler' && ship.health > 0 && !ship.exploding;
+  return ship !== undefined && ship.health > 0 && !ship.exploding;
 }
 
 function mountCards(): void {
@@ -141,6 +193,24 @@ function syncCards(): void {
   if (!elements) {
     return;
   }
+  const kit = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
+  const hauler = kit === 'hauler';
+  elements.cards.hidden = !hauler;
+  elements.tool.hidden = !hauler;
+  const eyebrow = elements.dialog.querySelector('.ship-schematic-eyebrow');
+  if (eyebrow) {
+    eyebrow.textContent = hauler ? 'HAULER' : 'SURVEYOR';
+  }
+  elements.canvas.setAttribute(
+    'aria-label',
+    `${hauler ? 'Hauler' : 'Surveyor'} equipment schematic`
+  );
+  if (!hauler) {
+    elements.title.textContent = 'Survey pulse';
+    elements.copy.textContent =
+      'Press E in flight to identify asteroids at long range. Equip a satellite for continuous nearby scanning.';
+    return;
+  }
   const part = HAULER_UTILITY[selectedUtility];
   elements.title.textContent = part.name;
   elements.copy.textContent = part.copy;
@@ -152,6 +222,9 @@ function syncCards(): void {
 }
 
 export function equipUtility(utilityId: HaulerUtilityId): void {
+  if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId !== 'hauler') {
+    return;
+  }
   selectedUtility = utilityId;
   rememberHaulerUtility(utilityId);
   const player = PlayerManager.getInstance().getLocalPlayer();
@@ -203,8 +276,9 @@ function strokePolyline(
   ctx.stroke();
 }
 
-function drawExplodedHull(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-  const outline = getKitHullOutline('hauler');
+function drawSchematicHull(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  const kit = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
+  const outline = getKitHullOutline(kit);
   const cx = width * 0.5;
   const cy = height * 0.46;
   const radius = Math.min(width, height) * 0.28;
@@ -221,61 +295,29 @@ function drawExplodedHull(ctx: CanvasRenderingContext2D, width: number, height: 
     projectHullPolyline(cx, cy, radius, angle, outline.hull),
     outline.hull.closed
   );
-  ctx.setLineDash([4, 5]);
-  ctx.strokeStyle = hexToRgba(PALETTE.HUD_MUTED, 0.85);
-  ctx.shadowBlur = 0;
+  // Hull panels stay assembled and neutral; only the interchangeable tool is highlighted.
   for (const extra of outline.extras) {
-    const points = projectHullPolyline(cx, cy, radius, angle, extra);
-    let ax = 0;
-    let ay = 0;
-    for (const point of points) {
-      ax += point.x;
-      ay += point.y;
-    }
-    const count = Math.max(1, points.length);
-    ax /= count;
-    ay /= count;
-    const exploded = points.map((point) => ({
-      x: point.x + (point.x - cx) * 0.12,
-      y: point.y + (point.y - cy) * 0.12,
-    }));
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(ax + (ax - cx) * 0.12, ay + (ay - cy) * 0.12);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle = selectedUtility === 'resource_tap' ? PALETTE.LOOT : PALETTE.LOCAL;
-    ctx.shadowColor = ctx.strokeStyle;
-    ctx.shadowBlur = VISUAL.SHIP_GLOW;
-    strokePolyline(ctx, exploded, extra.closed);
-    ctx.setLineDash([4, 5]);
-    ctx.strokeStyle = hexToRgba(PALETTE.HUD_MUTED, 0.85);
-    ctx.shadowBlur = 0;
+    strokePolyline(ctx, projectHullPolyline(cx, cy, radius, angle, extra), extra.closed);
   }
-  ctx.setLineDash([]);
-  const leftMount = { x: cx - radius * 0.72, y: cy - radius * 0.08 };
-  const rightMount = { x: cx + radius * 0.72, y: cy - radius * 0.08 };
-  const towActive = selectedUtility === 'tow_cable';
+  if (kit !== 'hauler') {
+    return;
+  }
+  ctx.strokeStyle = PALETTE.LOOT;
+  ctx.shadowColor = PALETTE.LOOT;
+  for (const part of getHaulerEquipment(selectedUtility)) {
+    strokePolyline(ctx, projectHullPolyline(cx, cy, radius, angle, part), part.closed);
+  }
+  if (window.matchMedia('(max-width: 700px)').matches) {
+    return;
+  }
+  // Either card points at the same central mount, never at the hull's side panels.
+  const mount = projectHullPoint(cx, cy, radius, angle, { f: 0.35, p: 0 });
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = hexToRgba(PALETTE.LOOT, 0.65);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = towActive ? PALETTE.LOCAL : hexToRgba(PALETTE.HUD_MUTED, 0.85);
-  ctx.shadowColor = towActive ? PALETTE.LOCAL : 'transparent';
-  ctx.shadowBlur = towActive ? VISUAL.SHIP_GLOW : 0;
   ctx.beginPath();
-  ctx.moveTo(width * 0.16, height * 0.22);
-  ctx.lineTo(leftMount.x, leftMount.y);
-  ctx.stroke();
-  ctx.strokeStyle = towActive ? hexToRgba(PALETTE.HUD_MUTED, 0.85) : PALETTE.LOOT;
-  ctx.shadowColor = towActive ? 'transparent' : PALETTE.LOOT;
-  ctx.shadowBlur = towActive ? 0 : VISUAL.SHIP_GLOW;
-  ctx.beginPath();
-  ctx.moveTo(width * 0.84, height * 0.22);
-  ctx.lineTo(rightMount.x, rightMount.y);
-  ctx.stroke();
-  ctx.strokeStyle = PALETTE.LASER_LOCAL;
-  ctx.shadowColor = PALETTE.LASER_LOCAL;
-  ctx.shadowBlur = VISUAL.SHIP_GLOW;
-  ctx.beginPath();
-  ctx.arc(cx, cy + radius * 0.08, 5, 0, Math.PI * 2);
+  ctx.moveTo(width * (selectedUtility === 'tow_cable' ? 0.16 : 0.84), height * 0.22);
+  ctx.lineTo(mount.x, mount.y);
   ctx.stroke();
 }
 
@@ -287,50 +329,66 @@ function drawToolLoop(
 ): void {
   ctx.clearRect(0, 0, width, height);
   const shipX = width * 0.22;
-  const rockX = width * 0.78;
+  const elapsed = now % 2600;
+  const attached = elapsed >= 250 && elapsed < 1850;
   const midY = height * 0.5;
-  const t = (now / 1000) % 1;
+  const radius = 19;
+  const haul = selectedUtility === 'tow_cable' && attached ? ((elapsed - 250) / 1600) * 12 : 0;
+  const kick = attached ? latchShudderOffset(elapsed - 250) : 0;
+  const rockX = width * 0.78 - haul + kick;
+  const rockY = midY + kick * 0.35;
   ctx.lineWidth = 1.25;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.strokeStyle = PALETTE.LOCAL;
   ctx.shadowColor = PALETTE.LOCAL;
   ctx.shadowBlur = VISUAL.SHIP_GLOW;
-  ctx.beginPath();
-  ctx.moveTo(shipX - 16, midY - 10);
-  ctx.lineTo(shipX + 10, midY);
-  ctx.lineTo(shipX - 16, midY + 10);
-  ctx.closePath();
-  ctx.stroke();
+  strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'hauler', selectedUtility);
   ctx.strokeStyle = PALETTE.HUD_MUTED;
   ctx.shadowBlur = 0;
   ctx.beginPath();
-  ctx.arc(rockX, midY, 14, 0, Math.PI * 2);
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const r = i % 2 === 0 ? 14 : 11;
+    const x = rockX + Math.cos(angle) * r;
+    const y = rockY + Math.sin(angle) * r;
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
   ctx.stroke();
-  ctx.strokeStyle = PALETTE.LOOT;
-  ctx.beginPath();
-  ctx.moveTo(shipX + 10, midY);
-  ctx.lineTo(rockX - 14, midY);
-  ctx.stroke();
-  ctx.strokeStyle = PALETTE.LASER_LOCAL;
-  ctx.beginPath();
-  ctx.arc(rockX - 14, midY, 2.2, 0, Math.PI * 2);
-  ctx.stroke();
+  if (attached) {
+    ctx.strokeStyle = PALETTE.LOOT;
+    ctx.beginPath();
+    ctx.moveTo(shipX + radius * 0.72, midY);
+    ctx.lineTo(rockX - 14, rockY);
+    ctx.stroke();
+  }
   if (selectedUtility === 'resource_tap') {
-    for (let i = 0; i < 4; i++) {
-      const u = (t + i / 4) % 1;
-      const x = rockX - 14 + (shipX + 10 - (rockX - 14)) * u;
-      ctx.strokeStyle = i === 3 ? PALETTE.LASER_LOCAL : PALETTE.LOOT;
+    const extractMs = (SHIP_ABILITY.TAP_EXTRACT_FRAMES / 60) * 1000;
+    for (let i = 0; i < SHIP_ABILITY.TAP_EXTRACT_BURSTS; i++) {
+      const age = elapsed - 250 - ((i + 1) * extractMs) / SHIP_ABILITY.TAP_EXTRACT_BURSTS;
+      if (age < 0 || age > 700) {
+        continue;
+      }
+      const angle = -0.9 + i * 0.6;
+      const travel = 13 + age * 0.045;
+      const x = rockX + Math.cos(angle) * travel;
+      const y = midY + Math.sin(angle) * travel;
+      ctx.globalAlpha = 1 - age / 700;
+      ctx.strokeStyle = PALETTE.LOOT;
       ctx.beginPath();
-      ctx.arc(x, midY, 1.6, 0, Math.PI * 2);
+      traceTapCanister(ctx, x, y, 5);
+      ctx.stroke();
+      ctx.strokeStyle = PALETTE.LASER_LOCAL;
+      ctx.beginPath();
+      ctx.moveTo(x - 1, y - 3.9);
+      ctx.lineTo(x + 1, y - 3.9);
       ctx.stroke();
     }
-  } else {
-    const haul = Math.sin(t * Math.PI * 2) * 6;
-    ctx.strokeStyle = PALETTE.HUD_MUTED;
-    ctx.beginPath();
-    ctx.arc(rockX + haul, midY, 14, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -338,6 +396,7 @@ function renderOverlay(): void {
   if (!elements || !isShipSchematicOpen()) {
     return;
   }
+  renderSatelliteInventory(elements.inventory, elements.inventoryStatus, elements.return);
   resizeCanvas(elements.canvas, 640, 360);
   resizeCanvas(elements.tool, 220, 80);
   const hull = elements.canvas.getContext('2d');
@@ -346,7 +405,7 @@ function renderOverlay(): void {
     hull.setTransform(1, 0, 0, 1, 0, 0);
     const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
     hull.scale(dpr, dpr);
-    drawExplodedHull(hull, elements.canvas.width / dpr, elements.canvas.height / dpr);
+    drawSchematicHull(hull, elements.canvas.width / dpr, elements.canvas.height / dpr);
   }
   if (tool) {
     tool.setTransform(1, 0, 0, 1, 0, 0);
@@ -371,10 +430,10 @@ function stopRenderLoop(): void {
   }
 }
 
-export function isPointerOnLocalHauler(clientX: number, clientY: number): boolean {
+export function isPointerOnLocalShip(clientX: number, clientY: number): boolean {
   const player = PlayerManager.getInstance().getLocalPlayer();
   const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
-  if (!player || !canvas || player.ship.kitId !== 'hauler' || player.lives <= 0) {
+  if (!player || !canvas || player.lives <= 0) {
     return false;
   }
   const rect = canvas.getBoundingClientRect();
@@ -385,7 +444,7 @@ export function isPointerOnLocalHauler(clientX: number, clientY: number): boolea
 }
 
 export function openShipSchematic(): boolean {
-  if (!elements || isShipSchematicOpen() || !canOpenForLocalHauler()) {
+  if (!elements || isShipSchematicOpen() || !canOpenForLocalShip()) {
     return false;
   }
   if (isUniverseMapOpen()) {
@@ -405,6 +464,7 @@ export function openShipSchematic(): boolean {
   const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
   selectedUtility = ship ? haulerUtilityOf(ship) : preferredHaulerUtility();
   syncCards();
+  renderSatelliteInventory(elements.inventory, elements.inventoryStatus, elements.return);
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameSchematicOpen'));
   startRenderLoop();
@@ -467,6 +527,10 @@ function handleSchematicKeydown(ev: KeyboardEvent): void {
     ev.preventDefault();
     ev.stopPropagation();
     closeShipSchematic();
+    return;
+  }
+  if (ev.code === 'Space' && ev.target instanceof HTMLButtonElement) {
+    ev.stopPropagation();
     return;
   }
   if (BLOCKED_GAMEPLAY_KEYS.has(ev.code)) {

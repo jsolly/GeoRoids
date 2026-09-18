@@ -254,7 +254,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <span><i class="map-key map-key-fog"></i>Uncharted</span>
       </div>
       <p id="${UNIVERSE_MAP_IDS.status}" aria-live="polite"></p>
-      <p class="universe-map-help">Drag to pan · Scroll or +/- to zoom · M or Esc closes · Cruise continues while you read the map.</p>
+      <p class="universe-map-help">Drag to pan · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.</p>
     </footer>`;
 }
 

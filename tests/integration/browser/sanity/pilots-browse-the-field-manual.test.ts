@@ -10,7 +10,7 @@ const articles = readWikiArticles();
 const GIF_SRC_SUFFIX_PATTERN = /\.gif$/u;
 const PNG_SRC_SUFFIX_PATTERN = /\.png$/u;
 const WHITESPACE_COLLAPSE_PATTERN = /\s+/gu;
-const HAULER_LEGACY_TERMS_PATTERN = /Q latches|winch|couple a second/u;
+const HAULER_LEGACY_TERMS_PATTERN = /Q latches|couple a second/u;
 
 test('pilots find rules and see autoplay demonstrations on desktop and mobile', async () => {
   const browser = await chromium.launch({ headless: true });
@@ -127,6 +127,12 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     for (const article of articles) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
       await expect.poll(() => page.locator('h1').textContent()).toBe(article.title);
+      if (article.id === 'satellites') {
+        await page.screenshot({
+          path: resolve(output, 'wiki-satellite-inventory-desktop.png'),
+          fullPage: true,
+        });
+      }
       const articleMedia = article.media;
       expect(await page.locator('.game-reference section').count()).toBe(article.sections.length);
       expect(
@@ -239,6 +245,12 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')
     ).toContain('Touch and hold the playfield to steer');
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#satellites`);
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Satellites and pickups');
+    await page.screenshot({
+      path: resolve(output, 'wiki-satellite-inventory-mobile.png'),
+      fullPage: true,
+    });
     await page.locator('.breadcrumb a').click();
     await page.screenshot({ path: resolve(output, 'wiki-mobile.png'), fullPage: true });
     await page.locator('#wiki-search').fill('minerals');

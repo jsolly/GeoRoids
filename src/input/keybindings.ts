@@ -33,7 +33,7 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 /** The live local ship cruises regardless of which controls are held. */
 function updateCruise(player: Player): void {
   const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
-  player.ship.thrusting = alive;
+  player.ship.thrusting = alive && !player.ship.movementLocked;
   if (!alive) {
     player.ship.boosting = false;
   }
@@ -48,7 +48,12 @@ function turnSpeedForShip(player: Player): number {
 }
 
 function updateTurnFromKeys(player: Player): void {
-  if (player.lives <= 0 || player.ship.health <= 0 || player.ship.exploding) {
+  if (
+    player.ship.movementLocked ||
+    player.lives <= 0 ||
+    player.ship.health <= 0 ||
+    player.ship.exploding
+  ) {
     player.ship.angularVelocity = 0;
     return;
   }

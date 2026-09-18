@@ -233,6 +233,12 @@ export class WorldStore {
   private readonly db: DatabaseSync;
   private readonly pilotJson = new Map<string, string>();
   private persistedAsteroidSectors = new Map<string, string>();
+  /**
+   * Saved deposits left per sector, including fully harvested sectors at zero.
+   * Sector progress reads this every frame; rows are parsed only when a
+   * sector is loaded or written.
+   */
+  private persistedSectorRocks = new Map<string, number>();
   private worldJson: string | undefined;
 
   constructor(path: string) {
@@ -294,6 +300,7 @@ export class WorldStore {
 
   private indexPersistedSectors(): void {
     const next = new Map<string, string>();
+    const rockCounts = new Map<string, number>();
     for (const row of this.db.prepare('SELECT id,json FROM sectors').all()) {
       const id = row['id'];
       if (typeof id !== 'string') {
@@ -307,8 +314,10 @@ export class WorldStore {
       }
       const rocks = this.validateSectorValue(id, value);
       this.indexSector(next, id, rocks);
+      rockCounts.set(id, rocks.length);
     }
     this.persistedAsteroidSectors = next;
+    this.persistedSectorRocks = rockCounts;
   }
 
   loadWorld(): SavedWorld | undefined {
@@ -369,17 +378,13 @@ export class WorldStore {
       });
   }
 
-  listSectorIds(): string[] {
-    return this.db
-      .prepare('SELECT id FROM sectors')
-      .all()
-      .map((row) => {
-        const id = row['id'];
-        if (typeof id !== 'string' || !validSectorId(id)) {
-          throw new Error('Saved sector has an invalid identity');
-        }
-        return id;
-      });
+  /** Deposits left in every saved sector, without reading the database. */
+  persistedSectorRockCounts(): ReadonlyMap<string, number> {
+    return this.persistedSectorRocks;
+  }
+
+  hasPersistedSector(id: string): boolean {
+    return this.persistedSectorRocks.has(id);
   }
 
   loadSector(id: string): AsteroidData[] | undefined {
@@ -439,6 +444,9 @@ export class WorldStore {
       this.db.exec('COMMIT');
       this.worldJson = worldJson;
       this.persistedAsteroidSectors = nextAsteroidSectors;
+      for (const [id, rocks] of validatedSectors) {
+        this.persistedSectorRocks.set(id, rocks.length);
+      }
       for (const pilot of changedPilots) {
         this.pilotJson.set(pilot.id, pilot.json);
       }
@@ -453,6 +461,7 @@ export class WorldStore {
       'BEGIN IMMEDIATE; DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; COMMIT;'
     );
     this.persistedAsteroidSectors.clear();
+    this.persistedSectorRocks.clear();
     this.pilotJson.clear();
     this.worldJson = undefined;
   }

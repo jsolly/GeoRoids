@@ -653,13 +653,16 @@ export class GameEngine {
     for (const [id, rocks] of this.regionalField.dormantSectors()) {
       remaining.set(id, (remaining.get(id) ?? 0) + rocks.length);
     }
+    // Saved sectors are counted from the store's in-memory index. Reading and
+    // validating every saved row here ran once per frame and blocked the loop
+    // for seconds on an explored world, which is what rebased joining pilots.
     const store = this.worldStore;
     if (store) {
-      for (const id of store.listSectorIds()) {
+      for (const [id, rocks] of store.persistedSectorRockCounts()) {
         if (this.regionalField.isActive(id) || this.regionalField.dormantSectors().has(id)) {
           continue;
         }
-        remaining.set(id, store.loadSector(id)?.length ?? 0);
+        remaining.set(id, rocks);
       }
     }
     const newlyCompleted: string[] = [];

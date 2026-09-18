@@ -66,10 +66,10 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   loot: {
-    title: 'Loot blast and growth',
-    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Surveyor and is collected, growing the ship.',
+    title: 'Loot blast and collect',
+    alt: 'A laser destroys one loot drop and blasts a small asteroid outward. A remaining shard flies toward a Surveyor and is collected without changing the hull size.',
     caption:
-      'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and grows the ship.',
+      'Controlled demonstration: shoot one drop to detonate it and push a small rock. A remaining shard magnetizes to the hull and is collected.',
     sources: [
       'shared/lootBlast.ts',
       'shared/shipGrowth.ts',

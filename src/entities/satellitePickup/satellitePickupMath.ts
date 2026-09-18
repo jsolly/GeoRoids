@@ -17,7 +17,7 @@ export function attachOrbitPosition(owner: Position, phase: number, radius: numb
   };
 }
 
-/** Keep an orbiting pickup outside the owner's current grown hull. */
+/** Keep an orbiting pickup outside the owner's kit hull. */
 export function orbitRadiusForOwner(ownerRadius: number, pickupRadius: number): number {
   return Math.max(
     SATELLITE_PICKUP.ORBIT_RADIUS,

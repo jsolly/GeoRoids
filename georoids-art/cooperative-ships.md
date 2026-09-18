@@ -7,7 +7,7 @@ and two engine bells. Runtime and SVG geometry live in
 The current pack is `georoids-art/ships-v2/{surveyor,hauler}.svg`.
 Stroke is `#5EEAD4` on `#000011`. Surveyor play-scale is `SHIP.SIZE` (30px);
 Hauler is `2×` that barge footprint on the playfield. Hull outlines stay
-normalized; kit `size` plus mass growth set draw, collision, and latch radii.
+normalized; kit `size` sets draw, collision, and latch radii.
 
 | Kit | Hull | Role |
 | --- | --- | --- |

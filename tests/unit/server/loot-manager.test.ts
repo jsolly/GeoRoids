@@ -4,7 +4,8 @@ import type { GameEntity } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { LootManager } from '../../../server/core/LootManager';
 import { RNGService } from '../../../server/core/RNGService';
-import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 function collectorAt(position: { x: number; y: number }): GameEntity {
@@ -89,12 +90,35 @@ describe('LootManager destroy-drop shards', () => {
         { x: 0, y: 0 },
         'hauler'
       );
-      const justPastSurveyor = radiusFromMass(GROWTH.BASE_MASS) + GROWTH.LOOT_RADIUS + 4;
+      const justPastSurveyor = hullRadiusForKit('surveyor') + GROWTH.LOOT_RADIUS + 4;
       const shard = manager.spawnShard({ x: justPastSurveyor, y: 0 }, 20);
       const collected = manager.collectOverlaps([surveyor, hauler]);
       expect(collected).toEqual([
         { collector: hauler, loot: expect.objectContaining({ id: shard.id }) },
       ]);
+    } finally {
+      engine.stopGameLoop();
+    }
+  });
+
+  test('a mass-grown Surveyor still misses a shard just past the kit hull', () => {
+    const manager = new LootManager(new RNGService(7));
+    const engine = new GameEngine(7);
+    try {
+      const surveyor = engine.addPlayer(
+        'scout',
+        'Scout',
+        new RecordingSocket(),
+        { x: 0, y: 0 },
+        'surveyor'
+      );
+      engine.updatePlayer('scout', { mass: GROWTH.SOFT_MAX_MASS });
+      expect(surveyor.mass).toBe(GROWTH.SOFT_MAX_MASS);
+      expect(hullRadiusForKit(surveyor.kitId, surveyor.mass)).toBe(hullRadiusForKit('surveyor'));
+      const justPastSurveyor = hullRadiusForKit('surveyor') + GROWTH.LOOT_RADIUS + 4;
+      const shard = manager.spawnShard({ x: justPastSurveyor, y: 0 }, 20);
+      expect(manager.collectOverlaps([surveyor])).toEqual([]);
+      expect(manager.get(shard.id)?.id).toBe(shard.id);
     } finally {
       engine.stopGameLoop();
     }

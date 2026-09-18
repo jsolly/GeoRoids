@@ -120,12 +120,7 @@ export class LootManager {
     for (const drop of drops) {
       const winner = collectors.find((entity) => {
         if (
-          !lootOverlap(
-            entity.position,
-            hullRadiusForKit(entity.kitId, entity.mass ?? GROWTH.BASE_MASS),
-            drop.position,
-            drop.radius
-          )
+          !lootOverlap(entity.position, hullRadiusForKit(entity.kitId), drop.position, drop.radius)
         ) {
           return false;
         }

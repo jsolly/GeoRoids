@@ -121,13 +121,12 @@ interface ServerLaser {
 function tapLootSpawnPosition(
   ship: Position,
   rock: Pick<AsteroidData, 'position' | 'size'>,
-  shipMass: number,
   kitId: ShipKitId
 ): Position {
   const dx = rock.position.x - ship.x;
   const dy = rock.position.y - ship.y;
   const dist = Math.hypot(dx, dy) || 1;
-  const offset = rock.size + GROWTH.TAP_LOOT_RADIUS + hullRadiusForKit(kitId, shipMass) + 8;
+  const offset = rock.size + GROWTH.TAP_LOOT_RADIUS + hullRadiusForKit(kitId) + 8;
   return {
     x: rock.position.x + (dx / dist) * offset,
     y: rock.position.y + (dy / dist) * offset,
@@ -680,7 +679,7 @@ export class GameEngine {
   }
 
   private ensurePilotInOpenSector(entity: GameEntity): boolean {
-    const radius = hullRadiusForKit(entity.kitId, entity.mass);
+    const radius = hullRadiusForKit(entity.kitId);
     if (
       !isInsideCompletedSector(entity.position, this.completedSectors) &&
       !shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
@@ -1426,7 +1425,7 @@ export class GameEngine {
     const owners = this.entityManager.getAllEntities().map((entity) => ({
       id: entity.id,
       position: entity.position,
-      radius: hullRadiusForKit(entity.kitId, entity.mass ?? GROWTH.BASE_MASS),
+      radius: hullRadiusForKit(entity.kitId),
       health: entity.health,
       exploding: entity.exploding,
     }));
@@ -1470,7 +1469,7 @@ export class GameEngine {
         {
           id: collector.id,
           position: collector.position,
-          radius: hullRadiusForKit(collector.kitId, collector.mass ?? GROWTH.BASE_MASS),
+          radius: hullRadiusForKit(collector.kitId),
           health: collector.health,
           exploding: collector.exploding,
         },
@@ -1615,7 +1614,7 @@ export class GameEngine {
     const results: CombatBroadcast[] = [];
     const entities = this.entityManager.getAllEntities();
     for (const entity of entities) {
-      const radius = hullRadiusForKit(entity.kitId, entity.mass);
+      const radius = hullRadiusForKit(entity.kitId);
       if (
         checkBoundaryCollision(entity.position, radius) ||
         shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
@@ -1924,7 +1923,7 @@ export class GameEngine {
     // Only server-granted knockback expands the normal envelope.
     const maxShipSpeed = this.playerMotion.legalSpeed(shooter, now);
     const maxLaserSpeed = maxShipSpeed + LASER.SPEED / GAME.FPS;
-    const muzzleRadius = (4 / 3) * hullRadiusForKit(shooter.kitId, shooter.mass);
+    const muzzleRadius = (4 / 3) * hullRadiusForKit(shooter.kitId);
     const maxOriginDistance =
       muzzleRadius +
       PLAYER_SHOOT_MUZZLE_SLOP +
@@ -2145,7 +2144,7 @@ export class GameEngine {
             .map((entity) => ({
               id: entity.id,
               position: entity.position,
-              radius: hullRadiusForKit(entity.kitId, entity.mass) + LASER.HIT_RADIUS,
+              radius: hullRadiusForKit(entity.kitId) + LASER.HIT_RADIUS,
               kind: 'ship' as const,
             }))
         : [];
@@ -2506,12 +2505,7 @@ export class GameEngine {
       pullHarpoonTarget(entity, target ? [target] : []);
       if (tickTapExtract(entity, target) === 'complete' && target) {
         this.lootManager.spawnTap(
-          tapLootSpawnPosition(
-            entity.position,
-            target,
-            entity.mass ?? GROWTH.BASE_MASS,
-            entity.kitId
-          ),
+          tapLootSpawnPosition(entity.position, target, entity.kitId),
           this.gameTime
         );
         clearHaulerLatch(entity);

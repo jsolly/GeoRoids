@@ -6,7 +6,7 @@ import {
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import { cruiseSpeed } from '../../../shared/shipFlight';
-import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
 import type {
   HaulerUtilityId,
   LaserUpgrade,
@@ -33,7 +33,7 @@ import {
   tickAbilityHost,
 } from './shipAbilities';
 import { getShipCombatNetwork } from './shipCombatNetwork';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from './shipKits';
+import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit, hullRadiusForKit } from './shipKits';
 import {
   applyShipSpawnProtection,
   applyThrustOrFriction,
@@ -49,7 +49,7 @@ class Ship {
   velocity: Velocity = { x: 0, y: 0 };
   /** Granted only by an authoritative motion rebase after an external impulse. */
   knockbackVelocityLimit = 0;
-  r: number = radiusFromMass(GROWTH.BASE_MASS);
+  r: number = hullRadiusForKit(DEFAULT_SHIP_KIT_ID);
   mass: number = GROWTH.BASE_MASS;
   angle: number = (90 / 180) * Math.PI;
   blinkCount: number = 0;

@@ -164,13 +164,13 @@ function bodyRadius(body: Pick<AbilityBody, 'r' | 'size'>): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-function hostHullRadius(host: Pick<AbilityHost, 'kitId' | 'mass'>): number {
-  return hullRadiusForKit(host.kitId, host.mass);
+function hostHullRadius(host: Pick<AbilityHost, 'kitId'>): number {
+  return hullRadiusForKit(host.kitId);
 }
 
 /** Gap from hull to hull. Negative means the ship is inside the target. */
 export function harpoonSurfaceGap(
-  host: Pick<AbilityHost, 'position' | 'kitId' | 'mass'>,
+  host: Pick<AbilityHost, 'position' | 'kitId'>,
   body: AbilityBody
 ): number {
   const dist = Math.hypot(body.position.x - host.position.x, body.position.y - host.position.y);
@@ -180,7 +180,7 @@ export function harpoonSurfaceGap(
 const NEAREST_GAP_TIE_WU = 24;
 
 function pickNearestHarpoonBody(
-  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId' | 'mass'>,
+  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId'>,
   bodies: readonly AbilityBody[],
   range: number
 ): AbilityBody | undefined {
@@ -212,7 +212,7 @@ function pickNearestHarpoonBody(
 }
 
 export function findHarpoonTarget(
-  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId' | 'mass'>,
+  host: Pick<AbilityHost, 'position' | 'angle' | 'kitId'>,
   bodies: readonly AbilityBody[],
   range: number = SHIP_ABILITY.HARPOON_RANGE
 ): AbilityBody | undefined {

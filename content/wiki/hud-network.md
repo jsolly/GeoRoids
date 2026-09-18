@@ -64,8 +64,9 @@ If your predicted flight drifts beyond the server's movement limits, your ship
 returns to its last accepted position and resumes flight there. This correction
 keeps the visible ship, shots, and asteroid impacts in the same place. A brief
 network stall that delivers up to about one second of held position reports all
-at once is not a drift; those reports are accepted and your ship stays where you
-flew it.
+at once is not a drift, and neither is a stall in the server's own game loop:
+that stalled time is credited to your next report, those reports are accepted,
+and your ship stays where you flew it.
 
 ## Connection interruptions
 

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
+import { GAME_TICK_MS, MAX_CATCH_UP_TICKS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { cruiseSpeed } from '../../shared/shipFlight';
@@ -15,14 +15,23 @@ interface MotionEnvelopeRejection {
   check: 'velocity' | 'displacement' | 'boundary' | 'sector' | 'anchor';
   mode: PlayerMotionState['mode'];
   elapsedMs: number;
+  /** Part of `elapsedMs` during which the server loop itself was blocked. */
+  blockedMs: number;
   speed: number;
   velocity: number;
   displacement: number;
   credit: number;
 }
 
+/** A server-time span during which the event loop could not read any pose. */
+interface BlockedSpan {
+  from: number;
+  to: number;
+}
+
 export type MotionOutcome =
-  | { ok: true }
+  /** `blockedMs` is the server-blocked time this pose was credited beyond client silence. */
+  | { ok: true; blockedMs: number }
   | { ok: false; error: string; envelope?: MotionEnvelopeRejection };
 
 type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'thrusting'> & {
@@ -58,6 +67,12 @@ interface Session {
  */
 const BURST_CREDIT_MS = PLAYER_MOTION.poseLeadFrames * GAME_TICK_MS;
 
+/** Ordinary timer jitter is not a blocked loop; anything past two ticks is. */
+const BLOCKED_SPAN_MIN_MS = 2 * GAME_TICK_MS;
+
+/** Matches the 30 s stale-actor timeout in EntityManager, so every live pose gap is covered. */
+const BLOCKED_SPAN_RETENTION_MS = 30_000;
+
 /**
  * Authoritative lifecycle and pose ownership for players.
  *
@@ -69,6 +84,7 @@ export class PlayerMotionService {
   private readonly sessions = new Map<string, Session>();
   private readonly tokens = new Map<string, Session>();
   private readonly sockets = new Map<WebSocket, Session>();
+  private blockedSpans: BlockedSpan[] = [];
 
   constructor(private readonly completedSectors: ReadonlySet<string> = new Set()) {}
 
@@ -76,6 +92,36 @@ export class PlayerMotionService {
     if (!Number.isFinite(now) || now < 0) {
       throw new RangeError('Motion requires finite server time');
     }
+  }
+
+  /**
+   * Record a span during which the server loop was blocked. Poses queued then
+   * could not be read sooner, so that time is server delay, not client silence.
+   */
+  public recordBlockedSpan(from: number, to: number): void {
+    this.assertTime(from);
+    this.assertTime(to);
+    if (to - from < BLOCKED_SPAN_MIN_MS) {
+      return;
+    }
+    this.blockedSpans = this.blockedSpans.filter(
+      (span) => span.to >= to - BLOCKED_SPAN_RETENTION_MS
+    );
+    this.blockedSpans.push({ from, to });
+  }
+
+  /**
+   * Longest single blocked span inside `(from, to]`. Each span is one clock
+   * step, and separate steps never add up: the loop read poses between them,
+   * so that time is ordinary silence and a stream of late ticks cannot
+   * accumulate into a multi-second allowance.
+   */
+  private blockedMsBetween(from: number, to: number): number {
+    let longest = 0;
+    for (const span of this.blockedSpans) {
+      longest = Math.max(longest, Math.min(span.to, to) - Math.max(span.from, from));
+    }
+    return Math.min(longest, Math.max(0, to - from));
   }
 
   private alive(actor: GameEntity): boolean {
@@ -380,8 +426,14 @@ export class PlayerMotionService {
     const boosting = pose.boosting === true;
     const speed = this.legalSpeed(session.actor, now, boosting);
     const elapsedMs = now - session.poseAt;
-    // Match the client's bounded catch-up; silence cannot bank an arbitrary jump.
-    const elapsedFrames = Math.min(MAX_CATCH_UP_TICKS, (elapsedMs * GAME.FPS) / 1000);
+    // Client silence is capped at the client's own bounded catch-up so it
+    // cannot bank an arbitrary jump. Time the server loop spent blocked is
+    // credited in full: the client kept flying and reporting, and nothing it
+    // sent could be read until the block ended.
+    const blockedMs = this.blockedMsBetween(session.poseAt, now);
+    const creditedMs = Math.min(MAX_TICK_DEBT_MS, elapsedMs - blockedMs) + blockedMs;
+    const elapsedFrames = (creditedMs * GAME.FPS) / 1000;
+    const blockedFrames = (blockedMs * GAME.FPS) / 1000;
     if (now - session.burstAt > BURST_CREDIT_MS) {
       session.burstCredit = 0;
     }
@@ -413,16 +465,28 @@ export class PlayerMotionService {
       return {
         ok: false,
         error: 'Enhanced movement exceeds its server-time envelope',
-        envelope: { check: failed, mode, elapsedMs, speed, velocity, displacement, credit },
+        envelope: {
+          check: failed,
+          mode,
+          elapsedMs,
+          blockedMs,
+          speed,
+          velocity,
+          displacement,
+          credit,
+        },
       };
     }
     const remaining = Math.max(0, credit - displacement);
     session.poseCredit = Math.min(speed * PLAYER_MOTION.poseLeadFrames, remaining);
     // Buffered poses released together all arrive with zero elapsed time, so
     // the first one must not be the only pose able to spend the gap they were
-    // held for. Excess above the lead stays for one jitter window, bounded by
-    // the client's catch-up, and its clock starts when the excess first appears.
-    const excess = Math.min(speed * MAX_CATCH_UP_TICKS, remaining - session.poseCredit);
+    // held for. Excess above the lead stays for one jitter window and its clock
+    // starts when the excess first appears. Growth is bounded by the client's
+    // catch-up plus any blocked server time this pose was credited; a reserve
+    // already earned carries over until it is spent or expires.
+    const reserveCap = Math.max(session.burstCredit, speed * (MAX_CATCH_UP_TICKS + blockedFrames));
+    const excess = Math.min(reserveCap, remaining - session.poseCredit);
     if (session.burstCredit <= 0 && excess > 0) {
       session.burstAt = now;
     }
@@ -439,7 +503,7 @@ export class PlayerMotionService {
     session.actor.boosting = boosting;
     session.actor.lastUpdate = now;
     this.publish(session);
-    return { ok: true };
+    return { ok: true, blockedMs };
   }
 
   /** Publish a server impulse as a new epoch so in-flight client poses cannot erase it. */
@@ -536,5 +600,6 @@ export class PlayerMotionService {
     for (const session of this.sessions.values()) {
       this.removeSession(session);
     }
+    this.blockedSpans = [];
   }
 }

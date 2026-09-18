@@ -200,6 +200,8 @@ export class GameEngine {
   private gameLoopInterval: NodeJS.Timeout | null = null;
   private isPaused: boolean = false; // Track if game is paused due to no players
   private lastTickAtMs = 0;
+  /** When the previous clock step returned; the loop was free to read poses after it. */
+  private lastTickFinishedAtMs = 0;
   private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
   private clockPrimed: boolean = false;
@@ -301,6 +303,7 @@ export class GameEngine {
     }
 
     this.lastTickAtMs = this.getServerTime();
+    this.lastTickFinishedAtMs = this.lastTickAtMs;
     this.lastSimulationAtMs = this.lastTickAtMs;
     this.nextTickDueAtMs = this.lastTickAtMs + GAME_TICK_MS;
     this.tickAccumulatorMs = 0;
@@ -319,12 +322,16 @@ export class GameEngine {
     const serverNow = this.simulationNow(nowMs);
     if (!this.clockPrimed) {
       this.lastTickAtMs = serverNow;
+      this.lastTickFinishedAtMs = serverNow;
       this.nextTickDueAtMs = serverNow + GAME_TICK_MS;
       this.clockPrimed = true;
       return 0;
     }
     const elapsed = serverNow - this.lastTickAtMs;
     this.lastTickAtMs = serverNow;
+    // Blocked time starts once the tick is overdue: the scheduled idle before
+    // the due time is when the loop normally reads queued poses.
+    const blockedFrom = Math.max(this.lastTickFinishedAtMs, this.nextTickDueAtMs);
     if (elapsed <= 0) {
       if (serverPerformanceMetrics.enabled) {
         serverPerformanceMetrics.recordClock({
@@ -352,6 +359,12 @@ export class GameEngine {
     for (let i = 0; i < frames; i++) {
       this.advanceOneFrame(serverNow);
     }
+    // One span per clock step: the late arrival plus a slow catch-up, during
+    // which the loop could not read poses. Recording it before the poll phase
+    // drains the queue lets those poses be credited, and steps never merge.
+    const finished = nowMs ?? this.getServerTime();
+    this.playerMotion.recordBlockedSpan(blockedFrom, finished);
+    this.lastTickFinishedAtMs = finished;
     return frames;
   }
 
@@ -434,6 +447,7 @@ export class GameEngine {
       this.gameLoopInterval = null;
     }
     this.lastTickAtMs = 0;
+    this.lastTickFinishedAtMs = 0;
     this.nextTickDueAtMs = 0;
     this.tickAccumulatorMs = 0;
     this.clockPrimed = false;
@@ -653,13 +667,16 @@ export class GameEngine {
     for (const [id, rocks] of this.regionalField.dormantSectors()) {
       remaining.set(id, (remaining.get(id) ?? 0) + rocks.length);
     }
+    // Saved sectors are counted from the store's in-memory index. Reading and
+    // validating every saved row here ran once per frame and blocked the loop
+    // for seconds on an explored world, which is what rebased joining pilots.
     const store = this.worldStore;
     if (store) {
-      for (const id of store.listSectorIds()) {
+      for (const [id, rocks] of store.persistedSectorRockCounts()) {
         if (this.regionalField.isActive(id) || this.regionalField.dormantSectors().has(id)) {
           continue;
         }
-        remaining.set(id, store.loadSector(id)?.length ?? 0);
+        remaining.set(id, rocks);
       }
     }
     const newlyCompleted: string[] = [];

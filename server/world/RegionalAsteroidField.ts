@@ -207,7 +207,7 @@ export class RegionalAsteroidField {
       this.visited.has(id) ||
       this.active.has(id) ||
       this.dormant.has(id) ||
-      this.store?.loadSector(id) !== undefined
+      this.store?.hasPersistedSector(id) === true
     );
   }
 
@@ -219,7 +219,7 @@ export class RegionalAsteroidField {
     for (const id of this.dormant.keys()) {
       ids.add(id);
     }
-    for (const id of this.store?.listSectorIds() ?? []) {
+    for (const id of this.store?.persistedSectorRockCounts().keys() ?? []) {
       ids.add(id);
     }
     return [...ids];

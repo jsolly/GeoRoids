@@ -37,7 +37,7 @@ Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDO
 **Server changes** (`server.ts`, `server/**`, `.railway/**`, or server-facing changes in `shared-types.ts`):
 
 1. Complete client verification above if the push also touched client files.
-2. Deploy manually on [Railway](https://railway.app). **Auto-deploy on push to `main` is off** — the public repo has no Railway GitHub App installation, so a merge does **not** deploy the server. Trigger a fresh GitHub-sourced build of the **exact merged commit SHA** (Railway dashboard Deploy, `railway up`/`railway redeploy` via CLI, or the Railway MCP agent's deploy with that `commitSha`). Do **not** commit unrelated staged environment patches while deploying — deploy the commit only.
+2. Deploy manually on [Railway](https://railway.app). **A merge to `main` does not deploy the server**: the Railway API reports the GitHub push-deploy trigger disabled (`NO_INSTALLATION` — no GitHub App on the public repo), and #608's merge produced no deployment until it was triggered by hand. The tracked `.railway/railway.ts` `source: github('jsolly/GeoRoids', { branch: 'main' })` only pins which repo and branch a deploy builds from; it does not by itself enable a push trigger. Deploy the **exact merged commit SHA**: the Railway dashboard's Deploy on that commit, or the Railway MCP agent / API deploy pinned to that `commitSha`. `railway redeploy` re-runs the previous build (its old SHA) and `railway up` uploads your local tree, so **neither** builds the merged commit. Deploy the commit only — do not commit unrelated staged environment patches.
 3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON (`world.persistence.mode` is `worker`, `failed` is `false`, `world.loop` stalls are `0`) and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
 4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
 
@@ -78,7 +78,7 @@ Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManage
 | --- | --- |
 | **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
 | **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
-| **Deploy** | Manual / separate from the Git push flow — Railway dashboard, CLI, or MCP agent. Auto-deploy on push is **off** (no Railway GitHub App on the public repo); deploy the exact merged commit SHA and do not commit unrelated staged env patches |
+| **Deploy** | Manual / separate from the Git push flow. Push-deploy auto-trigger is **off** (Railway API `NO_INSTALLATION`; #608's merge did not deploy). Deploy the exact merged commit SHA via the Railway dashboard Deploy-this-commit or the MCP agent/API pinned to that `commitSha` — `railway redeploy`/`up` do not build the merged SHA. Do not commit unrelated staged env patches |
 | **When required** | Changes under `server.ts`, `server/**`, `.railway/**`, or server protocol changes in `shared-types.ts` |
 
 Railpack installs dependencies and runs `npm run build` during the build. The

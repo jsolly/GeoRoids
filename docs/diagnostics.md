@@ -102,11 +102,13 @@ queues are capped at 256 KiB; the browser also checks socket backpressure.
 Client ingress limits each socket to 120 messages and 256 KiB per minute. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
-`logging.gameplayIngress` reports the per-connection `/ws` message budget:
-`rejected` messages refused because a connection outran its token bucket and
-`disconnected` connections closed for it (one per offending socket). Honest
-60 Hz play stays well inside the budget; it is disabled in test and development
-like the connection rate limiter.
+`logging.gameplayIngress` reports the per-connection `/ws` message budget
+(90 messages/s sustained, 480 burst, 96 KiB/s and 256 KiB burst): `rejected`
+messages refused because a connection outran its token bucket and `disconnected`
+connections closed for it (one per offending socket, terminated on the first
+refusal). The burst covers a full ~6 s reconnect backlog, so honest 60 Hz play
+stays well inside it; it is disabled in test and development like the connection
+rate limiter.
 The writer reports `stdoutDroppedRecords` and `stdoutWriteErrors` separately;
 standard-output and file failures must not mask one another.
 An stdout failure or buffer-limit drop writes a bounded `stdout_write_failed` error, including its

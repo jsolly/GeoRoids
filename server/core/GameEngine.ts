@@ -329,13 +329,9 @@ export class GameEngine {
     }
     const elapsed = serverNow - this.lastTickAtMs;
     this.lastTickAtMs = serverNow;
-    // Arriving well past the scheduled tick means the loop was blocked
-    // elsewhere and queued poses could not be read. The scheduled idle before
-    // the due time is when the loop normally reads them, so it never counts.
-    this.playerMotion.recordBlockedSpan(
-      Math.max(this.lastTickFinishedAtMs, this.nextTickDueAtMs),
-      serverNow
-    );
+    // Blocked time starts once the tick is overdue: the scheduled idle before
+    // the due time is when the loop normally reads queued poses.
+    const blockedFrom = Math.max(this.lastTickFinishedAtMs, this.nextTickDueAtMs);
     if (elapsed <= 0) {
       if (serverPerformanceMetrics.enabled) {
         serverPerformanceMetrics.recordClock({
@@ -363,10 +359,11 @@ export class GameEngine {
     for (let i = 0; i < frames; i++) {
       this.advanceOneFrame(serverNow);
     }
-    // A slow catch-up blocks the loop too; the poses read next were queued
-    // behind it, so credit that span before they are judged.
+    // One span per clock step: the late arrival plus a slow catch-up, during
+    // which the loop could not read poses. Recording it before the poll phase
+    // drains the queue lets those poses be credited, and steps never merge.
     const finished = nowMs ?? this.getServerTime();
-    this.playerMotion.recordBlockedSpan(serverNow, finished);
+    this.playerMotion.recordBlockedSpan(blockedFrom, finished);
     this.lastTickFinishedAtMs = finished;
     return frames;
   }

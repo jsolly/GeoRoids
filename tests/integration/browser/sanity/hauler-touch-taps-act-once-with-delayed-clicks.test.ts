@@ -91,7 +91,10 @@ for (const browserType of [chromium, webkit]) {
           haulerUtility: 'tow_cable',
           waitForCombatReady: false,
         });
-        await arrangeCrewField([await game.getLocalPlayerId()], 'delivery');
+        // The Hauler tows away from every furnace: the cargo must still be
+        // hooked when the release tap comes after the three-second cooldown,
+        // however slowly the browser gets there.
+        await arrangeCrewField([await game.getLocalPlayerId()], 'tow');
         await page.waitForFunction(() =>
           window.gameController
             ?.getCurrRoidBelt()

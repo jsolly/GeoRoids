@@ -125,7 +125,15 @@ function sleep(ms: number): Promise<void> {
 
 export async function arrangeCrewField(
   playerIds: string[],
-  scenario: 'delivery' | 'empty' | 'boundary' | 'impact' | 'mining' | 'cooperative' | 'reflection'
+  scenario:
+    | 'delivery'
+    | 'tow'
+    | 'empty'
+    | 'boundary'
+    | 'impact'
+    | 'mining'
+    | 'cooperative'
+    | 'reflection'
 ): Promise<void> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-crew-field`, {
     method: 'POST',

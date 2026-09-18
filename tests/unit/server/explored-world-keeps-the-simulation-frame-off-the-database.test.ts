@@ -1,4 +1,5 @@
 /* @vitest-environment node */
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
@@ -101,14 +102,16 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
   expect(engine.getDiagnostics().isPaused).toBe(false);
 
   // Steady flight: the pilot stays inside already-active sectors, so nothing
-  // about the saved world needs to be read again on these frames.
-  const sectorReads = vi.spyOn(WorldStore.prototype, 'loadSector');
+  // about the saved world needs to touch SQLite on these frames.
+  const statements = vi.spyOn(DatabaseSync.prototype, 'prepare');
+  const scripts = vi.spyOn(DatabaseSync.prototype, 'exec');
   for (let frame = 0; frame < 3; frame++) {
     elapsed += 1000 / 60;
     engine.advanceOneFrame(clock.now());
   }
   expect(engine.getDiagnostics().gameTime).toBe(3);
-  expect(sectorReads).not.toHaveBeenCalled();
+  expect(statements).not.toHaveBeenCalled();
+  expect(scripts).not.toHaveBeenCalled();
 
   // Sector completion still sees every saved sector: the harvested one walls
   // off once mapped, the one with a deposit left does not.

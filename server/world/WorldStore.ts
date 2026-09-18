@@ -16,6 +16,7 @@ import type {
   Velocity,
 } from '../../shared-types';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
+import type { LoadedWorld } from './worldPersistence';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -68,7 +69,7 @@ export interface RestorableFlight extends PersistentPilot {
   health: number;
 }
 
-interface SavedWorld {
+export interface SavedWorld {
   seed: number;
   startedAt: number;
   generation: number;
@@ -228,17 +229,23 @@ export function restorableFlight(
   };
 }
 
-/** Single-writer SQLite transactions keep cargo consumption, shared scores and discoveries together. */
+/**
+ * Single-writer SQLite transactions keep cargo consumption, shared scores and
+ * discoveries together.
+ *
+ * Opening the database parses and validates every saved sector once so the
+ * write path can refuse duplicate asteroids across sectors. The store itself
+ * is synchronous; a `WorldPersistence` adapter decides which thread it runs on.
+ */
 export class WorldStore {
   private readonly db: DatabaseSync;
   private readonly pilotJson = new Map<string, string>();
-  private persistedAsteroidSectors = new Map<string, string>();
-  /**
-   * Saved deposits left per sector, including fully harvested sectors at zero.
-   * Sector progress reads this every frame; rows are parsed only when a
-   * sector is loaded or written.
-   */
-  private persistedSectorRocks = new Map<string, number>();
+  /** Asteroid id → the sector row it is saved in; the duplicate-deposit guard. */
+  private readonly persistedAsteroidSectors = new Map<string, string>();
+  /** Sector id → the asteroid ids in its saved row, so a rewrite re-indexes only that row. */
+  private readonly persistedSectorRocks = new Map<string, string[]>();
+  /** Rows parsed while opening, handed over once by `loadSectors` and then released. */
+  private openedSectors: Map<string, AsteroidData[]> | undefined;
   private worldJson: string | undefined;
 
   constructor(path: string) {
@@ -251,7 +258,7 @@ export class WorldStore {
         CREATE TABLE IF NOT EXISTS world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS pilots (id TEXT PRIMARY KEY, json TEXT NOT NULL);`);
-      this.indexPersistedSectors();
+      this.openedSectors = this.indexPersistedSectors();
     } catch (error) {
       this.db.close();
       throw error;
@@ -284,23 +291,50 @@ export class WorldStore {
     return rocks;
   }
 
-  private indexSector(
-    index: Map<string, string>,
-    id: string,
-    rocks: readonly AsteroidData[]
-  ): void {
-    for (const rock of rocks) {
-      const previousSector = index.get(rock.id);
-      if (previousSector !== undefined && previousSector !== id) {
-        throw new Error(`Saved asteroid ${rock.id} appears in sectors ${previousSector} and ${id}`);
+  /** Record a sector row in the duplicate-deposit index; the caller has checked for conflicts. */
+  private indexSector(id: string, rocks: readonly AsteroidData[]): void {
+    for (const rockId of this.persistedSectorRocks.get(id) ?? []) {
+      if (this.persistedAsteroidSectors.get(rockId) === id) {
+        this.persistedAsteroidSectors.delete(rockId);
       }
-      index.set(rock.id, id);
+    }
+    this.persistedSectorRocks.set(
+      id,
+      rocks.map((rock) => rock.id)
+    );
+    for (const rock of rocks) {
+      this.persistedAsteroidSectors.set(rock.id, id);
     }
   }
 
-  private indexPersistedSectors(): void {
-    const next = new Map<string, string>();
-    const rockCounts = new Map<string, number>();
+  /**
+   * Refuse a batch that would save one asteroid under two sectors, whether
+   * both rows are in the batch or one is already on disk and not being
+   * rewritten. Costs the size of the batch, not of the world.
+   */
+  private assertNoDuplicateDeposits(sectors: ReadonlyArray<[string, AsteroidData[]]>): void {
+    const rewritten = new Set(sectors.map(([id]) => id));
+    const inBatch = new Map<string, string>();
+    for (const [id, rocks] of sectors) {
+      for (const rock of rocks) {
+        const other = inBatch.get(rock.id) ?? this.persistedAsteroidSectors.get(rock.id);
+        if (
+          other !== undefined &&
+          other !== id &&
+          (inBatch.has(rock.id) || !rewritten.has(other))
+        ) {
+          throw new Error(`Saved asteroid ${rock.id} appears in sectors ${other} and ${id}`);
+        }
+        inBatch.set(rock.id, id);
+      }
+    }
+  }
+
+  /** Parse, validate and index every saved sector row. */
+  private indexPersistedSectors(): Map<string, AsteroidData[]> {
+    this.persistedAsteroidSectors.clear();
+    this.persistedSectorRocks.clear();
+    const opened = new Map<string, AsteroidData[]>();
     for (const row of this.db.prepare('SELECT id,json FROM sectors').all()) {
       const id = row['id'];
       if (typeof id !== 'string') {
@@ -313,11 +347,16 @@ export class WorldStore {
         throw new Error(`Saved sector ${id} is not valid JSON`, { cause: error });
       }
       const rocks = this.validateSectorValue(id, value);
-      this.indexSector(next, id, rocks);
-      rockCounts.set(id, rocks.length);
+      for (const rock of rocks) {
+        const other = this.persistedAsteroidSectors.get(rock.id);
+        if (other !== undefined && other !== id) {
+          throw new Error(`Saved asteroid ${rock.id} appears in sectors ${other} and ${id}`);
+        }
+      }
+      this.indexSector(id, rocks);
+      opened.set(id, rocks);
     }
-    this.persistedAsteroidSectors = next;
-    this.persistedSectorRocks = rockCounts;
+    return opened;
   }
 
   loadWorld(): SavedWorld | undefined {
@@ -378,15 +417,23 @@ export class WorldStore {
       });
   }
 
-  /** Deposits left in every saved sector, without reading the database. */
-  persistedSectorRockCounts(): ReadonlyMap<string, number> {
-    return this.persistedSectorRocks;
+  /**
+   * Every saved sector. The rows parsed while opening are handed over once
+   * and the store drops its copy, so the world lives in memory exactly once.
+   * After that, or after any `checkpoint` or `reset`, the database is read
+   * again, so an in-process restart always sees what is on disk.
+   */
+  loadSectors(): Map<string, AsteroidData[]> {
+    const sectors = this.openedSectors ?? this.indexPersistedSectors();
+    this.openedSectors = undefined;
+    return sectors;
   }
 
-  hasPersistedSector(id: string): boolean {
-    return this.persistedSectorRocks.has(id);
+  load(): LoadedWorld {
+    return { world: this.loadWorld(), pilots: this.loadPilots(), sectors: this.loadSectors() };
   }
 
+  /** One saved row, for tests and tooling; the server reads the world once through `load`. */
   loadSector(id: string): AsteroidData[] | undefined {
     if (!validSectorId(id)) {
       throw new Error(`Invalid sector identity ${id}`);
@@ -404,30 +451,27 @@ export class WorldStore {
     return this.validateSectorValue(id, value);
   }
 
+  /**
+   * Commit one batch of changed rows. `world` is omitted when the world row
+   * did not change; unchanged pilot rows are skipped by content.
+   */
   checkpoint(
-    world: SavedWorld,
+    world: SavedWorld | undefined,
     sectors: ReadonlyMap<string, AsteroidData[]>,
     pilots: readonly PersistentPilot[]
   ): void {
-    const sectorEntries = [...sectors.entries()];
-    const validatedSectors = sectorEntries.map(([id, rocks]): [string, AsteroidData[]] => [
+    const validatedSectors = [...sectors].map(([id, rocks]): [string, AsteroidData[]] => [
       id,
       this.validateSectorValue(id, rocks),
     ]);
-    const nextAsteroidSectors = new Map(this.persistedAsteroidSectors);
-    const updatedSectorIds = new Set(validatedSectors.map(([id]) => id));
-    for (const [asteroidId, sectorId] of nextAsteroidSectors) {
-      if (updatedSectorIds.has(sectorId)) {
-        nextAsteroidSectors.delete(asteroidId);
-      }
-    }
-    for (const [id, rocks] of validatedSectors) {
-      this.indexSector(nextAsteroidSectors, id, rocks);
-    }
+    this.assertNoDuplicateDeposits(validatedSectors);
+    const worldJson = world === undefined ? undefined : JSON.stringify(world);
+    const changedPilots = pilots
+      .map((pilot) => ({ id: pilot.id, json: JSON.stringify(pilot) }))
+      .filter((pilot) => this.pilotJson.get(pilot.id) !== pilot.json);
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const worldJson = JSON.stringify(world);
-      if (this.worldJson !== worldJson) {
+      if (worldJson !== undefined && this.worldJson !== worldJson) {
         this.db.prepare('INSERT OR REPLACE INTO world(id,json) VALUES(1,?)').run(worldJson);
       }
       const sectorWrite = this.db.prepare('INSERT OR REPLACE INTO sectors(id,json) VALUES(?,?)');
@@ -435,35 +479,52 @@ export class WorldStore {
         sectorWrite.run(id, JSON.stringify(rocks));
       }
       const pilotWrite = this.db.prepare('INSERT OR REPLACE INTO pilots(id,json) VALUES(?,?)');
-      const changedPilots = pilots
-        .map((pilot) => ({ id: pilot.id, json: JSON.stringify(pilot) }))
-        .filter((pilot) => this.pilotJson.get(pilot.id) !== pilot.json);
       for (const pilot of changedPilots) {
         pilotWrite.run(pilot.id, pilot.json);
       }
       this.db.exec('COMMIT');
-      this.worldJson = worldJson;
-      this.persistedAsteroidSectors = nextAsteroidSectors;
-      for (const [id, rocks] of validatedSectors) {
-        this.persistedSectorRocks.set(id, rocks.length);
-      }
-      for (const pilot of changedPilots) {
-        this.pilotJson.set(pilot.id, pilot.json);
-      }
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      this.rollback();
       throw error;
     }
+    if (worldJson !== undefined) {
+      this.worldJson = worldJson;
+    }
+    for (const [id, rocks] of validatedSectors) {
+      this.indexSector(id, rocks);
+    }
+    for (const pilot of changedPilots) {
+      this.pilotJson.set(pilot.id, pilot.json);
+    }
+    // Rows parsed at open time no longer describe the database.
+    this.openedSectors = undefined;
   }
 
   reset(): void {
-    this.db.exec(
-      'BEGIN IMMEDIATE; DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; COMMIT;'
-    );
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec('DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world;');
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.rollback();
+      throw error;
+    }
     this.persistedAsteroidSectors.clear();
     this.persistedSectorRocks.clear();
+    this.openedSectors = undefined;
     this.pilotJson.clear();
     this.worldJson = undefined;
+  }
+
+  /**
+   * SQLite rolls a transaction back by itself on a full disk, an I/O error or
+   * a busy lock; asking again would throw "no transaction is active" from the
+   * catch block and replace the error that explains the failure.
+   */
+  private rollback(): void {
+    if (this.db.isTransaction) {
+      this.db.exec('ROLLBACK');
+    }
   }
 
   close(): void {

@@ -31,12 +31,13 @@ import {
   shipOverlapsCompletedSector,
 } from '../../shared/sectors';
 import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
-import { captureDiagnosticActorState } from '../../shared/stateDiagnostics';
+import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { parseSectorId, sectorAt, utcScoreSeason, WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
   AsteroidData,
+  ExplorationTile,
   FurnaceDelivery,
   LootCollected,
   LootData,
@@ -82,8 +83,9 @@ import {
   type PersistentPilot,
   type RestorableFlight,
   restorableFlight,
-  type WorldStore,
+  type SavedWorld,
 } from '../world/WorldStore';
+import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import {
   type AsteroidHitCause,
   type AsteroidHitOutcome,
@@ -92,6 +94,7 @@ import {
 } from './AsteroidManager.ts';
 import { CollisionAuthority } from './CollisionAuthority';
 import { EntityManager, type GameEntity } from './EntityManager';
+import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { LootManager } from './LootManager';
 import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
@@ -170,6 +173,37 @@ const PLAYER_SHOOT_MUZZLE_SLOP = 8;
 export const PLAYER_LASER_MAX_LIFETIME_MS = Math.ceil(5000 / GAME.MOTION_SCALE);
 const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 const MAX_PENDING_LOOT_COLLECTIONS = 256;
+/** World changes leave the loop once per second; a crash loses at most that window. */
+const WORLD_FLUSH_FRAMES = GAME.FPS;
+/**
+ * How long shutdown waits for an in-flight commit before giving up on the
+ * final flush. Railway kills the process ten seconds after SIGTERM: two go to
+ * the transports, this plus the writer's own close deadline to persistence,
+ * and the log flushes need the rest.
+ */
+const SHUTDOWN_IDLE_WAIT_MS = 1_500;
+
+/** Resolves true when `promise` settles first, false when the wait runs out. */
+function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boolean> {
+  if (!Number.isFinite(timeoutMs)) {
+    return promise.then(() => true);
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), Math.max(0, timeoutMs));
+    void promise.then(() => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+}
+
+/** What the last flushed world row was built from; the row is only sent again when this changes. */
+interface FlushedWorldRow {
+  exploration: ExplorationTile[];
+  completedSectors: number;
+  scoreSeason: string;
+  startedAt: number;
+}
 
 type PendingShockwave = {
   origin: Position;
@@ -205,6 +239,11 @@ export class GameEngine {
   private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
   private clockPrimed: boolean = false;
+  private readonly loopHealth = new GameLoopHealth();
+  /** Pilots whose saved row changed since the last flush; live pilots are captured at flush time. */
+  private readonly dirtyPilots = new Set<string>();
+  private lastFlushedWorldRow: FlushedWorldRow | undefined;
+  private flushWaitingForIdle = false;
   private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
   private lasers: ServerLaser[] = [];
@@ -233,12 +272,14 @@ export class GameEngine {
   constructor(
     rngSeed?: number,
     private readonly serverClock = new ServerClock(),
-    private readonly worldStore?: WorldStore
+    private readonly persistence?: WorldPersistence
   ) {
     this.scoreSeason = utcScoreSeason(this.serverClock.now());
-    let saved = worldStore?.loadWorld();
+    // The saved world is read exactly once, here, before the loop starts.
+    let loaded = persistence?.load();
+    const saved = loaded?.world;
     if (
-      worldStore &&
+      persistence &&
       saved &&
       (saved.generation !== WORLD.generation || saved.scoreSeason !== this.scoreSeason)
     ) {
@@ -252,22 +293,23 @@ export class GameEngine {
           currentScoreSeason: this.scoreSeason,
         }
       );
-      worldStore.reset();
-      saved = undefined;
+      persistence.reset();
+      loaded = undefined;
     }
-    this.worldSeed = saved?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
-    this.worldStartedAt = saved?.startedAt ?? this.serverClock.now();
+    this.worldSeed = loaded?.world?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
+    this.worldStartedAt = loaded?.world?.startedAt ?? this.serverClock.now();
     this.rngService = new RNGService(this.worldSeed);
-    this.regionalField = new RegionalAsteroidField(this.worldSeed, worldStore);
-    if (saved) {
-      this.exploration.restore(saved.exploration);
-      for (const id of saved.completedSectors) {
+    this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
+    if (loaded?.world) {
+      this.exploration.restore(loaded.world.exploration);
+      for (const id of loaded.world.completedSectors) {
         this.completedSectors.add(id);
       }
     }
-    for (const pilot of worldStore?.loadPilots() ?? []) {
+    for (const pilot of loaded?.pilots ?? []) {
       this.pilots.set(pilot.id, pilot);
     }
+    persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
     this.asteroidManager = new AsteroidManager(this.rngService);
     this.lootManager = new LootManager(this.rngService);
@@ -365,6 +407,15 @@ export class GameEngine {
     const finished = nowMs ?? this.getServerTime();
     this.playerMotion.recordBlockedSpan(blockedFrom, finished);
     this.lastTickFinishedAtMs = finished;
+    this.loopHealth.observe({
+      blockedMs: finished - blockedFrom,
+      catchupTicks: frames,
+      discardedMs,
+      now: finished,
+      gameTime: this.gameTime,
+      players: this.getPlayerCount(),
+      persistence: this.persistence?.diagnostics(),
+    });
     return frames;
   }
 
@@ -424,7 +475,9 @@ export class GameEngine {
     if (this.gameTime % 60 === 0) {
       this.ensureAsteroidField();
     }
-    if (this.gameTime % 300 === 0) {
+    // Write-behind: everything that changed this second leaves the loop as one
+    // batch. A commit still in flight means the next second carries the change.
+    if (this.gameTime % WORLD_FLUSH_FRAMES === 0 && this.persistenceIdle()) {
       this.checkpointWorld();
     }
   }
@@ -492,7 +545,10 @@ export class GameEngine {
     asteroids: number;
     loot: number;
     satellitePickups: number;
+    loop: GameLoopHealthSnapshot;
+    persistence?: WorldPersistenceDiagnostics;
   } {
+    const persistence = this.persistence?.diagnostics();
     return {
       isPaused: this.isPaused,
       gameTime: this.gameTime,
@@ -500,6 +556,8 @@ export class GameEngine {
       asteroids: this.asteroidManager.getAsteroidCount(),
       loot: this.lootManager.getCount(),
       satellitePickups: this.satellitePickupManager.getCount(),
+      loop: this.loopHealth.snapshot(),
+      ...(persistence ? { persistence } : {}),
     };
   }
 
@@ -526,8 +584,9 @@ export class GameEngine {
     if (closeErrors.length > 0) {
       throw new AggregateError(closeErrors, 'Test world reset could not close every player socket');
     }
-    this.worldStore?.reset();
+    this.persistence?.reset();
     this.resetGameState();
+    this.loopHealth.reset();
     this.isPaused = true;
     this.rngService.reset();
   }
@@ -566,6 +625,8 @@ export class GameEngine {
   private resetGameState(): void {
     this.regionalField.reset();
     this.pilots.clear();
+    this.dirtyPilots.clear();
+    this.lastFlushedWorldRow = undefined;
     this.managedField = true;
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
@@ -667,18 +728,6 @@ export class GameEngine {
     for (const [id, rocks] of this.regionalField.dormantSectors()) {
       remaining.set(id, (remaining.get(id) ?? 0) + rocks.length);
     }
-    // Saved sectors are counted from the store's in-memory index. Reading and
-    // validating every saved row here ran once per frame and blocked the loop
-    // for seconds on an explored world, which is what rebased joining pilots.
-    const store = this.worldStore;
-    if (store) {
-      for (const [id, rocks] of store.persistedSectorRockCounts()) {
-        if (this.regionalField.isActive(id) || this.regionalField.dormantSectors().has(id)) {
-          continue;
-        }
-        remaining.set(id, rocks);
-      }
-    }
     const newlyCompleted: string[] = [];
     for (const id of candidates) {
       if (this.completedSectors.has(id)) {
@@ -701,7 +750,6 @@ export class GameEngine {
       for (const entity of this.entityManager.getAllEntities()) {
         this.ensurePilotInOpenSector(entity);
       }
-      this.checkpointWorld();
     }
     return newlyCompleted;
   }
@@ -789,7 +837,7 @@ export class GameEngine {
     if (!saved || releaseId === undefined) {
       return;
     }
-    this.pilots.set(id, { ...saved, lastClientReleaseId: releaseId });
+    this.setPilot({ ...saved, lastClientReleaseId: releaseId });
   }
 
   private writePilotScore(pilot: PersistentPilot, score: number): PersistentPilot {
@@ -831,7 +879,7 @@ export class GameEngine {
     if (!previous || !actor) {
       return;
     }
-    this.pilots.set(id, this.snapshotPilot(actor, previous.tokenHash));
+    this.setPilot(this.snapshotPilot(actor, previous.tokenHash));
   }
 
   public registerPilot(
@@ -843,15 +891,13 @@ export class GameEngine {
     if (!result.ok) {
       return result;
     }
-    this.pilots.set(
-      actor.id,
+    this.setPilot(
       this.snapshotPilot(
         actor,
         createHash('sha256').update(result.resumeToken).digest('hex'),
         clientReleaseId
       )
     );
-    this.checkpointWorld();
     return result;
   }
 
@@ -975,15 +1021,15 @@ export class GameEngine {
     this.scoreSeason = season;
     const now = this.getServerTime();
     this.worldStartedAt = now;
-    this.worldStore?.reset();
+    this.persistence?.reset();
     this.regionalField.reset();
     this.exploration.reset();
     this.mapAssets.reset();
     this.completedSectors.clear();
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
-    for (const [id, pilot] of this.pilots) {
-      this.pilots.set(id, {
+    for (const pilot of this.pilots.values()) {
+      this.setPilot({
         id: pilot.id,
         tokenHash: pilot.tokenHash,
         name: pilot.name,
@@ -1003,38 +1049,189 @@ export class GameEngine {
     this.checkpointWorld();
   }
 
+  /**
+   * Hand everything that changed since the last flush to persistence as one
+   * batch. The batch leaves this thread without waiting on the disk; the
+   * inline store used by tests commits before returning instead. While a
+   * batch is still committing, the request is coalesced into one flush that
+   * runs as soon as the writer is idle, so a slow disk can never queue up
+   * more than one batch behind the one in flight.
+   */
   public checkpointWorld(): void {
     if (this.persistenceFailure) {
       throw this.persistenceFailure;
     }
     this.ensureScoreSeason();
-    if (!this.worldStore) {
+    if (!this.persistence) {
+      return;
+    }
+    if (!this.persistenceIdle()) {
+      this.flushWhenIdle();
       return;
     }
     try {
-      for (const id of this.pilots.keys()) {
-        this.capturePilot(id);
+      for (const actor of this.getAllPlayers()) {
+        this.capturePilot(actor.id);
       }
-      this.worldStore.checkpoint(
-        {
-          seed: this.worldSeed,
-          startedAt: this.worldStartedAt,
-          generation: WORLD.generation,
-          scoreSeason: this.scoreSeason,
-          writtenReleaseId: SERVER_RELEASE_ID,
-          exploration: this.exploration.snapshot(),
-          completedSectors: [...this.completedSectors].sort(),
-        },
-        this.regionalField.checkpoint(this.asteroidManager),
-        [...this.pilots.values()]
-      );
+      const pilots: PersistentPilot[] = [];
+      for (const id of this.dirtyPilots) {
+        const pilot = this.pilots.get(id);
+        if (pilot) {
+          pilots.push(pilot);
+        }
+      }
+      const worldRow = this.worldRowIfChanged();
+      this.persistence.persist({
+        ...(worldRow ? { world: worldRow.world } : {}),
+        sectors: this.regionalField.checkpoint(this.asteroidManager),
+        pilots,
+      });
+      if (worldRow) {
+        this.lastFlushedWorldRow = worldRow.builtFrom;
+      }
+      this.dirtyPilots.clear();
       this.regionalField.saved();
     } catch (cause) {
-      // Do not continue from memory after an uncommitted world mutation. The
-      // next tick reaches the process fatal-error boundary, including while paused.
-      this.persistenceFailure = new Error('Persistent world checkpoint failed', { cause });
+      this.failPersistence(cause);
       throw this.persistenceFailure;
     }
+  }
+
+  /**
+   * The world row carries the whole exploration grid, so it is only rebuilt
+   * and sent when one of its inputs changed since the last flush. The
+   * exploration snapshot keeps its identity until a cell is revealed, and
+   * completed sectors only ever grow between resets.
+   */
+  private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
+    const builtFrom: FlushedWorldRow = {
+      exploration: this.exploration.snapshot(),
+      completedSectors: this.completedSectors.size,
+      scoreSeason: this.scoreSeason,
+      startedAt: this.worldStartedAt,
+    };
+    const last = this.lastFlushedWorldRow;
+    if (
+      last &&
+      last.exploration === builtFrom.exploration &&
+      last.completedSectors === builtFrom.completedSectors &&
+      last.scoreSeason === builtFrom.scoreSeason &&
+      last.startedAt === builtFrom.startedAt
+    ) {
+      return undefined;
+    }
+    return {
+      world: {
+        seed: this.worldSeed,
+        startedAt: this.worldStartedAt,
+        generation: WORLD.generation,
+        scoreSeason: this.scoreSeason,
+        writtenReleaseId: SERVER_RELEASE_ID,
+        exploration: builtFrom.exploration,
+        completedSectors: [...this.completedSectors].sort(),
+      },
+      builtFrom,
+    };
+  }
+
+  /**
+   * Do not continue from memory that the database no longer matches. The
+   * next tick reaches the process fatal-error boundary, including while paused.
+   * The first-hand reason is logged here, once, so the restart loop that
+   * follows can be explained from the logs alone.
+   */
+  private failPersistence(cause: unknown): void {
+    if (this.persistenceFailure) {
+      return;
+    }
+    this.persistenceFailure = new Error('Persistent world checkpoint failed', { cause });
+    logger.error('WORLD', 'world_persistence_failed', {
+      releaseId: SERVER_RELEASE_ID,
+      observedAt: this.getServerTime(),
+      gameTime: this.gameTime,
+      players: this.getPlayerCount(),
+      persistence: this.persistence?.diagnostics(),
+      error: boundedDiagnosticError(cause, 'Unknown persistence failure'),
+    });
+  }
+
+  private persistenceIdle(): boolean {
+    return (this.persistence?.diagnostics().pendingBatches ?? 0) === 0;
+  }
+
+  private flushWhenIdle(): void {
+    if (this.flushWaitingForIdle || !this.persistence) {
+      return;
+    }
+    this.flushWaitingForIdle = true;
+    void this.persistence.whenIdle().then(() => {
+      this.flushWaitingForIdle = false;
+      if (this.persistenceFailure) {
+        return;
+      }
+      try {
+        this.checkpointWorld();
+      } catch (error) {
+        // Nothing awaits a deferred flush, so anything it throws is latched
+        // here; the next tick is fatal.
+        this.failPersistence(error);
+      }
+    });
+  }
+
+  /**
+   * Resolves true once nothing is in flight: every batch handed over has been
+   * committed or failed, including a flush that was waiting for the writer.
+   * Resolves false if the writer is still busy when the wait runs out.
+   */
+  public async whenPersistenceIdle(timeoutMs = Number.POSITIVE_INFINITY): Promise<boolean> {
+    const deadline = globalThis.performance.now() + timeoutMs;
+    while (this.persistence && (this.flushWaitingForIdle || !this.persistenceIdle())) {
+      const remaining = deadline - globalThis.performance.now();
+      if (!(await settledWithin(this.persistence.whenIdle(), remaining))) {
+        return false;
+      }
+      // Let a coalesced flush that was waiting on the same idle post its batch.
+      await Promise.resolve();
+    }
+    return true;
+  }
+
+  /**
+   * Flush the final state and release the database. Call after the loop has
+   * stopped and the transports have closed, so departing pilots are captured.
+   * A writer that does not drain within the shutdown budget forfeits the
+   * final flush: the worker is still closed on its own deadline, and the
+   * skipped flush is reported so the exit is not mistaken for a clean one.
+   */
+  public async shutdownPersistence(): Promise<void> {
+    if (!this.persistence) {
+      return;
+    }
+    let drained = false;
+    try {
+      drained = await this.whenPersistenceIdle(SHUTDOWN_IDLE_WAIT_MS);
+      if (drained && !this.persistenceFailure) {
+        this.checkpointWorld();
+      }
+    } finally {
+      await this.persistence.shutdown();
+    }
+    // A deferred flush that failed while draining latched the failure without
+    // anyone awaiting it; a clean exit would misreport that.
+    if (this.persistenceFailure) {
+      throw this.persistenceFailure;
+    }
+    if (!drained) {
+      throw new Error(
+        `World writer did not drain within ${SHUTDOWN_IDLE_WAIT_MS} ms; the final flush was skipped`
+      );
+    }
+  }
+
+  private setPilot(pilot: PersistentPilot): void {
+    this.pilots.set(pilot.id, pilot);
+    this.dirtyPilots.add(pilot.id);
   }
 
   public isPersistenceHealthy(): boolean {
@@ -1353,9 +1550,6 @@ export class GameEngine {
     }
 
     this.applyShipDeath(damaged, attackerId);
-    if (damaged.lives === 0) {
-      this.checkpointWorld();
-    }
     this.logDamageState(damaged, attackerId, damage, healthBefore, livesBefore, true);
     return { applied: true, isDestroyed: true, entity: damaged };
   }
@@ -1625,10 +1819,6 @@ export class GameEngine {
       if (result.destroyed.phenomenon?.kind === 'reflective') {
         this.lootManager.spawnLaserCore(result.destroyed.position, this.gameTime);
       }
-      // A terminal mining result is a user-visible success. Commit the
-      // removal, any split fragments, and every recipient's score together
-      // before returning it to the caller.
-      this.checkpointWorld();
     }
     return result;
   }
@@ -1685,12 +1875,7 @@ export class GameEngine {
       this.awardMiningPoints(item.playerId, item.points, item.contributors, []);
       this.dropShardAt(item.destroyed.position, asteroidShardMass(item.destroyed.material));
     }
-    if (expired.length > 0) {
-      // Expiry is another terminal destruction path. Persist all expired
-      // removals and rewards before making the events available to the wire.
-      this.checkpointWorld();
-      this.resolvedCollabHits.push(...expired);
-    }
+    this.resolvedCollabHits.push(...expired);
     return expired;
   }
 
@@ -2400,10 +2585,7 @@ export class GameEngine {
       };
       deliveries.push(delivery);
     }
-    if (deliveries.length > 0) {
-      this.checkpointWorld();
-      this.pendingFurnaceDeliveries.push(...deliveries);
-    }
+    this.pendingFurnaceDeliveries.push(...deliveries);
   }
 
   public drainFurnaceDeliveries(): FurnaceDelivery[] {
@@ -2442,7 +2624,6 @@ export class GameEngine {
         result.destroyed.surveyedBy ?? []
       );
       this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
-      this.checkpointWorld();
     }
     return {
       destroyed: result.outcome === 'destroyed',
@@ -2497,9 +2678,6 @@ export class GameEngine {
       });
     }
     if (results.length > 0) {
-      // Shard/core collection changes the pilot score and consumes a
-      // transient drop. Persist the score before acknowledging the collection.
-      this.checkpointWorld();
       for (const event of events) {
         if (this.pendingLootCollections.length >= MAX_PENDING_LOOT_COLLECTIONS) {
           this.pendingLootCollections.shift();
@@ -2552,9 +2730,6 @@ export class GameEngine {
       pushedAsteroidIds.push(asteroid.id);
     }
 
-    // The shard is consumed and nearby asteroid motion changes as one user
-    // action. Commit those world mutations before reporting a successful blast.
-    this.checkpointWorld();
     return { success: true, loot, origin, pushedAsteroidIds };
   }
 
@@ -2578,7 +2753,7 @@ export class GameEngine {
         return saved.score;
       }
       const next = this.writePilotScore(saved, saved.score + points);
-      this.pilots.set(entityId, next);
+      this.setPilot(next);
       return next.score;
     }
     return undefined;

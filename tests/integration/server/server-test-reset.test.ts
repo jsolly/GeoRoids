@@ -25,6 +25,7 @@ const emptyWorld = {
   asteroids: 0,
   loot: 0,
   satellitePickups: 0,
+  loop: { discardedDebtMs: 0, longestStallMs: 0, stalls: 0 },
 };
 
 test('resetting a populated test world closes its pilot and health reports the empty arena', async () => {

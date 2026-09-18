@@ -23,7 +23,7 @@ import {
   handleTestPlacePlayer,
   handleTestResetWorld,
 } from './testHttpHandlers';
-import { WorldStore } from './world/WorldStore';
+import { openWorldPersistence } from './world/openWorldPersistence';
 
 type CreateServerOptions = {
   port?: number;
@@ -285,8 +285,8 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     logger.error('❌ WebSocket server error:', error);
   });
 
-  const worldStore = options.worldPath ? new WorldStore(options.worldPath) : undefined;
-  const gameEngine = new GameEngine(options.seed, undefined, worldStore);
+  const persistence = options.worldPath ? openWorldPersistence(options.worldPath) : undefined;
+  const gameEngine = new GameEngine(options.seed, undefined, persistence);
   acquireServerPerformanceMetrics();
   // Ensure the server-side game loop runs
   gameEngine.startGameLoop();
@@ -427,14 +427,8 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     clearInterval(cleanupInterval);
     wsCore.stopPeriodicGameStateBroadcast();
     gameEngine.stopGameLoop();
-    let checkpointError: unknown;
-    try {
-      gameEngine.checkpointWorld();
-    } catch (error) {
-      checkpointError = error;
-    }
     releaseServerPerformanceMetrics();
-    closing = new Promise<void>((resolve, reject) => {
+    const stopTransports = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
         for (const socket of wss.clients) {
           socket.terminate();
@@ -457,27 +451,46 @@ export function createServerInstance(options: CreateServerOptions = {}) {
           }
         });
       });
-      void Promise.all([stopWebSockets, stopHttp])
-        .then(async () => {
-          worldStore?.close();
-          if (!(await ClientLogger.flushPending())) {
-            throw new Error('Timed out flushing forwarded client logs');
-          }
-          if (checkpointError) {
-            throw checkpointError;
-          }
-        })
-        .then(
-          () => {
-            clearTimeout(deadline);
-            resolve();
-          },
-          (error) => {
-            clearTimeout(deadline);
-            reject(error);
-          }
-        );
+      void Promise.all([stopWebSockets, stopHttp]).then(
+        () => {
+          clearTimeout(deadline);
+          resolve();
+        },
+        (error) => {
+          clearTimeout(deadline);
+          reject(error);
+        }
+      );
     });
+    closing = (async () => {
+      // Whether the sockets closed or were terminated at the deadline, the
+      // departing pilots are captured by now; flush the final batch and wait
+      // for its commit before the process can exit. The engine bounds both
+      // its wait for the writer and the writer's close, so a hung writer
+      // cannot hold the process past Railway's SIGTERM window either.
+      const errors: Error[] = [];
+      try {
+        await stopTransports;
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error : new Error('Server shutdown failed', { cause: error })
+        );
+      }
+      try {
+        await gameEngine.shutdownPersistence();
+      } catch (cause) {
+        errors.push(new Error('Persistent world checkpoint failed', { cause }));
+      }
+      if (!(await ClientLogger.flushPending())) {
+        errors.push(new Error('Timed out flushing forwarded client logs'));
+      }
+      if (errors.length === 1) {
+        throw errors[0];
+      }
+      if (errors.length > 1) {
+        throw new AggregateError(errors, 'Server shutdown did not complete cleanly');
+      }
+    })();
     return closing;
   }
 

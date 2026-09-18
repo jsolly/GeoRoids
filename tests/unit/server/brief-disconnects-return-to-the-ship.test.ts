@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -54,7 +55,7 @@ test('a long absence starts a new flight with the monthly score', () => {
   });
   const store = new WorldStore(':memory:');
   try {
-    const engine = new GameEngine(82, clock, store);
+    const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
     original.actor.lives = 2;
     original.actor.score = 210;
@@ -63,7 +64,7 @@ test('a long absence starts a new flight with the monthly score', () => {
     engine.stopGameLoop();
 
     monotonicMs += PLAYER_MOTION.returnToShipMs + 1;
-    const later = new GameEngine(82, clock, store);
+    const later = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const resumed = later.resumePilot(original.token, new RecordingSocket(), 'surveyor', 'Bob');
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
@@ -84,7 +85,7 @@ test('a long absence starts a new flight with the monthly score', () => {
 test('a restart inside the return window restores the last ship from storage', () => {
   const store = new WorldStore(':memory:');
   try {
-    const engine = new GameEngine(82, undefined, store);
+    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
     original.actor.lives = 1;
     original.actor.score = 880;
@@ -92,7 +93,7 @@ test('a restart inside the return window restores the last ship from storage', (
     engine.removePlayer('scout');
     engine.stopGameLoop();
 
-    const restarted = new GameEngine(82, undefined, store);
+    const restarted = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const resumed = restarted.resumePilot(original.token, new RecordingSocket());
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({

@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ExplorationMap } from '../../../shared/exploration';
@@ -99,7 +100,7 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
       new Map(),
       []
     );
-    const engine = new GameEngine(82, undefined, store);
+    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     engine.addPlayer('late', 'Late explorer', socket, { x: 0, y: 0 });
     const broadcaster = new GameStateBroadcaster(engine);

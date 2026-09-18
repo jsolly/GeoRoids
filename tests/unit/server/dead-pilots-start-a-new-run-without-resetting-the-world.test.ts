@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { GAME } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -9,7 +10,7 @@ import { RecordingSocket } from '../../support/recordingSocket';
 test('a final-life death starts a new flight at score 0 and keeps crew exploration', () => {
   const store = new WorldStore(':memory:');
   try {
-    const engine = new GameEngine(82, undefined, store);
+    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('old-run', 'Pilot', socket, { x: 4000, y: 0 });
     actor.asteroidInteractions = 1;
@@ -38,7 +39,9 @@ test('a final-life death starts a new flight at score 0 and keeps crew explorati
     expect(continued.actor.position).not.toEqual({ x: 4000, y: 0 });
     expect(engine.resumePilot(registered.resumeToken, new RecordingSocket()).ok).toBe(false);
 
-    const restarted = new GameEngine(0, undefined, store);
+    // A graceful restart flushes the new credential before the database is reopened.
+    engine.checkpointWorld();
+    const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
     const resumed = restarted.resumePilot(continued.resumeToken, new RecordingSocket());
     assert(resumed.ok);
     expect(resumed.actor.lives).toBe(3);

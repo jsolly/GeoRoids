@@ -8,6 +8,7 @@ import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { ServerClock } from '../../../server/core/ServerClock';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
@@ -40,7 +41,7 @@ function deposit(id: string, position: { x: number; y: number }): AsteroidData {
  * sectors, flies on, and the field puts the ones left behind to sleep.
  */
 function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidData[]>): void {
-  const field = new RegionalAsteroidField(SEED, store);
+  const field = new RegionalAsteroidField(SEED, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(SEED));
   const completed = new Set<string>();
   let x = 9_000;
@@ -106,7 +107,7 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
 
   let elapsed = 0;
   const clock = new ServerClock({ wallNow: () => WALL_ORIGIN_MS, monotonicNow: () => elapsed });
-  const engine = new GameEngine(SEED, clock, store);
+  const engine = new GameEngine(SEED, clock, new InlineWorldPersistence(store));
   cleanups.push(() => engine.stopGameLoop());
   const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
   pilot.asteroidInteractions = 1;

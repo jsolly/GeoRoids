@@ -22,7 +22,9 @@ The world remains available between sessions during the current UTC calendar
 month, so a month-long expedition keeps its shared chart and delivered
 progress. At the end of the month the server clears scores and the shared
 world. A world generation bump also resets saved sectors on the next server
-start.
+start. The server saves the shared world about once a second while a crew is
+aboard and when the last pilot leaves, so a sudden server crash can lose only
+about the last second of mining, deliveries, and score.
 
 Choose Surveyor for nimble exploration and shared mineral scanning, or Hauler
 for Resource Tap, Tow Cable, and stronger mining lasers. Their

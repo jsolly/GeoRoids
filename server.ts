@@ -4,6 +4,7 @@ import process from 'node:process';
 import { readServerConfiguration } from './server/configuration';
 import { createServerInstance } from './server/createServer';
 import { SERVER_RELEASE_ID } from './server/release';
+import { includesUnreleasedWriter } from './server/world/worldPersistence';
 import { flushServerLogs, logger } from './setup/serverLogger';
 import { boundedDiagnosticError } from './shared/stateDiagnostics';
 
@@ -34,15 +35,23 @@ async function shutdown(exitCode: number): Promise<void> {
     return;
   }
   shuttingDown = true;
+  let writerUnreleased = false;
   try {
     await server.close();
     logger.info('Server closed');
   } catch (error) {
     requestedExitCode = 1;
+    writerUnreleased = includesUnreleasedWriter(error);
     logger.error('Failed to shut down server', error);
   }
   if (!(await flushServerLogs())) {
     requestedExitCode = 1;
+  }
+  if (writerUnreleased) {
+    // process.exit joins worker threads, and a writer stuck in a native SQLite
+    // call would hold it until the platform's SIGKILL. The logs are flushed
+    // and the reason recorded, so end the process without waiting for it.
+    process.kill(process.pid, 'SIGKILL');
   }
   process.exit(requestedExitCode);
 }

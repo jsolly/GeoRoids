@@ -17,7 +17,7 @@ deletion are blocked. Human approval and conversation resolution are optional so
 CI-gated auto-merge can run unattended. The local break-glass variable does not
 override these GitHub protections.
 
-Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. See [world operations](docs/persistent-world.md).
+Persistent world state uses SQLite on the Railway `world-data` volume at `/data/world.sqlite`; `GEOROIDS_WORLD_PATH` is required in production. Apply the reviewed volume/path configuration before deploying server code. Local development defaults to `.data/world.sqlite`; integration runners explicitly use an in-memory database. Writes are write-behind through a worker thread (about a one-second loss window on a hard crash); the game loop never waits on the disk. See [world operations](docs/persistent-world.md).
 
 Production is split: **Vite static client on Vercel** + **WebSocket game server on Railway**. Merge to `main` only rebuilds the client. Server changes need a **separate Railway deploy** before multiplayer works in production.
 
@@ -217,6 +217,7 @@ Integration tests start their own dev servers through `scripts/test-runner.sh` o
 - **No CDN for app assets** — never load runtime CSS or JS from CDNs. Prefer npm, local files, or same-origin Vite/Railway builds.
 - **Biome** checks all authored formats it supports, including JavaScript/TypeScript, JSON/JSONC, CSS, HTML, and SVG (`biome.jsonc`). It respects `.gitignore` and excludes the generated npm lockfile. ESLint is gone. Knip and ts-prune check unused code; Markdownlint, Yamllint, actionlint, and ShellCheck cover their respective files. Every enabled lint diagnostic must fail its check, including Knip hints and ShellCheck info/style findings.
 - **Singletons via `getInstance()`** for the top-level managers (`GameController`, `PlayerManager`, `CollisionManager`, etc.) — wire through these, don't `new` them.
+- **The 60 Hz game loop never touches the disk or does O(world) work.** The saved world is read once at startup and lives in memory; changes leave the loop once a second as a batch through `WorldPersistence` (`server/world/`). Do not add SQLite calls, `fs` calls, or per-saved-sector scans to `advanceOneFrame` or the message handlers; `tests/unit/server/explored-world-keeps-the-simulation-frame-off-the-database.test.ts` and `world-writes-leave-the-game-loop-once-a-second.test.ts` fail if that regresses.
 - **Shared types** go in `shared-types.ts` at repo root, not duplicated per side.
 - **Conventional Commits** (`feat`, `fix`, `chore`, `refactor`, `test`, `perf`, `docs`) with a scope (e.g. `feat(network): ...`).
 - **Scenario-style test names** — describe a real user/system event, not the function under test.

@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
@@ -68,7 +69,7 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
   directories.push(directory);
   const path = join(directory, 'world.sqlite');
   const firstStore = database(path);
-  const first = new GameEngine(82, undefined, firstStore);
+  const first = new GameEngine(82, undefined, new InlineWorldPersistence(firstStore));
   const scout = pilot(first, 'scout', 'surveyor');
   const hauler = pilot(first, 'hauler', 'hauler', { x: 80, y: 0 });
   for (const rock of first.getAllAsteroids()) {
@@ -95,7 +96,7 @@ test('a restart preserves mined sectors, shared discoveries and offline Surveyor
   firstStore.close();
   stores.splice(stores.indexOf(firstStore), 1);
 
-  const second = new GameEngine(999, undefined, database(path));
+  const second = new GameEngine(999, undefined, new InlineWorldPersistence(database(path)));
   expect(second.getTerrainSeed()).toBe(82);
   const resumed = second.resumePilot(scout.token, new RecordingSocket(), undefined, 'Bob');
   assert(resumed.ok);
@@ -141,7 +142,7 @@ test('travelling far across the world loads local ore and returning does not rep
 
 test('a drifting deposit crosses into a sleeping sector once and preserves that sector’s native ore', () => {
   const store = database(':memory:');
-  const field = new RegionalAsteroidField(82, store);
+  const field = new RegionalAsteroidField(82, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(82));
   field.update(manager, [{ x: 0, y: 0 }], new Set());
   const drift = manager.getAllAsteroids()[0];
@@ -230,7 +231,7 @@ test('leaving then entering again returns to the same ship with monthly score', 
 
 test('checkpoints store monthly score and a recent flight', () => {
   const store = database(':memory:');
-  const engine = new GameEngine(82, undefined, store);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
   original.actor.score = 450;
   original.actor.lives = 2;

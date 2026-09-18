@@ -5,21 +5,29 @@ import type { AsteroidData, Position } from '../../shared-types';
 import { ROID } from '../../src/constants';
 import type { AsteroidManager } from '../core/AsteroidManager';
 import { RNGService } from '../core/RNGService';
-import type { WorldStore } from './WorldStore';
 
 const SECTOR_EDGE_EPSILON = 1e-6;
 
-/** Distant sectors sleep; visited empty sectors never regenerate harvested deposits. */
+/**
+ * Distant sectors sleep; visited empty sectors never regenerate harvested deposits.
+ *
+ * Every saved sector stays in memory as a dormant sector, so activating,
+ * sleeping and counting sectors never reads the database while the game runs.
+ * At the world's full 60,000-unit radius that is at most a few thousand
+ * sectors of deposit rows, well within a game server's memory.
+ */
 export class RegionalAsteroidField {
   private active = new Set<string>();
-  private dormant = new Map<string, AsteroidData[]>();
+  private readonly dormant: Map<string, AsteroidData[]>;
   private changed = new Map<string, AsteroidData[]>();
   private visited = new Set<string>();
 
   constructor(
     private readonly seed: number,
-    private readonly store?: WorldStore
-  ) {}
+    saved: ReadonlyMap<string, AsteroidData[]> = new Map()
+  ) {
+    this.dormant = new Map(saved);
+  }
 
   private generate(x: number, y: number): AsteroidData[] {
     const random = new RNGService(this.seed ^ Math.imul(x, 73856093) ^ Math.imul(y, 19349663));
@@ -81,7 +89,7 @@ export class RegionalAsteroidField {
 
   private load(id: string): AsteroidData[] {
     this.visited.add(id);
-    const cached = this.dormant.get(id) ?? this.store?.loadSector(id);
+    const cached = this.dormant.get(id);
     if (cached) {
       return cached;
     }
@@ -184,11 +192,9 @@ export class RegionalAsteroidField {
     return rows;
   }
 
+  /** The pending changes were handed to persistence; dormant rows stay as the in-memory world. */
   saved(): void {
     this.changed.clear();
-    if (this.store) {
-      this.dormant.clear();
-    }
   }
 
   reset(): void {
@@ -198,17 +204,8 @@ export class RegionalAsteroidField {
     this.visited.clear();
   }
 
-  isActive(id: string): boolean {
-    return this.active.has(id);
-  }
-
   hasVisited(id: string): boolean {
-    return (
-      this.visited.has(id) ||
-      this.active.has(id) ||
-      this.dormant.has(id) ||
-      this.store?.hasPersistedSector(id) === true
-    );
+    return this.visited.has(id) || this.active.has(id) || this.dormant.has(id);
   }
 
   visitedSectorIds(): string[] {
@@ -217,9 +214,6 @@ export class RegionalAsteroidField {
       ids.add(id);
     }
     for (const id of this.dormant.keys()) {
-      ids.add(id);
-    }
-    for (const id of this.store?.persistedSectorRockCounts().keys() ?? []) {
       ids.add(id);
     }
     return [...ids];

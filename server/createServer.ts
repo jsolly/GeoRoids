@@ -360,18 +360,22 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       logger.info('🔌 New player connected');
       ws.on('message', (data) => {
         const rawData = String(data);
-        if (
-          !shouldDisableRateLimit &&
-          messageBudget.admit(ws, Buffer.byteLength(rawData, 'utf8')) === 'rate-limited'
-        ) {
-          logger.warn('STATE', 'ws_message_budget_exceeded', {
-            releaseId: SERVER_RELEASE_ID,
-            ...(gameEngine.getPlayerBySocket(ws)?.id
-              ? { playerId: gameEngine.getPlayerBySocket(ws)?.id }
-              : {}),
-          });
-          ws.close(1008, 'Message rate limit exceeded');
-          return;
+        if (!shouldDisableRateLimit) {
+          const decision = messageBudget.admit(ws, Buffer.byteLength(rawData, 'utf8'));
+          if (decision !== 'ok') {
+            // Only the first over-budget frame acts: terminate (a flooder need
+            // not be owed the close handshake, which it can ignore for 30 s
+            // while every frame re-logs) and log once. Later frames drop silently.
+            if (decision === 'rate-limited') {
+              const offender = gameEngine.getPlayerBySocket(ws);
+              logger.warn('STATE', 'ws_message_budget_exceeded', {
+                releaseId: SERVER_RELEASE_ID,
+                ...(offender ? { playerId: offender.id } : {}),
+              });
+              ws.terminate();
+            }
+            return;
+          }
         }
         try {
           const message = JSON.parse(rawData);

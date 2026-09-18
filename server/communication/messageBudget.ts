@@ -3,14 +3,18 @@ import type { WebSocket } from 'ws';
 /**
  * A gameplay client sends one pose per client frame (~60 Hz) plus occasional
  * shoot, ability and chat messages. These token-bucket defaults sustain that
- * with roughly a 50% headroom and a two-second burst, so an honest client is
- * never throttled while a flood is cut off before it can load the single game
- * loop. The 64 KiB per-message cap in `createServer` bounds one message; this
- * bounds their rate and aggregate size per connection.
+ * with roughly a 50% headroom, and the burst covers a full backlog flush: the
+ * client keeps sampling poses on a fixed 60 Hz timer while its link is stalled
+ * and only gives up after 6 s (`CONNECTION_STALE_TIMEOUT_MS`), so TCP can
+ * deliver up to ~360 buffered poses in one read on recovery. The burst is
+ * sized past that (8 s of poses) so an honest reconnecting client is never
+ * throttled, while a sustained flood is still cut off before it can load the
+ * single game loop. The 64 KiB per-message cap in `createServer` bounds one
+ * message; this bounds their rate and aggregate size per connection.
  */
 export const GAMEPLAY_MESSAGE_BUDGET = {
   messagesPerSecond: 90,
-  messageBurst: 180,
+  messageBurst: 480,
   bytesPerSecond: 96 * 1024,
   byteBurst: 256 * 1024,
 } as const;
@@ -31,9 +35,11 @@ interface GameplayMessageBudgetDiagnostics {
 }
 
 /**
- * Per-connection token bucket for inbound `/ws` gameplay messages. One refused
- * message ends that connection, so `rejected` and `disconnected` move together
- * unless the caller keeps sending after the close.
+ * Per-connection token bucket for inbound `/ws` gameplay messages. The first
+ * over-budget message returns `rate-limited` (the caller drops the connection);
+ * any further message from the same socket returns `closed` so the caller can
+ * ignore it silently instead of logging and scanning once per flooded frame
+ * while the socket tears down.
  */
 export class GameplayMessageBudget {
   private readonly buckets = new WeakMap<WebSocket, Bucket>();
@@ -52,8 +58,12 @@ export class GameplayMessageBudget {
     this.now = options.now ?? Date.now;
   }
 
-  /** Charge one message of `byteLength` to `socket`. Returns whether it fits the budget. */
-  admit(socket: WebSocket, byteLength: number): 'ok' | 'rate-limited' {
+  /**
+   * Charge one message of `byteLength` to `socket`: `ok` if it fits,
+   * `rate-limited` on the first over-budget message (close the socket now),
+   * `closed` for later over-budget messages from an already-refused socket.
+   */
+  admit(socket: WebSocket, byteLength: number): 'ok' | 'rate-limited' | 'closed' {
     const now = this.now();
     const bucket = this.buckets.get(socket) ?? {
       messages: this.config.messageBurst,
@@ -74,12 +84,14 @@ export class GameplayMessageBudget {
     const bytes = Math.max(0, byteLength);
     if (bucket.messages < 1 || bucket.bytes < bytes) {
       this.rejected++;
-      if (!bucket.refused) {
-        bucket.refused = true;
-        this.disconnected++;
-      }
+      const firstRefusal = !bucket.refused;
+      bucket.refused = true;
       this.buckets.set(socket, bucket);
-      return 'rate-limited';
+      if (firstRefusal) {
+        this.disconnected++;
+        return 'rate-limited';
+      }
+      return 'closed';
     }
     bucket.messages -= 1;
     bucket.bytes -= bytes;

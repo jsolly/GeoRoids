@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed Boost Coupling arm/ignite, fixed heading, cancellation, simulation-time fuel and persistent sectors against implementation. Updated Hauler, controls, asteroids, teamwork and field manual; preserved Tow/Tap and satellite demonstrations after main integration. Lint, types, 17 focused unit tests and eight desktop/mobile gameplay and Wiki browser checks passed. Rechecked three Boost/Wiki browser cases and schematic captures after aligning the equipment pointer with the three-card layout.",
+  "note": "Server-only per-connection /ws message budget (GameplayMessageBudget); no player-facing rule or Wiki page is affected (abuse limiter, disabled in test/dev, invisible to honest play). docs/diagnostics.md documents the logging.gameplayIngress counter.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
@@ -58,6 +58,7 @@
     "server/communication/WebSocketCore.ts": "sha256:b474d6d358de1fbf9bcffd55dfde35b61cea9abe75a6a3230bc53d66700498ee",
     "server/communication/clientCommandDecoder.ts": "sha256:49c214f625fc31ec0cbdd4221cebe7fc98c62142522e8832ebd5f08ec81b2804",
     "server/communication/inboundMessageLog.ts": "sha256:a9ce18d51630fbbcdaa5145c7ad0940cddb41c5353be47dd3fa540155e74090a",
+    "server/communication/messageBudget.ts": "sha256:dd71f3c68553439828548a32db1c25cdce7ee7fd07a674fecbb2beacdb42e366",
     "server/configuration.ts": "sha256:199f5b12ba2bb65dd7153b4dfdbb4d389ab48e9dc0fdedad9f3ec4280804d1c1",
     "server/core/AsteroidManager.ts": "sha256:c9ccba8f8f6e1d71136e1ed526a77cc179c93abc07f4a0432c8c299e89412709",
     "server/core/CollisionAuthority.ts": "sha256:24037a7ba42708ad1114a93cf9a3dc30e35202dc04a19b707802612f44ab2c8e",

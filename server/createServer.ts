@@ -3,6 +3,7 @@ import process from 'node:process';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { getServerLogDiagnostics, logger, writeServerDiagnostic } from '../setup/serverLogger';
 import { shouldLogInboundGameplayMessage } from './communication/inboundMessageLog';
+import { GameplayMessageBudget } from './communication/messageBudget';
 import { WebSocketCore } from './communication/WebSocketCore';
 import { readServerConfiguration } from './configuration';
 import { GameEngine } from './core/GameEngine';
@@ -40,6 +41,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
   const loggingDiagnostics = () => ({
     activeLogClients: logClients.size,
     clientIngress: ClientLogger.getDiagnostics(),
+    gameplayIngress: messageBudget.diagnostics(),
     serverWriter: getServerLogDiagnostics(),
   });
 
@@ -232,6 +234,10 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     NODE_ENV === 'development' || process.env['NODE_ENV'] === 'development';
   const shouldDisableRateLimit = isTestEnvironment || isDevelopmentEnvironment;
   const MAX_CONNECTIONS_PER_MINUTE = shouldDisableRateLimit ? 10000 : 50; // Much higher limit for tests and dev
+  // Per-connection inbound message budget, on the same footing as the
+  // connection limiter: a flood cannot load the single game loop, and honest
+  // 60 Hz clients stay well inside it. Off in test/dev like the IP limiter.
+  const messageBudget = new GameplayMessageBudget();
 
   // Debug logging for environment detection
   if (shouldDisableRateLimit) {
@@ -354,6 +360,19 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       logger.info('🔌 New player connected');
       ws.on('message', (data) => {
         const rawData = String(data);
+        if (
+          !shouldDisableRateLimit &&
+          messageBudget.admit(ws, Buffer.byteLength(rawData, 'utf8')) === 'rate-limited'
+        ) {
+          logger.warn('STATE', 'ws_message_budget_exceeded', {
+            releaseId: SERVER_RELEASE_ID,
+            ...(gameEngine.getPlayerBySocket(ws)?.id
+              ? { playerId: gameEngine.getPlayerBySocket(ws)?.id }
+              : {}),
+          });
+          ws.close(1008, 'Message rate limit exceeded');
+          return;
+        }
         try {
           const message = JSON.parse(rawData);
           if (shouldLogInboundGameplayMessage(message.type)) {

@@ -118,18 +118,22 @@ interface ServerLaser {
   lastAsteroidId?: string;
 }
 
-function tapLootSpawnPosition(
+function tapLootEjection(
   ship: Position,
   rock: Pick<AsteroidData, 'position' | 'size'>,
-  kitId: ShipKitId
-): Position {
-  const dx = rock.position.x - ship.x;
-  const dy = rock.position.y - ship.y;
-  const dist = Math.hypot(dx, dy) || 1;
-  const offset = rock.size + GROWTH.TAP_LOOT_RADIUS + hullRadiusForKit(kitId) + 8;
+  burst: number
+): { position: Position; velocity: Velocity } {
+  const angle =
+    Math.atan2(rock.position.y - ship.y, rock.position.x - ship.x) +
+    (burst / (SHIP_ABILITY.TAP_EXTRACT_BURSTS - 1) - 0.5) * 1.4;
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
   return {
-    x: rock.position.x + (dx / dist) * offset,
-    y: rock.position.y + (dy / dist) * offset,
+    position: {
+      x: rock.position.x + dx * rock.size,
+      y: rock.position.y + dy * rock.size,
+    },
+    velocity: { x: dx * 3, y: dy * 3 },
   };
 }
 
@@ -1398,10 +1402,9 @@ export class GameEngine {
         continue;
       }
       pickup.position = { ...position };
-      pickup.orbitCenter = { ...position };
       pickup.velocity = { x: 0, y: 0 };
       pickup.ownerId = null;
-      if (pickup.state === 'orbiting') {
+      if (pickup.state === 'orbiting' || pickup.state === 'stored') {
         pickup.state = 'loose';
       }
     }
@@ -1434,6 +1437,22 @@ export class GameEngine {
     return this.getAllSatellitePickups();
   }
 
+  public equipSatellite(entityId: string, pickupId: string): boolean {
+    const owner = this.entityManager.getEntity(entityId);
+    if (!owner || owner.respawnTimer !== undefined || this.isPaused) {
+      return false;
+    }
+    return (
+      this.satellitePickupManager.equip(pickupId, {
+        id: owner.id,
+        position: owner.position,
+        radius: hullRadiusForKit(owner.kitId),
+        health: owner.health,
+        exploding: owner.exploding,
+      }) !== null
+    );
+  }
+
   private collectNearbySatellitePickups(): void {
     const players = this.entityManager
       .getAllEntities()
@@ -1464,17 +1483,13 @@ export class GameEngine {
         continue;
       }
 
-      const collected = this.satellitePickupManager.collect(
-        pickup.id,
-        {
-          id: collector.id,
-          position: collector.position,
-          radius: hullRadiusForKit(collector.kitId),
-          health: collector.health,
-          exploding: collector.exploding,
-        },
-        this.satellitePickupManager.nextOrbitPhaseFor(collector.id)
-      );
+      const collected = this.satellitePickupManager.collect(pickup.id, {
+        id: collector.id,
+        position: collector.position,
+        radius: hullRadiusForKit(collector.kitId),
+        health: collector.health,
+        exploding: collector.exploding,
+      });
       if (!collected) {
         continue;
       }
@@ -2151,7 +2166,10 @@ export class GameEngine {
       const auxiliaryTargets = [
         ...this.satellitePickupManager
           .getAllPickups()
-          .filter((pickup) => pickup.state !== 'broken' && pickup.health > 0)
+          .filter(
+            (pickup) =>
+              pickup.state === 'orbiting' && pickup.health > 0 && laserDamagesShips(laser.bounces)
+          )
           .map((pickup) => ({
             id: pickup.id,
             position: pickup.position,
@@ -2168,7 +2186,7 @@ export class GameEngine {
             kind: 'loot' as const,
           })),
         ...hulls,
-      ].filter((target) => target.kind !== 'satellitePickup' || !target.ownerId);
+      ];
       const auxiliaryHits: Array<{
         id: string;
         position: Position;
@@ -2452,13 +2470,17 @@ export class GameEngine {
     return activation.activated;
   }
 
-  private surveyNearbyAsteroids(surveyor: GameEntity, asteroids = this.getAllAsteroids()): void {
-    this.exploration.reveal(surveyor.position, SHIP_ABILITY.SCAN_RANGE);
+  private surveyNearbyAsteroids(
+    surveyor: GameEntity,
+    asteroids = this.getAllAsteroids(),
+    range: number = SHIP_ABILITY.SCAN_RANGE
+  ): void {
+    this.exploration.reveal(surveyor.position, range);
     for (const rock of asteroids) {
       if (
         rock.health <= 0 ||
         Math.hypot(rock.position.x - surveyor.position.x, rock.position.y - surveyor.position.y) >
-          SHIP_ABILITY.SCAN_RANGE
+          range
       ) {
         continue;
       }
@@ -2484,31 +2506,40 @@ export class GameEngine {
       if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= now) {
         delete entity.laserUpgrade;
       }
-      const nearbyAsteroids =
-        entity.kitId === 'surveyor'
-          ? asteroidIndex.query({
-              minX: entity.position.x - SHIP_ABILITY.SCAN_RANGE,
-              minY: entity.position.y - SHIP_ABILITY.SCAN_RANGE,
-              maxX: entity.position.x + SHIP_ABILITY.SCAN_RANGE,
-              maxY: entity.position.y + SHIP_ABILITY.SCAN_RANGE,
-            })
-          : [];
+      const scanRange =
+        entity.kitId === 'surveyor' && entity.abilityActiveFrames > 0
+          ? SHIP_ABILITY.SCAN_RANGE
+          : this.satellitePickupManager.countOrbitingFor(entity.id) > 0
+            ? SATELLITE_PICKUP.SCAN_RANGE
+            : 0;
       if (
-        entity.kitId === 'surveyor' &&
-        entity.abilityActiveFrames > 0 &&
+        scanRange > 0 &&
         !entity.exploding &&
-        entity.health > 0
+        entity.health > 0 &&
+        entity.respawnTimer === undefined
       ) {
-        this.surveyNearbyAsteroids(entity, nearbyAsteroids);
+        const nearbyAsteroids = asteroidIndex.query({
+          minX: entity.position.x - scanRange,
+          minY: entity.position.y - scanRange,
+          maxX: entity.position.x + scanRange,
+          maxY: entity.position.y + scanRange,
+        });
+        this.surveyNearbyAsteroids(entity, nearbyAsteroids, scanRange);
       }
       const target = entity.harpoonTargetId ? this.getAsteroid(entity.harpoonTargetId) : undefined;
       pullHarpoonTarget(entity, target ? [target] : []);
-      if (tickTapExtract(entity, target) === 'complete' && target) {
-        this.lootManager.spawnTap(
-          tapLootSpawnPosition(entity.position, target, entity.kitId),
-          this.gameTime
-        );
-        clearHaulerLatch(entity);
+      const extract = tickTapExtract(entity, target);
+      if ((extract === 'burst' || extract === 'complete') && target) {
+        const burst =
+          Math.floor(
+            ((entity.tapExtractFrames ?? 0) * SHIP_ABILITY.TAP_EXTRACT_BURSTS) /
+              SHIP_ABILITY.TAP_EXTRACT_FRAMES
+          ) - 1;
+        const ejection = tapLootEjection(entity.position, target, burst);
+        this.lootManager.spawnTap(ejection.position, this.gameTime, ejection.velocity);
+        if (extract === 'complete') {
+          clearHaulerLatch(entity);
+        }
       }
     }
   }

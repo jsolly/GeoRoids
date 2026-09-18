@@ -5,6 +5,7 @@ summary: A heavy hull that swaps Resource Tap and Tow Cable, then mines metal ef
 order: 40
 related:
   - content/wiki/controls.md
+  - content/wiki/satellites.md
   - content/wiki/asteroids.md
   - content/wiki/combat-survival.md
   - content/wiki/loot-growth.md
@@ -24,21 +25,27 @@ press and hold your own hull on touch, to swap **Resource Tap** and **Tow
 Cable**. Equip is immediate. E still fires the equipped tool; there is no
 second ability key. Other pilots cannot open your schematic.
 
+Both tools use the same central mount. The schematic and flying hull show the
+equipped hardware: a cable winch and hook, or an extraction probe. The animation
+preview uses that same Hauler design.
+
 New flights start on Resource Tap. A host that never reports a slot keeps the
 legacy Tow Cable so older sessions still haul.
 
 ## Resource Tap E
 
 E attaches a tap tether to the nearest living asteroid within a fixed 280-unit
-hull gap. The rock stays whole. After a short extract, a large cream canister
-with an amber tip appears beside the rock and the tether releases. The ability
-never targets a ship. E again releases an unfinished tap without spawning loot.
+hull gap. The rock briefly shudders on attachment and stays whole. Four cream
+canisters with amber tips pop out during extraction, then the tether
+releases. The ability never targets a ship. E again releases an unfinished tap,
+stopping further drops; canisters already extracted remain collectible.
 Furnaces do not consume a tapped rock.
 
 ## Tow cable E
 
 E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
-hull gap. The ability never targets a ship, and it cannot deal ship damage.
+hull gap. The rock briefly shudders when the cable catches. The ability never
+targets a ship, and it cannot deal ship damage.
 
 The asteroid keeps its existing motion and trails behind the Hauler as the
 Hauler flies under normal thrust and steering. Surveyor and Hauler share the
@@ -76,3 +83,11 @@ Hauler deals double mining damage to metal asteroids and cooperative large rocks
 Metal takes two hits instead of three. Small ice and rubble already break in
 one hit. The different-pilot requirement for cooperative large-rock splits
 remains unchanged. Lasers mine asteroids only; they cannot damage teammates.
+
+## Satellite inventory
+
+Loose satellites enter your ship inventory when collected. Open the schematic
+with V or press and hold your hull on touch, then choose Equip. One satellite
+orbits at a time, identifying nearby asteroids until its health runs out.
+Health drains with time and damage; stored satellites preserve their health. This uses a separate equipment
+slot and leaves your core ability available.

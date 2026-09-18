@@ -90,7 +90,9 @@ export class CollisionAuthority {
     asteroids: AsteroidData[],
     pickups: SatellitePickupData[]
   ): Array<{ asteroidId: string; pickupId: string }> {
-    const livePickups = pickups.filter((pickup) => pickup.state !== 'broken' && pickup.health > 0);
+    const livePickups = pickups.filter(
+      (pickup) => pickup.state === 'orbiting' && pickup.health > 0
+    );
     const hits: Array<{ asteroidId: string; pickupId: string }> = [];
     for (const pickup of livePickups) {
       const asteroid = asteroids.find((candidate) =>

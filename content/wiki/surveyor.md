@@ -5,6 +5,7 @@ summary: A nimble exploration ship. E shares nearby asteroid mineral scans with 
 order: 30
 related:
   - content/wiki/controls.md
+  - content/wiki/satellites.md
   - content/wiki/asteroids.md
   - content/wiki/hauler.md
 media:
@@ -36,3 +37,11 @@ Hauler and every Surveyor recorded on the tag receive the same delivery points.
 The mineral classification stays with the rock until it is delivered or
 removed, even after the active scan ends. The tag is also retained for the
 delivery reward.
+
+## Satellite inventory
+
+Loose satellites enter your ship inventory when collected. Open the schematic
+with V or press and hold your hull on touch, then choose Equip. One satellite
+orbits at a time, identifying nearby asteroids until its health runs out.
+Health drains with time and damage; stored satellites preserve their health. This uses a separate equipment
+slot and leaves your core ability available.

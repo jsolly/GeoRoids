@@ -36,6 +36,7 @@ export type ClientCommand =
       resumeToken?: string;
       clientReleaseId?: string;
     }
+  | { type: 'equipSatellite'; id: string; pickupId: string }
   | { type: 'leave' }
   | { type: 'snapshotResync' }
   | {
@@ -285,6 +286,12 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return decodeUpdate(id, fields);
     case 'useAbility':
       return decodeUseAbility(id, fields);
+    case 'equipSatellite': {
+      const pickupId = fields['pickupId'];
+      return id && typeof pickupId === 'string' && pickupId.length > 0 && pickupId.length <= 128
+        ? { ok: true, command: { type, id, pickupId } }
+        : invalid(type, 'Invalid satellite equipment request');
+    }
     case 'setHaulerUtility': {
       if (!id) {
         return invalid(type, 'Missing player ID for setHaulerUtility');

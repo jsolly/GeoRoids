@@ -185,7 +185,15 @@ export class GameStateBroadcaster {
           ...gameState,
           asteroids,
           loot: nearbyWorldRows(gameState.loot, player.position),
-          satellitePickups: nearbyWorldRows(gameState.satellitePickups, player.position),
+          satellitePickups: [
+            ...gameState.satellitePickups.filter((pickup) => pickup.ownerId === player.id),
+            ...nearbyWorldRows(
+              gameState.satellitePickups.filter(
+                (pickup) => pickup.ownerId !== player.id && pickup.state !== 'stored'
+              ),
+              player.position
+            ),
+          ],
           playerProjectiles: nearbyWorldRows(
             this.gameEngine.getPlayerProjectiles(),
             player.position

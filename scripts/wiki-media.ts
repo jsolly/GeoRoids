@@ -1,4 +1,6 @@
 import type { ShipKitId } from '../shared-types';
+import { drawSatelliteHealth } from '../src/entities/satellitePickup/satelliteHealthRenderer';
+import { drawSatellitePickupGlow } from '../src/entities/satellitePickup/satellitePickupGlow';
 import { scannedMaterial } from '../src/entities/ship/surveyScan';
 import './wiki-media-node-shim';
 import { spawnSync } from 'node:child_process';
@@ -1454,17 +1456,25 @@ function makeSatellitesDemo(): Demo {
         'satellite recording does not keep all profiles visible'
       );
       invariant(
-        recording.some((panels) =>
-          panels.some((panel) => Math.hypot(panel.pickup.position.x, panel.pickup.position.y) > 0)
+        recording.every((panels) =>
+          panels.every((panel, index) => {
+            const first = recording[0]?.[index]?.pickup;
+            return (
+              first &&
+              panel.pickup.position.x === first.position.x &&
+              panel.pickup.position.y === first.position.y &&
+              panel.pickup.angle === first.angle
+            );
+          })
         ),
-        'satellite recording contains no pickup motion'
+        'loose satellite hardware must remain stationary'
       );
     },
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'EO SATELLITES',
-        'six hulls · collectible interceptors',
+        'stationary pickups · equip to deploy',
         frame,
         PALETTE.SATELLITE
       );
@@ -1487,6 +1497,7 @@ function makeSatellitesDemo(): Demo {
           y: panelOrigin.y + pickup.position.y * displayScale,
         };
         const screen = screenPoint(position);
+        drawSatellitePickupGlow(ctx, pickup, screen, 17);
         ctx.save();
         ctx.translate(screen.x, screen.y);
         renderSatellite(ctx, pickup.typeId, 17, pickup.angle, pickup.color);
@@ -1508,7 +1519,7 @@ interface PickupView {
   angle: number;
   radius: number;
   color: string;
-  state: 'loose' | 'orbiting' | 'broken';
+  state: 'loose' | 'stored' | 'orbiting' | 'broken';
   health: number;
   maxHealth: number;
 }
@@ -1516,33 +1527,14 @@ interface PickupView {
 function drawPickup(ctx: RenderContext, pickup: PickupView, scale = 1): void {
   const screen = screenPoint(pickup.position, scale);
   const radius = Math.max(6, pickup.radius * scale);
+  drawSatellitePickupGlow(ctx, pickup, screen, radius);
   ctx.save();
   ctx.translate(screen.x, screen.y);
   ctx.shadowColor = pickup.color;
-  ctx.shadowBlur = 3;
+  ctx.shadowBlur = pickup.state === 'loose' ? 3 : 0;
   renderSatellite(ctx, pickup.typeId, radius, pickup.angle, pickup.color);
   ctx.restore();
-  if (pickup.state === 'broken' || pickup.health >= pickup.maxHealth) {
-    return;
-  }
-  const width = radius * 2.4;
-  const top = screen.y - radius * 1.5 - 6;
-  ctx.save();
-  ctx.lineWidth = 1.5;
-  ctx.lineCap = 'butt';
-  ctx.strokeStyle = PALETTE.HUD_MUTED;
-  ctx.globalAlpha = 0.45;
-  ctx.beginPath();
-  ctx.moveTo(screen.x - width / 2, top);
-  ctx.lineTo(screen.x + width / 2, top);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = PALETTE.HEALTH;
-  ctx.beginPath();
-  ctx.moveTo(screen.x - width / 2, top);
-  ctx.lineTo(screen.x - width / 2 + width * Math.max(0, pickup.health / pickup.maxHealth), top);
-  ctx.stroke();
-  ctx.restore();
+  drawSatelliteHealth(ctx, pickup, screen, radius);
 }
 
 function drawShipHealthCapsule(ctx: RenderContext, ship: Ship): void {
@@ -1666,10 +1658,11 @@ function makePickupsDemo(): Demo {
     health: 100,
     exploding: false,
   };
-  const collected = manager.collect(first.id, owner, manager.nextOrbitPhaseFor(owner.id));
+  manager.collect(first.id, owner);
+  const collected = manager.equip(first.id, owner);
   invariant(
     collected?.state === 'orbiting' && collected.ownerId === 'pilot',
-    'pickup collection did not enter orbiting state'
+    'equipped pickup did not enter orbiting state'
   );
   let sawOrbiting = false;
   let sawDamaged = false;
@@ -1687,7 +1680,14 @@ function makePickupsDemo(): Demo {
         'damaged pickup stopped orbiting'
       );
       invariant(
-        current !== undefined && current.health === current.maxHealth - DAMAGE.LASER_HIT,
+        current !== undefined &&
+          Math.abs(
+            current.health -
+              (current.maxHealth -
+                DAMAGE.LASER_HIT -
+                (FRAME_COUNT * SIM_TICKS_PER_FRAME * current.maxHealth) /
+                  SATELLITE_PICKUP.LIFETIME_FRAMES)
+          ) < 1e-8,
         'pickup health changed by the wrong amount'
       );
     },
@@ -1695,7 +1695,7 @@ function makePickupsDemo(): Demo {
       drawFrameChrome(
         ctx,
         'SATELLITE PICKUPS',
-        'auto-collect nearby Landsat 7 → orbit indefinitely while it intercepts fire',
+        'store nearby Landsat 7 → equip to orbit and scan until health runs out',
         frame,
         PALETTE.SATELLITE
       );
@@ -1748,7 +1748,7 @@ function makePickupsDemo(): Demo {
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'
-          ? `${firstPickup.name} orbit · ${firstPickup.health}/${firstPickup.maxHealth} HP`
+          ? `${firstPickup.name} orbit · ${Math.ceil(firstPickup.health)}/${firstPickup.maxHealth} HP`
           : firstPickup?.state === 'loose'
             ? `${firstPickup.name} released`
             : `${firstPickup?.name ?? 'Landsat 7'} collected`,
@@ -1756,7 +1756,13 @@ function makePickupsDemo(): Demo {
         112,
         PALETTE.SATELLITE
       );
-      drawTag(ctx, 'auto-collect ≤ 140 wu · laser removes 25 HP', 320, 286, PALETTE.HUD_MUTED);
+      drawTag(
+        ctx,
+        'equip from inventory · orbiting hardware can be damaged',
+        320,
+        286,
+        PALETTE.HUD_MUTED
+      );
     },
   };
 }

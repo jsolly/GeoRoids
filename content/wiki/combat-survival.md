@@ -21,9 +21,10 @@ Shots leave the nose and inherit your ship's velocity, so a moving ship
 changes their flight path. Hold fire to repeat shots at your kit's interval.
 The local shot field has a cap for regular shots. The slower movement leaves shots in flight longer while
 firing cadence and this cap stay fixed, so a full rack can remain occupied for
-more real time. A regular shot mines an asteroid or damages an orbiting
-satellite pickup by the configured laser amount; reflected or core-powered
-shots multiply that damage by their energy. Direct lasers never damage a
+more real time. A regular shot mines an asteroid by the configured laser amount; reflected or
+core-powered shots multiply that damage by their energy. Loose satellite
+pickups are invulnerable and shots pass through them. Equipped satellites
+can be damaged by asteroid impacts and ricochets. Direct lasers never damage a
 crew hull. After a bounce off the arena wall, a completed-sector wall, or a
 reflective asteroid, the shot becomes a ricochet: it damages any live ship
 it then hits, including its owner, and is consumed. Bounced bolts use the

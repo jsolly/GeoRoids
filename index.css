@@ -1138,6 +1138,69 @@
     line-height: 1;
   }
 
+  .ship-schematic-dialog [hidden] {
+    display: none;
+  }
+
+  .satellite-inventory {
+    border-top: 1px solid var(--palette-hud-muted, #64748b);
+    padding: 12px 0 18px;
+    flex-shrink: 0;
+  }
+
+  .satellite-inventory h3 {
+    margin: 0;
+    font: 700 1rem / 1.3 var(--font-mono, monospace);
+    color: var(--palette-local, #5eead4);
+  }
+
+  .satellite-inventory p,
+  .satellite-inventory-row span {
+    color: color-mix(in srgb, var(--palette-hud, #e2e8f0) 30%, var(--palette-hud-muted, #64748b));
+    font: 12px / 1.5 var(--font-mono, monospace);
+  }
+
+  .satellite-inventory-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .satellite-inventory-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 35%, transparent);
+  }
+
+  .satellite-inventory-row strong {
+    font: 600 14px / 1.5 var(--font-mono, monospace);
+  }
+
+  .satellite-inventory-row strong,
+  .satellite-inventory-row span {
+    display: block;
+  }
+
+  .satellite-inventory-row button {
+    font: 600 13px / 1.4 var(--font-mono, monospace);
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 8px 14px;
+    color: var(--palette-local, #5eead4);
+    border: 1px solid currentColor;
+    background: transparent;
+  }
+
+  .satellite-inventory-row button:disabled {
+    opacity: 0.45;
+  }
+
   .ship-schematic-stage {
     position: relative;
     min-height: 280px;
@@ -1180,7 +1243,8 @@
   }
 
   .ship-schematic-badge {
-    display: none;
+    display: block;
+    visibility: hidden;
     margin-top: 8px;
     color: var(--palette-local, #5eead4);
     font: 10px / 1 var(--font-mono, monospace);
@@ -1192,7 +1256,22 @@
   }
 
   .ship-schematic-card.is-active .ship-schematic-badge {
-    display: inline-block;
+    visibility: visible;
+  }
+
+  .ship-schematic-detail {
+    display: grid;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .ship-schematic-detail > div {
+    grid-area: 1 / 1;
+  }
+
+  .ship-schematic-detail-reserve {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .ship-schematic-detail p {
@@ -1202,11 +1281,13 @@
   }
 
   #ship-schematic-tool {
+    flex-shrink: 0;
     width: 180px;
     height: 64px;
   }
 
   #ship-schematic-return {
+    flex: 0 0 196px;
     padding: 8px 16px;
     color: var(--palette-local, #5eead4);
     border-color: color-mix(in srgb, var(--palette-local, #5eead4) 70%, transparent);
@@ -1243,6 +1324,14 @@
     .ship-schematic-footer {
       flex-wrap: wrap;
       align-items: flex-end;
+    }
+
+    .ship-schematic-detail {
+      flex-basis: 100%;
+    }
+
+    #ship-schematic-return {
+      flex-basis: auto;
     }
 
     #ship-schematic-tool {

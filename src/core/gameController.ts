@@ -370,7 +370,7 @@ export class GameController {
     ) {
       return;
     }
-    this.gameStateManager.setPickupMessage(detail.pickupName, detail.scoreBonus);
+    this.gameStateManager.setPickupMessage(detail.pickupName);
   };
 
   private handleFurnaceDelivery = (event: Event): void => {
@@ -442,6 +442,15 @@ export class GameController {
     this.cleanupServerAsteroidListeners();
     PlayerNetwork.getInstance().stopNetworkUpdates();
     this.networkManager.disconnect({ newSession: true });
+
+    // Refresh UI state in case a menu closed between the last frame and this death.
+    InputManager.getInstance().updateMovementLock();
+    // An open menu would hide the game-over message; return straight to Home.
+    if (localPlayer?.ship.movementLocked) {
+      this.gameStateManager.setIsGameRunning(false);
+      setPlayView(false);
+      return;
+    }
 
     this.gameOverTimer = setTimeout(() => {
       this.gameOverTimer = null;
@@ -735,6 +744,7 @@ export class GameController {
 
   /** Movement, timers, and swept collisions share one 60 Hz step. */
   private advanceSimulationFrame(currPlayer: Player): void {
+    InputManager.getInstance().updateMovementLock();
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
     shockwaveManager.update();

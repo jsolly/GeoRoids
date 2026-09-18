@@ -1,8 +1,8 @@
 ---
 title: Satellites and pickups
 category: Arena
-summary: Six Earth-observation satellite pickups drift in the shared field and
-  become durable orbiting interceptors when collected.
+summary: Six Earth-observation satellite pickups glow in the shared field and
+  enter ship inventory for temporary asteroid scanning.
 order: 110
 related:
   - content/wiki/teamwork.md
@@ -12,7 +12,7 @@ related:
 media:
   - heading: Six Earth-observation hulls
     demo: satellites
-  - heading: Orbiting interceptors
+  - heading: Equipped satellites
     demo: pickups
 ---
 
@@ -26,16 +26,52 @@ not fire or damage a ship on contact.
 ## Shared pickup rules
 
 The field holds a limited number of loose satellite pickups. They spawn
-separately from asteroid destruction and drift inside the pickup field. The
+separately from asteroid destruction, stay stationary, and glow to mark them as
+collectible hardware. Loose pickups cannot lose health. The
 nearest living player within collection range claims a loose pickup
 automatically and earns a score bonus. Collection does not grant a combat
 ability or spawn protection.
 
-## Orbiting interceptors
+## Inventory
 
-Collected hardware orbits its owner indefinitely, staying outside the hull.
-It has its own health and intercepts player laser shots and asteroid
-collisions. Damage reduces its health; at zero it breaks and
-respawns healthy as a loose pickup after its recovery delay. Owner death
-or leaving releases it at its current position without restoring health.
-Collection is shared, so two pilots cannot both claim one pickup.
+Collected hardware enters the collecting ship's inventory. Both Surveyors and
+Haulers open the ship schematic with V or by pressing and holding their own
+hull on touch. Stored satellites do not orbit or lose health. A brief notification names the
+satellite you acquired. The inventory lists its health and estimated flight
+time without further damage.
+
+## Equipped satellites
+
+Choose Equip in the schematic to deploy one stored satellite. Only one can
+orbit your ship at a time; the other satellites stay in storage. Equipping
+does not replace your ship's E ability or the Hauler's selected utility.
+
+The equipped satellite automatically identifies nearby asteroids for the crew.
+Their mineral markers remain identified after the satellite is gone. Scanning
+also contributes to the shared exploration chart and records the pilot for
+shared asteroid rewards. Satellite range is shorter than the Surveyor's core
+scan, so a Hauler gains local identification without the Surveyor's long-range
+ability. A Surveyor can use a satellite between its own scan pulses.
+
+Health and remaining lifetime are the same resource. A full-health satellite
+lasts two minutes while equipped. Its health drains steadily with time, and
+asteroid impacts or ricocheting shots remove health immediately, shortening
+that lifetime. Ordinary crew shots pass through owned satellites.
+
+Equipped satellites stop glowing and show the same thin green health bar as
+ships once health starts draining. There is no separate countdown ring. The
+schematic derives its remaining-time estimate from health. At zero health the
+satellite disappears from your inventory and orbit, then respawns healthy as a
+loose pickup after a recovery delay.
+
+It cannot be unequipped to save health or replaced while still active. Opening
+the schematic holds your ship stationary. The world keeps running: your ship
+can still take damage, and the satellite keeps orbiting, scanning, and losing
+health.
+
+Death or explicitly leaving the game drops both stored and equipped hardware
+at the ship's last position. A brief connection loss preserves ownership during
+reconnect grace; exceeding that grace drops the hardware. Dropped hardware stays stationary and glows again. It cannot take damage
+until equipped again, and keeps its remaining health. After a drop, a
+reconnect does not reserve that hardware; another pilot may collect them. Ship
+inventory is temporary and does not survive a server restart.

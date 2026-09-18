@@ -145,7 +145,7 @@ export interface AsteroidData {
   offsets: number[];
   /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
-  /** Surveyors who identified this deposit; retained until it leaves the field. */
+  /** Pilots who identified this deposit by scan or satellite; retained until it leaves the field. */
   surveyedBy?: string[];
   /** Pilots who have mined this deposit; persisted until the deposit is destroyed. */
   miningContributors?: string[];
@@ -174,7 +174,7 @@ export interface LootData {
 }
 
 export type SatellitePickupTypeId = import('./shared/eoSatellites').SatelliteTypeId;
-export type SatellitePickupState = 'loose' | 'orbiting' | 'broken';
+export type SatellitePickupState = 'loose' | 'stored' | 'orbiting' | 'broken';
 
 /** Server-owned collectible Earth-observation hardware. */
 export interface SatellitePickupData {
@@ -190,6 +190,7 @@ export interface SatellitePickupData {
   color: string;
   state: SatellitePickupState;
   ownerId: string | null;
+  /** Remaining service life; deployment and impacts both consume health. */
   health: number;
   maxHealth: number;
 }

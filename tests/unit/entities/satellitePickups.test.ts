@@ -49,11 +49,14 @@ describe('Satellite pickups', () => {
     });
   }
 
-  function collectNearest(playerId = 'pilot', distance = 110) {
+  function collectNearest(playerId = 'pilot', distance = 110, equip = true) {
     const pickup = gameEngine.getAllSatellitePickups()[0];
     assert.ok(pickup, 'a pickup exists');
     moveNearPickup(playerId, pickup.id, distance);
     gameEngine.tickSatellitePickups();
+    if (equip) {
+      expect(gameEngine.equipSatellite(playerId, pickup.id)).toBe(true);
+    }
     const collected = gameEngine.getSatellitePickup(pickup.id);
     assert.ok(collected, 'pickup remains in the roster');
     return collected;
@@ -90,7 +93,24 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getDiagnostics().satellitePickups).toBe(6);
   });
 
-  test('a reasonably close player is collected automatically and receives only the score bonus', () => {
+  test('loose hardware stays still and invulnerable without spending charge', () => {
+    addPilot();
+    const pickup = gameEngine.getAllSatellitePickups()[0];
+    assert.ok(pickup);
+    expect(gameEngine.handleSatellitePickupDamage(pickup.id, 1000)).toBeNull();
+    for (let frame = 0; frame < 180; frame += 1) {
+      gameEngine.tickSatellitePickups();
+    }
+    expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({
+      state: 'loose',
+      position: pickup.position,
+      angle: pickup.angle,
+      velocity: { x: 0, y: 0 },
+      health: pickup.health,
+    });
+  });
+
+  test('a nearby player stores a satellite for a score bonus and equips it to orbit', () => {
     addPilot();
     const attached = collectNearest('pilot', 110);
     const pilot = gameEngine.getPlayer('pilot');
@@ -128,29 +148,108 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getPlayer('second')?.score).toBe(0);
   });
 
-  test('a second pickup uses the current first orbit phase so the two orbiters stay apart', () => {
+  test('collected hardware stays stored and only one owned satellite can be equipped', () => {
     addPilot();
+    addPilot('other', { x: 4000, y: 0 });
     const [first, second] = gameEngine.getAllSatellitePickups();
     assert.ok(first);
     assert.ok(second);
-
     moveNearPickup('pilot', first.id);
     gameEngine.tickSatellitePickups();
     moveNearPickup('pilot', second.id);
     gameEngine.tickSatellitePickups();
+    expect(gameEngine.getSatellitePickup(first.id)?.state).toBe('stored');
+    expect(gameEngine.getSatellitePickup(second.id)?.state).toBe('stored');
+    expect(gameEngine.handleSatellitePickupDamage(first.id, 1000)).toBeNull();
+    expect(gameEngine.equipSatellite('other', first.id)).toBe(false);
+    expect(gameEngine.equipSatellite('pilot', first.id)).toBe(true);
+    gameEngine.tickSatellitePickups();
+    expect(gameEngine.equipSatellite('pilot', first.id)).toBe(false);
+    expect(gameEngine.equipSatellite('pilot', second.id)).toBe(false);
+    expect(gameEngine.getSatellitePickup(first.id)?.health).toBeCloseTo(
+      SATELLITE_PICKUP.HEALTH * (1 - 1 / SATELLITE_PICKUP.LIFETIME_FRAMES)
+    );
+    expect(gameEngine.getSatellitePickup(second.id)?.health).toBe(SATELLITE_PICKUP.HEALTH);
+    gameEngine.updatePlayer('pilot', { health: 0 });
+    gameEngine.tickSatellitePickups();
+    expect(gameEngine.getSatellitePickup(first.id)?.state).toBe('loose');
+    expect(gameEngine.getSatellitePickup(second.id)?.state).toBe('loose');
+    expect(gameEngine.equipSatellite('pilot', second.id)).toBe(false);
+  });
 
-    const firstAttached = gameEngine.getSatellitePickup(first.id);
-    const secondAttached = gameEngine.getSatellitePickup(second.id);
-    assert.ok(firstAttached);
-    assert.ok(secondAttached);
-    expect(firstAttached.ownerId).toBe('pilot');
-    expect(secondAttached.ownerId).toBe('pilot');
-    expect(
-      Math.hypot(
-        secondAttached.position.x - firstAttached.position.x,
-        secondAttached.position.y - firstAttached.position.y
-      )
-    ).toBeGreaterThan(40);
+  test('a Hauler satellite identifies nearby deposits until it exhausts, without activating the core ability', () => {
+    const pilot = addPilot('pilot', { x: 0, y: 0 }, 'hauler');
+    const stored = collectNearest('pilot', 110, false);
+    for (const asteroid of gameEngine.getAllAsteroids()) {
+      gameEngine.removeAsteroid(asteroid.id);
+    }
+    const template = {
+      velocity: { x: 0, y: 0 },
+      size: 25,
+      health: 75,
+      maxHealth: 75,
+      jaggedness: 0,
+      rotation: 0,
+      angularVelocity: 0,
+      vertices: 4,
+      offsets: [1, 1, 1, 1],
+    };
+    const near = {
+      ...template,
+      id: 'near',
+      position: { x: pilot.position.x + SATELLITE_PICKUP.SCAN_RANGE, y: pilot.position.y },
+    };
+    const far = {
+      ...template,
+      id: 'far',
+      position: { x: near.position.x + 1, y: pilot.position.y },
+    };
+    gameEngine.addAsteroid(near);
+    gameEngine.addAsteroid(far);
+    gameEngine.tickAbilities();
+    expect(gameEngine.getAsteroid('near')?.surveyedBy).toBeUndefined();
+    expect(gameEngine.equipSatellite('pilot', stored.id)).toBe(true);
+    gameEngine.tickAbilities();
+    expect(gameEngine.getAsteroid('near')?.surveyedBy).toEqual(['pilot']);
+    expect(gameEngine.getAsteroid('far')?.surveyedBy).toBeUndefined();
+    expect(pilot.abilityActiveFrames).toBe(0);
+    for (let frame = 0; frame < SATELLITE_PICKUP.LIFETIME_FRAMES - 1; frame++) {
+      gameEngine.tickSatellitePickups();
+    }
+    expect(gameEngine.getSatellitePickup(stored.id)?.state).toBe('orbiting');
+    expect(gameEngine.getSatellitePickup(stored.id)?.health).toBeCloseTo(
+      SATELLITE_PICKUP.HEALTH / SATELLITE_PICKUP.LIFETIME_FRAMES,
+      8
+    );
+    gameEngine.tickSatellitePickups();
+    expect(gameEngine.getSatellitePickup(stored.id)).toMatchObject({
+      state: 'broken',
+      ownerId: null,
+      health: 0,
+    });
+    gameEngine.updatePlayer('pilot', {
+      position: { x: pilot.position.x + 1, y: pilot.position.y },
+    });
+    gameEngine.tickAbilities();
+    expect(gameEngine.getAsteroid('far')?.surveyedBy).toBeUndefined();
+    expect(gameEngine.getAsteroid('near')?.surveyedBy).toEqual(['pilot']);
+  });
+
+  test('a half-health impact removes half the lifetime and expires at the shortened deadline', () => {
+    addPilot();
+    const pickup = collectNearest();
+    gameEngine.handleSatellitePickupDamage(pickup.id, SATELLITE_PICKUP.HEALTH / 2);
+    expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBe(SATELLITE_PICKUP.HEALTH / 2);
+    for (let frame = 0; frame < SATELLITE_PICKUP.LIFETIME_FRAMES / 2 - 1; frame++) {
+      gameEngine.tickSatellitePickups();
+    }
+    expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('orbiting');
+    expect(gameEngine.getSatellitePickup(pickup.id)?.health).toBeCloseTo(
+      SATELLITE_PICKUP.HEALTH / SATELLITE_PICKUP.LIFETIME_FRAMES,
+      8
+    );
+    gameEngine.tickSatellitePickups();
+    expect(gameEngine.getSatellitePickup(pickup.id)).toMatchObject({ state: 'broken', health: 0 });
   });
 
   test('two ordinary physical hits break a pickup and it respawns loose after the delay', () => {
@@ -194,6 +293,11 @@ describe('Satellite pickups', () => {
     expect(released?.state).toBe('loose');
     expect(released?.ownerId).toBeNull();
     expect(released?.health).toBe(SATELLITE_PICKUP.HEALTH - DAMAGE_PER_SHOT);
+    expect(gameEngine.handleSatellitePickupDamage(attached.id, 1000)).toBeNull();
+    for (let frame = 0; frame < 60; frame += 1) {
+      gameEngine.tickSatellitePickups();
+    }
+    expect(gameEngine.getSatellitePickup(attached.id)).toEqual(released);
   });
 
   test('Surveyor mass does not expand a satellite orbit beyond the kit hull', () => {
@@ -223,6 +327,8 @@ describe('Satellite pickups', () => {
     moveNearPickup('barge', bargePickup.id, 110);
     gameEngine.tickSatellitePickups();
 
+    expect(gameEngine.equipSatellite('scout', scoutPickup.id)).toBe(true);
+    expect(gameEngine.equipSatellite('barge', bargePickup.id)).toBe(true);
     const scout = gameEngine.getPlayer('scout');
     const barge = gameEngine.getPlayer('barge');
     const scoutSat = gameEngine.getSatellitePickup(scoutPickup.id);

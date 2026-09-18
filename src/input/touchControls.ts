@@ -2,7 +2,7 @@ import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import {
-  isPointerOnLocalHauler,
+  isPointerOnLocalShip,
   openShipSchematic,
   SHIP_SCHEMATIC_LONG_PRESS_MS,
 } from '../ui/shipSchematic';
@@ -334,7 +334,7 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
       steerTap = null;
       moveSteering(ev);
     }, TAP_MAX_MS);
-    if (isPointerOnLocalHauler(ev.clientX, ev.clientY)) {
+    if (isPointerOnLocalShip(ev.clientX, ev.clientY)) {
       schematicHoldTimer = setTimeout(() => {
         schematicHoldTimer = null;
         if (steerTap) {

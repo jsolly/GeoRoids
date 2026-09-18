@@ -47,8 +47,8 @@ export class GameStateManager {
     logger.debug('GAME_STATE', 'Game running state set', { isGameRunning: running });
   }
 
-  setPickupMessage(pickupName: string, scoreBonus: number): void {
-    this.pickupMessage = `${pickupName} acquired +${scoreBonus}`;
+  setPickupMessage(pickupName: string): void {
+    this.pickupMessage = `${pickupName} acquired`;
     this.pickupMessageTimer = this.PICKUP_MESSAGE_DURATION_FRAMES;
   }
 

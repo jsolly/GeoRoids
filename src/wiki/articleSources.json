@@ -108,7 +108,10 @@
     "server/core/CollisionAuthority.ts",
     "tests/unit/entities/satellite-pickups-follow-authoritative-health.test.ts",
     "tests/unit/server/satellite-pickup-scoring.test.ts",
-    "tests/integration/browser/e2e/player-collects-orbiting-satellite-pickup.test.ts"
+    "tests/integration/browser/e2e/player-collects-orbiting-satellite-pickup.test.ts",
+    "src/ui/satelliteInventory.ts",
+    "src/ui/shipSchematic.ts",
+    "server/communication/clientCommandDecoder.ts"
   ],
   "terrain": [
     "src/physics/terrain/terrainConfig.ts",

@@ -174,3 +174,20 @@ test('heartbeat probe identities are echoed only after integer validation while 
     expect(decodeClientCommand({ type: 'ping', probeId }).ok).toBe(false);
   }
 });
+
+test('satellite equipment commands require a player and a bounded pickup identity', () => {
+  expect(
+    decodeClientCommand({ type: 'equipSatellite', id: 'pilot', data: { pickupId: 'landsat' } })
+  ).toEqual({
+    ok: true,
+    command: { type: 'equipSatellite', id: 'pilot', pickupId: 'landsat' },
+  });
+  for (const pickupId of [null, '', 17, 'a'.repeat(129)]) {
+    expect(
+      decodeClientCommand({ type: 'equipSatellite', id: 'pilot', data: { pickupId } }).ok
+    ).toBe(false);
+  }
+  expect(decodeClientCommand({ type: 'equipSatellite', data: { pickupId: 'landsat' } }).ok).toBe(
+    false
+  );
+});

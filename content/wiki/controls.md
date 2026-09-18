@@ -15,13 +15,19 @@ media:
 
 ## Keyboard
 
-The thrusters stay on while you are alive. ArrowLeft or A and ArrowRight or D
+The thrusters stay on while you are alive and viewing the playfield. ArrowLeft or A and ArrowRight or D
 turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
 on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
 does not repeatedly activate it. On Hauler, E uses the equipped utility from
 the ship schematic. V opens or closes that schematic; Escape, the X control,
 or Return to flight also close it. Firing and E are blocked while it is open.
+The map and schematic hold your ship stationary, including its momentum and
+steering. Closing the menu resumes flight. The world keeps running while a
+menu is open: asteroids and ricochets can still damage or kill your ship, and
+satellite health continues draining. If you lose a life, the menu stays open
+and your respawned ship stays stationary. Losing your last life closes the
+menu and returns directly to the home screen.
 F is unbound.
 
 Your kit, mass, and terrain affect acceleration and speed. Surveyor and Hauler
@@ -41,10 +47,12 @@ until you move the pointer again.
 
 ## Ship schematic
 
-Hauler only. V opens the local schematic. On touch, press and hold your own
-hull for a beat; a short rest still only steers. The overlay shows the v2
-cargo-yoke outline, two callout cards, and a looping tool-in-use animation.
-Selecting a card equips that tool immediately.
+V opens the local schematic for either ship. On touch, press and hold your own
+hull for a beat; a short rest still only steers. The overlay shows your hull
+and satellite inventory. Choose Equip to launch one stored satellite for
+temporary nearby asteroid identification. The inventory displays its remaining
+lifetime, derived from health. Hauler also has two utility cards and a looping tool animation;
+selecting a utility card equips that tool immediately.
 
 ## Map
 
@@ -63,7 +71,7 @@ your finger covers the ship. A quick one-finger tap fires once on release. While
 one finger to steer, tap anywhere on the playfield with another finger to fire
 immediately, or hold that second finger for continuous fire until it is lifted.
 Use the ability button for the same action as E. Press and hold your own hull
-to open the Hauler schematic. Use the Boost button at the
+to open the ship schematic. Use the Boost button at the
 bottom of the screen for the same action as Shift: tap once to start boosting,
 tap again to stop. The action buttons do not steer the ship or create a pending
 playfield tap shot.

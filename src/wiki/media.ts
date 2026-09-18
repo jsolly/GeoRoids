@@ -103,26 +103,29 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   satellites: {
     title: 'EO satellite pickups',
-    alt: 'Six separate satellite views show the Earth-observation hulls drifting as collectible pickups.',
+    alt: 'Six separate satellite views show the Earth-observation hulls glowing as stationary collectible pickups.',
     caption:
-      'Controlled demonstration: six separate views compare the live Earth-observation pickup hulls. They drift as collectible hardware rather than firing.',
+      'Controlled demonstration: six separate views compare the live Earth-observation pickup hulls. They stay stationary and glow until collected and equipped.',
     sources: [
       'shared/eoSatellites.ts',
       'server/core/SatellitePickupManager.ts',
       'scripts/wiki-satellite-demo.ts',
+      'src/entities/satellitePickup/satellitePickupGlow.ts',
       'src/entities/satellite/eoOutlines.ts',
     ],
   },
   pickups: {
     title: 'Satellite pickup orbit',
-    alt: 'A Landsat 7 pickup auto-collects, orbits its pilot, and shows a reduced health bar after intercepting a laser.',
+    alt: 'An equipped Landsat 7 orbits its pilot and shows reduced health after a physical hit.',
     caption:
-      'Controlled demonstration: a nearby Landsat 7 attaches automatically, keeps orbiting while a laser removes 25 health, and remains active after the hit.',
+      'Controlled demonstration: Landsat 7 is collected into inventory and explicitly equipped, then remains in orbit after one physical hit. The green health bar drains with time, and the hit shortens its remaining lifetime.',
     sources: [
       'server/core/SatellitePickupManager.ts',
       'src/constants/index.ts',
       'src/entities/satellitePickup/satellitePickupMath.ts',
       'src/entities/satellitePickup/satellitePickupRenderer.ts',
+      'src/entities/satellitePickup/satellitePickupGlow.ts',
+      'src/entities/satellitePickup/satelliteHealthRenderer.ts',
       'src/entities/satellite/eoOutlines.ts',
     ],
   },

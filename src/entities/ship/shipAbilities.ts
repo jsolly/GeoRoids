@@ -305,7 +305,7 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBod
 export function tickTapExtract(
   host: AbilityHost,
   target?: AbilityBody
-): 'complete' | 'latched' | 'idle' {
+): 'complete' | 'burst' | 'latched' | 'idle' {
   if (!isResourceTapUtility(host) || !host.harpoonTargetId || !target) {
     return 'idle';
   }
@@ -317,7 +317,11 @@ export function tickTapExtract(
     host.tapExtractCompleted = true;
     return 'complete';
   }
-  return 'latched';
+  const interval = SHIP_ABILITY.TAP_EXTRACT_FRAMES / SHIP_ABILITY.TAP_EXTRACT_BURSTS;
+  return Math.floor(host.tapExtractFrames / interval) >
+    Math.floor((host.tapExtractFrames - 1) / interval)
+    ? 'burst'
+    : 'latched';
 }
 
 /**

@@ -77,6 +77,8 @@ class Ship {
   shotCooldown: number = 250;
   color: string = PALETTE.LOCAL;
   frictionCoefficient: number = GAME.FRICTION; // Player-specific friction coefficient
+  /** In-flight menus stop navigation without pausing combat or lifecycle timers. */
+  movementLocked = false;
   isLocalPlayer: boolean = false; // Track if this is the local player
   kitId: ShipKitId = DEFAULT_SHIP_KIT_ID;
   thrust: number = SHIP.THRUST;
@@ -403,6 +405,13 @@ class Ship {
 
   // Update ship movement (position, velocity, rotation)
   private updateMovement(): void {
+    if (this.movementLocked) {
+      this.velocity = { x: 0, y: 0 };
+      this.angularVelocity = 0;
+      this.thrusting = false;
+      this.knockbackVelocityLimit = 0;
+      return;
+    }
     this.angle += this.angularVelocity;
     const boost = this.boosting ? getShipKit(this.kitId).boostMultiplier : 1;
     const speed = cruiseSpeed(this.mass, this.maxVelocity, boost);

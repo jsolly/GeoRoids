@@ -35,6 +35,8 @@ the scan's range around that Surveyor. The shapes identify ice, metal, and
 rubble, and the classification stays with a scanned rock until the rock is
 delivered or removed. A qualifying scan also tags the asteroid with that
 Surveyor's player ID, so several Surveyors can contribute to one delivery.
+An equipped satellite on either ship performs shorter-range identification and
+records its owner for the same shared rewards.
 
 The Hauler presses E near an asteroid to attach its equipped tool. Resource
 Tap extracts a canister and leaves the rock in the field. Tow Cable hauls the
@@ -43,8 +45,8 @@ reel a rock into the hull or launch it at anything. Dragging towed cargo into
 another asteroid breaks both rocks and drops the cable. Dragging it into
 another ship deals an asteroid impact to that hull, then breaks the cargo and
 drops the cable. Bring a towed rock to
-an arena furnace to deliver it. The Hauler and every Surveyor recorded on the
-rock receive the same delivery points. A rock with no Surveyor tag still pays
+an arena furnace to deliver it. The Hauler and every scanning pilot recorded on the
+rock receive the same delivery points. A rock with no scan tag still pays
 the Hauler for the delivery.
 
 Three starter furnace landmarks sit around the field: North Works, Southeast

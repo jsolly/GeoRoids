@@ -12,10 +12,17 @@ import {
   strokePhosphorPolyline,
   type Vec2,
 } from '../../rendering/vectorJuice';
+import { latchShudderOffset } from './latchShudder';
 import { drawAsteroidMaterialDetails } from './materialArt';
 import type { Roid } from './Roid';
 
 const roidScreen = { x: 0, y: 0 };
+const latchShudders = new Map<string, number>();
+
+export function recordAsteroidLatch(id: string, now = performance.now()): void {
+  latchShudders.set(id, now);
+}
+
 const shatterBursts: Array<{ roid: Roid; startedAt: number }> = [];
 
 /** Keep the approved break visible after the authoritative rock is removed. */
@@ -28,6 +35,7 @@ export function recordAsteroidShatter(roid: Roid, now = performance.now()): void
 
 export function clearAsteroidShatters(): void {
   shatterBursts.length = 0;
+  latchShudders.clear();
 }
 
 export function getRoidStrokeWidth(
@@ -217,12 +225,24 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
   const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
   const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
 
+  const now = performance.now();
+  for (const [id, startedAt] of latchShudders) {
+    if (now - startedAt >= 240) {
+      latchShudders.delete(id);
+    }
+  }
   for (const roid of roids) {
     if (!canDrawAsteroid(roid)) {
       continue;
     }
 
     const screenPos = canvasManager.worldToScreenInto(roidScreen, roid.position, ship.position);
+    const latchStart = latchShudders.get(roid.id);
+    if (latchStart !== undefined) {
+      const kick = latchShudderOffset(now - latchStart);
+      screenPos.x += kick;
+      screenPos.y += kick * 0.35;
+    }
     const r = roid.r * scale;
     if (
       screenPos.x < -r ||
@@ -255,7 +275,6 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     drawRoidInteractionCues(ctx, roid, r, screenPos.x, screenPos.y);
   }
 
-  const now = performance.now();
   for (let i = shatterBursts.length - 1; i >= 0; i--) {
     const burst = shatterBursts[i];
     if (!burst) {

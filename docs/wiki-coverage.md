@@ -14,7 +14,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
-| satellites | Arena | Six EO pickup hulls, auto-collected orbiting interceptors |
+| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
@@ -110,17 +110,23 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   `tests/unit/server/crew-shots-bounce-at-world-edge.test.ts` and
   `tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts`.
 - The six Earth-observation hulls are maintained by the satellite pickup manager
-  and spawn separately from asteroid destruction. A nearest living player within
-  the automatic collection range claims one; the hardware orbits indefinitely,
-  intercepts laser shots and asteroid collisions, preserves health on owner
-  release, and respawns loose and healthy after breaking.
+  and spawn separately from asteroid destruction. Loose hardware is stationary,
+  glowing, and invulnerable. The nearest living player within
+  the automatic collection range stores it in ship inventory. Both kits can equip
+  one satellite from the schematic. Health drains with time and impacts, so damage
+  shortens its scanning lifetime. The ship-style green health bar and schematic
+  time estimate share that health value. Only loose pickups glow. Stored
+  hardware cannot collide; deployed hardware can break from physical damage.
+  Death, explicit leave, or expired reconnect grace drops hardware with its
+  health intact. Broken or exhausted hardware respawns loose and full.
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
   lives, score, current ability, and kit. The leaderboard includes every active
   player.
 - A laser detonation of any loot kind removes the drop and leaves every nearby
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
-  pickups intercept laser shots and rocks for their owner.
+  pickups take damage from asteroid impacts and ricochets while deployed;
+  ordinary crew shots pass through owned hardware.
 - Completing a visited sector (every explorable cell mapped and every asteroid
   gone) walls it off. Completed-sector walls kill ships like the outer boundary,
   bounce lasers that then become ricochets, and move anyone already inside

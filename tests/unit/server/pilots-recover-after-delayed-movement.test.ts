@@ -223,7 +223,7 @@ test.each([200, 400, 900])(
   }
 );
 
-test('a hold longer than the one-second catch-up window still rebases the pilot to the last delivered pose', () => {
+test('a network hold longer than the one-second catch-up window still rebases the pilot to the last delivered pose', () => {
   const f = flight();
   f.advance(2);
   expect(f.report().ok).toBe(true);
@@ -242,6 +242,79 @@ test('a hold longer than the one-second catch-up window still rebases the pilot 
   });
   expect(f.actor.playerMotion?.mode).toBe('handoff');
   expect(f.actor.position).toEqual(buffered[firstRejected - 1]?.position);
+});
+
+/** Ambient rocks must not hit the pilot while the clock replays a blocked second. */
+function clearAmbientField(f: ReturnType<typeof flight>): void {
+  for (const rock of f.engine.getAllAsteroids()) {
+    f.engine.removeAsteroid(rock.id);
+  }
+}
+
+test('honest 60 Hz poses queued while the server loop was blocked for 1.6 s all land after the join', () => {
+  const f = flight();
+  clearAmbientField(f);
+  expect(f.engine.stepClock()).toBe(0);
+  f.advance(2);
+  expect(f.report().ok).toBe(true);
+  f.reconcile();
+  const lastAccepted = { ...f.actor.position };
+  const epoch = f.actor.playerMotion?.epoch;
+  // The pilot keeps cruising and reporting every frame, but the server's own
+  // event loop is blocked and reads none of it until the block ends.
+  const buffered: ReturnType<typeof f.capture>[] = [];
+  for (let frame = 0; frame < 96; frame++) {
+    f.advance(1);
+    buffered.push(f.capture());
+  }
+  // The loop resumes: the clock tick catches up, then the queued poses drain
+  // together inside the same server millisecond, exactly as production logged.
+  expect(f.engine.stepClock()).toBe(MAX_CATCH_UP_TICKS);
+  const outcomes = buffered.map((pose) => f.submit(pose));
+  expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([]);
+  expect(f.actor.playerMotion).toMatchObject({ mode: 'free', epoch });
+  expect(f.actor.position).toEqual(f.ship.position);
+  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
+  expect(f.actor.position.x - lastAccepted.x).toBeGreaterThan(buffered.length * speed * 0.95);
+  // Flight simply continues from where the pilot really is.
+  f.reconcile();
+  expect(f.ship.serverOwnsMotion).toBe(false);
+  f.advance(12);
+  expect(f.report().ok).toBe(true);
+});
+
+test('a pilot silent through a blocked server second still cannot claim more than that block plus one second', () => {
+  // 1.6 s blocked on the server, then two responsive seconds with no poses.
+  const silentPilot = () => {
+    const f = flight();
+    clearAmbientField(f);
+    expect(f.engine.stepClock()).toBe(0);
+    f.advance(2);
+    expect(f.report().ok).toBe(true);
+    const held = { ...f.actor.position };
+    f.wait(96);
+    expect(f.engine.stepClock()).toBe(MAX_CATCH_UP_TICKS);
+    const caughtUp = f.engine.getDiagnostics().gameTime;
+    for (let frame = 0; frame < 120; frame++) {
+      f.wait(1);
+      f.engine.stepClock();
+    }
+    expect(f.engine.getDiagnostics().gameTime - caughtUp).toBeGreaterThanOrEqual(119);
+    return { f, held, speed: f.engine.playerMotion.legalSpeed(f.actor, f.clock.now()) };
+  };
+  // Blocked time is credited in full; silence while the server was listening
+  // still stops at one second.
+  const creditFrames = PLAYER_MOTION.poseLeadFrames + 96 + MAX_CATCH_UP_TICKS;
+
+  const within = silentPilot();
+  within.f.ship.position.x = within.held.x + within.speed * (creditFrames - 2);
+  expect(within.f.report().ok).toBe(true);
+  expect(within.f.actor.position.x).toBeCloseTo(within.f.ship.position.x, 6);
+
+  const beyond = silentPilot();
+  beyond.f.ship.position.x = beyond.held.x + beyond.speed * (creditFrames + 2);
+  expect(beyond.f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
+  expect(beyond.f.actor.position).toEqual(beyond.held);
 });
 
 test('a pilot silent for two seconds replays at most one second of travel plus the lead in one pose', () => {

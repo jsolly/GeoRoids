@@ -200,6 +200,8 @@ export class GameEngine {
   private gameLoopInterval: NodeJS.Timeout | null = null;
   private isPaused: boolean = false; // Track if game is paused due to no players
   private lastTickAtMs = 0;
+  /** When the previous clock step returned; the loop was free to read poses after it. */
+  private lastTickFinishedAtMs = 0;
   private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
   private clockPrimed: boolean = false;
@@ -301,6 +303,7 @@ export class GameEngine {
     }
 
     this.lastTickAtMs = this.getServerTime();
+    this.lastTickFinishedAtMs = this.lastTickAtMs;
     this.lastSimulationAtMs = this.lastTickAtMs;
     this.nextTickDueAtMs = this.lastTickAtMs + GAME_TICK_MS;
     this.tickAccumulatorMs = 0;
@@ -319,12 +322,16 @@ export class GameEngine {
     const serverNow = this.simulationNow(nowMs);
     if (!this.clockPrimed) {
       this.lastTickAtMs = serverNow;
+      this.lastTickFinishedAtMs = serverNow;
       this.nextTickDueAtMs = serverNow + GAME_TICK_MS;
       this.clockPrimed = true;
       return 0;
     }
     const elapsed = serverNow - this.lastTickAtMs;
     this.lastTickAtMs = serverNow;
+    // Arriving long after the previous step returned means the loop was
+    // blocked elsewhere; queued poses could not be read in that span.
+    this.playerMotion.recordBlockedSpan(this.lastTickFinishedAtMs, serverNow);
     if (elapsed <= 0) {
       if (serverPerformanceMetrics.enabled) {
         serverPerformanceMetrics.recordClock({
@@ -352,6 +359,11 @@ export class GameEngine {
     for (let i = 0; i < frames; i++) {
       this.advanceOneFrame(serverNow);
     }
+    // A slow catch-up blocks the loop too; the poses read next were queued
+    // behind it, so credit that span before they are judged.
+    const finished = nowMs ?? this.getServerTime();
+    this.playerMotion.recordBlockedSpan(serverNow, finished);
+    this.lastTickFinishedAtMs = finished;
     return frames;
   }
 
@@ -434,6 +446,7 @@ export class GameEngine {
       this.gameLoopInterval = null;
     }
     this.lastTickAtMs = 0;
+    this.lastTickFinishedAtMs = 0;
     this.nextTickDueAtMs = 0;
     this.tickAccumulatorMs = 0;
     this.clockPrimed = false;

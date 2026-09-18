@@ -204,10 +204,6 @@ export class RegionalAsteroidField {
     this.visited.clear();
   }
 
-  isActive(id: string): boolean {
-    return this.active.has(id);
-  }
-
   hasVisited(id: string): boolean {
     return this.visited.has(id) || this.active.has(id) || this.dormant.has(id);
   }

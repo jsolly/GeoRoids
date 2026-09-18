@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { afterEach, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import type {
   LoadedWorld,
@@ -24,10 +25,10 @@ afterEach(() => {
   }
 });
 
-function metalDeposit(id: string): AsteroidData {
+function metalDeposit(id: string, position = { x: 400, y: 300 }): AsteroidData {
   return {
     id,
-    position: { x: 400, y: 300 },
+    position,
     velocity: { x: 0, y: 0 },
     size: 25,
     material: 'metal',
@@ -64,7 +65,7 @@ test('a mining break and its score reach the database on the next one-second flu
   const store = new WorldStore(':memory:');
   cleanups.push(() => store.close());
   const commits = vi.spyOn(WorldStore.prototype, 'checkpoint');
-  const { engine, miner, frame } = world(store);
+  const { engine, miner, frame } = world(new InlineWorldPersistence(store));
   const target = metalDeposit('flush-target');
   engine.addAsteroid(target);
   // Storage starts out holding the intact deposit and a score of zero.
@@ -142,17 +143,26 @@ class InFlightPersistence implements WorldPersistence {
   }
 }
 
-test('a commit still in flight defers the next flush instead of queueing behind it', async () => {
+test('a commit still in flight defers the next flush, which then carries everything that changed meanwhile', async () => {
   const persistence = new InFlightPersistence();
   const { engine, miner, frame } = world(persistence);
+  const target = metalDeposit('deferred-target', { x: 40, y: 0 });
+  engine.addAsteroid(target);
   expect(persistence.batches).toHaveLength(0);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
   }
   expect(persistence.batches).toHaveLength(1);
+  // The first flush carries the world row with the pilot's discoveries.
+  expect(persistence.batches[0]?.world?.exploration.length).toBeGreaterThan(0);
+  expect(persistence.batches[0]?.sectors.get('0,0')?.map((rock) => rock.id)).toEqual([target.id]);
 
-  // The worker is still committing: this second's cadence passes without a new batch.
+  // The worker is still committing: this second's cadence passes without a
+  // new batch, even though a deposit breaks and a score changes meanwhile.
   persistence.pendingBatches = 1;
+  expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('destroyed');
+  expect(miner.score).toBeGreaterThanOrEqual(ROID.POINTS_MEDIUM);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
   }
@@ -165,10 +175,18 @@ test('a commit still in flight defers the next flush instead of queueing behind 
   engine.checkpointWorld();
   expect(persistence.batches).toHaveLength(1);
 
-  // ...and exactly one flush follows as soon as the writer is idle again.
+  // ...and exactly one flush follows as soon as the writer is idle again,
+  // carrying the emptied sector and the score from the deferred window. The
+  // world row stays home: nothing in it changed since the first flush.
   persistence.drain();
   await Promise.resolve();
   expect(persistence.batches).toHaveLength(2);
-  expect(persistence.batches[1]?.pilots.map((pilot) => pilot.id)).toEqual([miner.id]);
+  const deferred = persistence.batches[1];
+  assert(deferred);
+  expect(deferred.sectors.get('0,0')).toEqual([]);
+  expect(deferred.pilots.map((pilot) => [pilot.id, pilot.score])).toEqual([
+    [miner.id, miner.score],
+  ]);
+  expect(deferred.world).toBeUndefined();
   expect(engine.getDiagnostics().persistence).toMatchObject({ mode: 'worker', pendingBatches: 0 });
 });

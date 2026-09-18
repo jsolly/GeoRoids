@@ -8,6 +8,7 @@ import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { ServerClock } from '../../../server/core/ServerClock';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
@@ -106,7 +107,7 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
 
   let elapsed = 0;
   const clock = new ServerClock({ wallNow: () => WALL_ORIGIN_MS, monotonicNow: () => elapsed });
-  const engine = new GameEngine(SEED, clock, store);
+  const engine = new GameEngine(SEED, clock, new InlineWorldPersistence(store));
   cleanups.push(() => engine.stopGameLoop());
   const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 0, y: 0 });
   pilot.asteroidInteractions = 1;

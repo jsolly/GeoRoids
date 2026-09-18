@@ -1,3 +1,4 @@
+import { InlineWorldPersistence } from './InlineWorldPersistence';
 import { WorkerWorldPersistence } from './WorkerWorldPersistence';
 import { WorldStore } from './WorldStore';
 import type { WorldPersistence } from './worldPersistence';
@@ -8,5 +9,7 @@ import type { WorldPersistence } from './worldPersistence';
  * runners' `:memory:` world commits inline instead.
  */
 export function openWorldPersistence(path: string): WorldPersistence {
-  return path === ':memory:' ? new WorldStore(path) : new WorkerWorldPersistence(path);
+  return path === ':memory:'
+    ? new InlineWorldPersistence(new WorldStore(path))
+    : new WorkerWorldPersistence(path);
 }

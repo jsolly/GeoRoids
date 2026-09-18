@@ -462,23 +462,34 @@ export function createServerInstance(options: CreateServerOptions = {}) {
         }
       );
     });
-    closing = stopTransports.then(async () => {
-      // Sockets are closed, so departing pilots are captured; flush the final
-      // batch and wait for its commit before the process can exit.
-      // Persistence owns its own shutdown deadline.
-      let checkpointError: Error | undefined;
+    closing = (async () => {
+      // Whether the sockets closed or were terminated at the deadline, the
+      // departing pilots are captured by now; flush the final batch and wait
+      // for its commit before the process can exit. Persistence owns its own
+      // shutdown deadline, so a hung writer cannot hold the process either.
+      const errors: Error[] = [];
+      try {
+        await stopTransports;
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error : new Error('Server shutdown failed', { cause: error })
+        );
+      }
       try {
         await gameEngine.shutdownPersistence();
       } catch (cause) {
-        checkpointError = new Error('Persistent world checkpoint failed', { cause });
+        errors.push(new Error('Persistent world checkpoint failed', { cause }));
       }
       if (!(await ClientLogger.flushPending())) {
-        throw new Error('Timed out flushing forwarded client logs');
+        errors.push(new Error('Timed out flushing forwarded client logs'));
       }
-      if (checkpointError) {
-        throw checkpointError;
+      if (errors.length === 1) {
+        throw errors[0];
       }
-    });
+      if (errors.length > 1) {
+        throw new AggregateError(errors, 'Server shutdown did not complete cleanly');
+      }
+    })();
     return closing;
   }
 

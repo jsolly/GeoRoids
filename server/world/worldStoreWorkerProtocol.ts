@@ -6,20 +6,21 @@ export type WorldStoreWorkerRequest =
   | {
       type: 'persist';
       id: number;
-      world: SavedWorld;
-      /** Map entries; a Map survives structured clone but an array is cheaper to inspect. */
-      sectors: Array<[string, AsteroidData[]]>;
+      world: SavedWorld | undefined;
+      /** Structured clone carries the Map as-is; the worker validates its contents. */
+      sectors: ReadonlyMap<string, AsteroidData[]>;
       pilots: PersistentPilot[];
     }
   | { type: 'reset'; id: number }
   | { type: 'shutdown'; id: number };
 
-/** Messages the worker sends back; every request is answered exactly once. */
+/**
+ * Messages the worker sends back. Every request is answered exactly once, so
+ * the game thread can treat the set of unanswered ids as "not yet durable".
+ * A startup failure has no request to answer and carries no id.
+ */
 export type WorldStoreWorkerReply =
-  | { type: 'ready' }
-  | { type: 'committed'; id: number; durationMs: number }
-  | { type: 'reset'; id: number }
-  | { type: 'closed'; id: number }
+  | { type: 'done'; id: number; durationMs: number }
   | { type: 'failed'; id: number | undefined; error: SerializedWorkerError };
 
 /** Errors cross the thread boundary as plain data and are rebuilt on arrival. */

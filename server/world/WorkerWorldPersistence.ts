@@ -1,10 +1,11 @@
 import { Worker } from 'node:worker_threads';
 import { WorldStore } from './WorldStore';
-import type {
-  LoadedWorld,
-  WorldCheckpoint,
-  WorldPersistence,
-  WorldPersistenceDiagnostics,
+import {
+  CommitStats,
+  type LoadedWorld,
+  type WorldCheckpoint,
+  type WorldPersistence,
+  type WorldPersistenceDiagnostics,
 } from './worldPersistence';
 import {
   deserializeWorkerError,
@@ -21,28 +22,32 @@ const SHUTDOWN_TIMEOUT_MS = 5_000;
 const BATCH_STALL_TIMEOUT_MS = 30_000;
 const STALL_WATCH_INTERVAL_MS = 5_000;
 /** The engine coalesces flushes while one is pending; more than this means it is not draining. */
-const MAX_PENDING_BATCHES = 4;
+const MAX_PENDING_REQUESTS = 4;
+
+interface PendingRequest {
+  type: 'persist' | 'reset';
+  /** Wall time the request was handed over, for the stall watchdog. */
+  postedAt: number;
+}
 
 /**
  * `WorldPersistence` whose SQLite writer lives on a worker thread.
  *
  * The game thread opens the database once to load the saved world, then only
  * ever hands batches to the worker, so a commit and its fsync can never block
- * a simulation frame. Batches are applied in order; a failure is reported once
- * and the adapter stays failed, matching the engine's fail-closed contract.
- * A worker that stops answering is a failure too: pending batches are
- * watched, so the loop can never keep trusting memory behind a dead writer.
+ * a simulation frame. Requests are applied in order and each is answered
+ * once; a failure is reported once and the adapter stays failed, matching the
+ * engine's fail-closed contract. A worker that stops answering is a failure
+ * too: pending requests are watched, so the loop can never keep trusting
+ * memory behind a dead writer.
  */
 export class WorkerWorldPersistence implements WorldPersistence {
   private worker: Worker | undefined;
   private watchdog: NodeJS.Timeout | undefined;
   private nextRequestId = 1;
-  /** Batch id → wall time it was handed over. */
-  private readonly pending = new Map<number, number>();
+  private readonly pending = new Map<number, PendingRequest>();
   private readonly idleWaiters: Array<() => void> = [];
-  private committedBatches = 0;
-  private lastCommitMs: number | undefined;
-  private lastCommittedAt: number | undefined;
+  private readonly stats = new CommitStats();
   private failure: Error | undefined;
   private failureHandler: ((error: Error) => void) | undefined;
   private closing: Promise<void> | undefined;
@@ -58,13 +63,21 @@ export class WorkerWorldPersistence implements WorldPersistence {
     this.stallTimeoutMs = options.stallTimeoutMs ?? BATCH_STALL_TIMEOUT_MS;
   }
 
+  /**
+   * Read the saved world on this thread, then start the writer. Starting it
+   * here, once the loading connection is closed, surfaces a worker that
+   * cannot open the database before the first player joins.
+   */
   load(): LoadedWorld {
     const store = new WorldStore(this.path);
+    let loaded: LoadedWorld;
     try {
-      return store.load();
+      loaded = store.load();
     } finally {
       store.close();
     }
+    this.ensureWorker();
+    return loaded;
   }
 
   persist(batch: WorldCheckpoint): void {
@@ -72,7 +85,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
       type: 'persist',
       id: this.nextRequestId++,
       world: batch.world,
-      sectors: [...batch.sectors.entries()],
+      sectors: batch.sectors,
       pilots: [...batch.pilots],
     });
   }
@@ -97,7 +110,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
     });
   }
 
-  /** Commits everything handed over, then rejects if any batch ever failed. */
+  /** Commits everything handed over, then rejects if any request ever failed. */
   shutdown(): Promise<void> {
     if (this.closing !== undefined) {
       return this.closing;
@@ -134,30 +147,21 @@ export class WorkerWorldPersistence implements WorldPersistence {
   }
 
   diagnostics(): WorldPersistenceDiagnostics {
-    return {
-      mode: 'worker',
-      pendingBatches: this.pending.size,
-      committedBatches: this.committedBatches,
-      ...(this.lastCommitMs !== undefined ? { lastCommitMs: this.lastCommitMs } : {}),
-      ...(this.lastCommittedAt !== undefined ? { lastCommittedAt: this.lastCommittedAt } : {}),
-      failed: this.failure !== undefined,
-    };
+    return this.stats.diagnostics('worker', this.pending.size, this.failure !== undefined);
   }
 
-  private send(request: WorldStoreWorkerRequest): void {
+  private send(request: Exclude<WorldStoreWorkerRequest, { type: 'shutdown' }>): void {
     if (this.failure) {
       throw this.failure;
     }
     if (this.closing !== undefined) {
       throw new Error('World persistence is shutting down');
     }
-    if (request.type === 'persist') {
-      if (this.pending.size >= MAX_PENDING_BATCHES) {
-        this.fail(new Error('World store worker is not keeping up with world batches'));
-        throw this.failure;
-      }
-      this.pending.set(request.id, Date.now());
+    if (this.pending.size >= MAX_PENDING_REQUESTS) {
+      this.fail(new Error('World store worker is not keeping up with world batches'));
+      throw this.failure;
     }
+    this.pending.set(request.id, { type: request.type, postedAt: Date.now() });
     this.ensureWorker().postMessage(request);
   }
 
@@ -180,7 +184,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
     );
     worker.on('exit', (code) => {
       // Only shutdown ends the worker on purpose; any other exit, even a clean
-      // one, leaves batches unanswered.
+      // one, leaves requests unanswered.
       if (this.closing === undefined) {
         this.fail(new Error(`World store worker exited unexpectedly with code ${code}`));
       }
@@ -193,7 +197,7 @@ export class WorkerWorldPersistence implements WorldPersistence {
 
   private failIfStalled(): void {
     let oldest = Number.POSITIVE_INFINITY;
-    for (const postedAt of this.pending.values()) {
+    for (const { postedAt } of this.pending.values()) {
       oldest = Math.min(oldest, postedAt);
     }
     const waitedMs = Date.now() - oldest;
@@ -215,22 +219,20 @@ export class WorkerWorldPersistence implements WorldPersistence {
 
   private receive(reply: WorldStoreWorkerReply): void {
     switch (reply.type) {
-      case 'committed':
+      case 'done': {
+        const request = this.pending.get(reply.id);
         this.pending.delete(reply.id);
-        this.committedBatches++;
-        this.lastCommitMs = reply.durationMs;
-        this.lastCommittedAt = Date.now();
+        if (request?.type === 'persist') {
+          this.stats.recordCommit(reply.durationMs);
+        }
         this.settleIdle();
         return;
+      }
       case 'failed':
         if (reply.id !== undefined) {
           this.pending.delete(reply.id);
         }
         this.fail(deserializeWorkerError(reply.error));
-        return;
-      case 'ready':
-      case 'reset':
-      case 'closed':
         return;
       default:
         this.fail(new Error(`Unknown world store reply ${JSON.stringify(reply)}`));

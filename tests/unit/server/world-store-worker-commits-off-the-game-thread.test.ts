@@ -60,14 +60,24 @@ function reopen(path: string): WorldStore {
   return store;
 }
 
+/** `shutdown()` is idempotent, so the test body may await it too; a rejection here fails the test. */
+function shutDownAfter(persistence: WorkerWorldPersistence): void {
+  cleanups.push(() => persistence.shutdown());
+}
+
+/** For adapters the test has failed on purpose: shutdown must reject, and with that failure. */
+function expectFailedShutdownAfter(persistence: WorkerWorldPersistence, message: string): void {
+  cleanups.push(() => expect(persistence.shutdown()).rejects.toThrow(message));
+}
+
 test('batches handed to the worker are committed in order and survive a reopen', async () => {
   const path = worldFile();
   const persistence = new WorkerWorldPersistence(path);
-  cleanups.push(() => persistence.shutdown().catch(() => undefined));
+  shutDownAfter(persistence);
   expect(persistence.load()).toEqual({ world: undefined, sectors: new Map(), pilots: [] });
 
   persistence.persist(batch(new Map([['0,0', [deposit('ore', { x: 20, y: 20 })]]]), 10));
-  persistence.persist(batch(new Map([['0,0', []]]), 25));
+  persistence.persist({ sectors: new Map([['0,0', []]]), pilots: batch(new Map(), 25).pilots });
   expect(persistence.diagnostics()).toMatchObject({ mode: 'worker', pendingBatches: 2 });
   await persistence.whenIdle();
   expect(persistence.diagnostics()).toMatchObject({
@@ -76,10 +86,12 @@ test('batches handed to the worker are committed in order and survive a reopen',
     failed: false,
   });
   expect(persistence.diagnostics().lastCommitMs).toBeGreaterThanOrEqual(0);
+  await persistence.shutdown();
 
   const saved = reopen(path);
   expect(saved.loadSector('0,0')).toEqual([]);
   expect(saved.loadPilots().find((pilot) => pilot.id === 'pilot')?.score).toBe(25);
+  // The second batch carried no world row; the first one's row is still there.
   expect(saved.loadWorld()?.seed).toBe(7);
 });
 
@@ -95,26 +107,55 @@ test('shutdown commits the batch still in flight before releasing the database',
   expect(saved.loadPilots().find((pilot) => pilot.id === 'pilot')?.score).toBe(40);
 });
 
-test('a batch the worker cannot commit fails the adapter once and rejects its shutdown', async () => {
+test('a reset queued behind a batch erases it, and a batch queued behind the reset survives', async () => {
   const path = worldFile();
   const persistence = new WorkerWorldPersistence(path);
-  cleanups.push(() => persistence.shutdown().catch(() => undefined));
+  shutDownAfter(persistence);
+  persistence.load();
+  persistence.persist(batch(new Map([['0,0', [deposit('doomed', { x: 20, y: 20 })]]]), 10));
+  persistence.reset();
+  persistence.persist(batch(new Map([['1,0', [deposit('kept', { x: 2_100, y: 20 })]]]), 30));
+  // Idle means the reset has been applied too, not only the batches around it.
+  expect(persistence.diagnostics().pendingBatches).toBe(3);
+  await persistence.whenIdle();
+  expect(persistence.diagnostics()).toMatchObject({ pendingBatches: 0, committedBatches: 2 });
+  await persistence.shutdown();
+
+  const saved = reopen(path);
+  expect(saved.loadSector('0,0')).toBeUndefined();
+  expect(saved.loadSector('1,0')?.map((rock) => rock.id)).toEqual(['kept']);
+  expect(saved.loadPilots().find((pilot) => pilot.id === 'pilot')?.score).toBe(30);
+});
+
+test('a batch the worker cannot commit fails the adapter once, and nothing queued behind it lands', async () => {
+  const path = worldFile();
+  const persistence = new WorkerWorldPersistence(path);
+  expectFailedShutdownAfter(persistence, 'Saved sector 0,0');
   persistence.load();
   const failures: Error[] = [];
   persistence.onFailure((error) => failures.push(error));
 
   // A deposit whose position lies outside its sector is refused by the store's validation.
   persistence.persist(batch(new Map([['0,0', [deposit('stray', { x: 5_000, y: 5_000 })]]]), 5));
+  // Handed over in the same turn, before the failure could be reported back:
+  // it was built on memory the database will never match, so it must not commit.
+  persistence.persist(batch(new Map([['1,0', [deposit('follower', { x: 2_100, y: 20 })]]]), 25));
   await persistence.whenIdle();
   expect(failures).toHaveLength(1);
   expect(failures[0]?.message).toContain('Saved sector 0,0');
-  expect(persistence.diagnostics()).toMatchObject({ failed: true, committedBatches: 0 });
+  expect(persistence.diagnostics()).toMatchObject({
+    failed: true,
+    pendingBatches: 0,
+    committedBatches: 0,
+  });
   expect(() => persistence.persist(batch(new Map(), 6))).toThrow('Saved sector 0,0');
   await expect(persistence.shutdown()).rejects.toThrow('Saved sector 0,0');
 
   const saved = reopen(path);
   expect(saved.loadPilots()).toEqual([]);
   expect(saved.loadSector('0,0')).toBeUndefined();
+  expect(saved.loadSector('1,0')).toBeUndefined();
+  expect(saved.loadWorld()).toBeUndefined();
 });
 
 test('a worker that stops answering fails the adapter instead of leaving the loop trusting memory', () => {
@@ -124,7 +165,7 @@ test('a worker that stops answering fails the adapter instead of leaving the loo
   });
   const path = worldFile();
   const persistence = new WorkerWorldPersistence(path, { stallTimeoutMs: 1_000 });
-  cleanups.push(() => persistence.shutdown().catch(() => undefined));
+  expectFailedShutdownAfter(persistence, 'World store worker unresponsive');
   const failures: Error[] = [];
   persistence.onFailure((error) => failures.push(error));
   persistence.persist(batch(new Map(), 1));
@@ -140,7 +181,7 @@ test('a worker that stops answering fails the adapter instead of leaving the loo
 test('handing over more batches than the writer could ever be behind by fails closed', () => {
   const path = worldFile();
   const persistence = new WorkerWorldPersistence(path);
-  cleanups.push(() => persistence.shutdown().catch(() => undefined));
+  expectFailedShutdownAfter(persistence, 'not keeping up');
   const failures: Error[] = [];
   persistence.onFailure((error) => failures.push(error));
   for (let round = 0; round < 4; round++) {

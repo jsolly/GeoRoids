@@ -111,6 +111,16 @@ re-enters stdout; if both sinks fail, the health counters still show degradation
 connection recovers; it is a reported count, not independently verified delivery.
 The status page labels lifetime losses separately from current queue size.
 
+The game loop reports its own health the same way. `/health` `world.loop`
+counts clock steps that were blocked for 250 ms or more (`stalls`), the longest
+such stretch (`longestStallMs`) and simulation time dropped because a step was
+more than a second late (`discardedDebtMs`); `world.persistence` shows how many
+world batches are waiting on the store worker and when the last one committed.
+Each stall also writes one `game_loop_stalled` warning per five-second window
+with `blockedMs`, `catchupTicks` and the persistence counters, so a blocked
+event loop is searchable in Railway logs without the profiler running. A pose
+that was credited a blocked second logs `motion_blocked_time_credited` once.
+
 Contexts are copied when logged, with bounded depth and text length. Sensitive
 fields are redacted, and page URLs omit query strings and fragments. Do not log
 chat, player names, authentication/resume tokens, complete packets or full

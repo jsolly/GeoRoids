@@ -12,6 +12,7 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { SERVER_RELEASE_ID } from '../../../server/release';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { FURNACES } from '../../../shared/furnaces';
 import { utcScoreSeason } from '../../../shared/world';
@@ -46,7 +47,7 @@ function worldStore(): WorldStore {
 }
 
 function engineWithStore(store: WorldStore, clock?: ServerClock): GameEngine {
-  const engine = new GameEngine(82, clock, store);
+  const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
   engines.push(engine);
   return engine;
 }

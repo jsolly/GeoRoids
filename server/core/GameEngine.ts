@@ -37,6 +37,7 @@ import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
   AsteroidData,
+  ExplorationTile,
   FurnaceDelivery,
   LootCollected,
   LootData,
@@ -78,7 +79,12 @@ import { SERVER_RELEASE_ID } from '../release';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import { MapAssets } from '../world/MapAssets';
 import { RegionalAsteroidField } from '../world/RegionalAsteroidField';
-import { type PersistentPilot, type RestorableFlight, restorableFlight } from '../world/WorldStore';
+import {
+  type PersistentPilot,
+  type RestorableFlight,
+  restorableFlight,
+  type SavedWorld,
+} from '../world/WorldStore';
 import type { WorldPersistence, WorldPersistenceDiagnostics } from '../world/worldPersistence';
 import {
   type AsteroidHitCause,
@@ -88,6 +94,7 @@ import {
 } from './AsteroidManager.ts';
 import { CollisionAuthority } from './CollisionAuthority';
 import { EntityManager, type GameEntity } from './EntityManager';
+import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
 import { LootManager } from './LootManager';
 import { PlayerMotionService } from './PlayerMotionService';
 import { RNGService } from './RNGService';
@@ -168,18 +175,13 @@ const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 const MAX_PENDING_LOOT_COLLECTIONS = 256;
 /** World changes leave the loop once per second; a crash loses at most that window. */
 const WORLD_FLUSH_FRAMES = GAME.FPS;
-/** A clock step this long could not read poses or serve clients; say so in the logs. */
-const GAME_LOOP_STALL_WARN_MS = 250;
-const GAME_LOOP_STALL_LOG_INTERVAL_MS = 5_000;
 
-/** Always-on loop health for /health; cheap counters, not the opt-in profiler. */
-interface GameLoopHealth {
-  /** Simulation time dropped because a step was more than one second late. */
-  discardedDebtMs: number;
-  /** Longest single blocked stretch (late arrival plus catch-up) seen by the clock. */
-  longestStallMs: number;
-  /** Clock steps whose blocked stretch reached the stall warning threshold. */
-  stalls: number;
+/** What the last flushed world row was built from; the row is only sent again when this changes. */
+interface FlushedWorldRow {
+  exploration: ExplorationTile[];
+  completedSectors: number;
+  scoreSeason: string;
+  startedAt: number;
 }
 
 type PendingShockwave = {
@@ -216,14 +218,10 @@ export class GameEngine {
   private nextTickDueAtMs = 0;
   private tickAccumulatorMs = 0;
   private clockPrimed: boolean = false;
-  private readonly loopHealth: GameLoopHealth = {
-    discardedDebtMs: 0,
-    longestStallMs: 0,
-    stalls: 0,
-  };
-  private lastStallLoggedAtMs = Number.NEGATIVE_INFINITY;
+  private readonly loopHealth = new GameLoopHealth();
   /** Pilots whose saved row changed since the last flush; live pilots are captured at flush time. */
   private readonly dirtyPilots = new Set<string>();
+  private lastFlushedWorldRow: FlushedWorldRow | undefined;
   private flushWaitingForIdle = false;
   private lastSimulationAtMs: number | undefined;
   private resolvedCollabHits: ExpiredCollabHit[] = [];
@@ -290,11 +288,7 @@ export class GameEngine {
     for (const pilot of loaded?.pilots ?? []) {
       this.pilots.set(pilot.id, pilot);
     }
-    persistence?.onFailure((cause) => {
-      // Do not continue from memory that the database no longer matches. The
-      // next tick reaches the process fatal-error boundary, including while paused.
-      this.persistenceFailure ??= new Error('Persistent world checkpoint failed', { cause });
-    });
+    persistence?.onFailure((cause) => this.failPersistence(cause));
     this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
     this.asteroidManager = new AsteroidManager(this.rngService);
     this.lootManager = new LootManager(this.rngService);
@@ -383,7 +377,6 @@ export class GameEngine {
       });
     }
     this.tickAccumulatorMs = remainingMs;
-    this.loopHealth.discardedDebtMs += discardedMs;
     for (let i = 0; i < frames; i++) {
       this.advanceOneFrame(serverNow);
     }
@@ -393,35 +386,16 @@ export class GameEngine {
     const finished = nowMs ?? this.getServerTime();
     this.playerMotion.recordBlockedSpan(blockedFrom, finished);
     this.lastTickFinishedAtMs = finished;
-    this.observeStall(finished - blockedFrom, frames, discardedMs, finished);
-    return frames;
-  }
-
-  private observeStall(
-    blockedMs: number,
-    catchupTicks: number,
-    discardedMs: number,
-    now: number
-  ): void {
-    if (blockedMs < GAME_LOOP_STALL_WARN_MS) {
-      return;
-    }
-    this.loopHealth.stalls++;
-    this.loopHealth.longestStallMs = Math.max(this.loopHealth.longestStallMs, blockedMs);
-    if (now - this.lastStallLoggedAtMs < GAME_LOOP_STALL_LOG_INTERVAL_MS) {
-      return;
-    }
-    this.lastStallLoggedAtMs = now;
-    logger.warn('STATE', 'game_loop_stalled', {
-      releaseId: SERVER_RELEASE_ID,
-      observedAt: now,
+    this.loopHealth.observe({
+      blockedMs: finished - blockedFrom,
+      catchupTicks: frames,
+      discardedMs,
+      now: finished,
       gameTime: this.gameTime,
       players: this.getPlayerCount(),
-      blockedMs: Math.round(blockedMs),
-      catchupTicks,
-      discardedMs: Math.round(discardedMs),
       persistence: this.persistence?.diagnostics(),
     });
+    return frames;
   }
 
   /** One 60 Hz frame: clock always ticks; combat/field only while a player is in. */
@@ -550,7 +524,7 @@ export class GameEngine {
     asteroids: number;
     loot: number;
     satellitePickups: number;
-    loop: GameLoopHealth;
+    loop: GameLoopHealthSnapshot;
     persistence?: WorldPersistenceDiagnostics;
   } {
     const persistence = this.persistence?.diagnostics();
@@ -561,7 +535,7 @@ export class GameEngine {
       asteroids: this.asteroidManager.getAsteroidCount(),
       loot: this.lootManager.getCount(),
       satellitePickups: this.satellitePickupManager.getCount(),
-      loop: { ...this.loopHealth },
+      loop: this.loopHealth.snapshot(),
       ...(persistence ? { persistence } : {}),
     };
   }
@@ -591,9 +565,7 @@ export class GameEngine {
     }
     this.persistence?.reset();
     this.resetGameState();
-    this.loopHealth.discardedDebtMs = 0;
-    this.loopHealth.longestStallMs = 0;
-    this.loopHealth.stalls = 0;
+    this.loopHealth.reset();
     this.isPaused = true;
     this.rngService.reset();
   }
@@ -632,6 +604,8 @@ export class GameEngine {
   private resetGameState(): void {
     this.regionalField.reset();
     this.pilots.clear();
+    this.dirtyPilots.clear();
+    this.lastFlushedWorldRow = undefined;
     this.managedField = true;
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
@@ -1085,27 +1059,66 @@ export class GameEngine {
           pilots.push(pilot);
         }
       }
+      const worldRow = this.worldRowIfChanged();
       this.persistence.persist({
-        world: {
-          seed: this.worldSeed,
-          startedAt: this.worldStartedAt,
-          generation: WORLD.generation,
-          scoreSeason: this.scoreSeason,
-          writtenReleaseId: SERVER_RELEASE_ID,
-          exploration: this.exploration.snapshot(),
-          completedSectors: [...this.completedSectors].sort(),
-        },
+        ...(worldRow ? { world: worldRow.world } : {}),
         sectors: this.regionalField.checkpoint(this.asteroidManager),
         pilots,
       });
+      if (worldRow) {
+        this.lastFlushedWorldRow = worldRow.builtFrom;
+      }
       this.dirtyPilots.clear();
       this.regionalField.saved();
     } catch (cause) {
-      // Do not continue from memory after an uncommitted world mutation. The
-      // next tick reaches the process fatal-error boundary, including while paused.
-      this.persistenceFailure = new Error('Persistent world checkpoint failed', { cause });
+      this.failPersistence(cause);
       throw this.persistenceFailure;
     }
+  }
+
+  /**
+   * The world row carries the whole exploration grid, so it is only rebuilt
+   * and sent when one of its inputs changed since the last flush. The
+   * exploration snapshot keeps its identity until a cell is revealed, and
+   * completed sectors only ever grow between resets.
+   */
+  private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
+    const builtFrom: FlushedWorldRow = {
+      exploration: this.exploration.snapshot(),
+      completedSectors: this.completedSectors.size,
+      scoreSeason: this.scoreSeason,
+      startedAt: this.worldStartedAt,
+    };
+    const last = this.lastFlushedWorldRow;
+    if (
+      last &&
+      last.exploration === builtFrom.exploration &&
+      last.completedSectors === builtFrom.completedSectors &&
+      last.scoreSeason === builtFrom.scoreSeason &&
+      last.startedAt === builtFrom.startedAt
+    ) {
+      return undefined;
+    }
+    return {
+      world: {
+        seed: this.worldSeed,
+        startedAt: this.worldStartedAt,
+        generation: WORLD.generation,
+        scoreSeason: this.scoreSeason,
+        writtenReleaseId: SERVER_RELEASE_ID,
+        exploration: builtFrom.exploration,
+        completedSectors: [...this.completedSectors].sort(),
+      },
+      builtFrom,
+    };
+  }
+
+  /**
+   * Do not continue from memory that the database no longer matches. The
+   * next tick reaches the process fatal-error boundary, including while paused.
+   */
+  private failPersistence(cause: unknown): void {
+    this.persistenceFailure ??= new Error('Persistent world checkpoint failed', { cause });
   }
 
   private persistenceIdle(): boolean {

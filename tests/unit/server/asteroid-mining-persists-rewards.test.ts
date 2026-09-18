@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { FURNACES } from '../../../shared/furnaces';
 import { sectorAt, WORLD } from '../../../shared/world';
@@ -104,7 +105,7 @@ function metalDeposit(id: string): AsteroidData {
 test('a flush that cannot save every delivered score rolls the whole batch back and stops gameplay', () => {
   const path = temporaryWorldPath();
   const worldStore = fileStore(path);
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const furnace = FURNACES[0];
   assert(furnace);
   const first = pilot(engine, 'first-hauler', furnace.position, 'hauler');
@@ -142,7 +143,7 @@ test('a flush that cannot save every delivered score rolls the whole batch back 
 
 test('a collaborative laser break saves fragments and every contributor score by the next flush', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const firstMiner = pilot(engine, 'first-miner');
   const secondMiner = pilot(engine, 'second-miner', { x: 10, y: 0 });
   const target = largeIce('persisted-split-target');
@@ -176,7 +177,7 @@ test('a collaborative laser break saves fragments and every contributor score by
 
 test('expired collaborative mining credits an offline miner and Surveyor by the next flush', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const miner = pilot(engine, 'offline-miner');
   const active = pilot(engine, 'active-pilot', { x: 10, y: 0 });
   const surveyor = pilot(engine, 'survey-contributor', { x: 20, y: 0 });
@@ -202,7 +203,7 @@ test('expired collaborative mining credits an offline miner and Surveyor by the 
 
 test('a high-HP rock credits an offline first Hauler when a second Hauler finishes it', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const firstMiner = pilot(engine, 'offline-high-hp', { x: 0, y: 0 }, 'hauler');
   const terminalMiner = pilot(engine, 'terminal-high-hp', { x: 10, y: 0 }, 'hauler');
   const target = highHpIce('persisted-high-hp-target');
@@ -226,7 +227,7 @@ test('a high-HP rock credits an offline first Hauler when a second Hauler finish
 
 test('a regional unload and reload keeps partial mining contributors on the rock', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const firstMiner = pilot(engine, 'regional-first', { x: 0, y: 0 }, 'hauler');
   const terminalMiner = pilot(engine, 'regional-terminal', { x: 10, y: 0 }, 'hauler');
   const target = highHpIce('regional-mining-target');
@@ -255,7 +256,7 @@ test('a regional unload and reload keeps partial mining contributors on the rock
 
 test('a metal chip credits an offline first Hauler when a Surveyor lands the terminal hit', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const firstMiner = pilot(engine, 'offline-metal', { x: 0, y: 0 }, 'hauler');
   const terminalMiner = pilot(engine, 'terminal-metal', { x: 10, y: 0 });
   const target = metalDeposit('persisted-metal-target');
@@ -280,7 +281,7 @@ test('a metal chip credits an offline first Hauler when a Surveyor lands the ter
 test('a partially mined high-HP rock keeps its offline contributor after restart', () => {
   const path = temporaryWorldPath();
   const firstStore = fileStore(path);
-  const firstEngine = new GameEngine(82, undefined, firstStore);
+  const firstEngine = new GameEngine(82, undefined, new InlineWorldPersistence(firstStore));
   const firstMiner = pilot(firstEngine, 'restart-high-hp-first', { x: 0, y: 0 }, 'hauler');
   pilot(firstEngine, 'restart-high-hp-terminal', { x: 10, y: 0 }, 'hauler');
   const target = highHpIce('restart-high-hp-target');
@@ -292,7 +293,7 @@ test('a partially mined high-HP rock keeps its offline contributor after restart
   closeStore(firstStore);
 
   const resumedStore = fileStore(path);
-  const resumedEngine = new GameEngine(999, undefined, resumedStore);
+  const resumedEngine = new GameEngine(999, undefined, new InlineWorldPersistence(resumedStore));
   const terminalMiner = pilot(resumedEngine, 'restart-high-hp-terminal', { x: 10, y: 0 }, 'hauler');
   const resumedTarget = resumedEngine.getAsteroid(target.id);
   assert(resumedTarget);
@@ -315,7 +316,7 @@ test('a partially mined high-HP rock keeps its offline contributor after restart
 test('a partially mined metal deposit keeps its offline contributor after restart', () => {
   const path = temporaryWorldPath();
   const firstStore = fileStore(path);
-  const firstEngine = new GameEngine(82, undefined, firstStore);
+  const firstEngine = new GameEngine(82, undefined, new InlineWorldPersistence(firstStore));
   const firstMiner = pilot(firstEngine, 'restart-metal-first', { x: 0, y: 0 }, 'hauler');
   pilot(firstEngine, 'restart-metal-terminal', { x: 10, y: 0 });
   const target = metalDeposit('restart-metal-target');
@@ -328,7 +329,7 @@ test('a partially mined metal deposit keeps its offline contributor after restar
   closeStore(firstStore);
 
   const resumedStore = fileStore(path);
-  const resumedEngine = new GameEngine(999, undefined, resumedStore);
+  const resumedEngine = new GameEngine(999, undefined, new InlineWorldPersistence(resumedStore));
   const terminalMiner = pilot(resumedEngine, 'restart-metal-terminal', { x: 10, y: 0 });
   const resumedTarget = resumedEngine.getAsteroid(target.id);
   assert(resumedTarget);
@@ -350,7 +351,7 @@ test('a partially mined metal deposit keeps its offline contributor after restar
 
 test('an accidental hull break preserves credit for an offline miner and Surveyor', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const miner = pilot(engine, 'collision-miner', { x: 0, y: 0 }, 'hauler');
   const surveyor = pilot(engine, 'collision-surveyor', { x: 10, y: 0 });
   const rammer = pilot(engine, 'collision-finisher', { x: 20, y: 0 });
@@ -379,7 +380,7 @@ test('an accidental hull break preserves credit for an offline miner and Surveyo
 
 test('a terminal reflected shot credits the offline pilot who first charged the rock', () => {
   const worldStore = store();
-  const engine = new GameEngine(82, undefined, worldStore);
+  const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const first = pilot(engine, 'first-reflector', { x: -500, y: 0 });
   const second = pilot(engine, 'last-reflector', { x: -500, y: 10 });
   for (const rock of engine.getAllAsteroids()) {
@@ -420,7 +421,7 @@ test.each(['ice', 'rubble'] as const)(
   'mining %s at the world edge saves contained fragments and shared rewards by the next flush',
   (material) => {
     const worldStore = store();
-    const engine = new GameEngine(82, undefined, worldStore);
+    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
     const firstMiner = pilot(engine, 'edge-first');
     const secondMiner = pilot(engine, 'edge-second', { x: 10, y: 0 });
     const target = {

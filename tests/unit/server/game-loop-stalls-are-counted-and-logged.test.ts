@@ -61,6 +61,19 @@ test('a clock step that arrives seconds late is counted on /health and logged on
     expect(engine.getDiagnostics().loop.stalls).toBe(2);
     expect(engine.getDiagnostics().loop.longestStallMs).toBe(afterStall.longestStallMs);
     expect(stalled()).toHaveLength(1);
+
+    // Once the window has passed, the next stall is logged again.
+    for (let tick = 0; tick < 5 * 60; tick++) {
+      elapsed += GAME_TICK_MS;
+      engine.stepClock();
+    }
+    elapsed += 300;
+    engine.stepClock();
+    expect(engine.getDiagnostics().loop.stalls).toBe(3);
+    expect(stalled()).toHaveLength(2);
+    const relogged = stalled()[1]?.[2] as { blockedMs: number };
+    expect(relogged.blockedMs).toBeGreaterThanOrEqual(250);
+    expect(relogged.blockedMs).toBeLessThan(400);
   } finally {
     engine.stopGameLoop();
   }

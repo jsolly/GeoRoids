@@ -3,7 +3,8 @@ import type { PersistentPilot, SavedWorld } from './WorldStore';
 
 /** Everything the engine changed since the last flush, handed over as one transaction. */
 export interface WorldCheckpoint {
-  world: SavedWorld;
+  /** The world row, only when something in it changed since the last flush. */
+  world?: SavedWorld;
   sectors: ReadonlyMap<string, AsteroidData[]>;
   pilots: readonly PersistentPilot[];
 }
@@ -17,8 +18,9 @@ export interface LoadedWorld {
 
 export interface WorldPersistenceDiagnostics {
   mode: 'inline' | 'worker';
-  /** Batches handed over that have not been committed yet. */
+  /** Requests handed over (batches and resets) that have not been applied yet. */
   pendingBatches: number;
+  /** Batches committed; resets are not counted. */
   committedBatches: number;
   /** Wall time of the last commit as measured where it ran. */
   lastCommitMs?: number;
@@ -47,4 +49,32 @@ export interface WorldPersistence {
   /** Commit whatever is still pending, then release the database. */
   shutdown(): Promise<void>;
   diagnostics(): WorldPersistenceDiagnostics;
+}
+
+/** Commit bookkeeping every adapter reports the same way on /health. */
+export class CommitStats {
+  private committedBatches = 0;
+  private lastCommitMs: number | undefined;
+  private lastCommittedAt: number | undefined;
+
+  recordCommit(durationMs: number): void {
+    this.committedBatches++;
+    this.lastCommitMs = durationMs;
+    this.lastCommittedAt = Date.now();
+  }
+
+  diagnostics(
+    mode: WorldPersistenceDiagnostics['mode'],
+    pendingBatches: number,
+    failed: boolean
+  ): WorldPersistenceDiagnostics {
+    return {
+      mode,
+      pendingBatches,
+      committedBatches: this.committedBatches,
+      ...(this.lastCommitMs !== undefined ? { lastCommitMs: this.lastCommitMs } : {}),
+      ...(this.lastCommittedAt !== undefined ? { lastCommittedAt: this.lastCommittedAt } : {}),
+      failed,
+    };
+  }
 }

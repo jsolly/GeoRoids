@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
@@ -16,7 +17,7 @@ test('a UTC month boundary zeros scores and clears the shared world without yank
   });
   const store = new WorldStore(':memory:');
   try {
-    const engine = new GameEngine(82, clock, store);
+    const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('pilot', 'Bob', socket, { x: 4_000, y: 1_200 });
     actor.asteroidInteractions = 1;
@@ -87,7 +88,7 @@ test('a saved world missing a score season resets instead of restoring last mont
     );
     expect(store.loadWorld()?.scoreSeason).toBeUndefined();
     expect(store.loadSector('0,0')).toHaveLength(1);
-    const engine = new GameEngine(99, undefined, store);
+    const engine = new GameEngine(99, undefined, new InlineWorldPersistence(store));
     expect(engine.getTerrainSeed()).toBe(99);
     expect(store.loadWorld()).toBeUndefined();
     expect(store.loadSector('0,0')).toBeUndefined();

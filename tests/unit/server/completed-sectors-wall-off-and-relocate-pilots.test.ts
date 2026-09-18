@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { isInsideCompletedSector } from '../../../shared/sectors';
 import { sectorAt, WORLD } from '../../../shared/world';
@@ -182,7 +183,7 @@ test('a saved world from an older generation resets instead of loading depleted 
       []
     );
     expect(store.loadSector('0,0')).toHaveLength(1);
-    const engine = new GameEngine(99, undefined, store);
+    const engine = new GameEngine(99, undefined, new InlineWorldPersistence(store));
     expect(engine.getTerrainSeed()).toBe(99);
     expect(store.loadWorld()).toBeUndefined();
     expect(store.loadSector('0,0')).toBeUndefined();

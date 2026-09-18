@@ -41,29 +41,41 @@ if (typeof path !== 'string' || path.length === 0) {
     port.close();
     throw error;
   }
-  reply({ type: 'ready' });
+  // After a failed transaction the database no longer matches the game
+  // thread's memory, so later batches built on that memory must not land
+  // either; the process restarts from the last commit. Shutdown still closes.
+  let failure: unknown;
   port.on('message', (request: WorldStoreWorkerRequest) => {
+    if (request.type === 'shutdown') {
+      try {
+        store.close();
+        reply({ type: 'done', id: request.id, durationMs: 0 });
+      } catch (error) {
+        reply({ type: 'failed', id: request.id, error: serializeWorkerError(error) });
+      } finally {
+        port.close();
+      }
+      return;
+    }
+    if (failure !== undefined) {
+      reply({ type: 'failed', id: request.id, error: serializeWorkerError(failure) });
+      return;
+    }
+    const started = performance.now();
     try {
       switch (request.type) {
-        case 'persist': {
-          const started = performance.now();
-          store.checkpoint(request.world, new Map(request.sectors), request.pilots);
-          reply({ type: 'committed', id: request.id, durationMs: performance.now() - started });
-          return;
-        }
+        case 'persist':
+          store.checkpoint(request.world, request.sectors, request.pilots);
+          break;
         case 'reset':
           store.reset();
-          reply({ type: 'reset', id: request.id });
-          return;
-        case 'shutdown':
-          store.close();
-          reply({ type: 'closed', id: request.id });
-          port.close();
-          return;
+          break;
         default:
           throw new Error(`Unknown world store request ${JSON.stringify(request)}`);
       }
+      reply({ type: 'done', id: request.id, durationMs: performance.now() - started });
     } catch (error) {
+      failure = error;
       reply({ type: 'failed', id: request.id, error: serializeWorkerError(error) });
     }
   });

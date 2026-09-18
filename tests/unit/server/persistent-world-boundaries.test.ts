@@ -306,6 +306,67 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
   }
 });
 
+test('checkpoint refuses a deposit already saved under a sector the batch leaves alone', () => {
+  const store = new WorldStore(':memory:');
+  try {
+    const world = {
+      seed: 1,
+      startedAt: 1,
+      generation: WORLD.generation,
+      exploration: [],
+      completedSectors: [],
+    };
+    store.checkpoint(world, new Map([['0,0', [asteroid('ore', { x: 20, y: 20 })]]]), []);
+    // Rewriting only 1,0 with the same deposit would duplicate it across rows.
+    expect(() =>
+      store.checkpoint(undefined, new Map([['1,0', [asteroid('ore', { x: 2_020, y: 20 })]]]), [])
+    ).toThrow(DUPLICATE_SECTOR_ASTEROID_PATTERN);
+    expect(store.loadSector('1,0')).toBeUndefined();
+    // Rewriting both rows moves it, and a later batch treats the move as saved.
+    store.checkpoint(
+      undefined,
+      new Map([
+        ['0,0', []],
+        ['1,0', [asteroid('ore', { x: 2_020, y: 20 })]],
+      ]),
+      []
+    );
+    expect(() =>
+      store.checkpoint(undefined, new Map([['0,0', [asteroid('ore', { x: 20, y: 20 })]]]), [])
+    ).toThrow(DUPLICATE_SECTOR_ASTEROID_PATTERN);
+    expect(store.loadSector('0,0')).toEqual([]);
+    expect(store.loadSector('1,0')?.map((rock) => rock.id)).toEqual(['ore']);
+  } finally {
+    store.close();
+  }
+});
+
+test('a store reused after a checkpoint or reset hands the next load what is on disk', () => {
+  const store = new WorldStore(':memory:');
+  try {
+    const world = {
+      seed: 1,
+      startedAt: 1,
+      generation: WORLD.generation,
+      exploration: [],
+      completedSectors: [],
+    };
+    // Committed before anything was loaded: the rows parsed at open time are stale.
+    store.checkpoint(world, new Map([['0,0', [asteroid('early', { x: 20, y: 20 })]]]), []);
+    expect([...store.loadSectors().keys()]).toEqual(['0,0']);
+    store.reset();
+    expect(store.loadSectors().size).toBe(0);
+    store.checkpoint(world, new Map([['1,0', [asteroid('later', { x: 2_020, y: 20 })]]]), []);
+    expect([...store.loadSectors().keys()]).toEqual(['1,0']);
+    // The same deposit must still be refused under another sector after the re-read.
+    expect(() =>
+      store.checkpoint(undefined, new Map([['0,0', [asteroid('later', { x: 20, y: 20 })]]]), [])
+    ).toThrow(DUPLICATE_SECTOR_ASTEROID_PATTERN);
+  } finally {
+    store.close();
+  }
+});
+
 test('a restart refuses invalid asteroid metadata in saved sectors', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-world-validation-'));
   const path = join(directory, 'world.sqlite');

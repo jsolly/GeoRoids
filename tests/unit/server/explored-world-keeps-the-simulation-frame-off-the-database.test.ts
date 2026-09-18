@@ -1,4 +1,7 @@
 /* @vitest-environment node */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
@@ -73,23 +76,31 @@ function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidDa
 const cleanups: (() => void)[] = [];
 afterEach(() => {
   vi.restoreAllMocks();
-  for (const cleanup of cleanups.splice(0)) {
+  for (const cleanup of cleanups.splice(0).reverse()) {
     cleanup();
   }
 });
 
 test('an explored world with hundreds of saved sectors keeps each simulation frame off the database', () => {
-  const store = new WorldStore(':memory:');
-  cleanups.push(() => store.close());
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-explored-world-'));
+  cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'world.sqlite');
   const harvested = '4,4';
   const untouched = '5,4';
-  exploreAndSave(
-    store,
-    new Map([
-      [harvested, []],
-      [untouched, [deposit('remaining-ore', { x: 11_000, y: 9_000 })]],
-    ])
-  );
+  {
+    const saving = new WorldStore(path);
+    exploreAndSave(
+      saving,
+      new Map([
+        [harvested, []],
+        [untouched, [deposit('remaining-ore', { x: 11_000, y: 9_000 })]],
+      ])
+    );
+    saving.close();
+  }
+  // A restarted server opens the saved world cold, exactly as Railway does.
+  const store = new WorldStore(path);
+  cleanups.push(() => store.close());
   expect(store.loadSector(harvested)).toEqual([]);
   expect(store.loadSector(untouched)).toHaveLength(1);
 

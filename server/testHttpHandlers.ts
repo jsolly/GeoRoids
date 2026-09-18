@@ -279,9 +279,16 @@ export function handleTestArrangeCrewField(
       !body['playerIds'].every(
         (id: unknown) => typeof id === 'string' && id.length > 0 && id.length < 128
       ) ||
-      !['delivery', 'empty', 'boundary', 'impact', 'mining', 'cooperative', 'reflection'].includes(
-        String(body['scenario'])
-      )
+      ![
+        'delivery',
+        'tow',
+        'empty',
+        'boundary',
+        'impact',
+        'mining',
+        'cooperative',
+        'reflection',
+      ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
       return;
@@ -305,7 +312,7 @@ export function handleTestArrangeCrewField(
       const position =
         body['scenario'] === 'boundary'
           ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-          : body['scenario'] === 'delivery'
+          : body['scenario'] === 'delivery' || body['scenario'] === 'tow'
             ? player.kitId === 'hauler'
               ? { x: 0, y: -360 }
               : { x: 220, y: -460 }
@@ -322,9 +329,16 @@ export function handleTestArrangeCrewField(
         respond(409, { error: 'Crew fixture motion unavailable' });
         return;
       }
+      // 'tow' points the Hauler away from every furnace, so the cargo it hooks
+      // stays hooked for as long as the scenario needs instead of being smelted.
       player.angle =
-        body['scenario'] === 'reflection' || body['scenario'] === 'boundary' ? 0 : Math.PI / 2;
-      player.spawnProtectionTimer = body['scenario'] === 'delivery' ? 600 : 0;
+        body['scenario'] === 'reflection' || body['scenario'] === 'boundary'
+          ? 0
+          : body['scenario'] === 'tow'
+            ? -Math.PI / 2
+            : Math.PI / 2;
+      player.spawnProtectionTimer =
+        body['scenario'] === 'delivery' || body['scenario'] === 'tow' ? 600 : 0;
       if (body['scenario'] === 'impact' && index === 0) {
         player.health = DAMAGE.ASTEROID_COLLISION;
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
@@ -366,7 +380,12 @@ export function handleTestArrangeCrewField(
     } else if (body['scenario'] !== 'empty' && body['scenario'] !== 'boundary' && first) {
       gameEngine.addAsteroid({
         id: 'crew-fixture-ore',
-        position: body['scenario'] === 'impact' ? { ...first.position } : { x: 0, y: -460 },
+        position:
+          body['scenario'] === 'impact'
+            ? { ...first.position }
+            : body['scenario'] === 'tow'
+              ? { x: 0, y: -260 }
+              : { x: 0, y: -460 },
         velocity: { x: 0, y: 0 },
         size: body['scenario'] === 'cooperative' ? 50 : 25,
         health: body['scenario'] === 'mining' ? 25 : 75,

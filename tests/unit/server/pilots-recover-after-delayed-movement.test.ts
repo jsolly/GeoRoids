@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { ServerClock } from '../../../server/core/ServerClock';
 import { MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
@@ -223,14 +223,25 @@ test.each([200, 400, 900])(
   }
 );
 
+/** Ambient rocks must not hit the pilot while the clock replays a blocked second. */
+function clearAmbientField(f: ReturnType<typeof flight>): void {
+  for (const rock of f.engine.getAllAsteroids()) {
+    f.engine.removeAsteroid(rock.id);
+  }
+}
+
 test('a network hold longer than the one-second catch-up window still rebases the pilot to the last delivered pose', () => {
   const f = flight();
+  clearAmbientField(f);
+  expect(f.engine.stepClock()).toBe(0);
   f.advance(2);
   expect(f.report().ok).toBe(true);
   f.reconcile();
+  // The server keeps ticking on time; only the pilot's link holds the reports.
   const buffered: ReturnType<typeof f.capture>[] = [];
   for (let frame = 0; frame < 72; frame++) {
     f.advance(1);
+    f.engine.stepClock();
     buffered.push(f.capture());
   }
   const outcomes = buffered.map((pose) => f.submit(pose));
@@ -238,18 +249,11 @@ test('a network hold longer than the one-second catch-up window still rebases th
   expect(firstRejected).toBeGreaterThan(60);
   expect(outcomes[firstRejected]).toMatchObject({
     ok: false,
-    envelope: { check: 'displacement', mode: 'free', elapsedMs: 0 },
+    envelope: { check: 'displacement', mode: 'free', elapsedMs: 0, blockedMs: 0 },
   });
   expect(f.actor.playerMotion?.mode).toBe('handoff');
   expect(f.actor.position).toEqual(buffered[firstRejected - 1]?.position);
 });
-
-/** Ambient rocks must not hit the pilot while the clock replays a blocked second. */
-function clearAmbientField(f: ReturnType<typeof flight>): void {
-  for (const rock of f.engine.getAllAsteroids()) {
-    f.engine.removeAsteroid(rock.id);
-  }
-}
 
 test('honest 60 Hz poses queued while the server loop was blocked for 1.6 s all land after the join', () => {
   const f = flight();
@@ -283,6 +287,81 @@ test('honest 60 Hz poses queued while the server loop was blocked for 1.6 s all 
   expect(f.report().ok).toBe(true);
 });
 
+test('honest 60 Hz poses queued behind a slow 1.6 s catch-up tick all land as well', () => {
+  const f = flight();
+  clearAmbientField(f);
+  expect(f.engine.stepClock()).toBe(0);
+  f.advance(2);
+  expect(f.report().ok).toBe(true);
+  f.reconcile();
+  const epoch = f.actor.playerMotion?.epoch;
+  const buffered: ReturnType<typeof f.capture>[] = [];
+  // The loop first falls 1.6 s behind while the pilot keeps reporting...
+  for (let frame = 0; frame < 96; frame++) {
+    f.advance(1);
+    buffered.push(f.capture());
+  }
+  // ...then the catch-up tick itself is slow: each replayed server frame
+  // costs real time in which the pilot flies on and reports again, so the
+  // block lasts 1.6 s more than the pre-tick gap alone shows.
+  const original = f.engine.advanceOneFrame.bind(f.engine);
+  let replayed = 0;
+  const slowCatchUp = vi.spyOn(f.engine, 'advanceOneFrame').mockImplementation((nowMs) => {
+    original(nowMs);
+    const clientFrames = replayed++ < 36 ? 2 : 1;
+    for (let frame = 0; frame < clientFrames; frame++) {
+      f.advance(1);
+      buffered.push(f.capture());
+    }
+  });
+  expect(f.engine.stepClock()).toBe(MAX_CATCH_UP_TICKS);
+  slowCatchUp.mockRestore();
+  expect(buffered).toHaveLength(192);
+  const outcomes = buffered.map((pose) => f.submit(pose));
+  expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([]);
+  expect(f.actor.playerMotion).toMatchObject({ mode: 'free', epoch });
+  expect(f.actor.position).toEqual(f.ship.position);
+});
+
+test('a pilot who hovers through a blocked server second cannot bank more than that block into one jump', () => {
+  const hoveringPilot = () => {
+    const f = flight();
+    clearAmbientField(f);
+    expect(f.engine.stepClock()).toBe(0);
+    f.advance(1);
+    expect(f.report().ok).toBe(true);
+    const parked = { ...f.actor.position };
+    f.ship.velocity = { x: 0, y: 0 };
+    // Honest hover reports pile up behind the block and all land.
+    const buffered: ReturnType<typeof f.capture>[] = [];
+    for (let frame = 0; frame < 96; frame++) {
+      f.wait(1);
+      buffered.push(f.capture());
+    }
+    expect(f.engine.stepClock()).toBe(MAX_CATCH_UP_TICKS);
+    expect(buffered.map((pose) => f.submit(pose)).filter((outcome) => !outcome.ok)).toEqual([]);
+    expect(f.actor.position).toEqual(parked);
+    return { f, parked, speed: f.engine.playerMotion.legalSpeed(f.actor, f.clock.now()) };
+  };
+  const bankFrames = PLAYER_MOTION.poseLeadFrames + 96;
+
+  const within = hoveringPilot();
+  within.f.ship.position.x = within.parked.x + within.speed * (bankFrames - 2);
+  expect(within.f.report().ok).toBe(true);
+
+  const beyond = hoveringPilot();
+  beyond.f.ship.position.x = beyond.parked.x + beyond.speed * (bankFrames + 3);
+  expect(beyond.f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
+  expect(beyond.f.actor.position).toEqual(beyond.parked);
+
+  // The unspent block expires with the jitter window like any other reserve.
+  const late = hoveringPilot();
+  late.f.wait(10);
+  late.f.ship.position.x = late.parked.x + late.speed * (2 * PLAYER_MOTION.poseLeadFrames + 3);
+  expect(late.f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
+  expect(late.f.actor.position).toEqual(late.parked);
+});
+
 test('a pilot silent through a blocked server second still cannot claim more than that block plus one second', () => {
   // 1.6 s blocked on the server, then two responsive seconds with no poses.
   const silentPilot = () => {
@@ -313,7 +392,11 @@ test('a pilot silent through a blocked server second still cannot claim more tha
 
   const beyond = silentPilot();
   beyond.f.ship.position.x = beyond.held.x + beyond.speed * (creditFrames + 2);
-  expect(beyond.f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
+  // The diagnostics separate the server's 1.6 s block from the pilot's own silence.
+  expect(beyond.f.report()).toMatchObject({
+    ok: false,
+    envelope: { check: 'displacement', elapsedMs: 3600, blockedMs: 1600 },
+  });
   expect(beyond.f.actor.position).toEqual(beyond.held);
 });
 

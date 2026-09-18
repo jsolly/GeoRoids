@@ -108,11 +108,18 @@ class InFlightPersistence implements WorldPersistence {
   readonly batches: WorldCheckpoint[] = [];
   pendingBatches = 0;
   shutdownCalls = 0;
+  /** When set, the next hand-over throws this instead of accepting the batch. */
+  rejectNextBatchWith: Error | undefined;
   private readonly idleWaiters: Array<() => void> = [];
   load(): LoadedWorld {
     return { world: undefined, sectors: new Map(), pilots: [] };
   }
   persist(batch: WorldCheckpoint): void {
+    if (this.rejectNextBatchWith) {
+      const error = this.rejectNextBatchWith;
+      this.rejectNextBatchWith = undefined;
+      throw error;
+    }
     this.batches.push(batch);
   }
   reset(): void {}
@@ -202,6 +209,24 @@ test('shutdown flushes the final state once the writer is idle and then releases
   expect(persistence.batches.at(-1)?.pilots.map((pilot) => [pilot.id, pilot.score])).toEqual([
     [miner.id, 77],
   ]);
+});
+
+test('a deferred flush that fails while shutdown drains the writer still fails the shutdown', async () => {
+  const persistence = new InFlightPersistence();
+  const { engine, frame } = world(persistence);
+  for (let tick = 0; tick < GAME.FPS; tick++) {
+    frame();
+  }
+  // A flush is coalesced behind the in-flight commit; nothing awaits it.
+  persistence.pendingBatches = 1;
+  engine.checkpointWorld();
+  expect(persistence.batches).toHaveLength(1);
+  persistence.rejectNextBatchWith = new Error('World persistence is shutting down');
+  const closing = engine.shutdownPersistence();
+  persistence.drain();
+  await expect(closing).rejects.toThrow('Persistent world checkpoint failed');
+  expect(engine.isPersistenceHealthy()).toBe(false);
+  expect(persistence.shutdownCalls).toBe(1);
 });
 
 test('shutdown waits a bounded time for an in-flight commit, then closes the writer and reports the skipped flush', async () => {

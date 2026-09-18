@@ -6,6 +6,7 @@ import {
   type WorldCheckpoint,
   type WorldPersistence,
   type WorldPersistenceDiagnostics,
+  WorldWriterUnreleasedError,
 } from './worldPersistence';
 import {
   deserializeWorkerError,
@@ -28,16 +29,17 @@ const MAX_PENDING_REQUESTS = 4;
 
 /**
  * `terminate()` cannot interrupt a worker inside a synchronous SQLite call,
- * so a wedged writer must not be able to hold the process open past its
- * shutdown budget; the process exit reclaims the thread either way.
+ * so a wedged writer must not be able to hold shutdown past its budget.
+ * Resolves true when the thread released, false when the wait ran out; the
+ * caller reports the latter so the process ends without joining the thread.
  */
-function terminateWithin(worker: Worker, timeoutMs: number): Promise<void> {
+function terminateWithin(worker: Worker, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const deadline = setTimeout(resolve, timeoutMs);
+    const deadline = setTimeout(() => resolve(false), timeoutMs);
     deadline.unref();
     const settle = (): void => {
       clearTimeout(deadline);
-      resolve();
+      resolve(true);
     };
     worker.terminate().then(settle, settle);
   });
@@ -143,14 +145,23 @@ export class WorkerWorldPersistence implements WorldPersistence {
       return this.closing;
     }
     if (this.failure) {
-      this.closing = terminateWithin(worker, SHUTDOWN_TIMEOUT_MS).then(failed);
+      const failure = this.failure;
+      this.closing = terminateWithin(worker, SHUTDOWN_TIMEOUT_MS).then((released) => {
+        throw released
+          ? failure
+          : new WorldWriterUnreleasedError('World store worker did not release the database', {
+              cause: failure,
+            });
+      });
       return this.closing;
     }
     this.closing = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
         void worker.terminate();
         reject(
-          new Error('World store worker did not close in time; pending world writes were lost')
+          new WorldWriterUnreleasedError(
+            'World store worker did not close in time; pending world writes were lost'
+          )
         );
       }, SHUTDOWN_TIMEOUT_MS);
       worker.once('exit', () => {

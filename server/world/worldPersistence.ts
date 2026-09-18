@@ -51,6 +51,36 @@ export interface WorldPersistence {
   diagnostics(): WorldPersistenceDiagnostics;
 }
 
+/**
+ * Shutdown could not get the writer thread to release the database. A thread
+ * inside a synchronous SQLite call cannot be interrupted, and `process.exit`
+ * would wait for it, so the process must end itself another way.
+ */
+export class WorldWriterUnreleasedError extends Error {
+  override readonly name = 'WorldWriterUnreleasedError';
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+  }
+}
+
+/** True when `error`, one of its causes, or an aggregate member says the writer never released. */
+export function includesUnreleasedWriter(error: unknown, depth = 0): boolean {
+  if (!(error instanceof Error) || depth > 8) {
+    return false;
+  }
+  if (error instanceof WorldWriterUnreleasedError) {
+    return true;
+  }
+  if (
+    error instanceof AggregateError &&
+    error.errors.some((member) => includesUnreleasedWriter(member, depth + 1))
+  ) {
+    return true;
+  }
+  return includesUnreleasedWriter(error.cause, depth + 1);
+}
+
 /** Commit bookkeeping every adapter reports the same way on /health. */
 export class CommitStats {
   private committedBatches = 0;

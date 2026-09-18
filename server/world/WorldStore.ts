@@ -484,7 +484,7 @@ export class WorldStore {
       }
       this.db.exec('COMMIT');
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      this.rollback();
       throw error;
     }
     if (worldJson !== undefined) {
@@ -506,7 +506,7 @@ export class WorldStore {
       this.db.exec('DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world;');
       this.db.exec('COMMIT');
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      this.rollback();
       throw error;
     }
     this.persistedAsteroidSectors.clear();
@@ -514,6 +514,17 @@ export class WorldStore {
     this.openedSectors = undefined;
     this.pilotJson.clear();
     this.worldJson = undefined;
+  }
+
+  /**
+   * SQLite rolls a transaction back by itself on a full disk, an I/O error or
+   * a busy lock; asking again would throw "no transaction is active" from the
+   * catch block and replace the error that explains the failure.
+   */
+  private rollback(): void {
+    if (this.db.isTransaction) {
+      this.db.exec('ROLLBACK');
+    }
   }
 
   close(): void {

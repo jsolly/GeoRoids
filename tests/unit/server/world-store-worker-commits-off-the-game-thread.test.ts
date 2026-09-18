@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { WorkerWorldPersistence } from '../../../server/world/WorkerWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
-import type { WorldCheckpoint } from '../../../server/world/worldPersistence';
+import {
+  includesUnreleasedWriter,
+  type WorldCheckpoint,
+  WorldWriterUnreleasedError,
+} from '../../../server/world/worldPersistence';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 
@@ -196,6 +200,33 @@ test('handing over more batches than the writer could ever be behind by fails cl
   );
   expect(failures).toHaveLength(1);
   expect(persistence.diagnostics().failed).toBe(true);
+});
+
+test('a writer that never released is recognised anywhere in the shutdown error tree', () => {
+  const unreleased = new WorldWriterUnreleasedError('World store worker did not release', {
+    cause: new Error('database is locked'),
+  });
+  expect(includesUnreleasedWriter(unreleased)).toBe(true);
+  expect(
+    includesUnreleasedWriter(new Error('Persistent world checkpoint failed', { cause: unreleased }))
+  ).toBe(true);
+  expect(
+    includesUnreleasedWriter(
+      new AggregateError(
+        [new Error('Server shutdown timed out'), new Error('wrapped', { cause: unreleased })],
+        'Server shutdown did not complete cleanly'
+      )
+    )
+  ).toBe(true);
+  expect(
+    includesUnreleasedWriter(
+      new Error('Persistent world checkpoint failed', { cause: new Error('database is locked') })
+    )
+  ).toBe(false);
+  expect(includesUnreleasedWriter('not an error')).toBe(false);
+  const loop = new Error('loop');
+  loop.cause = loop;
+  expect(includesUnreleasedWriter(loop)).toBe(false);
 });
 
 test('an in-memory world refuses the worker adapter because threads cannot share it', () => {

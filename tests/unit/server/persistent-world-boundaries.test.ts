@@ -393,6 +393,43 @@ test('an inline reset that fails latches the adapter and leaves no transaction o
   }
 });
 
+test('a commit SQLite has already rolled back reports the disk error, not a phantom rollback', () => {
+  const store = new WorldStore(':memory:');
+  try {
+    const world = {
+      seed: 1,
+      startedAt: 1,
+      generation: WORLD.generation,
+      exploration: [],
+      completedSectors: [],
+    };
+    const execOriginal = DatabaseSync.prototype.exec;
+    // A full disk or I/O error ends the transaction inside SQLite before the
+    // error is thrown, so a second ROLLBACK would fail with a different message.
+    vi.spyOn(DatabaseSync.prototype, 'exec').mockImplementation(function (
+      this: DatabaseSync,
+      sql: string
+    ) {
+      if (sql === 'COMMIT') {
+        execOriginal.call(this, 'ROLLBACK');
+        throw Object.assign(new Error('database or disk is full'), { code: 'ERR_SQLITE_ERROR' });
+      }
+      return execOriginal.call(this, sql);
+    });
+    expect(() => store.checkpoint(world, new Map(), [scorePilot(5)])).toThrow(
+      'database or disk is full'
+    );
+    expect(() => store.reset()).toThrow('database or disk is full');
+    vi.restoreAllMocks();
+    // No transaction is left open once the disk recovers.
+    expect(() => store.checkpoint(world, new Map(), [scorePilot(5)])).not.toThrow();
+    expect(store.loadPilots().find((pilot) => pilot.id === 'pilot')?.score).toBe(5);
+  } finally {
+    vi.restoreAllMocks();
+    store.close();
+  }
+});
+
 test('a store reused after a checkpoint or reset hands the next load what is on disk', () => {
   const store = new WorldStore(':memory:');
   try {

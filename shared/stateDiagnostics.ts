@@ -66,15 +66,15 @@ export function boundedDiagnosticError(value: unknown, fallback: string, depth =
       ? { cause: boundedDiagnosticError(value.cause, 'Unknown cause', depth + 1) }
       : {};
   const message = boundedText(value.message || fallback);
+  const members =
+    value instanceof AggregateError && depth < MAX_ERROR_CAUSE_DEPTH
+      ? value.errors
+          .slice(0, MAX_AGGREGATE_ERRORS)
+          .map((member) => boundedDiagnosticError(member, 'Unknown error', depth + 1))
+      : undefined;
   const error =
     value instanceof AggregateError
-      ? new AggregateError(
-          value.errors
-            .slice(0, MAX_AGGREGATE_ERRORS)
-            .map((member) => boundedDiagnosticError(member, 'Unknown error', depth + 1)),
-          message,
-          options
-        )
+      ? new AggregateError(members ?? [], message, options)
       : new Error(message, options);
   error.name = boundedText(value.name || 'Error', 128);
   if (value.stack) {

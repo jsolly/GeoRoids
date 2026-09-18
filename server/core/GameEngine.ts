@@ -1217,6 +1217,11 @@ export class GameEngine {
     } finally {
       await this.persistence.shutdown();
     }
+    // A deferred flush that failed while draining latched the failure without
+    // anyone awaiting it; a clean exit would misreport that.
+    if (this.persistenceFailure) {
+      throw this.persistenceFailure;
+    }
     if (!drained) {
       throw new Error(
         `World writer did not drain within ${SHUTDOWN_IDLE_WAIT_MS} ms; the final flush was skipped`

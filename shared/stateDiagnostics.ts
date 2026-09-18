@@ -49,15 +49,39 @@ function boundedText(value: string, max = MAX_ERROR_TEXT): string {
     .slice(0, max);
 }
 
-/** Preserve a useful error cause without serializing arbitrary rejected objects or URL secrets. */
-export function boundedDiagnosticError(value: unknown, fallback: string): Error {
+/** How many `cause` links (and `AggregateError` members) a diagnostic error keeps. */
+const MAX_ERROR_CAUSE_DEPTH = 4;
+const MAX_AGGREGATE_ERRORS = 8;
+
+/**
+ * Preserve a useful error, its `cause` chain and `AggregateError` members
+ * without serializing arbitrary rejected objects or URL secrets.
+ */
+export function boundedDiagnosticError(value: unknown, fallback: string, depth = 0): Error {
   if (!(value instanceof Error)) {
     return new Error(typeof value === 'string' ? boundedText(value) : boundedText(fallback));
   }
-  const error = new Error(boundedText(value.message || fallback));
+  const options =
+    value.cause !== undefined && depth < MAX_ERROR_CAUSE_DEPTH
+      ? { cause: boundedDiagnosticError(value.cause, 'Unknown cause', depth + 1) }
+      : {};
+  const message = boundedText(value.message || fallback);
+  const error =
+    value instanceof AggregateError
+      ? new AggregateError(
+          value.errors
+            .slice(0, MAX_AGGREGATE_ERRORS)
+            .map((member) => boundedDiagnosticError(member, 'Unknown error', depth + 1)),
+          message,
+          options
+        )
+      : new Error(message, options);
   error.name = boundedText(value.name || 'Error', 128);
   if (value.stack) {
     error.stack = boundedText(value.stack);
+  }
+  if ('code' in value && typeof value.code === 'string') {
+    Object.assign(error, { code: boundedText(value.code, 128) });
   }
   return error;
 }

@@ -95,15 +95,30 @@ function safeValue(
   if (typeof value !== 'object') {
     return String(value).slice(0, MAX_CONTEXT_TEXT);
   }
-  if (value instanceof Error) {
-    return {
-      errorName: cleanText(value.name, 128) ?? 'Error',
-      message: cleanText(value.message) ?? '',
-      ...(value.stack ? { stack: cleanText(value.stack) } : {}),
-    };
-  }
   if (seen.has(value)) {
     return '[circular]';
+  }
+  if (value instanceof Error) {
+    // The cause chain is what tells a full volume from a corrupt row; keep it,
+    // bounded like any other nested value.
+    seen.add(value);
+    const code = 'code' in value ? value.code : undefined;
+    const result: Record<string, unknown> = {
+      errorName: cleanText(value.name, 128) ?? 'Error',
+      message: cleanText(value.message) ?? '',
+      ...(typeof code === 'string' ? { code: cleanText(code, 128) } : {}),
+      ...(value.stack ? { stack: cleanText(value.stack) } : {}),
+    };
+    if (value.cause !== undefined) {
+      result['cause'] =
+        depth + 1 >= MAX_DEPTH ? '[depth-limit]' : safeValue(value.cause, depth + 1, seen);
+    }
+    if (value instanceof AggregateError) {
+      result['errors'] =
+        depth + 1 >= MAX_DEPTH ? '[depth-limit]' : safeValue(value.errors, depth + 1, seen);
+    }
+    seen.delete(value);
+    return result;
   }
   if (depth >= MAX_DEPTH) {
     return '[depth-limit]';

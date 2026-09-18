@@ -31,7 +31,7 @@ import {
   shipOverlapsCompletedSector,
 } from '../../shared/sectors';
 import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
-import { captureDiagnosticActorState } from '../../shared/stateDiagnostics';
+import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { parseSectorId, sectorAt, utcScoreSeason, WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
@@ -175,6 +175,27 @@ const MAX_PENDING_SATELLITE_PICKUP_EVENTS = 32;
 const MAX_PENDING_LOOT_COLLECTIONS = 256;
 /** World changes leave the loop once per second; a crash loses at most that window. */
 const WORLD_FLUSH_FRAMES = GAME.FPS;
+/**
+ * How long shutdown waits for an in-flight commit before giving up on the
+ * final flush. Railway kills the process ten seconds after SIGTERM: two go to
+ * the transports, this plus the writer's own close deadline to persistence,
+ * and the log flushes need the rest.
+ */
+const SHUTDOWN_IDLE_WAIT_MS = 1_500;
+
+/** Resolves true when `promise` settles first, false when the wait runs out. */
+function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boolean> {
+  if (!Number.isFinite(timeoutMs)) {
+    return promise.then(() => true);
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), Math.max(0, timeoutMs));
+    void promise.then(() => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+}
 
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
@@ -1116,9 +1137,22 @@ export class GameEngine {
   /**
    * Do not continue from memory that the database no longer matches. The
    * next tick reaches the process fatal-error boundary, including while paused.
+   * The first-hand reason is logged here, once, so the restart loop that
+   * follows can be explained from the logs alone.
    */
   private failPersistence(cause: unknown): void {
-    this.persistenceFailure ??= new Error('Persistent world checkpoint failed', { cause });
+    if (this.persistenceFailure) {
+      return;
+    }
+    this.persistenceFailure = new Error('Persistent world checkpoint failed', { cause });
+    logger.error('WORLD', 'world_persistence_failed', {
+      releaseId: SERVER_RELEASE_ID,
+      observedAt: this.getServerTime(),
+      gameTime: this.gameTime,
+      players: this.getPlayerCount(),
+      persistence: this.persistence?.diagnostics(),
+      error: boundedDiagnosticError(cause, 'Unknown persistence failure'),
+    });
   }
 
   private persistenceIdle(): boolean {
@@ -1137,39 +1171,56 @@ export class GameEngine {
       }
       try {
         this.checkpointWorld();
-      } catch {
-        // checkpointWorld already recorded the failure; the next tick is fatal.
+      } catch (error) {
+        // Nothing awaits a deferred flush, so anything it throws is latched
+        // here; the next tick is fatal.
+        this.failPersistence(error);
       }
     });
   }
 
   /**
-   * Resolves once nothing is in flight: every batch handed over has been
+   * Resolves true once nothing is in flight: every batch handed over has been
    * committed or failed, including a flush that was waiting for the writer.
+   * Resolves false if the writer is still busy when the wait runs out.
    */
-  public async whenPersistenceIdle(): Promise<void> {
+  public async whenPersistenceIdle(timeoutMs = Number.POSITIVE_INFINITY): Promise<boolean> {
+    const deadline = globalThis.performance.now() + timeoutMs;
     while (this.persistence && (this.flushWaitingForIdle || !this.persistenceIdle())) {
-      await this.persistence.whenIdle();
+      const remaining = deadline - globalThis.performance.now();
+      if (!(await settledWithin(this.persistence.whenIdle(), remaining))) {
+        return false;
+      }
       // Let a coalesced flush that was waiting on the same idle post its batch.
       await Promise.resolve();
     }
+    return true;
   }
 
   /**
    * Flush the final state and release the database. Call after the loop has
    * stopped and the transports have closed, so departing pilots are captured.
+   * A writer that does not drain within the shutdown budget forfeits the
+   * final flush: the worker is still closed on its own deadline, and the
+   * skipped flush is reported so the exit is not mistaken for a clean one.
    */
   public async shutdownPersistence(): Promise<void> {
     if (!this.persistence) {
       return;
     }
+    let drained = false;
     try {
-      await this.whenPersistenceIdle();
-      if (!this.persistenceFailure) {
+      drained = await this.whenPersistenceIdle(SHUTDOWN_IDLE_WAIT_MS);
+      if (drained && !this.persistenceFailure) {
         this.checkpointWorld();
       }
     } finally {
       await this.persistence.shutdown();
+    }
+    if (!drained) {
+      throw new Error(
+        `World writer did not drain within ${SHUTDOWN_IDLE_WAIT_MS} ms; the final flush was skipped`
+      );
     }
   }
 

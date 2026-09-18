@@ -501,9 +501,14 @@ export class WorldStore {
   }
 
   reset(): void {
-    this.db.exec(
-      'BEGIN IMMEDIATE; DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; COMMIT;'
-    );
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec('DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world;');
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
     this.persistedAsteroidSectors.clear();
     this.persistedSectorRocks.clear();
     this.openedSectors = undefined;

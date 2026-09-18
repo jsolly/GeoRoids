@@ -107,6 +107,7 @@ test('a mining break and its score reach the database on the next one-second flu
 class InFlightPersistence implements WorldPersistence {
   readonly batches: WorldCheckpoint[] = [];
   pendingBatches = 0;
+  shutdownCalls = 0;
   private readonly idleWaiters: Array<() => void> = [];
   load(): LoadedWorld {
     return { world: undefined, sectors: new Map(), pilots: [] };
@@ -131,6 +132,7 @@ class InFlightPersistence implements WorldPersistence {
     }
   }
   shutdown(): Promise<void> {
+    this.shutdownCalls++;
     return Promise.resolve();
   }
   diagnostics(): WorldPersistenceDiagnostics {
@@ -189,4 +191,43 @@ test('a commit still in flight defers the next flush, which then carries everyth
   ]);
   expect(deferred.world).toBeUndefined();
   expect(engine.getDiagnostics().persistence).toMatchObject({ mode: 'worker', pendingBatches: 0 });
+});
+
+test('shutdown flushes the final state once the writer is idle and then releases it', async () => {
+  const persistence = new InFlightPersistence();
+  const { engine, miner } = world(persistence);
+  miner.score = 77;
+  await engine.shutdownPersistence();
+  expect(persistence.shutdownCalls).toBe(1);
+  expect(persistence.batches.at(-1)?.pilots.map((pilot) => [pilot.id, pilot.score])).toEqual([
+    [miner.id, 77],
+  ]);
+});
+
+test('shutdown waits a bounded time for an in-flight commit, then closes the writer and reports the skipped flush', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  cleanups.push(() => {
+    vi.useRealTimers();
+  });
+  const persistence = new InFlightPersistence();
+  const { engine, frame } = world(persistence);
+  for (let tick = 0; tick < GAME.FPS; tick++) {
+    frame();
+  }
+  expect(persistence.batches).toHaveLength(1);
+  // The writer never answers; shutdown must not wait for the stall watchdog.
+  persistence.pendingBatches = 1;
+  const closing = engine.shutdownPersistence();
+  const outcome = closing.then(
+    () => 'resolved',
+    (error: Error) => error.message
+  );
+  await vi.advanceTimersByTimeAsync(1_400);
+  expect(persistence.shutdownCalls).toBe(0);
+  await vi.advanceTimersByTimeAsync(200);
+  expect(persistence.shutdownCalls).toBe(1);
+  expect(await outcome).toBe(
+    'World writer did not drain within 1500 ms; the final flush was skipped'
+  );
+  expect(persistence.batches).toHaveLength(1);
 });

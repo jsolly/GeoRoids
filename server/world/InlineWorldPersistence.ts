@@ -47,7 +47,12 @@ export class InlineWorldPersistence implements WorldPersistence {
     if (this.failure) {
       throw this.failure;
     }
-    this.store.reset();
+    try {
+      this.store.reset();
+    } catch (error) {
+      this.fail(error instanceof Error ? error : new Error('World reset failed', { cause: error }));
+      throw error;
+    }
   }
 
   onFailure(handler: (error: Error) => void): void {

@@ -4,16 +4,18 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { decodeClientCommand } from '../../../server/communication/clientCommandDecoder';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { EntityManager } from '../../../server/core/EntityManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { createServerInstance } from '../../../server/createServer';
+import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import type { PersistentPilot } from '../../../server/world/WorldStore';
 import { WorldStore } from '../../../server/world/WorldStore';
+import { logger } from '../../../setup/serverLogger';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -58,11 +60,21 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
     );
     // The break itself succeeds in memory; the next flush carries it to the
     // worker, whose failed transaction rolls the whole batch back together.
+    const errorLog = vi.spyOn(logger, 'error');
     expect(engine.applyLaserAsteroidHit(target.id, miner.id).outcome).toBe('destroyed');
     engine.checkpointWorld();
     await engine.whenPersistenceIdle();
     expect(read()).toEqual(before);
     expect(engine.isPersistenceHealthy()).toBe(false);
+    // The operator gets the store's own reason once, not only the wrapper.
+    const failures = errorLog.mock.calls.filter(
+      ([category, event]) => category === 'WORLD' && event === 'world_persistence_failed'
+    );
+    expect(failures).toHaveLength(1);
+    const failure = failures[0]?.[2] as { error: Error; persistence: { failed: boolean } };
+    expect(failure.error.message).toContain('injected score write failure');
+    expect(failure.persistence).toMatchObject({ mode: 'worker', failed: true });
+    errorLog.mockRestore();
     const health = await fetch(`http://127.0.0.1:${port}/health`, {
       signal: AbortSignal.timeout(3000),
     });
@@ -337,6 +349,46 @@ test('checkpoint refuses a deposit already saved under a sector the batch leaves
     expect(store.loadSector('0,0')).toEqual([]);
     expect(store.loadSector('1,0')?.map((rock) => rock.id)).toEqual(['ore']);
   } finally {
+    store.close();
+  }
+});
+
+test('an inline reset that fails latches the adapter and leaves no transaction open', () => {
+  const store = new WorldStore(':memory:');
+  const persistence = new InlineWorldPersistence(store);
+  const failures: Error[] = [];
+  persistence.onFailure((error) => failures.push(error));
+  try {
+    const world = {
+      seed: 1,
+      startedAt: 1,
+      generation: WORLD.generation,
+      exploration: [],
+      completedSectors: [],
+    };
+    persistence.persist({ world, sectors: new Map(), pilots: [scorePilot(5)] });
+    const execOriginal = DatabaseSync.prototype.exec;
+    vi.spyOn(DatabaseSync.prototype, 'exec').mockImplementation(function (
+      this: DatabaseSync,
+      sql: string
+    ) {
+      if (sql.startsWith('DELETE')) {
+        throw new Error('injected reset failure');
+      }
+      return execOriginal.call(this, sql);
+    });
+    expect(() => persistence.reset()).toThrow('injected reset failure');
+    vi.restoreAllMocks();
+    expect(failures.map((error) => error.message)).toEqual(['injected reset failure']);
+    expect(persistence.diagnostics().failed).toBe(true);
+    expect(() => persistence.persist({ sectors: new Map(), pilots: [] })).toThrow(
+      'injected reset failure'
+    );
+    // The rolled-back reset left the row and no open transaction behind.
+    expect(store.loadPilots().find((pilot) => pilot.id === 'pilot')?.score).toBe(5);
+    expect(() => store.checkpoint(undefined, new Map(), [scorePilot(6)])).not.toThrow();
+  } finally {
+    vi.restoreAllMocks();
     store.close();
   }
 });

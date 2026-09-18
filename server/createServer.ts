@@ -465,8 +465,9 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     closing = (async () => {
       // Whether the sockets closed or were terminated at the deadline, the
       // departing pilots are captured by now; flush the final batch and wait
-      // for its commit before the process can exit. Persistence owns its own
-      // shutdown deadline, so a hung writer cannot hold the process either.
+      // for its commit before the process can exit. The engine bounds both
+      // its wait for the writer and the writer's close, so a hung writer
+      // cannot hold the process past Railway's SIGTERM window either.
       const errors: Error[] = [];
       try {
         await stopTransports;

@@ -14,10 +14,12 @@ import {
 } from './worldStoreWorkerProtocol';
 
 /**
- * Railway stops a service ten seconds after SIGTERM. Transports get two
- * seconds before this; leave room after it for the log flush.
+ * How long the worker gets to commit what it holds and close. Railway stops a
+ * service ten seconds after SIGTERM: two go to the transports, 1.5 s to the
+ * engine's wait for an in-flight commit, this to the worker, and the client
+ * and server log flushes need a second each after it.
  */
-const SHUTDOWN_TIMEOUT_MS = 5_000;
+const SHUTDOWN_TIMEOUT_MS = 3_500;
 /** A batch that has not committed after this long is a hung worker, not a slow disk. */
 const BATCH_STALL_TIMEOUT_MS = 30_000;
 const STALL_WATCH_INTERVAL_MS = 5_000;

@@ -1,7 +1,7 @@
 ---
 title: Loot and growth
 category: Systems
-summary: Collect loot to grow, or shoot a drop to push nearby small rocks.
+summary: Collect loot for mass and score, or shoot a drop to push nearby small rocks.
 order: 80
 related:
   - content/wiki/hauler.md
@@ -18,7 +18,9 @@ media:
 Growth uses the same base health curve for every kit. When a pickup raises
 maximum health, it adds the same amount to current health; it does not fully
 repair existing damage. For a heavy kit such as Hauler, the first small mass
-pickup can lower its starting maximum health to the shared growth value. Laser cores do not add mass.
+pickup can lower its starting maximum health to the shared growth value.
+Laser cores do not add mass. Hull draw size and collision radius stay at the
+kit base; collecting does not enlarge the silhouette.
 
 Asteroid breaks can release shards, and an environmental ship death releases
 wreckage. A finished Resource Tap extract drops a larger cream canister with an
@@ -28,9 +30,10 @@ expires after its configured lifetime. A nearby drop is pulled toward a living
 ship once it comes within magnet range. Tap canisters use a stronger pull when
 a Hauler is nearby. The pull adds to whatever motion the
 drop already has, including motion from its existing velocity. Collecting still
-happens when the drop overlaps the kit hull, scaled by mass, not an inflated ship hitbox. Mass follows a shared growth curve:
-greater mass raises radius and health capacity while reducing thrust and speed;
-the growth model soft-caps mass, caps size scaling, and enforces minimum thrust
+happens when the drop overlaps the kit hull, not an inflated ship hitbox.
+Mass follows a shared growth curve:
+greater mass raises health capacity while reducing thrust and speed;
+the growth model soft-caps mass and enforces minimum thrust
 and speed scales. Death resets the growth.
 
 A shard has a score value. A reflective core grants stronger laser charges with

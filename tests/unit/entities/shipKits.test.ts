@@ -1,5 +1,4 @@
 import { expect, test } from 'vitest';
-import { GROWTH } from '../../../shared/shipGrowth';
 import { SHIP } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
@@ -47,17 +46,13 @@ test('Hauler is about twice Surveyor on the playfield, including collision radiu
   expect(hullRadiusForKit('hauler')).toBe(hauler.size / 2);
   expect(hullRadiusForKit('surveyor')).toBe(surveyor.size / 2);
   expect(hullRadiusForKit('hauler') / hullRadiusForKit('surveyor')).toBe(ratio);
-  const grown = GROWTH.SOFT_MAX_MASS;
-  expect(hullRadiusForKit('hauler', grown) / hullRadiusForKit('surveyor', grown)).toBeCloseTo(
-    ratio
-  );
 });
 
-test('a spawned Hauler ship uses the barge hull instead of the Surveyor growth radius', () => {
+test('a spawned Hauler ship uses the barge hull instead of the Surveyor hull', () => {
   const hauler = new Ship({ kitId: 'hauler' });
   const surveyor = new Ship({ kitId: 'surveyor' });
-  expect(hauler.r).toBe(hullRadiusForKit('hauler', hauler.mass));
-  expect(surveyor.r).toBe(hullRadiusForKit('surveyor', surveyor.mass));
+  expect(hauler.r).toBe(hullRadiusForKit('hauler'));
+  expect(surveyor.r).toBe(hullRadiusForKit('surveyor'));
   expect(hauler.r).toBeGreaterThan(surveyor.r * 1.8);
   expect(hauler.r).toBeLessThanOrEqual(surveyor.r * 2.2);
 });

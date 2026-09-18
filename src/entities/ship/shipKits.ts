@@ -1,4 +1,3 @@
-import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
 import type { ShipKitId } from '../../../shared-types';
 import { GAME, SHIP } from '../../constants';
 
@@ -122,16 +121,15 @@ interface KitStatTarget {
 
 interface KitShipTarget extends KitStatTarget {
   r: number;
-  mass?: number;
   shotCooldown: number;
   thrust: number;
   maxVelocity: number;
   turnSpeed: number;
 }
 
-/** Draw, collision, latch, and loot all use this kit+mass hull radius. */
-export function hullRadiusForKit(kitId: unknown, mass: number = GROWTH.BASE_MASS): number {
-  return radiusFromMass(mass, getShipKit(kitId).size);
+/** Draw, collision, latch, and loot all use this kit hull radius. Mass is ignored. */
+export function hullRadiusForKit(kitId: unknown, _mass?: number): number {
+  return getShipKit(kitId).size / 2;
 }
 
 /** Shared kit application. Does not touch playfield colors. */
@@ -145,7 +143,7 @@ export function applyShipKitStats(target: KitStatTarget, kitId: unknown): ShipKi
 
 export function applyShipKitToShip(ship: KitShipTarget, kitId: unknown): ShipKit {
   const kit = applyShipKitStats(ship, kitId);
-  ship.r = hullRadiusForKit(kit.id, ship.mass ?? GROWTH.BASE_MASS);
+  ship.r = hullRadiusForKit(kit.id);
   ship.shotCooldown = kit.shotCooldown;
   ship.thrust = kit.thrust;
   ship.maxVelocity = kit.maxVelocity;

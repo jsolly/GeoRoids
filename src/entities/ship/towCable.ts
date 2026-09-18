@@ -14,7 +14,7 @@ export function attachTowCable(host: AbilityHost, rock: AbilityBody): void {
   cables.set(host, {
     targetId: rock.id,
     length: Math.max(
-      hullRadiusForKit(host.kitId, host.mass) + cargoRadius(rock) + TOW_HULL_GAP,
+      hullRadiusForKit(host.kitId) + cargoRadius(rock) + TOW_HULL_GAP,
       Math.hypot(rock.position.x - host.position.x, rock.position.y - host.position.y)
     ),
   });

@@ -2,9 +2,10 @@ import type { Position } from '../shared-types';
 import { GAME, SHIP } from '../src/constants';
 
 /**
- * Slither-style size/mass growth shared by every ship.
- * Soft max keeps multiplayer readable: extra mass still collects, but size
- * and HP approach a cap instead of growing without bound.
+ * Shared loot mass, health, and handling. Hull draw size and collision
+ * radius stay at the kit base; mass does not scale the silhouette.
+ * Soft max keeps multiplayer readable: extra mass still collects, but HP
+ * and speed approach a cap instead of changing without bound.
  */
 export const GROWTH = {
   BASE_MASS: 1,
@@ -33,7 +34,8 @@ export const GROWTH = {
   SCATTER_MAX: 40,
   MAX_LOOT: 48,
   LOOT_TTL_FRAMES: 20 * 60,
-  MAX_SIZE_SCALE: 2.2,
+  /** Surveyor-base HP multiplier at SOFT_MAX_MASS. */
+  MAX_HEALTH_SCALE: 2.2,
   MIN_THRUST_SCALE: 0.55,
   MIN_SPEED_SCALE: 0.6,
   MASS_GAIN_K: 0.45,
@@ -68,33 +70,25 @@ export function applyLootMass(current: number, gain: number): number {
   );
 }
 
-export function sizeScaleFromMass(mass: number): number {
+function massProgress(mass: number): number {
   const span = GROWTH.SOFT_MAX_MASS - GROWTH.BASE_MASS;
+  if (span <= 0) {
+    return 0;
+  }
   const t = (clampMass(mass) - GROWTH.BASE_MASS) / span;
-  const u = Math.max(0, Math.min(1, t));
-  return 1 + (GROWTH.MAX_SIZE_SCALE - 1) * u;
-}
-
-/** Hull radius for a given mass. `baseSize` is kit length (`SHIP.SIZE` for Surveyor). */
-export function radiusFromMass(mass: number, baseSize: number = SHIP.SIZE): number {
-  const size = Number.isFinite(baseSize) && baseSize > 0 ? baseSize : SHIP.SIZE;
-  return (size / 2) * sizeScaleFromMass(mass);
+  return Math.max(0, Math.min(1, t));
 }
 
 export function maxHealthFromMass(mass: number): number {
-  return Math.round(SHIP.MAX_HEALTH * sizeScaleFromMass(mass));
+  return Math.round(SHIP.MAX_HEALTH * (1 + (GROWTH.MAX_HEALTH_SCALE - 1) * massProgress(mass)));
 }
 
 export function thrustScaleFromMass(mass: number): number {
-  const span = GROWTH.MAX_SIZE_SCALE - 1;
-  const t = span <= 0 ? 0 : (sizeScaleFromMass(mass) - 1) / span;
-  return 1 - (1 - GROWTH.MIN_THRUST_SCALE) * t;
+  return 1 - (1 - GROWTH.MIN_THRUST_SCALE) * massProgress(mass);
 }
 
 export function maxVelocityFromMass(mass: number): number {
-  const span = GROWTH.MAX_SIZE_SCALE - 1;
-  const t = span <= 0 ? 0 : (sizeScaleFromMass(mass) - 1) / span;
-  return SHIP.MAX_VELOCITY * (1 - (1 - GROWTH.MIN_SPEED_SCALE) * t);
+  return SHIP.MAX_VELOCITY * (1 - (1 - GROWTH.MIN_SPEED_SCALE) * massProgress(mass));
 }
 
 export function applyShipMass(ship: GrowableShip, nextMass: number): void {

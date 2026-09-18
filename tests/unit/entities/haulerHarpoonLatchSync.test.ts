@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { GROWTH, radiusFromMass } from '../../../shared/shipGrowth';
+import { GROWTH } from '../../../shared/shipGrowth';
 import { Player } from '../../../src/entities/player/Player';
 import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { canDrawHaulerHarpoon } from '../../../src/entities/ship/shipRenderer';
@@ -79,7 +79,7 @@ test('remote Hauler matches the same server latch', () => {
   expect(canDrawHaulerHarpoon(remote.ship)).toBe(false);
 });
 
-test('a Hauler snapshot keeps the barge hull instead of the Surveyor growth radius', () => {
+test('a Hauler snapshot keeps the barge hull at any mass', () => {
   const local = new Player({
     id: 'alice',
     name: 'Alice',
@@ -88,8 +88,8 @@ test('a Hauler snapshot keeps the barge hull instead of the Surveyor growth radi
     kitId: 'hauler',
   });
   local.updateFromServer({ mass: GROWTH.BASE_MASS });
-  expect(local.ship.r).toBe(hullRadiusForKit('hauler', GROWTH.BASE_MASS));
-  expect(local.ship.r).toBeGreaterThan(radiusFromMass(GROWTH.BASE_MASS));
+  expect(local.ship.r).toBe(hullRadiusForKit('hauler'));
+  expect(local.ship.r).toBeGreaterThan(hullRadiusForKit('surveyor'));
 
   const remote = new Player({
     id: 'bob',
@@ -100,5 +100,20 @@ test('a Hauler snapshot keeps the barge hull instead of the Surveyor growth radi
   });
   remote.updateFromServer({ kitId: 'hauler', mass: GROWTH.SOFT_MAX_MASS });
   expect(remote.ship.kitId).toBe('hauler');
-  expect(remote.ship.r).toBe(hullRadiusForKit('hauler', GROWTH.SOFT_MAX_MASS));
+  expect(remote.ship.r).toBe(hullRadiusForKit('hauler'));
+});
+
+test('a Surveyor snapshot keeps the kit hull after many loot-mass updates', () => {
+  const local = new Player({
+    id: 'scout',
+    name: 'Scout',
+    type: 'local',
+    input: new MockPlayerInput(),
+    kitId: 'surveyor',
+  });
+  const baseRadius = local.ship.r;
+  expect(baseRadius).toBe(hullRadiusForKit('surveyor'));
+  local.updateFromServer({ mass: GROWTH.SOFT_MAX_MASS });
+  expect(local.ship.mass).toBe(GROWTH.SOFT_MAX_MASS);
+  expect(local.ship.r).toBe(baseRadius);
 });

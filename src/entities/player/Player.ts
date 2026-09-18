@@ -174,7 +174,7 @@ export class Player {
     if (data.mass !== undefined) {
       this.ship.mass = data.mass;
     }
-    this.ship.r = hullRadiusForKit(this.ship.kitId, this.ship.mass);
+    this.ship.r = hullRadiusForKit(this.ship.kitId);
 
     if (data.deathCause) {
       this.deathCause = preferDeathCause(data.deathCause, this.deathCause) ?? data.deathCause;

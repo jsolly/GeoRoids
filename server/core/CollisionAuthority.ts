@@ -8,7 +8,7 @@ function toCombatCircle(entity: GameEntity): CombatCircle {
   return {
     id: entity.id,
     position: entity.position,
-    radius: hullRadiusForKit(entity.kitId, entity.mass),
+    radius: hullRadiusForKit(entity.kitId),
     immune: isCombatantImmune(entity),
   };
 }

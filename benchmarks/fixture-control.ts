@@ -158,9 +158,7 @@ export async function startFixtureControl(
           for (const other of actors.slice(index + 1)) {
             assert(
               Math.hypot(actor.position.x - other.position.x, actor.position.y - other.position.y) >
-                hullRadiusForKit(actor.kitId, actor.mass) +
-                  hullRadiusForKit(other.kitId, other.mass) +
-                  20,
+                hullRadiusForKit(actor.kitId) + hullRadiusForKit(other.kitId) + 20,
               'Fixture hulls overlap'
             );
           }
@@ -173,7 +171,7 @@ export async function startFixtureControl(
                   actor.position.x - asteroid.position.x,
                   actor.position.y - asteroid.position.y
                 ) >
-                hullRadiusForKit(actor.kitId, actor.mass) + asteroid.size + 20
+                hullRadiusForKit(actor.kitId) + asteroid.size + 20
             );
           if (!clearsHulls()) {
             const angle = index * 2.399963229728653;

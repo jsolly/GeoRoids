@@ -172,7 +172,7 @@ test(
         message: 'the collector should grow after picking up environmental loot',
       })
       .toBeGreaterThan(startMass);
-    expect(await collector.getShipRadius()).toBeGreaterThan(startRadius);
+    expect(await collector.getShipRadius()).toBe(startRadius);
     expect(await collector.getShipMaxHealth()).toBeGreaterThan(startMaxHealth);
     expect(await collector.getScore()).toBe(scoreBefore);
 

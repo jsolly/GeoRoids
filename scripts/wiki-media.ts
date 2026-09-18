@@ -37,7 +37,7 @@ import {
   LOOT_BLAST,
 } from '../shared/lootBlast';
 import { cruiseSpeed } from '../shared/shipFlight';
-import { applyLootMass, GROWTH, lootOverlap, sizeScaleFromMass } from '../shared/shipGrowth';
+import { applyLootMass, GROWTH, lootOverlap } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
 import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRenderer';
@@ -1086,7 +1086,7 @@ function makeLootDemo(): Demo {
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'LOOT · ARM + GROWTH',
+        'LOOT · ARM + COLLECT',
         'laser hits shard → blast pushes rock → remaining shard magnetizes',
         frame,
         PALETTE.LOOT
@@ -1136,12 +1136,7 @@ function makeLootDemo(): Demo {
         }
         if (
           liveSecond &&
-          lootOverlap(
-            shooter,
-            hullRadiusForKit('surveyor', mass),
-            liveSecond.position,
-            liveSecond.radius
-          )
+          lootOverlap(shooter, hullRadiusForKit('surveyor'), liveSecond.position, liveSecond.radius)
         ) {
           const removed = lootManager.remove(secondDrop.id);
           if (removed !== undefined) {
@@ -1205,7 +1200,7 @@ function makeLootDemo(): Demo {
           Math.max(0, 0.8 - blastAge * 0.06)
         );
       }
-      const shipRadius = hullRadiusForKit('surveyor', mass);
+      const shipRadius = hullRadiusForKit('surveyor');
       drawShip(
         ctx,
         'surveyor',
@@ -1218,7 +1213,7 @@ function makeLootDemo(): Demo {
       drawTag(
         ctx,
         collected
-          ? 'shard collected · ship grew'
+          ? 'shard collected · mass gained'
           : detonated
             ? 'blast pushed the rock'
             : armed
@@ -1230,7 +1225,7 @@ function makeLootDemo(): Demo {
       );
       let growthTag = 'laser removes the first shard';
       if (collected) {
-        growthTag = `ship size ${sizeScaleFromMass(mass).toFixed(2)}×`;
+        growthTag = 'hull size unchanged';
       } else if (magnetized) {
         growthTag = 'shard pulling toward the hull';
       } else if (secondVisible) {
@@ -1667,7 +1662,7 @@ function makePickupsDemo(): Demo {
   const owner = {
     id: 'pilot',
     position: { x: 0, y: 0 },
-    radius: hullRadiusForKit('surveyor', GROWTH.SOFT_MAX_MASS),
+    radius: hullRadiusForKit('surveyor'),
     health: 100,
     exploding: false,
   };

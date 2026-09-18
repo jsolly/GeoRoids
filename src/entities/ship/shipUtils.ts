@@ -228,7 +228,7 @@ export function calculateLaserStartPosition(
 /**
  * Thrust / friction step for ships carrying combat knockback.
  * Callers pass their own friction so local and server-owned policies stay explicit.
- * Scalar mass/kit arguments keep loot growth and Hauler thrust on the same
+ * Scalar mass/kit arguments keep loot mass and Hauler thrust on the same
  * formula without allocating an options object on every frame.
  */
 export function applyThrustOrFriction(

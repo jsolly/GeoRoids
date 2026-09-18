@@ -110,7 +110,7 @@ export class EntityManager {
         {
           position: entity.position,
           velocity: entity.velocity,
-          size: hullRadiusForKit(entity.kitId, entity.mass),
+          size: hullRadiusForKit(entity.kitId),
         },
         origin,
         { radius, impulse }

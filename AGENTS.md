@@ -37,8 +37,8 @@ Do **not** curl `geoasteroids.com` — that domain is no longer registered (NXDO
 **Server changes** (`server.ts`, `server/**`, `.railway/**`, or server-facing changes in `shared-types.ts`):
 
 1. Complete client verification above if the push also touched client files.
-2. Deploy manually on [Railway](https://railway.app) (linked GitHub repo or Railway CLI).
-3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
+2. Deploy manually on [Railway](https://railway.app). **Auto-deploy on push to `main` is off** — the public repo has no Railway GitHub App installation, so a merge does **not** deploy the server. Trigger a fresh GitHub-sourced build of the **exact merged commit SHA** (Railway dashboard Deploy, `railway up`/`railway redeploy` via CLI, or the Railway MCP agent's deploy with that `commitSha`). Do **not** commit unrelated staged environment patches while deploying — deploy the commit only.
+3. Require `x-release-id` on `https://geoasteroids-production-2403.up.railway.app/health` to resolve to the server merge commit or a descendant; verify the health JSON (`world.persistence.mode` is `worker`, `failed` is `false`, `world.loop` stalls are `0`) and multiplayer flow. Smoke: `curl -sf https://geoasteroids-production-2403.up.railway.app/health` (if the Railway public URL changed, update Vercel production `VITE_WEBSOCKET_URL` to `wss://<new-host>/ws` and redeploy the Vercel client).
 4. Record: `deploy: verified (Vercel Git)` plus `Railway: deploy required` or `Railway: verified`.
 
 Do not run `vercel deploy` from `/ship` unless Git integration is broken.
@@ -78,7 +78,7 @@ Local dev: `npm run dev` sets an empty `VITE_WEBSOCKET_URL` so `ConnectionManage
 | --- | --- |
 | **Config** | `.railway/railway.ts` (Railpack, `node --import tsx server.ts`, healthcheck `/health`) |
 | **Public URL** | `https://geoasteroids-production-2403.up.railway.app` (WebSocket: `wss://geoasteroids-production-2403.up.railway.app/ws`) |
-| **Deploy** | Manual / separate from the Git push flow — Railway dashboard or CLI |
+| **Deploy** | Manual / separate from the Git push flow — Railway dashboard, CLI, or MCP agent. Auto-deploy on push is **off** (no Railway GitHub App on the public repo); deploy the exact merged commit SHA and do not commit unrelated staged env patches |
 | **When required** | Changes under `server.ts`, `server/**`, `.railway/**`, or server protocol changes in `shared-types.ts` |
 
 Railpack installs dependencies and runs `npm run build` during the build. The

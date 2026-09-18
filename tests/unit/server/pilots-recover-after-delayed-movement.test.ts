@@ -276,6 +276,9 @@ test('honest 60 Hz poses queued while the server loop was blocked for 1.6 s all 
   expect(f.engine.stepClock()).toBe(MAX_CATCH_UP_TICKS);
   const outcomes = buffered.map((pose) => f.submit(pose));
   expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([]);
+  // Only the first drained pose spans the block; the rest follow it directly.
+  expect(outcomes[0]).toEqual({ ok: true, blockedMs: 1600 });
+  expect(outcomes[1]).toEqual({ ok: true, blockedMs: 0 });
   expect(f.actor.playerMotion).toMatchObject({ mode: 'free', epoch });
   expect(f.actor.position).toEqual(f.ship.position);
   const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
@@ -401,24 +404,32 @@ test('a pilot silent through a blocked server second still cannot claim more tha
 });
 
 test('a server whose every tick runs late still holds a silent pilot to one second of travel', () => {
-  const f = flight();
-  clearAmbientField(f);
-  expect(f.engine.stepClock()).toBe(0);
-  f.advance(2);
-  expect(f.report().ok).toBe(true);
-  const held = { ...f.actor.position };
-  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
   // Twenty seconds of ticks each firing five frames late. Every late arrival is
   // a short blocked span, but the loop read poses between them, so those spans
   // must not add up: the pilot gets one second plus a single span, not twenty.
-  for (let tick = 0; tick < 200; tick++) {
-    f.wait(6);
-    f.engine.stepClock();
-  }
+  const lateTickServer = () => {
+    const f = flight();
+    clearAmbientField(f);
+    expect(f.engine.stepClock()).toBe(0);
+    f.advance(2);
+    expect(f.report().ok).toBe(true);
+    const held = { ...f.actor.position };
+    for (let tick = 0; tick < 200; tick++) {
+      f.wait(6);
+      f.engine.stepClock();
+    }
+    return { f, held, speed: f.engine.playerMotion.legalSpeed(f.actor, f.clock.now()) };
+  };
   const limitFrames = PLAYER_MOTION.poseLeadFrames + MAX_CATCH_UP_TICKS;
-  f.ship.position.x = held.x + speed * (limitFrames + 8);
-  expect(f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
-  expect(f.actor.position).toEqual(held);
+
+  const within = lateTickServer();
+  within.f.ship.position.x = within.held.x + within.speed * (limitFrames + 3);
+  expect(within.f.report().ok).toBe(true);
+
+  const beyond = lateTickServer();
+  beyond.f.ship.position.x = beyond.held.x + beyond.speed * (limitFrames + 8);
+  expect(beyond.f.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
+  expect(beyond.f.actor.position).toEqual(beyond.held);
 });
 
 test('a pilot silent for two seconds replays at most one second of travel plus the lead in one pose', () => {

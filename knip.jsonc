@@ -4,6 +4,7 @@
   // the shell runners, so package.json alone cannot describe every entrypoint.
   "entry": [
     "server.ts",
+    "server/world/worldStoreWorker.ts",
     ".railway/**/*.ts",
     "vitest.browser.config.ts",
     "scripts/**/*.ts",

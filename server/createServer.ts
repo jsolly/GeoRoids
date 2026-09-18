@@ -23,7 +23,7 @@ import {
   handleTestPlacePlayer,
   handleTestResetWorld,
 } from './testHttpHandlers';
-import { WorldStore } from './world/WorldStore';
+import { openWorldPersistence } from './world/openWorldPersistence';
 
 type CreateServerOptions = {
   port?: number;
@@ -285,8 +285,8 @@ export function createServerInstance(options: CreateServerOptions = {}) {
     logger.error('❌ WebSocket server error:', error);
   });
 
-  const worldStore = options.worldPath ? new WorldStore(options.worldPath) : undefined;
-  const gameEngine = new GameEngine(options.seed, undefined, worldStore);
+  const persistence = options.worldPath ? openWorldPersistence(options.worldPath) : undefined;
+  const gameEngine = new GameEngine(options.seed, undefined, persistence);
   acquireServerPerformanceMetrics();
   // Ensure the server-side game loop runs
   gameEngine.startGameLoop();
@@ -434,7 +434,7 @@ export function createServerInstance(options: CreateServerOptions = {}) {
       checkpointError = error;
     }
     releaseServerPerformanceMetrics();
-    closing = new Promise<void>((resolve, reject) => {
+    const stopTransports = new Promise<void>((resolve, reject) => {
       const deadline = setTimeout(() => {
         for (const socket of wss.clients) {
           socket.terminate();
@@ -457,26 +457,31 @@ export function createServerInstance(options: CreateServerOptions = {}) {
           }
         });
       });
-      void Promise.all([stopWebSockets, stopHttp])
-        .then(async () => {
-          worldStore?.close();
-          if (!(await ClientLogger.flushPending())) {
-            throw new Error('Timed out flushing forwarded client logs');
-          }
-          if (checkpointError) {
-            throw checkpointError;
-          }
-        })
-        .then(
-          () => {
-            clearTimeout(deadline);
-            resolve();
-          },
-          (error) => {
-            clearTimeout(deadline);
-            reject(error);
-          }
-        );
+      void Promise.all([stopWebSockets, stopHttp]).then(
+        () => {
+          clearTimeout(deadline);
+          resolve();
+        },
+        (error) => {
+          clearTimeout(deadline);
+          reject(error);
+        }
+      );
+    });
+    closing = stopTransports.then(async () => {
+      // The final batch was handed over above; wait for it to commit before
+      // the process can exit. Persistence owns its own shutdown deadline.
+      try {
+        await gameEngine.shutdownPersistence();
+      } catch (cause) {
+        checkpointError ??= new Error('Persistent world checkpoint failed', { cause });
+      }
+      if (!(await ClientLogger.flushPending())) {
+        throw new Error('Timed out flushing forwarded client logs');
+      }
+      if (checkpointError) {
+        throw checkpointError;
+      }
     });
     return closing;
   }

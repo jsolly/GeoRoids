@@ -12,6 +12,7 @@ const cleanWorld = {
   asteroids: 0,
   loot: 0,
   satellitePickups: 0,
+  loop: { discardedDebtMs: 0, longestStallMs: 0, stalls: 0 },
 };
 
 afterEach(() => {

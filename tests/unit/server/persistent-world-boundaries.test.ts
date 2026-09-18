@@ -45,6 +45,7 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
     delete target.phenomenon;
     engine.addAsteroid(target);
     engine.checkpointWorld();
+    await engine.whenPersistenceIdle();
     const read = () => ({
       world: db.prepare('SELECT * FROM world ORDER BY id').all(),
       sectors: db.prepare('SELECT * FROM sectors ORDER BY id').all(),
@@ -55,9 +56,11 @@ test('a mid-checkpoint write failure rolls back the whole world and stops furthe
     db.exec(
       "CREATE TRIGGER fail_score BEFORE INSERT ON pilots BEGIN SELECT RAISE(ABORT, 'injected score write failure'); END"
     );
-    expect(() => engine.applyLaserAsteroidHit(target.id, miner.id)).toThrow(
-      'Persistent world checkpoint failed'
-    );
+    // The break itself succeeds in memory; the next flush carries it to the
+    // worker, whose failed transaction rolls the whole batch back together.
+    expect(engine.applyLaserAsteroidHit(target.id, miner.id).outcome).toBe('destroyed');
+    engine.checkpointWorld();
+    await engine.whenPersistenceIdle();
     expect(read()).toEqual(before);
     expect(engine.isPersistenceHealthy()).toBe(false);
     const health = await fetch(`http://127.0.0.1:${port}/health`, {
@@ -160,7 +163,7 @@ function joinMessage(position: unknown): unknown {
 
 test('new deposits and reflective clusters stay inside their saved world sectors', () => {
   const store = new WorldStore(':memory:');
-  const field = new RegionalAsteroidField(82, store);
+  const field = new RegionalAsteroidField(82, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(82));
   try {
     const observers = Array.from({ length: 64 }, (_, index) => {

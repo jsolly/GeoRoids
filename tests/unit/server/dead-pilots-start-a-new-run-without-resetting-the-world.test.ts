@@ -38,6 +38,8 @@ test('a final-life death starts a new flight at score 0 and keeps crew explorati
     expect(continued.actor.position).not.toEqual({ x: 4000, y: 0 });
     expect(engine.resumePilot(registered.resumeToken, new RecordingSocket()).ok).toBe(false);
 
+    // A graceful restart flushes the new credential before the database is reopened.
+    engine.checkpointWorld();
     const restarted = new GameEngine(0, undefined, store);
     const resumed = restarted.resumePilot(continued.resumeToken, new RecordingSocket());
     assert(resumed.ok);

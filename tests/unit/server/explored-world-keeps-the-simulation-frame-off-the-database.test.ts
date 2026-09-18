@@ -40,7 +40,7 @@ function deposit(id: string, position: { x: number; y: number }): AsteroidData {
  * sectors, flies on, and the field puts the ones left behind to sleep.
  */
 function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidData[]>): void {
-  const field = new RegionalAsteroidField(SEED, store);
+  const field = new RegionalAsteroidField(SEED, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(SEED));
   const completed = new Set<string>();
   let x = 9_000;

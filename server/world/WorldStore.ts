@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { DatabaseSync } from 'node:sqlite';
 import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
@@ -16,6 +17,12 @@ import type {
   Velocity,
 } from '../../shared-types';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
+import type {
+  LoadedWorld,
+  WorldCheckpoint,
+  WorldPersistence,
+  WorldPersistenceDiagnostics,
+} from './worldPersistence';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -68,7 +75,7 @@ export interface RestorableFlight extends PersistentPilot {
   health: number;
 }
 
-interface SavedWorld {
+export interface SavedWorld {
   seed: number;
   startedAt: number;
   generation: number;
@@ -228,18 +235,26 @@ export function restorableFlight(
   };
 }
 
-/** Single-writer SQLite transactions keep cargo consumption, shared scores and discoveries together. */
-export class WorldStore {
+/**
+ * Single-writer SQLite transactions keep cargo consumption, shared scores and
+ * discoveries together.
+ *
+ * Opening the database parses and validates every saved sector once so the
+ * write path can refuse duplicate asteroids across sectors. As a
+ * `WorldPersistence` this store commits inline on the calling thread; the
+ * game server wraps it in a worker so the game loop never waits on the disk.
+ */
+export class WorldStore implements WorldPersistence {
   private readonly db: DatabaseSync;
   private readonly pilotJson = new Map<string, string>();
   private persistedAsteroidSectors = new Map<string, string>();
-  /**
-   * Saved deposits left per sector, including fully harvested sectors at zero.
-   * Sector progress reads this every frame; rows are parsed only when a
-   * sector is loaded or written.
-   */
-  private persistedSectorRocks = new Map<string, number>();
+  /** Rows parsed while opening, handed over once by `loadSectors` and then released. */
+  private openedSectors: Map<string, AsteroidData[]> | undefined;
   private worldJson: string | undefined;
+  private committedBatches = 0;
+  private lastCommitMs: number | undefined;
+  private lastCommittedAt: number | undefined;
+  private failed = false;
 
   constructor(path: string) {
     if (path !== ':memory:') {
@@ -300,7 +315,7 @@ export class WorldStore {
 
   private indexPersistedSectors(): void {
     const next = new Map<string, string>();
-    const rockCounts = new Map<string, number>();
+    const opened = new Map<string, AsteroidData[]>();
     for (const row of this.db.prepare('SELECT id,json FROM sectors').all()) {
       const id = row['id'];
       if (typeof id !== 'string') {
@@ -314,10 +329,10 @@ export class WorldStore {
       }
       const rocks = this.validateSectorValue(id, value);
       this.indexSector(next, id, rocks);
-      rockCounts.set(id, rocks.length);
+      opened.set(id, rocks);
     }
     this.persistedAsteroidSectors = next;
-    this.persistedSectorRocks = rockCounts;
+    this.openedSectors = opened;
   }
 
   loadWorld(): SavedWorld | undefined {
@@ -378,13 +393,62 @@ export class WorldStore {
       });
   }
 
-  /** Deposits left in every saved sector, without reading the database. */
-  persistedSectorRockCounts(): ReadonlyMap<string, number> {
-    return this.persistedSectorRocks;
+  /**
+   * Every saved sector. The first call hands over the rows parsed while
+   * opening and the store drops its copy, so the world lives in memory exactly
+   * once; a later call, as after an in-process restart, reads the database again.
+   */
+  loadSectors(): Map<string, AsteroidData[]> {
+    const opened = this.openedSectors;
+    if (opened) {
+      this.openedSectors = undefined;
+      return opened;
+    }
+    this.indexPersistedSectors();
+    const reread = this.openedSectors ?? new Map<string, AsteroidData[]>();
+    this.openedSectors = undefined;
+    return reread;
   }
 
-  hasPersistedSector(id: string): boolean {
-    return this.persistedSectorRocks.has(id);
+  load(): LoadedWorld {
+    return { world: this.loadWorld(), pilots: this.loadPilots(), sectors: this.loadSectors() };
+  }
+
+  persist(batch: WorldCheckpoint): void {
+    const started = performance.now();
+    try {
+      this.checkpoint(batch.world, batch.sectors, batch.pilots);
+    } catch (error) {
+      this.failed = true;
+      throw error;
+    }
+    this.committedBatches++;
+    this.lastCommitMs = performance.now() - started;
+    this.lastCommittedAt = Date.now();
+  }
+
+  onFailure(): void {
+    // Inline commits fail synchronously in `persist`; nothing is deferred.
+  }
+
+  whenIdle(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  shutdown(): Promise<void> {
+    this.close();
+    return Promise.resolve();
+  }
+
+  diagnostics(): WorldPersistenceDiagnostics {
+    return {
+      mode: 'inline',
+      pendingBatches: 0,
+      committedBatches: this.committedBatches,
+      ...(this.lastCommitMs !== undefined ? { lastCommitMs: this.lastCommitMs } : {}),
+      ...(this.lastCommittedAt !== undefined ? { lastCommittedAt: this.lastCommittedAt } : {}),
+      failed: this.failed,
+    };
   }
 
   loadSector(id: string): AsteroidData[] | undefined {
@@ -444,9 +508,6 @@ export class WorldStore {
       this.db.exec('COMMIT');
       this.worldJson = worldJson;
       this.persistedAsteroidSectors = nextAsteroidSectors;
-      for (const [id, rocks] of validatedSectors) {
-        this.persistedSectorRocks.set(id, rocks.length);
-      }
       for (const pilot of changedPilots) {
         this.pilotJson.set(pilot.id, pilot.json);
       }
@@ -461,7 +522,7 @@ export class WorldStore {
       'BEGIN IMMEDIATE; DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; COMMIT;'
     );
     this.persistedAsteroidSectors.clear();
-    this.persistedSectorRocks.clear();
+    this.openedSectors = new Map();
     this.pilotJson.clear();
     this.worldJson = undefined;
   }

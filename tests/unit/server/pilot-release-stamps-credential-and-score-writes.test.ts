@@ -84,6 +84,7 @@ test('registering a pilot stamps the current server and joining client on the cr
   actor.asteroidInteractions = 1;
   const registered = engine.registerPilot(actor, socket, CLIENT_RELEASE);
   assert(registered.ok);
+  engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'scout');
   assert(saved);
@@ -140,6 +141,7 @@ test('game over restamps score provenance and keeps the issued credential', () =
   actor.spawnProtectionTimer = 0;
   engine.checkpointWorld();
   expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
+  engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'pilot');
   assert(saved);
@@ -325,6 +327,7 @@ test('offline delivery credit restamps the server score without copying the last
   rock.position = { ...station.position };
   hauler.position = { x: station.position.x + 100, y: station.position.y };
   engine.processFurnaceDeliveries();
+  engine.checkpointWorld();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'scout');
   assert(saved);

@@ -101,7 +101,7 @@ function metalDeposit(id: string): AsteroidData {
   };
 }
 
-test('simultaneous furnace deliveries roll back together when the second pilot score cannot be saved', () => {
+test('a flush that cannot save every delivered score rolls the whole batch back and stops gameplay', () => {
   const path = temporaryWorldPath();
   const worldStore = fileStore(path);
   const engine = new GameEngine(82, undefined, worldStore);
@@ -121,8 +121,12 @@ test('simultaneous furnace deliveries roll back together when the second pilot s
     db.exec(
       "CREATE TRIGGER fail_second_score BEFORE INSERT ON pilots WHEN NEW.id = 'second-hauler' BEGIN SELECT RAISE(ABORT, 'injected second score failure'); END"
     );
-    expect(() => engine.processFurnaceDeliveries()).toThrow('Persistent world checkpoint failed');
-    expect(engine.drainFurnaceDeliveries()).toEqual([]);
+    // The deliveries land in memory; the failing flush is what stops the world.
+    engine.processFurnaceDeliveries();
+    expect(engine.drainFurnaceDeliveries()).toHaveLength(2);
+    expect(() => engine.checkpointWorld()).toThrow('Persistent world checkpoint failed');
+    expect(engine.isPersistenceHealthy()).toBe(false);
+    expect(() => engine.advanceOneFrame()).toThrow('Persistent world checkpoint failed');
     expect(
       worldStore
         .loadPilots()
@@ -136,7 +140,7 @@ test('simultaneous furnace deliveries roll back together when the second pilot s
   }
 });
 
-test('a collaborative laser break commits fragments and every contributor score before success', () => {
+test('a collaborative laser break saves fragments and every contributor score by the next flush', () => {
   const worldStore = store();
   const engine = new GameEngine(82, undefined, worldStore);
   const firstMiner = pilot(engine, 'first-miner');
@@ -152,6 +156,7 @@ test('a collaborative laser break commits fragments and every contributor score 
   expect(result.newAsteroids).toHaveLength(2);
   expect(firstMiner.score).toBe(ROID.POINTS_LARGE);
   expect(secondMiner.score).toBe(ROID.POINTS_LARGE);
+  engine.checkpointWorld();
   const saved = worldStore.loadPilots();
   expect(saved.find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_LARGE
@@ -169,7 +174,7 @@ test('a collaborative laser break commits fragments and every contributor score 
   ).toBe(true);
 });
 
-test('expired collaborative mining credits an offline miner and Surveyor before returning the event', () => {
+test('expired collaborative mining credits an offline miner and Surveyor by the next flush', () => {
   const worldStore = store();
   const engine = new GameEngine(82, undefined, worldStore);
   const miner = pilot(engine, 'offline-miner');
@@ -186,6 +191,7 @@ test('expired collaborative mining credits an offline miner and Surveyor before 
   expect(expired[0]?.contributors).toEqual([miner.id, surveyor.id]);
   expect(active.score).toBe(0);
   expect(surveyor.score).toBe(ROID.POINTS_LARGE);
+  engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === miner.id)?.score).toBe(
     ROID.POINTS_LARGE
   );
@@ -209,6 +215,7 @@ test('a high-HP rock credits an offline first Hauler when a second Hauler finish
   expect(engine.handleAsteroidDamage(target.id, terminalMiner.id).destroyed).toBe(true);
 
   expect(terminalMiner.score).toBe(ROID.POINTS_LARGE);
+  engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_LARGE
   );
@@ -240,6 +247,7 @@ test('a regional unload and reload keeps partial mining contributors on the rock
 
   expect(engine.handleAsteroidDamage(reloaded.id, terminalMiner.id).destroyed).toBe(true);
   expect(terminalMiner.score).toBe(ROID.POINTS_LARGE);
+  engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_LARGE
   );
@@ -260,6 +268,7 @@ test('a metal chip credits an offline first Hauler when a Surveyor lands the ter
   expect(engine.handleAsteroidHit(target.id, terminalMiner.id, 'laser').outcome).toBe('destroyed');
 
   expect(terminalMiner.score).toBe(ROID.POINTS_MEDIUM);
+  engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score).toBe(
     ROID.POINTS_MEDIUM
   );
@@ -294,6 +303,7 @@ test('a partially mined high-HP rock keeps its offline contributor after restart
     true
   );
   expect(terminalMiner.score).toBe(ROID.POINTS_LARGE);
+  resumedEngine.checkpointWorld();
   expect(
     resumedStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score
   ).toBe(ROID.POINTS_LARGE);
@@ -329,6 +339,7 @@ test('a partially mined metal deposit keeps its offline contributor after restar
     'destroyed'
   );
   expect(terminalMiner.score).toBe(ROID.POINTS_MEDIUM);
+  resumedEngine.checkpointWorld();
   expect(
     resumedStore.loadPilots().find((savedPilot) => savedPilot.id === firstMiner.id)?.score
   ).toBe(ROID.POINTS_MEDIUM);
@@ -355,6 +366,7 @@ test('an accidental hull break preserves credit for an offline miner and Surveyo
   expect(result.split).toBe(false);
   expect(result.newAsteroids).toHaveLength(0);
   expect(rammer.score).toBe(ROID.POINTS_LARGE);
+  engine.checkpointWorld();
   for (const id of [miner.id, surveyor.id]) {
     expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === id)?.score).toBe(
       ROID.POINTS_LARGE
@@ -394,6 +406,7 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
 
   expect(engine.getAsteroid(target.id)).toBeUndefined();
   expect(second.score).toBe(ROID.POINTS_MEDIUM);
+  engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === first.id)?.score).toBe(
     ROID.POINTS_MEDIUM
   );
@@ -404,7 +417,7 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
 });
 
 test.each(['ice', 'rubble'] as const)(
-  'mining %s at the world edge commits contained fragments and shared rewards',
+  'mining %s at the world edge saves contained fragments and shared rewards by the next flush',
   (material) => {
     const worldStore = store();
     const engine = new GameEngine(82, undefined, worldStore);
@@ -425,6 +438,7 @@ test.each(['ice', 'rubble'] as const)(
     const result = engine.applyLaserAsteroidHit(target.id, secondMiner.id, 'laser', 100);
     expect(result.outcome).toBe('destroyed');
     expect(result.newAsteroids).toHaveLength(material === 'rubble' ? 3 : 2);
+    engine.checkpointWorld();
     for (const fragment of result.newAsteroids) {
       expect(Math.hypot(fragment.position.x, fragment.position.y)).toBeLessThanOrEqual(
         WORLD.radius

@@ -141,7 +141,7 @@ test('travelling far across the world loads local ore and returning does not rep
 
 test('a drifting deposit crosses into a sleeping sector once and preserves that sector’s native ore', () => {
   const store = database(':memory:');
-  const field = new RegionalAsteroidField(82, store);
+  const field = new RegionalAsteroidField(82, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(82));
   field.update(manager, [{ x: 0, y: 0 }], new Set());
   const drift = manager.getAllAsteroids()[0];

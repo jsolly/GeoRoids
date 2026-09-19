@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { PALETTE } from '../../../src/constants';
+import { PALETTE, VISUAL } from '../../../src/constants';
 import {
   addFurnaceFlamePath,
   addFurnaceInnerFlamePath,
@@ -93,6 +93,12 @@ function canvasColor(ctx: CanvasRenderingContext2D, color: string): string {
   ctx.restore();
   return normalized;
 }
+
+test('furnace HUD marks stay pin-scale with the ship pip and other map assets', () => {
+  expect(MINIMAP_FURNACE_MARK_SIZE).toBeLessThanOrEqual(VISUAL.MINIMAP_LOCAL_SIZE);
+  expect(MINIMAP_FURNACE_MARK_SIZE * 2).toBeLessThan(VISUAL.MINIMAP_SIZE / 6);
+  expect(UNIVERSE_MAP_FURNACE_MARK_SIZE).toBeLessThanOrEqual(11);
+});
 
 test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not a lilac square', () => {
   const { ctx, strokes, fills } = recordingContext();

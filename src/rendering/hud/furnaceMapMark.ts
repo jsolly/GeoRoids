@@ -2,10 +2,10 @@ import { PALETTE } from '../../constants';
 
 /** Fire ink on radar and the universe map — distinct from lilac EO hardware. */
 export const FURNACE_MAP_INK = PALETTE.LASER_LOCAL;
-/** Radar glyph half-height in canvas pixels. */
-export const MINIMAP_FURNACE_MARK_SIZE = 8;
+/** Radar glyph half-height in canvas pixels; pin-scale with the local ship pip. */
+export const MINIMAP_FURNACE_MARK_SIZE = 4;
 /** Universe-map glyph half-size in screen pixels before the map scale. */
-export const UNIVERSE_MAP_FURNACE_MARK_SIZE = 16;
+export const UNIVERSE_MAP_FURNACE_MARK_SIZE = 10;
 const INNER_FLAME_MIN_SIZE = 5;
 
 type FlamePathTarget = {

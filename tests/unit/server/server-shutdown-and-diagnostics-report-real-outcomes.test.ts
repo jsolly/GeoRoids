@@ -120,6 +120,7 @@ test('status reports the actual connected log clients and bounded writer counter
         clientReportedDroppedRecords: expect.any(Number),
         writeErrors: expect.any(Number),
       },
+      gameplayIngress: { rejected: 0, disconnected: 0 },
       serverWriter: {
         queuedBytes: expect.any(Number),
         droppedRecords: expect.any(Number),

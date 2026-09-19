@@ -1,4 +1,5 @@
 import type {
+  AsteroidBoost,
   AsteroidData,
   AsteroidMaterial,
   AsteroidPhenomenon,
@@ -18,6 +19,7 @@ import type {
   ShipKitId,
   SnapshotCollabTag,
 } from '../shared-types';
+import { ASTEROID_BOOST } from './asteroidBoost';
 import { validExploration } from './exploration';
 
 type Rule = (value: unknown) => boolean;
@@ -45,6 +47,7 @@ const kit = enumeration<ShipKitId>({
 });
 const haulerUtility = enumeration<HaulerUtilityId>({
   resource_tap: true,
+  boost_coupling: true,
   tow_cable: true,
 });
 const lootKind = enumeration<LootKind>({
@@ -113,6 +116,20 @@ const entity = shape<ServerEntityData>({
   playerMotion: optional(motion),
   laserUpgrade: optional(upgrade),
 });
+const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({
+  phase: choice('armed'),
+  ownerId: string,
+  angle: number,
+});
+const burningBoost = shape<Extract<AsteroidBoost, { phase: 'burning' }>>({
+  phase: choice('burning'),
+  angle: number,
+  remainingFrames: (value) =>
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value > 0 &&
+    value <= ASTEROID_BOOST.burnFrames,
+});
 const asteroid = shape<AsteroidData>({
   id: string,
   position,
@@ -130,6 +147,7 @@ const asteroid = shape<AsteroidData>({
   surveyedBy: optional(array(string)),
   miningContributors: optional(array(string)),
   phenomenon: optional(reflective),
+  boost: optional((value) => value === null || armedBoost(value) || burningBoost(value)),
 });
 const loot = shape<LootData>({
   id: string,

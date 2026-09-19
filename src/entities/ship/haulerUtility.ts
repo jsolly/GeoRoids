@@ -1,7 +1,7 @@
 import type { HaulerUtilityId, ShipKitId } from '../../../shared-types';
 import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
 
-export const HAULER_UTILITY_IDS = ['tow_cable', 'resource_tap'] as const;
+export const HAULER_UTILITY_IDS = ['tow_cable', 'resource_tap', 'boost_coupling'] as const;
 
 /** New Hauler flights start on Resource Tap. */
 export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'resource_tap';
@@ -11,6 +11,12 @@ export const UNSET_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 export const HAULER_UTILITY_STORAGE_KEY = 'georoids.haulerUtility';
 
 export const HAULER_UTILITY = {
+  boost_coupling: {
+    id: 'boost_coupling',
+    name: 'Boost Coupling',
+    hint: 'Tap to equip',
+    copy: 'Aim; E or ARM locks heading. E or IGNITE launches a 3-second burn. Swap tools to cancel before ignition.',
+  },
   resource_tap: {
     id: 'resource_tap',
     name: 'Resource Tap',
@@ -26,7 +32,7 @@ export const HAULER_UTILITY = {
 } as const;
 
 export function isHaulerUtilityId(value: unknown): value is HaulerUtilityId {
-  return value === 'resource_tap' || value === 'tow_cable';
+  return value === 'resource_tap' || value === 'tow_cable' || value === 'boost_coupling';
 }
 
 export function parseHaulerUtilityId(value: unknown): HaulerUtilityId {

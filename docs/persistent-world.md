@@ -18,6 +18,8 @@ Asteroid impacts remove health, and deaths consume lives. Losing the final life 
 
 The full-screen universe map shows shared exploration and revealed landmarks across the world. Detailed asteroid geometry stays near each pilot. Furnaces and exploration survive restarts. Dropped loot and satellite pickups remain transient session objects, so their map markers expire when those objects disappear or the server restarts.
 
+Asteroid boost couplings are stored with their deposit. Burning couplings retain their remaining simulation frames; loading a saved sector resumes that fuel rather than starting a fresh burn. Fuel pauses when the world has no players. Armed couplings lose their owner when the live attachment ends and clear before the next motion step; disconnect and removal clear them immediately.
+
 Local development writes `.data/world.sqlite` by default. This directory and its journals are ignored by Git. `GEOROIDS_WORLD_PATH` overrides the location. The integration runner uses `:memory:` so tests cannot reset a developer's saved world. Direct server instances in tests are in-memory unless given a `worldPath`.
 
 ## Railway deployment and recovery

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../setup/serverLogger';
+import { tickAsteroidBoost } from '../../shared/asteroidBoost';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { WORLD } from '../../shared/world';
 import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
@@ -143,6 +144,7 @@ export class AsteroidManager {
     }
 
     for (const asteroid of this.asteroids.values()) {
+      tickAsteroidBoost(asteroid);
       const next = stepAsteroidMotion(asteroid.position, asteroid.velocity);
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;

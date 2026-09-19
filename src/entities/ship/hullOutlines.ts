@@ -124,6 +124,12 @@ const HAULER_CARGO_YOKE: HullOutline = kitOutline(
 
 /** Interchangeable hardware in the central bay between the Hauler's towers. */
 const HAULER_EQUIPMENT: Record<HaulerUtilityId, readonly HullPolyline[]> = {
+  boost_coupling: [
+    // Fuel chamber and flared nozzle use the same central utility mount.
+    path(true, [0.03, -0.2, 0.3, -0.2, 0.3, 0.2, 0.03, 0.2]),
+    path(false, [0.13, -0.2, 0.13, 0.2]),
+    path(true, [0.3, -0.08, 0.52, -0.08, 0.72, -0.22, 0.72, 0.22, 0.52, 0.08, 0.3, 0.08]),
+  ],
   tow_cable: [
     // Winch frame and visibly wound cable across its drum.
     path(true, [0.03, -0.2, 0.25, -0.2, 0.25, 0.2, 0.03, 0.2]),

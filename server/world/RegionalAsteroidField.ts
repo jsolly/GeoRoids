@@ -129,6 +129,12 @@ export class RegionalAsteroidField {
         }
       }
     }
+    for (const rock of manager.getAllAsteroids()) {
+      if (rock.boost?.phase === 'burning') {
+        const sector = sectorAt(rock.position);
+        wanted.set(sector.id, { x: sector.x, y: sector.y });
+      }
+    }
     this.sleepDistantSectors(manager, new Set(wanted.keys()));
     const created: AsteroidData[] = [];
     for (const id of wanted.keys()) {

@@ -5,6 +5,7 @@ import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/s
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',
+  boost_coupling: 'ARM',
   tow_cable: 'HOOK',
 };
 
@@ -60,8 +61,18 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const active =
     towing || (Number.isFinite(host.abilityActiveFrames) && host.abilityActiveFrames > 0);
   return {
-    label: towing ? 'RELEASE' : readyLabel,
-    name: towing ? 'Release asteroid' : touchAbilityName(kit.id),
+    label: towing
+      ? haulerUtilityOf(host) === 'boost_coupling'
+        ? 'IGNITE'
+        : 'RELEASE'
+      : readyLabel,
+    name: towing
+      ? haulerUtilityOf(host) === 'boost_coupling'
+        ? 'Ignite asteroid boost'
+        : 'Release asteroid'
+      : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+        ? 'Arm asteroid boost'
+        : touchAbilityName(kit.id),
     ready: alive && (towing || !cooling),
     active,
     cooling,

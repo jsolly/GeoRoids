@@ -33,6 +33,14 @@ drops the Hauler cable. Splits and fragments
 are part of the active sector's current population; sector loading does not
 impose a global asteroid cap.
 
+## Self-powered rocks
+
+A Hauler's [Boost Coupling](/wiki/#hauler) can propel an asteroid
+along the heading locked at attachment. The cream arrow means armed; the
+cream/amber exhaust means a three-second burn is active. Powered sectors stay
+awake until their burns finish, even when nearby pilots leave. The rock coasts
+afterward and keeps its normal collision behavior.
+
 ## Cooperative splits and score
 
 A cooperative split sends two outward pushes through nearby ships and rocks: a

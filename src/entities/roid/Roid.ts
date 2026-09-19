@@ -1,4 +1,6 @@
+import { tickAsteroidBoost } from '../../../shared/asteroidBoost';
 import type {
+  AsteroidBoost,
   AsteroidMaterial,
   AsteroidPhenomenon,
   Position,
@@ -22,6 +24,7 @@ class Roid {
   miningContributors?: string[];
   /** Optional server-owned reflection metadata. */
   phenomenon?: AsteroidPhenomenon;
+  boost?: AsteroidBoost | null;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
   isCollabTarget: boolean = false;
   taggedUntil?: number; // Server-owned collab window; do not destroy locally while set
@@ -84,6 +87,7 @@ class RoidBelt {
     }
 
     for (const roid of this.roids) {
+      tickAsteroidBoost(roid);
       stepAsteroidMotionInto(roid.position, roid.velocity, 1, roid.position, roid.velocity);
     }
   }

@@ -172,7 +172,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Display and HUD values',
       paragraphs: [
-        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius; the full-screen universe map uses the shared exploration chart and keeps discovered furnaces and other important assets visible across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight.`,
+        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius; the full-screen universe map uses the shared exploration chart and keeps discovered furnaces and other important assets visible across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight. Touch chrome hides those keyboard badges. Ships on the universe map use each pilot's hull silhouette.`,
       ],
     },
     {

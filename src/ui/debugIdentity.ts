@@ -1,6 +1,7 @@
 import { debugIsOn, setDebugPreference } from '../constants/user-preferences';
 import { getClientLogContext } from '../utils/clientLogContext';
 import { attachEventListener } from '../utils/dom';
+import { syncDebugHudVisibility } from './debugHud';
 
 const COPY_LABEL = 'Copy';
 const COPIED_LABEL = 'Copied';
@@ -93,6 +94,7 @@ export function applyDebugPreference(enabled: boolean): void {
   }
   setHidden(document.querySelector('#debug-identity'), !enabled);
   syncDebugIdentity();
+  syncDebugHudVisibility();
   if (enabled) {
     document.querySelector('#debug-identity')?.scrollIntoView?.({ block: 'nearest' });
   }

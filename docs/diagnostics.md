@@ -83,7 +83,8 @@ for forwarded client records:
 ```
 
 Debug is stored in this browser only. It does not log player names or resume
-tokens.
+tokens. The playfield Debug overlay (FPS, ping, snapshot age) is on-screen
+only and does not add Railway records.
 
 Railway captures standard output and supports filtering structured JSON fields.
 Start with these queries, substituting the incident's player or release ID:

@@ -77,6 +77,10 @@ export class NetworkManager {
     return this.connectionManager.getLocalPlayerId();
   }
 
+  getServerReleaseId(): string | undefined {
+    return this.connectionManager.getServerReleaseId();
+  }
+
   getAllPlayers(): Player[] {
     return this.connectionManager.getAllPlayers();
   }

@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { Player } from '../../../src/entities/player/Player';
+import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   clampUniverseMapZoom,
   closeUniverseMap,
@@ -161,6 +164,7 @@ describe('universe map play chrome', () => {
     const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
     const locate = document.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement;
     const zoomIn = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement;
+    const zoomOut = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement;
     const zoomReadout = document.querySelector(
       `#${UNIVERSE_MAP_IDS.zoomReadout}`
     ) as HTMLOutputElement;
@@ -172,20 +176,58 @@ describe('universe map play chrome', () => {
     expect(locate.getAttribute('aria-label')).toBe(UNIVERSE_MAP_LOCATE_LABEL);
     expect(locate.querySelector('svg')).not.toBeNull();
 
-    toggle.click();
-    expect(zoomReadout.textContent).toBe('2400%');
-    expect(locate.getAttribute('aria-pressed')).toBe('true');
-    expect(locate.style.left).toMatch(/px$/u);
-    expect(locate.style.top).toMatch(/px$/u);
+    const pilot = new Player({
+      id: 'map-pilot',
+      name: 'Map Pilot',
+      type: 'local',
+      input: new MockPlayerInput(),
+    });
+    pilot.ship.position.x = 4000;
+    pilot.ship.position.y = 0;
+    const localPlayer = vi
+      .spyOn(PlayerManager.getInstance(), 'getLocalPlayer')
+      .mockReturnValue(pilot);
+    try {
+      toggle.click();
+      expect(zoomReadout.textContent).toBe('2400%');
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+      expect(locate.style.left).toMatch(/px$/u);
+      expect(locate.style.top).toMatch(/px$/u);
 
-    zoomIn.click();
-    expect(zoomReadout.textContent).toBe('3240%');
-    expect(locate.getAttribute('aria-pressed')).toBe('false');
+      zoomIn.click();
+      expect(zoomReadout.textContent).toBe('3240%');
+      expect(locate.getAttribute('aria-pressed')).toBe('false');
 
-    locate.click();
-    expect(zoomReadout.textContent).toBe('2400%');
-    expect(locate.getAttribute('aria-pressed')).toBe('true');
-    closeUniverseMap();
+      locate.click();
+      expect(zoomReadout.textContent).toBe('2400%');
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+
+      zoomIn.click();
+      zoomOut.click();
+      expect(zoomReadout.textContent).toBe('2400%');
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+
+      const mapCanvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement;
+      mapCanvas.focus();
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true, cancelable: true })
+      );
+      expect(locate.getAttribute('aria-pressed')).toBe('false');
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'Home', bubbles: true, cancelable: true })
+      );
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+      mapCanvas.focus();
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true, cancelable: true })
+      );
+      expect(locate.getAttribute('aria-pressed')).toBe('false');
+      locate.click();
+      expect(locate.getAttribute('aria-pressed')).toBe('true');
+      closeUniverseMap();
+    } finally {
+      localPlayer.mockRestore();
+    }
   });
 
   test('touch chrome hides keyboard badges and keeps Close as a button', () => {

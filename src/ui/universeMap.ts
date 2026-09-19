@@ -169,8 +169,12 @@ function clampCenter(center: Position, mapFrame: MapFrame): Position {
   };
 }
 
+function isNearbyZoom(zoom: number): boolean {
+  return Math.round(zoom * 100) === Math.round(UNIVERSE_MAP_ZOOM.initial * 100);
+}
+
 function isNearbyLocalView(): boolean {
-  if (view.zoom !== UNIVERSE_MAP_ZOOM.initial) {
+  if (!isNearbyZoom(view.zoom)) {
     return false;
   }
   const local = PlayerManager.getInstance().getLocalPlayer();
@@ -723,6 +727,7 @@ function renderMap(): void {
   }
   resizeCanvas();
   positionLocateControl();
+  updateLocateControl();
   const context = elements.canvas.getContext('2d');
   if (!context) {
     return;

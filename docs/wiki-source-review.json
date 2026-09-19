@@ -1,5 +1,5 @@
 {
-  "note": "Universe map follow-ups: hide keyboard badges (Esc/M/Home) on touch chrome, and draw each pilot's kit hull silhouette instead of a generic triangle. Reviewed controls, hud-network, and teamwork against universeMap.ts, viewportChrome.ts, and hullOutlines.ts. No demonstration GIFs affected.",
+  "note": "Universe map follow-ups: hide keyboard badges on touch, draw kit hulls on the universe map only (local minimap stays heading triangles in local/crew colors), keep locate pressed across +/- zoom round-trips and live ship pose. Reviewed controls, hud-network, and teamwork against universeMap.ts, viewportChrome.ts, hullOutlines.ts, and minimap.ts. No demonstration GIFs affected.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -230,7 +230,7 @@
     "src/ui/shipSchematic.ts": "sha256:a5666dbdc8cb2d31c7b6ccc11ac3bd70e25076f94c911cf5e412ed6803cfdb5a",
     "src/ui/shipSchematicState.ts": "sha256:ac4298985cf52ae195dd7e69eb51a793221acc9c586b7fa0322db37d8bf37cb3",
     "src/ui/uiUtils.ts": "sha256:a883b7c2882c6723a52bf751ecc76d740bb119acdf4e364dc00cca7a01d7b537",
-    "src/ui/universeMap.ts": "sha256:7702ceb03da9777f348cc92979c4c96e1347e0ca13aa38ca978bfa4134848a20",
+    "src/ui/universeMap.ts": "sha256:2bfd2039114626c1af3cf3a3c96af379c47fd34cb27a554b64a5145c557d03ce",
     "src/ui/universeMapLabels.ts": "sha256:bb6e3c26570b750e192a0961c8b6a9e4f68c1f4b1925c5cef587e939f1487753",
     "src/ui/viewportChrome.ts": "sha256:6444f20c617d4e84f69352a356bb362df845ab9b35858b42bac183c9f8a92644",
     "src/utils/Logger.ts": "sha256:13b3fbdcc6dcb32938f5bca28a09a92cb6c323f920455b628213afcb15ce3d91",
@@ -353,7 +353,7 @@
     "tests/unit/ui/debugHud.test.ts": "sha256:59223ebaf5525c09996cfa282f25d9cec30c89c1095c5e015882e369af590eab",
     "tests/unit/ui/debugIdentity.test.ts": "sha256:034616166492491975e839af52276daf0d49414aa49b1a78935e2a5e2b8f733e",
     "tests/unit/ui/shipSchematic.test.ts": "sha256:68a430468d3963640c9a26f275eb315bedcac91b2359f89e90f6199ee67e959c",
-    "tests/unit/ui/universeMap.test.ts": "sha256:e51b695f739fd7b24e2438bf11243bc77f4e42a864d66531c5e284c94653855b",
+    "tests/unit/ui/universeMap.test.ts": "sha256:7da17198e5d1cece1e7f87afe60b39a62d2d1b119221c0fcf76478e3aa14a23c",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"

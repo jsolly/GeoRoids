@@ -1,4 +1,5 @@
 import { PALETTE } from '../../constants';
+import { resolveGlow } from '../renderQuality';
 
 /** Fire ink on radar and the universe map — distinct from lilac EO hardware. */
 export const FURNACE_MAP_INK = PALETTE.LASER_LOCAL;
@@ -131,12 +132,13 @@ export function drawFurnaceMapMark(
   ctx.lineCap = 'round';
   ctx.strokeStyle = FURNACE_MAP_INK;
   ctx.shadowColor = FURNACE_MAP_INK;
-  ctx.lineWidth = size * 0.04;
+  ctx.shadowBlur = resolveGlow(size * 0.5);
+  ctx.lineWidth = size * 0.08;
   ctx.beginPath();
   applyCampfirePath(ctx, x, y, size);
   ctx.stroke();
   if (size >= INNER_FLAME_MIN_SIZE) {
-    ctx.lineWidth = size * 0.035;
+    ctx.lineWidth = size * 0.07;
     ctx.beginPath();
     applyCampfirePath(ctx, x, y, size, FURNACE_INNER_CAMPFIRE_PATH);
     ctx.stroke();

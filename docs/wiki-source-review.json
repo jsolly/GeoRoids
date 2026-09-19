@@ -1,5 +1,5 @@
 {
-  "note": "Furnace HUD/map campfire marks shrink to pin scale (radar half-height 4, universe-map 10, legend 8x11). Wiki copy still names amber hairline three-tongue campfires; playfield hearth and GIF demonstrations are unchanged.",
+  "note": "Furnace HUD/map campfire marks shrink to pin scale (radar half-height 4, universe-map 10, legend 8x11). Glow and hairline width scale with the glyph so the halo does not keep the old footprint. Wiki copy still names amber hairline three-tongue campfires; playfield hearth and GIF demonstrations are unchanged.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -208,7 +208,7 @@
     "src/rendering/headingCueRenderer.ts": "sha256:97b72d0b42bbc39fa4351b0c3793d10c855717d6caf2d82e651b52d3ff4fc141",
     "src/rendering/hud/LaserUpgradeReadout.ts": "sha256:631d6c7e44965a47127790fc0f399ec5fd07d8665647f06a47bca9fee775a17b",
     "src/rendering/hud/cluster.ts": "sha256:b351f306d42dad552e377d0553dca5431703fb1e23b8bf8d14fc00883f5d1701",
-    "src/rendering/hud/furnaceMapMark.ts": "sha256:390b9d0e5a9c73f0276cf5e80473d87039aa1313ddc9b808c8ea90917605cb06",
+    "src/rendering/hud/furnaceMapMark.ts": "sha256:139203a64209f22ee7b188e1a863fa66b6be40fb0c96c8c24a18f75655baad07",
     "src/rendering/hud/gameInfo.ts": "sha256:680b308d666e94de75d3a050632818418ac2142357c6957610c68db47f477b41",
     "src/rendering/hud/hudLayout.ts": "sha256:05136ac7907c2e1aa80d9dfda7e1f5cc1f43e388ddaf12b67e58da54ceaedc11",
     "src/rendering/hud/leaderboard.ts": "sha256:9b11db76cc6635998907bccc4a9f388aa458beb8d3d7c07bb51ff39bfa9e1b47",

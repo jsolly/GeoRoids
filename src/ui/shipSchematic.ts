@@ -39,6 +39,19 @@ export const SHIP_SCHEMATIC_IDS = {
 } as const;
 
 export const SHIP_SCHEMATIC_LONG_PRESS_MS = 700;
+export const BOOST_COUPLING_DEMO_DURATION_MS = 3200;
+
+const BOOST_COUPLING_ATTACH_START_MS = 220;
+const BOOST_COUPLING_TURN_START_MS = 300;
+const BOOST_COUPLING_TURN_END_MS = 800;
+const BOOST_COUPLING_IGNITE_END_MS = 1100;
+const BOOST_COUPLING_BOOST_END_MS = 1850;
+const BOOST_COUPLING_FLAME_FADE_START_MS = 2600;
+const BOOST_COUPLING_BOOST_DISTANCE = 52;
+const DEMO_ASTEROID_RADIUS_FACTORS = {
+  asymmetric: [1, 0.72, 0.92, 0.66, 1.08, 0.8, 0.9],
+  default: [1, 0.78, 1, 0.78, 1, 0.78, 1, 0.78, 1],
+} as const;
 
 const BLOCKED_GAMEPLAY_KEYS = new Set([
   'Space',
@@ -62,6 +75,16 @@ type SchematicElements = {
   cards: HTMLElement;
   inventory: HTMLElement;
   inventoryStatus: HTMLElement;
+};
+
+type BoostCouplingDemoFrame = {
+  phase: 'idle' | 'turning' | 'igniting' | 'boosting' | 'coasting';
+  rockX: number;
+  rockY: number;
+  rockAngle: number;
+  cableVisible: boolean;
+  headingVisible: boolean;
+  flameStrength: number;
 };
 
 let initialized = false;
@@ -323,6 +346,153 @@ function drawSchematicHull(ctx: CanvasRenderingContext2D, width: number, height:
   ctx.stroke();
 }
 
+function clampUnit(value: number): number {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function easeInOut(value: number): number {
+  const t = clampUnit(value);
+  return t * t * (3 - 2 * t);
+}
+
+function intervalProgress(elapsed: number, start: number, end: number): number {
+  return clampUnit((elapsed - start) / (end - start));
+}
+
+export function getBoostCouplingDemoFrame(
+  now: number,
+  width: number,
+  height: number
+): BoostCouplingDemoFrame {
+  const elapsed =
+    ((now % BOOST_COUPLING_DEMO_DURATION_MS) + BOOST_COUPLING_DEMO_DURATION_MS) %
+    BOOST_COUPLING_DEMO_DURATION_MS;
+  const baseX = width * 0.64;
+  const baseY = height * 0.5;
+  const boostDistance = Math.min(BOOST_COUPLING_BOOST_DISTANCE, Math.max(24, width * 0.24));
+  const attached = elapsed >= BOOST_COUPLING_ATTACH_START_MS;
+  const turning = elapsed >= BOOST_COUPLING_TURN_START_MS && elapsed < BOOST_COUPLING_TURN_END_MS;
+  const igniting = elapsed >= BOOST_COUPLING_TURN_END_MS && elapsed < BOOST_COUPLING_IGNITE_END_MS;
+  const boosting = elapsed >= BOOST_COUPLING_IGNITE_END_MS && elapsed < BOOST_COUPLING_BOOST_END_MS;
+  const movement = boosting
+    ? easeInOut(
+        intervalProgress(elapsed, BOOST_COUPLING_IGNITE_END_MS, BOOST_COUPLING_BOOST_END_MS)
+      ) * boostDistance
+    : elapsed >= BOOST_COUPLING_BOOST_END_MS
+      ? boostDistance
+      : 0;
+  const fade = intervalProgress(
+    elapsed,
+    BOOST_COUPLING_FLAME_FADE_START_MS,
+    BOOST_COUPLING_DEMO_DURATION_MS
+  );
+  return {
+    phase: boosting
+      ? 'boosting'
+      : igniting
+        ? 'igniting'
+        : turning
+          ? 'turning'
+          : elapsed >= BOOST_COUPLING_BOOST_END_MS
+            ? 'coasting'
+            : 'idle',
+    rockX: baseX + movement,
+    rockY: baseY,
+    rockAngle:
+      turning || igniting
+        ? easeInOut(
+            intervalProgress(elapsed, BOOST_COUPLING_TURN_START_MS, BOOST_COUPLING_TURN_END_MS)
+          ) *
+          (Math.PI / 2)
+        : elapsed >= BOOST_COUPLING_TURN_END_MS
+          ? Math.PI / 2
+          : 0,
+    cableVisible: attached && elapsed < BOOST_COUPLING_TURN_END_MS,
+    headingVisible: attached && elapsed < BOOST_COUPLING_TURN_END_MS,
+    flameStrength: igniting
+      ? intervalProgress(elapsed, BOOST_COUPLING_TURN_END_MS, BOOST_COUPLING_IGNITE_END_MS)
+      : boosting
+        ? 0.85 + Math.sin(now / 55) * 0.1
+        : elapsed >= BOOST_COUPLING_BOOST_END_MS
+          ? 0.6 * (1 - fade)
+          : 0,
+  };
+}
+
+function drawDemoAsteroid(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  angle: number,
+  asymmetric = false
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  const radii = asymmetric
+    ? DEMO_ASTEROID_RADIUS_FACTORS.asymmetric
+    : DEMO_ASTEROID_RADIUS_FACTORS.default;
+  for (let i = 0; i < radii.length; i++) {
+    const vertexAngle = (i / (radii.length - 1)) * Math.PI * 2;
+    const vertexRadius = radius * (radii[i] ?? 1);
+    const vertexX = Math.cos(vertexAngle) * vertexRadius;
+    const vertexY = Math.sin(vertexAngle) * vertexRadius;
+    if (i === 0) {
+      ctx.moveTo(vertexX, vertexY);
+    } else {
+      ctx.lineTo(vertexX, vertexY);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBoostHeading(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x + 18, y);
+  ctx.lineTo(x + 34, y);
+  ctx.lineTo(x + 28, y - 4);
+  ctx.moveTo(x + 34, y);
+  ctx.lineTo(x + 28, y + 4);
+  ctx.stroke();
+}
+
+function drawBoostFlame(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  strength: number,
+  now: number
+): void {
+  if (strength <= 0) {
+    return;
+  }
+  const flicker = 0.9 + Math.sin(now / 45) * 0.1;
+  const length = 11 + strength * 18 * flicker;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = PALETTE.LASER_LOCAL;
+  ctx.shadowColor = PALETTE.LASER_LOCAL;
+  ctx.shadowBlur = VISUAL.SHIP_GLOW;
+  ctx.beginPath();
+  ctx.moveTo(x - 12, y - 5);
+  ctx.lineTo(x - 12 - length, y);
+  ctx.lineTo(x - 12, y + 5);
+  ctx.stroke();
+  ctx.strokeStyle = PALETTE.LOOT;
+  ctx.shadowColor = PALETTE.LOOT;
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.moveTo(x - 13, y - 2.5);
+  ctx.lineTo(x - 13 - length * 0.55, y);
+  ctx.lineTo(x - 13, y + 2.5);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawToolLoop(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -332,13 +502,17 @@ function drawToolLoop(
   ctx.clearRect(0, 0, width, height);
   const shipX = width * 0.22;
   const elapsed = now % 2600;
+  const boostFrame =
+    selectedUtility === 'boost_coupling'
+      ? getBoostCouplingDemoFrame(now, width, height)
+      : undefined;
   const attached = elapsed >= 250 && elapsed < 1850;
   const midY = height * 0.5;
   const radius = 19;
   const haul = selectedUtility === 'tow_cable' && attached ? ((elapsed - 250) / 1600) * 12 : 0;
   const kick = attached ? latchShudderOffset(elapsed - 250) : 0;
-  const rockX = width * (selectedUtility === 'boost_coupling' ? 0.65 : 0.78) - haul + kick;
-  const rockY = midY + kick * 0.35;
+  const rockX = boostFrame?.rockX ?? width * 0.78 - haul + kick;
+  const rockY = boostFrame?.rockY ?? midY + kick * 0.35;
   ctx.lineWidth = 1.25;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -348,20 +522,14 @@ function drawToolLoop(
   strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'hauler', selectedUtility);
   ctx.strokeStyle = PALETTE.HUD_MUTED;
   ctx.shadowBlur = 0;
-  ctx.beginPath();
-  for (let i = 0; i < 9; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    const r = i % 2 === 0 ? 14 : 11;
-    const x = rockX + Math.cos(angle) * r;
-    const y = rockY + Math.sin(angle) * r;
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  }
-  ctx.stroke();
-  if (attached && (selectedUtility !== 'boost_coupling' || elapsed < 1000)) {
+  drawDemoAsteroid(ctx, rockX, rockY, 14, boostFrame?.rockAngle ?? 0, boostFrame !== undefined);
+  if (selectedUtility === 'boost_coupling' && boostFrame?.cableVisible) {
+    ctx.strokeStyle = PALETTE.LOOT;
+    ctx.beginPath();
+    ctx.moveTo(shipX + radius * 0.72, midY);
+    ctx.lineTo(rockX - 14, rockY);
+    ctx.stroke();
+  } else if (attached && selectedUtility !== 'boost_coupling') {
     ctx.strokeStyle = PALETTE.LOOT;
     ctx.beginPath();
     ctx.moveTo(shipX + radius * 0.72, midY);
@@ -370,19 +538,10 @@ function drawToolLoop(
   }
   if (selectedUtility === 'boost_coupling') {
     ctx.strokeStyle = PALETTE.LOOT;
-    ctx.beginPath();
-    if (elapsed < 1000) {
-      ctx.moveTo(rockX + 18, midY);
-      ctx.lineTo(rockX + 34, midY);
-      ctx.lineTo(rockX + 28, midY - 4);
-      ctx.moveTo(rockX + 34, midY);
-      ctx.lineTo(rockX + 28, midY + 4);
-    } else {
-      ctx.moveTo(rockX - 16, midY - 4);
-      ctx.lineTo(rockX - 36 - Math.sin(now / 65) * 5, midY);
-      ctx.lineTo(rockX - 16, midY + 4);
+    if (boostFrame?.headingVisible) {
+      drawBoostHeading(ctx, rockX, rockY);
     }
-    ctx.stroke();
+    drawBoostFlame(ctx, rockX, rockY, boostFrame?.flameStrength ?? 0, now);
   } else if (selectedUtility === 'resource_tap') {
     const extractMs = (SHIP_ABILITY.TAP_EXTRACT_FRAMES / 60) * 1000;
     for (let i = 0; i < SHIP_ABILITY.TAP_EXTRACT_BURSTS; i++) {

@@ -125,31 +125,50 @@ const HAULER_CARGO_YOKE: HullOutline = kitOutline(
 /** Interchangeable hardware in the central bay between the Hauler's towers. */
 const HAULER_EQUIPMENT: Record<HaulerUtilityId, readonly HullPolyline[]> = {
   boost_coupling: [
-    // Fuel chamber and flared nozzle use the same central utility mount.
-    path(true, [0.03, -0.2, 0.3, -0.2, 0.3, 0.2, 0.03, 0.2]),
-    path(false, [0.13, -0.2, 0.13, 0.2]),
-    path(true, [0.3, -0.08, 0.52, -0.08, 0.72, -0.22, 0.72, 0.22, 0.52, 0.08, 0.3, 0.08]),
-  ],
-  tow_cable: [
-    // Winch frame and visibly wound cable across its drum.
-    path(true, [0.03, -0.2, 0.25, -0.2, 0.25, 0.2, 0.03, 0.2]),
+    // Fuel chamber, service rails, and a broad flared thrust nozzle share the central mount.
+    path(true, [0.02, -0.3, 0.34, -0.3, 0.34, 0.3, 0.02, 0.3]),
+    path(false, [0.11, -0.3, 0.11, 0.3]),
+    path(false, [0.25, -0.3, 0.25, 0.3]),
+    path(false, [0.06, -0.23, 0.29, -0.23]),
+    path(false, [0.06, 0.23, 0.29, 0.23]),
     path(
-      false,
+      true,
       [
-        0.04, -0.12, 0.24, -0.12, 0.04, -0.04, 0.24, -0.04, 0.04, 0.04, 0.24, 0.04, 0.04, 0.12,
-        0.24, 0.12,
+        0.34, -0.17, 0.48, -0.17, 0.78, -0.3, 0.86, -0.18, 0.86, 0.18, 0.78, 0.3, 0.48, 0.17, 0.34,
+        0.17,
       ]
     ),
-    // Exposed cable ending in a curved open tow hook.
-    path(false, [0.25, 0, 0.37, 0, 0.44, 0.03, 0.52, 0.03, 0.58, 0]),
-    path(false, [0.58, 0, 0.67, 0, 0.72, -0.06, 0.7, -0.13, 0.64, -0.16, 0.59, -0.13, 0.59, -0.08]),
+    path(false, [0.52, -0.17, 0.52, 0.17]),
+    path(false, [0.68, -0.24, 0.68, 0.24]),
+  ],
+  tow_cable: [
+    // A large winch cage and drum make the tow attachment legible at schematic scale.
+    path(true, [0.02, -0.33, 0.34, -0.33, 0.34, 0.33, 0.02, 0.33]),
+    path(true, [0.08, -0.25, 0.29, -0.25, 0.29, 0.25, 0.08, 0.25]),
+    oval(0.2, 0, 0.13, 0.22, 12),
+    path(false, [0.07, -0.27, 0.07, 0.27]),
+    path(false, [0.3, -0.27, 0.3, 0.27]),
+    path(false, [0.1, -0.18, 0.27, -0.18]),
+    path(false, [0.1, 0, 0.27, 0]),
+    path(false, [0.1, 0.18, 0.27, 0.18]),
+    // Short cable arm terminating in a broad open clamp.
+    path(false, [0.34, 0, 0.5, 0, 0.6, 0.04]),
+    path(false, [0.6, 0.04, 0.7, 0.16, 0.82, 0.18, 0.9, 0.1]),
+    path(false, [0.6, 0.04, 0.7, -0.08, 0.82, -0.18, 0.9, -0.1]),
+    path(false, [0.9, 0.1, 0.87, 0.02, 0.9, -0.1]),
   ],
   resource_tap: [
-    // Extractor housing and a long toothed probe, on the same mount.
-    path(true, [0.03, -0.2, 0.25, -0.2, 0.31, -0.12, 0.31, 0.12, 0.25, 0.2, 0.03, 0.2]),
-    path(false, [0.14, -0.2, 0.14, 0.2]),
-    path(true, [0.31, -0.09, 0.55, -0.09, 0.72, 0, 0.55, 0.09, 0.31, 0.09]),
-    path(false, [0.36, -0.09, 0.42, 0.09, 0.46, -0.09, 0.52, 0.09, 0.56, -0.08]),
+    // Reinforced extractor housing and a long, stepped auger for resource taps.
+    path(true, [0.02, -0.31, 0.34, -0.31, 0.4, -0.22, 0.4, 0.22, 0.34, 0.31, 0.02, 0.31]),
+    path(false, [0.1, -0.31, 0.1, 0.31]),
+    path(false, [0.27, -0.31, 0.27, 0.31]),
+    path(false, [0.08, -0.22, 0.31, -0.22]),
+    path(false, [0.08, 0.22, 0.31, 0.22]),
+    path(true, [0.4, -0.2, 0.55, -0.16, 0.86, -0.08, 0.94, 0, 0.86, 0.08, 0.55, 0.16, 0.4, 0.2]),
+    // Helical teeth and a reinforced tip keep the auger readable as it scales down in flight.
+    path(false, [0.46, -0.2, 0.59, 0.16, 0.7, -0.16, 0.81, 0.12, 0.9, -0.06]),
+    path(false, [0.46, 0.2, 0.59, -0.16, 0.7, 0.16, 0.81, -0.12, 0.9, 0.06]),
+    path(false, [0.88, -0.07, 0.98, 0, 0.88, 0.07]),
   ],
 };
 

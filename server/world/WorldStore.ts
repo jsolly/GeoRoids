@@ -6,12 +6,14 @@ import { validExploration } from '../../shared/exploration';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
 import { readCompletedSectorIds } from '../../shared/sectors';
+import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
   ExplorationTile,
   Position,
+  ShipBoostState,
   ShipKitId,
   Velocity,
 } from '../../shared-types';
@@ -42,6 +44,7 @@ export interface PersistentPilot {
   lives?: number;
   mass?: number;
   health?: number;
+  boost?: ShipBoostState;
   /** Server release that issued the current token digest. */
   credentialReleaseId?: string;
   /** Client release present when the current token digest was issued. */
@@ -73,6 +76,8 @@ export interface SavedWorld {
   seed: number;
   startedAt: number;
   generation: number;
+  /** Density schema for additive asteroid slots; absent in pre-migration worlds. */
+  asteroidDensityVersion?: number;
   scoreSeason?: string;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
@@ -188,6 +193,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     name,
     score,
     ...readOptionalFlight(pilot),
+    ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),
   };
 }
@@ -389,6 +395,12 @@ export class WorldStore {
         Number.isSafeInteger(value.generation)
           ? value.generation
           : 0,
+      ...('asteroidDensityVersion' in value &&
+      typeof value.asteroidDensityVersion === 'number' &&
+      Number.isSafeInteger(value.asteroidDensityVersion) &&
+      value.asteroidDensityVersion >= 0
+        ? { asteroidDensityVersion: value.asteroidDensityVersion }
+        : {}),
       ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
         ? { scoreSeason: value.scoreSeason }
         : {}),

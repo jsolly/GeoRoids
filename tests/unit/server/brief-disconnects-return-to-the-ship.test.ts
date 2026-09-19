@@ -82,18 +82,22 @@ test('a long absence starts a new flight with the monthly score', () => {
   }
 });
 
-test('a restart inside the return window restores the last ship from storage', () => {
+test('a restart inside the return window restores the ship and refills only elapsed boost charge', () => {
+  let elapsed = 0;
+  const clock = new ServerClock({ wallNow: () => 1789473600000, monotonicNow: () => elapsed });
   const store = new WorldStore(':memory:');
   try {
-    const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
+    const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
     original.actor.lives = 1;
     original.actor.score = 880;
     original.actor.health = 22;
+    original.actor.boost = { phase: 'exhausted', charge: 0.4 };
     engine.removePlayer('scout');
     engine.stopGameLoop();
 
-    const restarted = new GameEngine(82, undefined, new InlineWorldPersistence(store));
+    elapsed += 500;
+    const restarted = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const resumed = restarted.resumePilot(original.token, new RecordingSocket());
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
@@ -101,6 +105,7 @@ test('a restart inside the return window restores the last ship from storage', (
       lives: 1,
       score: 880,
       health: 22,
+      boost: { phase: 'exhausted', charge: 0.5 },
       position: { x: 2_400, y: 1_800 },
     });
     restarted.stopGameLoop();

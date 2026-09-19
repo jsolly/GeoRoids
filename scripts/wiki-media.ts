@@ -57,7 +57,11 @@ import {
   tickAbilityHost,
 } from '../src/entities/ship/shipAbilities';
 import { getShipKit, hullRadiusForKit } from '../src/entities/ship/shipKits';
-import { strokeKitHullOutline, strokePhosphorSegment } from '../src/entities/ship/shipRenderer';
+import {
+  drawSurveyorScanFx,
+  strokeKitHullOutline,
+  strokePhosphorSegment,
+} from '../src/entities/ship/shipRenderer';
 import { applyShipImpactFlash, tickShipImpactFlash } from '../src/entities/ship/shipUtils';
 import { steeringTurn } from '../src/input/pointerSteering';
 import { stepAsteroidMotion } from '../src/physics/asteroidMotion';
@@ -581,7 +585,15 @@ function makeSurveyorDemo(): Demo {
         'E scan → shared crew radar → persistent delivery tag',
         frame
       );
-      drawRing(ctx, host.position, 190, PALETTE.HUD_MUTED, 0.18);
+      const surveyorScreen = screenPoint(host.position);
+      drawSurveyorScanFx(
+        ctx,
+        host,
+        surveyorScreen.x,
+        surveyorScreen.y,
+        hullRadiusForKit('surveyor'),
+        { width: WIDTH, height: HEIGHT }
+      );
       drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL);
       drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE);
       for (const rock of rocks) {

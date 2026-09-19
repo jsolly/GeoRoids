@@ -6,7 +6,12 @@ export const WORLD = {
   sectorSize: 2_000,
   interestRadius: 2_800,
   minimapRadius: 1_800,
-  depositsPerSector: 24,
+  /** Current deterministic field width. Keep legacy slots stable during migrations. */
+  depositsPerSector: 72,
+  /** Slots present in worlds generated before the density increase. */
+  legacyDepositsPerSector: 24,
+  /** Persisted marker for the additive sector migration. */
+  asteroidDensityVersion: 2,
   /** Saved worlds with a different generation reset instead of loading stale progress. */
   generation: 1,
   spawnClusterRadius: 150,

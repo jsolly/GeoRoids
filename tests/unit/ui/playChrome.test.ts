@@ -92,7 +92,7 @@ test('title menu presents the keyboard and ability control hint', () => {
   expect(hint?.closest('#start-screen')).toBeTruthy();
   expect(hint?.textContent).toContain('Always thrust');
   expect(hint?.textContent).toContain('Space fires');
-  expect(hint?.textContent).toContain('Shift boost');
+  expect(hint?.textContent).toContain('Shift or right-click boost');
   expect(hint?.textContent).toContain('E ability');
   expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
 });

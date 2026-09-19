@@ -10,6 +10,7 @@ import { FURNACES, furnaceReward } from '../../shared/furnaces';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
+import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
@@ -56,7 +57,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Movement values',
       paragraphs: [
         `Automatic movement defaults: thrust ${SHIP.THRUST}, maximum velocity ${SHIP.MAX_VELOCITY}, and turn rate ${SHIP.TURN_SPEED} degrees per second. Terrain and mass still affect flight. The simulation runs at ${GAME.FPS} frames per second.`,
-        `Shift or the Boost button multiplies cruise speed and thrust by ${getShipKit('surveyor').boostMultiplier} for Surveyor and ${getShipKit('hauler').boostMultiplier} for Hauler. Tap or press again to return to the shared cruise speed.`,
+        `Shift, right-click, or the Boost button multiplies cruise speed and thrust by ${getShipKit('surveyor').boostMultiplier} for Surveyor and ${getShipKit('hauler').boostMultiplier} for Hauler. Tap, click, or press again to return to the shared cruise speed. A full tank lasts ${BOOST.durationMs / 1000} seconds and refills from empty in ${BOOST.rechargeMs / 1000} seconds; any available charge can start another burst and interrupt recharging.`,
         `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },
@@ -69,7 +70,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Ability and exploration values',
       paragraphs: [
-        `E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
         `Passive shared exploration reaches ${EXPLORATION_RANGE.surveyor} world units for Surveyor and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist for the match.`,
       ],
     },

@@ -19,12 +19,18 @@ Surveyor is the winged scout with a dish on the nose. It is the smaller hull
 next to Hauler's barge. It turns more quickly than
 Hauler and cruises automatically at the same speed. Press Shift or tap Boost for
 a stronger burst than Hauler's boost; tap or press again to return to cruise.
+The shared [boost tank](/wiki/#controls) drains during use and refills while inactive.
+Running it empty stops boost. Activate it again as soon as some charge returns;
+boosting interrupts the refill.
 Press E or
 tap Scan to run a range-limited mineral scan on every teammate's radar for a
 limited time. The range is centered on the active Surveyor. Teammates see the
 shared classification when the rock is inside their own local radar. Circles mark ice,
 squares metal, and triangles rubble. Once a rock is identified, its
 classification remains with that rock; unscanned rocks remain ordinary dots.
+While the scan is active, a thin cyan radar sweep pulses from the hull to the
+edge of the viewport. The sweep is a visual cue and does not expand the scan
+range.
 The ability has a cooldown and costs no resource.
 
 Surveyor also reveals a 650-unit radius around its hull for the shared

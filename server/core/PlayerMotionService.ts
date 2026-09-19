@@ -3,6 +3,7 @@ import type { WebSocket } from 'ws';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
 import { shipOverlapsCompletedSector } from '../../shared/sectors';
+import { advanceShipBoost, startShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { cruiseSpeed } from '../../shared/shipFlight';
 import type { PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
@@ -38,6 +39,7 @@ type EnhancedFreePose = Pick<GameEntity, 'position' | 'velocity' | 'angle' | 'th
   epoch: number;
   sequence: number;
   boosting?: boolean;
+  boostDepleted?: boolean;
 };
 
 interface Session {
@@ -57,6 +59,8 @@ interface Session {
   burstCredit: number;
   burstAt: number;
   wasAlive: boolean;
+  boostAt: number;
+  boostRequested: boolean;
   knockback?: { speed: number; at: number };
 }
 
@@ -146,7 +150,11 @@ export class PlayerMotionService {
     );
   }
 
-  public legalSpeed(actor: GameEntity, now: number, boosting = actor.boosting): number {
+  public legalSpeed(
+    actor: GameEntity,
+    now: number,
+    boosting = actor.boost.phase === 'active'
+  ): number {
     const kit = getShipKit(actor.kitId);
     const normal = cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1);
     const impulse = this.sessions.get(actor.id)?.knockback;
@@ -210,6 +218,8 @@ export class PlayerMotionService {
       burstCredit: 0,
       burstAt: now,
       wasAlive: true,
+      boostAt: now,
+      boostRequested: false,
     };
     actor.velocity = capMotionVelocity(actor.velocity, this.legalSpeed(actor, now));
     this.sessions.set(actor.id, session);
@@ -251,6 +261,7 @@ export class PlayerMotionService {
       }
       return { ok: true, actor: session.actor, resumeToken: session.token };
     }
+    this.advanceBoost(session, now);
     const old = session.socket;
     if (old) {
       this.sockets.delete(old);
@@ -278,12 +289,18 @@ export class PlayerMotionService {
     if (!session) {
       return false;
     }
+    this.advanceBoost(session, now);
     this.sockets.delete(socket);
     session.socket = undefined;
     delete session.actor.ws;
     session.disconnectedUntil = now + PLAYER_MOTION.reconnectGraceMs;
     session.actor.thrusting = false;
-    session.actor.boosting = false;
+    stopShipBoost(session.actor.boost);
+    session.actor.velocity = capMotionVelocity(
+      session.actor.velocity,
+      this.legalSpeed(session.actor, now)
+    );
+    session.boostRequested = false;
     return true;
   }
 
@@ -293,11 +310,14 @@ export class PlayerMotionService {
     delete actor.harpoonLatchPos;
   }
 
-  private handoff(
-    session: Session,
-    now: number,
-    poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames
-  ): void {
+  private handoff(session: Session, now: number, poseCredit?: number): void {
+    this.advanceBoost(session, now);
+    if (session.actor.boost.phase === 'active') {
+      session.boostRequested = false;
+    }
+    stopShipBoost(session.actor.boost);
+    const speed = this.legalSpeed(session.actor, now);
+    session.actor.velocity = capMotionVelocity(session.actor.velocity, speed);
     session.epoch += 1;
     session.mode = 'handoff';
     session.ack = 0;
@@ -305,11 +325,13 @@ export class PlayerMotionService {
     session.anchor = { ...session.actor.position };
     session.anchorAt = now;
     session.poseAt = now;
-    session.poseCredit = poseCredit;
+    session.poseCredit = Math.min(
+      poseCredit ?? Number.POSITIVE_INFINITY,
+      speed * PLAYER_MOTION.poseLeadFrames
+    );
     session.burstCredit = 0;
     session.burstAt = now;
     session.actor.thrusting = false;
-    session.actor.boosting = false;
     this.publish(session);
   }
 
@@ -321,6 +343,7 @@ export class PlayerMotionService {
       return;
     }
     session.wasAlive = this.alive(session.actor);
+    session.boostRequested = false;
     delete session.knockback;
     session.actor.velocity = capMotionVelocity(
       session.actor.velocity,
@@ -413,18 +436,40 @@ export class PlayerMotionService {
       Math.abs(pose.angle) > Math.PI * 2 ||
       typeof pose.thrusting !== 'boolean' ||
       (pose.boosting !== undefined && typeof pose.boosting !== 'boolean') ||
+      (pose.boostDepleted !== undefined && typeof pose.boostDepleted !== 'boolean') ||
+      (pose.boosting === true && pose.boostDepleted === true) ||
       Object.keys(pose).some(
         (key) =>
-          !['epoch', 'sequence', 'position', 'velocity', 'angle', 'thrusting', 'boosting'].includes(
-            key
-          )
+          ![
+            'epoch',
+            'sequence',
+            'position',
+            'velocity',
+            'angle',
+            'thrusting',
+            'boosting',
+            'boostDepleted',
+          ].includes(key)
       ) ||
       now < session.poseAt
     ) {
       return { ok: false, error: 'Invalid or stale enhanced movement pose' };
     }
-    const boosting = pose.boosting === true;
-    const speed = this.legalSpeed(session.actor, now, boosting);
+    this.advanceBoost(session, now);
+    const requested = pose.boosting === true;
+    const candidate = { ...session.actor.boost };
+    if (pose.boostDepleted && candidate.phase === 'active') {
+      // Prediction may reach zero one network frame before the server. This
+      // advisory can only spend remaining charge, never restore any.
+      candidate.phase = 'exhausted';
+      candidate.charge = 0;
+    }
+    if (!requested) {
+      stopShipBoost(candidate);
+    } else if (!session.boostRequested) {
+      startShipBoost(candidate);
+    }
+    const speed = this.legalSpeed(session.actor, now, candidate.phase === 'active');
     const elapsedMs = now - session.poseAt;
     // Client silence is capped at the client's own bounded catch-up so it
     // cannot bank an arbitrary jump. Time the server loop spent blocked is
@@ -500,7 +545,8 @@ export class PlayerMotionService {
     session.actor.velocity = { x: pose.velocity.x, y: pose.velocity.y };
     session.actor.angle = pose.angle;
     session.actor.thrusting = pose.thrusting;
-    session.actor.boosting = boosting;
+    session.actor.boost = candidate;
+    session.boostRequested = requested;
     session.actor.lastUpdate = now;
     this.publish(session);
     return { ok: true, blockedMs };
@@ -552,10 +598,24 @@ export class PlayerMotionService {
     session.actor.position = { ...position };
     session.actor.velocity = { x: 0, y: 0 };
     session.actor.thrusting = false;
-    session.actor.boosting = false;
+    stopShipBoost(session.actor.boost);
+    session.boostRequested = false;
     session.actor.lastUpdate = now;
     this.publish(session);
     return true;
+  }
+
+  private advanceBoost(session: Session, now: number): void {
+    const elapsed = Math.max(0, now - session.boostAt);
+    session.boostAt = Math.max(session.boostAt, now);
+    const wasActive = session.actor.boost.phase === 'active';
+    advanceShipBoost(session.actor.boost, elapsed);
+    if (wasActive && session.actor.boost.phase !== 'active') {
+      session.actor.velocity = capMotionVelocity(
+        session.actor.velocity,
+        this.legalSpeed(session.actor, now)
+      );
+    }
   }
 
   /** Advance session deadlines and lifecycle epochs; ship/asteroid physics stay elsewhere. */
@@ -563,6 +623,7 @@ export class PlayerMotionService {
     this.assertTime(now);
     const expired: string[] = [];
     for (const session of this.sessions.values()) {
+      this.advanceBoost(session, now);
       if (session.disconnectedUntil !== undefined && now >= session.disconnectedUntil) {
         expired.push(session.actor.id);
         this.removeSession(session);

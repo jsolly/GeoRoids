@@ -29,6 +29,7 @@ remembers the checkbox. It does not publish your nickname or resume token.
 While Debug is on, a small Player ID chip stays on the playfield so you can
 copy after the title screen hides, and a compact overlay shows live FPS, ping,
 snapshot age, motion epoch, world counts, and short client/server release IDs.
+The debug panel sits above the flight controls so Boost remains visible.
 Those health lines stay on-screen only; they are not written to Railway.
 
 Shots, impacts, and explosions vary their pitch slightly each time they
@@ -114,7 +115,9 @@ exploration chart. Passive Surveyor reveal reaches 650 world units and passive
 Hauler reveal reaches 260; every crew member contributes to the same
 explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
-Open the universe map with M or the Map button, then close it with M, Escape,
+Open the universe map with M or the Map button. It starts with a nearby view
+centered on your current ship; zoom out to see distant discoveries or use Local
+pilot to restore the nearby scale. Close it with M, Escape,
 or the Close control.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's

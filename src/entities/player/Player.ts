@@ -1,4 +1,4 @@
-import type { HaulerUtilityId, Position, ShipKitId } from '../../../shared-types';
+import type { HaulerUtilityId, Position, ShipBoostState, ShipKitId } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
 import type { PlayerInput } from '../../input/PlayerInput';
@@ -104,7 +104,7 @@ export class Player {
     score?: number;
     exploding?: boolean;
     thrusting?: boolean;
-    boosting?: boolean;
+    boost?: ShipBoostState;
     color?: string;
     deathCause?: string;
     health?: number;
@@ -228,8 +228,8 @@ export class Player {
     if (data.thrusting !== undefined && this.type !== 'local') {
       this.ship.thrusting = data.thrusting;
     }
-    if (data.boosting !== undefined && this.type !== 'local') {
-      this.ship.boosting = data.boosting;
+    if (data.boost !== undefined && this.type !== 'local') {
+      this.ship.boost = { ...data.boost };
     }
     if (data.color !== undefined && this.type !== 'local') {
       this.color = data.color;

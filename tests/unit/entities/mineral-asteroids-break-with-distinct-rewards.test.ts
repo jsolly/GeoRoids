@@ -7,6 +7,7 @@ import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { RNGService } from '../../../server/core/RNGService';
 import { ASTEROID_MATERIALS, MATERIAL_OUTLINES } from '../../../shared/asteroidMaterials';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData, AsteroidMaterial } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
 import { serializeAsteroidMaterialSvg } from '../../../src/entities/roid/materialArt';
@@ -91,9 +92,9 @@ describe('mineral asteroids break with distinct rewards', () => {
     expect(manager.getAsteroidCount()).toBe(0);
   });
 
-  test('rubble fragmentation respects the world cap and ship rams create no fragments', () => {
+  test('a crowded local field suppresses rubble fragments and ship rams create none', () => {
     const manager = new AsteroidManager(new RNGService(42));
-    for (let i = 0; i < 198; i++) {
+    for (let i = 0; i < WORLD.depositsPerSector * 6 - 2; i++) {
       manager.addAsteroid({ ...mineral('ice'), id: `ice-${i}` });
     }
     manager.addAsteroid(mineral('rubble'));

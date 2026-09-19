@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { RNGService } from '../../../server/core/RNGService';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { isBiggestAsteroid } from '../../../src/entities/roid/roidScore';
@@ -193,8 +194,8 @@ describe('Collaborative asteroid split', () => {
     expect(new Set([first.id, afterRestart.id]).size).toBe(2);
   });
 
-  test('asteroid splitting respects max count limit', () => {
-    const maxCount = 200;
+  test('a crowded local field suppresses cooperative fragments', () => {
+    const maxCount = WORLD.depositsPerSector * 6;
     for (let i = 0; i < maxCount - 1; i++) {
       asteroidManager.addAsteroid(makeAsteroid({ id: `filler-${i}`, size: 15 }));
     }

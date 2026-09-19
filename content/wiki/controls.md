@@ -42,8 +42,24 @@ knockback can still push the ship. W and ArrowUp are unbound.
 
 Move the mouse to steer from the canvas center toward the pointer. The ship
 turns toward that heading rather than snapping instantly. Hold the left mouse
-button to fire. Right-click is unbound. Arrow keys or A/D take over steering
+button to fire. Right-click toggles Boost on, and a second right-click turns it
+off, just like Shift. Releasing the mouse button keeps Boost on until the tank runs empty.
+Arrow keys or A/D take over steering
 until you move the pointer again.
+
+## Boost charge
+
+Shift, right-click, and the Boost button share one limited tank. The button is
+visible during flight on desktop and touch. While boosting, its amber fill drains
+from the top down. Switch boost off early to save charge; the inactive cyan fill
+rises from the bottom as the tank recharges. A partly filled tank can boost again
+if you stopped before it ran empty.
+
+An empty tank stops boost automatically. As soon as some charge returns, press,
+click, or tap to boost again. This interrupts recharging and spends the remaining
+charge; you do not need a full tank. Boost never restarts on its own. Opening the map or schematic stops boost and lets the tank recharge.
+Respawning starts with a full tank; reconnecting to the same flight preserves
+charge and credits the time spent away toward the refill.
 
 ## Ship schematic
 
@@ -59,9 +75,12 @@ changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 ## Map
 
 Press M or use the on-screen Map button to open the full-screen universe map.
-It shows the persistent shared exploration chart and discovered important
-assets across the open world. Press M, Escape, or the Close control to return
-to flight.
+It opens centered on your ship, showing 5,000 units across so nearby landmarks
+are easy to distinguish. Drag to pan and use the scroll wheel or +/− controls
+to zoom, including all the way out to the whole world. Local pilot restores
+the nearby view. The shared exploration chart and discovered assets persist;
+each opening returns to your current location. Press M, Escape, or Close to
+return to flight.
 
 ## Touch
 

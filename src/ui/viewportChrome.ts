@@ -52,7 +52,7 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
 }
 
 export const DESKTOP_CONTROLS_HINT =
-  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift boost · E ability · M map';
+  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · M map';
 export const TOUCH_CONTROLS_HINT =
   'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Map button';
 

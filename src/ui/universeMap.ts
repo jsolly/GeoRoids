@@ -11,6 +11,12 @@ import {
 } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
+import {
+  canPlaceMapAssetLabel,
+  canPlaceMapCrewLabel,
+  isFiniteMapPosition,
+  type MapLabelRect,
+} from './universeMapLabels';
 
 export const UNIVERSE_MAP_IDS = {
   dialog: 'universe-map-dialog',
@@ -27,7 +33,8 @@ export const UNIVERSE_MAP_IDS = {
 
 export const UNIVERSE_MAP_ZOOM = {
   min: 1,
-  max: 12,
+  max: 48,
+  initial: 24,
   step: 1.35,
 } as const;
 
@@ -63,13 +70,6 @@ type MapFrame = {
   scale: number;
 };
 
-type MapLabelRect = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-};
-
 type MapView = {
   center: Position;
   zoom: number;
@@ -101,8 +101,7 @@ let closeInProgress = false;
 let openInputRelease: (() => void) | undefined;
 let elements: UniverseMapElements | null = null;
 let dimensions: MapCanvasDimensions = { width: 1, height: 1, dpr: 1 };
-const view: MapView = { center: { x: 0, y: 0 }, zoom: UNIVERSE_MAP_ZOOM.min };
-let hasInitialCenter = false;
+const view: MapView = { center: { x: 0, y: 0 }, zoom: UNIVERSE_MAP_ZOOM.initial };
 let nextLocationUpdateAt = 0;
 let pointerPan: { id: number; x: number; y: number } | null = null;
 const explorationRaster: ExplorationRaster = {
@@ -110,15 +109,6 @@ const explorationRaster: ExplorationRaster = {
   canvas: null,
   context: null,
 };
-
-function finitePosition(value: Position | undefined): value is Position {
-  return (
-    value !== undefined &&
-    Number.isFinite(value.x) &&
-    Number.isFinite(value.y) &&
-    Math.hypot(value.x, value.y) <= WORLD.radius * 1.25
-  );
-}
 
 function clampZoom(zoom: number): number {
   return Math.min(UNIVERSE_MAP_ZOOM.max, Math.max(UNIVERSE_MAP_ZOOM.min, zoom));
@@ -230,12 +220,12 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       <div>
         <p class="universe-map-eyebrow">Shared field cartography</p>
         <h2 id="universe-map-title">Universe map</h2>
-        <p class="universe-map-subtitle">Crew discoveries persist across the whole world. Zoom in for more landmark names.</p>
+        <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
       </div>
       <div class="universe-map-actions">
         <button id="${UNIVERSE_MAP_IDS.center}" type="button">Local pilot</button>
         <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
-        <output id="${UNIVERSE_MAP_IDS.zoomReadout}" aria-label="Map zoom">100%</output>
+        <output id="${UNIVERSE_MAP_IDS.zoomReadout}" aria-label="Map zoom">2400%</output>
         <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
         <button id="${UNIVERSE_MAP_IDS.close}" type="button">Close <kbd>Esc</kbd></button>
       </div>
@@ -451,7 +441,7 @@ function drawMapAsset(
   frame: MapFrame,
   showLabel: boolean
 ): void {
-  if (!finitePosition(asset.position)) {
+  if (!isFiniteMapPosition(asset.position)) {
     return;
   }
   const size = 11 / frame.scale;
@@ -509,56 +499,24 @@ function drawMapAsset(
   if (showLabel && asset.name) {
     context.font = `${12 / frame.scale}px "Courier New", monospace`;
     context.fillStyle = hexToRgba(PALETTE.HUD, 0.86);
-    context.textAlign = 'left';
-    context.textBaseline = 'middle';
-    context.fillText(asset.name, size * 1.5, 0);
+    context.textAlign = 'center';
+    context.textBaseline = 'top';
+    context.fillText(asset.name, 0, size * 1.6);
   }
   context.restore();
 }
 
-function canPlaceMapAssetLabel(
-  asset: MapAsset,
+function drawCrew(
+  context: CanvasRenderingContext2D,
   frame: MapFrame,
   occupied: MapLabelRect[]
-): boolean {
-  if (!asset.name || !finitePosition(asset.position)) {
-    return false;
-  }
-
-  const fontSize = 12 / frame.scale;
-  const iconSize = 11 / frame.scale;
-  const gap = 6 / frame.scale;
-  const left = asset.position.x + iconSize * 1.5;
-  const top = asset.position.y - fontSize / 2 - gap;
-  const rect: MapLabelRect = {
-    left,
-    right: left + asset.name.length * fontSize * 0.62 + gap,
-    top,
-    bottom: top + fontSize + gap * 2,
-  };
-
-  if (
-    occupied.some(
-      (other) =>
-        rect.left < other.right &&
-        rect.right > other.left &&
-        rect.top < other.bottom &&
-        rect.bottom > other.top
-    )
-  ) {
-    return false;
-  }
-  occupied.push(rect);
-  return true;
-}
-
-function drawCrew(context: CanvasRenderingContext2D, frame: MapFrame): number {
+): number {
   const local = PlayerManager.getInstance().getLocalPlayer();
   const crew = PlayerManager.getInstance().getNonLocalPlayers();
   const players = local ? [local, ...crew] : crew;
   for (const player of players) {
     const position = player.ship.position;
-    if (!finitePosition(position)) {
+    if (!isFiniteMapPosition(position)) {
       continue;
     }
     const size = (player.type === 'local' ? 16 : 12) / frame.scale;
@@ -580,7 +538,10 @@ function drawCrew(context: CanvasRenderingContext2D, frame: MapFrame): number {
     context.fill();
     context.shadowBlur = 0;
     context.stroke();
-    if (view.zoom >= 1.35 && player.name) {
+    if (
+      view.zoom >= 1.35 &&
+      canPlaceMapCrewLabel(player.name, position, size, frame, view.center, occupied)
+    ) {
       context.rotate(player.ship.angle);
       context.font = `${11 / frame.scale}px "Courier New", monospace`;
       context.fillStyle = hexToRgba(PALETTE.HUD, 0.9);
@@ -616,7 +577,7 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   const locations = [
     ...assets.map((asset) => ({ name: `${asset.name} (${asset.kind})`, position: asset.position })),
     ...players
-      .filter((player) => finitePosition(player.ship.position))
+      .filter((player) => isFiniteMapPosition(player.ship.position))
       .map((player) => ({
         name: `${player.name}${player.type === 'local' ? ' (you)' : ' (crew)'}`,
         position: player.ship.position,
@@ -683,13 +644,13 @@ function renderMap(): void {
   for (const asset of revealedAssets) {
     revealedAssetCount++;
     const labelAllowed = view.zoom >= MAP_LABEL_ZOOM || drawnLabelCount < MAP_DEFAULT_LABEL_LIMIT;
-    const showLabel = labelAllowed && canPlaceMapAssetLabel(asset, frame, labelRects);
+    const showLabel = labelAllowed && canPlaceMapAssetLabel(asset, frame, view.center, labelRects);
     if (showLabel) {
       drawnLabelCount++;
     }
     drawMapAsset(context, asset, frame, showLabel);
   }
-  const crewCount = drawCrew(context, frame);
+  const crewCount = drawCrew(context, frame, labelRects);
   context.restore();
 
   context.save();
@@ -703,7 +664,7 @@ function renderMap(): void {
   context.fillText('NORTH', frame.x + 8, frame.y + 8);
   context.textAlign = 'right';
   context.fillText(
-    `${Math.round(WORLD.radius / 1000)}k radius`,
+    `${Number((WORLD_DIAMETER / view.zoom / 1000).toFixed(1))}k across`,
     frame.x + frame.size - 8,
     frame.y + 8
   );
@@ -750,10 +711,8 @@ function openMap(): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
   mapOpen = true;
   nextLocationUpdateAt = 0;
-  if (!hasInitialCenter) {
-    view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
-    hasInitialCenter = true;
-  }
+  view.zoom = UNIVERSE_MAP_ZOOM.initial;
+  view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
   resizeCanvas();
   setViewCenter(view.center);
   openInputRelease?.();
@@ -878,6 +837,7 @@ function canvasPoint(ev: PointerEvent | WheelEvent): { x: number; y: number } | 
 
 function centerOnLocalPlayer(): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
+  setViewZoom(UNIVERSE_MAP_ZOOM.initial);
   setViewCenter(local?.ship.position ?? { x: 0, y: 0 });
 }
 

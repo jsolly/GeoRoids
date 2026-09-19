@@ -92,14 +92,13 @@ async function openAndCaptureMap(
     .poll(() => readMapFrame(page), {
       timeout: 5000,
       interval: 100,
-      message: 'the universe map should render the discovered regional furnace label',
+      message: 'the universe map should render its nearby view',
     })
-    .toSatisfy((mapFrame: MapFrame) => mapFrame.open && mapFrame.labels.includes(FAR_FURNACE.name));
+    .toSatisfy((mapFrame: MapFrame) => mapFrame.open && mapFrame.labels.includes('5k across'));
   const frame = await readMapFrame(page);
   expect(frame.canvas.width).toBeGreaterThan(0);
   expect(frame.canvas.height).toBeGreaterThan(0);
   expect(frame.status).toMatch(REVEALED_ASSETS_STATUS_PATTERN);
-  expect(frame.labels).toContain(FAR_FURNACE.name);
   return frame;
 }
 
@@ -158,9 +157,16 @@ test.each([
     }
     const frame = await openAndCaptureMap(page, touch);
     expect(frame.labels).toContain('NORTH');
+    expect(frame.labels).toContain('5k across');
+    expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
     const locations = page.getByRole('list', { name: 'Revealed landmarks and crew coordinates' });
     await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(FAR_FURNACE.name);
     expect(await locations.textContent()).toContain('X +4000, Y +0');
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(
+        `crew-universe-map-${touch ? 'mobile' : 'desktop'}.png`
+      ),
+    });
     if (!touch) {
       await page.locator('#universe-map-canvas').focus();
       expect(
@@ -172,13 +178,22 @@ test.each([
       await page.keyboard.press('Space');
       await expect
         .poll(() => page.locator('#universe-map-zoom').textContent(), { timeout: 5000 })
-        .toBe('135%');
+        .toBe('3240%');
     }
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(
-        `crew-universe-map-${touch ? 'mobile' : 'desktop'}.png`
-      ),
-    });
+    const zoomOut = page.locator('#universe-map-zoom-out');
+    for (let index = 0; index < 12; index++) {
+      if (touch) {
+        await zoomOut.tap();
+      } else {
+        await zoomOut.click();
+      }
+    }
+    expect(await page.locator('#universe-map-zoom').textContent()).toBe('100%');
+    const wholeWorld = await readMapFrame(page);
+    expect(wholeWorld.labels).toContain('120k across');
+    expect(wholeWorld.labels).toContain(FAR_FURNACE.name);
+    await page.locator('#universe-map-center').click();
+    expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
 
     if (touch) {
       await page.locator('#universe-map-close').tap();
@@ -191,6 +206,13 @@ test.each([
         message: 'the universe map should close',
       })
       .toBe(false);
+    await game.placeShipAt(FAR_FURNACE.position.x, FAR_FURNACE.position.y);
+    await page.locator('#universe-map-toggle').click();
+    await expect
+      .poll(() => page.locator('#universe-map-status').textContent())
+      .toContain('X +4000');
+    expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
+    await page.locator('#universe-map-close').click();
     if (!touch) {
       expect(await page.evaluate(() => document.activeElement?.id)).toBe('universe-map-toggle');
       await page.locator('#universe-map-toggle').click();
@@ -201,6 +223,49 @@ test.each([
       expect(await page.locator('#universe-map-dialog').isVisible()).toBe(false);
     }
 
+    assertNoBrowserDiagnostics(diagnostics);
+  },
+  TestConfig.DEFAULT_TIMEOUT * 2
+);
+
+test(
+  'nearby crew names stay separate and edge labels do not clip the map',
+  async () => {
+    const page = browserManager.getCurrentPage();
+    if (!page) {
+      throw new Error('Missing map pilot');
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const diagnostics = watchBrowserDiagnostics(page);
+    const game = new GameInteractions(page);
+    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    const teammatePage = await browserManager.createAdditionalPage();
+    const teammate = new GameInteractions(teammatePage);
+    await teammate.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    const teammateName = await teammatePage.evaluate(
+      () => window.gameController?.getCurrPlayer()?.name
+    );
+    if (!teammateName) {
+      throw new Error('Missing teammate name');
+    }
+    await arrangeCrewField(
+      [await game.getLocalPlayerId(), await teammate.getLocalPlayerId()],
+      'empty'
+    );
+    await teammatePage.keyboard.press('KeyM');
+    await game.placeShipAt(0, 0);
+    await teammate.placeShipAt(0, 0);
+    await page.bringToFront();
+    await page.keyboard.press('KeyM');
+    await expect
+      .poll(() => page.locator('#universe-map-locations').textContent())
+      .toContain(teammateName);
+    expect((await readMapFrame(page)).labels).not.toContain(teammateName);
+    await teammate.placeShipAt(2450, 0);
+    await expect
+      .poll(() => page.locator('#universe-map-locations').textContent())
+      .toContain('X +2450');
+    expect((await readMapFrame(page)).labels).not.toContain(teammateName);
     assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT * 2

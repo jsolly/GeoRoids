@@ -509,7 +509,10 @@ test(
     expect(await game.getShipAngle()).toBeCloseTo(keyboardAngle, 6);
     expect((await readLocalTouchState(page)).thrusting).toBe(true);
 
-    expect(await page.locator('#touch-controls').isHidden()).toBe(true);
+    expect(await page.locator('#touch-controls').isVisible()).toBe(true);
+    expect(await page.locator('#touch-controls').getAttribute('class')).toContain('is-desktop');
+    expect(await page.locator('#touch-boost').isVisible()).toBe(true);
+    expect(await page.locator('#touch-ability').isHidden()).toBe(true);
     expect(await page.locator('#gameCanvas').isVisible()).toBe(true);
     const desktopScreenshot = screenshotManager.getScreenshotPath('wave2-touch-desktop.png');
     await page.screenshot({ path: desktopScreenshot });

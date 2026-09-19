@@ -52,10 +52,12 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
     return;
   }
 
-  // Left mouse fires; cruise needs no throttle button.
+  // Left mouse fires; right mouse toggles boost like Shift.
   if (ev.button === 0) {
     logger.debug('MOUSE', 'Left mouse click - shooting', { playerId: player.id });
     player.ship.shoot();
+  } else if (ev.button === 2) {
+    player.ship.toggleBoost();
   }
 }
 

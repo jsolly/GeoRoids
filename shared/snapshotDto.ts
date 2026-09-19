@@ -21,6 +21,7 @@ import type {
 } from '../shared-types';
 import { ASTEROID_BOOST } from './asteroidBoost';
 import { validExploration } from './exploration';
+import { isShipBoostState } from './shipBoost';
 
 type Rule = (value: unknown) => boolean;
 /** Every DTO key must have a validator; additions cannot silently escape validation. */
@@ -95,7 +96,7 @@ const entity = shape<ServerEntityData>({
   angle: number,
   exploding: boolean,
   thrusting: boolean,
-  boosting: optional(boolean),
+  boost: optional(isShipBoostState),
   color: string,
   lives: number,
   score: number,

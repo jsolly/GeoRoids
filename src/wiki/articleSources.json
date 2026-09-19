@@ -40,12 +40,18 @@
     "shared/shipFlight.ts",
     "src/rendering/headingCueRenderer.ts",
     "src/ui/universeMap.ts",
+    "src/ui/universeMapLabels.ts",
     "src/ui/shipSchematic.ts",
     "tests/unit/ui/shipSchematic.test.ts",
     "tests/unit/entities/input/keyboardControls.test.ts",
     "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts",
     "tests/integration/browser/sanity/boost-toggle-raises-cruise-then-returns-to-shared-speed.test.ts",
-    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts"
+    "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
+    "shared/shipBoost.ts",
+    "server/core/PlayerMotionService.ts",
+    "src/network/services/PlayerMotionReconciliation.ts",
+    "tests/unit/entities/boost-runs-out-and-refills.test.ts",
+    "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -77,7 +83,8 @@
     "shared/asteroidBoost.ts",
     "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts",
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts",
-    "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts"
+    "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts",
+    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -103,7 +110,11 @@
     "shared/asteroidBoost.ts",
     "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts",
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts",
-    "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts"
+    "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts",
+    "server/world/RegionalAsteroidField.ts",
+    "shared/world.ts",
+    "tests/unit/server/regional-asteroid-density.test.ts",
+    "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",
@@ -182,6 +193,7 @@
     "src/rendering/hud/minimap.ts",
     "src/rendering/hud/hudLayout.ts",
     "src/ui/universeMap.ts",
+    "src/ui/universeMapLabels.ts",
     "src/ui/shipSchematic.ts",
     "src/network/services/ConnectionManager.ts",
     "src/network/services/resumeCredential.ts",
@@ -237,7 +249,10 @@
     "shared/sectors.ts",
     "src/entities/ship/surveyScan.ts",
     "src/rendering/hud/minimap.ts",
-    "tests/unit/entities/surveyor-identifies-nearby-minerals.test.ts"
+    "tests/unit/entities/surveyor-identifies-nearby-minerals.test.ts",
+    "src/entities/ship/shipRenderer.ts",
+    "tests/unit/entities/surveyor-scan-vfx.test.ts",
+    "tests/integration/browser/sanity/surveyor-radar-pulses-cover-the-viewport.test.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",
@@ -278,6 +293,7 @@
     "src/network/services/ConnectionManager.ts",
     "src/network/worldExploration.ts",
     "src/ui/universeMap.ts",
+    "src/ui/universeMapLabels.ts",
     "tests/unit/server/crew-resumes-a-persistent-open-world.test.ts",
     "tests/unit/server/monthly-score-season-clears-world-and-scores.test.ts",
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts",

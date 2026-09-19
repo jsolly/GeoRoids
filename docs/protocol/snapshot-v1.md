@@ -18,6 +18,12 @@ receive HTTP 426 before upgrade and must refresh. The join message is validated
 again, so the URL parameter alone does not grant access. The client also rejects
 an unsupported server acknowledgment. No protocol rollout or rollback flags exist.
 
+Updated servers include `boost: {phase, charge}` in every player row: phase is
+`idle`, `active`, or `exhausted`, and charge is a fraction from zero to one. The
+field remains optional while client and server deploy independently. If an older
+server omits it, the client keeps its finite predicted tank without replenishing
+or resetting it. Deploy the server first to enforce charge authoritatively.
+
 ## Wire contract
 
 The envelope is `{type:"snapshot",data:<frame>,timestamp}`. A frame carries
@@ -221,3 +227,21 @@ position, velocity, or other authoritative movement state. The client rebases
 each authoritative frame and replays only its bounded unacknowledged input queue.
 A new handoff epoch and reachable-pose acknowledgment are required before free
 prediction resumes. Server time and kit speed bound all subsequent free poses.
+
+## Ship boost budget
+
+Movement poses carry a boolean `boosting` request and a `boostDepleted` advisory.
+The advisory spends the last fraction when client prediction reaches empty
+before its next pose arrives; it can never grant charge or restart a tank. The server owns the charge
+budget using its monotonic elapsed clock, not the client's packet frequency or
+charge claims. Repeated true requests cannot extend an active burst or restart
+an exhausted tank. After exhaustion, a false request followed by a fresh true
+request is needed once any charge has returned. Activation interrupts recharge;
+there is no full-tank requirement. Limits live in `shared/shipBoost.ts`.
+
+Snapshots carry the authoritative boost phase and remaining charge. Local
+prediction drains at the fixed simulation rate and reconciles against motion
+acknowledgments without letting an older echo undo a newer toggle. Active echoes
+cannot replenish an active tank or restart a locally exhausted one. Respawns
+restore a full tank; brief reconnects preserve the tank, and persisted recent
+flights restore it with elapsed inactive recharge. Menus stop active boost.

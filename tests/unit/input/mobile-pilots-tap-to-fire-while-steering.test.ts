@@ -26,12 +26,13 @@ beforeEach(() => {
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 390, 844));
   vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
   initializeTouchControls();
-  document.body.classList.add('touch-play');
+  document.body.classList.add('in-play', 'touch-play');
+  tickTouchControls(player);
 });
 
 afterEach(() => {
   window.dispatchEvent(new Event('blur'));
-  document.body.classList.remove('touch-play');
+  document.body.classList.remove('in-play', 'touch-play');
   canvas.remove();
   vi.restoreAllMocks();
 });

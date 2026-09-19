@@ -35,7 +35,7 @@ function updateCruise(player: Player): void {
   const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
   player.ship.thrusting = alive && !player.ship.movementLocked;
   if (!alive) {
-    player.ship.boosting = false;
+    player.ship.stopBoost();
   }
 }
 

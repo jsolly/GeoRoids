@@ -22,6 +22,7 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
         angle: i + tick * 0.01,
         exploding: false,
         thrusting: true,
+        boost: { phase: 'idle', charge: 1 },
         color: '#89aaff',
         lives: 3,
         score: 10,

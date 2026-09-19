@@ -5,6 +5,12 @@ import {
 } from '../../../shared/constants/health';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
+import {
+  advanceShipBoost,
+  fullShipBoost,
+  startShipBoost,
+  stopShipBoost,
+} from '../../../shared/shipBoost';
 import { cruiseSpeed } from '../../../shared/shipFlight';
 import { GROWTH } from '../../../shared/shipGrowth';
 import type {
@@ -65,7 +71,13 @@ class Ship {
   explodeTime = 0;
   angularVelocity = 0;
   thrusting: boolean = false;
-  boosting: boolean = false;
+  boost = fullShipBoost();
+  /** Local input revision prevents lagging snapshots from undoing a new toggle. */
+  boostInputVersion = 0;
+
+  get boosting(): boolean {
+    return this.boost.phase === 'active';
+  }
   health: number = SHIP.MAX_HEALTH;
   maxHealth: number = SHIP.MAX_HEALTH;
 
@@ -162,7 +174,7 @@ class Ship {
     this.explodeTime = SHIP.EXPLODE_DURATION_FRAMES;
     this.exploding = true; // Set exploding flag when explosion starts
     this.thrusting = false;
-    this.boosting = false;
+    this.stopBoost();
     this.angularVelocity = 0;
     playExplosionSound(this.position);
 
@@ -221,13 +233,25 @@ class Ship {
     this.sendShootEvent(laser);
   }
 
-  /** Tap or Shift toggles a stronger cruise; a dead hull always drops boost. */
+  /** Record every local stop, including menus and death, as new input intent. */
+  stopBoost(): void {
+    if (this.boosting) {
+      stopShipBoost(this.boost);
+      this.boostInputVersion++;
+    }
+  }
+
+  /** Toggle a stronger cruise using any charge currently available. */
   toggleBoost(): boolean {
-    if (this.exploding || this.health <= 0) {
-      this.boosting = false;
+    if (this.exploding || this.health <= 0 || this.movementLocked) {
+      this.stopBoost();
       return false;
     }
-    this.boosting = !this.boosting;
+    if (this.boosting) {
+      this.stopBoost();
+    } else if (startShipBoost(this.boost)) {
+      this.boostInputVersion++;
+    }
     return this.boosting;
   }
 
@@ -390,6 +414,14 @@ class Ship {
   update(): void {
     if (this.isLocalPlayer) {
       AuthoritativeProjectileField.getInstance().expirePendingShots();
+    }
+    if (this.exploding || this.health <= 0 || this.movementLocked) {
+      this.stopBoost();
+    }
+    const wasBoosting = this.boosting;
+    advanceShipBoost(this.boost, 1000 / GAME.FPS);
+    if (wasBoosting && !this.boosting) {
+      this.boostInputVersion++;
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {

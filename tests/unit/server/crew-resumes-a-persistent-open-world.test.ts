@@ -170,7 +170,7 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
   const sleeping = store.loadSector('4,0');
   assert(sleeping);
   expect(sleeping.filter((rock) => rock.id === drift.id)).toHaveLength(1);
-  expect(sleeping).toHaveLength(25);
+  expect(sleeping).toHaveLength(WORLD.depositsPerSector + 1);
 
   field.update(manager, [{ x: 8_200, y: 200 }], new Set());
   const arrived = manager.getAsteroid(drift.id);

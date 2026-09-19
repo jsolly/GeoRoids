@@ -18,6 +18,7 @@ export const media: Record<string, WikiMediaEntry> = {
     sources: [
       'src/entities/ship/shipAbilities.ts',
       'src/entities/ship/surveyScan.ts',
+      'src/entities/ship/shipRenderer.ts',
       'src/rendering/hud/minimap.ts',
       'src/entities/ship/shipKits.ts',
       'server/core/GameEngine.ts',

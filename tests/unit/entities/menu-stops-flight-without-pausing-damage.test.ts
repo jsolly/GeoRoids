@@ -8,7 +8,7 @@ test('a menu stops momentum and steering while damage and ability timers keep ru
   ship.velocity = { x: 8, y: -4 };
   ship.angularVelocity = 0.1;
   ship.thrusting = true;
-  ship.boosting = true;
+  ship.toggleBoost();
   ship.movementLocked = true;
   const angle = ship.angle;
   for (let frame = 0; frame < 60; frame++) {

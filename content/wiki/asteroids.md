@@ -18,8 +18,9 @@ media:
 ## Field and materials
 
 The server generates deterministic deposits in 2,000-unit sectors throughout
-the 60,000-unit world. A sector has 24 deposit slots, and sectors near every
-active pilot are loaded while distant sectors sleep. Harvested sectors stay
+the 60,000-unit world. Fresh sectors mix equal numbers of stationary and
+drifting deposits. Sectors near every active pilot are loaded while distant
+sectors sleep. Harvested sectors stay
 harvested when the crew returns; traveling into a new region loads its saved
 deposits without replenishing an emptied region. Ice and rubble are
 lower-health materials; metal is tougher and needs repeated normal laser hits.

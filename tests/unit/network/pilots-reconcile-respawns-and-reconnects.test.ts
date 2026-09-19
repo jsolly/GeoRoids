@@ -173,3 +173,154 @@ describe('player motion recovery', () => {
     expect(() => prediction.rebase(missingMotion, ship, 1)).toThrow(OMITTED_MOTION_PATTERN);
   });
 });
+
+test('late snapshots cannot undo boost toggles, refill an active tank, or restart an exhausted one', () => {
+  const { ship, prediction } = fixture();
+  ship.toggleBoost();
+  ship.update();
+  prediction.rebase(row(), ship, 10);
+  expect(ship.boosting).toBe(true);
+  const start = prediction.buildHandoffPose(ship);
+  expect(start).not.toBeNull();
+  if (!start) {
+    throw new Error('Missing pose');
+  }
+  prediction.rebase(
+    row({
+      boost: { phase: 'active', charge: 1 },
+      playerMotion: { epoch: 2, mode: 'free', ack: start.motionSequence },
+    }),
+    ship,
+    20
+  );
+  expect(ship.boost.charge).toBeLessThan(1);
+  ship.toggleBoost();
+  const stoppedCharge = ship.boost.charge;
+  prediction.rebase(
+    row({
+      boost: { phase: 'active', charge: 0.999 },
+      playerMotion: { epoch: 2, mode: 'free', ack: start.motionSequence },
+    }),
+    ship,
+    25
+  );
+  expect(ship.boost).toEqual({ phase: 'idle', charge: stoppedCharge });
+  prediction.rebase(
+    row({
+      boost: { phase: 'active', charge: 0.9 },
+      playerMotion: { epoch: 2, mode: 'free', ack: start.motionSequence },
+    }),
+    ship,
+    30
+  );
+  expect(ship.boosting).toBe(false);
+  ship.toggleBoost();
+  const next = prediction.buildHandoffPose(ship);
+  if (!next) {
+    throw new Error('Missing pose');
+  }
+  for (let frame = 0; frame < 162; frame++) {
+    ship.update();
+  }
+  expect(ship.boost.phase).toBe('exhausted');
+  const depleted = prediction.buildHandoffPose(ship);
+  if (!depleted) {
+    throw new Error('Missing depleted pose');
+  }
+  prediction.rebase(
+    row({
+      boost: { phase: 'active', charge: 0.1 },
+      playerMotion: { epoch: 2, mode: 'free', ack: next.motionSequence },
+    }),
+    ship,
+    40
+  );
+  expect(ship.boost.phase).toBe('exhausted');
+  prediction.rebase(
+    row({
+      boost: { phase: 'exhausted', charge: 0.5 },
+      playerMotion: { epoch: 2, mode: 'free', ack: next.motionSequence },
+    }),
+    ship,
+    50
+  );
+  expect(ship.toggleBoost()).toBe(true);
+  const restarted = prediction.buildHandoffPose(ship);
+  if (!restarted) {
+    throw new Error('Missing restarted pose');
+  }
+  ship.update();
+  const partialCharge = ship.boost.charge;
+  // A recharge echo from before this activation must not cancel it or add fuel.
+  prediction.rebase(
+    row({
+      boost: { phase: 'exhausted', charge: 0.7 },
+      playerMotion: { epoch: 2, mode: 'free', ack: depleted.motionSequence },
+    }),
+    ship,
+    60
+  );
+  expect(ship.boost).toEqual({ phase: 'active', charge: partialCharge });
+  prediction.rebase(
+    row({
+      boost: { phase: 'active', charge: 0.49 },
+      playerMotion: { epoch: 2, mode: 'free', ack: restarted.motionSequence },
+    }),
+    ship,
+    70
+  );
+  expect(ship.boost).toEqual({ phase: 'active', charge: 0.49 });
+  // An acknowledged server depletion still ends the burst.
+  prediction.rebase(
+    row({
+      boost: { phase: 'exhausted', charge: 0 },
+      playerMotion: { epoch: 2, mode: 'free', ack: restarted.motionSequence },
+    }),
+    ship,
+    80
+  );
+  expect(ship.boosting).toBe(false);
+});
+
+test.each(['menu', 'death'])(
+  'a delayed active snapshot cannot undo the local %s stop',
+  (reason) => {
+    const { ship, prediction } = fixture();
+    ship.toggleBoost();
+    const pose = prediction.buildHandoffPose(ship);
+    if (!pose) {
+      throw new Error('Missing active pose');
+    }
+    const active = row({
+      boost: { phase: 'active', charge: 0.8 },
+      playerMotion: { epoch: 2, mode: 'free', ack: pose.motionSequence },
+    });
+    prediction.rebase(active, ship, 10);
+    if (reason === 'menu') {
+      ship.movementLocked = true;
+      ship.update();
+    } else {
+      ship.explode('asteroid');
+    }
+    prediction.rebase(active, ship, 20);
+    expect(ship.boosting).toBe(false);
+  }
+);
+
+test('an older server row leaves the finite predicted tank unchanged during rollout', () => {
+  const { ship, prediction } = fixture();
+  ship.toggleBoost();
+  for (let frame = 0; frame < 90; frame++) {
+    ship.update();
+  }
+  const previous = { ...ship.boost };
+  const oldRow = row();
+  delete oldRow.boost;
+  prediction.rebase(oldRow, ship, 100);
+  expect(ship.boost).toEqual(previous);
+  for (let frame = 0; frame < 90; frame++) {
+    ship.update();
+  }
+  prediction.rebase(oldRow, ship, 200);
+  expect(ship.boost).toEqual({ phase: 'exhausted', charge: 0 });
+});

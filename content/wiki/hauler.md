@@ -72,7 +72,9 @@ targets a ship, and it cannot deal ship damage.
 
 The asteroid keeps its existing motion and trails behind the Hauler as the
 Hauler flies under normal thrust and steering. Surveyor and Hauler share the
-same cruise speed; Hauler Boost is weaker than Surveyor Boost. The cable only
+same cruise speed; Hauler Boost is weaker than Surveyor Boost. Both use the same
+limited [boost tank](/wiki/#controls), which refills while inactive. Any available
+charge can start another burst, interrupting the refill. The cable only
 applies a small correction when it is stretched; it never reels a rock into the
 hull or throws it toward a target. A successful attachment starts the
 three-second ability cooldown, while pressing E again releases the cable without

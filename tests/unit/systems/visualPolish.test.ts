@@ -168,6 +168,27 @@ test('every playable kit draws its outlined hull and retained details without fi
   expect(fill).not.toHaveBeenCalled();
 });
 
+test.each(['tow_cable', 'resource_tap', 'boost_coupling'] as const)(
+  'each Hauler utility renders a legible attachment silhouette at schematic scale: %s',
+  (utility) => {
+    const { ctx, strokes } = recordingContext();
+    const outline = getKitHullOutline('hauler');
+    const equipment = getHaulerEquipment(utility);
+    strokes.length = 0;
+    strokeKitHullOutline(ctx, 100, 80, 24, 0.4, PALETTE.LOCAL, 'hauler', utility);
+
+    expect(strokes).toHaveLength(2 * (1 + outline.extras.length + equipment.length));
+    const renderedEquipment = strokes
+      .slice(2 * (1 + outline.extras.length))
+      .filter((_, index) => index % 2 === 0)
+      .flatMap((stroke) => stroke.points);
+    const xValues = renderedEquipment.map(({ x }) => x);
+    const yValues = renderedEquipment.map(({ y }) => y);
+    expect(Math.max(...xValues) - Math.min(...xValues)).toBeGreaterThan(12);
+    expect(Math.max(...yValues) - Math.min(...yValues)).toBeGreaterThan(16);
+  }
+);
+
 test('local and remote shots draw short thicker trails, then the identified hit draws a ring and ticks', () => {
   const { ctx, strokes, fill } = recordingContext();
   const local = new Laser({ x: 30, y: 60 }, { x: 3, y: 4 }, 0, 0);

@@ -30,6 +30,7 @@ import {
   isSectorExplorationComplete,
   shipOverlapsCompletedSector,
 } from '../../shared/sectors';
+import { advanceShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { parseSectorId, sectorAt, utcScoreSeason, WORLD } from '../../shared/world';
@@ -206,6 +207,7 @@ interface FlushedWorldRow {
   completedSectors: number;
   scoreSeason: string;
   startedAt: number;
+  asteroidDensityVersion: number;
 }
 
 type PendingShockwave = {
@@ -308,6 +310,9 @@ export class GameEngine {
       for (const id of loaded.world.completedSectors) {
         this.completedSectors.add(id);
       }
+    }
+    if ((saved?.asteroidDensityVersion ?? 0) < WORLD.asteroidDensityVersion) {
+      this.regionalField.migrateSavedSectors(this.completedSectors);
     }
     for (const pilot of loaded?.pilots ?? []) {
       this.pilots.set(pilot.id, pilot);
@@ -793,6 +798,7 @@ export class GameEngine {
       lives: actor.lives,
       mass: actor.mass,
       health: actor.health,
+      boost: { ...actor.boost },
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
     if (previous === undefined) {
@@ -996,6 +1002,11 @@ export class GameEngine {
     flight: RestorableFlight,
     requestedKit: ShipKitId | undefined
   ): void {
+    if (flight.boost) {
+      actor.boost = { ...flight.boost };
+      stopShipBoost(actor.boost);
+      advanceShipBoost(actor.boost, Math.max(0, this.getServerTime() - flight.lastSeenAt));
+    }
     actor.angle = flight.angle;
     actor.lives = flight.lives;
     if (!requestedKit || requestedKit === flight.kitId) {
@@ -1113,6 +1124,7 @@ export class GameEngine {
       completedSectors: this.completedSectors.size,
       scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
+      asteroidDensityVersion: WORLD.asteroidDensityVersion,
     };
     const last = this.lastFlushedWorldRow;
     if (
@@ -1120,7 +1132,8 @@ export class GameEngine {
       last.exploration === builtFrom.exploration &&
       last.completedSectors === builtFrom.completedSectors &&
       last.scoreSeason === builtFrom.scoreSeason &&
-      last.startedAt === builtFrom.startedAt
+      last.startedAt === builtFrom.startedAt &&
+      last.asteroidDensityVersion === builtFrom.asteroidDensityVersion
     ) {
       return undefined;
     }
@@ -1129,6 +1142,7 @@ export class GameEngine {
         seed: this.worldSeed,
         startedAt: this.worldStartedAt,
         generation: WORLD.generation,
+        asteroidDensityVersion: WORLD.asteroidDensityVersion,
         scoreSeason: this.scoreSeason,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
@@ -2410,7 +2424,7 @@ export class GameEngine {
             angle: entity.angle,
             exploding: entity.exploding,
             thrusting: entity.thrusting,
-            boosting: entity.boosting,
+            boost: { ...entity.boost },
             color: entity.color,
             lives: entity.lives,
             score: entity.score,

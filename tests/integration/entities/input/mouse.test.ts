@@ -103,13 +103,15 @@ test('left click fires shoot() and release resets canShoot', () => {
   expect(player.ship.canShoot).toBeTruthy();
 });
 
-test('right click is unbound and does not interrupt automatic thrust', () => {
+test('right click starts boost and release preserves automatic thrust and boost', () => {
   const down = new MouseEvent('mousedown', { button: 2 });
   handleMouseDown(down, player);
+  expect(player.ship.boosting).toBe(true);
   expect(player.ship.thrusting).toBeTruthy();
 
   const up = new MouseEvent('mouseup', { button: 2 });
   handleMouseUp(up, player);
+  expect(player.ship.boosting).toBe(true);
   expect(player.ship.thrusting).toBeTruthy();
 });
 

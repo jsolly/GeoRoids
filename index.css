@@ -892,7 +892,7 @@
     opacity: 1;
   }
 
-  /* Touch steering + fire + kit actions. Hidden unless body.touch-play. */
+  /* Touch steering + fire + kit actions. Boost remains available on desktop. */
   .touch-controls {
     display: none;
     position: absolute;
@@ -905,7 +905,7 @@
     display: none;
   }
 
-  body.touch-play .touch-controls:not([hidden]) {
+  .touch-controls:not([hidden]) {
     display: block;
   }
 
@@ -945,6 +945,61 @@
   .touch-boost {
     left: 50%;
     transform: translateX(-50%);
+    width: 152px;
+    border-radius: 9px;
+    position: absolute;
+    overflow: hidden;
+    isolation: isolate;
+    --boost-charge: 1;
+    --boost-fill: #22d3ee;
+    border-color: color-mix(in srgb, var(--boost-fill) 78%, var(--palette-hud, #e2e8f0));
+    color: color-mix(in srgb, var(--boost-fill) 78%, var(--palette-hud, #e2e8f0));
+    font-size: 0.62rem;
+    z-index: 1;
+  }
+
+  .touch-boost::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--boost-fill) 30%, transparent);
+    transform: scaleY(var(--boost-charge));
+    transform-origin: bottom;
+    transition:
+      transform 100ms linear,
+      background-color 120ms ease;
+  }
+
+  .touch-boost.is-active {
+    --boost-fill: #fbbf24;
+  }
+
+  .touch-boost.is-exhausted {
+    --boost-fill: #22d3ee;
+    border-color: color-mix(
+      in srgb,
+      var(--palette-danger, #f43f5e) 72%,
+      var(--palette-hud, #e2e8f0)
+    );
+    color: #fecdd3;
+    cursor: not-allowed;
+  }
+
+  .touch-boost.is-exhausted::after {
+    content: "EMPTY";
+    position: absolute;
+    inset: 0.2rem 0.35rem auto auto;
+    color: color-mix(in srgb, var(--palette-danger, #f43f5e) 80%, white);
+    font-size: 0.42rem;
+    letter-spacing: 0.12em;
+    opacity: 0.9;
+    pointer-events: none;
+  }
+
+  .touch-boost:disabled {
+    cursor: not-allowed;
   }
 
   .touch-ability.is-pressed,
@@ -968,16 +1023,23 @@
     opacity: 0.42;
   }
 
+  .touch-ability:focus-visible,
+  .touch-boost:focus-visible {
+    outline: 2px solid var(--palette-laser, #fde68a);
+    outline-offset: 3px;
+  }
+
   @media (orientation: landscape) and (max-height: 500px) {
     .touch-ability,
     .touch-boost {
-      width: 48px;
+      width: 140px;
       height: 48px;
       bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 8px);
-      font-size: 0.48rem;
+      font-size: 0.5rem;
     }
 
     .touch-ability {
+      width: 48px;
       right: max(20px, env(safe-area-inset-right, 0px));
     }
 
@@ -1018,6 +1080,10 @@
     .enter-game {
       max-width: 100%;
     }
+  }
+
+  .touch-controls.is-desktop .touch-ability {
+    display: none;
   }
 
   .nickname-input.default-nickname {
@@ -1160,6 +1226,10 @@
     font: 12px / 1.5 var(--font-mono, monospace);
   }
 
+  .satellite-inventory > p {
+    margin: 6px 0 12px;
+  }
+
   .satellite-inventory-status {
     position: absolute;
     width: 1px;
@@ -1203,6 +1273,7 @@
 
   .ship-schematic-stage {
     position: relative;
+    flex: 0 0 auto;
     min-height: 280px;
     margin: 14px 0;
   }
@@ -1222,9 +1293,11 @@
   .ship-schematic-card {
     pointer-events: auto;
     width: 100%;
+    min-width: 0;
     min-height: 92px;
     padding: 10px 12px;
     text-align: left;
+    overflow-wrap: anywhere;
   }
 
   .ship-schematic-card-name {

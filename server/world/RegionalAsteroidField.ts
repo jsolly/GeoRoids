@@ -7,6 +7,11 @@ import type { AsteroidManager } from '../core/AsteroidManager';
 import { RNGService } from '../core/RNGService';
 
 const SECTOR_EDGE_EPSILON = 1e-6;
+const STATIONARY_SLOTS = WORLD.depositsPerSector / 2;
+
+function stationarySlot(index: number): boolean {
+  return index < STATIONARY_SLOTS;
+}
 
 /**
  * Distant sectors sleep; visited empty sectors never regenerate harvested deposits.
@@ -21,6 +26,7 @@ export class RegionalAsteroidField {
   private readonly dormant: Map<string, AsteroidData[]>;
   private changed = new Map<string, AsteroidData[]>();
   private visited = new Set<string>();
+  private savedDensityMigrationApplied = false;
 
   constructor(
     private readonly seed: number,
@@ -47,10 +53,13 @@ export class RegionalAsteroidField {
       const material = asteroidMaterialAt(index);
       const offsets = [...MATERIAL_OUTLINES[material]];
       const health = material === 'metal' ? 75 : 25;
+      // Keep drawing every random value for every slot, including stationary
+      // slots, so positions and all later slot metadata remain seed-stable.
+      const generatedVelocity = random.randomVelocity(ROID.SERVER_VELOCITY_MAX);
       rocks.push({
         id: `deposit-${this.seed}-${x}-${y}-${index}`,
         position,
-        velocity: random.randomVelocity(ROID.SERVER_VELOCITY_MAX),
+        velocity: stationarySlot(index) ? { x: 0, y: 0 } : generatedVelocity,
         size: 18 + random.random() * 30,
         material,
         health,
@@ -87,6 +96,53 @@ export class RegionalAsteroidField {
     return rocks.filter((rock) => Math.hypot(rock.position.x, rock.position.y) <= WORLD.radius);
   }
 
+  /**
+   * Add the new deterministic slots to rows written by the 24-slot world.
+   *
+   * A row is migrated once per process startup, and the caller persists the
+   * resulting rows atomically with WORLD.asteroidDensityVersion. Missing
+   * legacy IDs are intentionally never regenerated: they may have been
+   * harvested, destroyed, or carried into another sector.
+   */
+  private migrateSector(
+    id: string,
+    saved: readonly AsteroidData[],
+    persistedIds: ReadonlySet<string>
+  ): AsteroidData[] {
+    const parsed = parseSectorId(id);
+    if (!parsed) {
+      throw new Error('Invalid sector identity');
+    }
+    const generated = this.generate(parsed.x, parsed.y);
+    const additions = generated.filter((rock) => {
+      const prefix = `deposit-${this.seed}-${parsed.x}-${parsed.y}-`;
+      if (!rock.id.startsWith(prefix) || persistedIds.has(rock.id)) {
+        return false;
+      }
+      const slot = Number(rock.id.slice(prefix.length));
+      return (
+        Number.isSafeInteger(slot) &&
+        slot >= WORLD.legacyDepositsPerSector &&
+        slot < WORLD.depositsPerSector
+      );
+    });
+    // A pre-density sector has six stationary reflective rocks and 18 moving
+    // rocks. Fill the missing half from the additive slots while preserving
+    // the exact saved velocities (including sectors that were partly mined or
+    // carried across a boundary before this migration).
+    const existingStationary = saved.filter(
+      (rock) => rock.velocity.x === 0 && rock.velocity.y === 0
+    ).length;
+    const stationaryNeeded = Math.max(0, STATIONARY_SLOTS - existingStationary);
+    for (const [index, rock] of additions.entries()) {
+      if (index >= stationaryNeeded) {
+        break;
+      }
+      rock.velocity = { x: 0, y: 0 };
+    }
+    return additions.length === 0 ? [...saved] : [...saved, ...additions];
+  }
+
   private load(id: string): AsteroidData[] {
     this.visited.add(id);
     const cached = this.dormant.get(id);
@@ -98,6 +154,45 @@ export class RegionalAsteroidField {
       throw new Error('Invalid sector identity');
     }
     return this.generate(parsed.x, parsed.y);
+  }
+
+  /**
+   * Expand persisted, non-completed sectors exactly once for the density
+   * migration. This is deliberately separate from load(): a missing row means
+   * an unvisited sector, while a missing asteroid in a saved row may be a
+   * legitimate harvest. The world-row density marker makes this operation
+   * durable across restarts, including when every newly added slot is later
+   * destroyed.
+   */
+  migrateSavedSectors(completed: ReadonlySet<string>): ReadonlyMap<string, AsteroidData[]> {
+    if (this.savedDensityMigrationApplied) {
+      return new Map();
+    }
+    this.savedDensityMigrationApplied = true;
+    const migrated = new Map<string, AsteroidData[]>();
+    const persistedIds = new Set<string>();
+    for (const saved of this.dormant.values()) {
+      for (const rock of saved) {
+        persistedIds.add(rock.id);
+      }
+    }
+    for (const [id, saved] of this.dormant) {
+      // An empty saved row is a durable depletion tombstone even when the
+      // exploration-completion checkpoint has not reached SQLite yet.
+      if (completed.has(id) || saved.length === 0) {
+        continue;
+      }
+      const rows = this.migrateSector(id, saved, persistedIds);
+      if (rows.length !== saved.length) {
+        this.dormant.set(id, rows);
+        for (const rock of rows.slice(saved.length)) {
+          persistedIds.add(rock.id);
+        }
+        this.changed.set(id, rows);
+        migrated.set(id, rows);
+      }
+    }
+    return migrated;
   }
 
   update(
@@ -208,6 +303,7 @@ export class RegionalAsteroidField {
     this.dormant.clear();
     this.changed.clear();
     this.visited.clear();
+    this.savedDensityMigrationApplied = false;
   }
 
   hasVisited(id: string): boolean {

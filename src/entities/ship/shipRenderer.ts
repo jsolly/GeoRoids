@@ -1,7 +1,8 @@
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
-import { GAME, LASER, PALETTE, SHIP, TITLE, VISUAL } from '../../constants';
+import { GAME, LASER, PALETTE, SHIP, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
+import type { PlayfieldSize } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
@@ -23,7 +24,7 @@ import {
   projectKitHullEdges,
 } from './hullOutlines';
 import type { Ship } from './Ship';
-import { CLASSIC_HULL, type HullProfile } from './shipKits';
+import { CLASSIC_HULL, type HullProfile, SHIP_ABILITY } from './shipKits';
 
 const shipTriangle = {
   nose: { x: 0, y: 0 },
@@ -687,6 +688,111 @@ export function drawHaulerHarpoonVfx(
   ctx.restore();
 }
 
+const SURVEYOR_SCAN_PULSE_COUNT = 3;
+const SURVEYOR_SCAN_PULSE_FRAMES = SHIP_ABILITY.SCAN_FRAMES / SURVEYOR_SCAN_PULSE_COUNT;
+const SURVEYOR_SCAN_EDGE_OVERSHOOT = 1.1;
+const SURVEYOR_SCAN_FADE_START = 0.75;
+const SURVEYOR_SCAN_MAX_ALPHA = 0.28;
+
+export interface SurveyorScanVisualHost {
+  kitId: Ship['kitId'];
+  abilityActiveFrames: number;
+  health: number;
+  exploding: boolean;
+}
+
+interface SurveyorScanPulse {
+  readonly radius: number;
+  readonly alpha: number;
+}
+
+/** One of three expanding radar pulses, measured in viewport pixels. */
+export function surveyorScanPulseGeometry(
+  pulseIndex: number,
+  screenX: number,
+  screenY: number,
+  shipR: number,
+  abilityActiveFrames: number,
+  viewport: Readonly<PlayfieldSize>
+): SurveyorScanPulse | undefined {
+  if (
+    !Number.isInteger(pulseIndex) ||
+    pulseIndex < 0 ||
+    pulseIndex >= SURVEYOR_SCAN_PULSE_COUNT ||
+    !Number.isFinite(abilityActiveFrames) ||
+    abilityActiveFrames <= 0
+  ) {
+    return undefined;
+  }
+
+  const elapsedFrames = Math.min(
+    SHIP_ABILITY.SCAN_FRAMES,
+    Math.max(0, SHIP_ABILITY.SCAN_FRAMES - abilityActiveFrames)
+  );
+  const pulseElapsed = elapsedFrames - pulseIndex * SURVEYOR_SCAN_PULSE_FRAMES;
+  if (pulseElapsed < 0 || pulseElapsed >= SURVEYOR_SCAN_PULSE_FRAMES) {
+    return undefined;
+  }
+
+  const farthestCornerX = Math.max(screenX, viewport.width - screenX);
+  const farthestCornerY = Math.max(screenY, viewport.height - screenY);
+  const edgeRadius = Math.max(
+    shipR,
+    Math.hypot(farthestCornerX, farthestCornerY) * SURVEYOR_SCAN_EDGE_OVERSHOOT
+  );
+  const progress = pulseElapsed / SURVEYOR_SCAN_PULSE_FRAMES;
+  const fade =
+    progress <= SURVEYOR_SCAN_FADE_START ? 1 : (1 - progress) / (1 - SURVEYOR_SCAN_FADE_START);
+  return {
+    radius: shipR + (edgeRadius - shipR) * progress,
+    alpha: SURVEYOR_SCAN_MAX_ALPHA * fade,
+  };
+}
+
+/** Draw the Surveyor radar sweep in viewport space; it never changes scan gameplay. */
+export function drawSurveyorScanFx(
+  ctx: DrawingContext,
+  host: SurveyorScanVisualHost,
+  screenX: number,
+  screenY: number,
+  shipR: number,
+  viewport: Readonly<PlayfieldSize>
+): void {
+  if (
+    host.kitId !== 'surveyor' ||
+    host.exploding ||
+    host.health <= 0 ||
+    host.abilityActiveFrames <= 0
+  ) {
+    return;
+  }
+
+  for (let pulseIndex = 0; pulseIndex < SURVEYOR_SCAN_PULSE_COUNT; pulseIndex += 1) {
+    const pulse = surveyorScanPulseGeometry(
+      pulseIndex,
+      screenX,
+      screenY,
+      shipR,
+      host.abilityActiveFrames,
+      viewport
+    );
+    if (!pulse) {
+      continue;
+    }
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineWidth = VISUAL.SHIP_STROKE_WIDTH;
+    ctx.shadowColor = PALETTE.LOCAL;
+    ctx.shadowBlur = resolveGlow(VISUAL.SHIP_GLOW);
+    ctx.strokeStyle = hexToRgba(PALETTE.LOCAL, pulse.alpha);
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, pulse.radius, 0, Math.PI * 2, false);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 /** Ability rings only. Kit hulls come from the v2 outline bake. */
 function drawAbilityFx(
   ctx: DrawingContext,
@@ -695,13 +801,7 @@ function drawAbilityFx(
   screenY: number,
   shipR: number
 ): void {
-  if (ship.kitId === 'surveyor' && ship.abilityActiveFrames > 0) {
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, shipR + 6, 0, Math.PI * 2);
-    ctx.strokeStyle = hexToRgba(TITLE.ACCENT, 0.45);
-    ctx.lineWidth = 3;
-    ctx.stroke();
-  }
+  drawSurveyorScanFx(ctx, ship, screenX, screenY, shipR, canvasManager.getViewportSize());
 }
 
 function drawShipImpactFlash(

@@ -271,6 +271,11 @@ export interface ServerGameSnapshot extends ServerGameState {
   playerProjectiles: PlayerProjectileState[];
 }
 
+export interface ShipBoostState {
+  phase: 'idle' | 'active' | 'exhausted';
+  charge: number;
+}
+
 export interface ServerEntityData {
   id: string;
   name: string;
@@ -280,7 +285,8 @@ export interface ServerEntityData {
   angle: number;
   exploding: boolean;
   thrusting: boolean;
-  boosting?: boolean;
+  /** Omitted only by servers predating the independently deployed boost update. */
+  boost?: ShipBoostState;
   color: string;
   lives: number;
   score: number;

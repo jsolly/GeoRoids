@@ -876,7 +876,7 @@
   .debug-play-stack {
     position: absolute;
     left: max(10px, env(safe-area-inset-left, 0px));
-    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 76px);
     z-index: 22;
     display: none;
     flex-direction: column;

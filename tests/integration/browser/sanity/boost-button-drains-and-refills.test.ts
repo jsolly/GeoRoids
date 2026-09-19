@@ -101,3 +101,28 @@ for (const viewport of [
     assertNoBrowserDiagnostics(diagnostics);
   }, 20000);
 }
+
+test('a narrow-phone pilot can see and tap boost with the Debug HUD enabled', async () => {
+  const page = await browserManager.recreatePage({ hasTouch: true });
+  const diagnostics = watchBrowserDiagnostics(page);
+  await page.setViewportSize({ width: 390, height: 650 });
+  await page.addInitScript(() => localStorage.setItem('debugOn', 'true'));
+  const game = new GameInteractions(page);
+  await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+  const panel = page.locator('#debug-hud');
+  const boost = page.locator('#touch-boost');
+  await panel.waitFor({ state: 'visible' });
+  await boost.waitFor({ state: 'visible' });
+  const panelBounds = await page.locator('#debug-play-stack').boundingBox();
+  const boostBounds = await boost.boundingBox();
+  if (!panelBounds || !boostBounds) {
+    throw new Error('Missing Debug HUD or boost bounds');
+  }
+  await page.screenshot({
+    path: screenshotManager.getScreenshotPath('debug-hud-keeps-boost-visible-mobile.png'),
+  });
+  expect(panelBounds.y + panelBounds.height).toBeLessThan(boostBounds.y);
+  await boost.tap();
+  await expect.poll(() => boost.getAttribute('aria-pressed')).toBe('true');
+  assertNoBrowserDiagnostics(diagnostics);
+}, 20000);

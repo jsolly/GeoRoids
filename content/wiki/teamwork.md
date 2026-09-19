@@ -61,6 +61,8 @@ intake and throws embers past it. A furnace appears on the local minimap as an
 amber hairline three-tongue campfire after the crew discovers its area and remains visible
 there while it is nearby. When it
 moves beyond the local radar, use the universe map to find the exact landmark.
+Zoomed out, that mark is a small amber flame pin; the nearby view and closer
+restore the three-tongue campfire.
 A delivery consumes the towed rock, so the crew can turn a scan and a haul into
 a shared material score.
 

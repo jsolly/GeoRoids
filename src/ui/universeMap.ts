@@ -12,7 +12,7 @@ import {
 } from '../network/worldExploration';
 import {
   drawFurnaceMapMark,
-  UNIVERSE_MAP_FURNACE_MARK_SIZE,
+  universeMapFurnaceMarkAppearance,
 } from '../rendering/hud/furnaceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
@@ -80,6 +80,7 @@ type MapFrame = {
   y: number;
   size: number;
   scale: number;
+  zoom: number;
 };
 
 type MapView = {
@@ -139,6 +140,7 @@ function mapFrameFor(width: number, height: number, zoom: number): MapFrame {
     y: (height - size) / 2,
     size,
     scale: (size / WORLD_DIAMETER) * zoom,
+    zoom,
   };
 }
 
@@ -550,13 +552,16 @@ function drawMapAsset(
   if (!isFiniteMapPosition(asset.position)) {
     return;
   }
-  const size = (asset.kind === 'furnace' ? UNIVERSE_MAP_FURNACE_MARK_SIZE : 11) / frame.scale;
+  const furnaceMark =
+    asset.kind === 'furnace' ? universeMapFurnaceMarkAppearance(frame.zoom) : null;
+  const size = (furnaceMark?.screen ?? 11) / frame.scale;
   context.save();
   context.translate(asset.position.x, asset.position.y);
   context.lineWidth = 1.5 / frame.scale;
   context.shadowBlur = 8 / frame.scale;
   if (asset.kind === 'furnace') {
-    drawFurnaceMapMark(context, 0, 0, size);
+    const mark = furnaceMark ?? universeMapFurnaceMarkAppearance(frame.zoom);
+    drawFurnaceMapMark(context, 0, 0, size, mark.lod);
   } else {
     const color =
       asset.kind === 'laserCore'

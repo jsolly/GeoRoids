@@ -5,10 +5,15 @@ import {
   addFurnaceInnerFlamePath,
   drawFurnaceMapMark,
   FURNACE_CAMPFIRE_PATH,
+  FURNACE_DISTANT_FLAME_PATH,
   FURNACE_INNER_CAMPFIRE_PATH,
+  FURNACE_MAP_CAMPFIRE_ZOOM,
+  FURNACE_MAP_DETAIL_MAX_ZOOM,
   FURNACE_MAP_INK,
   MINIMAP_FURNACE_MARK_SIZE,
+  UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE,
   UNIVERSE_MAP_FURNACE_MARK_SIZE,
+  universeMapFurnaceMarkAppearance,
 } from '../../../src/rendering/hud/furnaceMapMark';
 
 afterEach(() => {
@@ -97,7 +102,18 @@ function canvasColor(ctx: CanvasRenderingContext2D, color: string): string {
 test('furnace HUD marks stay pin-scale with the ship pip and other map assets', () => {
   expect(MINIMAP_FURNACE_MARK_SIZE).toBeLessThanOrEqual(VISUAL.MINIMAP_LOCAL_SIZE);
   expect(MINIMAP_FURNACE_MARK_SIZE * 2).toBeLessThan(VISUAL.MINIMAP_SIZE / 6);
-  expect(UNIVERSE_MAP_FURNACE_MARK_SIZE).toBeLessThanOrEqual(11);
+  const nearby = universeMapFurnaceMarkAppearance(FURNACE_MAP_CAMPFIRE_ZOOM);
+  const distant = universeMapFurnaceMarkAppearance(1);
+  const close = universeMapFurnaceMarkAppearance(FURNACE_MAP_DETAIL_MAX_ZOOM);
+  expect(nearby.lod).toBe('campfire');
+  expect(distant.lod).toBe('distant');
+  expect(close.lod).toBe('campfire');
+  expect(nearby.screen).toBe(UNIVERSE_MAP_FURNACE_MARK_SIZE);
+  expect(nearby.screen).toBeLessThanOrEqual(11);
+  expect(distant.screen).toBe(UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE);
+  expect(distant.screen).toBeLessThan(nearby.screen);
+  expect(close.screen).toBeGreaterThan(nearby.screen);
+  expect(close.screen).toBeLessThanOrEqual(UNIVERSE_MAP_FURNACE_MARK_SIZE + 6);
 });
 
 test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not a lilac square', () => {
@@ -123,6 +139,29 @@ test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not 
   expect(tip.y).toBeCloseTo(40 - MINIMAP_FURNACE_MARK_SIZE, 5);
   expect(Math.min(...xs)).toBeLessThan(40 - MINIMAP_FURNACE_MARK_SIZE * 0.4);
   expect(Math.max(...xs)).toBeGreaterThan(40 + MINIMAP_FURNACE_MARK_SIZE * 0.4);
+  expect(fills).toEqual([]);
+});
+
+test('a zoomed-out universe-map furnace mark is a single-tongue flame pin', () => {
+  const { ctx, strokes, fills } = recordingContext();
+  const distant = universeMapFurnaceMarkAppearance(1);
+  drawFurnaceMapMark(ctx, 40, 40, distant.screen, distant.lod);
+
+  const campfires = strokes.filter(
+    (path) => path.closed && path.color === canvasColor(ctx, FURNACE_MAP_INK)
+  );
+  expect(campfires).toHaveLength(1);
+  const pin = campfires[0];
+  if (!pin) {
+    throw new Error('expected a distant furnace flame pin');
+  }
+  expect(pin.curves).toBe(FURNACE_DISTANT_FLAME_PATH.filter((command) => command.t === 'C').length);
+  expect(pin.curves).toBeLessThan(
+    FURNACE_CAMPFIRE_PATH.filter((command) => command.t === 'C').length
+  );
+  const tip = pin.points.reduce((highest, point) => (point.y < highest.y ? point : highest));
+  expect(tip.x).toBeGreaterThanOrEqual(40);
+  expect(tip.y).toBeCloseTo(40 - distant.screen, 5);
   expect(fills).toEqual([]);
 });
 

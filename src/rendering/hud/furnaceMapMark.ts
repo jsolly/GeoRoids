@@ -5,9 +5,39 @@ import { resolveGlow } from '../renderQuality';
 export const FURNACE_MAP_INK = PALETTE.LASER_LOCAL;
 /** Radar glyph half-height in canvas pixels; pin-scale with the local ship pip. */
 export const MINIMAP_FURNACE_MARK_SIZE = 4;
-/** Universe-map glyph half-size in screen pixels before the map scale. */
+/** Nearby-view campfire half-size in screen pixels before the map scale. */
 export const UNIVERSE_MAP_FURNACE_MARK_SIZE = 10;
+/** Zoomed-out flame-pin half-size in screen pixels before the map scale. */
+export const UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE = 7;
+/**
+ * Universe-map zoom where the pin becomes the three-tongue campfire.
+ * Keep in lockstep with `UNIVERSE_MAP_ZOOM.initial`.
+ */
+export const FURNACE_MAP_CAMPFIRE_ZOOM = 24;
+/**
+ * Universe-map zoom where the nearby campfire reaches its largest pin.
+ * Keep in lockstep with `UNIVERSE_MAP_ZOOM.max`.
+ */
+export const FURNACE_MAP_DETAIL_MAX_ZOOM = 48;
 const INNER_FLAME_MIN_SIZE = 5;
+const ZOOMED_IN_CAMPFIRE_EXTRA = 6;
+
+type FurnaceMapLod = 'distant' | 'campfire';
+
+export function universeMapFurnaceMarkAppearance(zoom: number): {
+  lod: FurnaceMapLod;
+  screen: number;
+} {
+  if (!(zoom > 0) || !Number.isFinite(zoom) || zoom < FURNACE_MAP_CAMPFIRE_ZOOM) {
+    return { lod: 'distant', screen: UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE };
+  }
+  const span = FURNACE_MAP_DETAIL_MAX_ZOOM - FURNACE_MAP_CAMPFIRE_ZOOM;
+  const t = span > 0 ? Math.min(1, (zoom - FURNACE_MAP_CAMPFIRE_ZOOM) / span) : 0;
+  return {
+    lod: 'campfire',
+    screen: UNIVERSE_MAP_FURNACE_MARK_SIZE + t * ZOOMED_IN_CAMPFIRE_EXTRA,
+  };
+}
 
 type FlamePathTarget = {
   moveTo(x: number, y: number): void;
@@ -55,6 +85,18 @@ export const FURNACE_CAMPFIRE_PATH: readonly FlameCommand[] = [
   { t: 'C', x1: -0.22, y1: -0.188, x2: -0.235, y2: -0.283, x: -0.21, y: -0.38 },
   { t: 'C', x1: -0.185, y1: -0.477, x2: -0.125, y2: -0.577, x: -0.09, y: -0.68 },
   { t: 'C', x1: -0.055, y1: -0.783, x2: -0.009, y2: -0.968, x: 0, y: -1 },
+];
+
+/**
+ * Far-zoom flame pin: one right-leaning tongue and a rounded U base.
+ * Tongues and the nested inner campfire wait until the nearby view.
+ */
+export const FURNACE_DISTANT_FLAME_PATH: readonly FlameCommand[] = [
+  { t: 'M', x: 0.06, y: -1 },
+  { t: 'C', x1: 0.2, y1: -0.52, x2: 0.46, y2: -0.08, x: 0.4, y: 0.28 },
+  { t: 'C', x1: 0.36, y1: 0.58, x2: 0.2, y2: 0.9, x: 0, y: 1 },
+  { t: 'C', x1: -0.2, y1: 0.9, x2: -0.36, y2: 0.58, x: -0.36, y: 0.28 },
+  { t: 'C', x1: -0.4, y1: -0.08, x2: -0.1, y2: -0.52, x: 0.06, y: -1 },
 ];
 
 /** Nested inner campfire from mockup C, in the same unit space as the outer path. */
@@ -121,23 +163,25 @@ export function drawFurnaceMapMark(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  size: number
+  size: number,
+  lod: FurnaceMapLod = 'campfire'
 ): void {
   if (!(size > 0) || !Number.isFinite(size)) {
     return;
   }
 
+  const distant = lod === 'distant';
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.strokeStyle = FURNACE_MAP_INK;
   ctx.shadowColor = FURNACE_MAP_INK;
   ctx.shadowBlur = resolveGlow(size * 0.5);
-  ctx.lineWidth = size * 0.08;
+  ctx.lineWidth = size * (distant ? 0.16 : 0.08);
   ctx.beginPath();
-  applyCampfirePath(ctx, x, y, size);
+  applyCampfirePath(ctx, x, y, size, distant ? FURNACE_DISTANT_FLAME_PATH : FURNACE_CAMPFIRE_PATH);
   ctx.stroke();
-  if (size >= INNER_FLAME_MIN_SIZE) {
+  if (!distant && size >= INNER_FLAME_MIN_SIZE) {
     ctx.lineWidth = size * 0.07;
     ctx.beginPath();
     applyCampfirePath(ctx, x, y, size, FURNACE_INNER_CAMPFIRE_PATH);

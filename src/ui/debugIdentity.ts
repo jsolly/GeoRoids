@@ -1,25 +1,27 @@
 import { debugIsOn, setDebugPreference } from '../constants/user-preferences';
-import type { PlayerIdentityStatus } from '../network/services/playerIdentityEvents';
 import { getClientLogContext } from '../utils/clientLogContext';
 import { attachEventListener } from '../utils/dom';
 
 const COPY_LABEL = 'Copy';
 const COPIED_LABEL = 'Copied';
 const PLAYER_ID_PENDING = 'Available after Enter Game';
+const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
 let listenersBound = false;
 let confirmedPlayerId = '';
-let provisionalPlayerId = '';
-let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
-
-function playerIdReady(): string {
-  return confirmedPlayerId || provisionalPlayerId;
-}
 
 function setHidden(element: HTMLElement | null, hidden: boolean): void {
   if (element) {
     element.hidden = hidden;
   }
+}
+
+function copyAriaLabel(button: HTMLButtonElement, copied: boolean): string {
+  const target = button.dataset['copyName']?.trim();
+  if (!target) {
+    return copied ? COPIED_LABEL : COPY_LABEL;
+  }
+  return copied ? `Copied ${target}` : `Copy ${target}`;
 }
 
 async function copyText(value: string, input?: HTMLInputElement | null): Promise<boolean> {
@@ -51,14 +53,20 @@ function flashCopied(button: HTMLButtonElement | null): void {
   if (!button) {
     return;
   }
-  button.textContent = COPIED_LABEL;
-  if (copyResetTimer !== null) {
-    clearTimeout(copyResetTimer);
+  const existing = copyResetTimers.get(button);
+  if (existing !== undefined) {
+    clearTimeout(existing);
   }
-  copyResetTimer = setTimeout(() => {
-    button.textContent = COPY_LABEL;
-    copyResetTimer = null;
-  }, 1400);
+  button.textContent = COPIED_LABEL;
+  button.setAttribute('aria-label', copyAriaLabel(button, true));
+  copyResetTimers.set(
+    button,
+    setTimeout(() => {
+      button.textContent = COPY_LABEL;
+      button.setAttribute('aria-label', copyAriaLabel(button, false));
+      copyResetTimers.delete(button);
+    }, 1400)
+  );
 }
 
 function selectReadableId(input: HTMLInputElement): void {
@@ -87,12 +95,12 @@ export function applyDebugPreference(enabled: boolean): void {
   syncDebugIdentity();
 }
 
-export function syncDebugIdentity(override?: { playerId?: string; sessionId?: string }): void {
+function syncDebugIdentity(override?: { playerId?: string; sessionId?: string }): void {
   if (typeof document === 'undefined') {
     return;
   }
   const sessionId = override?.sessionId ?? getClientLogContext().sessionId;
-  const playerId = override?.playerId ?? playerIdReady();
+  const playerId = override?.playerId ?? confirmedPlayerId;
   const playerInput = document.querySelector<HTMLInputElement>('#debug-player-id');
   const sessionInput = document.querySelector<HTMLInputElement>('#debug-session-id');
   const copyPlayer = document.querySelector<HTMLButtonElement>('#copy-debug-player-id');
@@ -120,24 +128,9 @@ export function syncDebugIdentity(override?: { playerId?: string; sessionId?: st
   setHidden(document.querySelector('#debug-play-chip'), !(debugOn && inPlay && playerId));
 }
 
-function rememberIdentity(playerId: string, status: PlayerIdentityStatus): void {
-  if (status === 'confirmed') {
-    confirmedPlayerId = playerId;
-    provisionalPlayerId = '';
-  } else {
-    provisionalPlayerId = playerId;
-  }
-  syncDebugIdentity();
-}
-
 /** Clear remembered correlators between unit tests. */
 export function resetDebugIdentityForTests(): void {
   confirmedPlayerId = '';
-  provisionalPlayerId = '';
-  if (copyResetTimer !== null) {
-    clearTimeout(copyResetTimer);
-    copyResetTimer = null;
-  }
 }
 
 export function mountDebugIdentity(): void {
@@ -182,7 +175,7 @@ export function mountDebugIdentity(): void {
   const copySession = document.querySelector<HTMLButtonElement>('#copy-debug-session-id');
   const copyChip = document.querySelector<HTMLButtonElement>('#copy-debug-play-chip');
   attachEventListener(copyPlayer, 'click', async () => {
-    if (await copyText(playerIdReady(), playerInput)) {
+    if (await copyText(confirmedPlayerId, playerInput)) {
       flashCopied(copyPlayer);
     }
   });
@@ -192,15 +185,16 @@ export function mountDebugIdentity(): void {
     }
   });
   attachEventListener(copyChip, 'click', async () => {
-    if (await copyText(playerIdReady())) {
+    if (await copyText(confirmedPlayerId)) {
       flashCopied(copyChip);
     }
   });
 
   window.addEventListener('playerIdentityChanged', (event) => {
-    const detail = event.detail;
-    if (detail?.playerId) {
-      rememberIdentity(detail.playerId, detail.status);
+    const playerId = event.detail?.playerId;
+    if (playerId) {
+      confirmedPlayerId = playerId;
+      syncDebugIdentity();
     }
   });
   window.addEventListener('playViewOn', () => {

@@ -1001,7 +1001,6 @@ export class ConnectionManager {
         this.joinAcknowledged = false;
         this.currentProtocolReady = false;
         this.clientId = replaceStoredClientId();
-        publishPlayerIdentity(this.clientId, 'provisional');
         this.initializeAsteroidSync();
         break;
       }
@@ -1530,7 +1529,7 @@ export class ConnectionManager {
     }
     this.lastDamageStateLogAt = 0;
     setClientLogContext({ playerId: data.id, connectionId: this.connectionId });
-    publishPlayerIdentity(data.id, 'confirmed');
+    publishPlayerIdentity(data.id);
     logger.info('STATE', 'player_joined', {
       joinedAt: Date.now(),
       playerId: data.id,

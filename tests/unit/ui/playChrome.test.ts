@@ -66,15 +66,20 @@ test('title menu uses first-party nickname and sound chrome', () => {
 });
 
 test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
-  const advanced = document.querySelector('#advanced-settings');
+  const advanced = document.querySelector<HTMLDetailsElement>('#advanced-settings');
   expect(advanced?.tagName).toBe('DETAILS');
+  expect(advanced?.open).toBe(false);
   expect(advanced?.querySelector('summary')?.textContent).toBe('Advanced');
   expect(document.querySelector('#debugPref')?.classList.contains('sound-toggle')).toBe(true);
   expect(document.querySelector('label[for="debugPref"]')?.textContent).toBe('Debug');
   expect(document.querySelector('#debug-player-id')?.getAttribute('readonly')).not.toBeNull();
   expect(document.querySelector('#copy-debug-player-id')?.tagName).toBe('BUTTON');
-  expect(productionHtml).toContain('id="advanced-settings"');
+  expect(productionHtml).toMatch(/<details id="advanced-settings"[^>]*>/u);
+  expect(productionHtml).not.toMatch(/<details id="advanced-settings"[^>]*\sopen[\s>]/u);
   expect(productionHtml).toContain('Paste this to an agent. Railway filter: @playerId:');
+  expect(productionHtml).toContain('id="debug-session-id"');
+  expect(productionHtml).toContain('id="debug-play-chip"');
+  expect(productionHtml).toContain('id="copy-debug-play-chip"');
   expect(productionCss).toContain('.advanced-settings');
   expect(productionCss).not.toMatch(/#ff0|#ffff00|yellow/iu);
 });

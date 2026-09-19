@@ -92,10 +92,18 @@
                     spellcheck="false"
                     autocomplete="off"
                     placeholder="Available after Enter Game"
+                    aria-describedby="debug-player-id-hint"
                   />
-                  <button id="copy-debug-player-id" type="button" class="debug-copy" disabled>Copy</button>
+                  <button
+                    id="copy-debug-player-id"
+                    type="button"
+                    class="debug-copy"
+                    data-copy-name="player ID"
+                    aria-label="Copy player ID"
+                    disabled
+                  >Copy</button>
                 </div>
-                <p class="debug-id-hint">Paste this to an agent. Railway filter: @playerId:…</p>
+                <p id="debug-player-id-hint" class="debug-id-hint">Paste this to an agent. Railway filter: @playerId:…</p>
               </div>
               <div>
                 <label class="debug-id-label" for="debug-session-id">Page session</label>
@@ -107,10 +115,17 @@
                     readonly
                     spellcheck="false"
                     autocomplete="off"
+                    aria-describedby="debug-session-id-hint"
                   />
-                  <button id="copy-debug-session-id" type="button" class="debug-copy">Copy</button>
+                  <button
+                    id="copy-debug-session-id"
+                    type="button"
+                    class="debug-copy"
+                    data-copy-name="page session"
+                    aria-label="Copy page session"
+                  >Copy</button>
                 </div>
-                <p class="debug-id-hint">Optional client-log filter: @sessionId:…</p>
+                <p id="debug-session-id-hint" class="debug-id-hint">Optional client-log filter: @sessionId:…</p>
               </div>
             </div>
           </details>
@@ -124,10 +139,17 @@
       </div>
 
       <div id="gameArea" hidden>
-        <div id="debug-play-chip" class="debug-play-chip" hidden role="status">
+        <div id="debug-play-chip" class="debug-play-chip" hidden>
           <span class="debug-play-chip-label">playerId</span>
-          <code id="debug-play-chip-id"></code>
-          <button id="copy-debug-play-chip" type="button" class="debug-copy" disabled>Copy</button>
+          <code id="debug-play-chip-id" role="status"></code>
+          <button
+            id="copy-debug-play-chip"
+            type="button"
+            class="debug-copy"
+            data-copy-name="player ID"
+            aria-label="Copy player ID"
+            disabled
+          >Copy</button>
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button

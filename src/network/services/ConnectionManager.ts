@@ -37,6 +37,12 @@ import {
 } from '../../audio/interactionSounds';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
 import { PALETTE, ROID } from '../../constants';
+import {
+  noteDebugPingSent,
+  noteDebugPong,
+  noteDebugSnapshot,
+  resetDebugHudSession,
+} from '../../diagnostics/debugHudMetrics';
 import { clientPerformance } from '../../diagnostics/performanceMetrics';
 import { entityFactory } from '../../entities/EntityFactory';
 import { AuthoritativeProjectileField } from '../../entities/laser/AuthoritativeProjectileField';
@@ -698,10 +704,12 @@ export class ConnectionManager {
     }
 
     this.pingPayload.timestamp = Date.now();
-    this.pingPayload.probeId = clientPerformance.probe(performance.now());
+    const pingNow = performance.now();
+    this.pingPayload.probeId = clientPerformance.probe(pingNow);
     if (!this.sendPayload(this.pingPayload)) {
       return;
     }
+    noteDebugPingSent(pingNow);
 
     if (isConnectionStale(this.lastServerMessageAt, Date.now())) {
       logger.warn('NETWORK', 'No server traffic within timeout; treating connection as lost', {
@@ -721,6 +729,10 @@ export class ConnectionManager {
 
   getLocalPlayerName(): string {
     return this.localPlayerName;
+  }
+
+  getServerReleaseId(): string | undefined {
+    return this.serverReleaseId;
   }
 
   getLocalPlayerId(): string {
@@ -949,9 +961,12 @@ export class ConnectionManager {
   private handleServerMessage(message: ServerMessageEnvelope): void {
     const data = 'data' in message ? message.data : undefined;
     switch (message.type) {
-      case 'pong':
-        clientPerformance.pong(message.probeId, performance.now());
+      case 'pong': {
+        const now = performance.now();
+        clientPerformance.pong(message.probeId, now);
+        noteDebugPong(now);
         return;
+      }
       case 'playerShotFired':
         if (
           data &&
@@ -1097,6 +1112,7 @@ export class ConnectionManager {
     this.lastAcceptedSnapshotSequence = 0;
     delete this.serverReleaseId;
     clientPerformance.serverReleaseId = undefined;
+    resetDebugHudSession();
   }
 
   private failCurrentProtocol(error: Error): void {
@@ -1172,6 +1188,7 @@ export class ConnectionManager {
         this.applyReceivedSnapshot(state);
       }
       this.lastAcceptedSnapshotSequence = metadata.sequence;
+      noteDebugSnapshot(metadata.sequence, performance.now());
       clientPerformance.snapshotApplied({
         sequence: metadata.sequence,
         kind: metadata.kind,

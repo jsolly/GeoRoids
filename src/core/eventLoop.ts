@@ -1,7 +1,9 @@
+import { noteDebugFrame } from '../diagnostics/debugHudMetrics';
 import { clientPerformance } from '../diagnostics/performanceMetrics';
 import { canvasManager } from '../rendering/canvasSurface';
-import '../ui/mainMenu'; // wires nickname + Enter Game listeners
 import { reportRenderError } from '../rendering/renderError';
+import '../ui/mainMenu'; // wires nickname + Enter Game listeners
+import { paintDebugHud } from '../ui/debugHud';
 import { initNetworkStatusUI } from '../ui/networkStatus';
 import { installGlobalErrorLogging } from '../utils/globalErrorLogging';
 import { GameController } from './gameController';
@@ -67,6 +69,7 @@ window.addEventListener('gameStart', () => {
         return;
       }
       const observing = clientPerformance.enabled;
+      const debugHudOn = document.body.classList.contains('debug-on');
       if (observing) {
         clientPerformance.setPhase(
           document.hidden
@@ -77,12 +80,18 @@ window.addEventListener('gameStart', () => {
         );
         clientPerformance.record('frameIntervalMs', dtMs);
       }
+      if (debugHudOn) {
+        noteDebugFrame(dtMs);
+      }
       const started = observing ? performance.now() : 0;
       gameController.updateGame(dtMs);
       const updated = observing ? performance.now() : 0;
 
       // Then render the current game state
       gameController.renderGame();
+      if (debugHudOn) {
+        paintDebugHud(now);
+      }
       if (observing) {
         const rendered = performance.now();
         clientPerformance.record('updateMs', updated - started);

@@ -80,7 +80,10 @@ test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
   expect(productionHtml).toContain('id="debug-session-id"');
   expect(productionHtml).toContain('id="debug-play-chip"');
   expect(productionHtml).toContain('id="copy-debug-play-chip"');
+  expect(productionHtml).toContain('id="debug-hud"');
+  expect(productionHtml).toContain('id="debug-hud-fps"');
   expect(productionCss).toContain('.advanced-settings');
+  expect(productionCss).toContain('.debug-hud');
   expect(productionCss).not.toMatch(/#ff0|#ffff00|yellow/iu);
 });
 

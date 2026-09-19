@@ -139,17 +139,30 @@
       </div>
 
       <div id="gameArea" hidden>
-        <div id="debug-play-chip" class="debug-play-chip" hidden>
-          <span class="debug-play-chip-label">playerId</span>
-          <code id="debug-play-chip-id" role="status"></code>
-          <button
-            id="copy-debug-play-chip"
-            type="button"
-            class="debug-copy"
-            data-copy-name="player ID"
-            aria-label="Copy player ID"
-            disabled
-          >Copy</button>
+        <div id="debug-play-stack" class="debug-play-stack">
+          <fieldset id="debug-hud" class="debug-hud" hidden>
+            <legend>Debug health</legend>
+            <dl>
+              <div class="debug-hud-row"><dt>FPS</dt><dd id="debug-hud-fps">—</dd></div>
+              <div class="debug-hud-row"><dt>RTT</dt><dd id="debug-hud-rtt">—</dd></div>
+              <div class="debug-hud-row"><dt>SNAP</dt><dd id="debug-hud-snap">—</dd></div>
+              <div class="debug-hud-row"><dt>MOVE</dt><dd id="debug-hud-move">—</dd></div>
+              <div class="debug-hud-row"><dt>WORLD</dt><dd id="debug-hud-world">—</dd></div>
+              <div class="debug-hud-row"><dt>REL</dt><dd id="debug-hud-rel">—</dd></div>
+            </dl>
+          </fieldset>
+          <div id="debug-play-chip" class="debug-play-chip" hidden>
+            <span class="debug-play-chip-label">playerId</span>
+            <code id="debug-play-chip-id" role="status"></code>
+            <button
+              id="copy-debug-play-chip"
+              type="button"
+              class="debug-copy"
+              data-copy-name="player ID"
+              aria-label="Copy player ID"
+              disabled
+            >Copy</button>
+          </div>
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button

@@ -70,6 +70,50 @@
             />
             <label class="sound-toggle-label" for="soundPref">Sound</label>
           </div>
+          <details id="advanced-settings" class="advanced-settings">
+            <summary>Advanced</summary>
+            <div class="debug-toggle-row">
+              <input
+                class="sound-toggle"
+                type="checkbox"
+                id="debugPref"
+              />
+              <label class="sound-toggle-label" for="debugPref">Debug</label>
+            </div>
+            <div id="debug-identity" class="debug-identity" hidden>
+              <div>
+                <label class="debug-id-label" for="debug-player-id">Player ID</label>
+                <div class="debug-id-row">
+                  <input
+                    id="debug-player-id"
+                    class="debug-id-input"
+                    type="text"
+                    readonly
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="Available after Enter Game"
+                  />
+                  <button id="copy-debug-player-id" type="button" class="debug-copy" disabled>Copy</button>
+                </div>
+                <p class="debug-id-hint">Paste this to an agent. Railway filter: @playerId:…</p>
+              </div>
+              <div>
+                <label class="debug-id-label" for="debug-session-id">Page session</label>
+                <div class="debug-id-row">
+                  <input
+                    id="debug-session-id"
+                    class="debug-id-input"
+                    type="text"
+                    readonly
+                    spellcheck="false"
+                    autocomplete="off"
+                  />
+                  <button id="copy-debug-session-id" type="button" class="debug-copy">Copy</button>
+                </div>
+                <p class="debug-id-hint">Optional client-log filter: @sessionId:…</p>
+              </div>
+            </div>
+          </details>
         </div>
 
         <p class="game-description">A free multiplayer space game. Survey the unknown, tow valuable asteroids, and build shared progress with your crew.</p>
@@ -80,6 +124,11 @@
       </div>
 
       <div id="gameArea" hidden>
+        <div id="debug-play-chip" class="debug-play-chip" hidden role="status">
+          <span class="debug-play-chip-label">playerId</span>
+          <code id="debug-play-chip-id"></code>
+          <button id="copy-debug-play-chip" type="button" class="debug-copy" disabled>Copy</button>
+        </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button
           id="universe-map-toggle"

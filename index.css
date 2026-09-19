@@ -723,6 +723,176 @@
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
   }
 
+  .advanced-settings {
+    width: min(100%, 260px);
+    margin: 0 auto;
+    padding: 0.15rem 0.65rem 0.45rem;
+    text-align: left;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 40%, transparent);
+    border-radius: 6px;
+  }
+
+  .advanced-settings summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.4rem 0;
+    color: var(--palette-hud-muted, #64748b);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .advanced-settings summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advanced-settings summary::after {
+    content: "+";
+    float: right;
+    color: var(--palette-accent, #a78bfa);
+  }
+
+  .advanced-settings[open] summary::after {
+    content: "–";
+  }
+
+  .advanced-settings summary:hover,
+  .advanced-settings summary:focus-visible {
+    color: var(--palette-hud, #e2e8f0);
+    outline: none;
+  }
+
+  .debug-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65em;
+    margin: 0.15rem 0 0.55rem;
+  }
+
+  .debug-identity {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .debug-identity[hidden] {
+    display: none;
+  }
+
+  .debug-id-label {
+    display: block;
+    margin: 0 0 0.22rem;
+    color: var(--palette-hud-muted, #64748b);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .debug-id-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .debug-id-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.35rem 0.45rem;
+    color: var(--palette-local, #5eead4);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.68rem;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--palette-local, #5eead4) 32%, transparent);
+    border-radius: 4px;
+  }
+
+  .debug-id-input:focus {
+    outline: none;
+    border-color: var(--palette-local, #5eead4);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--palette-local, #5eead4) 22%, transparent);
+  }
+
+  .debug-id-hint {
+    margin: 0.28rem 0 0;
+    color: color-mix(in srgb, var(--palette-hud, #e2e8f0) 35%, var(--palette-hud-muted, #64748b));
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.58rem;
+    line-height: 1.35;
+  }
+
+  .debug-copy {
+    flex-shrink: 0;
+    padding: 0.28rem 0.5rem;
+    color: var(--palette-accent, #a78bfa);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent);
+    border-radius: 4px;
+  }
+
+  .debug-copy:hover,
+  .debug-copy:focus-visible {
+    color: var(--palette-hud, #e2e8f0);
+    border-color: var(--palette-hud, #e2e8f0);
+    outline: none;
+  }
+
+  .debug-copy:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+
+  .debug-play-chip {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left, 0px));
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    z-index: 22;
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: min(92vw, 420px);
+    padding: 0.28rem 0.45rem;
+    pointer-events: auto;
+    background: color-mix(in srgb, var(--palette-bg, #000011) 78%, transparent);
+    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 50%, transparent);
+    border-radius: 4px;
+  }
+
+  .debug-play-chip[hidden] {
+    display: none;
+  }
+
+  body.in-play.debug-on .debug-play-chip:not([hidden]) {
+    display: flex;
+  }
+
+  .debug-play-chip-label {
+    color: var(--palette-hud-muted, #64748b);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .debug-play-chip code {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--palette-local, #5eead4);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.62rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: all;
+  }
+
   .enter-game.active-mode {
     transform: scale(1.02);
     border-width: 3px;

@@ -35,7 +35,8 @@ life, while a respawn resets that growth.
 ## Start a life
 
 Choose a ship on the title screen, then press Enter Game. You share the field
-with other pilots. Scan minerals, tow asteroids to a furnace, collect
+with other pilots. The optional Advanced Debug checkbox can show a Player ID
+for support after you enter; this browser remembers that preference. Scan minerals, tow asteroids to a furnace, collect
 rewards, and protect your lives. Your score carries across respawns and brief
 disconnects during the same UTC month, but the mass and upgrades gathered during
 a life do not. After game over, start a fresh flight with 3 lives and score 0.

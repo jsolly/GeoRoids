@@ -65,6 +65,26 @@ restart notice, retaining the original error for diagnosis.
 
 ## Search production logs
 
+A player can opt in on the title screen: open **Advanced**, enable **Debug**,
+enter the game, and copy the Player ID. That value is the same `playerId`
+already written on `player_joined` and motion `STATE` records. Do not invent a
+second correlator. Filter Railway logs with the pasted value:
+
+```text
+@playerId:PASTE
+@category:STATE AND @playerId:PASTE
+```
+
+The optional page session ID on that same Debug panel is the `sessionId` used
+for forwarded client records:
+
+```text
+@source:client AND @sessionId:PASTE
+```
+
+Debug is stored in this browser only. It does not log player names or resume
+tokens.
+
 Railway captures standard output and supports filtering structured JSON fields.
 Start with these queries, substituting the incident's player or release ID:
 

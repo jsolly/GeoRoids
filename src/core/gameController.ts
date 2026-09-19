@@ -36,6 +36,7 @@ import {
   bindAsteroidFieldApply,
   unbindAsteroidFieldApply,
 } from '../network/services/asteroidFieldSync';
+import { publishPlayerIdentity } from '../network/services/playerIdentityEvents';
 import { CollisionManager } from '../physics/collision/CollisionManager';
 import { applyShockwaveToBody, type ShockwaveWaveSpec } from '../physics/shockwave';
 import { contourSegmentCount } from '../physics/terrain/contours';
@@ -144,6 +145,7 @@ export class GameController {
     const joinStartedAt = performance.now();
     try {
       this.resetSessionForNewGame();
+      publishPlayerIdentity(this.networkManager.getLocalPlayerId(), 'provisional');
       clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
       this.laserUpgradeReadout ??= new LaserUpgradeReadout(

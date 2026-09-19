@@ -9,6 +9,7 @@ import {
   getWorldExploration,
   getWorldMapAssets,
 } from '../network/worldExploration';
+import { drawFurnaceMapMark } from '../rendering/hud/furnaceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import {
@@ -449,53 +450,50 @@ function drawMapAsset(
   context.translate(asset.position.x, asset.position.y);
   context.lineWidth = 1.5 / frame.scale;
   context.shadowBlur = 8 / frame.scale;
-  const color =
-    asset.kind === 'furnace'
-      ? PALETTE.SATELLITE
-      : asset.kind === 'laserCore'
+  if (asset.kind === 'furnace') {
+    drawFurnaceMapMark(context, 0, 0, size);
+  } else {
+    const color =
+      asset.kind === 'laserCore'
         ? PALETTE.LASER_LOCAL
         : asset.kind === 'satellite'
           ? PALETTE.REMOTE
           : PALETTE.LOOT;
-  context.strokeStyle = color;
-  context.fillStyle = hexToRgba(color, 0.2);
-  context.shadowColor = color;
-  context.beginPath();
-  switch (asset.kind) {
-    case 'furnace':
-      context.rect(-size, -size, size * 2, size * 2);
-      context.moveTo(-size * 0.55, 0);
-      context.lineTo(size * 0.55, 0);
-      context.moveTo(0, -size * 0.55);
-      context.lineTo(0, size * 0.55);
-      break;
-    case 'laserCore':
-      context.moveTo(0, -size);
-      context.lineTo(size, 0);
-      context.lineTo(0, size);
-      context.lineTo(-size, 0);
-      context.closePath();
-      context.moveTo(-size * 0.5, size * 0.5);
-      context.lineTo(size * 0.5, -size * 0.5);
-      break;
-    case 'satellite':
-      context.arc(0, 0, size * 0.55, 0, Math.PI * 2);
-      context.ellipse(0, 0, size * 1.35, size * 0.45, 0, 0, Math.PI * 2);
-      break;
-    case 'wreckage':
-      context.moveTo(-size, -size * 0.3);
-      context.lineTo(-size * 0.25, -size);
-      context.lineTo(size, -size * 0.15);
-      context.lineTo(size * 0.3, size);
-      context.lineTo(-size, size * 0.45);
-      context.closePath();
-      break;
-    default:
-      throw new Error(`Unexpected map asset kind: ${asset.kind}`);
+    context.strokeStyle = color;
+    context.fillStyle = hexToRgba(color, 0.2);
+    context.shadowColor = color;
+    context.beginPath();
+    switch (asset.kind) {
+      case 'laserCore':
+        context.moveTo(0, -size);
+        context.lineTo(size, 0);
+        context.lineTo(0, size);
+        context.lineTo(-size, 0);
+        context.closePath();
+        context.moveTo(-size * 0.5, size * 0.5);
+        context.lineTo(size * 0.5, -size * 0.5);
+        break;
+      case 'satellite':
+        context.arc(0, 0, size * 0.55, 0, Math.PI * 2);
+        context.ellipse(0, 0, size * 1.35, size * 0.45, 0, 0, Math.PI * 2);
+        break;
+      case 'wreckage':
+        context.moveTo(-size, -size * 0.3);
+        context.lineTo(-size * 0.25, -size);
+        context.lineTo(size, -size * 0.15);
+        context.lineTo(size * 0.3, size);
+        context.lineTo(-size, size * 0.45);
+        context.closePath();
+        break;
+      default: {
+        const unexpected: never = asset.kind;
+        throw new Error(`Unexpected map asset kind: ${unexpected}`);
+      }
+    }
+    context.fill();
+    context.shadowBlur = 0;
+    context.stroke();
   }
-  context.fill();
-  context.shadowBlur = 0;
-  context.stroke();
   if (showLabel && asset.name) {
     context.font = `${12 / frame.scale}px "Courier New", monospace`;
     context.fillStyle = hexToRgba(PALETTE.HUD, 0.86);

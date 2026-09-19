@@ -3,6 +3,8 @@ import { WORLD } from '../../../shared/world';
 import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
 import { getKitHullOutline } from '../../../src/entities/ship/hullOutlines';
 import { layoutHudCluster } from '../../../src/rendering/hud/cluster';
+import { FURNACE_MAP_FILL_ALPHA, FURNACE_MAP_INK } from '../../../src/rendering/hud/furnaceMapMark';
+import { hexToRgba } from '../../../src/utils/colorUtils';
 
 function recordCanvas(ctx: CanvasRenderingContext2D) {
   let points: Array<[number, number]> = [];
@@ -206,8 +208,11 @@ describe('painted HUD composition', () => {
     const ctx = canvasContext();
     const { filledPaths } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
-    const stationFill = normalizedCanvasColor(ctx, 'rgba(196,181,253,0.2)');
-    const stationInk = normalizedCanvasColor(ctx, PALETTE.SATELLITE);
+    const stationFill = normalizedCanvasColor(
+      ctx,
+      hexToRgba(FURNACE_MAP_INK, FURNACE_MAP_FILL_ALPHA)
+    );
+    const stationInk = normalizedCanvasColor(ctx, FURNACE_MAP_INK);
     drawMiniMap(ctx, layout, player.ship, [], [], [], []);
     expect(
       filledPaths.filter(({ style }) => style === stationFill || style === stationInk)
@@ -218,18 +223,7 @@ describe('painted HUD composition', () => {
     drawMiniMap(ctx, layout, player.ship, [], [], [], []);
     const stations = filledPaths.filter(({ style }) => style === stationFill);
     expect(stations).toHaveLength(1);
-    expect(stations[0]?.rectangles).toEqual([
-      {
-        x: layout.miniMap.x + layout.miniMap.size / 2 - 3,
-        y:
-          layout.miniMap.y +
-          layout.miniMap.size / 2 -
-          ((660 / WORLD.minimapRadius) * layout.miniMap.size) / 2 -
-          3,
-        width: 6,
-        height: 6,
-      },
-    ]);
+    expect(stations[0]?.rectangles).toEqual([]);
   });
 
   test('Surveyor radar classifies minerals during a scan and restores generic marks on expiry', async () => {

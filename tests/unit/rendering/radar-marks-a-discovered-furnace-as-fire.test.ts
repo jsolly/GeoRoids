@@ -2,15 +2,14 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { PALETTE } from '../../../src/constants';
 import {
   addFurnaceFlamePath,
+  addFurnaceInnerFlamePath,
   drawFurnaceMapMark,
-  FURNACE_FLAME_OUTLINE,
-  FURNACE_INNER_FLAME_OUTLINE,
-  FURNACE_MAP_FILL_ALPHA,
+  FURNACE_CAMPFIRE_PATH,
+  FURNACE_INNER_CAMPFIRE_PATH,
   FURNACE_MAP_INK,
   MINIMAP_FURNACE_MARK_SIZE,
   UNIVERSE_MAP_FURNACE_MARK_SIZE,
 } from '../../../src/rendering/hud/furnaceMapMark';
-import { hexToRgba } from '../../../src/utils/colorUtils';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -30,6 +29,7 @@ function recordingContext() {
     points: Array<{ x: number; y: number }>;
     closed: boolean;
     color: string;
+    curves: number;
   }> = [];
   const fills: Array<{
     points: Array<{ x: number; y: number }>;
@@ -38,9 +38,10 @@ function recordingContext() {
     rectangles: Array<{ x: number; y: number; width: number; height: number }>;
   }> = [];
   let rectangles: Array<{ x: number; y: number; width: number; height: number }> = [];
+  let curves = 0;
   const begin = ctx.beginPath.bind(ctx);
   const move = ctx.moveTo.bind(ctx);
-  const line = ctx.lineTo.bind(ctx);
+  const bezier = ctx.bezierCurveTo.bind(ctx);
   const close = ctx.closePath.bind(ctx);
   const rect = ctx.rect.bind(ctx);
   const stroke = ctx.stroke.bind(ctx);
@@ -49,15 +50,17 @@ function recordingContext() {
     points = [];
     closed = false;
     rectangles = [];
+    curves = 0;
     begin();
   });
   vi.spyOn(ctx, 'moveTo').mockImplementation((x, y) => {
     points.push({ x, y });
     move(x, y);
   });
-  vi.spyOn(ctx, 'lineTo').mockImplementation((x, y) => {
+  vi.spyOn(ctx, 'bezierCurveTo').mockImplementation((cp1x, cp1y, cp2x, cp2y, x, y) => {
     points.push({ x, y });
-    line(x, y);
+    curves += 1;
+    bezier(cp1x, cp1y, cp2x, cp2y, x, y);
   });
   vi.spyOn(ctx, 'closePath').mockImplementation(() => {
     closed = true;
@@ -68,7 +71,7 @@ function recordingContext() {
     rect(x, y, width, height);
   });
   vi.spyOn(ctx, 'stroke').mockImplementation((...args) => {
-    strokes.push({ points: [...points], closed, color: String(ctx.strokeStyle) });
+    strokes.push({ points: [...points], closed, color: String(ctx.strokeStyle), curves });
     stroke(...args);
   });
   vi.spyOn(ctx, 'fill').mockImplementation((...args) => {
@@ -91,7 +94,7 @@ function canvasColor(ctx: CanvasRenderingContext2D, color: string): string {
   return normalized;
 }
 
-test('a radar furnace mark is a three-tongue flame in fire ink, not a lilac square', () => {
+test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not a lilac square', () => {
   const { ctx, strokes, fills } = recordingContext();
   drawFurnaceMapMark(ctx, 40, 40, MINIMAP_FURNACE_MARK_SIZE);
 
@@ -100,7 +103,7 @@ test('a radar furnace mark is a three-tongue flame in fire ink, not a lilac squa
   if (!flame) {
     throw new Error('expected a closed furnace flame stroke');
   }
-  expect(flame.points).toHaveLength(FURNACE_FLAME_OUTLINE.length);
+  expect(flame.curves).toBe(FURNACE_CAMPFIRE_PATH.filter((command) => command.t === 'C').length);
   expect(flame.color).toBe(canvasColor(ctx, FURNACE_MAP_INK));
   expect(flame.color).not.toBe(canvasColor(ctx, PALETTE.SATELLITE));
 
@@ -110,31 +113,27 @@ test('a radar furnace mark is a three-tongue flame in fire ink, not a lilac squa
   const height = Math.max(...ys) - Math.min(...ys);
   const tip = flame.points.reduce((highest, point) => (point.y < highest.y ? point : highest));
   expect(height).toBeGreaterThan(width);
-  expect(tip).toEqual({ x: 40, y: 40 - MINIMAP_FURNACE_MARK_SIZE });
-  expect(upwardPeaks(flame.points)).toHaveLength(3);
-  expect(fills.some((path) => path.rectangles.length > 0)).toBe(false);
-  expect(
-    fills.some(
-      (path) => path.color === canvasColor(ctx, hexToRgba(FURNACE_MAP_INK, FURNACE_MAP_FILL_ALPHA))
-    )
-  ).toBe(true);
+  expect(tip.x).toBeGreaterThan(40);
+  expect(tip.y).toBeCloseTo(40 - MINIMAP_FURNACE_MARK_SIZE, 5);
+  expect(fills).toEqual([]);
 });
 
-test('a universe-map furnace mark keeps a cream inner tongue inside the outer flame', () => {
-  const { ctx, fills } = recordingContext();
+test('a universe-map furnace mark nests a smaller inner campfire in the same fire ink', () => {
+  const { ctx, strokes, fills } = recordingContext();
   drawFurnaceMapMark(ctx, 40, 40, UNIVERSE_MAP_FURNACE_MARK_SIZE);
 
-  const outer = fills.find(
-    (path) => path.color === canvasColor(ctx, hexToRgba(FURNACE_MAP_INK, FURNACE_MAP_FILL_ALPHA))
+  const campfires = strokes.filter(
+    (path) => path.closed && path.color === canvasColor(ctx, FURNACE_MAP_INK)
   );
-  const inner = fills.find(
-    (path) => path.color === canvasColor(ctx, hexToRgba(PALETTE.LOOT, 0.92))
-  );
-  expect(outer?.closed).toBe(true);
-  expect(inner?.closed).toBe(true);
+  expect(campfires).toHaveLength(2);
+  const outer = campfires[0];
+  const inner = campfires[1];
   if (!outer || !inner) {
-    throw new Error('expected outer and inner furnace flame fills');
+    throw new Error('expected outer and inner furnace campfire strokes');
   }
+  expect(inner.curves).toBe(
+    FURNACE_INNER_CAMPFIRE_PATH.filter((command) => command.t === 'C').length
+  );
   const outerSpan =
     Math.max(...outer.points.map((point) => point.y)) -
     Math.min(...outer.points.map((point) => point.y));
@@ -142,26 +141,19 @@ test('a universe-map furnace mark keeps a cream inner tongue inside the outer fl
     Math.max(...inner.points.map((point) => point.y)) -
     Math.min(...inner.points.map((point) => point.y));
   expect(innerSpan).toBeLessThan(outerSpan);
-  expect(inner.points).toHaveLength(FURNACE_INNER_FLAME_OUTLINE.length);
-  expect(upwardPeaks(inner.points)).toHaveLength(1);
+  expect(fills).toEqual([]);
 });
 
-function upwardPeaks(points: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
-  return points.filter((point, index) => {
-    const previous = points[(index + points.length - 1) % points.length];
-    const next = points[(index + 1) % points.length];
-    return previous !== undefined && next !== undefined && point.y < previous.y && point.y < next.y;
-  });
-}
-
-test('the shared flame path stays a closed three-tongue campfire', () => {
+test('the shared flame path is a closed right-leaning campfire', () => {
   const points: Array<{ x: number; y: number }> = [];
+  let curves = 0;
   addFurnaceFlamePath(
     {
       moveTo(x, y) {
         points.push({ x, y });
       },
-      lineTo(x, y) {
+      bezierCurveTo(_cp1x, _cp1y, _cp2x, _cp2y, x, y) {
+        curves += 1;
         points.push({ x, y });
       },
       closePath() {},
@@ -170,7 +162,28 @@ test('the shared flame path stays a closed three-tongue campfire', () => {
     0,
     1
   );
-  expect(points).toHaveLength(FURNACE_FLAME_OUTLINE.length);
-  expect(points[0]).toEqual({ x: 0, y: -1 });
-  expect(upwardPeaks(points)).toHaveLength(3);
+  expect(curves).toBe(FURNACE_CAMPFIRE_PATH.filter((command) => command.t === 'C').length);
+  expect(points[0]?.x).toBeGreaterThan(0);
+  expect(points[0]?.y).toBe(-1);
+  const innerPoints: Array<{ x: number; y: number }> = [];
+  addFurnaceInnerFlamePath(
+    {
+      moveTo(x, y) {
+        innerPoints.push({ x, y });
+      },
+      bezierCurveTo(_cp1x, _cp1y, _cp2x, _cp2y, x, y) {
+        innerPoints.push({ x, y });
+      },
+      closePath() {},
+    },
+    0,
+    0,
+    1
+  );
+  const outerHeight =
+    Math.max(...points.map((point) => point.y)) - Math.min(...points.map((point) => point.y));
+  const innerHeight =
+    Math.max(...innerPoints.map((point) => point.y)) -
+    Math.min(...innerPoints.map((point) => point.y));
+  expect(innerHeight).toBeLessThan(outerHeight);
 });

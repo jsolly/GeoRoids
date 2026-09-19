@@ -355,26 +355,19 @@
   }
 
   .map-key-furnace {
-    width: 9px;
-    height: 12px;
+    width: 11px;
+    height: 15px;
     border: 0;
     color: var(--palette-laser, #fde68a);
-    background: currentColor;
-    clip-path: polygon(
-      50% 0%,
-      63% 35%,
-      57% 54%,
-      79% 17%,
-      87% 57%,
-      71% 89%,
-      60% 100%,
-      40% 100%,
-      29% 89%,
-      13% 57%,
-      21% 17%,
-      43% 54%,
-      37% 35%
-    );
+    background-color: currentColor;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32' fill='none' stroke='white' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M14.4 1.45C16.16 7.56 13.92 13.38 14.88 16.29C18.08 11.35 21.28 9.02 20.96 11.64C22.56 16.29 20 24 15.2 29.38C12.96 30.84 9.76 30.84 8.16 29.09C3.36 23.27 .8 13.09 4.32 7.56C6.56 11.93 9.12 16.29 10.72 16.29C11.68 10.76 12.32 5.53 14.4 1.45Z'/%3E%3Cpath d='M13.12 10.76C13.92 13.67 13.6 16.58 14.72 17.16C15.84 14.25 17.12 12.8 16.8 14.84C17.44 18.33 15.2 23.27 12.64 24.73C11.36 25.6 10.08 25.31 9.76 24.15C7.2 22.11 6.56 16.58 7.84 13.67C9.44 16.58 10.72 17.16 11.36 17.16C12 14.25 12.32 12.22 13.12 10.76Z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32' fill='none' stroke='white' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M14.4 1.45C16.16 7.56 13.92 13.38 14.88 16.29C18.08 11.35 21.28 9.02 20.96 11.64C22.56 16.29 20 24 15.2 29.38C12.96 30.84 9.76 30.84 8.16 29.09C3.36 23.27 .8 13.09 4.32 7.56C6.56 11.93 9.12 16.29 10.72 16.29C11.68 10.76 12.32 5.53 14.4 1.45Z'/%3E%3Cpath d='M13.12 10.76C13.92 13.67 13.6 16.58 14.72 17.16C15.84 14.25 17.12 12.8 16.8 14.84C17.44 18.33 15.2 23.27 12.64 24.73C11.36 25.6 10.08 25.31 9.76 24.15C7.2 22.11 6.56 16.58 7.84 13.67C9.44 16.58 10.72 17.16 11.36 17.16C12 14.25 12.32 12.22 13.12 10.76Z'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
     filter: drop-shadow(0 0 4px currentColor);
   }
 

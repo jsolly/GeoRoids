@@ -50,7 +50,7 @@ disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, larger cream canisters
 with amber tips mark Tap loot, yellow slashed diamonds
 mark laser cores, lilac circles and diamonds mark loose and orbiting
-satellite pickups, and amber three-tongue flames mark discovered furnaces.
+satellite pickups, and amber hairline three-tongue campfires mark discovered furnaces.
 Ship headings and kit colors keep pilots identifiable above
 the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press

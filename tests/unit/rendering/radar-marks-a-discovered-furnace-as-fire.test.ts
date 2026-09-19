@@ -4,9 +4,11 @@ import {
   addFurnaceFlamePath,
   drawFurnaceMapMark,
   FURNACE_FLAME_OUTLINE,
+  FURNACE_INNER_FLAME_OUTLINE,
   FURNACE_MAP_FILL_ALPHA,
   FURNACE_MAP_INK,
   MINIMAP_FURNACE_MARK_SIZE,
+  UNIVERSE_MAP_FURNACE_MARK_SIZE,
 } from '../../../src/rendering/hud/furnaceMapMark';
 import { hexToRgba } from '../../../src/utils/colorUtils';
 
@@ -109,6 +111,7 @@ test('a radar furnace mark is a three-tongue flame in fire ink, not a lilac squa
   const tip = flame.points.reduce((highest, point) => (point.y < highest.y ? point : highest));
   expect(height).toBeGreaterThan(width);
   expect(tip).toEqual({ x: 40, y: 40 - MINIMAP_FURNACE_MARK_SIZE });
+  expect(upwardPeaks(flame.points)).toHaveLength(3);
   expect(fills.some((path) => path.rectangles.length > 0)).toBe(false);
   expect(
     fills.some(
@@ -119,7 +122,7 @@ test('a radar furnace mark is a three-tongue flame in fire ink, not a lilac squa
 
 test('a universe-map furnace mark keeps a cream inner tongue inside the outer flame', () => {
   const { ctx, fills } = recordingContext();
-  drawFurnaceMapMark(ctx, 40, 40, 11);
+  drawFurnaceMapMark(ctx, 40, 40, UNIVERSE_MAP_FURNACE_MARK_SIZE);
 
   const outer = fills.find(
     (path) => path.color === canvasColor(ctx, hexToRgba(FURNACE_MAP_INK, FURNACE_MAP_FILL_ALPHA))
@@ -139,9 +142,19 @@ test('a universe-map furnace mark keeps a cream inner tongue inside the outer fl
     Math.max(...inner.points.map((point) => point.y)) -
     Math.min(...inner.points.map((point) => point.y));
   expect(innerSpan).toBeLessThan(outerSpan);
+  expect(inner.points).toHaveLength(FURNACE_INNER_FLAME_OUTLINE.length);
+  expect(upwardPeaks(inner.points)).toHaveLength(1);
 });
 
-test('the shared flame path stays a closed tongue silhouette', () => {
+function upwardPeaks(points: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
+  return points.filter((point, index) => {
+    const previous = points[(index + points.length - 1) % points.length];
+    const next = points[(index + 1) % points.length];
+    return previous !== undefined && next !== undefined && point.y < previous.y && point.y < next.y;
+  });
+}
+
+test('the shared flame path stays a closed three-tongue campfire', () => {
   const points: Array<{ x: number; y: number }> = [];
   addFurnaceFlamePath(
     {
@@ -159,4 +172,5 @@ test('the shared flame path stays a closed tongue silhouette', () => {
   );
   expect(points).toHaveLength(FURNACE_FLAME_OUTLINE.length);
   expect(points[0]).toEqual({ x: 0, y: -1 });
+  expect(upwardPeaks(points)).toHaveLength(3);
 });

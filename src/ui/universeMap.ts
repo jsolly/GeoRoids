@@ -9,7 +9,10 @@ import {
   getWorldExploration,
   getWorldMapAssets,
 } from '../network/worldExploration';
-import { drawFurnaceMapMark } from '../rendering/hud/furnaceMapMark';
+import {
+  drawFurnaceMapMark,
+  UNIVERSE_MAP_FURNACE_MARK_SIZE,
+} from '../rendering/hud/furnaceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import {
@@ -445,7 +448,7 @@ function drawMapAsset(
   if (!isFiniteMapPosition(asset.position)) {
     return;
   }
-  const size = 11 / frame.scale;
+  const size = (asset.kind === 'furnace' ? UNIVERSE_MAP_FURNACE_MARK_SIZE : 11) / frame.scale;
   context.save();
   context.translate(asset.position.x, asset.position.y);
   context.lineWidth = 1.5 / frame.scale;

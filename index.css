@@ -355,24 +355,25 @@
   }
 
   .map-key-furnace {
-    width: 8px;
-    height: 11px;
+    width: 9px;
+    height: 12px;
     border: 0;
     color: var(--palette-laser, #fde68a);
     background: currentColor;
     clip-path: polygon(
       50% 0%,
-      60% 27.5%,
-      69% 46%,
-      58% 57%,
-      75% 76%,
-      64% 100%,
-      50% 85%,
-      36% 100%,
-      25% 76%,
-      42% 57%,
-      31% 46%,
-      40% 27.5%
+      63% 35%,
+      57% 54%,
+      79% 17%,
+      87% 57%,
+      71% 89%,
+      60% 100%,
+      40% 100%,
+      29% 89%,
+      13% 57%,
+      21% 17%,
+      43% 54%,
+      37% 35%
     );
     filter: drop-shadow(0 0 4px currentColor);
   }

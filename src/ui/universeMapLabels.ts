@@ -1,5 +1,6 @@
 import { WORLD } from '../../shared/world';
 import type { MapAsset, Position } from '../../shared-types';
+import { UNIVERSE_MAP_FURNACE_MARK_SIZE } from '../rendering/hud/furnaceMapMark';
 
 export type MapLabelRect = {
   left: number;
@@ -33,7 +34,7 @@ export function canPlaceMapAssetLabel(
   }
 
   const fontSize = 12 / frame.scale;
-  const iconSize = 11 / frame.scale;
+  const iconSize = (asset.kind === 'furnace' ? UNIVERSE_MAP_FURNACE_MARK_SIZE : 11) / frame.scale;
   const gap = 6 / frame.scale;
   const labelWidth = asset.name.length * fontSize * 0.62;
   const left = asset.position.x - labelWidth / 2 - gap;

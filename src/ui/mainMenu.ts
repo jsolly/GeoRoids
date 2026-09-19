@@ -8,6 +8,7 @@ import { applyLockedPaletteCss } from '../utils/colorUtils';
 import { attachEventListener, getElementById } from '../utils/dom';
 import { logger } from '../utils/Logger';
 import { sanitizePlayerName } from '../utils/playerName';
+import { mountDebugHud } from './debugHud';
 import { mountDebugIdentity } from './debugIdentity';
 import { getSelectedShipKitId, mountShipKitSelect } from './shipKitSelect';
 import { controlsHintFor } from './viewportChrome';
@@ -209,6 +210,7 @@ applyLockedPaletteCss();
 initTitleTerrain();
 mountShipKitSelect();
 mountDebugIdentity();
+mountDebugHud();
 
 function syncControlsHint(): void {
   const hint = getElementById<HTMLElement>('controls-hint');

@@ -27,7 +27,9 @@ and send it to an agent so they can find this ship in production logs with
 forwarded client records. Debug stays off unless you turn it on; this browser
 remembers the checkbox. It does not publish your nickname or resume token.
 While Debug is on, a small Player ID chip stays on the playfield so you can
-copy after the title screen hides.
+copy after the title screen hides, and a compact overlay shows live FPS, ping,
+snapshot age, motion epoch, world counts, and short client/server release IDs.
+Those health lines stay on-screen only; they are not written to Railway.
 
 Shots, impacts, and explosions vary their pitch slightly each time they
 start, keeping repeated actions from sounding identical. Automatic thrust is silent. Nearby action is louder; off-screen combat

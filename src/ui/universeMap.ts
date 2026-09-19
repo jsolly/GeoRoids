@@ -12,7 +12,9 @@ import {
 } from '../network/worldExploration';
 import {
   drawFurnaceMapMark,
+  UNIVERSE_MAP_LANDMARK_SIZE,
   universeMapFurnaceMarkAppearance,
+  universeMapMarkScreenSize,
 } from '../rendering/hud/furnaceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
@@ -543,6 +545,17 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.stroke();
 }
 
+const MAP_LOCAL_SHIP_SIZE = 18;
+const MAP_CREW_SHIP_SIZE = 14;
+
+function mapStrokeWidth(screen: number, nearSize: number, frame: MapFrame): number {
+  return (1.5 * screen) / nearSize / frame.scale;
+}
+
+function mapGlowBlur(screen: number, nearSize: number, frame: MapFrame): number {
+  return (8 * screen) / nearSize / frame.scale;
+}
+
 function drawMapAsset(
   context: CanvasRenderingContext2D,
   asset: MapAsset,
@@ -552,16 +565,14 @@ function drawMapAsset(
   if (!isFiniteMapPosition(asset.position)) {
     return;
   }
-  const furnaceMark =
-    asset.kind === 'furnace' ? universeMapFurnaceMarkAppearance(frame.zoom) : null;
-  const size = (furnaceMark?.screen ?? 11) / frame.scale;
+  const screen = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom);
+  const size = screen / frame.scale;
   context.save();
   context.translate(asset.position.x, asset.position.y);
-  context.lineWidth = 1.5 / frame.scale;
-  context.shadowBlur = 8 / frame.scale;
+  context.lineWidth = mapStrokeWidth(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
+  context.shadowBlur = mapGlowBlur(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
   if (asset.kind === 'furnace') {
-    const mark = furnaceMark ?? universeMapFurnaceMarkAppearance(frame.zoom);
-    drawFurnaceMapMark(context, 0, 0, size, mark.lod);
+    drawFurnaceMapMark(context, 0, 0, size, universeMapFurnaceMarkAppearance(frame.zoom).lod);
   } else {
     const color =
       asset.kind === 'laserCore'
@@ -650,18 +661,20 @@ function drawCrew(
     if (!isFiniteMapPosition(position)) {
       continue;
     }
-    const size = (player.type === 'local' ? 18 : 14) / frame.scale;
+    const nearSize = player.type === 'local' ? MAP_LOCAL_SHIP_SIZE : MAP_CREW_SHIP_SIZE;
+    const screen = universeMapMarkScreenSize(nearSize, frame.zoom);
+    const size = screen / frame.scale;
     const color = player.type === 'local' ? PALETTE.LOCAL : player.color;
     const outline = getKitHullOutline(player.ship.kitId);
     context.save();
     context.translate(position.x, position.y);
-    context.lineWidth = 1.5 / frame.scale;
+    context.lineWidth = mapStrokeWidth(screen, nearSize, frame);
     context.lineJoin = 'round';
     context.lineCap = 'round';
     context.strokeStyle = color;
     context.fillStyle = hexToRgba(color, player.type === 'local' ? 0.22 : 0.12);
     context.shadowColor = color;
-    context.shadowBlur = 8 / frame.scale;
+    context.shadowBlur = mapGlowBlur(screen, nearSize, frame);
     const hull = projectHullPolyline(0, 0, size, player.ship.angle, outline.hull);
     if (traceMapPolyline(context, hull, outline.hull.closed)) {
       context.fill();

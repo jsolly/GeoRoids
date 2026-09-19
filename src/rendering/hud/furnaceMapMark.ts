@@ -5,37 +5,48 @@ import { resolveGlow } from '../renderQuality';
 export const FURNACE_MAP_INK = PALETTE.LASER_LOCAL;
 /** Radar glyph half-height in canvas pixels; pin-scale with the local ship pip. */
 export const MINIMAP_FURNACE_MARK_SIZE = 4;
-/** Nearby-view campfire half-size in screen pixels before the map scale. */
-export const UNIVERSE_MAP_FURNACE_MARK_SIZE = 10;
-/** Zoomed-out flame-pin half-size in screen pixels before the map scale. */
-export const UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE = 7;
+/** Shared universe-map landmark half-size in screen pixels at the nearby view. */
+export const UNIVERSE_MAP_LANDMARK_SIZE = 11;
+/** Landmark half-size in screen pixels at minimum zoom. */
+export const UNIVERSE_MAP_LANDMARK_FAR_SIZE = 6;
 /**
  * Universe-map zoom where the pin becomes the three-tongue campfire.
  * Keep in lockstep with `UNIVERSE_MAP_ZOOM.initial`.
  */
 export const FURNACE_MAP_CAMPFIRE_ZOOM = 24;
 /**
- * Universe-map zoom where the nearby campfire reaches its largest pin.
- * Keep in lockstep with `UNIVERSE_MAP_ZOOM.max`.
+ * Universe-map zoom where landmark size reaches the far-pin floor.
+ * Keep in lockstep with `UNIVERSE_MAP_ZOOM.min`.
  */
-export const FURNACE_MAP_DETAIL_MAX_ZOOM = 48;
+export const FURNACE_MAP_FAR_ZOOM = 1;
 const INNER_FLAME_MIN_SIZE = 5;
-const ZOOMED_IN_CAMPFIRE_EXTRA = 6;
 
 type FurnaceMapLod = 'distant' | 'campfire';
+
+/** Keep furnaces, satellites, wreckage, and ships on one zoom scale. */
+export function universeMapMarkScreenSize(nearSize: number, zoom: number): number {
+  if (!(nearSize > 0) || !Number.isFinite(nearSize)) {
+    return 0;
+  }
+  if (!(zoom > 0) || !Number.isFinite(zoom)) {
+    return nearSize * (UNIVERSE_MAP_LANDMARK_FAR_SIZE / UNIVERSE_MAP_LANDMARK_SIZE);
+  }
+  if (zoom >= FURNACE_MAP_CAMPFIRE_ZOOM) {
+    return nearSize;
+  }
+  const span = FURNACE_MAP_CAMPFIRE_ZOOM - FURNACE_MAP_FAR_ZOOM;
+  const t = span > 0 ? Math.max(0, Math.min(1, (zoom - FURNACE_MAP_FAR_ZOOM) / span)) : 0;
+  const far = nearSize * (UNIVERSE_MAP_LANDMARK_FAR_SIZE / UNIVERSE_MAP_LANDMARK_SIZE);
+  return far + t * (nearSize - far);
+}
 
 export function universeMapFurnaceMarkAppearance(zoom: number): {
   lod: FurnaceMapLod;
   screen: number;
 } {
-  if (!(zoom > 0) || !Number.isFinite(zoom) || zoom < FURNACE_MAP_CAMPFIRE_ZOOM) {
-    return { lod: 'distant', screen: UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE };
-  }
-  const span = FURNACE_MAP_DETAIL_MAX_ZOOM - FURNACE_MAP_CAMPFIRE_ZOOM;
-  const t = span > 0 ? Math.min(1, (zoom - FURNACE_MAP_CAMPFIRE_ZOOM) / span) : 0;
   return {
-    lod: 'campfire',
-    screen: UNIVERSE_MAP_FURNACE_MARK_SIZE + t * ZOOMED_IN_CAMPFIRE_EXTRA,
+    lod: zoom >= FURNACE_MAP_CAMPFIRE_ZOOM ? 'campfire' : 'distant',
+    screen: universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, zoom),
   };
 }
 

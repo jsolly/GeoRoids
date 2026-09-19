@@ -8,12 +8,13 @@ import {
   FURNACE_DISTANT_FLAME_PATH,
   FURNACE_INNER_CAMPFIRE_PATH,
   FURNACE_MAP_CAMPFIRE_ZOOM,
-  FURNACE_MAP_DETAIL_MAX_ZOOM,
+  FURNACE_MAP_FAR_ZOOM,
   FURNACE_MAP_INK,
   MINIMAP_FURNACE_MARK_SIZE,
-  UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE,
-  UNIVERSE_MAP_FURNACE_MARK_SIZE,
+  UNIVERSE_MAP_LANDMARK_FAR_SIZE,
+  UNIVERSE_MAP_LANDMARK_SIZE,
   universeMapFurnaceMarkAppearance,
+  universeMapMarkScreenSize,
 } from '../../../src/rendering/hud/furnaceMapMark';
 
 afterEach(() => {
@@ -103,17 +104,22 @@ test('furnace HUD marks stay pin-scale with the ship pip and other map assets', 
   expect(MINIMAP_FURNACE_MARK_SIZE).toBeLessThanOrEqual(VISUAL.MINIMAP_LOCAL_SIZE);
   expect(MINIMAP_FURNACE_MARK_SIZE * 2).toBeLessThan(VISUAL.MINIMAP_SIZE / 6);
   const nearby = universeMapFurnaceMarkAppearance(FURNACE_MAP_CAMPFIRE_ZOOM);
-  const distant = universeMapFurnaceMarkAppearance(1);
-  const close = universeMapFurnaceMarkAppearance(FURNACE_MAP_DETAIL_MAX_ZOOM);
+  const distant = universeMapFurnaceMarkAppearance(FURNACE_MAP_FAR_ZOOM);
+  const close = universeMapFurnaceMarkAppearance(FURNACE_MAP_CAMPFIRE_ZOOM * 2);
   expect(nearby.lod).toBe('campfire');
   expect(distant.lod).toBe('distant');
   expect(close.lod).toBe('campfire');
-  expect(nearby.screen).toBe(UNIVERSE_MAP_FURNACE_MARK_SIZE);
-  expect(nearby.screen).toBeLessThanOrEqual(11);
-  expect(distant.screen).toBe(UNIVERSE_MAP_FURNACE_DISTANT_MARK_SIZE);
+  expect(nearby.screen).toBe(UNIVERSE_MAP_LANDMARK_SIZE);
+  expect(distant.screen).toBe(UNIVERSE_MAP_LANDMARK_FAR_SIZE);
   expect(distant.screen).toBeLessThan(nearby.screen);
-  expect(close.screen).toBeGreaterThan(nearby.screen);
-  expect(close.screen).toBeLessThanOrEqual(UNIVERSE_MAP_FURNACE_MARK_SIZE + 6);
+  expect(close.screen).toBe(nearby.screen);
+  expect(universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, 12.5)).toBe(8.5);
+  const shipNear = 18;
+  expect(universeMapMarkScreenSize(shipNear, FURNACE_MAP_CAMPFIRE_ZOOM)).toBe(shipNear);
+  expect(universeMapMarkScreenSize(shipNear, FURNACE_MAP_CAMPFIRE_ZOOM * 2)).toBe(shipNear);
+  expect(universeMapMarkScreenSize(shipNear, FURNACE_MAP_FAR_ZOOM) / shipNear).toBeCloseTo(
+    UNIVERSE_MAP_LANDMARK_FAR_SIZE / UNIVERSE_MAP_LANDMARK_SIZE
+  );
 });
 
 test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not a lilac square', () => {
@@ -167,7 +173,7 @@ test('a zoomed-out universe-map furnace mark is a single-tongue flame pin', () =
 
 test('a universe-map furnace mark nests a smaller inner campfire in the same fire ink', () => {
   const { ctx, strokes, fills } = recordingContext();
-  drawFurnaceMapMark(ctx, 40, 40, UNIVERSE_MAP_FURNACE_MARK_SIZE);
+  drawFurnaceMapMark(ctx, 40, 40, UNIVERSE_MAP_LANDMARK_SIZE);
 
   const campfires = strokes.filter(
     (path) => path.closed && path.color === canvasColor(ctx, FURNACE_MAP_INK)

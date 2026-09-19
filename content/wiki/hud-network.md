@@ -49,8 +49,9 @@ marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, larger cream canisters
 with amber tips mark Tap loot, yellow slashed diamonds
-mark laser cores, and lilac circles and diamonds mark loose and orbiting
-satellite pickups. Heading triangles in local and crew colors keep pilots
+mark laser cores, lilac circles and diamonds mark loose and orbiting
+satellite pickups, and amber hairline three-tongue campfires mark discovered furnaces.
+Heading triangles in local and crew colors keep pilots
 identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
 V or hold your own Hauler hull to open the local ship schematic.
@@ -58,8 +59,9 @@ M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are
 outside the local radar. A discovered furnace stays marked in the local radar
-while it is within that nearby view; the universe map keeps its exact landmark
-when it is farther away. Death, delivery, and pickup
+while it is within that nearby view. On the universe map, zoom out and those
+landmarks collapse to small amber flame pins; the nearby view and closer keep
+the three-tongue campfire. Death, delivery, and pickup
 messages appear in the center for 120 frames, or 2 seconds. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.

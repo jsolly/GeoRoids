@@ -98,9 +98,9 @@ delivery points.
 
 Hauler passive exploration reaches 260 world units and contributes to the same
 persistent crew chart as Surveyor. Use the shared chart to follow discovered
-furnace markers; the local radar shows a discovered furnace while it is within
-the nearby radar view, and the universe map keeps its exact landmark anywhere
-in the explored world.
+amber furnace markers; the local radar shows a discovered campfire while it is within
+the nearby radar view, and the universe map keeps that landmark as a flame pin
+when zoomed out and a three-tongue campfire in the nearby view.
 
 ## Mining lasers
 

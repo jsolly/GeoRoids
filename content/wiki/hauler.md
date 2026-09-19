@@ -1,7 +1,7 @@
 ---
 title: Hauler
 category: Ships
-summary: A heavy hull that swaps Resource Tap and Tow Cable, then mines metal efficiently.
+summary: A heavy hull with Resource Tap, Tow Cable, and Boost Coupling utilities.
 order: 40
 related:
   - content/wiki/controls.md
@@ -21,12 +21,12 @@ Hauler is the U-shaped cargo yoke with twin forward towers and two engine
 bells. On the playfield it is about twice Surveyor's linear hull size, so the
 barge reads as a real tug next to the scout. Draw scale, collision, and
 utility latch range share that hull. It has one utility slot. Open the ship schematic with V on desktop, or
-press and hold your own hull on touch, to swap **Resource Tap** and **Tow
-Cable**. Equip is immediate. E still fires the equipped tool; there is no
+press and hold your own hull on touch, to swap **Resource Tap**, **Tow
+Cable**, and **Boost Coupling**. Equip is immediate. E still fires the equipped tool; there is no
 second ability key. Other pilots cannot open your schematic.
 
-Both tools use the same central mount. The schematic and flying hull show the
-equipped hardware: a cable winch and hook, or an extraction probe. The animation
+All three tools use the same central mount. The schematic and flying hull show the
+equipped hardware: a cable winch and hook, an extraction probe, or a boost nozzle. The animation
 preview uses that same Hauler design.
 
 New flights start on Resource Tap. A host that never reports a slot keeps the
@@ -40,6 +40,29 @@ canisters with amber tips pop out during extraction, then the tether
 releases. The ability never targets a ship. E again releases an unfinished tap,
 stopping further drops; canisters already extracted remain collectible.
 Furnaces do not consume a tapped rock.
+
+## Boost Coupling E
+
+Equip Boost Coupling, aim the ship in the desired travel direction, and press E
+near a living asteroid. On touch, use ARM. Attachment locks the thrust heading
+shown by the cream arrow on the rock; it does not start thrust or extract loot.
+You can keep flying and turning without changing that locked heading.
+
+Press E again, or IGNITE on touch, to detach and start a three-second burn.
+Cream/amber exhaust marks the powered rock. Acceleration is gradual and speed
+is capped at 150 world units per second. After the fuel runs out, the exhaust
+ends and the asteroid coasts. Walls and impacts still affect its motion, but
+the thrust direction never turns with the ship or the spinning rock.
+
+Swap tools before ignition to cancel. Losing the attachment through distance,
+death, disconnect, or asteroid destruction also cancels an armed coupling.
+After ignition it runs independently of its pilot. Other Haulers cannot attach
+to an armed or burning rock. Ignition starts a new three-second ability cooldown.
+A powered rock remains an ordinary asteroid hazard and cannot deliver itself to
+a furnace; delivery still requires Tow Cable after the burn.
+
+Burn time follows the simulation, which pauses when nobody is playing. A saved
+burn resumes with its remaining fuel when its sector is loaded after restart.
 
 ## Tow cable E
 

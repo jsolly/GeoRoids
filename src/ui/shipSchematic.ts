@@ -16,6 +16,7 @@ import {
   projectHullPoint,
   projectHullPolyline,
 } from '../entities/ship/hullOutlines';
+import { setHaulerUtilityOnHost } from '../entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import { strokeKitHullOutline } from '../entities/ship/shipRenderer';
 import { NetworkManager } from '../network/networkManager';
@@ -229,7 +230,7 @@ export function equipUtility(utilityId: HaulerUtilityId): void {
   rememberHaulerUtility(utilityId);
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (player?.ship.kitId === 'hauler') {
-    player.ship.haulerUtility = utilityId;
+    setHaulerUtilityOnHost(player.ship, utilityId);
   }
   if (player) {
     const network = NetworkManager.getInstance();
@@ -310,13 +311,14 @@ function drawSchematicHull(ctx: CanvasRenderingContext2D, width: number, height:
   if (window.matchMedia('(max-width: 700px)').matches) {
     return;
   }
-  // Either card points at the same central mount, never at the hull's side panels.
+  // Every utility uses the same central mount.
   const mount = projectHullPoint(cx, cy, radius, angle, { f: 0.35, p: 0 });
   ctx.shadowBlur = 0;
   ctx.strokeStyle = hexToRgba(PALETTE.LOOT, 0.65);
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(width * (selectedUtility === 'tow_cable' ? 0.16 : 0.84), height * 0.22);
+  const slot = HAULER_UTILITY_IDS.indexOf(selectedUtility);
+  ctx.moveTo((width * (slot + 0.5)) / HAULER_UTILITY_IDS.length, height);
   ctx.lineTo(mount.x, mount.y);
   ctx.stroke();
 }
@@ -335,7 +337,7 @@ function drawToolLoop(
   const radius = 19;
   const haul = selectedUtility === 'tow_cable' && attached ? ((elapsed - 250) / 1600) * 12 : 0;
   const kick = attached ? latchShudderOffset(elapsed - 250) : 0;
-  const rockX = width * 0.78 - haul + kick;
+  const rockX = width * (selectedUtility === 'boost_coupling' ? 0.65 : 0.78) - haul + kick;
   const rockY = midY + kick * 0.35;
   ctx.lineWidth = 1.25;
   ctx.lineJoin = 'round';
@@ -359,14 +361,29 @@ function drawToolLoop(
     }
   }
   ctx.stroke();
-  if (attached) {
+  if (attached && (selectedUtility !== 'boost_coupling' || elapsed < 1000)) {
     ctx.strokeStyle = PALETTE.LOOT;
     ctx.beginPath();
     ctx.moveTo(shipX + radius * 0.72, midY);
     ctx.lineTo(rockX - 14, rockY);
     ctx.stroke();
   }
-  if (selectedUtility === 'resource_tap') {
+  if (selectedUtility === 'boost_coupling') {
+    ctx.strokeStyle = PALETTE.LOOT;
+    ctx.beginPath();
+    if (elapsed < 1000) {
+      ctx.moveTo(rockX + 18, midY);
+      ctx.lineTo(rockX + 34, midY);
+      ctx.lineTo(rockX + 28, midY - 4);
+      ctx.moveTo(rockX + 34, midY);
+      ctx.lineTo(rockX + 28, midY + 4);
+    } else {
+      ctx.moveTo(rockX - 16, midY - 4);
+      ctx.lineTo(rockX - 36 - Math.sin(now / 65) * 5, midY);
+      ctx.lineTo(rockX - 16, midY + 4);
+    }
+    ctx.stroke();
+  } else if (selectedUtility === 'resource_tap') {
     const extractMs = (SHIP_ABILITY.TAP_EXTRACT_FRAMES / 60) * 1000;
     for (let i = 0; i < SHIP_ABILITY.TAP_EXTRACT_BURSTS; i++) {
       const age = elapsed - 250 - ((i + 1) * extractMs) / SHIP_ABILITY.TAP_EXTRACT_BURSTS;

@@ -116,6 +116,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(haulerContent).toContain('E attaches a tow cable to the nearest living asteroid');
     expect(haulerContent).toContain('never reels a rock into the hull or throws it');
     expect(haulerContent).not.toMatch(HAULER_LEGACY_TERMS_PATTERN);
+    expect(haulerContent).toContain('Boost Coupling E');
+    expect(haulerContent).toContain('IGNITE on touch');
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');
@@ -240,6 +242,13 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
         })
       )
       .toBeLessThan(1);
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Hauler');
+    expect(await page.locator('#content').textContent()).toContain('Boost Coupling E');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+    await page.screenshot({ path: resolve(output, 'wiki-hauler-mobile.png'), fullPage: true });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect(
       (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')

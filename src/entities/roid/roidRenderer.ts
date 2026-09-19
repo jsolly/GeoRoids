@@ -162,6 +162,59 @@ export function drawRoidInteractionCues(
   ctx.restore();
 }
 
+/** Heading is world-fixed, independent of the asteroid silhouette's spin. */
+function drawAsteroidBoost(
+  ctx: DrawingContext,
+  roid: Roid,
+  x: number,
+  y: number,
+  radius: number
+): void {
+  const boost = roid.boost;
+  if (!boost) {
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-boost.angle);
+  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = PALETTE.LOOT;
+  ctx.shadowColor = PALETTE.LOOT;
+  ctx.shadowBlur = resolveGlow(VISUAL.ROID_GLOW);
+  ctx.beginPath();
+  ctx.moveTo(-radius - 5, -4);
+  ctx.lineTo(-radius + 2, -4);
+  ctx.lineTo(-radius + 2, 4);
+  ctx.lineTo(-radius - 5, 4);
+  ctx.stroke();
+  if (boost.phase === 'armed') {
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(radius + 5, 0);
+    ctx.lineTo(radius + 38, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(radius + 31, -5);
+    ctx.lineTo(radius + 38, 0);
+    ctx.lineTo(radius + 31, 5);
+    ctx.stroke();
+  } else {
+    const length = 24 + Math.sin(performance.now() / 65) * 5;
+    ctx.beginPath();
+    ctx.moveTo(-radius - 5, -4);
+    ctx.lineTo(-radius - length, 0);
+    ctx.lineTo(-radius - 5, 4);
+    ctx.stroke();
+    ctx.strokeStyle = PALETTE.LASER_LOCAL;
+    ctx.beginPath();
+    ctx.moveTo(-radius - 5, 0);
+    ctx.lineTo(-radius - length * 0.6, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawRoidShatter(
   ctx: DrawingContext,
   origin: Vec2,
@@ -273,6 +326,7 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
       );
     }
     drawRoidInteractionCues(ctx, roid, r, screenPos.x, screenPos.y);
+    drawAsteroidBoost(ctx, roid, screenPos.x, screenPos.y, r);
   }
 
   for (let i = shatterBursts.length - 1; i >= 0; i--) {

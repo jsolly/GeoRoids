@@ -33,7 +33,7 @@ export interface Velocity {
 export type ShipKitId = 'surveyor' | 'hauler';
 
 /** Hauler v1 utility slot. Same E key; one option active. */
-export type HaulerUtilityId = 'resource_tap' | 'tow_cable';
+export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
 export interface PlayerUpdate {
   id: string;
@@ -131,6 +131,11 @@ export interface PlayerShotAcknowledgement {
   projectileId: string | null;
 }
 
+/** Server-owned coupling; heading stays fixed in world space. */
+export type AsteroidBoost =
+  | { phase: 'armed'; ownerId: string; angle: number }
+  | { phase: 'burning'; angle: number; remainingFrames: number };
+
 export interface AsteroidData {
   id: string;
   position: Position;
@@ -152,6 +157,7 @@ export interface AsteroidData {
   /** High-HP rock that stacks hits from every pilot (voluntary coop). */
   isCollabTarget?: boolean;
   phenomenon?: AsteroidPhenomenon;
+  boost?: AsteroidBoost | null;
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */

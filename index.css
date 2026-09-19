@@ -1214,16 +1214,14 @@
   }
 
   .ship-schematic-cards {
-    position: absolute;
-    inset: 16px 8px;
-    display: flex;
-    justify-content: space-between;
-    pointer-events: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .ship-schematic-card {
     pointer-events: auto;
-    width: min(200px, 38%);
+    width: 100%;
     min-height: 92px;
     padding: 10px 12px;
     text-align: left;
@@ -1317,7 +1315,8 @@
     }
 
     .ship-schematic-card {
-      width: calc(50% - 4px);
+      width: 100%;
+      padding: 8px;
       min-height: 72px;
     }
 

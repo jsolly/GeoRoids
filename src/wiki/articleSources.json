@@ -73,7 +73,11 @@
     "tests/unit/server/authoritative-combat.test.ts",
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts",
     "tests/unit/entities/haulerUtility.test.ts",
-    "tests/unit/server/tap-extract-spawns-tap-loot.test.ts"
+    "tests/unit/server/tap-extract-spawns-tap-loot.test.ts",
+    "shared/asteroidBoost.ts",
+    "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts",
+    "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts",
+    "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -95,7 +99,11 @@
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/server/collaborative-asteroid-split.test.ts",
     "tests/unit/server/authoritative-combat.test.ts",
-    "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts"
+    "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts",
+    "shared/asteroidBoost.ts",
+    "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts",
+    "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts",
+    "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",

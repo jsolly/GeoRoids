@@ -49,6 +49,10 @@ an arena furnace to deliver it. The Hauler and every scanning pilot recorded on 
 rock receive the same delivery points. A rock with no scan tag still pays
 the Hauler for the delivery.
 
+Boost Coupling arms a rock on the first E and ignites a fixed-direction burn
+on the second. It stays reserved while armed or burning, so another Hauler
+cannot take it over. The rock still poses an asteroid collision hazard.
+
 Three starter furnace landmarks sit around the field: North Works, Southeast
 Works, and Southwest Works. Regional Works sites then continue on a 4,000-unit
 grid through the open field. On the playfield each Works site is a dashed

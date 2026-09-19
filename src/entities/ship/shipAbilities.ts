@@ -1,4 +1,11 @@
-import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
+import { ASTEROID_BOOST } from '../../../shared/asteroidBoost';
+import type {
+  AsteroidBoost,
+  HaulerUtilityId,
+  Position,
+  ShipKitId,
+  Velocity,
+} from '../../../shared-types';
 import { findHarpoonFieldBody, getHarpoonField, syncHarpoonFieldFromPlay } from './harpoonField';
 import {
   haulerUtilityOf,
@@ -30,6 +37,7 @@ export interface AbilityHost {
 
 /** Asteroid geometry shared by offline ability simulation and authoritative towing. */
 export interface AbilityBody {
+  boost?: AsteroidBoost | null;
   id: string;
   position: Position;
   velocity: Velocity;
@@ -293,7 +301,7 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBod
     return;
   }
 
-  if (isResourceTapUtility(host)) {
+  if (!isTowCableUtility(host)) {
     tickTowCable(host, undefined);
     host.harpoonLatchPos = { x: target.position.x, y: target.position.y };
     return;
@@ -333,6 +341,27 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     return { activated: false };
   }
   if (host.kitId === 'hauler' && host.harpoonTargetId) {
+    if (haulerUtilityOf(host) === 'boost_coupling') {
+      const target = world?.asteroids.find((body) => body.id === host.harpoonTargetId);
+      if (
+        target?.boost?.phase === 'armed' &&
+        target.boost.ownerId === host.id &&
+        latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE * 3)
+      ) {
+        target.boost = {
+          phase: 'burning',
+          angle: target.boost.angle,
+          remainingFrames: ASTEROID_BOOST.burnFrames,
+        };
+        host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
+      } else if (world) {
+        if (target?.boost?.phase === 'armed' && target.boost.ownerId === host.id) {
+          target.boost = null;
+        }
+        clearHarpoonLatch(host);
+        return { activated: false };
+      }
+    }
     clearHarpoonLatch(host);
     return { activated: true, abilityId: 'harpoon' };
   }
@@ -352,9 +381,19 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       return { activated: false };
     }
     const latchRange = SHIP_ABILITY.HARPOON_RANGE;
-    const target = findHarpoonTarget(host, listHarpoonCandidates(world), latchRange);
+    const target = findHarpoonTarget(
+      host,
+      listHarpoonCandidates(world).filter((body) => !body.boost),
+      latchRange
+    );
     if (!target) {
       return { activated: false };
+    }
+    if (world && haulerUtilityOf(host) === 'boost_coupling') {
+      if (!host.id) {
+        return { activated: false };
+      }
+      target.boost = { phase: 'armed', ownerId: host.id, angle: host.angle };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;

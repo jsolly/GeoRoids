@@ -51,8 +51,10 @@ V opens the local schematic for either ship. On touch, press and hold your own
 hull for a beat; a short rest still only steers. The overlay shows your hull
 and satellite inventory. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
-lifetime, derived from health. Hauler also has two utility cards and a looping tool animation;
-selecting a utility card equips that tool immediately.
+lifetime, derived from health. Hauler also has three utility cards and a looping tool animation;
+selecting a utility card equips that tool immediately. Boost Coupling uses E to arm
+and lock the asteroid thrust heading, then E again to ignite. Its touch button
+changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 
 ## Map
 

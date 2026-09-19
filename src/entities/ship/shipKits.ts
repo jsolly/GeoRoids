@@ -87,7 +87,8 @@ const KITS: Record<ShipKitId, ShipKit> = {
     name: 'Hauler',
     abilityId: 'harpoon',
     abilityName: 'Harpoon',
-    abilityHint: 'E latches the equipped tool — Resource Tap or Tow Cable. V opens the schematic.',
+    abilityHint:
+      'E latches the equipped tool — Resource Tap, Tow Cable, or Boost Coupling. V opens the schematic.',
     maxHealth: 140,
     size: SHIP.SIZE * HAULER_TO_SURVEYOR_SIZE,
     thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,

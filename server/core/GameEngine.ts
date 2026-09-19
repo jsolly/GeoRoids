@@ -762,6 +762,7 @@ export class GameEngine {
     this.playerMotion.forgetActor(id);
     const departing = this.getPlayer(id);
     if (departing) {
+      this.cancelArmedBoost(departing.id, departing.harpoonTargetId);
       departing.harpoonTargetId = null;
       delete departing.harpoonLatchPos;
     }
@@ -1242,7 +1243,12 @@ export class GameEngine {
   }
 
   public transportClosed(ws: WebSocket): boolean {
-    return this.playerMotion.transportClosed(ws, this.getServerTime());
+    const actor = this.entityManager.getEntityBySocket(ws);
+    const closed = this.playerMotion.transportClosed(ws, this.getServerTime());
+    if (closed && actor && this.cancelArmedBoost(actor.id, actor.harpoonTargetId)) {
+      clearHaulerLatch(actor);
+    }
+    return closed;
   }
 
   public drainDepartedPlayers(): string[] {
@@ -1791,6 +1797,7 @@ export class GameEngine {
     if (attackerId) {
       entity.deathCause = attackerId;
     }
+    this.cancelArmedBoost(entity.id, entity.harpoonTargetId);
     this.playerMotion.invalidateLife(entity.id, this.getServerTime());
     delete entity.laserUpgrade;
     this.satellitePickupManager.releaseOwner(entity.id);
@@ -2464,7 +2471,9 @@ export class GameEngine {
       this.entityManager.getAllEntities().map((actor) => actor.harpoonTargetId)
     );
     const world = {
-      asteroids: this.getAllAsteroids().filter((asteroid) => !cargo.has(asteroid.id)),
+      asteroids: this.getAllAsteroids().filter(
+        (asteroid) => asteroid.id === entity.harpoonTargetId || !cargo.has(asteroid.id)
+      ),
     };
     const activation = activateAbilityOnHost(entity, world);
     return activation.activated;
@@ -2493,7 +2502,8 @@ export class GameEngine {
 
   public tickAbilities(now = this.getServerTime()): void {
     this.entityManager.tickAbilityState();
-    const asteroidIndex = new AsteroidSpatialIndex(this.getAllAsteroids());
+    const rocks = this.getAllAsteroids();
+    const asteroidIndex = new AsteroidSpatialIndex(rocks);
     for (const entity of this.entityManager.getAllEntities()) {
       if (!entity.exploding && entity.health > 0 && entity.respawnTimer === undefined) {
         this.exploration.reveal(
@@ -2542,6 +2552,21 @@ export class GameEngine {
         }
       }
     }
+    for (const rock of rocks) {
+      if (rock.boost?.phase !== 'armed') {
+        continue;
+      }
+      const owner = this.entityManager.getEntity(rock.boost.ownerId);
+      if (
+        !owner ||
+        owner.exploding ||
+        owner.health <= 0 ||
+        owner.harpoonTargetId !== rock.id ||
+        haulerUtilityOf(owner) !== 'boost_coupling'
+      ) {
+        rock.boost = null;
+      }
+    }
   }
 
   public setHaulerUtility(entityId: string, utilityId: unknown): boolean {
@@ -2549,7 +2574,21 @@ export class GameEngine {
     if (!entity) {
       return false;
     }
-    return setHaulerUtilityOnHost(entity, utilityId);
+    const targetId = entity.harpoonTargetId;
+    const changed = setHaulerUtilityOnHost(entity, utilityId);
+    if (changed && entity.harpoonTargetId !== targetId) {
+      this.cancelArmedBoost(entity.id, targetId);
+    }
+    return changed;
+  }
+
+  private cancelArmedBoost(ownerId: string, targetId: string | null): boolean {
+    const target = targetId ? this.getAsteroid(targetId) : undefined;
+    if (target?.boost?.phase !== 'armed' || target.boost.ownerId !== ownerId) {
+      return false;
+    }
+    target.boost = null;
+    return true;
   }
 
   /** Furnace intake consumes attached cargo once; free-floating rocks remain in the field. */

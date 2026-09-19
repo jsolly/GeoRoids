@@ -11,9 +11,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
+| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, fixed-heading Boost Coupling, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
-| asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection |
+| asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection, armed coupling and finite powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
 | terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
@@ -25,13 +25,14 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Player question | Article | Primary source families |
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
-| How do I open the Hauler schematic and swap Tap vs Tow? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
+| How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | src/entities/ship/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |
+| How do I arm, ignite, and cancel an asteroid thruster? | hauler, controls, asteroids, teamwork | shared/asteroidBoost.ts, shipAbilities.ts, GameEngine.ts, boost lifecycle and persistence tests |
 | What happens when towed cargo hits another rock or ship? | hauler, asteroids, combat-survival | server/core/CollisionAuthority.ts, GameEngine.ts, authoritative combat tests |
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
@@ -71,11 +72,11 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 ## Known rule discrepancies and maintenance notes
 
 - Hauler E uses a fixed 280-unit hull-gap reach and selects only a living
-  asteroid. The equipped utility is Resource Tap or Tow Cable. Resource Tap
-  extracts a canister after 90 frames and leaves the rock intact. E again
+  asteroid. The equipped utility is Resource Tap, Tow Cable, or Boost Coupling. Resource Tap
+  extracts four spaced canister bursts across 90 frames and leaves the rock intact. E again
   releases the persistent tow cable. The asteroid
   keeps its momentum and trails behind normal Hauler movement; the cable applies
-  a correction only while stretched and never reels or throws the rock. A towed
+  a correction only while stretched and never reels or throws the rock. A
   successful attachment starts the three-second ability cooldown, but E again
   releases the cable immediately; an out-of-range attempt leaves the cooldown
   unchanged. A towed rock delivered inside a furnace's
@@ -84,6 +85,12 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   ordinary collision break on both rocks and drops the cable; towed cargo that
   overlaps another ship deals an asteroid impact, then breaks and drops the
   cable. The Hauler remains unharmed by its own cargo.
+- Boost Coupling arms the nearest available asteroid and captures the Hauler heading.
+  E or IGNITE releases it into a three-second simulation-time burn; steering the
+  Hauler does not change that thrust vector. Swapping tools, losing range, dying,
+  or disconnecting cancels an armed coupling. Burning rocks remain independent,
+  cannot be taken by another utility, and coast after fuel expires. An empty
+  world pauses fuel; saved sectors retain remaining fuel across reloads.
 - Surveyor E classifies nearby minerals on every teammate radar for the active
   1,200-unit scan range; each qualifying rock keeps that classification while
   it remains in the nearby radar and records the Surveyor player ID for delivery.

@@ -51,8 +51,8 @@ cream squares and diamonds mark wreckage and shards, larger cream canisters
 with amber tips mark Tap loot, yellow slashed diamonds
 mark laser cores, lilac circles and diamonds mark loose and orbiting
 satellite pickups, and amber hairline three-tongue campfires mark discovered furnaces.
-Ship headings and kit colors keep pilots identifiable above
-the world marks. Completed sectors are hatched on both maps. Crossing into a
+Heading triangles in local and crew colors keep pilots
+identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
 V or hold your own Hauler hull to open the local ship schematic.
 M or use the Map button to open the full-screen universe
@@ -118,9 +118,10 @@ Hauler reveal reaches 260; every crew member contributes to the same
 explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
-centered on your current ship; zoom out to see distant discoveries or use Local
-pilot to restore the nearby scale. Close it with M, Escape,
-or the Close control.
+centered on your current ship; zoom out to see distant discoveries or use the
+locate control on the map to restore the nearby scale. Ships on the chart use
+each pilot's hull silhouette. Close it with M, Escape, or the Close control.
+On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's
 radar. An active scan reaches 1,200 world units around its Surveyor. Ice becomes

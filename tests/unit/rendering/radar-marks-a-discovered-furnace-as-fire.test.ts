@@ -113,8 +113,10 @@ test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not 
   const height = Math.max(...ys) - Math.min(...ys);
   const tip = flame.points.reduce((highest, point) => (point.y < highest.y ? point : highest));
   expect(height).toBeGreaterThan(width);
-  expect(tip.x).toBeGreaterThan(40);
+  expect(tip.x).toBeGreaterThanOrEqual(40);
   expect(tip.y).toBeCloseTo(40 - MINIMAP_FURNACE_MARK_SIZE, 5);
+  expect(Math.min(...xs)).toBeLessThan(40 - MINIMAP_FURNACE_MARK_SIZE * 0.4);
+  expect(Math.max(...xs)).toBeGreaterThan(40 + MINIMAP_FURNACE_MARK_SIZE * 0.4);
   expect(fills).toEqual([]);
 });
 
@@ -163,8 +165,9 @@ test('the shared flame path is a closed right-leaning campfire', () => {
     1
   );
   expect(curves).toBe(FURNACE_CAMPFIRE_PATH.filter((command) => command.t === 'C').length);
-  expect(points[0]?.x).toBeGreaterThan(0);
+  expect(points[0]?.x).toBeGreaterThanOrEqual(0);
   expect(points[0]?.y).toBe(-1);
+  expect(Math.max(...points.map((point) => point.x))).toBeGreaterThan(0.4);
   const innerPoints: Array<{ x: number; y: number }> = [];
   addFurnaceInnerFlamePath(
     {

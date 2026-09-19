@@ -154,6 +154,22 @@
     font-size: 0.8em;
   }
 
+  @media (pointer: coarse), (hover: none) {
+    .universe-map-toggle kbd,
+    .universe-map-dialog kbd {
+      display: none;
+    }
+  }
+
+  .universe-map-toggle.universe-map-touch {
+    min-width: 52px;
+  }
+
+  .universe-map-toggle.universe-map-touch kbd,
+  .universe-map-dialog.universe-map-touch kbd {
+    display: none;
+  }
+
   /* Full-screen native dialog used for the shared universe map. */
   .universe-map-dialog {
     width: 100dvw;

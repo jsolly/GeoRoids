@@ -2,9 +2,11 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   clampUniverseMapZoom,
   closeUniverseMap,
+  DESKTOP_MAP_HELP,
   initializeUniverseMap,
   isUniverseMapOpen,
   mapWorldToCanvas,
+  TOUCH_MAP_HELP,
   UNIVERSE_MAP_IDS,
   UNIVERSE_MAP_LOCATE_LABEL,
   UNIVERSE_MAP_ZOOM,
@@ -184,5 +186,37 @@ describe('universe map play chrome', () => {
     expect(zoomReadout.textContent).toBe('2400%');
     expect(locate.getAttribute('aria-pressed')).toBe('true');
     closeUniverseMap();
+  });
+
+  test('touch chrome hides keyboard badges and keeps Close as a button', () => {
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
+    const close = document.querySelector(`#${UNIVERSE_MAP_IDS.close}`) as HTMLButtonElement;
+    const dialog = document.querySelector(`#${UNIVERSE_MAP_IDS.dialog}`) as HTMLDialogElement;
+    const help = document.querySelector('.universe-map-help') as HTMLElement;
+    const innerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    try {
+      window.dispatchEvent(new Event('resize'));
+      expect(toggle.classList.contains('universe-map-touch')).toBe(true);
+      expect(dialog.classList.contains('universe-map-touch')).toBe(true);
+      expect(toggle.getAttribute('aria-label')).toBe('Open universe map');
+      expect(toggle.getAttribute('aria-keyshortcuts')).toBeNull();
+      expect(close.getAttribute('aria-label')).toBe('Close');
+      expect(help.textContent).toBe(TOUCH_MAP_HELP);
+      expect(help.textContent).not.toMatch(/Esc|Home/u);
+    } finally {
+      if (innerWidth) {
+        Object.defineProperty(window, 'innerWidth', innerWidth);
+      }
+      if (innerHeight) {
+        Object.defineProperty(window, 'innerHeight', innerHeight);
+      }
+      window.dispatchEvent(new Event('resize'));
+    }
+    expect(toggle.classList.contains('universe-map-touch')).toBe(false);
+    expect(toggle.getAttribute('aria-keyshortcuts')).toBe('M');
+    expect(help.textContent).toBe(DESKTOP_MAP_HELP);
   });
 });

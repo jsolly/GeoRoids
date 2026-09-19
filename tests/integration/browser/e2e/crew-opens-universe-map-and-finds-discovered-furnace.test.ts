@@ -163,6 +163,14 @@ test.each([
     expect(await locate.getAttribute('aria-label')).toBe('Center on you');
     expect(await page.locator('.universe-map-stage #universe-map-center').isVisible()).toBe(true);
     expect(await page.locator('.universe-map-actions #universe-map-center').count()).toBe(0);
+    expect(await page.locator('#universe-map-close').getAttribute('aria-label')).toBe('Close');
+    expect(await page.locator('#universe-map-close kbd').isVisible()).toBe(!touch);
+    expect(await page.locator('#universe-map-toggle kbd').isVisible()).toBe(!touch);
+    if (touch) {
+      expect(await page.locator('.universe-map-help').textContent()).not.toMatch(/Esc|Home/u);
+    } else {
+      expect(await page.locator('.universe-map-help').textContent()).toMatch(/Esc/u);
+    }
     const locations = page.getByRole('list', { name: 'Revealed landmarks and crew coordinates' });
     await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(FAR_FURNACE.name);
     expect(await locations.textContent()).toContain('X +4000, Y +0');

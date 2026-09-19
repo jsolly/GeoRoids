@@ -117,8 +117,9 @@ explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
 centered on your current ship; zoom out to see distant discoveries or use the
-locate control on the map to restore the nearby scale. Close it with M, Escape,
-or the Close control.
+locate control on the map to restore the nearby scale. Ships on the chart use
+each pilot's hull silhouette. Close it with M, Escape, or the Close control.
+On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's
 radar. An active scan reaches 1,200 world units around its Surveyor. Ice becomes

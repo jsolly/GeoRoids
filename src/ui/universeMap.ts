@@ -4,6 +4,7 @@ import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { PALETTE } from '../constants';
 import { PlayerManager } from '../entities/player/PlayerManager';
+import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
 import {
   getCompletedSectors,
   getWorldExploration,
@@ -17,6 +18,7 @@ import {
   isFiniteMapPosition,
   type MapLabelRect,
 } from './universeMapLabels';
+import { shouldUseTouchControls } from './viewportChrome';
 
 export const UNIVERSE_MAP_IDS = {
   dialog: 'universe-map-dialog',
@@ -39,6 +41,10 @@ export const UNIVERSE_MAP_ZOOM = {
 } as const;
 
 export const UNIVERSE_MAP_LOCATE_LABEL = 'Center on you';
+export const DESKTOP_MAP_HELP =
+  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.';
+export const TOUCH_MAP_HELP =
+  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · You can still take damage.';
 
 const MAP_RASTER_SIZE = 960;
 const CELLS_PER_SECTOR = 16;
@@ -88,6 +94,7 @@ type UniverseMapElements = {
   zoomReadout: HTMLOutputElement;
   status: HTMLElement;
   locations: HTMLUListElement;
+  help: HTMLElement;
 };
 
 type ExplorationRaster = {
@@ -193,6 +200,24 @@ function updateLocateControl(): void {
   elements.center.setAttribute('aria-pressed', isNearbyLocalView() ? 'true' : 'false');
 }
 
+function syncMapInputChrome(): void {
+  if (!elements) {
+    return;
+  }
+  const touch = shouldUseTouchControls();
+  elements.dialog.classList.toggle('universe-map-touch', touch);
+  elements.toggle.classList.toggle('universe-map-touch', touch);
+  elements.help.textContent = touch ? TOUCH_MAP_HELP : DESKTOP_MAP_HELP;
+  elements.toggle.setAttribute('aria-label', touch ? 'Open universe map' : 'Open universe map (M)');
+  if (touch) {
+    elements.toggle.removeAttribute('aria-keyshortcuts');
+    elements.center.removeAttribute('aria-keyshortcuts');
+  } else {
+    elements.toggle.setAttribute('aria-keyshortcuts', 'M');
+    elements.center.setAttribute('aria-keyshortcuts', 'Home');
+  }
+}
+
 function setViewCenter(center: Position): void {
   if (!elements) {
     return;
@@ -281,7 +306,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
         <output id="${UNIVERSE_MAP_IDS.zoomReadout}" aria-label="Map zoom">2400%</output>
         <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
-        <button id="${UNIVERSE_MAP_IDS.close}" type="button">Close <kbd>Esc</kbd></button>
+        <button id="${UNIVERSE_MAP_IDS.close}" type="button" aria-label="Close">Close <kbd>Esc</kbd></button>
       </div>
     </header>
     <div class="universe-map-stage">
@@ -299,7 +324,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <span><i class="map-key map-key-fog"></i>Uncharted</span>
       </div>
       <p id="${UNIVERSE_MAP_IDS.status}" aria-live="polite"></p>
-      <p class="universe-map-help">Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.</p>
+      <p class="universe-map-help">${DESKTOP_MAP_HELP}</p>
     </footer>`;
 }
 
@@ -341,6 +366,7 @@ function ensureElements(): UniverseMapElements | null {
   const locations = dialog.querySelector(
     `#${UNIVERSE_MAP_IDS.locations}`
   ) as HTMLUListElement | null;
+  const help = dialog.querySelector('.universe-map-help') as HTMLElement | null;
   if (
     !canvas ||
     !close ||
@@ -350,12 +376,26 @@ function ensureElements(): UniverseMapElements | null {
     !zoomOut ||
     !zoomReadout ||
     !status ||
-    !locations
+    !locations ||
+    !help
   ) {
     return null;
   }
   decorateLocateControl(center, stage);
-  return { dialog, canvas, toggle, close, center, zoomIn, zoomOut, zoomReadout, status, locations };
+  close.setAttribute('aria-label', 'Close');
+  return {
+    dialog,
+    canvas,
+    toggle,
+    close,
+    center,
+    zoomIn,
+    zoomOut,
+    zoomReadout,
+    status,
+    locations,
+    help,
+  };
 }
 
 function resizeCanvas(): void {
@@ -564,6 +604,29 @@ function drawMapAsset(
   context.restore();
 }
 
+function traceMapPolyline(
+  context: CanvasRenderingContext2D,
+  points: readonly Position[],
+  closed: boolean
+): boolean {
+  const first = points[0];
+  if (!first) {
+    return false;
+  }
+  context.beginPath();
+  context.moveTo(first.x, first.y);
+  for (let index = 1; index < points.length; index++) {
+    const point = points[index];
+    if (point) {
+      context.lineTo(point.x, point.y);
+    }
+  }
+  if (closed) {
+    context.closePath();
+  }
+  return true;
+}
+
 function drawCrew(
   context: CanvasRenderingContext2D,
   frame: MapFrame,
@@ -577,30 +640,34 @@ function drawCrew(
     if (!isFiniteMapPosition(position)) {
       continue;
     }
-    const size = (player.type === 'local' ? 16 : 12) / frame.scale;
+    const size = (player.type === 'local' ? 18 : 14) / frame.scale;
     const color = player.type === 'local' ? PALETTE.LOCAL : player.color;
+    const outline = getKitHullOutline(player.ship.kitId);
     context.save();
     context.translate(position.x, position.y);
-    context.rotate(-player.ship.angle);
     context.lineWidth = 1.5 / frame.scale;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
     context.strokeStyle = color;
     context.fillStyle = hexToRgba(color, player.type === 'local' ? 0.22 : 0.12);
     context.shadowColor = color;
     context.shadowBlur = 8 / frame.scale;
-    context.beginPath();
-    context.moveTo(size, 0);
-    context.lineTo(-size * 0.7, -size * 0.62);
-    context.lineTo(-size * 0.45, 0);
-    context.lineTo(-size * 0.7, size * 0.62);
-    context.closePath();
-    context.fill();
-    context.shadowBlur = 0;
-    context.stroke();
+    const hull = projectHullPolyline(0, 0, size, player.ship.angle, outline.hull);
+    if (traceMapPolyline(context, hull, outline.hull.closed)) {
+      context.fill();
+      context.shadowBlur = 0;
+      context.stroke();
+    }
+    for (const extra of outline.extras) {
+      const points = projectHullPolyline(0, 0, size, player.ship.angle, extra);
+      if (traceMapPolyline(context, points, extra.closed)) {
+        context.stroke();
+      }
+    }
     if (
       view.zoom >= 1.35 &&
       canPlaceMapCrewLabel(player.name, position, size, frame, view.center, occupied)
     ) {
-      context.rotate(player.ship.angle);
       context.font = `${11 / frame.scale}px "Courier New", monospace`;
       context.fillStyle = hexToRgba(PALETTE.HUD, 0.9);
       context.textAlign = 'left';
@@ -770,6 +837,7 @@ function openMap(): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
   mapOpen = true;
   nextLocationUpdateAt = 0;
+  syncMapInputChrome();
   view.zoom = UNIVERSE_MAP_ZOOM.initial;
   view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
   resizeCanvas();
@@ -991,6 +1059,7 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
   elements.canvas.addEventListener('wheel', onWheel, { passive: false });
   document.addEventListener('keydown', handleMapKeydown, true);
   window.addEventListener('resize', () => {
+    syncMapInputChrome();
     if (mapOpen) {
       resizeCanvas();
       renderMap();
@@ -1004,6 +1073,7 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
     }
   });
   updateZoomReadout();
+  syncMapInputChrome();
 }
 
 export function closeUniverseMap(): void {

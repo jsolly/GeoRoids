@@ -102,7 +102,7 @@ for (const viewport of [
   }, 20000);
 }
 
-test('a narrow-phone pilot can see and tap boost with the Debug HUD enabled', async () => {
+test('a narrow-phone Debug overlay keeps boost and the ability disc fully on screen', async () => {
   const page = await browserManager.recreatePage({ hasTouch: true });
   const diagnostics = watchBrowserDiagnostics(page);
   await page.setViewportSize({ width: 390, height: 650 });
@@ -113,6 +113,47 @@ test('a narrow-phone pilot can see and tap boost with the Debug HUD enabled', as
   const boost = page.locator('#touch-boost');
   await panel.waitFor({ state: 'visible' });
   await boost.waitFor({ state: 'visible' });
+  const ability = page.locator('#touch-ability');
+  await ability.waitFor({ state: 'visible' });
+  const chrome = await page.evaluate(() => {
+    const box = (el: Element | null) => {
+      if (!el) {
+        return null;
+      }
+      const r = el.getBoundingClientRect();
+      return {
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        width: r.width,
+        height: r.height,
+      };
+    };
+    const visualWidth = Math.round(window.visualViewport?.width ?? window.innerWidth);
+    const visualHeight = Math.round(window.visualViewport?.height ?? window.innerHeight);
+    const abilityEl = document.querySelector('#touch-ability');
+    const abilityBox = box(abilityEl);
+    const hit =
+      abilityBox &&
+      document.elementFromPoint(
+        abilityBox.left + abilityBox.width / 2,
+        abilityBox.top + abilityBox.height / 2
+      );
+    return {
+      visualWidth,
+      visualHeight,
+      overflowX: document.documentElement.scrollWidth > visualWidth + 1,
+      overflowY: document.documentElement.scrollHeight > visualHeight + 1,
+      playfield: box(document.querySelector('#gameArea')),
+      canvas: box(document.querySelector('#gameCanvas')),
+      stack: box(document.querySelector('#debug-play-stack')),
+      ability: abilityBox,
+      boost: box(document.querySelector('#touch-boost')),
+      abilityLabel: abilityEl?.textContent,
+      abilityHit: hit instanceof Element && Boolean(abilityEl?.contains(hit) || hit === abilityEl),
+    };
+  });
   const panelBounds = await page.locator('#debug-play-stack').boundingBox();
   const boostBounds = await boost.boundingBox();
   if (!panelBounds || !boostBounds) {
@@ -121,6 +162,26 @@ test('a narrow-phone pilot can see and tap boost with the Debug HUD enabled', as
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('debug-hud-keeps-boost-visible-mobile.png'),
   });
+  expect(chrome.abilityLabel).toBe('SCAN');
+  expect(chrome.overflowX).toBe(false);
+  expect(chrome.overflowY).toBe(false);
+  expect(chrome.playfield?.width).toBe(chrome.visualWidth);
+  expect(chrome.playfield?.height).toBe(chrome.visualHeight);
+  expect(chrome.canvas?.width).toBe(chrome.visualWidth);
+  expect(chrome.ability).toBeTruthy();
+  expect(chrome.ability?.left).toBeGreaterThanOrEqual((chrome.playfield?.left ?? 0) - 1);
+  expect(chrome.ability?.right).toBeLessThanOrEqual((chrome.playfield?.right ?? 0) + 1);
+  expect(chrome.ability?.top).toBeGreaterThanOrEqual((chrome.playfield?.top ?? 0) - 1);
+  expect(chrome.ability?.bottom).toBeLessThanOrEqual((chrome.playfield?.bottom ?? 0) + 1);
+  expect(chrome.ability?.left).toBeGreaterThanOrEqual(-1);
+  expect(chrome.ability?.right).toBeLessThanOrEqual(chrome.visualWidth + 1);
+  expect(chrome.ability?.bottom).toBeLessThanOrEqual(chrome.visualHeight + 1);
+  expect(chrome.abilityHit).toBe(true);
+  expect(chrome.stack?.left).toBeGreaterThanOrEqual((chrome.playfield?.left ?? 0) - 1);
+  expect(chrome.stack?.right).toBeLessThanOrEqual((chrome.playfield?.right ?? 0) + 1);
+  expect(chrome.stack?.top).toBeGreaterThanOrEqual((chrome.playfield?.top ?? 0) - 1);
+  expect(chrome.stack?.bottom).toBeLessThanOrEqual((chrome.playfield?.bottom ?? 0) + 1);
+  expect(chrome.boost?.right).toBeLessThanOrEqual(chrome.ability?.left ?? 0);
   expect(panelBounds.y + panelBounds.height).toBeLessThan(boostBounds.y);
   await boost.tap();
   await expect.poll(() => boost.getAttribute('aria-pressed')).toBe('true');

@@ -19,6 +19,16 @@ checkbox on the title screen to enable or mute audio. Muting stops sounds alread
 playing too. Starting with Sound off skips loading sound files. When you enable
 audio, effects become available as they load; missed sounds do not play later.
 
+Open Advanced and enable Debug to show this browser's Player ID and page
+session ID. The Player ID is the same `playerId` already written on join and
+motion STATE records; it appears after Enter Game confirms the ship. Copy it
+and send it to an agent so they can find this ship in production logs with
+`@playerId:` plus that value. The page session ID matches `@sessionId:` on
+forwarded client records. Debug stays off unless you turn it on; this browser
+remembers the checkbox. It does not publish your nickname or resume token.
+While Debug is on, a small Player ID chip stays on the playfield so you can
+copy after the title screen hides.
+
 Shots, impacts, and explosions vary their pitch slightly each time they
 start, keeping repeated actions from sounding identical. Automatic thrust is silent. Nearby action is louder; off-screen combat
 cues stay silent. Tow cables have attach and release cues. Orbital pickup

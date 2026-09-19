@@ -5,10 +5,14 @@ import type {
   SatellitePickupCollected,
   ShockwaveEvent,
 } from '../../shared-types';
+import type { PlayerIdentityChangedDetail } from '../network/services/playerIdentityEvents';
 
 declare global {
   interface WindowEventMap {
     gameStart: CustomEvent<undefined>;
+    playViewOn: CustomEvent<undefined>;
+    playViewOff: CustomEvent<undefined>;
+    playerIdentityChanged: CustomEvent<PlayerIdentityChangedDetail>;
     playerDied: CustomEvent<{
       playerId: string;
       deathCause: string;

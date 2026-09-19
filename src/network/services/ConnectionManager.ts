@@ -86,6 +86,7 @@ import {
 } from './connectionHealth';
 import { nextReconnectDelayMs } from './connectionReconnect';
 import { PlayerMotionReconciliation } from './PlayerMotionReconciliation';
+import { publishPlayerIdentity } from './playerIdentityEvents';
 import { PlayerListCache } from './playerListCache';
 import { bindPageHideDisconnect, fillSnapshotEntityIds, isLocalGameEntity } from './playerPresence';
 import {
@@ -1528,6 +1529,7 @@ export class ConnectionManager {
     }
     this.lastDamageStateLogAt = 0;
     setClientLogContext({ playerId: data.id, connectionId: this.connectionId });
+    publishPlayerIdentity(data.id);
     logger.info('STATE', 'player_joined', {
       joinedAt: Date.now(),
       playerId: data.id,

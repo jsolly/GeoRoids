@@ -42,9 +42,37 @@ if (typeof window !== 'undefined') {
             />
             <label class="sound-toggle-label" for="soundPref">Sound</label>
           </div>
+          <details id="advanced-settings" class="advanced-settings">
+            <summary>Advanced</summary>
+            <div class="debug-toggle-row">
+              <input class="sound-toggle" type="checkbox" id="debugPref" />
+              <label class="sound-toggle-label" for="debugPref">Debug</label>
+            </div>
+            <div id="debug-identity" class="debug-identity" hidden>
+              <div>
+                <label class="debug-id-label" for="debug-player-id">Player ID</label>
+                <div class="debug-id-row">
+                  <input id="debug-player-id" class="debug-id-input" type="text" readonly />
+                  <button id="copy-debug-player-id" type="button" class="debug-copy" disabled>Copy</button>
+                </div>
+              </div>
+              <div>
+                <label class="debug-id-label" for="debug-session-id">Page session</label>
+                <div class="debug-id-row">
+                  <input id="debug-session-id" class="debug-id-input" type="text" readonly />
+                  <button id="copy-debug-session-id" type="button" class="debug-copy">Copy</button>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
       <div id="gameArea" hidden>
+        <div id="debug-play-chip" class="debug-play-chip" hidden>
+          <span class="debug-play-chip-label">playerId</span>
+          <code id="debug-play-chip-id"></code>
+          <button id="copy-debug-play-chip" type="button" class="debug-copy" disabled>Copy</button>
+        </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
         </div>

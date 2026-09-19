@@ -173,6 +173,19 @@ function isNearbyLocalView(): boolean {
   return Math.hypot(view.center.x - expected.x, view.center.y - expected.y) < 1;
 }
 
+function positionLocateControl(): void {
+  if (!elements) {
+    return;
+  }
+  const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
+  const inset = 12;
+  const size = 44;
+  elements.center.style.left = `${Math.round(frame.x + frame.size - inset - size)}px`;
+  elements.center.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
+  elements.center.style.right = 'auto';
+  elements.center.style.bottom = 'auto';
+}
+
 function updateLocateControl(): void {
   if (!elements) {
     return;
@@ -642,6 +655,7 @@ function renderMap(): void {
     return;
   }
   resizeCanvas();
+  positionLocateControl();
   const context = elements.canvas.getContext('2d');
   if (!context) {
     return;

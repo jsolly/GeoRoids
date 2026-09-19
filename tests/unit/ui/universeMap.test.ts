@@ -173,6 +173,8 @@ describe('universe map play chrome', () => {
     toggle.click();
     expect(zoomReadout.textContent).toBe('2400%');
     expect(locate.getAttribute('aria-pressed')).toBe('true');
+    expect(locate.style.left).toMatch(/px$/u);
+    expect(locate.style.top).toMatch(/px$/u);
 
     zoomIn.click();
     expect(zoomReadout.textContent).toBe('3240%');

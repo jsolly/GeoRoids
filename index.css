@@ -73,6 +73,7 @@
 
   #start-screen {
     font-size: 1rem;
+    padding: 1.6rem 2rem 1.35rem;
     background: rgba(8, 15, 25, 0.84);
     border-color: color-mix(in srgb, var(--palette-hud-muted, #64748b) 55%, transparent);
     backdrop-filter: none;
@@ -499,7 +500,8 @@
   }
 
   #start-screen h1 {
-    margin-bottom: 0.6em;
+    font-size: 2.55em;
+    margin-bottom: 0.35em;
   }
 
   .screen h1::after {
@@ -682,6 +684,27 @@
     gap: 0.8em;
     align-items: center;
     margin-bottom: 1.5em;
+  }
+
+  #start-screen .terrain-eyebrow {
+    margin-bottom: 0.45rem;
+  }
+
+  #start-screen .controls-hint {
+    margin: 0.25em 0 0.7em;
+  }
+
+  #start-screen .game-modes {
+    margin-bottom: 0.9em;
+  }
+
+  #start-screen .settings {
+    margin-bottom: 0.75em;
+    gap: 0.45em;
+  }
+
+  #start-screen .game-description {
+    margin-bottom: 0;
   }
 
   .sound-toggle-row {
@@ -961,6 +984,10 @@
     .screen {
       max-width: 700px;
       padding: 50px;
+    }
+
+    #start-screen {
+      padding: 1.85rem 2.4rem 1.5rem;
     }
 
     .enter-game {

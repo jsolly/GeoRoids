@@ -1,11 +1,11 @@
 {
-  "note": "Title-menu Advanced/Debug opt-in: Player ID is copyable only after joined confirmation (resume-safe). Session ID is available immediately. Reviewed hud-network and field-manual against debugIdentity and ConnectionManager handleJoined. No new log fields, names, or resume tokens. No demonstration GIFs affected.",
+  "note": "Start-menu spacing keeps collapsed Advanced visible at laptop height. Debug still copyable only after joined confirmation. Reviewed hud-network and field-manual against debugIdentity and ConnectionManager handleJoined. No new log fields, names, or resume tokens. No demonstration GIFs affected.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:89a5a354646b253710afcf7bd00e4cff93c495328bd195157fb553614f5babcc",
     "docs/protocol/snapshot-v1.md": "sha256:353af6f6eb555a31d6740b7700e394bfb68b07db7298cf209e2416e8f6be2784",
     "docs/sounds.md": "sha256:9cbd052d2da62c1270becfc3bddd11c3b2065fb498a3439102e184ba5631d30a",
-    "index.css": "sha256:a99c5f1d8246424a6ed5c9190d9f92b1bf323047940c0e160fee6e6e2bc7a78f",
+    "index.css": "sha256:c0cae3d58a1be7e3bc4d5618c4318e35f65b6cfc5dea9a301e6c95758e2ba941",
     "index.html": "sha256:289160d495106ac0ec1ec165e0323590b40ee85189813666cbd1e4e0fc589f77",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:70af69bb9e5652478668d3e96439641f536495247951ecad8bad0fb305caf90f",
@@ -219,7 +219,7 @@
     "src/rendering/starfield.ts": "sha256:1e9b9109e9b22a0fbfdcd69110c85943e7e85cc1af8fe1b74f24e6c7df63c76d",
     "src/rendering/titleTerrain.ts": "sha256:742666260615c8a70f8102a775c653f4f18a4949d8025de458c04104df95c8f8",
     "src/rendering/vectorJuice.ts": "sha256:3682cba0c1ef01d9362b7128e785848b6200de65065556be3b7987621887b2f2",
-    "src/ui/debugIdentity.ts": "sha256:4bd629bd73db1fc04e47de8cdcd40b0edc8fa61a0d8365c5365f4ba6df8c7e19",
+    "src/ui/debugIdentity.ts": "sha256:c82128855327410053183ed563e18b6fdb797f9a35ec67e1ca0039da757468a6",
     "src/ui/mainMenu.ts": "sha256:db82736db7a36735216928fb4ce653f3a5caf7b270b2d2669c1ebe5fb03880bd",
     "src/ui/networkStatus.ts": "sha256:4008684b8b2ca7cf4ee6757a6ffbc2bb90dda946191d0efd747fe8012921dc49",
     "src/ui/satelliteInventory.ts": "sha256:cfc00ef089d84b1104f158d64d1d1c92069b6ed2e4d0cf963254fd36d9ee5709",

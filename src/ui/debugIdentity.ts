@@ -93,6 +93,9 @@ export function applyDebugPreference(enabled: boolean): void {
   }
   setHidden(document.querySelector('#debug-identity'), !enabled);
   syncDebugIdentity();
+  if (enabled) {
+    document.querySelector('#debug-identity')?.scrollIntoView?.({ block: 'nearest' });
+  }
 }
 
 function syncDebugIdentity(override?: { playerId?: string; sessionId?: string }): void {

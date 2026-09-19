@@ -38,6 +38,8 @@ export const UNIVERSE_MAP_ZOOM = {
   step: 1.35,
 } as const;
 
+export const UNIVERSE_MAP_LOCATE_LABEL = 'Center on you';
+
 const MAP_RASTER_SIZE = 960;
 const CELLS_PER_SECTOR = 16;
 const CELL_SIZE = WORLD.sectorSize / CELLS_PER_SECTOR;
@@ -160,12 +162,31 @@ function clampCenter(center: Position, mapFrame: MapFrame): Position {
   };
 }
 
+function isNearbyLocalView(): boolean {
+  if (view.zoom !== UNIVERSE_MAP_ZOOM.initial) {
+    return false;
+  }
+  const local = PlayerManager.getInstance().getLocalPlayer();
+  const target = local?.ship.position ?? { x: 0, y: 0 };
+  const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
+  const expected = clampCenter(target, frame);
+  return Math.hypot(view.center.x - expected.x, view.center.y - expected.y) < 1;
+}
+
+function updateLocateControl(): void {
+  if (!elements) {
+    return;
+  }
+  elements.center.setAttribute('aria-pressed', isNearbyLocalView() ? 'true' : 'false');
+}
+
 function setViewCenter(center: Position): void {
   if (!elements) {
     return;
   }
   const frame = mapFrameFor(dimensions.width, dimensions.height, view.zoom);
   view.center = clampCenter(center, frame);
+  updateLocateControl();
 }
 
 function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
@@ -192,6 +213,7 @@ function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
     setViewCenter(view.center);
   }
   updateZoomReadout();
+  updateLocateControl();
 }
 
 function updateZoomReadout(): void {
@@ -211,6 +233,26 @@ function createButton(id: string, label: string, ariaLabel = label): HTMLButtonE
   return button;
 }
 
+const LOCATE_ICON = `<svg class="universe-map-locate-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><title>${UNIVERSE_MAP_LOCATE_LABEL}</title><circle class="universe-map-locate-dot" cx="12" cy="12" r="3"/><circle class="universe-map-locate-ring" cx="12" cy="12" r="7"/><path class="universe-map-locate-cross" d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/></svg>`;
+
+function locateControlMarkup(): string {
+  return `<button id="${UNIVERSE_MAP_IDS.center}" type="button" class="universe-map-locate" aria-label="${UNIVERSE_MAP_LOCATE_LABEL}" title="${UNIVERSE_MAP_LOCATE_LABEL}" aria-keyshortcuts="Home" aria-pressed="true">${LOCATE_ICON}</button>`;
+}
+
+function decorateLocateControl(button: HTMLButtonElement, stage: Element): void {
+  button.classList.add('universe-map-locate');
+  button.type = 'button';
+  button.setAttribute('aria-label', UNIVERSE_MAP_LOCATE_LABEL);
+  button.setAttribute('title', UNIVERSE_MAP_LOCATE_LABEL);
+  button.setAttribute('aria-keyshortcuts', 'Home');
+  if (!button.querySelector('svg')) {
+    button.innerHTML = LOCATE_ICON;
+  }
+  if (button.parentElement !== stage) {
+    stage.append(button);
+  }
+}
+
 function createDialogMarkup(dialog: HTMLDialogElement): void {
   if (dialog.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`)) {
     return;
@@ -223,7 +265,6 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
       </div>
       <div class="universe-map-actions">
-        <button id="${UNIVERSE_MAP_IDS.center}" type="button">Local pilot</button>
         <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
         <output id="${UNIVERSE_MAP_IDS.zoomReadout}" aria-label="Map zoom">2400%</output>
         <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
@@ -234,6 +275,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       <canvas id="${UNIVERSE_MAP_IDS.canvas}" tabindex="0" role="img" aria-label="Shared universe map" aria-details="${UNIVERSE_MAP_IDS.locations}"></canvas>
       <ul id="${UNIVERSE_MAP_IDS.locations}" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
       <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+      ${locateControlMarkup()}
     </div>
     <footer class="universe-map-footer">
       <div class="universe-map-legend">
@@ -244,7 +286,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <span><i class="map-key map-key-fog"></i>Uncharted</span>
       </div>
       <p id="${UNIVERSE_MAP_IDS.status}" aria-live="polite"></p>
-      <p class="universe-map-help">Drag to pan · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.</p>
+      <p class="universe-map-help">Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.</p>
     </footer>`;
 }
 
@@ -276,6 +318,7 @@ function ensureElements(): UniverseMapElements | null {
   const canvas = dialog.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement | null;
   const close = dialog.querySelector(`#${UNIVERSE_MAP_IDS.close}`) as HTMLButtonElement | null;
   const center = dialog.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement | null;
+  const stage = dialog.querySelector('.universe-map-stage');
   const zoomIn = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement | null;
   const zoomOut = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement | null;
   const zoomReadout = dialog.querySelector(
@@ -289,6 +332,7 @@ function ensureElements(): UniverseMapElements | null {
     !canvas ||
     !close ||
     !center ||
+    !stage ||
     !zoomIn ||
     !zoomOut ||
     !zoomReadout ||
@@ -297,6 +341,7 @@ function ensureElements(): UniverseMapElements | null {
   ) {
     return null;
   }
+  decorateLocateControl(center, stage);
   return { dialog, canvas, toggle, close, center, zoomIn, zoomOut, zoomReadout, status, locations };
 }
 
@@ -778,6 +823,12 @@ function handleMapKeydown(ev: KeyboardEvent): void {
     closeMap();
     return;
   }
+  if (ev.code === 'Home') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    centerOnLocalPlayer();
+    return;
+  }
   if (ev.target instanceof HTMLButtonElement) {
     ev.stopPropagation();
     return;
@@ -807,9 +858,6 @@ function handleMapKeydown(ev: KeyboardEvent): void {
     case 'Minus':
     case 'NumpadSubtract':
       setViewZoom(view.zoom / UNIVERSE_MAP_ZOOM.step);
-      break;
-    case 'Home':
-      centerOnLocalPlayer();
       break;
     default:
       if (!BLOCKED_GAMEPLAY_KEYS.has(ev.code)) {

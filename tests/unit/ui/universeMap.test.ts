@@ -6,6 +6,7 @@ import {
   isUniverseMapOpen,
   mapWorldToCanvas,
   UNIVERSE_MAP_IDS,
+  UNIVERSE_MAP_LOCATE_LABEL,
   UNIVERSE_MAP_ZOOM,
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
@@ -152,5 +153,34 @@ describe('universe map play chrome', () => {
     expect(
       mapWorldToCanvas({ x: 100, y: -50 }, { x: 0, y: 0 }, { x: 20, y: 30, size: 400, scale: 2 })
     ).toEqual({ x: 420, y: 130 });
+  });
+
+  test('the locate control sits on the map and restores the nearby ship view', () => {
+    const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
+    const locate = document.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement;
+    const zoomIn = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement;
+    const zoomReadout = document.querySelector(
+      `#${UNIVERSE_MAP_IDS.zoomReadout}`
+    ) as HTMLOutputElement;
+    const stage = document.querySelector('.universe-map-stage');
+    const headerActions = document.querySelector('.universe-map-actions');
+
+    expect(locate.parentElement).toBe(stage);
+    expect(headerActions?.contains(locate)).toBe(false);
+    expect(locate.getAttribute('aria-label')).toBe(UNIVERSE_MAP_LOCATE_LABEL);
+    expect(locate.querySelector('svg')).not.toBeNull();
+
+    toggle.click();
+    expect(zoomReadout.textContent).toBe('2400%');
+    expect(locate.getAttribute('aria-pressed')).toBe('true');
+
+    zoomIn.click();
+    expect(zoomReadout.textContent).toBe('3240%');
+    expect(locate.getAttribute('aria-pressed')).toBe('false');
+
+    locate.click();
+    expect(zoomReadout.textContent).toBe('2400%');
+    expect(locate.getAttribute('aria-pressed')).toBe('true');
+    closeUniverseMap();
   });
 });

@@ -77,10 +77,10 @@ changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 Press M or use the on-screen Map button to open the full-screen universe map.
 It opens centered on your ship, showing 5,000 units across so nearby landmarks
 are easy to distinguish. Drag to pan and use the scroll wheel or +/− controls
-to zoom, including all the way out to the whole world. Local pilot restores
-the nearby view. The shared exploration chart and discovered assets persist;
-each opening returns to your current location. Press M, Escape, or Close to
-return to flight.
+to zoom, including all the way out to the whole world. The locate control on
+the map, or Home, restores the nearby view centered on your ship. The shared
+exploration chart and discovered assets persist; each opening returns to your
+current location. Press M, Escape, or Close to return to flight.
 
 ## Touch
 

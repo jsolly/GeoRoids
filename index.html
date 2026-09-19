@@ -209,7 +209,6 @@
           <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
         </div>
         <div class="universe-map-actions">
-          <button id="universe-map-center" type="button">Local pilot</button>
           <button id="universe-map-zoom-out" type="button" aria-label="Zoom out">−</button>
           <output id="universe-map-zoom" aria-label="Map zoom">2400%</output>
           <button id="universe-map-zoom-in" type="button" aria-label="Zoom in">+</button>
@@ -226,6 +225,22 @@
         ></canvas>
         <ul id="universe-map-locations" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
         <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+        <button
+          id="universe-map-center"
+          type="button"
+          class="universe-map-locate"
+          aria-label="Center on you"
+          title="Center on you"
+          aria-keyshortcuts="Home"
+          aria-pressed="true"
+        >
+          <svg class="universe-map-locate-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <title>Center on you</title>
+            <circle class="universe-map-locate-dot" cx="12" cy="12" r="3" />
+            <circle class="universe-map-locate-ring" cx="12" cy="12" r="7" />
+            <path class="universe-map-locate-cross" d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2" />
+          </svg>
+        </button>
       </div>
       <footer class="universe-map-footer">
         <div class="universe-map-legend">
@@ -236,7 +251,7 @@
           <span><i class="map-key map-key-fog"></i>Uncharted</span>
         </div>
         <p id="universe-map-status" aria-live="polite"></p>
-        <p class="universe-map-help">Drag to pan · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.</p>
+        <p class="universe-map-help">Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.</p>
       </footer>
     </dialog>
 

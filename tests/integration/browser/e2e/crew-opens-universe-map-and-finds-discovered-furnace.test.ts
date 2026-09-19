@@ -159,6 +159,10 @@ test.each([
     expect(frame.labels).toContain('NORTH');
     expect(frame.labels).toContain('5k across');
     expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
+    const locate = page.locator('#universe-map-center');
+    expect(await locate.getAttribute('aria-label')).toBe('Center on you');
+    expect(await page.locator('.universe-map-stage #universe-map-center').isVisible()).toBe(true);
+    expect(await page.locator('.universe-map-actions #universe-map-center').count()).toBe(0);
     const locations = page.getByRole('list', { name: 'Revealed landmarks and crew coordinates' });
     await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(FAR_FURNACE.name);
     expect(await locations.textContent()).toContain('X +4000, Y +0');
@@ -192,8 +196,9 @@ test.each([
     const wholeWorld = await readMapFrame(page);
     expect(wholeWorld.labels).toContain('120k across');
     expect(wholeWorld.labels).toContain(FAR_FURNACE.name);
-    await page.locator('#universe-map-center').click();
+    await locate.click();
     expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
+    expect(await locate.getAttribute('aria-pressed')).toBe('true');
 
     if (touch) {
       await page.locator('#universe-map-close').tap();

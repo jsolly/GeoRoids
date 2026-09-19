@@ -65,6 +65,17 @@ test('title menu uses first-party nickname and sound chrome', () => {
   expect(document.querySelector('.nav-item')).toBeNull();
 });
 
+test('playfield chrome sizes to the visible box instead of overflowing 100dvw', () => {
+  expect(productionCss).toMatch(/#gameWrapper \{[^}]*width: 100%;/su);
+  expect(productionCss).toMatch(/#gameArea \{[^}]*width: 100%;/su);
+  expect(productionCss).toMatch(/#gameCanvas \{[^}]*width: 100%;/su);
+  expect(productionCss).not.toMatch(/#gameArea \{[^}]*width: 100dvw;/su);
+  expect(productionCss).toContain('max-width: min(calc(100% - 20px), 280px)');
+  expect(productionCss).toMatch(
+    /\.touch-ability \{\s*right: max\(16px, env\(safe-area-inset-right, 0px\)\);/u
+  );
+});
+
 test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
   const advanced = document.querySelector<HTMLDetailsElement>('#advanced-settings');
   expect(advanced?.tagName).toBe('DETAILS');

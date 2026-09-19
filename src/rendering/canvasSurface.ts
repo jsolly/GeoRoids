@@ -86,12 +86,7 @@ class CanvasManager {
     this.viewport.height = height;
 
     const { miniMap } = hudLayoutForCanvas(this.viewport);
-    const chrome = this.canvas.parentElement;
-    chrome?.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
-    chrome?.style.setProperty(
-      '--map-toggle-y',
-      `${touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84}px`
-    );
+    this.syncPlayfieldChrome(width, height, miniMap, touchControls);
 
     if (this.canvas.width !== backingWidth) {
       this.canvas.width = backingWidth;
@@ -128,6 +123,43 @@ class CanvasManager {
     return backingSizeChanged || devicePixelRatioChanged;
   }
 
+  private syncPlayfieldChrome(
+    width: number,
+    height: number,
+    miniMap: { x: number; y: number; size: number },
+    touchControls: boolean
+  ): void {
+    const chrome = this.canvas?.parentElement;
+    if (!(chrome instanceof HTMLElement)) {
+      return;
+    }
+    chrome.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
+    chrome.style.setProperty(
+      '--map-toggle-y',
+      `${touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84}px`
+    );
+    if (chrome.id !== 'gameArea') {
+      return;
+    }
+    const cssWidth = `${width}px`;
+    const cssHeight = `${height}px`;
+    if (chrome.style.width !== cssWidth) {
+      chrome.style.width = cssWidth;
+    }
+    if (chrome.style.height !== cssHeight) {
+      chrome.style.height = cssHeight;
+    }
+  }
+
+  private clearPlayfieldChrome(): void {
+    const chrome = this.canvas?.parentElement;
+    if (!(chrome instanceof HTMLElement) || chrome.id !== 'gameArea') {
+      return;
+    }
+    chrome.style.removeProperty('width');
+    chrome.style.removeProperty('height');
+  }
+
   private handleCanvasResize(): void {
     if (this.canvas && this.context) {
       const changed = this.applyViewportSize();
@@ -140,6 +172,7 @@ class CanvasManager {
   }
 
   destroy(): void {
+    this.clearPlayfieldChrome();
     this.stopDevicePixelRatioWatcher?.();
     this.stopDevicePixelRatioWatcher = null;
     if (this.resizeFrame !== null) {

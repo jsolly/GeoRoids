@@ -29,7 +29,8 @@ remembers the checkbox. It does not publish your nickname or resume token.
 While Debug is on, a small Player ID chip stays on the playfield so you can
 copy after the title screen hides, and a compact overlay shows live FPS, ping,
 snapshot age, motion epoch, world counts, and short client/server release IDs.
-The debug panel sits above the flight controls so Boost remains visible.
+The debug panel sits above the flight controls so Boost remains visible, and
+the kit ability button stays fully on the playfield.
 Those health lines stay on-screen only; they are not written to Railway.
 
 Shots, impacts, and explosions vary their pitch slightly each time they

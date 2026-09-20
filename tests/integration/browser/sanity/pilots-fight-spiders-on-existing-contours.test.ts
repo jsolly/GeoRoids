@@ -22,7 +22,7 @@ for (const viewport of [
   { name: 'desktop', width: 1280, height: 900, hasTouch: false },
   { name: 'mobile', width: 390, height: 844, hasTouch: true },
 ]) {
-  test(`a ${viewport.name} pilot is hunted on existing contours and shoots the spider dead`, async () => {
+  test(`a ${viewport.name} pilot finds a guarded deposit, escapes its pursuit, and shoots a guard dead`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.hasTouch });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
@@ -68,12 +68,14 @@ for (const viewport of [
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
     const playerId = await game.getLocalPlayerId();
-    await arrangeCrewField([playerId], 'empty');
-    await game.placeShipAt(2400, 1200);
+    await arrangeCrewField([playerId], 'spider-nest');
+    await game.placeShipAt(3000, 5000);
     await expect
-      .poll(async () => (await readField(page)).spiders.length, { timeout: 45000 })
-      .toBeGreaterThan(0);
-    const predator = (await readField(page)).spiders[0];
+      .poll(async () => (await readField(page)).spiders.length, { timeout: 5000 })
+      .toBe(4);
+    const predator = (await readField(page)).spiders.toSorted(
+      (a, b) => a.position.x - b.position.x
+    )[0];
     if (!predator) {
       throw new Error('No spider available');
     }
@@ -115,22 +117,45 @@ for (const viewport of [
         )
       )
       .toBe(true);
-    const lives = await game.getLives();
+    // Draw the guard outside its patrol before checking its return journey.
+    await game.placeShipAt(4400, 5000);
     await expect
-      .poll(() => game.getLives(), {
-        timeout: 7000,
-      })
-      .toBe(lives - 1);
-    await game.waitForShipAlive();
-    await game.waitForCombatReady();
-    // With no living pilots the field clears; fight a fresh predator after respawning.
-    await game.placeShipAt(2400, 1200);
+      .poll(
+        async () => {
+          const guard = (await readField(page)).spiders.find((spider) => spider.id === predator.id);
+          return guard ? Math.hypot(guard.position.x - 5000, guard.position.y - 5000) : 0;
+        },
+        { timeout: 5000 }
+      )
+      .toBeGreaterThan(320);
+    // Leave the nest's leash: the same guard must disengage and return home.
+    await game.placeShipAt(3700, 5000);
     await expect
-      .poll(async () => (await readField(page)).spiders.length, { timeout: 45000 })
-      .toBeGreaterThan(0);
-    const nextPredator = (await readField(page)).spiders[0];
+      .poll(
+        async () => {
+          const guard = (await readField(page)).spiders.find((spider) => spider.id === predator.id);
+          return guard?.phase === 'scuttling' && guard.targetId === null;
+        },
+        { timeout: 5000 }
+      )
+      .toBe(true);
+    await expect
+      .poll(
+        async () => {
+          const guard = (await readField(page)).spiders.find((spider) => spider.id === predator.id);
+          return guard ? Math.hypot(guard.position.x - 5000, guard.position.y - 5000) : Infinity;
+        },
+        { timeout: 10000 }
+      )
+      .toBeLessThanOrEqual(120);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`spider-return-${viewport.name}.png`),
+    });
+    const nextPredator = (await readField(page)).spiders.find(
+      (spider) => spider.id === predator.id
+    );
     if (!nextPredator) {
-      throw new Error('No spider available after respawn');
+      throw new Error('Guard disappeared instead of returning to its deposit');
     }
     const seenHealth: number[] = [];
     for (let shot = 0; shot < 6; shot++) {
@@ -147,7 +172,7 @@ for (const viewport of [
         });
       }
       // Arrange the firing lane, then use real input and authoritative damage.
-      await game.placeShipAt(target.position.x - 180, target.position.y);
+      await game.placeShipAt(target.position.x - 320, target.position.y);
       await page.evaluate(() => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
         if (ship) {

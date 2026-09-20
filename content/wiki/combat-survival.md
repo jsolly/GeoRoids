@@ -52,7 +52,7 @@ While the universe map or ship schematic is open, asteroid impacts, ricochets,
 and the boundary pass through the held hull. Closing the overlay grants the same
 blink window as a respawn.
 
-Terrain spiders chase nearby pilots and kill with one bite on contact, regardless of remaining health. Their bites obey spawn protection, overlay immunity, and life-loss rules. See [terrain spiders](/wiki/#terrain) for warnings, escape behavior, and how to fight them.
+Terrain spiders mostly guard resource territories, with larger groups around more valuable finds. Guards chase briefly before returning home; rare roaming hunters pursue farther. Both kill with one bite on contact, regardless of remaining health. Their bites obey spawn protection, overlay immunity, and life-loss rules. See [terrain spiders](/wiki/#terrain) for warnings, escape behavior, and how to fight them.
 
 ## Lives and respawn
 

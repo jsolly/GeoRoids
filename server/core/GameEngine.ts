@@ -108,6 +108,7 @@ import { RNGService } from './RNGService';
 import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 import { SurveyProbeManager } from './SurveyProbeManager';
+import { spiderResources } from './spiderResources';
 import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
 
 const PILOT_RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
@@ -559,7 +560,7 @@ export class GameEngine {
       logger.info('🔄 Game paused - no players online');
       this.lasers = [];
       this.clearPendingFeedback();
-      this.spiderManager.clear();
+      this.spiderManager.suspend();
       this.pendingSpiderAttacks = [];
       this.checkpointWorld();
     } else if (playerCount > 0 && this.isPaused) {
@@ -1365,6 +1366,12 @@ export class GameEngine {
       })),
       completedSectors: this.completedSectors,
       nowFrame: this.gameTime,
+      resources: () =>
+        spiderResources(
+          this.asteroidManager.getAllAsteroids(),
+          this.lootManager.getAll(),
+          this.satellitePickupManager.getAllPickups()
+        ),
     });
     this.pendingSpiderAttacks.push(...attacks);
   }

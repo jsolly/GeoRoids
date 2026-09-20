@@ -192,6 +192,7 @@
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts",
     "shared/terrainSpider.ts",
     "server/core/TerrainSpiderManager.ts",
+    "server/core/spiderResources.ts",
     "src/rendering/spiderRenderer.ts",
     "src/rendering/spiderFootContacts.ts",
     "src/audio/spiderScore.ts",

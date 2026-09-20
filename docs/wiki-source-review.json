@@ -1,11 +1,11 @@
 {
-  "note": "Merged main (title-screen Haptics toggle). Re-reviewed hud-network for Haptics plus Schematic/join-hint copy on controls, hauler, surveyor, satellites, and HUD. Join hint remains touch-only; desktop Schematic stays ahead of Map. No demonstration GIFs changed.",
+  "note": "Merged main title-menu chrome (#635). Re-reviewed controls, HUD, hauler, surveyor, and satellites for the desktop Schematic button, hidden-on-touch rule, and touch-only join hold hint. Title menu stacked toggles unchanged by this branch. No demonstration GIFs changed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
     "docs/protocol/snapshot-v1.md": "sha256:1ce8ae9659ef90be524e6efa2e9401b7b8b1a9a863936d1ac844473b75611e0d",
     "docs/sounds.md": "sha256:3029b875ed6c65f524b096d0ec2c2fb45ecdcb36e81f510fbd7fcee488f4b358",
-    "index.css": "sha256:6d38c997c5a75b3ad6ccae2f96c5a12e7ed917ccc5bc7046dc3544c786563368",
+    "index.css": "sha256:4ff9ad0fae8be43c9843a9673bc66ba7fef58e213428fe730128ff05f329e9e6",
     "index.html": "sha256:b32677b1a57ed7e547f08d772963952cc44cd5bc09db4c63a5975956183b09f8",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:897999f25f378daff966c32975be438b4ffde56f48f5a7d3fa375df5dad90bf1",

@@ -176,6 +176,12 @@ function onContextStateChange(): void {
     }
     return;
   }
+  if (!sessionEnabled()) {
+    stopSources();
+    library?.Howler.mute(true);
+    suspend();
+    return;
+  }
   // Looping beds must restart after an interruption; SFX initializers are
   // idempotent and do not replay one-shot cues.
   restartPlayback();

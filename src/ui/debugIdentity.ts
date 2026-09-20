@@ -1,10 +1,11 @@
 import { debugIsOn, setDebugPreference } from '../constants/user-preferences';
+import { buildClientDiagnostics } from '../diagnostics/clientDiagnostics';
 import { getClientLogContext } from '../utils/clientLogContext';
 import { attachEventListener } from '../utils/dom';
 import { syncDebugHudVisibility } from './debugHud';
 
 const COPY_LABEL = 'Copy';
-const COPIED_LABEL = 'Copied';
+const COPIED_LABEL = 'Copied!';
 const PLAYER_ID_PENDING = 'Available after Enter Game';
 const copyResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
 
@@ -37,36 +38,50 @@ async function copyText(value: string, input?: HTMLInputElement | null): Promise
   } catch {
     // Fall through to the select-all path when the clipboard API is blocked.
   }
+  const previousFocus = document.activeElement;
+  const target = input ?? document.createElement('textarea');
   if (!input) {
-    return false;
+    target.value = value;
+    target.readOnly = true;
+    target.style.position = 'fixed';
+    target.style.opacity = '0';
+    document.body.append(target);
   }
-  input.focus();
-  input.select();
-  input.setSelectionRange(0, input.value.length);
   try {
+    target.focus({ preventScroll: true });
+    target.select();
+    target.setSelectionRange(0, target.value.length);
     return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    if (!input) {
+      target.remove();
+    }
+    if (previousFocus instanceof HTMLElement) {
+      previousFocus.focus({ preventScroll: true });
+    }
   }
 }
 
-function flashCopied(button: HTMLButtonElement | null): void {
+function flashCopyResult(button: HTMLButtonElement | null, copied: boolean): void {
   if (!button) {
     return;
   }
+  const label = button.dataset['copyLabel'] ?? COPY_LABEL;
   const existing = copyResetTimers.get(button);
   if (existing !== undefined) {
     clearTimeout(existing);
   }
-  button.textContent = COPIED_LABEL;
-  button.setAttribute('aria-label', copyAriaLabel(button, true));
+  button.textContent = copied ? COPIED_LABEL : 'Copy failed';
+  button.setAttribute('aria-label', copied ? copyAriaLabel(button, true) : 'Copy failed');
   copyResetTimers.set(
     button,
     setTimeout(() => {
-      button.textContent = COPY_LABEL;
+      button.textContent = label;
       button.setAttribute('aria-label', copyAriaLabel(button, false));
       copyResetTimers.delete(button);
-    }, 1400)
+    }, 3000)
   );
 }
 
@@ -109,10 +124,6 @@ function syncDebugIdentity(override?: { playerId?: string; sessionId?: string })
   const playerInput = document.querySelector<HTMLInputElement>('#debug-player-id');
   const sessionInput = document.querySelector<HTMLInputElement>('#debug-session-id');
   const copyPlayer = document.querySelector<HTMLButtonElement>('#copy-debug-player-id');
-  const chipId = document.querySelector('#debug-play-chip-id');
-  const chipCopy = document.querySelector<HTMLButtonElement>('#copy-debug-play-chip');
-  const debugOn = document.body.classList.contains('debug-on');
-  const inPlay = document.body.classList.contains('in-play');
 
   if (sessionInput) {
     sessionInput.value = sessionId;
@@ -124,13 +135,6 @@ function syncDebugIdentity(override?: { playerId?: string; sessionId?: string })
   if (copyPlayer) {
     copyPlayer.disabled = !playerId;
   }
-  if (chipId) {
-    chipId.textContent = playerId;
-  }
-  if (chipCopy) {
-    chipCopy.disabled = !playerId;
-  }
-  setHidden(document.querySelector('#debug-play-chip'), !(debugOn && inPlay && playerId));
 }
 
 /** Clear remembered correlators between unit tests. */
@@ -178,21 +182,16 @@ export function mountDebugIdentity(): void {
 
   const copyPlayer = document.querySelector<HTMLButtonElement>('#copy-debug-player-id');
   const copySession = document.querySelector<HTMLButtonElement>('#copy-debug-session-id');
-  const copyChip = document.querySelector<HTMLButtonElement>('#copy-debug-play-chip');
   attachEventListener(copyPlayer, 'click', async () => {
-    if (await copyText(confirmedPlayerId, playerInput)) {
-      flashCopied(copyPlayer);
-    }
+    flashCopyResult(copyPlayer, await copyText(confirmedPlayerId, playerInput));
   });
   attachEventListener(copySession, 'click', async () => {
-    if (await copyText(getClientLogContext().sessionId, sessionInput)) {
-      flashCopied(copySession);
-    }
+    flashCopyResult(copySession, await copyText(getClientLogContext().sessionId, sessionInput));
   });
-  attachEventListener(copyChip, 'click', async () => {
-    if (await copyText(confirmedPlayerId)) {
-      flashCopied(copyChip);
-    }
+
+  const copyDiagnostics = document.querySelector<HTMLButtonElement>('#copy-debug-diagnostics');
+  attachEventListener(copyDiagnostics, 'click', async () => {
+    flashCopyResult(copyDiagnostics, await copyText(buildClientDiagnostics()));
   });
 
   window.addEventListener('playerIdentityChanged', (event) => {

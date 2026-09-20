@@ -18,6 +18,7 @@ const invalidMovements: Array<{ label: string; movement: Record<string, unknown>
   { label: 'non-boolean thrust', movement: { thrusting: 'true' } },
   { label: 'non-boolean boost', movement: { boosting: 'true' } },
   { label: 'non-boolean boost depletion', movement: { boostDepleted: 'true' } },
+  { label: 'non-boolean overlay hold', movement: { overlayHold: 'true' } },
 ];
 
 function join(core: WebSocketCore, socket: RecordingSocket, data: Record<string, unknown>): void {

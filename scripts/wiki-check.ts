@@ -132,6 +132,7 @@ const sourcePaths = new Set([
   ...files('scripts').filter((path) => path.includes('/wiki-media')),
   ...files('public/wiki/media'),
   ...files('public/sounds'),
+  ...files('public/music'),
 ]);
 const hashes: Record<string, string> = {};
 for (const path of [...sourcePaths].sort()) {

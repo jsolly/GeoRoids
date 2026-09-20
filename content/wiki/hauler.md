@@ -39,32 +39,44 @@ hull gap. The rock briefly shudders on attachment and stays whole. Four cream
 canisters with amber tips pop out during extraction, then the tether
 releases. The ability never targets a ship. E again releases an unfinished tap,
 stopping further drops; canisters already extracted remain collectible.
-Furnaces do not consume a tapped rock. With Sound enabled, each canister leaves
+Furnaces do not consume a tapped rock. With Sound Effects on, each canister leaves
 with a low crystal pluck. Collecting canisters answers with brighter notes;
 several quick pickups form a short melody.
 
 ## Boost Coupling E
 
-Equip Boost Coupling, aim the ship in the desired travel direction, and press E
-near a living asteroid. On touch, use ARM. Attachment locks the thrust heading
-shown by the cream arrow on the rock; it does not start thrust or extract loot.
-You can keep flying and turning without changing that locked heading.
+Equip Boost Coupling and press E near a living asteroid. On touch, use ARM.
+The cream arrow on the rock points toward its nearest furnace automatically.
+Arming does not start thrust or extract loot; your ship's heading does not
+control the delivery direction.
 
-Press E again, or IGNITE on touch, to detach and start a three-second burn.
-Cream/amber exhaust marks the powered rock. Acceleration is gradual and speed
-is capped at 150 world units per second. After the fuel runs out, the exhaust
-ends and the asteroid coasts. Walls and impacts still affect its motion, but
-the thrust direction never turns with the ship or the spinning rock.
+Press E again, or IGNITE on touch, to detach and start autonomous delivery.
+Cream/amber exhaust marks the powered rock. It continuously steers toward the
+nearest furnace, correcting any sideways momentum it had at ignition. Acceleration is
+gradual and speed is capped at 150 world units per second. Propulsion continues
+until delivery, with no fuel timeout.
+
+On entering a furnace's intake, the rock explodes and is consumed exactly once.
+The pilots who armed the coupling receive its full delivery value, as do its
+recorded Surveyors. Ordinary rocks need one coupling. A colossal deposit stays
+armed until two Haulers have coupled; E or IGNITE before that crew is ready
+leaves the couplings latched. The owners do not need to stay nearby or connected, and still earn this
+delivery if their last life is lost before intake.
 
 Swap tools before ignition to cancel. Losing the attachment through distance,
-death, disconnect, or asteroid destruction also cancels an armed coupling.
-After ignition it runs independently of its pilot. Other Haulers cannot attach
-to an armed or burning rock. Ignition starts a new three-second ability cooldown.
-A powered rock remains an ordinary asteroid hazard and cannot deliver itself to
-a furnace; delivery still requires Tow Cable after the burn.
+death, disconnect, or asteroid destruction also cancels an armed coupling;
+a second crew coupling on a colossal deposit remains if only one owner leaves.
+After ignition it runs independently of its pilots. Other Haulers cannot attach
+to an ordinary armed or burning rock. A second Boost Coupling can join an
+armed colossal deposit until the crew is complete. Ignition starts a new three-second ability cooldown.
+Once ignited, the rock passes through ships, other asteroids, satellites, and
+completed-sector barriers. Weapons and blast impulses do not affect it, and it
+cannot be scanned, tapped, towed, or coupled again. Existing Surveyor tags still
+receive credit. Only furnace intake consumes the self-guided cargo.
 
-Burn time follows the simulation, which pauses when nobody is playing. A saved
-burn resumes with its remaining fuel when its sector is loaded after restart.
+Guidance follows the simulation, which pauses when nobody is playing. A saved
+powered rock retains its owner and resumes guidance after restart, including
+in completed sectors. Legacy saved finite burns without an owner resume as unpowered rocks.
 
 ## Tow cable E
 
@@ -86,11 +98,18 @@ rock is in range, the attempt leaves the cable detached and does not start a
 cooldown. While towing, the touch button reads Release and stays available.
 After release, a new attachment waits for any remaining cooldown. A dead or
 removed rock detaches automatically. If the towed asteroid overlaps another
-asteroid, both rocks use the ordinary collision break and the cable detaches.
-If it overlaps another ship, that ship takes a normal asteroid impact, the cargo
-breaks, and the cable detaches. The Hauler stays unharmed by its own cargo,
+asteroid, both ordinary rocks use the ordinary collision break and the cable
+detaches. A towed colossal deposit breaks the other rock and keeps its cables.
+If ordinary cargo overlaps another ship, that ship takes a normal asteroid
+impact, the cargo
+breaks, and the cable detaches. A towed colossal deposit deals that same
+impact without breaking. The Hauler stays unharmed by its own cargo,
 including when that cargo is the rock that hits another deposit. Spawn protection
 still prevents the ship impact. Untowed rocks pass through each other.
+
+A colossal deposit needs two Tow Cables before the cables apply haul force.
+One latch holds without moving the rock. Two Haulers who haul it to a furnace
+both receive the delivery.
 
 Fly the towed asteroid into an arena furnace to deliver it. The furnace is a
 dashed delivery ring around a burning grate with a column of flame roaring up
@@ -100,15 +119,19 @@ delivery points.
 
 Hauler passive exploration reaches 260 world units and contributes to the same
 persistent crew chart as Surveyor. Use the shared chart to follow discovered
-furnace markers; the local radar shows a discovered furnace while it is within
-the nearby radar view, and the universe map keeps its exact landmark anywhere
-in the explored world.
+amber furnace markers; the local radar shows a discovered campfire while it is within
+the nearby radar view, and the universe map keeps that landmark on the same zoom
+scale as the other chart marks. Zoomed out it is a flame pin; the nearby view
+keeps the three-tongue campfire.
 
 ## Mining lasers
 
-Hauler deals double mining damage to metal asteroids and cooperative large rocks.
+Hauler deals double mining damage to metal asteroids, cooperative large rocks,
+and colossal deposits.
 Metal takes two hits instead of three. Small ice and rubble already break in
-one hit. The different-pilot requirement for cooperative large-rock splits
+one hit. A colossal deposit takes many hits and does not use the one-second
+collaboration window; at zero mining health it splits into two large fragments.
+The different-pilot requirement for cooperative large-rock splits
 remains unchanged. Lasers mine asteroids only; they cannot damage teammates.
 
 ## Satellite inventory

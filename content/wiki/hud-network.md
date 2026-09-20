@@ -12,12 +12,31 @@ related:
 media: []
 ---
 
+## Probe beacons
+
+A pulsing cyan ring around a rock's minimap mark identifies a live
+[Survey Probe](/wiki/#surveyor). Follow that rock to survey more of the field.
+On the playfield the small diamond has a green health bar and emits expanding
+scan rings. Amber pulses warn that its battery is nearly empty.
+
 ## What the HUD shows
 
-Before entering a game, set your pilot name, choose a kit, and use the Sound
-checkbox on the title screen to enable or mute audio. Muting stops sounds already
-playing too. Starting with Sound off skips loading sound files. When you enable
-audio, effects become available as they load; missed sounds do not play later.
+Before entering a game, set your pilot name, choose a kit, and use Sound
+Effects, Music, and Haptics on the title screen. Sound Effects mutes cues already
+playing; Music loops a quiet title bed and an in-game bed after Enter Game.
+In-play danger can temporarily switch to a threat bed, then the playfield
+loop returns. Music off silences every bed, including danger, without muting
+cues. This browser remembers both audio checkboxes. Starting with Sound Effects
+off skips loading effect files. When you enable effects, they become
+available as they load; missed sounds do not play later.
+The Haptics checkbox stays off until you turn it on, and this browser remembers
+that choice. With Haptics on, your own shots, hull hits, deaths, Boost starts,
+kit abilities, pickups, and furnace deliveries buzz the device. Crew action
+around you does not. Haptics use the web Vibration API: many Android browsers
+can vibrate, while iPhone browsers cannot. If this browser has no vibration
+API, the checkbox stays off and explained, and turning it on does nothing.
+Native apps can use richer haptic engines; this web client does not wrap a native
+shell.
 
 Open Advanced and enable Debug to show this browser's Player ID and page
 session ID. The Player ID is the same `playerId` already written on join and
@@ -26,9 +45,16 @@ and send it to an agent so they can find this ship in production logs with
 `@playerId:` plus that value. The page session ID matches `@sessionId:` on
 forwarded client records. Debug stays off unless you turn it on; this browser
 remembers the checkbox. It does not publish your nickname or resume token.
-While Debug is on, a small Player ID chip stays on the playfield so you can
-copy after the title screen hides, and a compact overlay shows live FPS, ping,
-snapshot age, motion epoch, world counts, and short client/server release IDs.
+While Debug is on, a compact HUD stays on the playfield. Its **Copy diagnostics**
+button copies the Player ID, current ship, connection, browser and release
+details plus up to 80 recent client warnings,
+errors and state records for a bug report. It excludes private resume credentials.
+Successful copies show **Copied!** for three seconds. If copying fails, the button
+says **Copy failed**. The HUD shows live FPS, ping, snapshot age, motion epoch,
+world counts, and short client/server release IDs.
+Use **Hide HUD** during play to collapse the health overlay without turning off
+Debug. **Show HUD** brings it back. This browser remembers the HUD visibility
+separately from the Debug checkbox.
 The debug panel sits above the flight controls so Boost remains visible, and
 the kit ability button stays fully on the playfield.
 Those health lines stay on-screen only; they are not written to Railway.
@@ -63,8 +89,9 @@ marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, larger cream canisters
 with amber tips mark Tap loot, yellow slashed diamonds
-mark laser cores, and lilac circles and diamonds mark loose and orbiting
-satellite pickups. Heading triangles in local and crew colors keep pilots
+mark laser cores, lilac circles and diamonds mark loose and orbiting
+satellite pickups, and amber hairline three-tongue campfires mark discovered furnaces.
+Kit hull silhouettes in local and crew colors keep pilots
 identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
 V or hold your own Hauler hull to open the local ship schematic.
@@ -72,8 +99,10 @@ M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are
 outside the local radar. A discovered furnace stays marked in the local radar
-while it is within that nearby view; the universe map keeps its exact landmark
-when it is farther away. Death, delivery, and pickup
+while it is within that nearby view. On the universe map, furnace marks keep
+the same zoom scale as satellites, wreckage, laser cores, and ships. Zoomed out,
+they are amber flame pins; the nearby view and closer keep the three-tongue
+campfire. Death, delivery, and pickup
 messages appear in the center for 120 frames, or 2 seconds. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.
@@ -132,8 +161,9 @@ explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
 centered on your current ship; zoom out to see distant discoveries or use the
-locate control on the map to restore the nearby scale. Ships on the chart use
-each pilot's hull silhouette. Close it with M, Escape, or the Close control.
+locate control on the map to restore the nearby scale. Ships on both the local
+radar and the chart use each pilot's hull silhouette. Close it with M, Escape, or
+the Close control.
 On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's

@@ -1,9 +1,14 @@
 import type { Howl, HowlOptions } from 'howler';
 import type { Position } from '../../shared-types';
-import { LOCAL_STORAGE_KEYS } from '../constants/user-preferences';
+import { LOCAL_STORAGE_KEYS, soundIsOn } from '../constants/user-preferences';
 import { logger } from '../utils/Logger';
 import { setStoredItem } from '../utils/safeStorage';
-import { activateAudio, canPlayAudio, muteAudio, registerAudioSound } from './audioRuntime';
+import {
+  activateAudio,
+  canPlayAudio,
+  muteSfxKeepSession,
+  registerAudioSound,
+} from './audioRuntime';
 
 function boundedScale(scale: number): number {
   return Number.isFinite(scale) ? Math.min(1, Math.max(0, scale)) : 1;
@@ -77,7 +82,7 @@ export class Sound {
     const howl = this.howl;
     const scale = boundedScale(volumeScale);
     // Howler queues unloaded/suspended play calls. Never submit stale game cues.
-    if (!howl || !canPlayAudio(howl) || scale <= 0) {
+    if (!soundIsOn() || !howl || !canPlayAudio(howl) || scale <= 0) {
       return false;
     }
     // Howler's pool only bounds idle nodes, not simultaneous playback.
@@ -110,7 +115,7 @@ export function setSound(pref: boolean): void {
   if (pref) {
     activateAudio();
   } else {
-    muteAudio();
+    muteSfxKeepSession();
   }
 }
 

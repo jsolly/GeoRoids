@@ -2,13 +2,20 @@ import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
 export const LOCAL_STORAGE_KEYS = {
   soundOn: 'soundOn',
+  musicOn: 'musicOn',
+  hapticsOn: 'hapticsOn',
   debugOn: 'debugOn',
+  debugHudHidden: 'debugHudHidden',
 };
 
 /* Preferences from Localstorage */
 
 export function soundIsOn(): boolean {
   return getStoredItem(LOCAL_STORAGE_KEYS.soundOn) === 'true';
+}
+
+export function musicIsOn(): boolean {
+  return getStoredItem(LOCAL_STORAGE_KEYS.musicOn) !== 'false';
 }
 
 export function debugIsOn(): boolean {
@@ -24,6 +31,10 @@ if (typeof document !== 'undefined') {
   const defaultSoundPref = document.querySelector('#soundPref') as HTMLInputElement;
   if (defaultSoundPref) {
     defaultSoundPref.checked = soundIsOn();
+  }
+  const defaultMusicPref = document.querySelector('#musicPref') as HTMLInputElement;
+  if (defaultMusicPref) {
+    defaultMusicPref.checked = musicIsOn();
   }
   const defaultDebugPref = document.querySelector('#debugPref') as HTMLInputElement;
   if (defaultDebugPref) {

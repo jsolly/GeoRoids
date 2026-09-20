@@ -16,7 +16,7 @@ test.each([
   { width: 1280, height: 900 },
   { width: 390, height: 844 },
 ])(
-  'Hauler equips, arms, and ignites a fixed-heading asteroid at $width pixels',
+  'Hauler equips, arms, and ignites a furnace-guided asteroid at $width pixels',
   async (viewport) => {
     const mobile = viewport.width < 600;
     const page = await browserManager.recreatePage({ hasTouch: mobile });
@@ -44,7 +44,7 @@ test.each([
     await coupling.click();
     expect(await coupling.getAttribute('aria-pressed')).toBe('true');
     expect(await page.locator('#ship-schematic-part-copy').textContent()).toContain(
-      'locks heading'
+      'nearest furnace'
     );
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`boost-schematic-${viewport.width}.png`),
@@ -115,7 +115,7 @@ test.each([
           .find((candidate) => candidate.id === id)?.boost,
       ROCK_ID
     );
-    expect(burning?.angle).toBe(armed.angle);
+    expect(burning?.angle).toBeCloseTo(armed.angle);
     expect(await readSamplePlaybackRates(page, 'boost-ignite')).toEqual([1]);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`boost-burning-${viewport.width}.png`),
@@ -125,10 +125,14 @@ test.each([
         window.gameController
           ?.getCurrRoidBelt()
           .getRoids()
-          .find((candidate) => candidate.id === id)?.boost === null,
+          .every((candidate) => candidate.id !== id),
       ROCK_ID,
       { timeout: 5000 }
     );
+    await page.waitForFunction(() => (window.gameController?.getCurrPlayer()?.score ?? 0) > 0);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`boost-delivered-${viewport.width}.png`),
+    });
     assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT

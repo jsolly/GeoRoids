@@ -1,7 +1,7 @@
 import type { LootData, LootKind, Position } from '../../../shared-types';
 
 function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
-  if (kind === 'shard' || kind === 'laserCore' || kind === 'tap') {
+  if (kind === 'shard' || kind === 'laserCore' || kind === 'tap' || kind === 'silk') {
     return kind;
   }
   return 'wreckage';

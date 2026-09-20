@@ -88,6 +88,23 @@ export class LootManager {
     return this.toPublic(drop);
   }
 
+  /** A silk bundle ejects before becoming collectible; it never grants hull mass. */
+  public spawnSilk(position: Position, gameTime: number, velocity: Velocity): LootData {
+    const drop: TrackedLoot = {
+      id: `silk-${this.nextId++}`,
+      position: { ...position },
+      mass: 0,
+      radius: GROWTH.TAP_LOOT_RADIUS,
+      kind: 'silk',
+      expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
+      velocity: { ...velocity },
+      ejectFramesLeft: GROWTH.TAP_LOOT_EJECT_FRAMES,
+    };
+    this.loot.set(drop.id, drop);
+    this.enforceCap();
+    return this.toPublic(drop);
+  }
+
   public spawnLaserCore(position: Position, gameTime: number): LootData {
     const drop: TrackedLoot = {
       id: `core-${this.nextId++}`,
@@ -152,7 +169,7 @@ export class LootManager {
     for (const [id, drop] of this.loot) {
       if ((drop.ejectFramesLeft ?? 0) > 0) {
         drop.ejectFramesLeft = (drop.ejectFramesLeft ?? 0) - 1;
-      } else if (drop.kind === 'tap' && haulerPositions.length > 0) {
+      } else if ((drop.kind === 'tap' || drop.kind === 'silk') && haulerPositions.length > 0) {
         addLootMagnetPull(drop, haulerPositions, {
           range: GROWTH.TAP_LOOT_MAGNET_RANGE,
           accel: GROWTH.TAP_LOOT_MAGNET_ACCEL,

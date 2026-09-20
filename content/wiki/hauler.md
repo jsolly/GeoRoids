@@ -34,7 +34,7 @@ legacy Tow Cable so older sessions still haul.
 
 ## Resource Tap E
 
-E attaches a tap tether to the nearest living asteroid within a fixed 280-unit
+E attaches a tap tether to the nearest living asteroid or spider within a fixed 280-unit
 hull gap. The rock briefly shudders on attachment and stays whole. Four cream
 canisters with amber tips pop out during extraction, then the tether
 releases. The ability never targets a ship. E again releases an unfinished tap,
@@ -43,9 +43,12 @@ Furnaces do not consume a tapped rock. With Sound Effects on, each canister leav
 with a low crystal pluck. Collecting canisters answers with brighter notes;
 several quick pickups form a short melody.
 
+Tapping a spider extracts collectible spider silk instead of ore. Each spider has a finite silk reserve. Collected bundles stay in your inventory across flights and reconnects. It shudders
+and becomes angry at the tapping pilot. Silk has no crafting use yet.
+
 ## Boost Coupling E
 
-Equip Boost Coupling and press E near a living asteroid. On touch, use ARM.
+Boost Coupling cannot attach to spiders. Equip it and press E near a living asteroid. On touch, use ARM.
 The cream arrow on the rock points toward its nearest furnace automatically.
 Arming does not start thrust or extract loot; your ship's heading does not
 control the delivery direction.
@@ -82,7 +85,7 @@ in completed sectors. Legacy saved finite burns without an owner resume as unpow
 
 ## Tow cable E
 
-E attaches a tow cable to the nearest living asteroid within a fixed 280-unit
+E attaches a tow cable to the nearest living asteroid or spider within a fixed 280-unit
 hull gap. The rock briefly shudders when the cable catches. The ability never
 targets a ship, and it cannot deal ship damage.
 
@@ -127,6 +130,10 @@ amber furnace markers; the local radar shows a discovered campfire while it is w
 the nearby radar view, and the universe map keeps that landmark on the same zoom
 scale as the other chart marks. Zoomed out it is a flame pin; the nearby view
 keeps the three-tongue campfire.
+
+Tow Cable can also pull a spider behind the Hauler. Drag it into a furnace to
+engulf it in flame; with Sound Effects on, nearby pilots hear a brief melodic
+whimper as it disappears.
 
 ## Mining lasers
 

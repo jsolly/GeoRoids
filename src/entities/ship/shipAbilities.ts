@@ -48,6 +48,7 @@ export interface AbilityHost {
 
 /** Asteroid geometry shared by offline ability simulation and authoritative towing. */
 export interface AbilityBody {
+  kind?: 'spider' | 'asteroid';
   boost?: AsteroidBoost | null;
   id: string;
   position: Position;
@@ -328,6 +329,9 @@ function abilityBodySize(body: Pick<AbilityBody, 'r' | 'size'>): number {
 }
 
 function canLatchBoostedBody(host: AbilityHost, body: AbilityBody): boolean {
+  if (body.kind === 'spider' && haulerUtilityOf(host) === 'boost_coupling') {
+    return false;
+  }
   if (!body.boost) {
     return true;
   }
@@ -377,6 +381,7 @@ export function pullHarpoonTarget(
   }
 
   tickTowCable(host, target, canHaul);
+  host.harpoonLatchPos = { ...target.position };
 }
 
 export function tickTapExtract(

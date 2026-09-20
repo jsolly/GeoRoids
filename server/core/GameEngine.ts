@@ -58,7 +58,11 @@ import type {
 } from '../../shared-types';
 import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
-import { haulerUtilityOf, isTowCableUtility } from '../../src/entities/ship/haulerUtility';
+import {
+  haulerUtilityOf,
+  isResourceTapUtility,
+  isTowCableUtility,
+} from '../../src/entities/ship/haulerUtility';
 import {
   activateAbilityOnHost,
   clearHaulerLatch,
@@ -133,7 +137,7 @@ type LaserAuxiliaryTarget = {
   position: Position;
   radius: number;
 } & (
-  | { kind: 'surveyProbe'; asteroidId: string; ownerId: string }
+  | { kind: 'surveyProbe'; hostId: string; ownerId: string }
   | { kind: 'ship' | 'satellitePickup' | 'loot'; ownerId?: string }
 );
 
@@ -844,6 +848,7 @@ export class GameEngine {
       tokenHash,
       name: actor.name,
       score: actor.score,
+      silk: actor.silk ?? 0,
       lastSeenAt: now,
       kitId: actor.kitId,
       position: { x: actor.position.x, y: actor.position.y },
@@ -1010,6 +1015,7 @@ export class GameEngine {
     );
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
     actor.score = saved.lives === 0 ? GAME.STARTING_SCORE : saved.score;
+    actor.silk = saved.silk ?? 0;
     if (flight) {
       this.restoreRecentFlight(actor, flight, requestedKit);
     }
@@ -1103,6 +1109,7 @@ export class GameEngine {
         tokenHash: pilot.tokenHash,
         name: pilot.name,
         score: 0,
+        silk: pilot.silk ?? 0,
         ...releaseField('credentialReleaseId', pilot.credentialReleaseId),
         ...releaseField('credentialClientReleaseId', pilot.credentialClientReleaseId),
         ...epochField('credentialIssuedAt', pilot.credentialIssuedAt),
@@ -1362,7 +1369,22 @@ export class GameEngine {
   }
 
   private advanceSpiderField(): void {
+    const towedIds = new Set(
+      this.entityManager
+        .getAllEntities()
+        .filter(
+          (entity) =>
+            isTowCableUtility(entity) &&
+            entity.harpoonTargetId &&
+            !entity.exploding &&
+            entity.health > 0
+        )
+        .map((entity) => entity.harpoonTargetId)
+        .filter((id): id is string => id !== null && id !== undefined)
+    );
+    const previousIds = new Set(this.spiderManager.getBodies().map((spider) => spider.id));
     const attacks = this.spiderManager.advance({
+      towedIds,
       players: this.entityManager.getAllEntities().map((entity) => ({
         id: entity.id,
         position: entity.position,
@@ -1388,6 +1410,15 @@ export class GameEngine {
         ),
     });
     this.pendingSpiderAttacks.push(...attacks);
+    for (const entity of this.entityManager.getAllEntities()) {
+      if (
+        entity.harpoonTargetId &&
+        previousIds.has(entity.harpoonTargetId) &&
+        !this.spiderManager.getBody(entity.harpoonTargetId)
+      ) {
+        clearHaulerLatch(entity);
+      }
+    }
   }
 
   public getPlayerCount(): number {
@@ -2373,7 +2404,7 @@ export class GameEngine {
             }))
         : [];
       const probeTargets: LaserAuxiliaryTarget[] = this.surveyProbeManager
-        .targetsIn(nearbyRocks)
+        .targetsIn([...nearbyRocks, ...this.spiderManager.getBodies()])
         .map((target) => ({ ...target, kind: 'surveyProbe' as const }));
       const auxiliaryTargets: LaserAuxiliaryTarget[] = [
         ...probeTargets,
@@ -2430,7 +2461,7 @@ export class GameEngine {
             });
           }
         } else if (auxiliary.kind === 'surveyProbe') {
-          this.damageSurveyProbe(auxiliary.asteroidId, DAMAGE.LASER_HIT * laser.energy);
+          this.damageSurveyProbe(auxiliary.hostId, DAMAGE.LASER_HIT * laser.energy);
         } else {
           this.applyRicochetHullHit(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         }
@@ -2629,6 +2660,7 @@ export class GameEngine {
             color: entity.color,
             lives: entity.lives,
             score: entity.score,
+            silk: entity.silk ?? 0,
             health: entity.health,
             maxHealth: entity.maxHealth,
 
@@ -2691,12 +2723,20 @@ export class GameEngine {
       this.entityManager.getAllEntities().map((actor) => actor.harpoonTargetId)
     );
     const world = {
-      asteroids: this.getAllAsteroids().filter((asteroid) =>
-        this.haulerCanTarget(entity, asteroid, cargo)
-      ),
+      asteroids: [
+        ...this.getAllAsteroids().filter((asteroid) =>
+          this.haulerCanTarget(entity, asteroid, cargo)
+        ),
+        ...this.spiderManager
+          .getBodies()
+          .filter((spider) => !cargo.has(spider.id) || spider.id === entity.harpoonTargetId),
+      ],
     };
     const priorTargetId = entity.harpoonTargetId;
     const activation = activateAbilityOnHost(entity, world);
+    if (activation.activated && entity.harpoonTargetId && isResourceTapUtility(entity)) {
+      this.spiderManager.provoke(entity.harpoonTargetId, entity.id);
+    }
     if (activation.activated && priorTargetId) {
       const ignited = this.getAsteroid(priorTargetId);
       if (ignited?.boost?.phase === 'burning') {
@@ -2766,7 +2806,7 @@ export class GameEngine {
     this.surveyProbeManager.tick(
       now,
       () => this.getAllAsteroids(),
-      (asteroidId) => this.getAsteroid(asteroidId),
+      (hostId) => this.getAsteroid(hostId) ?? this.spiderManager.getBody(hostId),
       ({ ownerId, position, asteroids }) =>
         this.surveyFromPosition(ownerId, position, asteroids, SURVEY_PROBE.RANGE)
     );
@@ -2774,9 +2814,18 @@ export class GameEngine {
 
   private launchSurveyProbe(surveyor: GameEntity): boolean {
     const now = this.getServerTime();
-    this.surveyProbeManager.prune(now, (asteroidId) => this.getAsteroid(asteroidId));
+    this.surveyProbeManager.prune(
+      now,
+      (hostId) => this.getAsteroid(hostId) ?? this.spiderManager.getBody(hostId)
+    );
     const asteroids = this.getAllAsteroids();
-    const result = this.surveyProbeManager.launch(surveyor, asteroids, this.completedSectors, now);
+    const result = this.surveyProbeManager.launch(
+      surveyor,
+      asteroids,
+      this.completedSectors,
+      now,
+      this.spiderManager.getBodies()
+    );
     if (!result) {
       return false;
     }
@@ -2788,15 +2837,17 @@ export class GameEngine {
       ({ ownerId, position, asteroids: nearby }) =>
         this.surveyFromPosition(ownerId, position, nearby, SURVEY_PROBE.RANGE)
     );
-    result.host.surveyedBy ??= [];
-    if (!result.host.surveyedBy.includes(result.probe.ownerId)) {
-      result.host.surveyedBy.push(result.probe.ownerId);
+    if ('rotation' in result.host) {
+      result.host.surveyedBy ??= [];
+      if (!result.host.surveyedBy.includes(result.probe.ownerId)) {
+        result.host.surveyedBy.push(result.probe.ownerId);
+      }
     }
     return true;
   }
 
-  private damageSurveyProbe(asteroidId: string, damage: number): boolean {
-    return this.surveyProbeManager.damage(asteroidId, damage);
+  private damageSurveyProbe(hostId: string, damage: number): boolean {
+    return this.surveyProbeManager.damage(hostId, damage);
   }
 
   public tickAbilities(now = this.getServerTime()): void {
@@ -2847,8 +2898,13 @@ export class GameEngine {
         });
         this.surveyNearbyAsteroids(entity, nearbyAsteroids, scanRange);
       }
-      const target = entity.harpoonTargetId ? this.getAsteroid(entity.harpoonTargetId) : undefined;
-      if (target?.boost?.phase === 'burning') {
+      const spider = entity.harpoonTargetId
+        ? this.spiderManager.getBody(entity.harpoonTargetId)
+        : undefined;
+      const target = entity.harpoonTargetId
+        ? (this.getAsteroid(entity.harpoonTargetId) ?? spider)
+        : undefined;
+      if (target && 'boost' in target && target.boost?.phase === 'burning') {
         clearHaulerLatch(entity);
         continue;
       }
@@ -2865,7 +2921,14 @@ export class GameEngine {
               SHIP_ABILITY.TAP_EXTRACT_FRAMES
           ) - 1;
         const ejection = tapLootEjection(entity.position, target, burst);
-        const drop = this.lootManager.spawnTap(ejection.position, this.gameTime, ejection.velocity);
+        const hasSilk = !spider || this.spiderManager.extractSilk(spider.id, entity.id);
+        if (!hasSilk) {
+          clearHaulerLatch(entity);
+          continue;
+        }
+        const drop = spider
+          ? this.lootManager.spawnSilk(ejection.position, this.gameTime, ejection.velocity)
+          : this.lootManager.spawnTap(ejection.position, this.gameTime, ejection.velocity);
         if (this.pendingTapEjections.length >= MAX_PENDING_LOOT_COLLECTIONS) {
           this.pendingTapEjections.shift();
         }
@@ -3086,6 +3149,13 @@ export class GameEngine {
         kind: loot.kind,
         position: { ...loot.position },
       });
+      if (loot.kind === 'silk') {
+        collector.silk = (collector.silk ?? 0) + 1;
+        collector.lastUpdate = this.getServerTime();
+        this.capturePilot(collector.id);
+        results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
+        continue;
+      }
       if (loot.kind === 'laserCore') {
         collector.laserUpgrade = {
           charges: ASTEROID_INTERACTIONS.coreCharges,

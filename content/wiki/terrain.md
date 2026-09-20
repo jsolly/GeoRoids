@@ -69,7 +69,7 @@ happens in a Works yard, so leftover guards there stay until they are killed.
 Rare roaming hunters can still approach, with minutes between attempts and a
 quiet interval after spider combat. There is no immediate roaming ambush when
 a flight starts. The starter area, furnaces, and completed sectors remain safe
-from spiders.
+from roaming spiders; a Hauler can drag a captured spider into a furnace.
 
 Their feet touch the existing iso-lines as they move. Nearby contour segments
 turn red under their influence. They add no new web strands or pits, and the
@@ -87,3 +87,9 @@ health. Ordinary lasers kill it in three hits; powered shots deal their increase
 damage. Shooting iso-lines does nothing to the terrain. Killing the spider ends
 its pursuit and restores the nearby contours’ normal color. Spawn protection and
 map/schematic hold still prevent bite damage.
+
+Hauler's Resource Tap extracts collectible silk from a spider, making it shudder
+and turn on the pilot. Silk has no crafting use yet. Tow Cable can pull a spider
+into a furnace, where it is engulfed with a melodic whimper audible nearby when
+Sound Effects is on. Boost Coupling cannot target spiders. See
+[Hauler utilities](/wiki/#hauler).

@@ -134,7 +134,7 @@ describe('Hauler ship schematic overlay', () => {
     equipUtility('resource_tap');
     expect(tap?.classList.contains('is-active')).toBe(true);
     expect(document.querySelector(`#${SHIP_SCHEMATIC_IDS.copy}`)?.textContent).toContain(
-      'Keeps the asteroid intact'
+      'spider for silk'
     );
     closeShipSchematic();
   });

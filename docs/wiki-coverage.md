@@ -165,3 +165,13 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Cooperative splits automatically expire without a second qualifying hit.
   Their fast and heavy shockwaves push ships and asteroids without direct
   damage; metal and rubble follow their own break rules.
+
+## Spider utility interactions
+
+Hauler and terrain articles cover tapping finite silk reserves, provocation,
+towing spiders into Works, and the furnace whimper. Loot and growth covers the
+separate silk inventory, which grants neither ore score nor hull mass. Surveyor
+covers probes riding spiders back to guarded resources, sharing the existing
+beacon limits and expiry. Server scenarios prove extraction, persistence,
+protected-area towing and release, consumption, and nest scans; desktop/mobile
+browser scenarios exercise both ships' controls and the changed wiki sections.

@@ -21,13 +21,13 @@ export const HAULER_UTILITY = {
     id: 'resource_tap',
     name: 'Resource Tap',
     hint: 'Tap to equip',
-    copy: 'Harpoon a roid to extract resources. Keeps the asteroid intact.',
+    copy: 'Tap an asteroid for resources or a spider for silk. Spiders shudder and turn hostile.',
   },
   tow_cable: {
     id: 'tow_cable',
     name: 'Tow Cable',
     hint: 'Tap to equip',
-    copy: 'Latch and haul a rock (or wreck).',
+    copy: 'Latch and haul an asteroid, wreck, or spider.',
   },
 } as const;
 

@@ -113,7 +113,11 @@
     "tests/unit/server/colossal-asteroids-need-a-crew.test.ts",
     "tests/unit/server/powered-asteroids-finish-before-their-sector-sleeps.test.ts",
     "tests/integration/browser/sanity/hauler-arms-and-ignites-a-roid.test.ts",
-    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts"
+    "tests/integration/browser/sanity/hauler-schematic-keeps-tools-readable-on-small-screens.test.ts",
+    "server/core/TerrainSpiderManager.ts",
+    "shared/terrainSpider.ts",
+    "tests/unit/server/hauler-taps-silk-and-tows-spiders-to-a-furnace.test.ts",
+    "tests/integration/browser/e2e/hauler-extracts-silk-and-tows-spiders-into-furnaces.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -205,7 +209,9 @@
     "src/physics/terrain/spiderSession.ts",
     "shared/furnaces.ts",
     "tests/unit/shared/furnaces.test.ts",
-    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts"
+    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts",
+    "src/audio/spiderWhimper.ts",
+    "tests/unit/audio/spiders-whimper-once-when-the-furnace-consumes-them.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -357,7 +363,10 @@
     "src/entities/ship/surveyorUtility.ts",
     "server/core/SurveyProbeManager.ts",
     "src/ui/shipSchematic.ts",
-    "src/rendering/hud/resourceMapMark.ts"
+    "src/rendering/hud/resourceMapMark.ts",
+    "server/core/TerrainSpiderManager.ts",
+    "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts",
+    "tests/integration/browser/e2e/surveyor-tags-a-spider-with-a-moving-beacon.test.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",
@@ -374,7 +383,10 @@
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts",
     "tests/unit/entities/tapLootRenderer.test.ts",
     "tests/unit/entities/haulerUtility.test.ts",
-    "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts"
+    "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts",
+    "server/world/WorldStore.ts",
+    "src/ui/satelliteInventory.ts",
+    "tests/unit/server/hauler-taps-silk-and-tows-spiders-to-a-furnace.test.ts"
   ],
   "teamwork": [
     "shared-types.ts",

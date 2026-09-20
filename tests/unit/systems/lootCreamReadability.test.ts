@@ -91,3 +91,21 @@ test('dense metal shards get a second readable inner outline', () => {
   // shard contributes one extra diamond to each pass.
   expect(ctx.lineToCount).toBe(45);
 });
+
+test('silk snapshots draw three looped filaments instead of mineral diamonds', () => {
+  const ctx = traceContext();
+  ctx.quadraticCurveTo = vi.fn();
+  vi.spyOn(canvasManager, 'getContext').mockReturnValue(ctx);
+  vi.spyOn(canvasManager, 'worldToScreen').mockImplementation(
+    (position) => new Point(position.x, position.y)
+  );
+  const field = LootField.getInstance();
+  field.applySnapshot([
+    { id: 'silk-1', position: { x: 30, y: 30 }, mass: 0, radius: 20, kind: 'silk' },
+  ]);
+  drawLootRelative(new Ship(), field.getAll());
+  expect(field.getAll()[0]?.kind).toBe('silk');
+  expect(ctx.quadraticCurveTo).toHaveBeenCalledTimes(18);
+  expect(ctx.lineToCount).toBe(0);
+  expect(ctx.strokeStyle).toBe(PALETTE.LOOT);
+});

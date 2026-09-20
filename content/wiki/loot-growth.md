@@ -43,6 +43,10 @@ energy 2, scores when collected, expires after a timed lifetime, and is cleared
 on death. The shared reflection rules cap laser energy; enhanced energy also
 lets a laser apply the metal hit twice.
 
+Spider silk comes from using Resource Tap on a spider. Collect it as a separate
+material in your inventory; it has no crafting use yet and does not grant ore,
+mass, or score. The tapped spider shudders and becomes hostile.
+
 ## Shoot a drop
 
 A laser can detonate a nearby loot drop when the shooter is within its arm

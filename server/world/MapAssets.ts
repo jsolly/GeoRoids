@@ -18,7 +18,7 @@ export class MapAssets {
       name: furnace.name,
     }));
     for (const drop of loot) {
-      if (drop.kind === 'shard' || drop.kind === 'tap') {
+      if (drop.kind === 'shard' || drop.kind === 'tap' || drop.kind === 'silk') {
         continue;
       }
       candidates.push({

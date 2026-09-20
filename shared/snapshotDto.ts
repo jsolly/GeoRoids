@@ -65,6 +65,7 @@ const lootKind = enumeration<LootKind>({
   wreckage: true,
   laserCore: true,
   tap: true,
+  silk: true,
 });
 const array =
   (rule: Rule): Rule =>
@@ -97,6 +98,7 @@ const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
   maxEnergy: energy,
 });
 const entity = shape<ServerEntityData>({
+  silk: optional((value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0),
   id: string,
   name: string,
   type: choice('player'),
@@ -237,6 +239,8 @@ const spider = shape<TerrainSpider>({
   position,
   angle: number,
   phase: choice('scuttling', 'hunting'),
+  shudderFrames: optional(number),
+  probe: optional((value) => value === null || probe(value)),
   targetId: (value) => value === null || string(value),
 });
 function uniqueRows(rule: Rule, maximum: number): Rule {
@@ -267,7 +271,14 @@ const nest = shape<SpiderFieldState['nests'][number]>({
   resourceId: (value) => typeof value === 'string' && value.length > 0,
   position,
 });
+const consumedSpider = shape<NonNullable<SpiderFieldState['consumed']>[number]>({
+  id: string,
+  position,
+  furnaceId: string,
+  frame: number,
+});
 const spiderField = shape<SpiderFieldState>({
+  consumed: optional(uniqueRows(consumedSpider, SPIDER.MAX_ACTIVE)),
   spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE),
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });

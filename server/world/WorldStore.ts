@@ -32,6 +32,7 @@ function validWorldPosition(position: Position): boolean {
 
 /** Browser credential plus this UTC month's score and optional recent flight. */
 export interface PersistentPilot {
+  silk?: number;
   id: string;
   tokenHash: string;
   name: string;
@@ -178,6 +179,10 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   const name = pilot['name'];
   const tokenHash = pilot['tokenHash'];
   const score = pilot['score'];
+  const silk = pilot['silk'];
+  if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
+    return undefined;
+  }
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
@@ -193,6 +198,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     tokenHash,
     name,
     score,
+    ...(typeof silk === 'number' ? { silk } : {}),
     ...readOptionalFlight(pilot),
     ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),

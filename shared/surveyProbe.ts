@@ -8,7 +8,7 @@ export const SURVEY_PROBE = {
   LAUNCH_RANGE: 700,
   /** Time between authoritative scan pulses. */
   PULSE_MS: 3_000,
-  /** Time a beacon remains attached to its host asteroid. */
+  /** Time a beacon remains attached to its host. */
   LIFETIME_MS: 300_000,
   /** Maximum active beacons credited to one Surveyor. */
   MAX_PER_OWNER: 3,
@@ -22,22 +22,19 @@ export const SURVEY_PROBE = {
   COOLDOWN_FRAMES: 180,
 } as const;
 
-interface SurveyProbeHost {
-  position: Position;
-  rotation: number;
-}
+type SurveyProbeHost = { position: Position } & ({ rotation: number } | { angle: number });
 
 /**
  * Resolve the beacon's world position from its host pose.
  *
- * `angle` is deliberately local to the asteroid. A beacon therefore follows
+ * `angle` is deliberately local to the host. A beacon therefore follows
  * both translation and rotation without storing a second world position.
  */
 export function probePosition(
   host: SurveyProbeHost,
   probe: Pick<AsteroidProbe, 'angle' | 'radialOffset'>
 ): Position {
-  const angle = host.rotation + probe.angle;
+  const angle = ('rotation' in host ? host.rotation : host.angle) + probe.angle;
   return {
     x: host.position.x + Math.cos(angle) * probe.radialOffset,
     y: host.position.y + Math.sin(angle) * probe.radialOffset,

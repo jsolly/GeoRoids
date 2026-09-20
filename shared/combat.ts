@@ -75,7 +75,12 @@ export function isClientOwnedCollisionAttacker(attackerId: string): boolean {
 
 /** World hazards the server may apply to crew hulls. */
 export function isWorldHazard(attackerId: string): boolean {
-  return attackerId === 'asteroid' || attackerId === 'boundary' || attackerId === 'ricochet';
+  return (
+    attackerId === 'asteroid' ||
+    attackerId === 'boundary' ||
+    attackerId === 'ricochet' ||
+    attackerId === 'spider'
+  );
 }
 
 /** Direct crew shots pass through hulls; a bounce arms the bolt as a hazard. */

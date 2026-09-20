@@ -72,6 +72,15 @@ Leaving the playfield zeros the threat count. All beds stay quieter than
 cues. Satellite break, respawn, scan, latch/release and
 shockwave already had cues and now use the new family.
 
+## Terrain spiders
+
+Nearby spiders play sparse ominous tones; being hunted adds a descending
+stinger and a faster pulse. These effects use the shared audio context and
+follow Sound Effects. A hunted pilot also holds one reference in the danger
+music API, independently of Sound Effects; Music controls that background bed.
+Escaping or resetting the spider session releases its reference without clearing
+other hazards. Spider tones stop on mute, hidden tabs, and session cleanup.
+
 ## Satellite orbit
 
 Only the local pilot's orbiting satellite plays a soft C4/C5 chime once per

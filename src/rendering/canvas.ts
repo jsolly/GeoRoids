@@ -38,6 +38,7 @@ import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
 import { drawSectorBoundaries } from './sectorRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
+import { drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield } from './starfield';
 
 const laserHosts: LiveLaserSource[] = [{ lasers: [] }];
@@ -68,6 +69,7 @@ export function drawGame(
 
   drawStarfield(currShip.position);
   drawIsoContours(currShip.position);
+  drawTerrainSpiders(currShip.position, currPlayer.id, currShip.health > 0 && !currShip.exploding);
 
   const localId = currPlayer.id;
   let laserHostCount = 1;

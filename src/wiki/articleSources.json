@@ -182,7 +182,13 @@
     "shared/worldBoundary.ts",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
-    "tests/unit/systems/lasers-ricochet-inside-world.test.ts"
+    "tests/unit/systems/lasers-ricochet-inside-world.test.ts",
+    "shared/terrainSpider.ts",
+    "server/core/TerrainSpiderManager.ts",
+    "src/rendering/spiderRenderer.ts",
+    "src/rendering/spiderFootContacts.ts",
+    "src/audio/spiderScore.ts",
+    "src/physics/terrain/spiderSession.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -215,7 +221,9 @@
     "shared/worldBoundary.ts",
     "tests/unit/server/crew-shots-bounce-at-world-edge.test.ts",
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
-    "tests/unit/systems/lasers-ricochet-inside-world.test.ts"
+    "tests/unit/systems/lasers-ricochet-inside-world.test.ts",
+    "shared/terrainSpider.ts",
+    "server/core/TerrainSpiderManager.ts"
   ],
   "hud-network": [
     "shared/gameClock.ts",

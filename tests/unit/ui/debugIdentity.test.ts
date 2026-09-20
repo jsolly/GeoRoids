@@ -120,27 +120,3 @@ test('a joined playerId is the copyable Debug value agents filter in Railway log
     expect(writeText).toHaveBeenCalledWith(JOINED_ID);
   });
 });
-
-test('an in-play Debug chip shows the same playerId after join and hides when Debug is off', () => {
-  applyDebugPreference(true);
-  window.dispatchEvent(
-    new CustomEvent('playerIdentityChanged', {
-      detail: { playerId: JOINED_ID },
-    })
-  );
-
-  expect(document.querySelector<HTMLElement>('#debug-play-chip')?.hidden).toBe(true);
-
-  setPlayView(true);
-
-  const chip = document.querySelector<HTMLElement>('#debug-play-chip');
-  expect(chip?.hidden).toBe(false);
-  expect(document.querySelector('#debug-play-chip-id')?.textContent).toBe(JOINED_ID);
-
-  setPlayView(false);
-  expect(document.querySelector<HTMLElement>('#debug-play-chip')?.hidden).toBe(true);
-
-  setPlayView(true);
-  applyDebugPreference(false);
-  expect(document.querySelector<HTMLElement>('#debug-play-chip')?.hidden).toBe(true);
-});

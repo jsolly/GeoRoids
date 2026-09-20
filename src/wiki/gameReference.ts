@@ -50,7 +50,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
-        `Starter furnaces: ${starterFurnaces.map((furnace) => furnace.name).join(', ')}; ${FURNACES.length - starterFurnaces.length} regional Works sites fill the ${WORLD.radius.toLocaleString('en-US')}-unit world.`,
+        `Starter furnaces: ${starterFurnaces.map((furnace) => furnace.name).join(', ')}; ${FURNACES.length - starterFurnaces.length} regional Works sites fill the ${WORLD.radius.toLocaleString('en-US')}-unit world from sector interiors on a ${(WORLD.sectorSize * 2).toLocaleString('en-US')}-unit grid.`,
         `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
       ],
     },
@@ -196,8 +196,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Shared field values',
       paragraphs: [
-        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited, fully mapped, empty sector is walled off.`,
-        `${starterFurnaces.map((furnace) => `${furnace.name} (${furnace.radius}-unit intake)`).join(', ')} anchor the starter area; ${FURNACES.length - starterFurnaces.length} regional Works sites are distributed across the field. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
+        `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited, fully mapped, empty sector is walled off unless it holds a Works site.`,
+        `${starterFurnaces.map((furnace) => `${furnace.name} (${furnace.radius}-unit intake)`).join(', ')} anchor the starter area; ${FURNACES.length - starterFurnaces.length} regional Works sites sit at sector centers on a ${(WORLD.sectorSize * 2).toLocaleString('en-US')}-unit grid. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
       ],
     },
   ],

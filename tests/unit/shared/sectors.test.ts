@@ -34,13 +34,13 @@ describe('open-world sector helpers', () => {
 
   test('spawn keeps a requested pose that is already in an open sector', () => {
     const requested = { x: 120, y: -40 };
-    expect(
-      chooseOpenSectorSpawn({
-        completed: new Set(['2,0']),
-        previous: requested,
-        random: () => 0.25,
-      })
-    ).toEqual(requested);
+    const spawn = chooseOpenSectorSpawn({
+      completed: new Set(['2,0']),
+      previous: requested,
+      random: () => 0.25,
+    });
+    expect(spawn).toEqual(requested);
+    expect(spawn).not.toBe(requested);
   });
 
   test('spawn relocates out of a completed sector instead of clustering there', () => {

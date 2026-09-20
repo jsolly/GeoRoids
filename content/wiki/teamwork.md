@@ -69,8 +69,9 @@ deposit. After ignition it passes through ships and objects, ignores
 weapons, and cannot be scanned or worked on again before furnace intake.
 
 Three starter furnace landmarks sit around the field: North Works, Southeast
-Works, and Southwest Works. Regional Works sites then continue on a 4,000-unit
-grid through the open field. On the playfield each Works site is a dashed
+Works, and Southwest Works. Regional Works then continue on a 4,000-unit grid,
+each in the middle of its sector so a towed rock can swing in from any side
+instead of along a four-way corner. On the playfield each Works site is a dashed
 delivery ring around a burning grate, where a column of flame roars up the
 intake and throws embers past it. A furnace appears on the local minimap as an
 amber hairline three-tongue campfire after the crew discovers its area and remains visible
@@ -100,9 +101,10 @@ Close the overview with the Close control, or with M or Escape on a keyboard.
 
 The world is divided into 2,000-unit sectors. A sector completes when the crew
 has visited it, mapped every explorable cell, and removed every asteroid there,
-including rocks that drifted to sleep in that sector. Completed sectors stay
-empty: they do not regenerate deposits, and their walls are lethal to ships the
-same way the outer world boundary is. Lasers bounce off those walls and then
+including rocks that drifted to sleep in that sector. A sector that holds a
+Works site never completes, so the delivery yard stays open. Completed sectors
+stay empty: they do not regenerate deposits, and their walls are lethal to ships
+the same way the outer world boundary is. Lasers bounce off those walls and then
 become ricochets that can damage ships. Anyone already inside when a sector
 completes is moved just outside its walls in the direction they were flying,
 without losing a life. A hull that has already crossed the grid but still

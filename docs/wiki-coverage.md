@@ -150,7 +150,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   pickups take damage from asteroid impacts and ricochets while deployed;
   ordinary crew shots pass through owned hardware.
 - Completing a visited sector (every explorable cell mapped and every asteroid
-  gone) walls it off. Completed-sector walls kill ships like the outer boundary,
+  gone) walls it off, unless that sector holds a Works site. Completed-sector
+  walls kill ships like the outer boundary,
   bounce lasers that then become ricochets, and move anyone already inside
   just outside along their heading
   without taking a life. A hull that already crossed the grid but still overlaps

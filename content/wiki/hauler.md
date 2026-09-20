@@ -113,10 +113,11 @@ A colossal deposit needs two Tow Cables before the cables apply haul force.
 One latch holds without moving the rock. Two Haulers who haul it to a furnace
 both receive the delivery.
 
-Fly the towed asteroid into an arena furnace to deliver it. The furnace is a
-dashed delivery ring around a burning grate with a column of flame roaring up
-its middle. Delivery shatters the rock in a red outline with a short smoke poof
-and awards the Hauler. If a Surveyor
+Fly the towed asteroid into an arena furnace to deliver it. Regional Works sit
+in sector interiors so a towed rock can approach from any side, and a Works
+yard never walls off. The furnace is a dashed delivery ring around a burning
+grate with a column of flame roaring up its middle. Delivery shatters the rock
+in a red outline with a short smoke poof and awards the Hauler. If a Surveyor
 scanned the rock, the Hauler and each Surveyor contributor receive identical
 delivery points.
 

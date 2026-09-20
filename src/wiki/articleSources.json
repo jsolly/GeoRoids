@@ -81,6 +81,8 @@
     "src/entities/player/Player.ts",
     "shared/shipGrowth.ts",
     "shared/furnaces.ts",
+    "tests/unit/shared/furnaces.test.ts",
+    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts",
     "src/rendering/furnaceRenderer.ts",
     "src/rendering/canvas.ts",
     "src/rendering/hud/furnaceMapMark.ts",
@@ -418,6 +420,7 @@
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts",
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts",
     "tests/unit/shared/sectors.test.ts",
+    "tests/unit/shared/furnaces.test.ts",
     "tests/unit/shared/utc-score-season.test.ts",
     "src/rendering/hud/resourceMapMark.ts"
   ]

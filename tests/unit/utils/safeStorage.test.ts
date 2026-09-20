@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { setSound } from '../../../src/audio/Sound';
 import { soundIsOn } from '../../../src/constants/user-preferences';
 import { Player } from '../../../src/entities/player/Player';
+import { hapticsPreferenceOn, setHaptics } from '../../../src/fx/haptics';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
   getStoredItem,
@@ -153,6 +154,30 @@ test('sound preference read/write does not throw when storage is blocked', () =>
   expect(soundIsOn()).toBe(true);
   expect(() => setSound(false)).not.toThrow();
   expect(soundIsOn()).toBe(false);
+});
+
+test('haptics preference read/write does not throw when storage is blocked', () => {
+  const originalVibrate = navigator.vibrate;
+  Object.defineProperty(navigator, 'vibrate', {
+    configurable: true,
+    value: () => true,
+    writable: true,
+  });
+  installStorage(throwingStorage());
+  resetSafeStorage();
+
+  try {
+    expect(() => setHaptics(true)).not.toThrow();
+    expect(hapticsPreferenceOn()).toBe(true);
+    expect(() => setHaptics(false)).not.toThrow();
+    expect(hapticsPreferenceOn()).toBe(false);
+  } finally {
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: originalVibrate,
+      writable: true,
+    });
+  }
 });
 
 test('session score still lives on the player when storage is blocked', () => {

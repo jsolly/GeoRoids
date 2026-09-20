@@ -28,6 +28,7 @@ import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/r
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
 import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
+import { playLocalHaptic } from '../fx/haptics';
 import { shockwaveManager } from '../fx/ShockwaveManager';
 import { tickTouchControls } from '../input/touchControls';
 import { NetworkManager } from '../network/networkManager';
@@ -388,6 +389,7 @@ export class GameController {
     }
     this.gameStateManager.setDeliveryMessage(reward.points, delivery.rewards.length);
     playFeedback('delivery');
+    playLocalHaptic(true, 'pickup');
   };
 
   private setupServerAsteroidListeners(): void {

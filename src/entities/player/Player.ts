@@ -7,6 +7,7 @@ import type {
 } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
+import { playLocalHaptic } from '../../fx/haptics';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getPlayerColor } from '../../utils/colorUtils';
 import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
@@ -298,6 +299,7 @@ export class Player {
           (data.health === undefined || data.health > 0)
         ) {
           playRespawn(this.ship.position);
+          playLocalHaptic(this.type === 'local', 'pickup');
           delete this.ship.lastExplodeCause;
           delete this.deathCause;
         }
@@ -431,6 +433,7 @@ export class Player {
 
     if (wasDeadOrExploding) {
       playRespawn(this.ship.position);
+      playLocalHaptic(this.type === 'local', 'pickup');
     }
 
     logger.debug('RESPAWN', 'Player respawn completed', {

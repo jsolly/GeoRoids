@@ -25,6 +25,7 @@ import type {
 import { playExplosionSound } from '../../audio/explosionSound';
 import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
+import { playLocalHaptic } from '../../fx/haptics';
 import { getCompletedSectors } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
@@ -189,6 +190,7 @@ class Ship {
     this.stopBoost();
     this.angularVelocity = 0;
     playExplosionSound(this.position);
+    playLocalHaptic(this.isLocalPlayer, 'boom');
 
     // Dispatch event to notify that ship has exploded with cause information
     window.dispatchEvent(
@@ -236,6 +238,7 @@ class Ship {
     const laser = this.generateLaser();
     this.lasers.push(laser);
     laser.playLaserSound();
+    playLocalHaptic(this.isLocalPlayer, 'shot');
 
     // Set canShoot to false to prevent rapid firing
     this.canShoot = false;
@@ -268,6 +271,7 @@ class Ship {
       this.boostInputVersion++;
       if (this.isLocalPlayer) {
         playFeedback('boostStart');
+        playLocalHaptic(true, 'boost');
       }
     }
     return this.boosting;

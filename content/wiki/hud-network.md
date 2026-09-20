@@ -22,13 +22,21 @@ scan rings. Amber pulses warn that its battery is nearly empty.
 ## What the HUD shows
 
 Before entering a game, set your pilot name, choose a kit, and use Sound
-Effects and Music on the title screen. Sound Effects mutes cues already
+Effects, Music, and Haptics on the title screen. Sound Effects mutes cues already
 playing; Music loops a quiet title bed and an in-game bed after Enter Game.
 In-play danger can temporarily switch to a threat bed, then the playfield
 loop returns. Music off silences every bed, including danger, without muting
-cues. This browser remembers both checkboxes. Starting with Sound Effects
+cues. This browser remembers both audio checkboxes. Starting with Sound Effects
 off skips loading effect files. When you enable effects, they become
 available as they load; missed sounds do not play later.
+The Haptics checkbox stays off until you turn it on, and this browser remembers
+that choice. With Haptics on, your own shots, hull hits, deaths, Boost starts,
+kit abilities, pickups, and furnace deliveries buzz the device. Crew action
+around you does not. Haptics use the web Vibration API: many Android browsers
+can vibrate, while iPhone browsers cannot. If this browser has no vibration
+API, the checkbox stays off and explained, and turning it on does nothing.
+Native apps can use richer haptic engines; this web client does not wrap a native
+shell.
 
 Open Advanced and enable Debug to show this browser's Player ID and page
 session ID. The Player ID is the same `playerId` already written on join and

@@ -3,6 +3,7 @@ import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 export const LOCAL_STORAGE_KEYS = {
   soundOn: 'soundOn',
   musicOn: 'musicOn',
+  hapticsOn: 'hapticsOn',
   debugOn: 'debugOn',
   debugHudHidden: 'debugHudHidden',
 };

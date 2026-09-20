@@ -1,5 +1,5 @@
 import type { Howl } from 'howler';
-import { soundIsOn } from '../constants/user-preferences';
+import { musicIsOn, soundIsOn } from '../constants/user-preferences';
 import { logger } from '../utils/Logger';
 
 type AudioLibrary = typeof import('howler');
@@ -9,11 +9,22 @@ let context: AudioContext | undefined;
 let unlockSource: AudioBufferSourceNode | undefined;
 let resuming: Promise<void> | undefined;
 let suspending: Promise<void> | undefined;
-const initializers = new Set<(audio: AudioLibrary) => void>();
-const stopHooks = new Set<() => void>();
+let musicBedsRegistered = false;
+const sfxInitializers = new Set<(audio: AudioLibrary) => void>();
+const musicInitializers = new Set<(audio: AudioLibrary) => void>();
+const sfxStopHooks = new Set<() => void>();
+const musicStopHooks = new Set<() => void>();
 
-function enabled(): boolean {
+function sfxEnabled(): boolean {
   return soundIsOn() && !document.hidden;
+}
+
+function musicEnabled(): boolean {
+  return musicBedsRegistered && musicIsOn() && !document.hidden;
+}
+
+function sessionEnabled(): boolean {
+  return sfxEnabled() || musicEnabled();
 }
 
 function report(error: unknown): void {
@@ -32,13 +43,24 @@ function syncState(): void {
   }
 }
 
+function stopSfxSources(): void {
+  for (const stop of sfxStopHooks) {
+    stop();
+  }
+}
+
+function stopMusicSources(): void {
+  for (const stop of musicStopHooks) {
+    stop();
+  }
+}
+
 function stopSources(): void {
   unlockSource?.stop();
   unlockSource?.disconnect();
   unlockSource = undefined;
-  for (const stop of stopHooks) {
-    stop();
-  }
+  stopSfxSources();
+  stopMusicSources();
 }
 
 function suspend(): void {
@@ -51,14 +73,14 @@ function suspend(): void {
     .finally(() => {
       suspending = undefined;
       syncState();
-      if (enabled()) {
+      if (sessionEnabled()) {
         resume();
       }
     });
 }
 
 function resume(): void {
-  if (!context || !enabled() || resuming || context.state === 'closed') {
+  if (!context || !sessionEnabled() || resuming || context.state === 'closed') {
     return;
   }
   if (context.state === 'running') {
@@ -71,7 +93,7 @@ function resume(): void {
     .finally(() => {
       resuming = undefined;
       syncState();
-      if (!enabled()) {
+      if (!sessionEnabled()) {
         suspend();
       }
     });
@@ -81,35 +103,60 @@ function onContextStateChange(): void {
   syncState();
   if (context?.state !== 'running') {
     stopSources();
+    if (!sessionEnabled()) {
+      suspend();
+    }
+    return;
   }
-  // Resume only on a foreground/gesture event. Safari's interrupted state can
-  // persist until then; simulation must neither retry it nor retain old cues.
-  if (!enabled()) {
-    suspend();
-  }
+  // Looping beds must restart after an interruption; SFX initializers are
+  // idempotent and do not replay one-shot cues.
+  initializeSfx();
+  initializeMusic();
 }
 
 function onVisibilityChange(): void {
-  if (enabled()) {
+  if (sessionEnabled()) {
+    library?.Howler.mute(false);
     resume();
+    initializeSfx();
+    initializeMusic();
   } else {
     stopSources();
+    library?.Howler.mute(true);
     suspend();
   }
 }
 
-function initializeSounds(): void {
-  if (!library || !enabled()) {
+function initializeSfx(): void {
+  if (!library || !sfxEnabled()) {
     return;
   }
-  for (const initialize of initializers) {
+  for (const initialize of sfxInitializers) {
     initialize(library);
   }
 }
 
+function initializeMusic(): void {
+  if (!library || !musicEnabled()) {
+    return;
+  }
+  for (const initialize of musicInitializers) {
+    initialize(library);
+  }
+}
+
+function contextIsLive(): boolean {
+  return sessionEnabled() && context?.state === 'running';
+}
+
+/** Music beds register here so SFX-only tests never open a music session. */
+export function registerMusicBedAvailability(available: boolean): void {
+  musicBedsRegistered = available;
+}
+
 /** Called synchronously by the enabled Play/checkbox gesture, never by gameplay. */
 export function activateAudio(): void {
-  if (!enabled()) {
+  if (!sessionEnabled()) {
     return;
   }
   if (!context) {
@@ -142,7 +189,8 @@ export function activateAudio(): void {
   resume();
   if (library) {
     library.Howler.mute(false);
-    initializeSounds();
+    initializeSfx();
+    initializeMusic();
     return;
   }
   _loading ??= import('howler')
@@ -159,9 +207,10 @@ export function activateAudio(): void {
       audio.Howler.masterGain = context.createGain();
       audio.Howler.masterGain.connect(context.destination);
       syncState();
-      audio.Howler.mute(!enabled());
-      initializeSounds();
-      if (!enabled()) {
+      audio.Howler.mute(!sessionEnabled());
+      initializeSfx();
+      initializeMusic();
+      if (!sessionEnabled()) {
         suspend();
       }
     })
@@ -175,15 +224,26 @@ export function registerAudioSound(
   initialize: (audio: AudioLibrary) => void,
   stop: () => void
 ): void {
-  initializers.add(initialize);
-  stopHooks.add(stop);
-  if (library && enabled()) {
+  sfxInitializers.add(initialize);
+  sfxStopHooks.add(stop);
+  if (library && sfxEnabled()) {
+    initialize(library);
+  }
+}
+
+export function registerMusicSound(
+  initialize: (audio: AudioLibrary) => void,
+  stop: () => void
+): void {
+  musicInitializers.add(initialize);
+  musicStopHooks.add(stop);
+  if (library && musicEnabled()) {
     initialize(library);
   }
 }
 
 export function registerSoundStopHook(stop: () => void): void {
-  stopHooks.add(stop);
+  sfxStopHooks.add(stop);
 }
 
 export function muteAudio(): void {
@@ -192,15 +252,31 @@ export function muteAudio(): void {
   suspend();
 }
 
+/** Stop cues without tearing down a live music session. */
+export function muteSfxKeepSession(): void {
+  stopSfxSources();
+  if (!sessionEnabled()) {
+    muteAudio();
+  }
+}
+
+/** Stop beds without tearing down a live Sound Effects session. */
+export function muteMusicKeepSession(): void {
+  stopMusicSources();
+  if (!sessionEnabled()) {
+    muteAudio();
+  }
+}
+
 export function getRunningAudioContext(): AudioContext | null {
-  return enabled() && context?.state === 'running' ? context : null;
+  return sfxEnabled() && context?.state === 'running' ? context : null;
 }
 
 export function canPlayAudio(sound: Howl): boolean {
   // Howler falls back to HTML media after an XHR transport error. Never play
   // that fallback: every audible source must share this context's lifecycle.
   return (
-    getRunningAudioContext() !== null &&
+    contextIsLive() &&
     sound.state() === 'loaded' &&
     '_webAudio' in sound &&
     sound._webAudio === true

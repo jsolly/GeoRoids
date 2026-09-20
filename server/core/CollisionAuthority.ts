@@ -1,5 +1,5 @@
 import { type CombatCircle, circlesOverlap, isCombatantImmune } from '../../shared/combat';
-import type { AsteroidData, SatellitePickupData } from '../../shared-types';
+import type { AsteroidData, Position, SatellitePickupData, Velocity } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 import type { GameEntity } from './EntityManager';
@@ -15,6 +15,31 @@ function toCombatCircle(entity: GameEntity): CombatCircle {
 
 function asteroidCollisionRadius(asteroid: AsteroidData): number {
   return asteroid.size;
+}
+
+/** Push a ship out of a surviving rock so the next frame is not another ram. */
+export function separateShipFromAsteroid(
+  ship: { position: Position; velocity: Velocity },
+  shipRadius: number,
+  rock: { position: Position; size: number }
+): void {
+  const dx = ship.position.x - rock.position.x;
+  const dy = ship.position.y - rock.position.y;
+  const distance = Math.hypot(dx, dy);
+  const minDistance = shipRadius + rock.size + 0.5;
+  if (distance >= minDistance) {
+    return;
+  }
+  const nx = distance > 1e-6 ? dx / distance : 1;
+  const ny = distance > 1e-6 ? dy / distance : 0;
+  const push = minDistance - distance;
+  ship.position.x += nx * push;
+  ship.position.y += ny * push;
+  const radial = ship.velocity.x * nx + ship.velocity.y * ny;
+  if (radial < 0) {
+    ship.velocity.x -= nx * radial;
+    ship.velocity.y -= ny * radial;
+  }
 }
 
 export class CollisionAuthority {

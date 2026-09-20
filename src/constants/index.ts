@@ -98,6 +98,7 @@ export const VISUAL = {
   HEALTH_CAPSULE_HEIGHT: 1.5,
   BOUNDARY_STROKE_WIDTH: 1.25,
   BOUNDARY_GLOW: 1.25,
+  ROID_STROKE_COLOSSAL: 2.5,
   ROID_STROKE_LARGE: 2,
   ROID_STROKE_MEDIUM: 1.5,
   ROID_STROKE_SMALL: 1.25,
@@ -238,14 +239,27 @@ export const ROID = {
   SPEED: 50 * GAME.MOTION_SCALE, // starting speed in pixels per second
   /** Server asteroid velocity uses pixels per 60 Hz tick, unlike SPEED. */
   SERVER_VELOCITY_MAX: 4 * GAME.MOTION_SCALE,
+  STATIONARY_FRACTION: 0.2,
+  DRIFT_SPEED_MIN: 0.3 * GAME.MOTION_SCALE,
+  DRIFT_SPEED_MAX: 3 * GAME.MOTION_SCALE,
   SIZE: 50, // starting size in pixels
   VERTICES: 10, // average number of vertices
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged
 
   // Scoring
+  POINTS_COLOSSAL: 200,
   POINTS_LARGE: 20,
   POINTS_MEDIUM: 50,
   POINTS_SMALL: 100,
+
+  // Rare crew-scale rocks: too heavy for one tow or one coupling, and they
+  // ignore the one-second collab window until many laser hits land.
+  COLOSSAL_MIN_SIZE: 90,
+  COLOSSAL_SIZE: 120,
+  COLOSSAL_LASER_HITS: 16,
+  COLOSSAL_CREW: 2,
+  COLOSSAL_SECTOR_PERIOD: 5,
+  COLOSSAL_CORE_EXCLUSION: 2,
 
   // Collaborative split: only the biggest asteroids, and only when two
   // distinct ships land laser hits within this window.
@@ -340,6 +354,14 @@ export const AUDIO = {
   EXPLOSION_VOLUME: 0.055,
   LASER_VOLUME: 0.04,
   HIT_VOLUME: 0.035,
+  // Soft looping beds sit under cues; never drown crystalline SFX.
+  MENU_BED_VOLUME: 0.014,
+  IN_GAME_BED_VOLUME: 0.012,
+  DANGER_BED_VOLUME: 0.016,
+  // Missing danger-bed files keep Playfield Drift, slightly more present.
+  DANGER_FALLBACK_VOLUME: 0.018,
+  DANGER_FALLBACK_RATE: 1.07,
+  BED_CROSSFADE_MS: 1600,
   // Used when the canvas size is unknown (matches PlayerNetwork nearby radius).
   FALLBACK_MAX_DISTANCE: 1200,
   // Floor so an on-screen source at the viewport edge stays a soft blush, not silent.

@@ -1,6 +1,13 @@
-import type { HaulerUtilityId, Position, ShipBoostState, ShipKitId } from '../../../shared-types';
+import type {
+  HaulerUtilityId,
+  Position,
+  ShipBoostState,
+  ShipKitId,
+  SurveyorUtilityId,
+} from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
 import { GAME } from '../../constants';
+import { playLocalHaptic } from '../../fx/haptics';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getPlayerColor } from '../../utils/colorUtils';
 import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
@@ -59,6 +66,7 @@ export class Player {
     health: number;
     maxHealth: number;
     mass: number;
+    overlayHold: boolean;
   };
 
   constructor(params: {
@@ -92,6 +100,7 @@ export class Player {
       health: this.ship.health,
       maxHealth: this.ship.maxHealth,
       mass: this.ship.mass,
+      overlayHold: false,
     };
   }
 
@@ -120,6 +129,7 @@ export class Player {
     harpoonTargetId?: string | null;
     harpoonLatchPos?: { x: number; y: number };
     haulerUtility?: HaulerUtilityId;
+    surveyorUtility?: SurveyorUtilityId;
   }): void {
     // Local selection is established at join. Preserve it during runtime reconciliation.
     if (data.kitId && data.kitId !== this.ship.kitId && this.type !== 'local') {
@@ -289,6 +299,7 @@ export class Player {
           (data.health === undefined || data.health > 0)
         ) {
           playRespawn(this.ship.position);
+          playLocalHaptic(this.type === 'local', 'pickup');
           delete this.ship.lastExplodeCause;
           delete this.deathCause;
         }
@@ -332,6 +343,11 @@ export class Player {
     });
     if (data.haulerUtility !== undefined && this.type !== 'local') {
       this.ship.haulerUtility = data.haulerUtility;
+    }
+    // A local tool choice survives stale snapshots while a remote Surveyor
+    // follows the authoritative utility row.
+    if (data.surveyorUtility !== undefined && this.type !== 'local') {
+      this.ship.surveyorUtility = data.surveyorUtility;
     }
     // Handle respawn timer from server
     if (data.respawnTimer !== undefined) {
@@ -417,6 +433,7 @@ export class Player {
 
     if (wasDeadOrExploding) {
       playRespawn(this.ship.position);
+      playLocalHaptic(this.type === 'local', 'pickup');
     }
 
     logger.debug('RESPAWN', 'Player respawn completed', {
@@ -465,6 +482,7 @@ export class Player {
     this.networkState.health = this.ship.health;
     this.networkState.maxHealth = this.ship.maxHealth;
     this.networkState.mass = this.ship.mass;
+    this.networkState.overlayHold = this.ship.movementLocked;
     return this.networkState;
   }
 }

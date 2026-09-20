@@ -17,7 +17,7 @@ test.each([
   { width: 1280, menu: 'schematic' },
   { width: 390, menu: 'schematic' },
 ] as const)(
-  'the $menu holds flight through respawns at $width pixels and game over returns Home',
+  'the $menu holds flight at $width pixels, ignores rocks, and blinks on return',
   async ({ width, menu }) => {
     const page =
       width === 390
@@ -29,7 +29,7 @@ test.each([
     await page.setViewportSize({ width, height: 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'hauler' });
     const id = await game.getLocalPlayerId();
     await arrangeCrewField([id], 'empty');
     await game.waitForAnimationFrames(20);
@@ -63,10 +63,12 @@ test.each([
           velocity: { ...ship.velocity },
           angle: ship.angle,
           thrusting: ship.thrusting,
+          movementLocked: ship.movementLocked,
         };
       });
     await game.waitForAnimationFrames(3);
     const held = await pose();
+    expect(held.movementLocked).toBe(true);
     if (width === 390) {
       const session = await page.context().newCDPSession(page);
       try {
@@ -92,38 +94,21 @@ test.each([
     expect(await pose()).toEqual(held);
     expect(held.velocity).toEqual({ x: 0, y: 0 });
     expect(held.thrusting).toBe(false);
+    const lives = await game.getLives();
+    await arrangeCrewField([id], 'impact');
+    await game.waitForAnimationFrames(30);
+    expect(await game.getLives()).toBe(lives);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`stationary-${menu}-${width}.png`),
     });
     await page.keyboard.press('Escape');
     await expect.poll(() => dialog.isVisible()).toBe(false);
-    await game.waitForAnimationFrames(20);
-    expect((await pose()).position).not.toEqual(held.position);
-    // A real server asteroid impact while the menu is reopened must cost a life.
-    await page.keyboard.press(menu === 'map' ? 'm' : 'v');
-    await expect.poll(() => dialog.isVisible()).toBe(true);
-    const lives = await game.getLives();
-    await arrangeCrewField([id], 'impact');
-    await expect.poll(() => game.getLives(), { timeout: 8000 }).toBe(lives - 1);
-    // Surviving lives respawn with this same menu open and navigation still locked.
-    for (let remaining = lives - 1; remaining > 0; remaining--) {
-      await game.waitForShipAlive();
-      await game.waitForAnimationFrames(5);
-      expect(await dialog.isVisible()).toBe(true);
-      const respawned = await pose();
-      await game.waitForAnimationFrames(30);
-      expect(await pose()).toEqual(respawned);
-      expect(respawned.velocity).toEqual({ x: 0, y: 0 });
-      await arrangeCrewField([id], 'impact');
-      await expect.poll(() => game.getLives(), { timeout: 8000 }).toBe(remaining - 1);
-    }
     await expect
-      .poll(() => page.locator('#start-screen').isVisible(), { timeout: 1500 })
-      .toBe(true);
-    expect(await dialog.isVisible()).toBe(false);
-    expect(await page.locator('#gameArea').isVisible()).toBe(false);
+      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.blinkCount ?? 0))
+      .toBeGreaterThan(0);
+    expect((await pose()).movementLocked).toBe(false);
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`menu-game-over-home-${menu}-${width}.png`),
+      path: screenshotManager.getScreenshotPath(`blink-return-${menu}-${width}.png`),
     });
     assertNoBrowserDiagnostics(diagnostics);
   },

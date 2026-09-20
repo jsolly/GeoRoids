@@ -19,13 +19,16 @@ import type {
   PlayerMotionState,
   Position,
   ShipKitId,
+  SurveyorUtilityId,
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
 import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
+import { playLocalHaptic } from '../../fx/haptics';
 import { getCompletedSectors } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
+import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
@@ -35,12 +38,19 @@ import { createLaser } from '../laser/laserUtils';
 import { advanceCruiseVelocity } from './cruiseMotion';
 import {
   type AbilityWorld,
+  abilityCooldownFramesFor,
   activateAbilityOnHost,
   canActivateAbility,
   tickAbilityHost,
 } from './shipAbilities';
 import { getShipCombatNetwork } from './shipCombatNetwork';
-import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit, hullRadiusForKit } from './shipKits';
+import {
+  applyShipKitToShip,
+  DEFAULT_SHIP_KIT_ID,
+  getShipKit,
+  hullRadiusForKit,
+  SHIP_ABILITY,
+} from './shipKits';
 import {
   applyShipSpawnProtection,
   applyThrustOrFriction,
@@ -49,6 +59,7 @@ import {
   shouldStartHealthRegeneration,
   tickShipImpactFlash,
 } from './shipUtils';
+import { surveyorUtilityOf } from './surveyorUtility';
 
 class Ship {
   id: string = uuidv4(); // Unique identifier for event handling
@@ -103,6 +114,7 @@ class Ship {
   harpoonTargetId: string | null = null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
+  surveyorUtility?: SurveyorUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Last specific environmental cause (boundary, asteroid, or ricochet). */
@@ -178,6 +190,7 @@ class Ship {
     this.stopBoost();
     this.angularVelocity = 0;
     playExplosionSound(this.position);
+    playLocalHaptic(this.isLocalPlayer, 'boom');
 
     // Dispatch event to notify that ship has exploded with cause information
     window.dispatchEvent(
@@ -225,6 +238,7 @@ class Ship {
     const laser = this.generateLaser();
     this.lasers.push(laser);
     laser.playLaserSound();
+    playLocalHaptic(this.isLocalPlayer, 'shot');
 
     // Set canShoot to false to prevent rapid firing
     this.canShoot = false;
@@ -257,6 +271,7 @@ class Ship {
       this.boostInputVersion++;
       if (this.isLocalPlayer) {
         playFeedback('boostStart');
+        playLocalHaptic(true, 'boost');
       }
     }
     return this.boosting;
@@ -273,10 +288,22 @@ class Ship {
       if (network?.isConnected) {
         // The server owns the ability result and cooldown. An optimistic toggle
         // can be undone by an older snapshot or disagree about eligible cargo.
-        return network.sendAbility({
+        const sent = network.sendAbility({
           kitId: this.kitId,
           abilityId: kit.abilityId,
         });
+        if (!sent) {
+          return false;
+        }
+        if (this.kitId === 'surveyor') {
+          // Surveyor tools share the same request, but the probe has no local
+          // world effect. Predict only the user-facing timer; asteroid
+          // attachment and mineral classification remain server-owned.
+          this.abilityCooldownFrames = abilityCooldownFramesFor(this);
+          this.abilityActiveFrames =
+            surveyorUtilityOf(this) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;
+        }
+        return true;
       }
     }
     return activateAbilityOnHost(this, world).activated;
@@ -316,7 +343,7 @@ class Ship {
   }
 
   takeDamage(amount: number, cause?: string): void {
-    if (this.exploding) {
+    if (this.exploding || this.movementLocked) {
       return;
     }
 
@@ -457,9 +484,12 @@ class Ship {
     this.angle += this.angularVelocity;
     const boost = this.boosting ? getShipKit(this.kitId).boostMultiplier : 1;
     const speed = cruiseSpeed(this.mass, this.maxVelocity, boost);
-    const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);
+    const velocityLimit = Math.max(
+      terrainSpeedLimit(this.position, speed),
+      this.knockbackVelocityLimit
+    );
     if (this.knockbackVelocityLimit <= speed) {
-      // Steering redirects normal momentum before thrust and terrain forces act.
+      // Terrain sets the cruise direction and speed, including downhill drift.
       // A server-granted blast keeps its motion until the excess speed decays.
       advanceCruiseVelocity(this, speed, boost);
     } else {

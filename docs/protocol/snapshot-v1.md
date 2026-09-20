@@ -37,12 +37,22 @@ named optional fields. An omitted field is unchanged. Collection patches contain
 `add` (full rows), `update` (`[id,set,clear]` tuples), `remove` (IDs), and optional
 `order` (complete ID order when membership/order changes). Empty arrays are
 complete empty collections. Removed remotes, asteroids, loot, EO satellites, projectiles and pickups disappear.
-Hauler snapshots include optional `haulerUtility` (`resource_tap` or
-`tow_cable`; missing means tow cable). Loot kind `tap` is a Resource Tap
+Hauler snapshots include optional `haulerUtility` (`resource_tap`,
+`boost_coupling`, or `tow_cable`; missing means tow cable). Loot kind `tap` is a Resource Tap
 canister. Harpoon attachments persist until release, delivery, target removal, death or
 excessive cable separation. An explicit null target clears the client's cached
 latch. Reconnection uses authoritative attachment state and never replays an
 ability request.
+
+Surveyor snapshots include optional `surveyorUtility` (`mineral_scan` or
+`survey_probe`; missing means mineral scan). `setSurveyorUtility` accepts only
+the socket owner's Surveyor ID and a valid `utilityId`. `useAbility` launches
+the selected tool; clients never submit a probe pose, target, health, or expiry.
+An asteroid's optional `probe` stores its beacon ID, owner, health, maximum
+health, attachment and expiry times in epoch milliseconds, and its local angle
+and radial offset. The client derives the moving beacon pose from the host.
+An explicit null or absence in a complete asteroid row clears the beacon.
+The server owns attachment, damage, scan pulses, expiry, and replacement.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps

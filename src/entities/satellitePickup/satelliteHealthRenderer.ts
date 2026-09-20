@@ -8,9 +8,10 @@ export function drawSatelliteHealth(
   ctx: DrawingContext,
   pickup: Pick<SatellitePickupData, 'state' | 'health' | 'maxHealth'>,
   center: Position,
-  hullRadius: number
+  hullRadius: number,
+  showFullHealth = false
 ): void {
-  if (pickup.state !== 'orbiting' || pickup.health >= pickup.maxHealth) {
+  if (pickup.state !== 'orbiting' || (!showFullHealth && pickup.health >= pickup.maxHealth)) {
     return;
   }
   const width = hullRadius * 2.4;

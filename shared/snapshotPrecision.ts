@@ -31,6 +31,11 @@ export function quantizeSnapshotKinematics(state: ServerGameSnapshot): void {
     vector(row.velocity);
     row.angle = rounded(row.angle);
   }
+  for (const spider of state.spiderField?.spiders ?? []) {
+    vector(spider.position);
+    spider.angle = rounded(spider.angle);
+  }
+
   for (const row of state.playerProjectiles) {
     vector(row.position);
     vector(row.prevPosition);

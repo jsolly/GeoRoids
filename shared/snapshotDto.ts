@@ -19,7 +19,9 @@ import type {
   ServerGameState,
   ShipKitId,
   SnapshotCollabTag,
+  SpiderFieldState,
   SurveyorUtilityId,
+  TerrainSpider,
 } from '../shared-types';
 import { validExploration } from './exploration';
 import { isShipBoostState } from './shipBoost';
@@ -226,7 +228,43 @@ const mapAsset = shape<MapAsset>({
 const SECTOR_IDENTITY_PATTERN = /^-?\d+,-?\d+$/u;
 const sectorIdentity: Rule = (value) =>
   typeof value === 'string' && SECTOR_IDENTITY_PATTERN.test(value);
+const spider = shape<TerrainSpider>({
+  health: (value) => typeof value === 'number' && Number.isFinite(value) && value > 0,
+  maxHealth: (value) => typeof value === 'number' && Number.isFinite(value) && value > 0,
+  id: string,
+  position,
+  angle: number,
+  phase: choice('scuttling', 'hunting'),
+  targetId: (value) => value === null || string(value),
+});
+function uniqueRows(rule: Rule, maximum: number): Rule {
+  return (value) => {
+    if (!Array.isArray(value) || value.length > maximum) {
+      return false;
+    }
+    const ids = new Set<string>();
+    return value.every((row: unknown) => {
+      if (
+        !rule(row) ||
+        row === null ||
+        typeof row !== 'object' ||
+        !('id' in row) ||
+        typeof row.id !== 'string' ||
+        row.id.length === 0 ||
+        ids.has(row.id)
+      ) {
+        return false;
+      }
+      ids.add(row.id);
+      return true;
+    });
+  };
+}
+const spiderField = shape<SpiderFieldState>({
+  spiders: uniqueRows(spider, 16),
+});
 const worldRules = {
+  spiderField: optional(spiderField),
   exploration: validExploration,
   completedSectors: array(sectorIdentity),
   mapAssets: array(mapAsset),

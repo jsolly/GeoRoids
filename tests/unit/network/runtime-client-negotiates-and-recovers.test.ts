@@ -772,7 +772,24 @@ describe('actual ConnectionManager WebSocket message path', () => {
     state.collabTags = [];
     ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
     expect(manager.getAllPlayers()).toEqual([player]);
+    const { getSpiderField, setSpiderField } = await import(
+      '../../../src/physics/terrain/spiderSession'
+    );
+    setSpiderField({
+      spiders: [
+        {
+          id: 'expired-spider',
+          position: { x: 2000, y: 0 },
+          angle: 0,
+          health: 75,
+          maxHealth: 75,
+          phase: 'hunting',
+          targetId: oldId,
+        },
+      ],
+    });
     ws.receive('sessionExpired', {});
+    expect(getSpiderField()).toEqual({ spiders: [] });
     const freshJoin = ws.sent.filter((message) => message.type === 'join').at(-1);
     assert.ok(freshJoin, 'fresh join message');
     const freshId = freshJoin.id;

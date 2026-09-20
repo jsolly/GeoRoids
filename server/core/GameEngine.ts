@@ -108,6 +108,7 @@ import { RNGService } from './RNGService';
 import { SatellitePickupManager } from './SatellitePickupManager';
 import { ServerClock } from './ServerClock';
 import { SurveyProbeManager } from './SurveyProbeManager';
+import { type SpiderAttack, TerrainSpiderManager } from './TerrainSpiderManager';
 
 const PILOT_RESUME_TOKEN_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -249,6 +250,7 @@ export class GameEngine {
   private asteroidManager: AsteroidManager;
   private lootManager: LootManager;
   private satellitePickupManager: SatellitePickupManager;
+  private spiderManager: TerrainSpiderManager;
   private rngService: RNGService;
   private collisionAuthority = new CollisionAuthority();
   private combatSink: CombatSink | null = null;
@@ -289,6 +291,7 @@ export class GameEngine {
   private pendingLootCollections: LootCollected[] = [];
   private pendingTapEjections: TapEjected[] = [];
   private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
+  private pendingSpiderAttacks: SpiderAttack[] = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly laserExpiry = new WeakMap<ServerLaser, number>();
   private readonly damageStateLogs = new WeakMap<GameEntity, number>();
@@ -348,6 +351,7 @@ export class GameEngine {
     this.asteroidManager = new AsteroidManager(this.rngService);
     this.lootManager = new LootManager(this.rngService);
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
+    this.spiderManager = new TerrainSpiderManager(() => this.rngService.random());
     ensureTerrain(this.worldSeed);
   }
 
@@ -489,6 +493,7 @@ export class GameEngine {
     }
     this.tickAbilities(serverNow);
     this.tickSurveyProbes(serverNow);
+    this.advanceSpiderField();
     this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
     this.collectLoot(serverNow);
@@ -528,6 +533,7 @@ export class GameEngine {
     this.entityManager.updateExplosions();
     this.logRespawns(this.entityManager.updateRespawns());
     this.tickAbilities();
+    this.advanceSpiderField();
     this.entityManager.updateHealthRegeneration();
   }
 
@@ -553,6 +559,8 @@ export class GameEngine {
       logger.info('🔄 Game paused - no players online');
       this.lasers = [];
       this.clearPendingFeedback();
+      this.spiderManager.clear();
+      this.pendingSpiderAttacks = [];
       this.checkpointWorld();
     } else if (playerCount > 0 && this.isPaused) {
       this.isPaused = false;
@@ -652,7 +660,9 @@ export class GameEngine {
     this.decoratedFieldId = undefined;
     this.clearPendingFeedback();
     this.pendingAsteroidHits = [];
+    this.pendingSpiderAttacks = [];
     this.satellitePickupManager.clear();
+    this.spiderManager.clear();
   }
 
   /** Atomic between-tick arrangement for the benchmark process's private control socket. */
@@ -1326,6 +1336,39 @@ export class GameEngine {
     return this.entityManager.getAllEntities();
   }
 
+  public getSpiderField() {
+    return this.spiderManager.snapshot();
+  }
+
+  /** Deterministic arrangement hook for server scenarios and diagnostics. */
+  public spawnTerrainSpider(position: Position, angle = 0) {
+    return this.spiderManager.spawnSpider(position, angle);
+  }
+
+  public clearSpiderField(): void {
+    this.spiderManager.clear();
+    this.pendingSpiderAttacks = [];
+  }
+
+  private advanceSpiderField(): void {
+    const attacks = this.spiderManager.advance({
+      players: this.entityManager.getAllEntities().map((entity) => ({
+        id: entity.id,
+        position: entity.position,
+        health: entity.health,
+        exploding: entity.exploding,
+        ...(entity.respawnTimer !== undefined ? { respawnTimer: entity.respawnTimer } : {}),
+        ...(entity.spawnProtectionTimer !== undefined
+          ? { spawnProtectionTimer: entity.spawnProtectionTimer }
+          : {}),
+        radius: hullRadiusForKit(entity.kitId),
+      })),
+      completedSectors: this.completedSectors,
+      nowFrame: this.gameTime,
+    });
+    this.pendingSpiderAttacks.push(...attacks);
+  }
+
   public getPlayerCount(): number {
     return this.entityManager.getAllEntities().length;
   }
@@ -1804,6 +1847,20 @@ export class GameEngine {
         this.playerMotion.applyExternalImpulse(rammed.id, this.getServerTime());
       }
       results.push(result);
+    }
+
+    for (const attack of this.pendingSpiderAttacks.splice(0)) {
+      if (!this.spiderManager.isAttackActive(attack)) {
+        continue;
+      }
+      const target = this.entityManager.getEntity(attack.targetId);
+      if (!target) {
+        continue;
+      }
+      const result = this.applyDirectedHit(attack.targetId, attack.attackerId, target.health);
+      if (result) {
+        results.push(result);
+      }
     }
 
     for (const result of results) {
@@ -2329,8 +2386,10 @@ export class GameEngine {
       const auxiliary = auxiliaryHits.sort(
         (a, b) => a.distance - b.distance || a.id.localeCompare(b.id)
       )[0];
+      const spiderHit = this.spiderManager.findLaserHit(start, end);
       if (
         auxiliary &&
+        (!spiderHit || auxiliary.distance <= spiderHit.distance) &&
         (!impact ||
           auxiliary.distance < impact.distance ||
           (auxiliary.distance === impact.distance && auxiliary.kind === 'surveyProbe')) &&
@@ -2354,6 +2413,16 @@ export class GameEngine {
         } else {
           this.applyRicochetHullHit(auxiliary.id, DAMAGE.LASER_HIT * laser.energy);
         }
+        return null;
+      }
+      if (
+        spiderHit &&
+        (!auxiliary || spiderHit.distance < auxiliary.distance) &&
+        (!impact || spiderHit.distance < impact.distance) &&
+        (!boundary || spiderHit.distance < boundary.distance)
+      ) {
+        this.spiderManager.resolveLaserHit(start, end, DAMAGE.LASER_HIT * laser.energy);
+        laser.hasExploded = true;
         return null;
       }
       if (boundary && (!impact || boundary.distance <= impact.distance)) {
@@ -2570,6 +2639,7 @@ export class GameEngine {
       gameTime: this.gameTime,
       isPaused: this.isPaused,
       terrainSeed: getTerrainSeed(),
+      spiderField: this.spiderManager.snapshot(),
     } satisfies ServerGameState & Record<keyof ServerGameState, unknown>;
 
     return gameState;

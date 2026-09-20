@@ -923,8 +923,8 @@ function makeTerrainDemo(): Demo {
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
-        'TERRAIN · SLOPE FORCE',
-        'automatic thrust + downhill force',
+        'TERRAIN · CONTOUR TRAVEL',
+        'ride the lines · downhill is a rush',
         frame,
         PALETTE.CONTOUR
       );

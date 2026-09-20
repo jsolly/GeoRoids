@@ -54,15 +54,16 @@ export const media: Record<string, WikiMediaEntry> = {
     ],
   },
   terrain: {
-    title: 'Terrain slope force',
-    alt: 'A Surveyor thrusts across the contour map while an arrow shows the downhill pull.',
+    title: 'Terrain contours and slope travel',
+    alt: 'A Surveyor thrusts across the contour map while an arrow shows the downhill direction.',
     caption:
-      'Controlled demonstration: contour lines show the landscape while an arrow marks the downhill pull on a ship with automatic thrust.',
+      'Controlled demonstration: automatic thrust rides the contours; an arrow marks downhill so descents look fast and climbs stay a light tax.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',
       'src/physics/terrain/terrainConfig.ts',
-      'src/physics/terrain/slopeForce.ts',
+      'src/physics/terrain/terrainTravel.ts',
+      'src/entities/ship/cruiseMotion.ts',
       'src/rendering/contourLabels.ts',
     ],
   },

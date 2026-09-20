@@ -37,8 +37,9 @@ share the same cruise speed. Boost multiplies that cruise and thrust, and
 Surveyor's multiplier is stronger than Hauler's. Each kit page lists its
 handling values. Turns have a capped rate; the arrow ahead of the hull shows
 the current heading. Releasing steering keeps the attained heading and automatic
-thrust. On slopes, your travel direction also includes downhill drift. Steep
-climbs are much slower; descents exceed ordinary cruise and stack with Boost.
+thrust. On slopes, following a contour keeps nearly full cruise with a light
+downhill tug. Steep climbs are only a bit slower; descents more than double
+ordinary cruise and stack with Boost.
 Combat knockback can still push the ship. W and ArrowUp are unbound.
 
 ## Mouse

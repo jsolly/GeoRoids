@@ -78,6 +78,20 @@ test('playfield chrome sizes to the visible box instead of overflowing 100dvw', 
   );
 });
 
+test('title menu stacks Enter Game, audio toggles, and Advanced at one control width', () => {
+  expect(productionCss).toContain('--start-control-width: 280px');
+  expect(productionCss).toMatch(
+    /\.start-actions,\s*\.settings \{[^}]*width: min\(100%, var\(--start-control-width, 280px\)\);/su
+  );
+  expect(productionCss).toMatch(
+    /\.enter-game,\s*\.sound-toggle-row,\s*\.advanced-settings \{[^}]*width: 100%;/su
+  );
+  expect(productionCss).toMatch(/\.sound-toggle-row \{[^}]*justify-content: flex-start;/su);
+  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*min-width: 220px;/su);
+  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*justify-content: center;/su);
+  expect(productionCss).not.toMatch(/\.advanced-settings \{[^}]*width: min\(100%, 260px\);/su);
+});
+
 test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
   const advanced = document.querySelector<HTMLDetailsElement>('#advanced-settings');
   expect(advanced?.tagName).toBe('DETAILS');

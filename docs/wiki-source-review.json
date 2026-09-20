@@ -1,11 +1,11 @@
 {
-  "note": "Landed Iso Threat (Suno 31b6f7b6) as public/music/danger-bed.{ogg,mp3} for pushMusicThreat. Merged main (probe beacons, colossal asteroids, freeze overlay, restore recovery). HUD documents in-play danger bed. No demonstration GIFs changed.",
+  "note": "Title-menu chrome: Enter Game, Sound Effects, Music, and Advanced share one control width with left-aligned checkboxes. HUD still documents the two audio checkboxes. No article copy or demonstration GIFs changed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
     "docs/protocol/snapshot-v1.md": "sha256:1ce8ae9659ef90be524e6efa2e9401b7b8b1a9a863936d1ac844473b75611e0d",
     "docs/sounds.md": "sha256:3029b875ed6c65f524b096d0ec2c2fb45ecdcb36e81f510fbd7fcee488f4b358",
-    "index.css": "sha256:b2c7e5d40754b3cbd090be053636c08464e7df535f6ab7b33228399c7dc2efe2",
+    "index.css": "sha256:ca1868acf5760221ef4da84d6cceab2f830721eb17ba6394cd5077d375a0228b",
     "index.html": "sha256:580c74801fcfaca92e559fde8985897df920fcec1db2f4fb63bbfce994980d26",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:897999f25f378daff966c32975be438b4ffde56f48f5a7d3fa375df5dad90bf1",

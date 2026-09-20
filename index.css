@@ -72,6 +72,7 @@
   }
 
   #start-screen {
+    --start-control-width: 280px;
     font-size: 1rem;
     padding: 1.6rem 2rem 1.35rem;
     background: rgba(8, 15, 25, 0.84);
@@ -703,18 +704,28 @@
     margin-bottom: 1.5em;
   }
 
-  .start-actions {
+  .start-actions,
+  .settings {
     display: flex;
     flex-direction: column;
     gap: 0.8em;
-    align-items: center;
+    align-items: stretch;
+    width: min(100%, var(--start-control-width, 280px));
+    margin-inline: auto;
+  }
+
+  .enter-game,
+  .sound-toggle-row,
+  .advanced-settings {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
   }
 
   .enter-game {
     appearance: none;
     display: inline-block;
-    width: 100%;
-    max-width: 280px;
     padding: 0.8em 1.2em;
     font-family: inherit;
     font-size: 1.1em;
@@ -760,10 +771,6 @@
   }
 
   .settings {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8em;
-    align-items: center;
     margin-bottom: 1.5em;
   }
 
@@ -791,13 +798,12 @@
   .sound-toggle-row {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.8em;
     padding: 0.4em 0.8em;
     background-color: rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    min-width: 220px;
     transition: all 0.3s ease;
     position: relative;
   }
@@ -819,6 +825,7 @@
   }
 
   .sound-toggle {
+    flex-shrink: 0;
     width: 1.3em;
     height: 1.3em;
     margin: 0;
@@ -828,8 +835,7 @@
   }
 
   .advanced-settings {
-    width: min(100%, 260px);
-    margin: 0 auto;
+    margin: 0;
     padding: 0.15rem 0.65rem 0.45rem;
     text-align: left;
     background: transparent;
@@ -1107,7 +1113,6 @@
     }
 
     .sound-toggle-row {
-      min-width: 200px;
       padding: 0.3em 0.6em;
     }
   }
@@ -1119,11 +1124,8 @@
     }
 
     #start-screen {
+      --start-control-width: 320px;
       padding: 1.85rem 2.4rem 1.5rem;
-    }
-
-    .enter-game {
-      max-width: 320px;
     }
   }
 
@@ -1408,8 +1410,8 @@
       letter-spacing: 0.1em;
     }
 
-    .enter-game {
-      max-width: 100%;
+    #start-screen {
+      --start-control-width: 100%;
     }
   }
 

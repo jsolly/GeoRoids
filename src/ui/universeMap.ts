@@ -572,7 +572,10 @@ function drawMapAsset(
   context.lineWidth = mapStrokeWidth(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
   context.shadowBlur = mapGlowBlur(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
   if (asset.kind === 'furnace') {
-    drawFurnaceMapMark(context, 0, 0, size, universeMapFurnaceMarkAppearance(frame.zoom).lod);
+    context.save();
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    drawFurnaceMapMark(context, 0, 0, screen, universeMapFurnaceMarkAppearance(frame.zoom).lod);
+    context.restore();
   } else {
     const color =
       asset.kind === 'laserCore'

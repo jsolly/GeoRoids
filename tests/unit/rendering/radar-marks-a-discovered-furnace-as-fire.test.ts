@@ -16,6 +16,7 @@ import {
   universeMapFurnaceMarkAppearance,
   universeMapMarkScreenSize,
 } from '../../../src/rendering/hud/furnaceMapMark';
+import { UNIVERSE_MAP_ZOOM } from '../../../src/ui/universeMap';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -120,14 +121,20 @@ test('furnace HUD marks stay pin-scale with the ship pip and other map assets', 
   expect(universeMapMarkScreenSize(shipNear, FURNACE_MAP_FAR_ZOOM) / shipNear).toBeCloseTo(
     UNIVERSE_MAP_LANDMARK_FAR_SIZE / UNIVERSE_MAP_LANDMARK_SIZE
   );
+  const restored = (FURNACE_MAP_CAMPFIRE_ZOOM / UNIVERSE_MAP_ZOOM.step) * UNIVERSE_MAP_ZOOM.step;
+  expect(restored).toBeLessThan(FURNACE_MAP_CAMPFIRE_ZOOM);
+  const restoredMark = universeMapFurnaceMarkAppearance(restored);
+  expect(restoredMark.lod).toBe('campfire');
+  expect(restoredMark.screen).toBe(UNIVERSE_MAP_LANDMARK_SIZE);
 });
 
 test('a radar furnace mark is a hairline three-tongue campfire in fire ink, not a lilac square', () => {
   const { ctx, strokes, fills } = recordingContext();
   drawFurnaceMapMark(ctx, 40, 40, MINIMAP_FURNACE_MARK_SIZE);
 
-  const flame = strokes.find((path) => path.closed);
-  expect(flame).toBeDefined();
+  const flames = strokes.filter((path) => path.closed);
+  expect(flames).toHaveLength(1);
+  const flame = flames[0];
   if (!flame) {
     throw new Error('expected a closed furnace flame stroke');
   }

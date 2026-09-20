@@ -23,6 +23,13 @@ const INNER_FLAME_MIN_SIZE = 5;
 
 type FurnaceMapLod = 'distant' | 'campfire';
 
+function universeMapZoomAtLeast(zoom: number, threshold: number): boolean {
+  if (!Number.isFinite(zoom) || !Number.isFinite(threshold)) {
+    return false;
+  }
+  return Math.round(zoom * 100) >= Math.round(threshold * 100);
+}
+
 /** Keep furnaces, satellites, wreckage, and ships on one zoom scale. */
 export function universeMapMarkScreenSize(nearSize: number, zoom: number): number {
   if (!(nearSize > 0) || !Number.isFinite(nearSize)) {
@@ -31,7 +38,7 @@ export function universeMapMarkScreenSize(nearSize: number, zoom: number): numbe
   if (!(zoom > 0) || !Number.isFinite(zoom)) {
     return nearSize * (UNIVERSE_MAP_LANDMARK_FAR_SIZE / UNIVERSE_MAP_LANDMARK_SIZE);
   }
-  if (zoom >= FURNACE_MAP_CAMPFIRE_ZOOM) {
+  if (universeMapZoomAtLeast(zoom, FURNACE_MAP_CAMPFIRE_ZOOM)) {
     return nearSize;
   }
   const span = FURNACE_MAP_CAMPFIRE_ZOOM - FURNACE_MAP_FAR_ZOOM;
@@ -45,7 +52,7 @@ export function universeMapFurnaceMarkAppearance(zoom: number): {
   screen: number;
 } {
   return {
-    lod: zoom >= FURNACE_MAP_CAMPFIRE_ZOOM ? 'campfire' : 'distant',
+    lod: universeMapZoomAtLeast(zoom, FURNACE_MAP_CAMPFIRE_ZOOM) ? 'campfire' : 'distant',
     screen: universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, zoom),
   };
 }

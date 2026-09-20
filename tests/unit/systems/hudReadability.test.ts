@@ -3,7 +3,10 @@ import { WORLD } from '../../../shared/world';
 import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
 import { getKitHullOutline } from '../../../src/entities/ship/hullOutlines';
 import { layoutHudCluster } from '../../../src/rendering/hud/cluster';
-import { FURNACE_MAP_INK } from '../../../src/rendering/hud/furnaceMapMark';
+import {
+  FURNACE_MAP_INK,
+  MINIMAP_FURNACE_MARK_SIZE,
+} from '../../../src/rendering/hud/furnaceMapMark';
 
 function recordCanvas(ctx: CanvasRenderingContext2D) {
   let points: Array<[number, number]> = [];
@@ -216,7 +219,16 @@ describe('painted HUD composition', () => {
     filledPaths.length = 0;
     drawMiniMap(ctx, layout, player.ship, [], [], [], []);
     const stations = strokes.filter(({ style, closed }) => style === stationInk && closed);
-    expect(stations.length).toBeGreaterThanOrEqual(1);
+    expect(stations).toHaveLength(1);
+    const tip = stations[0]?.points[0];
+    expect(tip?.[0]).toBeCloseTo(layout.miniMap.x + layout.miniMap.size / 2, 5);
+    expect(tip?.[1]).toBeCloseTo(
+      layout.miniMap.y +
+        layout.miniMap.size / 2 -
+        ((660 / WORLD.minimapRadius) * layout.miniMap.size) / 2 -
+        MINIMAP_FURNACE_MARK_SIZE,
+      5
+    );
     expect(filledPaths.every(({ rectangles }) => rectangles.length === 0)).toBe(true);
   });
 

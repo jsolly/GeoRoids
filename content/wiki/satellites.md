@@ -81,5 +81,6 @@ inventory is temporary and does not survive a server restart.
 Equipping a satellite plays a short crystal confirmation. While it orbits your
 ship, a soft chime sounds once per orbit, with silence between passes. The
 chime moves with the satellite and gently changes pitch. Headphones make its direction clearest. The sound stops when the satellite leaves orbit or breaks, and
-when you mute audio or leave the game tab. Other pilots' satellites do not add
+when you turn Sound Effects off or leave the game tab. Music off does not stop
+the chime. Other pilots' satellites do not add
 extra orbit chimes.

@@ -14,10 +14,12 @@ media: []
 
 ## What the HUD shows
 
-Before entering a game, set your pilot name, choose a kit, and use the Sound
-checkbox on the title screen to enable or mute audio. Muting stops sounds already
-playing too. Starting with Sound off skips loading sound files. When you enable
-audio, effects become available as they load; missed sounds do not play later.
+Before entering a game, set your pilot name, choose a kit, and use Sound
+Effects and Music on the title screen. Sound Effects mutes cues already
+playing; Music loops a quiet title bed and an in-game bed after Enter Game,
+and this browser remembers both. Starting with Sound Effects off skips loading
+effect files. When you enable effects, they become available as they load;
+missed sounds do not play later. Music off stops beds without muting cues.
 
 Open Advanced and enable Debug to show this browser's Player ID and page
 session ID. The Player ID is the same `playerId` already written on join and

@@ -244,6 +244,9 @@
     "tests/integration/browser/sanity/crew-scoreboard-lists-pilots.test.ts",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
     "src/audio/Sound.ts",
+    "src/audio/audioRuntime.ts",
+    "src/audio/musicBeds.ts",
+    "src/audio/musicCatalog.ts",
     "src/audio/pitch.ts",
     "src/audio/resourceMusic.ts",
     "src/audio/feedbackSounds.ts",
@@ -255,6 +258,7 @@
     "src/audio/spatialAudio.ts",
     "src/constants/user-preferences.ts",
     "docs/sounds.md",
+    "tests/unit/audio/title-and-play-loop-music-beds.test.ts",
     "src/rendering/sectorRenderer.ts",
     "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts",
     "src/ui/shipKitSelect.ts"

@@ -40,7 +40,16 @@ if (typeof window !== 'undefined') {
               id="soundPref"
               checked
             />
-            <label class="sound-toggle-label" for="soundPref">Sound</label>
+            <label class="sound-toggle-label" for="soundPref">Sound Effects</label>
+          </div>
+          <div class="sound-toggle-row">
+            <input
+              class="sound-toggle"
+              type="checkbox"
+              id="musicPref"
+              checked
+            />
+            <label class="sound-toggle-label" for="musicPref">Music</label>
           </div>
           <details id="advanced-settings" class="advanced-settings">
             <summary>Advanced</summary>

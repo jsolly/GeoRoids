@@ -79,15 +79,22 @@ test('playfield chrome sizes to the visible box instead of overflowing 100dvw', 
 });
 
 test('title menu stacks Enter Game, audio toggles, and Advanced at one control width', () => {
-  expect(productionCss).toContain('--start-control-width: 280px');
+  expect(productionCss).toMatch(/#start-screen \{[^}]*--start-control-width: 280px;/su);
+  expect(productionCss).toMatch(
+    /@media \(min-width: 800px\) \{[\s\S]*?#start-screen \{[^}]*--start-control-width: 320px;/u
+  );
+  expect(productionCss).toMatch(
+    /@media \(max-width: 430px\) \{[\s\S]*?#start-screen \{[^}]*--start-control-width: 100%;/u
+  );
   expect(productionCss).toMatch(
     /\.start-actions,\s*\.settings \{[^}]*width: min\(100%, var\(--start-control-width, 280px\)\);/su
   );
   expect(productionCss).toMatch(
-    /\.enter-game,\s*\.sound-toggle-row,\s*\.advanced-settings \{[^}]*width: 100%;/su
+    /\.enter-game,\s*\.sound-toggle-row,\s*\.advanced-settings \{[^}]*width: 100%;[^}]*max-width: none;/su
   );
   expect(productionCss).toMatch(/\.sound-toggle-row \{[^}]*justify-content: flex-start;/su);
-  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*min-width: 220px;/su);
+  expect(productionCss).not.toMatch(/\.enter-game \{[^}]*max-width: (?:280px|320px|100%);/su);
+  expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*min-width: 2(?:00|20)px;/su);
   expect(productionCss).not.toMatch(/\.sound-toggle-row \{[^}]*justify-content: center;/su);
   expect(productionCss).not.toMatch(/\.advanced-settings \{[^}]*width: min\(100%, 260px\);/su);
 });

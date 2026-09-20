@@ -176,7 +176,7 @@ test('in-play chrome disables text highlight and copy-paste callouts', () => {
     /body\.in-play \* \{[^}]*user-select: none;[^}]*-webkit-touch-callout: none;/su
   );
   expect(productionCss).toMatch(
-    /body\.in-play input,\s*body\.in-play textarea,\s*body\.in-play select,/su
+    /body\.in-play input,\s*body\.in-play textarea,\s*body\.in-play select,[\s\S]*-webkit-tap-highlight-color: revert;/su
   );
   expect(productionCss).toMatch(/#gameCanvas \{[^}]*-webkit-touch-callout: none;/su);
 });

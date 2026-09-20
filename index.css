@@ -1805,5 +1805,6 @@
     -webkit-user-select: text;
     -webkit-touch-callout: default;
     -webkit-user-drag: auto;
+    -webkit-tap-highlight-color: revert;
   }
 }

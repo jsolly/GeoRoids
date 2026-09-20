@@ -4,11 +4,18 @@ import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
+import { isFurnaceSector } from '../../../shared/furnaces';
 import { isInsideCompletedSector } from '../../../shared/sectors';
-import { sectorAt, WORLD } from '../../../shared/world';
+import { sectorAt, utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { SHIP } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
+
+/** Sector 1,0 has no Works site, so mapping it still raises walls. */
+const OPEN_CENTER = { x: 3_000, y: 1_000 };
+const OPEN_SECTOR = '1,0';
+const OPEN_WEST = 2_000;
+const OPEN_EAST = 4_000;
 
 function deposit(id: string, position: { x: number; y: number }): AsteroidData {
   return {
@@ -29,25 +36,27 @@ function deposit(id: string, position: { x: number; y: number }): AsteroidData {
 
 test('clearing and mapping a visited sector walls it off and relocates anyone still inside', () => {
   const engine = new GameEngine(7);
-  const center = { x: 5_000, y: 1_000 };
-  const miner = engine.addPlayer('miner', 'Miner', new RecordingSocket(), center);
+  const requested = { x: OPEN_CENTER.x, y: OPEN_CENTER.y };
+  const miner = engine.addPlayer('miner', 'Miner', new RecordingSocket(), requested);
   engine.entityManager.updateEntity(miner.id, { velocity: { x: 4, y: 0 }, angle: 0 });
   engine.ensureAsteroidField();
-  const sector = sectorAt(center);
-  expect(sector.id).toBe('2,0');
+  const sector = sectorAt(OPEN_CENTER);
+  expect(sector.id).toBe(OPEN_SECTOR);
+  expect(isFurnaceSector(sector.id)).toBe(false);
 
   for (const rock of engine.getAllAsteroids()) {
     if (sectorAt(rock.position).id === sector.id) {
       engine.removeAsteroid(rock.id);
     }
   }
-  engine.revealArea(center, WORLD.sectorSize);
+  engine.revealArea(OPEN_CENTER, WORLD.sectorSize);
   expect(engine.evaluateSectorProgress()).toContain(sector.id);
   expect(engine.getCompletedSectors()).toContain(sector.id);
   expect(isInsideCompletedSector(miner.position, new Set(engine.getCompletedSectors()))).toBe(
     false
   );
-  expect(miner.position.x).toBeGreaterThan(6_000);
+  expect(requested).toEqual(OPEN_CENTER);
+  expect(miner.position.x).toBeGreaterThan(OPEN_EAST);
   expect(miner.velocity.x).toBeGreaterThan(0);
   expect(miner.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
   expect(miner.lives).toBe(3);
@@ -56,10 +65,13 @@ test('clearing and mapping a visited sector walls it off and relocates anyone st
     engine.removeAsteroid(rock.id);
   }
 
-  const late = engine.addPlayer('late', 'Late', new RecordingSocket(), center);
+  const late = engine.addPlayer('late', 'Late', new RecordingSocket(), OPEN_CENTER);
   expect(isInsideCompletedSector(late.position, new Set(engine.getCompletedSectors()))).toBe(false);
 
-  const rammer = engine.addPlayer('ram', 'Ram', new RecordingSocket(), { x: 3_990, y: 1_000 });
+  const rammer = engine.addPlayer('ram', 'Ram', new RecordingSocket(), {
+    x: OPEN_WEST - 10,
+    y: 1_000,
+  });
   engine.entityManager.updateEntity(rammer.id, { spawnProtectionTimer: 0 });
   const hits = engine.resolveAuthoritativeCombat();
   expect(hits.some((hit) => hit.targetId === rammer.id && hit.attackerId === 'boundary')).toBe(
@@ -69,10 +81,10 @@ test('clearing and mapping a visited sector walls it off and relocates anyone st
   expect(rammer.lives).toBe(2);
 
   const shooter = engine.addPlayer('shooter', 'Shooter', new RecordingSocket(), {
-    x: 3_950,
+    x: OPEN_WEST - 50,
     y: 1_000,
   });
-  const laser = engine.spawnLaser(shooter.id, { x: 3_950, y: 1_000 }, { x: 8, y: 0 });
+  const laser = engine.spawnLaser(shooter.id, { x: OPEN_WEST - 50, y: 1_000 }, { x: 8, y: 0 });
   assert.ok(laser);
   for (let frame = 0; frame < 20; frame++) {
     engine.advanceLasersAndResolveHits();
@@ -88,18 +100,17 @@ test('clearing and mapping a visited sector walls it off and relocates anyone st
 
 test('a crew that already crossed the grid is nudged out instead of dying when the wall appears', () => {
   const engine = new GameEngine(7);
-  const center = { x: 5_000, y: 1_000 };
-  const miner = engine.addPlayer('miner', 'Miner', new RecordingSocket(), center);
-  const partner = engine.addPlayer('partner', 'Partner', new RecordingSocket(), center);
+  const miner = engine.addPlayer('miner', 'Miner', new RecordingSocket(), OPEN_CENTER);
+  const partner = engine.addPlayer('partner', 'Partner', new RecordingSocket(), OPEN_CENTER);
   engine.ensureAsteroidField();
   for (const rock of engine.getAllAsteroids()) {
-    if (sectorAt(rock.position).id === '2,0') {
+    if (sectorAt(rock.position).id === OPEN_SECTOR) {
       engine.removeAsteroid(rock.id);
     }
   }
-  engine.revealArea(center, WORLD.sectorSize);
+  engine.revealArea(OPEN_CENTER, WORLD.sectorSize);
   const justAcross = {
-    position: { x: 6_010, y: 1_000 },
+    position: { x: OPEN_EAST + 10, y: 1_000 },
     velocity: { x: 4, y: 0 },
     angle: 0,
     spawnProtectionTimer: 0,
@@ -107,13 +118,13 @@ test('a crew that already crossed the grid is nudged out instead of dying when t
   engine.entityManager.updateEntity(miner.id, justAcross);
   engine.entityManager.updateEntity(partner.id, {
     ...justAcross,
-    position: { x: 6_010, y: 1_020 },
+    position: { x: OPEN_EAST + 10, y: 1_020 },
   });
-  expect(sectorAt(miner.position).id).toBe('3,0');
-  expect(sectorAt(partner.position).id).toBe('3,0');
-  expect(engine.evaluateSectorProgress()).toContain('2,0');
+  expect(sectorAt(miner.position).id).toBe('2,0');
+  expect(sectorAt(partner.position).id).toBe('2,0');
+  expect(engine.evaluateSectorProgress()).toContain(OPEN_SECTOR);
   for (const leaver of [miner, partner]) {
-    expect(leaver.position.x).toBeGreaterThan(6_010);
+    expect(leaver.position.x).toBeGreaterThan(OPEN_EAST + 10);
     expect(leaver.velocity.x).toBeGreaterThan(0);
     expect(leaver.lives).toBe(3);
     expect(leaver.exploding).toBe(false);
@@ -131,19 +142,18 @@ test('a crew that already crossed the grid is nudged out instead of dying when t
 
 test('enhanced movement cannot carry a ship back into a completed sector', () => {
   const engine = new GameEngine(7);
-  const center = { x: 5_000, y: 1_000 };
   const socket = new RecordingSocket();
-  const miner = engine.addPlayer('miner', 'Miner', socket, center);
+  const miner = engine.addPlayer('miner', 'Miner', socket, OPEN_CENTER);
   miner.asteroidInteractions = 1;
   engine.entityManager.updateEntity(miner.id, { velocity: { x: 4, y: 0 }, angle: 0 });
   engine.ensureAsteroidField();
   for (const rock of engine.getAllAsteroids()) {
-    if (sectorAt(rock.position).id === '2,0') {
+    if (sectorAt(rock.position).id === OPEN_SECTOR) {
       engine.removeAsteroid(rock.id);
     }
   }
-  engine.revealArea(center, WORLD.sectorSize);
-  expect(engine.evaluateSectorProgress()).toContain('2,0');
+  engine.revealArea(OPEN_CENTER, WORLD.sectorSize);
+  expect(engine.evaluateSectorProgress()).toContain(OPEN_SECTOR);
   const now = engine.getServerTime();
   expect(engine.playerMotion.register(miner, socket, 1, now).ok).toBe(true);
   const outside = { ...miner.position };
@@ -153,7 +163,7 @@ test('enhanced movement cannot carry a ship back into a completed sector', () =>
       {
         epoch: miner.playerMotion?.epoch ?? 0,
         sequence: 1,
-        position: center,
+        position: OPEN_CENTER,
         velocity: { x: 4, y: 0 },
         angle: 0,
         thrusting: true,
@@ -196,30 +206,78 @@ test('a saved world from an older generation resets instead of loading depleted 
 test('self-guided cargo crosses a completed sector barrier while ordinary rocks stay outside', () => {
   const engine = new GameEngine(7);
   try {
-    const center = { x: 5000, y: 1000 };
-    engine.addPlayer('launcher', 'Launcher', new RecordingSocket(), center, 'hauler');
+    engine.addPlayer('launcher', 'Launcher', new RecordingSocket(), OPEN_CENTER, 'hauler');
     engine.ensureAsteroidField();
     for (const rock of engine.getAllAsteroids()) {
-      if (sectorAt(rock.position).id === '2,0') {
+      if (sectorAt(rock.position).id === OPEN_SECTOR) {
         engine.removeAsteroid(rock.id);
       }
     }
-    engine.revealArea(center, WORLD.sectorSize);
-    expect(engine.evaluateSectorProgress()).toContain('2,0');
+    engine.revealArea(OPEN_CENTER, WORLD.sectorSize);
+    expect(engine.evaluateSectorProgress()).toContain(OPEN_SECTOR);
     for (const rock of engine.getAllAsteroids()) {
       engine.removeAsteroid(rock.id);
     }
-    const guided = deposit('guided', { x: 3999, y: 400 });
+    const guided = deposit('guided', { x: OPEN_WEST - 1, y: 400 });
     guided.velocity = { x: 2.5, y: 0 };
     guided.boost = { phase: 'burning', ownerId: 'launcher', angle: 0 };
-    const loose = deposit('loose', { x: 3999, y: 800 });
+    const loose = deposit('loose', { x: OPEN_WEST - 1, y: 800 });
     loose.velocity = { x: 2.5, y: 0 };
     engine.addAsteroid(guided);
     engine.addAsteroid(loose);
     engine.advanceOneFrame();
-    expect(guided.position.x).toBeGreaterThan(4000);
-    expect(loose.position.x).toBeLessThan(4000);
+    expect(guided.position.x).toBeGreaterThan(OPEN_WEST);
+    expect(loose.position.x).toBeLessThan(OPEN_WEST);
   } finally {
     engine.stopGameLoop();
+  }
+});
+
+test('clearing a Works sector leaves the delivery yard open instead of walling it off', () => {
+  const engine = new GameEngine(7);
+  try {
+    const yard = { x: 5_000, y: 1_000 };
+    engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), yard, 'hauler');
+    engine.ensureAsteroidField();
+    const sector = sectorAt(yard);
+    expect(sector.id).toBe('2,0');
+    expect(isFurnaceSector(sector.id)).toBe(true);
+    for (const rock of engine.getAllAsteroids()) {
+      if (sectorAt(rock.position).id === sector.id) {
+        engine.removeAsteroid(rock.id);
+      }
+    }
+    engine.revealArea(yard, WORLD.sectorSize);
+    expect(engine.evaluateSectorProgress()).not.toContain(sector.id);
+    expect(engine.getCompletedSectors()).not.toContain(sector.id);
+    expect(isInsideCompletedSector(yard, new Set(engine.getCompletedSectors()))).toBe(false);
+  } finally {
+    engine.stopGameLoop();
+  }
+});
+
+test('a saved completed Works sector reopens so the delivery yard stays reachable', () => {
+  const store = new WorldStore(':memory:');
+  const savedAt = Date.now();
+  let engine: GameEngine | undefined;
+  try {
+    store.checkpoint(
+      {
+        seed: 7,
+        startedAt: savedAt,
+        generation: WORLD.generation,
+        scoreSeason: utcScoreSeason(savedAt),
+        exploration: [],
+        completedSectors: ['2,0', OPEN_SECTOR],
+      },
+      new Map(),
+      []
+    );
+    engine = new GameEngine(7, undefined, new InlineWorldPersistence(store));
+    expect(engine.getCompletedSectors()).toContain(OPEN_SECTOR);
+    expect(engine.getCompletedSectors()).not.toContain('2,0');
+  } finally {
+    engine?.stopGameLoop();
+    store.close();
   }
 });

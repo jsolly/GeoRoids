@@ -70,7 +70,7 @@ test('completed-sector protection covers the full spider footprint and protected
 
 test('roamers wait minutes even on the first arrival and postpone new attacks during a hunt', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
-  const players = [actorAt({ x: 5000, y: 5000 })];
+  const players = [actorAt({ x: 7_000, y: 3_000 })];
   manager.advance({ players, completedSectors, nowFrame: 1 });
   manager.advance({ players, completedSectors, nowFrame: 1801 });
   expect(manager.snapshot().spiders).toEqual([]);
@@ -90,7 +90,7 @@ test('failed roaming attempts wait another full interval instead of ambushing on
   manager.advance({ ...options, nowFrame: 1 });
   manager.advance({ ...options, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES + 1 });
   expect(manager.snapshot().spiders).toEqual([]);
-  pilot.position = { x: 5000, y: 5000 };
+  pilot.position = { x: 7_000, y: 3_000 };
   manager.advance({ ...options, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES + 2 });
   expect(manager.snapshot().spiders).toEqual([]);
   manager.advance({ ...options, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES * 2 + 1 });
@@ -100,8 +100,8 @@ test('failed roaming attempts wait another full interval instead of ambushing on
 test('a roaming spawn keeps its distance from every pilot, not only its chosen target', () => {
   const manager = new TerrainSpiderManager(() => 0);
   const players = [
-    actorAt({ x: 5000, y: 5000 }),
-    { ...actorAt({ x: 7100, y: 5000 }), id: 'z-other' },
+    actorAt({ x: 7_000, y: 3_000 }),
+    { ...actorAt({ x: 9_100, y: 3_000 }), id: 'z-other' },
   ];
   manager.advance({ players, completedSectors, nowFrame: 1 });
   manager.advance({ players, completedSectors, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES + 1 });
@@ -118,7 +118,7 @@ test('a roaming spawn keeps its distance from every pilot, not only its chosen t
 test('a non-hunting roamer still occupies the roaming population slot when a new spawn is due', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
   const roamer = manager.spawnSpider({ x: 2200, y: 2200 });
-  const players = [actorAt({ x: 5000, y: 5000 })];
+  const players = [actorAt({ x: 7_000, y: 3_000 })];
   manager.advance({ players, completedSectors, nowFrame: 1 });
   expect(manager.snapshot().spiders[0]?.phase).toBe('scuttling');
   manager.advance({ players, completedSectors, nowFrame: SPIDER.SPAWN_INTERVAL_MAX_FRAMES + 1 });

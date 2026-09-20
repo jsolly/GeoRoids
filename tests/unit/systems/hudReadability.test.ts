@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { FURNACES } from '../../../shared/furnaces';
 import { WORLD } from '../../../shared/world';
 import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
@@ -300,7 +301,11 @@ describe('painted HUD composition', () => {
     const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
     player.ship.position = { x: 0, y: 0 };
     const exploration = new ExplorationMap();
-    exploration.reveal({ x: 4000, y: 0 }, 100);
+    const distantWorks = FURNACES.find((site) => site.id === 'works-1-0');
+    if (!distantWorks) {
+      throw new Error('Radar fixture requires a regional Works site');
+    }
+    exploration.reveal(distantWorks.position, 100);
     setWorldExploration(exploration.snapshot());
     const ctx = canvasContext();
     const { strokes, filledPaths } = recordCanvas(ctx);

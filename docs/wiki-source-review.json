@@ -1,5 +1,5 @@
 {
-  "note": "Desktop Schematic button with V sits above Map; touch hides that button and paints a brief hold-to-equip label above the ship on join. Reviewed controls, hud-network, and hauler against shipSchematic.ts, schematicJoinHint.ts, viewportChrome.ts, canvas.ts, and canvasSurface playfield chrome. No demonstration GIFs affected.",
+  "note": "Join hint now registers on page load and starts if play is already visible, because startGame turns on the play view before InputManager listeners. Reviewed controls against schematicJoinHint.ts and eventLoop.ts. No demonstration GIFs affected.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -133,7 +133,7 @@
     "src/audio/splitSound.ts": "sha256:f1ba4b8785204096b8e10a4e90d75b04ce31b983c87f7242dc3819e4d37806c0",
     "src/constants/index.ts": "sha256:f04692a29f5986a5cf6c38c66bfa43f5b342f0c50d0ff9ee3d58d3a61a550158",
     "src/constants/user-preferences.ts": "sha256:176b07f171de9e8fe15f1f5bb719eeefd90596a2f388913ab7e923379e6b9afe",
-    "src/core/eventLoop.ts": "sha256:d9294cc36040e6ac078c15b10921e799bc91a923dacb654dd86f3d025eb0e901",
+    "src/core/eventLoop.ts": "sha256:241ebc5ed6ea6a9e62d8429850c5b6425c6f3c991661a6d68549625dfc44a7f5",
     "src/core/gameController.ts": "sha256:aa404c00104f4950a555937a2a1c1adb341a6ca062631aea16a8858fdb7bd0fa",
     "src/core/services/GameStateManager.ts": "sha256:8d16a03e7d35f00a43ff88f285e49e233284a5c096d1bfaadf5454e8bdd79a1a",
     "src/core/services/InputManager.ts": "sha256:73f91ff7bfb1e32b0b675186b92e30f46caea14c012cf167e21850a1bb974aab",
@@ -240,7 +240,7 @@
     "src/ui/mainMenu.ts": "sha256:214503312b0924afa8055e7def270694c2bea699f3b04aa8ecc9e102c9a96b20",
     "src/ui/networkStatus.ts": "sha256:451921c0c8040e9676b9d9caa1edb97ca37facd7eb78d564ce2ac1648396a24e",
     "src/ui/satelliteInventory.ts": "sha256:cfc00ef089d84b1104f158d64d1d1c92069b6ed2e4d0cf963254fd36d9ee5709",
-    "src/ui/schematicJoinHint.ts": "sha256:ebe4c7335c5630fbd048365d76afbaa6689cf6f08a8ac434521917b77b26d192",
+    "src/ui/schematicJoinHint.ts": "sha256:d27b426d53d84367e1add3d440036c5bf012283782ad742d2653931edf98e1c2",
     "src/ui/shipKitSelect.ts": "sha256:ac7e71725a6b95ab23bfee69bc15a3d98f32f0bbf8c578f8e8c102a41e999890",
     "src/ui/shipSchematic.ts": "sha256:4f6f79f801baab56028d7c7d3f2f586da5ba28b9f377c8e907393fefa1973870",
     "src/ui/shipSchematicState.ts": "sha256:ac4298985cf52ae195dd7e69eb51a793221acc9c586b7fa0322db37d8bf37cb3",

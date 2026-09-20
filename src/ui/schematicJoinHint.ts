@@ -39,6 +39,9 @@ export function initializeSchematicJoinHint(): void {
     dismissed = true;
     startedAt = null;
   });
+  if (document.body.classList.contains('in-play')) {
+    startHint(performance.now());
+  }
 }
 
 export function schematicJoinHintAlpha(now = performance.now()): number {

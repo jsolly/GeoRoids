@@ -5,11 +5,13 @@ import { reportRenderError } from '../rendering/renderError';
 import '../ui/mainMenu'; // wires nickname + Enter Game listeners
 import { paintDebugHud } from '../ui/debugHud';
 import { initNetworkStatusUI } from '../ui/networkStatus';
+import { initializeSchematicJoinHint } from '../ui/schematicJoinHint';
 import { installGlobalErrorLogging } from '../utils/globalErrorLogging';
 import { GameController } from './gameController';
 
 const gameController = GameController.getInstance();
 installGlobalErrorLogging();
+initializeSchematicJoinHint();
 
 // Surface a visible banner whenever the game-server connection drops.
 initNetworkStatusUI();

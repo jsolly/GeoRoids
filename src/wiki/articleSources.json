@@ -247,6 +247,7 @@
     "src/audio/audioRuntime.ts",
     "src/audio/musicBeds.ts",
     "src/audio/musicCatalog.ts",
+    "src/audio/musicThreat.ts",
     "src/audio/pitch.ts",
     "src/audio/resourceMusic.ts",
     "src/audio/feedbackSounds.ts",

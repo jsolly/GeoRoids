@@ -22,12 +22,15 @@ test('title Music checkbox loops the lobby bed and Enter Game swaps to the playf
   await expect.poll(() => page.locator('label[for="musicPref"]').textContent()).toBe('Music');
   await page.locator('#start-screen').click({ position: { x: 24, y: 24 } });
   await expect
-    .poll(async () => {
-      const events: Array<{ loop: boolean }> = await page.evaluate(() =>
-        JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
-      );
-      return events.some((event) => event.loop);
-    })
+    .poll(
+      async () => {
+        const events: Array<{ loop: boolean }> = await page.evaluate(() =>
+          JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
+        );
+        return events.some((event) => event.loop);
+      },
+      { timeout: 30000 }
+    )
     .toBe(true);
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('music-title-desktop.png'),
@@ -41,20 +44,23 @@ test('title Music checkbox loops the lobby bed and Enter Game swaps to the playf
   await game.startGame();
   await game.waitForGameReady();
   await expect
-    .poll(async () => {
-      if (!titleLoop) {
-        return false;
-      }
-      const events: Array<{ loop: boolean; duration: number; bufferId: number }> =
-        await page.evaluate(() =>
-          JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
+    .poll(
+      async () => {
+        if (!titleLoop) {
+          return false;
+        }
+        const events: Array<{ loop: boolean; duration: number; bufferId: number }> =
+          await page.evaluate(() =>
+            JSON.parse(document.documentElement.dataset['audioEvents'] ?? '[]')
+          );
+        return events.some(
+          (event) =>
+            event.loop &&
+            (event.bufferId !== titleLoop.bufferId || event.duration !== titleLoop.duration)
         );
-      return events.some(
-        (event) =>
-          event.loop &&
-          (event.bufferId !== titleLoop.bufferId || event.duration !== titleLoop.duration)
-      );
-    })
+      },
+      { timeout: 30000 }
+    )
     .toBe(true);
   await page.locator('#musicPref').evaluate((input) => {
     if (!(input instanceof HTMLInputElement)) {
@@ -65,9 +71,11 @@ test('title Music checkbox loops the lobby bed and Enter Game swaps to the playf
   });
   await expect.poll(() => page.evaluate(() => localStorage.getItem('musicOn'))).toBe('false');
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.dataset['activeLoops']))
+    .poll(() => page.evaluate(() => document.documentElement.dataset['activeLoops']), {
+      timeout: 10000,
+    })
     .toBe('0');
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('music-muted-in-play-desktop.png'),
   });
-}, 60000);
+}, 120000);

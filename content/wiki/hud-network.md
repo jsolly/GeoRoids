@@ -16,10 +16,12 @@ media: []
 
 Before entering a game, set your pilot name, choose a kit, and use Sound
 Effects and Music on the title screen. Sound Effects mutes cues already
-playing; Music loops a quiet title bed and an in-game bed after Enter Game,
-and this browser remembers both. Starting with Sound Effects off skips loading
-effect files. When you enable effects, they become available as they load;
-missed sounds do not play later. Music off stops beds without muting cues.
+playing; Music loops a quiet title bed and an in-game bed after Enter Game.
+In-play danger can temporarily switch to a threat bed, then the playfield
+loop returns. Music off silences every bed, including danger, without muting
+cues. This browser remembers both checkboxes. Starting with Sound Effects
+off skips loading effect files. When you enable effects, they become
+available as they load; missed sounds do not play later.
 
 Open Advanced and enable Debug to show this browser's Player ID and page
 session ID. The Player ID is the same `playerId` already written on join and

@@ -39,7 +39,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
 | How do pilots complete a sector and keep the shared field going? | teamwork, hud-network | shared/sectors.ts, shared/exploration.ts, shared/furnaces.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
-| How do I mute sound effects or music? | hud-network | src/constants/user-preferences.ts, src/audio/musicBeds.ts, src/audio/Sound.ts |
+| How do I mute sound effects or music? | hud-network | src/constants/user-preferences.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
 | How do I copy a Player ID so an agent can filter Railway logs? | hud-network | src/ui/debugIdentity.ts, src/utils/clientLogContext.ts, docs/diagnostics.md |
 
 ## Maintenance rules

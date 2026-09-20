@@ -11,26 +11,48 @@ import {
 } from './audioRuntime';
 import {
   getMusicBedCatalog,
+  MUSIC_BED_IDS,
   type MusicBedCatalog,
   type MusicBedId,
   musicBedsAreConfigured,
   setMusicBedCatalogForTests as setCatalog,
 } from './musicCatalog';
+import { isMusicThreatActive, registerMusicThreatListener, resetMusicThreats } from './musicThreat';
 
 type AudioLibrary = typeof import('howler');
 
 const volumes: Record<MusicBedId, number> = {
   menu: AUDIO.MENU_BED_VOLUME,
   inGame: AUDIO.IN_GAME_BED_VOLUME,
+  danger: AUDIO.DANGER_BED_VOLUME,
 };
 
 const howls: Partial<Record<MusicBedId, Howl>> = {};
 const fadingOut = new Set<string>();
 let current: MusicBedId | null = null;
 let currentId: number | undefined;
+let dangerFailed = false;
+let intenseInGame = false;
 
 function fadeKey(kind: MusicBedId, id: number): string {
   return `${kind}:${id}`;
+}
+
+function inPlay(): boolean {
+  return document.body.classList.contains('in-play');
+}
+
+function dangerCatalogued(): boolean {
+  return !dangerFailed && getMusicBedCatalog().danger.length > 0;
+}
+
+function dangerBedUsable(): boolean {
+  const howl = howls.danger;
+  return dangerCatalogued() && howl !== undefined && canPlayAudio(howl);
+}
+
+function shouldIntensifyInGame(): boolean {
+  return inPlay() && isMusicThreatActive() && !dangerCatalogued();
 }
 
 function desiredBed(): MusicBedId | null {
@@ -38,13 +60,20 @@ function desiredBed(): MusicBedId | null {
     return null;
   }
   const catalog = getMusicBedCatalog();
-  const want: MusicBedId = document.body.classList.contains('in-play') ? 'inGame' : 'menu';
-  return catalog[want].length > 0 ? want : null;
+  if (inPlay()) {
+    if (isMusicThreatActive() && dangerBedUsable()) {
+      return 'danger';
+    }
+    return catalog.inGame.length > 0 ? 'inGame' : null;
+  }
+  return catalog.menu.length > 0 ? 'menu' : null;
 }
 
 function stopImmediate(): void {
   fadingOut.clear();
+  intenseInGame = false;
   for (const howl of Object.values(howls)) {
+    howl?.rate(1);
     howl?.stop();
   }
   current = null;
@@ -66,12 +95,39 @@ function fadeOut(kind: MusicBedId, id: number): void {
   howl.fade(from, 0, AUDIO.BED_CROSSFADE_MS, id);
 }
 
+function inGameVolume(intense: boolean) {
+  return intense ? AUDIO.DANGER_FALLBACK_VOLUME : volumes.inGame;
+}
+
+function inGameRate(intense: boolean) {
+  return intense ? AUDIO.DANGER_FALLBACK_RATE : 1;
+}
+
+function applyInGameTreatment(howl: Howl, id: number, intense: boolean): void {
+  const volume = inGameVolume(intense);
+  const rate = inGameRate(intense);
+  if (intenseInGame === intense) {
+    howl.rate(rate, id);
+    return;
+  }
+  intenseInGame = intense;
+  howl.rate(rate, id);
+  const currentVolume = howl.volume(id);
+  const from = typeof currentVolume === 'number' ? currentVolume : volumes.inGame;
+  howl.volume(from, id);
+  howl.fade(from, volume, AUDIO.BED_CROSSFADE_MS, id);
+}
+
 function playBed(kind: MusicBedId): void {
   const howl = howls[kind];
   if (!howl || !canPlayAudio(howl)) {
     return;
   }
+  const intense = kind === 'inGame' && shouldIntensifyInGame();
   if (current === kind && currentId !== undefined && howl.playing(currentId)) {
+    if (kind === 'inGame') {
+      applyInGameTreatment(howl, currentId, intense);
+    }
     return;
   }
   const previous = current;
@@ -79,8 +135,17 @@ function playBed(kind: MusicBedId): void {
   const id = howl.play();
   current = kind;
   currentId = id;
-  howl.volume(0, id);
-  howl.fade(0, volumes[kind], AUDIO.BED_CROSSFADE_MS, id);
+  if (kind === 'inGame') {
+    intenseInGame = intense;
+    howl.rate(inGameRate(intense), id);
+    howl.volume(0, id);
+    howl.fade(0, inGameVolume(intense), AUDIO.BED_CROSSFADE_MS, id);
+  } else {
+    intenseInGame = false;
+    howl.rate(1, id);
+    howl.volume(0, id);
+    howl.fade(0, volumes[kind], AUDIO.BED_CROSSFADE_MS, id);
+  }
   if (previous !== null && previous !== kind && previousId !== undefined) {
     fadeOut(previous, previousId);
   }
@@ -93,6 +158,7 @@ function syncMusicBeds(): void {
       fadeOut(current, currentId);
       current = null;
       currentId = undefined;
+      intenseInGame = false;
     }
     return;
   }
@@ -101,9 +167,18 @@ function syncMusicBeds(): void {
   activateAudio();
 }
 
+function handleBedLoadError(kind: MusicBedId): void {
+  howls[kind]?.unload();
+  if (kind !== 'danger') {
+    return;
+  }
+  dangerFailed = true;
+  syncMusicBeds();
+}
+
 function ensureHowls(audio: AudioLibrary): void {
   const catalog = getMusicBedCatalog();
-  for (const kind of ['menu', 'inGame'] as const) {
+  for (const kind of MUSIC_BED_IDS) {
     const src = catalog[kind];
     if (src.length === 0 || howls[kind]) {
       continue;
@@ -120,14 +195,14 @@ function ensureHowls(audio: AudioLibrary): void {
         syncMusicBeds();
       },
       onloaderror: () => {
-        howls[kind]?.unload();
+        handleBedLoadError(kind);
       },
       onplayerror: (id) => {
         howls[kind]?.stop(id);
       },
       onfade: (id) => {
-        const howl = howls[kind];
-        const faded = howl?.volume(id);
+        const bed = howls[kind];
+        const faded = bed?.volume(id);
         if (!fadingOut.has(fadeKey(kind, id))) {
           return;
         }
@@ -135,7 +210,8 @@ function ensureHowls(audio: AudioLibrary): void {
           return;
         }
         fadingOut.delete(fadeKey(kind, id));
-        howl?.stop(id);
+        bed?.rate(1, id);
+        bed?.stop(id);
       },
     });
   }
@@ -156,6 +232,11 @@ function onGesture(): void {
   }
 }
 
+function onPlayViewOff(): void {
+  resetMusicThreats();
+  syncMusicBeds();
+}
+
 export function setMusic(pref: boolean): void {
   setStoredItem(LOCAL_STORAGE_KEYS.musicOn, String(pref));
   const checkbox = document.querySelector<HTMLInputElement>('#musicPref');
@@ -172,17 +253,20 @@ export function setMusic(pref: boolean): void {
 
 export function setMusicBedCatalogForTests(next: MusicBedCatalog): void {
   stopImmediate();
-  for (const kind of Object.keys(howls) as MusicBedId[]) {
+  for (const kind of MUSIC_BED_IDS) {
     howls[kind]?.unload();
     delete howls[kind];
   }
+  dangerFailed = false;
   setCatalog(next);
   registerMusicBedAvailability(musicBedsAreConfigured());
+  resetMusicThreats();
 }
 
 registerMusicBedAvailability(musicBedsAreConfigured());
 registerMusicSound(startMusic, stopImmediate);
+registerMusicThreatListener(syncMusicBeds);
 window.addEventListener('playViewOn', syncMusicBeds);
-window.addEventListener('playViewOff', syncMusicBeds);
+window.addEventListener('playViewOff', onPlayViewOff);
 document.addEventListener('pointerdown', onGesture, true);
 document.addEventListener('keydown', onGesture, true);

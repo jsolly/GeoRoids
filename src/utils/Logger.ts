@@ -19,6 +19,7 @@ class Logger {
   private static forwardingFailureReported = false;
   private static instance: Logger;
   private currentLevel: LogLevel;
+  private readonly recentDiagnostics: string[] = [];
   private static isForwarderInitialized = false;
 
   private constructor() {
@@ -72,6 +73,10 @@ class Logger {
     this.log(LogLevel.ERROR, category, message, context, error);
   }
 
+  getRecentDiagnostics(): string[] {
+    return [...this.recentDiagnostics];
+  }
+
   private log(
     level: LogLevel,
     category: string,
@@ -93,6 +98,12 @@ class Logger {
       ...getClientLogContext(),
     });
     const line = stringifyLogRecord(record);
+    if (level <= LogLevel.WARN || category === 'STATE') {
+      this.recentDiagnostics.push(line);
+      if (this.recentDiagnostics.length > 80) {
+        this.recentDiagnostics.shift();
+      }
+    }
 
     if (LOGGING.WRITE_TO_CONSOLE) {
       this.writeToConsole(level, line);

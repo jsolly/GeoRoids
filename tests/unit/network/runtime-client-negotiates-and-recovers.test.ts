@@ -112,6 +112,39 @@ describe('actual ConnectionManager WebSocket message path', () => {
     });
   }
 
+  test.each([1, 7])('a returning pilot moves after its saved epoch %i restarts', async (epoch) => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 0, y: 0 }, 'surveyor');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalShip').mockReturnValue(player.ship);
+    let ws = await connect();
+    acknowledge(ws);
+    const frame = captureSnapshot(snapshotFixture());
+    const pilot = frame.entities[0];
+    assert.ok(pilot);
+    pilot.id = manager.getClientId();
+    pilot.playerMotion = { epoch, mode: 'free', ack: 80 };
+    ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
+
+    // A hidden tab can outlive the live actor. Its private credential restores
+    // the saved pilot with the same ID but a new motion session starting at 1.
+    ws.close();
+    ws = await connect();
+    acknowledge(ws);
+    pilot.playerMotion = { epoch: 1, mode: 'free', ack: 0 };
+    pilot.position = { x: 2382, y: 2849 };
+    ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
+    expect(player.ship.serverOwnsMotion).toBe(false);
+    expect(player.ship.position).toEqual(pilot.position);
+    manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+    expect(ws.sent.at(-1)).toMatchObject({
+      type: 'update',
+      data: { motionEpoch: 1, motionSequence: 1 },
+    });
+    const before = { ...player.ship.position };
+    player.ship.update();
+    expect(player.ship.position).not.toEqual(before);
+  });
+
   test('nearby remote shots sound once, self echoes stay silent and collected loot is deduplicated', async () => {
     const player = entityFactory.createLocalPlayer('Listening pilot', { x: 0, y: 0 }, 'surveyor');
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);

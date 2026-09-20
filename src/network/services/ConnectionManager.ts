@@ -1583,6 +1583,10 @@ export class ConnectionManager {
       );
       return;
     }
+    // A restored pilot keeps its ID but starts a new motion epoch. The joined
+    // acknowledgment is the boundary after which old movement counters expire.
+    this.motionReconciliation.reset();
+    this.motionReconciliation.awaitAuthoritativePose();
     this.joinAcknowledged = true;
     this.shotAcknowledgements = data.shotAcknowledgements === true;
     this.currentProtocolReady = true;

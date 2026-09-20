@@ -12,6 +12,8 @@ export const WORLD = {
   legacyDepositsPerSector: 24,
   /** Persisted marker for the additive sector migration. */
   asteroidDensityVersion: 2,
+  /** One-time wake-up of saved deposits for the mostly drifting field. */
+  asteroidMotionVersion: 1,
   /** Saved worlds with a different generation reset instead of loading stale progress. */
   generation: 1,
   spawnClusterRadius: 150,

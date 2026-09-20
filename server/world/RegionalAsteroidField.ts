@@ -1,13 +1,18 @@
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
-import { seedAsteroidPhenomena } from '../../shared/asteroidPhenomena';
+import {
+  ASTEROID_INTERACTIONS,
+  layoutReflectiveCluster,
+  seedAsteroidPhenomena,
+} from '../../shared/asteroidPhenomena';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, Position } from '../../shared-types';
 import { ROID } from '../../src/constants';
 import type { AsteroidManager } from '../core/AsteroidManager';
 import { RNGService } from '../core/RNGService';
 
+const DEPOSIT_ID = /^deposit-(\d+)-(-?\d+)-(-?\d+)-(\d+)$/u;
 const SECTOR_EDGE_EPSILON = 1e-6;
-const STATIONARY_SLOTS = WORLD.depositsPerSector / 2;
+const STATIONARY_SLOTS = Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION);
 
 function stationarySlot(index: number): boolean {
   return index < STATIONARY_SLOTS;
@@ -27,12 +32,20 @@ export class RegionalAsteroidField {
   private changed = new Map<string, AsteroidData[]>();
   private visited = new Set<string>();
   private savedDensityMigrationApplied = false;
+  private savedMotionMigrationApplied = false;
+  private readonly savedPoweredSectors = new Set<string>();
 
   constructor(
     private readonly seed: number,
-    saved: ReadonlyMap<string, AsteroidData[]> = new Map()
+    saved: ReadonlyMap<string, AsteroidData[]> = new Map(),
+    private completed: ReadonlySet<string> = new Set()
   ) {
     this.dormant = new Map(saved);
+    for (const [id, rocks] of saved) {
+      if (rocks.some((rock) => rock.boost?.phase === 'burning')) {
+        this.savedPoweredSectors.add(id);
+      }
+    }
   }
 
   private generate(x: number, y: number): AsteroidData[] {
@@ -55,7 +68,10 @@ export class RegionalAsteroidField {
       const health = material === 'metal' ? 75 : 25;
       // Keep drawing every random value for every slot, including stationary
       // slots, so positions and all later slot metadata remain seed-stable.
-      const generatedVelocity = random.randomVelocity(ROID.SERVER_VELOCITY_MAX);
+      const direction = random.random() * Math.PI * 2;
+      const speed =
+        ROID.DRIFT_SPEED_MIN + (ROID.DRIFT_SPEED_MAX - ROID.DRIFT_SPEED_MIN) * random.random() ** 2;
+      const generatedVelocity = { x: Math.cos(direction) * speed, y: Math.sin(direction) * speed };
       rocks.push({
         id: `deposit-${this.seed}-${x}-${y}-${index}`,
         position,
@@ -79,6 +95,7 @@ export class RegionalAsteroidField {
       collab.maxHealth = 100;
     }
     seedAsteroidPhenomena(rocks);
+    this.placeReflectiveClusters(rocks, x, y);
     // Phenomenon clusters and the launch-area offset may move a generated
     // slot across an edge. Keep the slot owned by its deterministic sector;
     // later simulation drift is what transfers ownership during checkpointing.
@@ -127,7 +144,7 @@ export class RegionalAsteroidField {
       );
     });
     // A pre-density sector has six stationary reflective rocks and 18 moving
-    // rocks. Fill the missing half from the additive slots while preserving
+    // rocks. Fill the stationary target from the additive slots while preserving
     // the exact saved velocities (including sectors that were partly mined or
     // carried across a boundary before this migration).
     const existingStationary = saved.filter(
@@ -143,9 +160,118 @@ export class RegionalAsteroidField {
     return additions.length === 0 ? [...saved] : [...saved, ...additions];
   }
 
+  /** Keep intact pinball pockets off sector edges without restoring mined members. */
+  private placeReflectiveClusters(rocks: AsteroidData[], x: number, y: number): boolean {
+    const groups = new Map<string, AsteroidData[]>();
+    for (const rock of rocks) {
+      if (rock.phenomenon?.kind === 'reflective') {
+        const group = groups.get(rock.phenomenon.clusterId) ?? [];
+        group.push(rock);
+        groups.set(rock.phenomenon.clusterId, group);
+      }
+    }
+    let changed = false;
+    const extent = ASTEROID_INTERACTIONS.clusterRadius + ASTEROID_INTERACTIONS.reflectiveSize + 1;
+    for (const group of groups.values()) {
+      if (
+        group.length !== ASTEROID_INTERACTIONS.rocksPerCluster ||
+        group.some((rock) => rock.boost || rock.velocity.x !== 0 || rock.velocity.y !== 0)
+      ) {
+        continue;
+      }
+      const center = {
+        x: Math.min(
+          (x + 1) * WORLD.sectorSize - extent,
+          Math.max(
+            x * WORLD.sectorSize + extent,
+            group.reduce((sum, rock) => sum + rock.position.x, 0) / group.length
+          )
+        ),
+        y: Math.min(
+          (y + 1) * WORLD.sectorSize - extent,
+          Math.max(
+            y * WORLD.sectorSize + extent,
+            group.reduce((sum, rock) => sum + rock.position.y, 0) / group.length
+          )
+        ),
+      };
+      // At the circular rim, preserve the original group rather than placing
+      // a pocket partly outside the playable world.
+      if (Math.hypot(center.x, center.y) + extent > WORLD.radius) {
+        continue;
+      }
+      const placements = layoutReflectiveCluster(center);
+      for (const [index, rock] of group.entries()) {
+        const placement = placements[index];
+        if (
+          placement &&
+          (rock.position.x !== placement.position.x ||
+            rock.position.y !== placement.position.y ||
+            rock.rotation !== placement.rotation)
+        ) {
+          rock.position = { ...placement.position };
+          rock.rotation = placement.rotation;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  /** Wake newly drifting slots once at startup; never restore missing deposits. */
+  migrateSavedMotion(): void {
+    if (this.savedMotionMigrationApplied) {
+      return;
+    }
+    this.savedMotionMigrationApplied = true;
+    const generated = new Map<string, Map<string, AsteroidData>>();
+    for (const [sector, saved] of this.dormant) {
+      if (this.completed.has(sector)) {
+        continue;
+      }
+      let changed = false;
+      const rows = saved.map((rock) => {
+        if (rock.boost || rock.phenomenon || rock.velocity.x !== 0 || rock.velocity.y !== 0) {
+          return rock;
+        }
+        const match = DEPOSIT_ID.exec(rock.id);
+        if (!match || Number(match[1]) !== this.seed) {
+          return rock;
+        }
+        const x = Number(match[2]);
+        const y = Number(match[3]);
+        const origin = `${x},${y}`;
+        let originals = generated.get(origin);
+        if (!originals) {
+          originals = new Map(this.generate(x, y).map((entry) => [entry.id, entry]));
+          generated.set(origin, originals);
+        }
+        const velocity = originals.get(rock.id)?.velocity;
+        if (!velocity || (velocity.x === 0 && velocity.y === 0)) {
+          return rock;
+        }
+        changed = true;
+        return { ...rock, velocity: { ...velocity } };
+      });
+      const parsed = parseSectorId(sector);
+      // Clone rows before changing cluster poses; the saved input is a snapshot.
+      const arranged = rows.map((rock) => ({ ...rock }));
+      const layoutChanged = parsed
+        ? this.placeReflectiveClusters(arranged, parsed.x, parsed.y)
+        : false;
+      if (changed || layoutChanged) {
+        this.dormant.set(sector, arranged);
+        this.changed.set(sector, arranged);
+      }
+    }
+  }
+
   private load(id: string): AsteroidData[] {
     this.visited.add(id);
     const cached = this.dormant.get(id);
+    if (this.completed.has(id)) {
+      return cached?.filter((rock) => rock.boost?.phase === 'burning') ?? [];
+    }
     if (cached) {
       return cached;
     }
@@ -200,6 +326,7 @@ export class RegionalAsteroidField {
     observers: readonly Position[],
     completed: ReadonlySet<string>
   ): AsteroidData[] {
+    this.completed = completed;
     const wanted = new Map<string, { x: number; y: number }>();
     for (const observer of observers) {
       const start = sectorAt({
@@ -230,6 +357,15 @@ export class RegionalAsteroidField {
         wanted.set(sector.id, { x: sector.x, y: sector.y });
       }
     }
+    // Resume saved deliveries once, including cargo inside completed sectors.
+    // The index is built at startup; ticks never scan dormant world history.
+    for (const id of this.savedPoweredSectors) {
+      const sector = parseSectorId(id);
+      if (sector) {
+        wanted.set(id, sector);
+      }
+    }
+    this.savedPoweredSectors.clear();
     this.sleepDistantSectors(manager, new Set(wanted.keys()));
     const created: AsteroidData[] = [];
     for (const id of wanted.keys()) {
@@ -277,6 +413,23 @@ export class RegionalAsteroidField {
   }
 
   checkpoint(manager: AsteroidManager): ReadonlyMap<string, AsteroidData[]> {
+    // A powered rock may cross a sector edge between interest updates. Keep
+    // its new sector awake before checkpointing can put it into dormancy.
+    for (const rock of manager.getAllAsteroids()) {
+      if (rock.boost?.phase !== 'burning') {
+        continue;
+      }
+      const id = sectorAt(rock.position).id;
+      if (!this.active.has(id)) {
+        for (const native of this.load(id)) {
+          if (!manager.getAsteroid(native.id)) {
+            manager.addAsteroid(native);
+          }
+        }
+        this.dormant.delete(id);
+        this.active.add(id);
+      }
+    }
     this.sleepDistantSectors(manager, this.active);
     const rows = new Map(this.changed);
     for (const id of this.active) {
@@ -303,6 +456,7 @@ export class RegionalAsteroidField {
     this.dormant.clear();
     this.changed.clear();
     this.visited.clear();
+    this.savedPoweredSectors.clear();
     this.savedDensityMigrationApplied = false;
   }
 

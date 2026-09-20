@@ -17,6 +17,7 @@ import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
 import { getShipKit, SHIP_ABILITY, SHIP_KIT_IDS } from '../entities/ship/shipKits';
 import { getGameBoundary } from '../physics/boundary';
+import { TERRAIN } from '../physics/terrain/terrainConfig';
 
 function seconds(frames: number): string {
   return `${frames / GAME.FPS} seconds`;
@@ -109,7 +110,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Field and material values',
       paragraphs: [
-        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Ice and rubble have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
+        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Fresh interior sectors have ${Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} stationary deposits and ${WORLD.depositsPerSector - Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} drifting deposits. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.DRIFT_SPEED_MAX * GAME.FPS).toFixed(1)} world units per second. Ice and rubble have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
       ],
     },
     {
@@ -139,6 +140,12 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     },
   ],
   terrain: [
+    {
+      heading: 'Terrain travel values',
+      paragraphs: [
+        `At full steepness, climbing speed is ${TERRAIN.CLIMB_SPEED_FRACTION * 100}% of normal cruise and descending speed is ${(1 + TERRAIN.DESCENT_SPEED_BONUS) * 100}% of normal cruise. Cross-slope downhill drift reaches ${TERRAIN.CROSS_SLOPE_DRIFT * 100}% of cruise. Kit, mass, and Boost scale all three together.`,
+      ],
+    },
     {
       heading: 'Boundary values',
       paragraphs: [
@@ -172,7 +179,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Display and HUD values',
       paragraphs: [
-        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius; the full-screen universe map uses the shared exploration chart and keeps discovered furnaces and other important assets visible across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight. Touch chrome hides those keyboard badges. Ships on the universe map use each pilot's hull silhouette.`,
+        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius; the full-screen universe map uses the shared exploration chart and keeps discovered furnaces and other important assets visible across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight. Touch chrome hides those keyboard badges. Ships on the local minimap and universe map use each pilot's hull silhouette.`,
       ],
     },
     {

@@ -33,6 +33,9 @@ remembers the checkbox. It does not publish your nickname or resume token.
 While Debug is on, a small Player ID chip stays on the playfield so you can
 copy after the title screen hides, and a compact overlay shows live FPS, ping,
 snapshot age, motion epoch, world counts, and short client/server release IDs.
+Use **Hide HUD** during play to collapse the health overlay without turning off
+Debug or hiding the Player ID copy control. **Show HUD** brings it back. This
+browser remembers the HUD visibility separately from the Debug checkbox.
 The debug panel sits above the flight controls so Boost remains visible, and
 the kit ability button stays fully on the playfield.
 Those health lines stay on-screen only; they are not written to Railway.
@@ -67,8 +70,9 @@ marks follow each entity's current position; destroyed or collected objects
 disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, larger cream canisters
 with amber tips mark Tap loot, yellow slashed diamonds
-mark laser cores, and lilac circles and diamonds mark loose and orbiting
-satellite pickups. Heading triangles in local and crew colors keep pilots
+mark laser cores, lilac circles and diamonds mark loose and orbiting
+satellite pickups, and amber hairline three-tongue campfires mark discovered furnaces.
+Kit hull silhouettes in local and crew colors keep pilots
 identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
 V or hold your own Hauler hull to open the local ship schematic.
@@ -76,8 +80,10 @@ M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are
 outside the local radar. A discovered furnace stays marked in the local radar
-while it is within that nearby view; the universe map keeps its exact landmark
-when it is farther away. Death, delivery, and pickup
+while it is within that nearby view. On the universe map, furnace marks keep
+the same zoom scale as satellites, wreckage, laser cores, and ships. Zoomed out,
+they are amber flame pins; the nearby view and closer keep the three-tongue
+campfire. Death, delivery, and pickup
 messages appear in the center for 120 frames, or 2 seconds. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.
@@ -136,8 +142,9 @@ explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
 centered on your current ship; zoom out to see distant discoveries or use the
-locate control on the map to restore the nearby scale. Ships on the chart use
-each pilot's hull silhouette. Close it with M, Escape, or the Close control.
+locate control on the map to restore the nearby scale. Ships on both the local
+radar and the chart use each pilot's hull silhouette. Close it with M, Escape, or
+the Close control.
 On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's

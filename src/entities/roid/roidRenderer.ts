@@ -162,7 +162,7 @@ export function drawRoidInteractionCues(
   ctx.restore();
 }
 
-/** Heading is world-fixed, independent of the asteroid silhouette's spin. */
+/** Guidance heading is independent of the asteroid silhouette's spin. */
 function drawAsteroidBoost(
   ctx: DrawingContext,
   roid: Roid,

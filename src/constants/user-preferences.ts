@@ -4,6 +4,7 @@ export const LOCAL_STORAGE_KEYS = {
   soundOn: 'soundOn',
   musicOn: 'musicOn',
   debugOn: 'debugOn',
+  debugHudHidden: 'debugHudHidden',
 };
 
 /* Preferences from Localstorage */

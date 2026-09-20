@@ -80,7 +80,7 @@ scan reaches 1,200 world units and also classifies minerals in that range on
 every teammate's radar. Uncharted asteroid, loot, and furnace positions stay
 hidden until a crew member reveals their area. Discovered furnace landmarks and
 other important assets stay marked on the universe map, and pilots stay
-readable on both maps. The universe map draws each pilot's hull silhouette.
+readable on both maps. Both maps draw each pilot's hull silhouette.
 Close the overview with the Close control, or with M or Escape on a keyboard.
 
 ## Completing sectors

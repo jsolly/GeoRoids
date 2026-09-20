@@ -344,3 +344,35 @@ test('a warm rejoin keeps seen asteroid ids so the next snapshot updates in plac
   expect(shouldPreserveSeenAsteroidsOnJoin(0)).toBe(false);
   expect(shouldPreserveSeenAsteroidsOnJoin(11)).toBe(true);
 });
+
+test('a probe follows complete asteroid snapshots and disappears when the server clears it', () => {
+  const local: AsteroidKinematicTarget = {
+    position: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 },
+    angle: 0,
+    angularVelocity: 0,
+    health: 100,
+    maxHealth: 100,
+    r: 30,
+    probe: null,
+  };
+  const probe = {
+    id: 'probe',
+    ownerId: 'surveyor',
+    health: 40,
+    maxHealth: 40,
+    attachedAt: 1000,
+    expiresAt: 301000,
+    angle: 0,
+    radialOffset: 40,
+  };
+  const fields = writeAsteroidKinematicUpdates({ probe }, {});
+  applyAsteroidKinematics(local, fields, { complete: true });
+  expect(local.probe).toEqual(probe);
+  probe.health = 1;
+  expect(local.probe?.health).toBe(40);
+  applyAsteroidKinematics(local, { position: { x: 50, y: 60 } });
+  expect(local.probe?.id).toBe('probe');
+  applyAsteroidKinematics(local, {}, { complete: true });
+  expect(local.probe).toBeNull();
+});

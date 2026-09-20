@@ -14,6 +14,7 @@ import type {
   Position,
   ShipBoostState,
   ShipKitId,
+  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
@@ -61,6 +62,7 @@ export interface GameEntity {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
+  surveyorUtility?: SurveyorUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Environmental cause of the current death (cleared on respawn). */

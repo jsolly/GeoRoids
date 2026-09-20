@@ -17,6 +17,22 @@ test('each kit exposes its own E action label and name', () => {
   expect(touchAbilityLabel('unknown-kit')).toBe('SCAN');
 });
 
+test('Survey Probe changes the mobile ability label, name, and cooldown scale', () => {
+  expect(touchAbilityLabel('surveyor', 'survey_probe')).toBe('PROBE');
+  expect(touchAbilityName('surveyor', 'survey_probe')).toBe('Survey probe');
+  const state = readAbilityChrome({
+    kitId: 'surveyor',
+    surveyorUtility: 'survey_probe',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 90,
+    abilityActiveFrames: 0,
+  });
+  expect(state.label).toBe('PROBE');
+  expect(state.name).toBe('Survey probe');
+  expect(state.cooldownRatio).toBeCloseTo(0.5, 5);
+});
+
 test('E chrome distinguishes ready, cooldown, and dead', () => {
   const ready = readAbilityChrome({
     kitId: 'surveyor',

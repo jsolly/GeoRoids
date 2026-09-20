@@ -167,8 +167,9 @@ Tab visibility and mobile interruptions are lifecycle events rather than work
 repeated by the simulation loop. iOS WebKit can reject `AudioContext.resume()`
 with `InvalidStateError: Failed to start the audio device` after a background
 stall or reconnect. An interrupted context is not resumed from visibility
-alone; a user gesture retries, including a tap that arrived while a failed
-resume was still in flight. That rejection is a deferred device start, not an
+alone; touch-end and keyboard gestures retry synchronously even while an
+earlier resume is still pending. A pending promise must never consume the
+next gesture by queuing its retry outside the gesture handler. That rejection is a deferred device start, not an
 initialization failure. Looping beds start again once the shared context is
 running.
 

@@ -9,7 +9,6 @@ let context: AudioContext | undefined;
 let unlockSource: AudioBufferSourceNode | undefined;
 let resuming: Promise<void> | undefined;
 let suspending: Promise<void> | undefined;
-let queuedGestureResume = false;
 let needsPlaybackRestart = false;
 let musicBedsRegistered = false;
 const sfxInitializers = new Set<(audio: AudioLibrary) => void>();
@@ -127,10 +126,9 @@ function resume(fromGesture = false): void {
   if (!context || !sessionEnabled() || context.state === 'closed') {
     return;
   }
-  if (resuming) {
-    if (fromGesture) {
-      queuedGestureResume = true;
-    }
+  // A blocked browser resume can remain pending until another trusted gesture.
+  // Retry inside that gesture rather than waiting for the blocked promise.
+  if (resuming && !fromGesture) {
     return;
   }
   if (!fromGesture && isInterrupted()) {
@@ -144,22 +142,21 @@ function resume(fromGesture = false): void {
     }
     return;
   }
-  resuming = context
+  const attempt = context
     .resume()
     .catch(handleContextControlError)
     .finally(() => {
-      resuming = undefined;
+      if (resuming === attempt) {
+        resuming = undefined;
+      }
       syncState();
-      const retryGesture = queuedGestureResume;
-      queuedGestureResume = false;
       if (!sessionEnabled()) {
         suspend();
       } else if (context?.state === 'running') {
         restartPlayback();
-      } else if (retryGesture) {
-        resume(true);
       }
     });
+  resuming = attempt;
 }
 
 function resumeFromGesture(): void {
@@ -242,6 +239,7 @@ export function activateAudio(): void {
       context.addEventListener('statechange', onContextStateChange);
       document.addEventListener('visibilitychange', onVisibilityChange);
       document.addEventListener('pointerdown', resumeFromGesture, true);
+      document.addEventListener('touchend', resumeFromGesture, true);
       document.addEventListener('keydown', resumeFromGesture, true);
       const unlock = context.createBufferSource();
       unlock.buffer = context.createBuffer(1, 1, context.sampleRate);
@@ -354,4 +352,20 @@ export function canPlayAudio(sound: Howl): boolean {
     '_webAudio' in sound &&
     sound._webAudio === true
   );
+}
+
+/** Snapshot only: copying diagnostics never creates or resumes audio. */
+export function readAudioDiagnostics() {
+  return {
+    soundEnabled: soundIsOn(),
+    musicEnabled: musicIsOn(),
+    contextState: context?.state ?? 'not-created',
+    contextTime: context?.currentTime ?? null,
+    sampleRate: context?.sampleRate ?? null,
+    libraryLoaded: library !== undefined,
+    resumePending: resuming !== undefined,
+    suspendPending: suspending !== undefined,
+    needsPlaybackRestart,
+    masterGain: library?.Howler.masterGain?.gain.value ?? null,
+  };
 }

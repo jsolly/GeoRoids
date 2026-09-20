@@ -574,8 +574,8 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.arc(0, 0, WORLD.radius, 0, Math.PI * 2);
   context.stroke();
 
-  context.fillStyle = hexToRgba(PALETTE.DANGER, 0.16);
-  context.strokeStyle = hexToRgba(PALETTE.DANGER, 0.7);
+  context.fillStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.16);
+  context.strokeStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.7);
   context.lineWidth = 2 / frame.scale;
   for (const id of getCompletedSectors()) {
     const parsed = parseSectorId(id);

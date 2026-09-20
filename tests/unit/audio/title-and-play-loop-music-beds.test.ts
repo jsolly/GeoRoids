@@ -317,7 +317,7 @@ test('an interrupted phone session restarts the bed after a deferred device star
   );
   document.dispatchEvent(new Event('visibilitychange'));
   document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  expect(ctx.resume.mock.calls.length).toBe(resumesAfterInterrupt + 1);
+  expect(ctx.resume.mock.calls.length).toBe(resumesAfterInterrupt + 2);
   rejectResume(new DOMException('Failed to start the audio device', 'InvalidStateError'));
   await settle();
   expect(ctx.state).toBe('running');

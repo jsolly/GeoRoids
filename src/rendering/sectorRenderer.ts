@@ -72,9 +72,9 @@ export function drawSectorBoundaries(shipPosition: Position): void {
     }
     const bounds = sectorBounds(parsed.x, parsed.y);
     const rect = screenRect(shipPosition, bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
-    ctx.fillStyle = hexToRgba(PALETTE.DANGER, 0.12);
+    ctx.fillStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.12);
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-    ctx.strokeStyle = hexToRgba(PALETTE.DANGER, 0.85);
+    ctx.strokeStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.85);
     ctx.lineWidth = VISUAL.BOUNDARY_STROKE_WIDTH + 1;
     ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
   }

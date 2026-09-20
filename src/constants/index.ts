@@ -73,6 +73,7 @@ export const PALETTE = {
   HUD_MUTED: '#64748B',
   DANGER: '#F43F5E',
   HEALTH: '#4ADE80',
+  COMPLETED_SECTOR: '#4ADE80',
   /** Locked cream — wreckage/shard pickups + contour-laser blush. Same hex as Hauler tether. */
   LOOT: '#E8D5A3',
   /** Collectible EO hardware. */

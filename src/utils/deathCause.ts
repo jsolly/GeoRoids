@@ -19,8 +19,11 @@ export function preferDeathCause(...causes: Array<string | undefined>): string |
 /** Human-readable environmental cause; never identify another crew pilot as a killer. */
 export function describeDeathCause(
   cause: string | undefined
-): 'an asteroid' | 'the arena wall' | 'a ricochet' | 'unknown' {
+): 'an asteroid' | 'the arena wall' | 'a ricochet' | 'a terrain spider' | 'unknown' {
   switch (cause) {
+    case 'spider':
+    case 'a terrain spider':
+      return 'a terrain spider';
     case 'asteroid':
     case 'an asteroid':
       return 'an asteroid';

@@ -26,6 +26,7 @@ import { logger } from '../utils/Logger';
 import { renderSatelliteInventory, satelliteInventoryDescription } from './satelliteInventory';
 import { isShipSchematicOpen, setShipSchematicOpen } from './shipSchematicState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
+import { shouldUseTouchControls } from './viewportChrome';
 
 export const SHIP_SCHEMATIC_IDS = {
   dialog: 'ship-schematic-dialog',
@@ -37,6 +38,7 @@ export const SHIP_SCHEMATIC_IDS = {
   return: 'ship-schematic-return',
   cards: 'ship-schematic-cards',
   inventory: 'ship-schematic-inventory',
+  toggle: 'ship-schematic-toggle',
 } as const;
 
 export const SHIP_SCHEMATIC_LONG_PRESS_MS = 700;
@@ -76,6 +78,7 @@ type SchematicElements = {
   cards: HTMLElement;
   inventory: HTMLElement;
   inventoryStatus: HTMLElement;
+  toggle: HTMLButtonElement;
 };
 
 type BoostCouplingDemoFrame = {
@@ -94,6 +97,32 @@ let frameRequest: number | null = null;
 let openInputRelease: (() => void) | undefined;
 let elements: SchematicElements | null = null;
 let selectedUtility: HaulerUtilityId = preferredHaulerUtility();
+
+function decorateSchematicToggle(toggle: HTMLButtonElement): void {
+  toggle.type = 'button';
+  toggle.classList.add('ship-schematic-toggle');
+  if (!toggle.querySelector('kbd')) {
+    const shortcut = document.createElement('kbd');
+    shortcut.textContent = 'V';
+    toggle.replaceChildren('Schematic ', shortcut);
+  }
+}
+
+function syncSchematicInputChrome(): void {
+  if (!elements) {
+    return;
+  }
+  const touch = shouldUseTouchControls();
+  elements.toggle.classList.toggle('ship-schematic-touch', touch);
+  elements.toggle.hidden = touch;
+  if (touch) {
+    elements.toggle.removeAttribute('aria-keyshortcuts');
+    elements.toggle.setAttribute('aria-label', 'Open ship schematic');
+    return;
+  }
+  elements.toggle.setAttribute('aria-keyshortcuts', 'V');
+  elements.toggle.setAttribute('aria-label', 'Open ship schematic (V)');
+}
 
 function createDialogMarkup(dialog: HTMLDialogElement): void {
   if (dialog.querySelector(`#${SHIP_SCHEMATIC_IDS.canvas}`)) {
@@ -151,6 +180,14 @@ function ensureElements(): SchematicElements | null {
     document.body.appendChild(dialog);
   }
   createDialogMarkup(dialog);
+  let toggle = document.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.toggle}`);
+  if (!toggle) {
+    const gameArea = document.querySelector('#gameArea') ?? document.body;
+    toggle = document.createElement('button');
+    toggle.id = SHIP_SCHEMATIC_IDS.toggle;
+    gameArea.appendChild(toggle);
+  }
+  decorateSchematicToggle(toggle);
   const canvas = dialog.querySelector<HTMLCanvasElement>(`#${SHIP_SCHEMATIC_IDS.canvas}`);
   const tool = dialog.querySelector<HTMLCanvasElement>(`#${SHIP_SCHEMATIC_IDS.tool}`);
   const close = dialog.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.close}`);
@@ -184,6 +221,7 @@ function ensureElements(): SchematicElements | null {
     cards,
     inventory,
     inventoryStatus,
+    toggle,
   };
 }
 
@@ -734,6 +772,12 @@ export function initializeShipSchematic(options?: { onOpen?: () => void }): void
   initialized = true;
   mountCards();
   syncCards();
+  syncSchematicInputChrome();
+  elements.toggle.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    openShipSchematic();
+  });
   elements.close.addEventListener('click', () => {
     closeShipSchematic();
   });
@@ -756,6 +800,8 @@ export function initializeShipSchematic(options?: { onOpen?: () => void }): void
     }
   });
   document.addEventListener('keydown', handleSchematicKeydown, true);
+  window.addEventListener('resize', syncSchematicInputChrome);
+  window.addEventListener('playViewOn', syncSchematicInputChrome);
   window.addEventListener('playViewOff', () => {
     closeShipSchematic();
   });

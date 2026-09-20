@@ -70,8 +70,8 @@ mark laser cores, and lilac circles and diamonds mark loose and orbiting
 satellite pickups. Heading triangles in local and crew colors keep pilots
 identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
-V or hold your own Hauler hull to open the local ship schematic.
-M or use the Map button to open the full-screen universe
+V or the Schematic button on desktop, or hold your own hull on touch, to open
+the local ship schematic. M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are
 outside the local radar. A discovered furnace stays marked in the local radar

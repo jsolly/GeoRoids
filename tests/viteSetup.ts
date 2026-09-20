@@ -8,7 +8,7 @@ if (typeof window !== 'undefined') {
     <div id="gameWrapper">
       <div id="start-screen" class="screen">
         <h1>GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · M map</p>
+        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V schematic · M map</p>
         <div class="game-modes">
           <div>
             <label for="playerNameInput" class="nickname-label">Your Nickname</label>
@@ -88,6 +88,20 @@ if (typeof window !== 'undefined') {
           </div>
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <button
+          id="universe-map-toggle"
+          type="button"
+          class="universe-map-toggle"
+          aria-label="Open universe map (M)"
+          aria-keyshortcuts="M"
+        >Map <kbd>M</kbd></button>
+        <button
+          id="ship-schematic-toggle"
+          type="button"
+          class="ship-schematic-toggle"
+          aria-label="Open ship schematic (V)"
+          aria-keyshortcuts="V"
+        >Schematic <kbd>V</kbd></button>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
         </div>
       </div>

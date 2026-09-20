@@ -108,6 +108,17 @@ test('title menu presents the keyboard and ability control hint', () => {
   expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
 });
 
+test('playfield chrome ships a desktop Schematic button with the V shortcut', () => {
+  const toggle = document.querySelector('#ship-schematic-toggle');
+  expect(toggle?.tagName).toBe('BUTTON');
+  expect(toggle?.getAttribute('aria-keyshortcuts')).toBe('V');
+  expect(toggle?.querySelector('kbd')?.textContent).toBe('V');
+  expect(productionHtml).toContain('id="ship-schematic-toggle"');
+  expect(productionHtml).toContain('Schematic <kbd>V</kbd>');
+  expect(productionCss).toContain('.ship-schematic-toggle');
+  expect(productionCss).toContain('--schematic-toggle-y');
+});
+
 test('title menu exposes the ship kit picker before entering play', () => {
   const grid = document.querySelector('#ship-kit-grid');
   expect(grid?.closest('fieldset')?.querySelector('legend')?.textContent).toBe('Ship kit');

@@ -14,6 +14,7 @@ import {
   preventContextMenu,
 } from '../../input/mouse';
 import { initializeTouchControls } from '../../input/touchControls';
+import { initializeSchematicJoinHint } from '../../ui/schematicJoinHint';
 import { initializeShipSchematic } from '../../ui/shipSchematic';
 import { isShipSchematicOpen } from '../../ui/shipSchematicState';
 import { initializeUniverseMap, isUniverseMapOpen } from '../../ui/universeMap';
@@ -149,6 +150,7 @@ export class InputManager {
     initializeTouchControls();
     initializeUniverseMap({ onOpen: releaseInput });
     initializeShipSchematic({ onOpen: releaseInput });
+    initializeSchematicJoinHint();
 
     this.listenersInitialized = true;
   }

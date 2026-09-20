@@ -133,11 +133,11 @@ class CanvasManager {
     if (!(chrome instanceof HTMLElement)) {
       return;
     }
+    const mapToggleY =
+      touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84;
     chrome.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
-    chrome.style.setProperty(
-      '--map-toggle-y',
-      `${touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84}px`
-    );
+    chrome.style.setProperty('--map-toggle-y', `${mapToggleY}px`);
+    chrome.style.setProperty('--schematic-toggle-y', `${mapToggleY - 52}px`);
     if (chrome.id !== 'gameArea') {
       return;
     }

@@ -20,7 +20,37 @@ for (const viewport of [
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    const schematicToggle = page.locator('#ship-schematic-toggle');
     if (viewport.touch) {
+      expect(await schematicToggle.isVisible()).toBe(false);
+      const hintLines = await page.evaluate(() => {
+        const canvasElement = document.querySelector('#gameCanvas');
+        const original = CanvasRenderingContext2D.prototype.fillText;
+        const texts: string[] = [];
+        CanvasRenderingContext2D.prototype.fillText = function (
+          this: CanvasRenderingContext2D,
+          text: string,
+          x: number,
+          y: number,
+          maxWidth?: number
+        ): void {
+          if (this.canvas === canvasElement) {
+            texts.push(text);
+          }
+          original.call(this, text, x, y, maxWidth);
+        };
+        try {
+          window.gameController?.renderGame();
+        } finally {
+          CanvasRenderingContext2D.prototype.fillText = original;
+        }
+        return texts;
+      });
+      expect(hintLines).toContain('Tap and hold your ship');
+      expect(hintLines).toContain('to equip tools');
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`join-hint-${viewport.width}.png`),
+      });
       const touch = await page.context().newCDPSession(page);
       await touch.send('Input.dispatchTouchEvent', {
         type: 'touchStart',
@@ -30,7 +60,12 @@ for (const viewport of [
       await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await touch.detach();
     } else {
-      await page.keyboard.press('KeyV');
+      expect(await schematicToggle.isVisible()).toBe(true);
+      expect(await page.locator('#ship-schematic-toggle kbd').isVisible()).toBe(true);
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`schematic-button-${viewport.width}.png`),
+      });
+      await schematicToggle.click();
     }
     const dialog = page.locator('#ship-schematic-dialog');
     for (const utility of ['tow_cable', 'resource_tap', 'boost_coupling']) {

@@ -10,6 +10,7 @@ interface ShipCollisionState {
   exploding: boolean;
   health: number;
   blinkCount: number;
+  movementLocked?: boolean;
 }
 
 interface ShipSpawnProtectionState {
@@ -132,9 +133,38 @@ export function applyShipBoundaryDeath(ship: ShipLethalHitState): void {
   }
 }
 
+interface OverlayHoldShip extends ShipSpawnProtectionState {
+  exploding: boolean;
+  health: number;
+  movementLocked: boolean;
+  velocity: Velocity;
+  angularVelocity: number;
+  thrusting: boolean;
+  stopBoost(): void;
+}
+
 /** True when a ship must not report or receive collision damage. */
 export function isShipCollisionImmune(ship: ShipCollisionState): boolean {
-  return ship.exploding || ship.health <= 0 || ship.blinkCount > 0;
+  return ship.exploding || ship.health <= 0 || ship.blinkCount > 0 || ship.movementLocked === true;
+}
+
+/**
+ * Freeze the local hull while the map or schematic is open. Closing arms the
+ * same blink window as a respawn so an overlapping rock cannot kill immediately.
+ * Returns true when the hold state changed.
+ */
+export function applyLocalOverlayHold(ship: OverlayHoldShip, held: boolean): boolean {
+  const wasHeld = ship.movementLocked;
+  ship.movementLocked = held;
+  if (held) {
+    ship.velocity = { x: 0, y: 0 };
+    ship.angularVelocity = 0;
+    ship.thrusting = false;
+    ship.stopBoost();
+  } else if (wasHeld && !ship.exploding && ship.health > 0) {
+    applyShipSpawnProtection(ship);
+  }
+  return wasHeld !== held;
 }
 
 /** Arm the client blink window used after respawn. */

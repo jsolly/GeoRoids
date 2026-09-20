@@ -78,6 +78,7 @@ export interface SavedWorld {
   generation: number;
   /** Density schema for additive asteroid slots; absent in pre-migration worlds. */
   asteroidDensityVersion?: number;
+  asteroidMotionVersion?: number;
   scoreSeason?: string;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
@@ -277,7 +278,30 @@ export class WorldStore {
     }
     const ids = new Set<string>();
     const rocks: AsteroidData[] = [];
-    for (const [index, candidate] of value.entries()) {
+    for (const [index, saved] of value.entries()) {
+      // Retired finite burns never stored an owner. Preserve the deposit and
+      // momentum, but cancel that uncreditable propulsion at the storage boundary.
+      let candidate = saved;
+      if (typeof saved === 'object' && saved !== null && 'boost' in saved) {
+        const boost = saved.boost;
+        if (
+          typeof boost === 'object' &&
+          boost !== null &&
+          'phase' in boost &&
+          boost.phase === 'burning' &&
+          !('ownerId' in boost) &&
+          'remainingFrames' in boost &&
+          typeof boost.remainingFrames === 'number' &&
+          Number.isInteger(boost.remainingFrames) &&
+          boost.remainingFrames > 0 &&
+          boost.remainingFrames <= 180 &&
+          'angle' in boost &&
+          typeof boost.angle === 'number' &&
+          Number.isFinite(boost.angle)
+        ) {
+          candidate = { ...saved, boost: null };
+        }
+      }
       try {
         validateAsteroidDto(candidate);
       } catch (error) {
@@ -400,6 +424,12 @@ export class WorldStore {
       Number.isSafeInteger(value.asteroidDensityVersion) &&
       value.asteroidDensityVersion >= 0
         ? { asteroidDensityVersion: value.asteroidDensityVersion }
+        : {}),
+      ...('asteroidMotionVersion' in value &&
+      typeof value.asteroidMotionVersion === 'number' &&
+      Number.isSafeInteger(value.asteroidMotionVersion) &&
+      value.asteroidMotionVersion >= 0
+        ? { asteroidMotionVersion: value.asteroidMotionVersion }
         : {}),
       ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
         ? { scoreSeason: value.scoreSeason }

@@ -18,9 +18,9 @@ media:
 ## Field and materials
 
 The server generates deterministic deposits in 2,000-unit sectors throughout
-the 60,000-unit world. Fresh sectors mix equal numbers of stationary and
-drifting deposits. Sectors near every active pilot are loaded while distant
-sectors sleep. Harvested sectors stay
+the 60,000-unit world. Fresh sectors have roughly four drifting rocks for each
+stationary one. Drifters range from slow targets to fast-moving hazards.
+Sectors near every active pilot are loaded while distant sectors sleep. Harvested sectors stay
 harvested when the crew returns; traveling into a new region loads its saved
 deposits without replenishing an emptied region. Ice and rubble are
 lower-health materials; metal is tougher and needs repeated normal laser hits.
@@ -28,19 +28,29 @@ Metal shards carry more mass than ice and rubble shards.
 
 Rubble can fragment into three uneven pieces when it breaks above size 20.
 Those fragments are below size 20 and do not multiply again. Ship collisions
-destroy an asteroid without using the laser split path. A towed asteroid that
-overlaps another asteroid uses that same collision break on both rocks and
-drops the Hauler cable. Splits and fragments
+destroy an ordinary asteroid without using the laser split path. A towed
+ordinary asteroid that overlaps another asteroid uses that same collision
+break on both rocks and drops the Hauler cable. Splits and fragments
 are part of the active sector's current population; sector loading does not
 impose a global asteroid cap.
 
+A rare colossal deposit appears in some sectors outside the launch
+neighborhood. It is a stationary landmark far larger than the ordinary large
+class. One Hauler cannot haul it or ignite a Boost Coupling on it. Two Tow
+Cables, two armed couplings, or many laser hits are required before it
+starts breaking up. A ram or a towed collision against another rock leaves
+the colossal deposit intact and shoves the ship away; the other rock still
+breaks. Whole-rock furnace delivery still works once a crew can move it.
+
 ## Self-powered rocks
 
-A Hauler's [Boost Coupling](/wiki/#hauler) can propel an asteroid
-along the heading locked at attachment. The cream arrow means armed; the
-cream/amber exhaust means a three-second burn is active. Powered sectors stay
-awake until their burns finish, even when nearby pilots leave. The rock coasts
-afterward and keeps its normal collision behavior.
+A Hauler's [Boost Coupling](/wiki/#hauler) aims an asteroid at its nearest
+furnace. The cream arrow means armed; cream/amber exhaust means autonomous
+delivery is active. Powered sectors stay awake until delivery, even when nearby
+pilots leave. Self-guided cargo passes through ships, rocks, satellites, and
+completed-sector barriers. It ignores weapons and blast impulses, and cannot be
+scanned, tapped, towed, or coupled again. At intake it explodes and awards its
+launchers and previously recorded Surveyors the delivery points.
 
 ## Cooperative splits and score
 
@@ -65,8 +75,10 @@ Asteroid score is based on the rock size at the break. Every miner who damaged
 that rock and every Surveyor who identified it receives the full mining reward,
 including contributors who disconnected before the final hit. Chipped deposits
 retain their contributor history with the saved world. A collision break does
-not produce the collaboration split behavior. Towed cargo that hits another
-rock uses this collision break rather than the laser split path.
+not produce the collaboration split behavior. Towed ordinary cargo that hits
+another
+rock uses this collision break rather than the laser split path. A towed
+colossal deposit survives and breaks the other rock.
 
 ## Reflection and charge
 
@@ -80,3 +92,7 @@ and can release the core reward. Reflected projectiles keep their speed
 magnitude and remain a bounded asteroid interaction. Direct ship lasers mine
 rocks and pass through crew hulls; after a bounce, the same shot becomes a
 ricochet that damages any live ship it then hits.
+Three stationary metal rocks form each tight pinball cluster with inward-facing
+facets. Approach an entry gap from outside the pocket to chain ricochets; every
+bounce raises the shot energy, so a good lane can charge several rocks before
+the cap.

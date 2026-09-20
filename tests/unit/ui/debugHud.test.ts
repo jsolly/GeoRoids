@@ -7,6 +7,7 @@ import {
   formatDebugRtt,
   formatDebugSnapshot,
   formatDebugWorld,
+  mountDebugHud,
   resetDebugHudPaintForTests,
   syncDebugHudVisibility,
 } from '../../../src/ui/debugHud';
@@ -17,6 +18,7 @@ import { resetSafeStorage } from '../../../src/utils/safeStorage';
 beforeEach(() => {
   resetSafeStorage();
   localStorage.removeItem(LOCAL_STORAGE_KEYS.debugOn);
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.debugHudHidden);
   document.body.classList.remove('debug-on', 'in-play');
   setPlayView(false);
   applyDebugPreference(false);
@@ -29,6 +31,7 @@ afterEach(() => {
   document.body.classList.remove('debug-on', 'in-play');
   resetSafeStorage();
   localStorage.removeItem(LOCAL_STORAGE_KEYS.debugOn);
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.debugHudHidden);
   resetDebugHudPaintForTests();
 });
 
@@ -61,4 +64,39 @@ test('the Debug HUD is visible only while Debug is on during play', () => {
   applyDebugPreference(false);
   syncDebugHudVisibility();
   expect(panel?.hidden).toBe(true);
+});
+
+test('a pilot can hide and restore health metrics without disabling Debug', () => {
+  mountDebugHud();
+  applyDebugPreference(true);
+  setPlayView(true);
+  syncDebugHudVisibility();
+  const toggle = document.querySelector<HTMLButtonElement>('#debug-hud-toggle');
+  const panel = document.querySelector<HTMLElement>('#debug-hud');
+  expect(toggle?.hidden).toBe(false);
+  toggle?.click();
+  expect(panel?.hidden).toBe(true);
+  expect(toggle?.textContent).toBe('Show HUD');
+  expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+  expect(document.body.classList.contains('debug-on')).toBe(true);
+  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugOn)).toBe('true');
+  expect(localStorage.getItem(LOCAL_STORAGE_KEYS.debugHudHidden)).toBe('true');
+
+  applyDebugPreference(false);
+  expect(toggle?.hidden).toBe(true);
+  applyDebugPreference(true);
+  expect(panel?.hidden).toBe(true);
+  toggle?.click();
+  expect(panel?.hidden).toBe(false);
+  expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+});
+
+test('a returning pilot keeps the health panel hidden while Debug remains enabled', () => {
+  localStorage.setItem(LOCAL_STORAGE_KEYS.debugHudHidden, 'true');
+  mountDebugHud();
+  applyDebugPreference(true);
+  setPlayView(true);
+  syncDebugHudVisibility();
+  expect(document.querySelector<HTMLElement>('#debug-hud')?.hidden).toBe(true);
+  expect(document.querySelector('#debug-hud-toggle')?.textContent).toBe('Show HUD');
 });

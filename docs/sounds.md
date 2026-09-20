@@ -60,8 +60,16 @@ silent. These continuous or repetitive actions should not compete with the
 musical feedback. Changing the selected title-screen ship plays a crystal tick;
 successfully entering a flight plays the welcoming phrase. Selecting the same
 ship, title-screen typing, hover, and other settings remain silent;
-Sound-off must not initialize the backend. No periodic low-health alarm or
-background music is added. Satellite break, respawn, scan, latch/release and
+Sound-off must not initialize the effect backend. Optional instrumental beds
+live in `public/music/` and follow the Music checkbox instead: a title loop
+on the start screen, a playfield loop after Enter Game, and an optional
+danger loop while gameplay holds `pushMusicThreat()`. Pair every push with
+`clearMusicThreat()` (`src/audio/musicThreat.ts`); counts nest. Iso Threat
+(`danger-bed.ogg` / `danger-bed.mp3`) is the danger keeper; a missing or failed
+decode still keeps Playfield Drift slightly louder and faster. Music off
+silences every bed, including danger, without muting cues.
+Leaving the playfield zeros the threat count. All beds stay quieter than
+cues. Satellite break, respawn, scan, latch/release and
 shockwave already had cues and now use the new family.
 
 ## Satellite orbit
@@ -103,8 +111,9 @@ playback rate also shortens higher notes' tails. Only the split's quiet noise
 texture varies in rate; its body tones stay tuned. The split uses sine tones
 and low-pass noise instead of a sawtooth and high-pass crack.
 
-World cues retain viewport culling and distance attenuation. Sound-off stops
-active effects and prevents new cues. Each effect retains its configured
+World cues retain viewport culling and distance attenuation. Sound Effects off
+stops active cues and prevents new ones. Music off stops looping beds without
+muting cues. Each effect retains its configured
 simultaneous-voice limit; finished voices release their resources. Resource
 pickups allow eight overlapping voices, extraction four.
 
@@ -140,9 +149,10 @@ backend loads and decodes samples once for reuse; firing does not fetch or decod
 another copy. Cues that occur before an asset is ready are skipped, not replayed
 later in a burst. Audio failures must not block simulation or networking.
 
-One realtime audio context serves sample effects, the orbit chime and the
-synthesized split cue.
-Muting stops active sources and suspends audio work; delayed loads or resumes
+One realtime audio context serves sample effects, the orbit chime, looping
+beds, and the synthesized split cue.
+Muting sound effects stops active cue sources; hiding the tab or turning both
+Sound Effects and Music off suspends audio work. Delayed loads or resumes
 cannot undo a mute.
 Tab visibility and mobile interruptions are lifecycle events rather than work
 repeated by the simulation loop.

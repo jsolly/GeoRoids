@@ -38,7 +38,7 @@ export class BrowserManager {
     });
   }
 
-  async createPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  async createPage(options: { hasTouch?: boolean; music?: boolean } = {}): Promise<Page> {
     if (this.cleanupFailed) {
       await this.closeAllPages();
     }
@@ -54,6 +54,9 @@ export class BrowserManager {
       options.hasTouch ? { hasTouch: true, deviceScaleFactor: 2 } : { hasTouch: false }
     );
     this.contexts.add(context);
+    await context.addInitScript((musicEnabled: boolean) => {
+      localStorage.setItem('musicOn', String(musicEnabled));
+    }, options.music === true);
     let page: Page;
     try {
       page = await context.newPage();
@@ -99,7 +102,7 @@ export class BrowserManager {
   }
 
   /** Replace the scenario page when a test needs a different input device. */
-  async recreatePage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  async recreatePage(options: { hasTouch?: boolean; music?: boolean } = {}): Promise<Page> {
     await this.closeAllPages();
     return this.createPage(options);
   }
@@ -149,7 +152,7 @@ export class BrowserManager {
   }
 
   /** Open an additional independent browser context for a multi-client scenario. */
-  createAdditionalPage(options: { hasTouch?: boolean } = {}): Promise<Page> {
+  createAdditionalPage(options: { hasTouch?: boolean; music?: boolean } = {}): Promise<Page> {
     return this.createPage(options);
   }
 

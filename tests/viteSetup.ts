@@ -33,15 +33,31 @@ if (typeof window !== 'undefined') {
           </div>
         </div>
         <div class="settings">
-          <div class="sound-toggle-row">
-            <input
-              class="sound-toggle"
-              type="checkbox"
-              id="soundPref"
-              checked
-            />
-            <label class="sound-toggle-label" for="soundPref">Sound</label>
+          <div class="preference-toggles">
+            <div class="sound-toggle-row">
+              <input
+                class="sound-toggle"
+                type="checkbox"
+                id="soundPref"
+                checked
+              />
+              <label class="sound-toggle-label" for="soundPref">Sound Effects</label>
+            </div>
+            <div class="sound-toggle-row">
+              <input
+                class="sound-toggle"
+                type="checkbox"
+                id="musicPref"
+                checked
+              />
+              <label class="sound-toggle-label" for="musicPref">Music</label>
+            </div>
+            <div class="sound-toggle-row">
+              <input class="sound-toggle" type="checkbox" id="hapticsPref" />
+              <label class="sound-toggle-label" for="hapticsPref">Haptics</label>
+            </div>
           </div>
+          <p id="hapticsHint" class="haptics-hint" hidden></p>
           <details id="advanced-settings" class="advanced-settings">
             <summary>Advanced</summary>
             <div class="debug-toggle-row">
@@ -69,6 +85,7 @@ if (typeof window !== 'undefined') {
       </div>
       <div id="gameArea" hidden>
         <div id="debug-play-stack" class="debug-play-stack">
+          <button id="debug-hud-toggle" type="button" class="debug-copy debug-hud-toggle" aria-controls="debug-hud" aria-expanded="true" hidden>Hide HUD</button>
           <fieldset id="debug-hud" class="debug-hud" hidden>
             <legend>Debug health</legend>
             <dl>
@@ -79,12 +96,8 @@ if (typeof window !== 'undefined') {
               <div class="debug-hud-row"><dt>WORLD</dt><dd id="debug-hud-world">—</dd></div>
               <div class="debug-hud-row"><dt>REL</dt><dd id="debug-hud-rel">—</dd></div>
             </dl>
+            <button id="copy-debug-diagnostics" type="button" class="debug-copy debug-diagnostics-copy" data-copy-name="diagnostics" data-copy-label="Copy diagnostics" aria-label="Copy diagnostics">Copy diagnostics</button>
           </fieldset>
-          <div id="debug-play-chip" class="debug-play-chip" hidden>
-            <span class="debug-play-chip-label">playerId</span>
-            <code id="debug-play-chip-id"></code>
-            <button id="copy-debug-play-chip" type="button" class="debug-copy" disabled>Copy</button>
-          </div>
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">

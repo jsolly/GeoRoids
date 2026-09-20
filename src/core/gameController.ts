@@ -28,6 +28,7 @@ import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/r
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
 import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
+import { playLocalHaptic } from '../fx/haptics';
 import { shockwaveManager } from '../fx/ShockwaveManager';
 import { tickTouchControls } from '../input/touchControls';
 import { NetworkManager } from '../network/networkManager';
@@ -342,6 +343,9 @@ export class GameController {
     }
 
     for (const roid of this.currRoidBelt.roids) {
+      if (roid.boost?.phase === 'burning') {
+        continue;
+      }
       const next = applyShockwaveToBody(
         { position: roid.position, velocity: roid.velocity, size: roid.r },
         origin,
@@ -385,6 +389,7 @@ export class GameController {
     }
     this.gameStateManager.setDeliveryMessage(reward.points, delivery.rewards.length);
     playFeedback('delivery');
+    playLocalHaptic(true, 'pickup');
   };
 
   private setupServerAsteroidListeners(): void {

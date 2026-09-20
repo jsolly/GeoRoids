@@ -79,7 +79,7 @@ test('a pose outside the movement envelope logs which check failed and by how mu
   }
   // Half a second of silence earns 30 frames on top of the 9-frame lead; a
   // jump of 60 frames overshoots that budget the way a stalled client would.
-  const speed = engine.playerMotion.legalSpeed(pilot, engine.getServerTime());
+  const speed = engine.playerMotion.maximumTravelSpeed(pilot, engine.getServerTime());
   const earnedCredit = speed * (PLAYER_MOTION.poseLeadFrames + 30);
   const jump = speed * 60;
   advanceElapsed(500);

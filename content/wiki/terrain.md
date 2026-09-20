@@ -19,9 +19,9 @@ media:
 The open world contains hills, valleys, and saddles, with a flat starter area at
 the center. Pilots in the same world share the same terrain. The server loads
 nearby world sectors as the crew travels, while the minimap keeps the local
-radar readable. Slopes accelerate your ship downhill and resist travel uphill,
-even with automatic thrust. Steering redirects normal momentum toward the nose
-before the slope force acts. Terrain itself does not deal damage.
+radar readable. Steep climbs slow your ship sharply, descents accelerate it
+beyond normal cruise, and crossing a hillside pulls you downhill even while you
+hold a steady heading. Terrain itself does not deal damage.
 
 The world is circular. Asteroids bounce inward at the outer boundary, keeping
 the remaining deposits in the world. Lasers reflect off the wall and can mine
@@ -35,6 +35,15 @@ remain available between sessions.
 Contour lines are closest together on steep slopes and farther apart on gentle
 ground. Faint numbers mark relative elevations, including negative values in
 valleys. Watch the contours and changes in motion to tell uphill from downhill.
-Normal hull and mass speed limits still apply, and every ship feels the same slope
-force. Laser paths do not interact with terrain; glints where shots cross contours are
-visual feedback, with no terrain reflection or extra damage.
+At the steepest contours, climbing is much slower than ordinary cruising, while
+descending carries you beyond the normal speed limit. Both ships can climb at
+any mass without Boost. These effects scale with slope steepness; the
+flat starter area keeps normal handling.
+
+A longer route through widely spaced contours can beat a direct steep climb.
+Ride descending slopes for speed, follow gentler contour routes when climbing,
+and steer uphill slightly to counter drift when crossing a hillside. Boost
+stacks with downhill speed and helps climbs, but is never required to climb.
+Your ship's kit and mass still set the baseline for all of these speeds. Laser paths
+do not interact with terrain; glints where shots cross contours are visual
+feedback, with no terrain reflection or extra damage.

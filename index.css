@@ -973,6 +973,12 @@
     display: flex;
   }
 
+  .debug-hud-toggle {
+    pointer-events: auto;
+    min-height: 36px;
+    background: var(--palette-bg, #000011);
+  }
+
   .debug-hud {
     display: none;
     margin: 0;

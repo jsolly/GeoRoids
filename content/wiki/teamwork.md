@@ -49,9 +49,11 @@ an arena furnace to deliver it. The Hauler and every scanning pilot recorded on 
 rock receive the same delivery points. A rock with no scan tag still pays
 the Hauler for the delivery.
 
-Boost Coupling arms a rock on the first E and ignites a fixed-direction burn
-on the second. It stays reserved while armed or burning, so another Hauler
-cannot take it over. The rock still poses an asteroid collision hazard.
+Boost Coupling aims a rock at its nearest furnace on the first E and launches
+self-guided delivery on the second. At intake the rock explodes and pays the
+pilot who armed it plus every recorded Surveyor. It stays reserved while armed or burning, so another Hauler
+cannot take it over. After ignition it passes through ships and objects, ignores
+weapons, and cannot be scanned or worked on again before furnace intake.
 
 Three starter furnace landmarks sit around the field: North Works, Southeast
 Works, and Southwest Works. Regional Works sites then continue on a 4,000-unit
@@ -63,7 +65,7 @@ there while it is nearby. When it
 moves beyond the local radar, use the universe map to find the exact landmark.
 Zoomed out, that mark is an amber flame pin at the same size as the other
 chart landmarks; the nearby view and closer restore the three-tongue campfire.
-A delivery consumes the towed rock, so the crew can turn a scan and a haul into
+A delivery consumes the towed or self-guided rock, so the crew can turn a scan and a haul into
 a shared material score.
 
 ## Shared chart

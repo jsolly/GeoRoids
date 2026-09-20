@@ -168,6 +168,19 @@ test('title menu exposes the ship kit picker before entering play', () => {
   );
 });
 
+test('in-play chrome disables text highlight and copy-paste callouts', () => {
+  expect(productionCss).toMatch(
+    /body\.in-play \{[^}]*user-select: none;[^}]*-webkit-user-select: none;[^}]*-webkit-touch-callout: none;[^}]*-webkit-user-drag: none;/su
+  );
+  expect(productionCss).toMatch(
+    /body\.in-play \* \{[^}]*user-select: none;[^}]*-webkit-touch-callout: none;/su
+  );
+  expect(productionCss).toMatch(
+    /body\.in-play input,\s*body\.in-play textarea,\s*body\.in-play select,/su
+  );
+  expect(productionCss).toMatch(/#gameCanvas \{[^}]*-webkit-touch-callout: none;/su);
+});
+
 test('play view keeps the controls hint in title chrome and toggles the game area', () => {
   const hint = document.querySelector('#controls-hint');
   const gameArea = document.querySelector<HTMLElement>('#gameArea');

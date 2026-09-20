@@ -58,6 +58,12 @@ prediction and reconciliation; do not diagnose desynchronization from a single
 unequal coordinate. Rejected snapshots record the baseline/sequence problem
 while preserving the last accepted state and requesting resynchronization.
 
+Copied playfield diagnostics include an `input` object: `pointerHeading`,
+`touchFire`, `steerPointerHeld`, and `liveTouches`. Automatic cruise with a
+frozen heading, `movementLocked: false`, and later fire-only taps is a dropped
+playfield finger, not a locked ship. `steerPointerHeld: true` with
+`liveTouches` of `0` or `1` on the next drag should yield steering again.
+
 Repeated motion rejections and damage reports are sampled; death and respawn
 transitions remain explicit. Browser runtime errors and rejected promises enter
 the same pipeline. A failed game frame stops the affected loop and presents a

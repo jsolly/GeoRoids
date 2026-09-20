@@ -46,8 +46,9 @@ and send it to an agent so they can find this ship in production logs with
 forwarded client records. Debug stays off unless you turn it on; this browser
 remembers the checkbox. It does not publish your nickname or resume token.
 While Debug is on, a compact HUD stays on the playfield. Its **Copy diagnostics**
-button copies the Player ID, current ship, connection, browser and release
-details plus up to 80 recent client warnings,
+button copies the Player ID, current ship, connection, browser, release, and
+live touch input (heading, reserved steering finger, held fire, and how many
+fingers the browser still reports) plus up to 80 recent client warnings,
 errors and state records for a bug report. It excludes private resume credentials.
 Successful copies show **Copied!** for three seconds. If copying fails, the button
 says **Copy failed**. The HUD shows live FPS, ping, snapshot age, motion epoch,

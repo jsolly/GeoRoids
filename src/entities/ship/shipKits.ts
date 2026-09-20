@@ -73,7 +73,8 @@ const KITS: Record<ShipKitId, ShipKit> = {
     name: 'Surveyor',
     abilityId: 'surveyScan',
     abilityName: 'Mineral scan',
-    abilityHint: 'Scan minerals for the crew. Earn points when a Hauler delivers them.',
+    abilityHint:
+      'E uses Mineral Scan or Survey Probe. V opens the schematic so you can swap the tool.',
     maxHealth: SHIP.MAX_HEALTH,
     size: SHIP.SIZE,
     thrust: SHIP.THRUST,

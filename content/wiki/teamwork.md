@@ -30,6 +30,12 @@ blasts only push nearby small rocks and leave crew hulls safe.
 
 ## Scan, tow, deliver
 
+A Surveyor can equip [Survey Probe](/wiki/#surveyor) to attach a beacon to a
+moving rock. Anyone nearby can follow its pulsing minimap marker and benefit
+from the materials it identifies. Probes have limited batteries and can be
+shot off their hosts; revealed mineral classifications and delivery credit
+remain after a beacon is gone.
+
 An active Surveyor scan classifies minerals on every teammate's radar within
 the scan's range around that Surveyor. The shapes identify ice, metal, and
 rubble, and the classification stays with a scanned rock until the rock is

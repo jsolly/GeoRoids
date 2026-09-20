@@ -5,10 +5,12 @@ import type {
   PingMessage,
   Position,
   ShipKitId,
+  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
+import { isSurveyorUtilityId } from '../../src/entities/ship/surveyorUtility';
 
 type WireRecord = Record<string, unknown>;
 
@@ -50,6 +52,11 @@ export type ClientCommand =
       type: 'setHaulerUtility';
       id: string;
       utilityId: HaulerUtilityId;
+    }
+  | {
+      type: 'setSurveyorUtility';
+      id: string;
+      utilityId: SurveyorUtilityId;
     }
   | {
       type: 'update';
@@ -305,6 +312,15 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return isHaulerUtilityId(utilityId)
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Hauler utility');
+    }
+    case 'setSurveyorUtility': {
+      if (!id) {
+        return invalid(type, 'Missing player ID for setSurveyorUtility');
+      }
+      const utilityId = fields['utilityId'];
+      return isSurveyorUtilityId(utilityId)
+        ? { ok: true, command: { type, id, utilityId } }
+        : invalid(type, 'Invalid Surveyor utility');
     }
     case 'shoot': {
       if (!id) {

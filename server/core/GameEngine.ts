@@ -209,6 +209,7 @@ interface FlushedWorldRow {
   scoreSeason: string;
   startedAt: number;
   asteroidDensityVersion: number;
+  asteroidMotionVersion: number;
 }
 
 type PendingShockwave = {
@@ -306,12 +307,19 @@ export class GameEngine {
     this.worldSeed = loaded?.world?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
     this.worldStartedAt = loaded?.world?.startedAt ?? this.serverClock.now();
     this.rngService = new RNGService(this.worldSeed);
-    this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
+    this.regionalField = new RegionalAsteroidField(
+      this.worldSeed,
+      loaded?.sectors,
+      this.completedSectors
+    );
     if (loaded?.world) {
       this.exploration.restore(loaded.world.exploration);
       for (const id of loaded.world.completedSectors) {
         this.completedSectors.add(id);
       }
+    }
+    if ((saved?.asteroidMotionVersion ?? 0) < WORLD.asteroidMotionVersion) {
+      this.regionalField.migrateSavedMotion();
     }
     if ((saved?.asteroidDensityVersion ?? 0) < WORLD.asteroidDensityVersion) {
       this.regionalField.migrateSavedSectors(this.completedSectors);
@@ -470,7 +478,9 @@ export class GameEngine {
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion();
     for (const rock of this.asteroidManager.getAllAsteroids()) {
-      containBodyOutOfCompletedSectors(rock, this.completedSectors);
+      if (rock.boost?.phase !== 'burning') {
+        containBodyOutOfCompletedSectors(rock, this.completedSectors);
+      }
     }
     this.processFurnaceDeliveries();
     if (this.gameTime % 60 === 0) {
@@ -1135,6 +1145,7 @@ export class GameEngine {
       scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
       asteroidDensityVersion: WORLD.asteroidDensityVersion,
+      asteroidMotionVersion: WORLD.asteroidMotionVersion,
     };
     const last = this.lastFlushedWorldRow;
     if (
@@ -1143,7 +1154,8 @@ export class GameEngine {
       last.completedSectors === builtFrom.completedSectors &&
       last.scoreSeason === builtFrom.scoreSeason &&
       last.startedAt === builtFrom.startedAt &&
-      last.asteroidDensityVersion === builtFrom.asteroidDensityVersion
+      last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
+      last.asteroidMotionVersion === builtFrom.asteroidMotionVersion
     ) {
       return undefined;
     }
@@ -1153,6 +1165,7 @@ export class GameEngine {
         startedAt: this.worldStartedAt,
         generation: WORLD.generation,
         asteroidDensityVersion: WORLD.asteroidDensityVersion,
+        asteroidMotionVersion: WORLD.asteroidMotionVersion,
         scoreSeason: this.scoreSeason,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
@@ -1675,15 +1688,17 @@ export class GameEngine {
       }
     }
 
+    const asteroids = this.asteroidManager
+      .getAllAsteroids()
+      .filter((rock) => rock.boost?.phase !== 'burning');
     const pickupBodyHits = this.collisionAuthority.collectAsteroidPickupHits(
-      this.asteroidManager.getAllAsteroids(),
+      asteroids,
       this.satellitePickupManager.getAllPickups()
     );
     for (const hit of pickupBodyHits) {
       this.handleSatellitePickupDamage(hit.pickupId, DAMAGE.LASER_HIT);
     }
 
-    const asteroids = this.asteroidManager.getAllAsteroids();
     const ramHits = this.collisionAuthority.collectShipAsteroidHits(
       entities,
       asteroids,
@@ -1970,8 +1985,15 @@ export class GameEngine {
       return null;
     }
     const kit = getShipKit(shooter.kitId);
-    // Only server-granted knockback expands the normal envelope.
-    const maxShipSpeed = this.playerMotion.legalSpeed(shooter, now);
+    // Pose velocity is sampled before the client's final movement step. Use
+    // that same slope sample so a downhill shot is not rejected on flatter ground.
+    const maxShipSpeed = Math.max(
+      this.playerMotion.legalSpeed(shooter, now),
+      this.playerMotion.legalSpeed(shooter, now, shooter.boost.phase === 'active', {
+        x: shooter.position.x - shooter.velocity.x,
+        y: shooter.position.y - shooter.velocity.y,
+      })
+    );
     const maxLaserSpeed = maxShipSpeed + LASER.SPEED / GAME.FPS;
     const muzzleRadius = (4 / 3) * hullRadiusForKit(shooter.kitId);
     const maxOriginDistance =
@@ -2071,7 +2093,9 @@ export class GameEngine {
     if (this.lasers.length === 0) {
       return hits;
     }
-    const index = new AsteroidSpatialIndex(this.getAllAsteroids());
+    const index = new AsteroidSpatialIndex(
+      this.getAllAsteroids().filter((rock) => rock.boost?.phase !== 'burning')
+    );
 
     for (let i = this.lasers.length - 1; i >= 0; i--) {
       const laser = this.lasers[i];
@@ -2516,6 +2540,7 @@ export class GameEngine {
     for (const rock of asteroids) {
       if (
         rock.health <= 0 ||
+        rock.boost?.phase === 'burning' ||
         Math.hypot(rock.position.x - surveyor.position.x, rock.position.y - surveyor.position.y) >
           range
       ) {
@@ -2565,6 +2590,10 @@ export class GameEngine {
         this.surveyNearbyAsteroids(entity, nearbyAsteroids, scanRange);
       }
       const target = entity.harpoonTargetId ? this.getAsteroid(entity.harpoonTargetId) : undefined;
+      if (target?.boost?.phase === 'burning') {
+        clearHaulerLatch(entity);
+        continue;
+      }
       pullHarpoonTarget(entity, target ? [target] : []);
       const extract = tickTapExtract(entity, target);
       if ((extract === 'burst' || extract === 'complete') && target) {
@@ -2623,7 +2652,7 @@ export class GameEngine {
     return true;
   }
 
-  /** Furnace intake consumes attached cargo once; free-floating rocks remain in the field. */
+  /** Furnace intake accepts towed or self-guided cargo once; loose rocks remain. */
   public processFurnaceDeliveries(): void {
     const deliveries: FurnaceDelivery[] = [];
     for (const hauler of this.entityManager.getAllEntities()) {
@@ -2653,35 +2682,54 @@ export class GameEngine {
       ) {
         continue;
       }
-      this.removeAsteroid(rock.id);
-      const recipients = new Set([hauler.id, ...(rock.surveyedBy ?? [])]);
-      const points = furnaceReward(rock);
-      const rewards: FurnaceDelivery['rewards'] = [];
-      for (const playerId of recipients) {
-        const player = this.getPlayer(playerId);
-        const score = this.awardPilotPoints(playerId, points);
-        if (score === undefined) {
-          continue;
-        }
-        const saved = this.pilots.get(playerId);
-        rewards.push({
-          playerId,
-          playerName: player?.name ?? saved?.name ?? '',
-          points,
-          score,
-        });
+      deliveries.push(this.deliverAsteroid(rock, furnace, hauler.id));
+    }
+    for (const rock of this.getAllAsteroids()) {
+      if (rock.health <= 0 || rock.boost?.phase !== 'burning') {
+        continue;
       }
-      this.releaseTowsAttachedTo(rock.id);
-      const delivery: FurnaceDelivery = {
-        furnaceId: furnace.id,
-        asteroidId: rock.id,
-        position: { ...furnace.position },
-        material: rock.material ?? 'rubble',
-        rewards,
-      };
-      deliveries.push(delivery);
+      const furnace = FURNACES.find(
+        (site) =>
+          Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
+          site.radius
+      );
+      if (furnace) {
+        deliveries.push(this.deliverAsteroid(rock, furnace, rock.boost.ownerId));
+      }
     }
     this.pendingFurnaceDeliveries.push(...deliveries);
+  }
+
+  private deliverAsteroid(
+    rock: AsteroidData,
+    furnace: (typeof FURNACES)[number],
+    ownerId: string
+  ): FurnaceDelivery {
+    this.removeAsteroid(rock.id);
+    const recipients = new Set([ownerId, ...(rock.surveyedBy ?? [])]);
+    const points = furnaceReward(rock);
+    const rewards: FurnaceDelivery['rewards'] = [];
+    for (const playerId of recipients) {
+      const player = this.getPlayer(playerId);
+      const score = this.awardPilotPoints(
+        playerId,
+        points,
+        rock.boost?.phase === 'burning' && playerId === ownerId
+      );
+      if (score === undefined) {
+        continue;
+      }
+      const saved = this.pilots.get(playerId);
+      rewards.push({ playerId, playerName: player?.name ?? saved?.name ?? '', points, score });
+    }
+    this.releaseTowsAttachedTo(rock.id);
+    return {
+      furnaceId: furnace.id,
+      asteroidId: rock.id,
+      position: { ...furnace.position },
+      material: rock.material ?? 'rubble',
+      rewards,
+    };
   }
 
   public drainFurnaceDeliveries(): FurnaceDelivery[] {
@@ -2694,7 +2742,7 @@ export class GameEngine {
     miningDamage = this.miningDamage(playerId)
   ): { destroyed: boolean; asteroid: AsteroidData | null; newAsteroids: AsteroidData[] } {
     const current = this.asteroidManager.getAsteroid(asteroidId);
-    if (!current?.isCollabTarget) {
+    if (!current?.isCollabTarget || current.boost?.phase === 'burning') {
       return { destroyed: false, asteroid: null, newAsteroids: [] };
     }
 
@@ -2817,7 +2865,11 @@ export class GameEngine {
     const pushedAsteroidIds: string[] = [];
 
     for (const asteroid of this.asteroidManager.getAllAsteroids()) {
-      if (!isSmallRoid(asteroid.size) || !inBlastRadius(origin, asteroid.position, asteroid.size)) {
+      if (
+        asteroid.boost?.phase === 'burning' ||
+        !isSmallRoid(asteroid.size) ||
+        !inBlastRadius(origin, asteroid.position, asteroid.size)
+      ) {
         continue;
       }
       const impulse = blastPush(origin, asteroid.position);
@@ -2834,10 +2886,14 @@ export class GameEngine {
   }
 
   /** Award a score to a live actor or to its saved offline pilot record. */
-  private awardPilotPoints(entityId: string, points: number): number | undefined {
+  private awardPilotPoints(
+    entityId: string,
+    points: number,
+    allowEliminated = false
+  ): number | undefined {
     const entity = this.getPlayer(entityId);
     if (entity) {
-      if (entity.lives <= 0) {
+      if (!allowEliminated && entity.lives <= 0) {
         return entity.score;
       }
       this.awardPoints(entityId, points);
@@ -2845,7 +2901,7 @@ export class GameEngine {
     }
     const saved = this.pilots.get(entityId);
     if (saved) {
-      if (saved.lives !== undefined && saved.lives <= 0) {
+      if (!allowEliminated && saved.lives !== undefined && saved.lives <= 0) {
         return saved.score;
       }
       const next = this.writePilotScore(saved, saved.score + points);

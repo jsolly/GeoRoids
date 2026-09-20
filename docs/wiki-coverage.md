@@ -11,11 +11,11 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, fixed-heading Boost Coupling, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
+| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection, armed coupling and finite powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
-| terrain | Arena | Seeded hills and valleys, contour elevations, uphill/downhill movement, circular boundary, no terrain damage |
+| terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
@@ -86,12 +86,14 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   ordinary collision break on both rocks and drops the cable; towed cargo that
   overlaps another ship deals an asteroid impact, then breaks and drops the
   cable. The Hauler remains unharmed by its own cargo.
-- Boost Coupling arms the nearest available asteroid and captures the Hauler heading.
-  E or IGNITE releases it into a three-second simulation-time burn; steering the
-  Hauler does not change that thrust vector. Swapping tools, losing range, dying,
-  or disconnecting cancels an armed coupling. Burning rocks remain independent,
-  cannot be taken by another utility, and coast after fuel expires. An empty
-  world pauses fuel; saved sectors retain remaining fuel across reloads.
+- Boost Coupling arms the nearest available asteroid and points it at its nearest
+  furnace. E or IGNITE launches autonomous delivery until intake, where it explodes
+  and rewards its original launcher and previously recorded Surveyors exactly once.
+  Swapping tools, losing range, dying, or disconnecting cancels an armed coupling.
+  Ignited cargo passes through objects and completed-sector barriers and ignores
+  tools, weapons, scanning, and blast impulses. An empty world pauses guidance;
+  saved sectors retain delivery ownership across reloads and resume powered cargo
+  even inside completed sectors.
 - Surveyor E classifies nearby minerals on every teammate radar for the active
   1,200-unit scan range; each qualifying rock keeps that classification while
   it remains in the nearby radar and records the Surveyor player ID for delivery.

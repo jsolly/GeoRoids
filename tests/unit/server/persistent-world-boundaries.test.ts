@@ -623,3 +623,28 @@ test('a restart loads a recent flight only when lastSeenAt is present', () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('a legacy saved finite burn loads as coasting cargo without losing the deposit', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'georoids-legacy-boost-'));
+  const path = join(directory, 'world.sqlite');
+  try {
+    const initial = new WorldStore(path);
+    initial.close();
+    const db = new DatabaseSync(path);
+    const legacy = {
+      ...asteroid('legacy-cargo', { x: 20, y: 20 }),
+      velocity: { x: 1, y: 2 },
+      boost: { phase: 'burning', angle: 0.3, remainingFrames: 120 },
+    };
+    db.prepare('INSERT INTO sectors(id,json) VALUES(?,?)').run('0,0', JSON.stringify([legacy]));
+    db.close();
+    const restored = new WorldStore(path);
+    try {
+      expect(restored.loadSector('0,0')?.[0]).toEqual({ ...legacy, boost: null });
+    } finally {
+      restored.close();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

@@ -38,3 +38,13 @@ const MATERIAL_POINTS = { ice: 150, metal: 300, rubble: 100 };
 export function furnaceReward(rock: Pick<AsteroidData, 'material' | 'size'>): number {
   return MATERIAL_POINTS[rock.material ?? 'rubble'] * Math.max(1, Math.round(rock.size / 25));
 }
+
+/** Furnace landmarks are fixed and nonempty, independent of explored sectors. */
+export function nearestFurnace(position: Position): (typeof FURNACES)[number] {
+  return FURNACES.reduce((nearest, site) =>
+    Math.hypot(position.x - site.position.x, position.y - site.position.y) <
+    Math.hypot(position.x - nearest.position.x, position.y - nearest.position.y)
+      ? site
+      : nearest
+  );
+}

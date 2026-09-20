@@ -156,6 +156,9 @@ export class AsteroidManager {
   public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
     let affected = 0;
     for (const asteroid of this.asteroids.values()) {
+      if (asteroid.boost?.phase === 'burning') {
+        continue;
+      }
       const next = applyShockwaveToBody(
         { position: asteroid.position, velocity: asteroid.velocity, size: asteroid.size },
         origin,
@@ -289,7 +292,7 @@ export class AsteroidManager {
 
   public damageAsteroid(asteroidId: string, damage: number): AsteroidData | null {
     const asteroid = this.asteroids.get(asteroidId);
-    if (!asteroid) {
+    if (!asteroid || asteroid.boost?.phase === 'burning') {
       return null;
     }
 
@@ -314,6 +317,9 @@ export class AsteroidManager {
       return { outcome: 'missing', newAsteroids: [], split: false };
     }
 
+    if (asteroid.boost?.phase === 'burning') {
+      return { outcome: 'ignored', newAsteroids: [], split: false };
+    }
     this.recordMiningHit(asteroidId, shooterId);
 
     // Metal chips remain present until their mining HP is exhausted. This
@@ -375,7 +381,7 @@ export class AsteroidManager {
   /** Record a non-collab mining path (for example a high-HP target) uniformly. */
   public recordMiningHit(asteroidId: string, minerId: string): void {
     const asteroid = this.asteroids.get(asteroidId);
-    if (!asteroid) {
+    if (!asteroid || asteroid.boost?.phase === 'burning') {
       return;
     }
     const contributors = asteroid.miningContributors ?? [];
@@ -440,6 +446,11 @@ export class AsteroidManager {
     if (!destroyed) {
       this.laserHits.delete(asteroidId);
       return { outcome: 'missing', newAsteroids: [], split: false };
+    }
+
+    if (destroyed.boost?.phase === 'burning') {
+      this.laserHits.delete(asteroidId);
+      return { outcome: 'ignored', newAsteroids: [], split: false };
     }
 
     // Capture the hit and survey identities before removeAsteroid clears the

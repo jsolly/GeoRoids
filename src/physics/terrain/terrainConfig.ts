@@ -36,6 +36,14 @@ export const TERRAIN = {
   /** Gradient magnitude that maps to full slope force. */
   REF_GRADIENT: 0.0035,
   GRADIENT_EPS: 6,
+  /** Gentle terrain keeps ordinary handling; tight contours reach full route cost. */
+  TRAVEL_FLAT_GRADIENT: 0.0002,
+  TRAVEL_STEEP_GRADIENT: 0.0025,
+  /** A steep climb remains possible at one quarter of kit/mass cruise speed. */
+  CLIMB_SPEED_FRACTION: 0.25,
+  DESCENT_SPEED_BONUS: 0.65,
+  /** Cross-slope drift relative to cruise speed at full steepness. */
+  CROSS_SLOPE_DRIFT: 0.45,
   /** Below this, contour-laser ticks stay off (flat spawn saddle stays quiet). */
   CONTOUR_LASER_MIN_GRAD: 0.00045,
 } as const;

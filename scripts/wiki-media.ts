@@ -25,6 +25,7 @@ import { RNGService } from '../server/core/RNGService';
 import { SatellitePickupManager } from '../server/core/SatellitePickupManager';
 import {
   ASTEROID_INTERACTIONS,
+  layoutReflectiveCluster,
   previewChargedReflections,
   segmentCircleContact,
 } from '../shared/asteroidPhenomena';
@@ -1251,71 +1252,149 @@ function makeLootDemo(): Demo {
 }
 
 function makeReflectionDemo(): Demo {
-  const rock = makeAsteroid('reflector', { x: 88, y: 0 }, 42, 'metal');
-  rock.phenomenon = {
-    kind: 'reflective',
-    clusterId: 'demo-cluster',
-    energy: 0,
-    maxEnergy: ASTEROID_INTERACTIONS.reflectiveEnergy,
+  const center = { x: 0, y: 0 };
+  const cluster = layoutReflectiveCluster(center).map((placement, index) => {
+    const rock = makeAsteroid(
+      `reflector-${index}`,
+      placement.position,
+      ASTEROID_INTERACTIONS.reflectiveSize,
+      'metal',
+      placement.rotation
+    );
+    rock.vertices = 6;
+    rock.offsets = [1, 0.8, 1, 1, 0.8, 1];
+    rock.phenomenon = {
+      kind: 'reflective',
+      clusterId: 'demo-cluster',
+      energy: 0,
+      maxEnergy: ASTEROID_INTERACTIONS.reflectiveEnergy,
+    };
+    return rock;
+  });
+  const laneAngle = (Math.PI * 3) / 10;
+  const laneRadius = 260;
+  const start = {
+    x: center.x + Math.cos(laneAngle) * laneRadius,
+    y: center.y + Math.sin(laneAngle) * laneRadius,
   };
-  const start = { x: -235, y: 0 };
-  const preview = previewChargedReflections(start, { x: 1, y: 0 }, [rock], 500, 1);
+  const direction = { x: -Math.cos(laneAngle), y: -Math.sin(laneAngle) };
+  const preview = previewChargedReflections(start, direction, cluster, 800, 1);
   invariant(preview.impacts.length >= 1, 'reflection preview found no impact');
+  invariant(preview.impacts.length >= 3, 'reflection preview did not chain three impacts');
   invariant(preview.finalDirection.x < 0, 'reflection did not reverse the laser direction');
+  const displayScale = 0.58;
+  const pathLengths = preview.segments.map((segment) =>
+    Math.hypot(segment.end.x - segment.start.x, segment.end.y - segment.start.y)
+  );
+  const pathAt = (distance: number): { position: Position; direction: Position } => {
+    let remaining = Math.max(0, Math.min(distance, preview.traveledDistance));
+    for (const [index, segment] of preview.segments.entries()) {
+      const length = pathLengths[index] ?? 0;
+      if (length <= 1e-9) {
+        continue;
+      }
+      const dx = segment.end.x - segment.start.x;
+      const dy = segment.end.y - segment.start.y;
+      if (remaining > length && index < preview.segments.length - 1) {
+        remaining -= length;
+        continue;
+      }
+      const fraction = Math.min(1, remaining / length);
+      return {
+        position: {
+          x: segment.start.x + dx * fraction,
+          y: segment.start.y + dy * fraction,
+        },
+        direction: { x: dx / length, y: dy / length },
+      };
+    }
+    return { position: { ...center }, direction: preview.finalDirection };
+  };
   return {
     id: 'reflection',
     posterFrame: 11,
     verify: () =>
-      invariant(preview.segments.length >= 2, 'reflection path lacks a reflected segment'),
+      invariant(preview.segments.length >= 4, 'reflection path lacks a chained segment'),
     render: (ctx, frame) => {
       drawFrameChrome(
         ctx,
         'REFLECTIVE ASTEROID',
-        'faceted metal face → bounded specular reflection',
+        'aim through the entry gap → chain three ricochets',
         frame,
         PALETTE.LASER_LOCAL
       );
-      drawRoid(ctx, rock, 1);
+      for (const rock of cluster) {
+        drawRoid(ctx, rock, displayScale);
+      }
       const progress = frame / (FRAME_COUNT - 1);
-      const first = preview.segments[0];
-      const second = preview.segments[1];
-      if (first) {
-        const firstProgress = Math.min(1, progress * 2.2);
-        const position = {
-          x: first.start.x + (first.end.x - first.start.x) * firstProgress,
-          y: first.start.y + (first.end.y - first.start.y) * firstProgress,
-        };
+      const distance = progress * preview.traveledDistance;
+      for (const segment of preview.segments) {
+        const startPoint = screenPoint(segment.start, displayScale);
+        const endPoint = screenPoint(segment.end, displayScale);
+        ctx.save();
+        ctx.globalAlpha = 0.18;
         renderSegment(
           ctx,
-          screenPoint(first.start).x,
-          screenPoint(first.start).y,
-          screenPoint(position).x,
-          screenPoint(position).y,
+          startPoint.x,
+          startPoint.y,
+          endPoint.x,
+          endPoint.y,
+          PALETTE.HUD_MUTED,
+          1.2,
+          0.5
+        );
+        ctx.restore();
+      }
+      let remaining = distance;
+      let impactIndex = 0;
+      for (const [index, segment] of preview.segments.entries()) {
+        const length = pathLengths[index] ?? 0;
+        if (length <= 1e-9 || remaining <= 0) {
+          break;
+        }
+        const fraction = Math.min(1, remaining / length);
+        const endpoint = {
+          x: segment.start.x + (segment.end.x - segment.start.x) * fraction,
+          y: segment.start.y + (segment.end.y - segment.start.y) * fraction,
+        };
+        const startPoint = screenPoint(segment.start, displayScale);
+        const endPoint = screenPoint(endpoint, displayScale);
+        renderSegment(
+          ctx,
+          startPoint.x,
+          startPoint.y,
+          endPoint.x,
+          endPoint.y,
           PALETTE.LASER_LOCAL,
           2,
           3.5
         );
-        if (progress > 0.48 && second) {
-          const secondProgress = Math.min(1, (progress - 0.48) * 1.95);
-          const reflected = {
-            x: second.start.x + (second.end.x - second.start.x) * secondProgress,
-            y: second.start.y + (second.end.y - second.start.y) * secondProgress,
-          };
-          renderSegment(
-            ctx,
-            screenPoint(second.start).x,
-            screenPoint(second.start).y,
-            screenPoint(reflected).x,
-            screenPoint(reflected).y,
-            PALETTE.LASER_LOCAL,
-            2,
-            3.5
-          );
-          drawLaser(ctx, reflected, preview.finalDirection);
+        if (fraction >= 1 && segment.asteroidId) {
+          const impact = preview.impacts[impactIndex];
+          impactIndex += 1;
+          if (impact) {
+            drawRing(
+              ctx,
+              { x: impact.point.x * displayScale, y: impact.point.y * displayScale },
+              8 * displayScale,
+              PALETTE.LASER_LOCAL,
+              0.8
+            );
+          }
+        }
+        remaining -= length;
+        if (fraction < 1) {
+          break;
         }
       }
-      drawTag(ctx, 'laser bounces · energy grows', 340, 112, PALETTE.LASER_LOCAL);
-      drawTag(ctx, 'bounce path stays finite', 370, 286, PALETTE.HUD_MUTED);
+      const head = pathAt(distance);
+      drawLaser(
+        ctx,
+        { x: head.position.x * displayScale, y: head.position.y * displayScale },
+        head.direction
+      );
+      drawTag(ctx, 'entry gap → chain ricochets', 340, 112, PALETTE.LASER_LOCAL);
+      drawTag(ctx, 'each bounce raises shot energy', 370, 286, PALETTE.HUD_MUTED);
     },
   };
 }

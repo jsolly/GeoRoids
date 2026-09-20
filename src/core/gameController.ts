@@ -342,6 +342,9 @@ export class GameController {
     }
 
     for (const roid of this.currRoidBelt.roids) {
+      if (roid.boost?.phase === 'burning') {
+        continue;
+      }
       const next = applyShockwaveToBody(
         { position: roid.position, velocity: roid.velocity, size: roid.r },
         origin,

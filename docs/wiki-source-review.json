@@ -1,5 +1,5 @@
 {
-  "note": "Merged main terrain spiders (#637). Re-reviewed Surveyor cooldown prediction vs probe-miss (snapshot 0 stays ready), desktop Schematic/join-hint copy on controls/HUD/hauler/surveyor/satellites, and spider combat/terrain articles from main. No demonstration GIFs changed on this branch.",
+  "note": "Merged main @types/node 26.6.1 (#615). Re-reviewed Surveyor cooldown prediction vs probe-miss (snapshot 0 stays ready), desktop Schematic/join-hint copy on controls/HUD/hauler/surveyor/satellites, and spider combat/terrain articles from main. No demonstration GIFs changed on this branch. Types bump is compile-only.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -8,7 +8,7 @@
     "index.css": "sha256:4ff9ad0fae8be43c9843a9673bc66ba7fef58e213428fe730128ff05f329e9e6",
     "index.html": "sha256:b32677b1a57ed7e547f08d772963952cc44cd5bc09db4c63a5975956183b09f8",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
-    "package.json": "sha256:897999f25f378daff966c32975be438b4ffde56f48f5a7d3fa375df5dad90bf1",
+    "package.json": "sha256:09733c239cc1180a2f748d9ec58665c17d7d4e8a140e9f9dcfa6bea1a406d94b",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",

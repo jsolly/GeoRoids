@@ -19,7 +19,6 @@ import type {
   ShipKitId,
   SnapshotCollabTag,
 } from '../shared-types';
-import { ASTEROID_BOOST } from './asteroidBoost';
 import { validExploration } from './exploration';
 import { isShipBoostState } from './shipBoost';
 
@@ -125,11 +124,7 @@ const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({
 const burningBoost = shape<Extract<AsteroidBoost, { phase: 'burning' }>>({
   phase: choice('burning'),
   angle: number,
-  remainingFrames: (value) =>
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value > 0 &&
-    value <= ASTEROID_BOOST.burnFrames,
+  ownerId: string,
 });
 const asteroid = shape<AsteroidData>({
   id: string,

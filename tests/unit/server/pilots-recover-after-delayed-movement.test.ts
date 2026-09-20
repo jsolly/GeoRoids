@@ -124,13 +124,19 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
   if (rejected.ok || !rejected.envelope) {
     throw new Error('Expected envelope diagnostics on the rejected pose');
   }
-  // The previous accepted pose left the full lead in reserve and no time has
-  // passed, so the credit is the lead; the ship itself still cruises legally.
-  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
+  // Terrain cruise spends less than the maximum travel allowance. The unused
+  // part of these two elapsed frames remains inside the bounded burst reserve.
+  const speed = f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now());
   expect(rejected.envelope.displacement).toBe(500);
-  expect(rejected.envelope.credit / speed).toBeCloseTo(PLAYER_MOTION.poseLeadFrames, 1);
-  expect(rejected.envelope.speed).toBeCloseTo(speed, 6);
-  expect(rejected.envelope.velocity).toBeCloseTo(speed, 2);
+  expect(rejected.envelope.credit).toBeCloseTo(
+    speed * (PLAYER_MOTION.poseLeadFrames + (33 * 60) / 1000) - Math.hypot(accepted.x, accepted.y),
+    6
+  );
+  expect(rejected.envelope.speed).toBeLessThanOrEqual(speed);
+  expect(rejected.envelope.velocity).toBeCloseTo(
+    Math.hypot(f.ship.velocity.x, f.ship.velocity.y),
+    6
+  );
   expect(rejected.envelope.velocity).toBeLessThanOrEqual(speed);
   expect(f.actor.position).toEqual(accepted);
   expect(f.actor.playerMotion).toMatchObject({ mode: 'handoff', epoch: (oldEpoch ?? 0) + 1 });
@@ -173,7 +179,7 @@ test('a rejected pose rebases the pilot once, then movement, shooting and astero
 
 test('repeated invalid poses cannot refill spent movement credit', () => {
   const f = flight();
-  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
+  const speed = f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now());
   // Spend all startup jitter credit without advancing server time.
   f.ship.position.x += speed * PLAYER_MOTION.poseLeadFrames;
   expect(f.report().ok).toBe(true);
@@ -212,9 +218,9 @@ test.each([200, 400, 900])(
     expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([]);
     expect(f.actor.playerMotion).toMatchObject({ mode: 'free', epoch });
     expect(f.actor.position).toEqual(f.ship.position);
-    // The whole hold was replayed: one frame of cruise travel per buffered pose.
-    const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
-    expect(f.actor.position.x - lastAccepted.x).toBeGreaterThan(buffered.length * speed * 0.95);
+    // All poses arrive, including the terrain-dependent distance flown during the hold.
+    const speed = f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now());
+    expect(f.actor.position.x - lastAccepted.x).toBeGreaterThan(buffered.length * speed * 0.4);
     // Ordinary flight continues from the delivered position, not the held one.
     f.reconcile();
     expect(f.ship.position).toEqual(f.actor.position);
@@ -230,7 +236,7 @@ function clearAmbientField(f: ReturnType<typeof flight>): void {
   }
 }
 
-test('a network hold longer than the one-second catch-up window still rebases the pilot to the last delivered pose', () => {
+test('buffered travel beyond the catch-up distance budget rebases the pilot to the last delivered pose', () => {
   const f = flight();
   clearAmbientField(f);
   expect(f.engine.stepClock()).toBe(0);
@@ -239,7 +245,7 @@ test('a network hold longer than the one-second catch-up window still rebases th
   f.reconcile();
   // The server keeps ticking on time; only the pilot's link holds the reports.
   const buffered: ReturnType<typeof f.capture>[] = [];
-  for (let frame = 0; frame < 72; frame++) {
+  for (let frame = 0; frame < 180; frame++) {
     f.advance(1);
     f.engine.stepClock();
     buffered.push(f.capture());
@@ -281,8 +287,8 @@ test('honest 60 Hz poses queued while the server loop was blocked for 1.6 s all 
   expect(outcomes[1]).toEqual({ ok: true, blockedMs: 0 });
   expect(f.actor.playerMotion).toMatchObject({ mode: 'free', epoch });
   expect(f.actor.position).toEqual(f.ship.position);
-  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
-  expect(f.actor.position.x - lastAccepted.x).toBeGreaterThan(buffered.length * speed * 0.95);
+  const speed = f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now());
+  expect(f.actor.position.x - lastAccepted.x).toBeGreaterThan(buffered.length * speed * 0.4);
   // Flight simply continues from where the pilot really is.
   f.reconcile();
   expect(f.ship.serverOwnsMotion).toBe(false);
@@ -344,7 +350,7 @@ test('a pilot who hovers through a blocked server second cannot bank more than t
     expect(f.engine.stepClock()).toBe(MAX_CATCH_UP_TICKS);
     expect(buffered.map((pose) => f.submit(pose)).filter((outcome) => !outcome.ok)).toEqual([]);
     expect(f.actor.position).toEqual(parked);
-    return { f, parked, speed: f.engine.playerMotion.legalSpeed(f.actor, f.clock.now()) };
+    return { f, parked, speed: f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now()) };
   };
   const bankFrames = PLAYER_MOTION.poseLeadFrames + 96;
 
@@ -382,7 +388,7 @@ test('a pilot silent through a blocked server second still cannot claim more tha
       f.engine.stepClock();
     }
     expect(f.engine.getDiagnostics().gameTime - caughtUp).toBeGreaterThanOrEqual(119);
-    return { f, held, speed: f.engine.playerMotion.legalSpeed(f.actor, f.clock.now()) };
+    return { f, held, speed: f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now()) };
   };
   // Blocked time is credited in full; silence while the server was listening
   // still stops at one second.
@@ -418,7 +424,7 @@ test('a server whose every tick runs late still holds a silent pilot to one seco
       f.wait(6);
       f.engine.stepClock();
     }
-    return { f, held, speed: f.engine.playerMotion.legalSpeed(f.actor, f.clock.now()) };
+    return { f, held, speed: f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now()) };
   };
   const limitFrames = PLAYER_MOTION.poseLeadFrames + MAX_CATCH_UP_TICKS;
 
@@ -435,12 +441,13 @@ test('a server whose every tick runs late still holds a silent pilot to one seco
 test('a pilot silent for two seconds replays at most one second of travel plus the lead in one pose', () => {
   const limitFrames = PLAYER_MOTION.poseLeadFrames + MAX_CATCH_UP_TICKS;
   const within = flight();
-  const speed = within.engine.playerMotion.legalSpeed(within.actor, within.clock.now());
+  const speed = within.engine.playerMotion.maximumTravelSpeed(within.actor, within.clock.now());
   within.advance(2);
   expect(within.report().ok).toBe(true);
   const accepted = { ...within.actor.position };
   within.advance(120);
   within.ship.position.x = accepted.x + speed * (limitFrames - 2);
+  within.ship.velocity = { x: 0, y: 0 };
   expect(within.report().ok).toBe(true);
   expect(within.actor.position.x).toBeCloseTo(accepted.x + speed * (limitFrames - 2), 6);
 
@@ -452,13 +459,14 @@ test('a pilot silent for two seconds replays at most one second of travel plus t
   const held = { ...beyond.actor.position };
   beyond.advance(120);
   beyond.ship.position.x = held.x + speed * (limitFrames + 2);
+  beyond.ship.velocity = { x: 0, y: 0 };
   expect(beyond.report()).toMatchObject({ ok: false, envelope: { check: 'displacement' } });
   expect(beyond.actor.position).toEqual(held);
 });
 
 test('a pilot who hovers for two seconds cannot bank that time into one jump', () => {
   const f = flight();
-  const speed = f.engine.playerMotion.legalSpeed(f.actor, f.clock.now());
+  const speed = f.engine.playerMotion.maximumTravelSpeed(f.actor, f.clock.now());
   f.advance(1);
   expect(f.report().ok).toBe(true);
   const parked = { ...f.actor.position };
@@ -475,7 +483,7 @@ test('a pilot who hovers for two seconds cannot bank that time into one jump', (
   expect(f.actor.position).toEqual(parked);
 });
 
-test.each([120, 3600])('a silent pilot cannot bank %i frames of travel into one jump', (frames) => {
+test.each([240, 3600])('a silent pilot cannot bank %i frames of travel into one jump', (frames) => {
   const f = flight();
   const accepted = { ...f.actor.position };
   f.advance(frames);

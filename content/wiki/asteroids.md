@@ -18,9 +18,9 @@ media:
 ## Field and materials
 
 The server generates deterministic deposits in 2,000-unit sectors throughout
-the 60,000-unit world. Fresh sectors mix equal numbers of stationary and
-drifting deposits. Sectors near every active pilot are loaded while distant
-sectors sleep. Harvested sectors stay
+the 60,000-unit world. Fresh sectors have roughly four drifting rocks for each
+stationary one. Drifters range from slow targets to fast-moving hazards.
+Sectors near every active pilot are loaded while distant sectors sleep. Harvested sectors stay
 harvested when the crew returns; traveling into a new region loads its saved
 deposits without replenishing an emptied region. Ice and rubble are
 lower-health materials; metal is tougher and needs repeated normal laser hits.
@@ -36,11 +36,13 @@ impose a global asteroid cap.
 
 ## Self-powered rocks
 
-A Hauler's [Boost Coupling](/wiki/#hauler) can propel an asteroid
-along the heading locked at attachment. The cream arrow means armed; the
-cream/amber exhaust means a three-second burn is active. Powered sectors stay
-awake until their burns finish, even when nearby pilots leave. The rock coasts
-afterward and keeps its normal collision behavior.
+A Hauler's [Boost Coupling](/wiki/#hauler) aims an asteroid at its nearest
+furnace. The cream arrow means armed; cream/amber exhaust means autonomous
+delivery is active. Powered sectors stay awake until delivery, even when nearby
+pilots leave. Self-guided cargo passes through ships, rocks, satellites, and
+completed-sector barriers. It ignores weapons and blast impulses, and cannot be
+scanned, tapped, towed, or coupled again. At intake it explodes and awards its
+original launcher and previously recorded Surveyors the delivery points.
 
 ## Cooperative splits and score
 
@@ -80,3 +82,7 @@ and can release the core reward. Reflected projectiles keep their speed
 magnitude and remain a bounded asteroid interaction. Direct ship lasers mine
 rocks and pass through crew hulls; after a bounce, the same shot becomes a
 ricochet that damages any live ship it then hits.
+Three stationary metal rocks form each tight pinball cluster with inward-facing
+facets. Approach an entry gap from outside the pocket to chain ricochets; every
+bounce raises the shot energy, so a good lane can charge several rocks before
+the cap.

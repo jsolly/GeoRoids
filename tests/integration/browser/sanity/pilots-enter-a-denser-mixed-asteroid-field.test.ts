@@ -31,8 +31,8 @@ for (const viewport of [
           .length,
       };
     });
-    expect(mix.stationary / mix.total).toBeGreaterThan(0.4);
-    expect(mix.stationary / mix.total).toBeLessThan(0.6);
+    expect(mix.stationary / mix.total).toBeGreaterThan(0.1);
+    expect(mix.stationary / mix.total).toBeLessThan(0.3);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`dense-field-${viewport.width}.png`),
     });

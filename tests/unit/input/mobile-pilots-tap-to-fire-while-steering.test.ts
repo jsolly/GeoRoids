@@ -343,3 +343,33 @@ test('two live fingers still let the second tap fire while the first keeps steer
   expect(controlSources.touchFire).toBe(true);
   expect(readTouchControlDiagnostics().liveTouches).toBe(2);
 });
+
+test('a second pointerdown still fires when the live list has not yet added that finger', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [{ id: 1, x: 60, y: 270 }]);
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  pointer('pointerdown', 2, 50, 320, 400);
+  expect(shoot).toHaveBeenCalledTimes(1);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().liveTouches).toBe(1);
+});
+
+test('a Chromium pointer id that does not match the touch identifier still lets the second finger fire', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [
+    { id: 11, x: 60, y: 300 },
+    { id: 12, x: 320, y: 400 },
+  ]);
+  pointer('pointerdown', 3, 0, 60, 300);
+  pointer('pointermove', 3, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  expect(heading).not.toBeNull();
+  pointer('pointerdown', 4, 50, 320, 400);
+  expect(shoot).toHaveBeenCalledTimes(1);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().liveTouches).toBe(2);
+});

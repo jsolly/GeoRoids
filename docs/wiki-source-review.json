@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed playfield text-selection suppression: in-play CSS disables user-select, touch-callout, and drag on the playfield and HUD; JS cancels selectstart and contextmenu and collapses stray selections except form fields. Controls copy now states taps do not open highlight or copy-paste banners. No demonstration GIFs changed.",
+  "note": "Reviewed two-finger autofire after iPhone steer recovery: reserved steering is bound to a live Touch.identifier by position so a second canvas finger still fires when Chromium's pointerId does not match. Dropped-finger drag still reclaims steer. Controls copy unchanged. No demonstration GIFs changed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:4c67935387b3f70b45e3c7c6521926aab45bceae521cfb3883a8f4a50b93ecd4",
@@ -203,7 +203,7 @@
     "src/input/playfieldSelection.ts": "sha256:d9407d0b91d5e8e33a1446799e928e06111d031ff74ce69e1bbb5581e19db03f",
     "src/input/pointerSteering.ts": "sha256:7c85e4a3f553223a44cbc097f09a66bec4d7258b38399ef1f998f64829cfa729",
     "src/input/touchAbility.ts": "sha256:75d65801b668cdffd49637ab8273da44c95632f19fddb4cba07aca609af9ae8c",
-    "src/input/touchControls.ts": "sha256:55d5590621fb71c06f2f4c6495544715e7d498b0ac796e819a1fd0d6c9b73302",
+    "src/input/touchControls.ts": "sha256:e3e7cd766bdc6adbc28ed999e043cd51d8d6e5430b86809bc55525445140dd76",
     "src/network/networkManager.ts": "sha256:61c32b7fd804d836a5fd7cc02e545e319c126458068cd7fdae217ecf25a98942",
     "src/network/services/ConnectionManager.ts": "sha256:626146e75cf05e187b27b6e6150fb44cf27b1103e3d10791988eab3b80bf65af",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:6b295647a937231f7fd8f982536ab6d515439514249f2127c243a164dca15fe7",
@@ -354,7 +354,7 @@
     "tests/unit/entities/tapLootRenderer.test.ts": "sha256:007ec5c85725990f2afc8823a544b4aa194cab6026512e39a361013eafde9725",
     "tests/unit/entities/terrain-makes-pilots-choose-their-route.test.ts": "sha256:4c2cbe2d8e65b7030b6d292edd30dfdf7ef53d95e9fe4413bac159e89d4e7883",
     "tests/unit/fx/haptics.test.ts": "sha256:83439b6ff7bccd4b9e0662c327617a7c0c0408ffd66d5cea1d67fb3f414307e9",
-    "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "sha256:264b77244d72d49f958c86ed7d22ce84ac4510dc5d81b4d370cd04f985d5fef4",
+    "tests/unit/input/mobile-pilots-tap-to-fire-while-steering.test.ts": "sha256:552c950086ff9c8e34ea9e34689ee9aff29c53de5507e2805f782efdbec873b8",
     "tests/unit/input/mouseDesktop.test.ts": "sha256:1cdcff82a5450044048e0d07cc48e713d1eadea944d640e8352851fab4134ed4",
     "tests/unit/input/playfield-taps-do-not-open-copy-banners.test.ts": "sha256:6b5e894821a69433c0b2fb68ba652ea33e6ad0c23b83e67f543095a90724d282",
     "tests/unit/input/touchAbility.test.ts": "sha256:ac9ea300e56ccba111cee45fd1a67d218b8f13745917d0b44c1f4abd468da56b",

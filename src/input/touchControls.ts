@@ -34,8 +34,12 @@ let abilityButton: HTMLButtonElement | null = null;
 let boostButton: HTMLButtonElement | null = null;
 let lastAbilityChromeKey = '';
 let lastBoostChromeKey = '';
+const TOUCH_BIND_SLOP_PX = 40;
 let touchListObserved = false;
-const liveTouchIds = new Set<number>();
+const liveTouchPoints = new Map<number, { x: number; y: number }>();
+let steerTouchId: number | null = null;
+let steerClientX = 0;
+let steerClientY = 0;
 
 export type TouchControlDiagnostics = {
   pointerHeading: number | null;
@@ -45,12 +49,43 @@ export type TouchControlDiagnostics = {
 };
 
 function liveTouchCount(): number | null {
-  return touchListObserved ? liveTouchIds.size : null;
+  return touchListObserved ? liveTouchPoints.size : null;
 }
 
 function resetTouchListTracking(): void {
   touchListObserved = false;
-  liveTouchIds.clear();
+  liveTouchPoints.clear();
+}
+
+function touchIdNear(x: number, y: number): number | null {
+  let best: number | null = null;
+  let bestDist = TOUCH_BIND_SLOP_PX;
+  for (const [id, point] of liveTouchPoints) {
+    const dist = Math.hypot(point.x - x, point.y - y);
+    if (dist <= bestDist) {
+      best = id;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+function bindSteerTouch(): void {
+  if (steerPointerId === null) {
+    steerTouchId = null;
+    return;
+  }
+  if (steerTouchId !== null && liveTouchPoints.has(steerTouchId)) {
+    return;
+  }
+  const nearby = touchIdNear(steerClientX, steerClientY);
+  if (nearby !== null) {
+    steerTouchId = nearby;
+    return;
+  }
+  if (liveTouchPoints.has(steerPointerId)) {
+    steerTouchId = steerPointerId;
+  }
 }
 
 function syncLiveTouches(ev: TouchEvent): void {
@@ -59,20 +94,21 @@ function syncLiveTouches(ev: TouchEvent): void {
     return;
   }
   touchListObserved = true;
-  liveTouchIds.clear();
+  liveTouchPoints.clear();
   for (let i = 0; i < touches.length; i++) {
     const touch =
       typeof touches.item === 'function' ? touches.item(i) : (touches as unknown as Touch[])[i];
     if (touch) {
-      liveTouchIds.add(touch.identifier);
+      liveTouchPoints.set(touch.identifier, { x: touch.clientX, y: touch.clientY });
     }
   }
+  bindSteerTouch();
 }
 
 /** iOS can drop pointerup after capture while the live touch list still tells the truth. */
 function onTouchListChange(ev: TouchEvent): void {
   syncLiveTouches(ev);
-  if (ev.type !== 'touchstart' && liveTouchIds.size === 0) {
+  if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
     resetTouchInteraction(requireLocalPlayer(), { forgetTouches: false });
   }
 }
@@ -343,6 +379,7 @@ function resetTouchInteraction(player: Player | null, options?: { forgetTouches?
   const activeAbilityPointerId = abilityPointerId;
   const activeBoostPointerId = boostPointerId;
   steerPointerId = null;
+  steerTouchId = null;
   clearSteerHoldTimer();
   clearSchematicHoldTimer();
   steerTap = null;
@@ -429,6 +466,7 @@ function ensureTouchDom(): {
 function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): void {
   const previous = steerPointerId;
   steerPointerId = null;
+  steerTouchId = null;
   clearSteerHoldTimer();
   clearSchematicHoldTimer();
   steerTap = null;
@@ -438,6 +476,9 @@ function abandonSteerPointer(player: Player, canvas: HTMLCanvasElement | null): 
 
 function beginSteerPointer(ev: PointerEvent, player: Player): void {
   steerPointerId = ev.pointerId;
+  steerClientX = ev.clientX;
+  steerClientY = ev.clientY;
+  bindSteerTouch();
   steerTap =
     firePointerId === null
       ? { x: ev.clientX, y: ev.clientY, startedAt: ev.timeStamp, canFire: true }
@@ -465,8 +506,14 @@ function beginSteerPointer(ev: PointerEvent, player: Player): void {
 }
 
 function reservedSteerHasNoLiveFinger(): boolean {
-  const touches = liveTouchCount();
-  return steerPointerId !== null && touches !== null && touches <= 1;
+  if (steerPointerId === null || !touchListObserved) {
+    return false;
+  }
+  bindSteerTouch();
+  if (steerTouchId !== null) {
+    return !liveTouchPoints.has(steerTouchId);
+  }
+  return liveTouchPoints.size > 0 && touchIdNear(steerClientX, steerClientY) === null;
 }
 
 function onPlayfieldPointerDown(ev: PointerEvent): void {
@@ -536,6 +583,7 @@ function onPlayfieldPointerUp(ev: PointerEvent): void {
     ev.timeStamp - steerTap.startedAt <= TAP_MAX_MS &&
     Math.hypot(ev.clientX - steerTap.x, ev.clientY - steerTap.y) <= TAP_SLOP_PX;
   steerPointerId = null;
+  steerTouchId = null;
   clearSteerHoldTimer();
   clearSchematicHoldTimer();
   steerTap = null;
@@ -558,6 +606,9 @@ function moveSteering(ev: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
   if (!player || !canvas) {
     return;
   }
+  steerClientX = ev.clientX;
+  steerClientY = ev.clientY;
+  bindSteerTouch();
   const rect = canvas.getBoundingClientRect();
   // CSS pixels keep the resting zone the same physical size at every device DPR.
   const dx = ev.clientX - rect.left - rect.width / 2;

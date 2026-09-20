@@ -55,9 +55,9 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   terrain: {
     title: 'Terrain contours and slope travel',
-    alt: 'A Surveyor thrusts across the contour map while an arrow shows the downhill direction.',
+    alt: 'A Surveyor rides contour lines, then turns downhill while an arrow shows the descent.',
     caption:
-      'Controlled demonstration: automatic thrust rides the contours; an arrow marks downhill so descents look fast and climbs stay a light tax.',
+      'Controlled demonstration: automatic thrust follows a contour, then the nose turns downhill so speed more than doubles; an arrow marks the downhill direction.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',

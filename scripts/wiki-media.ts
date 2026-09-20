@@ -39,7 +39,7 @@ import {
   isSmallRoid,
   LOOT_BLAST,
 } from '../shared/lootBlast';
-import { cruiseSpeed } from '../shared/shipFlight';
+import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
 import { applyLootMass, GROWTH, lootOverlap } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
@@ -75,6 +75,7 @@ import {
 } from '../src/physics/shockwave';
 import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield';
+import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
@@ -883,38 +884,72 @@ function makeMovementDemo(): Demo {
   };
 }
 
+const TERRAIN_DOWNHILL_START_FRAME = 28;
+const TERRAIN_TURN_PER_TICK = (SHIP.TURN_SPEED * Math.PI) / (180 * GAME.FPS);
+
+/** Nose angle whose cruiseVelocity (canvas y-down) points along `(dirX, dirY)`. */
+function headingForDirection(dirX: number, dirY: number): number {
+  return Math.atan2(-dirY, dirX);
+}
+
+function headingAlongContour(gradientX: number, gradientY: number, preferredAngle: number): number {
+  const magnitude = Math.hypot(gradientX, gradientY);
+  if (magnitude <= 0) {
+    return preferredAngle;
+  }
+  const tangentA = headingForDirection(-gradientY, gradientX);
+  const tangentB = headingForDirection(gradientY, -gradientX);
+  const preferred = cruiseVelocity(preferredAngle, 1);
+  const alignment = (angle: number) => {
+    const heading = cruiseVelocity(angle, 1);
+    return heading.x * preferred.x + heading.y * preferred.y;
+  };
+  return alignment(tangentA) >= alignment(tangentB) ? tangentA : tangentB;
+}
+
+function headingDownhill(gradientX: number, gradientY: number, fallback: number): number {
+  return Math.hypot(gradientX, gradientY) <= 0
+    ? fallback
+    : headingForDirection(-gradientX, -gradientY);
+}
+
 function makeTerrainDemo(): Demo {
   const field = getTerrainField();
-  const candidates: Position[] = [
-    { x: 720, y: 410 },
-    { x: -720, y: 410 },
-    { x: 620, y: -520 },
-    { x: -620, y: -520 },
-  ];
-  const start = candidates.find((candidate) => {
-    const gradient = sampleGradient(field, candidate.x, candidate.y);
-    return Math.hypot(gradient.x, gradient.y) > 0.0001;
-  });
-  if (start === undefined) {
-    throw new Error('wiki-media verification failed: terrain field has no measurable slope');
+  let start: Position | undefined;
+  let startSteepness = 0;
+  for (let x = -2400; x <= 2400; x += 80) {
+    for (let y = -2400; y <= 2400; y += 80) {
+      const gradient = sampleGradient(field, x, y);
+      const steepness = Math.hypot(gradient.x, gradient.y);
+      if (steepness > startSteepness) {
+        start = { x, y };
+        startSteepness = steepness;
+      }
+    }
+  }
+  if (start === undefined || startSteepness < TERRAIN.TRAVEL_STEEP_GRADIENT) {
+    throw new Error('wiki-media verification failed: terrain field has no steep contour');
   }
   const contours = extractIsoContours(field);
+  const cruise = cruiseSpeed(1, SHIP.MAX_VELOCITY);
+  const initialGradient = sampleGradient(field, start.x, start.y);
   const state = {
     position: copyPosition(start),
     velocity: { x: 0, y: 0 },
-    angle: 0,
+    angle: headingAlongContour(initialGradient.x, initialGradient.y, 0),
     mass: 1,
     thrust: SHIP.THRUST,
   };
-  const initialGradient = sampleGradient(field, state.position.x, state.position.y);
   const gradients: number[] = [Math.hypot(initialGradient.x, initialGradient.y)];
-  let sawSlopeMotion = false;
+  let sawContourFollow = false;
+  let maxDownhillSpeed = 0;
   return {
     id: 'terrain',
     posterFrame: 20,
     verify: () => {
       invariant(contours.length > 0, 'terrain contour extraction returned no levels');
-      invariant(sawSlopeMotion, 'terrain slope force did not move the ship');
+      invariant(sawContourFollow, 'terrain demo did not ride a contour');
+      invariant(maxDownhillSpeed > cruise * 1.5, 'terrain demo downhill was not a rush');
       invariant(
         gradients.some((gradient) => gradient > 0.0001),
         'terrain gradient samples were flat'
@@ -930,11 +965,32 @@ function makeTerrainDemo(): Demo {
       );
       if (frame > 0) {
         runSimulationTicks(SIM_TICKS_PER_FRAME, () => {
-          advanceCruiseVelocity(state, cruiseSpeed(1, SHIP.MAX_VELOCITY));
+          const gradient = sampleGradient(field, state.position.x, state.position.y);
+          const desired =
+            frame < TERRAIN_DOWNHILL_START_FRAME
+              ? headingAlongContour(gradient.x, gradient.y, state.angle)
+              : headingDownhill(gradient.x, gradient.y, state.angle);
+          state.angle += steeringTurn(state.angle, desired, TERRAIN_TURN_PER_TICK);
+          advanceCruiseVelocity(state, cruise);
           state.position.x += state.velocity.x;
           state.position.y += state.velocity.y;
-          if (Math.hypot(state.velocity.x, state.velocity.y) > 0) {
-            sawSlopeMotion = true;
+          const speed = Math.hypot(state.velocity.x, state.velocity.y);
+          const magnitude = Math.hypot(gradient.x, gradient.y);
+          if (magnitude > TERRAIN.TRAVEL_FLAT_GRADIENT && speed > 0) {
+            const heading = cruiseVelocity(state.angle, 1);
+            const tangentAlignment = Math.abs(
+              heading.x * (-gradient.y / magnitude) + heading.y * (gradient.x / magnitude)
+            );
+            if (
+              frame < TERRAIN_DOWNHILL_START_FRAME &&
+              tangentAlignment > 0.92 &&
+              speed > cruise * 0.95
+            ) {
+              sawContourFollow = true;
+            }
+            if (frame >= TERRAIN_DOWNHILL_START_FRAME) {
+              maxDownhillSpeed = Math.max(maxDownhillSpeed, speed);
+            }
           }
         });
         const gradient = sampleGradient(field, state.position.x, state.position.y);
@@ -990,7 +1046,7 @@ function makeTerrainDemo(): Demo {
         ctx,
         'surveyor',
         { x: 0, y: 0 },
-        0,
+        state.angle,
         PALETTE.LOCAL,
         getShipKit('surveyor').size / 2,
         true
@@ -1009,7 +1065,15 @@ function makeTerrainDemo(): Demo {
         112,
         PALETTE.CONTOUR
       );
-      drawTag(ctx, 'arrow shows downhill', 390, 286, PALETTE.HUD_MUTED);
+      drawTag(
+        ctx,
+        frame < TERRAIN_DOWNHILL_START_FRAME
+          ? 'ride the contours · arrow is downhill'
+          : 'downhill rush · arrow is downhill',
+        320,
+        286,
+        PALETTE.HUD_MUTED
+      );
     },
   };
 }

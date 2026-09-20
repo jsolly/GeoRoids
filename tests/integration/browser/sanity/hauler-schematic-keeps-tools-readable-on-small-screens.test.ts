@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import { STEERING } from '../../../../src/constants';
+import { PLAYFIELD_CLOSE_SCALE } from '../../../../src/rendering/playfieldCamera';
+import { SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX } from '../../../../src/ui/schematicJoinHint';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -19,42 +21,69 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
-    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    await game.navigateToGame();
+    const kitButton = page.locator('[data-kit-id="hauler"]');
+    await kitButton.waitFor({ state: 'visible', timeout: 5000 });
+    await kitButton.click();
+    await game.startGame();
+    await game.waitForGameReady();
+    await game.waitForServerJoin();
     const schematicToggle = page.locator('#ship-schematic-toggle');
     if (viewport.touch) {
       expect(await schematicToggle.isVisible()).toBe(false);
-      const hintLines = await page.evaluate(() => {
-        const canvasElement = document.querySelector('#gameCanvas');
-        const original = CanvasRenderingContext2D.prototype.fillText;
-        const texts: { text: string; y: number }[] = [];
-        CanvasRenderingContext2D.prototype.fillText = function (
-          this: CanvasRenderingContext2D,
-          text: string,
-          x: number,
-          y: number,
-          maxWidth?: number
-        ): void {
-          if (this.canvas === canvasElement) {
-            texts.push({ text, y });
+      const hintHandle = await page.waitForFunction(
+        () => {
+          const canvasElement = document.querySelector('#gameCanvas');
+          const controller = window.gameController;
+          const ship = controller?.getCurrPlayer()?.ship;
+          if (!canvasElement || !controller || !ship) {
+            return false;
           }
-          original.call(this, text, x, y, maxWidth);
-        };
-        try {
-          window.gameController?.renderGame();
-        } finally {
-          CanvasRenderingContext2D.prototype.fillText = original;
-        }
-        return texts;
-      });
+          const original = CanvasRenderingContext2D.prototype.fillText;
+          const texts: { text: string; y: number }[] = [];
+          CanvasRenderingContext2D.prototype.fillText = function (
+            this: CanvasRenderingContext2D,
+            text: string,
+            x: number,
+            y: number,
+            maxWidth?: number
+          ): void {
+            if (this.canvas === canvasElement) {
+              texts.push({ text, y });
+            }
+            original.call(this, text, x, y, maxWidth);
+          };
+          try {
+            controller.renderGame();
+          } finally {
+            CanvasRenderingContext2D.prototype.fillText = original;
+          }
+          const hold = texts.find((line) => line.text === 'Tap and hold your ship');
+          const equip = texts.find((line) => line.text === 'to equip tools');
+          return hold && equip ? texts : false;
+        },
+        undefined,
+        { timeout: 4000 }
+      );
+      const hintLines = (await hintHandle.jsonValue()) as { text: string; y: number }[];
       const hold = hintLines.find((line) => line.text === 'Tap and hold your ship');
       const equip = hintLines.find((line) => line.text === 'to equip tools');
       expect(hold).toBeDefined();
       expect(equip).toBeDefined();
-      expect(equip?.y).toBeLessThan(viewport.height / 2 - STEERING.ARROW_DISTANCE_PX);
+      const shipR = await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.r ?? 0);
+      const cueTip = Math.max(STEERING.ARROW_DISTANCE_PX, shipR * PLAYFIELD_CLOSE_SCALE + 32);
+      expect(equip?.y).toBeCloseTo(
+        viewport.height / 2 - cueTip - SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX,
+        0
+      );
+      expect(equip?.y).toBeLessThan(viewport.height / 2 - cueTip);
       await page.screenshot({
         path: screenshotManager.getScreenshotPath(`join-hint-${viewport.width}.png`),
       });
+    }
+    await game.waitForNetworkAsteroids(1);
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    if (viewport.touch) {
       const touch = await page.context().newCDPSession(page);
       await touch.send('Input.dispatchTouchEvent', {
         type: 'touchStart',

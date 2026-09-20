@@ -173,6 +173,10 @@ describe('Hauler ship schematic overlay', () => {
     expect(toggle?.getAttribute('aria-keyshortcuts')).toBe('V');
     expect(toggle?.querySelector('kbd')?.textContent).toBe('V');
     expect(toggle?.textContent).toMatch(/Schematic/u);
+    const map = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`);
+    expect(toggle && map ? toggle.compareDocumentPosition(map) : 0).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
     toggle?.click();
     expect(isShipSchematicOpen()).toBe(true);
     closeShipSchematic();

@@ -15,15 +15,18 @@ const HINT_ALPHA = 0.92;
 
 let initialized = false;
 let startedAt: number | null = null;
+let pending = false;
 let dismissed = false;
 
-function startHint(now: number): void {
+function startHint(): void {
   dismissed = false;
-  startedAt = shouldUseTouchControls() ? now : null;
+  startedAt = null;
+  pending = shouldUseTouchControls();
 }
 
 function clearHint(): void {
   startedAt = null;
+  pending = false;
   dismissed = false;
 }
 
@@ -32,22 +35,28 @@ export function initializeSchematicJoinHint(): void {
     return;
   }
   initialized = true;
-  window.addEventListener('playViewOn', () => {
-    startHint(performance.now());
-  });
+  window.addEventListener('playViewOn', startHint);
   window.addEventListener('playViewOff', clearHint);
   window.addEventListener('gameSchematicOpen', () => {
     dismissed = true;
     startedAt = null;
+    pending = false;
   });
   if (document.body.classList.contains('in-play')) {
-    startHint(performance.now());
+    startHint();
   }
 }
 
 export function schematicJoinHintAlpha(now = performance.now()): number {
-  if (dismissed || startedAt === null || !shouldUseTouchControls()) {
+  if (dismissed || !shouldUseTouchControls()) {
     return 0;
+  }
+  if (startedAt === null) {
+    if (!pending) {
+      return 0;
+    }
+    startedAt = now;
+    pending = false;
   }
   const elapsed = now - startedAt;
   if (elapsed < 0 || elapsed >= SCHEMATIC_JOIN_HINT_DURATION_MS) {

@@ -193,7 +193,12 @@ function ensureElements(): SchematicElements | null {
     const gameArea = document.querySelector('#gameArea') ?? document.body;
     toggle = document.createElement('button');
     toggle.id = SHIP_SCHEMATIC_IDS.toggle;
-    gameArea.appendChild(toggle);
+    const mapToggle = gameArea.querySelector('#universe-map-toggle');
+    if (mapToggle) {
+      gameArea.insertBefore(toggle, mapToggle);
+    } else {
+      gameArea.appendChild(toggle);
+    }
   }
   decorateSchematicToggle(toggle);
   const canvas = dialog.querySelector<HTMLCanvasElement>(`#${SHIP_SCHEMATIC_IDS.canvas}`);

@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { STEERING } from '../../../src/constants';
+import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import type { DrawingContext } from '../../../src/rendering/drawingContext';
-import { headingCueTipDistance } from '../../../src/rendering/headingCueRenderer';
 import {
   drawSchematicJoinHint,
   initializeSchematicJoinHint,
@@ -13,6 +13,9 @@ import {
 } from '../../../src/ui/schematicJoinHint';
 import { setPlayView } from '../../../src/ui/uiUtils';
 import * as viewportChrome from '../../../src/ui/viewportChrome';
+
+const HAULER_RADIUS = hullRadiusForKit('hauler');
+const OVERSIZED_HULL_RADIUS = STEERING.ARROW_DISTANCE_PX + 20;
 
 function mockContext(): DrawingContext & { fillText: ReturnType<typeof vi.fn> } {
   return {
@@ -44,18 +47,28 @@ describe('touch join schematic hint', () => {
 
     expect(schematicJoinHintAlpha(now)).toBe(1);
     const ctx = mockContext();
-    drawSchematicJoinHint(ctx, 200, 300, 20, now);
+    drawSchematicJoinHint(ctx, 200, 300, HAULER_RADIUS, now);
     expect(ctx.fillText.mock.calls.map((call) => call[0])).toEqual([...SCHEMATIC_JOIN_HINT_LINES]);
     const lastLineY = Number(ctx.fillText.mock.calls.at(-1)?.[2]);
-    expect(lastLineY).toBe(300 - headingCueTipDistance(20) - SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX);
+    expect(lastLineY).toBe(
+      300 -
+        Math.max(STEERING.ARROW_DISTANCE_PX, HAULER_RADIUS + 32) -
+        SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX
+    );
     expect(lastLineY).toBeLessThan(300 - STEERING.ARROW_DISTANCE_PX);
+
+    ctx.fillText.mockClear();
+    drawSchematicJoinHint(ctx, 200, 300, OVERSIZED_HULL_RADIUS, now);
+    expect(Number(ctx.fillText.mock.calls.at(-1)?.[2])).toBe(
+      300 - (OVERSIZED_HULL_RADIUS + 32) - SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX
+    );
 
     now = 1_000 + SCHEMATIC_JOIN_HINT_DURATION_MS - SCHEMATIC_JOIN_HINT_FADE_MS / 2;
     expect(schematicJoinHintAlpha(now)).toBeCloseTo(0.5);
     now = 1_000 + SCHEMATIC_JOIN_HINT_DURATION_MS;
     expect(schematicJoinHintAlpha(now)).toBe(0);
     ctx.fillText.mockClear();
-    drawSchematicJoinHint(ctx, 200, 300, 20, now);
+    drawSchematicJoinHint(ctx, 200, 300, HAULER_RADIUS, now);
     expect(ctx.fillText).not.toHaveBeenCalled();
   });
 

@@ -94,19 +94,19 @@ if (typeof window !== 'undefined') {
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button
-          id="universe-map-toggle"
-          type="button"
-          class="universe-map-toggle"
-          aria-label="Open universe map (M)"
-          aria-keyshortcuts="M"
-        >Map <kbd>M</kbd></button>
-        <button
           id="ship-schematic-toggle"
           type="button"
           class="ship-schematic-toggle"
           aria-label="Open ship schematic (V)"
           aria-keyshortcuts="V"
         >Schematic <kbd>V</kbd></button>
+        <button
+          id="universe-map-toggle"
+          type="button"
+          class="universe-map-toggle"
+          aria-label="Open universe map (M)"
+          aria-keyshortcuts="M"
+        >Map <kbd>M</kbd></button>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">
         </div>
       </div>

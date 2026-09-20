@@ -238,6 +238,9 @@ export const ROID = {
   SPEED: 50 * GAME.MOTION_SCALE, // starting speed in pixels per second
   /** Server asteroid velocity uses pixels per 60 Hz tick, unlike SPEED. */
   SERVER_VELOCITY_MAX: 4 * GAME.MOTION_SCALE,
+  STATIONARY_FRACTION: 0.2,
+  DRIFT_SPEED_MIN: 0.3 * GAME.MOTION_SCALE,
+  DRIFT_SPEED_MAX: 3 * GAME.MOTION_SCALE,
   SIZE: 50, // starting size in pixels
   VERTICES: 10, // average number of vertices
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged

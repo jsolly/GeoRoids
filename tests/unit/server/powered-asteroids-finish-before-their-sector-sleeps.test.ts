@@ -4,7 +4,6 @@ import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
-import { ASTEROID_BOOST } from '../../../shared/asteroidBoost';
 import type { AsteroidData } from '../../../shared-types';
 
 function rock(): AsteroidData {
@@ -20,33 +19,34 @@ function rock(): AsteroidData {
     maxHealth: 75,
     vertices: 4,
     offsets: [1, 1, 1, 1],
-    boost: { phase: 'burning', angle: 0, remainingFrames: ASTEROID_BOOST.burnFrames },
+    boost: { phase: 'burning', ownerId: 'pilot', angle: 0 },
   };
 }
 
-test('a powered sector stays awake after its observer leaves, then sleeps with the coasting rock', () => {
+test('a powered sector stays awake until its rock is delivered or destroyed', () => {
   const deposit = rock();
   const field = new RegionalAsteroidField(42, new Map([['0,0', [deposit]]]));
   const manager = new AsteroidManager(new RNGService(42));
   field.update(manager, [{ x: 500, y: 500 }], new Set());
   field.update(manager, [], new Set());
   expect(manager.getAsteroid(deposit.id)).toBe(deposit);
-  for (let frame = 0; frame < ASTEROID_BOOST.burnFrames; frame++) {
+  for (let frame = 0; frame < 240; frame++) {
     manager.updateMotion();
   }
-  expect(deposit.boost).toBeNull();
-  expect(deposit.position.x).toBeGreaterThan(500);
+  expect(deposit.boost?.phase).toBe('burning');
   field.update(manager, [], new Set());
-  expect(manager.getAsteroid(deposit.id)).toBeUndefined();
-  const saved = field
-    .checkpoint(manager)
-    .get('0,0')
-    ?.find((row) => row.id === deposit.id);
-  expect(saved?.boost).toBeNull();
-  expect(saved?.velocity.x).toBeCloseTo(ASTEROID_BOOST.maxSpeed);
+  expect(manager.getAsteroid(deposit.id)).toBe(deposit);
+  manager.removeAsteroid(deposit.id);
+  field.update(manager, [], new Set());
+  expect(
+    field
+      .checkpoint(manager)
+      .get('0,0')
+      ?.some((row) => row.id === deposit.id)
+  ).toBe(false);
 });
 
-test('a checkpoint restores the remaining simulation-time fuel without replaying the whole burn', () => {
+test('a checkpoint restores guidance and its original owner', () => {
   const store = new WorldStore(':memory:');
   try {
     const manager = new AsteroidManager(new RNGService(42));
@@ -57,7 +57,7 @@ test('a checkpoint restores the remaining simulation-time fuel without replaying
     }
     store.checkpoint(undefined, new Map([['0,0', [deposit]]]), []);
     const restored = store.loadSector('0,0')?.[0];
-    expect(restored?.boost).toEqual({ phase: 'burning', angle: 0, remainingFrames: 120 });
+    expect(restored?.boost).toEqual(deposit.boost);
     if (!restored) {
       throw new Error('Checkpoint lost the deposit');
     }
@@ -66,9 +66,56 @@ test('a checkpoint restores the remaining simulation-time fuel without replaying
     for (let frame = 0; frame < 120; frame++) {
       restarted.updateMotion();
     }
-    expect(restored.boost).toBeNull();
-    expect(restored.velocity.x).toBeCloseTo(ASTEROID_BOOST.maxSpeed);
+    expect(restored.boost).toEqual(expect.objectContaining({ phase: 'burning', ownerId: 'pilot' }));
   } finally {
     store.close();
   }
 });
+
+test('saved powered cargo wakes inside a completed sector without a nearby observer', () => {
+  const deposit = rock();
+  const field = new RegionalAsteroidField(42, new Map([['0,0', [deposit]]]));
+  const manager = new AsteroidManager(new RNGService(42));
+  const completed = new Set(['0,0']);
+  field.update(manager, [], completed);
+  expect(manager.getAsteroid(deposit.id)).toBe(deposit);
+  field.update(manager, [], completed);
+  expect(manager.getAsteroid(deposit.id)).toBe(deposit);
+});
+
+test('a checkpoint cannot put powered cargo to sleep after it crosses a sector edge', () => {
+  const deposit = rock();
+  const field = new RegionalAsteroidField(
+    42,
+    new Map([
+      ['0,0', [deposit]],
+      ['1,0', []],
+    ])
+  );
+  const manager = new AsteroidManager(new RNGService(42));
+  field.update(manager, [], new Set());
+  deposit.position = { x: 2100, y: 500 };
+  const rows = field.checkpoint(manager);
+  expect(manager.getAsteroid(deposit.id)).toBe(deposit);
+  expect(rows.get('1,0')).toContain(deposit);
+  expect(rows.get('0,0')).toEqual([]);
+});
+
+test.each(['interest update', 'checkpoint'] as const)(
+  'guided cargo entering a completed sector never regenerates native deposits during %s',
+  (operation) => {
+    const deposit = rock();
+    const completed = new Set(['1,0']);
+    const field = new RegionalAsteroidField(42, new Map([['0,0', [deposit]]]), completed);
+    const manager = new AsteroidManager(new RNGService(42));
+    field.update(manager, [], completed);
+    deposit.position = { x: 2100, y: 500 };
+    if (operation === 'interest update') {
+      field.update(manager, [], completed);
+    } else {
+      field.checkpoint(manager);
+    }
+    expect(manager.getAllAsteroids()).toEqual([deposit]);
+    expect(field.checkpoint(manager).get('1,0')).toEqual([deposit]);
+  }
+);

@@ -69,6 +69,7 @@ if (typeof window !== 'undefined') {
       </div>
       <div id="gameArea" hidden>
         <div id="debug-play-stack" class="debug-play-stack">
+          <button id="debug-hud-toggle" type="button" class="debug-copy debug-hud-toggle" aria-controls="debug-hud" aria-expanded="true" hidden>Hide HUD</button>
           <fieldset id="debug-hud" class="debug-hud" hidden>
             <legend>Debug health</legend>
             <dl>

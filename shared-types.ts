@@ -131,10 +131,10 @@ export interface PlayerShotAcknowledgement {
   projectileId: string | null;
 }
 
-/** Server-owned coupling; heading stays fixed in world space. */
+/** Server-owned coupling; guidance points at the nearest furnace. */
 export type AsteroidBoost =
   | { phase: 'armed'; ownerId: string; angle: number }
-  | { phase: 'burning'; angle: number; remainingFrames: number };
+  | { phase: 'burning'; ownerId: string; angle: number };
 
 export interface AsteroidData {
   id: string;

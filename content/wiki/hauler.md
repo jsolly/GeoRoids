@@ -43,26 +43,34 @@ Furnaces do not consume a tapped rock.
 
 ## Boost Coupling E
 
-Equip Boost Coupling, aim the ship in the desired travel direction, and press E
-near a living asteroid. On touch, use ARM. Attachment locks the thrust heading
-shown by the cream arrow on the rock; it does not start thrust or extract loot.
-You can keep flying and turning without changing that locked heading.
+Equip Boost Coupling and press E near a living asteroid. On touch, use ARM.
+The cream arrow on the rock points toward its nearest furnace automatically.
+Arming does not start thrust or extract loot; your ship's heading does not
+control the delivery direction.
 
-Press E again, or IGNITE on touch, to detach and start a three-second burn.
-Cream/amber exhaust marks the powered rock. Acceleration is gradual and speed
-is capped at 150 world units per second. After the fuel runs out, the exhaust
-ends and the asteroid coasts. Walls and impacts still affect its motion, but
-the thrust direction never turns with the ship or the spinning rock.
+Press E again, or IGNITE on touch, to detach and start autonomous delivery.
+Cream/amber exhaust marks the powered rock. It continuously steers toward the
+nearest furnace, correcting any sideways momentum it had at ignition. Acceleration is
+gradual and speed is capped at 150 world units per second. Propulsion continues
+until delivery, with no fuel timeout.
+
+On entering a furnace's intake, the rock explodes and is consumed exactly once.
+The pilot who armed the coupling receives its full delivery value, as do its
+recorded Surveyors. The owner does not need to stay nearby or connected, and still earns this
+delivery if their last life is lost before intake.
 
 Swap tools before ignition to cancel. Losing the attachment through distance,
 death, disconnect, or asteroid destruction also cancels an armed coupling.
 After ignition it runs independently of its pilot. Other Haulers cannot attach
 to an armed or burning rock. Ignition starts a new three-second ability cooldown.
-A powered rock remains an ordinary asteroid hazard and cannot deliver itself to
-a furnace; delivery still requires Tow Cable after the burn.
+Once ignited, the rock passes through ships, other asteroids, satellites, and
+completed-sector barriers. Weapons and blast impulses do not affect it, and it
+cannot be scanned, tapped, towed, or coupled again. Existing Surveyor tags still
+receive credit. Only furnace intake consumes the self-guided cargo.
 
-Burn time follows the simulation, which pauses when nobody is playing. A saved
-burn resumes with its remaining fuel when its sector is loaded after restart.
+Guidance follows the simulation, which pauses when nobody is playing. A saved
+powered rock retains its owner and resumes guidance after restart, including
+in completed sectors. Legacy saved finite burns without an owner resume as unpowered rocks.
 
 ## Tow cable E
 

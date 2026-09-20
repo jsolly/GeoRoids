@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cruiseSpeed } from '../../../shared/shipFlight';
+import { Ship } from '../../../src/entities/ship/Ship';
 import { getShipKit } from '../../../src/entities/ship/shipKits';
+import { sampleGradient } from '../../../src/physics/terrain/heightfield';
+import { getTerrainField } from '../../../src/physics/terrain/terrainSession';
 import { RecordingSocket } from '../../support/recordingSocket';
 import {
   EXPLOSION_FRAMES,
@@ -276,3 +279,50 @@ test('a pilot can boost immediately after dying during a burst and respawning', 
   expect(motion.acceptFreePose(pilot.socket, pose(), world.engine.getServerTime()).ok).toBe(true);
   expect(actor.boost.phase).toBe('active');
 });
+
+test.each(['surveyor', 'hauler'] as const)(
+  '%s reports downhill speed, fires, and turns across contours without server corrections',
+  (kitId) => {
+    const pilot = world.join('Contour pilot', { x: 2250, y: 0 }, { kitId });
+    const actor = world.entity(pilot);
+    world.clearAsteroids();
+    const ship = new Ship({ kitId, position: { ...actor.position }, isLocalPlayer: true });
+    const gradient = sampleGradient(getTerrainField(), ship.position.x, ship.position.y);
+    ship.angle = Math.atan2(gradient.y, -gradient.x);
+    const now = world.engine.getServerTime();
+    let fastest = 0;
+    for (let frame = 1; frame <= 480; frame++) {
+      if (frame % 120 === 0) {
+        ship.angle += Math.PI / 2;
+      }
+      ship.update();
+      ship.angle = Math.atan2(Math.sin(ship.angle), Math.cos(ship.angle));
+      fastest = Math.max(fastest, Math.hypot(ship.velocity.x, ship.velocity.y));
+      const outcome = world.engine.playerMotion.acceptFreePose(
+        pilot.socket,
+        {
+          epoch: actor.playerMotion?.epoch ?? 0,
+          sequence: frame,
+          position: { ...ship.position },
+          velocity: { ...ship.velocity },
+          angle: ship.angle,
+          thrusting: true,
+        },
+        now + (frame * 1000) / 60
+      );
+      expect(outcome.ok, JSON.stringify(outcome)).toBe(true);
+      if (frame % 30 === 0) {
+        const laser = ship.generateLaser();
+        expect(
+          world.engine.spawnPlayerLaser(
+            actor.id,
+            laser.position,
+            laser.velocity,
+            now + (frame * 1000) / 60
+          )
+        ).not.toBeNull();
+      }
+    }
+    expect(fastest).toBeGreaterThan(getShipKit(kitId).maxVelocity * 1.1);
+  }
+);

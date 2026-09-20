@@ -25,6 +25,7 @@ import { playExplosionSound } from '../../audio/explosionSound';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { getCompletedSectors } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
+import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { addPositionAndVelocity } from '../../utils/mathUtils';
@@ -447,9 +448,12 @@ class Ship {
     this.angle += this.angularVelocity;
     const boost = this.boosting ? getShipKit(this.kitId).boostMultiplier : 1;
     const speed = cruiseSpeed(this.mass, this.maxVelocity, boost);
-    const velocityLimit = Math.max(speed, this.knockbackVelocityLimit);
+    const velocityLimit = Math.max(
+      terrainSpeedLimit(this.position, speed),
+      this.knockbackVelocityLimit
+    );
     if (this.knockbackVelocityLimit <= speed) {
-      // Steering redirects normal momentum before thrust and terrain forces act.
+      // Terrain sets the cruise direction and speed, including downhill drift.
       // A server-granted blast keeps its motion until the excess speed decays.
       advanceCruiseVelocity(this, speed, boost);
     } else {

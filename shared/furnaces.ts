@@ -1,5 +1,5 @@
 import type { AsteroidData, Position } from '../shared-types';
-import { WORLD } from './world';
+import { sectorAt, WORLD } from './world';
 
 const orbit = 660;
 export const FURNACES = [
@@ -18,18 +18,32 @@ export const FURNACES = [
   },
 ] satisfies { id: string; name: string; position: Position; radius: number }[];
 
+const REGIONAL_SPACING = WORLD.sectorSize * 2;
+const SECTOR_CENTER = WORLD.sectorSize / 2;
+
 // Fixed landmarks remain discoverable even when their surrounding sector is asleep.
+// Sit them in sector interiors so a towed rock can swing in from any side.
 for (let row = -14; row <= 14; row++) {
   for (let col = -14; col <= 14; col++) {
     if (col === 0 && row === 0) {
       continue;
     }
-    const position = { x: col * 4_000, y: row * 4_000 };
-    if (Math.hypot(position.x, position.y) > WORLD.radius - 2_000) {
+    const position = {
+      x: col * REGIONAL_SPACING + SECTOR_CENTER,
+      y: row * REGIONAL_SPACING + SECTOR_CENTER,
+    };
+    if (Math.hypot(position.x, position.y) > WORLD.radius - WORLD.sectorSize) {
       continue;
     }
     FURNACES.push({ id: `works-${col}-${row}`, name: `Works ${col}:${row}`, position, radius: 85 });
   }
+}
+
+const FURNACE_SECTOR_IDS = new Set(FURNACES.map((site) => sectorAt(site.position).id));
+
+/** Works yards stay flyable; mapping them must not raise completed-sector walls. */
+export function isFurnaceSector(id: string): boolean {
+  return FURNACE_SECTOR_IDS.has(id);
 }
 
 const MATERIAL_POINTS = { ice: 150, metal: 300, rubble: 100 };

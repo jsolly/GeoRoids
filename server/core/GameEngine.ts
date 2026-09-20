@@ -14,7 +14,7 @@ import { asteroidCrewNeeded, isColossalAsteroid } from '../../shared/asteroidSca
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
-import { FURNACES, furnaceReward } from '../../shared/furnaces';
+import { FURNACES, furnaceReward, isFurnaceSector } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
@@ -335,6 +335,11 @@ export class GameEngine {
     if (loaded?.world) {
       this.exploration.restore(loaded.world.exploration);
       for (const id of loaded.world.completedSectors) {
+        // Older worlds could complete a Works yard when the hearth sat on a
+        // corner. Those sectors stay flyable so delivery still has an approach.
+        if (isFurnaceSector(id)) {
+          continue;
+        }
         this.completedSectors.add(id);
       }
     }
@@ -791,7 +796,7 @@ export class GameEngine {
         continue;
       }
       const parsed = parseSectorId(id);
-      if (!parsed || !this.regionalField.hasVisited(id)) {
+      if (!parsed || isFurnaceSector(id) || !this.regionalField.hasVisited(id)) {
         continue;
       }
       if ((remaining.get(id) ?? 0) > 0) {

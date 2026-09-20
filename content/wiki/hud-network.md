@@ -96,6 +96,8 @@ Amber campfires mark discovered furnaces. Red spiderwebs surround the stationary
 resources guarded by nests, even while their spiders are chasing elsewhere or
 sleeping. The web remains after the guards are killed while the resource remains;
 it disappears when that resource is collected, moved, or its sector completes.
+A Works yard never completes, so a web there lasts until the resource is
+collected or moved.
 The universe map uses the same symbols and also shows nearby explored rocks
 and small loot from the current local snapshot.
 Kit hull silhouettes in local and crew colors keep pilots

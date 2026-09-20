@@ -8,16 +8,16 @@ import { RecordingSocket } from '../../support/recordingSocket';
 
 test('the last pilot disconnecting preserves a wounded resource guard and its slain nestmate', () => {
   const engine = new GameEngine(81);
-  const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 3000, y: 5000 });
+  const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 13_000, y: 5_000 });
   engine.prepareDiagnosticWorld('traversal');
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
   }
   engine.parkSatellitePickups();
-  pilot.position = { x: 3000, y: 5000 };
+  pilot.position = { x: 13_000, y: 5_000 };
   engine.addAsteroid({
     id: 'guarded-metal',
-    position: { x: 5000, y: 5000 },
+    position: { x: 15_000, y: 5_000 },
     velocity: { x: 0, y: 0 },
     size: 24,
     health: 75,
@@ -45,7 +45,7 @@ test('the last pilot disconnecting preserves a wounded resource guard and its sl
   );
   engine.removePlayer(pilot.id);
   expect(engine.getSpiderField().spiders).toEqual([]);
-  engine.addPlayer('returning', 'Returning', new RecordingSocket(), { x: 3000, y: 5000 });
+  engine.addPlayer('returning', 'Returning', new RecordingSocket(), { x: 13_000, y: 5_000 });
   engine.advanceCombatFrame();
   expect(engine.getSpiderField().spiders.map(({ id, health }) => ({ id, health }))).toEqual(before);
   engine.stopGameLoop();

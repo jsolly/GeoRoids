@@ -15,7 +15,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
-| terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, sparse resource nests, value-scaled guard groups, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
+| terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, sparse resource nests (Works yards never complete, so those webs last until the resource moves), value-scaled guard groups, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
@@ -150,7 +150,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   pickups take damage from asteroid impacts and ricochets while deployed;
   ordinary crew shots pass through owned hardware.
 - Completing a visited sector (every explorable cell mapped and every asteroid
-  gone) walls it off. Completed-sector walls kill ships like the outer boundary,
+  gone) walls it off, unless that sector holds a Works site. Completed-sector
+  walls kill ships like the outer boundary,
   bounce lasers that then become ricochets, and move anyone already inside
   just outside along their heading
   without taking a life. A hull that already crossed the grid but still overlaps

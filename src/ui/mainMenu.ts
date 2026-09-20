@@ -1,4 +1,5 @@
 import { activateAudio } from '../audio/audioRuntime';
+import { setMusic } from '../audio/musicBeds';
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
 import { setHaptics, syncHapticsControl } from '../fx/haptics';
@@ -16,6 +17,7 @@ import { controlsHintFor } from './viewportChrome';
 
 // UI element references
 const soundCheckBox = getElementById<HTMLInputElement>('soundPref');
+const musicCheckBox = getElementById<HTMLInputElement>('musicPref');
 const hapticsCheckBox = getElementById<HTMLInputElement>('hapticsPref');
 const startGameBtn = getElementById<HTMLButtonElement>('start-game');
 const playerNameInput = getElementById<HTMLInputElement>('playerNameInput');
@@ -196,6 +198,11 @@ if (playerNameInput) {
 attachEventListener(soundCheckBox, 'change', (ev) => {
   const target = ev.target as HTMLInputElement;
   setSound(target.checked);
+});
+
+attachEventListener(musicCheckBox, 'change', (ev) => {
+  const target = ev.target as HTMLInputElement;
+  setMusic(target.checked);
 });
 
 syncHapticsControl();

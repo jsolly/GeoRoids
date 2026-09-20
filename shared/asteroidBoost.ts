@@ -1,6 +1,52 @@
 import type { AsteroidBoost, Position, Velocity } from '../shared-types';
 import { nearestFurnace } from './furnaces';
 
+export function boostOwnerIds(boost: AsteroidBoost | null | undefined): string[] {
+  if (!boost) {
+    return [];
+  }
+  if (boost.couplings && boost.couplings.length > 0) {
+    return [...new Set(boost.couplings)];
+  }
+  return [boost.ownerId];
+}
+
+function packArmedBoost(ownerId: string, angle: number, owners: readonly string[]): AsteroidBoost {
+  return owners.length > 1
+    ? { phase: 'armed', ownerId, angle, couplings: [...owners] }
+    : { phase: 'armed', ownerId, angle };
+}
+
+export function addBoostOwner(boost: AsteroidBoost, ownerId: string): AsteroidBoost {
+  if (boost.phase !== 'armed') {
+    return boost;
+  }
+  const owners = boostOwnerIds(boost);
+  if (!owners.includes(ownerId)) {
+    owners.push(ownerId);
+  }
+  return packArmedBoost(boost.ownerId, boost.angle, owners);
+}
+
+export function removeBoostOwner(boost: AsteroidBoost, ownerId: string): AsteroidBoost | null {
+  if (boost.phase !== 'armed') {
+    return boost;
+  }
+  const owners = boostOwnerIds(boost).filter((id) => id !== ownerId);
+  if (owners.length === 0) {
+    return null;
+  }
+  const primary = owners.includes(boost.ownerId) ? boost.ownerId : (owners[0] ?? ownerId);
+  return packArmedBoost(primary, boost.angle, owners);
+}
+
+export function igniteBoost(boost: AsteroidBoost, angle: number): AsteroidBoost {
+  const owners = boostOwnerIds(boost);
+  return owners.length > 1
+    ? { phase: 'burning', ownerId: boost.ownerId, angle, couplings: owners }
+    : { phase: 'burning', ownerId: boost.ownerId, angle };
+}
+
 /** Velocity uses world units per fixed 60 Hz simulation tick. */
 export const ASTEROID_BOOST = {
   acceleration: 0.025,

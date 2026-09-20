@@ -33,7 +33,9 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionHtml).toContain('class="sound-toggle"');
   expect(productionHtml).toContain('id="hapticsPref"');
   expect(productionHtml).toContain('class="preference-toggles"');
-  expect(productionCss).toMatch(/\.preference-toggles \{[^}]*grid-template-columns: 1fr 1fr;/su);
+  expect(productionCss).toMatch(
+    /\.preference-toggles \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/su
+  );
   expect(productionCss).toContain('.haptics-hint');
 });
 
@@ -62,7 +64,9 @@ test('title menu uses first-party nickname and sound chrome', () => {
     true
   );
   expect(document.querySelector('#soundPref')?.classList.contains('sound-toggle')).toBe(true);
-  expect(document.querySelector('.sound-toggle-label')?.getAttribute('for')).toBe('soundPref');
+  expect(document.querySelector('label[for="soundPref"]')?.textContent).toBe('Sound Effects');
+  expect(document.querySelector('#musicPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="musicPref"]')?.textContent).toBe('Music');
   expect(document.querySelector('#hapticsPref')?.classList.contains('sound-toggle')).toBe(true);
   expect(document.querySelector('label[for="hapticsPref"]')?.textContent).toBe('Haptics');
   expect(document.querySelector('#hapticsHint')?.classList.contains('haptics-hint')).toBe(true);
@@ -96,8 +100,7 @@ test('title menu keeps Advanced Debug chrome first-party and collapsed', () => {
   expect(productionHtml).not.toMatch(/<details id="advanced-settings"[^>]*\sopen[\s>]/u);
   expect(productionHtml).toContain('Paste this to an agent. Railway filter: @playerId:');
   expect(productionHtml).toContain('id="debug-session-id"');
-  expect(productionHtml).toContain('id="debug-play-chip"');
-  expect(productionHtml).toContain('id="copy-debug-play-chip"');
+  expect(productionHtml).toContain('id="copy-debug-diagnostics"');
   expect(productionHtml).toContain('id="debug-hud"');
   expect(productionHtml).toContain('id="debug-hud-fps"');
   expect(productionCss).toContain('.advanced-settings');

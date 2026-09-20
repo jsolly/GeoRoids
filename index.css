@@ -769,10 +769,10 @@
 
   .preference-toggles {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.45em;
     justify-content: center;
-    width: min(100%, 26rem);
+    width: min(100%, 40rem);
   }
 
   #start-screen .terrain-eyebrow {
@@ -805,7 +805,7 @@
     background-color: rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    min-width: 200px;
+    min-width: 220px;
     transition: all 0.3s ease;
     position: relative;
   }
@@ -1010,6 +1010,7 @@
     display: flex;
   }
 
+  .debug-diagnostics-copy,
   .debug-hud-toggle {
     pointer-events: auto;
     min-height: 36px;
@@ -1080,45 +1081,8 @@
     white-space: nowrap;
   }
 
-  .debug-play-chip {
-    display: none;
-    box-sizing: border-box;
-    align-items: center;
-    gap: 0.4rem;
-    max-width: 100%;
-    min-width: 0;
-    padding: 0.28rem 0.45rem;
-    pointer-events: auto;
-    background: color-mix(in srgb, var(--palette-bg, #000011) 78%, transparent);
-    border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 50%, transparent);
-    border-radius: 4px;
-  }
-
-  .debug-play-chip[hidden] {
-    display: none;
-  }
-
-  body.in-play.debug-on .debug-play-chip:not([hidden]) {
-    display: flex;
-  }
-
-  .debug-play-chip-label {
-    color: var(--palette-hud-muted, #64748b);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.5rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .debug-play-chip code {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--palette-local, #5eead4);
-    font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.62rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    user-select: all;
+  .debug-diagnostics-copy {
+    margin-top: 0.5rem;
   }
 
   .enter-game.active-mode {
@@ -1180,7 +1144,7 @@
     }
 
     .sound-toggle-row {
-      min-width: 180px;
+      min-width: 200px;
       padding: 0.3em 0.6em;
     }
 
@@ -1700,6 +1664,10 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .ship-schematic-cards[data-kit-id="surveyor"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .ship-schematic-card {

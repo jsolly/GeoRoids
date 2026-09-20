@@ -69,7 +69,9 @@ test('hexToRgba returns the same string instance for the same quantized alpha', 
   expect(a).toBe(b);
 });
 
-test('roid stroke weights follow three size tiers', () => {
+test('roid stroke weights follow four size tiers', () => {
+  expect(getRoidStrokeWidth(ROID.COLOSSAL_MIN_SIZE)).toBe(VISUAL.ROID_STROKE_COLOSSAL);
+  expect(getRoidStrokeWidth(ROID.COLOSSAL_SIZE)).toBe(VISUAL.ROID_STROKE_COLOSSAL);
   expect(getRoidStrokeWidth(ROID.SIZE)).toBe(VISUAL.ROID_STROKE_LARGE);
   expect(getRoidStrokeWidth(ROID.SIZE * 0.5)).toBe(VISUAL.ROID_STROKE_MEDIUM);
   expect(getRoidStrokeWidth(ROID.SIZE * 0.2)).toBe(VISUAL.ROID_STROKE_SMALL);
@@ -86,6 +88,7 @@ test('shots are thicker short cream segments, never pins or beams', () => {
 
 test('ships stay hairline; roids read as silhouettes', () => {
   expect(VISUAL.SHIP_STROKE_WIDTH).toBeLessThanOrEqual(1.5);
+  expect(VISUAL.ROID_STROKE_COLOSSAL).toBeGreaterThan(VISUAL.ROID_STROKE_LARGE);
   expect(VISUAL.ROID_STROKE_LARGE).toBeLessThanOrEqual(2.25);
   expect(VISUAL.ROID_STROKE_MEDIUM).toBeLessThanOrEqual(VISUAL.ROID_STROKE_LARGE);
   expect(VISUAL.ROID_STROKE_SMALL).toBeLessThanOrEqual(VISUAL.ROID_STROKE_MEDIUM);

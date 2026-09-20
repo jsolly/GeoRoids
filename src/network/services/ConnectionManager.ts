@@ -57,8 +57,10 @@ import { recordAsteroidLatch } from '../../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
 import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
+import { setSurveyorUtilityOnHost } from '../../entities/ship/shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
+import { preferredSurveyorUtility, surveyorUtilityOf } from '../../entities/ship/surveyorUtility';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
@@ -1403,7 +1405,15 @@ export class ConnectionManager {
           entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
         }
         entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
-        entity.ship.abilityActiveFrames = entityData.abilityActiveFrames ?? 0;
+        const snapshotUtility =
+          entity.type === 'local'
+            ? surveyorUtilityOf(entity.ship)
+            : (entityData.surveyorUtility ?? surveyorUtilityOf(entity.ship));
+        const surveyorProbeSelected =
+          entity.ship.kitId === 'surveyor' && snapshotUtility === 'survey_probe';
+        entity.ship.abilityActiveFrames = surveyorProbeSelected
+          ? 0
+          : (entityData.abilityActiveFrames ?? 0);
         if (entityData.laserUpgrade) {
           entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
         } else {
@@ -1579,6 +1589,10 @@ export class ConnectionManager {
       );
       return;
     }
+    // A restored pilot keeps its ID but starts a new motion epoch. The joined
+    // acknowledgment is the boundary after which old movement counters expire.
+    this.motionReconciliation.reset();
+    this.motionReconciliation.awaitAuthoritativePose();
     this.joinAcknowledged = true;
     this.shotAcknowledgements = data.shotAcknowledgements === true;
     this.currentProtocolReady = true;
@@ -1657,6 +1671,15 @@ export class ConnectionManager {
         localPlayer.ship.haulerUtility = utility;
         this.sendMessage({
           type: 'setHaulerUtility',
+          id: localPlayer.id,
+          data: { utilityId: utility },
+        });
+      }
+      if (localPlayer.ship.kitId === 'surveyor') {
+        const utility = preferredSurveyorUtility();
+        setSurveyorUtilityOnHost(localPlayer.ship, utility);
+        this.sendMessage({
+          type: 'setSurveyorUtility',
           id: localPlayer.id,
           data: { utilityId: utility },
         });

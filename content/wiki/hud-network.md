@@ -12,20 +12,30 @@ related:
 media: []
 ---
 
+## Probe beacons
+
+A pulsing cyan ring around a rock's minimap mark identifies a live
+[Survey Probe](/wiki/#surveyor). Follow that rock to survey more of the field.
+On the playfield the small diamond has a green health bar and emits expanding
+scan rings. Amber pulses warn that its battery is nearly empty.
+
 ## What the HUD shows
 
-Before entering a game, set your pilot name, choose a kit, and use the Sound
-checkbox on the title screen to enable or mute audio. Muting stops sounds already
-playing too. Starting with Sound off skips loading sound files. When you enable
-audio, effects become available as they load; missed sounds do not play later.
-The Haptics checkbox is next to Sound. It stays off until you turn it on, and
-this browser remembers that choice. With Haptics on, your own shots, hull hits,
-deaths, Boost starts, kit abilities, pickups, and furnace deliveries buzz the
-device. Crew action around you does not. Haptics use the web Vibration API: many
-Android browsers can vibrate, while iPhone browsers cannot. If this browser has
-no vibration API, the checkbox stays off and disabled with a short explanation.
-Native apps can use richer haptic engines; this web client does not wrap a native
-shell.
+Before entering a game, set your pilot name, choose a kit, and use Sound
+Effects, Music, and Haptics on the title screen. Sound Effects mutes cues already
+playing; Music loops a quiet title bed and an in-game bed after Enter Game.
+In-play danger can temporarily switch to a threat bed, then the playfield
+loop returns. Music off silences every bed, including danger, without muting
+cues. This browser remembers both audio checkboxes. Starting with Sound Effects
+off skips loading effect files. When you enable effects, they become
+available as they load; missed sounds do not play later.
+The Haptics checkbox stays off until you turn it on, and this browser remembers
+that choice. With Haptics on, your own shots, hull hits, deaths, Boost starts,
+kit abilities, pickups, and furnace deliveries buzz the device. Crew action
+around you does not. Haptics use the web Vibration API: many Android browsers
+can vibrate, while iPhone browsers cannot. If this browser has no vibration
+API, the checkbox stays off and disabled with a short explanation. Native apps
+can use richer haptic engines; this web client does not wrap a native shell.
 
 Open Advanced and enable Debug to show this browser's Player ID and page
 session ID. The Player ID is the same `playerId` already written on join and
@@ -34,12 +44,16 @@ and send it to an agent so they can find this ship in production logs with
 `@playerId:` plus that value. The page session ID matches `@sessionId:` on
 forwarded client records. Debug stays off unless you turn it on; this browser
 remembers the checkbox. It does not publish your nickname or resume token.
-While Debug is on, a small Player ID chip stays on the playfield so you can
-copy after the title screen hides, and a compact overlay shows live FPS, ping,
-snapshot age, motion epoch, world counts, and short client/server release IDs.
+While Debug is on, a compact HUD stays on the playfield. Its **Copy diagnostics**
+button copies the Player ID, current ship, connection, browser and release
+details plus up to 80 recent client warnings,
+errors and state records for a bug report. It excludes private resume credentials.
+Successful copies show **Copied!** for three seconds. If copying fails, the button
+says **Copy failed**. The HUD shows live FPS, ping, snapshot age, motion epoch,
+world counts, and short client/server release IDs.
 Use **Hide HUD** during play to collapse the health overlay without turning off
-Debug or hiding the Player ID copy control. **Show HUD** brings it back. This
-browser remembers the HUD visibility separately from the Debug checkbox.
+Debug. **Show HUD** brings it back. This browser remembers the HUD visibility
+separately from the Debug checkbox.
 The debug panel sits above the flight controls so Boost remains visible, and
 the kit ability button stays fully on the playfield.
 Those health lines stay on-screen only; they are not written to Railway.

@@ -6,6 +6,8 @@ interface CombatantState {
   blinkCount?: number;
   spawnProtectionTimer?: number;
   respawnTimer?: number;
+  /** Map or schematic is open; the hull is frozen and must not collide. */
+  overlayHold?: boolean;
 }
 
 export interface CombatCircle {
@@ -24,6 +26,9 @@ export function isCombatantImmune(state: CombatantState): boolean {
     return true;
   }
   if (state.spawnProtectionTimer !== undefined && state.spawnProtectionTimer > 0) {
+    return true;
+  }
+  if (state.overlayHold === true) {
     return true;
   }
   return false;

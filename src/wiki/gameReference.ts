@@ -1,5 +1,6 @@
 import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import { ASTEROID_INTERACTIONS } from '../../shared/asteroidPhenomena';
+import { colossalMiningHealth } from '../../shared/asteroidScale';
 import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
@@ -12,6 +13,7 @@ import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
 import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
+import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
@@ -71,7 +73,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Ability and exploration values',
       paragraphs: [
-        `E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `With Mineral Scan equipped, E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `Survey Probe: launch range ${SURVEY_PROBE.LAUNCH_RANGE} units; beacon scan radius ${SURVEY_PROBE.RANGE} units every ${SURVEY_PROBE.PULSE_MS / 1000} seconds; battery ${SURVEY_PROBE.LIFETIME_MS / 60000} minutes with a warning during the last ${SURVEY_PROBE.WARNING_MS / 1000} seconds. Health: ${SURVEY_PROBE.MAX_HEALTH}. Maximum ${SURVEY_PROBE.MAX_PER_OWNER} active probes per Surveyor; a successful extra attachment replaces the oldest. Attachment cooldown: ${seconds(SURVEY_PROBE.COOLDOWN_FRAMES)}.`,
         `Passive shared exploration reaches ${EXPLORATION_RANGE.surveyor} world units for Surveyor and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist for the match.`,
       ],
     },
@@ -84,8 +87,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Tow and mining values',
       paragraphs: [
-        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids and cooperative large rocks. The ability has no ship-targeting mode.`,
-        `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable.`,
+        `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids, cooperative large rocks, and colossal deposits. The ability has no ship-targeting mode.`,
+        `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Ordinary towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable. A colossal deposit needs ${ROID.COLOSSAL_CREW} Tow Cables before it will haul, and ${ROID.COLOSSAL_CREW} Boost Couplings before ignition; ramming it or dragging it into another rock does not shatter it.`,
         `Furnace intakes are ${starterFurnaces[0]?.radius ?? 0} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor.`,
       ],
     },
@@ -110,14 +113,14 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Field and material values',
       paragraphs: [
-        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Fresh interior sectors have ${Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} stationary deposits and ${WORLD.depositsPerSector - Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} drifting deposits. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.DRIFT_SPEED_MAX * GAME.FPS).toFixed(1)} world units per second. Ice and rubble have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
+        `The procedural field uses ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors with ${WORLD.depositsPerSector} deterministic deposits per sector inside the ${WORLD.radius.toLocaleString('en-US')}-unit world. Fresh interior sectors have ${Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} stationary deposits and ${WORLD.depositsPerSector - Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION)} drifting deposits. Drift speeds range from ${(ROID.DRIFT_SPEED_MIN * GAME.FPS).toFixed(1)} to ${(ROID.DRIFT_SPEED_MAX * GAME.FPS).toFixed(1)} world units per second. Ice and rubble have ${DAMAGE.LASER_HIT} health; metal has ${DAMAGE.LASER_HIT * 3}. A colossal deposit is size ${ROID.COLOSSAL_SIZE} with ${colossalMiningHealth()} mining health. Metal shard mass is ${asteroidShardMass('metal')}; ice and rubble shard mass is ${asteroidShardMass('ice')}.`,
       ],
     },
     {
       heading: 'Split and score values',
       paragraphs: [
         `The fast collaboration shockwave reaches ${SHOCKWAVE.FAST.radius} units with impulse ${SHOCKWAVE.FAST.impulse}; the heavy wave reaches ${SHOCKWAVE.HEAVY.radius} units with impulse ${SHOCKWAVE.HEAVY.impulse}.`,
-        `Large-rock collaboration starts at size ${ROID.COLLAB_SPLIT_MIN_SIZE}; the collaboration window is ${ROID.COLLAB_SPLIT_WINDOW_MS} milliseconds and same-shooter deduplication lasts ${ROID.COLLAB_HIT_DEDUPE_MS} milliseconds. Asteroid scores are large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, and small ${ROID.POINTS_SMALL}.`,
+        `Large-rock collaboration starts at size ${ROID.COLLAB_SPLIT_MIN_SIZE}; the collaboration window is ${ROID.COLLAB_SPLIT_WINDOW_MS} milliseconds and same-shooter deduplication lasts ${ROID.COLLAB_HIT_DEDUPE_MS} milliseconds. Colossal deposits begin at size ${ROID.COLOSSAL_MIN_SIZE}, need ${ROID.COLOSSAL_CREW} Haulers or Boost Couplings, take ${ROID.COLOSSAL_LASER_HITS} Surveyor laser hits, and appear in 1 of every ${ROID.COLOSSAL_SECTOR_PERIOD} sectors outside the ${ROID.COLOSSAL_CORE_EXCLUSION * 2 - 1}×${ROID.COLOSSAL_CORE_EXCLUSION * 2 - 1} launch neighborhood. Asteroid scores are colossal ${ROID.POINTS_COLOSSAL}, large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, and small ${ROID.POINTS_SMALL}.`,
       ],
     },
     {
@@ -157,7 +160,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Combat values',
       paragraphs: [
-        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; a towed rock uses that same impact against another ship and then breaks. Boundary contact destroys a vulnerable ship regardless of hull health.`,
+        `A ship can have ${SHIP.MAX_LASERS} local lasers. Laser projectiles use hit radius ${LASER.HIT_RADIUS}; a normal laser hit deals ${DAMAGE.LASER_HIT}. Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts leave crew hulls unharmed. After a bounce, a laser deals ${DAMAGE.LASER_HIT} times its energy to any live ship it hits, including its owner, and is consumed. An environmental asteroid impact deals ${DAMAGE.ASTEROID_COLLISION}; a towed ordinary rock uses that same impact against another ship and then breaks. A colossal deposit deals that impact without shattering. Boundary contact destroys a vulnerable ship regardless of hull health.`,
         `Spawn protection lasts ${frameValue(SHIP.INVINCIBILITY_DURATION_FRAMES)}.`,
       ],
     },
@@ -171,7 +174,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Score values',
       paragraphs: [
-        `Asteroid score: large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, small ${ROID.POINTS_SMALL}. Shard score: ${GROWTH.SHARD_SCORE}. Satellite pickup score: ${SATELLITE_PICKUP.SCORE_BONUS}. Furnace delivery at size 25 awards ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, or rubble ${furnaceReward({ material: 'rubble', size: 25 })} to each contributor.`,
+        `Asteroid score: colossal ${ROID.POINTS_COLOSSAL}, large ${ROID.POINTS_LARGE}, medium ${ROID.POINTS_MEDIUM}, small ${ROID.POINTS_SMALL}. Shard score: ${GROWTH.SHARD_SCORE}. Satellite pickup score: ${SATELLITE_PICKUP.SCORE_BONUS}. Furnace delivery at size 25 awards ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, or rubble ${furnaceReward({ material: 'rubble', size: 25 })} to each contributor.`,
       ],
     },
   ],

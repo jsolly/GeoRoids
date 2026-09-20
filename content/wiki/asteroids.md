@@ -28,11 +28,19 @@ Metal shards carry more mass than ice and rubble shards.
 
 Rubble can fragment into three uneven pieces when it breaks above size 20.
 Those fragments are below size 20 and do not multiply again. Ship collisions
-destroy an asteroid without using the laser split path. A towed asteroid that
-overlaps another asteroid uses that same collision break on both rocks and
-drops the Hauler cable. Splits and fragments
+destroy an ordinary asteroid without using the laser split path. A towed
+ordinary asteroid that overlaps another asteroid uses that same collision
+break on both rocks and drops the Hauler cable. Splits and fragments
 are part of the active sector's current population; sector loading does not
 impose a global asteroid cap.
+
+A rare colossal deposit appears in some sectors outside the launch
+neighborhood. It is a stationary landmark far larger than the ordinary large
+class. One Hauler cannot haul it or ignite a Boost Coupling on it. Two Tow
+Cables, two armed couplings, or many laser hits are required before it
+starts breaking up. A ram or a towed collision against another rock leaves
+the colossal deposit intact and shoves the ship away; the other rock still
+breaks. Whole-rock furnace delivery still works once a crew can move it.
 
 ## Self-powered rocks
 
@@ -42,7 +50,7 @@ delivery is active. Powered sectors stay awake until delivery, even when nearby
 pilots leave. Self-guided cargo passes through ships, rocks, satellites, and
 completed-sector barriers. It ignores weapons and blast impulses, and cannot be
 scanned, tapped, towed, or coupled again. At intake it explodes and awards its
-original launcher and previously recorded Surveyors the delivery points.
+launchers and previously recorded Surveyors the delivery points.
 
 ## Cooperative splits and score
 
@@ -67,8 +75,10 @@ Asteroid score is based on the rock size at the break. Every miner who damaged
 that rock and every Surveyor who identified it receives the full mining reward,
 including contributors who disconnected before the final hit. Chipped deposits
 retain their contributor history with the saved world. A collision break does
-not produce the collaboration split behavior. Towed cargo that hits another
-rock uses this collision break rather than the laser split path.
+not produce the collaboration split behavior. Towed ordinary cargo that hits
+another
+rock uses this collision break rather than the laser split path. A towed
+colossal deposit survives and breaks the other rock.
 
 ## Reflection and charge
 

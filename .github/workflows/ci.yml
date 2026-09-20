@@ -8,6 +8,8 @@ name: CI
     branches: [main]
 
 permissions:
+  actions: read
+  pull-requests: read
   contents: read
 
 concurrency:
@@ -23,18 +25,30 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Check for a validated PR tree
+        id: verified-tree
+        timeout-minutes: 1
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-verified-tree.sh
       - name: Prepare behavioral artifacts
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: |
           mkdir -p behavioral-artifacts/logs behavioral-artifacts/screenshots
           echo "Runner has not started; inspect job setup steps if no test log follows." > behavioral-artifacts/README.txt
       - uses: actions/setup-node@v6
+        if: steps.verified-tree.outputs.run_full != 'false'
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+        if: steps.verified-tree.outputs.run_full != 'false'
       - name: Install pinned Playwright Chromium, WebKit and OS dependencies
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: npx --no-install playwright install --with-deps chromium webkit
       - name: Run serialized critical behavioral scenarios
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: |
           set +e
           set -o pipefail
@@ -79,11 +93,13 @@ jobs:
           done
           exit "$status"
       - name: Report deterministic frame work budget
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: >-
           node --import tsx scripts/measure-frame-work.ts
           --budget docs/performance/frame-work-budget.json
           --output behavioral-artifacts/frame-work.json
       - name: Run constrained production client correctness
+        if: steps.verified-tree.outputs.run_full != 'false'
         run: |
           set -euo pipefail
           GEOROIDS_TEST_MAX_DURATION_SECONDS=240 ./scripts/test-runner.sh --benchmark-client \
@@ -95,13 +111,23 @@ jobs:
             --scenario combat --seed 42 --warmup 5 --seconds 15 \
             --output behavioral-artifacts/mobile-combat.json 2>&1 | tee behavioral-artifacts/mobile-combat.log
       - name: Upload behavioral artifacts
-        if: ${{ always() }}
+        if: (always()) && steps.verified-tree.outputs.run_full != 'false'
         uses: actions/upload-artifact@v7
         with:
           name: behavioral-smoke-${{ github.run_id }}
           path: behavioral-artifacts
           if-no-files-found: error
           retention-days: 14
+      - name: Record validated PR tree
+        if: >-
+          success() && github.event_name == 'pull_request' &&
+          steps.verified-tree.outputs.tree != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
+          if-no-files-found: error
+          retention-days: 7
 
   ci:
     name: ci
@@ -112,25 +138,48 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Check for a validated PR tree
+        id: verified-tree
+        timeout-minutes: 1
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci-verified-tree.sh
       - uses: actions/setup-node@v6
+        if: steps.verified-tree.outputs.run_full != 'false'
         with:
           node-version-file: .nvmrc
           cache: npm
       - uses: astral-sh/setup-uv@v10.1.0
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm ci
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:actions
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:lint-policy
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:lint
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:knip
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:ts-prune
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:md
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:yaml
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:ts
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:benchmarks
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:test-runner
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run check:dev-server
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm test
+        if: steps.verified-tree.outputs.run_full != 'false'
       - run: npm run build
+        if: steps.verified-tree.outputs.run_full != 'false'
       - name: Require behavioral smoke lane to pass
         if: ${{ always() }}
         env:
@@ -141,3 +190,13 @@ jobs:
             echo "Critical behavioral lane result: $BEHAVIORAL_RESULT" >&2
             exit 1
           fi
+      - name: Record validated PR tree
+        if: >-
+          success() && github.event_name == 'pull_request' &&
+          steps.verified-tree.outputs.tree != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-tree-v1-${{ github.job }}-${{ steps.verified-tree.outputs.tree }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-tree-${{ github.job }}.txt
+          if-no-files-found: error
+          retention-days: 7

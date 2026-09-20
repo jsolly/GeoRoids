@@ -267,3 +267,11 @@ npm run check:ts           # tsc --noEmit — should pass cleanly
 npm run test         # unit tests (~3s)
 npm run build        # tsc -p tsconfig.build.json && vite build — produces dist/
 ```
+
+## Verified-tree CI
+
+PRs run the full CI suite. Post-merge CI reuses a successful PR run only when
+its recorded checkout tree exactly matches the landed tree, using
+`scripts/ci-verified-tree.sh` from dotagents. Missing proof runs full CI;
+manual runs always validate. Job names and deployment triggers stay intact.
+Canonical contract: `~/code/dotagents/templates/github/verified-tree-ci.md`.

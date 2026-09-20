@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -21,6 +22,7 @@ test.each([
     const page = await browserManager.recreatePage({ hasTouch: mobile });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
+    await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
     const canvas = page.locator('#gameCanvas');
@@ -114,6 +116,7 @@ test.each([
       ROCK_ID
     );
     expect(burning?.angle).toBe(armed.angle);
+    expect(await readSamplePlaybackRates(page, 'boost-ignite')).toEqual([1]);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`boost-burning-${viewport.width}.png`),
     });

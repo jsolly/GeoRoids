@@ -11,7 +11,8 @@ import type {
   ShipKitId,
 } from '../../shared-types';
 import { playDestructionSound } from '../audio/destructionSounds';
-import { playOrbitalPickup } from '../audio/interactionSounds';
+import { playFeedback } from '../audio/feedbackSounds';
+import { playRespawn } from '../audio/interactionSounds';
 import { bindGameAudio } from '../audio/spatialAudio';
 import { playSplitSound } from '../audio/splitSound';
 import { GAME } from '../constants';
@@ -180,6 +181,7 @@ export class GameController {
       // Begin sending continuous local player updates to server
       PlayerNetwork.getInstance().startNetworkUpdates();
 
+      playRespawn();
       window.dispatchEvent(new CustomEvent('gameStart'));
     } catch (error) {
       clientPerformance.joinFailed();
@@ -382,7 +384,7 @@ export class GameController {
       return;
     }
     this.gameStateManager.setDeliveryMessage(reward.points, delivery.rewards.length);
-    playOrbitalPickup(delivery.position);
+    playFeedback('delivery');
   };
 
   private setupServerAsteroidListeners(): void {
@@ -429,6 +431,7 @@ export class GameController {
       return;
     }
     this.gameOverInProgress = true;
+    playFeedback('gameOver');
     this.laserUpgradeReadout?.update(undefined);
 
     const localPlayer = this.playerManager.getLocalPlayer();

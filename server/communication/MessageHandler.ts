@@ -3,7 +3,7 @@ import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
-import type { PlayerShotAcknowledgement } from '../../shared-types';
+import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
 import { getShipKit } from '../../src/entities/ship/shipKits';
 import { sanitizePlayerName } from '../../src/utils/playerName';
 import type { GameEntity } from '../core/EntityManager';
@@ -469,6 +469,10 @@ export class MessageHandler {
     if (command.kitId !== undefined && command.kitId !== socketPlayer.kitId) {
       return;
     }
+    const latchedTarget = socketPlayer.harpoonTargetId
+      ? this.gameEngine.getAsteroid(socketPlayer.harpoonTargetId)
+      : undefined;
+    const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
     if (!activated) {
       return;
@@ -492,7 +496,10 @@ export class MessageHandler {
           : {}),
 
         abilityActiveFrames: entity.abilityActiveFrames,
-      },
+        ...(wasArmed && latchedTarget?.boost?.phase === 'burning'
+          ? { boostIgnitionPosition: { ...latchedTarget.position } }
+          : {}),
+      } satisfies AbilityUsedEvent,
       timestamp: sentAt,
     });
     this.broadcaster.broadcastGameState();

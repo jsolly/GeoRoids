@@ -135,7 +135,9 @@
     "tests/integration/browser/e2e/player-collects-orbiting-satellite-pickup.test.ts",
     "src/ui/satelliteInventory.ts",
     "src/ui/shipSchematic.ts",
-    "server/communication/clientCommandDecoder.ts"
+    "server/communication/clientCommandDecoder.ts",
+    "src/audio/satelliteOrbitSound.ts",
+    "src/entities/satellitePickup/SatellitePickup.ts"
   ],
   "terrain": [
     "src/physics/terrain/terrainConfig.ts",
@@ -247,13 +249,19 @@
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts",
     "src/audio/Sound.ts",
     "src/audio/pitch.ts",
+    "src/audio/resourceMusic.ts",
+    "src/audio/feedbackSounds.ts",
+    "src/audio/satelliteOrbitSound.ts",
+    "scripts/generate-sounds.ts",
     "src/audio/interactionSounds.ts",
     "src/audio/destructionSounds.ts",
     "src/audio/splitSound.ts",
     "src/audio/spatialAudio.ts",
     "src/constants/user-preferences.ts",
     "docs/sounds.md",
-    "src/rendering/sectorRenderer.ts"
+    "src/rendering/sectorRenderer.ts",
+    "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts",
+    "src/ui/shipKitSelect.ts"
   ],
   "surveyor": [
     "src/entities/ship/shipKits.ts",

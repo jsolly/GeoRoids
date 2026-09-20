@@ -4,11 +4,11 @@ import {
   playHarpoonLatch,
   playHarpoonLaunch,
   playHarpoonRelease,
-  playLootPickup,
   playOrbitalFire,
   playOrbitalPickup,
   playRespawn,
 } from '../../../src/audio/interactionSounds';
+import { playLootPickup } from '../../../src/audio/resourceMusic';
 import { Sound, setSound } from '../../../src/audio/Sound';
 import { bindGameAudio, resetGameAudio } from '../../../src/audio/spatialAudio';
 import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
@@ -37,6 +37,11 @@ describe('interaction sound cues', () => {
     vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
       played.push(this);
       return Promise.resolve();
+    });
+
+    vi.spyOn(Sound.prototype, 'playNote').mockImplementation(function (this: Sound) {
+      played.push(this);
+      return true;
     });
 
     playHarpoonLaunch(listener);

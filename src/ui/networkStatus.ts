@@ -1,3 +1,4 @@
+import { playFeedback } from '../audio/feedbackSounds';
 import { logger } from '../utils/Logger';
 
 /**
@@ -11,6 +12,7 @@ import { logger } from '../utils/Logger';
 
 const BANNER_ID = 'network-status-banner';
 let initialized = false;
+let lossAnnounced = false;
 
 function getOrCreateBanner(): HTMLElement | null {
   if (typeof document === 'undefined') {
@@ -56,6 +58,7 @@ export function showNetworkBanner(message: string, tone: 'error' | 'reconnect' =
 }
 
 export function hideNetworkBanner(): void {
+  lossAnnounced = false;
   if (typeof document === 'undefined') {
     return;
   }
@@ -94,6 +97,10 @@ export function initNetworkStatusUI(): void {
     logger.warn('NETWORK', 'Displayed disconnect banner', { reason });
   });
   window.addEventListener('networkPermanentlyDisconnected', (event) => {
+    if (!lossAnnounced) {
+      playFeedback('connectionLost');
+      lossAnnounced = true;
+    }
     const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason;
     showNetworkBanner(DISCONNECT_BANNER_TEXT);
     logger.warn('NETWORK', 'Displayed permanent disconnect banner', { reason });

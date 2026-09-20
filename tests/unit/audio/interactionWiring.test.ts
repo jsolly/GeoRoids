@@ -35,3 +35,30 @@ describe('game interaction sound wiring', () => {
     expect(playSpy).not.toHaveBeenCalled();
   });
 });
+
+test('local boost activation, manual release and exhaustion sound once, remote simulation stays quiet', () => {
+  const played: string[] = [];
+  vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+    played.push(this.src);
+  });
+  const ship = new Ship({ kitId: 'hauler' });
+  ship.isLocalPlayer = true;
+  expect(ship.toggleBoost()).toBe(true);
+  expect(ship.toggleBoost()).toBe(false);
+  expect(played).toEqual(['/sounds/boost-start.m4a', '/sounds/boost-end.m4a']);
+  ship.boost = { phase: 'active', charge: 0.0001 };
+  ship.update();
+  ship.update();
+  expect(played).toEqual([
+    '/sounds/boost-start.m4a',
+    '/sounds/boost-end.m4a',
+    '/sounds/boost-end.m4a',
+  ]);
+  ship.boost = { phase: 'exhausted', charge: 0 };
+  expect(ship.toggleBoost()).toBe(false);
+  expect(played).toHaveLength(3);
+  ship.isLocalPlayer = false;
+  ship.boost = { phase: 'idle', charge: 1 };
+  ship.toggleBoost();
+  expect(played).toHaveLength(3);
+});

@@ -4,6 +4,7 @@ import {
   layoutReflectiveCluster,
   seedAsteroidPhenomena,
 } from '../../shared/asteroidPhenomena';
+import { applyColossalDeposit, sectorHostsColossal } from '../../shared/asteroidScale';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, Position } from '../../shared-types';
 import { ROID } from '../../src/constants';
@@ -107,6 +108,7 @@ export class RegionalAsteroidField {
     }
     seedAsteroidPhenomena(rocks);
     this.placeReflectiveClusters(rocks, x, y);
+    this.placeColossalDeposit(rocks, x, y);
     // Phenomenon clusters and the launch-area offset may move a generated
     // slot across an edge. Keep the slot owned by its deterministic sector;
     // later simulation drift is what transfers ownership during checkpointing.
@@ -227,6 +229,21 @@ export class RegionalAsteroidField {
       }
     }
     return changed;
+  }
+
+  /** Resize one ordinary slot; keep collab rocks and pinball clusters intact. */
+  private placeColossalDeposit(rocks: AsteroidData[], x: number, y: number): void {
+    if (!sectorHostsColossal(x, y, this.seed)) {
+      return;
+    }
+    const slot =
+      rocks.find(
+        (rock) =>
+          !rock.isCollabTarget && !rock.phenomenon && rock.velocity.x === 0 && rock.velocity.y === 0
+      ) ?? rocks.find((rock) => !rock.isCollabTarget && !rock.phenomenon);
+    if (slot) {
+      applyColossalDeposit(slot);
+    }
   }
 
   /** Wake newly drifting slots once at startup; never restore missing deposits. */

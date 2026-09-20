@@ -27,7 +27,9 @@ aboard and when the last pilot leaves, so a sudden server crash can lose only
 about the last second of mining, deliveries, and score.
 
 Choose Surveyor for nimble exploration and shared mineral scanning, or Hauler
-for Resource Tap, Tow Cable, Boost Coupling, and stronger mining lasers. Their
+for Resource Tap, Tow Cable, Boost Coupling, and stronger mining lasers. Rare
+colossal deposits need a crew of Haulers or many laser hits before they break
+up. Their
 starting health, handling, shot interval, and ability cooldowns are fixed by
 the kit data; loot changes a living ship's mass and health curve during a
 life, while a respawn resets that growth.

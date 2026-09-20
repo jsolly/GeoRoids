@@ -1,15 +1,31 @@
 ---
 name: Coverage report
+run-name: >-
+  ${{ (github.event_name != 'pull_request' ||
+  (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+  (github.event.action == 'labeled' &&
+   github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && format('{0} validation', github.workflow) || 'Deferred validation' }}
 
 'on':
   workflow_dispatch:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
 
 jobs:
   coverage:
+    name: >-
+      ${{ (github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))) && 'coverage' || 'coverage-deferred' }}
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'labeled' && github.event.pull_request.user.login != 'dependabot[bot]') ||
+      (github.event.action == 'labeled' &&
+       github.event.label.name == format('deps:ci:{0}', github.event.pull_request.head.sha))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

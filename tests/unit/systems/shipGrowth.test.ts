@@ -63,7 +63,7 @@ describe('ship growth math', () => {
     expect(canCollectLoot({ exploding: false, health: 100 })).toBe(true);
     expect(canCollectLoot({ exploding: true, health: 100 })).toBe(false);
     expect(canCollectLoot({ exploding: false, health: 0 })).toBe(false);
-    expect(canCollectLoot({ exploding: false, health: 100, respawnTimer: 10 })).toBe(false);
+    expect(canCollectLoot({ exploding: false, health: 100, overlayHold: true })).toBe(false);
   });
 
   test('loot overlap uses the kit hull radius', () => {

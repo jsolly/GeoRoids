@@ -22,6 +22,7 @@ interface PlayerMovementUpdate {
   boosting?: boolean;
   boostDepleted?: boolean;
   angularVelocity?: number;
+  overlayHold?: boolean;
 }
 
 export type ClientCommand =
@@ -147,6 +148,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawThrusting = fields['thrusting'];
   const rawBoosting = fields['boosting'];
   const rawBoostDepleted = fields['boostDepleted'];
+  const rawOverlayHold = fields['overlayHold'];
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
@@ -163,7 +165,8 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     (rawAngularVelocity !== undefined && angularVelocity === undefined) ||
     (rawThrusting !== undefined && thrusting === undefined) ||
     (rawBoosting !== undefined && boosting === undefined) ||
-    (rawBoostDepleted !== undefined && boostDepleted === undefined)
+    (rawBoostDepleted !== undefined && boostDepleted === undefined) ||
+    (rawOverlayHold !== undefined && typeof rawOverlayHold !== 'boolean')
   ) {
     return invalid('update', !id ? 'Missing player ID' : 'Invalid player movement update');
   }
@@ -176,6 +179,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(boosting !== undefined ? { boosting } : {}),
     ...(boostDepleted !== undefined ? { boostDepleted } : {}),
     ...(angularVelocity !== undefined ? { angularVelocity } : {}),
+    ...(typeof rawOverlayHold === 'boolean' ? { overlayHold: rawOverlayHold } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);
   const motionSequence = readSafeInteger(fields['motionSequence']);

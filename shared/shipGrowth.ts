@@ -123,8 +123,14 @@ export function canCollectLoot(entity: {
   exploding: boolean;
   health: number;
   respawnTimer?: number;
+  overlayHold?: boolean;
 }): boolean {
-  return !entity.exploding && entity.health > 0 && entity.respawnTimer === undefined;
+  return (
+    !entity.exploding &&
+    entity.health > 0 &&
+    entity.respawnTimer === undefined &&
+    entity.overlayHold !== true
+  );
 }
 
 export function lootOverlap(

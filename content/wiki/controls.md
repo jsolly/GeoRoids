@@ -23,10 +23,13 @@ does not repeatedly activate it. On Hauler, E uses the equipped utility from
 the ship schematic. V opens or closes that schematic; Escape, the X control,
 or Return to flight also close it. Firing and E are blocked while it is open.
 The map and schematic hold your ship stationary, including its momentum and
-steering. Closing the menu resumes flight. The world keeps running while a
-menu is open: asteroids and ricochets can still damage or kill your ship, and
-satellite health continues draining. If you lose a life, the menu stays open
-and your respawned ship stays stationary. Losing your last life closes the
+steering. Closing the menu resumes flight and grants the same brief blink
+protection as a respawn, so a rock that drifted over the hull cannot kill you
+immediately. The world keeps running while a
+menu is open: asteroids, ricochets, and the arena wall pass through your ship
+without colliding, and satellite health continues draining. You cannot lose a
+life from world hazards until you return to flight and blink protection ends.
+Losing your last life still closes the
 menu and returns directly to the home screen.
 F is unbound.
 

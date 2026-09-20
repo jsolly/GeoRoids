@@ -50,7 +50,8 @@ A player starts with lives and score. A death decrements one life; the last life
 reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
-spawn protection. Respawns use the nearest furnace to the death location, 180
+spawn protection. Closing the universe map or ship schematic grants that same
+blink window, because rocks can occupy the hull while it is held. Respawns use the nearest furnace to the death location, 180
 world units from its center at a random angle, skipping completed sectors.
 
 After game over, a fresh flight starts with 3 lives and score 0. A brief

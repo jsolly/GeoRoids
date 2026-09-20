@@ -65,9 +65,9 @@ satellite disappears from your inventory and orbit, then respawns healthy as a
 loose pickup after a recovery delay.
 
 It cannot be unequipped to save health or replaced while still active. Opening
-the schematic holds your ship stationary. The world keeps running: your ship
-can still take damage, and the satellite keeps orbiting, scanning, and losing
-health.
+the schematic holds your ship stationary. The world keeps running: asteroids
+pass through the hull without colliding, and the satellite keeps orbiting,
+scanning, and losing health. Closing the schematic blinks the ship briefly.
 
 Death or explicitly leaving the game drops both stored and equipped hardware
 at the ship's last position. A brief connection loss preserves ownership during

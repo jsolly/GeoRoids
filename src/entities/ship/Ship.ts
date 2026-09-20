@@ -316,7 +316,7 @@ class Ship {
   }
 
   takeDamage(amount: number, cause?: string): void {
-    if (this.exploding) {
+    if (this.exploding || this.movementLocked) {
       return;
     }
 

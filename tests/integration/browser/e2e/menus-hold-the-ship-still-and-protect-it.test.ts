@@ -29,7 +29,7 @@ test.each([
     await page.setViewportSize({ width, height: 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'hauler' });
     const id = await game.getLocalPlayerId();
     await arrangeCrewField([id], 'empty');
     await game.waitForAnimationFrames(20);
@@ -63,7 +63,6 @@ test.each([
           velocity: { ...ship.velocity },
           angle: ship.angle,
           thrusting: ship.thrusting,
-          blinkCount: ship.blinkCount,
           movementLocked: ship.movementLocked,
         };
       });
@@ -104,7 +103,9 @@ test.each([
     });
     await page.keyboard.press('Escape');
     await expect.poll(() => dialog.isVisible()).toBe(false);
-    await expect.poll(async () => (await pose()).blinkCount).toBeGreaterThan(0);
+    await expect
+      .poll(() => page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.blinkCount ?? 0))
+      .toBeGreaterThan(0);
     expect((await pose()).movementLocked).toBe(false);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`blink-return-${menu}-${width}.png`),

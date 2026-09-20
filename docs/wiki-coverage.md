@@ -16,7 +16,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection, armed coupling and finite powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no terrain damage |
-| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
+| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
@@ -26,7 +26,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
-| What happens to my ship while the map or schematic is open? | controls, satellites, combat-survival | InputManager.ts, shipUtils.ts, GameEngine overlay hold, combat immunity tests |
+| What happens to my ship while the map or schematic is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, GameEngine overlay hold, combat immunity tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |

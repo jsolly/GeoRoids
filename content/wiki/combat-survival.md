@@ -43,6 +43,9 @@ configured laser hit times its energy and is consumed on the first live hull it
 meets. The boundary destroys a vulnerable ship on contact, even at full health;
 asteroids bounce back into the world. Untowed asteroids pass through each other;
 only towed cargo turns an asteroid-to-asteroid overlap into a collision break.
+While the universe map or ship schematic is open, asteroid impacts, ricochets,
+and the boundary pass through the held hull. Closing the overlay grants the same
+blink window as a respawn.
 
 ## Lives and respawn
 

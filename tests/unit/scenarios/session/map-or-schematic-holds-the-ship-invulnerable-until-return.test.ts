@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { DAMAGE, GAME, SHIP } from '../../../../src/constants';
 import {
+  EXPLOSION_FRAMES,
   GameServerWorld,
   type Pilot,
   SPAWN_PROTECTION_FRAMES,
@@ -78,5 +79,27 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health - DAMAGE.ASTEROID_COLLISION);
     expect(world.entity(ace).lives).toBe(GAME.START_LIVES);
+  });
+
+  test('a hold latched during explosion does not freeze or extra-blink the next life', () => {
+    world.hitBoundary(ace);
+    expect(world.entity(ace).exploding).toBe(true);
+    sendHold(true);
+    expect(world.entity(ace).overlayHold).toBe(true);
+
+    sendHold(false);
+    expect(world.entity(ace).overlayHold).toBe(false);
+    expect(world.entity(ace).spawnProtectionTimer).toBeUndefined();
+
+    sendHold(true);
+    expect(world.entity(ace).overlayHold).toBe(true);
+
+    world.tick(EXPLOSION_FRAMES);
+    const revived = world.entity(ace);
+    expect(revived.exploding).toBe(false);
+    expect(revived.overlayHold).toBeUndefined();
+    expect(revived.health).toBe(revived.maxHealth);
+    expect(revived.spawnProtectionTimer).toBeGreaterThanOrEqual(SPAWN_PROTECTION_FRAMES - 2);
+    expect(revived.spawnProtectionTimer).toBeLessThanOrEqual(SPAWN_PROTECTION_FRAMES);
   });
 });

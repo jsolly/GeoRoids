@@ -29,8 +29,6 @@ immediately. The world keeps running while a
 menu is open: asteroids, ricochets, and the arena wall pass through your ship
 without colliding, and satellite health continues draining. You cannot lose a
 life from world hazards until you return to flight and blink protection ends.
-Losing your last life still closes the
-menu and returns directly to the home screen.
 F is unbound.
 
 Your kit, mass, and terrain affect acceleration and speed. Surveyor and Hauler

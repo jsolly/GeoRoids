@@ -14,6 +14,7 @@ import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { Roid } from '../../../src/entities/roid/Roid';
 import { SatellitePickupManager } from '../../../src/entities/satellitePickup/SatellitePickupManager';
 import { publishHarpoonField } from '../../../src/entities/ship/harpoonField';
+import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { resetControlSources } from '../../../src/input/controlSources';
 import { keyDown, keyUp } from '../../../src/input/keybindings';
 import { handleMouseDown, handleMouseUp } from '../../../src/input/mouse';
@@ -1038,6 +1039,56 @@ describe('actual ConnectionManager WebSocket message path', () => {
     expect(player.ship.harpoonTargetId).toBeNull();
     expect(player.ship.harpoonLatchPos).toBeUndefined();
     expect(player.ship.abilityActiveFrames).toBe(0);
+  });
+
+  test('a stale snapshot does not clear a predicted Mineral Scan cooldown', async () => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    const zero = captureSnapshot(snapshotFixture());
+    const zeroEntity = zero.entities[0];
+    assert.ok(zeroEntity, 'zero snapshot entity');
+    zeroEntity.id = manager.getClientId();
+    zeroEntity.kitId = 'surveyor';
+    zeroEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
+    player.ship.surveyorUtility = 'mineral_scan';
+    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.surveyor;
+    const stale = captureSnapshot(zero);
+    const staleEntity = stale.entities[0];
+    assert.ok(staleEntity, 'stale snapshot entity');
+    staleEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(stale).encode(2));
+    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor);
+    const echoed = captureSnapshot(stale);
+    const echoedEntity = echoed.entities[0];
+    assert.ok(echoedEntity, 'echoed snapshot entity');
+    echoedEntity.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.surveyor - 4;
+    ws.receive('snapshot', new SnapshotEncoder(echoed).encode(3));
+    expect(player.ship.abilityCooldownFrames).toBe(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor - 4);
+  });
+
+  test('a probe miss snapshot keeps the Surveyor ability ready', async () => {
+    const player = entityFactory.createLocalPlayer('Runtime pilot', { x: 500, y: 100 }, 'surveyor');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    const zero = captureSnapshot(snapshotFixture());
+    const zeroEntity = zero.entities[0];
+    assert.ok(zeroEntity, 'zero snapshot entity');
+    zeroEntity.id = manager.getClientId();
+    zeroEntity.kitId = 'surveyor';
+    zeroEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(zero).encode(1));
+    player.ship.surveyorUtility = 'survey_probe';
+    player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.surveyor;
+    const miss = captureSnapshot(zero);
+    const missEntity = miss.entities[0];
+    assert.ok(missEntity, 'miss snapshot entity');
+    missEntity.abilityCooldownFrames = 0;
+    ws.receive('snapshot', new SnapshotEncoder(miss).encode(2));
+    expect(player.ship.abilityCooldownFrames).toBe(0);
   });
 
   test('unacked Hauler tow survives an empty-belt snapshot while the held rock remains', async () => {

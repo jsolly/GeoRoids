@@ -1,5 +1,5 @@
 {
-  "note": "Merged main title-menu chrome (#635). Re-reviewed controls, HUD, hauler, surveyor, and satellites for the desktop Schematic button, hidden-on-touch rule, and touch-only join hold hint. Title menu stacked toggles unchanged by this branch. No demonstration GIFs changed.",
+  "note": "Inspected Surveyor cooldown after snapshot apply: Mineral Scan keeps its predicted cooling until the server echo; a Survey Probe miss still applies snapshot 0 so the tool stays ready, matching surveyor.md. Controls/HUD/schematic join-hint copy unchanged. No demonstration GIFs changed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -200,7 +200,7 @@
     "src/input/touchAbility.ts": "sha256:75d65801b668cdffd49637ab8273da44c95632f19fddb4cba07aca609af9ae8c",
     "src/input/touchControls.ts": "sha256:5eb3171c8b2b8a01fa9902b4023c92497a286ff1af973ca9de48ac7552265575",
     "src/network/networkManager.ts": "sha256:61c32b7fd804d836a5fd7cc02e545e319c126458068cd7fdae217ecf25a98942",
-    "src/network/services/ConnectionManager.ts": "sha256:c2ec7d9bc583a0c5dce87564c4611502aeca84bcdabb0d97d2a0a3bec2737be0",
+    "src/network/services/ConnectionManager.ts": "sha256:eca5d555aa526708f5d3cdcfe728baf98cc1a16cd0b52abd91b0ff35b1c7234c",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:6b295647a937231f7fd8f982536ab6d515439514249f2127c243a164dca15fe7",
     "src/network/services/asteroidFieldSync.ts": "sha256:1f2714173c82f4ac71319db694f3d4ed2ffc2bfe8dc4557e1be4e17230754d12",
     "src/network/services/clientIdentity.ts": "sha256:8decf593a00a1a4e60c20352eff0ba3817ae93dd87349c9a78415284babe62ab",
@@ -314,7 +314,7 @@
     "tests/integration/browser/sanity/pilots-see-mostly-drifting-rocks-at-varied-speeds.test.ts": "sha256:6209e7e45b2449473606b09039ff6e325e90507a36e6a864384f914b0343b725",
     "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts": "sha256:a0b2108977f4054c2488f30fb5e0694ee4b6642e4f368ef8b953c7d0b9f1befa",
     "tests/integration/browser/sanity/surveyor-radar-pulses-cover-the-viewport.test.ts": "sha256:f4a5b1ee0d449de7f28b415d24349a7f5c0122779485eae9aeb258ef1abbe27b",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:eb60b439ca3538a790668c7d11bd822097623208c602bee40866762c9114afc4",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:f5c45e127dc92c2810cf321a52778b981d9cfde041df4eb2cfb0f7c6e8ad21d9",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:5060ce2c60253186525b6ac7aa1aa7c222f80db034f6d8b3023a43eac0610016",
     "tests/integration/entities/input/mouse.test.ts": "sha256:13cdacd658260eb109b4cdb8a7f133aa3ff40a849a045c9716745619195340ee",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:2bdcb0c6395f2907783226e50fe3489f1edd5ab6e91ac9c96c8fe14784df031d",

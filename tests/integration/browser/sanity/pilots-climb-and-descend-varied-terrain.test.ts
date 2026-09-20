@@ -94,7 +94,7 @@ function readTerrain(page: Page): Promise<{
     }
     return {
       peak: gc.getTerrainProbe({ x: 0, y: 0 }),
-      slope: gc.getTerrainProbe({ x: 2250, y: 0 }),
+      slope: gc.getTerrainProbe({ x: -2200, y: 650 }),
       rim: gc.getTerrainProbe({ x: rimX + 1, y: 0 }),
     };
   }, WORLD.radius);
@@ -140,7 +140,7 @@ for (const viewport of [
       expect(terrain.rim.height).toBe(0);
       expect(terrain.slope.gradient.x).toBeGreaterThan(0.002);
 
-      await game.placeShipAt(2250, 0);
+      await game.placeShipAt(-2200, 650);
       await game.armSpawnProtection();
       await page.evaluate((heading) => {
         const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -166,7 +166,9 @@ for (const viewport of [
         .poll(
           () => {
             const position = authoritative.getPosition(localPlayerId);
-            return position ? Math.hypot(position.x - 2250, position.y) : Number.POSITIVE_INFINITY;
+            return position
+              ? Math.hypot(position.x + 2200, position.y - 650)
+              : Number.POSITIVE_INFINITY;
           },
           { timeout: 5000, interval: 50 }
         )
@@ -248,12 +250,12 @@ for (const viewport of [
     if (downhill === undefined || uphill === undefined) {
       throw new Error('Both local directions must be measured');
     }
-    expect(downhill).toBeGreaterThan(uphill * 1.08);
+    expect(downhill).toBeGreaterThan(uphill * 2.5);
 
     const [authoritativeDownhill, authoritativeUphill] = authoritativeSpeeds;
     if (authoritativeDownhill === undefined || authoritativeUphill === undefined) {
       throw new Error('Both authoritative directions must be measured');
     }
-    expect(authoritativeDownhill).toBeGreaterThan(authoritativeUphill * 1.08);
+    expect(authoritativeDownhill).toBeGreaterThan(authoritativeUphill * 2.5);
   });
 }

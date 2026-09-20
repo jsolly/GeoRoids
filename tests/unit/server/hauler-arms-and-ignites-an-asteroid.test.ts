@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { ASTEROID_BOOST } from '../../../shared/asteroidBoost';
+import { AsteroidManager } from '../../../server/core/AsteroidManager';
+import { RNGService } from '../../../server/core/RNGService';
+import { ASTEROID_BOOST, furnaceHeading } from '../../../shared/asteroidBoost';
+import { furnaceReward, nearestFurnace } from '../../../shared/furnaces';
 import { validateAsteroidDto } from '../../../shared/snapshotDto';
 import type { AsteroidData, HaulerUtilityId } from '../../../shared-types';
 import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
@@ -12,7 +15,7 @@ import {
 
 useQuietServerConsole();
 
-describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', () => {
+describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery', () => {
   let world: GameServerWorld;
   let alice: Pilot;
   let bob: Pilot;
@@ -68,10 +71,14 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
   });
   afterEach(() => world.dispose());
 
-  test('arming does not thrust; ignition survives steering and departure, then both clients clear the exhausted burn', () => {
+  test('arming aims at the furnace; ignition survives departure and rewards its owner exactly once', () => {
     activate(alice);
     step(5);
-    expect(rock.boost).toEqual({ phase: 'armed', ownerId: alice.id, angle: 0 });
+    expect(rock.boost).toEqual({
+      phase: 'armed',
+      ownerId: alice.id,
+      angle: furnaceHeading(rock.position),
+    });
     expect(rock.velocity).toEqual({ x: 0, y: 0 });
     expect(rock.position).toEqual({ x: 150, y: 0 });
     expect(snapshotRock(bob).boost).toEqual(rock.boost);
@@ -79,7 +86,12 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
     activate(alice);
     expect(world.entity(alice).harpoonTargetId).toBeNull();
     expect(world.entity(alice).abilityCooldownFrames).toBe(180);
-    expect(rock.boost).toEqual({ phase: 'burning', angle: 0, remainingFrames: 180 });
+    expect(rock.boost).toEqual({
+      phase: 'burning',
+      ownerId: alice.id,
+      angle: furnaceHeading(rock.position),
+    });
+    const destination = nearestFurnace(rock.position);
     const aliceView = snapshotRock(alice);
     const bobView = snapshotRock(bob);
     expect(bobView.boost).toEqual(aliceView.boost);
@@ -90,22 +102,30 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
     world.engine.removePlayer(alice.id);
     step(1);
     belt.moveRoids();
-    expect(rock.velocity.x).toBeCloseTo(ASTEROID_BOOST.acceleration);
+    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(ASTEROID_BOOST.acceleration);
     expect(local.velocity).toEqual(rock.velocity);
     expect(local.boost).toEqual(rock.boost);
-    expect(bobView.boost).toEqual({ phase: 'burning', angle: 0, remainingFrames: 180 });
+    expect(bobView.boost).toEqual({
+      phase: 'burning',
+      ownerId: alice.id,
+      angle: furnaceHeading(rock.position),
+    });
     step(179);
-    expect(rock.boost).toBeNull();
-    expect(rock.velocity.x).toBeCloseTo(ASTEROID_BOOST.maxSpeed);
-    expect(rock.velocity.y).toBe(0);
-    expect(rock.position.x).toBeGreaterThan(150);
-    expect(rock.health).toBe(75);
-    expect(world.engine.getLoot()).toEqual([]);
-    applyAsteroidKinematics(local, snapshotRock(bob), { complete: true });
-    expect(local.boost).toBeNull();
-    const coast = { ...rock.velocity };
-    step(1);
-    expect(rock.velocity).toEqual(coast);
+    expect(rock.boost?.phase).toBe('burning');
+    for (let frame = 0; frame < 1000 && world.engine.getAsteroid(rock.id); frame++) {
+      step(1);
+    }
+    expect(world.engine.getAsteroid(rock.id)).toBeUndefined();
+    const deliveries = world.engine.drainFurnaceDeliveries();
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.furnaceId).toBe(destination.id);
+    expect(deliveries[0]?.rewards).toEqual([
+      expect.objectContaining({ playerId: alice.id, points: furnaceReward(rock) }),
+    ]);
+    world.engine.processFurnaceDeliveries();
+    expect(world.engine.drainFurnaceDeliveries()).toEqual([]);
+    const resumed = world.resume(alice, { x: 0, y: 0 });
+    expect(world.entity(resumed).score).toBe(furnaceReward(rock));
   });
 
   test.each(['boost_coupling', 'resource_tap', 'tow_cable'] as const)(
@@ -115,7 +135,11 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
       equip(bob, utility);
       activate(bob);
       expect(world.entity(bob).harpoonTargetId).toBeNull();
-      expect(rock.boost).toEqual({ phase: 'armed', ownerId: alice.id, angle: 0 });
+      expect(rock.boost).toEqual({
+        phase: 'armed',
+        ownerId: alice.id,
+        angle: furnaceHeading(rock.position),
+      });
       // The transport must not allow Bob to ignite Alice's coupling by claiming her id.
       world.send(bob, {
         type: 'useAbility',
@@ -170,7 +194,7 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
     expect(world.engine.handleShipDamage(alice.id, 'ricochet', 1000).isDestroyed).toBe(true);
     expect(rock.boost?.phase).toBe('burning');
     step(1);
-    expect(rock.velocity.x).toBeCloseTo(ASTEROID_BOOST.acceleration);
+    expect(Math.hypot(rock.velocity.x, rock.velocity.y)).toBeCloseTo(ASTEROID_BOOST.acceleration);
   });
 
   test('an out-of-range ignition cannot launch the rock before the next lifecycle tick', () => {
@@ -209,7 +233,7 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
     expect(rock.velocity).toEqual({ x: 0, y: 0 });
   });
 
-  test('burn fuel pauses with an empty world and resumes when a pilot returns', () => {
+  test('guidance pauses with an empty world and resumes when a pilot returns', () => {
     activate(alice);
     activate(alice);
     step(10);
@@ -220,16 +244,99 @@ describe('A Hauler arms an asteroid, then sends it on a fixed-direction burn', (
     expect(rock.boost).toEqual(remaining);
     world.join('Carol', { x: 0, y: 0 });
     step(170);
-    expect(rock.boost).toBeNull();
+    expect(rock.boost?.phase).toBe('burning');
   });
+
+  test('ignited cargo passes through a ship and its tow without damaging either', () => {
+    activate(alice);
+    activate(alice);
+    const bobActor = world.entity(bob);
+    equip(bob, 'tow_cable');
+    const towed = { ...rock, id: 'other-cargo', boost: null, position: { x: 0, y: 250 } };
+    world.engine.addAsteroid(towed);
+    activate(bob);
+    expect(bobActor.harpoonTargetId).toBe(towed.id);
+    bobActor.position = { ...rock.position };
+    bobActor.spawnProtectionTimer = 0;
+    towed.position = { ...rock.position };
+    const health = bobActor.health;
+    world.engine.resolveAuthoritativeCombat();
+    expect(bobActor.health).toBe(health);
+    expect(world.engine.getAsteroid(towed.id)).toBe(towed);
+    expect(world.engine.getAsteroid(rock.id)).toBe(rock);
+  });
+
+  test('weapons, direct mining, shockwaves, and new scans cannot affect ignited cargo', () => {
+    activate(alice);
+    activate(alice);
+    rock.isCollabTarget = true;
+    const original = structuredClone(rock);
+    expect(world.engine.applyLaserAsteroidHit(rock.id, bob.id).outcome).toBe('ignored');
+    expect(world.engine.handleAsteroidDamage(rock.id, bob.id).destroyed).toBe(false);
+    const manager = new AsteroidManager(new RNGService(42));
+    manager.addAsteroid(rock);
+    expect(manager.applyRadialImpulse({ x: 140, y: 0 }, 300, 10)).toBe(0);
+    const scout = world.join('Scout', { x: 150, y: 0 });
+    world.engine.useAbility(scout.id);
+    expect(rock).toEqual(original);
+    const laser = world.engine.spawnLaser(bob.id, { x: 100, y: 0 }, { x: 8, y: 0 });
+    expect(laser).toBeTruthy();
+    for (let frame = 0; frame < 15; frame++) {
+      expect(world.engine.advanceLasersAndResolveHits()).toEqual([]);
+    }
+    expect(laser?.hasExploded).toBe(false);
+    expect(laser?.position.x).toBeGreaterThan(rock.position.x + rock.size);
+    expect(rock).toEqual(original);
+  });
+
+  test('a mining tag from before ignition cannot destroy self-guided cargo when it expires', () => {
+    rock.material = 'ice';
+    rock.size = 50;
+    const hitAt = world.engine.getServerTime();
+    expect(world.engine.applyLaserAsteroidHit(rock.id, bob.id, 'laser', hitAt).outcome).toBe(
+      'tagged'
+    );
+    activate(alice);
+    activate(alice);
+    expect(rock.boost?.phase).toBe('burning');
+    world.engine.flushExpiredCollabHits(hitAt + 10000);
+    expect(world.engine.getAsteroid(rock.id)).toBe(rock);
+    expect(world.engine.getLoot()).toEqual([]);
+  });
+
+  test('delivery still pays its original launcher after the launcher loses the last life', () => {
+    activate(alice);
+    activate(alice);
+    world.entity(alice).lives = 0;
+    rock.position = { ...nearestFurnace(rock.position).position };
+    world.engine.processFurnaceDeliveries();
+    expect(world.entity(alice).score).toBe(furnaceReward(rock));
+  });
+
+  test.each(['tow_cable', 'resource_tap'] as const)(
+    'ignition invalidates a stale %s attachment before it can affect cargo',
+    (utility) => {
+      activate(alice);
+      activate(alice);
+      equip(bob, utility);
+      world.entity(bob).harpoonTargetId = rock.id;
+      world.entity(bob).harpoonLatchPos = { ...rock.position };
+      world.entity(bob).tapExtractFrames = 999;
+      const velocity = { ...rock.velocity };
+      world.engine.tickAbilities();
+      expect(world.entity(bob).harpoonTargetId).toBeNull();
+      expect(rock.velocity).toEqual(velocity);
+      expect(world.engine.getLoot()).toEqual([]);
+    }
+  );
 
   test('wire validation rejects malformed or unbounded burn state', () => {
     for (const boost of [
       { phase: 'armed', angle: 0 },
-      { phase: 'burning', angle: Infinity, remainingFrames: 180 },
-      { phase: 'burning', angle: 0, remainingFrames: 0 },
-      { phase: 'burning', angle: 0, remainingFrames: 181 },
-      { phase: 'burning', angle: 0, remainingFrames: 1.5 },
+      { phase: 'burning', ownerId: alice.id, angle: Infinity },
+      { phase: 'burning', angle: 0 },
+      { phase: 'burning', ownerId: 42, angle: 0 },
+      { phase: 'burning', ownerId: alice.id, angle: NaN },
     ]) {
       const candidate = { ...rock, boost };
       expect(() => validateAsteroidDto(candidate)).toThrow();

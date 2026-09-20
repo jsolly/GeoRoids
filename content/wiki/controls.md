@@ -38,8 +38,9 @@ share the same cruise speed. Boost multiplies that cruise and thrust, and
 Surveyor's multiplier is stronger than Hauler's. Each kit page lists its
 handling values. Turns have a capped rate; the arrow ahead of the hull shows
 the current heading. Releasing steering keeps the attained heading and automatic
-thrust. Steering redirects momentum toward the nose; terrain forces and combat
-knockback can still push the ship. W and ArrowUp are unbound.
+thrust. On slopes, your travel direction also includes downhill drift. Steep
+climbs are much slower; descents exceed ordinary cruise and stack with Boost.
+Combat knockback can still push the ship. W and ArrowUp are unbound.
 
 ## Mouse
 

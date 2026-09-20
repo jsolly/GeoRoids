@@ -1,11 +1,14 @@
+import { LOCAL_STORAGE_KEYS } from '../constants/user-preferences';
 import { GameController } from '../core/gameController';
 import { readDebugHudMetrics, shortReleaseId } from '../diagnostics/debugHudMetrics';
 import { getClientReleaseId } from '../utils/buildInfo';
+import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 
 const PAINT_INTERVAL_MS = 250;
 const MISSING = '—';
 
 let lastPaintAt = 0;
+let hudHidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) === 'true';
 
 function setText(id: string, value: string): void {
   const node = document.querySelector(`#${id}`);
@@ -61,7 +64,14 @@ export function syncDebugHudVisibility(): void {
   }
   const debugOn = document.body.classList.contains('debug-on');
   const inPlay = document.body.classList.contains('in-play');
-  setHidden(document.querySelector('#debug-hud'), !(debugOn && inPlay));
+  const available = debugOn && inPlay;
+  setHidden(document.querySelector('#debug-hud'), !available || hudHidden);
+  const toggle = document.querySelector<HTMLButtonElement>('#debug-hud-toggle');
+  if (toggle) {
+    toggle.hidden = !available;
+    setText('debug-hud-toggle', hudHidden ? 'Show HUD' : 'Hide HUD');
+    toggle.setAttribute('aria-expanded', String(!hudHidden));
+  }
 }
 
 export function paintDebugHud(now = performance.now()): void {
@@ -96,11 +106,22 @@ export function paintDebugHud(now = performance.now()): void {
 
 export function resetDebugHudPaintForTests(): void {
   lastPaintAt = 0;
+  hudHidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) === 'true';
 }
 
 export function mountDebugHud(): void {
   if (typeof document === 'undefined') {
     return;
+  }
+  hudHidden = getStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden) === 'true';
+  const toggle = document.querySelector<HTMLButtonElement>('#debug-hud-toggle');
+  if (toggle) {
+    toggle.onclick = () => {
+      hudHidden = !hudHidden;
+      setStoredItem(LOCAL_STORAGE_KEYS.debugHudHidden, String(hudHidden));
+      lastPaintAt = 0;
+      paintDebugHud();
+    };
   }
   syncDebugHudVisibility();
   window.addEventListener('playViewOn', () => {

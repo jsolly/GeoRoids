@@ -192,3 +192,34 @@ test('a saved world from an older generation resets instead of loading depleted 
     store.close();
   }
 });
+
+test('self-guided cargo crosses a completed sector barrier while ordinary rocks stay outside', () => {
+  const engine = new GameEngine(7);
+  try {
+    const center = { x: 5000, y: 1000 };
+    engine.addPlayer('launcher', 'Launcher', new RecordingSocket(), center, 'hauler');
+    engine.ensureAsteroidField();
+    for (const rock of engine.getAllAsteroids()) {
+      if (sectorAt(rock.position).id === '2,0') {
+        engine.removeAsteroid(rock.id);
+      }
+    }
+    engine.revealArea(center, WORLD.sectorSize);
+    expect(engine.evaluateSectorProgress()).toContain('2,0');
+    for (const rock of engine.getAllAsteroids()) {
+      engine.removeAsteroid(rock.id);
+    }
+    const guided = deposit('guided', { x: 3999, y: 400 });
+    guided.velocity = { x: 2.5, y: 0 };
+    guided.boost = { phase: 'burning', ownerId: 'launcher', angle: 0 };
+    const loose = deposit('loose', { x: 3999, y: 800 });
+    loose.velocity = { x: 2.5, y: 0 };
+    engine.addAsteroid(guided);
+    engine.addAsteroid(loose);
+    engine.advanceOneFrame();
+    expect(guided.position.x).toBeGreaterThan(4000);
+    expect(loose.position.x).toBeLessThan(4000);
+  } finally {
+    engine.stopGameLoop();
+  }
+});

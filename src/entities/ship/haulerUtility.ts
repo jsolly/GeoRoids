@@ -15,7 +15,7 @@ export const HAULER_UTILITY = {
     id: 'boost_coupling',
     name: 'Boost Coupling',
     hint: 'Tap to equip',
-    copy: 'Aim; E or ARM locks heading. E or IGNITE launches a 3-second burn. Swap tools to cancel before ignition.',
+    copy: 'E or ARM aims at the nearest furnace. E or IGNITE launches self-guided delivery and earns you points. Swap tools to cancel before ignition.',
   },
   resource_tap: {
     id: 'resource_tap',

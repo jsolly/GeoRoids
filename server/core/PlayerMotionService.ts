@@ -9,6 +9,8 @@ import type { PlayerMotionState, Position } from '../../shared-types';
 import { GAME } from '../../src/constants';
 import { getShipKit, hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
+import { TERRAIN } from '../../src/physics/terrain/terrainConfig';
+import { terrainSpeedLimit } from '../../src/physics/terrain/terrainTravel';
 import type { GameEntity } from './EntityManager';
 
 /** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
@@ -153,10 +155,14 @@ export class PlayerMotionService {
   public legalSpeed(
     actor: GameEntity,
     now: number,
-    boosting = actor.boost.phase === 'active'
+    boosting = actor.boost.phase === 'active',
+    position = actor.position
   ): number {
     const kit = getShipKit(actor.kitId);
-    const normal = cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1);
+    const normal = terrainSpeedLimit(
+      position,
+      cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1)
+    );
     const impulse = this.sessions.get(actor.id)?.knockback;
     if (!impulse) {
       return normal;
@@ -167,6 +173,20 @@ export class PlayerMotionService {
       ((now - impulse.at) * GAME.FPS) / 1000 - PLAYER_MOTION.poseLeadFrames
     );
     return Math.max(normal, impulse.speed * PLAYER_MOTION.knockbackRetention ** elapsedFrames);
+  }
+
+  /** Buffered travel may cross steeper ground before its final reported pose. */
+  public maximumTravelSpeed(
+    actor: GameEntity,
+    now: number,
+    boosting = actor.boost.phase === 'active'
+  ): number {
+    const kit = getShipKit(actor.kitId);
+    return Math.max(
+      this.legalSpeed(actor, now, boosting),
+      cruiseSpeed(actor.mass, kit.maxVelocity, boosting ? kit.boostMultiplier : 1) *
+        (1 + TERRAIN.DESCENT_SPEED_BONUS)
+    );
   }
 
   private owner(socket: WebSocket): Session | undefined {
@@ -214,7 +234,7 @@ export class PlayerMotionService {
       poseSequence: -1,
       anchorAt: now,
       poseAt: now,
-      poseCredit: this.legalSpeed(actor, now) * PLAYER_MOTION.poseLeadFrames,
+      poseCredit: this.maximumTravelSpeed(actor, now) * PLAYER_MOTION.poseLeadFrames,
       burstCredit: 0,
       burstAt: now,
       wasAlive: true,
@@ -327,7 +347,7 @@ export class PlayerMotionService {
     session.poseAt = now;
     session.poseCredit = Math.min(
       poseCredit ?? Number.POSITIVE_INFINITY,
-      speed * PLAYER_MOTION.poseLeadFrames
+      this.maximumTravelSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames
     );
     session.burstCredit = 0;
     session.burstAt = now;
@@ -469,7 +489,20 @@ export class PlayerMotionService {
     } else if (!session.boostRequested) {
       startShipBoost(candidate);
     }
-    const speed = this.legalSpeed(session.actor, now, candidate.phase === 'active');
+    // The client samples terrain before its final movement step. Include that
+    // point and the last accepted position so downhill exits and turns do not
+    // trigger a correction; displacement is still bounded by server-time credit.
+    const speed = Math.max(
+      this.legalSpeed(session.actor, now, candidate.phase === 'active'),
+      this.legalSpeed(session.actor, now, candidate.phase === 'active', {
+        x: pose.position.x - pose.velocity.x,
+        y: pose.position.y - pose.velocity.y,
+      })
+    );
+    // Use the fastest legal terrain travel for elapsed distance credit. A local
+    // endpoint slope cannot bound a buffered route across hills and valleys.
+    // Velocity itself still uses the local ceiling above.
+    const travelSpeed = this.maximumTravelSpeed(session.actor, now, candidate.phase === 'active');
     const elapsedMs = now - session.poseAt;
     // Client silence is capped at the client's own bounded catch-up so it
     // cannot bank an arbitrary jump. Time the server loop spent blocked is
@@ -484,14 +517,14 @@ export class PlayerMotionService {
     }
     // Spend elapsed travel before capping unused jitter credit. Capping first
     // rejects ordinary flight whenever updates are more than 150 ms apart.
-    const credit = session.poseCredit + session.burstCredit + elapsedFrames * speed;
+    const credit = session.poseCredit + session.burstCredit + elapsedFrames * travelSpeed;
     const velocity = Math.hypot(pose.velocity.x, pose.velocity.y);
     const displacement = Math.hypot(
       pose.position.x - session.actor.position.x,
       pose.position.y - session.actor.position.y
     );
     const anchorReach =
-      (speed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
+      (travelSpeed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
     const hullRadius = hullRadiusForKit(session.actor.kitId, session.actor.mass);
     const failed = this.failedEnvelopeCheck(session, pose, {
       speed,
@@ -506,7 +539,7 @@ export class PlayerMotionService {
       // A fresh epoch makes the client adopt the last accepted pose. Preserve
       // the earned budget so rejected commands cannot mint more movement credit.
       const mode = session.mode;
-      this.handoff(session, now, Math.min(speed * PLAYER_MOTION.poseLeadFrames, credit));
+      this.handoff(session, now, Math.min(travelSpeed * PLAYER_MOTION.poseLeadFrames, credit));
       return {
         ok: false,
         error: 'Enhanced movement exceeds its server-time envelope',
@@ -523,14 +556,17 @@ export class PlayerMotionService {
       };
     }
     const remaining = Math.max(0, credit - displacement);
-    session.poseCredit = Math.min(speed * PLAYER_MOTION.poseLeadFrames, remaining);
+    session.poseCredit = Math.min(travelSpeed * PLAYER_MOTION.poseLeadFrames, remaining);
     // Buffered poses released together all arrive with zero elapsed time, so
     // the first one must not be the only pose able to spend the gap they were
     // held for. Excess above the lead stays for one jitter window and its clock
     // starts when the excess first appears. Growth is bounded by the client's
     // catch-up plus any blocked server time this pose was credited; a reserve
     // already earned carries over until it is spent or expires.
-    const reserveCap = Math.max(session.burstCredit, speed * (MAX_CATCH_UP_TICKS + blockedFrames));
+    const reserveCap = Math.max(
+      session.burstCredit,
+      travelSpeed * (MAX_CATCH_UP_TICKS + blockedFrames)
+    );
     const excess = Math.min(reserveCap, remaining - session.poseCredit);
     if (session.burstCredit <= 0 && excess > 0) {
       session.burstAt = now;
@@ -568,7 +604,7 @@ export class PlayerMotionService {
     session.anchor = undefined;
     session.poseAt = now;
     session.anchorAt = now;
-    session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
+    session.poseCredit = this.maximumTravelSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
     session.burstCredit = 0;
     session.burstAt = now;
     this.publish(session);
@@ -592,7 +628,7 @@ export class PlayerMotionService {
     session.anchor = undefined;
     session.poseAt = now;
     session.anchorAt = now;
-    session.poseCredit = this.legalSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
+    session.poseCredit = this.maximumTravelSpeed(session.actor, now) * PLAYER_MOTION.poseLeadFrames;
     session.burstCredit = 0;
     session.burstAt = now;
     session.actor.position = { ...position };

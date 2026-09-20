@@ -1,4 +1,4 @@
-import { ASTEROID_BOOST } from '../../../shared/asteroidBoost';
+import { furnaceHeading } from '../../../shared/asteroidBoost';
 import type {
   AsteroidBoost,
   HaulerUtilityId,
@@ -350,8 +350,8 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       ) {
         target.boost = {
           phase: 'burning',
-          angle: target.boost.angle,
-          remainingFrames: ASTEROID_BOOST.burnFrames,
+          angle: furnaceHeading(target.position),
+          ownerId: target.boost.ownerId,
         };
         host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
       } else if (world) {
@@ -393,7 +393,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       if (!host.id) {
         return { activated: false };
       }
-      target.boost = { phase: 'armed', ownerId: host.id, angle: host.angle };
+      target.boost = { phase: 'armed', ownerId: host.id, angle: furnaceHeading(target.position) };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;

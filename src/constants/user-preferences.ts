@@ -3,6 +3,7 @@ import { getStoredItem, setStoredItem } from '../utils/safeStorage';
 export const LOCAL_STORAGE_KEYS = {
   soundOn: 'soundOn',
   debugOn: 'debugOn',
+  debugHudHidden: 'debugHudHidden',
 };
 
 /* Preferences from Localstorage */

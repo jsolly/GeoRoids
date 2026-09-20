@@ -156,12 +156,16 @@ test('two pilots see a depleted belt stay empty without sending asteroid initial
 test('a pilot briefly disconnects and resumes the same live field while its peer keeps playing', async () => {
   const first = await join('rejoin-pilot-a');
   await join('rejoin-pilot-b');
-  const localIds = nearbyWorldRows(
+  const originalIds = new Set(server.gameEngine.getAllAsteroids().map((rock) => rock.id));
+  const stationaryIds = nearbyWorldRows(
     server.gameEngine.getAllAsteroids(),
     server.gameEngine.getPlayer('rejoin-pilot-a')?.position ?? { x: 0, y: 0 }
   )
-    .map((asteroid) => asteroid.id)
-    .sort((left, right) => left.localeCompare(right));
+    .filter((asteroid) => asteroid.velocity.x === 0 && asteroid.velocity.y === 0)
+    .map((asteroid) => asteroid.id);
+  const harvested = stationaryIds.pop();
+  assert(harvested);
+  server.gameEngine.removeAsteroid(harvested);
   const token = resumeTokens.get(first);
   assert(token);
   await first.close();
@@ -170,7 +174,12 @@ test('a pilot briefly disconnects and resumes the same live field while its peer
   const rejoined = await join('rejoin-pilot-a', token);
   const response = waitForMessage(rejoined, (message) => message.type === 'asteroidCreateBatch');
   rejoined.send({ type: 'initAsteroids', id: 'rejoin-pilot-a', data: { asteroidCount: 999999 } });
-  expect(asteroidIds(await response)).toEqual(localIds);
+  // Drifters may cross the view boundary during the disconnect. Stationary
+  // targets remain visible, while mined IDs and newly initialized ore do not.
+  const returnedIds = asteroidIds(await response);
+  expect(returnedIds).toEqual(expect.arrayContaining(stationaryIds));
+  expect(returnedIds).not.toContain(harvested);
+  expect(returnedIds.every((id) => originalIds.has(id))).toBe(true);
   expect(server.gameEngine.isGamePaused()).toBe(false);
   expect(server.gameEngine.getPlayerCount()).toBe(2);
 });

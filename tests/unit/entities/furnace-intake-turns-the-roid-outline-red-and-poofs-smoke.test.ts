@@ -1,10 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import process from 'node:process';
 import { afterEach, expect, test, vi } from 'vitest';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { entityFactory } from '../../../src/entities/EntityFactory';
 import { Roid } from '../../../src/entities/roid/Roid';
 import {
   clearAsteroidShatters,
-  drawRoidsRelative,
+  drawAsteroidShatterBursts,
   markFurnaceAsteroidShatter,
   recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
@@ -123,7 +126,7 @@ test('furnace intake shatters the rock in danger-red with a short smoke poof ins
   const strokes = recordStrokes(ctx);
   const fill = vi.spyOn(ctx, 'fill');
 
-  drawRoidsRelative(pilot.ship, []);
+  drawAsteroidShatterBursts(pilot.ship);
 
   ctx.strokeStyle = PALETTE.DANGER;
   const danger = ctx.strokeStyle;
@@ -151,7 +154,7 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
   recordAsteroidShatter(pending, 2000);
   const strokes = recordStrokes(ctx);
 
-  drawRoidsRelative(pilot.ship, []);
+  drawAsteroidShatterBursts(pilot.ship);
 
   ctx.strokeStyle = PALETTE.ROID;
   const slate = ctx.strokeStyle;
@@ -161,7 +164,7 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
 
   markFurnaceAsteroidShatter(pending.id);
   strokes.length = 0;
-  drawRoidsRelative(pilot.ship, []);
+  drawAsteroidShatterBursts(pilot.ship);
 
   ctx.strokeStyle = PALETTE.DANGER;
   const danger = ctx.strokeStyle;
@@ -170,4 +173,16 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
   expect(edges).toHaveLength(4);
   expect(edges.map((path) => path.style)).toEqual([danger, danger, danger, danger]);
   expect(wisps).toHaveLength(VISUAL.ROID_FURNACE_SMOKE_WISPS);
+});
+
+test('the playfield still paints a furnace poof after the last rock leaves the belt', () => {
+  const playfield = readFileSync(resolve(process.cwd(), 'src/rendering/canvas.ts'), 'utf8');
+  const rocks = playfield.indexOf('drawRoidsRelative(currShip, roids);');
+  const emptyBelt = playfield.indexOf('if (roids.length > 0)');
+  const hearth = playfield.indexOf('drawFurnacesRelative(currShip.position);');
+  const poof = playfield.indexOf('drawAsteroidShatterBursts(currShip);');
+  expect(rocks).toBeGreaterThan(-1);
+  expect(emptyBelt).toBeGreaterThan(rocks);
+  expect(hearth).toBeGreaterThan(emptyBelt);
+  expect(poof).toBeGreaterThan(hearth);
 });

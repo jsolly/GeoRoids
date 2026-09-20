@@ -384,6 +384,22 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
     drawRoidInteractionCues(ctx, roid, r, screenPos.x, screenPos.y);
     drawAsteroidBoost(ctx, roid, screenPos.x, screenPos.y, r);
   }
+  ctx.shadowBlur = 0;
+}
+
+/** Paint in-flight breaks after hearths so a last-rock furnace poof stays readable. */
+export function drawAsteroidShatterBursts(ship: Ship): void {
+  const ctx = canvasManager.getContext();
+  const cvs = canvasManager.getCanvas();
+  if (!ctx) {
+    return;
+  }
+
+  const scale = canvasManager.getPlayfieldScale();
+  const viewport = cvs ? canvasManager.getViewportSize() : undefined;
+  const viewW = viewport?.width ?? Number.POSITIVE_INFINITY;
+  const viewH = viewport?.height ?? Number.POSITIVE_INFINITY;
+  const now = performance.now();
 
   for (let i = shatterBursts.length - 1; i >= 0; i--) {
     const burst = shatterBursts[i];

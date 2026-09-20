@@ -5,6 +5,7 @@ import { Roid } from '../../../src/entities/roid/Roid';
 import {
   canDrawAsteroid,
   clearAsteroidShatters,
+  drawAsteroidShatterBursts,
   drawRoidsRelative,
   recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
@@ -126,6 +127,7 @@ test('a destroyed asteroid shatters without its silhouette while a nearby empty-
   const strokes = recordStrokes(ctx);
 
   drawRoidsRelative(pilot.ship, [normal]);
+  drawAsteroidShatterBursts(pilot.ship);
 
   const silhouettes = strokes.filter((path) => path.closed);
   expect(silhouettes).toHaveLength(2); // Glow and crisp passes of the identified normal rock.
@@ -173,6 +175,7 @@ test('a destroyed asteroid shatters without its silhouette while a nearby empty-
   outlines.mockClear();
   strokes.length = 0;
   drawRoidsRelative(pilot.ship, [normal]);
+  drawAsteroidShatterBursts(pilot.ship);
   expect(strokes).toEqual(silhouettes);
   expect(outlines.mock.calls.map(([x, y]) => [x, y])).toEqual([[280, 210]]);
 });

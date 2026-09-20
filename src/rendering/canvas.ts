@@ -4,7 +4,7 @@ import { LootField } from '../entities/loot/LootField';
 import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
 import type { RoidBelt } from '../entities/roid/Roid';
-import { drawRoidsRelative } from '../entities/roid/roidRenderer';
+import { drawAsteroidShatterBursts, drawRoidsRelative } from '../entities/roid/roidRenderer';
 import { drawSurveyProbes } from '../entities/roid/surveyProbeRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
@@ -93,11 +93,12 @@ export function drawGame(
   drawFieryBoundary(currShip.position);
   drawSectorBoundaries(currShip.position);
 
+  drawRoidsRelative(currShip, roids);
   if (roids.length > 0) {
-    drawRoidsRelative(currShip, roids);
     drawSurveyProbes(roids, currShip.position);
   }
   drawFurnacesRelative(currShip.position);
+  drawAsteroidShatterBursts(currShip);
 
   const loot = LootField.getInstance().getAll();
   const satellitePickups = SatellitePickupManager.getInstance().getAll();

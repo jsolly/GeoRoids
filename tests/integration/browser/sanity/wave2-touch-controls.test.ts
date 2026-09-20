@@ -163,6 +163,12 @@ test(
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await page.waitForFunction(
+      () =>
+        document.body.classList.contains('touch-play') &&
+        !document.querySelector<HTMLElement>('#touch-controls')?.hidden,
+      { timeout: 5000 }
+    );
     const steerPoint = await canvasPoint(page, 0.75, 0.5);
     const actionPoint = await centerOf(page, '#touch-ability');
     const session = await page.context().newCDPSession(page);

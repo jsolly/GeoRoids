@@ -1408,13 +1408,25 @@ export class ConnectionManager {
         if (entity.type !== 'local') {
           entityData.kitId ??= DEFAULT_SHIP_KIT_ID;
         }
-        entity.ship.abilityCooldownFrames = entityData.abilityCooldownFrames ?? 0;
         const snapshotUtility =
           entity.type === 'local'
             ? surveyorUtilityOf(entity.ship)
             : (entityData.surveyorUtility ?? surveyorUtilityOf(entity.ship));
         const surveyorProbeSelected =
           entity.ship.kitId === 'surveyor' && snapshotUtility === 'survey_probe';
+        const serverCooldown = entityData.abilityCooldownFrames ?? 0;
+        // Mineral Scan predicts its cooldown on send. A snapshot that still
+        // reads 0 must not clear that timer before the server echo. Probe
+        // misses stay at 0 on the server and must remain usable.
+        if (
+          entity.type !== 'local' ||
+          entity.ship.kitId !== 'surveyor' ||
+          surveyorProbeSelected ||
+          serverCooldown > 0 ||
+          entity.ship.abilityCooldownFrames <= 0
+        ) {
+          entity.ship.abilityCooldownFrames = serverCooldown;
+        }
         entity.ship.abilityActiveFrames = surveyorProbeSelected
           ? 0
           : (entityData.abilityActiveFrames ?? 0);

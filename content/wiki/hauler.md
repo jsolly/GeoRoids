@@ -20,8 +20,8 @@ media:
 Hauler is the U-shaped cargo yoke with twin forward towers and two engine
 bells. On the playfield it is about twice Surveyor's linear hull size, so the
 barge reads as a real tug next to the scout. Draw scale, collision, and
-utility latch range share that hull. It has one utility slot. Open the ship schematic with V on desktop, or
-press and hold your own hull on touch, to swap **Resource Tap**, **Tow
+utility latch range share that hull. It has one utility slot. Open the ship schematic with V or the Schematic button
+on desktop, or press and hold your own hull on touch, to swap **Resource Tap**, **Tow
 Cable**, and **Boost Coupling**. Equip is immediate. E still fires the equipped tool; there is no
 second ability key. Other pilots cannot open your schematic.
 
@@ -140,7 +140,8 @@ remains unchanged. Lasers mine asteroids only; they cannot damage teammates.
 ## Satellite inventory
 
 Loose satellites enter your ship inventory when collected. Open the schematic
-with V or press and hold your hull on touch, then choose Equip. One satellite
+with V or the Schematic button on desktop, or press and hold your hull on
+touch, then choose Equip. One satellite
 orbits at a time, identifying nearby asteroids until its health runs out.
 Health drains with time and damage; stored satellites preserve their health. This uses a separate equipment
 slot and leaves your core ability available.

@@ -165,4 +165,44 @@ describe('Hauler ship schematic overlay', () => {
     expect(looped.rockX).toBe(turning.rockX);
     expect(looped.rockAngle).toBe(turning.rockAngle);
   });
+
+  test('the desktop Schematic button shows V and opens the overlay', () => {
+    const toggle = document.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.toggle}`);
+    expect(toggle).toBeInstanceOf(HTMLButtonElement);
+    expect(toggle?.hidden).toBe(false);
+    expect(toggle?.getAttribute('aria-keyshortcuts')).toBe('V');
+    expect(toggle?.querySelector('kbd')?.textContent).toBe('V');
+    expect(toggle?.textContent).toMatch(/Schematic/u);
+    const map = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`);
+    expect(toggle && map ? toggle.compareDocumentPosition(map) : 0).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    toggle?.click();
+    expect(isShipSchematicOpen()).toBe(true);
+    closeShipSchematic();
+  });
+
+  test('touch chrome hides the Schematic button', () => {
+    const toggle = document.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.toggle}`);
+    const innerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    try {
+      window.dispatchEvent(new Event('resize'));
+      expect(toggle?.hidden).toBe(true);
+      expect(toggle?.classList.contains('ship-schematic-touch')).toBe(true);
+      expect(toggle?.getAttribute('aria-keyshortcuts')).toBeNull();
+    } finally {
+      if (innerWidth) {
+        Object.defineProperty(window, 'innerWidth', innerWidth);
+      }
+      if (innerHeight) {
+        Object.defineProperty(window, 'innerHeight', innerHeight);
+      }
+      window.dispatchEvent(new Event('resize'));
+    }
+    expect(toggle?.hidden).toBe(false);
+    expect(toggle?.getAttribute('aria-keyshortcuts')).toBe('V');
+  });
 });

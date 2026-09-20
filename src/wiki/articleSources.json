@@ -45,6 +45,7 @@
     "src/entities/ship/hullOutlines.ts",
     "tests/unit/ui/universeMap.test.ts",
     "src/ui/shipSchematic.ts",
+    "src/ui/schematicJoinHint.ts",
     "src/core/services/InputManager.ts",
     "src/entities/ship/shipUtils.ts",
     "shared/combat.ts",
@@ -52,6 +53,7 @@
     "server/communication/MessageHandler.ts",
     "server/communication/clientCommandDecoder.ts",
     "tests/unit/ui/shipSchematic.test.ts",
+    "tests/unit/ui/schematicJoinHint.test.ts",
     "tests/unit/entities/input/keyboardControls.test.ts",
     "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts",
     "tests/integration/browser/sanity/boost-stacks-with-downhill-speed-and-toggles-off.test.ts",
@@ -74,6 +76,7 @@
     "src/entities/ship/towCable.ts",
     "src/entities/ship/haulerUtility.ts",
     "src/ui/shipSchematic.ts",
+    "src/ui/schematicJoinHint.ts",
     "src/entities/player/Player.ts",
     "shared/shipGrowth.ts",
     "shared/furnaces.ts",
@@ -263,6 +266,7 @@
     "src/ui/viewportChrome.ts",
     "src/entities/ship/hullOutlines.ts",
     "src/ui/shipSchematic.ts",
+    "src/ui/schematicJoinHint.ts",
     "src/network/services/ConnectionManager.ts",
     "src/network/services/resumeCredential.ts",
     "shared/releaseId.ts",
@@ -338,7 +342,8 @@
     "shared/surveyProbe.ts",
     "src/entities/roid/surveyProbeRenderer.ts",
     "src/entities/ship/surveyorUtility.ts",
-    "server/core/SurveyProbeManager.ts"
+    "server/core/SurveyProbeManager.ts",
+    "src/ui/shipSchematic.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",

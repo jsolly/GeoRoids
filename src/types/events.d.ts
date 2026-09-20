@@ -12,6 +12,10 @@ declare global {
     gameStart: CustomEvent<undefined>;
     playViewOn: CustomEvent<undefined>;
     playViewOff: CustomEvent<undefined>;
+    gameSchematicOpen: CustomEvent<undefined>;
+    gameSchematicClose: CustomEvent<undefined>;
+    gameMapOpen: CustomEvent<undefined>;
+    gameMapClose: CustomEvent<undefined>;
     playerIdentityChanged: CustomEvent<PlayerIdentityChangedDetail>;
     playerDied: CustomEvent<{
       playerId: string;

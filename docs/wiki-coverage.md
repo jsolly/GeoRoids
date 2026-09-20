@@ -9,7 +9,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
-| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, and map/schematic hold with blink on return |
+| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, first-join hold-to-equip hint, and map/schematic hold with blink on return |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, moving probe beacons, and delivery tags |
 | hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
@@ -25,7 +25,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Player question | Article | Primary source families |
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
-| How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
+| How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicJoinHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map or schematic is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, GameEngine overlay hold, combat immunity tests |
 | How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |

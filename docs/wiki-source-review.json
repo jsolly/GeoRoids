@@ -1,5 +1,5 @@
 {
-  "note": "Merged overlay-hold freeze/blink with origin/main probe beacons and restored-pilot diagnostics: controls, combat-survival, and loot-growth still document map/schematic hold immunity and blink on return; surveyor probe inventory and copy-diagnostics HUD from main kept. Overlay-hold still latches before dead-pose ignore, pins pose, skips collision/loot/pickups, and blinks on falling edge.",
+  "note": "Overlay-hold freeze/blink: satellites and controls now state map/schematic hold skips loose pickup and loot collection; combat-survival and loot-growth already cover immunity and blink. Scenario test parks a pickup on the held hull and proves later overlayHold:false packets do not restack blink.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -309,7 +309,7 @@
     "tests/unit/entities/asteroidSplitting.test.ts": "sha256:c15d62d86bbcea9c33942cebc9a029a6e45cd5b68a991d14187e146a71e8382c",
     "tests/unit/entities/asteroids.test.ts": "sha256:62dc849ff1583c360a13b467e09b07ccfdb5261e8b4806f6413ee4487e7444d6",
     "tests/unit/entities/boost-runs-out-and-refills.test.ts": "sha256:c470d95eae656e3893ad1f499ad2f7ee20869f7a87f53436c60e7107011c8e53",
-    "tests/unit/entities/combatDamage.test.ts": "sha256:8b29ba1856ef23cfa25db16e9422962b2fed15e5c8f37a03f22bf2aa7d37e98f",
+    "tests/unit/entities/combatDamage.test.ts": "sha256:313becdfe1590dca21168139be281ca1771419dbb738191b7f78fd5ed3be11f7",
     "tests/unit/entities/eoSatelliteRoster.test.ts": "sha256:8e1ad144bb2a03d19ff52b48f9011e8168fde9f0b5b779530728e94e8ecca9a3",
     "tests/unit/entities/haulerHarpoonLatchSync.test.ts": "sha256:8944754873ec93813f59b63591f4964b97c51a14bee09f72fb9c1a56e82799c4",
     "tests/unit/entities/haulerUtility.test.ts": "sha256:a42bf9209eb3634e450b3f1aa88ab50ba162b9de97b54100354752e1140792b0",
@@ -346,7 +346,7 @@
     "tests/unit/scenarios/combat/hauler-harpoons-a-nearby-asteroid.test.ts": "sha256:d82d416ca9788f649f00f85db917cac438d76f9a9a3e78d7d48cf6f4f60a9879",
     "tests/unit/scenarios/combat/hauler-hull-collides-farther-than-surveyor.test.ts": "sha256:21f0827f8682e198250258828d4d7a58dd94f524b9becdff09fe0978b3f08397",
     "tests/unit/scenarios/combat/wall-or-roid-hit-explodes-then-respawns-without-freeze.test.ts": "sha256:c3984f371b75dc55f288abafee19edfa83166907f41020e1e99840e266545509",
-    "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:ffca9787c1082f3e158ceba8f3e9d25d5d4183927e3fc0a61a9f0923830a2b6c",
+    "tests/unit/scenarios/session/map-or-schematic-holds-the-ship-invulnerable-until-return.test.ts": "sha256:0a465b8ad10bb58d03087a3d4decacc13030f8ab5d242254e63c5d8fbe3dd882",
     "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-lives-and-score.test.ts": "sha256:edc922fed657e10abf77def44996a139d8eca2e8822e00641f93016ac2174961",
     "tests/unit/server/authoritative-combat.test.ts": "sha256:8bb1dacef75b67c2c67964e38fb7999b9e0c85682b68096189e73185f4ff58fc",
     "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts": "sha256:db438af0aec635a5ca84fc108ca1d207d1d98f7d5026b4162a63423736875f4d",

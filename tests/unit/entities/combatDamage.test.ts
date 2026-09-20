@@ -41,8 +41,12 @@ describe('Crew survival against world hazards', () => {
     engine.setOverlayHold('p1', false);
     expect(engine.getPlayer('p1')?.overlayHold).toBe(false);
     expect(engine.getPlayer('p1')?.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
+    engine.entityManager.updateRespawns();
+    const remaining = engine.getPlayer('p1')?.spawnProtectionTimer;
+    expect(remaining).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES - 1);
     engine.setOverlayHold('p1', false);
-    expect(engine.getPlayer('p1')?.spawnProtectionTimer).toBe(SHIP.INVINCIBILITY_DURATION_FRAMES);
+    engine.setOverlayHold('p1', false);
+    expect(engine.getPlayer('p1')?.spawnProtectionTimer).toBe(remaining);
   });
 
   test('environmental damage destroys a player, spends a life, and schedules respawn', () => {

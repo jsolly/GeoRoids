@@ -27,7 +27,8 @@ steering. Closing the menu resumes flight and grants the same brief blink
 protection as a respawn, so a rock that drifted over the hull cannot kill you
 immediately. The world keeps running while a
 menu is open: asteroids, ricochets, and the arena wall pass through your ship
-without colliding, and satellite health continues draining. You cannot lose a
+without colliding, and satellite health continues draining. Loose satellite
+pickups and loot stay on the field until you return to flight. You cannot lose a
 life from world hazards until you return to flight and blink protection ends.
 F is unbound.
 

@@ -14,7 +14,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection, armed coupling and finite powered flight |
-| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
+| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
@@ -124,7 +124,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - The six Earth-observation hulls are maintained by the satellite pickup manager
   and spawn separately from asteroid destruction. Loose hardware is stationary,
   glowing, and invulnerable. The nearest living player within
-  the automatic collection range stores it in ship inventory. Both kits can equip
+  the automatic collection range stores it in ship inventory,
+  except during a map or schematic hold. Both kits can equip
   one satellite from the schematic. Health drains with time and impacts, so damage
   shortens its scanning lifetime. The ship-style green health bar and schematic
   time estimate share that health value. Only loose pickups glow. Stored

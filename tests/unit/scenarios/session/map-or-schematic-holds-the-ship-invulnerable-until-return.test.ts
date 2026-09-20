@@ -55,6 +55,15 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
     expect(held.thrusting).toBe(false);
     expect(held.overlayHold).toBe(true);
 
+    const parkedPickup = world.engine.getAllSatellitePickups()[0];
+    if (!parkedPickup) {
+      throw new Error('Ace joined without a loose satellite pickup');
+    }
+    world.engine.parkSatellitePickups(origin);
+    world.engine.tickSatellitePickups();
+    expect(world.entity(ace).score).toBe(0);
+    expect(world.engine.getSatellitePickup(parkedPickup.id)?.state).toBe('loose');
+
     const health = held.health;
     const lives = held.lives;
     world.hitAsteroid(ace);
@@ -75,7 +84,20 @@ describe('Map or schematic holds the ship invulnerable until return', () => {
     expect(world.entity(ace).exploding).toBe(false);
     world.clearAsteroids();
 
-    world.tick(SPAWN_PROTECTION_FRAMES);
+    const consumed = 30;
+    world.tick(consumed);
+    sendHold(false);
+    sendHold(false);
+    sendHold(false);
+    expect(world.entity(ace).spawnProtectionTimer).toBe(
+      SHIP.INVINCIBILITY_DURATION_FRAMES - consumed
+    );
+
+    world.hitAsteroid(ace);
+    expect(world.entity(ace).health).toBe(health);
+    world.clearAsteroids();
+
+    world.tick(SPAWN_PROTECTION_FRAMES - consumed);
     world.hitAsteroid(ace);
     expect(world.entity(ace).health).toBe(health - DAMAGE.ASTEROID_COLLISION);
     expect(world.entity(ace).lives).toBe(GAME.START_LIVES);

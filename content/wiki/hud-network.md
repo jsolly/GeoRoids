@@ -64,7 +64,7 @@ disappear when the shared state removes them. Slate squares mark asteroids;
 cream squares and diamonds mark wreckage and shards, larger cream canisters
 with amber tips mark Tap loot, yellow slashed diamonds
 mark laser cores, and lilac circles and diamonds mark loose and orbiting
-satellite pickups. Heading triangles in local and crew colors keep pilots
+satellite pickups. Kit hull silhouettes in local and crew colors keep pilots
 identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
 V or hold your own Hauler hull to open the local ship schematic.
@@ -132,8 +132,9 @@ explored area. Pilots stay readable; discovered furnaces remain marked on the
 universe map, while uncharted asteroid, loot, and furnace positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
 centered on your current ship; zoom out to see distant discoveries or use the
-locate control on the map to restore the nearby scale. Ships on the chart use
-each pilot's hull silhouette. Close it with M, Escape, or the Close control.
+locate control on the map to restore the nearby scale. Ships on both the local
+radar and the chart use each pilot's hull silhouette. Close it with M, Escape, or
+the Close control.
 On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's

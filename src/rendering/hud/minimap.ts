@@ -7,14 +7,21 @@ import {
 import { FURNACES } from '../../../shared/furnaces';
 import { sectorBounds } from '../../../shared/sectors';
 import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
-import type { ExplorationTile, LootData, LootKind, Position } from '../../../shared-types';
+import type {
+  ExplorationTile,
+  LootData,
+  LootKind,
+  Position,
+  ShipKitId,
+} from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { lootStrokeColor } from '../../entities/loot/lootRenderer';
 import type { Player } from '../../entities/player/Player';
 import type { Roid } from '../../entities/roid/Roid';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
+import { getKitHullOutline, projectHullPolyline } from '../../entities/ship/hullOutlines';
 import type { Ship } from '../../entities/ship/Ship';
-import { calculateShipTrianglePoints, strokePhosphorHull } from '../../entities/ship/shipRenderer';
+import { strokePhosphorPolyline } from '../../entities/ship/shipRenderer';
 import { activeScanners, scannedMaterial } from '../../entities/ship/surveyScan';
 import { getCompletedSectors, getWorldExploration } from '../../network/worldExploration';
 import { hexToRgba } from '../../utils/colorUtils';
@@ -22,15 +29,14 @@ import { logger } from '../../utils/Logger';
 import { resolveGlow } from '../renderQuality';
 import type { HudLayout } from './hudLayout';
 
-type RadarMark =
-  | { kind: 'local'; x: number; y: number; heading: number; color: string }
-  | {
-      kind: 'other';
-      x: number;
-      y: number;
-      heading: number;
-      color: string;
-    };
+type RadarMark = {
+  kind: 'local' | 'other';
+  x: number;
+  y: number;
+  heading: number;
+  color: string;
+  kitId: ShipKitId;
+};
 
 const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore', 'tap'] satisfies readonly LootKind[];
 
@@ -153,22 +159,57 @@ function drawCompletedSectors(ctx: CanvasRenderingContext2D, geometry: MiniMapGe
   ctx.restore();
 }
 
+function strokeRadarHull(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  color: string,
+  kitId: ShipKitId
+): void {
+  const outline = getKitHullOutline(kitId);
+  strokePhosphorPolyline(
+    ctx,
+    projectHullPolyline(x, y, size, heading, outline.hull),
+    color,
+    outline.hull.closed
+  );
+  for (const extra of outline.extras) {
+    strokePhosphorPolyline(
+      ctx,
+      projectHullPolyline(x, y, size, heading, extra),
+      color,
+      extra.closed
+    );
+  }
+}
+
 function drawRadarMark(ctx: CanvasRenderingContext2D, mark: RadarMark): void {
   const { kind } = mark;
   switch (kind) {
     case 'local': {
-      const hull = calculateShipTrianglePoints(
+      strokeRadarHull(
+        ctx,
         mark.x,
         mark.y,
         VISUAL.MINIMAP_LOCAL_SIZE,
-        mark.heading
+        mark.heading,
+        mark.color,
+        mark.kitId
       );
-      strokePhosphorHull(ctx, hull, mark.color);
       return;
     }
     case 'other': {
-      const hull = calculateShipTrianglePoints(mark.x, mark.y, VISUAL.MINIMAP_DOT, mark.heading);
-      strokePhosphorHull(ctx, hull, mark.color);
+      strokeRadarHull(
+        ctx,
+        mark.x,
+        mark.y,
+        VISUAL.MINIMAP_DOT,
+        mark.heading,
+        mark.color,
+        mark.kitId
+      );
       return;
     }
     default:
@@ -180,7 +221,8 @@ function drawPilotEdgeMark(
   ctx: CanvasRenderingContext2D,
   geometry: MiniMapGeometry,
   position: Position,
-  color: string
+  color: string,
+  kitId: ShipKitId
 ): void {
   const dx = position.x - geometry.center.x;
   const dy = position.y - geometry.center.y;
@@ -191,8 +233,7 @@ function drawPilotEdgeMark(
   const radius = Math.max(8, geometry.size / 2 - 8);
   const x = geometry.x + geometry.size / 2 + Math.cos(angle) * radius;
   const y = geometry.y + geometry.size / 2 + Math.sin(angle) * radius;
-  const hull = calculateShipTrianglePoints(x, y, VISUAL.MINIMAP_DOT, angle);
-  strokePhosphorHull(ctx, hull, color);
+  strokeRadarHull(ctx, x, y, VISUAL.MINIMAP_DOT, angle, color, kitId);
 }
 
 function canDrawAsteroidOnMiniMap(roid: Roid): boolean {
@@ -636,7 +677,7 @@ export function drawMiniMap(
       }
       const p = projectPosition(geometry, player.ship.position);
       if (!p) {
-        drawPilotEdgeMark(ctx, geometry, player.ship.position, player.color);
+        drawPilotEdgeMark(ctx, geometry, player.ship.position, player.color, player.ship.kitId);
         continue;
       }
       drawRadarMark(ctx, {
@@ -645,6 +686,7 @@ export function drawMiniMap(
         y: geometry.projection.y,
         heading: player.ship.angle,
         color: player.color,
+        kitId: player.ship.kitId,
       });
     }
 
@@ -657,6 +699,7 @@ export function drawMiniMap(
           y: geometry.projection.y,
           heading: ship.angle,
           color: ship.color,
+          kitId: ship.kitId,
         });
       }
     }

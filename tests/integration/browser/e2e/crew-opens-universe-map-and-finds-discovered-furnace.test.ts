@@ -21,6 +21,12 @@ const FAR_FURNACE = (() => {
   return furnace;
 })();
 
+function formatMapCoordinate(value: number): string {
+  return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
+}
+
+const FAR_FURNACE_LOCATION = `X ${formatMapCoordinate(FAR_FURNACE.position.x)}, Y ${formatMapCoordinate(FAR_FURNACE.position.y)}`;
+
 type MapFrame = {
   open: boolean;
   canvas: { width: number; height: number };
@@ -173,7 +179,7 @@ test.each([
     }
     const locations = page.getByRole('list', { name: 'Revealed landmarks and crew coordinates' });
     await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(FAR_FURNACE.name);
-    expect(await locations.textContent()).toContain('X +4000, Y +0');
+    expect(await locations.textContent()).toContain(FAR_FURNACE_LOCATION);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(
         `crew-universe-map-${touch ? 'mobile' : 'desktop'}.png`
@@ -223,7 +229,7 @@ test.each([
     await page.locator('#universe-map-toggle').click();
     await expect
       .poll(() => page.locator('#universe-map-status').textContent())
-      .toContain('X +4000');
+      .toContain(`X ${formatMapCoordinate(FAR_FURNACE.position.x)}`);
     expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
     await page.locator('#universe-map-close').click();
     if (!touch) {

@@ -7,6 +7,7 @@ import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersist
 import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ExplorationMap } from '../../../shared/exploration';
+import { FURNACES } from '../../../shared/furnaces';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { LootData } from '../../../shared-types';
@@ -14,12 +15,17 @@ import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('the global map shares a distant furnace while each pilot receives only nearby asteroid geometry', () => {
+  const distantWorks = FURNACES.find((site) => site.id === 'works-10-6');
+  if (!distantWorks) {
+    throw new Error('Expected regional Works 10:6');
+  }
+  const distant = distantWorks.position;
   const engine = new GameEngine(82);
   const broadcaster = new GameStateBroadcaster(engine);
   const nearSocket = new RecordingSocket();
   const farSocket = new RecordingSocket();
   engine.addPlayer('near', 'Near', nearSocket, { x: 0, y: 0 }, 'hauler');
-  const scout = engine.addPlayer('far', 'Far', farSocket, { x: 40_000, y: 24_000 }, 'surveyor');
+  const scout = engine.addPlayer('far', 'Far', farSocket, distant, 'surveyor');
   broadcaster.negotiateSnapshot(nearSocket);
   broadcaster.negotiateSnapshot(farSocket);
   expect(engine.getGameState().mapAssets.some((asset) => asset.id === 'furnace:works-10-6')).toBe(
@@ -37,7 +43,7 @@ test('the global map shares a distant furnace while each pilot receives only nea
     id: 'furnace:works-10-6',
     name: 'Works 10:6',
     kind: 'furnace',
-    position: { x: 40_000, y: 24_000 },
+    position: distant,
   });
   expect(near.asteroids.length).toBeGreaterThan(0);
   expect(far.asteroids.length).toBeGreaterThan(0);
@@ -49,7 +55,8 @@ test('the global map shares a distant furnace while each pilot receives only nea
   expect(
     far.asteroids.every(
       (rock) =>
-        Math.abs(rock.position.x - 40_000) <= 2800 && Math.abs(rock.position.y - 24_000) <= 2800
+        Math.abs(rock.position.x - distant.x) <= 2800 &&
+        Math.abs(rock.position.y - distant.y) <= 2800
     )
   ).toBe(true);
   expect(

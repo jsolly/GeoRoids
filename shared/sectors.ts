@@ -468,7 +468,7 @@ export function chooseOpenSectorSpawn(options: {
     !isInsideCompletedSector(options.previous, completed) &&
     Math.hypot(options.previous.x, options.previous.y) <= WORLD.radius
   ) {
-    return options.previous;
+    return { x: options.previous.x, y: options.previous.y };
   }
   const ally = options.allies?.find((position) => !isInsideCompletedSector(position, completed));
   if (ally) {

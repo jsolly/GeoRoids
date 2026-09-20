@@ -86,7 +86,7 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
   const directory = mkdtempSync(join(tmpdir(), 'georoids-explored-world-'));
   cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'world.sqlite');
-  const harvested = '4,4';
+  const harvested = '3,4';
   const untouched = '5,4';
   {
     const saving = new WorldStore(path);
@@ -127,7 +127,7 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
 
   // Sector completion still sees every saved sector: the harvested one walls
   // off once mapped, the one with a deposit left does not.
-  engine.revealArea({ x: 9_000, y: 9_000 }, WORLD.sectorSize);
+  engine.revealArea({ x: 7_000, y: 9_000 }, WORLD.sectorSize);
   engine.revealArea({ x: 11_000, y: 9_000 }, WORLD.sectorSize);
   const completed = engine.evaluateSectorProgress();
   expect(completed).toContain(harvested);

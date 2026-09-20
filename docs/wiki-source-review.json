@@ -1,5 +1,5 @@
 {
-  "note": "Recorded source review after merging main (#637 spiders), vitest 5.0.1, and matching @vitest/coverage-v8 5.0.1 (exact peer). Test-runner patch; no player-facing wiki rules or demonstration GIFs changed.",
+  "note": "Recorded source review after merging @types/node 26.6.1 from main (#615) with vitest 5.0.1 and @vitest/coverage-v8 5.0.1. Toolchain-only package.json digest; no player-facing wiki rules or GIFs changed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -8,7 +8,7 @@
     "index.css": "sha256:90dbe4ec6f893e2c8e04e726f508884a914b73cc0c00974ec58c8b122a6a1929",
     "index.html": "sha256:38ed7041635f26bae571eedf28b85b2fccde7a77e6688d340719f7801d77d66d",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
-    "package.json": "sha256:2aaf4b153770852b6fd1563f072cc231709741d4bf6f023caee2287550d93300",
+    "package.json": "sha256:54bb156a4f03c98660851b6d9aa27f462b736a73f0c9ed72ed7c5adf92d54fff",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
     "public/music/danger-bed.mp3": "sha256:1ef1e5df3e06fa787c45599409d8180c2e5e31aea289c3ededa58cf5dd31e509",
     "public/music/danger-bed.ogg": "sha256:17dda03d81b59cb1ce53fe769dceae65ccecac19b2ce71bc415d1905c7c12f9f",

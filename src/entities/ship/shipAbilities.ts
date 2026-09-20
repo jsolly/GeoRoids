@@ -1,4 +1,11 @@
-import { furnaceHeading } from '../../../shared/asteroidBoost';
+import {
+  addBoostOwner,
+  boostOwnerIds,
+  furnaceHeading,
+  igniteBoost,
+  removeBoostOwner,
+} from '../../../shared/asteroidBoost';
+import { asteroidCrewNeeded, isColossalAsteroid } from '../../../shared/asteroidScale';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type {
   AsteroidBoost,
@@ -315,8 +322,35 @@ function latchStillValid(
   return harpoonSurfaceGap(host, target) <= range * SHIP_ABILITY.HARPOON_SLACK;
 }
 
+function abilityBodySize(body: Pick<AbilityBody, 'r' | 'size'>): number {
+  const value = body.size ?? body.r;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function canLatchBoostedBody(host: AbilityHost, body: AbilityBody): boolean {
+  if (!body.boost) {
+    return true;
+  }
+  if (
+    body.boost.phase !== 'armed' ||
+    haulerUtilityOf(host) !== 'boost_coupling' ||
+    !isColossalAsteroid(abilityBodySize(body))
+  ) {
+    return false;
+  }
+  const owners = boostOwnerIds(body.boost);
+  if (host.id && owners.includes(host.id)) {
+    return false;
+  }
+  return owners.length < asteroidCrewNeeded(abilityBodySize(body));
+}
+
 /** Hauler-only: advance the authoritative tow cable. Resource Tap holds without haul. */
-export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBody[]): void {
+export function pullHarpoonTarget(
+  host: AbilityHost,
+  bodies: readonly AbilityBody[],
+  canHaul = true
+): void {
   if (host.kitId !== 'hauler') {
     tickTowCable(host, undefined);
     clearHarpoonLatch(host);
@@ -342,7 +376,7 @@ export function pullHarpoonTarget(host: AbilityHost, bodies: readonly AbilityBod
     return;
   }
 
-  tickTowCable(host, target);
+  tickTowCable(host, target, canHaul);
 }
 
 export function tickTapExtract(
@@ -378,20 +412,22 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
   if (host.kitId === 'hauler' && host.harpoonTargetId) {
     if (haulerUtilityOf(host) === 'boost_coupling') {
       const target = world?.asteroids.find((body) => body.id === host.harpoonTargetId);
+      const armed = target?.boost?.phase === 'armed' ? target.boost : null;
+      const ownsArmedBoost = Boolean(host.id && armed && boostOwnerIds(armed).includes(host.id));
       if (
-        target?.boost?.phase === 'armed' &&
-        target.boost.ownerId === host.id &&
+        ownsArmedBoost &&
+        target &&
+        armed &&
         latchStillValid(host, target, SHIP_ABILITY.HARPOON_RANGE * 3)
       ) {
-        target.boost = {
-          phase: 'burning',
-          angle: furnaceHeading(target.position),
-          ownerId: target.boost.ownerId,
-        };
+        if (boostOwnerIds(armed).length < asteroidCrewNeeded(abilityBodySize(target))) {
+          return { activated: true, abilityId: 'harpoon' };
+        }
+        target.boost = igniteBoost(armed, furnaceHeading(target.position));
         host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
       } else if (world) {
-        if (target?.boost?.phase === 'armed' && target.boost.ownerId === host.id) {
-          target.boost = null;
+        if (ownsArmedBoost && host.id && armed && target) {
+          target.boost = removeBoostOwner(armed, host.id);
         }
         clearHarpoonLatch(host);
         return { activated: false };
@@ -419,7 +455,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
     const latchRange = SHIP_ABILITY.HARPOON_RANGE;
     const target = findHarpoonTarget(
       host,
-      listHarpoonCandidates(world).filter((body) => !body.boost),
+      listHarpoonCandidates(world).filter((body) => canLatchBoostedBody(host, body)),
       latchRange
     );
     if (!target) {
@@ -429,7 +465,10 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       if (!host.id) {
         return { activated: false };
       }
-      target.boost = { phase: 'armed', ownerId: host.id, angle: furnaceHeading(target.position) };
+      target.boost =
+        target.boost?.phase === 'armed'
+          ? addBoostOwner(target.boost, host.id)
+          : { phase: 'armed', ownerId: host.id, angle: furnaceHeading(target.position) };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;

@@ -47,18 +47,25 @@ records its owner for the same shared rewards.
 The Hauler presses E near an asteroid to attach its equipped tool. Resource
 Tap extracts a canister and leaves the rock in the field. Tow Cable hauls the
 rock: it keeps its motion and trails behind the Hauler; the cable does not
-reel a rock into the hull or launch it at anything. Dragging towed cargo into
-another asteroid breaks both rocks and drops the cable. Dragging it into
-another ship deals an asteroid impact to that hull, then breaks the cargo and
-drops the cable. Bring a towed rock to
+reel a rock into the hull or launch it at anything. Dragging towed ordinary
+cargo into another asteroid breaks both rocks and drops the cable. A towed
+colossal deposit breaks the other rock and keeps its cables. Dragging ordinary
+cargo into another ship deals an asteroid impact to that hull, then breaks the
+cargo and drops the cable. A colossal deposit needs two Tow Cables before it
+will haul, and both Haulers who deliver it receive the points. Bring a towed
+rock to
 an arena furnace to deliver it. The Hauler and every scanning pilot recorded on the
 rock receive the same delivery points. A rock with no scan tag still pays
 the Hauler for the delivery.
 
 Boost Coupling aims a rock at its nearest furnace on the first E and launches
-self-guided delivery on the second. At intake the rock explodes and pays the
-pilot who armed it plus every recorded Surveyor. It stays reserved while armed or burning, so another Hauler
-cannot take it over. After ignition it passes through ships and objects, ignores
+self-guided delivery on the second. A colossal deposit needs two armed
+couplings before ignition, and both owners are paid at intake. At intake the
+rock explodes and pays
+the pilots who armed it plus every recorded Surveyor. Ordinary rocks stay
+reserved while armed or burning, so another Hauler
+cannot take them over. A second Boost Coupling can join an armed colossal
+deposit. After ignition it passes through ships and objects, ignores
 weapons, and cannot be scanned or worked on again before furnace intake.
 
 Three starter furnace landmarks sit around the field: North Works, Southeast

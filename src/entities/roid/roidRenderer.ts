@@ -1,3 +1,4 @@
+import { isColossalAsteroid } from '../../../shared/asteroidScale';
 import type { AsteroidMaterial } from '../../../shared-types';
 import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
@@ -41,9 +42,13 @@ export function clearAsteroidShatters(): void {
 export function getRoidStrokeWidth(
   radius: number
 ):
+  | typeof VISUAL.ROID_STROKE_COLOSSAL
   | typeof VISUAL.ROID_STROKE_LARGE
   | typeof VISUAL.ROID_STROKE_MEDIUM
   | typeof VISUAL.ROID_STROKE_SMALL {
+  if (isColossalAsteroid(radius)) {
+    return VISUAL.ROID_STROKE_COLOSSAL;
+  }
   if (radius >= ROID.SIZE * 0.8) {
     return VISUAL.ROID_STROKE_LARGE;
   }

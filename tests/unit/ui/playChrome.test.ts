@@ -31,6 +31,8 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionHtml).toContain('class="enter-game"');
   expect(productionHtml).toContain('class="nickname-input"');
   expect(productionHtml).toContain('class="sound-toggle"');
+  expect(productionHtml).toContain('id="hapticsPref"');
+  expect(productionCss).toContain('.haptics-hint');
 });
 
 test('agents guide forbids CDN runtime CSS and JS', () => {
@@ -59,6 +61,9 @@ test('title menu uses first-party nickname and sound chrome', () => {
   );
   expect(document.querySelector('#soundPref')?.classList.contains('sound-toggle')).toBe(true);
   expect(document.querySelector('.sound-toggle-label')?.getAttribute('for')).toBe('soundPref');
+  expect(document.querySelector('#hapticsPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="hapticsPref"]')?.textContent).toBe('Haptics');
+  expect(document.querySelector('#hapticsHint')?.classList.contains('haptics-hint')).toBe(true);
   expect(document.querySelector('.form-control')).toBeNull();
   expect(document.querySelector('.form-label')).toBeNull();
   expect(document.querySelector('.form-check-input')).toBeNull();

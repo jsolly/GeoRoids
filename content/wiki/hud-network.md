@@ -18,6 +18,14 @@ Before entering a game, set your pilot name, choose a kit, and use the Sound
 checkbox on the title screen to enable or mute audio. Muting stops sounds already
 playing too. Starting with Sound off skips loading sound files. When you enable
 audio, effects become available as they load; missed sounds do not play later.
+The Haptics checkbox is next to Sound. It stays off until you turn it on, and
+this browser remembers that choice. With Haptics on, your own shots, hull hits,
+deaths, Boost starts, kit abilities, pickups, and furnace deliveries buzz the
+device. Crew action around you does not. Haptics use the web Vibration API: many
+Android browsers can vibrate, while iPhone browsers cannot. If this browser has
+no vibration API, the checkbox stays off and disabled with a short explanation.
+Native apps can use richer haptic engines; this web client does not wrap a native
+shell.
 
 Open Advanced and enable Debug to show this browser's Player ID and page
 session ID. The Player ID is the same `playerId` already written on join and

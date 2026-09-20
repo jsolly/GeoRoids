@@ -59,6 +59,7 @@ import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/s
 import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
+import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
@@ -1284,14 +1285,18 @@ export class ConnectionManager {
     }
     const abilityId = getShipKit(data.kitId ?? entity.ship.kitId).abilityId;
     const isHarpoonRelease = abilityId === 'harpoon' && data.harpoonTargetId === null;
+    const isLocalAbility =
+      data.id === localPlayer?.id || data.id === this.getLocalPlayerId() || entity.type === 'local';
     if (!isHarpoonRelease) {
       playAbilityActivation(abilityId, entity.ship.position);
+      playLocalHaptic(isLocalAbility, 'ability');
     }
     if (abilityId === 'harpoon') {
       if (isHarpoonRelease) {
         playHarpoonRelease(entity.ship.position);
         if (isFinitePosition(data.boostIgnitionPosition)) {
           playFeedback('boostIgnite', data.boostIgnitionPosition);
+          playLocalHaptic(isLocalAbility, 'boost');
         }
       } else {
         const targetPosition = isFinitePosition(data.harpoonLatchPos)
@@ -1539,6 +1544,7 @@ export class ConnectionManager {
     }
     this.playedLootCollectionIds.add(data.lootId);
     playLootPickup(data.kind, data.position);
+    playLocalHaptic(data.collectorId === this.getLocalPlayerId(), 'pickup');
   }
 
   private handleFurnaceDelivery(data: FurnaceDelivery): void {
@@ -1728,6 +1734,7 @@ export class ConnectionManager {
     if (isFinitePosition(data.position)) {
       playOrbitalPickup(data.position);
     }
+    playLocalHaptic(data.playerId === this.getLocalPlayerId(), 'pickup');
     window.dispatchEvent(new CustomEvent('satellitePickupCollected', { detail: data }));
   }
 
@@ -1788,6 +1795,7 @@ export class ConnectionManager {
       targetPlayer.ship.takeDamage(0, data.attackerId);
       if (isLocalTarget && beforeHealth !== undefined && data.remainingHealth < beforeHealth) {
         playFeedback('hullDamage');
+        playLocalHaptic(true, 'hit');
       }
     }
 

@@ -7,6 +7,8 @@ import type {
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
 import { playFeedback } from '../../audio/feedbackSounds';
+import { playLocalHaptic } from '../../fx/haptics';
+import { PlayerManager } from '../player/PlayerManager';
 
 export class SatellitePickup {
   id: string;
@@ -42,6 +44,7 @@ export class SatellitePickup {
   updateFromServer(data: SatellitePickupData): void {
     if (this.state === 'stored' && data.state === 'orbiting') {
       playFeedback('satelliteEquip', data.position);
+      playLocalHaptic(data.ownerId === PlayerManager.getInstance().getLocalPlayer()?.id, 'pickup');
     }
     if (data.state === 'broken' && this.state !== 'broken') {
       playDestructionSound('satellite', data.position);

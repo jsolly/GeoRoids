@@ -42,6 +42,11 @@ if (typeof window !== 'undefined') {
             />
             <label class="sound-toggle-label" for="soundPref">Sound</label>
           </div>
+          <div class="sound-toggle-row">
+            <input class="sound-toggle" type="checkbox" id="hapticsPref" />
+            <label class="sound-toggle-label" for="hapticsPref">Haptics</label>
+          </div>
+          <p id="hapticsHint" class="haptics-hint" hidden></p>
           <details id="advanced-settings" class="advanced-settings">
             <summary>Advanced</summary>
             <div class="debug-toggle-row">

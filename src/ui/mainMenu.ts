@@ -1,6 +1,7 @@
 import { activateAudio } from '../audio/audioRuntime';
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
+import { setHaptics, syncHapticsControl } from '../fx/haptics';
 import { readStoredResumeName } from '../network/services/resumeCredential';
 import { initTitleTerrain } from '../rendering/titleTerrain';
 import { getBuildInfoString } from '../utils/buildInfo';
@@ -15,6 +16,7 @@ import { controlsHintFor } from './viewportChrome';
 
 // UI element references
 const soundCheckBox = getElementById<HTMLInputElement>('soundPref');
+const hapticsCheckBox = getElementById<HTMLInputElement>('hapticsPref');
 const startGameBtn = getElementById<HTMLButtonElement>('start-game');
 const playerNameInput = getElementById<HTMLInputElement>('playerNameInput');
 
@@ -194,6 +196,12 @@ if (playerNameInput) {
 attachEventListener(soundCheckBox, 'change', (ev) => {
   const target = ev.target as HTMLInputElement;
   setSound(target.checked);
+});
+
+syncHapticsControl();
+attachEventListener(hapticsCheckBox, 'change', (ev) => {
+  const target = ev.target as HTMLInputElement;
+  setHaptics(target.checked);
 });
 
 // Display build info

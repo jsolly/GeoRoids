@@ -1,11 +1,11 @@
 {
-  "note": "Reviewed root shared spider contracts, sparse30-second/three-spider encounters, instant lethal bites, all death causes, contour-only rendering, combat and audio. Desktop/mobile verified; existing wiki media stays accurate.",
+  "note": "Reviewed latest main title-menu alignment and spider feature sources: rare contour predators, lethal bites at all health, protection, laser combat, death cause and audio. Existing media and updated wiki remain accurate.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
     "docs/protocol/snapshot-v1.md": "sha256:1ce8ae9659ef90be524e6efa2e9401b7b8b1a9a863936d1ac844473b75611e0d",
     "docs/sounds.md": "sha256:63d9a0e9488d9dfcfd68a4da18dba1b42ec355245894b813141c61040b926360",
-    "index.css": "sha256:1730803550a93fa999501820c5511987b2722018949994ede06dd03f8a473797",
+    "index.css": "sha256:90dbe4ec6f893e2c8e04e726f508884a914b73cc0c00974ec58c8b122a6a1929",
     "index.html": "sha256:38ed7041635f26bae571eedf28b85b2fccde7a77e6688d340719f7801d77d66d",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:897999f25f378daff966c32975be438b4ffde56f48f5a7d3fa375df5dad90bf1",

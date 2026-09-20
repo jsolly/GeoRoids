@@ -32,16 +32,18 @@ test.each(['surveyor', 'hauler'] as const)(
         return Math.hypot(ship.velocity.x, ship.velocity.y);
       });
       const [climb = 0, descent = 0] = speeds;
-      expect(climb).toBeGreaterThanOrEqual(cruise * 0.24);
-      expect(climb).toBeLessThan(cruise * 0.4);
-      expect(descent).toBeGreaterThan(cruise * 1.5);
-      expect(descent).toBeGreaterThan(climb * 4);
+      expect(TERRAIN.CLIMB_SPEED_FRACTION).toBe(0.7);
+      expect(TERRAIN.DESCENT_SPEED_BONUS).toBe(1.15);
+      expect(climb).toBeGreaterThanOrEqual(cruise * 0.65);
+      expect(climb).toBeLessThan(cruise * 0.82);
+      expect(descent).toBeGreaterThan(cruise * 1.9);
+      expect(descent).toBeGreaterThan(climb * 2.5);
       expect(descent).toBeLessThanOrEqual(terrainSpeedLimit(position, cruise) + 1e-9);
     }
   }
 );
 
-test('crossing a steep hillside pulls persistently downhill instead of erasing drift each frame', () => {
+test('crossing a steep hillside keeps nearly full cruise with a light downhill tug', () => {
   const field = ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
   const gradient = sampleGradient(field, position.x, position.y);
   const magnitude = Math.hypot(gradient.x, gradient.y);
@@ -58,7 +60,10 @@ test('crossing a steep hillside pulls persistently downhill instead of erasing d
     advanceCruiseVelocity(ship, kit.maxVelocity);
   }
   const downhillDrift = -(ship.velocity.x * gradient.x + ship.velocity.y * gradient.y) / magnitude;
-  expect(downhillDrift).toBeGreaterThan(kit.maxVelocity * 0.35);
+  expect(TERRAIN.CROSS_SLOPE_DRIFT).toBe(0.16);
+  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(kit.maxVelocity * 0.98);
+  expect(downhillDrift).toBeGreaterThan(kit.maxVelocity * 0.1);
+  expect(downhillDrift).toBeLessThan(kit.maxVelocity * 0.22);
   const before = { ...ship.velocity };
   advanceCruiseVelocity(ship, kit.maxVelocity);
   expect(ship.velocity).toEqual(before);

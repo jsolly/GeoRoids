@@ -11,6 +11,7 @@ import {
   resetWorldExploration,
   setCompletedSectors,
 } from '../../../src/network/worldExploration';
+import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 afterEach(() => {
@@ -21,6 +22,8 @@ afterEach(() => {
 describe('shared ship motion helper', () => {
   test('automatic thrust accelerates at the existing pace and shots keep their speed', () => {
     expect(GAME.MOTION_SCALE).toBe(0.5625);
+    expect(GAME.PLAYER_SPEED_SCALE).toBe(1.25);
+    expect(LASER.SPEED).toBe(300 * GAME.MOTION_SCALE);
     expect(GAME.FPS).toBe(60);
     const laserStep = LASER.SPEED / GAME.FPS;
     const ship = new Ship({ position: { x: 0, y: 0 }, isLocalPlayer: true });
@@ -88,6 +91,8 @@ describe('shared ship motion helper', () => {
 
     const capped = applyThrustOrFriction({ x: 20, y: 0 }, 0, true, GAME.FRICTION);
     const speed = Math.hypot(capped.x, capped.y);
+    expect(SHIP.THRUST).toBe(5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
+    expect(getShipKit('hauler').thrust).toBe(4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(SHIP.MAX_VELOCITY).toBe(2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE);
     expect(speed).toBeCloseTo(SHIP.MAX_VELOCITY);
   });
@@ -178,7 +183,7 @@ describe('shared ship motion helper', () => {
       ship.update();
     }
     expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeLessThanOrEqual(
-      SHIP.MAX_VELOCITY * 1.65
+      SHIP.MAX_VELOCITY * (1 + TERRAIN.DESCENT_SPEED_BONUS)
     );
     expect(ship.velocity.x).toBeGreaterThan(SHIP.MAX_VELOCITY * 0.24);
     // After the blast decays, terrain can still bend the cruise direction.

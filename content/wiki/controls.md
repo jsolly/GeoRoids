@@ -72,7 +72,9 @@ lifetime, derived from health. Surveyor offers Mineral Scan and Survey Probe;
 the probe fires along your heading and attaches a shared scanning beacon to a rock.
 Hauler has three utility cards and a looping tool animation;
 selecting a utility card equips that tool immediately. Boost Coupling uses E to arm
-and lock the asteroid thrust heading, then E again to ignite. Its touch button
+and lock the asteroid thrust heading, then E again to ignite an ordinary rock.
+A colossal deposit stays latched until two couplings are armed; E before that
+crew is ready does not ignite. Its touch button
 changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 
 ## Map

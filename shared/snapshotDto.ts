@@ -127,11 +127,13 @@ const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({
   phase: choice('armed'),
   ownerId: string,
   angle: number,
+  couplings: optional(array(string)),
 });
 const burningBoost = shape<Extract<AsteroidBoost, { phase: 'burning' }>>({
   phase: choice('burning'),
   angle: number,
   ownerId: string,
+  couplings: optional(array(string)),
 });
 const probe = shape<AsteroidProbe>({
   id: string,

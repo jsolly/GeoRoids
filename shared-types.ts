@@ -147,8 +147,8 @@ export interface PlayerShotAcknowledgement {
 
 /** Server-owned coupling; guidance points at the nearest furnace. */
 export type AsteroidBoost =
-  | { phase: 'armed'; ownerId: string; angle: number }
-  | { phase: 'burning'; ownerId: string; angle: number };
+  | { phase: 'armed'; ownerId: string; angle: number; couplings?: string[] }
+  | { phase: 'burning'; ownerId: string; angle: number; couplings?: string[] };
 
 /** Transient Surveyor hardware attached to one asteroid face. */
 export interface AsteroidProbe {

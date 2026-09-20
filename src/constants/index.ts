@@ -98,6 +98,7 @@ export const VISUAL = {
   HEALTH_CAPSULE_HEIGHT: 1.5,
   BOUNDARY_STROKE_WIDTH: 1.25,
   BOUNDARY_GLOW: 1.25,
+  ROID_STROKE_COLOSSAL: 2.5,
   ROID_STROKE_LARGE: 2,
   ROID_STROKE_MEDIUM: 1.5,
   ROID_STROKE_SMALL: 1.25,
@@ -246,9 +247,19 @@ export const ROID = {
   JAGGEDNESS: 0.5, // 0 = smooth, 1 = jagged
 
   // Scoring
+  POINTS_COLOSSAL: 200,
   POINTS_LARGE: 20,
   POINTS_MEDIUM: 50,
   POINTS_SMALL: 100,
+
+  // Rare crew-scale rocks: too heavy for one tow or one coupling, and they
+  // ignore the one-second collab window until many laser hits land.
+  COLOSSAL_MIN_SIZE: 90,
+  COLOSSAL_SIZE: 120,
+  COLOSSAL_LASER_HITS: 16,
+  COLOSSAL_CREW: 2,
+  COLOSSAL_SECTOR_PERIOD: 5,
+  COLOSSAL_CORE_EXCLUSION: 2,
 
   // Collaborative split: only the biggest asteroids, and only when two
   // distinct ships land laser hits within this window.

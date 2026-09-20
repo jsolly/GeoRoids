@@ -56,7 +56,9 @@ nearest furnace, correcting any sideways momentum it had at ignition. Accelerati
 gradual and speed is capped at 150 world units per second. Propulsion continues
 until delivery, with no fuel timeout.
 
-On entering a furnace's intake, the rock explodes and is consumed exactly once.
+On entering a furnace's intake, the rock's outline flashes danger-red as it
+shatters, a short smoke poof rises up the grate, and the rock is consumed
+exactly once.
 The pilots who armed the coupling receive its full delivery value, as do its
 recorded Surveyors. Ordinary rocks need one coupling. A colossal deposit stays
 armed until two Haulers have coupled; E or IGNITE before that crew is ready
@@ -113,7 +115,8 @@ both receive the delivery.
 
 Fly the towed asteroid into an arena furnace to deliver it. The furnace is a
 dashed delivery ring around a burning grate with a column of flame roaring up
-its middle. Delivery consumes the rock and awards the Hauler. If a Surveyor
+its middle. Delivery shatters the rock in a red outline with a short smoke poof
+and awards the Hauler. If a Surveyor
 scanned the rock, the Hauler and each Surveyor contributor receive identical
 delivery points.
 

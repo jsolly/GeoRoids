@@ -128,7 +128,7 @@ export class GameStateBroadcaster {
       for (const reward of delivery.rewards) {
         this.broadcastScoreUpdate(reward.playerId, reward.score);
       }
-      this.broadcastAsteroidDestruction(delivery.asteroidId);
+      this.broadcastAsteroidDestruction(delivery.asteroidId, { consumedBy: 'furnace' });
       this.broadcastToAll({ type: 'furnaceDelivery', data: delivery, timestamp: Date.now() });
     }
     for (const data of this.gameEngine.drainShotSounds()) {
@@ -445,7 +445,7 @@ export class GameStateBroadcaster {
 
   public broadcastAsteroidDestruction(
     asteroidId: string,
-    extras?: { collabSplit?: boolean; origin?: { x: number; y: number } }
+    extras?: { collabSplit?: boolean; origin?: { x: number; y: number }; consumedBy?: 'furnace' }
   ): void {
     const message = {
       type: 'asteroidDestroy',
@@ -453,6 +453,7 @@ export class GameStateBroadcaster {
         asteroidId,
         collabSplit: extras?.collabSplit === true,
         ...(extras?.origin !== undefined ? { origin: extras.origin } : {}),
+        ...(extras?.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
       },
       timestamp: Date.now(),
     };

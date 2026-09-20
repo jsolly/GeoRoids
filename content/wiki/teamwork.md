@@ -61,7 +61,7 @@ the Hauler for the delivery.
 Boost Coupling aims a rock at its nearest furnace on the first E and launches
 self-guided delivery on the second. A colossal deposit needs two armed
 couplings before ignition, and both owners are paid at intake. At intake the
-rock explodes and pays
+rock shatters in a red outline with a short smoke poof and pays
 the pilots who armed it plus every recorded Surveyor. Ordinary rocks stay
 reserved while armed or burning, so another Hauler
 cannot take them over. A second Boost Coupling can join an armed colossal

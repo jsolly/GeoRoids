@@ -11,7 +11,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, first-join hold-to-equip hint, and map/schematic hold with blink on return |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, moving probe beacons, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery, and double metal mining damage |
+| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |

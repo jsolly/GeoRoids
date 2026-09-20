@@ -4,6 +4,7 @@ import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import { sectorAt } from '../../shared/world';
 import type {
   AsteroidData,
+  AsteroidDestroyEvent,
   FurnaceDelivery,
   LootData,
   Position,
@@ -24,7 +25,11 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import { PlayerNetwork } from '../entities/player/playerNetwork';
 import { advanceRemotePlayerShips } from '../entities/player/remoteLasers';
 import type { RoidBelt } from '../entities/roid/Roid';
-import { clearAsteroidShatters, recordAsteroidShatter } from '../entities/roid/roidRenderer';
+import {
+  clearAsteroidShatters,
+  markFurnaceAsteroidShatter,
+  recordAsteroidShatter,
+} from '../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
 import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
@@ -263,11 +268,7 @@ export class GameController {
   };
 
   private removeServerAsteroid = (
-    event: {
-      asteroidId: string;
-      collabSplit?: boolean;
-      origin?: Position;
-    },
+    event: AsteroidDestroyEvent,
     showDestructionVfx: boolean
   ): void => {
     const { asteroidId, collabSplit, origin } = event;
@@ -291,17 +292,17 @@ export class GameController {
       } else {
         playDestructionSound('asteroid', roid.position);
       }
-      recordAsteroidShatter(roid);
+      recordAsteroidShatter(
+        roid,
+        performance.now(),
+        event.consumedBy === 'furnace' ? 'furnace' : 'break'
+      );
     }
     delete roid.taggedUntil;
     this.currRoidBelt.roids.splice(index, 1);
   };
 
-  private applyServerAsteroidDestroyed = (event: {
-    asteroidId: string;
-    collabSplit?: boolean;
-    origin?: Position;
-  }): void => {
+  private applyServerAsteroidDestroyed = (event: AsteroidDestroyEvent): void => {
     this.removeServerAsteroid(event, true);
   };
 
@@ -381,6 +382,7 @@ export class GameController {
 
   private handleFurnaceDelivery = (event: Event): void => {
     const delivery = (event as CustomEvent<FurnaceDelivery>).detail;
+    markFurnaceAsteroidShatter(delivery.asteroidId);
     const reward = delivery.rewards.find(
       (item) => item.playerId === this.networkManager.getLocalPlayerId()
     );

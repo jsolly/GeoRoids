@@ -77,15 +77,17 @@ export function playLocalHaptic(isLocal: boolean, kind: HapticKind): void {
 }
 
 export function setHaptics(enabled: boolean): void {
+  if (enabled && !hapticsApiAvailable()) {
+    syncHapticsControl();
+    return;
+  }
   setStoredItem(LOCAL_STORAGE_KEYS.hapticsOn, String(enabled));
   if (!enabled) {
     vibrateNow(0);
     syncHapticsControl();
     return;
   }
-  if (hapticsApiAvailable()) {
-    vibrateNow(PATTERNS.preview);
-  }
+  vibrateNow(PATTERNS.preview);
   syncHapticsControl();
 }
 
@@ -99,9 +101,14 @@ export function syncHapticsControl(): void {
     return;
   }
   const supported = hapticsApiAvailable();
-  checkbox.disabled = !supported;
+  checkbox.disabled = false;
   checkbox.checked = supported && hapticsPreferenceOn();
   checkbox.setAttribute('aria-disabled', supported ? 'false' : 'true');
+  if (supported) {
+    checkbox.removeAttribute('aria-describedby');
+  } else {
+    checkbox.setAttribute('aria-describedby', 'hapticsHint');
+  }
   if (hint) {
     hint.hidden = supported;
     hint.textContent = supported ? '' : HAPTICS_UNSUPPORTED_HINT;

@@ -2,7 +2,7 @@ import { activateAudio } from '../audio/audioRuntime';
 import { setMusic } from '../audio/musicBeds';
 import { setSound } from '../audio/Sound';
 import { GameController } from '../core/gameController';
-import { setHaptics, syncHapticsControl } from '../fx/haptics';
+import { hapticsApiAvailable, setHaptics, syncHapticsControl } from '../fx/haptics';
 import { readStoredResumeName } from '../network/services/resumeCredential';
 import { initTitleTerrain } from '../rendering/titleTerrain';
 import { getBuildInfoString } from '../utils/buildInfo';
@@ -208,6 +208,10 @@ attachEventListener(musicCheckBox, 'change', (ev) => {
 syncHapticsControl();
 attachEventListener(hapticsCheckBox, 'change', (ev) => {
   const target = ev.target as HTMLInputElement;
+  if (!hapticsApiAvailable()) {
+    target.checked = false;
+    return;
+  }
   setHaptics(target.checked);
 });
 

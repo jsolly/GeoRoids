@@ -157,13 +157,27 @@ test('sound preference read/write does not throw when storage is blocked', () =>
 });
 
 test('haptics preference read/write does not throw when storage is blocked', () => {
+  const originalVibrate = navigator.vibrate;
+  Object.defineProperty(navigator, 'vibrate', {
+    configurable: true,
+    value: () => true,
+    writable: true,
+  });
   installStorage(throwingStorage());
   resetSafeStorage();
 
-  expect(() => setHaptics(true)).not.toThrow();
-  expect(hapticsPreferenceOn()).toBe(true);
-  expect(() => setHaptics(false)).not.toThrow();
-  expect(hapticsPreferenceOn()).toBe(false);
+  try {
+    expect(() => setHaptics(true)).not.toThrow();
+    expect(hapticsPreferenceOn()).toBe(true);
+    expect(() => setHaptics(false)).not.toThrow();
+    expect(hapticsPreferenceOn()).toBe(false);
+  } finally {
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: originalVibrate,
+      writable: true,
+    });
+  }
 });
 
 test('session score still lives on the player when storage is blocked', () => {

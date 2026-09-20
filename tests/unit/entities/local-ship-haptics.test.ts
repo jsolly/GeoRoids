@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { LOCAL_STORAGE_KEYS } from '../../../src/constants/user-preferences';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { resetHapticsForTests, setHaptics } from '../../../src/fx/haptics';
 import { resetSafeStorage } from '../../../src/utils/safeStorage';
@@ -16,6 +17,7 @@ function installVibrate(impl: (pattern: VibratePattern) => boolean): void {
 beforeEach(() => {
   resetSafeStorage();
   resetHapticsForTests();
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.hapticsOn);
 });
 
 afterEach(() => {

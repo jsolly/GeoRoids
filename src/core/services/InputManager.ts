@@ -14,6 +14,7 @@ import {
   handleMouseUp,
   preventContextMenu,
 } from '../../input/mouse';
+import { initializePlayfieldSelection } from '../../input/playfieldSelection';
 import { initializeTouchControls } from '../../input/touchControls';
 import { initializeSchematicJoinHint } from '../../ui/schematicJoinHint';
 import { initializeShipSchematic } from '../../ui/shipSchematic';
@@ -148,6 +149,7 @@ export class InputManager {
         releaseInput();
       }
     });
+    initializePlayfieldSelection();
     initializeTouchControls();
     initializeUniverseMap({ onOpen: releaseInput });
     initializeShipSchematic({ onOpen: releaseInput });

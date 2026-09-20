@@ -114,7 +114,11 @@
     width: 100%;
     height: 100%;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
     -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Playfield chrome above the local radar: Map always, Schematic on desktop. */
@@ -611,6 +615,11 @@
 
   body.in-play {
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .ship-kit-select {
@@ -1274,6 +1283,8 @@
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .touch-ability,
@@ -1774,5 +1785,25 @@
       width: 140px;
       height: 48px;
     }
+  }
+
+  /* After other * rules so in-play selection suppression stays last in the layer. */
+  body.in-play * {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.in-play input,
+  body.in-play textarea,
+  body.in-play select,
+  body.in-play [contenteditable=""],
+  body.in-play [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+    -webkit-user-drag: auto;
   }
 }

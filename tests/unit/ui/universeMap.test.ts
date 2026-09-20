@@ -3,6 +3,10 @@ import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
 import {
+  FURNACE_MAP_CAMPFIRE_ZOOM,
+  FURNACE_MAP_FAR_ZOOM,
+} from '../../../src/rendering/hud/furnaceMapMark';
+import {
   clampUniverseMapZoom,
   closeUniverseMap,
   DESKTOP_MAP_HELP,
@@ -155,6 +159,8 @@ describe('universe map play chrome', () => {
   test('keeps map zoom bounded and projects world coordinates from the active view', () => {
     expect(clampUniverseMapZoom(0)).toBe(UNIVERSE_MAP_ZOOM.min);
     expect(clampUniverseMapZoom(Number.POSITIVE_INFINITY)).toBe(UNIVERSE_MAP_ZOOM.max);
+    expect(FURNACE_MAP_CAMPFIRE_ZOOM).toBe(UNIVERSE_MAP_ZOOM.initial);
+    expect(FURNACE_MAP_FAR_ZOOM).toBe(UNIVERSE_MAP_ZOOM.min);
     expect(
       mapWorldToCanvas({ x: 100, y: -50 }, { x: 0, y: 0 }, { x: 20, y: 30, size: 400, scale: 2 })
     ).toEqual({ x: 420, y: 130 });

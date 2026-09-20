@@ -715,7 +715,9 @@
   }
 
   .enter-game,
+  .preference-toggles,
   .sound-toggle-row,
+  .haptics-hint,
   .advanced-settings {
     box-sizing: border-box;
     width: 100%;
@@ -772,6 +774,12 @@
 
   .settings {
     margin-bottom: 1.5em;
+  }
+
+  .preference-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45em;
   }
 
   #start-screen .terrain-eyebrow {
@@ -832,6 +840,37 @@
     cursor: pointer;
     accent-color: var(--palette-accent, #a78bfa);
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  }
+
+  .sound-toggle:disabled,
+  .sound-toggle[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .sound-toggle-row:has(.sound-toggle:disabled),
+  .sound-toggle-row:has(.sound-toggle[aria-disabled="true"]) {
+    opacity: 0.7;
+  }
+
+  .sound-toggle-row:has(.sound-toggle:disabled):hover,
+  .sound-toggle-row:has(.sound-toggle[aria-disabled="true"]):hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .preference-toggles .sound-toggle-row {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  .haptics-hint {
+    margin: 0;
+    color: color-mix(in srgb, var(--palette-hud, #e2e8f0) 78%, var(--palette-hud-muted, #64748b));
+    font-size: 0.68rem;
+    line-height: 1.35;
+    text-align: left;
   }
 
   .advanced-settings {
@@ -1114,6 +1153,14 @@
 
     .sound-toggle-row {
       padding: 0.3em 0.6em;
+    }
+
+    .preference-toggles .sound-toggle-row {
+      min-width: 0;
+    }
+
+    #start-screen {
+      padding: 1.1rem 0.85rem 1rem;
     }
   }
 

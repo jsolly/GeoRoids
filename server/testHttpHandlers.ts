@@ -290,6 +290,7 @@ export function handleTestArrangeCrewField(
         'reflection',
         'satellite',
         'probe',
+        'spider-nest',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
@@ -312,15 +313,17 @@ export function handleTestArrangeCrewField(
         throw new Error('Validated crew disappeared');
       }
       const position =
-        body['scenario'] === 'boundary'
-          ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-          : body['scenario'] === 'delivery' || body['scenario'] === 'tow'
-            ? player.kitId === 'hauler'
-              ? { x: 0, y: -360 }
-              : { x: 220, y: -460 }
-            : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-              ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-              : { x: index * 120, y: -360 };
+        body['scenario'] === 'spider-nest'
+          ? { x: 3000 + index * 120, y: 5000 }
+          : body['scenario'] === 'boundary'
+            ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+            : body['scenario'] === 'delivery' || body['scenario'] === 'tow'
+              ? player.kitId === 'hauler'
+                ? { x: 0, y: -360 }
+                : { x: 220, y: -460 }
+              : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
+                : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -362,7 +365,22 @@ export function handleTestArrangeCrewField(
       gameEngine.parkSatellitePickups();
     }
     const first = poses[0];
-    if (body['scenario'] === 'probe') {
+    if (body['scenario'] === 'spider-nest') {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-spider-deposit',
+        position: { x: 5000, y: 5000 },
+        velocity: { x: 0, y: 0 },
+        size: 50,
+        health: 500,
+        maxHealth: 500,
+        material: 'metal',
+        rotation: 0,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
+    } else if (body['scenario'] === 'probe') {
       gameEngine.addAsteroid({
         id: 'crew-fixture-probe-host',
         position: { x: -20, y: -460 },
@@ -439,9 +457,11 @@ export function handleTestArrangeCrewField(
       poses,
       asteroidId: ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
         ? null
-        : body['scenario'] === 'reflection'
-          ? 'crew-fixture-reflector'
-          : 'crew-fixture-ore',
+        : body['scenario'] === 'spider-nest'
+          ? 'crew-fixture-spider-deposit'
+          : body['scenario'] === 'reflection'
+            ? 'crew-fixture-reflector'
+            : 'crew-fixture-ore',
     });
   });
 }

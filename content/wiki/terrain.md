@@ -51,17 +51,30 @@ feedback, with no terrain reflection or extra damage.
 
 ## Terrain spiders
 
-At most three spiders roam the world, with new arrivals at least 30 seconds apart.
-Away from the starter area and furnaces, spiders traverse the hills with their
-feet touching the existing iso-lines. Nearby contour segments turn red under
-their influence. They add no new web strands or pits, and the terrain keeps its
-normal shape and movement rules.
+Spiders mostly live in widely spaced territories around stationary deposits,
+loose loot, and unclaimed pickups. More valuable resources attract larger guard
+groups; some sites have a whole horde. Most resources remain unguarded. Guards
+patrol close to their home instead of following pilots around the world.
+A cleared nest stays cleared for the server session, and surviving guards keep
+their injuries when you leave and return. Remaining guards keep their territory
+even after its resource is collected or mined. Completing the home sector
+removes its remaining guards, including any still outside on a chase.
 
-Spiders actively pursue nearby pilots and kill with a single bite on contact,
-regardless of remaining health. They keep chasing beyond their initial detection range until you escape far enough or reach a
-protected area. A red screen edge warns when you are being hunted. Sound Effects
-adds ominous nearby tones and a sharper pursuit cue; Music switches to the danger
-bed during a hunt.
+Rare roaming hunters can still approach, with minutes between attempts and a
+quiet interval after spider combat. There is no immediate roaming ambush when
+a flight starts. The starter area, furnaces, and completed sectors remain safe
+from spiders.
+
+Their feet touch the existing iso-lines as they move. Nearby contour segments
+turn red under their influence. They add no new web strands or pits, and the
+terrain keeps its normal shape and movement rules.
+
+Guards pursue pilots who approach their patrol, but return home after a brief
+chase or when the pilot leaves their territory. Roaming hunters pursue farther;
+escape their range or reach a protected area to lose them. A spider kills with
+a single bite on contact, regardless of remaining health. A red screen edge
+warns when you are being hunted. Sound Effects adds ominous nearby tones and a
+sharper pursuit cue; Music switches to the danger bed during a hunt.
 
 Aim at the spider to damage it. Hits flash its body and reveal its remaining
 health. Ordinary lasers kill it in three hits; powered shots deal their increased

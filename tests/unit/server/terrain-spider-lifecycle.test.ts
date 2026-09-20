@@ -68,32 +68,59 @@ test('completed-sector protection covers the full spider footprint and protected
   }
 });
 
-test('ambient predators stay bounded and distribute their spawn attempts across pilots', () => {
-  const manager = new TerrainSpiderManager(() => 0.5);
-  const players = [
-    actorAt({ x: 5000, y: 5000 }),
-    { ...actorAt({ x: -5000, y: -5000 }), id: 'other' },
-  ];
-  for (let cycle = 0; cycle < SPIDER.MAX_ACTIVE + 3; cycle++) {
-    manager.advance({
-      players,
-      completedSectors,
-      nowFrame: cycle * SPIDER.SPAWN_INTERVAL_FRAMES + 1,
-    });
-  }
-  const { spiders } = manager.snapshot();
-  expect(spiders).toHaveLength(SPIDER.MAX_ACTIVE);
-  expect(spiders.some((spider) => spider.position.x < 0)).toBe(true);
-  expect(spiders.some((spider) => spider.position.x > 0)).toBe(true);
-});
-
-test('new spiders arrive no more than once every thirty seconds', () => {
+test('roamers wait minutes even on the first arrival and postpone new attacks during a hunt', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
   const players = [actorAt({ x: 5000, y: 5000 })];
   manager.advance({ players, completedSectors, nowFrame: 1 });
-  expect(manager.snapshot().spiders).toHaveLength(1);
-  manager.advance({ players, completedSectors, nowFrame: 1800 });
-  expect(manager.snapshot().spiders).toHaveLength(1);
   manager.advance({ players, completedSectors, nowFrame: 1801 });
-  expect(manager.snapshot().spiders).toHaveLength(2);
+  expect(manager.snapshot().spiders).toEqual([]);
+  const interval = (SPIDER.SPAWN_INTERVAL_FRAMES + SPIDER.SPAWN_INTERVAL_MAX_FRAMES) / 2;
+  manager.advance({ players, completedSectors, nowFrame: interval });
+  expect(manager.snapshot().spiders).toEqual([]);
+  manager.advance({ players, completedSectors, nowFrame: interval + 1 });
+  expect(manager.snapshot().spiders).toHaveLength(1);
+  manager.advance({ players, completedSectors, nowFrame: interval * 2 + 1 });
+  expect(manager.snapshot().spiders).toHaveLength(SPIDER.MAX_ROAMERS);
+});
+
+test('failed roaming attempts wait another full interval instead of ambushing on leaving safety', () => {
+  const manager = new TerrainSpiderManager(() => 0);
+  const pilot = actorAt({ x: 100, y: 100 });
+  const options = { players: [pilot], completedSectors: new Set(['0,0']) };
+  manager.advance({ ...options, nowFrame: 1 });
+  manager.advance({ ...options, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES + 1 });
+  expect(manager.snapshot().spiders).toEqual([]);
+  pilot.position = { x: 5000, y: 5000 };
+  manager.advance({ ...options, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES + 2 });
+  expect(manager.snapshot().spiders).toEqual([]);
+  manager.advance({ ...options, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES * 2 + 1 });
+  expect(manager.snapshot().spiders).toHaveLength(1);
+});
+
+test('a roaming spawn keeps its distance from every pilot, not only its chosen target', () => {
+  const manager = new TerrainSpiderManager(() => 0);
+  const players = [
+    actorAt({ x: 5000, y: 5000 }),
+    { ...actorAt({ x: 7100, y: 5000 }), id: 'z-other' },
+  ];
+  manager.advance({ players, completedSectors, nowFrame: 1 });
+  manager.advance({ players, completedSectors, nowFrame: SPIDER.SPAWN_INTERVAL_FRAMES + 1 });
+  for (const spider of manager.snapshot().spiders) {
+    for (const pilot of players) {
+      expect(
+        Math.hypot(spider.position.x - pilot.position.x, spider.position.y - pilot.position.y)
+      ).toBeGreaterThanOrEqual(SPIDER.NEST_SPAWN_SAFE_RADIUS);
+    }
+  }
+  expect(manager.snapshot().spiders).toHaveLength(1);
+});
+
+test('a non-hunting roamer still occupies the roaming population slot when a new spawn is due', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  const roamer = manager.spawnSpider({ x: 2200, y: 2200 });
+  const players = [actorAt({ x: 5000, y: 5000 })];
+  manager.advance({ players, completedSectors, nowFrame: 1 });
+  expect(manager.snapshot().spiders[0]?.phase).toBe('scuttling');
+  manager.advance({ players, completedSectors, nowFrame: SPIDER.SPAWN_INTERVAL_MAX_FRAMES + 1 });
+  expect(manager.snapshot().spiders.map(({ id }) => id)).toEqual([roamer?.id]);
 });

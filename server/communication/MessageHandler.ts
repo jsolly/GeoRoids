@@ -91,6 +91,9 @@ export class MessageHandler {
         case 'setHaulerUtility':
           this.handleSetHaulerUtility(ws, command);
           break;
+        case 'setSurveyorUtility':
+          this.handleSetSurveyorUtility(ws, command);
+          break;
 
         case 'update':
           this.handlePlayerUpdate(ws, command);
@@ -452,6 +455,17 @@ export class MessageHandler {
       return;
     }
     if (!this.gameEngine.setHaulerUtility(command.id, command.utilityId)) {
+      return;
+    }
+    this.broadcaster.broadcastGameState();
+  }
+
+  private handleSetSurveyorUtility(ws: WebSocket, command: CommandOf<'setSurveyorUtility'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id || socketPlayer.kitId !== 'surveyor') {
+      return;
+    }
+    if (!this.gameEngine.setSurveyorUtility(command.id, command.utilityId)) {
       return;
     }
     this.broadcaster.broadcastGameState();

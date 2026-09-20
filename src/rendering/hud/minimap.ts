@@ -6,6 +6,7 @@ import {
 } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
 import { sectorBounds } from '../../../shared/sectors';
+import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
 import type {
   ExplorationTile,
@@ -280,7 +281,7 @@ function drawAsteroidMarks(
   }
   ctx.fill();
   const hasSurveyedDeposits = roids.some(
-    (roid) => Array.isArray(roid.surveyedBy) && roid.surveyedBy.length > 0
+    (roid) => (Array.isArray(roid.surveyedBy) && roid.surveyedBy.length > 0) || Boolean(roid.probe)
   );
   if (scanners.length === 0 && !hasSurveyedDeposits) {
     ctx.restore();
@@ -320,11 +321,23 @@ function drawAsteroidMarks(
         ctx.closePath();
         break;
       case undefined:
-        continue;
+        break;
       default:
         throw new Error(`Unexpected minimap material: ${material}`);
     }
     ctx.fill();
+    if (roid.probe && roid.probe.health > 0) {
+      const phase =
+        (Math.max(0, Date.now() - roid.probe.attachedAt) % SURVEY_PROBE.PULSE_MS) /
+        SURVEY_PROBE.PULSE_MS;
+      ctx.strokeStyle = PALETTE.LOCAL;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1 - phase * 0.65;
+      ctx.beginPath();
+      ctx.arc(x, y, 5 + phase * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
   ctx.restore();
 }

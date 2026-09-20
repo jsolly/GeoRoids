@@ -3,6 +3,7 @@ import type {
   AsteroidBoost,
   AsteroidMaterial,
   AsteroidPhenomenon,
+  AsteroidProbe,
   Position,
   Velocity,
 } from '../../../shared-types';
@@ -25,6 +26,7 @@ class Roid {
   /** Optional server-owned reflection metadata. */
   phenomenon?: AsteroidPhenomenon;
   boost?: AsteroidBoost | null;
+  probe?: AsteroidProbe | null;
   /** Shared multi-pilot HP rock. Lasers chip; do not pending-lock. */
   isCollabTarget: boolean = false;
   taggedUntil?: number; // Server-owned collab window; do not destroy locally while set

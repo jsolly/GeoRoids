@@ -199,6 +199,7 @@ function syncAbilityChrome(player: Player): void {
   lastAbilityChromeKey = key;
   button.textContent = state.label;
   button.setAttribute('aria-label', state.name);
+  button.title = state.name;
   button.setAttribute('aria-disabled', state.ready ? 'false' : 'true');
   button.classList.toggle('is-ready', state.ready);
   button.classList.toggle('is-cooling', state.cooling && !state.active);

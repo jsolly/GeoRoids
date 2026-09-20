@@ -12,6 +12,13 @@ related:
 media: []
 ---
 
+## Probe beacons
+
+A pulsing cyan ring around a rock's minimap mark identifies a live
+[Survey Probe](/wiki/#surveyor). Follow that rock to survey more of the field.
+On the playfield the small diamond has a green health bar and emits expanding
+scan rings. Amber pulses warn that its battery is nearly empty.
+
 ## What the HUD shows
 
 Before entering a game, set your pilot name, choose a kit, and use the Sound

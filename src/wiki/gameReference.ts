@@ -12,6 +12,7 @@ import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
 import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
+import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
@@ -71,7 +72,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Ability and exploration values',
       paragraphs: [
-        `E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `With Mineral Scan equipped, E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `Survey Probe: launch range ${SURVEY_PROBE.LAUNCH_RANGE} units; beacon scan radius ${SURVEY_PROBE.RANGE} units every ${SURVEY_PROBE.PULSE_MS / 1000} seconds; battery ${SURVEY_PROBE.LIFETIME_MS / 60000} minutes with a warning during the last ${SURVEY_PROBE.WARNING_MS / 1000} seconds. Health: ${SURVEY_PROBE.MAX_HEALTH}. Maximum ${SURVEY_PROBE.MAX_PER_OWNER} active probes per Surveyor; a successful extra attachment replaces the oldest. Attachment cooldown: ${seconds(SURVEY_PROBE.COOLDOWN_FRAMES)}.`,
         `Passive shared exploration reaches ${EXPLORATION_RANGE.surveyor} world units for Surveyor and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist for the match.`,
       ],
     },

@@ -513,6 +513,11 @@ export class RegionalAsteroidField {
     return [...ids];
   }
 
+  /** Look up one known nest resource in its home sector without traversing world history. */
+  dormantAsteroid(id: string, home: Position): AsteroidData | undefined {
+    return this.dormant.get(sectorAt(home).id)?.find((rock) => rock.id === id);
+  }
+
   dormantSectors(): ReadonlyMap<string, AsteroidData[]> {
     return this.dormant;
   }

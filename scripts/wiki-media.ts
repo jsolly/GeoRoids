@@ -80,6 +80,7 @@ import { getTerrainField } from '../src/physics/terrain/terrainSession';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
+import { asteroidMapInk, drawResourceMapMark } from '../src/rendering/hud/resourceMapMark';
 import {
   polygonPoints,
   strokePhosphorPolyline,
@@ -599,7 +600,7 @@ function makeSurveyorDemo(): Demo {
       drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL);
       drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE);
       for (const rock of rocks) {
-        const material = scannedMaterial(host, rock);
+        const material = rock.surveyedBy?.length ? rock.material : scannedMaterial(host, rock);
         classified ||= material !== undefined;
         const teammateMaterial = material;
         sharedClassification ||= teammateMaterial !== undefined;
@@ -611,26 +612,15 @@ function makeSurveyorDemo(): Demo {
           tagged = true;
         }
         const point = screenPoint(rock.position);
-        ctx.fillStyle =
-          material === 'metal'
-            ? '#FDE68A'
-            : material === 'ice'
-              ? '#A5F3FC'
-              : material === 'rubble'
-                ? '#FDBA74'
-                : PALETTE.HUD_MUTED;
-        ctx.beginPath();
-        if (material === 'metal') {
-          ctx.rect(point.x - 5, point.y - 5, 10, 10);
-        } else if (material === 'rubble') {
-          ctx.moveTo(point.x, point.y - 6);
-          ctx.lineTo(point.x + 6, point.y + 5);
-          ctx.lineTo(point.x - 6, point.y + 5);
-          ctx.closePath();
-        } else {
-          ctx.arc(point.x, point.y, material ? 5 : 2, 0, Math.PI * 2);
-        }
-        ctx.fill();
+        drawResourceMapMark(
+          ctx,
+          'asteroid',
+          point.x,
+          point.y,
+          material ? 5 : 2.5,
+          asteroidMapInk(material),
+          material
+        );
         if (material) {
           drawTag(ctx, material, point.x + 15, point.y + 8, PALETTE.HUD);
         }

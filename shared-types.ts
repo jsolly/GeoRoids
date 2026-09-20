@@ -30,6 +30,8 @@ export interface TerrainSpider {
 
 export interface SpiderFieldState {
   spiders: TerrainSpider[];
+  /** Known nest homes whose original stationary resource is still present. */
+  nests: { id: string; resourceId: string; position: Position }[];
 }
 
 // Common position and velocity types used throughout the system

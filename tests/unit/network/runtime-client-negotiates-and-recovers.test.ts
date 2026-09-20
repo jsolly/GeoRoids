@@ -777,6 +777,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       '../../../src/physics/terrain/spiderSession'
     );
     setSpiderField({
+      nests: [{ id: '0,0', resourceId: 'ore', position: { x: 5000, y: 5000 } }],
       spiders: [
         {
           id: 'expired-spider',
@@ -790,7 +791,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       ],
     });
     ws.receive('sessionExpired', {});
-    expect(getSpiderField()).toEqual({ spiders: [] });
+    expect(getSpiderField()).toEqual({ spiders: [], nests: [] });
     const freshJoin = ws.sent.filter((message) => message.type === 'join').at(-1);
     assert.ok(freshJoin, 'fresh join message');
     const freshId = freshJoin.id;

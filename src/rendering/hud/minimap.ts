@@ -25,11 +25,13 @@ import type { Ship } from '../../entities/ship/Ship';
 import { strokePhosphorPolyline } from '../../entities/ship/shipRenderer';
 import { activeScanners, scannedMaterial } from '../../entities/ship/surveyScan';
 import { getCompletedSectors, getWorldExploration } from '../../network/worldExploration';
+import { getSpiderField } from '../../physics/terrain/spiderSession';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { resolveGlow } from '../renderQuality';
 import { drawFurnaceMapMark, MINIMAP_FURNACE_MARK_SIZE } from './furnaceMapMark';
 import type { HudLayout } from './hudLayout';
+import { addResourceMapPath, asteroidMapInk, drawResourceMapMark } from './resourceMapMark';
 
 type RadarMark = {
   kind: 'local' | 'other';
@@ -44,9 +46,9 @@ const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore', 'tap'] satisfies read
 
 // These marks stay visible at the radar's world scale without borrowing the
 // much larger playfield silhouettes.
-const MINIMAP_ROID_SIZE = 1.5;
-const MINIMAP_LOOT_SIZE = 2;
-const MINIMAP_ORBITER_SIZE = 3;
+const MINIMAP_ROID_SIZE = 2.5;
+const MINIMAP_LOOT_SIZE = 4;
+const MINIMAP_ORBITER_SIZE = 4;
 
 interface MiniMapGeometry {
   readonly center: Position;
@@ -264,22 +266,20 @@ function drawAsteroidMarks(
   const { projection } = geometry;
   ctx.save();
   ctx.beginPath();
-  ctx.fillStyle = hexToRgba(PALETTE.ROID, 0.55);
+  ctx.strokeStyle = hexToRgba(PALETTE.ROID, 0.65);
+  ctx.lineWidth = 0.8;
   for (const roid of roids) {
     if (
       canDrawAsteroidOnMiniMap(roid) &&
+      !(roid.surveyedBy && roid.surveyedBy.length > 0 && roid.material !== undefined) &&
+      !scanners.some((scanner) => scannedMaterial(scanner, roid) !== undefined) &&
       isExploredPosition(geometry, roid.position) &&
       projectPosition(geometry, roid.position)
     ) {
-      ctx.rect(
-        projection.x - MINIMAP_ROID_SIZE / 2,
-        projection.y - MINIMAP_ROID_SIZE / 2,
-        MINIMAP_ROID_SIZE,
-        MINIMAP_ROID_SIZE
-      );
+      addResourceMapPath(ctx, 'asteroid', projection.x, projection.y, MINIMAP_ROID_SIZE);
     }
   }
-  ctx.fill();
+  ctx.stroke();
   const hasSurveyedDeposits = roids.some(
     (roid) => (Array.isArray(roid.surveyedBy) && roid.surveyedBy.length > 0) || Boolean(roid.probe)
   );
@@ -303,29 +303,9 @@ function drawAsteroidMarks(
             .find((value) => value !== undefined);
     const x = projection.x,
       y = projection.y;
-    ctx.beginPath();
-    switch (material) {
-      case 'ice':
-        ctx.fillStyle = '#A5F3FC';
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        break;
-      case 'metal':
-        ctx.fillStyle = '#FDE68A';
-        ctx.rect(x - 3, y - 3, 6, 6);
-        break;
-      case 'rubble':
-        ctx.fillStyle = '#FDBA74';
-        ctx.moveTo(x, y - 4);
-        ctx.lineTo(x + 3.5, y + 3);
-        ctx.lineTo(x - 3.5, y + 3);
-        ctx.closePath();
-        break;
-      case undefined:
-        break;
-      default:
-        throw new Error(`Unexpected minimap material: ${material}`);
+    if (material !== undefined) {
+      drawResourceMapMark(ctx, 'asteroid', x, y, 4, asteroidMapInk(material), material);
     }
-    ctx.fill();
     if (roid.probe && roid.probe.health > 0) {
       const phase =
         (Math.max(0, Date.now() - roid.probe.attachedAt) % SURVEY_PROBE.PULSE_MS) /
@@ -340,50 +320,6 @@ function drawAsteroidMarks(
     }
   }
   ctx.restore();
-}
-
-function addDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
-  ctx.moveTo(x, y - radius);
-  ctx.lineTo(x + radius, y);
-  ctx.lineTo(x, y + radius);
-  ctx.lineTo(x - radius, y);
-  ctx.closePath();
-}
-
-function addLootMark(ctx: CanvasRenderingContext2D, drop: LootData, x: number, y: number): void {
-  switch (drop.kind) {
-    case 'laserCore':
-      addDiamond(ctx, x, y, MINIMAP_LOOT_SIZE);
-      ctx.moveTo(x - 1, y + 1);
-      ctx.lineTo(x + 1, y - 1);
-      return;
-    case 'shard':
-      addDiamond(ctx, x, y, MINIMAP_LOOT_SIZE);
-      return;
-    case 'wreckage':
-      ctx.rect(
-        x - MINIMAP_LOOT_SIZE,
-        y - MINIMAP_LOOT_SIZE,
-        MINIMAP_LOOT_SIZE * 2,
-        MINIMAP_LOOT_SIZE * 2
-      );
-      return;
-    case 'tap':
-      ctx.rect(
-        x - MINIMAP_LOOT_SIZE * 0.7,
-        y - MINIMAP_LOOT_SIZE * 1.15,
-        MINIMAP_LOOT_SIZE * 1.4,
-        MINIMAP_LOOT_SIZE * 2.3
-      );
-      ctx.moveTo(x - MINIMAP_LOOT_SIZE * 0.35, y - MINIMAP_LOOT_SIZE * 1.15);
-      ctx.lineTo(x, y - MINIMAP_LOOT_SIZE * 1.7);
-      ctx.lineTo(x + MINIMAP_LOOT_SIZE * 0.35, y - MINIMAP_LOOT_SIZE * 1.15);
-      return;
-    default: {
-      const _exhaustive: never = drop.kind;
-      void _exhaustive;
-    }
-  }
 }
 
 function drawLootMarks(
@@ -414,7 +350,7 @@ function drawLootMarks(
         ctx.lineJoin = 'round';
         ctx.beginPath();
       }
-      addLootMark(ctx, drop, projection.x, projection.y);
+      addResourceMapPath(ctx, drop.kind, projection.x, projection.y, MINIMAP_LOOT_SIZE);
       painted = true;
     }
     if (painted) {
@@ -449,9 +385,7 @@ function drawLoosePickupMarks(
       ctx.lineWidth = 1;
       ctx.beginPath();
     }
-    const radius = VISUAL.MINIMAP_DOT / 2;
-    ctx.moveTo(projection.x + radius, projection.y);
-    ctx.arc(projection.x, projection.y, radius, 0, Math.PI * 2);
+    addResourceMapPath(ctx, 'satellite', projection.x, projection.y, MINIMAP_ORBITER_SIZE);
     painted = true;
   }
   if (painted) {
@@ -487,7 +421,9 @@ function drawOrbiterMarks(
       ctx.lineJoin = 'round';
       ctx.beginPath();
     }
-    addDiamond(ctx, projection.x, projection.y, MINIMAP_ORBITER_SIZE);
+    addResourceMapPath(ctx, 'satellite', projection.x, projection.y, MINIMAP_ORBITER_SIZE);
+    ctx.moveTo(projection.x + 6, projection.y);
+    ctx.ellipse(projection.x, projection.y, 6, 2, -0.5, 0, Math.PI * 2);
     painted = true;
   }
   if (painted) {
@@ -637,8 +573,17 @@ export function drawMiniMap(
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const legendX = miniMapX >= 70 ? miniMapX - 64 : miniMapX + miniMapSize + 6;
-    for (const [index, label] of ['○ Ice', '□ Metal', '△ Rubble'].entries()) {
-      ctx.fillText(label, legendX, miniMapY + index * 13);
+    for (const [index, material] of (['ice', 'metal', 'rubble'] as const).entries()) {
+      drawResourceMapMark(
+        ctx,
+        'asteroid',
+        legendX + 4,
+        miniMapY + index * 13 + 5,
+        4,
+        asteroidMapInk(material),
+        material
+      );
+      ctx.fillText(material, legendX + 12, miniMapY + index * 13);
     }
     ctx.restore();
   }
@@ -669,6 +614,18 @@ export function drawMiniMap(
       roids
     );
     drawFurnaceMarks(ctx, geometry);
+    for (const nest of getSpiderField().nests) {
+      if (isExploredPosition(geometry, nest.position) && projectPosition(geometry, nest.position)) {
+        drawResourceMapMark(
+          ctx,
+          'nest',
+          geometry.projection.x,
+          geometry.projection.y,
+          8,
+          PALETTE.DANGER
+        );
+      }
+    }
 
     // The pilot hulls are deliberately last: they must remain readable over
     // dense rock, loot, and pickup fields.

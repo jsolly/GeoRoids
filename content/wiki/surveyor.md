@@ -25,9 +25,9 @@ boosting interrupts the refill.
 Choose Mineral Scan in the ship schematic, then press E or
 tap Scan to run a range-limited mineral scan on every teammate's radar for a
 limited time. The range is centered on the active Surveyor. Teammates see the
-shared classification when the rock is inside their own local radar. Circles mark ice,
-squares metal, and triangles rubble. Once a rock is identified, its
-classification remains with that rock; unscanned rocks remain ordinary dots.
+shared classification when the rock is inside their own local radar. All minerals keep the same rock silhouette: pale cyan with a crack for ice,
+gold with parallel seams for metal, and orange with chipped details for rubble. Once a rock is identified, its
+classification remains with that rock; unscanned rocks keep a small slate rock outline.
 While the scan is active, a thin cyan radar sweep pulses from the hull to the
 edge of the viewport. The sweep is a visual cue and does not expand the scan
 range.

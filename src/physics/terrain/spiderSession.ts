@@ -2,7 +2,7 @@ import { SPIDER } from '../../../shared/terrainSpider';
 import type { Position, SpiderFieldState } from '../../../shared-types';
 import { resetSpiderScore, type SpiderDanger } from '../../audio/spiderScore';
 
-const empty: SpiderFieldState = { spiders: [] };
+const empty: SpiderFieldState = { spiders: [], nests: [] };
 let sessionField: SpiderFieldState = empty;
 
 export function setSpiderField(state: SpiderFieldState | undefined): void {

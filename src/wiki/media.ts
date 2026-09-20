@@ -20,6 +20,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/entities/ship/surveyScan.ts',
       'src/entities/ship/shipRenderer.ts',
       'src/rendering/hud/minimap.ts',
+      'src/rendering/hud/resourceMapMark.ts',
       'src/entities/ship/shipKits.ts',
       'server/core/GameEngine.ts',
       'shared/exploration.ts',

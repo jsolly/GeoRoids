@@ -25,6 +25,8 @@ import type {
 } from '../shared-types';
 import { validExploration } from './exploration';
 import { isShipBoostState } from './shipBoost';
+import { SPIDER } from './terrainSpider';
+import { WORLD } from './world';
 
 type Rule = (value: unknown) => boolean;
 /** Every DTO key must have a validator; additions cannot silently escape validation. */
@@ -260,8 +262,14 @@ function uniqueRows(rule: Rule, maximum: number): Rule {
     });
   };
 }
+const nest = shape<SpiderFieldState['nests'][number]>({
+  id: sectorIdentity,
+  resourceId: (value) => typeof value === 'string' && value.length > 0,
+  position,
+});
 const spiderField = shape<SpiderFieldState>({
-  spiders: uniqueRows(spider, 16),
+  spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE),
+  nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
   spiderField: optional(spiderField),

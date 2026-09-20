@@ -58,6 +58,7 @@ import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { setPlayView } from '../ui/uiUtils';
+import { bindUniverseMapField } from '../ui/universeMap';
 import { formatGameOverText, preferDeathCause } from '../utils/deathCause';
 import { logger } from '../utils/Logger';
 import { GameStateManager } from './services/GameStateManager';
@@ -108,6 +109,7 @@ export class GameController {
     // Initialize with empty asteroid belt - will be populated by server
     this.currRoidBelt = entityFactory.createEmptyRoidBelt();
     bindHarpoonFieldSource(() => this.currRoidBelt.roids);
+    bindUniverseMapField(() => this.currRoidBelt.roids);
 
     // Set up network disconnection handler
     this.setupNetworkDisconnectionHandler();

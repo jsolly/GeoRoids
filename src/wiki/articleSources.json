@@ -65,7 +65,8 @@
     "server/core/PlayerMotionService.ts",
     "src/network/services/PlayerMotionReconciliation.ts",
     "tests/unit/entities/boost-runs-out-and-refills.test.ts",
-    "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts"
+    "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts",
+    "src/rendering/hud/resourceMapMark.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -319,7 +320,8 @@
     "tests/unit/audio/title-and-play-loop-music-beds.test.ts",
     "src/rendering/sectorRenderer.ts",
     "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts",
-    "src/ui/shipKitSelect.ts"
+    "src/ui/shipKitSelect.ts",
+    "src/rendering/hud/resourceMapMark.ts"
   ],
   "surveyor": [
     "src/entities/ship/shipKits.ts",
@@ -344,7 +346,8 @@
     "src/entities/roid/surveyProbeRenderer.ts",
     "src/entities/ship/surveyorUtility.ts",
     "server/core/SurveyProbeManager.ts",
-    "src/ui/shipSchematic.ts"
+    "src/ui/shipSchematic.ts",
+    "src/rendering/hud/resourceMapMark.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",
@@ -415,6 +418,7 @@
     "tests/unit/server/crew-maps-revealed-landmarks-beyond-local-snapshots.test.ts",
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts",
     "tests/unit/shared/sectors.test.ts",
-    "tests/unit/shared/utc-score-season.test.ts"
+    "tests/unit/shared/utc-score-season.test.ts",
+    "src/rendering/hud/resourceMapMark.ts"
   ]
 }

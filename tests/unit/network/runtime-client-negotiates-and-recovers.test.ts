@@ -117,6 +117,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
     setSound(true);
     bindGameAudio({
       getListenerPosition: () => ({ x: 0, y: 0 }),
@@ -126,6 +127,10 @@ describe('actual ConnectionManager WebSocket message path', () => {
     vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
       played.push(this.src);
       return Promise.resolve();
+    });
+    vi.spyOn(Sound.prototype, 'playNote').mockImplementation(function (this: Sound) {
+      played.push(this.src);
+      return true;
     });
     try {
       ws.receive('playerShotFired', {
@@ -180,7 +185,116 @@ describe('actual ConnectionManager WebSocket message path', () => {
       acknowledge(reconnected);
       setSound(true);
       reconnected.receive('lootCollected', collection);
+      expect(played).toHaveLength(3);
+      reconnected.receive(
+        'snapshot',
+        new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1)
+      );
+      reconnected.receive('lootCollected', collection);
+      expect(played).toHaveLength(3);
+      reconnected.receive('lootCollected', { ...collection, lootId: 'new-live-pickup' });
       expect(played).toHaveLength(4);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
+  test('tap ejection events sound once; malformed, distant and baseline loot stay silent', async () => {
+    const ws = await connect();
+    acknowledge(ws);
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => ({ x: 0, y: 0 }),
+      getViewport: () => ({ width: 800, height: 600 }),
+    });
+    const notes = vi.spyOn(Sound.prototype, 'playNote').mockReturnValue(true);
+    try {
+      const event = { lootId: 'tap-1', position: { x: 10, y: 0 } };
+      ws.receive('tapEjected', { ...event, lootId: 'before-baseline' });
+      ws.receive('lootCollected', {
+        lootId: 'old-pickup',
+        kind: 'tap',
+        collectorId: 'other',
+        position: { x: 10, y: 0 },
+      });
+      expect(notes).not.toHaveBeenCalled();
+      const state = captureSnapshot(snapshotFixture());
+      state.loot = [
+        { id: 'existing-tap', kind: 'tap', position: { x: 10, y: 0 }, mass: 0.1, radius: 5 },
+      ];
+      ws.receive('snapshot', new SnapshotEncoder(state).encode(1));
+      expect(notes).not.toHaveBeenCalled();
+      ws.receive('tapEjected', event);
+      ws.receive('tapEjected', event);
+      ws.receive('tapEjected', { ...event, lootId: 'bad', position: { x: 'bad', y: 0 } });
+      ws.receive('tapEjected', { ...event, lootId: 'far', position: { x: 5000, y: 0 } });
+      expect(notes).toHaveBeenCalledTimes(1);
+      setSound(false);
+      ws.receive('tapEjected', { ...event, lootId: 'muted' });
+      setSound(true);
+      ws.receive('tapEjected', { ...event, lootId: 'muted' });
+      expect(notes).toHaveBeenCalledTimes(1);
+    } finally {
+      resetGameAudio();
+      setSound(false);
+    }
+  });
+
+  test('a surviving local hull hit has feedback; a zero-damage notification stays quiet', async () => {
+    const player = entityFactory.createLocalPlayer('Hull pilot', { x: 0, y: 0 }, 'surveyor');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
+    setSound(true);
+    const played: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      played.push(this.src);
+    });
+    const damage = {
+      targetPlayerId: player.id,
+      attackerId: 'asteroid',
+      damage: 10,
+      remainingHealth: 90,
+      isDestroyed: false,
+      remainingLives: 3,
+    };
+    ws.receive('playerDamaged', damage);
+    expect(played).toContain('/sounds/hull-damage.m4a');
+    played.length = 0;
+    ws.receive('playerDamaged', damage);
+    expect(played).toEqual([]);
+    ws.receive('playerDamaged', { ...damage, damage: 0 });
+    expect(played).toEqual([]);
+    setSound(false);
+  });
+
+  test('offscreen coupling ignition still confirms release at the local ship', async () => {
+    const player = entityFactory.createLocalPlayer('Hauler pilot', { x: 0, y: 0 }, 'hauler');
+    vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
+    const ws = await connect();
+    acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
+    setSound(true);
+    bindGameAudio({
+      getListenerPosition: () => player.ship.position,
+      getViewport: () => ({ width: 390, height: 844 }),
+    });
+    const played: string[] = [];
+    vi.spyOn(Sound.prototype, 'play').mockImplementation(function (this: Sound) {
+      played.push(this.src);
+    });
+    try {
+      ws.receive('abilityUsed', {
+        id: player.id,
+        kitId: 'hauler',
+        abilityId: 'harpoon',
+        harpoonTargetId: null,
+        abilityActiveFrames: 0,
+        boostIgnitionPosition: { x: player.ship.position.x + 250, y: player.ship.position.y },
+      });
+      expect(played).toEqual(['/sounds/harpoon-release.m4a']);
     } finally {
       resetGameAudio();
       setSound(false);
@@ -233,6 +347,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     vi.spyOn(PlayerManager.getInstance(), 'getLocalPlayer').mockReturnValue(player);
     const ws = await connect();
     acknowledge(ws);
+    ws.receive('snapshot', new SnapshotEncoder(captureSnapshot(snapshotFixture())).encode(1));
     setSound(true);
     bindGameAudio({
       getListenerPosition: () => ({ x: 0, y: 0 }),

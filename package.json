@@ -5,6 +5,7 @@
   "description": "",
   "type": "module",
   "scripts": {
+    "sounds:generate": "tsx scripts/generate-sounds.ts",
     "worktree:init": "bash scripts/worktree-init.sh && npm ci",
     "prune": "npm run check:knip && npm run check:ts-prune",
     "logs": "tsx scripts/read-game-logs.ts",

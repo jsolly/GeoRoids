@@ -22,6 +22,7 @@ import type {
   Velocity,
 } from '../../../shared-types';
 import { playExplosionSound } from '../../audio/explosionSound';
+import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { getCompletedSectors } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
@@ -249,8 +250,14 @@ class Ship {
     }
     if (this.boosting) {
       this.stopBoost();
+      if (this.isLocalPlayer) {
+        playFeedback('boostEnd');
+      }
     } else if (startShipBoost(this.boost)) {
       this.boostInputVersion++;
+      if (this.isLocalPlayer) {
+        playFeedback('boostStart');
+      }
     }
     return this.boosting;
   }
@@ -422,6 +429,9 @@ class Ship {
     advanceShipBoost(this.boost, 1000 / GAME.FPS);
     if (wasBoosting && !this.boosting) {
       this.boostInputVersion++;
+      if (this.isLocalPlayer) {
+        playFeedback('boostEnd');
+      }
     }
     this.updateLifecycle();
     if (this.exploding || this.health <= 0) {

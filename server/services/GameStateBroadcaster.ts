@@ -134,6 +134,9 @@ export class GameStateBroadcaster {
     for (const data of this.gameEngine.drainShotSounds()) {
       this.broadcastToAll({ type: 'playerShotFired', data, timestamp: Date.now() }, data.ownerId);
     }
+    for (const data of this.gameEngine.drainTapEjections()) {
+      this.broadcastToAll({ type: 'tapEjected', data, timestamp: Date.now() });
+    }
     for (const data of this.gameEngine.drainLootCollections()) {
       this.broadcastToAll({ type: 'lootCollected', data, timestamp: Date.now() });
     }

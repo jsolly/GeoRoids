@@ -106,7 +106,8 @@ your finger covers the ship. A quick one-finger tap fires once on release. While
 one finger to steer, tap anywhere on the playfield with another finger to fire
 immediately, or hold that second finger for continuous fire until it is lifted.
 If the browser drops a held finger without a release, the next single-finger
-drag steers again instead of only firing.
+drag steers again instead of only firing, including when that finger lands
+near the last heading. A second finger that is still down keeps firing.
 Taps and holds on the playfield, HUD, and action buttons do not highlight text
 or open copy-paste banners; those gestures steer, fire, or activate the button.
 Nickname and other form fields on the title screen still accept typing and

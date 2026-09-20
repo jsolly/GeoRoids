@@ -75,7 +75,9 @@ function bindSteerTouch(): void {
     steerTouchId = null;
     return;
   }
-  if (steerTouchId !== null && liveTouchPoints.has(steerTouchId)) {
+  if (steerTouchId !== null) {
+    // First bind wins. A missing id stays reserved so a nearby second finger
+    // or a returning thumb cannot steal steer until the next pointerdown.
     return;
   }
   const nearby = touchIdNear(steerClientX, steerClientY);

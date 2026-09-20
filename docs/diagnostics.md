@@ -61,8 +61,10 @@ while preserving the last accepted state and requesting resynchronization.
 Copied playfield diagnostics include an `input` object: `pointerHeading`,
 `touchFire`, `steerPointerHeld`, and `liveTouches`. Automatic cruise with a
 frozen heading, `movementLocked: false`, and later fire-only taps is a dropped
-playfield finger, not a locked ship. `steerPointerHeld: true` with
-`liveTouches` of `0` or `1` on the next drag should yield steering again.
+playfield finger, not a locked ship. A reserved steer id that has left the
+live touch list stays dead until the next pointerdown, so putting the finger
+back near the last heading reclaims steering instead of only firing. A second
+finger that is still down keeps firing.
 
 Repeated motion rejections and damage reports are sampled; death and respawn
 transitions remain explicit. Browser runtime errors and rejected promises enter

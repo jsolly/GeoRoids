@@ -373,3 +373,91 @@ test('a Chromium pointer id that does not match the touch identifier still lets 
   expect(controlSources.pointerHeading).toBe(heading);
   expect(readTouchControlDiagnostics().liveTouches).toBe(2);
 });
+
+test('putting the thumb back near the last heading reclaims steer instead of only firing', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [{ id: 1, x: 60, y: 270 }]);
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  const firstHeading = controlSources.pointerHeading;
+  expect(firstHeading).not.toBeNull();
+
+  // iOS can replace the reserved id without an empty touch list in between.
+  touchChange('touchstart', [{ id: 8, x: 70, y: 280 }]);
+  pointer('pointerdown', 8, 400, 70, 280);
+  expect(controlSources.touchFire).toBe(false);
+  expect(shoot).not.toHaveBeenCalled();
+  pointer('pointermove', 8, 420, 120, 180);
+  expect(controlSources.pointerHeading).not.toBeNull();
+  expect(controlSources.pointerHeading).not.toBe(firstHeading);
+  expect(readTouchControlDiagnostics()).toMatchObject({
+    steerPointerHeld: true,
+    touchFire: false,
+    liveTouches: 1,
+  });
+});
+
+test('after iPhone drops steer capture, the other finger keeps firing and a nearby thumb then steers again', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [{ id: 11, x: 60, y: 300 }]);
+  pointer('pointerdown', 3, 0, 60, 300);
+  pointer('pointermove', 3, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  expect(heading).not.toBeNull();
+
+  touchChange('touchstart', [
+    { id: 11, x: 60, y: 270 },
+    { id: 12, x: 320, y: 400 },
+  ]);
+  pointer('lostpointercapture', 3, 40);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+
+  pointer('pointerdown', 4, 50, 320, 400);
+  expect(shoot).toHaveBeenCalledTimes(1);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+
+  touchChange('touchstart', [{ id: 12, x: 320, y: 400 }]);
+  pointer('pointerup', 4, 80, 320, 400);
+  touchChange('touchstart', [{ id: 8, x: 70, y: 280 }]);
+  pointer('pointerdown', 8, 120, 70, 280);
+  expect(controlSources.touchFire).toBe(false);
+  pointer('pointermove', 8, 140, 130, 160);
+  expect(controlSources.pointerHeading).not.toBeNull();
+  expect(controlSources.pointerHeading).not.toBe(heading);
+  expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+});
+
+test('a nearby second finger keeps firing after the reserved steer id disappears, and the next thumb steers', () => {
+  touchChange('touchstart', [{ id: 11, x: 60, y: 300 }]);
+  pointer('pointerdown', 3, 0, 60, 300);
+  pointer('pointermove', 3, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  expect(heading).not.toBeNull();
+
+  touchChange('touchstart', [
+    { id: 11, x: 60, y: 270 },
+    { id: 12, x: 80, y: 280 },
+  ]);
+  pointer('pointerdown', 4, 50, 80, 280);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+
+  touchChange('touchstart', [{ id: 12, x: 80, y: 280 }]);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+
+  touchChange('touchstart', [
+    { id: 12, x: 80, y: 280 },
+    { id: 8, x: 50, y: 250 },
+  ]);
+  pointer('pointerdown', 8, 120, 50, 250);
+  expect(controlSources.touchFire).toBe(true);
+  pointer('pointermove', 8, 140, 130, 160);
+  expect(controlSources.pointerHeading).not.toBeNull();
+  expect(controlSources.pointerHeading).not.toBe(heading);
+  expect(controlSources.touchFire).toBe(true);
+  expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+});

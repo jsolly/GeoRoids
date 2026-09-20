@@ -3,7 +3,11 @@ import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import { controlSources, resetControlSources } from '../../../src/input/controlSources';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
-import { initializeTouchControls, tickTouchControls } from '../../../src/input/touchControls';
+import {
+  initializeTouchControls,
+  readTouchControlDiagnostics,
+  tickTouchControls,
+} from '../../../src/input/touchControls';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 
 let player: Player;
@@ -52,6 +56,28 @@ function pointer(
     timeStamp: { value: time },
   });
   target.dispatchEvent(event);
+}
+
+function touchChange(
+  type: 'touchstart' | 'touchend' | 'touchcancel',
+  remaining: Array<{ id: number; x?: number; y?: number }>
+): void {
+  const touches = remaining.map((point) => ({
+    identifier: point.id,
+    clientX: point.x ?? 60,
+    clientY: point.y ?? 300,
+    target: canvas,
+  }));
+  const list = Object.assign(touches, {
+    item: (index: number) => touches[index] ?? null,
+  });
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperties(event, {
+    touches: { value: list },
+    targetTouches: { value: list },
+    changedTouches: { value: list },
+  });
+  canvas.dispatchEvent(event);
 }
 
 test('a quick playfield tap fires once while cruise continues', () => {
@@ -245,4 +271,105 @@ test('resting on a grown hull cancels the target and tiny finger jitter cannot w
     expect(player.ship.thrusting).toBe(true);
   }
   pointer('pointerup', 1, 300, 195, 422);
+});
+
+test('lifting every reported finger clears a reserved steering pointer so cruise keeps the last heading', () => {
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  expect(readTouchControlDiagnostics()).toMatchObject({
+    steerPointerHeld: true,
+    pointerHeading: expect.any(Number),
+    liveTouches: null,
+  });
+  touchChange('touchstart', [{ id: 1, x: 60, y: 270 }]);
+  expect(readTouchControlDiagnostics().liveTouches).toBe(1);
+  touchChange('touchend', []);
+  expect(readTouchControlDiagnostics()).toMatchObject({
+    steerPointerHeld: false,
+    pointerHeading: null,
+    touchFire: false,
+    liveTouches: 0,
+  });
+  expect(player.ship.thrusting).toBe(true);
+});
+
+test('a dropped steering finger lets the next single-finger drag turn again instead of only firing', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  const firstHeading = controlSources.pointerHeading;
+  expect(firstHeading).not.toBeNull();
+  expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+
+  touchChange('touchstart', [{ id: 7, x: 300, y: 200 }]);
+  pointer('pointerdown', 7, 400, 300, 200);
+  expect(controlSources.touchFire).toBe(false);
+  expect(shoot).not.toHaveBeenCalled();
+  pointer('pointermove', 7, 420, 320, 160);
+  expect(controlSources.pointerHeading).not.toBeNull();
+  expect(controlSources.pointerHeading).not.toBe(firstHeading);
+  expect(readTouchControlDiagnostics()).toMatchObject({
+    steerPointerHeld: true,
+    touchFire: false,
+    liveTouches: 1,
+  });
+  expect(player.ship.thrusting).toBe(true);
+});
+
+test('losing pointer capture while a finger is still reported keeps the steering heading', () => {
+  touchChange('touchstart', [{ id: 1 }]);
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  pointer('lostpointercapture', 1, 40);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+  expect(player.ship.thrusting).toBe(true);
+});
+
+test('two live fingers still let the second tap fire while the first keeps steering', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [{ id: 1 }]);
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  touchChange('touchstart', [
+    { id: 1, x: 60, y: 270 },
+    { id: 2, x: 320, y: 400 },
+  ]);
+  pointer('pointerdown', 2, 50, 320, 400);
+  expect(shoot).toHaveBeenCalledTimes(1);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(controlSources.touchFire).toBe(true);
+  expect(readTouchControlDiagnostics().liveTouches).toBe(2);
+});
+
+test('a second pointerdown still fires when the live list has not yet added that finger', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [{ id: 1, x: 60, y: 270 }]);
+  pointer('pointerdown', 1, 0);
+  pointer('pointermove', 1, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  pointer('pointerdown', 2, 50, 320, 400);
+  expect(shoot).toHaveBeenCalledTimes(1);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().liveTouches).toBe(1);
+});
+
+test('a Chromium pointer id that does not match the touch identifier still lets the second finger fire', () => {
+  const shoot = vi.spyOn(player.ship, 'shoot');
+  touchChange('touchstart', [
+    { id: 11, x: 60, y: 300 },
+    { id: 12, x: 320, y: 400 },
+  ]);
+  pointer('pointerdown', 3, 0, 60, 300);
+  pointer('pointermove', 3, 10, 60, 270);
+  const heading = controlSources.pointerHeading;
+  expect(heading).not.toBeNull();
+  pointer('pointerdown', 4, 50, 320, 400);
+  expect(shoot).toHaveBeenCalledTimes(1);
+  expect(controlSources.touchFire).toBe(true);
+  expect(controlSources.pointerHeading).toBe(heading);
+  expect(readTouchControlDiagnostics().liveTouches).toBe(2);
 });

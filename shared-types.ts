@@ -25,10 +25,13 @@ export interface TerrainSpider {
   health: number;
   maxHealth: number;
   phase: 'scuttling' | 'hunting';
+  shudderFrames?: number;
+  probe?: AsteroidProbe | null;
   targetId: string | null;
 }
 
 export interface SpiderFieldState {
+  consumed?: { id: string; position: Position; furnaceId: string; frame: number }[];
   spiders: TerrainSpider[];
   /** Known nest homes whose original stationary resource is still present. */
   nests: { id: string; resourceId: string; position: Position }[];
@@ -210,7 +213,7 @@ export interface AsteroidData {
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
-export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap';
+export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -336,6 +339,8 @@ export interface ShipBoostState {
 }
 
 export interface ServerEntityData {
+  /** Stored spider silk, retained across flights. */
+  silk?: number;
   id: string;
   name: string;
   type: 'player';

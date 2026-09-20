@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { segmentCircleContact } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact } from '../../shared/asteroidReflection';
 import { findSectorWallImpact } from '../../shared/sectors';
 import { probePosition, SURVEY_PROBE } from '../../shared/surveyProbe';
+import { SPIDER } from '../../shared/terrainSpider';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
-import type { AsteroidData, AsteroidProbe, Position } from '../../shared-types';
+import type { AsteroidData, AsteroidProbe, Position, TerrainSpider } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import { AsteroidSpatialIndex } from '../world/AsteroidSpatialIndex';
 
@@ -20,7 +22,7 @@ interface SurveyProbeLaunchHost {
 
 interface SurveyProbeTarget {
   id: string;
-  asteroidId: string;
+  hostId: string;
   position: Position;
   radius: number;
   ownerId: string;
@@ -32,12 +34,13 @@ interface SurveyProbePulse {
   asteroids: readonly AsteroidData[];
 }
 
-type AsteroidLookup = (asteroidId: string) => AsteroidData | undefined;
+type ProbeHost = AsteroidData | TerrainSpider;
+type HostLookup = (hostId: string) => ProbeHost | undefined;
 type ProbeScan = (pulse: SurveyProbePulse) => void;
 
-/** Owns transient Surveyor beacons while asteroid DTOs carry their wire state. */
+/** Owns transient Surveyor beacons while host DTOs carry their wire state. */
 export class SurveyProbeManager {
-  private readonly hosts = new Map<string, AsteroidData>();
+  private readonly hosts = new Map<string, ProbeHost>();
   private readonly pulseAt = new Map<string, number>();
 
   public registerAsteroid(host: AsteroidData): void {
@@ -68,7 +71,7 @@ export class SurveyProbeManager {
     return [...this.hosts.values()].map((host) => ({ ...host.position }));
   }
 
-  public prune(now: number, lookup: AsteroidLookup): void {
+  public prune(now: number, lookup: HostLookup): void {
     for (const [asteroidId, host] of this.hosts) {
       const probe = host.probe;
       const current = lookup(asteroidId);
@@ -85,8 +88,9 @@ export class SurveyProbeManager {
     surveyor: SurveyProbeLaunchHost,
     asteroids: readonly AsteroidData[],
     completedSectors: ReadonlySet<string>,
-    now: number
-  ): { host: AsteroidData; probe: AsteroidProbe } | null {
+    now: number,
+    spiders: readonly TerrainSpider[] = []
+  ): { host: ProbeHost; probe: AsteroidProbe } | null {
     if (
       surveyor.kitId !== 'surveyor' ||
       surveyor.exploding ||
@@ -114,7 +118,32 @@ export class SurveyProbeManager {
       maxX: Math.max(start.x, end.x),
       maxY: Math.max(start.y, end.y),
     });
-    const impact = findNearestAsteroidImpact(start, end, candidates);
+    const asteroidImpact = findNearestAsteroidImpact(start, end, candidates);
+    let impact: { host: ProbeHost; point: Position; distance: number } | undefined;
+    if (asteroidImpact) {
+      const host = asteroids.find((candidate) => candidate.id === asteroidImpact.asteroidId);
+      if (host) {
+        impact = { host, point: asteroidImpact.point, distance: asteroidImpact.distance };
+      }
+    }
+    for (const spider of spiders) {
+      const fraction = segmentCircleContact(start, end, spider.position, SPIDER.HIT_RADIUS);
+      if (fraction === undefined) {
+        continue;
+      }
+      const distance = fraction * SURVEY_PROBE.LAUNCH_RANGE;
+      if (impact && impact.distance <= distance) {
+        continue;
+      }
+      impact = {
+        host: spider,
+        point: {
+          x: start.x + (end.x - start.x) * fraction,
+          y: start.y + (end.y - start.y) * fraction,
+        },
+        distance,
+      };
+    }
     if (!impact) {
       return null;
     }
@@ -131,8 +160,8 @@ export class SurveyProbeManager {
       return null;
     }
 
-    const host = asteroids.find((candidate) => candidate.id === impact.asteroidId);
-    if (!host || host.health <= 0 || host.boost?.phase === 'burning' || host.probe) {
+    const host = impact.host;
+    if (host.health <= 0 || ('boost' in host && host.boost?.phase === 'burning') || host.probe) {
       return null;
     }
 
@@ -158,7 +187,7 @@ export class SurveyProbeManager {
     );
     const radialAngle =
       Math.atan2(impact.point.y - host.position.y, impact.point.x - host.position.x) -
-      host.rotation;
+      ('rotation' in host ? host.rotation : host.angle);
     const probe: AsteroidProbe = {
       id: `survey-probe-${randomUUID()}`,
       ownerId: surveyor.id,
@@ -178,7 +207,7 @@ export class SurveyProbeManager {
   public tick(
     now: number,
     getAsteroids: () => readonly AsteroidData[],
-    lookup: AsteroidLookup,
+    lookup: HostLookup,
     scan: ProbeScan
   ): void {
     this.prune(now, lookup);
@@ -201,7 +230,7 @@ export class SurveyProbeManager {
   }
 
   public pulseNow(
-    host: AsteroidData,
+    host: ProbeHost,
     probe: AsteroidProbe,
     asteroids: readonly AsteroidData[],
     scan: ProbeScan
@@ -210,7 +239,7 @@ export class SurveyProbeManager {
   }
 
   private emitPulse(
-    host: AsteroidData,
+    host: ProbeHost,
     probe: AsteroidProbe,
     index: AsteroidSpatialIndex,
     scan: ProbeScan
@@ -228,8 +257,8 @@ export class SurveyProbeManager {
     });
   }
 
-  public targetsIn(asteroids: readonly AsteroidData[]): SurveyProbeTarget[] {
-    const nearby = new Set(asteroids);
+  public targetsIn(hosts: readonly ProbeHost[]): SurveyProbeTarget[] {
+    const nearby = new Set(hosts);
     const targets: SurveyProbeTarget[] = [];
     for (const host of this.hosts.values()) {
       const probe = host.probe;
@@ -238,7 +267,7 @@ export class SurveyProbeManager {
       }
       targets.push({
         id: probe.id,
-        asteroidId: host.id,
+        hostId: host.id,
         position: probePosition(host, probe),
         radius: SURVEY_PROBE.RADIUS,
         ownerId: probe.ownerId,

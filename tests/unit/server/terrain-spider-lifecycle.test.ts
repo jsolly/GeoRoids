@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
+import { FURNACES } from '../../../shared/furnaces';
 import { shipOverlapsCompletedSector } from '../../../shared/sectors';
 import { SPIDER } from '../../../shared/terrainSpider';
 import { DAMAGE } from '../../../src/constants';
@@ -123,4 +124,59 @@ test('a non-hunting roamer still occupies the roaming population slot when a new
   expect(manager.snapshot().spiders[0]?.phase).toBe('scuttling');
   manager.advance({ players, completedSectors, nowFrame: SPIDER.SPAWN_INTERVAL_MAX_FRAMES + 1 });
   expect(manager.snapshot().spiders.map(({ id }) => id)).toEqual([roamer?.id]);
+});
+
+test('a spider released near a furnace retreats out of protection without attacking the pilot', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  const furnace = FURNACES.find((site) => site.id === 'works-1-0');
+  if (!furnace) {
+    throw new Error('Expected eastern furnace');
+  }
+  const spawned = manager.spawnSpider({ x: furnace.position.x + 500, y: furnace.position.y });
+  const body = spawned ? manager.getBody(spawned.id) : undefined;
+  if (!body) {
+    throw new Error('Expected spider');
+  }
+  body.velocity = { x: -200, y: 0 };
+  const pilot = actorAt({ x: furnace.position.x + 300, y: furnace.position.y });
+  const options = { players: [pilot], completedSectors };
+  manager.advance({ ...options, nowFrame: 1, towedIds: new Set([body.id]) });
+  expect(body.position.x).toBe(furnace.position.x + 300);
+  const retreatFrames = Math.ceil(
+    (SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS - 300) / SPIDER.SCUTTLE_SPEED
+  );
+  for (let frame = 2; frame <= retreatFrames + 1; frame++) {
+    expect(manager.advance({ ...options, nowFrame: frame })).toEqual([]);
+  }
+  expect(manager.getBody(body.id)).toBe(body);
+  expect(body.position.x).toBeGreaterThanOrEqual(
+    furnace.position.x + SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
+  );
+  expect(body.targetId).toBeNull();
+  expect(manager.snapshot().consumed).toEqual([]);
+});
+
+test('released spiders escape overlapping central protection and burn if retreat crosses an intake', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  const spawned = manager.spawnSpider({ x: 0, y: -1100 });
+  const body = spawned ? manager.getBody(spawned.id) : undefined;
+  if (!body) {
+    throw new Error('Expected spider');
+  }
+  // Arrange a previously towed spider on the inner side of the north Works.
+  body.position = { x: 0, y: -400 };
+  const pilot = actorAt({ x: 0, y: -400 });
+  const options = { players: [pilot], completedSectors };
+  manager.advance({ ...options, nowFrame: 1, towedIds: new Set([body.id]) });
+  expect(manager.getBody(body.id)).toBe(body);
+  for (let frame = 2; frame <= 300; frame++) {
+    manager.advance({ ...options, nowFrame: frame });
+    if (!manager.getBody(body.id)) {
+      break;
+    }
+  }
+  expect(manager.getBody(body.id)).toBeUndefined();
+  expect(manager.snapshot().consumed).toEqual([
+    expect.objectContaining({ id: body.id, furnaceId: 'north' }),
+  ]);
 });

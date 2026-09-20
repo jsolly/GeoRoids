@@ -1,6 +1,7 @@
 import { consumeTickAccumulator } from '../../shared/gameClock';
 import { formatSectorLabel } from '../../shared/sectors';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
+import { SPIDER } from '../../shared/terrainSpider';
 import { sectorAt } from '../../shared/world';
 import type {
   AsteroidData,
@@ -47,6 +48,7 @@ import { CollisionManager } from '../physics/collision/CollisionManager';
 import { applyShockwaveToBody, type ShockwaveWaveSpec } from '../physics/shockwave';
 import { contourSegmentCount } from '../physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../physics/terrain/heightfield';
+import { getSpiderField } from '../physics/terrain/spiderSession';
 import {
   getTerrainContours,
   getTerrainField,
@@ -65,6 +67,20 @@ import { GameStateManager } from './services/GameStateManager';
 import { InputManager } from './services/InputManager';
 
 export class GameController {
+  private harpoonBodies() {
+    return [
+      ...this.currRoidBelt.roids,
+      ...getSpiderField().spiders.map((spider) => ({
+        kind: 'spider' as const,
+        id: spider.id,
+        position: spider.position,
+        velocity: { x: 0, y: 0 },
+        health: spider.health,
+        size: SPIDER.HIT_RADIUS,
+      })),
+    ];
+  }
+
   private static instance: GameController;
 
   private gameStateManager: GameStateManager;
@@ -108,7 +124,7 @@ export class GameController {
 
     // Initialize with empty asteroid belt - will be populated by server
     this.currRoidBelt = entityFactory.createEmptyRoidBelt();
-    bindHarpoonFieldSource(() => this.currRoidBelt.roids);
+    bindHarpoonFieldSource(() => this.harpoonBodies());
     bindUniverseMapField(() => this.currRoidBelt.roids);
 
     // Set up network disconnection handler
@@ -784,7 +800,7 @@ export class GameController {
   }
 
   private publishLiveHarpoonField(): void {
-    publishHarpoonField(this.currRoidBelt.roids);
+    publishHarpoonField(this.harpoonBodies());
   }
 
   private playersWithLocal(local: Player, allPlayers: Player[]): Player[] {

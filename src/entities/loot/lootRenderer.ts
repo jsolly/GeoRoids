@@ -1,6 +1,7 @@
 import type { LootData, LootKind } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
+import { addResourceMapPath } from '../../rendering/hud/resourceMapMark';
 import { PLAYFIELD_CLOSE_SCALE } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
 import { hexToRgba } from '../../utils/colorUtils';
@@ -116,6 +117,10 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     const glow = isTap ? VISUAL.TAP_LOOT_GLOW : VISUAL.LOOT_GLOW;
     const trace = (): void => {
       ctx.beginPath();
+      if (drop.kind === 'silk') {
+        addResourceMapPath(ctx, 'silk', screen.x, screen.y, r);
+        return;
+      }
       if (isTap) {
         traceTapCanister(ctx, screen.x, screen.y, drawR);
         return;

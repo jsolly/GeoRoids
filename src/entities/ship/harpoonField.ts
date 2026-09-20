@@ -13,7 +13,7 @@ export function syncHarpoonFieldFromPlay(): readonly AbilityBody[] {
   if (fieldSource) {
     publishHarpoonField(fieldSource());
   }
-  return field;
+  return getHarpoonField();
 }
 
 /** Retain visible cargo while a disconnected client waits for its next snapshot. */
@@ -36,5 +36,5 @@ export function getHarpoonField(): readonly AbilityBody[] {
 }
 
 export function findHarpoonFieldBody(id: string | null | undefined): AbilityBody | undefined {
-  return field.find((asteroid) => asteroid.id === id);
+  return getHarpoonField().find((body) => body.id === id);
 }

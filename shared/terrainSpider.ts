@@ -7,6 +7,9 @@ import { DAMAGE, GAME } from '../src/constants';
  */
 export const SPIDER = {
   MAX_ACTIVE: 48,
+  SILK_BURSTS: 4,
+  SHUDDER_FRAMES: 30,
+  CONSUMED_HISTORY_FRAMES: 180,
   MAX_ROAMERS: 1,
   NEST_SPACING: 10_000,
   NEST_SITE_RADIUS: 1_200,

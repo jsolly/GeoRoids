@@ -29,6 +29,7 @@ import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */
 export interface GameEntity {
+  silk?: number;
   id: string;
   name: string;
   type: 'player';

@@ -22,6 +22,7 @@ interface SpiderAdvanceOptions {
   players: readonly SpiderActor[];
   completedSectors: ReadonlySet<string>;
   nowFrame: number;
+  towedIds?: ReadonlySet<string>;
   resources?: () => readonly SpiderResource[];
   dormantResource?: (id: string, home: Position) => SpiderResource | undefined;
 }
@@ -50,6 +51,11 @@ type Territory =
     };
 
 interface RuntimeSpider extends TerrainSpider {
+  readonly kind: 'spider';
+  size: number;
+  velocity: Position;
+  silkBursts: number;
+  displaced: boolean;
   biteReadyAt: number;
   territory: Territory;
 }
@@ -85,6 +91,8 @@ function copySpider(spider: TerrainSpider): TerrainSpider {
     maxHealth: spider.maxHealth,
     phase: spider.phase,
     targetId: spider.targetId,
+    shudderFrames: spider.shudderFrames ?? 0,
+    ...(spider.probe ? { probe: { ...spider.probe } } : {}),
   };
 }
 
@@ -121,6 +129,7 @@ function liveActor(actor: SpiderActor): boolean {
 
 /** Server-owned terrain predators and swept laser interactions. */
 export class TerrainSpiderManager {
+  private consumed: NonNullable<SpiderFieldState['consumed']> = [];
   private readonly spiders = new Map<string, RuntimeSpider>();
   private spiderSequence = 0;
   private nextSpawnFrame: number | null = null;
@@ -138,6 +147,10 @@ export class TerrainSpiderManager {
       spiders: [...this.spiders.values()].sort((a, b) => a.id.localeCompare(b.id)).map(copySpider),
       // Rebuilt with the resource refresh; snapshots never scan dormant nest history.
       nests: this.nestMarkers,
+      consumed: this.consumed.map((event) => ({
+        ...event,
+        position: copyPosition(event.position),
+      })),
     };
   }
 
@@ -155,6 +168,7 @@ export class TerrainSpiderManager {
 
   public clear(): void {
     this.spiders.clear();
+    this.consumed = [];
     this.nextSpawnFrame = null;
     this.nextNestFrame = 0;
     this.nests.clear();
@@ -181,11 +195,50 @@ export class TerrainSpiderManager {
       maxHealth: SPIDER.MAX_HEALTH,
       phase: 'scuttling',
       targetId: null,
+      kind: 'spider',
+      size: SPIDER.HIT_RADIUS,
+      velocity: { x: 0, y: 0 },
+      silkBursts: SPIDER.SILK_BURSTS,
+      displaced: false,
       biteReadyAt: 0,
       territory: { kind: 'roaming' },
     };
     this.spiders.set(spider.id, spider);
     return copySpider(spider);
+  }
+
+  public getBody(id: string): RuntimeSpider | undefined {
+    return this.spiders.get(id);
+  }
+
+  public getBodies(): readonly RuntimeSpider[] {
+    return [...this.spiders.values()];
+  }
+
+  /** Tapping agitates the living spider without reducing its health. */
+  public provoke(id: string, targetId: string): void {
+    const spider = this.spiders.get(id);
+    if (!spider) {
+      return;
+    }
+    spider.phase = 'hunting';
+    spider.targetId = targetId;
+    spider.shudderFrames = SPIDER.SHUDDER_FRAMES;
+    if (spider.territory.kind === 'guard') {
+      spider.territory.activity = 'patrolling';
+      spider.territory.chaseUntil = this.nowFrame + SPIDER.NEST_CHASE_FRAMES;
+    }
+  }
+
+  /** A spider has a finite silk reserve; repeated latches cannot farm infinite drops. */
+  public extractSilk(id: string, targetId: string): boolean {
+    this.provoke(id, targetId);
+    const spider = this.spiders.get(id);
+    if (!spider || spider.silkBursts <= 0) {
+      return false;
+    }
+    spider.silkBursts -= 1;
+    return true;
   }
 
   /** Remove a spider and invalidate its pending attacks. */
@@ -215,6 +268,15 @@ export class TerrainSpiderManager {
       .sort((a, b) => a.id.localeCompare(b.id));
     const playerById = new Map(players.map((player) => [player.id, player]));
 
+    this.consumed = this.consumed.filter(
+      (event) => nowFrame - event.frame <= SPIDER.CONSUMED_HISTORY_FRAMES
+    );
+    for (const spider of this.spiders.values()) {
+      spider.shudderFrames = Math.max(0, (spider.shudderFrames ?? 0) - 1);
+      if (options.towedIds?.has(spider.id)) {
+        spider.displaced = true;
+      }
+    }
     this.removeBlockedBodies(options.completedSectors);
     this.removeDistantBodies(players);
     if (players.length > 0 && nowFrame >= this.nextNestFrame) {
@@ -232,6 +294,23 @@ export class TerrainSpiderManager {
 
     const attacks: SpiderAttack[] = [];
     for (const spider of [...this.spiders.values()].sort((a, b) => a.id.localeCompare(b.id))) {
+      if (options.towedIds?.has(spider.id)) {
+        const start = copyPosition(spider.position);
+        spider.position = this.containPosition({
+          x: start.x + spider.velocity.x,
+          y: start.y + spider.velocity.y,
+        });
+        this.consumeAtFurnace(spider, start);
+        continue;
+      }
+      spider.velocity.x = 0;
+      spider.velocity.y = 0;
+      if (spider.displaced) {
+        if (this.retreatFromProtection(spider)) {
+          continue;
+        }
+        spider.displaced = false;
+      }
       this.advanceSpider(spider, players, playerById, options.completedSectors, nowFrame, attacks);
     }
 
@@ -303,7 +382,9 @@ export class TerrainSpiderManager {
   private removeBlockedBodies(completedSectors: ReadonlySet<string>): void {
     for (const spider of [...this.spiders.values()]) {
       if (
-        !this.canOccupy(spider.position, SPIDER.HIT_RADIUS, completedSectors) ||
+        shipOverlapsCompletedSector(spider.position, SPIDER.HIT_RADIUS, completedSectors) ||
+        (!spider.displaced &&
+          !this.canOccupy(spider.position, SPIDER.HIT_RADIUS, completedSectors)) ||
         (spider.territory.kind === 'guard' &&
           !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS, completedSectors))
       ) {
@@ -314,14 +395,17 @@ export class TerrainSpiderManager {
 
   private removeDistantBodies(players: readonly SpiderActor[]): void {
     for (const spider of [...this.spiders.values()]) {
-      const origin = spider.territory.kind === 'guard' ? spider.territory.home : spider.position;
+      const origin =
+        spider.territory.kind === 'guard' && !spider.displaced
+          ? spider.territory.home
+          : spider.position;
       const nearest = players.reduce(
         (distance, player) => Math.min(distance, distanceBetween(origin, player.position)),
         Number.POSITIVE_INFINITY
       );
       const limit =
         spider.territory.kind === 'guard' ? SPIDER.NEST_WAKE_DISTANCE : SPIDER.DESPAWN_DISTANCE;
-      if (nearest > limit) {
+      if (nearest > limit && !spider.probe) {
         // Sleeping guards retain their health and identity. Death uses removeSpider.
         this.spiders.delete(spider.id);
         spider.targetId = null;
@@ -439,7 +523,7 @@ export class TerrainSpiderManager {
           nest.guards = nest.guards.filter(
             (guard) =>
               this.canOccupy(nest.home, SPIDER.HIT_RADIUS, completed) &&
-              this.canOccupy(guard.position, SPIDER.HIT_RADIUS, completed)
+              (guard.displaced || this.canOccupy(guard.position, SPIDER.HIT_RADIUS, completed))
           );
           for (const guard of nest.guards) {
             if (this.spiders.size >= SPIDER.MAX_ACTIVE) {
@@ -555,6 +639,57 @@ export class TerrainSpiderManager {
       });
       spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
     }
+  }
+
+  private consumeAtFurnace(spider: RuntimeSpider, start: Position): boolean {
+    const furnace = FURNACES.find(
+      (site) =>
+        segmentCircleContact(start, spider.position, site.position, site.radius) !== undefined
+    );
+    if (!furnace) {
+      return false;
+    }
+    this.consumed.push({
+      id: spider.id,
+      position: copyPosition(spider.position),
+      furnaceId: furnace.id,
+      frame: this.nowFrame,
+    });
+    this.consumed = this.consumed.slice(-SPIDER.MAX_ACTIVE);
+    this.removeSpider(spider.id);
+    return true;
+  }
+
+  /** Released cargo walks out of safe areas instead of freezing or attacking inside them. */
+  private retreatFromProtection(spider: RuntimeSpider): boolean {
+    const furnace = FURNACES.find(
+      (site) =>
+        distanceBetween(spider.position, site.position) <
+        SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
+    );
+    const inStarter =
+      Math.hypot(spider.position.x, spider.position.y) <
+      SPIDER.STARTER_SAFE_RADIUS + SPIDER.HIT_RADIUS;
+    const origin = inStarter ? { x: 0, y: 0 } : furnace?.position;
+    if (!origin) {
+      return false;
+    }
+    const angle = Math.atan2(spider.position.y - origin.y, spider.position.x - origin.x);
+    const next = {
+      x: spider.position.x + Math.cos(angle) * SPIDER.SCUTTLE_SPEED,
+      y: spider.position.y + Math.sin(angle) * SPIDER.SCUTTLE_SPEED,
+    };
+    if (shipOverlapsCompletedSector(next, SPIDER.HIT_RADIUS, this.completedSectors)) {
+      this.removeSpider(spider.id);
+      return true;
+    }
+    spider.phase = 'scuttling';
+    spider.targetId = null;
+    spider.angle = angle;
+    const start = spider.position;
+    spider.position = next;
+    this.consumeAtFurnace(spider, start);
+    return true;
   }
 
   private returnHome(

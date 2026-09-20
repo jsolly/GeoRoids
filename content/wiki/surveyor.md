@@ -49,20 +49,25 @@ delivery reward.
 Open the ship schematic with V or the Schematic button on desktop, or a long
 press on your hull on touch, then select Survey Probe. Press E or tap Probe to
 fire along your heading. The first
-asteroid in range receives a small beacon on its surface. Aim at an unoccupied
-rock; a rock already carrying a probe blocks the shot. Walls also block it.
+asteroid or spider in range receives a small beacon on its surface. Aim at an
+unoccupied host; a host already carrying a probe blocks the shot. Walls also block it.
 A miss does not consume the cooldown or replace an existing beacon.
 
-The probe moves and rotates with its host. It identifies the host immediately,
+The probe moves and rotates with its host. It identifies a host asteroid immediately,
 then periodically identifies nearby asteroid materials for everyone. A thin
 expanding ring shows the scan radius, and a pulsing minimap marker lets Haulers
 follow the host through the field. Discovered materials remain identified after
 the beacon stops. Probe discoveries also record the launching Surveyor for
 furnace delivery credit, just like Mineral Scan.
 
+Attach a probe to a guarding spider, then retreat and let it return to its nest.
+The beacon scans along its route and identifies nearby guarded asteroid resources
+when it reaches home. Spider probes share the same battery, durability, and
+per-Surveyor limit as asteroid probes.
+
 A green health bar above the probe shows its durability. Any pilot can shoot
-the exposed beacon off the surface without first destroying the rock. Aim at
-the small diamond; a shot that hits the rock first still mines the rock.
+the exposed beacon off the surface without first destroying its host. Aim at
+the small diamond; a shot that hits the host first still damages the host.
 Destroying or delivering the host removes its probe too.
 
 The battery expires after a limited time. An amber warning pulse signals that

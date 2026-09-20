@@ -1,8 +1,14 @@
+import { probePosition } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
 import type { Position, TerrainSpider } from '../../shared-types';
 import { updateSpiderScore } from '../audio/spiderScore';
+import { drawSurveyProbe } from '../entities/roid/surveyProbeRenderer';
 import type { ContourLevel } from '../physics/terrain/contours';
-import { getSpiderField, spiderDanger } from '../physics/terrain/spiderSession';
+import {
+  getSpiderConsumptionEffects,
+  getSpiderField,
+  spiderDanger,
+} from '../physics/terrain/spiderSession';
 import { getTerrainContours } from '../physics/terrain/terrainSession';
 import { canvasManager } from './canvasSurface';
 import { contourCandidates } from './contourSpatialIndex';
@@ -54,6 +60,9 @@ function drawSpider(
   ctx.save();
   ctx.translate(spider.position.x, spider.position.y);
   ctx.rotate(spider.angle);
+  const shudder = Math.min(1, (spider.shudderFrames ?? 0) / 12);
+  ctx.translate(Math.sin(time * 95) * 4 * shudder, Math.cos(time * 77) * 3 * shudder);
+  ctx.rotate(Math.sin(time * 85) * 0.13 * shudder);
   const speed = spider.phase === 'hunting' ? 24 : 12;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -91,7 +100,7 @@ function drawSpider(
   const flashUntil =
     previous && spider.health < previous.health ? time + 0.18 : (previous?.flashUntil ?? 0);
   healthHistory.set(spider.id, { health: spider.health, flashUntil });
-  ctx.fillStyle = time < flashUntil ? '#fff0da' : '#200e20';
+  ctx.fillStyle = time < flashUntil ? '#fff0da' : shudder > 0 ? '#8c254e' : '#200e20';
   ctx.strokeStyle = '#d04c66';
   ctx.lineWidth = 1.5 / scale;
   ctx.beginPath();
@@ -146,7 +155,47 @@ export function drawTerrainSpiders(position: Position, playerId: string, alive: 
       drawSpider(ctx, spider, time, scale, levels);
     }
   }
+  for (const effect of getSpiderConsumptionEffects()) {
+    const progress = Math.min(1, time - effect.startedAt);
+    ctx.save();
+    ctx.translate(effect.position.x, effect.position.y - progress * 40);
+    ctx.globalAlpha = 1 - progress;
+    ctx.strokeStyle = '#ffbd69';
+    ctx.fillStyle = '#ef6544';
+    ctx.lineWidth = 2 / scale;
+    const shrink = 1 - progress;
+    for (const side of [-1, 1]) {
+      for (let leg = 0; leg < 4; leg++) {
+        ctx.beginPath();
+        ctx.moveTo((12 - leg * 7) * shrink, 0);
+        ctx.lineTo((20 - leg * 12) * shrink, side * 23 * shrink);
+        ctx.lineTo((25 - leg * 14) * shrink, side * (30 - progress * 24) * shrink);
+        ctx.stroke();
+      }
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 22 * shrink + 0.1, 12 * shrink + 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (let ember = 0; ember < 7; ember++) {
+      ctx.beginPath();
+      ctx.arc(
+        Math.sin(ember * 7) * 26 * progress,
+        -ember * 5 * progress,
+        2 * shrink + 0.1,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   ctx.restore();
+  for (const spider of field.spiders) {
+    if (spider.probe) {
+      const screen = canvasManager.worldToScreen(probePosition(spider, spider.probe), position);
+      drawSurveyProbe(ctx, spider.probe, screen, scale, Date.now());
+    }
+  }
   const danger = alive ? spiderDanger(position, field, playerId) : 'quiet';
   updateSpiderScore(danger);
   if (danger === 'hunted') {

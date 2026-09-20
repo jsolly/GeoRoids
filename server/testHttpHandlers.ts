@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
+import { FURNACES } from '../shared/furnaces';
 import { WORLD } from '../shared/world';
 import { DAMAGE } from '../src/constants';
 import type { WebSocketCore } from './communication/WebSocketCore';
@@ -291,11 +292,16 @@ export function handleTestArrangeCrewField(
         'satellite',
         'probe',
         'spider-nest',
+        'spider-tools',
         'map-icons',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
       return;
+    }
+    const spiderWorks = FURNACES.find((site) => site.id === 'works-1-0');
+    if (!spiderWorks) {
+      throw new Error('Missing regional furnace');
     }
     const ids = body['playerIds'] as string[];
     const players = ids.map((id) => gameEngine.getPlayer(id));
@@ -313,17 +319,20 @@ export function handleTestArrangeCrewField(
       if (!player) {
         throw new Error('Validated crew disappeared');
       }
-      const position = ['spider-nest', 'map-icons'].includes(String(body['scenario']))
-        ? { x: 3000 + index * 120, y: 5000 }
-        : body['scenario'] === 'boundary'
-          ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-          : body['scenario'] === 'delivery' || body['scenario'] === 'tow'
-            ? player.kitId === 'hauler'
-              ? { x: 0, y: -360 }
-              : { x: 220, y: -460 }
-            : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-              ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-              : { x: index * 120, y: -360 };
+      const position =
+        body['scenario'] === 'spider-tools'
+          ? { x: spiderWorks.position.x + 400, y: spiderWorks.position.y }
+          : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
+            ? { x: 3000 + index * 120, y: 5000 }
+            : body['scenario'] === 'boundary'
+              ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+              : body['scenario'] === 'delivery' || body['scenario'] === 'tow'
+                ? player.kitId === 'hauler'
+                  ? { x: 0, y: -360 }
+                  : { x: 220, y: -460 }
+                : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                  ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
+                  : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -337,14 +346,16 @@ export function handleTestArrangeCrewField(
       // 'tow' points the Hauler away from every furnace, so the cargo it hooks
       // stays hooked for as long as the scenario needs instead of being smelted.
       player.angle =
-        body['scenario'] === 'reflection' ||
-        body['scenario'] === 'probe' ||
-        body['scenario'] === 'boundary'
-          ? 0
-          : body['scenario'] === 'tow'
-            ? -Math.PI / 2
-            : Math.PI / 2;
-      player.spawnProtectionTimer = ['delivery', 'tow', 'map-icons'].includes(
+        body['scenario'] === 'spider-tools'
+          ? Math.PI
+          : body['scenario'] === 'reflection' ||
+              body['scenario'] === 'probe' ||
+              body['scenario'] === 'boundary'
+            ? 0
+            : body['scenario'] === 'tow'
+              ? -Math.PI / 2
+              : Math.PI / 2;
+      player.spawnProtectionTimer = ['delivery', 'tow', 'map-icons', 'spider-tools'].includes(
         String(body['scenario'])
       )
         ? 600
@@ -368,7 +379,17 @@ export function handleTestArrangeCrewField(
       gameEngine.parkSatellitePickups();
     }
     const first = poses[0];
-    if (['spider-nest', 'map-icons'].includes(String(body['scenario']))) {
+    if (body['scenario'] === 'spider-tools') {
+      gameEngine.clearSpiderField();
+      if (
+        !gameEngine.spawnTerrainSpider({
+          x: spiderWorks.position.x + 500,
+          y: spiderWorks.position.y,
+        })
+      ) {
+        throw new Error('Spider tool fixture could not spawn its target');
+      }
+    } else if (['spider-nest', 'map-icons'].includes(String(body['scenario']))) {
       gameEngine.addAsteroid({
         id: 'crew-fixture-spider-deposit',
         position: { x: 5000, y: 5000 },

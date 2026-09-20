@@ -35,6 +35,7 @@ export class Player {
   type: 'local' | 'remote';
   ship: Ship;
   score: number = 0;
+  silk = 0;
   lastUpdate: number = Date.now();
   lives: number = GAME.START_LIVES;
   color: string; // Player's unique color for lasers and other visual elements
@@ -111,6 +112,7 @@ export class Player {
     angle?: number;
     lives?: number;
     score?: number;
+    silk?: number;
     exploding?: boolean;
     thrusting?: boolean;
     boost?: ShipBoostState;
@@ -136,6 +138,9 @@ export class Player {
       const color = this.ship.color;
       applyShipKitToShip(this.ship, data.kitId);
       this.ship.color = color;
+    }
+    if (data.silk !== undefined) {
+      this.silk = data.silk;
     }
     if (data.spawnProtectionTimer !== undefined) {
       this.serverSpawnProtectionTimer = data.spawnProtectionTimer;

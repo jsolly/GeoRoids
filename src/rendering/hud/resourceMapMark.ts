@@ -141,6 +141,24 @@ export function addResourceMapPath(
         line(0.8, -1);
       }
       return;
+    case 'silk':
+      // Three looped strands read as a loose skein at both pickup and radar scale.
+      for (const offset of [-0.35, 0, 0.35]) {
+        move(-0.7, offset - 0.35);
+        ctx.quadraticCurveTo(
+          x + size,
+          y + (offset - 0.7) * size,
+          x + size * 0.65,
+          y + (offset + 0.15) * size
+        );
+        ctx.quadraticCurveTo(
+          x - size * 0.4,
+          y + (offset + 0.85) * size,
+          x - size * 0.7,
+          y + (offset - 0.35) * size
+        );
+      }
+      return;
     case 'tap':
       move(-0.55, -0.35);
       line(-0.55, 0.6);

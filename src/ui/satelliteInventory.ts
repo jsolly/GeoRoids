@@ -32,6 +32,7 @@ export function renderSatelliteInventory(
     !active;
   const signature = JSON.stringify([
     canEquip,
+    player?.silk ?? 0,
     owned.map((pickup) => [
       pickup.id,
       pickup.state,
@@ -70,6 +71,11 @@ export function renderSatelliteInventory(
       ? document.activeElement.dataset['pickupId']
       : undefined;
   container.replaceChildren();
+  const silk = document.createElement('p');
+  silk.className = 'satellite-inventory-silk';
+  const silkCount = player?.silk ?? 0;
+  silk.textContent = `Spider silk: ${silkCount} ${silkCount === 1 ? 'bundle' : 'bundles'} stored. No use yet.`;
+  container.append(silk);
   if (owned.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'satellite-inventory-empty';

@@ -42,7 +42,13 @@ type RadarMark = {
   kitId: ShipKitId;
 };
 
-const LOOT_MARK_KINDS = ['wreckage', 'shard', 'laserCore', 'tap'] satisfies readonly LootKind[];
+const LOOT_MARK_KINDS = [
+  'wreckage',
+  'shard',
+  'laserCore',
+  'tap',
+  'silk',
+] satisfies readonly LootKind[];
 
 // These marks stay visible at the radar's world scale without borrowing the
 // much larger playfield silhouettes.
@@ -307,18 +313,27 @@ function drawAsteroidMarks(
       drawResourceMapMark(ctx, 'asteroid', x, y, 4, asteroidMapInk(material), material);
     }
     if (roid.probe && roid.probe.health > 0) {
-      const phase =
-        (Math.max(0, Date.now() - roid.probe.attachedAt) % SURVEY_PROBE.PULSE_MS) /
-        SURVEY_PROBE.PULSE_MS;
-      ctx.strokeStyle = PALETTE.LOCAL;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 1 - phase * 0.65;
-      ctx.beginPath();
-      ctx.arc(x, y, 5 + phase * 4, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      drawProbePulse(ctx, x, y, roid.probe.attachedAt);
     }
   }
+  ctx.restore();
+}
+
+function drawProbePulse(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  attachedAt: number
+): void {
+  const phase =
+    (Math.max(0, Date.now() - attachedAt) % SURVEY_PROBE.PULSE_MS) / SURVEY_PROBE.PULSE_MS;
+  ctx.save();
+  ctx.strokeStyle = PALETTE.LOCAL;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1 - phase * 0.65;
+  ctx.beginPath();
+  ctx.arc(x, y, 5 + phase * 4, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -614,7 +629,19 @@ export function drawMiniMap(
       roids
     );
     drawFurnaceMarks(ctx, geometry);
-    for (const nest of getSpiderField().nests) {
+    const spiderField = getSpiderField();
+    for (const spider of spiderField.spiders) {
+      if (
+        spider.health > 0 &&
+        spider.probe &&
+        spider.probe.health > 0 &&
+        isExploredPosition(geometry, spider.position) &&
+        projectPosition(geometry, spider.position)
+      ) {
+        drawProbePulse(ctx, geometry.projection.x, geometry.projection.y, spider.probe.attachedAt);
+      }
+    }
+    for (const nest of spiderField.nests) {
       if (isExploredPosition(geometry, nest.position) && projectPosition(geometry, nest.position)) {
         drawResourceMapMark(
           ctx,

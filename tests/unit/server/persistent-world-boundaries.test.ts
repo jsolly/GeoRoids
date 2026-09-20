@@ -648,3 +648,14 @@ test('a legacy saved finite burn loads as coasting cargo without losing the depo
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('stored spider silk survives a world checkpoint and reload without becoming score', () => {
+  const store = new WorldStore(':memory:');
+  try {
+    const pilot = { ...scorePilot(5), silk: 7 };
+    store.checkpoint(undefined, new Map(), [pilot]);
+    expect(store.loadPilots()).toEqual([pilot]);
+  } finally {
+    store.close();
+  }
+});

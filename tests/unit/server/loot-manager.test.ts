@@ -125,18 +125,26 @@ describe('LootManager destroy-drop shards', () => {
   });
 });
 
-test('tap loot visibly ejects before an overlapping ship can collect it', () => {
-  const manager = new LootManager(new RNGService(7));
-  const drop = manager.spawnTap({ x: 0, y: 0 }, 0, { x: 3, y: 0 });
-  const collector = collectorAt({ x: 0, y: 0 });
-  expect(manager.collectOverlaps([collector])).toEqual([]);
-  for (let frame = 1; frame < GROWTH.TAP_LOOT_EJECT_FRAMES; frame++) {
-    manager.expire(frame, [collector]);
-    const moved = manager.get(drop.id);
-    expect(moved?.position.x).toBeGreaterThan(collector.position.x);
-    collector.position = { ...(moved?.position ?? collector.position) };
+test.each(['tap', 'silk'] as const)(
+  '%s visibly ejects before an overlapping ship can collect it',
+  (kind) => {
+    const manager = new LootManager(new RNGService(7));
+    const drop =
+      kind === 'tap'
+        ? manager.spawnTap({ x: 0, y: 0 }, 0, { x: 3, y: 0 })
+        : manager.spawnSilk({ x: 0, y: 0 }, 0, { x: 3, y: 0 });
+    expect(drop.kind).toBe(kind);
+    expect(drop.mass).toBe(kind === 'silk' ? 0 : GROWTH.TAP_LOOT_MASS);
+    const collector = collectorAt({ x: 0, y: 0 });
     expect(manager.collectOverlaps([collector])).toEqual([]);
+    for (let frame = 1; frame < GROWTH.TAP_LOOT_EJECT_FRAMES; frame++) {
+      manager.expire(frame, [collector]);
+      const moved = manager.get(drop.id);
+      expect(moved?.position.x).toBeGreaterThan(collector.position.x);
+      collector.position = { ...(moved?.position ?? collector.position) };
+      expect(manager.collectOverlaps([collector])).toEqual([]);
+    }
+    manager.expire(GROWTH.TAP_LOOT_EJECT_FRAMES, [collector]);
+    expect(manager.collectOverlaps([collector]).map((entry) => entry.loot.id)).toEqual([drop.id]);
   }
-  manager.expire(GROWTH.TAP_LOOT_EJECT_FRAMES, [collector]);
-  expect(manager.collectOverlaps([collector]).map((entry) => entry.loot.id)).toEqual([drop.id]);
-});
+);

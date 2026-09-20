@@ -150,8 +150,8 @@ function drawCompletedSectors(ctx: CanvasRenderingContext2D, geometry: MiniMapGe
   }
   const cellScale = geometry.size / (geometry.radius * 2);
   ctx.save();
-  ctx.fillStyle = hexToRgba(PALETTE.DANGER, 0.22);
-  ctx.strokeStyle = hexToRgba(PALETTE.DANGER, 0.7);
+  ctx.fillStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.22);
+  ctx.strokeStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.7);
   ctx.lineWidth = 1;
   for (const id of completed) {
     const parsed = parseSectorId(id);

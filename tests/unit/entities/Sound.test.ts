@@ -272,7 +272,7 @@ test('an interrupted tab does not resume until a gesture, and a failed lifecycle
   );
   document.dispatchEvent(new Event('visibilitychange'));
   document.dispatchEvent(new Event('pointerdown'));
-  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 1);
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 2);
   rejectResume(audioDeviceError());
   await settle();
   expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 2);
@@ -366,4 +366,20 @@ test('simultaneous remote shots retain independent directions and local reuse re
   howl().end(1);
   sound.play();
   expect(howl().pos).toHaveBeenLastCalledWith(0, 0, -1, 3);
+});
+
+test('lifting a finger unlocks audio while an earlier resume never settles', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  context().changeState('suspended');
+  context().resume.mockImplementationOnce(() => new Promise<void>(() => {}));
+  document.dispatchEvent(new Event('visibilitychange'));
+  const attempts = context().resume.mock.calls.length;
+  document.dispatchEvent(new Event('touchend'));
+  expect(context().resume).toHaveBeenCalledTimes(attempts + 1);
+  expect(context().state).toBe('running');
+  await settle();
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(1);
 });

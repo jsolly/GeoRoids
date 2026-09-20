@@ -1,6 +1,7 @@
 import type { Howl } from 'howler';
 import { AUDIO } from '../constants';
 import { LOCAL_STORAGE_KEYS, musicIsOn } from '../constants/user-preferences';
+import { logger } from '../utils/Logger';
 import { setStoredItem } from '../utils/safeStorage';
 import {
   activateAudio,
@@ -194,10 +195,12 @@ function ensureHowls(audio: AudioLibrary): void {
       onload: () => {
         syncMusicBeds();
       },
-      onloaderror: () => {
+      onloaderror: (_id, error) => {
+        logger.warn('SOUND', 'Music bed failed to load', { bed: kind, error });
         handleBedLoadError(kind);
       },
-      onplayerror: (id) => {
+      onplayerror: (id, error) => {
+        logger.warn('SOUND', 'Music bed failed to play', { bed: kind, error });
         howls[kind]?.stop(id);
       },
       onfade: (id) => {
@@ -269,4 +272,17 @@ registerMusicThreatListener(syncMusicBeds);
 window.addEventListener('playViewOn', syncMusicBeds);
 window.addEventListener('playViewOff', onPlayViewOff);
 document.addEventListener('pointerdown', onGesture, true);
+document.addEventListener('touchend', onGesture, true);
 document.addEventListener('keydown', onGesture, true);
+
+export function readMusicDiagnostics() {
+  return {
+    desiredBed: desiredBed(),
+    currentBed: current,
+    beds: MUSIC_BED_IDS.map((bed) => ({
+      bed,
+      state: howls[bed]?.state() ?? 'not-created',
+      playing: howls[bed]?.playing() ?? false,
+    })),
+  };
+}

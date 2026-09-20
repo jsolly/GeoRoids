@@ -28,7 +28,9 @@ In-play danger can temporarily switch to a threat bed, then the playfield
 loop returns. Music off silences every bed, including danger, without muting
 cues. This browser remembers both audio checkboxes. Starting with Sound Effects
 off skips loading effect files. When you enable effects, they become
-available as they load; missed sounds do not play later.
+available as they load; missed sounds do not play later. On phones, lifting
+your finger after a tap retries blocked audio startup. Copy Diagnostics includes
+audio context state and music loading/playback state if sound remains silent.
 The Haptics checkbox stays off until you turn it on, and this browser remembers
 that choice. With Haptics on, your own shots, hull hits, deaths, Boost starts,
 kit abilities, pickups, and furnace deliveries buzz the device. Crew action
@@ -101,7 +103,8 @@ collected or moved.
 The universe map uses the same symbols and also shows nearby explored rocks
 and small loot from the current local snapshot.
 Kit hull silhouettes in local and crew colors keep pilots
-identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
+identifiable above the world marks. Completed sectors have green shading and borders on both maps and green walls
+in the playfield, distinct from spiderweb hazards. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
 V or the Schematic button on desktop, or hold your own hull on touch, to open
 the local ship schematic. M or use the Map button to open the full-screen universe

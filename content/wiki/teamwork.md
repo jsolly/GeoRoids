@@ -112,5 +112,5 @@ without losing a life. A hull that has already crossed the grid but still
 overlaps the new wall is nudged the rest of the way out the same way, so
 finishing a sector cannot yank a crew backward or spend a life. New spawns
 skip completed sectors. Crossing into a new open sector shows a brief HUD
-notice with that sector's coordinates. The local radar and universe map hatch
-completed sectors so the closed ground stays obvious.
+notice with that sector's coordinates. The local radar and universe map shade completed sectors green, matching
+their green playfield walls, so closed ground stays distinct from spiderwebs.

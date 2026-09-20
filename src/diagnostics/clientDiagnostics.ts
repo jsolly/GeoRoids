@@ -1,3 +1,5 @@
+import { readAudioDiagnostics } from '../audio/audioRuntime';
+import { readMusicDiagnostics } from '../audio/musicBeds';
 import { GameController } from '../core/gameController';
 import { readTouchControlDiagnostics } from '../input/touchControls';
 import { getClientReleaseId } from '../utils/buildInfo';
@@ -24,6 +26,7 @@ export function buildClientDiagnostics(): string {
       width: innerWidth,
       height: innerHeight,
     },
+    audio: { ...readAudioDiagnostics(), ...readMusicDiagnostics() },
     metrics: readDebugHudMetrics(performance.now()),
     connected: network.isConnected,
     running: game.getIsGameRunning(),

@@ -18,7 +18,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no terrain damage |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
-| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, Sound Effects and Music settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
+| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
 ## Coverage matrix
 
@@ -44,6 +44,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
 | How do I mute sound effects or music? | hud-network | src/constants/user-preferences.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
 | How do I copy a Player ID so an agent can filter Railway logs? | hud-network | src/ui/debugIdentity.ts, src/utils/clientLogContext.ts, docs/diagnostics.md |
+| How do I turn on haptics, and which phones can vibrate? | hud-network | src/fx/haptics.ts, src/ui/mainMenu.ts, src/constants/user-preferences.ts |
 
 ## Maintenance rules
 

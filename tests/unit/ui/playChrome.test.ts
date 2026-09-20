@@ -31,6 +31,12 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionHtml).toContain('class="enter-game"');
   expect(productionHtml).toContain('class="nickname-input"');
   expect(productionHtml).toContain('class="sound-toggle"');
+  expect(productionHtml).toContain('id="hapticsPref"');
+  expect(productionHtml).toContain('class="preference-toggles"');
+  expect(productionCss).toMatch(
+    /\.preference-toggles \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/su
+  );
+  expect(productionCss).toContain('.haptics-hint');
 });
 
 test('agents guide forbids CDN runtime CSS and JS', () => {
@@ -61,6 +67,9 @@ test('title menu uses first-party nickname and sound chrome', () => {
   expect(document.querySelector('label[for="soundPref"]')?.textContent).toBe('Sound Effects');
   expect(document.querySelector('#musicPref')?.classList.contains('sound-toggle')).toBe(true);
   expect(document.querySelector('label[for="musicPref"]')?.textContent).toBe('Music');
+  expect(document.querySelector('#hapticsPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="hapticsPref"]')?.textContent).toBe('Haptics');
+  expect(document.querySelector('#hapticsHint')?.classList.contains('haptics-hint')).toBe(true);
   expect(document.querySelector('.form-control')).toBeNull();
   expect(document.querySelector('.form-label')).toBeNull();
   expect(document.querySelector('.form-check-input')).toBeNull();

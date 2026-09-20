@@ -24,13 +24,7 @@ import {
   projectKitHullEdges,
 } from './hullOutlines';
 import type { Ship } from './Ship';
-import { CLASSIC_HULL, type HullProfile, SHIP_ABILITY } from './shipKits';
-
-const shipTriangle = {
-  nose: { x: 0, y: 0 },
-  rearLeft: { x: 0, y: 0 },
-  rearRight: { x: 0, y: 0 },
-};
+import { SHIP_ABILITY } from './shipKits';
 
 const thrusterGeom = {
   rearCenter: { x: 0, y: 0 },
@@ -38,32 +32,7 @@ const thrusterGeom = {
 
 const laserScreen = { x: 0, y: 0 };
 const shipScreen = { x: 0, y: 0 };
-// Helper function to calculate ship triangle points for consistent ship rendering
-export function calculateShipTrianglePoints(
-  centerX: number,
-  centerY: number,
-  radius: number,
-  angle: number,
-  hull: HullProfile = CLASSIC_HULL
-): {
-  nose: { x: number; y: number };
-  rearLeft: { x: number; y: number };
-  rearRight: { x: number; y: number };
-} {
-  shipTriangle.nose.x = centerX + radius * hull.nose * Math.cos(angle);
-  shipTriangle.nose.y = centerY - radius * hull.nose * Math.sin(angle);
-  shipTriangle.rearLeft.x =
-    centerX - radius * hull.rear * Math.cos(angle) + radius * hull.beam * Math.sin(angle);
-  shipTriangle.rearLeft.y =
-    centerY + radius * hull.rear * Math.sin(angle) + radius * hull.beam * Math.cos(angle);
-  shipTriangle.rearRight.x =
-    centerX - radius * hull.rear * Math.cos(angle) - radius * hull.beam * Math.sin(angle);
-  shipTriangle.rearRight.y =
-    centerY + radius * hull.rear * Math.sin(angle) - radius * hull.beam * Math.cos(angle);
-  return shipTriangle;
-}
-
-/** Shared phosphor stroke for v2 kit outlines (and the leftover 3-point helper). */
+/** Shared phosphor stroke for kit outlines. */
 export function strokePhosphorPolyline(
   ctx: DrawingContext,
   points: readonly { x: number; y: number }[],
@@ -103,18 +72,6 @@ export function strokePhosphorPolyline(
   // stroke() retains the path; reuse it for the crisp pass.
   ctx.stroke();
   ctx.restore();
-}
-
-export function strokePhosphorHull(
-  ctx: DrawingContext,
-  hull: {
-    nose: { x: number; y: number };
-    rearLeft: { x: number; y: number };
-    rearRight: { x: number; y: number };
-  },
-  color: string
-): void {
-  strokePhosphorPolyline(ctx, [hull.nose, hull.rearLeft, hull.rearRight], color, true);
 }
 
 export function strokeKitHullOutline(

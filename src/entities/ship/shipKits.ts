@@ -7,12 +7,6 @@ export const DEFAULT_SHIP_KIT_ID: ShipKitId = 'surveyor';
 
 export type ShipAbilityId = 'surveyScan' | 'harpoon';
 
-export interface HullProfile {
-  nose: number;
-  rear: number;
-  beam: number;
-}
-
 interface ShipKit {
   id: ShipKitId;
   name: string;
@@ -28,13 +22,6 @@ interface ShipKit {
   turnSpeed: number;
   shotCooldown: number;
 }
-
-/** Classic triangle. Kept for the leftover 3-point helper; play hulls use v2 outlines. */
-export const CLASSIC_HULL: HullProfile = {
-  nose: 1,
-  rear: 0.8,
-  beam: 0.5,
-};
 
 export const SHIP_HULL_TOPOLOGY = {
   surveyor: 'delta-wing',

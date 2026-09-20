@@ -105,6 +105,8 @@ movements cannot whip the ship around. Watch the arrow ahead of the hull when
 your finger covers the ship. A quick one-finger tap fires once on release. While holding
 one finger to steer, tap anywhere on the playfield with another finger to fire
 immediately, or hold that second finger for continuous fire until it is lifted.
+If the browser drops a held finger without a release, the next single-finger
+drag steers again instead of only firing.
 Use the ability button for the same action as E. Press and hold your own hull
 to open the ship schematic. A short label above the ship on first join repeats
 that hold-to-equip reminder. Use the Boost button at the

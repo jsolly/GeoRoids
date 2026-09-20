@@ -1,4 +1,5 @@
 import { GameController } from '../core/gameController';
+import { readTouchControlDiagnostics } from '../input/touchControls';
 import { getClientReleaseId } from '../utils/buildInfo';
 import { getClientLogContext } from '../utils/clientLogContext';
 import { logger } from '../utils/Logger';
@@ -42,6 +43,7 @@ export function buildClientDiagnostics(): string {
           boost: ship.boost,
         }
       : null,
+    input: readTouchControlDiagnostics(),
     world: {
       players: network.getAllPlayers().length,
       asteroids: game.getCurrRoidCount(),

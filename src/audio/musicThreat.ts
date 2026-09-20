@@ -13,8 +13,9 @@
  * cannot inherit a stale threat, and re-entering play restores the normal
  * in-game bed until something pushes again.
  *
- * Expected files (optional follow-up drop; missing is a documented fallback):
- * `public/music/danger-bed.ogg` and `public/music/danger-bed.mp3`.
+ * Expected files: `public/music/danger-bed.ogg` and `public/music/danger-bed.mp3`
+ * (Iso Threat, Suno `31b6f7b6`). Missing or failed decode falls back to a
+ * slightly more intense in-game bed.
  */
 
 let threatCount = 0;

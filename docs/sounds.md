@@ -64,9 +64,10 @@ Sound-off must not initialize the effect backend. Optional instrumental beds
 live in `public/music/` and follow the Music checkbox instead: a title loop
 on the start screen, a playfield loop after Enter Game, and an optional
 danger loop while gameplay holds `pushMusicThreat()`. Pair every push with
-`clearMusicThreat()` (`src/audio/musicThreat.ts`); counts nest. Missing
-`danger-bed.ogg` / `danger-bed.mp3` keeps Playfield Drift slightly louder and
-faster. Music off silences every bed, including danger, without muting cues.
+`clearMusicThreat()` (`src/audio/musicThreat.ts`); counts nest. Iso Threat
+(`danger-bed.ogg` / `danger-bed.mp3`) is the danger keeper; a missing or failed
+decode still keeps Playfield Drift slightly louder and faster. Music off
+silences every bed, including danger, without muting cues.
 Leaving the playfield zeros the threat count. All beds stay quieter than
 cues. Satellite break, respawn, scan, latch/release and
 shockwave already had cues and now use the new family.

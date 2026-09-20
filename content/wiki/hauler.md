@@ -39,7 +39,7 @@ hull gap. The rock briefly shudders on attachment and stays whole. Four cream
 canisters with amber tips pop out during extraction, then the tether
 releases. The ability never targets a ship. E again releases an unfinished tap,
 stopping further drops; canisters already extracted remain collectible.
-Furnaces do not consume a tapped rock. With Sound enabled, each canister leaves
+Furnaces do not consume a tapped rock. With Sound Effects on, each canister leaves
 with a low crystal pluck. Collecting canisters answers with brighter notes;
 several quick pickups form a short melody.
 

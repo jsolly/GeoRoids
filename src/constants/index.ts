@@ -354,6 +354,14 @@ export const AUDIO = {
   EXPLOSION_VOLUME: 0.055,
   LASER_VOLUME: 0.04,
   HIT_VOLUME: 0.035,
+  // Soft looping beds sit under cues; never drown crystalline SFX.
+  MENU_BED_VOLUME: 0.014,
+  IN_GAME_BED_VOLUME: 0.012,
+  DANGER_BED_VOLUME: 0.016,
+  // Missing danger-bed files keep Playfield Drift, slightly more present.
+  DANGER_FALLBACK_VOLUME: 0.018,
+  DANGER_FALLBACK_RATE: 1.07,
+  BED_CROSSFADE_MS: 1600,
   // Used when the canvas size is unknown (matches PlayerNetwork nearby radius).
   FALLBACK_MAX_DISTANCE: 1200,
   // Floor so an on-screen source at the viewport edge stays a soft blush, not silent.

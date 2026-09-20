@@ -53,7 +53,7 @@ the blast does not deal ship damage or consume a life.
 
 ## Pickup melody
 
-With Sound enabled, collecting material plays a bright crystal note. Quick
+With Sound Effects on, collecting material plays a bright crystal note. Quick
 pickups continue a composed phrase, while a pause starts it again. Laser cores
 use a brighter voice in the same melody. Resource Tap ejections provide the
 lower accompanying notes.

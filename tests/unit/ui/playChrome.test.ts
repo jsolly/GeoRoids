@@ -58,7 +58,9 @@ test('title menu uses first-party nickname and sound chrome', () => {
     true
   );
   expect(document.querySelector('#soundPref')?.classList.contains('sound-toggle')).toBe(true);
-  expect(document.querySelector('.sound-toggle-label')?.getAttribute('for')).toBe('soundPref');
+  expect(document.querySelector('label[for="soundPref"]')?.textContent).toBe('Sound Effects');
+  expect(document.querySelector('#musicPref')?.classList.contains('sound-toggle')).toBe(true);
+  expect(document.querySelector('label[for="musicPref"]')?.textContent).toBe('Music');
   expect(document.querySelector('.form-control')).toBeNull();
   expect(document.querySelector('.form-label')).toBeNull();
   expect(document.querySelector('.form-check-input')).toBeNull();

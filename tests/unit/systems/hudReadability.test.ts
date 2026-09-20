@@ -5,6 +5,10 @@ import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
 import { getKitHullOutline, projectHullPolyline } from '../../../src/entities/ship/hullOutlines';
 import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
 import { layoutHudCluster } from '../../../src/rendering/hud/cluster';
+import {
+  FURNACE_MAP_INK,
+  MINIMAP_FURNACE_MARK_SIZE,
+} from '../../../src/rendering/hud/furnaceMapMark';
 
 function recordCanvas(ctx: CanvasRenderingContext2D) {
   let points: Array<[number, number]> = [];
@@ -273,32 +277,28 @@ describe('painted HUD composition', () => {
     exploration.reveal({ x: 4000, y: 0 }, 100);
     setWorldExploration(exploration.snapshot());
     const ctx = canvasContext();
-    const { filledPaths } = recordCanvas(ctx);
+    const { strokes, filledPaths } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
-    const stationFill = normalizedCanvasColor(ctx, 'rgba(196,181,253,0.2)');
-    const stationInk = normalizedCanvasColor(ctx, PALETTE.SATELLITE);
+    const stationInk = normalizedCanvasColor(ctx, FURNACE_MAP_INK);
     drawMiniMap(ctx, layout, player.ship, [], [], [], []);
-    expect(
-      filledPaths.filter(({ style }) => style === stationFill || style === stationInk)
-    ).toEqual([]);
+    expect(strokes.filter(({ style }) => style === stationInk)).toEqual([]);
     exploration.reveal({ x: 0, y: -660 }, 100);
     setWorldExploration(exploration.snapshot());
+    strokes.length = 0;
     filledPaths.length = 0;
     drawMiniMap(ctx, layout, player.ship, [], [], [], []);
-    const stations = filledPaths.filter(({ style }) => style === stationFill);
+    const stations = strokes.filter(({ style, closed }) => style === stationInk && closed);
     expect(stations).toHaveLength(1);
-    expect(stations[0]?.rectangles).toEqual([
-      {
-        x: layout.miniMap.x + layout.miniMap.size / 2 - 3,
-        y:
-          layout.miniMap.y +
-          layout.miniMap.size / 2 -
-          ((660 / WORLD.minimapRadius) * layout.miniMap.size) / 2 -
-          3,
-        width: 6,
-        height: 6,
-      },
-    ]);
+    const tip = stations[0]?.points[0];
+    expect(tip?.[0]).toBeCloseTo(layout.miniMap.x + layout.miniMap.size / 2, 5);
+    expect(tip?.[1]).toBeCloseTo(
+      layout.miniMap.y +
+        layout.miniMap.size / 2 -
+        ((660 / WORLD.minimapRadius) * layout.miniMap.size) / 2 -
+        MINIMAP_FURNACE_MARK_SIZE,
+      5
+    );
+    expect(filledPaths.every(({ rectangles }) => rectangles.length === 0)).toBe(true);
   });
 
   test('Surveyor radar classifies minerals during a scan and restores generic marks on expiry', async () => {

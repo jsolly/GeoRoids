@@ -275,6 +275,8 @@ export interface AsteroidDestroyEvent {
   asteroidId: string;
   collabSplit?: boolean;
   origin?: Position;
+  /** Furnace intake; clients shatter the outline in danger-red with a smoke poof. */
+  consumedBy?: 'furnace';
 }
 
 export interface ShockwaveEvent {

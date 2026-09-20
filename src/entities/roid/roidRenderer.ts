@@ -8,6 +8,7 @@ import { drawingOffsets } from '../../rendering/playfieldCamera';
 import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
+  easeOutCubic,
   polygonPoints,
   strokeBurstTicks,
   strokePhosphorPolyline,
@@ -24,13 +25,30 @@ export function recordAsteroidLatch(id: string, now = performance.now()): void {
   latchShudders.set(id, now);
 }
 
-const shatterBursts: Array<{ roid: Roid; startedAt: number }> = [];
+type AsteroidShatterKind = 'break' | 'furnace';
+
+const shatterBursts: Array<{ roid: Roid; startedAt: number; kind: AsteroidShatterKind }> = [];
 
 /** Keep the approved break visible after the authoritative rock is removed. */
-export function recordAsteroidShatter(roid: Roid, now = performance.now()): void {
-  shatterBursts.push({ roid, startedAt: now });
+export function recordAsteroidShatter(
+  roid: Roid,
+  now = performance.now(),
+  kind: AsteroidShatterKind = 'break'
+): void {
+  shatterBursts.push({ roid, startedAt: now, kind });
   if (shatterBursts.length > 48) {
     shatterBursts.shift();
+  }
+}
+
+/** Furnace delivery retags an in-flight shatter so intake reads as fire, not a laser break. */
+export function markFurnaceAsteroidShatter(asteroidId: string): void {
+  for (let i = shatterBursts.length - 1; i >= 0; i--) {
+    const burst = shatterBursts[i];
+    if (burst?.roid.id === asteroidId) {
+      burst.kind = 'furnace';
+      return;
+    }
   }
 }
 
@@ -220,22 +238,50 @@ function drawAsteroidBoost(
   ctx.restore();
 }
 
+function drawFurnaceSmokePoof(ctx: DrawingContext, origin: Vec2, radius: number, t: number): void {
+  const pop = easeOutCubic(t);
+  const alpha = Math.max(0, 1 - t) * 0.62;
+  ctx.save();
+  ctx.strokeStyle = PALETTE.HUD_MUTED;
+  ctx.shadowColor = PALETTE.HUD_MUTED;
+  ctx.shadowBlur = resolveGlow(VISUAL.ROID_GLOW * 0.55);
+  ctx.lineWidth = VISUAL.ROID_STROKE_SMALL;
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = 'round';
+  const wisps = VISUAL.ROID_FURNACE_SMOKE_WISPS;
+  for (let i = 0; i < wisps; i++) {
+    const spread = (i - (wisps - 1) / 2) * 0.38;
+    const heading = -Math.PI / 2 + spread;
+    const lift = radius * (0.2 + pop * 1.15);
+    const x = origin.x + Math.cos(heading) * lift * 0.72;
+    const y = origin.y + Math.sin(heading) * lift;
+    const size = radius * (0.14 + pop * 0.22 + Math.abs(spread) * 0.08);
+    ctx.beginPath();
+    ctx.arc(x, y, size, heading - 0.85, heading + 2.05);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawRoidShatter(
   ctx: DrawingContext,
   origin: Vec2,
   points: readonly Vec2[],
   radius: number,
   t: number,
-  material?: AsteroidMaterial
+  material: AsteroidMaterial | undefined,
+  kind: AsteroidShatterKind
 ): void {
+  const furnace = kind === 'furnace';
+  const ink = furnace ? PALETTE.DANGER : PALETTE.ROID;
   const alpha = 1 - t * 0.85;
   const spread =
     radius *
     VISUAL.ROID_SHATTER_SPREAD *
     (material === 'ice' ? 1.2 : material === 'metal' ? 0.55 : 1);
   ctx.save();
-  ctx.strokeStyle = PALETTE.ROID;
-  ctx.shadowColor = PALETTE.ROID;
+  ctx.strokeStyle = ink;
+  ctx.shadowColor = ink;
   ctx.shadowBlur = resolveGlow(VISUAL.ROID_GLOW);
   ctx.lineWidth = VISUAL.ROID_STROKE_SMALL;
   ctx.globalAlpha = alpha;
@@ -255,6 +301,11 @@ function drawRoidShatter(
     ctx.stroke();
   }
   ctx.restore();
+
+  if (furnace) {
+    drawFurnaceSmokePoof(ctx, origin, radius, t);
+    return;
+  }
 
   strokeBurstTicks(
     ctx,
@@ -365,7 +416,15 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
       rock.vertices,
       drawingOffsets(rock.offsets)
     );
-    drawRoidShatter(ctx, screen, outline, radius, elapsed / VISUAL.ROID_SHATTER_MS, rock.material);
+    drawRoidShatter(
+      ctx,
+      screen,
+      outline,
+      radius,
+      elapsed / VISUAL.ROID_SHATTER_MS,
+      rock.material,
+      burst.kind
+    );
   }
   ctx.shadowBlur = 0;
 }

@@ -106,6 +106,8 @@ export const VISUAL = {
   ROID_INNER_SCALE: 0.46,
   ROID_SHATTER_MS: 280,
   ROID_SHATTER_SPREAD: 1.8,
+  /** Short furnace-intake smoke; same budget as a laser shatter's hit ticks. */
+  ROID_FURNACE_SMOKE_WISPS: 4,
   // Open-V thruster with a shorter inner core; flickers between two lengths.
   THRUSTER_STROKE_WIDTH: 1.25,
   THRUSTER_GLOW: 2.25,

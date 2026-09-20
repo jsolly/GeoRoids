@@ -10,6 +10,7 @@ related:
   - content/wiki/loot-growth.md
   - content/wiki/satellites.md
   - content/wiki/hud-network.md
+  - content/wiki/terrain.md
 media:
   - heading: Damage and protection
     demo: survival
@@ -31,6 +32,7 @@ it then hits, including its owner, and is consumed. Bounced bolts use the
 danger color so a live ricochet is readable. Local shots appear immediately
 and stay visible while the server confirms them; the server still controls
 hits and removal.
+Shots also damage and kill terrain spiders without changing your firing limits.
 
 ## Damage and protection
 
@@ -50,6 +52,8 @@ While the universe map or ship schematic is open, asteroid impacts, ricochets,
 and the boundary pass through the held hull. Closing the overlay grants the same
 blink window as a respawn.
 
+Terrain spiders chase nearby pilots and kill with one bite on contact, regardless of remaining health. Their bites obey spawn protection, overlay immunity, and life-loss rules. See [terrain spiders](/wiki/#terrain) for warnings, escape behavior, and how to fight them.
+
 ## Lives and respawn
 
 A player starts with lives and score. A death decrements one life; the last life
@@ -68,7 +72,7 @@ the shared world both reset.
 
 Health regenerates after a real-damage delay. Score survives a respawn.
 Wreckage is emitted from a destroyed ship. The visible death message includes
-the recorded environmental cause (an asteroid, the arena wall, or a ricochet),
+the recorded environmental cause (an asteroid, the arena wall, a ricochet, or a terrain spider),
 and the final-life state shows the game-over overlay.
 
 ## Score values

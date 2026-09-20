@@ -63,6 +63,7 @@ import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { preferredSurveyorUtility, surveyorUtilityOf } from '../../entities/ship/surveyorUtility';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
+import { setSpiderField } from '../../physics/terrain/spiderSession';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { getClientReleaseId } from '../../utils/buildInfo';
@@ -1011,6 +1012,7 @@ export class ConnectionManager {
         }
         break;
       case 'sessionExpired': {
+        setSpiderField(undefined);
         // Remove the previous map key before initializeAsteroidSync changes
         // the local Player object's id for the replacement session.
         const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1113,6 +1115,7 @@ export class ConnectionManager {
     this.playedLootCollectionIds.clear();
     this.playedTapEjectionIds.clear();
     this.playedLootExplosionIds.clear();
+    setSpiderField(undefined);
     this.shotAcknowledgements = false;
     AuthoritativeProjectileField.getInstance().clear();
     this.clearJoinCompletionTimer();
@@ -1326,6 +1329,7 @@ export class ConnectionManager {
   }
 
   private handleSnapshotState(data: ServerGameSnapshot): void {
+    setSpiderField(data.spiderField);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
     setCompletedSectors(data.completedSectors);

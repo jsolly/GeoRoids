@@ -20,6 +20,7 @@ import { getCompletedSectors, getWorldExploration } from '../../network/worldExp
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { resolveGlow } from '../renderQuality';
+import { drawFurnaceMapMark, MINIMAP_FURNACE_MARK_SIZE } from './furnaceMapMark';
 import type { HudLayout } from './hudLayout';
 
 type RadarMark =
@@ -503,11 +504,8 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
   const { projection } = geometry;
 
   ctx.save();
-  ctx.strokeStyle = PALETTE.SATELLITE;
-  ctx.fillStyle = hexToRgba(PALETTE.SATELLITE, 0.2);
-  ctx.shadowColor = PALETTE.SATELLITE;
-  ctx.shadowBlur = resolveGlow(4);
   ctx.lineWidth = 1;
+  ctx.shadowBlur = resolveGlow(4);
   for (const furnace of FURNACES) {
     if (!isExploredPosition(geometry, furnace.position)) {
       continue;
@@ -521,18 +519,7 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
     if (!projectPosition(geometry, furnace.position)) {
       continue;
     }
-    const x = projection.x;
-    const y = projection.y;
-    ctx.beginPath();
-    ctx.rect(x - 3, y - 3, 6, 6);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x - 2, y);
-    ctx.lineTo(x + 2, y);
-    ctx.moveTo(x, y - 2);
-    ctx.lineTo(x, y + 2);
-    ctx.stroke();
+    drawFurnaceMapMark(ctx, projection.x, projection.y, MINIMAP_FURNACE_MARK_SIZE);
   }
   ctx.restore();
 }

@@ -1,15 +1,16 @@
 import { PALETTE } from '../constants';
 import type { DrawingContext } from '../rendering/drawingContext';
+import { headingCueTipDistance } from '../rendering/headingCueRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { shouldUseTouchControls } from './viewportChrome';
 
 export const SCHEMATIC_JOIN_HINT_LINES = ['Tap and hold your ship', 'to equip tools'] as const;
 export const SCHEMATIC_JOIN_HINT_DURATION_MS = 4800;
 export const SCHEMATIC_JOIN_HINT_FADE_MS = 800;
+export const SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX = 12;
 
 const HINT_FONT = '13px Arial';
 const HINT_LINE_HEIGHT = 16;
-const HINT_GAP_ABOVE_HULL = 18;
 const HINT_ALPHA = 0.92;
 
 let initialized = false;
@@ -70,7 +71,7 @@ export function drawSchematicJoinHint(
   if (alpha <= 0) {
     return;
   }
-  const lastLineY = screenY - shipR - HINT_GAP_ABOVE_HULL;
+  const lastLineY = screenY - headingCueTipDistance(shipR) - SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX;
   const firstLineY = lastLineY - (SCHEMATIC_JOIN_HINT_LINES.length - 1) * HINT_LINE_HEIGHT;
   ctx.save();
   ctx.fillStyle = hexToRgba(PALETTE.HUD, HINT_ALPHA * alpha);

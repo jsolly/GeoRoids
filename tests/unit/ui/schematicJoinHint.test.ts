@@ -1,11 +1,13 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-
+import { STEERING } from '../../../src/constants';
 import type { DrawingContext } from '../../../src/rendering/drawingContext';
+import { headingCueTipDistance } from '../../../src/rendering/headingCueRenderer';
 import {
   drawSchematicJoinHint,
   initializeSchematicJoinHint,
   SCHEMATIC_JOIN_HINT_DURATION_MS,
   SCHEMATIC_JOIN_HINT_FADE_MS,
+  SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX,
   SCHEMATIC_JOIN_HINT_LINES,
   schematicJoinHintAlpha,
 } from '../../../src/ui/schematicJoinHint';
@@ -44,7 +46,9 @@ describe('touch join schematic hint', () => {
     const ctx = mockContext();
     drawSchematicJoinHint(ctx, 200, 300, 20, now);
     expect(ctx.fillText.mock.calls.map((call) => call[0])).toEqual([...SCHEMATIC_JOIN_HINT_LINES]);
-    expect(ctx.fillText.mock.calls.every((call) => Number(call[2]) < 300 - 20)).toBe(true);
+    const lastLineY = Number(ctx.fillText.mock.calls.at(-1)?.[2]);
+    expect(lastLineY).toBe(300 - headingCueTipDistance(20) - SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX);
+    expect(lastLineY).toBeLessThan(300 - STEERING.ARROW_DISTANCE_PX);
 
     now = 1_000 + SCHEMATIC_JOIN_HINT_DURATION_MS - SCHEMATIC_JOIN_HINT_FADE_MS / 2;
     expect(schematicJoinHintAlpha(now)).toBeCloseTo(0.5);

@@ -9,14 +9,14 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
-| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
+| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, and map/schematic hold with blink on return |
 | surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, moving probe beacons, and delivery tags |
 | hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
-| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
+| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no terrain damage |
-| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
+| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
@@ -26,6 +26,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
+| What happens to my ship while the map or schematic is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, GameEngine overlay hold, combat immunity tests |
 | How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
@@ -130,7 +131,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - The six Earth-observation hulls are maintained by the satellite pickup manager
   and spawn separately from asteroid destruction. Loose hardware is stationary,
   glowing, and invulnerable. The nearest living player within
-  the automatic collection range stores it in ship inventory. Both kits can equip
+  the automatic collection range stores it in ship inventory,
+  except during a map or schematic hold. Both kits can equip
   one satellite from the schematic. Health drains with time and impacts, so damage
   shortens its scanning lifetime. The ship-style green health bar and schematic
   time estimate share that health value. Only loose pickups glow. Stored

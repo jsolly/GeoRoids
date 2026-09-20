@@ -1330,6 +1330,34 @@ export class GameEngine {
     return this.entityManager.getAllEntities().length;
   }
 
+  /**
+   * Map/schematic hold: freeze this hull, skip collisions, and blink when the
+   * overlay closes. Session-only; not written to the world database.
+   */
+  public setOverlayHold(id: string, held: boolean): void {
+    const entity = this.entityManager.getEntity(id);
+    if (!entity) {
+      return;
+    }
+    const wasHeld = entity.overlayHold === true;
+    if (held) {
+      entity.overlayHold = true;
+      entity.velocity = { x: 0, y: 0 };
+      entity.knockbackVelocityLimit = 0;
+      entity.thrusting = false;
+      stopShipBoost(entity.boost);
+      return;
+    }
+    if (wasHeld) {
+      entity.overlayHold = false;
+      if (!entity.exploding && entity.health > 0 && entity.respawnTimer === undefined) {
+        entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
+      }
+      return;
+    }
+    entity.overlayHold = false;
+  }
+
   // Asteroid operations
   public addAsteroid(asteroid: AsteroidData): void {
     this.asteroidManager.addAsteroid(asteroid);
@@ -1536,7 +1564,11 @@ export class GameEngine {
     const players = this.entityManager
       .getAllEntities()
       .filter(
-        (entity) => entity.health > 0 && !entity.exploding && entity.respawnTimer === undefined
+        (entity) =>
+          entity.health > 0 &&
+          !entity.exploding &&
+          entity.respawnTimer === undefined &&
+          entity.overlayHold !== true
       )
       .sort((a, b) => a.id.localeCompare(b.id));
 
@@ -1624,7 +1656,7 @@ export class GameEngine {
     if (!existing) {
       return { applied: false, isDestroyed: false };
     }
-    if (existing.respawnTimer !== undefined || existing.health <= 0 || existing.exploding) {
+    if (isCombatantImmune(existing)) {
       return { applied: false, isDestroyed: false };
     }
 

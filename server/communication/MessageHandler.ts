@@ -291,16 +291,22 @@ export class MessageHandler {
       return;
     }
 
+    this.gameEngine.setOverlayHold(id, update.overlayHold === true);
+
     // Ignore movement updates while the player is dead, exploding, or waiting to
     // respawn. Otherwise the client's stale position keeps overwriting the
     // server-chosen respawn position, leaving the ship frozen where it died
-    // (e.g. stuck outside the boundary at full health).
-    const existing = this.gameEngine.getPlayer(id);
-    if (
-      existing &&
-      (existing.exploding || existing.respawnTimer !== undefined || existing.health <= 0)
-    ) {
+    // (e.g. stuck outside the boundary at full health). Overlay hold still
+    // latches above so closing a menu during that window cannot stick forever.
+    const held = this.gameEngine.getPlayer(id);
+    if (held && (held.exploding || held.respawnTimer !== undefined || held.health <= 0)) {
       return;
+    }
+    if (held?.overlayHold === true) {
+      update.position = { ...held.position };
+      update.velocity = { x: 0, y: 0 };
+      update.thrusting = false;
+      update.boosting = false;
     }
 
     if (

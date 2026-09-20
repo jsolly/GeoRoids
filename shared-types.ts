@@ -61,6 +61,8 @@ export interface PlayerUpdate {
   exploding: boolean;
   health: number;
   maxHealth: number;
+  /** True while the local map or schematic holds this hull still. */
+  overlayHold?: boolean;
 
   kitId?: ShipKitId;
   mass?: number;

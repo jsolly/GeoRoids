@@ -65,6 +65,7 @@ export class Player {
     health: number;
     maxHealth: number;
     mass: number;
+    overlayHold: boolean;
   };
 
   constructor(params: {
@@ -98,6 +99,7 @@ export class Player {
       health: this.ship.health,
       maxHealth: this.ship.maxHealth,
       mass: this.ship.mass,
+      overlayHold: false,
     };
   }
 
@@ -477,6 +479,7 @@ export class Player {
     this.networkState.health = this.ship.health;
     this.networkState.maxHealth = this.ship.maxHealth;
     this.networkState.mass = this.ship.mass;
+    this.networkState.overlayHold = this.ship.movementLocked;
     return this.networkState;
   }
 }

@@ -737,6 +737,7 @@ export function openShipSchematic(): boolean {
     return false;
   }
   if (isUniverseMapOpen()) {
+    setShipSchematicOpen(true);
     closeUniverseMap();
   }
   try {
@@ -747,6 +748,9 @@ export function openShipSchematic(): boolean {
       'Could not open the ship schematic',
       error instanceof Error ? error : new Error(String(error))
     );
+    if (isShipSchematicOpen()) {
+      setShipSchematicOpen(false);
+    }
     return false;
   }
   setShipSchematicOpen(true);

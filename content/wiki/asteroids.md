@@ -49,7 +49,8 @@ furnace. The cream arrow means armed; cream/amber exhaust means autonomous
 delivery is active. Powered sectors stay awake until delivery, even when nearby
 pilots leave. Self-guided cargo passes through ships, rocks, satellites, and
 completed-sector barriers. It ignores weapons and blast impulses, and cannot be
-scanned, tapped, towed, or coupled again. At intake it explodes and awards its
+scanned, tapped, towed, or coupled again. At intake it shatters in a red outline
+with a short smoke poof and awards its
 launchers and previously recorded Surveyors the delivery points.
 
 ## Cooperative splits and score

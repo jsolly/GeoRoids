@@ -1729,6 +1729,7 @@ export class ConnectionManager {
       asteroidId: data.asteroidId,
       collabSplit: data.collabSplit === true,
       ...(data.origin !== undefined ? { origin: data.origin } : {}),
+      ...(data.consumedBy === 'furnace' ? { consumedBy: 'furnace' as const } : {}),
     });
   }
 

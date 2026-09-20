@@ -78,7 +78,7 @@
     "@biomejs/biome": "2.5.14",
     "@types/howler": "^2.2.13",
     "@types/jsdom": "^30.0.0",
-    "@vitest/coverage-v8": "5.0.0",
+    "@vitest/coverage-v8": "5.0.1",
     "canvas": "^3.2.3",
     "concurrently": "^10.0.5",
     "jsdom": "^30.0.1",

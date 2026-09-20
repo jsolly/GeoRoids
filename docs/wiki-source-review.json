@@ -1,5 +1,5 @@
 {
-  "note": "Local radar now draws each kit hull silhouette and extras, matching the universe map instead of heading triangles. Reviewed hud-network, teamwork, and gameReference against minimap.ts, hullOutlines.ts, and universeMap crew marks after merging guided cargo and pinball asteroid fields. HUD tests pin in-range Surveyor/Hauler hulls and an off-radar rim mark whose bearing differs from ship heading. Surveyor/Hauler demonstration GIFs still show playfield hulls and mineral radar marks, not the compact player icon, so media was not regenerated.",
+  "note": "Local radar now draws each kit hull silhouette and extras, matching the universe map instead of heading triangles. Off-radar rim marks use game heading (Y-up) so noses point outward. Reviewed hud-network, teamwork, and gameReference against minimap.ts, hullOutlines.ts, and universeMap crew marks after merging guided cargo and pinball asteroid fields. HUD tests pin in-range Surveyor/Hauler hulls plus extras, and a north rim mark whose outward pose is neither ship heading nor canvas-inward bearing. Surveyor/Hauler demonstration GIFs still show playfield hulls and mineral radar marks, not the compact player icon, so media was not regenerated.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -226,7 +226,7 @@
     "src/rendering/hud/hudLayout.ts": "sha256:05136ac7907c2e1aa80d9dfda7e1f5cc1f43e388ddaf12b67e58da54ceaedc11",
     "src/rendering/hud/leaderboard.ts": "sha256:9b11db76cc6635998907bccc4a9f388aa458beb8d3d7c07bb51ff39bfa9e1b47",
     "src/rendering/hud/lives.ts": "sha256:c3a720b506376823b62344d8a2e094ddceae8477d1cb302dc188e16811c3238f",
-    "src/rendering/hud/minimap.ts": "sha256:320649e469e8c679187f6257382d5519e39b4df34f0842f5a4768ba6b29fe96c",
+    "src/rendering/hud/minimap.ts": "sha256:2d63414e60d2ec4355d3421c495863f1ad16cc31ad94e49c29d5de2dbcc7c8bc",
     "src/rendering/playfieldCamera.ts": "sha256:57f526c939e5e78115e92dc5548bf57a0f94f5c2873fe2884ff4e574bf772e1f",
     "src/rendering/renderError.ts": "sha256:426004f76c64f1e368bad54c746a8799c7bc7044a701717a5bb083f3b4c94a99",
     "src/rendering/renderQuality.ts": "sha256:db30b72fcf8016e57878c49f9408e792e6e71d9d9e3062203e691b56d7077059",
@@ -365,7 +365,7 @@
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts": "sha256:d1f4b03ddc100ffa3738864dd723a70fd8bc022b92e9c411beefa3695e839848",
     "tests/unit/shared/utc-score-season.test.ts": "sha256:fb5bb4bf9b2efa293e6ae5624df9c12d73ce1b14545536d279bf909e4c2815d6",
     "tests/unit/systems/contourLaser.test.ts": "sha256:22d1c84ba91d08cbca213c0b69d683d147087e07cf3358b2aa0621487ff4ef5f",
-    "tests/unit/systems/hudReadability.test.ts": "sha256:211fc7ad2dbe45a43828c383fded4da35c7aa3868f8152813ed2b338567754ed",
+    "tests/unit/systems/hudReadability.test.ts": "sha256:c66f636bccbdda9f25bd3556e5d18c2bf1593dbb981374c7092cba2148b6a9d7",
     "tests/unit/systems/isoContourTerrain.test.ts": "sha256:c259490e53530a1e7e722fa79f708c5b948833ee8472e5ea2e44914afef27591",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts": "sha256:ee8dc109344bdd51f01e99fa733b0e2af2c492060fb5fc213bb389cbed43392c",
     "tests/unit/systems/lootBlast.test.ts": "sha256:5bb4035d9b7552a86ad303404bef34961c944552225393ad6be5d10f171db59e",

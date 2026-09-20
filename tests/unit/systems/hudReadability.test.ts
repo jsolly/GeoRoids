@@ -105,6 +105,16 @@ function normalizedCanvasColor(ctx: CanvasRenderingContext2D, color: string) {
   return normalized;
 }
 
+function radarPolylinePoints(
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  line: Parameters<typeof projectHullPolyline>[4]
+): Array<[number, number]> {
+  return projectHullPolyline(x, y, size, heading, line).map((point) => [point.x, point.y]);
+}
+
 function radarHullPoints(
   x: number,
   y: number,
@@ -112,10 +122,43 @@ function radarHullPoints(
   heading: number,
   kitId: ShipKitId
 ): Array<[number, number]> {
-  return projectHullPolyline(x, y, size, heading, getKitHullOutline(kitId).hull).map((point) => [
-    point.x,
-    point.y,
-  ]);
+  return radarPolylinePoints(x, y, size, heading, getKitHullOutline(kitId).hull);
+}
+
+function radarKitPolylines(
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  kitId: ShipKitId
+): Array<{ points: Array<[number, number]>; closed: boolean }> {
+  const outline = getKitHullOutline(kitId);
+  return [
+    { points: radarPolylinePoints(x, y, size, heading, outline.hull), closed: outline.hull.closed },
+    ...outline.extras.map((extra) => ({
+      points: radarPolylinePoints(x, y, size, heading, extra),
+      closed: extra.closed,
+    })),
+  ];
+}
+
+function expectRadarKitMark(
+  strokes: Array<{
+    points: Array<[number, number]>;
+    closed: boolean;
+    style: string | CanvasGradient | CanvasPattern;
+  }>,
+  color: string,
+  x: number,
+  y: number,
+  size: number,
+  heading: number,
+  kitId: ShipKitId
+): void {
+  const painted = crispKitStrokes(strokes, color);
+  for (const expected of radarKitPolylines(x, y, size, heading, kitId)) {
+    expect(painted).toEqual(expect.arrayContaining([expect.objectContaining(expected)]));
+  }
 }
 
 function crispKitStrokes(
@@ -372,10 +415,10 @@ describe('painted HUD composition', () => {
     peer.ship.angle = 0;
     applyShipKitToShip(peer.ship, 'hauler');
     const far = entityFactory.createRemotePlayer('radar-far', 'Radar Far', {
-      x: WORLD.minimapRadius * 2,
-      y: 0,
+      x: 0,
+      y: -WORLD.minimapRadius * 2,
     });
-    far.ship.angle = Math.PI / 2;
+    far.ship.angle = 0;
     SatellitePickupManager.getInstance().syncFromServer([
       {
         id: 'radar-pickup',
@@ -516,51 +559,50 @@ describe('painted HUD composition', () => {
     const peerX = radarX + layout.miniMap.size / 4;
     const crewX = radarX - layout.miniMap.size / 4;
     const rimRadius = Math.max(8, layout.miniMap.size / 2 - 8);
-    const rimX = radarX + rimRadius;
-    const rimY = radarY;
+    const rimX = radarX;
+    const rimY = radarY - rimRadius;
     const localColor = normalizedCanvasColor(ctx, player.color);
     const remoteColor = normalizedCanvasColor(ctx, PALETTE.REMOTE);
-    const localHull = crispKitStrokes(strokes, localColor).find(
-      (call) => call.closed && call.points.length === surveyorOutline.hull.points.length
-    );
-    if (!localHull) {
-      throw new Error('Radar did not draw the local kit hull');
-    }
-    expect(localHull.points).toHaveLength(surveyorOutline.hull.points.length);
-    expect(localHull.points.length).toBeGreaterThan(3);
-    expect(localHull.points).toEqual(
-      radarHullPoints(radarX, radarY, VISUAL.MINIMAP_LOCAL_SIZE, Math.PI / 2, 'surveyor')
-    );
-    expect(crispKitStrokes(strokes, localColor)).toHaveLength(surveyorMarks);
-    const peerHull = crispKitStrokes(strokes, remoteColor).find(
-      (call) => call.closed && call.points.length === haulerOutline.hull.points.length
-    );
-    expect(peerHull?.points).toEqual(
-      radarHullPoints(peerX, radarY, VISUAL.MINIMAP_DOT, 0, 'hauler')
-    );
-    expect(peerHull?.points).not.toEqual(
-      radarHullPoints(peerX, radarY, VISUAL.MINIMAP_DOT, 0, 'surveyor')
-    );
-    const crewHull = crispKitStrokes(strokes, remoteColor).find(
-      (call) => call.closed && call.points.length === surveyorOutline.hull.points.length
-    );
-    expect(crewHull?.points).toEqual(
-      radarHullPoints(crewX, radarY, VISUAL.MINIMAP_DOT, 0, 'surveyor')
-    );
-    const rimPoints = radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, 0, 'surveyor');
-    const headingInsteadOfBearing = radarHullPoints(
-      rimX,
-      rimY,
-      VISUAL.MINIMAP_DOT,
+    expectRadarKitMark(
+      strokes,
+      localColor,
+      radarX,
+      radarY,
+      VISUAL.MINIMAP_LOCAL_SIZE,
       Math.PI / 2,
       'surveyor'
     );
+    expect(crispKitStrokes(strokes, localColor)).toHaveLength(surveyorMarks);
+    expectRadarKitMark(strokes, remoteColor, peerX, radarY, VISUAL.MINIMAP_DOT, 0, 'hauler');
+    expectRadarKitMark(strokes, remoteColor, crewX, radarY, VISUAL.MINIMAP_DOT, 0, 'surveyor');
+    const rimHeading = Math.PI / 2;
+    const canvasInwardHeading = -Math.PI / 2;
     const rimHull = crispKitStrokes(strokes, remoteColor).find(
-      (call) => call.closed && call.points[0]?.[0] === rimPoints[0]?.[0]
+      (call) =>
+        call.closed &&
+        call.points.length === surveyorOutline.hull.points.length &&
+        call.points[0]?.[1] ===
+          radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'surveyor')[0]?.[1]
     );
     expect(rimHull?.points.length).toBeGreaterThan(3);
-    expect(rimHull?.points).toEqual(rimPoints);
-    expect(rimHull?.points).not.toEqual(headingInsteadOfBearing);
+    expect(rimHull?.points).toEqual(
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, rimHeading, 'surveyor')
+    );
+    expect(rimHull?.points).not.toEqual(
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, canvasInwardHeading, 'surveyor')
+    );
+    expect(rimHull?.points).not.toEqual(
+      radarHullPoints(rimX, rimY, VISUAL.MINIMAP_DOT, 0, 'surveyor')
+    );
+    expectRadarKitMark(
+      strokes,
+      remoteColor,
+      rimX,
+      rimY,
+      VISUAL.MINIMAP_DOT,
+      rimHeading,
+      'surveyor'
+    );
     expect(crispKitStrokes(strokes, remoteColor)).toHaveLength(surveyorMarks * 2 + haulerMarks);
 
     strokes.length = 0;

@@ -229,11 +229,13 @@ function drawPilotEdgeMark(
   if (!Number.isFinite(dx) || !Number.isFinite(dy) || (dx === 0 && dy === 0)) {
     return;
   }
-  const angle = Math.atan2(dy, dx);
+  // Placement is canvas Y-down; kit projection uses game heading (Y-up).
+  const canvasBearing = Math.atan2(dy, dx);
+  const heading = Math.atan2(-dy, dx);
   const radius = Math.max(8, geometry.size / 2 - 8);
-  const x = geometry.x + geometry.size / 2 + Math.cos(angle) * radius;
-  const y = geometry.y + geometry.size / 2 + Math.sin(angle) * radius;
-  strokeRadarHull(ctx, x, y, VISUAL.MINIMAP_DOT, angle, color, kitId);
+  const x = geometry.x + geometry.size / 2 + Math.cos(canvasBearing) * radius;
+  const y = geometry.y + geometry.size / 2 + Math.sin(canvasBearing) * radius;
+  strokeRadarHull(ctx, x, y, VISUAL.MINIMAP_DOT, heading, color, kitId);
 }
 
 function canDrawAsteroidOnMiniMap(roid: Roid): boolean {

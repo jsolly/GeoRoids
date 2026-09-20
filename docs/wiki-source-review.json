@@ -1,12 +1,12 @@
 {
-  "note": "Map and schematic hold freeze the hull, skip world collisions, and grant respawn blink on return. Reviewed controls, satellites, and combat-survival against GameEngine overlayHold, InputManager lock, and immunity tests.",
+  "note": "Map and schematic hold freeze the hull, skip collisions, and blink on return. Map chrome no longer says you can take damage while stopped.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
     "docs/protocol/snapshot-v1.md": "sha256:e8afafae512258bb151c5a619c617eebf9c1f70a874bab60e3642172cc625841",
     "docs/sounds.md": "sha256:69aaeeba824e827a7a651de3aa140630761cea9b1fc5a6e70bd6b05ba116e5d7",
     "index.css": "sha256:b51d20078eed2fdf4d7cb0ff97a724febcf7cdc61089a484d8c742f723e855d5",
-    "index.html": "sha256:588e6beb82e5ad399539540f96c90961d6364463f14ad8dea59e788a52922429",
+    "index.html": "sha256:4aecb5922f07f937f079c2cc3a1ed945058e36a3c8f4ec7c147b76b1a5492b03",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:897999f25f378daff966c32975be438b4ffde56f48f5a7d3fa375df5dad90bf1",
     "public/sounds/asteroid-explode.m4a": "sha256:4ab4a2505abbade962fb202a17a1c45b6446a3c1ba1ac8d5286e71d72019df7f",
@@ -243,7 +243,7 @@
     "src/ui/shipSchematic.ts": "sha256:565d143fb3a2f37212a77f48dc6776556cb1869243300ef2299d0baad4e618aa",
     "src/ui/shipSchematicState.ts": "sha256:ac4298985cf52ae195dd7e69eb51a793221acc9c586b7fa0322db37d8bf37cb3",
     "src/ui/uiUtils.ts": "sha256:a883b7c2882c6723a52bf751ecc76d740bb119acdf4e364dc00cca7a01d7b537",
-    "src/ui/universeMap.ts": "sha256:c52b2f951913f180620a1b31363421910f4bef3ef12806db3a177fcc49bff015",
+    "src/ui/universeMap.ts": "sha256:fcdaa2f8ba9284f378fbca495aef59e42d399063c1d864222294e7854c1e4d83",
     "src/ui/universeMapLabels.ts": "sha256:bb6e3c26570b750e192a0961c8b6a9e4f68c1f4b1925c5cef587e939f1487753",
     "src/ui/viewportChrome.ts": "sha256:6444f20c617d4e84f69352a356bb362df845ab9b35858b42bac183c9f8a92644",
     "src/utils/Logger.ts": "sha256:13b3fbdcc6dcb32938f5bca28a09a92cb6c323f920455b628213afcb15ce3d91",

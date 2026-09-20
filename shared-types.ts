@@ -17,6 +17,21 @@ export type DiagnosticLogRecord = {
   receiverReleaseId?: string;
 };
 
+/** The server-owned predator state rendered by every client. */
+export interface TerrainSpider {
+  id: string;
+  position: Position;
+  angle: number;
+  health: number;
+  maxHealth: number;
+  phase: 'scuttling' | 'hunting';
+  targetId: string | null;
+}
+
+export interface SpiderFieldState {
+  spiders: TerrainSpider[];
+}
+
 // Common position and velocity types used throughout the system
 export interface Position {
   x: number;
@@ -268,6 +283,8 @@ export interface ShockwaveEvent {
 }
 
 export interface ServerGameState {
+  /** Server-owned terrain predators, pursuit targets, and remaining health. */
+  spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
   exploration: ExplorationTile[];
   /** Finished world sectors that stay walled off. */

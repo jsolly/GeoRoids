@@ -21,7 +21,7 @@ the center. Pilots in the same world share the same terrain. The server loads
 nearby world sectors as the crew travels, while the minimap keeps the local
 radar readable. Steep climbs slow your ship sharply, descents accelerate it
 beyond normal cruise, and crossing a hillside pulls you downhill even while you
-hold a steady heading. Terrain itself does not deal damage.
+hold a steady heading. Ordinary terrain does not deal damage.
 
 The world is circular. Asteroids bounce inward at the outer boundary, keeping
 the remaining deposits in the world. Lasers reflect off the wall and can mine
@@ -47,3 +47,23 @@ stacks with downhill speed and helps climbs, but is never required to climb.
 Your ship's kit and mass still set the baseline for all of these speeds. Laser paths
 do not interact with terrain; glints where shots cross contours are visual
 feedback, with no terrain reflection or extra damage.
+
+## Terrain spiders
+
+At most three spiders roam the world, with new arrivals at least 30 seconds apart.
+Away from the starter area and furnaces, spiders traverse the hills with their
+feet touching the existing iso-lines. Nearby contour segments turn red under
+their influence. They add no new web strands or pits, and the terrain keeps its
+normal shape and movement rules.
+
+Spiders actively pursue nearby pilots and kill with a single bite on contact,
+regardless of remaining health. They keep chasing beyond their initial detection range until you escape far enough or reach a
+protected area. A red screen edge warns when you are being hunted. Sound Effects
+adds ominous nearby tones and a sharper pursuit cue; Music switches to the danger
+bed during a hunt.
+
+Aim at the spider to damage it. Hits flash its body and reveal its remaining
+health. Ordinary lasers kill it in three hits; powered shots deal their increased
+damage. Shooting iso-lines does nothing to the terrain. Killing the spider ends
+its pursuit and restores the nearby contours’ normal color. Spawn protection and
+map/schematic hold still prevent bite damage.

@@ -1147,14 +1147,19 @@ export class GameEngine {
       const worldRow = this.worldRowIfChanged();
       this.persistence.persist({
         ...(worldRow ? { world: worldRow.world } : {}),
-        sectors: this.regionalField.checkpoint(this.asteroidManager),
+        // Custom diagnostic belts do not belong to regional activation or sleep bookkeeping.
+        sectors: this.managedField
+          ? this.regionalField.checkpoint(this.asteroidManager)
+          : new Map(),
         pilots,
       });
       if (worldRow) {
         this.lastFlushedWorldRow = worldRow.builtFrom;
       }
       this.dirtyPilots.clear();
-      this.regionalField.saved();
+      if (this.managedField) {
+        this.regionalField.saved();
+      }
     } catch (cause) {
       this.failPersistence(cause);
       throw this.persistenceFailure;
@@ -1366,6 +1371,10 @@ export class GameEngine {
       })),
       completedSectors: this.completedSectors,
       nowFrame: this.gameTime,
+      dormantResource: (id, home) => {
+        const rock = this.regionalField.dormantAsteroid(id, home);
+        return rock ? spiderResources([rock], [], [])[0] : undefined;
+      },
       resources: () =>
         spiderResources(
           this.asteroidManager.getAllAsteroids(),

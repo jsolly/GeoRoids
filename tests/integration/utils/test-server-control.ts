@@ -137,6 +137,7 @@ export async function arrangeCrewField(
     | 'satellite'
     | 'probe'
     | 'spider-nest'
+    | 'map-icons'
 ): Promise<void> {
   const response = await fetch(`${TestConfig.SERVER_URL}/test/arrange-crew-field`, {
     method: 'POST',

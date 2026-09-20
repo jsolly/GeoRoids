@@ -38,6 +38,10 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     rectangles: Array<{ x: number; y: number; width: number; height: number }>;
     style: typeof ctx.fillStyle;
   }> = [];
+  const outlinedRectangles: Array<{
+    rectangles: Array<{ x: number; y: number; width: number; height: number }>;
+    style: typeof ctx.strokeStyle;
+  }> = [];
   let pathRectangles: Array<{ x: number; y: number; width: number; height: number }> = [];
   const beginPath = ctx.beginPath.bind(ctx);
   const moveTo = ctx.moveTo.bind(ctx);
@@ -67,6 +71,7 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     closePath();
   });
   vi.spyOn(ctx, 'stroke').mockImplementation(() => {
+    outlinedRectangles.push({ rectangles: [...pathRectangles], style: ctx.strokeStyle });
     strokes.push({ points: [...points], closed, style: ctx.strokeStyle, width: ctx.lineWidth });
     stroke();
   });
@@ -87,7 +92,28 @@ function recordCanvas(ctx: CanvasRenderingContext2D) {
     rectangles.push({ x, y, width, height, style: ctx.fillStyle });
     fillRect(x, y, width, height);
   });
-  return { strokes, texts, rectangles, filledPaths };
+  return { strokes, texts, rectangles, filledPaths, outlinedRectangles };
+}
+
+function asteroidSilhouette(x: number, y: number, size: number) {
+  return [
+    [-0.95, -0.25],
+    [-0.5, -0.9],
+    [0.15, -1],
+    [0.8, -0.55],
+    [1, 0.15],
+    [0.5, 0.85],
+    [-0.25, 1],
+    [-0.85, 0.5],
+  ].map(([dx = 0, dy = 0]) => [x + dx * size, y + dy * size]);
+}
+
+function satellitePanels(x: number, y: number) {
+  return [
+    { x: x - 0.88, y: y - 1.6, width: 1.76, height: 3.2 },
+    { x: x - 4, y: y - 2.6, width: 2.2, height: 5.2 },
+    { x: x + 1.8, y: y - 2.6, width: 2.2, height: 5.2 },
+  ];
 }
 
 function canvasContext(): CanvasRenderingContext2D {
@@ -301,7 +327,7 @@ describe('painted HUD composition', () => {
     expect(filledPaths.every(({ rectangles }) => rectangles.length === 0)).toBe(true);
   });
 
-  test('Surveyor radar classifies minerals during a scan and restores generic marks on expiry', async () => {
+  test('An unconfirmed local scan previews minerals and restores generic marks on expiry', async () => {
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { Roid } = await import('../../../src/entities/roid/Roid');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
@@ -317,9 +343,7 @@ describe('painted HUD composition', () => {
       return rock;
     });
     const ctx = canvasContext();
-    const { texts, filledPaths } = recordCanvas(ctx);
-    const arc = vi.spyOn(ctx, 'arc');
-    const line = vi.spyOn(ctx, 'lineTo');
+    const { texts, strokes } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const centers = [-800, 0, 800].map((x) => ({
       x:
@@ -339,33 +363,39 @@ describe('painted HUD composition', () => {
     setWorldExploration(exploration.snapshot());
     drawMiniMap(ctx, layout, player.ship, roids, [], [], []);
     expect(texts.map(({ text }) => text)).toEqual([
-      '○ Ice',
-      '□ Metal',
-      '△ Rubble',
+      'ice',
+      'metal',
+      'rubble',
       'X +0',
       'Y +0 · S0,0',
     ]);
-    expect(arc).toHaveBeenCalledWith(ice.x, ice.y, 3, 0, Math.PI * 2);
-    expect(
-      filledPaths.find(({ style }) => style === normalizedCanvasColor(ctx, '#FDE68A'))?.rectangles
-    ).toEqual([{ x: metal.x - 3, y: metal.y - 3, width: 6, height: 6 }]);
-    expect(line).toHaveBeenCalledWith(rubble.x + 3.5, rubble.y + 3);
-    expect(line).toHaveBeenCalledWith(rubble.x - 3.5, rubble.y + 3);
-    expect(filledPaths.some(({ style }) => style === normalizedCanvasColor(ctx, '#FDBA74'))).toBe(
-      true
-    );
+    for (const [index, color] of ['#A5F3FC', '#FDE68A', '#FDBA74'].entries()) {
+      const center = centers[index];
+      if (!center) {
+        throw new Error('Missing mineral projection');
+      }
+      const mineral = strokes.find(
+        (stroke) =>
+          stroke.style === normalizedCanvasColor(ctx, color) &&
+          stroke.points[0]?.[0] === center.x - 3.8
+      );
+      expect(mineral?.closed).toBe(true);
+      expect(mineral?.points.slice(0, 8)).toEqual(asteroidSilhouette(center.x, center.y, 4));
+      expect(mineral?.points.length).toBeGreaterThan(8);
+    }
     player.ship.abilityActiveFrames = 0;
     texts.length = 0;
-    filledPaths.length = 0;
-    arc.mockClear();
+    strokes.length = 0;
     drawMiniMap(ctx, layout, player.ship, roids, [], [], []);
     expect(texts.map(({ text }) => text)).toEqual(['X +0', 'Y +0 · S0,0']);
-    expect(arc.mock.calls.every((call) => call[2] !== 3)).toBe(true);
-    expect(filledPaths).toHaveLength(2);
-    expect(filledPaths[1]?.rectangles).toHaveLength(3);
-    expect(
-      filledPaths[1]?.rectangles.every(({ width, height }) => width === 1.5 && height === 1.5)
-    ).toBe(true);
+    const generic = strokes.find(
+      ({ style }) => style === normalizedCanvasColor(ctx, 'rgba(148,163,184,0.65)')
+    );
+    expect(generic?.closed).toBe(true);
+    expect(generic?.points).toEqual(centers.flatMap(({ x, y }) => asteroidSilhouette(x, y, 2.5)));
+    expect(strokes.some(({ style }) => style === normalizedCanvasColor(ctx, '#FDE68A'))).toBe(
+      false
+    );
   });
 
   test('radar paints moving world marks and keeps pilots above live objects', async () => {
@@ -476,7 +506,7 @@ describe('painted HUD composition', () => {
       },
     ]);
     const ctx = canvasContext();
-    const { strokes, rectangles, filledPaths } = recordCanvas(ctx);
+    const { strokes, rectangles, filledPaths, outlinedRectangles } = recordCanvas(ctx);
     const arc = vi.spyOn(ctx, 'arc');
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const draw = (): void => {
@@ -493,11 +523,7 @@ describe('painted HUD composition', () => {
 
     draw();
 
-    expect(arc.mock.calls).toEqual([
-      [736, 536, 48, 0, Math.PI * 2],
-      [736, 560, 2.5, 0, Math.PI * 2],
-      [748, 560, 2.5, 0, Math.PI * 2],
-    ]);
+    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
     expect(strokes[0]).toEqual({
       points: [],
       closed: true,
@@ -510,50 +536,60 @@ describe('painted HUD composition', () => {
     expect(
       rectangles.filter(({ style }) => style === normalizedCanvasColor(ctx, 'rgba(0, 0, 17, 0.72)'))
     ).toHaveLength(1);
-    expect(filledPaths).toHaveLength(2);
-    expect(filledPaths[1]).toEqual({
-      rectangles: [{ x: 759.25, y: 535.25, width: 1.5, height: 1.5 }],
-      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
+    expect(filledPaths).toHaveLength(1);
+    expect(strokes[1]).toEqual({
+      points: asteroidSilhouette(760, 536, 2.5),
+      closed: true,
+      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.65)'),
+      width: 0.8,
     });
-    expect(strokes.slice(1, 4)).toEqual([
-      {
-        points: [
-          [736, 522],
-          [738, 524],
-          [736, 526],
-          [734, 524],
-        ],
-        closed: true,
-        style: normalizedCanvasColor(ctx, '#E8D5A3'),
-        width: 1,
-      },
-      {
-        points: [
-          [738.5, 560],
-          [750.5, 560],
-        ],
-        closed: false,
-        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'),
-        width: 1,
-      },
-      {
-        points: [
-          [712, 533],
-          [715, 536],
-          [712, 539],
-          [709, 536],
-        ],
-        closed: true,
-        style: normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)'),
-        width: 1,
-      },
+    expect(strokes[2]).toEqual({
+      points: [
+        [733.4, 526.8],
+        [734.8, 522.2],
+        [739.2, 520],
+        [738.4, 525.6],
+        [735.6, 527.6],
+        [735.6, 527.6],
+        [736.8, 523],
+        [739.2, 520],
+      ],
+      closed: true,
+      style: normalizedCanvasColor(ctx, '#E8D5A3'),
+      width: 1,
+    });
+    const satelliteColor = normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)');
+    const panels = outlinedRectangles.filter(({ style }) => style === satelliteColor);
+    expect(panels.map((panel) => panel.rectangles)).toEqual([
+      [...satellitePanels(736, 560), ...satellitePanels(748, 560)],
+      satellitePanels(712, 536),
+    ]);
+    expect(strokes[3]?.points).toEqual([
+      [732, 560],
+      [740, 560],
+      [736, 558.4],
+      [736, 556.4],
+      [737.2, 555.6],
+      [744, 560],
+      [752, 560],
+      [748, 558.4],
+      [748, 556.4],
+      [749.2, 555.6],
+    ]);
+    expect(strokes[4]?.points).toEqual([
+      [708, 536],
+      [716, 536],
+      [712, 534.4],
+      [712, 532.4],
+      [713.2, 531.6],
+      [718, 536],
     ]);
     const surveyorOutline = getKitHullOutline('surveyor');
     const haulerOutline = getKitHullOutline('hauler');
     const surveyorMarks = 1 + surveyorOutline.extras.length;
     const haulerMarks = 1 + haulerOutline.extras.length;
-    // One arena ring, three batched world marks, then two-pass kit hulls and extras.
-    expect(strokes).toHaveLength(1 + 3 + surveyorMarks * 2 * 3 + haulerMarks * 2);
+    // One arena ring, four world layers, then two-pass kit hulls and extras.
+    expect(strokes).toHaveLength(1 + 4 + surveyorMarks * 2 * 3 + haulerMarks * 2);
     const radarX = layout.miniMap.x + layout.miniMap.size / 2;
     const radarY = layout.miniMap.y + layout.miniMap.size / 2;
     const peerX = radarX + layout.miniMap.size / 4;
@@ -606,6 +642,7 @@ describe('painted HUD composition', () => {
     expect(crispKitStrokes(strokes, remoteColor)).toHaveLength(surveyorMarks * 2 + haulerMarks);
 
     strokes.length = 0;
+    outlinedRectangles.length = 0;
     filledPaths.length = 0;
     arc.mockClear();
     visible.position = { x: -WORLD.minimapRadius / 4, y: 0 };
@@ -619,21 +656,21 @@ describe('painted HUD composition', () => {
     setWorldExploration(exploration.snapshot());
     draw();
 
-    expect(filledPaths[1]).toEqual({
-      rectangles: [{ x: 723.25, y: 535.25, width: 1.5, height: 1.5 }],
-      style: normalizedCanvasColor(ctx, 'rgba(148,163,184,0.55)'),
-    });
-    const movedOrbiter = strokes.find(
-      (call) => call.style === normalizedCanvasColor(ctx, 'rgba(196,181,253,0.95)') && call.closed
-    );
-    expect(movedOrbiter?.points).toEqual([
-      [748, 533],
-      [751, 536],
-      [748, 539],
-      [745, 536],
+    expect(strokes[1]?.points).toEqual(asteroidSilhouette(724, 536, 2.5));
+    expect(
+      outlinedRectangles.filter(({ style }) => style === satelliteColor).at(-1)?.rectangles
+    ).toEqual(satellitePanels(748, 536));
+    expect(strokes[4]?.points).toEqual([
+      [744, 536],
+      [752, 536],
+      [748, 534.4],
+      [748, 532.4],
+      [749.2, 531.6],
+      [754, 536],
     ]);
 
     strokes.length = 0;
+    outlinedRectangles.length = 0;
     filledPaths.length = 0;
     arc.mockClear();
     SatellitePickupManager.getInstance().syncFromServer([

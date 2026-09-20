@@ -23,6 +23,7 @@ interface SpiderAdvanceOptions {
   completedSectors: ReadonlySet<string>;
   nowFrame: number;
   resources?: () => readonly SpiderResource[];
+  dormantResource?: (id: string, home: Position) => SpiderResource | undefined;
 }
 
 export interface SpiderAttack {
@@ -54,6 +55,7 @@ interface RuntimeSpider extends TerrainSpider {
 }
 
 interface SpiderNest {
+  resourceId: string;
   home: Position;
   guards: RuntimeSpider[];
 }
@@ -125,6 +127,7 @@ export class TerrainSpiderManager {
   private nextNestFrame = 0;
   private nowFrame = 0;
   private readonly nests = new Map<string, SpiderNest>();
+  private nestMarkers: SpiderFieldState['nests'] = [];
   private spawnTargetIndex = 0;
   private completedSectors: ReadonlySet<string> = new Set();
 
@@ -133,6 +136,8 @@ export class TerrainSpiderManager {
   public snapshot(): SpiderFieldState {
     return {
       spiders: [...this.spiders.values()].sort((a, b) => a.id.localeCompare(b.id)).map(copySpider),
+      // Rebuilt with the resource refresh; snapshots never scan dormant nest history.
+      nests: this.nestMarkers,
     };
   }
 
@@ -153,6 +158,7 @@ export class TerrainSpiderManager {
     this.nextSpawnFrame = null;
     this.nextNestFrame = 0;
     this.nests.clear();
+    this.nestMarkers = [];
     this.spawnTargetIndex = 0;
   }
 
@@ -212,7 +218,12 @@ export class TerrainSpiderManager {
     this.removeBlockedBodies(options.completedSectors);
     this.removeDistantBodies(players);
     if (players.length > 0 && nowFrame >= this.nextNestFrame) {
-      this.updateNests(options.resources?.() ?? [], players, options.completedSectors);
+      this.updateNests(
+        options.resources?.() ?? [],
+        players,
+        options.completedSectors,
+        options.dormantResource
+      );
       this.nextNestFrame = nowFrame + 60;
     }
     if (this.nextSpawnFrame === null) {
@@ -332,7 +343,8 @@ export class TerrainSpiderManager {
   private updateNests(
     resources: readonly SpiderResource[],
     players: readonly SpiderActor[],
-    completed: ReadonlySet<string>
+    completed: ReadonlySet<string>,
+    dormantResource: SpiderAdvanceOptions['dormantResource']
   ): void {
     const candidates = new Map<string, SpiderResource>();
     for (const resource of resources) {
@@ -381,7 +393,7 @@ export class TerrainSpiderManager {
       if (!positions.every((position) => this.canOccupy(position, SPIDER.HIT_RADIUS, completed))) {
         continue;
       }
-      const nest: SpiderNest = { home, guards: [] };
+      const nest: SpiderNest = { resourceId: resource.id, home, guards: [] };
       this.nests.set(id, nest);
       for (const position of positions) {
         const spawned = this.spawnSpider(position);
@@ -398,6 +410,22 @@ export class TerrainSpiderManager {
         }
       }
     }
+    const available = new Map(resources.map((resource) => [resource.id, resource]));
+    const markers: SpiderFieldState['nests'] = [];
+    // At most one nest per 10,000-unit cell (144 cells across this world).
+    // Check only those known homes once a second, never scan dormant sectors.
+    for (const [id, nest] of this.nests) {
+      const resource =
+        available.get(nest.resourceId) ?? dormantResource?.(nest.resourceId, nest.home);
+      if (
+        resource &&
+        distanceBetween(nest.home, resource.position) <= POSITION_EPSILON &&
+        this.canOccupy(nest.home, SPIDER.HIT_RADIUS, completed)
+      ) {
+        markers.push({ id, resourceId: nest.resourceId, position: copyPosition(nest.home) });
+      }
+    }
+    this.nestMarkers = markers.sort((a, b) => a.id.localeCompare(b.id));
     // Constant-size neighborhood lookup per pilot, never a scan of the saved world.
     for (const player of players) {
       const x = Math.floor(player.position.x / SPIDER.NEST_SPACING);

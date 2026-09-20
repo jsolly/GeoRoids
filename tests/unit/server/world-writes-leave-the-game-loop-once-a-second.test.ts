@@ -256,3 +256,32 @@ test('shutdown waits a bounded time for an in-flight commit, then closes the wri
   );
   expect(persistence.batches).toHaveLength(1);
 });
+
+test('a persistence flush never parks a custom diagnostic belt in dormant regional sectors', () => {
+  const store = new WorldStore(':memory:');
+  cleanups.push(() => store.close());
+  const { engine, miner, frame } = world(new InlineWorldPersistence(store));
+  engine.prepareDiagnosticWorld('traversal');
+  for (const rock of engine.getAllAsteroids()) {
+    engine.removeAsteroid(rock.id);
+  }
+  const target = metalDeposit('diagnostic-nest-deposit', { x: 5000, y: 5000 });
+  engine.addAsteroid(target);
+  expect(
+    engine.playerMotion.placeActorForTesting(miner.id, { x: 3000, y: 5000 }, WALL_ORIGIN_MS)
+  ).toBe(true);
+  miner.score = 321;
+  engine.checkpointWorld();
+  expect(engine.getAllAsteroids()).toContainEqual(target);
+  expect(store.loadSector('2,2')).toBeUndefined();
+  expect(store.loadPilots().find((pilot) => pilot.id === miner.id)?.score).toBe(321);
+  for (let tick = 0; tick < GAME.FPS * 2; tick++) {
+    frame();
+  }
+  expect(engine.getAllAsteroids()).toContainEqual(target);
+  expect(engine.getSpiderField().nests).toContainEqual({
+    id: '0,0',
+    resourceId: target.id,
+    position: target.position,
+  });
+});

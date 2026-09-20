@@ -4,19 +4,25 @@ import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE } from '../constants';
+import { LootField } from '../entities/loot/LootField';
+import { lootStrokeColor } from '../entities/loot/lootRenderer';
 import { PlayerManager } from '../entities/player/PlayerManager';
+import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
+import { activeScanners, scannedMaterial } from '../entities/ship/surveyScan';
 import {
   getCompletedSectors,
   getWorldExploration,
   getWorldMapAssets,
 } from '../network/worldExploration';
+import { getSpiderField } from '../physics/terrain/spiderSession';
 import {
   drawFurnaceMapMark,
   UNIVERSE_MAP_LANDMARK_SIZE,
   universeMapFurnaceMarkAppearance,
   universeMapMarkScreenSize,
 } from '../rendering/hud/furnaceMapMark';
+import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import {
@@ -110,6 +116,12 @@ type ExplorationRaster = {
   canvas: HTMLCanvasElement | null;
   context: CanvasRenderingContext2D | null;
 };
+
+let readMapRoids: () => readonly Roid[] = () => [];
+
+export function bindUniverseMapField(source: () => readonly Roid[]): void {
+  readMapRoids = source;
+}
 
 let initialized = false;
 let mapOpen = false;
@@ -329,16 +341,55 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       ${locateControlMarkup()}
     </div>
     <footer class="universe-map-footer">
-      <div class="universe-map-legend">
-        <span><i class="map-key map-key-local"></i>You</span>
-        <span><i class="map-key map-key-crew"></i>Crew</span>
-        <span><i class="map-key map-key-furnace"></i>Furnace</span>
-        <span><i class="map-key map-key-discovery"></i>Discovery</span>
-        <span><i class="map-key map-key-fog"></i>Uncharted</span>
-      </div>
+      <div class="universe-map-legend"></div>
       <p id="${UNIVERSE_MAP_IDS.status}" aria-live="polite"></p>
       <p class="universe-map-help">${DESKTOP_MAP_HELP}</p>
     </footer>`;
+}
+
+function drawMapLegend(dialog: HTMLDialogElement): void {
+  const legend = dialog.querySelector('.universe-map-legend');
+  if (!legend) {
+    return;
+  }
+  legend.replaceChildren();
+  for (const kind of ['You', 'Crew', 'Furnace', 'Resources', 'Nest', 'Uncharted']) {
+    const item = document.createElement('span');
+    const canvas = document.createElement('canvas');
+    canvas.className = 'map-key';
+    canvas.width = 32;
+    canvas.height = 32;
+    canvas.setAttribute('aria-hidden', 'true');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(2, 2);
+      if (kind === 'You' || kind === 'Crew') {
+        ctx.strokeStyle = kind === 'You' ? PALETTE.LOCAL : PALETTE.REMOTE;
+        ctx.lineWidth = 1;
+        const player =
+          kind === 'You'
+            ? PlayerManager.getInstance().getLocalPlayer()
+            : PlayerManager.getInstance().getNonLocalPlayers()[0];
+        const hull = getKitHullOutline(player?.ship.kitId ?? 'surveyor');
+        if (traceMapPolyline(ctx, projectHullPolyline(8, 8, 6, Math.PI / 2, hull.hull), true)) {
+          ctx.stroke();
+        }
+      } else if (kind === 'Furnace') {
+        drawFurnaceMapMark(ctx, 8, 8, 6);
+      } else if (kind === 'Resources') {
+        drawResourceMapMark(ctx, 'asteroid', 8, 8, 5, PALETTE.ROID);
+      } else if (kind === 'Nest') {
+        drawResourceMapMark(ctx, 'nest', 8, 8, 6, PALETTE.DANGER);
+      } else {
+        ctx.fillStyle = '#050914';
+        ctx.fillRect(3, 3, 10, 10);
+        ctx.strokeStyle = PALETTE.HUD_MUTED;
+        ctx.strokeRect(3, 3, 10, 10);
+      }
+    }
+    item.append(canvas, kind);
+    legend.append(item);
+  }
 }
 
 function ensureElements(): UniverseMapElements | null {
@@ -582,42 +633,11 @@ function drawMapAsset(
       asset.kind === 'laserCore'
         ? PALETTE.LASER_LOCAL
         : asset.kind === 'satellite'
-          ? PALETTE.REMOTE
+          ? PALETTE.SATELLITE
           : PALETTE.LOOT;
-    context.strokeStyle = color;
-    context.fillStyle = hexToRgba(color, 0.2);
-    context.shadowColor = color;
-    context.beginPath();
-    switch (asset.kind) {
-      case 'laserCore':
-        context.moveTo(0, -size);
-        context.lineTo(size, 0);
-        context.lineTo(0, size);
-        context.lineTo(-size, 0);
-        context.closePath();
-        context.moveTo(-size * 0.5, size * 0.5);
-        context.lineTo(size * 0.5, -size * 0.5);
-        break;
-      case 'satellite':
-        context.arc(0, 0, size * 0.55, 0, Math.PI * 2);
-        context.ellipse(0, 0, size * 1.35, size * 0.45, 0, 0, Math.PI * 2);
-        break;
-      case 'wreckage':
-        context.moveTo(-size, -size * 0.3);
-        context.lineTo(-size * 0.25, -size);
-        context.lineTo(size, -size * 0.15);
-        context.lineTo(size * 0.3, size);
-        context.lineTo(-size, size * 0.45);
-        context.closePath();
-        break;
-      default: {
-        const unexpected: never = asset.kind;
-        throw new Error(`Unexpected map asset kind: ${unexpected}`);
-      }
-    }
-    context.fill();
-    context.shadowBlur = 0;
-    context.stroke();
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    drawResourceMapMark(context, asset.kind, 0, 0, screen, color);
+    context.scale(frame.scale, frame.scale);
   }
   if (showLabel && asset.name) {
     context.font = `${12 / frame.scale}px "Courier New", monospace`;
@@ -625,6 +645,92 @@ function drawMapAsset(
     context.textAlign = 'center';
     context.textBaseline = 'top';
     context.fillText(asset.name, 0, size * 1.6);
+  }
+  context.restore();
+}
+
+/** Local snapshot details supplement the chart's persistent landmarks. */
+function drawNearbyResources(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  exploration: readonly ExplorationTile[]
+): void {
+  const local = PlayerManager.getInstance().getLocalPlayer();
+  if (!local) {
+    return;
+  }
+  const scanners = activeScanners(
+    local.ship,
+    PlayerManager.getInstance()
+      .getNonLocalPlayers()
+      .map((player) => player.ship)
+  );
+  context.save();
+  context.scale(1 / frame.scale, 1 / frame.scale);
+  for (const roid of readMapRoids()) {
+    if (
+      roid.health <= 0 ||
+      !isFiniteMapPosition(roid.position) ||
+      !isRevealed(roid.position, exploration)
+    ) {
+      continue;
+    }
+    const material =
+      roid.surveyedBy && roid.surveyedBy.length > 0
+        ? roid.material
+        : scanners
+            .map((scanner) => scannedMaterial(scanner, roid))
+            .find((value) => value !== undefined);
+    drawResourceMapMark(
+      context,
+      'asteroid',
+      roid.position.x * frame.scale,
+      roid.position.y * frame.scale,
+      universeMapMarkScreenSize(material ? 5 : 3, frame.zoom),
+      asteroidMapInk(material),
+      material
+    );
+  }
+  for (const drop of LootField.getInstance().getAll()) {
+    // Wreckage and cores already have persistent landmark entries.
+    if (
+      (drop.kind !== 'shard' && drop.kind !== 'tap') ||
+      !isFiniteMapPosition(drop.position) ||
+      !isRevealed(drop.position, exploration)
+    ) {
+      continue;
+    }
+    drawResourceMapMark(
+      context,
+      drop.kind,
+      drop.position.x * frame.scale,
+      drop.position.y * frame.scale,
+      universeMapMarkScreenSize(6, frame.zoom),
+      lootStrokeColor(drop.kind)
+    );
+  }
+  context.restore();
+}
+
+function drawNestMarks(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  exploration: readonly ExplorationTile[]
+): void {
+  context.save();
+  context.scale(1 / frame.scale, 1 / frame.scale);
+  for (const nest of getSpiderField().nests) {
+    if (!isFiniteMapPosition(nest.position) || !isRevealed(nest.position, exploration)) {
+      continue;
+    }
+    drawResourceMapMark(
+      context,
+      'nest',
+      nest.position.x * frame.scale,
+      nest.position.y * frame.scale,
+      universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom),
+      PALETTE.DANGER
+    );
   }
   context.restore();
 }
@@ -728,6 +834,12 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   const players = local ? [local, ...crew] : crew;
   const locations = [
     ...assets.map((asset) => ({ name: `${asset.name} (${asset.kind})`, position: asset.position })),
+    ...getSpiderField()
+      .nests.filter(
+        (nest) =>
+          isFiniteMapPosition(nest.position) && isRevealed(nest.position, getWorldExploration())
+      )
+      .map((nest) => ({ name: 'Spider nest · guarded resource', position: nest.position })),
     ...players
       .filter((player) => isFiniteMapPosition(player.ship.position))
       .map((player) => ({
@@ -771,6 +883,7 @@ function renderMap(): void {
 
   const exploration = getWorldExploration();
   drawMapBackground(context, frame);
+  drawNearbyResources(context, frame, exploration);
   let revealedAssetCount = 0;
   let drawnLabelCount = 0;
   const revealedAssets = getWorldMapAssets().filter((asset) =>
@@ -804,6 +917,7 @@ function renderMap(): void {
     }
     drawMapAsset(context, asset, frame, showLabel);
   }
+  drawNestMarks(context, frame, exploration);
   const crewCount = drawCrew(context, frame, labelRects);
   context.restore();
 
@@ -866,6 +980,7 @@ function openMap(): void {
   mapOpen = true;
   nextLocationUpdateAt = 0;
   syncMapInputChrome();
+  drawMapLegend(elements.dialog);
   view.zoom = UNIVERSE_MAP_ZOOM.initial;
   view.center = local?.ship.position ? { ...local.ship.position } : { x: 0, y: 0 };
   resizeCanvas();

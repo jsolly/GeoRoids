@@ -18,6 +18,7 @@ export type DrawingContext = Pick<
   | 'lineTo'
   | 'lineWidth'
   | 'moveTo'
+  | 'quadraticCurveTo'
   | 'rect'
   | 'restore'
   | 'rotate'

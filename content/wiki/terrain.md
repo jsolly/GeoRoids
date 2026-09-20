@@ -53,7 +53,11 @@ feedback, with no terrain reflection or extra damage.
 
 Spiders mostly live in widely spaced territories around stationary deposits,
 loose loot, and unclaimed pickups. More valuable resources attract larger guard
-groups; some sites have a whole horde. Most resources remain unguarded. Guards
+groups; some sites have a whole horde. Most resources remain unguarded. A red spiderweb on both maps marks each
+discovered nest at its guarded resource, not the moving spiders. The web
+remains after the guards die while the original resource stays in place. It
+disappears after the resource is collected or moved, or its sector completes.
+Guards
 patrol close to their home instead of following pilots around the world.
 A cleared nest stays cleared for the server session, and surviving guards keep
 their injuries when you leave and return. Remaining guards keep their territory

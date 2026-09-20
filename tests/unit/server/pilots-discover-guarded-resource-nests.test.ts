@@ -1,9 +1,12 @@
 import { expect, test } from 'vitest';
-import type { SpiderResource } from '../../../server/core/spiderResources';
+import { AsteroidManager } from '../../../server/core/AsteroidManager';
+import { RNGService } from '../../../server/core/RNGService';
+import { type SpiderResource, spiderResources } from '../../../server/core/spiderResources';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
+import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { SPIDER } from '../../../shared/terrainSpider';
-import type { Position } from '../../../shared-types';
-import { DAMAGE } from '../../../src/constants';
+import type { AsteroidData, Position } from '../../../shared-types';
+import { DAMAGE, ROID } from '../../../src/constants';
 
 const home = { x: 5000, y: 5000 };
 function setup(value: SpiderResource['value'] = 1) {
@@ -233,3 +236,132 @@ test('multiplayer nest creation and sleeping guards share the same active popula
   expect(manager.snapshot().spiders).toHaveLength(SPIDER.MAX_ACTIVE);
   expect(manager.snapshot().spiders.filter(({ id }) => sleepingIds.includes(id))).toHaveLength(6);
 });
+
+test('the map marks the guarded deposit while its spiders chase, sleep, and remain cleared', () => {
+  const { manager, pilot, resource, step } = setup();
+  step();
+  const marker = { id: '0,0', resourceId: resource.id, position: { ...home } };
+  expect(manager.snapshot().nests).toEqual([marker]);
+  pilot.position = { ...home };
+  step(120);
+  expect(manager.snapshot().spiders.some((spider) => spider.phase === 'hunting')).toBe(true);
+  expect(manager.snapshot().nests).toEqual([marker]);
+  manager.suspend();
+  expect(manager.snapshot().spiders).toEqual([]);
+  expect(manager.snapshot().nests).toEqual([marker]);
+  pilot.position = { x: 3000, y: 5000 };
+  step(60);
+  for (const spider of manager.snapshot().spiders) {
+    manager.removeSpider(spider.id);
+  }
+  step(60);
+  expect(manager.snapshot().spiders).toEqual([]);
+  expect(manager.snapshot().nests).toEqual([marker]);
+});
+
+test.each(['collected', 'moved', 'replaced', 'completed'] as const)(
+  'a %s deposit no longer advertises the old nest on the map',
+  (change) => {
+    const manager = new TerrainSpiderManager(() => 0.5);
+    const pilot = { id: 'pilot', position: { x: 3000, y: 5000 }, health: 100, exploding: false };
+    let resources: SpiderResource[] = [{ id: 'ore', position: { ...home }, value: 1 }];
+    const advance = (nowFrame: number, completedSectors: ReadonlySet<string> = new Set()) =>
+      manager.advance({ players: [pilot], resources: () => resources, completedSectors, nowFrame });
+    advance(1);
+    expect(manager.snapshot().nests).toHaveLength(1);
+    if (change === 'collected') {
+      resources = [];
+    }
+    if (change === 'moved') {
+      resources = [{ id: 'ore', position: { x: 5010, y: 5000 }, value: 1 }];
+    }
+    if (change === 'replaced') {
+      resources = [{ id: 'other-ore', position: { ...home }, value: 1 }];
+    }
+    advance(61, change === 'completed' ? new Set(['2,2']) : new Set());
+    expect(manager.snapshot().nests).toEqual([]);
+  }
+);
+
+test('map snapshots reuse the scheduled resource refresh and roaming spiders add no nests', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  const pilot = { id: 'pilot', position: { x: 3000, y: 5000 }, health: 100, exploding: false };
+  let reads = 0;
+  const resources = (): SpiderResource[] => {
+    reads++;
+    return [{ id: 'ore', position: home, value: 1 }];
+  };
+  for (let nowFrame = 1; nowFrame <= 120; nowFrame++) {
+    manager.advance({
+      players: [pilot],
+      resources,
+      completedSectors: new Set(),
+      nowFrame,
+    });
+    manager.snapshot();
+  }
+  expect(reads).toBe(2);
+  manager.clear();
+  manager.spawnSpider(home);
+  expect(manager.snapshot().nests).toEqual([]);
+});
+
+test.each(['collected', 'moved'] as const)(
+  'a discovered nest survives sector sleep and revisit, then hides its %s dormant resource',
+  (change) => {
+    const deposit: AsteroidData = {
+      id: 'aaa-nest-deposit',
+      position: { ...home },
+      velocity: { x: 0, y: 0 },
+      size: ROID.COLOSSAL_SIZE,
+      jaggedness: 0.2,
+      rotation: 0,
+      angularVelocity: 0,
+      health: 75,
+      maxHealth: 75,
+      vertices: 4,
+      offsets: [1, 1, 1, 1],
+    };
+    const field = new RegionalAsteroidField(42, new Map([['2,2', [deposit]]]));
+    const rocks = new AsteroidManager(new RNGService(42));
+    const manager = new TerrainSpiderManager(() => 0.5);
+    const pilot = { id: 'pilot', position: { x: 3000, y: 5000 }, health: 100, exploding: false };
+    const advance = (nowFrame: number) => {
+      field.update(rocks, [pilot.position], new Set());
+      manager.advance({
+        players: [pilot],
+        completedSectors: new Set(),
+        nowFrame,
+        resources: () => spiderResources(rocks.getAllAsteroids(), [], []),
+        dormantResource: (id, position) => {
+          const dormant = field.dormantAsteroid(id, position);
+          return dormant ? spiderResources([dormant], [], [])[0] : undefined;
+        },
+      });
+    };
+    const marker = { id: '0,0', resourceId: deposit.id, position: { ...home } };
+    advance(1);
+    expect(manager.snapshot().nests).toContainEqual(marker);
+    pilot.position = { x: -20000, y: -20000 };
+    advance(61);
+    expect(rocks.getAsteroid(deposit.id)).toBeUndefined();
+    expect(field.dormantAsteroid(deposit.id, home)).toBeDefined();
+    expect(manager.snapshot().nests).toContainEqual(marker);
+    pilot.position = { x: 3000, y: 5000 };
+    advance(121);
+    expect(rocks.getAsteroid(deposit.id)).toBeDefined();
+    expect(manager.snapshot().nests).toContainEqual(marker);
+    if (change === 'collected') {
+      rocks.removeAsteroid(deposit.id);
+    } else {
+      rocks.updateAsteroid(deposit.id, { position: { x: home.x + 100, y: home.y } });
+    }
+    // Leave before the next nest refresh: depletion must not be mistaken for unloading.
+    pilot.position = { x: -20000, y: -20000 };
+    advance(181);
+    expect(manager.snapshot().nests.some((nest) => nest.resourceId === deposit.id)).toBe(false);
+    pilot.position = { x: 3000, y: 5000 };
+    advance(241);
+    expect(manager.snapshot().nests.some((nest) => nest.resourceId === deposit.id)).toBe(false);
+  }
+);

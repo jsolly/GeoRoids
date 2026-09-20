@@ -86,11 +86,17 @@ minimap. The local minimap follows the ship's nearby radar: it shows your ship,
 other players, explored asteroids, loot drops, loose satellite
 pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
 marks follow each entity's current position; destroyed or collected objects
-disappear when the shared state removes them. Slate squares mark asteroids;
-cream squares and diamonds mark wreckage and shards, larger cream canisters
-with amber tips mark Tap loot, yellow slashed diamonds
-mark laser cores, lilac circles and diamonds mark loose and orbiting
-satellite pickups, and amber hairline three-tongue campfires mark discovered furnaces.
+disappear when the shared state removes them. Asteroids use one jagged rock
+silhouette; identified minerals change its color and small surface details.
+Broken hulls mark wreckage, angular fragments mark shards, canisters mark Tap
+loot, and yellow laser emitters mark laser cores. Lilac satellites have a
+central body and solar panels; an orbit line distinguishes deployed pickups.
+Amber campfires mark discovered furnaces. Red spiderwebs surround the stationary
+resources guarded by nests, even while their spiders are chasing elsewhere or
+sleeping. The web remains after the guards are killed while the resource remains;
+it disappears when that resource is collected, moved, or its sector completes.
+The universe map uses the same symbols and also shows nearby explored rocks
+and small loot from the current local snapshot.
 Kit hull silhouettes in local and crew colors keep pilots
 identifiable above the world marks. Completed sectors are hatched on both maps. Crossing into a
 new open sector shows a brief HUD notice with that sector's coordinates. Press
@@ -167,9 +173,9 @@ the Close control.
 On touch, Map and Close hide keyboard badges.
 
 Press E or tap Scan to identify nearby asteroid minerals on every teammate's
-radar. An active scan reaches 1,200 world units around its Surveyor. Ice becomes
-a circle, metal a square, and rubble a triangle; the legend labels each shape.
+radar. An active scan reaches 1,200 world units around its Surveyor. All asteroid types keep the same rock outline: ice is pale cyan with a crack,
+metal is gold with parallel seams, and rubble is orange with chipped details.
 The classification remains visible for that rock while it is in the nearby
-radar, even after the active scan ends. Unscanned rocks remain ordinary dots.
+radar, even after the active scan ends. Unscanned rocks keep a smaller slate rock outline.
 The Surveyor's scan also records its player ID on the rock for a later furnace
 delivery.

@@ -67,6 +67,13 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
       }
     }
     expect(spawnFrames).toEqual([23, 45, 68, 90]);
+    expect(world.engine.drainTapEjections()).toEqual(
+      world.engine.getLoot().map((drop) => ({
+        lootId: drop.id,
+        position: drop.position,
+      }))
+    );
+    expect(world.engine.drainTapEjections()).toEqual([]);
     expect(world.engine.getLoot().reduce((sum, drop) => sum + drop.mass, 0)).toBeCloseTo(0.4);
     for (let frame = 0; frame < 90; frame++) {
       world.engine.tickAbilities();
@@ -95,6 +102,31 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
     const collected = world.engine.collectLoot();
     expect(collected.some((entry) => entry.lootId === tap.id)).toBe(true);
     expect(world.entity(alice).score).toBeGreaterThanOrEqual(GROWTH.TAP_LOOT_SCORE);
+  });
+
+  test('the last pilot leaving discards unheard ejections before a later join', () => {
+    world.clearAsteroids();
+    addRock();
+    alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    world.send(alice, {
+      type: 'setHaulerUtility',
+      id: alice.id,
+      data: { utilityId: 'resource_tap' },
+    });
+    world.send(alice, {
+      type: 'useAbility',
+      id: alice.id,
+      data: { kitId: 'hauler', abilityId: 'harpoon' },
+    });
+    for (let frame = 0; frame < 23; frame++) {
+      world.engine.tickAbilities();
+    }
+    expect(world.engine.getLoot().filter((drop) => drop.kind === 'tap')).toHaveLength(1);
+    world.disconnect(alice);
+    expect(world.engine.isGamePaused()).toBe(true);
+    const bob = world.join('Bob', { x: 0, y: 0 });
+    expect(bob.socket.received('tapEjected')).toEqual([]);
+    expect(world.engine.drainTapEjections()).toEqual([]);
   });
 
   test.each(['release', 'death'] as const)(

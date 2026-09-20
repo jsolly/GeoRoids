@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -13,6 +14,7 @@ test(
       throw new Error('Page not available');
     }
 
+    await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame();
     await game.waitForCombatReady();
@@ -43,6 +45,7 @@ test(
       })
       .toBe(true);
 
+    expect(await readSamplePlaybackRates(page, 'game-over')).toEqual([1]);
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();

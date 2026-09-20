@@ -11,6 +11,7 @@ import {
   shouldSampleSnapshot,
 } from '../../../shared/stateDiagnostics';
 import type {
+  AbilityUsedEvent,
   AsteroidData,
   AsteroidDestroyEvent,
   AsteroidTaggedEvent,
@@ -27,14 +28,16 @@ import type {
   ShockwaveEvent,
 } from '../../../shared-types';
 import { playDestructionSound } from '../../audio/destructionSounds';
+import { playFeedback } from '../../audio/feedbackSounds';
 import { playLaserSound } from '../../audio/gameSounds';
 import {
   playAbilityActivation,
   playHarpoonLatch,
   playHarpoonRelease,
-  playLootPickup,
   playOrbitalPickup,
 } from '../../audio/interactionSounds';
+import { playLootPickup, playTapEjection, resetResourceMusic } from '../../audio/resourceMusic';
+import { stopSatelliteOrbit, syncSatelliteOrbit } from '../../audio/satelliteOrbitSound';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
 import { PALETTE, ROID } from '../../constants';
 import {
@@ -201,6 +204,8 @@ export class ConnectionManager {
   private readonly snapshotEntityIds = new Set<string>();
   private readonly taggedAsteroidIds = new Set<string>();
   private readonly playedLootCollectionIds = new Set<string>();
+  private readonly playedTapEjectionIds = new Set<string>();
+  private readonly playedLootExplosionIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
   private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
   private readonly updateEnvelope: ClientMessage = {
@@ -385,7 +390,14 @@ export class ConnectionManager {
                   clientPerformance.record('parseMs', result.timings.parseMs);
                 }
               }
-              this.handleServerMessage(result.message);
+              const message = result.message;
+              // Events queued before this pilot joined may precede the baseline.
+              // Apply their state, but do not announce a world not yet received.
+              if (this.lastAcceptedSnapshotSequence === 0 && message.type !== 'error') {
+                withoutWorldAudio(() => this.handleServerMessage(message));
+              } else {
+                this.handleServerMessage(message);
+              }
               return;
             }
             if (clientPerformance.enabled) {
@@ -551,7 +563,6 @@ export class ConnectionManager {
     this.state.socket = null;
     this.allPlayers.clear();
     this.taggedAsteroidIds.clear();
-    this.playedLootCollectionIds.clear();
     this.playerListCache.invalidate();
     this.seenAsteroidIds.clear();
     this.hasInitializedAsteroidsForConnection = false;
@@ -1069,21 +1080,14 @@ export class ConnectionManager {
       case 'lootCollected':
         this.handleLootCollected(data);
         break;
+      case 'tapEjected':
+        this.handleTapEjected(data);
+        break;
       case 'furnaceDelivery':
         this.handleFurnaceDelivery(data as FurnaceDelivery);
         break;
       case 'abilityUsed':
-        this.handleAbilityUsed(
-          data as {
-            id?: string;
-            kitId?: string;
-            abilityId?: string;
-            harpoonTargetId?: string | null;
-            harpoonLatchPos?: Position;
-
-            abilityActiveFrames?: number;
-          }
-        );
+        this.handleAbilityUsed(data as AbilityUsedEvent);
         break;
       case 'error':
         if (this.joinCompletionPending && !this.joinAcknowledged) {
@@ -1101,6 +1105,11 @@ export class ConnectionManager {
   }
 
   private resetSnapshotSession(): void {
+    resetResourceMusic();
+    stopSatelliteOrbit();
+    this.playedLootCollectionIds.clear();
+    this.playedTapEjectionIds.clear();
+    this.playedLootExplosionIds.clear();
     this.shotAcknowledgements = false;
     AuthoritativeProjectileField.getInstance().clear();
     this.clearJoinCompletionTimer();
@@ -1263,15 +1272,7 @@ export class ConnectionManager {
     }
   }
 
-  private handleAbilityUsed(data: {
-    id?: string;
-    kitId?: unknown;
-    abilityId?: unknown;
-    harpoonTargetId?: string | null;
-    harpoonLatchPos?: Position;
-
-    abilityActiveFrames?: number;
-  }): void {
+  private handleAbilityUsed(data: AbilityUsedEvent): void {
     if (!data.id) {
       return;
     }
@@ -1289,6 +1290,9 @@ export class ConnectionManager {
     if (abilityId === 'harpoon') {
       if (isHarpoonRelease) {
         playHarpoonRelease(entity.ship.position);
+        if (isFinitePosition(data.boostIgnitionPosition)) {
+          playFeedback('boostIgnite', data.boostIgnitionPosition);
+        }
       } else {
         const targetPosition = isFinitePosition(data.harpoonLatchPos)
           ? data.harpoonLatchPos
@@ -1441,6 +1445,11 @@ export class ConnectionManager {
 
     LootField.getInstance().applySnapshot(data.loot);
     SatellitePickupManager.getInstance().syncFromServer(data.satellitePickups);
+    syncSatelliteOrbit(
+      data.satellitePickups.find(
+        (pickup) => pickup.ownerId === this.localPlayerId && pickup.state === 'orbiting'
+      )
+    );
     const projectileField = AuthoritativeProjectileField.getInstance();
     projectileField.sync(data.playerProjectiles);
     for (const player of this.allPlayers.values()) {
@@ -1469,14 +1478,50 @@ export class ConnectionManager {
     radius: number;
     shooterId: string;
   }): void {
-    if (!data.lootId) {
+    if (
+      !data.lootId ||
+      !isFinitePosition(data.position) ||
+      !Number.isFinite(data.radius) ||
+      this.playedLootExplosionIds.has(data.lootId)
+    ) {
       return;
     }
-    LootField.getInstance().remove(data.lootId);
-    if (isFinitePosition(data.position) && Number.isFinite(data.radius)) {
-      playDestructionSound('loot', data.position);
-      LootField.getInstance().noteBlast(data.position, data.radius);
+    if (this.playedLootExplosionIds.size >= MAX_PLAYED_LOOT_COLLECTION_IDS) {
+      const oldest = this.playedLootExplosionIds.values().next().value;
+      if (oldest !== undefined) {
+        this.playedLootExplosionIds.delete(oldest);
+      }
     }
+    this.playedLootExplosionIds.add(data.lootId);
+    LootField.getInstance().remove(data.lootId);
+    playDestructionSound('loot', data.position);
+    LootField.getInstance().noteBlast(data.position, data.radius);
+  }
+
+  private handleTapEjected(data: unknown): void {
+    if (
+      typeof data !== 'object' ||
+      data === null ||
+      Array.isArray(data) ||
+      !('lootId' in data) ||
+      typeof data.lootId !== 'string' ||
+      !data.lootId ||
+      !('position' in data) ||
+      !isFinitePosition(data.position)
+    ) {
+      return;
+    }
+    if (this.playedTapEjectionIds.has(data.lootId)) {
+      return;
+    }
+    if (this.playedTapEjectionIds.size >= MAX_PLAYED_LOOT_COLLECTION_IDS) {
+      const oldest = this.playedTapEjectionIds.values().next().value;
+      if (oldest !== undefined) {
+        this.playedTapEjectionIds.delete(oldest);
+      }
+    }
+    this.playedTapEjectionIds.add(data.lootId);
+    playTapEjection(data.position);
   }
 
   private handleLootCollected(data: unknown): void {
@@ -1741,6 +1786,9 @@ export class ConnectionManager {
 
     if (data.remainingHealth > 0 && data.damage > 0) {
       targetPlayer.ship.takeDamage(0, data.attackerId);
+      if (isLocalTarget && beforeHealth !== undefined && data.remainingHealth < beforeHealth) {
+        playFeedback('hullDamage');
+      }
     }
 
     if (data.isDestroyed && !targetPlayer.ship.exploding) {

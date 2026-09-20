@@ -33,6 +33,7 @@
   ],
   // These dependencies are executed by shell scripts, CI, or deployment
   // tooling; Knip cannot infer those non-TypeScript consumers.
-  "ignoreBinaries": ["uvx"],
+  // afconvert is the macOS system encoder used by sounds:generate.
+  "ignoreBinaries": ["uvx", "afconvert"],
   "ignoreDependencies": ["concurrently", "markdownlint-cli2", "jsonc-parser"]
 }

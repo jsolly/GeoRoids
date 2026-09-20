@@ -49,3 +49,10 @@ range. The drop is removed and its shot-triggered blast is safe for every crew
 hull, including the shooter and teammates. It adds an outward velocity impulse
 to small asteroids. A rock is affected when its edge reaches the blast radius;
 the blast does not deal ship damage or consume a life.
+
+## Pickup melody
+
+With Sound enabled, collecting material plays a bright crystal note. Quick
+pickups continue a composed phrase, while a pause starts it again. Laser cores
+use a brighter voice in the same melody. Resource Tap ejections provide the
+lower accompanying notes.

@@ -2,6 +2,7 @@ import { explorationCellAt, isCellExplored } from '../../shared/exploration';
 import { sectorBounds } from '../../shared/sectors';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
+import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE } from '../constants';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
@@ -849,6 +850,7 @@ function openMap(): void {
   setViewCenter(view.center);
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameMapOpen'));
+  playFeedback('interface');
   updateZoomReadout();
   renderMap();
   startRenderLoop();
@@ -866,6 +868,7 @@ function closeMap(): void {
   elements.dialog.close();
   closeInProgress = false;
   window.dispatchEvent(new CustomEvent('gameMapClose'));
+  playFeedback('interface');
 }
 
 function handleDialogClosed(): void {
@@ -876,6 +879,7 @@ function handleDialogClosed(): void {
   pointerPan = null;
   stopRenderLoop();
   window.dispatchEvent(new CustomEvent('gameMapClose'));
+  playFeedback('interface');
 }
 
 function handleMapKeydown(ev: KeyboardEvent): void {

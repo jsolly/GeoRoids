@@ -288,6 +288,7 @@ export function handleTestArrangeCrewField(
         'mining',
         'cooperative',
         'reflection',
+        'satellite',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
@@ -354,7 +355,9 @@ export function handleTestArrangeCrewField(
     for (const rock of gameEngine.getAllAsteroids()) {
       gameEngine.removeAsteroid(rock.id);
     }
-    gameEngine.parkSatellitePickups();
+    if (body['scenario'] !== 'satellite') {
+      gameEngine.parkSatellitePickups();
+    }
     const first = poses[0];
     if (body['scenario'] === 'reflection') {
       gameEngine.addAsteroid({
@@ -377,7 +380,7 @@ export function handleTestArrangeCrewField(
           maxEnergy: 6,
         },
       });
-    } else if (body['scenario'] !== 'empty' && body['scenario'] !== 'boundary' && first) {
+    } else if (!['empty', 'boundary', 'satellite'].includes(String(body['scenario'])) && first) {
       gameEngine.addAsteroid({
         id: 'crew-fixture-ore',
         position:
@@ -402,12 +405,11 @@ export function handleTestArrangeCrewField(
     respond(200, {
       status: 'arranged',
       poses,
-      asteroidId:
-        body['scenario'] === 'empty' || body['scenario'] === 'boundary'
-          ? null
-          : body['scenario'] === 'reflection'
-            ? 'crew-fixture-reflector'
-            : 'crew-fixture-ore',
+      asteroidId: ['empty', 'boundary', 'satellite'].includes(String(body['scenario']))
+        ? null
+        : body['scenario'] === 'reflection'
+          ? 'crew-fixture-reflector'
+          : 'crew-fixture-ore',
     });
   });
 }

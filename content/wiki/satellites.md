@@ -75,3 +75,11 @@ reconnect grace; exceeding that grace drops the hardware. Dropped hardware stays
 until equipped again, and keeps its remaining health. After a drop, a
 reconnect does not reserve that hardware; another pilot may collect them. Ship
 inventory is temporary and does not survive a server restart.
+
+## Satellite audio
+
+Equipping a satellite plays a short crystal confirmation. While it orbits your
+ship, a soft chime sounds once per orbit, with silence between passes. The
+chime moves with the satellite and gently changes pitch. Headphones make its direction clearest. The sound stops when the satellite leaves orbit or breaks, and
+when you mute audio or leave the game tab. Other pilots' satellites do not add
+extra orbit chimes.

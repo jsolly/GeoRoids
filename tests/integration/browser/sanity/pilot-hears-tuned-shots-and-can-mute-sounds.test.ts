@@ -1,7 +1,7 @@
 import { readdirSync, writeFileSync } from 'node:fs';
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { installAudioProbe } from '../../utils/audio-probe';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import {
@@ -83,7 +83,7 @@ for (const viewport of [
     expect(requests).toEqual([]);
   }, 60000);
 
-  test(`${viewport.name} pilot cruises silently, hears varied shots, then mutes every cue`, async () => {
+  test(`${viewport.name} pilot cruises silently, hears tuned shots, then mutes every cue`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.name === 'mobile' });
     await page.setViewportSize(viewport);
     const errors: string[] = [];
@@ -99,7 +99,13 @@ for (const viewport of [
     });
     await installAudioProbe(page);
     const game = new GameInteractions(page);
-    await game.bootGame();
+    await game.navigateToGame();
+    const selected = page.locator('#ship-kit-grid [aria-pressed="true"]');
+    if (viewport.name === 'mobile') {
+      await selected.tap();
+    } else {
+      await selected.click();
+    }
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContexts']))
       .toBe('1');
@@ -107,6 +113,24 @@ for (const viewport of [
     await expect
       .poll(() => page.evaluate(() => Number(document.documentElement.dataset['decodedAudio'])))
       .toBe(assets.length);
+    expect(await readSamplePlaybackRates(page, 'interface')).toEqual([]);
+    const otherKit = page.locator('#ship-kit-grid [aria-pressed="false"]');
+    const chosenId = await otherKit.getAttribute('data-kit-id');
+    if (viewport.name === 'mobile') {
+      await otherKit.tap();
+    } else {
+      await otherKit.click();
+    }
+    expect(await readSamplePlaybackRates(page, 'interface')).toEqual([1]);
+    await page.locator(`[data-kit-id="${chosenId}"]`).click();
+    expect(await readSamplePlaybackRates(page, 'interface')).toEqual([1]);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`audio-title-${viewport.name}.png`),
+    });
+    await game.startGame();
+    await game.waitForGameReady();
+    await game.waitForCombatReady();
+    expect(await readSamplePlaybackRates(page, 'respawn')).toEqual([1]);
     for (let shot = 0; shot < 4; shot++) {
       const release = await holdInput(page, viewport.name === 'mobile', 'fire');
       await page.waitForTimeout(100);
@@ -157,10 +181,9 @@ for (const viewport of [
     expect(lasers.length).toBeGreaterThanOrEqual(3);
     expect(new Set(lasers.map((event) => event.bufferId)).size).toBe(1);
     for (const laser of lasers) {
-      expect(laser.rate).toBeGreaterThanOrEqual(0.8999);
-      expect(laser.rate).toBeLessThanOrEqual(1.1001);
+      expect(laser.rate).toBe(1);
     }
-    expect(new Set(lasers.map((event) => event.rate)).size).toBeGreaterThan(1);
+    expect(new Set(lasers.map((event) => event.rate)).size).toBe(1);
     // Mute while native sample and synthesized sources are still active.
     await page.evaluate(`(async () => {
       const { synthesizeSplitCrack } = await import('/src/audio/splitSound.ts');
@@ -198,7 +221,7 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`audio-${viewport.name}.png`),
     });
     await page.goto(new URL('/wiki/#hud-network', page.url()).href);
-    await expect.poll(() => page.locator('body').textContent()).toContain('pitch');
+    await expect.poll(() => page.locator('body').textContent()).toContain('crystal');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`audio-wiki-${viewport.name}.png`),
     });
@@ -235,10 +258,10 @@ for (const viewport of [
     for (const [index, split] of splits.entries()) {
       const rate = index === 0 ? 0.9 : 1.1;
       expect(split.rate).toBeCloseTo(rate);
-      expect(split.starts[0]).toBeCloseTo(880 * rate, 2);
-      expect(split.starts[1]).toBeCloseTo(180 * rate, 2);
-      expect(split.ends[0]).toBeCloseTo(220 * rate, 2);
-      expect(split.ends[1]).toBeCloseTo(70 * rate, 2);
+      expect(split.starts[0]).toBeCloseTo(196, 2);
+      expect(split.starts[1]).toBeCloseTo(130.8128, 2);
+      expect(split.ends[0]).toBeCloseTo(130.8128, 2);
+      expect(split.ends[1]).toBeCloseTo(65.4064, 2);
       expect(split.peak).toBeGreaterThan(0);
     }
     const mutedSplitPeak = await page.evaluate(`(async () => {

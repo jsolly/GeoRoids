@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -18,6 +19,7 @@ for (const viewport of [
     const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize(viewport);
+    await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
     const id = await page.evaluate(() => window.gameController?.getCurrPlayer()?.id);
@@ -56,6 +58,8 @@ for (const viewport of [
       return boost?.phase === 'exhausted' && boost.charge > 0.4 && boost.charge < 0.75;
     });
     expect(await button.getAttribute('aria-pressed')).toBe('false');
+    expect(await readSamplePlaybackRates(page, 'boost-start')).toEqual([1]);
+    expect(await readSamplePlaybackRates(page, 'boost-end')).toEqual([1]);
     expect(
       await button.evaluate((el) => getComputedStyle(el).getPropertyValue('--boost-fill').trim())
     ).toBe('#22d3ee');

@@ -2,6 +2,7 @@ import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
 import { FURNACES, furnaceReward } from '../../../../shared/furnaces';
 import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -156,6 +157,8 @@ test(
     const surveyorPage = await browserManager.createAdditionalPage({ hasTouch: true });
     const haulerDiagnostics = watchBrowserDiagnostics(haulerPage);
     const surveyorDiagnostics = watchBrowserDiagnostics(surveyorPage);
+    await installAudioProbe(haulerPage);
+    await installAudioProbe(surveyorPage);
     const hauler = new GameInteractions(haulerPage);
     const surveyor = new GameInteractions(surveyorPage);
 
@@ -279,6 +282,8 @@ test(
     await surveyorPage.screenshot({
       path: screenshotManager.getScreenshotPath('crew-delivery-surveyor-mobile.png'),
     });
+    expect(await readSamplePlaybackRates(haulerPage, 'delivery')).toEqual([1]);
+    expect(await readSamplePlaybackRates(surveyorPage, 'delivery')).toEqual([1]);
     assertNoBrowserDiagnostics(haulerDiagnostics);
     assertNoBrowserDiagnostics(surveyorDiagnostics);
   },

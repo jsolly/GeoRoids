@@ -1,4 +1,4 @@
-import type { LootKind, Position } from '../../shared-types';
+import type { Position } from '../../shared-types';
 import { AUDIO } from '../constants';
 import type { ShipAbilityId } from '../entities/ship/shipKits';
 import { Sound } from './Sound';
@@ -15,8 +15,6 @@ const fxHarpoonLatch = new Sound(...AUDIO.HARPOON_LATCH);
 const fxHarpoonRelease = new Sound(...AUDIO.HARPOON_RELEASE);
 const fxOrbitalFire = new Sound(...AUDIO.ORBITAL_FIRE);
 const fxOrbitalPickup = new Sound(...AUDIO.ORBITAL_PICKUP);
-const fxLootPickup = new Sound(...AUDIO.LOOT_PICKUP);
-const fxCorePickup = new Sound(...AUDIO.CORE_PICKUP);
 const fxSurveyScan = new Sound(...AUDIO.SURVEY_SCAN);
 const fxRespawn = new Sound(...AUDIO.RESPAWN);
 
@@ -42,21 +40,6 @@ export function playOrbitalFire(position?: Position): void {
 
 export function playOrbitalPickup(position?: Position): void {
   playInteraction(fxOrbitalPickup, position);
-}
-
-export function playLootPickup(kind: LootKind, position?: Position): void {
-  switch (kind) {
-    case 'laserCore':
-      playInteraction(fxCorePickup, position);
-      return;
-    case 'shard':
-    case 'wreckage':
-    case 'tap':
-      playInteraction(fxLootPickup, position);
-      return;
-    default:
-      throw new Error(`Unexpected loot kind: ${kind}`);
-  }
 }
 
 export function playRespawn(position?: Position): void {

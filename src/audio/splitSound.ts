@@ -6,13 +6,14 @@ import { randomPlaybackRate } from './pitch';
 import { planBoundPlayback } from './spatialAudio';
 
 const MAX_SPLIT_VOICES = 4;
-const activeSources = new Map<GainNode, AudioScheduledSourceNode[]>();
+const activeSources = new Map<GainNode, { sources: AudioScheduledSourceNode[]; pan: PannerNode }>();
 registerSoundStopHook(() => {
-  for (const [master, sources] of activeSources) {
+  for (const [master, { sources, pan }] of activeSources) {
     for (const source of sources) {
       source.stop();
     }
     master.disconnect();
+    pan.disconnect();
   }
   activeSources.clear();
 });
@@ -48,12 +49,13 @@ function startTone(
 }
 
 /**
- * Phosphor crack + descending split whoosh. Layered on the existing explosion
+ * Rounded low impact and a soft crystal tail. Layered on the existing explosion
  * so the collab break still reads as an impact.
  */
 export function synthesizeSplitCrack(
   volumeScale: number,
-  ctx: BaseAudioContext | null = getRunningAudioContext()
+  ctx: BaseAudioContext | null = getRunningAudioContext(),
+  offset?: Position
 ): boolean {
   if (!ctx || !(volumeScale > 0) || activeSources.size >= MAX_SPLIT_VOICES) {
     return false;
@@ -62,8 +64,14 @@ export function synthesizeSplitCrack(
   const now = ctx.currentTime;
   const pitch = randomPlaybackRate();
   const master = ctx.createGain();
-  master.gain.value = 0.22 * volumeScale;
-  master.connect(ctx.destination);
+  master.gain.value = 0.075 * volumeScale;
+  const pan = ctx.createPanner();
+  pan.panningModel = 'HRTF';
+  pan.rolloffFactor = 0;
+  pan.positionX.value = offset ? offset.x / 100 : 0;
+  pan.positionZ.value = offset ? offset.y / 100 : -1;
+  master.connect(pan);
+  pan.connect(ctx.destination);
 
   const noiseDuration = 0.055;
   const noiseBuffer = ctx.createBuffer(
@@ -79,10 +87,10 @@ export function synthesizeSplitCrack(
   noise.buffer = noiseBuffer;
   noise.playbackRate.value = pitch;
   const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = 'highpass';
-  noiseFilter.frequency.value = 1400;
+  noiseFilter.type = 'lowpass';
+  noiseFilter.frequency.value = 500;
   const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.9, now);
+  noiseGain.gain.setValueAtTime(0.12, now);
   noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + noiseDuration);
   noise.connect(noiseFilter);
   noiseFilter.connect(noiseGain);
@@ -90,28 +98,29 @@ export function synthesizeSplitCrack(
   noise.start(now);
 
   const crack = startTone(ctx, master, {
-    type: 'sawtooth',
-    startHz: 880 * pitch,
-    endHz: 220 * pitch,
+    type: 'sine',
+    startHz: 196,
+    endHz: 130.8128,
     start: now,
     duration: 0.16,
-    peak: 0.35,
+    peak: 0.3,
   });
   const tail = startTone(ctx, master, {
     type: 'sine',
-    startHz: 180 * pitch,
-    endHz: 70 * pitch,
+    startHz: 130.8128,
+    endHz: 65.4064,
     start: now + 0.07,
     duration: 0.28,
-    peak: 0.55,
+    peak: 0.45,
   });
 
-  activeSources.set(master, [noise, crack, tail]);
+  activeSources.set(master, { sources: [noise, crack, tail], pan });
 
   tail.addEventListener(
     'ended',
     () => {
       master.disconnect();
+      pan.disconnect();
       activeSources.delete(master);
     },
     { once: true }
@@ -125,5 +134,5 @@ export function playSplitSound(position?: Position): void {
     return;
   }
   playExplosionSound(position);
-  synthesizeSplitCrack(plan.volumeScale);
+  synthesizeSplitCrack(plan.volumeScale, getRunningAudioContext(), plan.offset);
 }

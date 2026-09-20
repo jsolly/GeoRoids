@@ -34,6 +34,7 @@ class FakeHowl {
       voice.rate = value;
     }
   }
+  pos = vi.fn();
   end(id: number) {
     if (!this.options.loop) {
       this.voices.delete(id);
@@ -178,16 +179,18 @@ test('active voice cap drops overflow and releases capacity when a shot ends', a
   expect(howl().voices.size).toBe(2);
 });
 
-test('overlapping shots vary pitch and volume independently', async () => {
+test('overlapping cues preserve tuning and per-voice volume; melody uses exact intervals', async () => {
   const sound = new Sound('sounds/laser.m4a', 2, 0.1);
   setSound(true);
   await settle();
-  vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999999);
   await sound.play(1);
-  await sound.play(0.5);
-  expect(howl().voices.get(1)).toEqual({ volume: 0.1, rate: 0.9 });
+  expect(sound.playNote(0.5, 7)).toBe(true);
+  expect(howl().voices.get(1)).toEqual({ volume: 0.1, rate: 1 });
   expect(howl().voices.get(2)?.volume).toBe(0.05);
-  expect(howl().voices.get(2)?.rate).toBeCloseTo(1.1);
+  expect(howl().voices.get(2)?.rate).toBeCloseTo(2 ** (7 / 12));
+  expect(sound.playNote(1, 12)).toBe(false);
+  setSound(false);
+  expect(sound.playNote(1, 4)).toBe(false);
 });
 
 test('unloaded and interrupted shots are dropped without replay or hot-loop resumes', async () => {
@@ -305,4 +308,20 @@ test('a Howler transport fallback never starts HTML media playback', async () =>
   howl()._webAudio = false;
   await sound.play();
   expect(howl().play).not.toHaveBeenCalled();
+});
+
+test('simultaneous remote shots retain independent directions and local reuse recenters', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  expect(howl().options).toMatchObject({ pos: [0, 0, -1], panningModel: 'HRTF', rolloffFactor: 0 });
+  sound.play(1, { x: -200, y: 100 });
+  sound.play(1, { x: 200, y: -100 });
+  expect(howl().pos.mock.calls).toEqual([
+    [-2, 0, 1, 1],
+    [2, 0, -1, 2],
+  ]);
+  howl().end(1);
+  sound.play();
+  expect(howl().pos).toHaveBeenLastCalledWith(0, 0, -1, 3);
 });

@@ -1,4 +1,4 @@
-import type { HaulerUtilityId } from '../../shared-types';
+import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE, VISUAL } from '../constants';
 import { traceTapCanister } from '../entities/loot/lootRenderer';
@@ -17,9 +17,16 @@ import {
   projectHullPoint,
   projectHullPolyline,
 } from '../entities/ship/hullOutlines';
-import { setHaulerUtilityOnHost } from '../entities/ship/shipAbilities';
+import { setHaulerUtilityOnHost, setSurveyorUtilityOnHost } from '../entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import { strokeKitHullOutline } from '../entities/ship/shipRenderer';
+import {
+  preferredSurveyorUtility,
+  rememberSurveyorUtility,
+  SURVEYOR_UTILITY,
+  SURVEYOR_UTILITY_IDS,
+  surveyorUtilityOf,
+} from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
@@ -97,6 +104,7 @@ let frameRequest: number | null = null;
 let openInputRelease: (() => void) | undefined;
 let elements: SchematicElements | null = null;
 let selectedUtility: HaulerUtilityId = preferredHaulerUtility();
+let selectedSurveyorUtility: SurveyorUtilityId = preferredSurveyorUtility();
 
 function decorateSchematicToggle(toggle: HTMLButtonElement): void {
   toggle.type = 'button';
@@ -237,18 +245,29 @@ function mountCards(): void {
   if (!elements) {
     return;
   }
-  elements.cards.replaceChildren();
-  for (const id of HAULER_UTILITY_IDS) {
-    const part = HAULER_UTILITY[id];
+  const kitId: ShipKitId = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
+  const cards = elements.cards;
+  cards.dataset['kitId'] = kitId;
+  cards.replaceChildren();
+  const appendCard = (id: string, name: string, hint: string, select: () => void): void => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'ship-schematic-card';
     button.dataset['utilityId'] = id;
-    button.innerHTML = `<span class="ship-schematic-card-name">${part.name}</span><span class="ship-schematic-card-hint">${part.hint}</span><span class="ship-schematic-badge">ACTIVE</span>`;
-    button.addEventListener('click', () => {
-      equipUtility(id);
-    });
-    elements.cards.appendChild(button);
+    button.innerHTML = `<span class="ship-schematic-card-name">${name}</span><span class="ship-schematic-card-hint">${hint}</span><span class="ship-schematic-badge">ACTIVE</span>`;
+    button.addEventListener('click', select);
+    cards.appendChild(button);
+  };
+  if (kitId === 'hauler') {
+    for (const id of HAULER_UTILITY_IDS) {
+      const part = HAULER_UTILITY[id];
+      appendCard(id, part.name, part.hint, () => equipUtility(id));
+    }
+  } else {
+    for (const id of SURVEYOR_UTILITY_IDS) {
+      const part = SURVEYOR_UTILITY[id];
+      appendCard(id, part.name, part.hint, () => equipSurveyorUtility(id));
+    }
   }
 }
 
@@ -258,8 +277,11 @@ function syncCards(): void {
   }
   const kit = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
   const hauler = kit === 'hauler';
-  elements.cards.hidden = !hauler;
-  elements.tool.hidden = !hauler;
+  if (elements.cards.dataset['kitId'] !== kit) {
+    mountCards();
+  }
+  elements.cards.hidden = false;
+  elements.tool.hidden = false;
   const eyebrow = elements.dialog.querySelector('.ship-schematic-eyebrow');
   if (eyebrow) {
     eyebrow.textContent = hauler ? 'HAULER' : 'SURVEYOR';
@@ -269,9 +291,14 @@ function syncCards(): void {
     `${hauler ? 'Hauler' : 'Surveyor'} equipment schematic`
   );
   if (!hauler) {
-    elements.title.textContent = 'Survey pulse';
-    elements.copy.textContent =
-      'Press E in flight to identify asteroids at long range. Equip a satellite for continuous nearby scanning.';
+    const part = SURVEYOR_UTILITY[selectedSurveyorUtility];
+    elements.title.textContent = part.name;
+    elements.copy.textContent = part.copy;
+    for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
+      const active = button.dataset['utilityId'] === selectedSurveyorUtility;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
     return;
   }
   const part = HAULER_UTILITY[selectedUtility];
@@ -302,6 +329,32 @@ export function equipUtility(utilityId: HaulerUtilityId): void {
     if (network.isConnected) {
       network.sendMessage({
         type: 'setHaulerUtility',
+        id: network.getLocalPlayerId() || player.id,
+        data: { utilityId },
+      });
+    }
+  }
+  syncCards();
+}
+
+function equipSurveyorUtility(utilityId: SurveyorUtilityId): void {
+  if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId !== 'surveyor') {
+    return;
+  }
+  if (selectedSurveyorUtility !== utilityId) {
+    playFeedback('interface');
+  }
+  selectedSurveyorUtility = utilityId;
+  rememberSurveyorUtility(utilityId);
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (player?.ship.kitId === 'surveyor') {
+    setSurveyorUtilityOnHost(player.ship, utilityId);
+  }
+  if (player) {
+    const network = NetworkManager.getInstance();
+    if (network.isConnected) {
+      network.sendMessage({
+        type: 'setSurveyorUtility',
         id: network.getLocalPlayerId() || player.id,
         data: { utilityId },
       });
@@ -542,6 +595,62 @@ function drawToolLoop(
   now: number
 ): void {
   ctx.clearRect(0, 0, width, height);
+  const kit = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
+  if (kit === 'surveyor') {
+    const shipX = width * 0.2;
+    const midY = height * 0.5;
+    const radius = 18;
+    const elapsed = now % 2600;
+    const launching = elapsed < 520;
+    const rockX = width * 0.76 + Math.sin(now / 520) * 5;
+    const rockY = midY + Math.sin(now / 680) * 4;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 260);
+    ctx.lineWidth = 1.25;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = PALETTE.LOCAL;
+    ctx.shadowColor = PALETTE.LOCAL;
+    ctx.shadowBlur = VISUAL.SHIP_GLOW;
+    strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'surveyor');
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = PALETTE.HUD_MUTED;
+    drawDemoAsteroid(ctx, rockX, rockY, 13, now / 900);
+    if (selectedSurveyorUtility === 'mineral_scan') {
+      ctx.strokeStyle = PALETTE.LOOT;
+      ctx.globalAlpha = 0.35 + pulse * 0.45;
+      for (const ring of [14, 23, 32]) {
+        ctx.beginPath();
+        ctx.arc(shipX + 34, midY, ring + pulse * 3, -0.72, 0.72);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    } else {
+      const probeX = rockX;
+      const probeY = rockY - 15;
+      ctx.strokeStyle = PALETTE.LOOT;
+      if (launching) {
+        ctx.globalAlpha = 1 - elapsed / 520;
+        ctx.beginPath();
+        ctx.moveTo(shipX + radius, midY);
+        ctx.lineTo(probeX, probeY);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.beginPath();
+      ctx.moveTo(probeX, probeY - 7);
+      ctx.lineTo(probeX + 7, probeY);
+      ctx.lineTo(probeX, probeY + 7);
+      ctx.lineTo(probeX - 7, probeY);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.globalAlpha = 0.28 + pulse * 0.42;
+      ctx.beginPath();
+      ctx.arc(probeX, probeY, 16 + pulse * 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    return;
+  }
   const shipX = width * 0.22;
   const elapsed = now % 2600;
   const boostFrame =
@@ -666,6 +775,7 @@ export function openShipSchematic(): boolean {
     return false;
   }
   if (isUniverseMapOpen()) {
+    setShipSchematicOpen(true);
     closeUniverseMap();
   }
   try {
@@ -676,11 +786,22 @@ export function openShipSchematic(): boolean {
       'Could not open the ship schematic',
       error instanceof Error ? error : new Error(String(error))
     );
+    if (isShipSchematicOpen()) {
+      setShipSchematicOpen(false);
+    }
     return false;
   }
   setShipSchematicOpen(true);
   const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
-  selectedUtility = ship ? haulerUtilityOf(ship) : preferredHaulerUtility();
+  if (ship?.kitId === 'hauler') {
+    selectedUtility = haulerUtilityOf(ship);
+  } else if (ship?.kitId === 'surveyor') {
+    selectedSurveyorUtility = surveyorUtilityOf(ship);
+  } else {
+    selectedUtility = preferredHaulerUtility();
+    selectedSurveyorUtility = preferredSurveyorUtility();
+  }
+  mountCards();
   syncCards();
   renderSatelliteInventory(elements.inventory, elements.inventoryStatus, elements.return);
   openInputRelease?.();
@@ -787,7 +908,12 @@ export function initializeShipSchematic(options?: { onOpen?: () => void }): void
   const hullCanvas = elements.canvas;
   hullCanvas.addEventListener('click', (ev) => {
     const rect = hullCanvas.getBoundingClientRect();
-    equipUtility(ev.clientX < rect.left + rect.width / 2 ? 'tow_cable' : 'resource_tap');
+    const left = ev.clientX < rect.left + rect.width / 2;
+    if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId === 'surveyor') {
+      equipSurveyorUtility(left ? 'mineral_scan' : 'survey_probe');
+    } else {
+      equipUtility(left ? 'tow_cable' : 'resource_tap');
+    }
   });
   elements.dialog.addEventListener('close', handleDialogClosed);
   elements.dialog.addEventListener('cancel', (ev) => {

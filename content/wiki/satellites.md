@@ -29,8 +29,9 @@ The field holds a limited number of loose satellite pickups. They spawn
 separately from asteroid destruction, stay stationary, and glow to mark them as
 collectible hardware. Loose pickups cannot lose health. The
 nearest living player within collection range claims a loose pickup
-automatically and earns a score bonus. Collection does not grant a combat
-ability or spawn protection.
+automatically and earns a score bonus. A map or schematic hold does not
+collect an overlapping pickup until you return to flight. Collection does not
+grant a combat ability or spawn protection.
 
 ## Inventory
 
@@ -65,9 +66,10 @@ satellite disappears from your inventory and orbit, then respawns healthy as a
 loose pickup after a recovery delay.
 
 It cannot be unequipped to save health or replaced while still active. Opening
-the schematic holds your ship stationary. The world keeps running: your ship
-can still take damage, and the satellite keeps orbiting, scanning, and losing
-health.
+the schematic holds your ship stationary. The world keeps running: asteroids
+pass through the hull without colliding, loose pickups stay uncollected, and
+the satellite keeps orbiting, scanning, and losing health. Closing the schematic
+blinks the ship briefly.
 
 Death or explicitly leaving the game drops both stored and equipped hardware
 at the ship's last position. A brief connection loss preserves ownership during
@@ -81,5 +83,6 @@ inventory is temporary and does not survive a server restart.
 Equipping a satellite plays a short crystal confirmation. While it orbits your
 ship, a soft chime sounds once per orbit, with silence between passes. The
 chime moves with the satellite and gently changes pitch. Headphones make its direction clearest. The sound stops when the satellite leaves orbit or breaks, and
-when you mute audio or leave the game tab. Other pilots' satellites do not add
+when you turn Sound Effects off or leave the game tab. Music off does not stop
+the chime. Other pilots' satellites do not add
 extra orbit chimes.

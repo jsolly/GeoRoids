@@ -40,7 +40,16 @@ if (typeof window !== 'undefined') {
               id="soundPref"
               checked
             />
-            <label class="sound-toggle-label" for="soundPref">Sound</label>
+            <label class="sound-toggle-label" for="soundPref">Sound Effects</label>
+          </div>
+          <div class="sound-toggle-row">
+            <input
+              class="sound-toggle"
+              type="checkbox"
+              id="musicPref"
+              checked
+            />
+            <label class="sound-toggle-label" for="musicPref">Music</label>
           </div>
           <details id="advanced-settings" class="advanced-settings">
             <summary>Advanced</summary>
@@ -80,12 +89,8 @@ if (typeof window !== 'undefined') {
               <div class="debug-hud-row"><dt>WORLD</dt><dd id="debug-hud-world">—</dd></div>
               <div class="debug-hud-row"><dt>REL</dt><dd id="debug-hud-rel">—</dd></div>
             </dl>
+            <button id="copy-debug-diagnostics" type="button" class="debug-copy debug-diagnostics-copy" data-copy-name="diagnostics" data-copy-label="Copy diagnostics" aria-label="Copy diagnostics">Copy diagnostics</button>
           </fieldset>
-          <div id="debug-play-chip" class="debug-play-chip" hidden>
-            <span class="debug-play-chip-label">playerId</span>
-            <code id="debug-play-chip-id"></code>
-            <button id="copy-debug-play-chip" type="button" class="debug-copy" disabled>Copy</button>
-          </div>
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button

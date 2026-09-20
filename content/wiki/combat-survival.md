@@ -35,14 +35,20 @@ hits and removal.
 ## Damage and protection
 
 Normal lasers, asteroid impacts, and boundary impacts use different damage
-rules. A ship-to-asteroid impact removes 25 health. A towed asteroid that hits
+rules. A ship-to-asteroid impact removes 25 health. A towed ordinary asteroid
+that hits
 another ship uses that same impact and then breaks, dropping the Hauler cable.
-Unbounced ship lasers, ship-to-ship ramming, the Hauler tow cable, and a
+A towed colossal deposit deals that impact without breaking. Unbounced ship
+lasers, ship-to-ship ramming, the Hauler tow cable, and a
 shot-triggered loot blast never damage a crew hull. A bounced laser deals the
 configured laser hit times its energy and is consumed on the first live hull it
 meets. The boundary destroys a vulnerable ship on contact, even at full health;
 asteroids bounce back into the world. Untowed asteroids pass through each other;
 only towed cargo turns an asteroid-to-asteroid overlap into a collision break.
+A colossal deposit survives that break and leaves the other rock destroyed.
+While the universe map or ship schematic is open, asteroid impacts, ricochets,
+and the boundary pass through the held hull. Closing the overlay grants the same
+blink window as a respawn.
 
 ## Lives and respawn
 
@@ -50,7 +56,8 @@ A player starts with lives and score. A death decrements one life; the last life
 reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
-spawn protection. Respawns use the nearest furnace to the death location, 180
+spawn protection. Closing the universe map or ship schematic grants that same
+blink window, because rocks can occupy the hull while it is held. Respawns use the nearest furnace to the death location, 180
 world units from its center at a random angle, skipping completed sectors.
 
 After game over, a fresh flight starts with 3 lives and score 0. A brief

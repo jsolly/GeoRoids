@@ -5,6 +5,7 @@ import { drawLootRelative } from '../entities/loot/lootRenderer';
 import type { Player } from '../entities/player/Player';
 import type { RoidBelt } from '../entities/roid/Roid';
 import { drawRoidsRelative } from '../entities/roid/roidRenderer';
+import { drawSurveyProbes } from '../entities/roid/surveyProbeRenderer';
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { drawSatellitePickups } from '../entities/satellitePickup/satellitePickupRenderer';
 import {
@@ -93,6 +94,7 @@ export function drawGame(
 
   if (roids.length > 0) {
     drawRoidsRelative(currShip, roids);
+    drawSurveyProbes(roids, currShip.position);
   }
   drawFurnacesRelative(currShip.position);
 

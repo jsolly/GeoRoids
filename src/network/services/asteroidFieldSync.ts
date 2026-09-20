@@ -148,6 +148,7 @@ export function writeAsteroidKinematicUpdates(
   writeOptionalField(into, 'miningContributors', asteroid.miningContributors);
   writeOptionalField(into, 'phenomenon', asteroid.phenomenon);
   writeOptionalField(into, 'boost', asteroid.boost);
+  writeOptionalField(into, 'probe', asteroid.probe);
   if (asteroid.material === undefined || isAsteroidMaterial(asteroid.material)) {
     writeOptionalField(into, 'material', asteroid.material);
   } else {
@@ -210,6 +211,7 @@ export interface AsteroidKinematicTarget {
   jaggedness?: number;
   phenomenon?: AsteroidData['phenomenon'];
   boost?: AsteroidData['boost'];
+  probe?: AsteroidData['probe'];
 }
 
 export function shouldSnapAsteroidPose(
@@ -232,6 +234,9 @@ export function applyAsteroidKinematics(
   updates: Partial<AsteroidData>,
   options: { snapPosition?: boolean; complete?: boolean } = {}
 ): void {
+  if (options.complete || 'probe' in updates) {
+    roid.probe = updates.probe ? { ...updates.probe } : null;
+  }
   if (options.complete || 'boost' in updates) {
     roid.boost = updates.boost ? { ...updates.boost } : null;
   }

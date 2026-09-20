@@ -25,6 +25,7 @@ const browserApi = await vi.hoisted(async () => {
       page,
       newPage: vi.fn(async () => page),
       close: vi.fn(),
+      addInitScript: vi.fn(),
     };
     contexts.push(context);
     return context;

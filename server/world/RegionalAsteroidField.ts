@@ -4,6 +4,7 @@ import {
   layoutReflectiveCluster,
   seedAsteroidPhenomena,
 } from '../../shared/asteroidPhenomena';
+import { applyColossalDeposit, sectorHostsColossal } from '../../shared/asteroidScale';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type { AsteroidData, Position } from '../../shared-types';
 import { ROID } from '../../src/constants';
@@ -13,6 +14,15 @@ import { RNGService } from '../core/RNGService';
 const DEPOSIT_ID = /^deposit-(\d+)-(-?\d+)-(-?\d+)-(\d+)$/u;
 const SECTOR_EDGE_EPSILON = 1e-6;
 const STATIONARY_SLOTS = Math.round(WORLD.depositsPerSector * ROID.STATIONARY_FRACTION);
+
+/** Probes are live hardware, not part of the durable asteroid field. */
+function stripTransientProbe(rock: AsteroidData): AsteroidData {
+  if (!Object.hasOwn(rock, 'probe')) {
+    return rock;
+  }
+  const { probe: _probe, ...persisted } = rock;
+  return persisted;
+}
 
 function stationarySlot(index: number): boolean {
   return index < STATIONARY_SLOTS;
@@ -40,7 +50,9 @@ export class RegionalAsteroidField {
     saved: ReadonlyMap<string, AsteroidData[]> = new Map(),
     private completed: ReadonlySet<string> = new Set()
   ) {
-    this.dormant = new Map(saved);
+    this.dormant = new Map(
+      [...saved].map(([id, rocks]) => [id, rocks.map(stripTransientProbe)] as const)
+    );
     for (const [id, rocks] of saved) {
       if (rocks.some((rock) => rock.boost?.phase === 'burning')) {
         this.savedPoweredSectors.add(id);
@@ -96,6 +108,7 @@ export class RegionalAsteroidField {
     }
     seedAsteroidPhenomena(rocks);
     this.placeReflectiveClusters(rocks, x, y);
+    this.placeColossalDeposit(rocks, x, y);
     // Phenomenon clusters and the launch-area offset may move a generated
     // slot across an edge. Keep the slot owned by its deterministic sector;
     // later simulation drift is what transfers ownership during checkpointing.
@@ -216,6 +229,21 @@ export class RegionalAsteroidField {
       }
     }
     return changed;
+  }
+
+  /** Resize one ordinary slot; keep collab rocks and pinball clusters intact. */
+  private placeColossalDeposit(rocks: AsteroidData[], x: number, y: number): void {
+    if (!sectorHostsColossal(x, y, this.seed)) {
+      return;
+    }
+    const slot =
+      rocks.find(
+        (rock) =>
+          !rock.isCollabTarget && !rock.phenomenon && rock.velocity.x === 0 && rock.velocity.y === 0
+      ) ?? rocks.find((rock) => !rock.isCollabTarget && !rock.phenomenon);
+    if (slot) {
+      applyColossalDeposit(slot);
+    }
   }
 
   /** Wake newly drifting slots once at startup; never restore missing deposits. */
@@ -352,7 +380,7 @@ export class RegionalAsteroidField {
       }
     }
     for (const rock of manager.getAllAsteroids()) {
-      if (rock.boost?.phase === 'burning') {
+      if (rock.boost?.phase === 'burning' || rock.probe) {
         const sector = sectorAt(rock.position);
         wanted.set(sector.id, { x: sector.x, y: sector.y });
       }
@@ -387,6 +415,16 @@ export class RegionalAsteroidField {
   }
 
   private sleepDistantSectors(manager: AsteroidManager, wanted: ReadonlySet<string>): void {
+    const probeSectors = new Set<string>();
+    for (const rock of manager.getAllAsteroids()) {
+      if (rock.probe) {
+        probeSectors.add(sectorAt(rock.position).id);
+      }
+    }
+    for (const id of probeSectors) {
+      this.active.add(id);
+    }
+    const retained = new Set([...wanted, ...probeSectors]);
     // Partition current positions, including rocks carried across sector boundaries.
     const bySector = new Map<string, AsteroidData[]>([...this.active].map((id) => [id, []]));
     for (const rock of manager.getAllAsteroids()) {
@@ -399,7 +437,7 @@ export class RegionalAsteroidField {
       rows.push(rock);
     }
     for (const [id, rows] of bySector) {
-      if (wanted.has(id)) {
+      if (retained.has(id)) {
         continue;
       }
       const prior = this.active.has(id) ? [] : this.load(id);
@@ -441,7 +479,7 @@ export class RegionalAsteroidField {
       if (!sector) {
         throw new Error(`Active asteroid ${rock.id} has no sector ${id}`);
       }
-      sector.push(rock);
+      sector.push(stripTransientProbe(rock));
     }
     return rows;
   }

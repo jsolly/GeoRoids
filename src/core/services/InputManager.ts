@@ -1,4 +1,5 @@
 import { PlayerManager } from '../../entities/player/PlayerManager';
+import { applyLocalOverlayHold } from '../../entities/ship/shipUtils';
 import { resetControlSources } from '../../input/controlSources';
 import {
   getPressedKeysForPlayer,
@@ -151,21 +152,27 @@ export class InputManager {
     initializeUniverseMap({ onOpen: releaseInput });
     initializeShipSchematic({ onOpen: releaseInput });
     initializeSchematicJoinHint();
+    window.addEventListener('gameMapClose', () => {
+      this.updateMovementLock();
+    });
+    window.addEventListener('gameSchematicClose', () => {
+      this.updateMovementLock();
+    });
 
     this.listenersInitialized = true;
   }
 
-  /** Lock only navigation; the simulation and authoritative damage keep running. */
+  /** Lock navigation and collisions while a map or schematic is open. */
   updateMovementLock(): void {
-    const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    const player = PlayerManager.getInstance().getLocalPlayer();
+    const ship = player?.ship;
     if (!ship) {
       return;
     }
-    ship.movementLocked = isUniverseMapOpen() || isShipSchematicOpen();
-    if (ship.movementLocked) {
-      ship.velocity = { x: 0, y: 0 };
-      ship.angularVelocity = 0;
-      ship.thrusting = false;
+    const held = isUniverseMapOpen() || isShipSchematicOpen();
+    const changed = applyLocalOverlayHold(ship, held);
+    if (changed) {
+      PlayerManager.getInstance().updateNetworkState();
     }
   }
 

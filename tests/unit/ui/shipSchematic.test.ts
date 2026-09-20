@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
+import {
+  bindPlayerNetworkPort,
+  resetPlayerNetworkPort,
+} from '../../../src/entities/player/playerNetworkPort';
 import {
   BOOST_COUPLING_DEMO_DURATION_MS,
   closeShipSchematic,
@@ -10,6 +15,12 @@ import {
   SHIP_SCHEMATIC_IDS,
 } from '../../../src/ui/shipSchematic';
 import { isShipSchematicOpen } from '../../../src/ui/shipSchematicState';
+import {
+  closeUniverseMap,
+  initializeUniverseMap,
+  isUniverseMapOpen,
+  UNIVERSE_MAP_IDS,
+} from '../../../src/ui/universeMap';
 
 describe('Hauler ship schematic overlay', () => {
   const releaseInput = vi.fn();
@@ -39,11 +50,20 @@ describe('Hauler ship schematic overlay', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     document.body.classList.add('in-play');
     PlayerManager.getInstance().createLocalPlayer('hauler');
+    bindPlayerNetworkPort({
+      getAllPlayers: () => [],
+      setLocalPlayerName: () => undefined,
+      updatePlayerState: () => undefined,
+    });
     initializeShipSchematic({ onOpen: releaseInput });
+    initializeUniverseMap({ onOpen: releaseInput });
+    InputManager.getInstance().initializeListeners();
   });
 
   afterAll(() => {
     closeShipSchematic();
+    closeUniverseMap();
+    resetPlayerNetworkPort();
     canvasContext.mockRestore();
     document.body.classList.remove('in-play');
     Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
@@ -75,6 +95,31 @@ describe('Hauler ship schematic overlay', () => {
     ret?.click();
     expect(isShipSchematicOpen()).toBe(false);
     window.removeEventListener('gameSchematicOpen', opened);
+  });
+
+  test('opening the schematic from the map keeps the hull held without blinking', () => {
+    const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+    expect(ship).toBeDefined();
+    if (!ship) {
+      return;
+    }
+    ship.spawnProtectionTimer = 0;
+    ship.blinkCount = 0;
+    (document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement).click();
+    InputManager.getInstance().updateMovementLock();
+    expect(isUniverseMapOpen()).toBe(true);
+    expect(ship.movementLocked).toBe(true);
+    expect(ship.blinkCount).toBe(0);
+
+    expect(openShipSchematic()).toBe(true);
+    expect(isUniverseMapOpen()).toBe(false);
+    expect(isShipSchematicOpen()).toBe(true);
+    expect(ship.movementLocked).toBe(true);
+    expect(ship.blinkCount).toBe(0);
+
+    closeShipSchematic();
+    expect(ship.movementLocked).toBe(false);
+    expect(ship.blinkCount).toBeGreaterThan(0);
   });
 
   test('selecting Tow Cable then Resource Tap updates the ACTIVE card', () => {

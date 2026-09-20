@@ -11,6 +11,12 @@ import {
   getWorldExploration,
   getWorldMapAssets,
 } from '../network/worldExploration';
+import {
+  drawFurnaceMapMark,
+  UNIVERSE_MAP_LANDMARK_SIZE,
+  universeMapFurnaceMarkAppearance,
+  universeMapMarkScreenSize,
+} from '../rendering/hud/furnaceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import {
@@ -43,9 +49,9 @@ export const UNIVERSE_MAP_ZOOM = {
 
 export const UNIVERSE_MAP_LOCATE_LABEL = 'Center on you';
 export const DESKTOP_MAP_HELP =
-  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.';
+  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · Rocks pass through until you return and blink.';
 export const TOUCH_MAP_HELP =
-  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · You can still take damage.';
+  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · Rocks pass through until you return and blink.';
 
 const MAP_RASTER_SIZE = 960;
 const CELLS_PER_SECTOR = 16;
@@ -77,6 +83,7 @@ type MapFrame = {
   y: number;
   size: number;
   scale: number;
+  zoom: number;
 };
 
 type MapView = {
@@ -136,6 +143,7 @@ function mapFrameFor(width: number, height: number, zoom: number): MapFrame {
     y: (height - size) / 2,
     size,
     scale: (size / WORLD_DIAMETER) * zoom,
+    zoom,
   };
 }
 
@@ -538,6 +546,17 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.stroke();
 }
 
+const MAP_LOCAL_SHIP_SIZE = 18;
+const MAP_CREW_SHIP_SIZE = 14;
+
+function mapStrokeWidth(screen: number, nearSize: number, frame: MapFrame): number {
+  return (1.5 * screen) / nearSize / frame.scale;
+}
+
+function mapGlowBlur(screen: number, nearSize: number, frame: MapFrame): number {
+  return (8 * screen) / nearSize / frame.scale;
+}
+
 function drawMapAsset(
   context: CanvasRenderingContext2D,
   asset: MapAsset,
@@ -547,58 +566,59 @@ function drawMapAsset(
   if (!isFiniteMapPosition(asset.position)) {
     return;
   }
-  const size = 11 / frame.scale;
+  const screen = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom);
+  const size = screen / frame.scale;
   context.save();
   context.translate(asset.position.x, asset.position.y);
-  context.lineWidth = 1.5 / frame.scale;
-  context.shadowBlur = 8 / frame.scale;
-  const color =
-    asset.kind === 'furnace'
-      ? PALETTE.SATELLITE
-      : asset.kind === 'laserCore'
+  context.lineWidth = mapStrokeWidth(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
+  context.shadowBlur = mapGlowBlur(screen, UNIVERSE_MAP_LANDMARK_SIZE, frame);
+  if (asset.kind === 'furnace') {
+    context.save();
+    context.scale(1 / frame.scale, 1 / frame.scale);
+    drawFurnaceMapMark(context, 0, 0, screen, universeMapFurnaceMarkAppearance(frame.zoom).lod);
+    context.restore();
+  } else {
+    const color =
+      asset.kind === 'laserCore'
         ? PALETTE.LASER_LOCAL
         : asset.kind === 'satellite'
           ? PALETTE.REMOTE
           : PALETTE.LOOT;
-  context.strokeStyle = color;
-  context.fillStyle = hexToRgba(color, 0.2);
-  context.shadowColor = color;
-  context.beginPath();
-  switch (asset.kind) {
-    case 'furnace':
-      context.rect(-size, -size, size * 2, size * 2);
-      context.moveTo(-size * 0.55, 0);
-      context.lineTo(size * 0.55, 0);
-      context.moveTo(0, -size * 0.55);
-      context.lineTo(0, size * 0.55);
-      break;
-    case 'laserCore':
-      context.moveTo(0, -size);
-      context.lineTo(size, 0);
-      context.lineTo(0, size);
-      context.lineTo(-size, 0);
-      context.closePath();
-      context.moveTo(-size * 0.5, size * 0.5);
-      context.lineTo(size * 0.5, -size * 0.5);
-      break;
-    case 'satellite':
-      context.arc(0, 0, size * 0.55, 0, Math.PI * 2);
-      context.ellipse(0, 0, size * 1.35, size * 0.45, 0, 0, Math.PI * 2);
-      break;
-    case 'wreckage':
-      context.moveTo(-size, -size * 0.3);
-      context.lineTo(-size * 0.25, -size);
-      context.lineTo(size, -size * 0.15);
-      context.lineTo(size * 0.3, size);
-      context.lineTo(-size, size * 0.45);
-      context.closePath();
-      break;
-    default:
-      throw new Error(`Unexpected map asset kind: ${asset.kind}`);
+    context.strokeStyle = color;
+    context.fillStyle = hexToRgba(color, 0.2);
+    context.shadowColor = color;
+    context.beginPath();
+    switch (asset.kind) {
+      case 'laserCore':
+        context.moveTo(0, -size);
+        context.lineTo(size, 0);
+        context.lineTo(0, size);
+        context.lineTo(-size, 0);
+        context.closePath();
+        context.moveTo(-size * 0.5, size * 0.5);
+        context.lineTo(size * 0.5, -size * 0.5);
+        break;
+      case 'satellite':
+        context.arc(0, 0, size * 0.55, 0, Math.PI * 2);
+        context.ellipse(0, 0, size * 1.35, size * 0.45, 0, 0, Math.PI * 2);
+        break;
+      case 'wreckage':
+        context.moveTo(-size, -size * 0.3);
+        context.lineTo(-size * 0.25, -size);
+        context.lineTo(size, -size * 0.15);
+        context.lineTo(size * 0.3, size);
+        context.lineTo(-size, size * 0.45);
+        context.closePath();
+        break;
+      default: {
+        const unexpected: never = asset.kind;
+        throw new Error(`Unexpected map asset kind: ${unexpected}`);
+      }
+    }
+    context.fill();
+    context.shadowBlur = 0;
+    context.stroke();
   }
-  context.fill();
-  context.shadowBlur = 0;
-  context.stroke();
   if (showLabel && asset.name) {
     context.font = `${12 / frame.scale}px "Courier New", monospace`;
     context.fillStyle = hexToRgba(PALETTE.HUD, 0.86);
@@ -645,18 +665,20 @@ function drawCrew(
     if (!isFiniteMapPosition(position)) {
       continue;
     }
-    const size = (player.type === 'local' ? 18 : 14) / frame.scale;
+    const nearSize = player.type === 'local' ? MAP_LOCAL_SHIP_SIZE : MAP_CREW_SHIP_SIZE;
+    const screen = universeMapMarkScreenSize(nearSize, frame.zoom);
+    const size = screen / frame.scale;
     const color = player.type === 'local' ? PALETTE.LOCAL : player.color;
     const outline = getKitHullOutline(player.ship.kitId);
     context.save();
     context.translate(position.x, position.y);
-    context.lineWidth = 1.5 / frame.scale;
+    context.lineWidth = mapStrokeWidth(screen, nearSize, frame);
     context.lineJoin = 'round';
     context.lineCap = 'round';
     context.strokeStyle = color;
     context.fillStyle = hexToRgba(color, player.type === 'local' ? 0.22 : 0.12);
     context.shadowColor = color;
-    context.shadowBlur = 8 / frame.scale;
+    context.shadowBlur = mapGlowBlur(screen, nearSize, frame);
     const hull = projectHullPolyline(0, 0, size, player.ship.angle, outline.hull);
     if (traceMapPolyline(context, hull, outline.hull.closed)) {
       context.fill();

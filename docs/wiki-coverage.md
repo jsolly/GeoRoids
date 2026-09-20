@@ -9,16 +9,16 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
-| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, and first-join hold-to-equip hint |
-| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
+| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, first-join hold-to-equip hint, and map/schematic hold with blink on return |
+| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, moving probe beacons, and delivery tags |
+| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
-| asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection, armed coupling and finite powered flight |
-| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion |
+| asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
+| satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no terrain damage |
-| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, lives, respawn, brief-disconnect return, and score |
+| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
-| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
+| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, Sound Effects and Music settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
 ## Coverage matrix
 
@@ -26,11 +26,14 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicJoinHint.ts, haulerUtility.ts, shipAbilities.ts |
+| What happens to my ship while the map or schematic is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, GameEngine overlay hold, combat immunity tests |
+| How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
+| Why won't this huge rock tow, ignite, or break from a ram? | asteroids, hauler, teamwork | shared/asteroidScale.ts, GameEngine.ts, colossal crew tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | src/entities/ship/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |
 | How do I arm, ignite, and cancel an asteroid thruster? | hauler, controls, asteroids, teamwork | shared/asteroidBoost.ts, shipAbilities.ts, GameEngine.ts, boost lifecycle and persistence tests |
 | What happens when towed cargo hits another rock or ship? | hauler, asteroids, combat-survival | server/core/CollisionAuthority.ts, GameEngine.ts, authoritative combat tests |
@@ -39,6 +42,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
 | How do pilots complete a sector and keep the shared field going? | teamwork, hud-network | shared/sectors.ts, shared/exploration.ts, shared/furnaces.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
+| How do I mute sound effects or music? | hud-network | src/constants/user-preferences.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
 | How do I copy a Player ID so an agent can filter Railway logs? | hud-network | src/ui/debugIdentity.ts, src/utils/clientLogContext.ts, docs/diagnostics.md |
 
 ## Maintenance rules
@@ -82,14 +86,19 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   releases the cable immediately; an out-of-range attempt leaves the cooldown
   unchanged. A towed rock delivered inside a furnace's
   85-unit intake is consumed and awards the Hauler plus every recorded Surveyor
-  the full material reward. Towed cargo that overlaps another asteroid uses the
-  ordinary collision break on both rocks and drops the cable; towed cargo that
+  the full material reward. Towed ordinary cargo that overlaps another asteroid uses the
+  ordinary collision break on both rocks and drops the cable; a towed colossal
+  deposit breaks the other rock and keeps its cables. Towed ordinary cargo that
   overlaps another ship deals an asteroid impact, then breaks and drops the
-  cable. The Hauler remains unharmed by its own cargo.
+  cable. The Hauler remains unharmed by its own cargo. A colossal deposit needs
+  two Tow Cables before it hauls and two Boost Couplings before ignition; rams
+  and towed collisions do not shatter it.
 - Boost Coupling arms the nearest available asteroid and points it at its nearest
-  furnace. E or IGNITE launches autonomous delivery until intake, where it explodes
-  and rewards its original launcher and previously recorded Surveyors exactly once.
-  Swapping tools, losing range, dying, or disconnecting cancels an armed coupling.
+  furnace. Ordinary rocks ignite on the second E and pay that launcher plus recorded
+  Surveyors at intake. A colossal deposit stays armed until two couplings are latched;
+  those launchers and recorded Surveyors are paid. Dropping one colossal coupling
+  leaves the other armed. Swapping tools, losing range, dying, or disconnecting
+  cancels an ordinary armed coupling.
   Ignited cargo passes through objects and completed-sector barriers and ignores
   tools, weapons, scanning, and blast impulses. An empty world pauses guidance;
   saved sectors retain delivery ownership across reloads and resume powered cargo
@@ -103,7 +112,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   button opens a full-screen universe overview. Pilots stay readable;
   discovered furnace and other important asset markers remain visible on the
   overview while uncharted asteroid, loot, and furnace positions remain hidden.
-- Hauler mining damage is doubled for metal asteroids and cooperative large rocks;
+- Hauler mining damage is doubled for metal asteroids, cooperative large rocks,
+  and colossal deposits;
   normal asteroid mining damage remains configured per material. Large ice
   collaboration requires distinct pilot IDs; both contributors receive the
   collaboration score. Every miner and recorded Surveyor receives the full
@@ -122,7 +132,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - The six Earth-observation hulls are maintained by the satellite pickup manager
   and spawn separately from asteroid destruction. Loose hardware is stationary,
   glowing, and invulnerable. The nearest living player within
-  the automatic collection range stores it in ship inventory. Both kits can equip
+  the automatic collection range stores it in ship inventory,
+  except during a map or schematic hold. Both kits can equip
   one satellite from the schematic. Health drains with time and impacts, so damage
   shortens its scanning lifetime. The ship-style green health bar and schematic
   time estimate share that health value. Only loose pickups glow. Stored

@@ -3,7 +3,8 @@ title: Teamwork
 category: Systems
 summary: Every player shares one crew. Scan, tow, and deliver together.
   Direct weapons and collisions leave teammates unharmed; bounced lasers
-  become ricochets. Completing a sector walls it off for later expeditions.
+  become ricochets. Completing a sector walls it off for later expeditions;
+  a Works yard never completes.
 order: 140
 related:
   - content/wiki/surveyor.md

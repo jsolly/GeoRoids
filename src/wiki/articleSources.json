@@ -199,7 +199,10 @@
     "src/rendering/spiderRenderer.ts",
     "src/rendering/spiderFootContacts.ts",
     "src/audio/spiderScore.ts",
-    "src/physics/terrain/spiderSession.ts"
+    "src/physics/terrain/spiderSession.ts",
+    "shared/furnaces.ts",
+    "tests/unit/shared/furnaces.test.ts",
+    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -323,7 +326,9 @@
     "src/rendering/sectorRenderer.ts",
     "tests/integration/browser/sanity/nearby-crew-actions-have-audible-direction.test.ts",
     "src/ui/shipKitSelect.ts",
-    "src/rendering/hud/resourceMapMark.ts"
+    "src/rendering/hud/resourceMapMark.ts",
+    "tests/unit/shared/furnaces.test.ts",
+    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts"
   ],
   "surveyor": [
     "src/entities/ship/shipKits.ts",

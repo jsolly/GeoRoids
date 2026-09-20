@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed regional Works placement at sector centers, furnace-hosting sectors that never complete, teamwork/hauler copy, and fixture updates so nest and map tests sit off those hearths. Furnace GIFs still use starter North Works geometry and were not regenerated.",
+  "note": "Reviewed nest and map copy so Works yards never complete: webs last until the resource is collected or moved, leftover guards stay until killed. Teamwork summary names the same exception. Terrain and HUD articles now cite furnaces tests and completed-sector proofs. Furnace GIFs still use starter North Works geometry and were not regenerated.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -291,7 +291,7 @@
     "src/utils/safeStorage.ts": "sha256:9540743d8a87bca16e1243f389113f48a14bfda169475115e4b1ead9eaae6874",
     "src/utils/spawnPosition.ts": "sha256:6c0f91f2c664fd3c343d306f8d030e965e2083374d913fade89cd49ed49a5817",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
-    "src/wiki/articleSources.json": "sha256:0acce2d0bacf206a81f619dcedb28ab980eb4ed48ee9ca04bcf672e1e55bca55",
+    "src/wiki/articleSources.json": "sha256:44a8932b5c9e445e02fef90aead6b5fa8dc7e4fc602a70ee2c82723f2e05a368",
     "src/wiki/gameReference.ts": "sha256:b395cda6f7deffbfc5a644a7f5d7e7f83796fa1906af1f3bb19b5bbc7ec37f9e",
     "src/wiki/main.ts": "sha256:9335401816d6f05254cbfec4c1a4a680bb18ae3e489511273d15a8fc1b7c5600",
     "src/wiki/media.ts": "sha256:db1700d7d0f0e66689c34d7d4883f182412606503c1516b35b5dc2404bdb0958",

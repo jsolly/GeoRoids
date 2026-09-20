@@ -1,4 +1,5 @@
 import type { HaulerUtilityId } from '../../shared-types';
+import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE, VISUAL } from '../constants';
 import { traceTapCanister } from '../entities/loot/lootRenderer';
 import { PlayerManager } from '../entities/player/PlayerManager';
@@ -248,6 +249,9 @@ function syncCards(): void {
 export function equipUtility(utilityId: HaulerUtilityId): void {
   if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId !== 'hauler') {
     return;
+  }
+  if (selectedUtility !== utilityId) {
+    playFeedback('interface');
   }
   selectedUtility = utilityId;
   rememberHaulerUtility(utilityId);
@@ -643,6 +647,7 @@ export function openShipSchematic(): boolean {
   renderSatelliteInventory(elements.inventory, elements.inventoryStatus, elements.return);
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameSchematicOpen'));
+  playFeedback('interface');
   startRenderLoop();
   elements.close.focus({ preventScroll: true });
   return true;
@@ -658,6 +663,7 @@ export function closeShipSchematic(): void {
   elements.dialog.close();
   closeInProgress = false;
   window.dispatchEvent(new CustomEvent('gameSchematicClose'));
+  playFeedback('interface');
 }
 
 function handleDialogClosed(): void {
@@ -667,6 +673,7 @@ function handleDialogClosed(): void {
   setShipSchematicOpen(false);
   stopRenderLoop();
   window.dispatchEvent(new CustomEvent('gameSchematicClose'));
+  playFeedback('interface');
 }
 
 function handleSchematicKeydown(ev: KeyboardEvent): void {

@@ -9,6 +9,7 @@ type ViewportSize = { width: number; height: number };
 interface PlaybackPlan {
   shouldPlay: boolean;
   volumeScale: number;
+  offset?: Position;
 }
 
 type ListenerProvider = () => Position | undefined;
@@ -108,6 +109,7 @@ export function planPositionalPlayback(
   return {
     shouldPlay: volumeScale > 0,
     volumeScale,
+    offset: { x: sourcePosition.x - listener.x, y: sourcePosition.y - listener.y },
   };
 }
 
@@ -133,5 +135,5 @@ export function playWorldSound(
   if (!plan.shouldPlay) {
     return;
   }
-  playSound(sound, plan.volumeScale);
+  playSound(sound, plan.volumeScale, plan.offset);
 }

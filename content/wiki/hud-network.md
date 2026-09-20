@@ -36,11 +36,25 @@ The debug panel sits above the flight controls so Boost remains visible, and
 the kit ability button stays fully on the playfield.
 Those health lines stay on-screen only; they are not written to Railway.
 
-Shots, impacts, and explosions vary their pitch slightly each time they
-start, keeping repeated actions from sounding identical. Automatic thrust is silent. Nearby action is louder; off-screen combat
-cues stay silent. Tow cables have attach and release cues. Orbital pickup
+Sounds share a soft crystal-synth palette and a common musical key. Shots are
+short tuned plucks; asteroid destruction is a rounded impact with a gentle
+crystal tail. Resource Tap ejections play lower notes, and successive material
+pickups answer with a melody. Three quick pickups complete a short phrase;
+longer streaks vary it, and a pause starts a fresh phrase. Automatic thrust is silent. Nearby action is louder; off-screen combat
+cues stay silent. Nearby shots and asteroid breaks come from their direction
+around your ship: left/right match the screen, and up/down become front/back.
+Headphones give the clearest 3D effect; the game outputs spatial stereo rather
+than dedicated surround channels. Tow cables have attach and release cues. Orbital pickup
 and pickup-break sounds differ from ship lasers. Laser cores and
-material pickups have separate cues, as do kit abilities and respawning.
+material pickups have separate voices, as do kit abilities and respawning.
+Boost start and stop, hull damage, satellite equip, and opening or closing the
+map and schematic have quiet feedback. Furnace rewards play a short resolving
+phrase even when your contribution was made away from the delivery; game over
+has a lower closing phrase. Steering, recharge, map movement and regeneration
+stay silent. Your equipped satellite plays a soft chime once per orbit, with silence between passes; a permanent
+connection failure sounds once. Changing ships on the title screen plays a
+quiet selection note, and entering a flight plays a welcoming phrase once the
+world is ready.
 
 The HUD shows lives as kit hull icons, score, kit name, and the current ability.
 Desktop layouts include a leaderboard of every active player row and a

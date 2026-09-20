@@ -35,6 +35,17 @@ export type ShipKitId = 'surveyor' | 'hauler';
 /** Hauler v1 utility slot. Same E key; one option active. */
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
+export interface AbilityUsedEvent {
+  id: string;
+  kitId: ShipKitId;
+  abilityId: 'harpoon' | 'surveyScan';
+  harpoonTargetId?: string | null;
+  harpoonLatchPos?: Position;
+  abilityActiveFrames: number;
+  /** Present only on an accepted ignition, never on a snapshot or ordinary release. */
+  boostIgnitionPosition?: Position;
+}
+
 export interface PlayerUpdate {
   id: string;
   name: string;
@@ -168,6 +179,12 @@ export interface LootCollected {
   lootId: string;
   collectorId: string;
   kind: LootKind;
+  position: Position;
+}
+
+/** One Resource Tap canister leaving the rock, independent of snapshot visibility. */
+export interface TapEjected {
+  lootId: string;
   position: Position;
 }
 

@@ -50,6 +50,7 @@ import type {
   ServerEntityData,
   ServerGameState,
   ShipKitId,
+  TapEjected,
   Velocity,
 } from '../../shared-types';
 import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
@@ -270,6 +271,7 @@ export class GameEngine {
   private pendingShockwaves: PendingShockwave[] = [];
   private pendingShotSounds: Array<{ laser: ServerLaser; position: Position }> = [];
   private pendingLootCollections: LootCollected[] = [];
+  private pendingTapEjections: TapEjected[] = [];
   private pendingSatellitePickupCollections: SatellitePickupCollected[] = [];
   private readonly shootBudgets = new WeakMap<GameEntity, { tokens: number; at: number }>();
   private readonly laserExpiry = new WeakMap<ServerLaser, number>();
@@ -533,6 +535,7 @@ export class GameEngine {
       this.isPaused = true;
       logger.info('🔄 Game paused - no players online');
       this.lasers = [];
+      this.clearPendingFeedback();
       this.checkpointWorld();
     } else if (playerCount > 0 && this.isPaused) {
       this.isPaused = false;
@@ -609,6 +612,16 @@ export class GameEngine {
     this.rngService.reset();
   }
 
+  /** State and earned rewards persist; missed sounds/notifications do not. */
+  private clearPendingFeedback(): void {
+    this.pendingLootBlasts = [];
+    this.pendingLootCollections = [];
+    this.pendingTapEjections = [];
+    this.pendingShotSounds = [];
+    this.pendingSatellitePickupCollections = [];
+    this.pendingFurnaceDeliveries = [];
+  }
+
   // Clear ambient entities and pending combat without replacing player sessions.
   private clearWorldObjects(): void {
     // Clear all asteroids and pending collab resolutions
@@ -619,11 +632,8 @@ export class GameEngine {
     this.lasers = [];
     this.departedPlayers = [];
     this.decoratedFieldId = undefined;
-    this.pendingLootBlasts = [];
-    this.pendingLootCollections = [];
-    this.pendingShotSounds = [];
+    this.clearPendingFeedback();
     this.pendingAsteroidHits = [];
-    this.pendingSatellitePickupCollections = [];
     this.satellitePickupManager.clear();
   }
 
@@ -1371,6 +1381,10 @@ export class GameEngine {
 
   public drainLootCollections(): LootCollected[] {
     return this.pendingLootCollections.splice(0);
+  }
+
+  public drainTapEjections(): TapEjected[] {
+    return this.pendingTapEjections.splice(0);
   }
 
   public drainLootBlasts() {
@@ -2589,7 +2603,11 @@ export class GameEngine {
               SHIP_ABILITY.TAP_EXTRACT_FRAMES
           ) - 1;
         const ejection = tapLootEjection(entity.position, target, burst);
-        this.lootManager.spawnTap(ejection.position, this.gameTime, ejection.velocity);
+        const drop = this.lootManager.spawnTap(ejection.position, this.gameTime, ejection.velocity);
+        if (this.pendingTapEjections.length >= MAX_PENDING_LOOT_COLLECTIONS) {
+          this.pendingTapEjections.shift();
+        }
+        this.pendingTapEjections.push({ lootId: drop.id, position: { ...drop.position } });
         if (extract === 'complete') {
           clearHaulerLatch(entity);
         }

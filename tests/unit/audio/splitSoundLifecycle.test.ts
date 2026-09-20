@@ -23,6 +23,14 @@ class SynthContext {
     this.gains.push(gain);
     return gain;
   }
+  createPanner() {
+    return {
+      positionX: { value: 0 },
+      positionZ: { value: 0 },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  }
   createBuffer(_channels: number, length: number) {
     return { getChannelData: () => new Float32Array(length) };
   }

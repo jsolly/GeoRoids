@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { expect, test } from 'vitest';
 import { SATELLITE_PICKUP } from '../../../../src/constants';
-import { installAudioProbe } from '../../utils/audio-probe';
+import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
+import { arrangeCrewField } from '../../utils/test-server-control';
 import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
@@ -47,6 +48,7 @@ test.each([
     const game = new GameInteractions(page);
     // Start before automatic thrust can carry the pilot into a pickup.
     await game.bootGame({ kitId, waitForCombatReady: false });
+    await arrangeCrewField([await game.getLocalPlayerId()], 'satellite');
     await game.placeShipAt(0, 0);
     await page.keyboard.press('v');
     await expect
@@ -81,6 +83,10 @@ test.each([
       };
     });
 
+    // Establish the destination sector before collection so its entry banner
+    // cannot overwrite the acquisition notice in the same snapshot.
+    await game.placeShipAt(target.x + 250, target.y);
+    await game.waitForAnimationFrames(10);
     await game.placeShipAt(target.x + 110, target.y);
     await expect
       .poll(
@@ -146,6 +152,31 @@ test.each([
     assert.ok(draining);
     expect(draining.health).toBeLessThan(healthBefore);
     expect(draining.health).toBeGreaterThan(healthBefore - 2);
+    const orbitAudio = await page.evaluate(() => ({
+      active: Number(document.documentElement.dataset['activeTones']),
+      motion: JSON.parse(document.documentElement.dataset['orbitMotion'] ?? '[]') as Array<{
+        kind: string;
+        value: number;
+      }>,
+    }));
+    expect(orbitAudio.active).toBe(2);
+    const pans = orbitAudio.motion
+      .filter((motion) => motion.kind === 'pan')
+      .map((motion) => motion.value);
+    const detunes = orbitAudio.motion
+      .filter((motion) => motion.kind === 'detune')
+      .map((motion) => motion.value);
+    expect(Math.max(...pans) - Math.min(...pans)).toBeGreaterThan(0.2);
+    expect(Math.max(...detunes) - Math.min(...detunes)).toBeGreaterThan(5);
+    expect(Math.max(...detunes.map(Math.abs))).toBeLessThanOrEqual(18);
+    // Observe the real AudioParam: the orbit becomes audible, then fully silent.
+    const orbitGain = () =>
+      page.evaluate(() => {
+        const gains: number[] = JSON.parse(document.documentElement.dataset['orbitGains'] ?? '[]');
+        return Math.min(...gains);
+      });
+    await expect.poll(orbitGain, { timeout: 5000, interval: 50 }).toBeGreaterThan(0.001);
+    await expect.poll(orbitGain, { timeout: 5000, interval: 50 }).toBe(0);
     expect(await page.locator('#satellite-inventory-status').textContent()).toBe(
       `${target.name} equipped.`
     );
@@ -172,6 +203,8 @@ test.each([
     expect(attached.health).toBeLessThan(attached.maxHealth);
     expect(sent).not.toContain('satellitePickupCollected');
     expect(sent).toContain('equipSatellite');
+    expect(await readSamplePlaybackRates(page, 'satellite-equip')).toEqual([1]);
+    expect((await readSamplePlaybackRates(page, 'interface')).length).toBeGreaterThanOrEqual(3);
     await expect
       .poll(() =>
         page.evaluate(({ duration, eventCount }) => {
@@ -187,6 +220,30 @@ test.each([
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`satellite-orbit-${capture}.png`),
     });
+    await page.locator('#soundPref').evaluate((input) => {
+      if (!(input instanceof HTMLInputElement)) {
+        throw new Error('Sound checkbox missing');
+      }
+      input.checked = false;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['activeTones']))
+      .toBe('0');
+    await page.locator('#soundPref').evaluate((input) => {
+      if (!(input instanceof HTMLInputElement)) {
+        throw new Error('Sound checkbox missing');
+      }
+      input.checked = true;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['activeTones']))
+      .toBe('2');
+    await page.evaluate(() => window.gameController?.getNetworkManager().disconnect());
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['activeTones']))
+      .toBe('0');
     expect(errors).toEqual([]);
     expect(warnings).toEqual([]);
   },

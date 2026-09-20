@@ -3,6 +3,7 @@ import type {
   AsteroidData,
   AsteroidMaterial,
   AsteroidPhenomenon,
+  AsteroidProbe,
   HaulerUtilityId,
   LaserUpgrade,
   LootData,
@@ -18,6 +19,7 @@ import type {
   ServerGameState,
   ShipKitId,
   SnapshotCollabTag,
+  SurveyorUtilityId,
 } from '../shared-types';
 import { validExploration } from './exploration';
 import { isShipBoostState } from './shipBoost';
@@ -49,6 +51,10 @@ const haulerUtility = enumeration<HaulerUtilityId>({
   resource_tap: true,
   boost_coupling: true,
   tow_cable: true,
+});
+const surveyorUtility = enumeration<SurveyorUtilityId>({
+  mineral_scan: true,
+  survey_probe: true,
 });
 const lootKind = enumeration<LootKind>({
   shard: true,
@@ -112,6 +118,7 @@ const entity = shape<ServerEntityData>({
   harpoonTargetId: optional((value) => value === null || string(value)),
   harpoonLatchPos: optional(position),
   haulerUtility: optional(haulerUtility),
+  surveyorUtility: optional(surveyorUtility),
   deathCause: optional(string),
   playerMotion: optional(motion),
   laserUpgrade: optional(upgrade),
@@ -125,6 +132,16 @@ const burningBoost = shape<Extract<AsteroidBoost, { phase: 'burning' }>>({
   phase: choice('burning'),
   angle: number,
   ownerId: string,
+});
+const probe = shape<AsteroidProbe>({
+  id: string,
+  ownerId: string,
+  health: number,
+  maxHealth: number,
+  attachedAt: number,
+  expiresAt: number,
+  angle: number,
+  radialOffset: number,
 });
 const asteroid = shape<AsteroidData>({
   id: string,
@@ -144,6 +161,7 @@ const asteroid = shape<AsteroidData>({
   miningContributors: optional(array(string)),
   phenomenon: optional(reflective),
   boost: optional((value) => value === null || armedBoost(value) || burningBoost(value)),
+  probe: optional((value) => value === null || probe(value)),
 });
 const loot = shape<LootData>({
   id: string,

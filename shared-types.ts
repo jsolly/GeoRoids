@@ -35,6 +35,9 @@ export type ShipKitId = 'surveyor' | 'hauler';
 /** Hauler v1 utility slot. Same E key; one option active. */
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
+/** Surveyor v1 utility slot. Same E key; one option active. */
+export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe';
+
 export interface AbilityUsedEvent {
   id: string;
   kitId: ShipKitId;
@@ -147,6 +150,20 @@ export type AsteroidBoost =
   | { phase: 'armed'; ownerId: string; angle: number }
   | { phase: 'burning'; ownerId: string; angle: number };
 
+/** Transient Surveyor hardware attached to one asteroid face. */
+export interface AsteroidProbe {
+  id: string;
+  ownerId: string;
+  health: number;
+  maxHealth: number;
+  attachedAt: number;
+  expiresAt: number;
+  /** Angular offset from the host asteroid's current rotation. */
+  angle: number;
+  /** Radial distance from the host asteroid center in world units. */
+  radialOffset: number;
+}
+
 export interface AsteroidData {
   id: string;
   position: Position;
@@ -169,6 +186,8 @@ export interface AsteroidData {
   isCollabTarget?: boolean;
   phenomenon?: AsteroidPhenomenon;
   boost?: AsteroidBoost | null;
+  /** Explicit null clears a previously rendered probe from client state. */
+  probe?: AsteroidProbe | null;
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
@@ -321,6 +340,8 @@ export interface ServerEntityData {
   harpoonLatchPos?: Position;
   /** Equipped Hauler utility. Omitted on other kits. Missing means tow cable. */
   haulerUtility?: HaulerUtilityId;
+  /** Equipped Surveyor utility. Omitted on other kits. Missing means mineral scan. */
+  surveyorUtility?: SurveyorUtilityId;
   /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;

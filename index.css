@@ -1657,6 +1657,10 @@
     gap: 8px;
   }
 
+  .ship-schematic-cards[data-kit-id="surveyor"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .ship-schematic-card {
     pointer-events: auto;
     width: 100%;

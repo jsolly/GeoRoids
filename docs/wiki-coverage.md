@@ -10,7 +10,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, and playfield tap-to-fire |
-| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, and delivery tags |
+| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, moving probe beacons, and delivery tags |
 | hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, furnace delivery, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, reflection, armed coupling and finite powered flight |
@@ -26,6 +26,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, haulerUtility.ts, shipAbilities.ts |
+| How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |

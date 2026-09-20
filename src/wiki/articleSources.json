@@ -287,7 +287,11 @@
     "tests/unit/entities/surveyor-identifies-nearby-minerals.test.ts",
     "src/entities/ship/shipRenderer.ts",
     "tests/unit/entities/surveyor-scan-vfx.test.ts",
-    "tests/integration/browser/sanity/surveyor-radar-pulses-cover-the-viewport.test.ts"
+    "tests/integration/browser/sanity/surveyor-radar-pulses-cover-the-viewport.test.ts",
+    "shared/surveyProbe.ts",
+    "src/entities/roid/surveyProbeRenderer.ts",
+    "src/entities/ship/surveyorUtility.ts",
+    "server/core/SurveyProbeManager.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",

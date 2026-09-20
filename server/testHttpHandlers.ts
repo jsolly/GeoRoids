@@ -289,6 +289,7 @@ export function handleTestArrangeCrewField(
         'cooperative',
         'reflection',
         'satellite',
+        'probe',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
@@ -317,8 +318,8 @@ export function handleTestArrangeCrewField(
             ? player.kitId === 'hauler'
               ? { x: 0, y: -360 }
               : { x: 220, y: -460 }
-            : body['scenario'] === 'reflection'
-              ? { x: -220, y: -460 }
+            : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+              ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
               : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
@@ -333,7 +334,9 @@ export function handleTestArrangeCrewField(
       // 'tow' points the Hauler away from every furnace, so the cargo it hooks
       // stays hooked for as long as the scenario needs instead of being smelted.
       player.angle =
-        body['scenario'] === 'reflection' || body['scenario'] === 'boundary'
+        body['scenario'] === 'reflection' ||
+        body['scenario'] === 'probe' ||
+        body['scenario'] === 'boundary'
           ? 0
           : body['scenario'] === 'tow'
             ? -Math.PI / 2
@@ -359,7 +362,36 @@ export function handleTestArrangeCrewField(
       gameEngine.parkSatellitePickups();
     }
     const first = poses[0];
-    if (body['scenario'] === 'reflection') {
+    if (body['scenario'] === 'probe') {
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-probe-host',
+        position: { x: -20, y: -460 },
+        velocity: { x: 0.12, y: 0 },
+        size: 50,
+        health: 500,
+        maxHealth: 500,
+        material: 'metal',
+        rotation: 0,
+        angularVelocity: 0.001,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
+      gameEngine.addAsteroid({
+        id: 'crew-fixture-probe-deposit',
+        position: { x: 60, y: -610 },
+        velocity: { x: 0, y: 0 },
+        size: 30,
+        health: 300,
+        maxHealth: 300,
+        material: 'ice',
+        rotation: 0,
+        angularVelocity: 0,
+        jaggedness: 0.25,
+        vertices: 4,
+        offsets: [1, 1, 1, 1],
+      });
+    } else if (body['scenario'] === 'reflection') {
       gameEngine.addAsteroid({
         id: 'crew-fixture-reflector',
         position: { x: 0, y: -460 },

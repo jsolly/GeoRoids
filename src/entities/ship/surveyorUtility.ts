@@ -1,0 +1,52 @@
+import { SURVEY_PROBE } from '../../../shared/surveyProbe';
+import type { ShipKitId, SurveyorUtilityId } from '../../../shared-types';
+import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
+
+export const SURVEYOR_UTILITY_IDS = ['mineral_scan', 'survey_probe'] as const;
+
+export const DEFAULT_SURVEYOR_UTILITY: SurveyorUtilityId = 'mineral_scan';
+export const SURVEYOR_UTILITY_STORAGE_KEY = 'georoids.surveyorUtility';
+
+export const SURVEYOR_UTILITY = {
+  mineral_scan: {
+    id: 'mineral_scan',
+    name: 'Mineral Scan',
+    hint: 'Tap to equip',
+    copy: 'Scan minerals for the crew. Earn points when a Hauler delivers them.',
+  },
+  survey_probe: {
+    id: 'survey_probe',
+    name: 'Survey Probe',
+    hint: `Tap to equip · ${SURVEY_PROBE.MAX_PER_OWNER} max`,
+    copy: `Fire a beacon forward. It scans a ${SURVEY_PROBE.RANGE}-unit radius for ${SURVEY_PROBE.LIFETIME_MS / 60_000} minutes, with ${SURVEY_PROBE.MAX_HEALTH} health. Everyone benefits.`,
+  },
+} as const;
+
+export function isSurveyorUtilityId(value: unknown): value is SurveyorUtilityId {
+  return value === 'mineral_scan' || value === 'survey_probe';
+}
+
+function parseSurveyorUtilityId(value: unknown): SurveyorUtilityId {
+  return isSurveyorUtilityId(value) ? value : DEFAULT_SURVEYOR_UTILITY;
+}
+
+export function surveyorUtilityOf(host: {
+  kitId?: ShipKitId | string;
+  surveyorUtility?: unknown;
+}): SurveyorUtilityId {
+  if (host.kitId !== 'surveyor') {
+    return DEFAULT_SURVEYOR_UTILITY;
+  }
+  return isSurveyorUtilityId(host.surveyorUtility)
+    ? host.surveyorUtility
+    : DEFAULT_SURVEYOR_UTILITY;
+}
+
+export function preferredSurveyorUtility(): SurveyorUtilityId {
+  const stored = getStoredItem(SURVEYOR_UTILITY_STORAGE_KEY);
+  return stored === null ? DEFAULT_SURVEYOR_UTILITY : parseSurveyorUtilityId(stored);
+}
+
+export function rememberSurveyorUtility(utilityId: SurveyorUtilityId): void {
+  setStoredItem(SURVEYOR_UTILITY_STORAGE_KEY, utilityId);
+}

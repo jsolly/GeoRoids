@@ -19,7 +19,7 @@ The thrusters stay on while you are alive and viewing the playfield. ArrowLeft o
 turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
 on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
-does not repeatedly activate it. On Hauler, E uses the equipped utility from
+does not repeatedly activate it. E uses the equipped tool from
 the ship schematic. V opens or closes that schematic; Escape, the X control,
 or Return to flight also close it. Firing and E are blocked while it is open.
 The map and schematic hold your ship stationary, including its momentum and
@@ -68,7 +68,9 @@ V opens the local schematic for either ship. On touch, press and hold your own
 hull for a beat; a short rest still only steers. The overlay shows your hull
 and satellite inventory. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
-lifetime, derived from health. Hauler also has three utility cards and a looping tool animation;
+lifetime, derived from health. Surveyor offers Mineral Scan and Survey Probe;
+the probe fires along your heading and attaches a shared scanning beacon to a rock.
+Hauler has three utility cards and a looping tool animation;
 selecting a utility card equips that tool immediately. Boost Coupling uses E to arm
 and lock the asteroid thrust heading, then E again to ignite. Its touch button
 changes from ARM to IGNITE. Swap tools to cancel an armed coupling.

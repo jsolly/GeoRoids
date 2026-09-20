@@ -1,5 +1,5 @@
 {
-  "note": "Furnace intake poof now paints after hearths even when the belt is empty (canvas.ts drawAsteroidShatterBursts). Hauler, asteroids, and teamwork copy already describe the red shatter and smoke poof. Laser shatter unchanged. Hauler GIF still shows the rock vanishing at the grate; the 280ms poof is playfield-only and was not regenerated.",
+  "note": "Furnace intake poof now paints after hearths even when the belt is empty. Empty-belt coverage is a drawGame stroke assertion (danger-red edges plus smoke arcs), not a canvas.ts source scan. Hauler, asteroids, and teamwork copy already describe the red shatter and smoke poof. Laser shatter unchanged. Hauler GIF still shows the rock vanishing at the grate; the 280ms poof is playfield-only and was not regenerated.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
@@ -330,7 +330,7 @@
     "tests/unit/entities/boost-runs-out-and-refills.test.ts": "sha256:c470d95eae656e3893ad1f499ad2f7ee20869f7a87f53436c60e7107011c8e53",
     "tests/unit/entities/combatDamage.test.ts": "sha256:313becdfe1590dca21168139be281ca1771419dbb738191b7f78fd5ed3be11f7",
     "tests/unit/entities/eoSatelliteRoster.test.ts": "sha256:8e1ad144bb2a03d19ff52b48f9011e8168fde9f0b5b779530728e94e8ecca9a3",
-    "tests/unit/entities/furnace-intake-turns-the-roid-outline-red-and-poofs-smoke.test.ts": "sha256:e64df631a642fd1a62e95909d1ded43a1fca00c26008dc35238d5ae40ca31cbf",
+    "tests/unit/entities/furnace-intake-turns-the-roid-outline-red-and-poofs-smoke.test.ts": "sha256:02084edce35f60cef3db70880250261739543c9d5ee055fa26328eb67d69da77",
     "tests/unit/entities/haulerHarpoonLatchSync.test.ts": "sha256:8944754873ec93813f59b63591f4964b97c51a14bee09f72fb9c1a56e82799c4",
     "tests/unit/entities/haulerUtility.test.ts": "sha256:a42bf9209eb3634e450b3f1aa88ab50ba162b9de97b54100354752e1140792b0",
     "tests/unit/entities/input/keyboardControls.test.ts": "sha256:d988d524325999d526ea3fc6777960c0d3fd0e4a12a4f370ec074462ff9850f8",

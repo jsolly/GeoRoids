@@ -1,17 +1,16 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import process from 'node:process';
 import { afterEach, expect, test, vi } from 'vitest';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { entityFactory } from '../../../src/entities/EntityFactory';
-import { Roid } from '../../../src/entities/roid/Roid';
+import { Roid, RoidBelt } from '../../../src/entities/roid/Roid';
 import {
   clearAsteroidShatters,
   drawAsteroidShatterBursts,
   markFurnaceAsteroidShatter,
   recordAsteroidShatter,
 } from '../../../src/entities/roid/roidRenderer';
+import { drawGame } from '../../../src/rendering/canvas';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import { TestPath2D } from '../../support/TestPath2D';
 import { setWindowViewport } from '../../support/viewport';
 
 let restoreViewport = () => {};
@@ -29,6 +28,7 @@ afterEach(() => {
   canvas = undefined;
   previousCanvas = null;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   restoreViewport();
 });
 
@@ -176,13 +176,41 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
 });
 
 test('the playfield still paints a furnace poof after the last rock leaves the belt', () => {
-  const playfield = readFileSync(resolve(process.cwd(), 'src/rendering/canvas.ts'), 'utf8');
-  const rocks = playfield.indexOf('drawRoidsRelative(currShip, roids);');
-  const emptyBelt = playfield.indexOf('if (roids.length > 0)');
-  const hearth = playfield.indexOf('drawFurnacesRelative(currShip.position);');
-  const poof = playfield.indexOf('drawAsteroidShatterBursts(currShip);');
-  expect(rocks).toBeGreaterThan(-1);
-  expect(emptyBelt).toBeGreaterThan(rocks);
-  expect(hearth).toBeGreaterThan(emptyBelt);
-  expect(poof).toBeGreaterThan(hearth);
+  vi.stubGlobal('Path2D', TestPath2D);
+  vi.spyOn(performance, 'now').mockReturnValue(2000);
+  const { ctx, pilot } = asteroidScene();
+  recordAsteroidShatter(consumedRock(), 2000, 'furnace');
+  const strokes = recordStrokes(ctx);
+
+  drawGame(pilot, new RoidBelt(), 0, 0, '', 3, [pilot]);
+
+  ctx.strokeStyle = PALETTE.DANGER;
+  const danger = ctx.strokeStyle;
+  ctx.strokeStyle = PALETTE.HUD_MUTED;
+  const smoke = ctx.strokeStyle;
+  const edges = strokes.filter(
+    (path) => !path.closed && path.arcs.length === 0 && path.style === danger
+  );
+  const wisps = strokes.filter((path) => path.arcs.length === 1 && path.style === smoke);
+  expect(edges).toHaveLength(4);
+  expect(wisps).toHaveLength(VISUAL.ROID_FURNACE_SMOKE_WISPS);
+  expect(edges.map((path) => path.points)).toEqual([
+    [
+      [494, 330],
+      [480, 344],
+    ],
+    [
+      [480, 344],
+      [466, 330],
+    ],
+    [
+      [466, 330],
+      [480, 316],
+    ],
+    [
+      [480, 316],
+      [494, 330],
+    ],
+  ]);
+  expect(wisps.every((path) => (path.arcs[0]?.[1] ?? 330) < 330)).toBe(true);
 });

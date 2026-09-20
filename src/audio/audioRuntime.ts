@@ -9,6 +9,8 @@ let context: AudioContext | undefined;
 let unlockSource: AudioBufferSourceNode | undefined;
 let resuming: Promise<void> | undefined;
 let suspending: Promise<void> | undefined;
+let queuedGestureResume = false;
+let needsPlaybackRestart = false;
 let musicBedsRegistered = false;
 const sfxInitializers = new Set<(audio: AudioLibrary) => void>();
 const musicInitializers = new Set<(audio: AudioLibrary) => void>();
@@ -27,12 +29,42 @@ function sessionEnabled(): boolean {
   return sfxEnabled() || musicEnabled();
 }
 
+function contextState(): string {
+  return context?.state ?? '';
+}
+
+function isInterrupted(): boolean {
+  return contextState() === 'interrupted';
+}
+
+function isAudioDeviceError(error: unknown): boolean {
+  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return text.includes('Failed to start the audio device');
+}
+
 function report(error: unknown): void {
   logger.error(
     'SOUND',
     'Audio initialization failed',
     error instanceof Error ? error : new Error(String(error))
   );
+}
+
+function reportDeferredDeviceStart(error: unknown): void {
+  needsPlaybackRestart = true;
+  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  logger.warn('SOUND', 'Audio device start deferred', {
+    contextState: contextState(),
+    message: text,
+  });
+}
+
+function handleContextControlError(error: unknown): void {
+  if (isAudioDeviceError(error) || isInterrupted()) {
+    reportDeferredDeviceStart(error);
+    return;
+  }
+  report(error);
 }
 
 function syncState(): void {
@@ -63,13 +95,25 @@ function stopSources(): void {
   stopMusicSources();
 }
 
+function restartPlayback(): void {
+  initializeSfx();
+  initializeMusic();
+  needsPlaybackRestart = false;
+}
+
 function suspend(): void {
-  if (!context || context.state === 'closed' || context.state === 'suspended' || suspending) {
+  if (
+    !context ||
+    context.state === 'closed' ||
+    context.state === 'suspended' ||
+    isInterrupted() ||
+    suspending
+  ) {
     return;
   }
   suspending = context
     .suspend()
-    .catch(report)
+    .catch(handleContextControlError)
     .finally(() => {
       suspending = undefined;
       syncState();
@@ -79,39 +123,68 @@ function suspend(): void {
     });
 }
 
-function resume(): void {
-  if (!context || !sessionEnabled() || resuming || context.state === 'closed') {
+function resume(fromGesture = false): void {
+  if (!context || !sessionEnabled() || context.state === 'closed') {
+    return;
+  }
+  if (resuming) {
+    if (fromGesture) {
+      queuedGestureResume = true;
+    }
+    return;
+  }
+  if (!fromGesture && isInterrupted()) {
+    needsPlaybackRestart = true;
     return;
   }
   if (context.state === 'running') {
     syncState();
+    if (fromGesture || needsPlaybackRestart) {
+      restartPlayback();
+    }
     return;
   }
   resuming = context
     .resume()
-    .catch(report)
+    .catch(handleContextControlError)
     .finally(() => {
       resuming = undefined;
       syncState();
+      const retryGesture = queuedGestureResume;
+      queuedGestureResume = false;
       if (!sessionEnabled()) {
         suspend();
+      } else if (context?.state === 'running') {
+        restartPlayback();
+      } else if (retryGesture) {
+        resume(true);
       }
     });
+}
+
+function resumeFromGesture(): void {
+  resume(true);
 }
 
 function onContextStateChange(): void {
   syncState();
   if (context?.state !== 'running') {
     stopSources();
+    needsPlaybackRestart = true;
     if (!sessionEnabled()) {
       suspend();
     }
     return;
   }
+  if (!sessionEnabled()) {
+    stopSources();
+    library?.Howler.mute(true);
+    suspend();
+    return;
+  }
   // Looping beds must restart after an interruption; SFX initializers are
   // idempotent and do not replay one-shot cues.
-  initializeSfx();
-  initializeMusic();
+  restartPlayback();
 }
 
 function onVisibilityChange(): void {
@@ -168,8 +241,8 @@ export function activateAudio(): void {
       context = new AudioContext();
       context.addEventListener('statechange', onContextStateChange);
       document.addEventListener('visibilitychange', onVisibilityChange);
-      document.addEventListener('pointerdown', resume, true);
-      document.addEventListener('keydown', resume, true);
+      document.addEventListener('pointerdown', resumeFromGesture, true);
+      document.addEventListener('keydown', resumeFromGesture, true);
       const unlock = context.createBufferSource();
       unlock.buffer = context.createBuffer(1, 1, context.sampleRate);
       unlock.connect(context.destination);
@@ -186,7 +259,7 @@ export function activateAudio(): void {
       return;
     }
   }
-  resume();
+  resume(true);
   if (library) {
     library.Howler.mute(false);
     initializeSfx();

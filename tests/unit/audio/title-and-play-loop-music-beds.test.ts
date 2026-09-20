@@ -2,7 +2,6 @@ import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { AUDIO } from '../../../src/constants';
-import { logger } from '../../../src/utils/Logger';
 
 class FakeHowl {
   static instances: FakeHowl[] = [];
@@ -113,6 +112,7 @@ let clearMusicThreat: typeof import('../../../src/audio/musicThreat').clearMusic
 let resetMusicThreats: typeof import('../../../src/audio/musicThreat').resetMusicThreats;
 let setSound: typeof import('../../../src/audio/Sound').setSound;
 let Sound: typeof import('../../../src/audio/Sound').Sound;
+let logger: typeof import('../../../src/utils/Logger').logger;
 let loadLibrary = vi.fn();
 let globalAudio: { state: string; mute: ReturnType<typeof vi.fn> };
 let removeListeners: Array<() => void> = [];
@@ -167,6 +167,7 @@ beforeEach(async () => {
     '../../../src/audio/musicThreat'
   ));
   ({ Sound, setSound } = await import('../../../src/audio/Sound'));
+  ({ logger } = await import('../../../src/utils/Logger'));
 });
 
 afterEach(() => {
@@ -286,6 +287,70 @@ test('turning Music and Sound Effects off suspends the shared session', async ()
   await settle();
   expect(FakeContext.instances[0]?.state).toBe('suspended');
   expect(globalAudio.mute).toHaveBeenLastCalledWith(true);
+});
+
+test('an interrupted phone session restarts the bed after a deferred device start', async () => {
+  const errors = vi.spyOn(logger, 'error');
+  setMusic(true);
+  await settle();
+  const bed = FakeHowl.instances[0];
+  const ctx = FakeContext.instances[0];
+  if (!bed || !ctx) {
+    throw new Error('Expected music bed and audio context');
+  }
+  expect(bed.playing()).toBe(true);
+  ctx.changeState('interrupted');
+  await settle();
+  expect(bed.playing()).toBe(false);
+  const resumesAfterInterrupt = ctx.resume.mock.calls.length;
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  expect(ctx.resume.mock.calls.length).toBe(resumesAfterInterrupt);
+
+  ctx.changeState('suspended');
+  let rejectResume: (error: DOMException) => void = () => {};
+  ctx.resume.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectResume = reject;
+      })
+  );
+  document.dispatchEvent(new Event('visibilitychange'));
+  document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  expect(ctx.resume.mock.calls.length).toBe(resumesAfterInterrupt + 1);
+  rejectResume(new DOMException('Failed to start the audio device', 'InvalidStateError'));
+  await settle();
+  expect(ctx.state).toBe('running');
+  expect(bed.playing()).toBe(true);
+  expect(bed.play.mock.calls.length).toBeGreaterThan(1);
+  expect(errors.mock.calls.some((call) => call[0] === 'SOUND')).toBe(false);
+});
+
+test('an interrupted hidden session stays silent when the OS auto-resumes', async () => {
+  setMusic(true);
+  await settle();
+  const bed = FakeHowl.instances[0];
+  const ctx = FakeContext.instances[0];
+  if (!bed || !ctx) {
+    throw new Error('Expected music bed and audio context');
+  }
+  expect(bed.playing()).toBe(true);
+  ctx.changeState('interrupted');
+  await settle();
+  expect(bed.playing()).toBe(false);
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  expect(bed.playing()).toBe(false);
+
+  const playCount = bed.play.mock.calls.length;
+  ctx.changeState('running');
+  await settle();
+  expect(bed.playing()).toBe(false);
+  expect(bed.play.mock.calls.length).toBe(playCount);
+  expect(ctx.state).toBe('suspended');
+  expect(globalAudio.mute).toHaveBeenLastCalledWith(true);
+  hidden.mockReturnValue(false);
 });
 
 test('hiding the tab stops beds immediately and returning restarts the loop', async () => {

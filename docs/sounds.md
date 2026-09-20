@@ -164,7 +164,13 @@ Muting sound effects stops active cue sources; hiding the tab or turning both
 Sound Effects and Music off suspends audio work. Delayed loads or resumes
 cannot undo a mute.
 Tab visibility and mobile interruptions are lifecycle events rather than work
-repeated by the simulation loop.
+repeated by the simulation loop. iOS WebKit can reject `AudioContext.resume()`
+with `InvalidStateError: Failed to start the audio device` after a background
+stall or reconnect. An interrupted context is not resumed from visibility
+alone; a user gesture retries, including a tap that arrived while a failed
+resume was still in flight. That rejection is a deferred device start, not an
+initialization failure. Looping beds start again once the shared context is
+running.
 
 These choices follow [MDN's short-sample guidance](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices)
 and [shared-context recommendation](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext).

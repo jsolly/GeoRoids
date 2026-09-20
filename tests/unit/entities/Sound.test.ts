@@ -79,6 +79,7 @@ class FakeContext extends EventTarget {
 let Sound: typeof import('../../../src/audio/Sound').Sound;
 let setSound: typeof import('../../../src/audio/Sound').setSound;
 let activateAudio: typeof import('../../../src/audio/audioRuntime').activateAudio;
+let logger: typeof import('../../../src/utils/Logger').logger;
 let loadLibrary = vi.fn();
 let globalAudio: { state: string; mute: ReturnType<typeof vi.fn> };
 let removeListeners: Array<() => void> = [];
@@ -96,6 +97,11 @@ function context() {
   }
   return ctx;
 }
+
+function audioDeviceError(): DOMException {
+  return new DOMException('Failed to start the audio device', 'InvalidStateError');
+}
+
 function howl() {
   const sound = FakeHowl.instances[0];
   if (!sound) {
@@ -121,6 +127,7 @@ beforeEach(async () => {
   vi.doMock('howler', () => loadLibrary());
   ({ Sound, setSound } = await import('../../../src/audio/Sound'));
   ({ activateAudio } = await import('../../../src/audio/audioRuntime'));
+  ({ logger } = await import('../../../src/utils/Logger'));
 });
 
 afterEach(() => {
@@ -239,6 +246,41 @@ test('late load completion after mute never replays old cues', async () => {
   await settle();
   expect(howl().play).not.toHaveBeenCalled();
   expect(context().state).toBe('suspended');
+});
+
+test('an interrupted tab does not resume until a gesture, and a failed lifecycle resume retries', async () => {
+  const sound = new Sound('sounds/laser.m4a', 2);
+  const errors = vi.spyOn(logger, 'error');
+  const warnings = vi.spyOn(logger, 'warn');
+  setSound(true);
+  await settle();
+  await sound.play();
+  context().changeState('interrupted');
+  const resumesAfterInterrupt = context().resume.mock.calls.length;
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt);
+  expect(sound.isPlaying()).toBe(false);
+
+  context().changeState('suspended');
+  let rejectResume: (error: DOMException) => void = () => {};
+  context().resume.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectResume = reject;
+      })
+  );
+  document.dispatchEvent(new Event('visibilitychange'));
+  document.dispatchEvent(new Event('pointerdown'));
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 1);
+  rejectResume(audioDeviceError());
+  await settle();
+  expect(context().resume).toHaveBeenCalledTimes(resumesAfterInterrupt + 2);
+  expect(context().state).toBe('running');
+  await sound.play();
+  expect(howl().play).toHaveBeenCalledTimes(2);
+  expect(errors.mock.calls.some((call) => call[1] === 'Audio initialization failed')).toBe(false);
+  expect(warnings.mock.calls.some((call) => call[1] === 'Audio device start deferred')).toBe(true);
 });
 
 test('a pending resume that finishes after mute is suspended again', async () => {

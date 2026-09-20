@@ -146,7 +146,10 @@ version.
 
 Switching away from the game releases held movement and fire controls. On
 return, the client requests current server state and resumes drawing without
-replaying the time the tab was hidden.
+replaying the time the tab was hidden. Leaving the app, locking the phone, or a
+reconnect can also interrupt this browser's audio session. Sound Effects and
+Music stop for that interruption and start again when audio is running,
+including on the next tap if the speaker is not ready yet.
 
 The game automatically tries to reconnect after a lost connection. During an
 interruption, the local view may lag behind the shared world; wait for the

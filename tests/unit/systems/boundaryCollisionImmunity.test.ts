@@ -67,6 +67,12 @@ describe('Boundary collision immunity', () => {
     expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
+  test('does not send boundary damage while a menu holds the ship', () => {
+    ship.movementLocked = true;
+    collisionManager.checkBoundaryCollisions([ship], 'local-player-123');
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
   test('does not send boundary damage while dead or exploding', () => {
     ship.health = 0;
     collisionManager.checkBoundaryCollisions([ship], 'local-player-123');

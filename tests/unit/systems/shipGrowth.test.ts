@@ -66,6 +66,10 @@ describe('ship growth math', () => {
     expect(canCollectLoot({ exploding: false, health: 100, respawnTimer: 10 })).toBe(false);
   });
 
+  test('a held overlay cannot collect loot', () => {
+    expect(canCollectLoot({ exploding: false, health: 100, overlayHold: true })).toBe(false);
+  });
+
   test('loot overlap uses the kit hull radius', () => {
     const origin = { x: 0, y: 0 };
     const surveyorRadius = hullRadiusForKit('surveyor');

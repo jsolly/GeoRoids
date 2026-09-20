@@ -5,10 +5,12 @@ import type {
   PingMessage,
   Position,
   ShipKitId,
+  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
+import { isSurveyorUtilityId } from '../../src/entities/ship/surveyorUtility';
 
 type WireRecord = Record<string, unknown>;
 
@@ -22,6 +24,7 @@ interface PlayerMovementUpdate {
   boosting?: boolean;
   boostDepleted?: boolean;
   angularVelocity?: number;
+  overlayHold?: boolean;
 }
 
 export type ClientCommand =
@@ -50,6 +53,11 @@ export type ClientCommand =
       type: 'setHaulerUtility';
       id: string;
       utilityId: HaulerUtilityId;
+    }
+  | {
+      type: 'setSurveyorUtility';
+      id: string;
+      utilityId: SurveyorUtilityId;
     }
   | {
       type: 'update';
@@ -147,6 +155,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawThrusting = fields['thrusting'];
   const rawBoosting = fields['boosting'];
   const rawBoostDepleted = fields['boostDepleted'];
+  const rawOverlayHold = fields['overlayHold'];
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
@@ -163,7 +172,8 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     (rawAngularVelocity !== undefined && angularVelocity === undefined) ||
     (rawThrusting !== undefined && thrusting === undefined) ||
     (rawBoosting !== undefined && boosting === undefined) ||
-    (rawBoostDepleted !== undefined && boostDepleted === undefined)
+    (rawBoostDepleted !== undefined && boostDepleted === undefined) ||
+    (rawOverlayHold !== undefined && typeof rawOverlayHold !== 'boolean')
   ) {
     return invalid('update', !id ? 'Missing player ID' : 'Invalid player movement update');
   }
@@ -176,6 +186,7 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(boosting !== undefined ? { boosting } : {}),
     ...(boostDepleted !== undefined ? { boostDepleted } : {}),
     ...(angularVelocity !== undefined ? { angularVelocity } : {}),
+    ...(typeof rawOverlayHold === 'boolean' ? { overlayHold: rawOverlayHold } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);
   const motionSequence = readSafeInteger(fields['motionSequence']);
@@ -305,6 +316,15 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return isHaulerUtilityId(utilityId)
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Hauler utility');
+    }
+    case 'setSurveyorUtility': {
+      if (!id) {
+        return invalid(type, 'Missing player ID for setSurveyorUtility');
+      }
+      const utilityId = fields['utilityId'];
+      return isSurveyorUtilityId(utilityId)
+        ? { ok: true, command: { type, id, utilityId } }
+        : invalid(type, 'Invalid Surveyor utility');
     }
     case 'shoot': {
       if (!id) {

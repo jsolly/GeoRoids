@@ -14,6 +14,7 @@ import type {
   Position,
   ShipBoostState,
   ShipKitId,
+  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { PALETTE, SHIP } from '../../src/constants';
@@ -50,6 +51,8 @@ export interface GameEntity {
   lastUpdate: number;
   respawnTimer?: number;
   spawnProtectionTimer?: number;
+  /** Client map/schematic hold: freeze, skip collisions, then blink on release. */
+  overlayHold?: boolean;
   ws?: WebSocket;
   explodeTime?: number;
   kitId: ShipKitId;
@@ -59,6 +62,7 @@ export interface GameEntity {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
+  surveyorUtility?: SurveyorUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Environmental cause of the current death (cleared on respawn). */
@@ -105,7 +109,12 @@ export class EntityManager {
   public applyRadialImpulse(origin: Position, radius: number, impulse: number): number {
     let affected = 0;
     for (const entity of this.entities.values()) {
-      if (entity.exploding || entity.health <= 0 || entity.respawnTimer !== undefined) {
+      if (
+        entity.exploding ||
+        entity.health <= 0 ||
+        entity.respawnTimer !== undefined ||
+        entity.overlayHold === true
+      ) {
         continue;
       }
       const next = applyShockwaveToBody(
@@ -226,6 +235,10 @@ export class EntityManager {
   public damageEntity(entityId: string, damage: number): GameEntity | null {
     const entity = this.entities.get(entityId);
     if (!entity || entity.exploding || entity.health <= 0) {
+      return null;
+    }
+
+    if (entity.overlayHold === true) {
       return null;
     }
 
@@ -379,6 +392,7 @@ export class EntityManager {
     delete entity.deathCause;
 
     this.placeEntityInArena(entity);
+    delete entity.overlayHold;
     entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
   }
 

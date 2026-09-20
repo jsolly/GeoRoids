@@ -89,12 +89,8 @@ if (typeof window !== 'undefined') {
               <div class="debug-hud-row"><dt>WORLD</dt><dd id="debug-hud-world">—</dd></div>
               <div class="debug-hud-row"><dt>REL</dt><dd id="debug-hud-rel">—</dd></div>
             </dl>
+            <button id="copy-debug-diagnostics" type="button" class="debug-copy debug-diagnostics-copy" data-copy-name="diagnostics" data-copy-label="Copy diagnostics" aria-label="Copy diagnostics">Copy diagnostics</button>
           </fieldset>
-          <div id="debug-play-chip" class="debug-play-chip" hidden>
-            <span class="debug-play-chip-label">playerId</span>
-            <code id="debug-play-chip-id"></code>
-            <button id="copy-debug-play-chip" type="button" class="debug-copy" disabled>Copy</button>
-          </div>
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="touch-controls" class="touch-controls" hidden aria-hidden="true">

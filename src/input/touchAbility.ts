@@ -1,8 +1,18 @@
-import type { HaulerUtilityId, ShipKitId } from '../../shared-types';
+import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
+import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
+import { surveyorUtilityOf } from '../entities/ship/surveyorUtility';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
+const SURVEYOR_ABILITY_LABEL: Record<SurveyorUtilityId, string> = {
+  mineral_scan: 'SCAN',
+  survey_probe: 'PROBE',
+};
+const SURVEYOR_ABILITY_NAME: Record<SurveyorUtilityId, string> = {
+  mineral_scan: 'Mineral scan',
+  survey_probe: 'Survey probe',
+};
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',
   boost_coupling: 'ARM',
@@ -17,6 +27,7 @@ type AbilityChromeHost = {
   abilityActiveFrames: number;
   harpoonTargetId?: string | null;
   haulerUtility?: HaulerUtilityId | null;
+  surveyorUtility?: SurveyorUtilityId | null;
 };
 
 type AbilityChromeState = {
@@ -30,12 +41,21 @@ type AbilityChromeState = {
 };
 
 /** Short phosphor label for the on-screen kit button. */
-export function touchAbilityLabel(kitId: unknown): string {
-  return ABILITY_LABEL[getShipKit(kitId).abilityId];
+export function touchAbilityLabel(kitId: unknown, utilityId?: unknown): string {
+  const kit = getShipKit(kitId);
+  if (kit.id === 'surveyor') {
+    const utility = surveyorUtilityOf({ kitId: kit.id, surveyorUtility: utilityId });
+    return SURVEYOR_ABILITY_LABEL[utility];
+  }
+  return ABILITY_LABEL[kit.abilityId];
 }
 
-export function touchAbilityName(kitId: unknown): string {
+export function touchAbilityName(kitId: unknown, utilityId?: unknown): string {
   const kit = getShipKit(kitId);
+  if (kit.id === 'surveyor') {
+    const utility = surveyorUtilityOf({ kitId: kit.id, surveyorUtility: utilityId });
+    return SURVEYOR_ABILITY_NAME[utility];
+  }
   return kit.abilityName;
 }
 
@@ -65,18 +85,28 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'IGNITE'
         : 'RELEASE'
-      : readyLabel,
+      : kit.id === 'surveyor'
+        ? touchAbilityLabel(kit.id, host.surveyorUtility)
+        : readyLabel,
     name: towing
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'Ignite asteroid boost'
         : 'Release asteroid'
       : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
         ? 'Arm asteroid boost'
-        : touchAbilityName(kit.id),
+        : kit.id === 'surveyor'
+          ? touchAbilityName(kit.id, host.surveyorUtility)
+          : touchAbilityName(kit.id),
     ready: alive && (towing || !cooling),
     active,
     cooling,
     unavailable,
-    cooldownRatio: towing ? 0 : abilityCooldownRatio(kit.id, host.abilityCooldownFrames),
+    cooldownRatio: towing
+      ? 0
+      : abilityCooldownRatio(
+          kit.id,
+          host.abilityCooldownFrames,
+          kit.id === 'surveyor' ? abilityCooldownFramesFor(host) : undefined
+        ),
   };
 }

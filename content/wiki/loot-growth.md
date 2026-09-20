@@ -32,6 +32,7 @@ ship once it comes within magnet range. Tap canisters use a stronger pull when
 a Hauler is nearby. The pull adds to whatever motion the
 drop already has, including motion from its existing velocity. Collecting still
 happens when the drop overlaps the kit hull, not an inflated ship hitbox.
+A map or schematic hold does not collect loot until you return to flight.
 Mass follows a shared growth curve:
 greater mass raises health capacity while reducing thrust and speed;
 the growth model soft-caps mass and enforces minimum thrust

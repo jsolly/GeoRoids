@@ -27,6 +27,13 @@ describe('shared combat helpers', () => {
         spawnProtectionTimer: 0,
       })
     ).toBe(false);
+    expect(
+      isCombatantImmune({
+        exploding: false,
+        health: 100,
+        overlayHold: true,
+      })
+    ).toBe(true);
   });
   test('finds the first asteroid overlap for each ship', () => {
     const ships = [

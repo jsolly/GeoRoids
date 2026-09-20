@@ -191,3 +191,36 @@ test('satellite equipment commands require a player and a bounded pickup identit
     false
   );
 });
+
+test('pose updates may latch overlay hold without extra pose keys', () => {
+  expect(
+    decodeClientCommand({
+      type: 'update',
+      id: 'pilot',
+      data: {
+        position: { x: 1, y: 2 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: false,
+        overlayHold: true,
+        motionEpoch: 0,
+        motionSequence: 1,
+      },
+    })
+  ).toEqual({
+    ok: true,
+    command: {
+      type: 'update',
+      id: 'pilot',
+      update: {
+        position: { x: 1, y: 2 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: false,
+        overlayHold: true,
+      },
+      motionEpoch: 0,
+      motionSequence: 1,
+    },
+  });
+});

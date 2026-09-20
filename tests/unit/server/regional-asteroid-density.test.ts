@@ -76,6 +76,7 @@ test('a fresh sector creates 72 deterministic slots with mostly drifting rocks a
   expect(Math.max(...speeds)).toBeLessThanOrEqual(ROID.DRIFT_SPEED_MAX + 1e-9);
   expect(speeds.some((speed) => speed < ROID.DRIFT_SPEED_MAX / 3)).toBe(true);
   expect(speeds.some((speed) => speed > ROID.DRIFT_SPEED_MAX * 0.8)).toBe(true);
+  expect(rocks.some((rock) => rock.size >= ROID.COLOSSAL_MIN_SIZE)).toBe(false);
   expect(rocks.filter((rock) => rock.phenomenon?.kind === 'reflective')).toHaveLength(6);
   expect(new Set(rocks.map((rock) => rock.id)).size).toBe(rocks.length);
 });

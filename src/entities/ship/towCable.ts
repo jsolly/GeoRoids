@@ -21,7 +21,11 @@ export function attachTowCable(host: AbilityHost, rock: AbilityBody): void {
 }
 
 /** A damped cable only pulls when stretched. It never reels or throws cargo. */
-export function tickTowCable(host: AbilityHost, rock: AbilityBody | undefined): void {
+export function tickTowCable(
+  host: AbilityHost,
+  rock: AbilityBody | undefined,
+  canHaul = true
+): void {
   const cable = cables.get(host);
   if (!cable) {
     return;
@@ -36,6 +40,9 @@ export function tickTowCable(host: AbilityHost, rock: AbilityBody | undefined): 
     rock.health === 0
   ) {
     cables.delete(host);
+    return;
+  }
+  if (!canHaul) {
     return;
   }
   // Mild cargo drag damps swing while the Hauler supplies towing force.

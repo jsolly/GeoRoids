@@ -49,9 +49,9 @@ export const UNIVERSE_MAP_ZOOM = {
 
 export const UNIVERSE_MAP_LOCATE_LABEL = 'Center on you';
 export const DESKTOP_MAP_HELP =
-  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · You can still take damage.';
+  'Drag to pan · Locate or Home for your ship · Scroll or +/- to zoom · M or Esc closes · Ship stopped · Rocks pass through until you return and blink.';
 export const TOUCH_MAP_HELP =
-  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · You can still take damage.';
+  'Drag to pan · Locate for your ship · Tap +/− to zoom · Close returns to flight · Ship stopped · Rocks pass through until you return and blink.';
 
 const MAP_RASTER_SIZE = 960;
 const CELLS_PER_SECTOR = 16;

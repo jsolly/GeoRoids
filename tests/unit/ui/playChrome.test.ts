@@ -32,6 +32,8 @@ test('play client ships first-party GeoRoids CSS with no Bootstrap package or CD
   expect(productionHtml).toContain('class="nickname-input"');
   expect(productionHtml).toContain('class="sound-toggle"');
   expect(productionHtml).toContain('id="hapticsPref"');
+  expect(productionHtml).toContain('class="preference-toggles"');
+  expect(productionCss).toMatch(/\.preference-toggles \{[^}]*grid-template-columns: 1fr 1fr;/su);
   expect(productionCss).toContain('.haptics-hint');
 });
 

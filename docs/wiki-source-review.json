@@ -1,12 +1,12 @@
 {
-  "note": "Title-screen Haptics checkbox beside Sound. Reviewed hud-network settings against src/fx/haptics.ts, mainMenu.ts, user-preferences, Ship/ConnectionManager local-only gates, and the new haptics unit tests. Vibration API only; iPhone remains unsupported. No demonstration GIFs affected.",
+  "note": "Title-screen Sound and Haptics sit in a two-column grid so both stay on-screen on a 390px phone. Reviewed hud-network settings copy (Haptics next to Sound, Vibration API / iPhone limit), index.html preference-toggles, index.css grid and mobile padding, and playChrome chrome contract. No GIFs affected.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e5d08f4d73a63fc34dc9d994142b23dc0ad94492c6e531a5f63d213ae3baea36",
     "docs/protocol/snapshot-v1.md": "sha256:e8afafae512258bb151c5a619c617eebf9c1f70a874bab60e3642172cc625841",
     "docs/sounds.md": "sha256:69aaeeba824e827a7a651de3aa140630761cea9b1fc5a6e70bd6b05ba116e5d7",
-    "index.css": "sha256:01f8556f73b6842871b4808353deedbb8ea6e9d88e89b048615a554080e7893b",
-    "index.html": "sha256:0283b98315b89c591eb5d42340bba3216cd35757026ecc3378bc324017fe1025",
+    "index.css": "sha256:28ccd5ee3901721921355a8cd220fbb79a54c77e5ce6e3fb7583fa0bba86915b",
+    "index.html": "sha256:fece15eb21c202ff5f344511f8db54dca3f3a9c908d13b3d70889f5ec1fc9515",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:897999f25f378daff966c32975be438b4ffde56f48f5a7d3fa375df5dad90bf1",
     "public/sounds/asteroid-explode.m4a": "sha256:4ab4a2505abbade962fb202a17a1c45b6446a3c1ba1ac8d5286e71d72019df7f",

@@ -754,6 +754,14 @@
     margin-bottom: 1.5em;
   }
 
+  .preference-toggles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45em;
+    justify-content: center;
+    width: min(100%, 26rem);
+  }
+
   #start-screen .terrain-eyebrow {
     margin-bottom: 0.45rem;
   }
@@ -826,6 +834,12 @@
   .sound-toggle-row:has(.sound-toggle:disabled):hover {
     transform: none;
     box-shadow: none;
+  }
+
+  .preference-toggles .sound-toggle-row {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
   }
 
   .haptics-hint {
@@ -1155,6 +1169,14 @@
     .sound-toggle-row {
       min-width: 180px;
       padding: 0.3em 0.6em;
+    }
+
+    .preference-toggles .sound-toggle-row {
+      min-width: 0;
+    }
+
+    #start-screen {
+      padding: 1.1rem 0.85rem 1rem;
     }
   }
 

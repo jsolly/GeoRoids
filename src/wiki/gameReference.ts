@@ -8,7 +8,13 @@ import {
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { EXPLORATION_RANGE } from '../../shared/exploration';
 import { FURNACE_BUILD } from '../../shared/furnaceField';
-import { FURNACES, furnaceReward } from '../../shared/furnaces';
+import {
+  CIVIC_LOTS,
+  FURNACE_PIPE_SPEED,
+  furnaceReward,
+  TOWN_HEARTH,
+  TOWN_SPAWN_RADIUS,
+} from '../../shared/furnaces';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
@@ -16,6 +22,7 @@ import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
+import { SHIP_PAINTS, TOWN_STORE_RADIUS, TOWN_YIELD_PER_MODULE } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
@@ -43,7 +50,19 @@ function satelliteProfiles(): string[] {
   );
 }
 
-const starterFurnaces = FURNACES.slice(0, 3);
+function streetLots(ring: 1 | 2 | 3) {
+  return CIVIC_LOTS.filter((lot) => lot.ring === ring);
+}
+
+function streetCost(ring: 1 | 2 | 3): string {
+  return (streetLots(ring)[0]?.cost ?? 0).toLocaleString('en-US');
+}
+
+function paintPrices(): string {
+  return SHIP_PAINTS.map((paint) => `${paint.name} ${paint.cost.toLocaleString('en-US')}`).join(
+    ', '
+  );
+}
 
 export const gameReference: Record<string, { heading: string; paragraphs: string[] }[]> = {
   'field-manual': [
@@ -52,8 +71,8 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
-        `Starter furnaces: ${starterFurnaces.map((furnace) => furnace.name).join(', ')}; ${FURNACES.length - starterFurnaces.length} regional Works sites fill the ${WORLD.radius.toLocaleString('en-US')}-unit world from sector interiors on a ${(WORLD.sectorSize * 2).toLocaleString('en-US')}-unit grid.`,
-        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
+        `${TOWN_HEARTH.name} is the only pre-lit hearth. ${CIVIC_LOTS.length} street foundations start dark: ${streetLots(1).length} at score ${streetCost(1)}, ${streetLots(2).length} at score ${streetCost(2)}, and ${streetLots(3).length} at score ${streetCost(3)}.`,
+        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress stay until the expedition is reset.`,
       ],
     },
   ],
@@ -66,12 +85,18 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },
+    {
+      heading: 'Town store values',
+      paragraphs: [
+        `The Town Square store opens within ${TOWN_STORE_RADIUS} units of the origin. B or the Store button holds the ship the same way the map and schematic do. Each street a pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to that pilot's own furnace deliveries. Hull paints cost ${paintPrices()} score.`,
+      ],
+    },
   ],
   surveyor: [
     {
       heading: 'Furnace construction',
       paragraphs: [
-        `Build Furnace places a ${FURNACE_BUILD.RADIUS}-unit intake at the ship. Each pilot can keep ${FURNACE_BUILD.MAX_PER_OWNER} sites; placing another removes their oldest first. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units between furnace centers, more than ${SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS} units from a spider nest home, and at least ${FURNACE_BUILD.WORLD_INSET} units inside the world edge. A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius) rejects construction without removing the nest or spending cooldown. Successful construction uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Sites persist until the world resets.`,
+        `Build spends the Surveyor's own score to light the ${FURNACE_BUILD.RADIUS}-unit street foundation under the ship. The nearer lot on that road must already be burning, and that pilot's score must cover the lot (${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}). A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius ${SPIDER.HIT_RADIUS}) rejects the build without spending score or cooldown. The lit furnace keeps the builder's name. Each street that pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to their own later furnace deliveries. Other pilots keep the base reward. A nickname change does not move the bonus. Success spends that cost and uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Lit streets persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
       ],
     },
     {
@@ -97,7 +122,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids, cooperative large rocks, and colossal deposits. The ability has no ship-targeting mode.`,
         `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Ordinary towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable. A colossal deposit needs ${ROID.COLOSSAL_CREW} Tow Cables before it will haul, and ${ROID.COLOSSAL_CREW} Boost Couplings before ignition; ramming it or dragging it into another rock does not shatter it.`,
-        `Furnace intakes are ${starterFurnaces[0]?.radius ?? 0} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor.`,
+        `Furnace intakes are ${TOWN_HEARTH.radius} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor. A street delivery lights the pipe from that grate through each nearer lot to ${TOWN_HEARTH.name}, and the light runs along it at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
       ],
     },
   ],
@@ -175,7 +200,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Players start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest furnace with a 180-unit offset. Score survives respawn and leave until game over or the UTC calendar month ends. A brief disconnect of up to ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with that score; game over starts a new flight at score ${GAME.STARTING_SCORE}.`,
+        `Players start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest lit hearth with a ${TOWN_SPAWN_RADIUS}-unit offset. A fresh flight stands on that same ring around ${TOWN_HEARTH.name}. Score survives respawn and leave until game over. A brief disconnect of up to ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with that score; game over starts a new flight at score ${GAME.STARTING_SCORE}.`,
         `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },
@@ -190,7 +215,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Display and HUD values',
       paragraphs: [
-        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius; the full-screen universe map uses the shared exploration chart and keeps discovered furnaces and other important assets visible across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight. Touch chrome hides those keyboard badges. Ships on the local minimap and universe map use each pilot's hull silhouette.`,
+        `The shared simulation runs at ${GAME.FPS} frames per second. The local minimap uses a ${WORLD.minimapRadius}-unit radar radius. Lit hearths appear there after the crew reveals them; dark street foundations inside that radar stay marked. The full-screen universe map shows the whole street plan plus the shared exploration chart and other discovered assets across the ${WORLD.radius.toLocaleString('en-US')}-unit world. M or the on-screen Map button opens the overview; M, Escape, or Close returns to flight. Touch chrome hides those keyboard badges. Ships on the local minimap and universe map use each pilot's hull silhouette.`,
       ],
     },
     {
@@ -205,7 +230,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Shared field values',
       paragraphs: [
         `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited region with no asteroids left stays empty, and ships can still fly through it.`,
-        `${starterFurnaces.map((furnace) => `${furnace.name} (${furnace.radius}-unit intake)`).join(', ')} anchor the starter area; ${FURNACES.length - starterFurnaces.length} regional Works sites sit at sector centers on a ${(WORLD.sectorSize * 2).toLocaleString('en-US')}-unit grid. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
+        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} streets leave the square, then ${streetLots(2).length} and ${streetLots(3).length} farther lots. A Surveyor builds the next dark foundation with their own score once its nearer lot is burning and that score covers ${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Surveyor receives the size-scaled material reward, and each street that recipient built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to their own payout. Size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}. The Town Square store, within ${TOWN_STORE_RADIUS} units of the origin, sells hull paints for ${paintPrices()} score.`,
       ],
     },
   ],

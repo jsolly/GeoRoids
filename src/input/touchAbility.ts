@@ -13,7 +13,7 @@ const SURVEYOR_ABILITY_LABEL: Record<SurveyorUtilityId, string> = {
 const SURVEYOR_ABILITY_NAME: Record<SurveyorUtilityId, string> = {
   mineral_scan: 'Mineral scan',
   survey_probe: 'Survey probe',
-  build_furnace: 'Build furnace',
+  build_furnace: 'Build',
 };
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',

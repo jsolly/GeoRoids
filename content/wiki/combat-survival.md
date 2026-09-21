@@ -61,14 +61,13 @@ reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
 spawn protection. Closing the universe map or ship schematic grants that same
-blink window, because rocks can occupy the hull while it is held. Respawns use the nearest furnace to the death location, 180
-world units from its center at a random angle.
+blink window, because rocks can occupy the hull while it is held. Respawns use the nearest lit hearth to the death location, 180
+world units from its center at a random angle. Dark street foundations are not respawn sites.
 
 After game over, a fresh flight starts with 3 lives and score 0. A brief
 disconnect still returns you to the same ship; a long absence does not.
 The persistent universe, shared exploration chart, and delivered
-progress remain available until the UTC calendar month ends, when scores and
-the shared world both reset.
+progress stay until the expedition is reset.
 
 Health regenerates after a real-damage delay. Score survives a respawn.
 Wreckage is emitted from a destroyed ship. The visible death message includes
@@ -78,5 +77,6 @@ and the final-life state shows the game-over overlay.
 ## Score values
 
 Asteroid breaks, shard pickups, satellite pickups, and furnace deliveries each
-award their own score value. A furnace delivery gives the Hauler and every
-Surveyor recorded on the rock the same delivery points.
+award their own score value. A furnace delivery pays the Hauler and every
+Surveyor recorded on the rock. A pilot who built streets receives more on their
+own payout.

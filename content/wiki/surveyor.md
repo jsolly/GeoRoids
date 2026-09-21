@@ -42,7 +42,9 @@ return to a route or furnace that any Surveyor has charted.
 
 Scan does not push rocks or damage ships. A qualifying scan tags the asteroid
 with the Surveyor's ID. If a Hauler later delivers that rock to a furnace, the
-Hauler and every Surveyor recorded on the tag receive the same delivery points.
+Hauler and every Surveyor recorded on the tag receive that delivery. A pilot
+who has built streets receives a higher personal payout; everyone else receives
+the base reward.
 The mineral classification stays with the rock until it is delivered or
 removed, even after the active scan ends. The tag is also retained for the
 delivery reward.
@@ -79,33 +81,35 @@ a successful attachment beyond that limit replaces their oldest probe.
 Switching tools does not remove existing beacons. Probes are temporary equipment
 and do not survive a server restart.
 
-## Build furnace
+## Build
 
-Equip Build Furnace in the ship schematic, then press E or tap Build to place a
-furnace at your ship's position. Building costs no resource and shares Mineral
-Scan's cooldown. A failed placement uses neither a slot nor a cooldown; the HUD
-explains why it failed. Move clear of other furnaces, spider nests,
-and the world edge before trying again. A nest whose
-home would sit inside the new furnace's spider occupancy is an illegal site;
-that miss does not wipe the nest. Standing furnaces still scare spiders that
-enter that occupancy.
+Equip Build in the ship schematic, then stand inside a dark street foundation
+and press E or tap Build. The tool spends your own score to build that
+designated furnace, and the furnace takes your name. It does not place a hearth
+at an arbitrary position. The nearer lot on that road must already be burning,
+and your score must cover the lot. Each street you build raises your own later
+furnace deliveries. The same score buys hull paint at the Town Square store.
+The bonus stays with the pilot who paid, so a later nickname
+change leaves both the furnace name and the bonus where they were. Other pilots
+keep the base reward. Deliveries still pay the Hauler and each recorded Surveyor
+personally. A failed build spends neither score nor cooldown;
+the HUD explains why it failed. A nest whose home would sit inside the new
+furnace's spider occupancy is an illegal site; that miss does not wipe the nest.
+Standing furnaces still scare spiders that enter that occupancy.
 
-Each pilot can keep three furnaces at once. Fixed map furnaces do not count
-against that limit. Placing a fourth removes your oldest built furnace first,
-then raises the new hearth; a HUD notice explains when a prior site yields.
-The schematic shows how many you have built. Your furnaces survive death,
-changing ships, reconnecting with the same saved pilot credential, and server
-restarts. They reset with the world at the next monthly season. Clearing your
-browser's saved pilot credential creates a different pilot; it does not reclaim
-old furnaces.
+Town Square starts lit at the map center. The street plan radiates outward from
+it, and each farther ring costs more of the builder's score. Built streets keep
+the builder's name and survive death, changing ships, reconnecting, and server
+restarts. They stay until the expedition is reset.
 
-Everyone can use a built furnace. It accepts towed and boosted ore and consumes towed spiders, awards the
-usual delivery credit, guides nearby boosted cargo, provides the usual spider
-safe area, and can serve as a nearby respawn site. Discovered furnaces appear on
-the local radar and universe map. Building itself awards no delivery points.
-Furnaces cannot be moved or dismantled by hand. The only way one of yours
-comes down is when a later placement needs the slot. Mapping and mining
-around a furnace cannot close the delivery site.
+Everyone can use a built furnace. It accepts towed and boosted ore and consumes
+towed spiders, awards the usual delivery credit, guides nearby boosted cargo,
+provides the usual spider safe area, and can serve as a nearby respawn site.
+Dark foundations stay marked on the universe map and, when they are inside the
+local radar, on the minimap. A lit hearth appears on the local radar after the
+crew reveals its area. Building itself awards no delivery points. Furnaces
+cannot be moved or dismantled by hand. Mapping and mining around a furnace
+cannot close the delivery site.
 
 ## Satellite inventory
 

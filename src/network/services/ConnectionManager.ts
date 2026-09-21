@@ -1077,6 +1077,9 @@ export class ConnectionManager {
           GameStateManager.getInstance().setNotice(data);
         }
         break;
+      case 'townStoreResult':
+        window.dispatchEvent(new CustomEvent('townStoreResult', { detail: data }));
+        break;
       case 'furnaceDelivery':
         this.handleFurnaceDelivery(data as FurnaceDelivery);
         break;
@@ -1321,7 +1324,7 @@ export class ConnectionManager {
     setSpiderField(data.spiderField);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
-    worldFurnaces.replace(data.builtFurnaces ?? []);
+    worldFurnaces.replaceLit(data.civicModules ?? []);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
     }

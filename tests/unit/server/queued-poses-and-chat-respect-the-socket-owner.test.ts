@@ -7,6 +7,8 @@ import { GameEngine } from '../../../server/core/GameEngine';
 import { logger } from '../../../setup/serverLogger';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS } from '../../../shared/gameClock';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
+import { cruiseSpeed } from '../../../shared/shipFlight';
+import { getShipKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 let engine: GameEngine;
@@ -129,13 +131,16 @@ test('a pose credited a blocked server second lands where the pilot flew and is 
   }
   expect(engine.stepClock()).toBe(0);
   const speed = engine.playerMotion.legalSpeed(pilot, engine.getServerTime());
+  // Reported velocity stays at flat cruise. A town-ring departure can be on a
+  // descent, and the next pose is rejected if it keeps that bonus onto flatter ground.
+  const flat = cruiseSpeed(pilot.mass, getShipKit(pilot.kitId).maxVelocity);
   const start = { ...pilot.position };
   const cruise = (sequence: number, frames: number) => ({
     type: 'update',
     id: 'enhanced-pilot',
     data: {
       position: { x: start.x + speed * frames, y: start.y },
-      velocity: { x: speed, y: 0 },
+      velocity: { x: flat, y: 0 },
       angle: 0,
       thrusting: true,
       motionEpoch: 1,

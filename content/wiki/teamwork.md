@@ -55,7 +55,8 @@ cargo and drops the cable. A colossal deposit needs two Tow Cables before it
 will haul, and both Haulers who deliver it receive the points. Bring a towed
 rock to
 an arena furnace to deliver it. The Hauler and every scanning pilot recorded on the
-rock receive the same delivery points. A rock with no scan tag still pays
+rock receive that delivery. A pilot who built streets receives a higher personal
+payout; everyone else receives the base reward. A rock with no scan tag still pays
 the Hauler for the delivery.
 
 Boost Coupling aims a rock at its nearest furnace on the first E and launches
@@ -68,32 +69,37 @@ cannot take them over. A second Boost Coupling can join an armed colossal
 deposit. After ignition it passes through ships and objects, ignores
 weapons, and cannot be scanned or worked on again before furnace intake.
 
-Three starter furnace landmarks sit around the field: North Works, Southeast
-Works, and Southwest Works. Regional Works then continue on a 4,000-unit grid,
-each in the middle of its sector so a towed rock can swing in from any side
-instead of along a four-way corner. On the playfield each Works site is a dashed
-delivery ring around a burning grate, where a column of flame roars up the
-intake and throws embers past it. A furnace appears on the local minimap as an
-amber hairline three-tongue campfire after the crew discovers its area and remains visible
-there while it is nearby. When it
-moves beyond the local radar, use the universe map to find the exact landmark.
-Zoomed out, that mark is an amber flame pin at the same size as the other
-chart landmarks; the nearby view and closer restore the three-tongue campfire.
-A delivery consumes the towed or self-guided rock, so the crew can turn a scan and a haul into
-a shared material score.
+Town Square is the only furnace that starts burning. It sits at the map center.
+Dark street foundations radiate outward from it. On the playfield a lit hearth
+is a dashed delivery ring around a burning grate, where a column of flame roars
+up the intake and throws embers past it. A dark lot is a dashed ring labeled
+with the score it costs. A lit hearth appears on the local minimap as an
+amber hairline three-tongue campfire after the crew discovers its area and
+remains visible there while it is nearby. Dark lots inside that radar stay
+marked. When a hearth moves beyond the local radar, use the universe map to
+find it; the whole street plan is drawn there, lit or not. Zoomed out, a lit
+mark is an amber flame pin at the same size as the other chart landmarks; the
+nearby view and closer restore the three-tongue campfire. A delivery consumes
+the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
+Streets a pilot built raise only that pilot's payout. Town Square also holds a
+store: spend your own score there on a hull paint. The paint stays on your ship
+through death, reconnect, and restart.
+Faint pipes join each street lot
+to the nearer grate and end at Town Square. Dragging a rock or a spider into a
+street furnace lights that whole run, and a bright head travels from the source
+grate back to Town Square.
 
 ## Shared chart
 
 The local minimap follows the ship's nearby radar. The full-screen universe map
 opens with M or the Map button and shows the crew's shared overview of the
 world. Every pilot adds the area around its ship, and explored cells remain
-revealed for the crew after that ship moves away until the UTC calendar month
-ends and the shared world resets. Surveyor passive reveal
+revealed for the crew after that ship moves away. Surveyor passive reveal
 reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
 scan reaches 1,200 world units and also classifies minerals in that range on
-every teammate's radar. Uncharted asteroid, loot, and furnace positions stay
-hidden until a crew member reveals their area. Discovered furnace landmarks and
-other important assets stay marked on the universe map, and pilots stay
+every teammate's radar. Uncharted asteroid and loot positions stay
+hidden until a crew member reveals their area. The street plan stays marked on
+the universe map, and pilots stay
 readable on both maps. Both maps draw each pilot's hull silhouette.
 Close the overview with the Close control, or with M or Escape on a keyboard.
 
@@ -102,14 +108,15 @@ Close the overview with the Close control, or with M or Escape on a keyboard.
 The world stores ore in 2,000-unit regions. A region the crew has visited and
 emptied does not grow new deposits, and ships can still fly through it.
 Furnace yards stay usable the same way. Lasers bounce off the outer world
-boundary and then become ricochets that can damage ships. A new flight returns
-to a recent pose inside the world, gathers near a living crewmate, or appears
-in the region under the origin. The local radar and universe map keep explored
+boundary and then become ricochets that can damage ships. A new flight stands
+on the ring around Town Square. A brief return keeps the same ship, and death
+respawns beside the nearest lit hearth. The local radar and universe map keep explored
 cells visible, and the universe map still draws its alignment grid.
 
-Surveyors can equip [Build Furnace](/wiki/#surveyor) to place shared delivery
-sites. Each pilot can keep three built sites at once; placing another yields
-their oldest. They cannot place a hearth whose spider occupancy covers an
-existing nest. Every crew member can use the sites. Built furnaces survive
-reconnects and server restarts until the world resets. Active Mineral Scan also
-drives nearby spiders away from the crew.
+Surveyors can equip [Build](/wiki/#surveyor) to light the street foundation they
+are standing in. The nearer lot on that road must already be burning, and that
+Surveyor's own score must cover the cost. The furnace takes their name. They
+cannot build a hearth whose spider occupancy covers an existing nest. Every
+crew member can use the sites. Built furnaces survive reconnects and server
+restarts until the world resets. Active Mineral Scan also drives nearby spiders
+away from the crew.

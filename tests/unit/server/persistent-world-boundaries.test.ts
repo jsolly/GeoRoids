@@ -16,7 +16,7 @@ import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidFie
 import type { PersistentPilot } from '../../../server/world/WorldStore';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { logger } from '../../../setup/serverLogger';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -507,7 +507,7 @@ test('a restart refuses one asteroid identity stored in two sectors', () => {
   }
 });
 
-test('a restart refuses a saved pilot without a finite monthly score', () => {
+test('a restart refuses a saved pilot without a finite saved score', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-validation-'));
   const path = join(directory, 'world.sqlite');
   try {
@@ -531,7 +531,7 @@ test('a restart refuses a saved pilot without a finite monthly score', () => {
   }
 });
 
-test('a restart loads a legacy placement record as monthly score only', () => {
+test('a restart loads a legacy placement record as saved score only', () => {
   const directory = mkdtempSync(join(tmpdir(), 'georoids-pilot-legacy-'));
   const path = join(directory, 'world.sqlite');
   try {
@@ -562,7 +562,6 @@ test('a restart loads a legacy placement record as monthly score only', () => {
           seed: 1,
           startedAt: 1,
           generation: WORLD.generation,
-          scoreSeason: utcScoreSeason(1),
           exploration: [],
         },
         new Map(),

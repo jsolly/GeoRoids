@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { FURNACES } from '../../../../shared/furnaces';
+import { civicLot } from '../../../../shared/furnaces';
 import { WORLD } from '../../../../shared/world';
 import {
   assertNoBrowserDiagnostics,
@@ -14,9 +14,9 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirna
 const REVEALED_ASSETS_STATUS_PATTERN = /\d+ revealed assets/u;
 
 const FAR_FURNACE = (() => {
-  const furnace = FURNACES.find((candidate) => candidate.id === 'works-1-0');
+  const furnace = civicLot('street-2-0');
   if (!furnace) {
-    throw new Error('Universe map fixture requires the first regional Works furnace');
+    throw new Error('Universe map fixture requires an outer street foundation');
   }
   return furnace;
 })();

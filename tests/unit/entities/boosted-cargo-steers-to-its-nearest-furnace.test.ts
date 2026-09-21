@@ -9,8 +9,8 @@ function cargo(position: Position, phase: AsteroidBoost['phase'] = 'burning') {
 
 test.each([
   { x: 150, y: 0 },
-  { x: 4100, y: 3500 },
-  { x: -4200, y: -4500 },
+  { x: 600, y: 500 },
+  { x: -700, y: -400 },
 ])(
   'powered cargo at $x, $y cancels sideways momentum and reaches its nearest intake',
   (position) => {

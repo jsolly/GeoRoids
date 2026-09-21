@@ -3,15 +3,16 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
-import { validBuiltFurnaces } from '../../shared/furnaceField';
+import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
 import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { purchasedHullColor } from '../../shared/townStore';
+import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
-  BuiltFurnace,
+  CivicModule,
   ExplorationTile,
   Position,
   ShipBoostState,
@@ -23,6 +24,22 @@ import type { LoadedWorld } from './worldPersistence';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
+function readCivicModules(value: object): CivicModule[] {
+  if ('civicModules' in value) {
+    if (!validCivicModules(value.civicModules)) {
+      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
+    }
+    return value.civicModules;
+  }
+  if ('litCivicLotIds' in value) {
+    if (!validLitCivicLotIds(value.litCivicLotIds)) {
+      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
+    }
+    return value.litCivicLotIds.map((id) => ({ id, builderName: '' }));
+  }
+  return [];
+}
+
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
 }
@@ -31,13 +48,15 @@ function validWorldPosition(position: Position): boolean {
   return finiteMotionVector(position) && Math.hypot(position.x, position.y) <= WORLD.radius;
 }
 
-/** Browser credential plus this UTC month's score and optional recent flight. */
+/** Browser credential plus the saved score and optional recent flight. */
 export interface PersistentPilot {
   silk?: number;
   id: string;
   tokenHash: string;
   name: string;
   score: number;
+  /** Catalog hull color bought at Town Square. */
+  hullColor?: string;
   lastSeenAt?: number;
   kitId?: ShipKitId;
   position?: Position;
@@ -75,14 +94,14 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
-  builtFurnaces?: BuiltFurnace[];
+  /** Street furnaces a Surveyor paid for. Absent on older rows. */
+  civicModules?: CivicModule[];
   seed: number;
   startedAt: number;
   generation: number;
   /** Density schema for additive asteroid slots; absent in pre-migration worlds. */
   asteroidDensityVersion?: number;
   asteroidMotionVersion?: number;
-  scoreSeason?: string;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
 }
@@ -184,6 +203,10 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
     return undefined;
   }
+  const hullColor = pilot['hullColor'];
+  if (hullColor !== undefined && typeof hullColor !== 'string') {
+    return undefined;
+  }
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
@@ -200,6 +223,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     name,
     score,
     ...(typeof silk === 'number' ? { silk } : {}),
+    ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
     ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),
@@ -417,15 +441,9 @@ export class WorldStore {
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
-    if ('builtFurnaces' in value && !validBuiltFurnaces(value.builtFurnaces)) {
-      throw new Error('Saved furnaces are invalid; refusing to replace player structures');
-    }
     return {
       seed: value.seed,
-      builtFurnaces:
-        'builtFurnaces' in value && validBuiltFurnaces(value.builtFurnaces)
-          ? value.builtFurnaces
-          : [],
+      civicModules: readCivicModules(value),
       startedAt: value.startedAt,
       generation:
         'generation' in value &&
@@ -444,9 +462,6 @@ export class WorldStore {
       Number.isSafeInteger(value.asteroidMotionVersion) &&
       value.asteroidMotionVersion >= 0
         ? { asteroidMotionVersion: value.asteroidMotionVersion }
-        : {}),
-      ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
-        ? { scoreSeason: value.scoreSeason }
         : {}),
       ...releaseField(
         'writtenReleaseId',

@@ -39,7 +39,7 @@ export function setWorldExploration(value: ExplorationTile[]): void {
 }
 
 export function resetWorldExploration(): void {
-  worldFurnaces.replace([]);
+  worldFurnaces.replaceLit([]);
   mapAssets = [];
   exploration = EMPTY_EXPLORATION;
 }

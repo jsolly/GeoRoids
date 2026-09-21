@@ -282,19 +282,17 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
-export interface BuiltFurnace {
+/** A street furnace a Surveyor lit with their own score. */
+export interface CivicModule {
   id: string;
-  ownerId: string;
-  name: string;
-  position: Position;
-  radius: number;
-  /** Server clock when this site was placed. Older worlds may omit it. */
-  placedAt?: number;
+  builderName: string;
+  /** Public pilot id of the Surveyor who paid. Absent on older unnamed streets. */
+  builderId?: string;
 }
 
 export interface ServerGameState {
-  /** Persistent player-built delivery sites. Fixed landmarks are shared definitions. */
-  builtFurnaces?: BuiltFurnace[];
+  /** Street furnaces the crew has lit, named for the Surveyor who paid. */
+  civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
@@ -313,7 +311,7 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  kind: 'furnace' | 'laserCore' | 'wreckage' | 'satellite';
+  kind: 'furnace' | 'foundation' | 'laserCore' | 'wreckage' | 'satellite';
   position: Position;
   name: string;
 }

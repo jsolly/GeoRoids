@@ -1,178 +1,123 @@
-import type { BuiltFurnace, Position } from '../shared-types';
-import { FURNACES, nearestFurnace } from './furnaces';
-import { WORLD } from './world';
+import type { CivicModule, Position } from '../shared-types';
+import { civicLot, civicModuleName, FURNACES, nearestFurnace, TOWN_HEARTH } from './furnaces';
 
 export const FURNACE_BUILD = {
-  MAX_PER_OWNER: 3,
-  RADIUS: 85,
-  MIN_DISTANCE: 400,
-  /** Leaves room for the 180-unit respawn ring and either ship hull. */
-  WORLD_INSET: 500,
-  NOTICE: {
-    BUILT: 'Furnace built',
-    YIELDED: 'Your oldest furnace made way for this new hearth.',
-  },
+  RADIUS: TOWN_HEARTH.radius,
   ISSUE: {
     NEST: 'Too close to a spider nest',
+    STAND: 'Stand inside a street foundation',
+    LIT: 'This street is already burning',
+    READY: 'Furnace builder not ready',
   },
 } as const;
 
-function furnaceSerial(site: BuiltFurnace): number {
-  const suffix = site.id.slice(site.id.lastIndexOf(':') + 1);
-  const serial = Number(suffix);
-  return Number.isSafeInteger(serial) && serial > 0 ? serial : Number.POSITIVE_INFINITY;
-}
-
-/** Oldest first: explicit placement time, then the id serial used before placedAt existed. */
-export function furnacePlacementOrder(site: BuiltFurnace): number {
-  return typeof site.placedAt === 'number' && Number.isFinite(site.placedAt)
-    ? site.placedAt
-    : furnaceSerial(site);
-}
-
-function byOldestPlacement(left: BuiltFurnace, right: BuiltFurnace): number {
-  return (
-    furnacePlacementOrder(left) - furnacePlacementOrder(right) ||
-    furnaceSerial(left) - furnaceSerial(right) ||
-    left.id.localeCompare(right.id)
-  );
-}
-
 const CELL_SIZE = 1_000;
-type Furnace = (typeof FURNACES)[number];
 
-/** Saved structures are validated once at the storage or snapshot boundary. */
-export function validBuiltFurnaces(value: unknown): value is BuiltFurnace[] {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-  const ids = new Set<string>();
-  const counts = new Map<string, number>();
-  return value.every((site: unknown) => {
-    if (
-      !site ||
-      typeof site !== 'object' ||
-      !('id' in site) ||
-      typeof site.id !== 'string' ||
-      !site.id.startsWith('built:') ||
-      ids.has(site.id) ||
-      !('ownerId' in site) ||
-      typeof site.ownerId !== 'string' ||
-      site.ownerId.length === 0 ||
-      !('name' in site) ||
-      typeof site.name !== 'string' ||
-      site.name.length === 0 ||
-      !('radius' in site) ||
-      site.radius !== FURNACE_BUILD.RADIUS ||
-      !('position' in site) ||
-      !site.position ||
-      typeof site.position !== 'object' ||
-      !('x' in site.position) ||
-      typeof site.position.x !== 'number' ||
-      !('y' in site.position) ||
-      typeof site.position.y !== 'number' ||
-      !Number.isFinite(site.position.x) ||
-      !Number.isFinite(site.position.y) ||
-      Math.hypot(site.position.x, site.position.y) > WORLD.radius - FURNACE_BUILD.WORLD_INSET ||
-      ('placedAt' in site && (typeof site.placedAt !== 'number' || !Number.isFinite(site.placedAt)))
-    ) {
-      return false;
-    }
-    ids.add(site.id);
-    const count = (counts.get(site.ownerId) ?? 0) + 1;
-    counts.set(site.ownerId, count);
-    return count <= FURNACE_BUILD.MAX_PER_OWNER;
-  });
+interface Hearth {
+  id: string;
+  name: string;
+  position: Position;
+  radius: number;
 }
 
-/** Per-world structures, indexed so simulation queries never walk every player's buildings. */
+/** Lit hearths only. Dark street lots stay out of intake, guidance, and spider safety. */
 export class FurnaceField {
-  private built: BuiltFurnace[] = [];
-  private readonly cells = new Map<string, Furnace[]>();
-  private readonly counts = new Map<string, number>();
+  private modules: CivicModule[] = [];
+  private readonly lit = new Set<string>();
+  private readonly labels = new Map<string, string>();
+  private readonly cells = new Map<string, Hearth[]>();
 
   constructor() {
-    this.replace([]);
+    this.reindex();
   }
 
-  snapshot(): BuiltFurnace[] {
-    return this.built;
+  litModules(): readonly CivicModule[] {
+    return this.modules;
   }
 
-  count(ownerId: string): number {
-    return this.counts.get(ownerId) ?? 0;
+  /** Name shown for a lit module, or the plan name while the lot is still dark. */
+  displayName(id: string): string {
+    return (
+      this.labels.get(id) ?? civicLot(id)?.name ?? (id === TOWN_HEARTH.id ? TOWN_HEARTH.name : '')
+    );
   }
 
-  replace(sites: readonly BuiltFurnace[]): void {
+  isLit(id: string): boolean {
+    return id === TOWN_HEARTH.id || this.lit.has(id);
+  }
+
+  modulesBuiltBy(playerId: string) {
+    let built = 0;
+    for (const module of this.modules) {
+      if (module.builderId === playerId) {
+        built += 1;
+      }
+    }
+    return built;
+  }
+
+  replaceLit(modules: readonly CivicModule[]): void {
     if (
-      this.cells.size > 0 &&
-      sites.length === this.built.length &&
-      sites.every((site, index) => {
-        const previous = this.built[index];
-        return (
-          previous?.id === site.id &&
-          previous.ownerId === site.ownerId &&
-          previous.name === site.name &&
-          previous.radius === site.radius &&
-          previous.position.x === site.position.x &&
-          previous.position.y === site.position.y &&
-          previous.placedAt === site.placedAt
-        );
-      })
+      modules.length === this.modules.length &&
+      modules.every(
+        (module, index) =>
+          module.id === this.modules[index]?.id &&
+          module.builderName === this.modules[index]?.builderName &&
+          module.builderId === this.modules[index]?.builderId
+      )
     ) {
       return;
     }
-    this.built = [...sites];
+    this.modules = modules.map((module) => ({
+      id: module.id,
+      builderName: module.builderName,
+      ...(module.builderId ? { builderId: module.builderId } : {}),
+    }));
+    this.lit.clear();
+    for (const module of this.modules) {
+      this.lit.add(module.id);
+    }
+    this.reindex();
+  }
+
+  light(id: string, builderName = '', builderId = ''): void {
+    if (this.lit.has(id) || !civicLot(id)) {
+      return;
+    }
+    this.modules = [
+      ...this.modules,
+      builderId ? { id, builderName, builderId } : { id, builderName },
+    ];
+    this.lit.add(id);
+    this.reindex();
+  }
+
+  private reindex(): void {
     this.cells.clear();
-    this.counts.clear();
+    this.labels.clear();
     for (const site of FURNACES) {
       this.index(site);
     }
-    for (const site of sites) {
-      this.counts.set(site.ownerId, this.count(site.ownerId) + 1);
-      this.index(site);
-    }
-  }
-
-  add(site: BuiltFurnace): void {
-    this.built = [...this.built, site];
-    this.counts.set(site.ownerId, this.count(site.ownerId) + 1);
-    this.index(site);
-  }
-
-  owned(ownerId: string): BuiltFurnace[] {
-    return this.built.filter((site) => site.ownerId === ownerId);
-  }
-
-  nextOwnedSerial(ownerId: string): number {
-    let next = 1;
-    for (const site of this.owned(ownerId)) {
-      const serial = furnaceSerial(site);
-      if (serial !== Number.POSITIVE_INFINITY && serial >= next) {
-        next = serial + 1;
+    for (const module of this.modules) {
+      const lot = civicLot(module.id);
+      if (!lot) {
+        continue;
       }
+      const name = civicModuleName(module.builderName, lot.name);
+      this.labels.set(lot.id, name);
+      this.index({ id: lot.id, name, position: lot.position, radius: lot.radius });
     }
-    return next;
   }
 
-  evictOldestOwned(ownerId: string): BuiltFurnace | undefined {
-    const oldest = this.owned(ownerId).slice().sort(byOldestPlacement)[0];
-    if (!oldest) {
-      return undefined;
-    }
-    this.replace(this.built.filter((site) => site.id !== oldest.id));
-    return oldest;
-  }
-
-  private index(site: Furnace): void {
+  private index(site: Hearth): void {
     const key = `${Math.floor(site.position.x / CELL_SIZE)},${Math.floor(site.position.y / CELL_SIZE)}`;
     const cell = this.cells.get(key) ?? [];
     cell.push(site);
     this.cells.set(key, cell);
   }
 
-  nearby(position: Position, radius: number): Furnace[] {
-    const found: Furnace[] = [];
+  nearby(position: Position, radius: number): Hearth[] {
+    const found: Hearth[] = [];
     for (
       let x = Math.floor((position.x - radius) / CELL_SIZE);
       x <= Math.floor((position.x + radius) / CELL_SIZE);
@@ -193,9 +138,8 @@ export class FurnaceField {
     return found;
   }
 
-  nearest(position: Position): Furnace {
-    // Fixed landmarks bound the search even when no player has built nearby.
-    let nearest = nearestFurnace(position);
+  nearest(position: Position): Hearth {
+    let nearest: Hearth = nearestFurnace(position);
     let distance = Math.hypot(position.x - nearest.position.x, position.y - nearest.position.y);
     for (const site of this.nearby(position, distance)) {
       const candidate = Math.hypot(position.x - site.position.x, position.y - site.position.y);

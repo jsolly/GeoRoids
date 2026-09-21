@@ -24,14 +24,6 @@ export const GAME = {
 } as const;
 
 // ============================================================================
-// SPAWN CONFIGURATION
-// ============================================================================
-export const SPAWN = {
-  // Radius (px) around a living ally or open-sector center for new pilots.
-  NEAR_CENTER_RADIUS: WORLD.spawnClusterRadius,
-} as const;
-
-// ============================================================================
 // CANVAS CONFIGURATION
 // ============================================================================
 export const CANVAS = {

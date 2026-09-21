@@ -159,7 +159,7 @@ describe('Colossal asteroids need a crew', () => {
     expect(rock.boost?.couplings).toEqual([alice.id, bob.id]);
     expect(world.entity(alice).harpoonTargetId).toBeNull();
     expect(world.entity(bob).harpoonTargetId).toBeNull();
-    rock.position = { x: 0, y: -660 };
+    rock.position = { x: 0, y: 0 };
     world.engine.processFurnaceDeliveries();
     const deliveries = world.engine.drainFurnaceDeliveries();
     expect(deliveries).toHaveLength(1);

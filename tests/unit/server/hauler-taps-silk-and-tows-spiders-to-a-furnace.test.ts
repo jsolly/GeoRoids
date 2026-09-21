@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { FURNACES } from '../../../shared/furnaces';
+import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { HaulerUtilityId } from '../../../shared-types';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
@@ -88,19 +88,19 @@ describe('Hauler tools interact with living spiders', () => {
   test.each(['landmark', 'built'])(
     'tow pulls a spider into a %s furnace, consumes it once, and releases its cable',
     (kind) => {
+      const street = civicLot('street-1-0');
+      if (!street) {
+        throw new Error('Missing street lot');
+      }
       if (kind === 'built') {
-        const scout = world.join('Builder', { x: 3000, y: 5000 }, { kitId: 'surveyor' });
-        world.entity(scout).position = { x: 3000, y: 5000 };
+        const scout = world.join('Builder', street.position, { kitId: 'surveyor' });
+        world.entity(scout).position = { ...street.position };
+        world.entity(scout).score = street.cost;
         world.engine.setSurveyorUtility(scout.id, 'build_furnace');
+        world.entity(scout).abilityCooldownFrames = 0;
         expect(world.engine.useAbility(scout.id)).toBe(true);
       }
-      const furnace =
-        kind === 'built'
-          ? world.engine.getGameState().builtFurnaces?.[0]
-          : FURNACES.find((site) => site.id === 'works-1-0');
-      if (!furnace) {
-        throw new Error('Expected eastern furnace');
-      }
+      const furnace = kind === 'built' ? street : TOWN_HEARTH;
       world.engine.updatePlayer(pilot.id, {
         position: { x: furnace.position.x + 400, y: furnace.position.y },
       });

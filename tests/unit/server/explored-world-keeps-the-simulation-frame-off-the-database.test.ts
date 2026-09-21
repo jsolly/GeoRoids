@@ -11,7 +11,7 @@ import { ServerClock } from '../../../server/core/ServerClock';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -63,7 +63,6 @@ function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidDa
       seed: SEED,
       startedAt: WALL_ORIGIN_MS,
       generation: WORLD.generation,
-      scoreSeason: utcScoreSeason(WALL_ORIGIN_MS),
       exploration: [],
     },
     rows,

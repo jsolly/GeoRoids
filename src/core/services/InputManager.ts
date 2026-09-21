@@ -19,6 +19,8 @@ import { initializeTouchControls } from '../../input/touchControls';
 import { initializeSchematicJoinHint } from '../../ui/schematicJoinHint';
 import { initializeShipSchematic } from '../../ui/shipSchematic';
 import { isShipSchematicOpen } from '../../ui/shipSchematicState';
+import { initializeTownStore } from '../../ui/townStore';
+import { isTownStoreOpen } from '../../ui/townStoreState';
 import { initializeUniverseMap, isUniverseMapOpen } from '../../ui/universeMap';
 import { logger } from '../../utils/Logger';
 import { GameStateManager } from './GameStateManager';
@@ -53,7 +55,7 @@ export class InputManager {
       // The universe map owns its keyboard controls while open. This guard is
       // intentionally duplicated with the map's capture listener so a future
       // input source cannot make firing or steering leak through the dialog.
-      if (isUniverseMapOpen() || isShipSchematicOpen()) {
+      if (isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen()) {
         return;
       }
       const localPlayer = getLocalPlayer();
@@ -72,7 +74,7 @@ export class InputManager {
     });
 
     document.addEventListener('keyup', (ev) => {
-      if (isUniverseMapOpen() || isShipSchematicOpen()) {
+      if (isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen()) {
         return;
       }
       const localPlayer = getLocalPlayer();
@@ -153,6 +155,7 @@ export class InputManager {
     initializeTouchControls();
     initializeUniverseMap({ onOpen: releaseInput });
     initializeShipSchematic({ onOpen: releaseInput });
+    initializeTownStore({ onOpen: releaseInput });
     initializeSchematicJoinHint();
     window.addEventListener('gameMapClose', () => {
       this.updateMovementLock();
@@ -160,18 +163,24 @@ export class InputManager {
     window.addEventListener('gameSchematicClose', () => {
       this.updateMovementLock();
     });
+    window.addEventListener('gameStoreOpen', () => {
+      this.updateMovementLock();
+    });
+    window.addEventListener('gameStoreClose', () => {
+      this.updateMovementLock();
+    });
 
     this.listenersInitialized = true;
   }
 
-  /** Lock navigation and collisions while a map or schematic is open. */
+  /** Lock navigation and collisions while a map, schematic, or town store is open. */
   updateMovementLock(): void {
     const player = PlayerManager.getInstance().getLocalPlayer();
     const ship = player?.ship;
     if (!ship) {
       return;
     }
-    const held = isUniverseMapOpen() || isShipSchematicOpen();
+    const held = isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
     const changed = applyLocalOverlayHold(ship, held);
     if (changed) {
       PlayerManager.getInstance().updateNetworkState();

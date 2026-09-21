@@ -1,5 +1,5 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { FURNACES } from '../../shared/furnaces';
+import { CIVIC_LOTS, FURNACES } from '../../shared/furnaces';
 import type { ExplorationTile, LootData, MapAsset, SatellitePickupData } from '../../shared-types';
 
 /** Crew knowledge outlives the local viewport; consumed assets leave the shared map. */
@@ -10,14 +10,23 @@ export class MapAssets {
     exploration: readonly ExplorationTile[],
     loot: readonly LootData[],
     pickups: readonly SatellitePickupData[],
-    builtFurnaces: readonly (typeof FURNACES)[number][] = []
+    moduleNames: ReadonlyMap<string, string> = new Map()
   ): MapAsset[] {
-    const candidates: MapAsset[] = [...FURNACES, ...builtFurnaces].map((furnace) => ({
+    const candidates: MapAsset[] = FURNACES.map((furnace) => ({
       id: `furnace:${furnace.id}`,
       kind: 'furnace',
       position: furnace.position,
       name: furnace.name,
     }));
+    for (const lot of CIVIC_LOTS) {
+      const builtName = moduleNames.get(lot.id);
+      candidates.push({
+        id: `furnace:${lot.id}`,
+        kind: builtName === undefined ? 'foundation' : 'furnace',
+        position: lot.position,
+        name: builtName ?? lot.name,
+      });
+    }
     for (const drop of loot) {
       if (drop.kind === 'shard' || drop.kind === 'tap' || drop.kind === 'silk') {
         continue;
@@ -40,7 +49,7 @@ export class MapAssets {
       }
     }
     const revealed = candidates.filter((asset) => {
-      if (this.known.has(asset.id)) {
+      if (asset.kind === 'furnace' || asset.kind === 'foundation' || this.known.has(asset.id)) {
         return true;
       }
       const cell = explorationCellAt(asset.position);

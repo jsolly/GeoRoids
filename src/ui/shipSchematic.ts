@@ -1,4 +1,3 @@
-import { FURNACE_BUILD } from '../../shared/furnaceField';
 import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE, VISUAL } from '../constants';
@@ -29,12 +28,12 @@ import {
   surveyorUtilityOf,
 } from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
-import { worldFurnaces } from '../network/worldExploration';
 import { drawFurnaceArtwork } from '../rendering/furnaceRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { renderSatelliteInventory, satelliteInventoryDescription } from './satelliteInventory';
 import { isShipSchematicOpen, setShipSchematicOpen } from './shipSchematicState';
+import { requestTownStoreClose } from './townStoreState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
 import { shouldUseTouchControls } from './viewportChrome';
 
@@ -301,12 +300,7 @@ function syncCards(): void {
   if (!hauler) {
     const part = SURVEYOR_UTILITY[selectedSurveyorUtility];
     elements.title.textContent = part.name;
-    const player = PlayerManager.getInstance().getLocalPlayer();
-    elements.copy.textContent =
-      part.copy +
-      (selectedSurveyorUtility === 'build_furnace' && player
-        ? ` Built: ${worldFurnaces.count(player.id)}/${FURNACE_BUILD.MAX_PER_OWNER}.`
-        : '');
+    elements.copy.textContent = part.copy;
     for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
       const active = button.dataset['utilityId'] === selectedSurveyorUtility;
       button.classList.toggle('is-active', active);
@@ -791,6 +785,7 @@ export function openShipSchematic(): boolean {
   if (!elements || isShipSchematicOpen() || !canOpenForLocalShip()) {
     return false;
   }
+  requestTownStoreClose();
   if (isUniverseMapOpen()) {
     setShipSchematicOpen(true);
     closeUniverseMap();

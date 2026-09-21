@@ -15,7 +15,6 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { FURNACES } from '../../../shared/furnaces';
-import { utcScoreSeason } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { GAME, ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -156,7 +155,7 @@ test('game over restamps score provenance and keeps the issued credential', () =
   expect(saved.scoreUpdatedAt).toBeGreaterThanOrEqual(saved.credentialIssuedAt ?? 0);
 });
 
-test('a UTC month boundary restamps scores and keeps the credential that issued the token', () => {
+test('a new UTC month leaves the saved score and its credential stamps alone', () => {
   let monotonicMs = 1_000;
   const clock = new ServerClock({
     wallNow: () => Date.parse('2026-09-30T12:00:00.000Z'),
@@ -170,22 +169,20 @@ test('a UTC month boundary restamps scores and keeps the credential that issued 
   assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
   actor.score = 880;
   engine.checkpointWorld();
+  const before = store.loadPilots().find((pilot) => pilot.id === 'pilot');
+  assert(before);
   monotonicMs += 24 * 60 * 60 * 1000;
-  expect(utcScoreSeason(clock.now())).toBe('2026-10');
   actor.lastUpdate = clock.now();
   engine.advanceOneFrame();
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'pilot');
   assert(saved);
-  expect(saved.score).toBe(0);
+  expect(saved.score).toBe(880);
+  expect(saved.scoreClientReleaseId).toBe(before.scoreClientReleaseId);
+  expect(saved.scoreUpdatedAt).toBe(before.scoreUpdatedAt);
   expect(saved.credentialReleaseId).toBe(SERVER_RELEASE_ID);
   expect(saved.credentialClientReleaseId).toBe(CLIENT_RELEASE);
-  expect(saved.scoreReleaseId).toBe(SERVER_RELEASE_ID);
-  expect(saved.scoreClientReleaseId).toBeUndefined();
-  expect(saved.lastClientReleaseId).toBe(CLIENT_RELEASE);
-  expect(saved.credentialIssuedAt).toEqual(expect.any(Number));
-  expect(saved.scoreUpdatedAt).toBeGreaterThan(saved.credentialIssuedAt ?? 0);
-  expect(store.loadWorld()?.writtenReleaseId).toBe(SERVER_RELEASE_ID);
+  expect(actor.score).toBe(880);
 });
 
 test('legacy pilots without release stamps still load, and invalid stamps are dropped', () => {

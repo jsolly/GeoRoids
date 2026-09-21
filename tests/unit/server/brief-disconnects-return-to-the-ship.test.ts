@@ -47,7 +47,7 @@ test('Enter Game after a brief leave puts the ship back with the same lives and 
   engine.stopGameLoop();
 });
 
-test('a long absence starts a new flight with the monthly score', () => {
+test('a long absence starts a new flight with the saved score', () => {
   let monotonicMs = 1_000;
   const clock = new ServerClock({
     wallNow: () => Date.parse('2026-09-15T12:00:00.000Z'),

@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { FURNACES } from '../../../../shared/furnaces';
+import { TOWN_HEARTH } from '../../../../shared/furnaces';
 import type { SpiderFieldState } from '../../../../shared-types';
 import {
   assertNoBrowserDiagnostics,
@@ -47,10 +47,7 @@ for (const width of [1280, 390]) {
         await session.detach();
       }
     };
-    const works = FURNACES.find((site) => site.id === 'works-1-0');
-    if (!works) {
-      throw new Error('Missing furnace');
-    }
+    const works = TOWN_HEARTH;
     const arrange = async (angle: number) => {
       await arrangeCrewField([id], 'spider-tools');
       await game.placeShipAt(works.position.x + 400, works.position.y);
@@ -115,7 +112,7 @@ for (const width of [1280, 390]) {
       .poll(
         async () =>
           (await field(page)).consumed?.some(
-            (event) => event.id === cargo.id && event.furnaceId === 'works-1-0'
+            (event) => event.id === cargo.id && event.furnaceId === TOWN_HEARTH.id
           ),
         { timeout: 20000 }
       )

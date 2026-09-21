@@ -9,7 +9,8 @@ A Hauler presses **E** to attach to a nearby asteroid and tows it at the cable's
 original length. Press **E** again to release it. Attached cargo cannot damage its
 Hauler or be destroyed by crew lasers. Other asteroids remain dangerous; crew
 ships can overlap safely. Tow surveyed cargo into a furnace to award the Hauler
-and each contributing Surveyor the same delivery points.
+and each contributing Surveyor. A pilot who built streets receives a higher
+personal payout.
 
 ## Reflective clusters and laser cores
 
@@ -32,7 +33,7 @@ Every pilot uses snapshot v1 with `asteroidInteractions:1`, acknowledged by the
 server with a private resume token. Unsupported clients cannot join. The server
 owns projectile collisions, and clients render keyed projectile snapshots.
 Reflective phenomena are generated with each world sector and persist with its
-deposits during the current UTC month. Private resume tokens recover a
+deposits across restarts. Private resume tokens recover a
 browser's current score across disconnects and server restarts while the ship
 still has lives. They appear only on the joined socket, not in the common
 public world. Join also records the client and server Git identities that
@@ -42,8 +43,8 @@ omit a client identity. Those stamps do not replace the snapshot-v1 join gate.
 A live reconnect while the ship still has lives keeps the current pose. After
 the socket is gone, Enter Game returns you to that ship for 30 seconds; a
 longer gap starts a new flight with that score. Game over zeros the score and
-starts a new flight. At UTC month rollover, scores and the shared world both
-reset.
+starts a new flight. Scores and the shared world stay until `WORLD.generation`
+changes.
 
 ## Updating open clients
 

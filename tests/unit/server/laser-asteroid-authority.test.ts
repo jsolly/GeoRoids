@@ -234,6 +234,14 @@ describe('Asteroid destruction over real sockets', () => {
       expect(received.filter((message) => message.type === 'joined')).toHaveLength(1);
       const pilot = server.gameEngine.getPlayer('shooter');
       assert.ok(pilot);
+      // Join keeps a town-ring arrival. The shot corridor is arranged at the requested yard.
+      expect(
+        server.gameEngine.playerMotion.placeActorForTesting(
+          pilot.id,
+          { x: 800, y: 800 },
+          server.gameEngine.getServerTime()
+        )
+      ).toBe(true);
       // Keep the stopped world's other laser targets far from the shot corridor.
       server.gameEngine.parkSatellitePickups({ x: -2400, y: -2400 });
       expect(server.gameEngine.getLoot()).toEqual([]);

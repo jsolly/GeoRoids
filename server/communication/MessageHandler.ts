@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
 import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
@@ -93,6 +94,9 @@ export class MessageHandler {
           break;
         case 'setSurveyorUtility':
           this.handleSetSurveyorUtility(ws, command);
+          break;
+        case 'buyShipPaint':
+          this.handleBuyShipPaint(ws, command);
           break;
 
         case 'update':
@@ -212,7 +216,9 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'The game server is full');
         return;
       }
-      player = this.gameEngine.addPlayer(id, name, ws, command.position, command.kitId);
+      const arrival =
+        command.position && isTownSquareArrival(command.position) ? command.position : undefined;
+      player = this.gameEngine.addPlayer(id, name, ws, arrival, command.kitId);
       player.asteroidInteractions = 1;
       const registered = this.gameEngine.registerPilot(player, ws, command.clientReleaseId);
       if (!registered.ok) {
@@ -464,6 +470,31 @@ export class MessageHandler {
       return;
     }
     this.broadcaster.broadcastGameState();
+  }
+
+  private handleBuyShipPaint(ws: WebSocket, command: CommandOf<'buyShipPaint'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id) {
+      return;
+    }
+    const issue = this.gameEngine.buyShipPaint(command.id, command.paintId);
+    const pilot = this.gameEngine.getPlayer(command.id);
+    ws.send(
+      JSON.stringify({
+        type: 'townStoreResult',
+        data: issue
+          ? { message: issue }
+          : {
+              message: this.gameEngine.townStoreNotice(command.paintId),
+              score: pilot?.score,
+              color: pilot?.color,
+            },
+        timestamp: Date.now(),
+      })
+    );
+    if (!issue) {
+      this.broadcaster.broadcastGameState();
+    }
   }
 
   private handleSetSurveyorUtility(ws: WebSocket, command: CommandOf<'setSurveyorUtility'>): void {

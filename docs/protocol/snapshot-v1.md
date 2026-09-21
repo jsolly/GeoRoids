@@ -54,6 +54,15 @@ and radial offset. The client derives the moving beacon pose from the host.
 An explicit null or absence in a complete asteroid row clears the beacon.
 The server owns attachment, damage, scan pulses, expiry, and replacement.
 
+`civicModules` lists lit street furnaces with `builderName` and an optional
+`builderId`. That id is the public pilot who paid; older unnamed streets omit
+it and grant no delivery bonus. `buyShipPaint` accepts the socket owner's id
+and a catalog `paintId` while that ship is inside the Town Square store.
+Success replies `townStoreResult` with the notice, the new score, and the
+catalog color, then broadcasts. A refusal replies with the notice only and
+spends nothing. A request for another pilot's id is ignored. Player `color`
+stays the kit default until a catalog paint is worn.
+
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
 make additions to the shared world/entity/asteroid/loot/EO/pickup/projectile/tag DTOs

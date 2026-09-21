@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { civicLot } from '../../../../shared/furnaces';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -23,6 +24,18 @@ for (const viewport of [
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
+    const storeToggle = page.locator('#town-store-toggle');
+    await storeToggle.waitFor({ state: 'visible' });
+    if (viewport.touch) {
+      await storeToggle.tap();
+    } else {
+      await page.keyboard.press('KeyB');
+    }
+    const store = page.locator('#town-store-dialog');
+    await store.waitFor({ state: 'visible' });
+    expect(await store.textContent()).toContain('Ember');
+    await page.locator('#town-store-return').click();
+    await store.waitFor({ state: 'hidden' });
     await arrangeCrewField([await game.getLocalPlayerId()], 'furnace');
     await page.waitForFunction(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
@@ -52,7 +65,10 @@ for (const viewport of [
       await card.click();
     }
     expect(await card.getAttribute('aria-pressed')).toBe('true');
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Built: 0/3');
+    const schematic = await page.locator('#ship-schematic-dialog').textContent();
+    expect(schematic).toContain('Build');
+    expect(schematic).toContain('your own score');
+    expect(schematic).not.toContain('Town purse');
     expect(await page.locator('[data-utility-id]').count()).toBe(3);
     const layout = await page.locator('#ship-schematic-dialog').evaluate((element) => ({
       width: element.clientWidth,
@@ -75,37 +91,44 @@ for (const viewport of [
       await page.keyboard.press('KeyE');
     }
     await page.waitForFunction(
-      () => window.gameController?.getGameStateManager().getPickupMessage() === 'Furnace built'
+      () =>
+        window.gameController?.getGameStateManager().getPickupMessage() ===
+        'Stand inside a street foundation'
     );
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`surveyor-built-furnace-${viewport.width}.png`),
     });
-    await openSchematic();
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Built: 1/3');
-    // Keep the ship at its furnace until the shared cooldown expires.
-    await page.waitForFunction(
-      () => (window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames ?? 1) <= 0
-    );
-    await page.waitForTimeout(150);
-    await page.locator('#ship-schematic-return').click();
+    const lot = civicLot('street-1-0');
+    if (!lot) {
+      throw new Error('Missing street lot');
+    }
+    await arrangeCrewField([await game.getLocalPlayerId()], 'street-build');
+    await page.waitForFunction(({ x, y }) => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      return Boolean(
+        ship && Math.abs(ship.position.x - x) < 20 && Math.abs(ship.position.y - y) < 20
+      );
+    }, lot.position);
     if (viewport.touch) {
       await page.locator('#touch-ability').tap();
     } else {
       await page.keyboard.press('KeyE');
     }
-    await page.waitForFunction(
-      () =>
-        window.gameController?.getGameStateManager().getPickupMessage() ===
-        'Too close to another furnace'
-    );
+    await page.waitForFunction((streetName) => {
+      const message = window.gameController?.getGameStateManager().getPickupMessage() ?? '';
+      return message.includes(streetName) && message.includes('is burning');
+    }, lot.name);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`surveyor-lit-street-${viewport.width}.png`),
+    });
     // The changed Wiki is rendered at both viewport sizes as well.
     await page.goto(`${new URL(page.url()).origin}/wiki/#surveyor`);
-    const buildHeading = page.getByRole('heading', { name: 'Build furnace', exact: true });
+    const buildHeading = page.getByRole('heading', { name: 'Build', exact: true });
     await buildHeading.waitFor();
     await buildHeading.scrollIntoViewIfNeeded();
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`surveyor-wiki-${viewport.width}.png`),
     });
     assertNoBrowserDiagnostics(diagnostics);
-  }, 45_000);
+  }, 60_000);
 }

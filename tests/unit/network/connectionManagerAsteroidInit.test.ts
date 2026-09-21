@@ -46,7 +46,6 @@ test('rejoining after a server restart requests asteroids despite a cached belt'
       type: 'initAsteroids',
       id: 'server-player-1',
       data: {},
-      timestamp: expect.any(Number),
     },
   ]);
   expect(manager.hasInitializedAsteroidsForConnection).toBe(true);

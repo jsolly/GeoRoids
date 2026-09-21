@@ -13,5 +13,4 @@ export interface ClientMessage {
     | 'equipSatellite';
   id?: string; // Optional ID field for messages that need it
   data: unknown;
-  timestamp: number;
 }

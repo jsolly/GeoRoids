@@ -384,7 +384,6 @@ export interface ServerEntityData {
 /** Optional monotonic probe identity; bare heartbeat messages remain supported. */
 export interface PingMessage {
   type: 'ping';
-  timestamp?: number;
   probeId?: number;
 }
 

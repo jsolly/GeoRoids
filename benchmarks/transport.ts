@@ -241,7 +241,7 @@ export async function runTransportSample(options = DEFAULT_TRANSPORT_SAMPLE_OPTI
       for (const client of clients) {
         if (client.pingSentAt === 0) {
           client.pingSentAt = performance.now();
-          send(client, { type: 'ping', timestamp: Date.now() });
+          send(client, { type: 'ping' });
         }
       }
       await delay(Math.min(100, Math.max(1, end - performance.now())), undefined, {

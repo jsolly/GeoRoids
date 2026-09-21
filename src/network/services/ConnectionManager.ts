@@ -218,11 +218,10 @@ export class ConnectionManager {
   private readonly playedTapEjectionIds = new Set<string>();
   private readonly playedLootExplosionIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
-  private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
+  private readonly pingPayload: PingMessage = { type: 'ping' };
   private readonly updateEnvelope: ClientMessage = {
     type: 'update',
     data: {} as PlayerUpdate,
-    timestamp: 0,
   };
 
   // Heartbeat / half-open-socket detection (see connectionHealth.ts).
@@ -725,7 +724,6 @@ export class ConnectionManager {
       return;
     }
 
-    this.pingPayload.timestamp = Date.now();
     const pingNow = performance.now();
     this.pingPayload.probeId = clientPerformance.probe(pingNow);
     if (!this.sendPayload(this.pingPayload)) {
@@ -821,7 +819,6 @@ export class ConnectionManager {
       return;
     }
     this.updateEnvelope.data = playerState;
-    this.updateEnvelope.timestamp = Date.now();
     this.sendPayload(this.updateEnvelope);
   }
 
@@ -851,7 +848,6 @@ export class ConnectionManager {
         laserDirection: laser.velocity,
         ...(requestId ? { requestId } : {}),
       },
-      timestamp: Date.now(),
     };
 
     logger.debug('NETWORK', 'Sending shoot message to server', { playerId: message.id });
@@ -900,7 +896,6 @@ export class ConnectionManager {
         clientReleaseId: getClientReleaseId(),
         ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),
       },
-      timestamp: Date.now(),
     };
 
     logger.debug('NETWORK', 'Sending join message', {
@@ -942,7 +937,6 @@ export class ConnectionManager {
       type: 'initAsteroids',
       id: this.localPlayerId,
       data: {},
-      timestamp: Date.now(),
     };
 
     if (!this.sendPayload(message)) {
@@ -1177,7 +1171,7 @@ export class ConnectionManager {
     if (this.snapshotResyncPending) {
       return false;
     }
-    const sent = this.sendMessage({ type: 'snapshotResync', data: {}, timestamp: Date.now() });
+    const sent = this.sendMessage({ type: 'snapshotResync', data: {} });
     if (sent) {
       this.snapshotResyncPending = true;
       clientPerformance.count('resyncs');

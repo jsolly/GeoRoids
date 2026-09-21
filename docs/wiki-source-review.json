@@ -1,5 +1,5 @@
 {
-  "note": "No player-facing rule changed. Movement commands no longer include score, lives, health, radius, mass, name, or spin; the server already applied only pose, thrust, boost, and overlay hold. HUD score, health, and lives still come from the server snapshot. No article or demonstration needed an edit.",
+  "note": "No player-facing rule changed. Client gameplay and heartbeat messages no longer carry a timestamp the server never read. Liveness still uses probe identity and pong. Server snapshots and events still include their timestamps. No article or demonstration needed an edit.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -103,7 +103,7 @@
     "server/world/worldPersistence.ts": "sha256:11e4eb4ec61c9af884840e43b27d729a578904312da60781da0b6be85df99656",
     "server/world/worldStoreWorker.ts": "sha256:abf64424383e906e07a51b51b87fd2468646b6cd8b9ea8289da0d85f87bea09a",
     "server/world/worldStoreWorkerProtocol.ts": "sha256:f92949d11c533e16a94ef6565c177b192c06e1bb24d267a5d21e74268cd8952a",
-    "shared-types.ts": "sha256:3b00c16942dcad1fabdea9d2f25fa6cab797ce7598c7315dc1a302bef2df7558",
+    "shared-types.ts": "sha256:ac2cb06aac17a9f2d4da266e98e5f55ff867ebfa6161c01c0b26d7e3cdf3c09f",
     "shared/asteroidBoost.ts": "sha256:098371c53c2ac466c5344c12de64f371cd7d35d9945440410d5d74202cae02f3",
     "shared/asteroidMaterials.ts": "sha256:91e41142e02a82c58377d2f7a1556e76abdf84ae672cc078a2365d7f428184bc",
     "shared/asteroidPhenomena.ts": "sha256:a9a425b1e831260d4cafe450d62f022a7a646ef831ad115542ba0a6fa592024e",
@@ -207,7 +207,7 @@
     "src/input/touchAbility.ts": "sha256:89ff08a0c1018de61627c708cde0290b3fe51a8239fb1eb5c8b7d653b0f1ce6b",
     "src/input/touchControls.ts": "sha256:a147927fac077b66277be8261dacf0357da7b68c7d2b8d14f4ab0995a213832b",
     "src/network/networkManager.ts": "sha256:c14f58186a878ca92fd1796aaee3b412f71ca908f22c6276dc097bdbd9f6d6ed",
-    "src/network/services/ConnectionManager.ts": "sha256:385894901899906297c2323922dcdac1555eceb1f5c4f853ed4668b855674c97",
+    "src/network/services/ConnectionManager.ts": "sha256:bf69a92e947021dacde13f405cb906fda3afcd725c2fadee39c564718bad118d",
     "src/network/services/PlayerMotionReconciliation.ts": "sha256:6b295647a937231f7fd8f982536ab6d515439514249f2127c243a164dca15fe7",
     "src/network/services/asteroidFieldSync.ts": "sha256:1f2714173c82f4ac71319db694f3d4ed2ffc2bfe8dc4557e1be4e17230754d12",
     "src/network/services/clientIdentity.ts": "sha256:8decf593a00a1a4e60c20352eff0ba3817ae93dd87349c9a78415284babe62ab",
@@ -217,7 +217,7 @@
     "src/network/services/playerListCache.ts": "sha256:697af7c36daf0af2e45eafde566827cf39e571f985efd4eb2709d03592e497ef",
     "src/network/services/playerPresence.ts": "sha256:cb5d9881afb74703c002a1ba133bbb4dee2844e0e526e837578354b59138b5ea",
     "src/network/services/resumeCredential.ts": "sha256:6524e7ee2c06c9bd053dc94da62f3451bcf3435861edca9b208b93b56468c317",
-    "src/network/types.ts": "sha256:2bf70e610dc1923a916e963a34711e13286c1436ded27be0d401c66be1036374",
+    "src/network/types.ts": "sha256:3a18a984f88805e3a8e5efc127a244710dd7f4ece8079a7cd55158973716ca92",
     "src/network/worldExploration.ts": "sha256:36ecd635a9e9b4374061a892bc36127b7d2f13b877375aabb9c2ab942c174fef",
     "src/physics/Point.ts": "sha256:6630058ce08c3ce9d0e6c4fe73c974e5b9ae7e67b83c3c642af33629a47c7e5a",
     "src/physics/asteroidMotion.ts": "sha256:6901e0d7156264f9af2a1b8c32690b651842bb7811fef0cb2d4c1ecffa4f44dd",

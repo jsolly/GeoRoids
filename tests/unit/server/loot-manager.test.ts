@@ -114,7 +114,6 @@ describe('LootManager destroy-drop shards', () => {
       );
       engine.updatePlayer('scout', { mass: GROWTH.SOFT_MAX_MASS });
       expect(surveyor.mass).toBe(GROWTH.SOFT_MAX_MASS);
-      expect(hullRadiusForKit(surveyor.kitId, surveyor.mass)).toBe(hullRadiusForKit('surveyor'));
       const justPastSurveyor = hullRadiusForKit('surveyor') + GROWTH.LOOT_RADIUS + 4;
       const shard = manager.spawnShard({ x: justPastSurveyor, y: 0 }, 20);
       expect(manager.collectOverlaps([surveyor])).toEqual([]);

@@ -53,6 +53,7 @@ test('a UTC month boundary keeps scores, exploration, and the live ship', () => 
 
     const placement = { ...actor.position };
     monotonicMs += 24 * 60 * 60 * 1000;
+    expect(clock.now()).toBe(Date.parse('2026-10-01T12:00:00.000Z'));
     actor.lastUpdate = clock.now();
     engine.advanceOneFrame();
 

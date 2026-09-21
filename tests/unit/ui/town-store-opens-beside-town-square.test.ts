@@ -93,6 +93,7 @@ test('the store opens at Town Square, lists paints, and wears a purchased hull',
   );
   expect(player.ship.color).not.toBe(ember.color);
 
+  player.score = ember.cost;
   applyTownStoreResult({
     message: 'Ember is on your hull',
     score: 0,

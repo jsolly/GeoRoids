@@ -19,8 +19,9 @@ its E ability, then read the arena entries for the rules that every pilot
 shares.
 
 The world stays up between sessions and server restarts, so the shared chart,
-streets, and delivered progress remain until the expedition is reset. A world
-generation bump resets saved sectors on the next server start. The server saves
+streets, and delivered progress remain until the expedition is reset. Changing
+the world generation clears saved sectors, streets, scores, and hull paint on
+the next server start. The server saves
 the shared world about once a second while a crew is aboard and when the last
 pilot leaves, so a sudden server crash can lose only about the last second of
 mining, deliveries, and score.

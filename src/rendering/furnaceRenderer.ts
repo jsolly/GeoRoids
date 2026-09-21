@@ -469,7 +469,10 @@ export function drawFurnacePipes(viewerPosition: Position, now = performance.now
     if (!visible) {
       continue;
     }
-    const count = Math.min(pulse.points.length, PIPE_SCREEN.length);
+    while (PIPE_SCREEN.length < pulse.points.length) {
+      PIPE_SCREEN.push({ x: 0, y: 0 });
+    }
+    const count = pulse.points.length;
     for (let index = 0; index < count; index += 1) {
       const world = pulse.points[index];
       const screen = PIPE_SCREEN[index];

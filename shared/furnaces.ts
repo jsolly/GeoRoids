@@ -88,10 +88,9 @@ function layoutCivicLots(): CivicLot[] {
       const position = placeOnRing(spec.radius, offset + index * step, placed);
       placed.push(position);
       const street = streetIndex(spec.ring, index);
-      const parentId =
-        spec.ring === 1
-          ? TOWN_HEARTH.id
-          : `street-${spec.ring - 1}-${spec.ring === 2 ? street : Math.floor(index / 2)}`;
+      const previousRing = RINGS[RINGS.indexOf(spec) - 1];
+      const parentSlot = previousRing ? Math.floor(index / (spec.count / previousRing.count)) : 0;
+      const parentId = previousRing ? `street-${previousRing.ring}-${parentSlot}` : TOWN_HEARTH.id;
       drafts.push({
         id: `street-${spec.ring}-${index}`,
         position,

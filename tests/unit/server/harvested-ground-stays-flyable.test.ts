@@ -83,14 +83,39 @@ test('an old completed-sector list does not wall harvested ground or refill it',
     writeCompletedSectors(path, ['1,0']);
     store = new WorldStore(path);
     engine = new GameEngine(seed, undefined, new InlineWorldPersistence(store));
-    const pilot = engine.addPlayer('pilot', 'Pilot', new RecordingSocket(), { x: 2_500, y: 200 });
-    expect(pilot.position).toEqual({ x: 2_500, y: 200 });
+    const socket = new RecordingSocket();
+    const outside = { x: 1_980, y: 800 };
+    const pilot = engine.addPlayer('pilot', 'Pilot', socket, outside);
+    expect(pilot.position).toEqual(outside);
+    pilot.asteroidInteractions = 1;
+    const joinedAt = engine.getServerTime();
+    expect(engine.playerMotion.register(pilot, socket, 1, joinedAt).ok).toBe(true);
+    const crossed = engine.playerMotion.acceptFreePose(
+      socket,
+      {
+        epoch: 1,
+        sequence: 1,
+        position: { x: 2_020, y: 800 },
+        velocity: { x: 0, y: 0 },
+        angle: 0,
+        thrusting: true,
+      },
+      joinedAt + 1_000
+    );
+    expect(crossed.ok).toBe(true);
+    expect(pilot.position).toEqual({ x: 2_020, y: 800 });
     engine.ensureAsteroidField();
+    const shot = engine.spawnLaser('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 }, joinedAt);
+    expect(shot).not.toBeNull();
+    engine.advanceLasersAndResolveHits(joinedAt);
+    const liveShot = engine.getServerLasers().find((laser) => laser.id === shot?.id);
+    expect(liveShot?.hasExploded).toBe(false);
+    expect(liveShot?.position.x).toBeGreaterThan(2_000);
+    delete pilot.spawnProtectionTimer;
     for (let frame = 0; frame < 30; frame++) {
       engine.advanceOneFrame();
     }
-    expect(pilot.position.x).toBeGreaterThanOrEqual(2_000);
-    expect(pilot.position.x).toBeLessThan(4_000);
+    expect(pilot.position).toEqual({ x: 2_020, y: 800 });
     expect(pilot.health).toBeGreaterThan(0);
     expect(
       engine.getAllAsteroids().some((rock) => rock.id.startsWith(`deposit-${seed}-1-0-`))

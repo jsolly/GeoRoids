@@ -16,7 +16,6 @@ import {
   shipPaintById,
   TOWN_STORE_ISSUE,
   TOWN_STORE_RADIUS,
-  townDeliveryPoints,
 } from '../../../shared/townStore';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
@@ -87,8 +86,9 @@ test('a street the Surveyor paid for raises only that pilot furnace payout', () 
   hauler.score = 0;
   scout.score = 0;
   const base = deliver(engine, 'first-haul', hauler.id, scout.id);
-  expect(scout.score).toBe(townDeliveryPoints(base, 1));
-  expect(hauler.score).toBe(base);
+  expect(base).toBe(300);
+  expect(scout.score).toBe(330);
+  expect(hauler.score).toBe(300);
 
   scout.position = { ...child.position };
   scout.abilityCooldownFrames = 0;
@@ -96,14 +96,14 @@ test('a street the Surveyor paid for raises only that pilot furnace payout', () 
   expect(engine.useAbility(scout.id)).toBe(true);
   const before = { scout: scout.score, hauler: hauler.score };
   const second = deliver(engine, 'second-haul', hauler.id, scout.id);
-  expect(scout.score - before.scout).toBe(townDeliveryPoints(second, 2));
-  expect(hauler.score - before.hauler).toBe(second);
+  expect(second).toBe(300);
+  expect(scout.score - before.scout).toBe(360);
+  expect(hauler.score - before.hauler).toBe(300);
 
   scout.name = 'New name';
   const renamed = deliver(engine, 'renamed-haul', hauler.id, scout.id);
-  expect(scout.score - (before.scout + townDeliveryPoints(second, 2))).toBe(
-    townDeliveryPoints(renamed, 2)
-  );
+  expect(renamed).toBe(300);
+  expect(scout.score - (before.scout + 360)).toBe(360);
   expect(engine.getGameState().civicModules?.[0]?.builderName).toBe('scout');
 });
 

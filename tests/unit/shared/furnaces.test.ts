@@ -58,6 +58,12 @@ test('a street stays dark until its nearer lot is a legal parent', () => {
   expect(first.parentId).toBe(TOWN_HEARTH.id);
   expect(second.parentId).toBe('street-1-0');
   expect(third.parentId).toBe('street-2-0');
+  for (const lot of CIVIC_LOTS) {
+    const index = Number(lot.id.slice(lot.id.lastIndexOf('-') + 1));
+    expect(lot.parentId).toBe(
+      lot.ring === 1 ? TOWN_HEARTH.id : `street-${lot.ring - 1}-${Math.floor(index / 2)}`
+    );
+  }
   expect(validLitCivicLotIds(['street-1-0'])).toBe(true);
   expect(validLitCivicLotIds(['street-2-0', 'street-1-0'])).toBe(true);
   expect(validLitCivicLotIds(['street-2-0'])).toBe(false);

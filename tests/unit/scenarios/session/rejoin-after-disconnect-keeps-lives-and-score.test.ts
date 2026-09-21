@@ -31,7 +31,7 @@ describe('Rejoin after a dropped socket', () => {
     expect(ship.spawnProtectionTimer ?? 0).toBe(0);
   });
 
-  test('leaving then entering again returns to the same ship with monthly score', () => {
+  test('leaving then entering again returns to the same ship with the saved score', () => {
     const ship = world.entity(ace);
     ship.position = { x: 2_400, y: 1_800 };
     world.disconnect(ace);

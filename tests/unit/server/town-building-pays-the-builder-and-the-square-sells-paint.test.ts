@@ -18,7 +18,7 @@ import {
   TOWN_STORE_RADIUS,
   townDeliveryPoints,
 } from '../../../shared/townStore';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { PALETTE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -118,7 +118,6 @@ test('an unnamed street grants no delivery bonus', () => {
         seed: 42,
         startedAt: now,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(now),
         exploration: [],
         civicModules: [{ id: street.id, builderName: '' }],
       },

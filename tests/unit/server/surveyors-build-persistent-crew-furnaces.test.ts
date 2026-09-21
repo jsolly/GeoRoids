@@ -23,7 +23,7 @@ import {
 } from '../../../shared/furnaces';
 import { validateSnapshotDto } from '../../../shared/snapshotDto';
 import { SPIDER } from '../../../shared/terrainSpider';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -223,7 +223,6 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken m
         seed: 42,
         startedAt: now,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(now),
         exploration: [],
       },
       new Map(),

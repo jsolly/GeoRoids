@@ -9,7 +9,7 @@ import { releaseField } from '../../shared/releaseId';
 import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { purchasedHullColor } from '../../shared/townStore';
-import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
   CivicModule,
@@ -48,7 +48,7 @@ function validWorldPosition(position: Position): boolean {
   return finiteMotionVector(position) && Math.hypot(position.x, position.y) <= WORLD.radius;
 }
 
-/** Browser credential plus this UTC month's score and optional recent flight. */
+/** Browser credential plus the saved score and optional recent flight. */
 export interface PersistentPilot {
   silk?: number;
   id: string;
@@ -102,7 +102,6 @@ export interface SavedWorld {
   /** Density schema for additive asteroid slots; absent in pre-migration worlds. */
   asteroidDensityVersion?: number;
   asteroidMotionVersion?: number;
-  scoreSeason?: string;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
 }
@@ -463,9 +462,6 @@ export class WorldStore {
       Number.isSafeInteger(value.asteroidMotionVersion) &&
       value.asteroidMotionVersion >= 0
         ? { asteroidMotionVersion: value.asteroidMotionVersion }
-        : {}),
-      ...('scoreSeason' in value && isScoreSeason(value.scoreSeason)
-        ? { scoreSeason: value.scoreSeason }
         : {}),
       ...releaseField(
         'writtenReleaseId',

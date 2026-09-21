@@ -8,7 +8,7 @@ import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersist
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ASTEROID_INTERACTIONS } from '../../../shared/asteroidPhenomena';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
@@ -128,7 +128,6 @@ test('the density marker keeps a destroyed added slot absent after a reload', ()
         seed,
         startedAt: savedAt,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(savedAt),
         exploration: [],
       },
       new Map([
@@ -186,7 +185,6 @@ test('saved stationary deposits wake once without restoring mined ore or resetti
         seed,
         startedAt: now,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(now),
         asteroidDensityVersion: WORLD.asteroidDensityVersion,
         exploration: [],
       },

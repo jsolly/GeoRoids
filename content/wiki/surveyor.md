@@ -100,7 +100,7 @@ Standing furnaces still scare spiders that enter that occupancy.
 Town Square starts lit at the map center. The street plan radiates outward from
 it, and each farther ring costs more of the builder's score. Built streets keep
 the builder's name and survive death, changing ships, reconnecting, and server
-restarts. They reset with the world at the next monthly season.
+restarts. They stay until the expedition is reset.
 
 Everyone can use a built furnace. It accepts towed and boosted ore and consumes
 towed spiders, awards the usual delivery credit, guides nearby boosted cargo,

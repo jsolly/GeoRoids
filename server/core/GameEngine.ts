@@ -44,7 +44,7 @@ import {
   TOWN_STORE_ISSUE,
   townDeliveryPoints,
 } from '../../shared/townStore';
-import { utcScoreSeason, WORLD } from '../../shared/world';
+import { WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
@@ -238,7 +238,6 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 interface FlushedWorldRow {
   exploration: ExplorationTile[];
   civicModules: readonly CivicModule[];
-  scoreSeason: string;
   startedAt: number;
   asteroidDensityVersion: number;
   asteroidMotionVersion: number;
@@ -258,7 +257,6 @@ export class GameEngine {
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
   private worldStartedAt: number;
-  private scoreSeason: string;
   private readonly pilots = new Map<string, PersistentPilot>();
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
@@ -318,25 +316,14 @@ export class GameEngine {
     private readonly serverClock = new ServerClock(),
     private readonly persistence?: WorldPersistence
   ) {
-    this.scoreSeason = utcScoreSeason(this.serverClock.now());
     // The saved world is read exactly once, here, before the loop starts.
     let loaded = persistence?.load();
     const saved = loaded?.world;
-    if (
-      persistence &&
-      saved &&
-      (saved.generation !== WORLD.generation || saved.scoreSeason !== this.scoreSeason)
-    ) {
-      logger.warn(
-        'WORLD',
-        'Saved world generation or score season does not match; resetting world',
-        {
-          savedGeneration: saved.generation,
-          currentGeneration: WORLD.generation,
-          savedScoreSeason: saved.scoreSeason,
-          currentScoreSeason: this.scoreSeason,
-        }
-      );
+    if (persistence && saved && saved.generation !== WORLD.generation) {
+      logger.warn('WORLD', 'Saved world generation does not match; resetting world', {
+        savedGeneration: saved.generation,
+        currentGeneration: WORLD.generation,
+      });
       persistence.reset();
       loaded = undefined;
     }
@@ -491,7 +478,6 @@ export class GameEngine {
     if (this.persistenceFailure) {
       throw this.persistenceFailure;
     }
-    this.ensureScoreSeason();
     this.gameTime++;
     if (this.isPaused) {
       return;
@@ -998,52 +984,6 @@ export class GameEngine {
     delete actor.spawnProtectionTimer;
   }
 
-  private ensureScoreSeason(): void {
-    const season = utcScoreSeason(this.getServerTime());
-    if (season === this.scoreSeason) {
-      return;
-    }
-    this.beginScoreSeason(season);
-  }
-
-  private beginScoreSeason(season: string): void {
-    logger.warn('WORLD', 'Score season rolled over; resetting world and monthly scores', {
-      previousScoreSeason: this.scoreSeason,
-      currentScoreSeason: season,
-    });
-    this.scoreSeason = season;
-    const now = this.getServerTime();
-    this.worldStartedAt = now;
-    this.persistence?.reset();
-    this.regionalField.reset();
-    this.exploration.reset();
-    this.mapAssets.reset();
-    this.clearTown();
-    this.clearWorldObjects();
-    this.pendingFurnaceDeliveries = [];
-    for (const pilot of this.pilots.values()) {
-      this.setPilot({
-        id: pilot.id,
-        tokenHash: pilot.tokenHash,
-        name: pilot.name,
-        score: 0,
-        silk: pilot.silk ?? 0,
-        ...releaseField('credentialReleaseId', pilot.credentialReleaseId),
-        ...releaseField('credentialClientReleaseId', pilot.credentialClientReleaseId),
-        ...epochField('credentialIssuedAt', pilot.credentialIssuedAt),
-        scoreReleaseId: SERVER_RELEASE_ID,
-        scoreUpdatedAt: now,
-        ...releaseField('lastClientReleaseId', pilot.lastClientReleaseId),
-        ...(pilot.hullColor ? { hullColor: pilot.hullColor } : {}),
-      });
-    }
-    for (const actor of this.getAllPlayers()) {
-      actor.score = 0;
-    }
-    this.ensureAsteroidField();
-    this.checkpointWorld();
-  }
-
   /**
    * Hand everything that changed since the last flush to persistence as one
    * batch. The batch leaves this thread without waiting on the disk; the
@@ -1056,7 +996,6 @@ export class GameEngine {
     if (this.persistenceFailure) {
       throw this.persistenceFailure;
     }
-    this.ensureScoreSeason();
     if (!this.persistence) {
       return;
     }
@@ -1106,7 +1045,6 @@ export class GameEngine {
     const builtFrom: FlushedWorldRow = {
       exploration: this.exploration.snapshot(),
       civicModules: this.furnaces.litModules(),
-      scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
       asteroidDensityVersion: WORLD.asteroidDensityVersion,
       asteroidMotionVersion: WORLD.asteroidMotionVersion,
@@ -1116,7 +1054,6 @@ export class GameEngine {
       last &&
       last.exploration === builtFrom.exploration &&
       last.civicModules === builtFrom.civicModules &&
-      last.scoreSeason === builtFrom.scoreSeason &&
       last.startedAt === builtFrom.startedAt &&
       last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
       last.asteroidMotionVersion === builtFrom.asteroidMotionVersion
@@ -1130,7 +1067,6 @@ export class GameEngine {
         generation: WORLD.generation,
         asteroidDensityVersion: WORLD.asteroidDensityVersion,
         asteroidMotionVersion: WORLD.asteroidMotionVersion,
-        scoreSeason: this.scoreSeason,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
         civicModules: [...this.furnaces.litModules()],

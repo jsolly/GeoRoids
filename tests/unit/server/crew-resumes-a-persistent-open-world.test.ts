@@ -12,7 +12,7 @@ import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidFie
 import { WorldStore } from '../../../server/world/WorldStore';
 import { explorationCellAt, isCellExplored } from '../../../shared/exploration';
 import { FURNACES } from '../../../shared/furnaces';
-import { nearbyWorldRows, utcScoreSeason, WORLD } from '../../../shared/world';
+import { nearbyWorldRows, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -155,7 +155,6 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
         seed: 82,
         startedAt: 1,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(1),
         exploration: [],
       },
       field.checkpoint(manager),
@@ -204,7 +203,7 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
   engine.stopGameLoop();
 });
 
-test('leaving then entering again returns to the same ship with monthly score', () => {
+test('leaving then entering again returns to the same ship with the saved score', () => {
   const engine = new GameEngine(82);
   const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });
   original.actor.lives = 2;
@@ -228,7 +227,7 @@ test('leaving then entering again returns to the same ship with monthly score', 
   engine.stopGameLoop();
 });
 
-test('checkpoints store monthly score and a recent flight', () => {
+test('checkpoints store the saved score and a recent flight', () => {
   const store = database(':memory:');
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   const original = pilot(engine, 'scout', 'surveyor', { x: 200, y: 300 });

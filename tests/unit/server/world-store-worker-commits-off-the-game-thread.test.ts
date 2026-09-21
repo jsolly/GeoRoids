@@ -49,7 +49,6 @@ function batch(sectors: ReadonlyMap<string, AsteroidData[]>, score: number): Wor
       seed: 7,
       startedAt: 1,
       generation: WORLD.generation,
-      scoreSeason: '2026-09',
       exploration: [],
     },
     sectors,

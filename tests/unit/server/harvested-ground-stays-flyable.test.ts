@@ -7,7 +7,7 @@ import { expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
-import { utcScoreSeason, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -63,7 +63,6 @@ test('an old completed-sector list does not wall harvested ground or refill it',
         seed,
         startedAt: now,
         generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(now),
         exploration: [],
       },
       new Map([

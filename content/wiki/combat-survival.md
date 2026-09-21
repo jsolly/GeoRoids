@@ -67,8 +67,7 @@ world units from its center at a random angle. Dark street foundations are not r
 After game over, a fresh flight starts with 3 lives and score 0. A brief
 disconnect still returns you to the same ship; a long absence does not.
 The persistent universe, shared exploration chart, and delivered
-progress remain available until the UTC calendar month ends, when scores and
-the shared world both reset.
+progress stay until the expedition is reset.
 
 Health regenerates after a real-damage delay. Score survives a respawn.
 Wreckage is emitted from a destroyed ship. The visible death message includes

@@ -83,7 +83,7 @@ nearby view and closer restore the three-tongue campfire. A delivery consumes
 the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
 Streets a pilot built raise only that pilot's payout. Town Square also holds a
 store: spend your own score there on a hull paint. The paint stays on your ship
-through death, reconnect, restart, and the monthly score reset.
+through death, reconnect, and restart.
 Faint pipes join each street lot
 to the nearer grate and end at Town Square. Dragging a rock or a spider into a
 street furnace lights that whole run, and a bright head travels from the source
@@ -94,8 +94,7 @@ grate back to Town Square.
 The local minimap follows the ship's nearby radar. The full-screen universe map
 opens with M or the Map button and shows the crew's shared overview of the
 world. Every pilot adds the area around its ship, and explored cells remain
-revealed for the crew after that ship moves away until the UTC calendar month
-ends and the shared world resets. Surveyor passive reveal
+revealed for the crew after that ship moves away. Surveyor passive reveal
 reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
 scan reaches 1,200 world units and also classifies minerals in that range on
 every teammate's radar. Uncharted asteroid and loot positions stay

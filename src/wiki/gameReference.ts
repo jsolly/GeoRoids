@@ -72,7 +72,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
         `${TOWN_HEARTH.name} is the only pre-lit hearth. ${CIVIC_LOTS.length} street foundations start dark: ${streetLots(1).length} at score ${streetCost(1)}, ${streetLots(2).length} at score ${streetCost(2)}, and ${streetLots(3).length} at score ${streetCost(3)}.`,
-        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
+        `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress stay until the expedition is reset.`,
       ],
     },
   ],
@@ -200,7 +200,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Lifecycle and health values',
       paragraphs: [
-        `Players start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest lit hearth with a ${TOWN_SPAWN_RADIUS}-unit offset. A fresh flight stands on that same ring around ${TOWN_HEARTH.name}. Score survives respawn and leave until game over or the UTC calendar month ends. A brief disconnect of up to ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with that score; game over starts a new flight at score ${GAME.STARTING_SCORE}.`,
+        `Players start with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. Explosion duration is ${frameValue(SHIP.EXPLODE_DURATION_FRAMES)}; respawn delay is ${frameValue(SHIP.RESPAWN_DELAY_FRAMES)}; respawns use the nearest lit hearth with a ${TOWN_SPAWN_RADIUS}-unit offset. A fresh flight stands on that same ring around ${TOWN_HEARTH.name}. Score survives respawn and leave until game over. A brief disconnect of up to ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with that score; game over starts a new flight at score ${GAME.STARTING_SCORE}.`,
         `Health regeneration is ${SHIP.HEALTH_REGEN_RATE} point per second (${calculateHealthRegenPerFrame()} per frame) after a ${SHIP.HEALTH_REGEN_DELAY} second delay (${calculateHealthRegenDelayFrames()} frames).`,
       ],
     },

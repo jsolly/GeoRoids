@@ -159,19 +159,16 @@ test('nests never materialize beside a pilot, inside completed sectors, or in a 
   expect(manager.snapshot().spiders.length).toBeGreaterThan(0);
 });
 
-test('a furnace site inside 360 of a nest home covers that nest, and a site on the radius does not', () => {
+test('a furnace site inside nest occupancy covers that nest, and a site on the occupancy edge does not', () => {
   const { manager, step } = setup();
   step();
   expect(manager.snapshot().nests).toHaveLength(1);
+  const occupancy = SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS;
+  expect(manager.furnaceWouldCoverNest({ x: home.x + occupancy - 1, y: home.y })).toBe(true);
   expect(
     manager.furnaceWouldCoverNest({ x: home.x + SPIDER.FURNACE_SAFE_RADIUS - 1, y: home.y })
   ).toBe(true);
-  expect(manager.furnaceWouldCoverNest({ x: home.x + SPIDER.FURNACE_SAFE_RADIUS, y: home.y })).toBe(
-    false
-  );
-  expect(
-    manager.furnaceWouldCoverNest({ x: home.x + SPIDER.FURNACE_SAFE_RADIUS + 1, y: home.y })
-  ).toBe(false);
+  expect(manager.furnaceWouldCoverNest({ x: home.x + occupancy, y: home.y })).toBe(false);
   expect(manager.snapshot().nests).toHaveLength(1);
 });
 

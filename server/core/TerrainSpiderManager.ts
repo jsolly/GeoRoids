@@ -160,12 +160,14 @@ export class TerrainSpiderManager {
   }
 
   /**
-   * True when a furnace at `position` would cover a known nest home with its
-   * spider-safe radius. Cleared deposits (web gone) are not keep-out.
+   * True when a furnace at `position` would occupy a known nest home the same
+   * way standing hearths hide webs and cull guards: dist < FURNACE_SAFE_RADIUS
+   * + HIT_RADIUS. Cleared deposits (web gone) are not keep-out.
    */
   public furnaceWouldCoverNest(position: Position): boolean {
     return this.nestMarkers.some(
-      (nest) => distanceBetween(position, nest.position) < SPIDER.FURNACE_SAFE_RADIUS
+      (nest) =>
+        distanceBetween(position, nest.position) < SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
     );
   }
 

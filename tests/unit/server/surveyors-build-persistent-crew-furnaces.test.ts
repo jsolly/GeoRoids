@@ -386,17 +386,45 @@ test('building a furnace inside a nest home spider-safe radius fails without wip
   );
 });
 
-test('building a furnace just outside a nest home spider-safe radius still succeeds', () => {
+test('building a furnace on the spider-safe radius still fails because it would occupy the nest', () => {
   const engine = new GameEngine(42);
   const scout = builder(engine);
   awakenNest(engine, scout.actor);
+  const before = structuredClone(engine.getSpiderField());
   scout.actor.position = { x: nestHome.x - SPIDER.FURNACE_SAFE_RADIUS, y: nestHome.y };
+  scout.actor.abilityCooldownFrames = 0;
+  expect(engine.useAbility(scout.actor.id)).toBe(false);
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.NEST);
+  expect(scout.actor.abilityCooldownFrames).toBe(0);
+  expect(engine.getGameState().builtFurnaces ?? []).toEqual([]);
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceOneFrame();
+  }
+  expect(engine.getSpiderField().nests).toEqual(before.nests);
+});
+
+test('building a furnace just outside nest occupancy still succeeds and leaves the nest', () => {
+  const engine = new GameEngine(42);
+  const scout = builder(engine);
+  awakenNest(engine, scout.actor);
+  scout.actor.position = {
+    x: nestHome.x - (SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS),
+    y: nestHome.y,
+  };
   scout.actor.abilityCooldownFrames = 0;
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBeUndefined();
   expect(engine.useAbility(scout.actor.id)).toBe(true);
   expect(engine.furnaceBuildNotice()).toBe(FURNACE_BUILD.NOTICE.BUILT);
   expect(engine.getGameState().builtFurnaces).toHaveLength(1);
   expect(scout.actor.abilityCooldownFrames).toBeGreaterThan(0);
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceOneFrame();
+  }
+  expect(
+    engine
+      .getSpiderField()
+      .nests.some((nest) => nest.position.x === nestHome.x && nest.position.y === nestHome.y)
+  ).toBe(true);
 });
 
 test('a nest-blocked furnace build toasts the placing Surveyor without spending a slot', () => {

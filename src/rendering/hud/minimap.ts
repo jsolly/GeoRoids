@@ -4,7 +4,6 @@ import {
   explorationCellsInView,
   isCellExplored,
 } from '../../../shared/exploration';
-import { FURNACES } from '../../../shared/furnaces';
 import { sectorBounds } from '../../../shared/sectors';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
@@ -24,7 +23,11 @@ import { getKitHullOutline, projectHullPolyline } from '../../entities/ship/hull
 import type { Ship } from '../../entities/ship/Ship';
 import { strokePhosphorPolyline } from '../../entities/ship/shipRenderer';
 import { activeScanners, scannedMaterial } from '../../entities/ship/surveyScan';
-import { getCompletedSectors, getWorldExploration } from '../../network/worldExploration';
+import {
+  getCompletedSectors,
+  getWorldExploration,
+  worldFurnaces,
+} from '../../network/worldExploration';
 import { getSpiderField } from '../../physics/terrain/spiderSession';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
@@ -513,7 +516,7 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
   ctx.save();
   ctx.lineWidth = 1;
   ctx.shadowBlur = resolveGlow(4);
-  for (const furnace of FURNACES) {
+  for (const furnace of worldFurnaces.nearby(geometry.center, geometry.radius)) {
     if (!isExploredPosition(geometry, furnace.position)) {
       continue;
     }

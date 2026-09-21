@@ -3,6 +3,7 @@ import { logger } from '../../setup/serverLogger';
 import { tickAsteroidBoost } from '../../shared/asteroidBoost';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { isColossalAsteroid } from '../../shared/asteroidScale';
+import { FurnaceField } from '../../shared/furnaceField';
 import { WORLD } from '../../shared/world';
 import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
 import { DAMAGE, DEBUG, GAME, ROID } from '../../src/constants';
@@ -57,7 +58,10 @@ export class AsteroidManager {
   private readonly SPLIT_SIZE_RATIO = 0.6; // New asteroids are 60% of original size
   private readonly COLOSSAL_SPLIT_SIZE_RATIO = 0.5;
 
-  constructor(rngService: RNGService) {
+  constructor(
+    rngService: RNGService,
+    private readonly furnaces = new FurnaceField()
+  ) {
     this.rng = rngService;
   }
 
@@ -146,7 +150,7 @@ export class AsteroidManager {
     }
 
     for (const asteroid of this.asteroids.values()) {
-      tickAsteroidBoost(asteroid);
+      tickAsteroidBoost(asteroid, this.furnaces);
       const next = stepAsteroidMotion(asteroid.position, asteroid.velocity);
       asteroid.position = next.position;
       asteroid.velocity = next.velocity;

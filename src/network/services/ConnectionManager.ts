@@ -40,6 +40,7 @@ import { playLootPickup, playTapEjection, resetResourceMusic } from '../../audio
 import { stopSatelliteOrbit, syncSatelliteOrbit } from '../../audio/satelliteOrbitSound';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
 import { PALETTE, ROID } from '../../constants';
+import { GameStateManager } from '../../core/services/GameStateManager';
 import {
   noteDebugPingSent,
   noteDebugPong,
@@ -77,6 +78,7 @@ import {
   setCompletedSectors,
   setWorldExploration,
   setWorldMapAssets,
+  worldFurnaces,
 } from '../worldExploration';
 import {
   applyAsteroidFieldPartition,
@@ -1094,6 +1096,11 @@ export class ConnectionManager {
       case 'tapEjected':
         this.handleTapEjected(data);
         break;
+      case 'furnaceBuildResult':
+        if (typeof data === 'string') {
+          GameStateManager.getInstance().setNotice(data);
+        }
+        break;
       case 'furnaceDelivery':
         this.handleFurnaceDelivery(data as FurnaceDelivery);
         break;
@@ -1338,6 +1345,7 @@ export class ConnectionManager {
     setSpiderField(data.spiderField);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
+    worldFurnaces.replace(data.builtFurnaces ?? []);
     setCompletedSectors(data.completedSectors);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
@@ -1418,22 +1426,22 @@ export class ConnectionManager {
           entity.type === 'local'
             ? surveyorUtilityOf(entity.ship)
             : (entityData.surveyorUtility ?? surveyorUtilityOf(entity.ship));
-        const surveyorProbeSelected =
-          entity.ship.kitId === 'surveyor' && snapshotUtility === 'survey_probe';
+        const surveyorToolSelected =
+          entity.ship.kitId === 'surveyor' && snapshotUtility !== 'mineral_scan';
         const serverCooldown = entityData.abilityCooldownFrames ?? 0;
         // Mineral Scan predicts its cooldown on send. A snapshot that still
-        // reads 0 must not clear that timer before the server echo. Probe
-        // misses stay at 0 on the server and must remain usable.
+        // reads 0 must not clear that timer before the server echo. Failed
+        // probe launches and furnace builds stay at 0 and remain usable.
         if (
           entity.type !== 'local' ||
           entity.ship.kitId !== 'surveyor' ||
-          surveyorProbeSelected ||
+          surveyorToolSelected ||
           serverCooldown > 0 ||
           entity.ship.abilityCooldownFrames <= 0
         ) {
           entity.ship.abilityCooldownFrames = serverCooldown;
         }
-        entity.ship.abilityActiveFrames = surveyorProbeSelected
+        entity.ship.abilityActiveFrames = surveyorToolSelected
           ? 0
           : (entityData.abilityActiveFrames ?? 0);
         if (entityData.laserUpgrade) {

@@ -6,6 +6,7 @@ import {
   removeBoostOwner,
 } from '../../../shared/asteroidBoost';
 import { asteroidCrewNeeded, isColossalAsteroid } from '../../../shared/asteroidScale';
+import type { FurnaceField } from '../../../shared/furnaceField';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type {
   AsteroidBoost,
@@ -60,6 +61,7 @@ export interface AbilityBody {
 }
 
 export interface AbilityWorld {
+  furnaces?: FurnaceField;
   asteroids: readonly AbilityBody[];
 }
 
@@ -164,7 +166,7 @@ export function setSurveyorUtilityOnHost(
   host.surveyorUtility = utilityId;
   if (changed) {
     // A tool swap cannot leave a predicted Mineral Scan pulse running while
-    // Survey Probe is equipped. The authoritative cooldown is preserved.
+    // another tool is equipped. The authoritative cooldown is preserved.
     host.abilityActiveFrames = 0;
   }
   return true;
@@ -428,7 +430,7 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
         if (boostOwnerIds(armed).length < asteroidCrewNeeded(abilityBodySize(target))) {
           return { activated: true, abilityId: 'harpoon' };
         }
-        target.boost = igniteBoost(armed, furnaceHeading(target.position));
+        target.boost = igniteBoost(armed, furnaceHeading(target.position, world?.furnaces));
         host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
       } else if (world) {
         if (ownsArmedBoost && host.id && armed && target) {
@@ -473,7 +475,11 @@ export function activateAbilityOnHost(host: AbilityHost, world?: AbilityWorld): 
       target.boost =
         target.boost?.phase === 'armed'
           ? addBoostOwner(target.boost, host.id)
-          : { phase: 'armed', ownerId: host.id, angle: furnaceHeading(target.position) };
+          : {
+              phase: 'armed',
+              ownerId: host.id,
+              angle: furnaceHeading(target.position, world?.furnaces),
+            };
     }
     host.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES[kit.id];
     host.harpoonTargetId = target.id;

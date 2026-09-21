@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
+import { validBuiltFurnaces } from '../../shared/furnaceField';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
 import { readCompletedSectorIds } from '../../shared/sectors';
@@ -11,6 +12,7 @@ import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
+  BuiltFurnace,
   ExplorationTile,
   Position,
   ShipBoostState,
@@ -74,6 +76,7 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
+  builtFurnaces?: BuiltFurnace[];
   seed: number;
   startedAt: number;
   generation: number;
@@ -416,8 +419,15 @@ export class WorldStore {
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
+    if ('builtFurnaces' in value && !validBuiltFurnaces(value.builtFurnaces)) {
+      throw new Error('Saved furnaces are invalid; refusing to replace player structures');
+    }
     return {
       seed: value.seed,
+      builtFurnaces:
+        'builtFurnaces' in value && validBuiltFurnaces(value.builtFurnaces)
+          ? value.builtFurnaces
+          : [],
       startedAt: value.startedAt,
       generation:
         'generation' in value &&

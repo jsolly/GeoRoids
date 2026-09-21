@@ -1,7 +1,7 @@
 ---
 title: Surveyor
 category: Ships
-summary: A nimble scout with shared mineral scans and mobile probe beacons.
+summary: A nimble scout with shared mineral scans, mobile probe beacons, and furnace construction.
 order: 30
 related:
   - content/wiki/controls.md
@@ -31,6 +31,9 @@ classification remains with that rock; unscanned rocks keep a small slate rock o
 While the scan is active, a thin cyan radar sweep pulses from the hull to the
 edge of the viewport. The sweep is a visual cue and does not expand the scan
 range.
+While Mineral Scan is active, spiders within its range flee from the Surveyor
+and stop biting, including spiders chasing a teammate. They can resume hunting
+when the scan ends or they leave its range. Survey Probes do not repel spiders.
 The ability has a cooldown and costs no resource.
 
 Surveyor also reveals a 650-unit radius around its hull for the shared
@@ -75,6 +78,28 @@ it is nearly empty. Each Surveyor can keep a limited number of probes active;
 a successful attachment beyond that limit replaces their oldest probe.
 Switching tools does not remove existing beacons. Probes are temporary equipment
 and do not survive a server restart.
+
+## Build furnace
+
+Equip Build Furnace in the ship schematic, then press E or tap Build to place a
+furnace at your ship's position. Building costs no resource and shares Mineral
+Scan's cooldown. A failed placement uses neither a slot nor a cooldown; the HUD
+explains why it failed. Move clear of other furnaces, completed-sector walls,
+and the world edge before trying again.
+
+Each pilot can build up to three furnaces. Fixed map furnaces do not count
+against that limit, and reaching it blocks further construction. The schematic
+shows how many you have built. Your furnaces survive death, changing ships,
+reconnecting with the same saved pilot credential, and server restarts. They
+reset with the world at the next monthly season. Clearing your browser's saved
+pilot credential creates a different pilot; it does not reclaim old furnaces.
+
+Everyone can use a built furnace. It accepts towed and boosted ore and consumes towed spiders, awards the
+usual delivery credit, guides nearby boosted cargo, provides the usual spider
+safe area, and can serve as a nearby respawn site. Discovered furnaces appear on
+the local radar and universe map. Building itself awards no delivery points.
+Furnaces cannot be moved or dismantled. Sectors touched by a furnace intake stay open, so mapping and mining them
+cannot wall off your delivery site.
 
 ## Satellite inventory
 

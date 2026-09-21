@@ -69,7 +69,9 @@
     "src/network/services/PlayerMotionReconciliation.ts",
     "tests/unit/entities/boost-runs-out-and-refills.test.ts",
     "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts",
-    "src/rendering/hud/resourceMapMark.ts"
+    "src/rendering/hud/resourceMapMark.ts",
+    "shared/furnaceField.ts",
+    "server/core/TerrainSpiderManager.ts"
   ],
   "hauler": [
     "src/entities/ship/shipKits.ts",
@@ -211,7 +213,10 @@
     "tests/unit/shared/furnaces.test.ts",
     "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts",
     "src/audio/spiderWhimper.ts",
-    "tests/unit/audio/spiders-whimper-once-when-the-furnace-consumes-them.test.ts"
+    "tests/unit/audio/spiders-whimper-once-when-the-furnace-consumes-them.test.ts",
+    "shared/furnaceField.ts",
+    "server/core/GameEngine.ts",
+    "tests/unit/server/mineral-scans-drive-spiders-away.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -337,7 +342,10 @@
     "src/ui/shipKitSelect.ts",
     "src/rendering/hud/resourceMapMark.ts",
     "tests/unit/shared/furnaces.test.ts",
-    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts"
+    "tests/unit/server/completed-sectors-wall-off-and-relocate-pilots.test.ts",
+    "shared/furnaceField.ts",
+    "server/core/GameEngine.ts",
+    "server/core/TerrainSpiderManager.ts"
   ],
   "surveyor": [
     "src/entities/ship/shipKits.ts",
@@ -366,7 +374,10 @@
     "src/rendering/hud/resourceMapMark.ts",
     "server/core/TerrainSpiderManager.ts",
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts",
-    "tests/integration/browser/e2e/surveyor-tags-a-spider-with-a-moving-beacon.test.ts"
+    "tests/integration/browser/e2e/surveyor-tags-a-spider-with-a-moving-beacon.test.ts",
+    "shared/furnaceField.ts",
+    "tests/unit/server/surveyors-build-persistent-crew-furnaces.test.ts",
+    "tests/unit/server/mineral-scans-drive-spiders-away.test.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",
@@ -442,6 +453,8 @@
     "tests/unit/shared/sectors.test.ts",
     "tests/unit/shared/furnaces.test.ts",
     "tests/unit/shared/utc-score-season.test.ts",
-    "src/rendering/hud/resourceMapMark.ts"
+    "src/rendering/hud/resourceMapMark.ts",
+    "shared/furnaceField.ts",
+    "server/core/TerrainSpiderManager.ts"
   ]
 }

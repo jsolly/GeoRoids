@@ -24,6 +24,7 @@ import type {
   TerrainSpider,
 } from '../shared-types';
 import { validExploration } from './exploration';
+import { validBuiltFurnaces } from './furnaceField';
 import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
@@ -59,6 +60,7 @@ const haulerUtility = enumeration<HaulerUtilityId>({
 const surveyorUtility = enumeration<SurveyorUtilityId>({
   mineral_scan: true,
   survey_probe: true,
+  build_furnace: true,
 });
 const lootKind = enumeration<LootKind>({
   shard: true,
@@ -283,6 +285,7 @@ const spiderField = shape<SpiderFieldState>({
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
+  builtFurnaces: optional(validBuiltFurnaces),
   spiderField: optional(spiderField),
   exploration: validExploration,
   completedSectors: array(sectorIdentity),

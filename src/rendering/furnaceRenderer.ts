@@ -1,8 +1,7 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { FURNACES } from '../../shared/furnaces';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
-import { getWorldExploration } from '../network/worldExploration';
+import { getWorldExploration, worldFurnaces } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
 import type { DrawingContext } from './drawingContext';
@@ -122,7 +121,10 @@ export function drawFurnacesRelative(viewerPosition: Position): void {
   const viewport = canvasManager.getViewportSize();
   const exploration = getWorldExploration();
   const now = performance.now();
-  for (const furnace of FURNACES) {
+  for (const furnace of worldFurnaces.nearby(
+    viewerPosition,
+    Math.hypot(viewport.width, viewport.height) / scale + 200
+  )) {
     const cell = explorationCellAt(furnace.position);
     if (cell === null || !isCellExplored(exploration, cell)) {
       continue;

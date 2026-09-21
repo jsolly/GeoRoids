@@ -9,9 +9,10 @@ export class MapAssets {
   snapshot(
     exploration: readonly ExplorationTile[],
     loot: readonly LootData[],
-    pickups: readonly SatellitePickupData[]
+    pickups: readonly SatellitePickupData[],
+    builtFurnaces: readonly (typeof FURNACES)[number][] = []
   ): MapAsset[] {
-    const candidates: MapAsset[] = FURNACES.map((furnace) => ({
+    const candidates: MapAsset[] = [...FURNACES, ...builtFurnaces].map((furnace) => ({
       id: `furnace:${furnace.id}`,
       kind: 'furnace',
       position: furnace.position,

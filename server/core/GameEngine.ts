@@ -14,7 +14,8 @@ import { asteroidCrewNeeded, isColossalAsteroid } from '../../shared/asteroidSca
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
-import { FURNACES, furnaceReward, isFurnaceSector } from '../../shared/furnaces';
+import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
+import { furnaceReward } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
@@ -64,7 +65,9 @@ import {
   isTowCableUtility,
 } from '../../src/entities/ship/haulerUtility';
 import {
+  abilityCooldownFramesFor,
   activateAbilityOnHost,
+  canActivateAbility,
   clearHaulerLatch,
   pullHarpoonTarget,
   setHaulerUtilityOnHost,
@@ -226,6 +229,7 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
   exploration: ExplorationTile[];
+  builtFurnaces: ReturnType<FurnaceField['snapshot']>;
   completedSectors: number;
   scoreSeason: string;
   startedAt: number;
@@ -243,6 +247,7 @@ type PendingShockwave = {
 export class GameEngine {
   private exploration = new ExplorationMap();
   private mapAssets = new MapAssets();
+  private readonly furnaces = new FurnaceField();
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
   private worldStartedAt: number;
@@ -337,11 +342,12 @@ export class GameEngine {
       this.completedSectors
     );
     if (loaded?.world) {
+      this.furnaces.replace(loaded.world.builtFurnaces ?? []);
       this.exploration.restore(loaded.world.exploration);
       for (const id of loaded.world.completedSectors) {
         // Older worlds could complete a Works yard when the hearth sat on a
         // corner. Those sectors stay flyable so delivery still has an approach.
-        if (isFurnaceSector(id)) {
+        if (this.furnaces.hasSector(id)) {
           continue;
         }
         this.completedSectors.add(id);
@@ -357,11 +363,15 @@ export class GameEngine {
       this.pilots.set(pilot.id, pilot);
     }
     persistence?.onFailure((cause) => this.failPersistence(cause));
-    this.entityManager = new EntityManager(this.rngService, () => this.getServerTime());
-    this.asteroidManager = new AsteroidManager(this.rngService);
+    this.entityManager = new EntityManager(
+      this.rngService,
+      () => this.getServerTime(),
+      this.furnaces
+    );
+    this.asteroidManager = new AsteroidManager(this.rngService, this.furnaces);
     this.lootManager = new LootManager(this.rngService);
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
-    this.spiderManager = new TerrainSpiderManager(() => this.rngService.random());
+    this.spiderManager = new TerrainSpiderManager(() => this.rngService.random(), this.furnaces);
     ensureTerrain(this.worldSeed);
   }
 
@@ -681,6 +691,7 @@ export class GameEngine {
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
+    this.furnaces.replace([]);
     this.completedSectors.clear();
     this.rngService.reset();
     this.createAsteroids(scenario === 'combat' ? 80 : ROID.INITIAL_ROID_COUNT);
@@ -698,6 +709,7 @@ export class GameEngine {
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
+    this.furnaces.replace([]);
     this.completedSectors.clear();
     this.playerMotion.reset();
     this.entityManager.clearAll();
@@ -800,7 +812,7 @@ export class GameEngine {
         continue;
       }
       const parsed = parseSectorId(id);
-      if (!parsed || isFurnaceSector(id) || !this.regionalField.hasVisited(id)) {
+      if (!parsed || this.furnaces.hasSector(id) || !this.regionalField.hasVisited(id)) {
         continue;
       }
       if ((remaining.get(id) ?? 0) > 0) {
@@ -1100,6 +1112,7 @@ export class GameEngine {
     this.regionalField.reset();
     this.exploration.reset();
     this.mapAssets.reset();
+    this.furnaces.replace([]);
     this.completedSectors.clear();
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
@@ -1187,6 +1200,7 @@ export class GameEngine {
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
       exploration: this.exploration.snapshot(),
+      builtFurnaces: this.furnaces.snapshot(),
       completedSectors: this.completedSectors.size,
       scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
@@ -1197,6 +1211,7 @@ export class GameEngine {
     if (
       last &&
       last.exploration === builtFrom.exploration &&
+      last.builtFurnaces === builtFrom.builtFurnaces &&
       last.completedSectors === builtFrom.completedSectors &&
       last.scoreSeason === builtFrom.scoreSeason &&
       last.startedAt === builtFrom.startedAt &&
@@ -1215,6 +1230,7 @@ export class GameEngine {
         scoreSeason: this.scoreSeason,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
+        builtFurnaces: this.furnaces.snapshot(),
         completedSectors: [...this.completedSectors].sort(),
       },
       builtFrom,
@@ -1395,6 +1411,10 @@ export class GameEngine {
           ? { spawnProtectionTimer: entity.spawnProtectionTimer }
           : {}),
         radius: hullRadiusForKit(entity.kitId),
+        scanning:
+          entity.kitId === 'surveyor' &&
+          surveyorUtilityOf(entity) === 'mineral_scan' &&
+          entity.abilityActiveFrames > 0,
       })),
       completedSectors: this.completedSectors,
       nowFrame: this.gameTime,
@@ -2642,7 +2662,13 @@ export class GameEngine {
     const loot = this.lootManager.getAll();
     const satellitePickups = this.satellitePickupManager.getAllPickups();
     const gameState = {
-      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups),
+      builtFurnaces: this.furnaces.snapshot(),
+      mapAssets: this.mapAssets.snapshot(
+        exploration,
+        loot,
+        satellitePickups,
+        this.furnaces.snapshot()
+      ),
       exploration: this.exploration.snapshot(),
       completedSectors: [...this.completedSectors].sort(),
       entities: allEntities.map(
@@ -2710,6 +2736,9 @@ export class GameEngine {
       return false;
     }
     if (entity.kitId === 'surveyor') {
+      if (surveyorUtilityOf(entity) === 'build_furnace') {
+        return this.buildFurnace(entity);
+      }
       if (surveyorUtilityOf(entity) === 'survey_probe') {
         return this.launchSurveyProbe(entity);
       }
@@ -2723,6 +2752,7 @@ export class GameEngine {
       this.entityManager.getAllEntities().map((actor) => actor.harpoonTargetId)
     );
     const world = {
+      furnaces: this.furnaces,
       asteroids: [
         ...this.getAllAsteroids().filter((asteroid) =>
           this.haulerCanTarget(entity, asteroid, cargo)
@@ -2810,6 +2840,50 @@ export class GameEngine {
       ({ ownerId, position, asteroids }) =>
         this.surveyFromPosition(ownerId, position, asteroids, SURVEY_PROBE.RANGE)
     );
+  }
+
+  public furnaceBuildIssue(entityId: string): string | undefined {
+    const surveyor = this.getPlayer(entityId);
+    if (
+      surveyor?.kitId !== 'surveyor' ||
+      !canActivateAbility(surveyor) ||
+      surveyor.respawnTimer !== undefined
+    ) {
+      return 'Furnace builder not ready';
+    }
+    if (this.furnaces.count(surveyor.id) >= FURNACE_BUILD.MAX_PER_OWNER) {
+      return 'Furnace limit reached (3/3)';
+    }
+    if (
+      !Number.isFinite(surveyor.position.x) ||
+      !Number.isFinite(surveyor.position.y) ||
+      Math.hypot(surveyor.position.x, surveyor.position.y) >
+        WORLD.radius - FURNACE_BUILD.WORLD_INSET ||
+      shipOverlapsCompletedSector(surveyor.position, FURNACE_BUILD.RADIUS, this.completedSectors)
+    ) {
+      return 'Move clear of the world or sector wall';
+    }
+    if (this.furnaces.nearby(surveyor.position, FURNACE_BUILD.MIN_DISTANCE).length > 0) {
+      return 'Too close to another furnace';
+    }
+    return undefined;
+  }
+
+  private buildFurnace(surveyor: GameEntity): boolean {
+    if (this.furnaceBuildIssue(surveyor.id)) {
+      return false;
+    }
+    const count = this.furnaces.count(surveyor.id);
+    this.furnaces.add({
+      id: `built:${surveyor.id}:${count + 1}`,
+      ownerId: surveyor.id,
+      name: `${surveyor.name}'s Works ${count + 1}`,
+      position: { ...surveyor.position },
+      radius: FURNACE_BUILD.RADIUS,
+    });
+    surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
+    surveyor.abilityActiveFrames = 0;
+    return true;
   }
 
   private launchSurveyProbe(surveyor: GameEntity): boolean {
@@ -3024,11 +3098,13 @@ export class GameEngine {
       if (!rock || rock.health <= 0) {
         continue;
       }
-      const furnace = FURNACES.find(
-        (site) =>
-          Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
-          site.radius
-      );
+      const furnace = this.furnaces
+        .nearby(rock.position, FURNACE_BUILD.RADIUS)
+        .find(
+          (site) =>
+            Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
+            site.radius
+        );
       if (
         !furnace ||
         Math.hypot(hauler.position.x - furnace.position.x, hauler.position.y - furnace.position.y) >
@@ -3042,11 +3118,13 @@ export class GameEngine {
       if (rock.health <= 0 || rock.boost?.phase !== 'burning') {
         continue;
       }
-      const furnace = FURNACES.find(
-        (site) =>
-          Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
-          site.radius
-      );
+      const furnace = this.furnaces
+        .nearby(rock.position, FURNACE_BUILD.RADIUS)
+        .find(
+          (site) =>
+            Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
+            site.radius
+        );
       if (furnace) {
         deliveries.push(this.deliverAsteroid(rock, furnace, boostOwnerIds(rock.boost)));
       }
@@ -3056,7 +3134,7 @@ export class GameEngine {
 
   private deliverAsteroid(
     rock: AsteroidData,
-    furnace: (typeof FURNACES)[number],
+    furnace: ReturnType<FurnaceField['nearest']>,
     ownerIds: readonly string[]
   ): FurnaceDelivery {
     this.removeAsteroid(rock.id);

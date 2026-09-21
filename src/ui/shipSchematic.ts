@@ -1,3 +1,4 @@
+import { FURNACE_BUILD } from '../../shared/furnaceField';
 import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE, VISUAL } from '../constants';
@@ -28,6 +29,8 @@ import {
   surveyorUtilityOf,
 } from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
+import { worldFurnaces } from '../network/worldExploration';
+import { drawFurnaceArtwork } from '../rendering/furnaceRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { renderSatelliteInventory, satelliteInventoryDescription } from './satelliteInventory';
@@ -298,7 +301,12 @@ function syncCards(): void {
   if (!hauler) {
     const part = SURVEYOR_UTILITY[selectedSurveyorUtility];
     elements.title.textContent = part.name;
-    elements.copy.textContent = part.copy;
+    const player = PlayerManager.getInstance().getLocalPlayer();
+    elements.copy.textContent =
+      part.copy +
+      (selectedSurveyorUtility === 'build_furnace' && player
+        ? ` Built: ${worldFurnaces.count(player.id)}/${FURNACE_BUILD.MAX_PER_OWNER}.`
+        : '');
     for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
       const active = button.dataset['utilityId'] === selectedSurveyorUtility;
       button.classList.toggle('is-active', active);
@@ -619,8 +627,12 @@ function drawToolLoop(
     strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'surveyor');
     ctx.shadowBlur = 0;
     ctx.strokeStyle = PALETTE.HUD_MUTED;
-    drawDemoAsteroid(ctx, rockX, rockY, 13, now / 900);
-    if (selectedSurveyorUtility === 'mineral_scan') {
+    if (selectedSurveyorUtility !== 'build_furnace') {
+      drawDemoAsteroid(ctx, rockX, rockY, 13, now / 900);
+    }
+    if (selectedSurveyorUtility === 'build_furnace') {
+      drawFurnaceArtwork(ctx, width * 0.7, midY, 20, now);
+    } else if (selectedSurveyorUtility === 'mineral_scan') {
       ctx.strokeStyle = PALETTE.LOOT;
       ctx.globalAlpha = 0.35 + pulse * 0.45;
       for (const ring of [14, 23, 32]) {
@@ -915,7 +927,14 @@ export function initializeShipSchematic(options?: { onOpen?: () => void }): void
     const rect = hullCanvas.getBoundingClientRect();
     const left = ev.clientX < rect.left + rect.width / 2;
     if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId === 'surveyor') {
-      equipSurveyorUtility(left ? 'mineral_scan' : 'survey_probe');
+      const index = Math.min(
+        SURVEYOR_UTILITY_IDS.length - 1,
+        Math.max(
+          0,
+          Math.floor(((ev.clientX - rect.left) / rect.width) * SURVEYOR_UTILITY_IDS.length)
+        )
+      );
+      equipSurveyorUtility(SURVEYOR_UTILITY_IDS[index] ?? 'mineral_scan');
     } else {
       equipUtility(left ? 'tow_cable' : 'resource_tap');
     }

@@ -4,7 +4,7 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
-import { FURNACES } from '../../shared/furnaces';
+import { FurnaceField } from '../../shared/furnaceField';
 import { fullShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
@@ -78,7 +78,11 @@ export class EntityManager {
   private rng: RNGService;
   private readonly now: () => number;
 
-  constructor(rngService: RNGService, now: () => number = () => Date.now()) {
+  constructor(
+    rngService: RNGService,
+    now: () => number = () => Date.now(),
+    private readonly furnaces = new FurnaceField()
+  ) {
     this.rng = rngService;
     this.now = now;
   }
@@ -398,13 +402,7 @@ export class EntityManager {
   }
 
   private placeEntityInArena(entity: GameEntity): void {
-    const station = FURNACES.reduce((nearest, site) =>
-      !nearest ||
-      Math.hypot(site.position.x - entity.position.x, site.position.y - entity.position.y) <
-        Math.hypot(nearest.position.x - entity.position.x, nearest.position.y - entity.position.y)
-        ? site
-        : nearest
-    );
+    const station = this.furnaces.nearest(entity.position);
     const angle = this.rng.random() * Math.PI * 2;
     entity.position = {
       x: (station?.position.x ?? 0) + Math.cos(angle) * 180,

@@ -494,6 +494,17 @@ export class MessageHandler {
       : undefined;
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
+    if (socketPlayer.kitId === 'surveyor' && socketPlayer.surveyorUtility === 'build_furnace') {
+      ws.send(
+        JSON.stringify({
+          type: 'furnaceBuildResult',
+          data: activated
+            ? 'Furnace built'
+            : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
+          timestamp: Date.now(),
+        })
+      );
+    }
     if (!activated) {
       return;
     }

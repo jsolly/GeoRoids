@@ -1,9 +1,10 @@
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
-import { FURNACES } from '../../shared/furnaces';
+import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
 import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { SPIDER } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-types';
+import { SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import { sampleGradient } from '../../src/physics/terrain/heightfield';
 import { getTerrainField } from '../../src/physics/terrain/terrainSession';
 import type { SpiderResource } from './spiderResources';
@@ -16,6 +17,7 @@ interface SpiderActor {
   respawnTimer?: number;
   spawnProtectionTimer?: number;
   radius?: number;
+  scanning?: boolean;
 }
 
 interface SpiderAdvanceOptions {
@@ -140,7 +142,10 @@ export class TerrainSpiderManager {
   private spawnTargetIndex = 0;
   private completedSectors: ReadonlySet<string> = new Set();
 
-  public constructor(private readonly random: () => number = Math.random) {}
+  public constructor(
+    private readonly random: () => number = Math.random,
+    private readonly furnaces = new FurnaceField()
+  ) {}
 
   public snapshot(): SpiderFieldState {
     return {
@@ -553,6 +558,42 @@ export class TerrainSpiderManager {
     nowFrame: number,
     attacks: SpiderAttack[]
   ): void {
+    const scanner = players
+      .filter(
+        (player) =>
+          player.scanning &&
+          distanceBetween(player.position, spider.position) <= SHIP_ABILITY.SCAN_RANGE
+      )
+      .sort(
+        (a, b) =>
+          distanceBetween(a.position, spider.position) -
+          distanceBetween(b.position, spider.position)
+      )[0];
+    if (scanner) {
+      spider.phase = 'scuttling';
+      spider.targetId = null;
+      const away =
+        distanceBetween(spider.position, scanner.position) > POSITION_EPSILON
+          ? Math.atan2(
+              spider.position.y - scanner.position.y,
+              spider.position.x - scanner.position.x
+            )
+          : spider.angle;
+      // A blocked exit may slide along a sector or world edge, but never toward the scanner.
+      for (const turn of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]) {
+        const angle = away + turn;
+        const next = {
+          x: spider.position.x + Math.cos(angle) * SPIDER.HUNT_SPEED,
+          y: spider.position.y + Math.sin(angle) * SPIDER.HUNT_SPEED,
+        };
+        if (this.canOccupy(next, SPIDER.HIT_RADIUS, completedSectors)) {
+          spider.angle = normalizeAngle(angle);
+          spider.position = next;
+          break;
+        }
+      }
+      return;
+    }
     const territory = spider.territory;
     if (territory.kind === 'guard') {
       if (
@@ -642,10 +683,13 @@ export class TerrainSpiderManager {
   }
 
   private consumeAtFurnace(spider: RuntimeSpider, start: Position): boolean {
-    const furnace = FURNACES.find(
-      (site) =>
-        segmentCircleContact(start, spider.position, site.position, site.radius) !== undefined
-    );
+    const midpoint = { x: (start.x + spider.position.x) / 2, y: (start.y + spider.position.y) / 2 };
+    const furnace = this.furnaces
+      .nearby(midpoint, distanceBetween(start, spider.position) / 2 + FURNACE_BUILD.RADIUS)
+      .find(
+        (site) =>
+          segmentCircleContact(start, spider.position, site.position, site.radius) !== undefined
+      );
     if (!furnace) {
       return false;
     }
@@ -662,11 +706,13 @@ export class TerrainSpiderManager {
 
   /** Released cargo walks out of safe areas instead of freezing or attacking inside them. */
   private retreatFromProtection(spider: RuntimeSpider): boolean {
-    const furnace = FURNACES.find(
-      (site) =>
-        distanceBetween(spider.position, site.position) <
-        SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
-    );
+    const furnace = this.furnaces
+      .nearby(spider.position, SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS)
+      .find(
+        (site) =>
+          distanceBetween(spider.position, site.position) <
+          SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
+      );
     const inStarter =
       Math.hypot(spider.position.x, spider.position.y) <
       SPIDER.STARTER_SAFE_RADIUS + SPIDER.HIT_RADIUS;
@@ -774,10 +820,12 @@ export class TerrainSpiderManager {
       Math.hypot(position.x, position.y) <= WORLD.radius - SPIDER.WORLD_INSET &&
       Math.hypot(position.x, position.y) >= SPIDER.STARTER_SAFE_RADIUS + radius &&
       !shipOverlapsCompletedSector(position, radius, completed) &&
-      !FURNACES.some(
-        (furnace) =>
-          distanceBetween(position, furnace.position) < SPIDER.FURNACE_SAFE_RADIUS + radius
-      )
+      !this.furnaces
+        .nearby(position, SPIDER.FURNACE_SAFE_RADIUS + radius)
+        .some(
+          (furnace) =>
+            distanceBetween(position, furnace.position) < SPIDER.FURNACE_SAFE_RADIUS + radius
+        )
     );
   }
 

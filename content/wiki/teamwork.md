@@ -114,3 +114,8 @@ finishing a sector cannot yank a crew backward or spend a life. New spawns
 skip completed sectors. Crossing into a new open sector shows a brief HUD
 notice with that sector's coordinates. The local radar and universe map shade completed sectors green, matching
 their green playfield walls, so closed ground stays distinct from spiderwebs.
+
+Surveyors can equip [Build Furnace](/wiki/#surveyor) to place shared delivery
+sites. Each pilot has a separate construction limit; every crew member can use
+the sites. Built furnaces survive reconnects and server restarts until the
+world resets. Active Mineral Scan also drives nearby spiders away from the crew.

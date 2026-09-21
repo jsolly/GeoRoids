@@ -3,7 +3,7 @@
 # pre-commit gate lib from a private dotagents checkout into Cursor Cloud Agent home paths.
 # Skills → ~/.cursor/skills; agents → ~/.cursor/agents;
 # cited rules → ~/.cursor/dotagents-package/rules;
-# mcps/catalog.json → ~/.cursor/dotagents-package/mcps (so /integration-verify can reconcile live
+# mcps/catalog.json → ~/.cursor/dotagents-package/mcps (so /optimize-workspaces can reconcile live
 # connectors/plugins against the canon on a VM with no laptop checkout);
 # gate/gate-lib.sh → ~/.cursor/dotagents-package/gate/gate-lib.sh (DOTAGENTS_GATE_LIB) plus a
 # stub symlink at ~/code/dotagents/gate/gate-lib.sh so child-repo pre-commit shims that
@@ -26,6 +26,8 @@
 # into the child repo working tree — copies only into VM home paths.
 # Laptop-only skills stay off cloud VMs (skills/laptop-only.txt).
 # skills/work-excluded.txt is a same-name alias for already-copied child installers.
+# Re-runs prune dest skill dirs that are retired or now laptop-only so a leftover
+# copied playbook (for example a deleted skills/integration-verify) cannot stay loadable.
 set -euo pipefail
 
 SKILLS_HOME="${CURSOR_CLOUD_SKILLS_HOME:-${HOME}/.cursor/skills}"
@@ -298,12 +300,24 @@ fi
 
 read_laptop_only "$root"
 
-# --- skills (required) ---
 src_skills="$root/skills"
 if [[ ! -d "$src_skills" ]]; then
   echo "cloud-package: ERROR — no skills/ directory in checkout $root" >&2
   exit 1
 fi
+
+# Currently shipped = source SKILL.md and not laptop-only. Copy and prune
+# both use this so a new skip reason cannot leave a leftover dest loadable.
+should_ship_skill() {
+  local name="$1"
+  [[ -f "$src_skills/$name/SKILL.md" ]] || return 1
+  if is_laptop_only "$name"; then
+    return 1
+  fi
+  return 0
+}
+
+# --- skills (required) ---
 
 mkdir -p "$SKILLS_HOME"
 installed_skills=0
@@ -311,17 +325,21 @@ skipped_excluded=0
 for skill_dir in "$src_skills"/*/; do
   [[ -d "$skill_dir" ]] || continue
   name="$(basename "$skill_dir")"
-  if is_laptop_only "$name"; then
-    echo "cloud-package: skip skill ${name} (laptop-only)"
-    skipped_excluded=$((skipped_excluded + 1))
-    continue
-  fi
-  if [[ ! -f "$skill_dir/SKILL.md" ]]; then
-    echo "cloud-package: skip skill ${name} (no SKILL.md)"
+  if ! should_ship_skill "$name"; then
+    if is_laptop_only "$name"; then
+      echo "cloud-package: skip skill ${name} (laptop-only)"
+      skipped_excluded=$((skipped_excluded + 1))
+    else
+      echo "cloud-package: skip skill ${name} (no SKILL.md)"
+    fi
     continue
   fi
   dest="$SKILLS_HOME/$name"
-  rm -rf "$dest"
+  if [[ -L "$dest" ]]; then
+    rm -f -- "$dest"
+  else
+    rm -rf -- "$dest"
+  fi
   cp -R "$skill_dir" "$dest"
   installed_skills=$((installed_skills + 1))
   echo "cloud-package: installed skill ${name} → ${dest}"
@@ -331,6 +349,39 @@ if [[ "$installed_skills" -eq 0 ]]; then
   echo "cloud-package: ERROR — no skills installed from $root" >&2
   exit 1
 fi
+
+# Copy skips laptop-only names without deleting a previous dest copy, and never
+# sees retired names that left the source tree. Drop dest skill dirs that are
+# no longer shipped (missing source SKILL.md, or now laptop-only). Leave dest
+# dirs that are not skills (no SKILL.md) alone. Directory symlinks are unlinked
+# only — never `rm -rf symlink/`, which follows the referent.
+# SKILLS_HOME is this installer's reconstitution dest on Cloud Agent VMs.
+pruned_skills=0
+shopt -s nullglob
+for dest_path in "$SKILLS_HOME"/*; do
+  dest_dir="${dest_path%/}"
+  [[ -e "$dest_dir" || -L "$dest_dir" ]] || continue
+  name="$(basename "$dest_dir")"
+  if [[ -L "$dest_dir" ]]; then
+    if should_ship_skill "$name"; then
+      continue
+    fi
+    rm -f -- "$dest_dir"
+    pruned_skills=$((pruned_skills + 1))
+    echo "cloud-package: pruned retired skill ${name}"
+    continue
+  fi
+  if [[ ! -d "$dest_dir" || ! -f "$dest_dir/SKILL.md" ]]; then
+    continue
+  fi
+  if should_ship_skill "$name"; then
+    continue
+  fi
+  rm -rf -- "$dest_dir"
+  pruned_skills=$((pruned_skills + 1))
+  echo "cloud-package: pruned retired skill ${name}"
+done
+shopt -u nullglob
 
 # --- agents ---
 src_agents="$root/agents"
@@ -378,7 +429,7 @@ fi
 
 # --- connector/plugin catalog ---
 # The cloud-first canon for MCP servers and marketplace plugins. Copied (not required) so an older
-# checkout still installs skills — a missing catalog degrades /integration-verify's reconciliation to
+# checkout still installs skills — a missing catalog degrades /optimize-workspaces's reconciliation to
 # "canon unavailable", which the receipt discloses rather than inventing green.
 installed_catalog=0
 src_catalog="$root/mcps/catalog.json"
@@ -392,9 +443,9 @@ if [[ -f "$src_catalog" ]]; then
   fi
 else
   # These two files are installer-owned. An older checkout must not leave a
-  # previous revision looking like current canon to integration-verify.
+  # previous revision looking like current canon to /optimize-workspaces.
   rm -f "$MCPS_HOME/catalog.json" "$MCPS_HOME/README.md"
-  echo "cloud-package: WARN — no mcps/catalog.json in $root; /integration-verify cannot reconcile connectors against the canon" >&2
+  echo "cloud-package: WARN — no mcps/catalog.json in $root; /optimize-workspaces cannot reconcile connectors against the canon" >&2
 fi
 
 # --- shared pre-commit gate lib ---
@@ -408,4 +459,4 @@ else
   echo "cloud-package: WARN — no gate/gate-lib.sh in $root; child-repo pre-commits that source DOTAGENTS_GATE_LIB will fail. Do not hand-copy gate-lib.sh into the child working tree." >&2
 fi
 
-echo "cloud-package: done (${installed_skills} skill(s), ${skipped_excluded} laptop-only skipped, ${installed_agents} agent file(s), ${installed_rules} rule file(s), ${installed_catalog} catalog file(s), ${installed_gate} gate lib(s))"
+echo "cloud-package: done (${installed_skills} skill(s), ${skipped_excluded} laptop-only skipped, ${pruned_skills} retired skill(s) pruned, ${installed_agents} agent file(s), ${installed_rules} rule file(s), ${installed_catalog} catalog file(s), ${installed_gate} gate lib(s))"

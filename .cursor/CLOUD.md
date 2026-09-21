@@ -19,7 +19,7 @@ before anonymous HTTPS clone works. There is no public skills mirror.
 | Skills | `~/.cursor/skills/` | Same discovery as laptop `~/.cursor/skills` |
 | Agents | `~/.cursor/agents/` | One `.md` file per reviewer/scanner agent |
 | Cited rules | `~/.cursor/dotagents-package/rules/` | **Read from here** when a skill cites `rules/<name>.md` |
-| Connector catalog | `~/.cursor/dotagents-package/mcps/catalog.json` | The cloud-first canon for MCP servers + marketplace plugins. `/integration-verify` reconciles the live session against it — no laptop checkout needed |
+| Connector catalog | `~/.cursor/dotagents-package/mcps/catalog.json` | The cloud-first canon for MCP servers + marketplace plugins. `/optimize-workspaces` reconciles the live session against it — no laptop checkout needed |
 | Pre-commit gate lib | `~/.cursor/dotagents-package/gate/gate-lib.sh` | Canonical copy. Export `DOTAGENTS_GATE_LIB` to this path. Child `.git-hooks/pre-commit` shims source `${DOTAGENTS_GATE_LIB:-$HOME/code/dotagents/gate/gate-lib.sh}` |
 
 Laptop-only skills (see `skills/laptop-only.txt`) are **not** installed on cloud.
@@ -48,7 +48,7 @@ canonical package path.
 The account's marketplace plugins follow you onto this VM; `~/.cursor/mcp.json` does **not**. The
 canon is `mcps/catalog.json` (copied to `~/.cursor/dotagents-package/mcps/`): it records every
 fleet-worthy connector with its plugin id / remote URL, the surfaces it belongs on, and its rule.
-Run `/integration-verify` to reconcile this session against it. Two standing rules: GitHub MCP access
+Run `/optimize-workspaces` to reconcile this session against it. Two standing rules: GitHub MCP access
 may use the approved marketplace plugin `48677658`, the `github-local` account connector, or `gh` — with the same authorization rules — and
 a connector that crosses repos gets its catalog row in the **same change** that adds it.
 
@@ -76,7 +76,7 @@ require the connector. Catalog installation is not authentication proof.
 
 - `setup/install-local-agent-runtime.sh` and `setup/doctor-agents.sh`
 - User-level `~/.cursor/hooks.json` and other home hooks/guards
-- Laptop-only skills (e.g. `setup-personal-machine`, `create-lambda`)
+- Laptop-only skills (e.g. `setup-personal-machine`, `solly-create-skill`)
 
 ## Skills / slash commands
 
@@ -84,12 +84,35 @@ If slash-skill autocomplete is empty on a **follow-up** turn, invoke the skill b
 (known Agents Window bug; typed invoke still works).
 
 `/verify-ui` ships in this package — use it for UI smoke when the skill is present. If it is
-missing, follow this repo's `AGENTS.md` **Hello-world smoke** and browser integration tests
-instead of a laptop-only UI stanza.
+missing, follow this repo's `AGENTS.md` **Local UI verification** stanza instead.
+
+Product UI must not load runtime CSS/JS from third-party CDNs (jsDelivr, unpkg, cdnjs, esm.sh,
+Google Fonts CSS, and similar). Prefer npm/local packages and first-party origins. Canon: laptop
+global brief **No CDN for app assets**; also this repo's `AGENTS.md` when present.
+
+Vercel Git repos must not auto-Preview every branch. Production stays on `main`; opt-in `/preview`
+only when John asks. Canon: laptop global brief **No automatic Vercel Previews**; also this repo's
+`AGENTS.md` when present.
+
+Personal AWS/SAM Lambdas keep the full enrichment path (copied logger, both alarms, error-level
+metric filter, `AlertTopicArn`). Copy retention and thresholds; never invent. Missing `~/code/shared-infra` is `not done`. Canon: laptop global brief **Shared-infra Lambdas**; also
+this repo's `AGENTS.md` when present. Add or repair via `/new-solly-repo`.
 
 `/remove-feature` ships in this package — load it before substantial code deletion (a feature,
 module, many files, a large deleted-line diff), not only when the user types the slash command.
 Tiny unused-line deletes and complexity-only cleanup (`/remove-slop`) stay ordinary editing.
+
+## Outbound identity (standing rule, not a skill)
+
+Outbound is the assistant, not John. Write in the assistant voice about John — never first person
+as John, never signed with his name alone. The last line is a hyphen signature line (hyphen, space,
+John's AI Assistant), never a markdown list. Never Holiday Proton. Communications addressed to
+third-party people or organizations hold 15 minutes unless John says send now; internal messages
+and own-repo or operational work have no hold. A held message waits as the full draft in the chat
+plus a one-shot timed send where the host has one; channel Drafts (Fastmail `draft_email`) are a
+last resort, never the default. There is no outbound skill to load (the former one is retired) — read
+`~/.cursor/dotagents-package/rules/outbound-identity.md` for the hold-surface order and the receipt
+before claiming `done`, `holding`, or `sent`.
 
 ## Hooks / guards
 

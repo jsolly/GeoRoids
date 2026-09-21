@@ -2865,6 +2865,9 @@ export class GameEngine {
     if (this.furnaces.nearby(surveyor.position, FURNACE_BUILD.MIN_DISTANCE).length > 0) {
       return 'Too close to another furnace';
     }
+    if (this.spiderManager.furnaceWouldCoverNest(surveyor.position)) {
+      return FURNACE_BUILD.ISSUE.NEST;
+    }
     return undefined;
   }
 

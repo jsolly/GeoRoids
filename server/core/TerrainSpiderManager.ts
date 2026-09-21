@@ -159,6 +159,16 @@ export class TerrainSpiderManager {
     };
   }
 
+  /**
+   * True when a furnace at `position` would cover a known nest home with its
+   * spider-safe radius. Cleared deposits (web gone) are not keep-out.
+   */
+  public furnaceWouldCoverNest(position: Position): boolean {
+    return this.nestMarkers.some(
+      (nest) => distanceBetween(position, nest.position) < SPIDER.FURNACE_SAFE_RADIUS
+    );
+  }
+
   public isAttackActive(attack: SpiderAttack): boolean {
     const spider = this.spiders.get(attack.spiderId);
     return spider?.phase === 'hunting' && spider.targetId === attack.targetId;

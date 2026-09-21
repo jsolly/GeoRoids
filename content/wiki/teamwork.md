@@ -117,6 +117,7 @@ their green playfield walls, so closed ground stays distinct from spiderwebs.
 
 Surveyors can equip [Build Furnace](/wiki/#surveyor) to place shared delivery
 sites. Each pilot can keep three built sites at once; placing another yields
-their oldest. Every crew member can use the sites. Built furnaces survive
+their oldest. They cannot place a hearth whose spider-safe radius covers an
+existing nest. Every crew member can use the sites. Built furnaces survive
 reconnects and server restarts until the world resets. Active Mineral Scan also
 drives nearby spiders away from the crew.

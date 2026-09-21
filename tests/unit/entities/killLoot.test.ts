@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { applyShipMass, GROWTH, planKillLoot } from '../../../shared/shipGrowth';
-import { hullRadiusForKit } from '../../../src/entities/ship/shipKits';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 describe('kill loot and growth', () => {
@@ -67,7 +66,6 @@ describe('kill loot and growth', () => {
     expect(collected[0]?.collectorId).toBe('p1');
     expect(collector.mass).toBeGreaterThan(before);
     expect(collector.maxHealth).toBeGreaterThan(100);
-    expect(hullRadiusForKit(collector.kitId, collector.mass)).toBe(hullRadiusForKit('surveyor'));
     expect(engine.getLoot().some((drop) => drop.id === pellet.id)).toBe(false);
   });
 

@@ -71,21 +71,14 @@ export interface AbilityUsedEvent {
 
 export interface PlayerUpdate {
   id: string;
-  name: string;
   position: Position;
   velocity: Velocity;
-  r: number;
   angle: number;
-  lives: number;
-  score: number;
-  exploding: boolean;
-  health: number;
-  maxHealth: number;
+  thrusting: boolean;
+  boosting?: boolean;
+  boostDepleted?: boolean;
   /** True while the local map or schematic holds this hull still. */
   overlayHold?: boolean;
-
-  kitId?: ShipKitId;
-  mass?: number;
   /** Acknowledges the server's current movement ownership epoch. */
   motionEpoch?: number;
   motionSequence?: number;
@@ -391,7 +384,6 @@ export interface ServerEntityData {
 /** Optional monotonic probe identity; bare heartbeat messages remain supported. */
 export interface PingMessage {
   type: 'ping';
-  timestamp?: number;
   probeId?: number;
 }
 

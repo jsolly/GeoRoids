@@ -117,8 +117,8 @@ interface KitShipTarget extends KitStatTarget {
   turnSpeed: number;
 }
 
-/** Draw, collision, latch, and loot all use this kit hull radius. Mass is ignored. */
-export function hullRadiusForKit(kitId: unknown, _mass?: number): number {
+/** Draw, collision, latch, and loot all use this kit hull radius. */
+export function hullRadiusForKit(kitId: unknown): number {
   return getShipKit(kitId).size / 2;
 }
 

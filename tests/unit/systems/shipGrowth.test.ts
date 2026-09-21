@@ -42,8 +42,6 @@ describe('ship growth math', () => {
     expect(thrustScaleFromMass(mass)).toBeGreaterThanOrEqual(GROWTH.MIN_THRUST_SCALE);
     expect(hullRadiusForKit('surveyor')).toBe(SHIP.SIZE / 2);
     expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
-    expect(hullRadiusForKit('surveyor', mass)).toBe(hullRadiusForKit('surveyor'));
-    expect(hullRadiusForKit('hauler', mass)).toBe(hullRadiusForKit('hauler'));
   });
 
   test('a base-mass kill still plans loot pellets', () => {

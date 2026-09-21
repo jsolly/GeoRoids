@@ -136,7 +136,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(frame).encode(1));
     expect(player.ship.serverOwnsMotion).toBe(false);
     expect(player.ship.position).toEqual(pilot.position);
-    manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+    manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
     expect(ws.sent.at(-1)).toMatchObject({
       type: 'update',
       data: { motionEpoch: 1, motionSequence: 1 },
@@ -549,7 +549,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       // An older echo arrives before the newly held input has been sent.
       clock.mockReturnValue(10_017);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(2));
-      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
         thrusting: true,
       });
@@ -558,7 +558,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       local.thrusting = true;
       clock.mockReturnValue(10_034);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(3));
-      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(ws.sent.filter((message) => message.type === 'update').at(-1)?.data).toMatchObject({
         thrusting: true,
       });
@@ -567,7 +567,7 @@ describe('actual ConnectionManager WebSocket message path', () => {
       Object.assign(local, { health: 0, exploding: true, thrusting: false });
       clock.mockReturnValue(10_051);
       ws.receive('snapshot', new SnapshotEncoder(state).encode(4));
-      manager.sendPlayerState({ id: player.id, name: player.name, ...player.getStateForNetwork() });
+      manager.sendPlayerState({ id: player.id, ...player.getStateForNetwork() });
       expect(player.ship.thrusting).toBe(false);
       expect(ws.sent.filter((message) => message.type === 'asteroidInput')).toHaveLength(0);
     }

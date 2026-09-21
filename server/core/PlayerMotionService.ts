@@ -525,7 +525,7 @@ export class PlayerMotionService {
     );
     const anchorReach =
       (travelSpeed * (now - session.anchorAt) * GAME.FPS) / 1000 + PLAYER_MOTION.poseTolerance;
-    const hullRadius = hullRadiusForKit(session.actor.kitId, session.actor.mass);
+    const hullRadius = hullRadiusForKit(session.actor.kitId);
     const failed = this.failedEnvelopeCheck(session, pose, {
       speed,
       velocity,

@@ -4,7 +4,7 @@ import type { Player } from './Player';
 interface PlayerNetworkPort {
   getAllPlayers(): Player[];
   setLocalPlayerName(name: string): void;
-  updatePlayerState(playerState: Omit<PlayerUpdate, 'id' | 'name'>): void;
+  updatePlayerState(playerState: Omit<PlayerUpdate, 'id'>): void;
 }
 
 let playerNetworkPort: PlayerNetworkPort | null = null;

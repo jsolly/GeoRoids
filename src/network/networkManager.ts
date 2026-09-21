@@ -94,10 +94,9 @@ export class NetworkManager {
   }
 
   // Player state synchronization - just send input to server
-  updatePlayerState(playerState: Omit<PlayerUpdate, 'id' | 'name'>): void {
+  updatePlayerState(playerState: Omit<PlayerUpdate, 'id'>): void {
     const fullPlayerState = {
       id: this.getLocalPlayerId() || this.connectionManager.getClientId(),
-      name: this.getLocalPlayerName(),
       ...playerState,
     };
     this.connectionManager.sendPlayerState(fullPlayerState);

@@ -39,7 +39,6 @@ import {
 import { playLootPickup, playTapEjection, resetResourceMusic } from '../../audio/resourceMusic';
 import { stopSatelliteOrbit, syncSatelliteOrbit } from '../../audio/satelliteOrbitSound';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
-import { PALETTE, ROID } from '../../constants';
 import { GameStateManager } from '../../core/services/GameStateManager';
 import {
   noteDebugPingSent,
@@ -219,11 +218,10 @@ export class ConnectionManager {
   private readonly playedTapEjectionIds = new Set<string>();
   private readonly playedLootExplosionIds = new Set<string>();
   private readonly asteroidScratch = createAsteroidFieldSyncScratch();
-  private readonly pingPayload: PingMessage = { type: 'ping', timestamp: 0 };
+  private readonly pingPayload: PingMessage = { type: 'ping' };
   private readonly updateEnvelope: ClientMessage = {
     type: 'update',
     data: {} as PlayerUpdate,
-    timestamp: 0,
   };
 
   // Heartbeat / half-open-socket detection (see connectionHealth.ts).
@@ -726,7 +724,6 @@ export class ConnectionManager {
       return;
     }
 
-    this.pingPayload.timestamp = Date.now();
     const pingNow = performance.now();
     this.pingPayload.probeId = clientPerformance.probe(pingNow);
     if (!this.sendPayload(this.pingPayload)) {
@@ -761,13 +758,6 @@ export class ConnectionManager {
   getLocalPlayerId(): string {
     // Join uses clientId until the server `joined` echo sets localPlayerId (same value).
     return this.localPlayerId || this.clientId;
-  }
-
-  private getLocalPlayerColor(): string {
-    // Get the local player's color from the player manager
-    const playerManager = PlayerManager.getInstance();
-    const localPlayer = playerManager.getLocalPlayer();
-    return localPlayer?.color ?? PALETTE.LOCAL;
   }
 
   private getLocalPlayerPosition(): { x: number; y: number } {
@@ -805,12 +795,7 @@ export class ConnectionManager {
   }
 
   // Send player state to server
-  sendPlayerState(
-    playerState: Omit<PlayerUpdate, 'lives' | 'score'> & {
-      lives?: number;
-      score?: number;
-    }
-  ): void {
+  sendPlayerState(playerState: PlayerUpdate): void {
     if (
       !this.state.isConnected ||
       !this.state.socket ||
@@ -834,7 +819,6 @@ export class ConnectionManager {
       return;
     }
     this.updateEnvelope.data = playerState;
-    this.updateEnvelope.timestamp = Date.now();
     this.sendPayload(this.updateEnvelope);
   }
 
@@ -864,7 +848,6 @@ export class ConnectionManager {
         laserDirection: laser.velocity,
         ...(requestId ? { requestId } : {}),
       },
-      timestamp: Date.now(),
     };
 
     logger.debug('NETWORK', 'Sending shoot message to server', { playerId: message.id });
@@ -906,7 +889,6 @@ export class ConnectionManager {
       id: this.clientId,
       data: {
         name: this.localPlayerName,
-        color: this.getLocalPlayerColor(),
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         snapshotVersion: SNAPSHOT_VERSION,
@@ -914,7 +896,6 @@ export class ConnectionManager {
         clientReleaseId: getClientReleaseId(),
         ...(this.resumeToken ? { resumeToken: this.resumeToken } : {}),
       },
-      timestamp: Date.now(),
     };
 
     logger.debug('NETWORK', 'Sending join message', {
@@ -950,14 +931,12 @@ export class ConnectionManager {
 
     logger.debug('NETWORK', 'Sending initAsteroids message', {
       playerId: this.localPlayerId,
-      asteroidCount: ROID.INITIAL_ROID_COUNT,
     });
 
     const message: ClientMessage = {
       type: 'initAsteroids',
       id: this.localPlayerId,
-      data: { asteroidCount: ROID.INITIAL_ROID_COUNT },
-      timestamp: Date.now(),
+      data: {},
     };
 
     if (!this.sendPayload(message)) {
@@ -1192,7 +1171,7 @@ export class ConnectionManager {
     if (this.snapshotResyncPending) {
       return false;
     }
-    const sent = this.sendMessage({ type: 'snapshotResync', data: {}, timestamp: Date.now() });
+    const sent = this.sendMessage({ type: 'snapshotResync', data: {} });
     if (sent) {
       this.snapshotResyncPending = true;
       clientPerformance.count('resyncs');

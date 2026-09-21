@@ -67,7 +67,7 @@ Rare roaming hunters can still approach, with minutes between attempts and a
 quiet interval after spider combat. There is no immediate roaming ambush when
 a flight starts. The starter area and furnaces remain safe
 from roaming spiders; a Hauler can drag a captured spider into a furnace.
-Surveyors cannot raise a street furnace when an existing nest home would sit inside
+Surveyors cannot build a street furnace when an existing nest home would sit inside
 the hearth's spider occupancy — the same keep-away that hides a web under a
 standing furnace. That rejected construction does not clear the nest. Furnaces
 that are already standing still scare spiders that enter that occupancy.
@@ -98,4 +98,4 @@ Sound Effects is on. Boost Coupling cannot target spiders. See
 An active [Mineral Scan](/wiki/#surveyor) drives spiders away within its scan
 range and stops their bites while they remain inside it. They can hunt again
 after the scan ends or they leave its range. Survey Probes do not repel them.
-A raised street furnace provides the same spider safe area as Town Square.
+A built street furnace provides the same spider safe area as Town Square.

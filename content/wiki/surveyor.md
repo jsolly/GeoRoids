@@ -79,29 +79,29 @@ a successful attachment beyond that limit replaces their oldest probe.
 Switching tools does not remove existing beacons. Probes are temporary equipment
 and do not survive a server restart.
 
-## Raise furnace
+## Build
 
-Equip Raise Furnace in the ship schematic, then stand inside a dark street
-foundation and press E or tap Raise. The tool lights that designated lot only.
-It does not place a hearth at an arbitrary position. The nearer lot on that
-road must already be burning, and the shared town purse must cover the lot.
-Deliveries into Town Square or a lit street fill that purse once, in addition
-to the usual personal delivery credit. A failed raise spends neither purse nor
-cooldown; the HUD explains why it failed. A nest whose home would sit inside
-the new furnace's spider occupancy is an illegal site; that miss does not wipe
-the nest. Standing furnaces still scare spiders that enter that occupancy.
+Equip Build in the ship schematic, then stand inside a dark street foundation
+and press E or tap Build. The tool builds that designated furnace only. It does
+not place a hearth at an arbitrary position. The nearer lot on that road must
+already be burning, and the shared town purse must cover the lot. Deliveries
+into Town Square or a lit street fill that purse once, in addition to the usual
+personal delivery credit. A failed build spends neither purse nor cooldown; the
+HUD explains why it failed. A nest whose home would sit inside the new furnace's
+spider occupancy is an illegal site; that miss does not wipe the nest. Standing
+furnaces still scare spiders that enter that occupancy.
 
 Town Square starts lit at the map center. The street plan radiates outward from
 it, and each farther ring costs more. The schematic shows the current purse.
-Raised streets survive death, changing ships, reconnecting, and server
-restarts. They reset with the world at the next monthly season.
+Built streets survive death, changing ships, reconnecting, and server restarts.
+They reset with the world at the next monthly season.
 
-Everyone can use a raised furnace. It accepts towed and boosted ore and consumes
+Everyone can use a built furnace. It accepts towed and boosted ore and consumes
 towed spiders, awards the usual delivery credit, banks the purse, guides nearby
 boosted cargo, provides the usual spider safe area, and can serve as a nearby
 respawn site. Dark foundations stay marked on the universe map and, when they
 are inside the local radar, on the minimap. A lit hearth appears on the local
-radar after the crew reveals its area. Raising itself awards no delivery points.
+radar after the crew reveals its area. Building itself awards no delivery points.
 Furnaces cannot be moved or dismantled by hand. Mapping and mining around a
 furnace cannot close the delivery site.
 

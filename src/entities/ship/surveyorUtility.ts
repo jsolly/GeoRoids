@@ -16,9 +16,9 @@ export const SURVEYOR_UTILITY = {
   },
   build_furnace: {
     id: 'build_furnace',
-    name: 'Raise Furnace',
-    hint: 'Tap to equip · street lots',
-    copy: 'Stand inside a dark street foundation and raise that furnace for the crew. Deliveries into the Town Square or a lit street fill one shared purse, and raising spends it. A street stays dark until the nearer lot on that road is burning. Raised furnaces survive death, reconnects, and restarts until the world resets.',
+    name: 'Build',
+    hint: 'Tap to equip · build sites',
+    copy: 'Stand inside a dark street foundation and build that furnace for the crew. Deliveries into the Town Square or a lit street fill one shared purse, and building spends it. A street stays dark until the nearer lot on that road is burning. Built furnaces survive death, reconnects, and restarts until the world resets.',
   },
   survey_probe: {
     id: 'survey_probe',

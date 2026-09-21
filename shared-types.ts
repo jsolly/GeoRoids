@@ -283,7 +283,7 @@ export interface ShockwaveEvent {
 }
 
 export interface ServerGameState {
-  /** Shared delivery credit spent to raise the next street furnace. */
+  /** Shared delivery credit spent to build the next street furnace. */
   townCredit?: number;
   /** Civic lots the crew has lit. Geometry lives in the shared street plan. */
   litCivicLotIds?: string[];

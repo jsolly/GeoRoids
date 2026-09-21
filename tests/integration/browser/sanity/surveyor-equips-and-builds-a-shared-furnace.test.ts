@@ -53,7 +53,7 @@ for (const viewport of [
     }
     expect(await card.getAttribute('aria-pressed')).toBe('true');
     expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Town purse 0');
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Raise Furnace');
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Build');
     expect(await page.locator('[data-utility-id]').count()).toBe(3);
     const layout = await page.locator('#ship-schematic-dialog').evaluate((element) => ({
       width: element.clientWidth,
@@ -70,7 +70,7 @@ for (const viewport of [
     await page.locator('#ship-schematic-return').click();
     await page.locator('#ship-schematic-dialog').waitFor({ state: 'hidden' });
     if (viewport.touch) {
-      expect(await page.locator('#touch-ability').textContent()).toContain('RAISE');
+      expect(await page.locator('#touch-ability').textContent()).toContain('BUILD');
       await page.locator('#touch-ability').tap();
     } else {
       await page.keyboard.press('KeyE');
@@ -85,7 +85,7 @@ for (const viewport of [
     });
     // The changed Wiki is rendered at both viewport sizes as well.
     await page.goto(`${new URL(page.url()).origin}/wiki/#surveyor`);
-    const buildHeading = page.getByRole('heading', { name: 'Raise furnace', exact: true });
+    const buildHeading = page.getByRole('heading', { name: 'Build', exact: true });
     await buildHeading.waitFor();
     await buildHeading.scrollIntoViewIfNeeded();
     await page.screenshot({

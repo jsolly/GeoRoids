@@ -11,7 +11,7 @@ export const TOWN_HEARTH = {
   radius: 85,
 } as const;
 
-/** Always-lit hearths. Street lots start dark and join this set when raised. */
+/** Always-lit hearths. Street lots start dark and join this set when built. */
 export const FURNACES = [TOWN_HEARTH] satisfies {
   id: string;
   name: string;

@@ -110,9 +110,9 @@ on the ring around Town Square. A brief return keeps the same ship, and death
 respawns beside the nearest lit hearth. The local radar and universe map keep explored
 cells visible, and the universe map still draws its alignment grid.
 
-Surveyors can equip [Raise Furnace](/wiki/#surveyor) to light the street
-foundation they are standing in. The nearer lot on that road must already be
-burning, and the town purse must cover the cost. They cannot raise a hearth
-whose spider occupancy covers an existing nest. Every crew member can use the
-sites. Raised furnaces survive reconnects and server restarts until the world
-resets. Active Mineral Scan also drives nearby spiders away from the crew.
+Surveyors can equip [Build](/wiki/#surveyor) to light the street foundation they
+are standing in. The nearer lot on that road must already be burning, and the
+town purse must cover the cost. They cannot build a hearth whose spider
+occupancy covers an existing nest. Every crew member can use the sites. Built
+furnaces survive reconnects and server restarts until the world resets. Active
+Mineral Scan also drives nearby spiders away from the crew.

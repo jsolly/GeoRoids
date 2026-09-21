@@ -74,7 +74,7 @@ only steers. When you enter a touch flight, a brief label above your
 ship says to tap and hold to equip tools, then fades. The overlay shows your hull
 and satellite inventory. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
-lifetime, derived from health. Surveyor offers Mineral Scan, Survey Probe, and Raise Furnace;
+lifetime, derived from health. Surveyor offers Mineral Scan, Survey Probe, and Build;
 the probe fires along your heading and attaches a shared scanning beacon to a rock.
 Hauler has three utility cards and a looping tool animation;
 selecting a utility card equips that tool immediately. Boost Coupling uses E to arm

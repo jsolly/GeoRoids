@@ -78,7 +78,7 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
-  /** Shared haul credit for raising the next street. Absent on older rows. */
+  /** Shared haul credit for building the next street. Absent on older rows. */
   townCredit?: number;
   /** Lit street lots. Absent on older rows, including rows that stored personal furnaces. */
   litCivicLotIds?: string[];

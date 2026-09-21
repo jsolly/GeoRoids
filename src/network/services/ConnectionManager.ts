@@ -797,12 +797,7 @@ export class ConnectionManager {
   }
 
   // Send player state to server
-  sendPlayerState(
-    playerState: Omit<PlayerUpdate, 'lives' | 'score'> & {
-      lives?: number;
-      score?: number;
-    }
-  ): void {
+  sendPlayerState(playerState: PlayerUpdate): void {
     if (
       !this.state.isConnected ||
       !this.state.socket ||

@@ -58,15 +58,8 @@ export class Player {
   private readonly networkState: {
     position: Position;
     velocity: Position;
-    r: number;
     angle: number;
-    lives: number;
-    score: number;
-    exploding: boolean;
     thrusting: boolean;
-    health: number;
-    maxHealth: number;
-    mass: number;
     overlayHold: boolean;
   };
 
@@ -92,15 +85,8 @@ export class Player {
     this.networkState = {
       position: this.ship.position,
       velocity: this.ship.velocity,
-      r: this.ship.r,
       angle: this.ship.angle,
-      lives: this.lives,
-      score: this.score,
-      exploding: this.ship.exploding,
       thrusting: this.ship.thrusting,
-      health: this.ship.health,
-      maxHealth: this.ship.maxHealth,
-      mass: this.ship.mass,
       overlayHold: false,
     };
   }
@@ -478,15 +464,8 @@ export class Player {
   getStateForNetwork() {
     this.networkState.position = this.ship.position;
     this.networkState.velocity = this.ship.velocity;
-    this.networkState.r = this.ship.r;
     this.networkState.angle = this.ship.angle;
-    this.networkState.lives = this.lives;
-    this.networkState.score = this.score;
-    this.networkState.exploding = this.ship.exploding;
     this.networkState.thrusting = this.ship.thrusting;
-    this.networkState.health = this.ship.health;
-    this.networkState.maxHealth = this.ship.maxHealth;
-    this.networkState.mass = this.ship.mass;
     this.networkState.overlayHold = this.ship.movementLocked;
     return this.networkState;
   }

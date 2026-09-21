@@ -23,7 +23,6 @@ interface PlayerMovementUpdate {
   thrusting?: boolean;
   boosting?: boolean;
   boostDepleted?: boolean;
-  angularVelocity?: number;
   overlayHold?: boolean;
 }
 
@@ -141,7 +140,6 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const rawPosition = fields['position'];
   const rawVelocity = fields['velocity'];
   const rawAngle = fields['angle'];
-  const rawAngularVelocity = fields['angularVelocity'];
   const rawThrusting = fields['thrusting'];
   const rawBoosting = fields['boosting'];
   const rawBoostDepleted = fields['boostDepleted'];
@@ -149,7 +147,6 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
   const position = readFinitePosition(rawPosition);
   const velocity = readFinitePosition(rawVelocity);
   const angle = readFiniteNumber(rawAngle);
-  const angularVelocity = readFiniteNumber(rawAngularVelocity);
   const thrusting = typeof rawThrusting === 'boolean' ? rawThrusting : undefined;
   const boosting = typeof rawBoosting === 'boolean' ? rawBoosting : undefined;
   const boostDepleted = typeof rawBoostDepleted === 'boolean' ? rawBoostDepleted : undefined;
@@ -159,7 +156,6 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     (rawPosition !== undefined && position === undefined) ||
     (rawVelocity !== undefined && velocity === undefined) ||
     (rawAngle !== undefined && angle === undefined) ||
-    (rawAngularVelocity !== undefined && angularVelocity === undefined) ||
     (rawThrusting !== undefined && thrusting === undefined) ||
     (rawBoosting !== undefined && boosting === undefined) ||
     (rawBoostDepleted !== undefined && boostDepleted === undefined) ||
@@ -175,7 +171,6 @@ function decodeUpdate(id: string, fields: WireRecord): ClientCommandDecodeResult
     ...(thrusting !== undefined ? { thrusting } : {}),
     ...(boosting !== undefined ? { boosting } : {}),
     ...(boostDepleted !== undefined ? { boostDepleted } : {}),
-    ...(angularVelocity !== undefined ? { angularVelocity } : {}),
     ...(typeof rawOverlayHold === 'boolean' ? { overlayHold: rawOverlayHold } : {}),
   };
   const motionEpoch = readSafeInteger(fields['motionEpoch']);

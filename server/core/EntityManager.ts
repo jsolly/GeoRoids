@@ -5,6 +5,7 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../shared/constants/health';
 import { FurnaceField } from '../../shared/furnaceField';
+import { TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
 import { fullShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
@@ -405,8 +406,8 @@ export class EntityManager {
     const station = this.furnaces.nearest(entity.position);
     const angle = this.rng.random() * Math.PI * 2;
     entity.position = {
-      x: (station?.position.x ?? 0) + Math.cos(angle) * 180,
-      y: (station?.position.y ?? 0) + Math.sin(angle) * 180,
+      x: (station?.position.x ?? 0) + Math.cos(angle) * TOWN_SPAWN_RADIUS,
+      y: (station?.position.y ?? 0) + Math.sin(angle) * TOWN_SPAWN_RADIUS,
     };
     entity.angle = this.rng.random() * Math.PI * 2;
     entity.velocity = { x: 0, y: 0 };

@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { FURNACES } from '../../../shared/furnaces';
 import { WORLD } from '../../../shared/world';
 import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
@@ -301,19 +300,15 @@ describe('painted HUD composition', () => {
     const player = PlayerManager.getInstance().createLocalPlayer('surveyor');
     player.ship.position = { x: 0, y: 0 };
     const exploration = new ExplorationMap();
-    const distantWorks = FURNACES.find((site) => site.id === 'works-1-0');
-    if (!distantWorks) {
-      throw new Error('Radar fixture requires a regional Works site');
-    }
-    exploration.reveal(distantWorks.position, 100);
+    exploration.reveal({ x: 40_000, y: 0 }, 100);
     setWorldExploration(exploration.snapshot());
     const ctx = canvasContext();
     const { strokes, filledPaths } = recordCanvas(ctx);
     const layout = computeHudLayout(ctx.canvas, { touchControls: false });
     const stationInk = normalizedCanvasColor(ctx, FURNACE_MAP_INK);
     drawMiniMap(ctx, layout, player.ship, [], [], [], []);
-    expect(strokes.filter(({ style }) => style === stationInk)).toEqual([]);
-    exploration.reveal({ x: 0, y: -660 }, 100);
+    expect(strokes.filter(({ style, closed }) => style === stationInk && closed)).toEqual([]);
+    exploration.reveal({ x: 0, y: 0 }, 100);
     setWorldExploration(exploration.snapshot());
     strokes.length = 0;
     filledPaths.length = 0;
@@ -323,10 +318,7 @@ describe('painted HUD composition', () => {
     const tip = stations[0]?.points[0];
     expect(tip?.[0]).toBeCloseTo(layout.miniMap.x + layout.miniMap.size / 2, 5);
     expect(tip?.[1]).toBeCloseTo(
-      layout.miniMap.y +
-        layout.miniMap.size / 2 -
-        ((660 / WORLD.minimapRadius) * layout.miniMap.size) / 2 -
-        MINIMAP_FURNACE_MARK_SIZE,
+      layout.miniMap.y + layout.miniMap.size / 2 - MINIMAP_FURNACE_MARK_SIZE,
       5
     );
     expect(filledPaths.every(({ rectangles }) => rectangles.length === 0)).toBe(true);
@@ -392,9 +384,11 @@ describe('painted HUD composition', () => {
     );
     expect(generic?.closed).toBe(true);
     expect(generic?.points).toEqual(centers.flatMap(({ x, y }) => asteroidSilhouette(x, y, 2.5)));
-    expect(strokes.some(({ style }) => style === normalizedCanvasColor(ctx, '#FDE68A'))).toBe(
-      false
-    );
+    expect(
+      strokes.some(
+        ({ style, points }) => style === normalizedCanvasColor(ctx, '#FDE68A') && points.length > 8
+      )
+    ).toBe(false);
   });
 
   test('radar paints moving world marks and keeps pilots above live objects', async () => {
@@ -522,7 +516,8 @@ describe('painted HUD composition', () => {
 
     draw();
 
-    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
+    expect(arc.mock.calls[0]).toEqual([736, 536, 48, 0, Math.PI * 2]);
+    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(6);
     expect(strokes[0]).toEqual({
       points: [],
       closed: true,
@@ -587,8 +582,8 @@ describe('painted HUD composition', () => {
     const haulerOutline = getKitHullOutline('hauler');
     const surveyorMarks = 1 + surveyorOutline.extras.length;
     const haulerMarks = 1 + haulerOutline.extras.length;
-    // One arena ring, four world layers, then two-pass kit hulls and extras.
-    expect(strokes).toHaveLength(1 + 4 + surveyorMarks * 2 * 3 + haulerMarks * 2);
+    // One arena ring, four world layers, six nearby street foundations, then kit hulls.
+    expect(strokes).toHaveLength(1 + 4 + 6 + surveyorMarks * 2 * 3 + haulerMarks * 2);
     const radarX = layout.miniMap.x + layout.miniMap.size / 2;
     const radarY = layout.miniMap.y + layout.miniMap.size / 2;
     const peerX = radarX + layout.miniMap.size / 4;
@@ -693,7 +688,8 @@ describe('painted HUD composition', () => {
     roids.length = 0;
     draw();
 
-    expect(arc.mock.calls).toEqual([[736, 536, 48, 0, Math.PI * 2]]);
+    expect(arc.mock.calls[0]).toEqual([736, 536, 48, 0, Math.PI * 2]);
+    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(6);
     expect(filledPaths).toHaveLength(1);
     expect(strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#E8D5A3'))).toEqual(
       []

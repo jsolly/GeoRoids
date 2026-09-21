@@ -16,7 +16,13 @@ import { chooseCrewSpawn } from '../../shared/crewSpawn';
 import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
 import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
-import { furnaceReward } from '../../shared/furnaces';
+import {
+  civicLot,
+  civicLotAt,
+  furnaceReward,
+  TOWN_HEARTH,
+  townSquareSpawn,
+} from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
@@ -222,7 +228,8 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
   exploration: ExplorationTile[];
-  builtFurnaces: ReturnType<FurnaceField['snapshot']>;
+  litCivicLotIds: readonly string[];
+  townCredit: number;
   scoreSeason: string;
   startedAt: number;
   asteroidDensityVersion: number;
@@ -240,6 +247,7 @@ export class GameEngine {
   private exploration = new ExplorationMap();
   private mapAssets = new MapAssets();
   private readonly furnaces = new FurnaceField();
+  private townCredit = 0;
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
   private worldStartedAt: number;
@@ -247,8 +255,7 @@ export class GameEngine {
   private readonly pilots = new Map<string, PersistentPilot>();
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
-  private lastFurnaceBuildNotice: (typeof FURNACE_BUILD.NOTICE)[keyof typeof FURNACE_BUILD.NOTICE] =
-    FURNACE_BUILD.NOTICE.BUILT;
+  private lastFurnaceBuildNotice = '';
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
   private lootManager: LootManager;
@@ -331,7 +338,8 @@ export class GameEngine {
     this.rngService = new RNGService(this.worldSeed);
     this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
     if (loaded?.world) {
-      this.furnaces.replace(loaded.world.builtFurnaces ?? []);
+      this.townCredit = loaded.world.townCredit ?? 0;
+      this.furnaces.replaceLit(loaded.world.litCivicLotIds ?? []);
       this.exploration.restore(loaded.world.exploration);
     }
     if ((saved?.asteroidMotionVersion ?? 0) < WORLD.asteroidMotionVersion) {
@@ -666,7 +674,7 @@ export class GameEngine {
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
-    this.furnaces.replace([]);
+    this.clearTown();
     this.rngService.reset();
     this.createAsteroids(scenario === 'combat' ? 80 : ROID.INITIAL_ROID_COUNT);
     this.seedAsteroidInteractions();
@@ -683,7 +691,7 @@ export class GameEngine {
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
-    this.furnaces.replace([]);
+    this.clearTown();
     this.playerMotion.reset();
     this.entityManager.clearAll();
 
@@ -713,13 +721,11 @@ export class GameEngine {
   }
 
   private choosePilotSpawn(requested?: Position): Position {
-    const allies = this.entityManager
-      .getAllEntities()
-      .filter((actor) => actor.health > 0 && !actor.exploding && actor.respawnTimer === undefined)
-      .map((actor) => actor.position);
+    if (!requested) {
+      return townSquareSpawn(() => this.rngService.random());
+    }
     return chooseCrewSpawn({
-      allies,
-      ...(requested ? { previous: requested } : {}),
+      previous: requested,
       random: () => this.rngService.random(),
     });
   }
@@ -1002,7 +1008,7 @@ export class GameEngine {
     this.regionalField.reset();
     this.exploration.reset();
     this.mapAssets.reset();
-    this.furnaces.replace([]);
+    this.clearTown();
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
     for (const pilot of this.pilots.values()) {
@@ -1088,7 +1094,8 @@ export class GameEngine {
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
       exploration: this.exploration.snapshot(),
-      builtFurnaces: this.furnaces.snapshot(),
+      litCivicLotIds: this.furnaces.litLotIds(),
+      townCredit: this.townCredit,
       scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
       asteroidDensityVersion: WORLD.asteroidDensityVersion,
@@ -1098,7 +1105,8 @@ export class GameEngine {
     if (
       last &&
       last.exploration === builtFrom.exploration &&
-      last.builtFurnaces === builtFrom.builtFurnaces &&
+      last.litCivicLotIds === builtFrom.litCivicLotIds &&
+      last.townCredit === builtFrom.townCredit &&
       last.scoreSeason === builtFrom.scoreSeason &&
       last.startedAt === builtFrom.startedAt &&
       last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
@@ -1116,7 +1124,8 @@ export class GameEngine {
         scoreSeason: this.scoreSeason,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
-        builtFurnaces: this.furnaces.snapshot(),
+        townCredit: this.townCredit,
+        litCivicLotIds: [...this.furnaces.litLotIds()],
       },
       builtFrom,
     };
@@ -2530,14 +2539,11 @@ export class GameEngine {
     const exploration = this.exploration.snapshot();
     const loot = this.lootManager.getAll();
     const satellitePickups = this.satellitePickupManager.getAllPickups();
+    const litLots = new Set(this.furnaces.litLotIds());
     const gameState = {
-      builtFurnaces: this.furnaces.snapshot(),
-      mapAssets: this.mapAssets.snapshot(
-        exploration,
-        loot,
-        satellitePickups,
-        this.furnaces.snapshot()
-      ),
+      townCredit: this.townCredit,
+      litCivicLotIds: [...this.furnaces.litLotIds()],
+      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups, litLots),
       exploration: this.exploration.snapshot(),
       entities: allEntities.map(
         (entity) =>
@@ -2717,20 +2723,23 @@ export class GameEngine {
       !canActivateAbility(surveyor) ||
       surveyor.respawnTimer !== undefined
     ) {
-      return 'Furnace builder not ready';
+      return FURNACE_BUILD.ISSUE.READY;
     }
-    if (
-      !Number.isFinite(surveyor.position.x) ||
-      !Number.isFinite(surveyor.position.y) ||
-      Math.hypot(surveyor.position.x, surveyor.position.y) >
-        WORLD.radius - FURNACE_BUILD.WORLD_INSET
-    ) {
-      return 'Move clear of the world edge';
+    const lot = civicLotAt(surveyor.position);
+    if (!lot) {
+      return FURNACE_BUILD.ISSUE.STAND;
     }
-    if (this.furnaces.nearby(surveyor.position, FURNACE_BUILD.MIN_DISTANCE).length > 0) {
-      return 'Too close to another furnace';
+    if (this.furnaces.isLit(lot.id)) {
+      return FURNACE_BUILD.ISSUE.LIT;
     }
-    if (this.spiderManager.furnaceWouldCoverNest(surveyor.position)) {
+    if (lot.parentId !== TOWN_HEARTH.id && !this.furnaces.isLit(lot.parentId)) {
+      const parent = civicLot(lot.parentId);
+      return parent ? `Light ${parent.name} first` : 'Light the nearer street first';
+    }
+    if (this.townCredit < lot.cost) {
+      return `Town purse needs ${lot.cost - this.townCredit} more`;
+    }
+    if (this.spiderManager.furnaceWouldCoverNest(lot.position)) {
       return FURNACE_BUILD.ISSUE.NEST;
     }
     return undefined;
@@ -2740,29 +2749,22 @@ export class GameEngine {
     return this.lastFurnaceBuildNotice;
   }
 
+  private clearTown(): void {
+    this.townCredit = 0;
+    this.furnaces.replaceLit([]);
+  }
+
   private buildFurnace(surveyor: GameEntity): boolean {
     if (this.furnaceBuildIssue(surveyor.id)) {
       return false;
     }
-    let yielded = false;
-    if (this.furnaces.count(surveyor.id) >= FURNACE_BUILD.MAX_PER_OWNER) {
-      if (!this.furnaces.evictOldestOwned(surveyor.id)) {
-        return false;
-      }
-      yielded = true;
+    const lot = civicLotAt(surveyor.position);
+    if (!lot) {
+      return false;
     }
-    const serial = this.furnaces.nextOwnedSerial(surveyor.id);
-    this.furnaces.add({
-      id: `built:${surveyor.id}:${serial}`,
-      ownerId: surveyor.id,
-      name: `${surveyor.name}'s Works ${serial}`,
-      position: { ...surveyor.position },
-      radius: FURNACE_BUILD.RADIUS,
-      placedAt: this.getServerTime(),
-    });
-    this.lastFurnaceBuildNotice = yielded
-      ? FURNACE_BUILD.NOTICE.YIELDED
-      : FURNACE_BUILD.NOTICE.BUILT;
+    this.townCredit -= lot.cost;
+    this.furnaces.light(lot.id);
+    this.lastFurnaceBuildNotice = `${lot.name} is burning`;
     surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
     surveyor.abilityActiveFrames = 0;
     return true;
@@ -3022,6 +3024,10 @@ export class GameEngine {
     const launchers = new Set(ownerIds);
     const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);
     const points = furnaceReward(rock);
+    const nextPurse = this.townCredit + points;
+    if (Number.isSafeInteger(nextPurse)) {
+      this.townCredit = nextPurse;
+    }
     const rewards: FurnaceDelivery['rewards'] = [];
     for (const playerId of recipients) {
       const player = this.getPlayer(playerId);

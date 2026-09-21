@@ -3,38 +3,6 @@ import { SHIP } from '../constants';
 import { getGameBoundary } from '../physics/boundary';
 
 /**
- * Generates a random position near a specific point, ensuring it's within the game boundary
- * @param center The center point to generate positions near
- * @param maxDistance Maximum distance from the center point
- * @returns A random position near the center point, guaranteed to be inside the boundary
- */
-export function getRandomPositionNearPoint(center: Position, maxDistance: number = 200): Position {
-  const boundary = getGameBoundary();
-  const shipRadius = SHIP.SIZE / 2;
-
-  // Generate a random angle and distance from the center
-  const angle = Math.random() * 2 * Math.PI;
-  const distance = Math.random() * maxDistance;
-
-  // Calculate the new position
-  let newX = center.x + distance * Math.cos(angle);
-  let newY = center.y + distance * Math.sin(angle);
-
-  // Ensure the position is within the boundary
-  const boundaryRadius = boundary.radius - shipRadius;
-  const distanceFromCenter = Math.hypot(newX - boundary.cx, newY - boundary.cy);
-
-  if (distanceFromCenter > boundaryRadius) {
-    // If outside boundary, clamp to boundary edge
-    const scale = boundaryRadius / distanceFromCenter;
-    newX = boundary.cx + (newX - boundary.cx) * scale;
-    newY = boundary.cy + (newY - boundary.cy) * scale;
-  }
-
-  return { x: newX, y: newY };
-}
-
-/**
  * Generates a random position near the game boundary, ensuring it's within the boundary
  * @param minDistanceFromCenter Minimum distance from center (default: 60% of boundary radius)
  * @returns A random position near the boundary, guaranteed to be inside the boundary

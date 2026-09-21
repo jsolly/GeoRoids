@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
 import type { AbilityUsedEvent, PlayerShotAcknowledgement } from '../../shared-types';
@@ -212,7 +213,9 @@ export class MessageHandler {
         this.broadcaster.sendError(ws, 'The game server is full');
         return;
       }
-      player = this.gameEngine.addPlayer(id, name, ws, command.position, command.kitId);
+      const arrival =
+        command.position && isTownSquareArrival(command.position) ? command.position : undefined;
+      player = this.gameEngine.addPlayer(id, name, ws, arrival, command.kitId);
       player.asteroidInteractions = 1;
       const registered = this.gameEngine.registerPilot(player, ws, command.clientReleaseId);
       if (!registered.ok) {

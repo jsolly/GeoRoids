@@ -1,4 +1,5 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
+import { CIVIC_LOTS } from '../../shared/furnaces';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { getWorldExploration, worldFurnaces } from '../network/worldExploration';
@@ -360,7 +361,8 @@ function drawFurnaceLabel(
   x: number,
   y: number,
   radius: number,
-  name: string
+  name: string,
+  subtitle = 'DELIVERY ZONE'
 ): void {
   ctx.save();
   ctx.fillStyle = hexToRgba(FURNACE_LABEL_COLOR, 0.82);
@@ -371,6 +373,53 @@ function drawFurnaceLabel(
   ctx.fillStyle = hexToRgba(FURNACE_COLOR, 0.72);
   ctx.font = '9px monospace';
   ctx.textBaseline = 'top';
-  ctx.fillText('DELIVERY ZONE', x, y + radius + 7);
+  ctx.fillText(subtitle, x, y + radius + 7);
   ctx.restore();
+}
+
+/** Dark street lots. A dashed ring with no flame until a Surveyor raises it. */
+export function drawStreetFoundations(viewerPosition: Position): void {
+  const ctx = canvasManager.getContext();
+  const cvs = canvasManager.getCanvas();
+  if (!ctx || !cvs) {
+    return;
+  }
+  const scale = canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
+  const reach = Math.hypot(viewport.width, viewport.height) / scale + 200;
+  for (const lot of CIVIC_LOTS) {
+    if (worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    if (Math.hypot(lot.position.x - viewerPosition.x, lot.position.y - viewerPosition.y) > reach) {
+      continue;
+    }
+    const screen = canvasManager.worldToScreenInto(furnaceScreen, lot.position, viewerPosition);
+    const radius = lot.radius * scale;
+    const cull = radius * 2;
+    if (
+      screen.x < -cull ||
+      screen.y < -cull ||
+      screen.x > viewport.width + cull ||
+      screen.y > viewport.height + cull
+    ) {
+      continue;
+    }
+    ctx.save();
+    ctx.setLineDash([Math.max(4, radius * 0.12), Math.max(3, radius * 0.08)]);
+    ctx.strokeStyle = hexToRgba(FURNACE_COLOR, 0.45);
+    ctx.lineWidth = Math.max(1, radius * 0.02);
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    drawFurnaceLabel(
+      ctx,
+      screen.x,
+      screen.y,
+      radius,
+      lot.name,
+      `PURSE ${lot.cost.toLocaleString('en-US')}`
+    );
+  }
 }

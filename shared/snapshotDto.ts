@@ -24,7 +24,7 @@ import type {
   TerrainSpider,
 } from '../shared-types';
 import { validExploration } from './exploration';
-import { validBuiltFurnaces } from './furnaceField';
+import { validLitCivicLotIds } from './furnaces';
 import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
@@ -227,7 +227,7 @@ const collabTag = shape<SnapshotCollabTag>({
 });
 const mapAsset = shape<MapAsset>({
   id: string,
-  kind: choice('furnace', 'laserCore', 'wreckage', 'satellite'),
+  kind: choice('furnace', 'foundation', 'laserCore', 'wreckage', 'satellite'),
   position,
   name: string,
 });
@@ -285,7 +285,8 @@ const spiderField = shape<SpiderFieldState>({
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
-  builtFurnaces: optional(validBuiltFurnaces),
+  townCredit: optional(counter),
+  litCivicLotIds: optional(validLitCivicLotIds),
   spiderField: optional(spiderField),
   exploration: validExploration,
   mapAssets: array(mapAsset),

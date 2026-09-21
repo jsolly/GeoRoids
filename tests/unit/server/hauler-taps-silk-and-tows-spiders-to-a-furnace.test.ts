@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { FURNACES } from '../../../shared/furnaces';
+import { civicLot, furnaceReward, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { HaulerUtilityId } from '../../../shared-types';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
@@ -88,19 +88,39 @@ describe('Hauler tools interact with living spiders', () => {
   test.each(['landmark', 'built'])(
     'tow pulls a spider into a %s furnace, consumes it once, and releases its cable',
     (kind) => {
+      const street = civicLot('street-1-0');
+      if (!street) {
+        throw new Error('Missing street lot');
+      }
       if (kind === 'built') {
-        const scout = world.join('Builder', { x: 3000, y: 5000 }, { kitId: 'surveyor' });
-        world.entity(scout).position = { x: 3000, y: 5000 };
+        world.clearAsteroids();
+        const reward = furnaceReward({ material: 'metal', size: 25 });
+        for (let index = 0; index < street.cost / reward; index++) {
+          world.engine.addAsteroid({
+            id: `purse-${kind}-${index}`,
+            position: { x: 0, y: 0 },
+            velocity: { x: 0, y: 0 },
+            size: 25,
+            material: 'metal',
+            health: 75,
+            maxHealth: 75,
+            rotation: 0,
+            angularVelocity: 0,
+            jaggedness: 0.2,
+            offsets: [1, 1, 1, 1],
+            vertices: 4,
+            boost: { phase: 'burning', ownerId: 'purse', angle: 0 },
+          });
+          world.engine.processFurnaceDeliveries();
+          world.engine.drainFurnaceDeliveries();
+        }
+        const scout = world.join('Builder', street.position, { kitId: 'surveyor' });
+        world.entity(scout).position = { ...street.position };
         world.engine.setSurveyorUtility(scout.id, 'build_furnace');
+        world.entity(scout).abilityCooldownFrames = 0;
         expect(world.engine.useAbility(scout.id)).toBe(true);
       }
-      const furnace =
-        kind === 'built'
-          ? world.engine.getGameState().builtFurnaces?.[0]
-          : FURNACES.find((site) => site.id === 'works-1-0');
-      if (!furnace) {
-        throw new Error('Expected eastern furnace');
-      }
+      const furnace = kind === 'built' ? street : TOWN_HEARTH;
       world.engine.updatePlayer(pilot.id, {
         position: { x: furnace.position.x + 400, y: furnace.position.y },
       });

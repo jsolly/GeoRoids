@@ -1,6 +1,4 @@
-import { FURNACE_BUILD } from '../../../shared/furnaceField';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
-import { SPIDER } from '../../../shared/terrainSpider';
 import type { ShipKitId, SurveyorUtilityId } from '../../../shared-types';
 import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
 
@@ -18,9 +16,9 @@ export const SURVEYOR_UTILITY = {
   },
   build_furnace: {
     id: 'build_furnace',
-    name: 'Build Furnace',
-    hint: `Tap to equip · ${FURNACE_BUILD.MAX_PER_OWNER} at once`,
-    copy: `Place a shared furnace at your ship. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units from other furnaces, more than ${SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS} units from a spider nest, and clear of the world edge. Your furnaces survive death, reconnects and restarts until the world resets. A fourth placement retires your oldest site.`,
+    name: 'Raise Furnace',
+    hint: 'Tap to equip · street lots',
+    copy: 'Stand inside a dark street foundation and raise that furnace for the crew. Deliveries into the Town Square or a lit street fill one shared purse, and raising spends it. A street stays dark until the nearer lot on that road is burning. Raised furnaces survive death, reconnects, and restarts until the world resets.',
   },
   survey_probe: {
     id: 'survey_probe',

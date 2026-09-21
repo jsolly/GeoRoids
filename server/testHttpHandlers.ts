@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
-import { FURNACES } from '../shared/furnaces';
+import { TOWN_HEARTH } from '../shared/furnaces';
 import { WORLD } from '../shared/world';
 import { DAMAGE } from '../src/constants';
 import type { WebSocketCore } from './communication/WebSocketCore';
@@ -300,10 +300,7 @@ export function handleTestArrangeCrewField(
       respond(400, { error: 'Invalid crew fixture' });
       return;
     }
-    const spiderWorks = FURNACES.find((site) => site.id === 'works-1-0');
-    if (!spiderWorks) {
-      throw new Error('Missing regional furnace');
-    }
+    const spiderWorks = TOWN_HEARTH;
     const ids = body['playerIds'] as string[];
     const players = ids.map((id) => gameEngine.getPlayer(id));
     if (
@@ -322,18 +319,22 @@ export function handleTestArrangeCrewField(
       }
       const position =
         body['scenario'] === 'spider-tools'
-          ? { x: spiderWorks.position.x + 400, y: spiderWorks.position.y }
+          ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
           : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
             ? { x: 3000 + index * 120, y: 5000 }
             : body['scenario'] === 'boundary'
               ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-              : body['scenario'] === 'delivery' || body['scenario'] === 'tow'
+              : body['scenario'] === 'delivery'
                 ? player.kitId === 'hauler'
-                  ? { x: 0, y: -360 }
-                  : { x: 220, y: -460 }
-                : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-                  ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                  : { x: index * 120, y: -360 };
+                  ? { x: 0, y: 360 }
+                  : { x: 220, y: 460 }
+                : body['scenario'] === 'tow'
+                  ? player.kitId === 'hauler'
+                    ? { x: 0, y: -360 }
+                    : { x: 220, y: -460 }
+                  : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                    ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
+                    : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -344,8 +345,9 @@ export function handleTestArrangeCrewField(
         respond(409, { error: 'Crew fixture motion unavailable' });
         return;
       }
-      // 'tow' points the Hauler away from every furnace, so the cargo it hooks
-      // stays hooked for as long as the scenario needs instead of being smelted.
+      // Delivery faces screen-up, which decreases world y, from the positive-y
+      // approach into Town Square. Tow uses that same heading from the
+      // negative-y side so the hooked rock moves farther from the hearth.
       player.angle =
         body['scenario'] === 'spider-tools'
           ? Math.PI
@@ -353,9 +355,7 @@ export function handleTestArrangeCrewField(
               body['scenario'] === 'probe' ||
               body['scenario'] === 'boundary'
             ? 0
-            : body['scenario'] === 'tow'
-              ? -Math.PI / 2
-              : Math.PI / 2;
+            : Math.PI / 2;
       player.spawnProtectionTimer = [
         'delivery',
         'tow',
@@ -388,7 +388,7 @@ export function handleTestArrangeCrewField(
       gameEngine.clearSpiderField();
       if (
         !gameEngine.spawnTerrainSpider({
-          x: spiderWorks.position.x + 500,
+          x: spiderWorks.position.x + 980,
           y: spiderWorks.position.y,
         })
       ) {
@@ -467,7 +467,9 @@ export function handleTestArrangeCrewField(
             ? { ...first.position }
             : body['scenario'] === 'tow'
               ? { x: 0, y: -260 }
-              : { x: 0, y: -460 },
+              : body['scenario'] === 'delivery'
+                ? { x: 0, y: 460 }
+                : { x: 0, y: -460 },
         velocity: { x: 0, y: 0 },
         size: body['scenario'] === 'cooperative' ? 50 : 25,
         health: body['scenario'] === 'mining' ? 25 : 75,

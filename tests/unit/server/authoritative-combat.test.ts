@@ -402,6 +402,8 @@ describe('server-authoritative combat', () => {
     const beta = engine.getPlayer('beta');
     expect(alpha?.kitId).toBe('surveyor');
     expect(beta?.kitId).toBe('surveyor');
+    const alphaPosition = alpha ? { ...alpha.position } : undefined;
+    const betaPosition = beta ? { ...beta.position } : undefined;
 
     wsCore.handleClientMessage(
       { type: 'update', id: 'beta', data: { position: { x: 999, y: 999 } } },
@@ -411,8 +413,8 @@ describe('server-authoritative combat', () => {
       { type: 'update', id: 'alpha', data: { position: { x: 888, y: 888 } } },
       unjoinedWs
     );
-    expect(engine.getPlayer('beta')?.position).toEqual({ x: 100, y: 0 });
-    expect(engine.getPlayer('alpha')?.position).toEqual({ x: 0, y: 0 });
+    expect(engine.getPlayer('beta')?.position).toEqual(betaPosition);
+    expect(engine.getPlayer('alpha')?.position).toEqual(alphaPosition);
 
     wsCore.handleClientMessage(
       {
@@ -441,6 +443,8 @@ describe('server-authoritative combat', () => {
     join(wsCore, pilotWs, { id: 'pilot', name: 'Pilot', position: { x: 0, y: 0 } });
     join(wsCore, otherWs, { id: 'other', name: 'Other', position: { x: 200, y: 0 } });
     clearAsteroidField(engine);
+    const pilot = engine.getPlayer('pilot');
+    expect(pilot).toBeDefined();
     expect(pilotWs.received('joined')[0]?.data).toMatchObject({ shotAcknowledgements: true });
 
     wsCore.handleClientMessage(
@@ -476,7 +480,7 @@ describe('server-authoritative combat', () => {
         type: 'shoot',
         id: 'pilot',
         data: {
-          laserStart: { x: 0, y: 0 },
+          laserStart: { x: pilot?.position.x ?? 0, y: pilot?.position.y ?? 0 },
           laserDirection: { x: 1, y: 0 },
           requestId: 'owned-pilot',
         },

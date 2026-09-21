@@ -52,7 +52,8 @@ for (const viewport of [
       await card.click();
     }
     expect(await card.getAttribute('aria-pressed')).toBe('true');
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Built: 0/3');
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Town purse 0');
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Raise Furnace');
     expect(await page.locator('[data-utility-id]').count()).toBe(3);
     const layout = await page.locator('#ship-schematic-dialog').evaluate((element) => ({
       width: element.clientWidth,
@@ -69,26 +70,7 @@ for (const viewport of [
     await page.locator('#ship-schematic-return').click();
     await page.locator('#ship-schematic-dialog').waitFor({ state: 'hidden' });
     if (viewport.touch) {
-      expect(await page.locator('#touch-ability').textContent()).toContain('BUILD');
-      await page.locator('#touch-ability').tap();
-    } else {
-      await page.keyboard.press('KeyE');
-    }
-    await page.waitForFunction(
-      () => window.gameController?.getGameStateManager().getPickupMessage() === 'Furnace built'
-    );
-    await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`surveyor-built-furnace-${viewport.width}.png`),
-    });
-    await openSchematic();
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Built: 1/3');
-    // Keep the ship at its furnace until the shared cooldown expires.
-    await page.waitForFunction(
-      () => (window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames ?? 1) <= 0
-    );
-    await page.waitForTimeout(150);
-    await page.locator('#ship-schematic-return').click();
-    if (viewport.touch) {
+      expect(await page.locator('#touch-ability').textContent()).toContain('RAISE');
       await page.locator('#touch-ability').tap();
     } else {
       await page.keyboard.press('KeyE');
@@ -96,11 +78,14 @@ for (const viewport of [
     await page.waitForFunction(
       () =>
         window.gameController?.getGameStateManager().getPickupMessage() ===
-        'Too close to another furnace'
+        'Stand inside a street foundation'
     );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`surveyor-built-furnace-${viewport.width}.png`),
+    });
     // The changed Wiki is rendered at both viewport sizes as well.
     await page.goto(`${new URL(page.url()).origin}/wiki/#surveyor`);
-    const buildHeading = page.getByRole('heading', { name: 'Build furnace', exact: true });
+    const buildHeading = page.getByRole('heading', { name: 'Raise furnace', exact: true });
     await buildHeading.waitFor();
     await buildHeading.scrollIntoViewIfNeeded();
     await page.screenshot({

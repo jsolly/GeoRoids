@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { FURNACES, furnaceReward } from '../../../../shared/furnaces';
+import { furnaceReward, TOWN_HEARTH } from '../../../../shared/furnaces';
 import { computeHudLayout } from '../../../../src/rendering/hud/hudLayout';
 import { installAudioProbe, readSamplePlaybackRates } from '../../utils/audio-probe';
 import {
@@ -148,7 +148,7 @@ async function assertMapButtonClearOfRadar(page: Page): Promise<void> {
 }
 
 test(
-  'Surveyor scans a rock for the crew, Hauler tows it to North Works, and both score on desktop and mobile',
+  'Surveyor scans a rock for the crew, Hauler tows it to Town Square, and both score on desktop and mobile',
   async () => {
     const haulerPage = browserManager.getCurrentPage();
     if (!haulerPage) {
@@ -176,14 +176,13 @@ test(
     await Promise.all([hauler.waitForRemotePlayers(1), surveyor.waitForRemotePlayers(1)]);
 
     await arrangeCrewField([haulerId, surveyorId], 'delivery');
-    await Promise.all([hauler.placeShipAt(0, -360), surveyor.placeShipAt(220, -460)]);
+    await Promise.all([hauler.placeShipAt(0, 360), surveyor.placeShipAt(220, 460)]);
     await Promise.all([
-      waitForFixture(haulerPage, 'hauler', { x: 0, y: -360 }),
-      waitForFixture(surveyorPage, 'surveyor', { x: 220, y: -460 }),
+      waitForFixture(haulerPage, 'hauler', { x: 0, y: 360 }),
+      waitForFixture(surveyorPage, 'surveyor', { x: 220, y: 460 }),
     ]);
 
-    const northWorks = FURNACES.find((furnace) => furnace.name === 'North Works');
-    expect(northWorks?.position).toEqual({ x: 0, y: -660 });
+    expect(TOWN_HEARTH.position).toEqual({ x: 0, y: 0 });
     const scoresBefore = await Promise.all([hauler.getScore(), surveyor.getScore()]);
 
     // The Surveyor's real E input records the tag. The remote Hauler snapshot
@@ -245,7 +244,7 @@ test(
             ? 'towing'
             : 'waiting';
         },
-        { timeout: 15000, message: 'Hauler should tow the rock north into North Works' }
+        { timeout: 15000, message: 'Hauler should tow the rock into Town Square' }
       )
       .toBe('delivered');
 

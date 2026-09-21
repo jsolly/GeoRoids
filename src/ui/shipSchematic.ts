@@ -1,4 +1,3 @@
-import { FURNACE_BUILD } from '../../shared/furnaceField';
 import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE, VISUAL } from '../constants';
@@ -29,7 +28,7 @@ import {
   surveyorUtilityOf,
 } from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
-import { worldFurnaces } from '../network/worldExploration';
+import { getTownCredit } from '../network/worldExploration';
 import { drawFurnaceArtwork } from '../rendering/furnaceRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
@@ -301,11 +300,10 @@ function syncCards(): void {
   if (!hauler) {
     const part = SURVEYOR_UTILITY[selectedSurveyorUtility];
     elements.title.textContent = part.name;
-    const player = PlayerManager.getInstance().getLocalPlayer();
     elements.copy.textContent =
       part.copy +
-      (selectedSurveyorUtility === 'build_furnace' && player
-        ? ` Built: ${worldFurnaces.count(player.id)}/${FURNACE_BUILD.MAX_PER_OWNER}.`
+      (selectedSurveyorUtility === 'build_furnace'
+        ? ` Town purse ${getTownCredit().toLocaleString('en-US')}.`
         : '');
     for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
       const active = button.dataset['utilityId'] === selectedSurveyorUtility;

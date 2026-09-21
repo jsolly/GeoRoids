@@ -282,19 +282,11 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
-export interface BuiltFurnace {
-  id: string;
-  ownerId: string;
-  name: string;
-  position: Position;
-  radius: number;
-  /** Server clock when this site was placed. Older worlds may omit it. */
-  placedAt?: number;
-}
-
 export interface ServerGameState {
-  /** Persistent player-built delivery sites. Fixed landmarks are shared definitions. */
-  builtFurnaces?: BuiltFurnace[];
+  /** Shared delivery credit spent to raise the next street furnace. */
+  townCredit?: number;
+  /** Civic lots the crew has lit. Geometry lives in the shared street plan. */
+  litCivicLotIds?: string[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
@@ -313,7 +305,7 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  kind: 'furnace' | 'laserCore' | 'wreckage' | 'satellite';
+  kind: 'furnace' | 'foundation' | 'laserCore' | 'wreckage' | 'satellite';
   position: Position;
   name: string;
 }

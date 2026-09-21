@@ -6,6 +6,15 @@ export const worldFurnaces = new FurnaceField();
 
 let exploration: ExplorationTile[] = EMPTY_EXPLORATION;
 let mapAssets: MapAsset[] = [];
+let townCredit = 0;
+
+export function getTownCredit(): number {
+  return townCredit;
+}
+
+export function setTownCredit(value: number): void {
+  townCredit = Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
 
 export function getWorldMapAssets(): readonly MapAsset[] {
   return mapAssets;
@@ -39,7 +48,8 @@ export function setWorldExploration(value: ExplorationTile[]): void {
 }
 
 export function resetWorldExploration(): void {
-  worldFurnaces.replace([]);
+  worldFurnaces.replaceLit([]);
+  setTownCredit(0);
   mapAssets = [];
   exploration = EMPTY_EXPLORATION;
 }

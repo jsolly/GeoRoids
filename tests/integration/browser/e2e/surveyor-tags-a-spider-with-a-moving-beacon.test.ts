@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { expect, test } from 'vitest';
-import { FURNACES } from '../../../../shared/furnaces';
+import { TOWN_HEARTH } from '../../../../shared/furnaces';
 import type { SpiderFieldState } from '../../../../shared-types';
 import {
   assertNoBrowserDiagnostics,
@@ -47,10 +47,7 @@ for (const width of [1280, 390]) {
     }
     await page.getByRole('button', { name: 'Return to flight' }).click();
     const id = await game.getLocalPlayerId();
-    const works = FURNACES.find((site) => site.id === 'works-1-0');
-    if (!works) {
-      throw new Error('Missing furnace');
-    }
+    const works = TOWN_HEARTH;
     await arrangeCrewField([id], 'spider-tools');
     await game.placeShipAt(works.position.x + 400, works.position.y);
     await page.evaluate(() => {

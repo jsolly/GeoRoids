@@ -61,8 +61,8 @@ reaching zero enters game over. Explosion stops active thrust and turning; held
 controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
 spawn protection. Closing the universe map or ship schematic grants that same
-blink window, because rocks can occupy the hull while it is held. Respawns use the nearest furnace to the death location, 180
-world units from its center at a random angle.
+blink window, because rocks can occupy the hull while it is held. Respawns use the nearest lit hearth to the death location, 180
+world units from its center at a random angle. Dark street foundations are not respawn sites.
 
 After game over, a fresh flight starts with 3 lives and score 0. A brief
 disconnect still returns you to the same ship; a long absence does not.

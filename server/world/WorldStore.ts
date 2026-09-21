@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
-import { validBuiltFurnaces } from '../../shared/furnaceField';
+import { validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
 import { isShipBoostState } from '../../shared/shipBoost';
@@ -11,7 +11,6 @@ import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
-  BuiltFurnace,
   ExplorationTile,
   Position,
   ShipBoostState,
@@ -22,6 +21,10 @@ import { isShipKitId } from '../../src/entities/ship/shipKits';
 import type { LoadedWorld } from './worldPersistence';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+
+function validTownCredit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
 
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
@@ -75,7 +78,10 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
-  builtFurnaces?: BuiltFurnace[];
+  /** Shared haul credit for raising the next street. Absent on older rows. */
+  townCredit?: number;
+  /** Lit street lots. Absent on older rows, including rows that stored personal furnaces. */
+  litCivicLotIds?: string[];
   seed: number;
   startedAt: number;
   generation: number;
@@ -417,14 +423,18 @@ export class WorldStore {
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
-    if ('builtFurnaces' in value && !validBuiltFurnaces(value.builtFurnaces)) {
-      throw new Error('Saved furnaces are invalid; refusing to replace player structures');
+    if ('townCredit' in value && !validTownCredit(value.townCredit)) {
+      throw new Error('Saved town purse is invalid; refusing to replace player progress');
+    }
+    if ('litCivicLotIds' in value && !validLitCivicLotIds(value.litCivicLotIds)) {
+      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
     }
     return {
       seed: value.seed,
-      builtFurnaces:
-        'builtFurnaces' in value && validBuiltFurnaces(value.builtFurnaces)
-          ? value.builtFurnaces
+      townCredit: 'townCredit' in value && validTownCredit(value.townCredit) ? value.townCredit : 0,
+      litCivicLotIds:
+        'litCivicLotIds' in value && validLitCivicLotIds(value.litCivicLotIds)
+          ? value.litCivicLotIds
           : [],
       startedAt: value.startedAt,
       generation:

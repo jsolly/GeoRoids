@@ -4,8 +4,8 @@ import { RNGService } from '../../../server/core/RNGService';
 import { type SpiderResource, spiderResources } from '../../../server/core/spiderResources';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
-import { FURNACE_BUILD, FurnaceField } from '../../../shared/furnaceField';
-import { FURNACES } from '../../../shared/furnaces';
+import { FurnaceField } from '../../../shared/furnaceField';
+import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { AsteroidData, Position } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
@@ -115,37 +115,38 @@ test('nests never materialize beside a pilot or in a furnace yard', () => {
   nearby.pilot.position = { ...home };
   nearby.step(60);
   expect(nearby.manager.snapshot().spiders).toEqual([]);
-  const works = FURNACES.find((site) => site.id === 'works-1-1');
-  if (!works) {
-    throw new Error('Expected Works 1:1');
-  }
   const worksYard = new TerrainSpiderManager(() => 0.5);
   const worksPilot = {
     id: 'pilot',
-    position: { x: works.position.x - 2_000, y: works.position.y },
+    position: { x: TOWN_HEARTH.position.x - 2_000, y: TOWN_HEARTH.position.y },
     health: 100,
     exploding: false,
   };
   worksYard.advance({
     players: [worksPilot],
-    resources: () => [{ id: 'ore', position: { ...works.position }, value: 1 }],
+    resources: () => [{ id: 'ore', position: { ...TOWN_HEARTH.position }, value: 1 }],
     nowFrame: 1,
   });
   expect(worksYard.snapshot().nests).toEqual([]);
   expect(worksYard.snapshot().spiders).toEqual([]);
+  const lot = civicLot('street-1-0');
+  if (!lot) {
+    throw new Error('Missing street lot');
+  }
   const field = new FurnaceField();
-  field.add({
-    id: 'built:pilot:1',
-    ownerId: 'pilot',
-    name: 'Yard',
-    radius: FURNACE_BUILD.RADIUS,
-    position: { ...home },
-  });
+  field.light(lot.id);
   const builtYard = new TerrainSpiderManager(() => 0.5, field);
-  const { manager, pilot, resource, step } = setup();
+  const { manager, step } = setup();
   builtYard.advance({
-    players: [pilot],
-    resources: () => [resource],
+    players: [
+      {
+        id: 'pilot',
+        position: { x: lot.position.x - 2_000, y: lot.position.y },
+        health: 100,
+        exploding: false,
+      },
+    ],
+    resources: () => [{ id: 'ore', position: { ...lot.position }, value: 1 }],
     nowFrame: 1,
   });
   expect(builtYard.snapshot().nests).toEqual([]);

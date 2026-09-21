@@ -207,3 +207,24 @@ export function drawFurnaceMapMark(
   }
   ctx.restore();
 }
+
+/** Unlit street lot: a hollow ring, not a flame. */
+export function drawFoundationMapMark(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number
+): void {
+  if (!(size > 0) || !Number.isFinite(size)) {
+    return;
+  }
+  ctx.save();
+  ctx.strokeStyle = FURNACE_MAP_INK;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = Math.max(1, size * 0.12);
+  ctx.setLineDash([Math.max(2, size * 0.35), Math.max(1.5, size * 0.22)]);
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}

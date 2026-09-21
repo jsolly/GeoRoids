@@ -126,6 +126,11 @@ describe('invalid client movement cannot corrupt the shared world', () => {
     assert.ok(pilot, 'latch pilot');
     const rock = engine.getAllAsteroids()[0];
     assert.ok(rock, 'latch asteroid');
+    // Fresh flights arrive on the town ring. Park beside the pose this test
+    // submits so the movement envelope accepts the sanitized coordinates.
+    expect(
+      engine.playerMotion.placeActorForTesting(pilot.id, { x: 5, y: 5 }, engine.getServerTime())
+    ).toBe(true);
     // The trusted entity API remains available to the authoritative ability
     // owner; the untrusted movement route may not rewrite its active endpoint.
     const latch = { ...rock.position };

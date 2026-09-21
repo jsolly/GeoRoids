@@ -295,6 +295,8 @@ export interface BuiltFurnace {
   name: string;
   position: Position;
   radius: number;
+  /** Server clock when this site was placed. Older worlds may omit it. */
+  placedAt?: number;
 }
 
 export interface ServerGameState {

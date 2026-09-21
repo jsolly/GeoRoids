@@ -18,8 +18,8 @@ export const SURVEYOR_UTILITY = {
   build_furnace: {
     id: 'build_furnace',
     name: 'Build Furnace',
-    hint: `Tap to equip · ${FURNACE_BUILD.MAX_PER_OWNER} max`,
-    copy: `Place a shared furnace at your ship. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units from other furnaces and clear of sector walls. Your furnaces survive death, reconnects and restarts until the world resets.`,
+    hint: `Tap to equip · ${FURNACE_BUILD.MAX_PER_OWNER} at once`,
+    copy: `Place a shared furnace at your ship. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units from other furnaces and clear of sector walls. Your furnaces survive death, reconnects and restarts until the world resets. A fourth placement retires your oldest site.`,
   },
   survey_probe: {
     id: 'survey_probe',

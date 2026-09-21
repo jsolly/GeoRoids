@@ -256,6 +256,8 @@ export class GameEngine {
   private readonly completedSectors = new Set<string>();
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
+  private lastFurnaceBuildNotice: (typeof FURNACE_BUILD.NOTICE)[keyof typeof FURNACE_BUILD.NOTICE] =
+    FURNACE_BUILD.NOTICE.BUILT;
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
   private lootManager: LootManager;
@@ -2851,9 +2853,6 @@ export class GameEngine {
     ) {
       return 'Furnace builder not ready';
     }
-    if (this.furnaces.count(surveyor.id) >= FURNACE_BUILD.MAX_PER_OWNER) {
-      return 'Furnace limit reached (3/3)';
-    }
     if (
       !Number.isFinite(surveyor.position.x) ||
       !Number.isFinite(surveyor.position.y) ||
@@ -2869,18 +2868,33 @@ export class GameEngine {
     return undefined;
   }
 
+  public furnaceBuildNotice(): string {
+    return this.lastFurnaceBuildNotice;
+  }
+
   private buildFurnace(surveyor: GameEntity): boolean {
     if (this.furnaceBuildIssue(surveyor.id)) {
       return false;
     }
-    const count = this.furnaces.count(surveyor.id);
+    let yielded = false;
+    if (this.furnaces.count(surveyor.id) >= FURNACE_BUILD.MAX_PER_OWNER) {
+      if (!this.furnaces.evictOldestOwned(surveyor.id)) {
+        return false;
+      }
+      yielded = true;
+    }
+    const serial = this.furnaces.nextOwnedSerial(surveyor.id);
     this.furnaces.add({
-      id: `built:${surveyor.id}:${count + 1}`,
+      id: `built:${surveyor.id}:${serial}`,
       ownerId: surveyor.id,
-      name: `${surveyor.name}'s Works ${count + 1}`,
+      name: `${surveyor.name}'s Works ${serial}`,
       position: { ...surveyor.position },
       radius: FURNACE_BUILD.RADIUS,
+      placedAt: this.getServerTime(),
     });
+    this.lastFurnaceBuildNotice = yielded
+      ? FURNACE_BUILD.NOTICE.YIELDED
+      : FURNACE_BUILD.NOTICE.BUILT;
     surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
     surveyor.abilityActiveFrames = 0;
     return true;

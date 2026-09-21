@@ -499,7 +499,7 @@ export class MessageHandler {
         JSON.stringify({
           type: 'furnaceBuildResult',
           data: activated
-            ? 'Furnace built'
+            ? this.gameEngine.furnaceBuildNotice()
             : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
           timestamp: Date.now(),
         })

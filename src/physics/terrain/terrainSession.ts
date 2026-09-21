@@ -28,7 +28,6 @@ const contourPatches = new Map<string, ContourPatch>();
 let contourPatchBuilds = 0;
 let contourPatchAccess = 0;
 let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
-let lastRequestedCenter: Position = { x: 0, y: 0 };
 
 // A large world needs a local contour patch. Overlap between adjacent patches
 // keeps the camera from seeing a gap when it crosses a patch boundary.
@@ -211,7 +210,6 @@ export function getTerrainContours(center?: Position, viewRadius?: number): Cont
   }
 
   const requestedCenter = center ?? { x: field.cx, y: field.cy };
-  lastRequestedCenter = requestedCenter;
   const region = contourRegionFor(requestedCenter, viewRadius);
   const previous = cache.contourRegion;
   if (
@@ -248,19 +246,18 @@ export function applyTerrainSeed(seed: number | undefined): Heightfield {
 }
 
 /** Test helper: how many local contour patches were marched for the current terrain. */
-export function builtContourPatchCount(): number {
+export function builtContourPatchCount() {
   return contourPatchBuilds;
 }
 
-/** Test helper: finish queued neighbor contour work on the current terrain. */
-export function flushContourPrefetch(): void {
-  cancelPrefetch();
-  if (!cache || fieldRadiusIsSmallEnoughForFullContours(cache.field) || !cache.contourRegion) {
-    return;
+/** Test helper: levels already marched for this view, without building or warming. */
+export function peekBuiltContourPatch(
+  center: Position,
+  viewRadius?: number
+): ContourLevel[] | undefined {
+  if (!cache || fieldRadiusIsSmallEnoughForFullContours(cache.field)) {
+    return undefined;
   }
-  const field = cache.field;
-  const region = cache.contourRegion;
-  for (const neighbor of neighborRegions(region, lastRequestedCenter)) {
-    loadContourPatch(field, neighbor);
-  }
+  const region = contourRegionFor(center, viewRadius);
+  return contourPatches.get(regionKey(region))?.levels;
 }

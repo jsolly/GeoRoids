@@ -16,9 +16,9 @@ import {
   builtContourPatchCount,
   CONTOUR_REGION_STEP,
   ensureTerrain,
-  flushContourPrefetch,
   getTerrainContours,
   getTerrainSeed,
+  peekBuiltContourPatch,
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import {
@@ -34,6 +34,7 @@ const ISO_CONTOUR_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
@@ -322,16 +323,35 @@ test('elevation labels stay a spacing apart on a dense contour patch', () => {
   }
 });
 
-test('crossing into the next contour patch reuses a warmed neighbor instead of remarching', () => {
+test('crossing into the next contour patch reuses a warmed neighbor instead of remarching', async () => {
+  vi.useFakeTimers();
   ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
-  getTerrainContours({ x: 0, y: 0 }, 800);
+  const origin = getTerrainContours({ x: 0, y: 0 }, 800);
   expect(builtContourPatchCount()).toBe(1);
-  flushContourPrefetch();
+  expect(elevationLabelsAreCached(origin, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
+  expect(contourSpatialIndexIsCached(origin)).toBe(true);
+
+  const nextCenter = { x: CONTOUR_REGION_STEP, y: 0 };
+  let neighbor = peekBuiltContourPatch(nextCenter, 800);
+  for (let step = 0; step < 4 && !neighbor; step++) {
+    await vi.advanceTimersByTimeAsync(0);
+    neighbor = peekBuiltContourPatch(nextCenter, 800);
+  }
+  expect(neighbor).toBeDefined();
+  if (!neighbor) {
+    return;
+  }
+  expect(neighbor).not.toBe(origin);
+  expect(elevationLabelsAreCached(neighbor, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
+  expect(contourSpatialIndexIsCached(neighbor)).toBe(true);
   const warmed = builtContourPatchCount();
   expect(warmed).toBeGreaterThan(1);
-  const levels = getTerrainContours({ x: CONTOUR_REGION_STEP, y: 0 }, 800);
+
+  const levels = getTerrainContours(nextCenter, 800);
+  expect(levels).toBe(neighbor);
   expect(builtContourPatchCount()).toBe(warmed);
   expect(contourSegmentCount(levels)).toBeGreaterThan(100);
-  expect(elevationLabelsAreCached(levels, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
-  expect(contourSpatialIndexIsCached(levels)).toBe(true);
+  expect(
+    levels.some((level) => level.segments.some((segment) => segment.ax > 2048 || segment.bx > 2048))
+  ).toBe(true);
 });

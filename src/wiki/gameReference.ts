@@ -8,7 +8,13 @@ import {
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { EXPLORATION_RANGE } from '../../shared/exploration';
 import { FURNACE_BUILD } from '../../shared/furnaceField';
-import { CIVIC_LOTS, furnaceReward, TOWN_HEARTH, TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
+import {
+  CIVIC_LOTS,
+  FURNACE_PIPE_SPEED,
+  furnaceReward,
+  TOWN_HEARTH,
+  TOWN_SPAWN_RADIUS,
+} from '../../shared/furnaces';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
@@ -103,7 +109,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids, cooperative large rocks, and colossal deposits. The ability has no ship-targeting mode.`,
         `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Ordinary towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable. A colossal deposit needs ${ROID.COLOSSAL_CREW} Tow Cables before it will haul, and ${ROID.COLOSSAL_CREW} Boost Couplings before ignition; ramming it or dragging it into another rock does not shatter it.`,
-        `Furnace intakes are ${TOWN_HEARTH.radius} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor. The same delivery adds that value once to the shared town purse.`,
+        `Furnace intakes are ${TOWN_HEARTH.radius} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor. The same delivery adds that value once to the shared town purse. A street delivery lights the pipe from that grate through each nearer lot to ${TOWN_HEARTH.name}, and the light runs along it at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
       ],
     },
   ],

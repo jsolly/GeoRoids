@@ -2,6 +2,7 @@ import { SPIDER } from '../../../shared/terrainSpider';
 import type { Position, SpiderFieldState } from '../../../shared-types';
 import { resetSpiderScore, type SpiderDanger } from '../../audio/spiderScore';
 import { playSpiderWhimper, stopSpiderWhimpers } from '../../audio/spiderWhimper';
+import { noteFurnacePipePulse } from '../../fx/furnacePipePulse';
 
 const empty: SpiderFieldState = { spiders: [], nests: [] };
 let sessionField: SpiderFieldState = empty;
@@ -30,6 +31,7 @@ export function setSpiderField(state: SpiderFieldState | undefined): void {
           position: { ...event.position },
           startedAt: performance.now() / 1000,
         });
+        noteFurnacePipePulse(event.furnaceId);
         playSpiderWhimper(event.position);
       }
     }

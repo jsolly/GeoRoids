@@ -4,6 +4,7 @@ import {
   civicLot,
   FURNACES,
   isTownSquareArrival,
+  pipeToTownSquare,
   TOWN_HEARTH,
   TOWN_SPAWN_RADIUS,
   townSquareSpawn,
@@ -61,6 +62,31 @@ test('a street stays dark until its nearer lot is a legal parent', () => {
   expect(validLitCivicLotIds(['street-1-0', 'street-1-0'])).toBe(false);
   expect(validLitCivicLotIds(['built:pilot:1'])).toBe(false);
   expect(validLitCivicLotIds('street-1-0')).toBe(false);
+});
+
+test('a street pipe runs from the source grate through each nearer lot to Town Square', () => {
+  const first = civicLot('street-1-0');
+  const second = civicLot('street-2-0');
+  const third = civicLot('street-3-1');
+  const secondParent = civicLot('street-1-0');
+  const thirdParent = civicLot('street-2-0');
+  if (!first || !second || !third || !secondParent || !thirdParent) {
+    throw new Error('Missing civic street lots');
+  }
+  expect(pipeToTownSquare(TOWN_HEARTH.id)).toEqual([TOWN_HEARTH.position]);
+  expect(pipeToTownSquare('missing')).toEqual([]);
+  expect(pipeToTownSquare(first.id)).toEqual([first.position, TOWN_HEARTH.position]);
+  expect(pipeToTownSquare(second.id)).toEqual([
+    second.position,
+    secondParent.position,
+    TOWN_HEARTH.position,
+  ]);
+  expect(pipeToTownSquare(third.id)).toEqual([
+    third.position,
+    thirdParent.position,
+    secondParent.position,
+    TOWN_HEARTH.position,
+  ]);
 });
 
 test('fresh flights stand on the town ring', () => {

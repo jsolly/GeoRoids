@@ -1,7 +1,8 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { CIVIC_LOTS } from '../../shared/furnaces';
+import { CIVIC_LOTS, civicLot, TOWN_HEARTH } from '../../shared/furnaces';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
+import { activeFurnacePipePulses, furnacePipeFrame } from '../fx/furnacePipePulse';
 import { getWorldExploration, worldFurnaces } from '../network/worldExploration';
 import { hexToRgba } from '../utils/colorUtils';
 import { canvasManager } from './canvasSurface';
@@ -10,6 +11,14 @@ import { resolveGlow } from './renderQuality';
 import { strokePhosphorPolyline, type Vec2 } from './vectorJuice';
 
 const furnaceScreen = { x: 0, y: 0 };
+const pipeEnd = { x: 0, y: 0 };
+const pipeHead = { x: 0, y: 0 };
+const PIPE_SCREEN: Array<{ x: number; y: number }> = [
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+  { x: 0, y: 0 },
+];
 const FURNACE_COLOR = PALETTE.SATELLITE;
 const FURNACE_LABEL_COLOR = PALETTE.HUD;
 /** Contour samples per flame edge; enough for a curling tongue, few enough to stay hairline. */
@@ -374,6 +383,118 @@ function drawFurnaceLabel(
   ctx.font = '9px monospace';
   ctx.textBaseline = 'top';
   ctx.fillText(subtitle, x, y + radius + 7);
+  ctx.restore();
+}
+
+function parentPosition(lotId: string): Position | undefined {
+  const lot = civicLot(lotId);
+  if (!lot) {
+    return undefined;
+  }
+  if (lot.parentId === TOWN_HEARTH.id) {
+    return TOWN_HEARTH.position;
+  }
+  return civicLot(lot.parentId)?.position;
+}
+
+function segmentNear(viewer: Position, start: Position, end: Position, reach: number): boolean {
+  const abx = end.x - start.x;
+  const aby = end.y - start.y;
+  const lengthSquared = abx * abx + aby * aby;
+  const t =
+    lengthSquared === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(1, ((viewer.x - start.x) * abx + (viewer.y - start.y) * aby) / lengthSquared)
+        );
+  const dx = viewer.x - (start.x + abx * t);
+  const dy = viewer.y - (start.y + aby * t);
+  return dx * dx + dy * dy <= reach * reach;
+}
+
+/**
+ * Faint pipes join every street lot to the nearer grate, ending at Town Square.
+ * A delivery lights that whole run and sends one bright head back to the square.
+ */
+export function drawFurnacePipes(viewerPosition: Position, now = performance.now()): void {
+  const ctx = canvasManager.getContext();
+  const cvs = canvasManager.getCanvas();
+  if (!ctx || !cvs) {
+    return;
+  }
+  const scale = canvasManager.getPlayfieldScale();
+  const viewport = canvasManager.getViewportSize();
+  const reach = Math.hypot(viewport.width, viewport.height) / scale + 200;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([10, 14]);
+  ctx.strokeStyle = hexToRgba(PALETTE.LASER_LOCAL, 0.28);
+  ctx.lineWidth = 1.5;
+  for (const lot of CIVIC_LOTS) {
+    const parent = parentPosition(lot.id);
+    if (!parent || !segmentNear(viewerPosition, lot.position, parent, reach)) {
+      continue;
+    }
+    const start = canvasManager.worldToScreenInto(furnaceScreen, lot.position, viewerPosition);
+    const end = canvasManager.worldToScreenInto(pipeEnd, parent, viewerPosition);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for (const pulse of activeFurnacePipePulses(now)) {
+    const frame = furnacePipeFrame(pulse, now);
+    if (!frame) {
+      continue;
+    }
+    let visible = false;
+    for (let index = 0; index < pulse.points.length - 1; index += 1) {
+      const start = pulse.points[index];
+      const end = pulse.points[index + 1];
+      if (start && end && segmentNear(viewerPosition, start, end, reach)) {
+        visible = true;
+        break;
+      }
+    }
+    if (!visible) {
+      continue;
+    }
+    const count = Math.min(pulse.points.length, PIPE_SCREEN.length);
+    for (let index = 0; index < count; index += 1) {
+      const world = pulse.points[index];
+      const screen = PIPE_SCREEN[index];
+      if (!world || !screen) {
+        continue;
+      }
+      canvasManager.worldToScreenInto(screen, world, viewerPosition);
+    }
+    ctx.save();
+    ctx.shadowColor = PALETTE.LASER_LOCAL;
+    ctx.shadowBlur = resolveGlow(VISUAL.FURNACE_FLAME_GLOW);
+    ctx.strokeStyle = hexToRgba(PALETTE.LASER_LOCAL, 0.9 * frame.alpha);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const first = PIPE_SCREEN[0];
+    if (first) {
+      ctx.moveTo(first.x, first.y);
+    }
+    for (let index = 1; index < count; index += 1) {
+      const screen = PIPE_SCREEN[index];
+      if (screen) {
+        ctx.lineTo(screen.x, screen.y);
+      }
+    }
+    ctx.stroke();
+    canvasManager.worldToScreenInto(pipeHead, frame.head, viewerPosition);
+    ctx.fillStyle = hexToRgba(PALETTE.LOOT, frame.alpha);
+    ctx.beginPath();
+    ctx.arc(pipeHead.x, pipeHead.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.restore();
 }
 

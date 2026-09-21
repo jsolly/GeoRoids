@@ -118,7 +118,10 @@ both receive the delivery.
 
 Fly the towed asteroid into a lit furnace to deliver it. Street grates sit
 inside one sector so a towed rock can approach from any side. The furnace is a dashed delivery ring around a burning
-grate with a column of flame roaring up its middle. Delivery shatters the rock
+grate with a column of flame roaring up its middle. Faint pipes join each street
+lot to the nearer grate and end at Town Square. A delivery lights that whole
+run, and a bright head travels from the grate that took the rock back to Town
+Square. Delivery shatters the rock
 in a red outline with a short smoke poof and awards the Hauler. If a Surveyor
 scanned the rock, the Hauler and each Surveyor contributor receive identical
 delivery points.
@@ -131,7 +134,8 @@ scale as the other chart marks. Zoomed out it is a flame pin; the nearby view
 keeps the three-tongue campfire.
 
 Tow Cable can also pull a spider behind the Hauler. Drag it into a furnace to
-engulf it in flame; with Sound Effects on, nearby pilots hear a brief melodic
+engulf it in flame; the same pipe lights and the head runs back to Town Square.
+With Sound Effects on, nearby pilots hear a brief melodic
 whimper as it disappears.
 
 ## Mining lasers

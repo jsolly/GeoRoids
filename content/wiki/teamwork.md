@@ -80,7 +80,10 @@ find it; the whole street plan is drawn there, lit or not. Zoomed out, a lit
 mark is an amber flame pin at the same size as the other chart landmarks; the
 nearby view and closer restore the three-tongue campfire. A delivery consumes
 the towed or self-guided rock, pays the Hauler and every recorded Surveyor, and
-banks that same value once in the town purse.
+banks that same value once in the town purse. Faint pipes join each street lot
+to the nearer grate and end at Town Square. Dragging a rock or a spider into a
+street furnace lights that whole run, and a bright head travels from the source
+grate back to Town Square.
 
 ## Shared chart
 

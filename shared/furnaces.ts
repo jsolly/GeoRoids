@@ -128,7 +128,48 @@ function layoutCivicLots(): CivicLot[] {
 
 export const CIVIC_LOTS: readonly CivicLot[] = layoutCivicLots();
 
+/** How fast a delivery light runs along the street pipes, in world units per second. */
+export const FURNACE_PIPE_SPEED = 2_400;
+
 const LOT_BY_ID = new Map(CIVIC_LOTS.map((lot) => [lot.id, lot]));
+
+function hearthPosition(id: string): Position | undefined {
+  if (id === TOWN_HEARTH.id) {
+    return TOWN_HEARTH.position;
+  }
+  return LOT_BY_ID.get(id)?.position;
+}
+
+/**
+ * Grate centers from the furnace that took the delivery back to Town Square.
+ * The first point is the source. Town Square itself is a single point.
+ */
+export function pipeToTownSquare(furnaceId: string): readonly Position[] {
+  if (furnaceId === TOWN_HEARTH.id) {
+    return [TOWN_HEARTH.position];
+  }
+  const path: Position[] = [];
+  const seen = new Set<string>();
+  let id = furnaceId;
+  while (id !== TOWN_HEARTH.id) {
+    if (seen.has(id)) {
+      return [];
+    }
+    seen.add(id);
+    const lot = LOT_BY_ID.get(id);
+    if (!lot) {
+      return [];
+    }
+    path.push(lot.position);
+    id = lot.parentId;
+  }
+  const square = hearthPosition(TOWN_HEARTH.id);
+  if (!square) {
+    return [];
+  }
+  path.push(square);
+  return path;
+}
 
 export function civicLot(id: string): CivicLot | undefined {
   return LOT_BY_ID.get(id);

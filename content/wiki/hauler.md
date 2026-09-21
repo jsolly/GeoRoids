@@ -74,14 +74,14 @@ a second crew coupling on a colossal deposit remains if only one owner leaves.
 After ignition it runs independently of its pilots. Other Haulers cannot attach
 to an ordinary armed or burning rock. A second Boost Coupling can join an
 armed colossal deposit until the crew is complete. Ignition starts a new three-second ability cooldown.
-Once ignited, the rock passes through ships, other asteroids, satellites, and
-completed-sector barriers. Weapons and blast impulses do not affect it, and it
+Once ignited, the rock passes through ships, other asteroids, and satellites.
+Weapons and blast impulses do not affect it, and it
 cannot be scanned, tapped, towed, or coupled again. Existing Surveyor tags still
 receive credit. Only furnace intake consumes the self-guided cargo.
 
 Guidance follows the simulation, which pauses when nobody is playing. A saved
-powered rock retains its owner and resumes guidance after restart, including
-in completed sectors. Legacy saved finite burns without an owner resume as unpowered rocks.
+powered rock retains its owner and resumes guidance after restart.
+Legacy saved finite burns without an owner resume as unpowered rocks.
 
 ## Tow cable E
 
@@ -117,8 +117,7 @@ One latch holds without moving the rock. Two Haulers who haul it to a furnace
 both receive the delivery.
 
 Fly the towed asteroid into an arena furnace to deliver it. Regional Works sit
-in sector interiors so a towed rock can approach from any side, and a Works
-yard never walls off. The furnace is a dashed delivery ring around a burning
+in sector interiors so a towed rock can approach from any side. The furnace is a dashed delivery ring around a burning
 grate with a column of flame roaring up its middle. Delivery shatters the rock
 in a red outline with a short smoke poof and awards the Hauler. If a Surveyor
 scanned the rock, the Hauler and each Surveyor contributor receive identical

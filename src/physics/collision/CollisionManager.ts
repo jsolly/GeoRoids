@@ -1,8 +1,6 @@
-import { shipOverlapsCompletedSector } from '../../../shared/sectors';
 import type { Ship } from '../../entities/ship/Ship';
 import { applyShipBoundaryDeath, isShipCollisionImmune } from '../../entities/ship/shipUtils';
 import { NetworkManager } from '../../network/networkManager';
-import { getCompletedSectors } from '../../network/worldExploration';
 import { logger } from '../../utils/Logger';
 import { checkBoundaryCollision } from './collisionDetection';
 
@@ -33,10 +31,7 @@ export class CollisionManager {
         continue;
       }
 
-      if (
-        checkBoundaryCollision(ship.position, ship.r) ||
-        shipOverlapsCompletedSector(ship.position, ship.r, getCompletedSectors())
-      ) {
+      if (checkBoundaryCollision(ship.position, ship.r)) {
         this.handleBoundaryCollision(ship, localPlayerId);
       }
     }

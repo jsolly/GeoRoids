@@ -95,7 +95,7 @@ next delta. Backpressure above 1 MiB, failed writes and explicitly requested
 resynchronization force the next send to be full.
 Excluded recipients keep their own baseline. Each recipient receives nearby
 asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
-The crew roster, shared exploration, completed sectors and revealed `mapAssets` remain global.
+The crew roster, shared exploration, and revealed `mapAssets` remain global.
 These lightweight furnace and valuable-drop markers supply the universe map;
 they do not require distant asteroid geometry. The outbound budget accommodates
 a fully explored 120,000-unit-wide atlas on late joins and resynchronization.

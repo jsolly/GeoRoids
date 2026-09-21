@@ -299,8 +299,6 @@ export interface ServerGameState {
   spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
   exploration: ExplorationTile[];
-  /** Finished world sectors that stay walled off. */
-  completedSectors: string[];
   /** Revealed landmarks and valuable drops, independent of local simulation visibility. */
   mapAssets: MapAsset[];
   entities: ServerEntityData[];

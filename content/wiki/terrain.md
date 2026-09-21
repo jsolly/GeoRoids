@@ -56,19 +56,16 @@ loose loot, and unclaimed pickups. More valuable resources attract larger guard
 groups; some sites have a whole horde. Most resources remain unguarded. A red spiderweb on both maps marks each
 discovered nest at its guarded resource, not the moving spiders. The web
 remains after the guards die while the original resource stays in place. It
-disappears after the resource is collected or moved, or its sector completes.
-A Works yard never completes, so a nest there lasts until the resource is
-collected or moved. Guards patrol close to their home instead of following
+disappears after the resource is collected or moved. Guards patrol close to their home instead of following
 pilots around the world.
 A cleared nest stays cleared for the server session, and surviving guards keep
 their injuries when you leave and return. Remaining guards keep their territory
-even after its resource is collected or mined. Completing the home sector
-removes its remaining guards, including any still outside on a chase. That never
-happens in a Works yard, so leftover guards there stay until they are killed.
+even after its resource is collected or mined. Leftover guards stay until
+they are killed.
 
 Rare roaming hunters can still approach, with minutes between attempts and a
 quiet interval after spider combat. There is no immediate roaming ambush when
-a flight starts. The starter area, furnaces, and completed sectors remain safe
+a flight starts. The starter area and furnaces remain safe
 from roaming spiders; a Hauler can drag a captured spider into a furnace.
 Surveyors cannot place a new furnace when an existing nest home would sit inside
 the hearth's spider occupancy — the same keep-away that hides a web under a

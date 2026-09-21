@@ -1,6 +1,5 @@
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
 import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
-import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { SPIDER } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-types';
@@ -22,7 +21,6 @@ interface SpiderActor {
 
 interface SpiderAdvanceOptions {
   players: readonly SpiderActor[];
-  completedSectors: ReadonlySet<string>;
   nowFrame: number;
   towedIds?: ReadonlySet<string>;
   resources?: () => readonly SpiderResource[];
@@ -140,7 +138,6 @@ export class TerrainSpiderManager {
   private readonly nests = new Map<string, SpiderNest>();
   private nestMarkers: SpiderFieldState['nests'] = [];
   private spawnTargetIndex = 0;
-  private completedSectors: ReadonlySet<string> = new Set();
 
   public constructor(
     private readonly random: () => number = Math.random,
@@ -276,7 +273,6 @@ export class TerrainSpiderManager {
    * continue through the one authoritative ship damage path.
    */
   public advance(options: SpiderAdvanceOptions): SpiderAttack[] {
-    this.completedSectors = options.completedSectors;
     const nowFrame = Number.isFinite(options.nowFrame) ? options.nowFrame : 0;
     this.nowFrame = nowFrame;
     const players = options.players
@@ -294,15 +290,10 @@ export class TerrainSpiderManager {
         spider.displaced = true;
       }
     }
-    this.removeBlockedBodies(options.completedSectors);
+    this.removeBlockedBodies();
     this.removeDistantBodies(players);
     if (players.length > 0 && nowFrame >= this.nextNestFrame) {
-      this.updateNests(
-        options.resources?.() ?? [],
-        players,
-        options.completedSectors,
-        options.dormantResource
-      );
+      this.updateNests(options.resources?.() ?? [], players, options.dormantResource);
       this.nextNestFrame = nowFrame + 60;
     }
     if (this.nextSpawnFrame === null) {
@@ -328,7 +319,7 @@ export class TerrainSpiderManager {
         }
         spider.displaced = false;
       }
-      this.advanceSpider(spider, players, playerById, options.completedSectors, nowFrame, attacks);
+      this.advanceSpider(spider, players, playerById, nowFrame, attacks);
     }
 
     // A nest encounter also buys a full quiet interval before another ambush.
@@ -343,7 +334,7 @@ export class TerrainSpiderManager {
         (spider) => spider.territory.kind === 'roaming'
       );
       if (roamers.length < SPIDER.MAX_ROAMERS && this.spiders.size < SPIDER.MAX_ACTIVE) {
-        this.spawnNearPlayers(players, options.completedSectors);
+        this.spawnNearPlayers(players);
       }
       // Failed attempts consume the interval too; never retry spawning every frame.
       this.scheduleRoamer(nowFrame);
@@ -396,14 +387,12 @@ export class TerrainSpiderManager {
     return hit;
   }
 
-  private removeBlockedBodies(completedSectors: ReadonlySet<string>): void {
+  private removeBlockedBodies(): void {
     for (const spider of [...this.spiders.values()]) {
       if (
-        shipOverlapsCompletedSector(spider.position, SPIDER.HIT_RADIUS, completedSectors) ||
-        (!spider.displaced &&
-          !this.canOccupy(spider.position, SPIDER.HIT_RADIUS, completedSectors)) ||
+        (!spider.displaced && !this.canOccupy(spider.position, SPIDER.HIT_RADIUS)) ||
         (spider.territory.kind === 'guard' &&
-          !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS, completedSectors))
+          !this.canOccupy(spider.territory.home, SPIDER.HIT_RADIUS))
       ) {
         this.removeSpider(spider.id);
       }
@@ -444,7 +433,6 @@ export class TerrainSpiderManager {
   private updateNests(
     resources: readonly SpiderResource[],
     players: readonly SpiderActor[],
-    completed: ReadonlySet<string>,
     dormantResource: SpiderAdvanceOptions['dormantResource']
   ): void {
     const candidates = new Map<string, SpiderResource>();
@@ -453,11 +441,7 @@ export class TerrainSpiderManager {
       if (
         this.nests.has(cell.id) ||
         distanceBetween(resource.position, cell.center) > SPIDER.NEST_SITE_RADIUS ||
-        !this.canOccupy(
-          resource.position,
-          SPIDER.NEST_PATROL_RADIUS + SPIDER.HIT_RADIUS,
-          completed
-        ) ||
+        !this.canOccupy(resource.position, SPIDER.NEST_PATROL_RADIUS + SPIDER.HIT_RADIUS) ||
         !players.some(
           (player) =>
             distanceBetween(player.position, resource.position) <= SPIDER.NEST_WAKE_DISTANCE
@@ -491,7 +475,7 @@ export class TerrainSpiderManager {
           y: home.y + Math.sin(angle) * SPIDER.NEST_PATROL_RADIUS * 0.6,
         };
       });
-      if (!positions.every((position) => this.canOccupy(position, SPIDER.HIT_RADIUS, completed))) {
+      if (!positions.every((position) => this.canOccupy(position, SPIDER.HIT_RADIUS))) {
         continue;
       }
       const nest: SpiderNest = { resourceId: resource.id, home, guards: [] };
@@ -521,7 +505,7 @@ export class TerrainSpiderManager {
       if (
         resource &&
         distanceBetween(nest.home, resource.position) <= POSITION_EPSILON &&
-        this.canOccupy(nest.home, SPIDER.HIT_RADIUS, completed)
+        this.canOccupy(nest.home, SPIDER.HIT_RADIUS)
       ) {
         markers.push({ id, resourceId: nest.resourceId, position: copyPosition(nest.home) });
       }
@@ -539,8 +523,8 @@ export class TerrainSpiderManager {
           }
           nest.guards = nest.guards.filter(
             (guard) =>
-              this.canOccupy(nest.home, SPIDER.HIT_RADIUS, completed) &&
-              (guard.displaced || this.canOccupy(guard.position, SPIDER.HIT_RADIUS, completed))
+              this.canOccupy(nest.home, SPIDER.HIT_RADIUS) &&
+              (guard.displaced || this.canOccupy(guard.position, SPIDER.HIT_RADIUS))
           );
           for (const guard of nest.guards) {
             if (this.spiders.size >= SPIDER.MAX_ACTIVE) {
@@ -566,7 +550,6 @@ export class TerrainSpiderManager {
     spider: RuntimeSpider,
     players: readonly SpiderActor[],
     playerById: ReadonlyMap<string, SpiderActor>,
-    completedSectors: ReadonlySet<string>,
     nowFrame: number,
     attacks: SpiderAttack[]
   ): void {
@@ -598,7 +581,7 @@ export class TerrainSpiderManager {
           x: spider.position.x + Math.cos(angle) * SPIDER.HUNT_SPEED,
           y: spider.position.y + Math.sin(angle) * SPIDER.HUNT_SPEED,
         };
-        if (this.canOccupy(next, SPIDER.HIT_RADIUS, completedSectors)) {
+        if (this.canOccupy(next, SPIDER.HIT_RADIUS)) {
           spider.angle = normalizeAngle(angle);
           spider.position = next;
           break;
@@ -618,7 +601,7 @@ export class TerrainSpiderManager {
       if (territory.activity === 'returning') {
         spider.phase = 'scuttling';
         spider.targetId = null;
-        this.returnHome(spider, territory, completedSectors);
+        this.returnHome(spider, territory);
         return;
       }
     }
@@ -640,9 +623,9 @@ export class TerrainSpiderManager {
         distanceBetween(spider.position, territory.home) >= SPIDER.NEST_PATROL_RADIUS
       ) {
         territory.activity = 'returning';
-        this.returnHome(spider, territory, completedSectors);
+        this.returnHome(spider, territory);
       } else {
-        this.scuttle(spider, completedSectors);
+        this.scuttle(spider);
       }
       return;
     }
@@ -652,7 +635,7 @@ export class TerrainSpiderManager {
       !target ||
       (territory.kind === 'guard' &&
         distanceBetween(target.position, territory.home) > SPIDER.NEST_LEASH_DISTANCE) ||
-      !this.canOccupy(target.position, target.radius ?? 0, completedSectors) ||
+      !this.canOccupy(target.position, target.radius ?? 0) ||
       distanceBetween(target.position, spider.position) > SPIDER.HUNT_RELEASE_DISTANCE
     ) {
       spider.targetId = null;
@@ -673,7 +656,7 @@ export class TerrainSpiderManager {
         x: spider.position.x + (dx / distance) * stride,
         y: spider.position.y + (dy / distance) * stride,
       });
-      if (!this.canOccupy(next, SPIDER.HIT_RADIUS, completedSectors)) {
+      if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
         spider.targetId = null;
         spider.phase = 'scuttling';
         return;
@@ -737,10 +720,6 @@ export class TerrainSpiderManager {
       x: spider.position.x + Math.cos(angle) * SPIDER.SCUTTLE_SPEED,
       y: spider.position.y + Math.sin(angle) * SPIDER.SCUTTLE_SPEED,
     };
-    if (shipOverlapsCompletedSector(next, SPIDER.HIT_RADIUS, this.completedSectors)) {
-      this.removeSpider(spider.id);
-      return true;
-    }
     spider.phase = 'scuttling';
     spider.targetId = null;
     spider.angle = angle;
@@ -752,8 +731,7 @@ export class TerrainSpiderManager {
 
   private returnHome(
     spider: RuntimeSpider,
-    territory: Extract<Territory, { kind: 'guard' }>,
-    completed: ReadonlySet<string>
+    territory: Extract<Territory, { kind: 'guard' }>
   ): void {
     const distance = distanceBetween(spider.position, territory.home);
     if (distance <= SPIDER.NEST_PATROL_RADIUS * 0.5) {
@@ -769,13 +747,13 @@ export class TerrainSpiderManager {
       x: spider.position.x + Math.cos(angle) * stride,
       y: spider.position.y + Math.sin(angle) * stride,
     };
-    if (this.canOccupy(next, SPIDER.HIT_RADIUS, completed)) {
+    if (this.canOccupy(next, SPIDER.HIT_RADIUS)) {
       spider.angle = normalizeAngle(angle);
       spider.position = next;
     }
   }
 
-  private scuttle(spider: RuntimeSpider, completedSectors: ReadonlySet<string>): void {
+  private scuttle(spider: RuntimeSpider): void {
     const gradient = sampleGradient(getTerrainField(), spider.position.x, spider.position.y);
     const gradientMagnitude = Math.hypot(gradient.x, gradient.y);
     if (gradientMagnitude > 1e-6) {
@@ -796,7 +774,7 @@ export class TerrainSpiderManager {
       x: spider.position.x + Math.cos(spider.angle) * SPIDER.SCUTTLE_SPEED,
       y: spider.position.y + Math.sin(spider.angle) * SPIDER.SCUTTLE_SPEED,
     });
-    if (!this.canOccupy(next, SPIDER.HIT_RADIUS, completedSectors)) {
+    if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
       spider.angle = normalizeAngle(spider.angle + Math.PI);
       return;
     }
@@ -810,7 +788,7 @@ export class TerrainSpiderManager {
     return players
       .filter(
         (player) =>
-          this.canOccupy(player.position, player.radius ?? 0, this.completedSectors) &&
+          this.canOccupy(player.position, player.radius ?? 0) &&
           distanceBetween(player.position, spider.position) <=
             (spider.territory.kind === 'guard'
               ? SPIDER.NEST_ACQUIRE_DISTANCE
@@ -825,13 +803,12 @@ export class TerrainSpiderManager {
       )[0];
   }
 
-  private canOccupy(position: Position, radius: number, completed: ReadonlySet<string>): boolean {
+  private canOccupy(position: Position, radius: number): boolean {
     return (
       Number.isFinite(position.x) &&
       Number.isFinite(position.y) &&
       Math.hypot(position.x, position.y) <= WORLD.radius - SPIDER.WORLD_INSET &&
       Math.hypot(position.x, position.y) >= SPIDER.STARTER_SAFE_RADIUS + radius &&
-      !shipOverlapsCompletedSector(position, radius, completed) &&
       !this.furnaces
         .nearby(position, SPIDER.FURNACE_SAFE_RADIUS + radius)
         .some(
@@ -841,13 +818,10 @@ export class TerrainSpiderManager {
     );
   }
 
-  private spawnNearPlayers(
-    players: readonly SpiderActor[],
-    completedSectors: ReadonlySet<string>
-  ): boolean {
+  private spawnNearPlayers(players: readonly SpiderActor[]): boolean {
     for (let attempt = 0; attempt < SPAWN_ATTEMPTS; attempt++) {
       const player = players[(this.spawnTargetIndex + attempt) % players.length];
-      if (!player || !this.canOccupy(player.position, player.radius ?? 0, completedSectors)) {
+      if (!player || !this.canOccupy(player.position, player.radius ?? 0)) {
         continue;
       }
       const angle = this.random() * Math.PI * 2;
@@ -859,7 +833,7 @@ export class TerrainSpiderManager {
         x: player.position.x + Math.cos(angle) * distance,
         y: player.position.y + Math.sin(angle) * distance,
       };
-      if (!this.validSpawn(position, players, completedSectors)) {
+      if (!this.validSpawn(position, players)) {
         continue;
       }
       const spawned = this.spawnSpider(position, angle);
@@ -876,13 +850,9 @@ export class TerrainSpiderManager {
     return false;
   }
 
-  private validSpawn(
-    position: Position,
-    players: readonly SpiderActor[],
-    completedSectors: ReadonlySet<string>
-  ): boolean {
+  private validSpawn(position: Position, players: readonly SpiderActor[]): boolean {
     return (
-      this.canOccupy(position, SPIDER.HIT_RADIUS, completedSectors) &&
+      this.canOccupy(position, SPIDER.HIT_RADIUS) &&
       !players.some(
         (player) => distanceBetween(position, player.position) < SPIDER.NEST_SPAWN_SAFE_RADIUS
       )

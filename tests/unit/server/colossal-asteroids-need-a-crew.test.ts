@@ -93,7 +93,7 @@ describe('Colossal asteroids need a crew', () => {
       x: (hosted.x + 0.5) * WORLD.sectorSize,
       y: (hosted.y + 0.5) * WORLD.sectorSize,
     };
-    field.update(manager, [observer], new Set());
+    field.update(manager, [observer]);
     const rocks = manager
       .getAllAsteroids()
       .filter((rock) => rock.id.startsWith(`deposit-${seed}-${hosted.x}-${hosted.y}-`));

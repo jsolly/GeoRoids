@@ -94,6 +94,5 @@ export function snapshotFixture(tick = 0): ServerGameSnapshot {
     gameTime: tick / 30,
     isPaused: false,
     terrainSeed: 2345,
-    completedSectors: [],
   };
 }

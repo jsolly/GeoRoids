@@ -124,34 +124,34 @@ describe('authoritative Surveyor probes', () => {
     expect(outside.surveyedBy).toBeUndefined();
   });
 
-  test('launch selects the nearest polygon and rejects range, occupied hosts, and sector walls', () => {
+  test('launch selects the nearest polygon and rejects range and occupied hosts', () => {
     const manager = new SurveyProbeManager();
     const pilot = probePilot({ x: 0, y: 0 });
     const near = asteroidAt('near-host', { x: 300, y: 0 });
     const far = asteroidAt('far-host', { x: 500, y: 0 });
 
-    expect(manager.launch(pilot, [near, far], new Set(), 1_000)).toMatchObject({ host: near });
+    expect(manager.launch(pilot, [near, far], 1_000)).toMatchObject({ host: near });
     expect(far.probe).toBeUndefined();
 
     pilot.abilityCooldownFrames = 0;
-    expect(manager.launch(pilot, [near], new Set(), 1_001)).toBeNull();
+    expect(manager.launch(pilot, [near], 1_001)).toBeNull();
 
     pilot.position = { x: 0, y: 1_000 };
     pilot.abilityCooldownFrames = 0;
     const outside = asteroidAt('outside-launch-range', { x: 800, y: 1_000 });
-    expect(manager.launch(pilot, [outside], new Set(), 1_002)).toBeNull();
+    expect(manager.launch(pilot, [outside], 1_002)).toBeNull();
 
     pilot.position = { x: 1_800, y: 1_000 };
     pilot.abilityCooldownFrames = 0;
-    const walled = asteroidAt('walled-host', { x: 2_100, y: 1_000 });
-    expect(manager.launch(pilot, [walled], new Set(['1,0']), 1_003)).toBeNull();
+    const distantHost = asteroidAt('distant-host', { x: 2_100, y: 1_000 });
+    expect(manager.launch(pilot, [distantHost], 1_003)).toMatchObject({ host: distantHost });
   });
 
   test('idle pulse ticks do not materialize the asteroid source before a due pulse', () => {
     const manager = new SurveyProbeManager();
     const pilot = probePilot({ x: 0, y: 0 });
     const host = asteroidAt('lazy-host', { x: 300, y: 0 });
-    expect(manager.launch(pilot, [host], new Set(), 1_000)).not.toBeNull();
+    expect(manager.launch(pilot, [host], 1_000)).not.toBeNull();
     let materializations = 0;
     const source = () => {
       materializations++;
@@ -283,7 +283,7 @@ describe('authoritative Surveyor probes', () => {
     };
     const field = new RegionalAsteroidField(42, new Map([['0,0', [host]]]));
     const manager = new AsteroidManager(new RNGService(42));
-    field.update(manager, [{ x: 0, y: 0 }], new Set());
+    field.update(manager, [{ x: 0, y: 0 }]);
     const checkpoint = field.checkpoint(manager);
     const savedHost = checkpoint.get('0,0')?.find((rock) => rock.id === host.id);
     expect(savedHost).toBeDefined();
@@ -291,7 +291,7 @@ describe('authoritative Surveyor probes', () => {
 
     const restored = new RegionalAsteroidField(42, new Map([['0,0', checkpoint.get('0,0') ?? []]]));
     const restoredManager = new AsteroidManager(new RNGService(42));
-    restored.update(restoredManager, [{ x: 0, y: 0 }], new Set());
+    restored.update(restoredManager, [{ x: 0, y: 0 }]);
     expect(restoredManager.getAsteroid(host.id)?.probe).toBeUndefined();
   });
 

@@ -37,7 +37,7 @@ export function isScoreSeason(value: unknown): value is string {
 
 const SECTOR_ID_PATTERN = /^-?\d+,-?\d+$/u;
 
-export function sectorId(x: number, y: number): string {
+function sectorId(x: number, y: number): string {
   return `${x},${y}`;
 }
 

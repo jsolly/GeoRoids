@@ -51,7 +51,6 @@ function batch(sectors: ReadonlyMap<string, AsteroidData[]>, score: number): Wor
       generation: WORLD.generation,
       scoreSeason: '2026-09',
       exploration: [],
-      completedSectors: [],
     },
     sectors,
     pilots: [{ id: 'pilot', tokenHash: 'a'.repeat(64), name: 'Pilot', score }],

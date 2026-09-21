@@ -13,18 +13,6 @@ import type { AsteroidData } from '../../../shared-types';
 import { ROID } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-function completeNeighbors(): Set<string> {
-  const completed = new Set<string>();
-  for (let y = -2; y <= 1; y++) {
-    for (let x = -2; x <= 1; x++) {
-      if (x !== 0 || y !== 0) {
-        completed.add(`${x},${y}`);
-      }
-    }
-  }
-  return completed;
-}
-
 function legacyRock(seed: number, slot: number, position = { x: 200, y: 200 }): AsteroidData {
   return {
     id: `deposit-${seed}-0-0-${slot}`,
@@ -49,10 +37,13 @@ test('a fresh sector creates 72 deterministic slots with mostly drifting rocks a
   const mirrorField = new RegionalAsteroidField(82);
   const mirrorManager = new AsteroidManager(new RNGService(82));
 
-  field.update(manager, [{ x: 0, y: 0 }], completeNeighbors());
-  mirrorField.update(mirrorManager, [{ x: 0, y: 0 }], completeNeighbors());
-  const rocks = manager.getAllAsteroids();
-  const mirrorRocks = mirrorManager.getAllAsteroids();
+  field.update(manager, [{ x: 0, y: 0 }]);
+  mirrorField.update(mirrorManager, [{ x: 0, y: 0 }]);
+  const sectorPrefix = 'deposit-82-0-0-';
+  const rocks = manager.getAllAsteroids().filter((rock) => rock.id.startsWith(sectorPrefix));
+  const mirrorRocks = mirrorManager
+    .getAllAsteroids()
+    .filter((rock) => rock.id.startsWith(sectorPrefix));
 
   expect(rocks).toHaveLength(WORLD.depositsPerSector);
   expect(
@@ -98,7 +89,7 @@ test('saved legacy sectors add only missing slots and preserve harvested and mov
     ])
   );
 
-  const migrated = field.migrateSavedSectors(new Set(['1,0']));
+  const migrated = field.migrateSavedSectors();
   const source = migrated.get('0,0');
   expect(source).toBeDefined();
   expect(source).toHaveLength(WORLD.depositsPerSector - 2);
@@ -107,15 +98,21 @@ test('saved legacy sectors add only missing slots and preserve harvested and mov
   expect(source?.filter((rock) => rock.id.startsWith(`deposit-${seed}-0-0-`))).toHaveLength(
     WORLD.depositsPerSector - 2
   );
-  expect(field.dormantSectors().get('1,0')).toEqual([movedNew]);
-  expect(field.migrateSavedSectors(new Set(['1,0']))).toEqual(new Map());
+  const neighbor = field.dormantSectors().get('1,0');
+  const addedNeighborSlots = WORLD.depositsPerSector - WORLD.legacyDepositsPerSector;
+  expect(neighbor?.some((rock) => rock.id === movedNew.id)).toBe(true);
+  expect(neighbor?.filter((rock) => rock.id.startsWith(`deposit-${seed}-1-0-`))).toHaveLength(
+    addedNeighborSlots
+  );
+  expect(neighbor).toHaveLength(addedNeighborSlots + 1);
+  expect(field.migrateSavedSectors()).toEqual(new Map());
 });
 
 test('empty saved sectors stay empty during the density migration', () => {
   const seed = 82;
   const field = new RegionalAsteroidField(seed, new Map([['0,0', []]]));
 
-  expect(field.migrateSavedSectors(new Set())).toEqual(new Map());
+  expect(field.migrateSavedSectors()).toEqual(new Map());
   expect(field.dormantSectors().get('0,0')).toEqual([]);
 });
 
@@ -133,7 +130,6 @@ test('the density marker keeps a destroyed added slot absent after a reload', ()
         generation: WORLD.generation,
         scoreSeason: utcScoreSeason(savedAt),
         exploration: [],
-        completedSectors: [],
       },
       new Map([
         [
@@ -193,7 +189,6 @@ test('saved stationary deposits wake once without restoring mined ore or resetti
         scoreSeason: utcScoreSeason(now),
         asteroidDensityVersion: WORLD.asteroidDensityVersion,
         exploration: [],
-        completedSectors: ['1,0'],
       },
       new Map([
         ['0,0', rows],

@@ -42,7 +42,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Which satellite am I facing and what does a pickup do? | satellites | shared/eoSatellites.ts, pickup manager, pickup collision tests |
 | Why did the terrain push or slow my ship? | terrain | src/physics/terrain/, terrain and contour tests |
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
-| How do pilots complete a sector and keep the shared field going? | teamwork, hud-network | shared/sectors.ts, shared/exploration.ts, shared/furnaces.ts, GameEngine.ts |
+| How does harvested ground stay open while the shared field continues? | teamwork, hud-network | shared/exploration.ts, shared/world.ts, shared/crewSpawn.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
 | How do I mute sound effects or music? | hud-network | src/constants/user-preferences.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
 | How do I copy a Player ID so an agent can filter Railway logs? | hud-network | src/ui/debugIdentity.ts, src/utils/clientLogContext.ts, docs/diagnostics.md |
@@ -102,10 +102,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   those launchers and recorded Surveyors are paid. Dropping one colossal coupling
   leaves the other armed. Swapping tools, losing range, dying, or disconnecting
   cancels an ordinary armed coupling.
-  Ignited cargo passes through objects and completed-sector barriers and ignores
+  Ignited cargo passes through objects and ignores
   tools, weapons, scanning, and blast impulses. An empty world pauses guidance;
   saved sectors retain delivery ownership across reloads and resume powered cargo
-  even inside completed sectors.
+  after a restart.
 - Surveyor E classifies nearby minerals on every teammate radar for the active
   1,200-unit scan range; each qualifying rock keeps that classification while
   it remains in the nearby radar and records the Surveyor player ID for delivery.
@@ -123,8 +123,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   mining reward; partial-rock contributor history survives saved-region reloads
   and server restarts, and offline pilots retain their credit.
 - Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
-  never damage crew hulls. After a bounce off the arena wall, a completed-sector
-  wall, or a reflective asteroid, a laser becomes a ricochet: it deals the
+  never damage crew hulls. After a bounce off the arena wall or a reflective
+  asteroid, a laser becomes a ricochet: it deals the
   configured laser hit times its energy to the first live hull it meets,
   including its owner, and is consumed. Asteroid impacts remain world hazards
   and remove 25 health per impact, including a towed rock that hits another ship.
@@ -151,15 +151,11 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
   pickups take damage from asteroid impacts and ricochets while deployed;
   ordinary crew shots pass through owned hardware.
-- Completing a visited sector (every explorable cell mapped and every asteroid
-  gone) walls it off, unless that sector holds a Works site. Completed-sector
-  walls kill ships like the outer boundary,
-  bounce lasers that then become ricochets, and move anyone already inside
-  just outside along their heading
-  without taking a life. A hull that already crossed the grid but still overlaps
-  the new wall is nudged out the same way. New spawns skip those sectors.
-  Crossing into a new open sector shows a HUD notice, and both maps hatch
-  finished ground.
+- A visited region that no longer holds asteroids stays empty. Ships, lasers,
+  and new flights can still cross it. An empty saved row is the harvest
+  record; historical `completedSectors` values on an old world row are ignored
+  and omitted from the next world save. Respawn uses the nearest furnace. The
+  universe map keeps its alignment grid and counts explored cells.
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.

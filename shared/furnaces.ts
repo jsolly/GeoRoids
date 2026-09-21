@@ -1,5 +1,5 @@
 import type { AsteroidData, Position } from '../shared-types';
-import { sectorAt, WORLD } from './world';
+import { WORLD } from './world';
 
 const orbit = 660;
 export const FURNACES = [
@@ -39,13 +39,6 @@ for (let row = -14; row <= 14; row++) {
   }
 }
 
-const FURNACE_SECTOR_IDS = new Set(FURNACES.map((site) => sectorAt(site.position).id));
-
-/** Works yards stay flyable; mapping them must not raise completed-sector walls. */
-export function isFurnaceSector(id: string): boolean {
-  return FURNACE_SECTOR_IDS.has(id);
-}
-
 const MATERIAL_POINTS = { ice: 150, metal: 300, rubble: 100 };
 
 /** Each contributor receives the full delivery value. */
@@ -53,7 +46,7 @@ export function furnaceReward(rock: Pick<AsteroidData, 'material' | 'size'>): nu
   return MATERIAL_POINTS[rock.material ?? 'rubble'] * Math.max(1, Math.round(rock.size / 25));
 }
 
-/** Furnace landmarks are fixed and nonempty, independent of explored sectors. */
+/** Furnace landmarks are fixed and nonempty, independent of explored ground. */
 export function nearestFurnace(position: Position): (typeof FURNACES)[number] {
   return FURNACES.reduce((nearest, site) =>
     Math.hypot(position.x - site.position.x, position.y - site.position.y) <

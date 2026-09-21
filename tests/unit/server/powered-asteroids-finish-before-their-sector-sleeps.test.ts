@@ -27,17 +27,17 @@ test('a powered sector stays awake until its rock is delivered or destroyed', ()
   const deposit = rock();
   const field = new RegionalAsteroidField(42, new Map([['0,0', [deposit]]]));
   const manager = new AsteroidManager(new RNGService(42));
-  field.update(manager, [{ x: 500, y: 500 }], new Set());
-  field.update(manager, [], new Set());
+  field.update(manager, [{ x: 500, y: 500 }]);
+  field.update(manager, []);
   expect(manager.getAsteroid(deposit.id)).toBe(deposit);
   for (let frame = 0; frame < 240; frame++) {
     manager.updateMotion();
   }
   expect(deposit.boost?.phase).toBe('burning');
-  field.update(manager, [], new Set());
+  field.update(manager, []);
   expect(manager.getAsteroid(deposit.id)).toBe(deposit);
   manager.removeAsteroid(deposit.id);
-  field.update(manager, [], new Set());
+  field.update(manager, []);
   expect(
     field
       .checkpoint(manager)
@@ -72,14 +72,13 @@ test('a checkpoint restores guidance and its original owner', () => {
   }
 });
 
-test('saved powered cargo wakes inside a completed sector without a nearby observer', () => {
+test('saved powered cargo wakes without a nearby observer', () => {
   const deposit = rock();
   const field = new RegionalAsteroidField(42, new Map([['0,0', [deposit]]]));
   const manager = new AsteroidManager(new RNGService(42));
-  const completed = new Set(['0,0']);
-  field.update(manager, [], completed);
+  field.update(manager, []);
   expect(manager.getAsteroid(deposit.id)).toBe(deposit);
-  field.update(manager, [], completed);
+  field.update(manager, []);
   expect(manager.getAsteroid(deposit.id)).toBe(deposit);
 });
 
@@ -93,7 +92,7 @@ test('a checkpoint cannot put powered cargo to sleep after it crosses a sector e
     ])
   );
   const manager = new AsteroidManager(new RNGService(42));
-  field.update(manager, [], new Set());
+  field.update(manager, []);
   deposit.position = { x: 2100, y: 500 };
   const rows = field.checkpoint(manager);
   expect(manager.getAsteroid(deposit.id)).toBe(deposit);
@@ -102,16 +101,21 @@ test('a checkpoint cannot put powered cargo to sleep after it crosses a sector e
 });
 
 test.each(['interest update', 'checkpoint'] as const)(
-  'guided cargo entering a completed sector never regenerates native deposits during %s',
+  'guided cargo entering an empty saved sector never regenerates native deposits during %s',
   (operation) => {
     const deposit = rock();
-    const completed = new Set(['1,0']);
-    const field = new RegionalAsteroidField(42, new Map([['0,0', [deposit]]]), completed);
+    const field = new RegionalAsteroidField(
+      42,
+      new Map([
+        ['0,0', [deposit]],
+        ['1,0', []],
+      ])
+    );
     const manager = new AsteroidManager(new RNGService(42));
-    field.update(manager, [], completed);
+    field.update(manager, []);
     deposit.position = { x: 2100, y: 500 };
     if (operation === 'interest update') {
-      field.update(manager, [], completed);
+      field.update(manager, []);
     } else {
       field.checkpoint(manager);
     }

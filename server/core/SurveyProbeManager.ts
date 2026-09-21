@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
 import { findNearestAsteroidImpact } from '../../shared/asteroidReflection';
-import { findSectorWallImpact } from '../../shared/sectors';
 import { probePosition, SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
@@ -87,7 +86,6 @@ export class SurveyProbeManager {
   public launch(
     surveyor: SurveyProbeLaunchHost,
     asteroids: readonly AsteroidData[],
-    completedSectors: ReadonlySet<string>,
     now: number,
     spiders: readonly TerrainSpider[] = []
   ): { host: ProbeHost; probe: AsteroidProbe } | null {
@@ -148,14 +146,7 @@ export class SurveyProbeManager {
       return null;
     }
 
-    const worldWall = findWorldBoundaryImpact(start, end);
-    const sectorWall = findSectorWallImpact(start, end, completedSectors);
-    const boundary =
-      worldWall && sectorWall
-        ? worldWall.distance <= sectorWall.distance
-          ? worldWall
-          : sectorWall
-        : (worldWall ?? sectorWall);
+    const boundary = findWorldBoundaryImpact(start, end);
     if (boundary && boundary.distance <= impact.distance) {
       return null;
     }

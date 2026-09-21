@@ -12,6 +12,7 @@ import {
 import { findNearestAsteroidImpact, reflectVector } from '../../shared/asteroidReflection';
 import { asteroidCrewNeeded, isColossalAsteroid } from '../../shared/asteroidScale';
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
+import { chooseCrewSpawn } from '../../shared/crewSpawn';
 import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
 import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
@@ -25,19 +26,11 @@ import {
   LOOT_BLAST,
 } from '../../shared/lootBlast';
 import { readReleaseId, releaseField } from '../../shared/releaseId';
-import {
-  chooseOpenSectorSpawn,
-  containBodyOutOfCompletedSectors,
-  findSectorWallImpact,
-  isInsideCompletedSector,
-  isSectorExplorationComplete,
-  shipOverlapsCompletedSector,
-} from '../../shared/sectors';
 import { advanceShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
-import { parseSectorId, sectorAt, utcScoreSeason, WORLD } from '../../shared/world';
+import { utcScoreSeason, WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
@@ -230,7 +223,6 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 interface FlushedWorldRow {
   exploration: ExplorationTile[];
   builtFurnaces: ReturnType<FurnaceField['snapshot']>;
-  completedSectors: number;
   scoreSeason: string;
   startedAt: number;
   asteroidDensityVersion: number;
@@ -253,7 +245,6 @@ export class GameEngine {
   private worldStartedAt: number;
   private scoreSeason: string;
   private readonly pilots = new Map<string, PersistentPilot>();
-  private readonly completedSectors = new Set<string>();
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
   private lastFurnaceBuildNotice: (typeof FURNACE_BUILD.NOTICE)[keyof typeof FURNACE_BUILD.NOTICE] =
@@ -286,7 +277,7 @@ export class GameEngine {
   private laserSeq = 0;
   private readonly laserNonce = randomUUID();
   private readonly surveyProbeManager = new SurveyProbeManager();
-  public readonly playerMotion = new PlayerMotionService(this.completedSectors);
+  public readonly playerMotion = new PlayerMotionService();
   private departedPlayers: string[] = [];
   private decoratedFieldId?: string | undefined;
   private pendingLootBlasts: Array<{
@@ -338,28 +329,16 @@ export class GameEngine {
     this.worldSeed = loaded?.world?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
     this.worldStartedAt = loaded?.world?.startedAt ?? this.serverClock.now();
     this.rngService = new RNGService(this.worldSeed);
-    this.regionalField = new RegionalAsteroidField(
-      this.worldSeed,
-      loaded?.sectors,
-      this.completedSectors
-    );
+    this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
     if (loaded?.world) {
       this.furnaces.replace(loaded.world.builtFurnaces ?? []);
       this.exploration.restore(loaded.world.exploration);
-      for (const id of loaded.world.completedSectors) {
-        // Older worlds could complete a Works yard when the hearth sat on a
-        // corner. Those sectors stay flyable so delivery still has an approach.
-        if (this.furnaces.hasSector(id)) {
-          continue;
-        }
-        this.completedSectors.add(id);
-      }
     }
     if ((saved?.asteroidMotionVersion ?? 0) < WORLD.asteroidMotionVersion) {
       this.regionalField.migrateSavedMotion();
     }
     if ((saved?.asteroidDensityVersion ?? 0) < WORLD.asteroidDensityVersion) {
-      this.regionalField.migrateSavedSectors(this.completedSectors);
+      this.regionalField.migrateSavedSectors();
     }
     for (const pilot of loaded?.pilots ?? []) {
       this.pilots.set(pilot.id, pilot);
@@ -521,11 +500,6 @@ export class GameEngine {
     this.collectLoot(serverNow);
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion();
-    for (const rock of this.asteroidManager.getAllAsteroids()) {
-      if (rock.boost?.phase !== 'burning') {
-        containBodyOutOfCompletedSectors(rock, this.completedSectors);
-      }
-    }
     this.processFurnaceDeliveries();
     if (this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
@@ -534,7 +508,6 @@ export class GameEngine {
     this.flushDueShockwaves(serverNow);
     this.flushExpiredCollabHits(serverNow);
     this.resolveAuthoritativeCombat();
-    this.evaluateSectorProgress();
     // Activate newly reached sectors without replenishing harvested deposits.
     if (this.gameTime % 60 === 0) {
       this.ensureAsteroidField();
@@ -694,7 +667,6 @@ export class GameEngine {
     this.exploration.reset();
     this.mapAssets.reset();
     this.furnaces.replace([]);
-    this.completedSectors.clear();
     this.rngService.reset();
     this.createAsteroids(scenario === 'combat' ? 80 : ROID.INITIAL_ROID_COUNT);
     this.seedAsteroidInteractions();
@@ -712,7 +684,6 @@ export class GameEngine {
     this.exploration.reset();
     this.mapAssets.reset();
     this.furnaces.replace([]);
-    this.completedSectors.clear();
     this.playerMotion.reset();
     this.entityManager.clearAll();
 
@@ -737,10 +708,6 @@ export class GameEngine {
     return entity;
   }
 
-  public getCompletedSectors(): readonly string[] {
-    return [...this.completedSectors].sort();
-  }
-
   public revealArea(position: Position, range: number): void {
     this.exploration.reveal(position, range);
   }
@@ -750,88 +717,11 @@ export class GameEngine {
       .getAllEntities()
       .filter((actor) => actor.health > 0 && !actor.exploding && actor.respawnTimer === undefined)
       .map((actor) => actor.position);
-    const spawn = chooseOpenSectorSpawn({
-      completed: this.completedSectors,
+    return chooseCrewSpawn({
       allies,
       ...(requested ? { previous: requested } : {}),
       random: () => this.rngService.random(),
     });
-    return spawn;
-  }
-
-  private ensurePilotInOpenSector(entity: GameEntity): boolean {
-    const radius = hullRadiusForKit(entity.kitId);
-    if (
-      !isInsideCompletedSector(entity.position, this.completedSectors) &&
-      !shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
-    ) {
-      return false;
-    }
-    entity.harpoonTargetId = null;
-    delete entity.harpoonLatchPos;
-    const heading =
-      Math.hypot(entity.velocity.x, entity.velocity.y) > 1e-4
-        ? entity.velocity
-        : { x: Math.cos(entity.angle), y: Math.sin(entity.angle) };
-    containBodyOutOfCompletedSectors(entity, this.completedSectors, {
-      radius,
-      bias: heading,
-    });
-    if (
-      isInsideCompletedSector(entity.position, this.completedSectors) ||
-      shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
-    ) {
-      entity.velocity = { x: 0, y: 0 };
-      delete entity.knockbackVelocityLimit;
-      entity.position = this.choosePilotSpawn(entity.position);
-    }
-    entity.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
-    this.playerMotion.invalidateLife(entity.id, this.getServerTime());
-    return true;
-  }
-
-  public evaluateSectorProgress(): string[] {
-    const tiles = this.exploration.snapshot();
-    const candidates = new Set<string>([
-      ...this.regionalField.visitedSectorIds(),
-      ...this.entityManager.getAllEntities().map((entity) => sectorAt(entity.position).id),
-      ...this.asteroidManager.getAllAsteroids().map((rock) => sectorAt(rock.position).id),
-    ]);
-    const remaining = new Map<string, number>();
-    for (const id of candidates) {
-      remaining.set(id, 0);
-    }
-    for (const rock of this.asteroidManager.getAllAsteroids()) {
-      const id = sectorAt(rock.position).id;
-      remaining.set(id, (remaining.get(id) ?? 0) + 1);
-    }
-    for (const [id, rocks] of this.regionalField.dormantSectors()) {
-      remaining.set(id, (remaining.get(id) ?? 0) + rocks.length);
-    }
-    const newlyCompleted: string[] = [];
-    for (const id of candidates) {
-      if (this.completedSectors.has(id)) {
-        continue;
-      }
-      const parsed = parseSectorId(id);
-      if (!parsed || this.furnaces.hasSector(id) || !this.regionalField.hasVisited(id)) {
-        continue;
-      }
-      if ((remaining.get(id) ?? 0) > 0) {
-        continue;
-      }
-      if (!isSectorExplorationComplete(tiles, parsed.x, parsed.y)) {
-        continue;
-      }
-      this.completedSectors.add(id);
-      newlyCompleted.push(id);
-    }
-    if (newlyCompleted.length > 0) {
-      for (const entity of this.entityManager.getAllEntities()) {
-        this.ensurePilotInOpenSector(entity);
-      }
-    }
-    return newlyCompleted;
   }
 
   public removePlayer(id: string): GameEntity | undefined {
@@ -1004,7 +894,6 @@ export class GameEngine {
     if (live.ok && live.actor.lives > 0) {
       this.rememberClientRelease(live.actor.id, clientReleaseId);
       this.applyRequestedPilotIdentity(live.actor, requestedKit, requestedName, true);
-      this.ensurePilotInOpenSector(live.actor);
       return live;
     }
     if (live.ok) {
@@ -1091,7 +980,6 @@ export class GameEngine {
       actor.velocity = { x: flight.velocity.x, y: flight.velocity.y };
     }
     delete actor.spawnProtectionTimer;
-    this.ensurePilotInOpenSector(actor);
   }
 
   private ensureScoreSeason(): void {
@@ -1115,7 +1003,6 @@ export class GameEngine {
     this.exploration.reset();
     this.mapAssets.reset();
     this.furnaces.replace([]);
-    this.completedSectors.clear();
     this.clearWorldObjects();
     this.pendingFurnaceDeliveries = [];
     for (const pilot of this.pilots.values()) {
@@ -1196,14 +1083,12 @@ export class GameEngine {
   /**
    * The world row carries the whole exploration grid, so it is only rebuilt
    * and sent when one of its inputs changed since the last flush. The
-   * exploration snapshot keeps its identity until a cell is revealed, and
-   * completed sectors only ever grow between resets.
+   * exploration snapshot keeps its identity until a cell is revealed.
    */
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
       exploration: this.exploration.snapshot(),
       builtFurnaces: this.furnaces.snapshot(),
-      completedSectors: this.completedSectors.size,
       scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
       asteroidDensityVersion: WORLD.asteroidDensityVersion,
@@ -1214,7 +1099,6 @@ export class GameEngine {
       last &&
       last.exploration === builtFrom.exploration &&
       last.builtFurnaces === builtFrom.builtFurnaces &&
-      last.completedSectors === builtFrom.completedSectors &&
       last.scoreSeason === builtFrom.scoreSeason &&
       last.startedAt === builtFrom.startedAt &&
       last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
@@ -1233,7 +1117,6 @@ export class GameEngine {
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
         builtFurnaces: this.furnaces.snapshot(),
-        completedSectors: [...this.completedSectors].sort(),
       },
       builtFrom,
     };
@@ -1418,7 +1301,6 @@ export class GameEngine {
           surveyorUtilityOf(entity) === 'mineral_scan' &&
           entity.abilityActiveFrames > 0,
       })),
-      completedSectors: this.completedSectors,
       nowFrame: this.gameTime,
       dormantResource: (id, home) => {
         const rock = this.regionalField.dormantAsteroid(id, home);
@@ -1580,14 +1462,10 @@ export class GameEngine {
     if (!this.managedField) {
       return [];
     }
-    const created = this.regionalField.update(
-      this.asteroidManager,
-      [
-        ...this.entityManager.getAllEntities().map((entity) => entity.position),
-        ...this.surveyProbeManager.observerPositions(),
-      ],
-      this.completedSectors
-    );
+    const created = this.regionalField.update(this.asteroidManager, [
+      ...this.entityManager.getAllEntities().map((entity) => entity.position),
+      ...this.surveyProbeManager.observerPositions(),
+    ]);
     this.seedAsteroidInteractions();
     return created;
   }
@@ -1833,7 +1711,6 @@ export class GameEngine {
       if (!entity) {
         continue;
       }
-      this.ensurePilotInOpenSector(entity);
       logger.info('STATE', 'player_respawned', {
         releaseId: SERVER_RELEASE_ID,
         playerId,
@@ -1858,10 +1735,7 @@ export class GameEngine {
     const entities = this.entityManager.getAllEntities();
     for (const entity of entities) {
       const radius = hullRadiusForKit(entity.kitId);
-      if (
-        checkBoundaryCollision(entity.position, radius) ||
-        shipOverlapsCompletedSector(entity.position, radius, this.completedSectors)
-      ) {
+      if (checkBoundaryCollision(entity.position, radius)) {
         const result = this.applyDirectedHit(entity.id, 'boundary', entity.health);
         if (result) {
           results.push(result);
@@ -2404,14 +2278,7 @@ export class GameEngine {
         .filter((nearbyRock) => this.getAsteroid(nearbyRock.id) === nearbyRock);
       const rocks = nearbyRocks.filter((nearbyRock) => !cargo.has(nearbyRock.id));
       const impact = findNearestAsteroidImpact(start, end, rocks, laser.lastAsteroidId);
-      const worldWall = findWorldBoundaryImpact(start, end);
-      const sectorWall = findSectorWallImpact(start, end, this.completedSectors);
-      const boundary =
-        worldWall && sectorWall
-          ? worldWall.distance <= sectorWall.distance
-            ? worldWall
-            : sectorWall
-          : (worldWall ?? sectorWall);
+      const boundary = findWorldBoundaryImpact(start, end);
       const distance = Math.hypot(end.x - start.x, end.y - start.y);
       const owner = this.getPlayer(laser.ownerId);
       const hulls = laserDamagesShips(laser.bounces)
@@ -2672,7 +2539,6 @@ export class GameEngine {
         this.furnaces.snapshot()
       ),
       exploration: this.exploration.snapshot(),
-      completedSectors: [...this.completedSectors].sort(),
       entities: allEntities.map(
         (entity) =>
           ({
@@ -2857,10 +2723,9 @@ export class GameEngine {
       !Number.isFinite(surveyor.position.x) ||
       !Number.isFinite(surveyor.position.y) ||
       Math.hypot(surveyor.position.x, surveyor.position.y) >
-        WORLD.radius - FURNACE_BUILD.WORLD_INSET ||
-      shipOverlapsCompletedSector(surveyor.position, FURNACE_BUILD.RADIUS, this.completedSectors)
+        WORLD.radius - FURNACE_BUILD.WORLD_INSET
     ) {
-      return 'Move clear of the world or sector wall';
+      return 'Move clear of the world edge';
     }
     if (this.furnaces.nearby(surveyor.position, FURNACE_BUILD.MIN_DISTANCE).length > 0) {
       return 'Too close to another furnace';
@@ -2913,7 +2778,6 @@ export class GameEngine {
     const result = this.surveyProbeManager.launch(
       surveyor,
       asteroids,
-      this.completedSectors,
       now,
       this.spiderManager.getBodies()
     );

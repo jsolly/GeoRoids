@@ -85,7 +85,7 @@ Equip Build Furnace in the ship schematic, then press E or tap Build to place a
 furnace at your ship's position. Building costs no resource and shares Mineral
 Scan's cooldown. A failed placement uses neither a slot nor a cooldown; the HUD
 explains why it failed. Move clear of other furnaces, spider nests,
-completed-sector walls, and the world edge before trying again. A nest whose
+and the world edge before trying again. A nest whose
 home would sit inside the new furnace's spider occupancy is an illegal site;
 that miss does not wipe the nest. Standing furnaces still scare spiders that
 enter that occupancy.
@@ -104,9 +104,8 @@ usual delivery credit, guides nearby boosted cargo, provides the usual spider
 safe area, and can serve as a nearby respawn site. Discovered furnaces appear on
 the local radar and universe map. Building itself awards no delivery points.
 Furnaces cannot be moved or dismantled by hand. The only way one of yours
-comes down is when a later placement needs the slot. Sectors touched by a
-furnace intake stay open, so mapping and mining them cannot wall off your
-delivery site.
+comes down is when a later placement needs the slot. Mapping and mining
+around a furnace cannot close the delivery site.
 
 ## Satellite inventory
 

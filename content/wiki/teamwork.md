@@ -3,8 +3,7 @@ title: Teamwork
 category: Systems
 summary: Every player shares one crew. Scan, tow, and deliver together.
   Direct weapons and collisions leave teammates unharmed; bounced lasers
-  become ricochets. Completing a sector walls it off for later expeditions;
-  a Works yard never completes.
+  become ricochets. Harvested ground stays open for later expeditions.
 order: 140
 related:
   - content/wiki/surveyor.md
@@ -25,7 +24,7 @@ Direct ship lasers, ship-to-ship ramming, and the Hauler tow cable never
 damage a teammate. After a laser bounces off a wall or reflective asteroid, it
 becomes a ricochet that can hurt you or another pilot. The Hauler ability
 attaches only to asteroids; it cannot select, pull, or throw a ship.
-Asteroids, completed-sector walls, and the arena boundary remain world
+Asteroids and the arena boundary remain world
 hazards, including a towed rock that hits another ship; shot-triggered loot
 blasts only push nearby small rocks and leave crew hulls safe.
 
@@ -98,22 +97,15 @@ other important assets stay marked on the universe map, and pilots stay
 readable on both maps. Both maps draw each pilot's hull silhouette.
 Close the overview with the Close control, or with M or Escape on a keyboard.
 
-## Completing sectors
+## Harvested ground
 
-The world is divided into 2,000-unit sectors. A sector completes when the crew
-has visited it, mapped every explorable cell, and removed every asteroid there,
-including rocks that drifted to sleep in that sector. A sector that holds a
-Works site never completes, so the delivery yard stays open. Completed sectors
-stay empty: they do not regenerate deposits, and their walls are lethal to ships
-the same way the outer world boundary is. Lasers bounce off those walls and then
-become ricochets that can damage ships. Anyone already inside when a sector
-completes is moved just outside its walls in the direction they were flying,
-without losing a life. A hull that has already crossed the grid but still
-overlaps the new wall is nudged the rest of the way out the same way, so
-finishing a sector cannot yank a crew backward or spend a life. New spawns
-skip completed sectors. Crossing into a new open sector shows a brief HUD
-notice with that sector's coordinates. The local radar and universe map shade completed sectors green, matching
-their green playfield walls, so closed ground stays distinct from spiderwebs.
+The world stores ore in 2,000-unit regions. A region the crew has visited and
+emptied does not grow new deposits, and ships can still fly through it.
+Furnace yards stay usable the same way. Lasers bounce off the outer world
+boundary and then become ricochets that can damage ships. A new flight returns
+to a recent pose inside the world, gathers near a living crewmate, or appears
+in the region under the origin. The local radar and universe map keep explored
+cells visible, and the universe map still draws its alignment grid.
 
 Surveyors can equip [Build Furnace](/wiki/#surveyor) to place shared delivery
 sites. Each pilot can keep three built sites at once; placing another yields

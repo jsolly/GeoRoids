@@ -6,7 +6,6 @@ export const worldFurnaces = new FurnaceField();
 
 let exploration: ExplorationTile[] = EMPTY_EXPLORATION;
 let mapAssets: MapAsset[] = [];
-let completedSectors = new Set<string>();
 
 export function getWorldMapAssets(): readonly MapAsset[] {
   return mapAssets;
@@ -39,17 +38,8 @@ export function setWorldExploration(value: ExplorationTile[]): void {
   exploration = value;
 }
 
-export function getCompletedSectors(): ReadonlySet<string> {
-  return completedSectors;
-}
-
-export function setCompletedSectors(ids: readonly string[]): void {
-  completedSectors = new Set(ids);
-}
-
 export function resetWorldExploration(): void {
   worldFurnaces.replace([]);
   mapAssets = [];
   exploration = EMPTY_EXPLORATION;
-  completedSectors = new Set();
 }

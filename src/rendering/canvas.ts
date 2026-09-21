@@ -36,7 +36,6 @@ import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
 import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
-import { drawSectorBoundaries } from './sectorRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
 import { drawTerrainSpiders } from './spiderRenderer';
 import { drawStarfield } from './starfield';
@@ -92,7 +91,6 @@ export function drawGame(
   drawContourLaserTicks(currShip.position, liveLaserPositions(laserHosts, liveLaserScratch));
 
   drawFieryBoundary(currShip.position);
-  drawSectorBoundaries(currShip.position);
 
   drawRoidsRelative(currShip, roids);
   if (roids.length > 0) {

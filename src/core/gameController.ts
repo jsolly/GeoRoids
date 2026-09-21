@@ -1,8 +1,6 @@
 import { consumeTickAccumulator } from '../../shared/gameClock';
-import { formatSectorLabel } from '../../shared/sectors';
 import { boundedDiagnosticError } from '../../shared/stateDiagnostics';
 import { SPIDER } from '../../shared/terrainSpider';
-import { sectorAt } from '../../shared/world';
 import type {
   AsteroidData,
   AsteroidDestroyEvent,
@@ -96,7 +94,6 @@ export class GameController {
   private gameOverTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly GAME_OVER_MENU_DELAY_MS = 3500;
   private simulationAccumulatorMs = 0;
-  private lastSectorId: string | null = null;
   private laserUpgradeReadout: LaserUpgradeReadout | undefined;
 
   private constructor() {
@@ -151,7 +148,6 @@ export class GameController {
   newGame(playerName?: string, kitId?: ShipKitId): void {
     clearAsteroidShatters();
     this.simulationAccumulatorMs = 0;
-    this.lastSectorId = null;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
     this.laserUpgradeReadout?.update(undefined);
@@ -776,12 +772,6 @@ export class GameController {
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
     shockwaveManager.update();
-
-    const sector = sectorAt(currPlayer.ship.position);
-    if (this.lastSectorId !== null && this.lastSectorId !== sector.id) {
-      this.gameStateManager.setNotice(`Entering sector ${formatSectorLabel(sector)}`);
-    }
-    this.lastSectorId = sector.id;
 
     // Remote pose remains server-driven; their projectiles and lifecycle
     // advance on the same simulation clock as the local ship.

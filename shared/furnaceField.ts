@@ -1,7 +1,6 @@
 import type { BuiltFurnace, Position } from '../shared-types';
 import { FURNACES, nearestFurnace } from './furnaces';
-import { circleOverlapsBounds, sectorBounds } from './sectors';
-import { sectorAt, WORLD } from './world';
+import { WORLD } from './world';
 
 export const FURNACE_BUILD = {
   MAX_PER_OWNER: 3,
@@ -91,7 +90,6 @@ export class FurnaceField {
   private built: BuiltFurnace[] = [];
   private readonly cells = new Map<string, Furnace[]>();
   private readonly counts = new Map<string, number>();
-  private readonly sectors = new Set<string>();
 
   constructor() {
     this.replace([]);
@@ -127,7 +125,6 @@ export class FurnaceField {
     this.built = [...sites];
     this.cells.clear();
     this.counts.clear();
-    this.sectors.clear();
     for (const site of FURNACES) {
       this.index(site);
     }
@@ -167,19 +164,7 @@ export class FurnaceField {
     return oldest;
   }
 
-  hasSector(id: string): boolean {
-    return this.sectors.has(id);
-  }
-
   private index(site: Furnace): void {
-    for (const x of [site.position.x - site.radius, site.position.x + site.radius]) {
-      for (const y of [site.position.y - site.radius, site.position.y + site.radius]) {
-        const sector = sectorAt({ x, y });
-        if (circleOverlapsBounds(site.position, site.radius, sectorBounds(sector.x, sector.y))) {
-          this.sectors.add(sector.id);
-        }
-      }
-    }
     const key = `${Math.floor(site.position.x / CELL_SIZE)},${Math.floor(site.position.y / CELL_SIZE)}`;
     const cell = this.cells.get(key) ?? [];
     cell.push(site);

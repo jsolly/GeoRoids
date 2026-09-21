@@ -20,9 +20,9 @@ function setup(value: SpiderResource['value'] = 1) {
   const resource: SpiderResource = { id: 'ore', position: home, value };
   const resources = () => [resource];
   let frame = 0;
-  const step = (frames = 1, completedSectors: ReadonlySet<string> = new Set()) => {
+  const step = (frames = 1) => {
     for (let i = 0; i < frames; i++) {
-      manager.advance({ players: [pilot], resources, completedSectors, nowFrame: ++frame });
+      manager.advance({ players: [pilot], resources, nowFrame: ++frame });
     }
   };
   return { manager, pilot, resource, step };
@@ -110,14 +110,11 @@ test('leaving and revisiting preserves wounded guards and never replaces killed 
   expect(manager.snapshot().spiders).toEqual([]);
 });
 
-test('nests never materialize beside a pilot, inside completed sectors, or in a furnace yard', () => {
+test('nests never materialize beside a pilot or in a furnace yard', () => {
   const nearby = setup();
   nearby.pilot.position = { ...home };
   nearby.step(60);
   expect(nearby.manager.snapshot().spiders).toEqual([]);
-  const protectedSite = setup();
-  protectedSite.step(60, new Set([homeSector]));
-  expect(protectedSite.manager.snapshot().spiders).toEqual([]);
   const works = FURNACES.find((site) => site.id === 'works-1-1');
   if (!works) {
     throw new Error('Expected Works 1:1');
@@ -132,7 +129,6 @@ test('nests never materialize beside a pilot, inside completed sectors, or in a 
   worksYard.advance({
     players: [worksPilot],
     resources: () => [{ id: 'ore', position: { ...works.position }, value: 1 }],
-    completedSectors: new Set(),
     nowFrame: 1,
   });
   expect(worksYard.snapshot().nests).toEqual([]);
@@ -150,7 +146,6 @@ test('nests never materialize beside a pilot, inside completed sectors, or in a 
   builtYard.advance({
     players: [pilot],
     resources: () => [resource],
-    completedSectors: new Set(),
     nowFrame: 1,
   });
   expect(builtYard.snapshot().nests).toEqual([]);
@@ -177,16 +172,6 @@ test('valuable resources away from a widely spaced nest site remain unguarded', 
   resource.position = { x: 2200, y: 2200 };
   pilot.position = { x: 4000, y: 2200 };
   step(120);
-  expect(manager.snapshot().spiders).toEqual([]);
-});
-
-test('a completed sector removes sleeping guards when that territory is revisited', () => {
-  const { manager, pilot, step } = setup();
-  step();
-  pilot.position = { x: -10000, y: -10000 };
-  step(60);
-  pilot.position = { ...approach };
-  step(60, new Set([homeSector]));
   expect(manager.snapshot().spiders).toEqual([]);
 });
 
@@ -225,36 +210,6 @@ test('shooting guards from outside detection range postpones a due roaming attac
   expect(manager.snapshot().spiders).toEqual([]);
 });
 
-test.each(['awake', 'sleeping'] as const)(
-  'completing a nest retires its %s guards even when they are outside the home sector',
-  (state) => {
-    const { manager, resource, pilot, step } = setup(0);
-    resource.position = { x: home.x + 700, y: home.y };
-    pilot.position = { x: home.x - 2_000, y: home.y };
-    step();
-    const guard = manager.snapshot().spiders[0];
-    if (!guard) {
-      throw new Error('Expected a nest guard');
-    }
-    pilot.position = { ...guard.position };
-    step();
-    pilot.position = { x: home.x + 1_400, y: home.y };
-    step(300);
-    expect(
-      manager.snapshot().spiders.find(({ id }) => id === guard.id)?.position.x
-    ).toBeGreaterThan(16_000);
-    if (state === 'sleeping') {
-      manager.suspend();
-      pilot.position = { x: home.x - 2_000, y: home.y };
-    }
-    step(60, new Set([homeSector]));
-    expect(manager.snapshot().spiders).toEqual([]);
-    pilot.position = { x: home.x - 2_000, y: home.y };
-    step(60, new Set([homeSector]));
-    expect(manager.snapshot().spiders).toEqual([]);
-  }
-);
-
 test('multiplayer nest creation and sleeping guards share the same active population limit', () => {
   const manager = new TerrainSpiderManager(() => 0.5);
   const resources: SpiderResource[] = Array.from({ length: 8 }, (_, index) => ({
@@ -271,7 +226,6 @@ test('multiplayer nest creation and sleeping guards share the same active popula
   manager.advance({
     players: players.slice(0, 1),
     resources: () => resources,
-    completedSectors: new Set(),
     nowFrame: 1,
   });
   const sleepingIds = manager.snapshot().spiders.map(({ id }) => id);
@@ -279,7 +233,6 @@ test('multiplayer nest creation and sleeping guards share the same active popula
   manager.advance({
     players: players.slice(1),
     resources: () => resources,
-    completedSectors: new Set(),
     nowFrame: 61,
   });
   expect(manager.snapshot().spiders).toHaveLength(42);
@@ -287,7 +240,6 @@ test('multiplayer nest creation and sleeping guards share the same active popula
   manager.advance({
     players,
     resources: () => resources,
-    completedSectors: new Set(),
     nowFrame: 121,
   });
   expect(manager.snapshot().spiders).toHaveLength(SPIDER.MAX_ACTIVE);
@@ -316,14 +268,14 @@ test('the map marks the guarded deposit while its spiders chase, sleep, and rema
   expect(manager.snapshot().nests).toEqual([marker]);
 });
 
-test.each(['collected', 'moved', 'replaced', 'completed'] as const)(
+test.each(['collected', 'moved', 'replaced'] as const)(
   'a %s deposit no longer advertises the old nest on the map',
   (change) => {
     const manager = new TerrainSpiderManager(() => 0.5);
     const pilot = { id: 'pilot', position: { ...approach }, health: 100, exploding: false };
     let resources: SpiderResource[] = [{ id: 'ore', position: { ...home }, value: 1 }];
-    const advance = (nowFrame: number, completedSectors: ReadonlySet<string> = new Set()) =>
-      manager.advance({ players: [pilot], resources: () => resources, completedSectors, nowFrame });
+    const advance = (nowFrame: number) =>
+      manager.advance({ players: [pilot], resources: () => resources, nowFrame });
     advance(1);
     expect(manager.snapshot().nests).toHaveLength(1);
     if (change === 'collected') {
@@ -335,7 +287,7 @@ test.each(['collected', 'moved', 'replaced', 'completed'] as const)(
     if (change === 'replaced') {
       resources = [{ id: 'other-ore', position: { ...home }, value: 1 }];
     }
-    advance(61, change === 'completed' ? new Set([homeSector]) : new Set());
+    advance(61);
     expect(manager.snapshot().nests).toEqual([]);
   }
 );
@@ -352,7 +304,6 @@ test('map snapshots reuse the scheduled resource refresh and roaming spiders add
     manager.advance({
       players: [pilot],
       resources,
-      completedSectors: new Set(),
       nowFrame,
     });
     manager.snapshot();
@@ -384,10 +335,9 @@ test.each(['collected', 'moved'] as const)(
     const manager = new TerrainSpiderManager(() => 0.5);
     const pilot = { id: 'pilot', position: { ...approach }, health: 100, exploding: false };
     const advance = (nowFrame: number) => {
-      field.update(rocks, [pilot.position], new Set());
+      field.update(rocks, [pilot.position]);
       manager.advance({
         players: [pilot],
-        completedSectors: new Set(),
         nowFrame,
         resources: () => spiderResources(rocks.getAllAsteroids(), [], []),
         dormantResource: (id, position) => {

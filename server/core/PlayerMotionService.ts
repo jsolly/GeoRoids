@@ -2,7 +2,6 @@ import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { GAME_TICK_MS, MAX_CATCH_UP_TICKS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { capMotionVelocity, finiteMotionVector, PLAYER_MOTION } from '../../shared/playerMotion';
-import { shipOverlapsCompletedSector } from '../../shared/sectors';
 import { advanceShipBoost, startShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { cruiseSpeed } from '../../shared/shipFlight';
 import type { PlayerMotionState, Position } from '../../shared-types';
@@ -15,7 +14,7 @@ import type { GameEntity } from './EntityManager';
 
 /** Which envelope check failed, with the numbers behind it, for diagnostics logs. */
 interface MotionEnvelopeRejection {
-  check: 'velocity' | 'displacement' | 'boundary' | 'sector' | 'anchor';
+  check: 'velocity' | 'displacement' | 'boundary' | 'anchor';
   mode: PlayerMotionState['mode'];
   elapsedMs: number;
   /** Part of `elapsedMs` during which the server loop itself was blocked. */
@@ -91,8 +90,6 @@ export class PlayerMotionService {
   private readonly tokens = new Map<string, Session>();
   private readonly sockets = new Map<WebSocket, Session>();
   private blockedSpans: BlockedSpan[] = [];
-
-  constructor(private readonly completedSectors: ReadonlySet<string> = new Set()) {}
 
   private assertTime(now: number): void {
     if (!Number.isFinite(now) || now < 0) {
@@ -419,9 +416,6 @@ export class PlayerMotionService {
     }
     if (checkBoundaryCollision(pose.position, limits.hullRadius)) {
       return 'boundary';
-    }
-    if (shipOverlapsCompletedSector(pose.position, limits.hullRadius, this.completedSectors)) {
-      return 'sector';
     }
     if (
       session.mode === 'handoff' &&

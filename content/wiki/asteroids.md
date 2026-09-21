@@ -47,8 +47,8 @@ breaks. Whole-rock furnace delivery still works once a crew can move it.
 A Hauler's [Boost Coupling](/wiki/#hauler) aims an asteroid at its nearest
 furnace. The cream arrow means armed; cream/amber exhaust means autonomous
 delivery is active. Powered sectors stay awake until delivery, even when nearby
-pilots leave. Self-guided cargo passes through ships, rocks, satellites, and
-completed-sector barriers. It ignores weapons and blast impulses, and cannot be
+pilots leave. Self-guided cargo passes through ships, rocks, and satellites.
+It ignores weapons and blast impulses, and cannot be
 scanned, tapped, towed, or coupled again. At intake it shatters in a red outline
 with a short smoke poof and awards its
 launchers and previously recorded Surveyors the delivery points.

@@ -1,5 +1,5 @@
 {
-  "note": "Removed completed-sector walls, green closed ground, sector-entry notices, and respawn skips from the field manual. Harvested regions stay empty and flyable. The universe map counts explored cells from the chart bits and keeps its alignment grid. No demonstration shows closed ground, so wiki media was not regenerated.",
+  "note": "Cited spawn and harvested-ground tests now prove an in-world pose is kept, clustering stays on the inset, and a pilot and shot cross an emptied chunk. The field-manual inventory matches harvested ground and nest webs. No demonstration change.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -391,7 +391,7 @@
     "tests/unit/server/crew-surveys-tows-and-smelts-asteroids.test.ts": "sha256:2005cb7cfe3120b36d943998a450cc8c3698931a0622960959d61ba52d772e76",
     "tests/unit/server/dead-pilots-start-a-new-run-without-resetting-the-world.test.ts": "sha256:ebe1d942e39b0b87f2a2757744a38f983bf81cef200b75f6aeae2c0310a87221",
     "tests/unit/server/furnace-intake-tells-clients-the-rock-was-consumed.test.ts": "sha256:c10614d5946ca61e17763f43e2cfbcafcc4d863d1fea7fc8bfcc31f0281c8d1e",
-    "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:2fbdd6b6338c23a0ad67cec9311a590c4cdb0a44d343bc0442b9fbb56a6a44c8",
+    "tests/unit/server/harvested-ground-stays-flyable.test.ts": "sha256:25b0b667f5bf240af0cdc0234c89b5045553631cfae99ecb261469aa53442418",
     "tests/unit/server/hauler-arms-and-ignites-an-asteroid.test.ts": "sha256:61164414f6f2e27a312ec3b76a7f00b837bfed1ffc853ef1af4c5f381947787e",
     "tests/unit/server/hauler-taps-silk-and-tows-spiders-to-a-furnace.test.ts": "sha256:6de8887abd56362d6aee5a72623602b110d1450e56eed3f2b9877c53fc989abb",
     "tests/unit/server/haulers-mine-metal-faster-and-leave-crew-unharmed.test.ts": "sha256:1ca14370431506908376c2743790077d3a1b1a8c99c112ebea23633299c34d5d",
@@ -410,7 +410,7 @@
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts": "sha256:6d398d554fe99ff131c23a04d8a0bc6305e0fbf1d39a02eeb59ead3903c6fee6",
     "tests/unit/server/surveyors-build-persistent-crew-furnaces.test.ts": "sha256:0cbea6049cbfef82b3ecfdd157f0a6602da242fe279b6702b00395e13af9823d",
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts": "sha256:08663b16895bc882b5bf984d4471083076ef0fc52d2f201b64945a6b73e274f4",
-    "tests/unit/shared/crewSpawn.test.ts": "sha256:d144f5555532121ffde50ba9e04a1d332a216b8b086559b215a5601c20f1c428",
+    "tests/unit/shared/crewSpawn.test.ts": "sha256:66765c476129c84bde5a0c8e43590083a3a76966b055f8fb36cdb3b45b1d02d8",
     "tests/unit/shared/furnaces.test.ts": "sha256:83dd2b88d6e45f2a4da2b81f9a58c5d63f39865d258aacadf61e54727dd8a9e2",
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts": "sha256:d1f4b03ddc100ffa3738864dd723a70fd8bc022b92e9c411beefa3695e839848",
     "tests/unit/shared/utc-score-season.test.ts": "sha256:fb5bb4bf9b2efa293e6ae5624df9c12d73ce1b14545536d279bf909e4c2815d6",

@@ -18,14 +18,48 @@ test('the first flight appears inside the region under the origin', () => {
   expect(spawned.y).toBeLessThan(WORLD.sectorSize);
 });
 
-test('a lone returning pilot clusters near the first living ally', () => {
+test('an in-world pose is kept while a living ally is elsewhere', () => {
+  const previous = { x: 5_000, y: 1_000 };
+  const spawned = chooseCrewSpawn({
+    previous,
+    allies: [{ x: -12_000, y: 4_000 }],
+    random: () => 0.5,
+  });
+  expect(spawned).toEqual(previous);
+  expect(spawned).not.toBe(previous);
+});
+
+test('a pose in the outer ring is kept instead of pulled to the spawn inset', () => {
+  const previous = { x: WORLD.radius - 10, y: 0 };
+  const spawned = chooseCrewSpawn({
+    previous,
+    allies: [{ x: 0, y: 0 }],
+    random: () => 0.5,
+  });
+  expect(Math.hypot(previous.x, previous.y)).toBeGreaterThan(WORLD.radius - WORLD.spawnInset);
+  expect(spawned).toEqual(previous);
+});
+
+test('a new pilot clusters off the first living ally', () => {
   const ally = { x: 8_000, y: -2_000 };
   const spawned = chooseCrewSpawn({
     previous: { x: WORLD.radius + 500, y: 0 },
     allies: [ally],
-    random: () => 0,
+    random: () => 1,
   });
+  expect(Math.hypot(spawned.x - ally.x, spawned.y - ally.y)).toBeCloseTo(WORLD.spawnClusterRadius);
+});
+
+test('a pilot clustering near the rim stays on the spawn inset', () => {
+  const limit = WORLD.radius - WORLD.spawnInset;
+  const ally = { x: limit, y: 0 };
+  const spawned = chooseCrewSpawn({
+    previous: { x: WORLD.radius + 500, y: 0 },
+    allies: [ally],
+    random: () => 0.01,
+  });
+  expect(Math.hypot(spawned.x, spawned.y)).toBeCloseTo(limit);
   expect(Math.hypot(spawned.x - ally.x, spawned.y - ally.y)).toBeLessThanOrEqual(
-    WORLD.spawnClusterRadius + 1e-6
+    0.01 * WORLD.spawnClusterRadius
   );
 });

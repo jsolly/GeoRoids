@@ -70,6 +70,10 @@ Rare roaming hunters can still approach, with minutes between attempts and a
 quiet interval after spider combat. There is no immediate roaming ambush when
 a flight starts. The starter area, furnaces, and completed sectors remain safe
 from roaming spiders; a Hauler can drag a captured spider into a furnace.
+Surveyors cannot place a new furnace when an existing nest home would sit inside
+the hearth's spider occupancy — the same keep-away that hides a web under a
+standing furnace. That rejected construction does not clear the nest. Furnaces
+that are already standing still scare spiders that enter that occupancy.
 
 Their feet touch the existing iso-lines as they move. Nearby contour segments
 turn red under their influence. They add no new web strands or pits, and the

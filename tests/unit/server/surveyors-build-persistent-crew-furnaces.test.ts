@@ -19,9 +19,12 @@ import {
 } from '../../../shared/furnaceField';
 import { FURNACES } from '../../../shared/furnaces';
 import { validateSnapshotDto } from '../../../shared/snapshotDto';
+import { SPIDER } from '../../../shared/terrainSpider';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
+
+const nestHome = { x: 15_000, y: 5_000 };
 
 function builder(engine: GameEngine, id = 'scout', socket = new RecordingSocket()) {
   const actor = engine.addPlayer(id, id, socket, { x: 2200, y: 2200 }, 'surveyor');
@@ -41,6 +44,22 @@ function buildThree(engine: GameEngine) {
     expect(engine.useAbility(scout.actor.id)).toBe(true);
   }
   return scout;
+}
+
+function awakenNest(engine: GameEngine, actor: ReturnType<GameEngine['addPlayer']>) {
+  engine.parkSatellitePickups();
+  for (const rock of engine.getAllAsteroids()) {
+    engine.removeAsteroid(rock.id);
+  }
+  engine.addAsteroid(cargo('nest-ore', nestHome));
+  actor.position = { x: nestHome.x - 2_000, y: nestHome.y };
+  actor.abilityCooldownFrames = 0;
+  engine.advanceOneFrame();
+  expect(
+    engine
+      .getSpiderField()
+      .nests.some((nest) => nest.position.x === nestHome.x && nest.position.y === nestHome.y)
+  ).toBe(true);
 }
 
 function cargo(id: string, position: { x: number; y: number }): AsteroidData {
@@ -342,6 +361,87 @@ test('legacy furnaces without placedAt still yield in serial order', () => {
   expect(field.snapshot().map((site) => site.id)).toEqual(['built:pilot:2']);
   expect(field.evictOldestOwned('other')).toBeUndefined();
   expect(field.nearby(early.position, 1)).toEqual([]);
+});
+
+test('building a furnace inside a nest home spider-safe radius fails without wiping the nest', () => {
+  const engine = new GameEngine(42);
+  const scout = builder(engine);
+  awakenNest(engine, scout.actor);
+  const before = structuredClone(engine.getSpiderField());
+  scout.actor.position = { x: nestHome.x - (SPIDER.FURNACE_SAFE_RADIUS - 1), y: nestHome.y };
+  scout.actor.abilityCooldownFrames = 0;
+  expect(engine.useAbility(scout.actor.id)).toBe(false);
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.NEST);
+  expect(scout.actor.abilityCooldownFrames).toBe(0);
+  expect(engine.getGameState().builtFurnaces ?? []).toEqual([]);
+  engine.advanceOneFrame();
+  expect(engine.getSpiderField().nests).toEqual(before.nests);
+  expect(
+    engine
+      .getSpiderField()
+      .spiders.map((body) => body.id)
+      .toSorted((left, right) => left.localeCompare(right))
+  ).toEqual(
+    before.spiders.map((body) => body.id).toSorted((left, right) => left.localeCompare(right))
+  );
+});
+
+test('building a furnace on the spider-safe radius still fails because it would occupy the nest', () => {
+  const engine = new GameEngine(42);
+  const scout = builder(engine);
+  awakenNest(engine, scout.actor);
+  const before = structuredClone(engine.getSpiderField());
+  scout.actor.position = { x: nestHome.x - SPIDER.FURNACE_SAFE_RADIUS, y: nestHome.y };
+  scout.actor.abilityCooldownFrames = 0;
+  expect(engine.useAbility(scout.actor.id)).toBe(false);
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.NEST);
+  expect(scout.actor.abilityCooldownFrames).toBe(0);
+  expect(engine.getGameState().builtFurnaces ?? []).toEqual([]);
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceOneFrame();
+  }
+  expect(engine.getSpiderField().nests).toEqual(before.nests);
+});
+
+test('building a furnace just outside nest occupancy still succeeds and leaves the nest', () => {
+  const engine = new GameEngine(42);
+  const scout = builder(engine);
+  awakenNest(engine, scout.actor);
+  scout.actor.position = {
+    x: nestHome.x - (SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS),
+    y: nestHome.y,
+  };
+  scout.actor.abilityCooldownFrames = 0;
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBeUndefined();
+  expect(engine.useAbility(scout.actor.id)).toBe(true);
+  expect(engine.furnaceBuildNotice()).toBe(FURNACE_BUILD.NOTICE.BUILT);
+  expect(engine.getGameState().builtFurnaces).toHaveLength(1);
+  expect(scout.actor.abilityCooldownFrames).toBeGreaterThan(0);
+  for (let frame = 0; frame < 60; frame++) {
+    engine.advanceOneFrame();
+  }
+  expect(
+    engine
+      .getSpiderField()
+      .nests.some((nest) => nest.position.x === nestHome.x && nest.position.y === nestHome.y)
+  ).toBe(true);
+});
+
+test('a nest-blocked furnace build toasts the placing Surveyor without spending a slot', () => {
+  const engine = new GameEngine(42);
+  const socket = new RecordingSocket();
+  const scout = builder(engine, 'scout', socket);
+  awakenNest(engine, scout.actor);
+  const broadcaster = new GameStateBroadcaster(engine);
+  const handler = new MessageHandler(engine, broadcaster);
+  scout.actor.position = { x: nestHome.x - 200, y: nestHome.y };
+  scout.actor.abilityCooldownFrames = 0;
+  handler.handleMessage({ type: 'useAbility', id: scout.actor.id, kitId: 'surveyor' }, socket);
+  expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(FURNACE_BUILD.ISSUE.NEST);
+  expect(engine.getGameState().builtFurnaces ?? []).toEqual([]);
+  expect(scout.actor.abilityCooldownFrames).toBe(0);
+  expect(engine.getSpiderField().nests.some((nest) => nest.position.x === nestHome.x)).toBe(true);
+  broadcaster.stopPeriodicBroadcast();
 });
 
 test('a player-built furnace matches a Works yard for spider occupancy and hunt break', () => {

@@ -15,6 +15,7 @@ import { PLAYER_MOTION } from '../../shared/playerMotion';
 import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
+import { SPIDER } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
@@ -70,7 +71,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Furnace construction',
       paragraphs: [
-        `Build Furnace places a ${FURNACE_BUILD.RADIUS}-unit intake at the ship. Each pilot can keep ${FURNACE_BUILD.MAX_PER_OWNER} sites; placing another removes their oldest first. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units between furnace centers and at least ${FURNACE_BUILD.WORLD_INSET} units inside the world edge. Successful construction uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Sites persist until the world resets.`,
+        `Build Furnace places a ${FURNACE_BUILD.RADIUS}-unit intake at the ship. Each pilot can keep ${FURNACE_BUILD.MAX_PER_OWNER} sites; placing another removes their oldest first. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units between furnace centers, more than ${SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS} units from a spider nest home, and at least ${FURNACE_BUILD.WORLD_INSET} units inside the world edge. A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius) rejects construction without removing the nest or spending cooldown. Successful construction uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Sites persist until the world resets.`,
       ],
     },
     {

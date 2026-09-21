@@ -216,7 +216,8 @@
     "tests/unit/audio/spiders-whimper-once-when-the-furnace-consumes-them.test.ts",
     "shared/furnaceField.ts",
     "server/core/GameEngine.ts",
-    "tests/unit/server/mineral-scans-drive-spiders-away.test.ts"
+    "tests/unit/server/mineral-scans-drive-spiders-away.test.ts",
+    "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -377,6 +378,7 @@
     "tests/integration/browser/e2e/surveyor-tags-a-spider-with-a-moving-beacon.test.ts",
     "shared/furnaceField.ts",
     "tests/unit/server/surveyors-build-persistent-crew-furnaces.test.ts",
+    "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts"
   ],
   "loot-growth": [

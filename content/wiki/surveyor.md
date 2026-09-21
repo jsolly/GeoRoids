@@ -84,8 +84,11 @@ and do not survive a server restart.
 Equip Build Furnace in the ship schematic, then press E or tap Build to place a
 furnace at your ship's position. Building costs no resource and shares Mineral
 Scan's cooldown. A failed placement uses neither a slot nor a cooldown; the HUD
-explains why it failed. Move clear of other furnaces, completed-sector walls,
-and the world edge before trying again.
+explains why it failed. Move clear of other furnaces, spider nests,
+completed-sector walls, and the world edge before trying again. A nest whose
+home would sit inside the new furnace's spider occupancy is an illegal site;
+that miss does not wipe the nest. Standing furnaces still scare spiders that
+enter that occupancy.
 
 Each pilot can keep three furnaces at once. Fixed map furnaces do not count
 against that limit. Placing a fourth removes your oldest built furnace first,

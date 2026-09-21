@@ -13,6 +13,9 @@ export const FURNACE_BUILD = {
     BUILT: 'Furnace built',
     YIELDED: 'Your oldest furnace made way for this new hearth.',
   },
+  ISSUE: {
+    NEST: 'Too close to a spider nest',
+  },
 } as const;
 
 function furnaceSerial(site: BuiltFurnace): number {

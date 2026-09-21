@@ -39,7 +39,6 @@ import {
 import { playLootPickup, playTapEjection, resetResourceMusic } from '../../audio/resourceMusic';
 import { stopSatelliteOrbit, syncSatelliteOrbit } from '../../audio/satelliteOrbitSound';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
-import { PALETTE, ROID } from '../../constants';
 import { GameStateManager } from '../../core/services/GameStateManager';
 import {
   noteDebugPingSent,
@@ -763,13 +762,6 @@ export class ConnectionManager {
     return this.localPlayerId || this.clientId;
   }
 
-  private getLocalPlayerColor(): string {
-    // Get the local player's color from the player manager
-    const playerManager = PlayerManager.getInstance();
-    const localPlayer = playerManager.getLocalPlayer();
-    return localPlayer?.color ?? PALETTE.LOCAL;
-  }
-
   private getLocalPlayerPosition(): { x: number; y: number } {
     const localPlayer = PlayerManager.getInstance().getLocalPlayer();
     if (localPlayer?.ship?.position) {
@@ -906,7 +898,6 @@ export class ConnectionManager {
       id: this.clientId,
       data: {
         name: this.localPlayerName,
-        color: this.getLocalPlayerColor(),
         position: playerPosition,
         kitId: localPlayer?.ship.kitId ?? getSelectedShipKitId(),
         snapshotVersion: SNAPSHOT_VERSION,
@@ -950,13 +941,12 @@ export class ConnectionManager {
 
     logger.debug('NETWORK', 'Sending initAsteroids message', {
       playerId: this.localPlayerId,
-      asteroidCount: ROID.INITIAL_ROID_COUNT,
     });
 
     const message: ClientMessage = {
       type: 'initAsteroids',
       id: this.localPlayerId,
-      data: { asteroidCount: ROID.INITIAL_ROID_COUNT },
+      data: {},
       timestamp: Date.now(),
     };
 

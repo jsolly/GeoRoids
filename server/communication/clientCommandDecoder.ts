@@ -125,18 +125,8 @@ function readJoinPosition(value: unknown): Position | undefined {
   if (value === undefined) {
     return { x: 0, y: 0 };
   }
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const rawX = value['x'];
-  const rawY = value['y'];
-  const x = typeof rawX === 'number' ? rawX : typeof rawX === 'string' ? parseFloat(rawX) : NaN;
-  const y = typeof rawY === 'number' ? rawY : typeof rawY === 'string' ? parseFloat(rawY) : NaN;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return undefined;
-  }
-  const position = { x, y };
-  return Math.hypot(position.x, position.y) <= WORLD.radius ? position : undefined;
+  const position = readFinitePosition(value);
+  return position && Math.hypot(position.x, position.y) <= WORLD.radius ? position : undefined;
 }
 
 function invalid(messageType: string, error?: string): ClientCommandDecodeResult {

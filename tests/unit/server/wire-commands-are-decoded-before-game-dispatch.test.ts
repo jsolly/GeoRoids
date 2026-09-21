@@ -86,14 +86,14 @@ test('shoot request IDs remain optional while malformed correlation values stop 
   }
 });
 
-test('nested current joins keep numeric-string positions and capability offers', () => {
+test('nested joins keep finite positions and capability offers', () => {
   expect(
     decodeClientCommand({
       type: 'join',
       data: {
         id: 'pilot',
         name: 'Pilot',
-        position: { x: '12.5px', y: '-4' },
+        position: { x: 12.5, y: -4 },
         kitId: 'hauler',
         asteroidInteractions: 1,
         snapshotVersion: 1,
@@ -111,6 +111,25 @@ test('nested current joins keep numeric-string positions and capability offers',
       asteroidInteractions: 1,
       resumeRequested: false,
     },
+  });
+});
+
+test('join coordinates must be finite numbers', () => {
+  expect(
+    decodeClientCommand({
+      type: 'join',
+      data: {
+        id: 'pilot',
+        name: 'Pilot',
+        position: { x: '12.5px', y: '-4' },
+        snapshotVersion: 1,
+        asteroidInteractions: 1,
+      },
+    })
+  ).toEqual({
+    ok: false,
+    messageType: 'join',
+    error: 'Join position is outside the world or invalid',
   });
 });
 

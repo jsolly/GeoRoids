@@ -392,7 +392,6 @@ export const DEBUG = {
   },
 
   // Player positioning settings (Affects local and remote players)
-  PLACE_PLAYERS_NEAR_CENTER: false,
   PLACE_PLAYERS_NEAR_BOUNDARY: false,
 } as const;
 

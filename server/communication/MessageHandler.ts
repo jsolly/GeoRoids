@@ -590,9 +590,8 @@ export class MessageHandler {
       return;
     }
 
-    // The active server owns field creation and replenishment. Keep this
-    // message as an idempotent resync for reconnecting clients, but do not
-    // trust a client-requested count as the source of world state.
+    // The active server owns field creation and replenishment. This message
+    // is an idempotent resync for reconnecting clients.
     const created = this.gameEngine.ensureAsteroidField();
     if (created.length > 0) {
       this.broadcaster.broadcastAsteroidCreation(created);

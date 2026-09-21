@@ -194,6 +194,7 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
     expect(joined['resumeToken']).toMatch(RESUME_TOKEN_PATTERN);
 
     const before = entity(await observer.state(), 'pilot');
+    const parked = { ...before.position };
     expect(before.playerMotion).toMatchObject({ mode: 'free', epoch: 1, ack: 0 });
     expect(JSON.stringify(before)).not.toContain(String(joined['resumeToken']));
 
@@ -222,7 +223,8 @@ describe('Enhanced player motion cross real gameplay WebSockets', () => {
       epoch: 1,
       ack: 0,
     });
-    expect(engine.getPlayer('pilot')?.position).toEqual({ x: 100, y: 0 });
+    expect(engine.getPlayer('pilot')?.position).toEqual(parked);
+    expect(parked).not.toEqual({ x: 800, y: 0 });
   });
 
   test('rejects a valid resume token on a socket already bound to another current pilot', async () => {

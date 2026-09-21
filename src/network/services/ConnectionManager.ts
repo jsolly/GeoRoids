@@ -1077,6 +1077,9 @@ export class ConnectionManager {
           GameStateManager.getInstance().setNotice(data);
         }
         break;
+      case 'townStoreResult':
+        window.dispatchEvent(new CustomEvent('townStoreResult', { detail: data }));
+        break;
       case 'furnaceDelivery':
         this.handleFurnaceDelivery(data as FurnaceDelivery);
         break;

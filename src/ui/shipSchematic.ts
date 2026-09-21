@@ -33,6 +33,7 @@ import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { renderSatelliteInventory, satelliteInventoryDescription } from './satelliteInventory';
 import { isShipSchematicOpen, setShipSchematicOpen } from './shipSchematicState';
+import { requestTownStoreClose } from './townStoreState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
 import { shouldUseTouchControls } from './viewportChrome';
 
@@ -784,6 +785,7 @@ export function openShipSchematic(): boolean {
   if (!elements || isShipSchematicOpen() || !canOpenForLocalShip()) {
     return false;
   }
+  requestTownStoreClose();
   if (isUniverseMapOpen()) {
     setShipSchematicOpen(true);
     closeUniverseMap();

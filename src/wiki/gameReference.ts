@@ -22,6 +22,7 @@ import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
+import { SHIP_PAINTS, TOWN_STORE_RADIUS, TOWN_YIELD_PER_MODULE } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
@@ -57,6 +58,12 @@ function streetCost(ring: 1 | 2 | 3): string {
   return (streetLots(ring)[0]?.cost ?? 0).toLocaleString('en-US');
 }
 
+function paintPrices(): string {
+  return SHIP_PAINTS.map((paint) => `${paint.name} ${paint.cost.toLocaleString('en-US')}`).join(
+    ', '
+  );
+}
+
 export const gameReference: Record<string, { heading: string; paragraphs: string[] }[]> = {
   'field-manual': [
     {
@@ -78,12 +85,18 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
         `Movement and projectiles are ${Math.round((1 - GAME.MOTION_SCALE) * 100)}% slower. Turning, firing cadence, and ability cooldowns keep their responsiveness. Shots still reach the same distance, but take longer to get there.`,
       ],
     },
+    {
+      heading: 'Town store values',
+      paragraphs: [
+        `The Town Square store opens within ${TOWN_STORE_RADIUS} units of the origin. B or the Store button holds the ship the same way the map and schematic do. Each street a pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to that pilot's own furnace deliveries. Hull paints cost ${paintPrices()} score.`,
+      ],
+    },
   ],
   surveyor: [
     {
       heading: 'Furnace construction',
       paragraphs: [
-        `Build spends the Surveyor's own score to light the ${FURNACE_BUILD.RADIUS}-unit street foundation under the ship. The nearer lot on that road must already be burning, and that pilot's score must cover the lot (${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}). A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius ${SPIDER.HIT_RADIUS}) rejects the build without spending score or cooldown. The lit furnace keeps the builder's name. Success spends that cost and uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Lit streets persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
+        `Build spends the Surveyor's own score to light the ${FURNACE_BUILD.RADIUS}-unit street foundation under the ship. The nearer lot on that road must already be burning, and that pilot's score must cover the lot (${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}). A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius ${SPIDER.HIT_RADIUS}) rejects the build without spending score or cooldown. The lit furnace keeps the builder's name. Each street that pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to their own later furnace deliveries. Other pilots keep the base reward. A nickname change does not move the bonus. Success spends that cost and uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Lit streets persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
       ],
     },
     {
@@ -217,7 +230,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Shared field values',
       paragraphs: [
         `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited region with no asteroids left stays empty, and ships can still fly through it.`,
-        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} streets leave the square, then ${streetLots(2).length} and ${streetLots(3).length} farther lots. A Surveyor builds the next dark foundation with their own score once its nearer lot is burning and that score covers ${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
+        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} streets leave the square, then ${streetLots(2).length} and ${streetLots(3).length} farther lots. A Surveyor builds the next dark foundation with their own score once its nearer lot is burning and that score covers ${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Surveyor receives the size-scaled material reward, and each street that recipient built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to their own payout. Size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}. The Town Square store, within ${TOWN_STORE_RADIUS} units of the origin, sells hull paints for ${paintPrices()} score.`,
       ],
     },
   ],

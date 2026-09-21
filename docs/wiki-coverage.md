@@ -9,15 +9,15 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, monthly score, brief-disconnect return |
-| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, first-join hold-to-equip hint, and map/schematic hold with blink on return |
-| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent furnace construction with a three-site FIFO cap and nest keep-out, moving probe beacons, and delivery tags |
+| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, first-join hold-to-equip hint, Town Square store, and map/schematic/store hold with blink on return |
+| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named street furnaces paid with personal score, a personal delivery bonus per street built, nest keep-out, moving probe beacons, and delivery tags |
 | hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, sparse resource nests (Works yards never complete, so those webs last until the resource moves), value-scaled guard groups, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
-| teamwork | Systems | One shared crew, scan-to-tow furnace loop, delivery credit, sector completion, and persistent exploration |
+| teamwork | Systems | One shared crew, scan-to-tow furnace loop, personal delivery yield, Town Square store, sector completion, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
 ## Coverage matrix
@@ -26,7 +26,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicJoinHint.ts, haulerUtility.ts, shipAbilities.ts |
-| What happens to my ship while the map or schematic is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, GameEngine overlay hold, combat immunity tests |
+| What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
+| How do I buy a hull color at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyShipPaint, town store tests |
 | How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | How do I build furnaces and repel spiders? | surveyor, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, nest keep-out, and scan-defense tests |
 | Can I clear a spider nest by building a furnace on it? | surveyor, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS keep-out, furnace construction tests |

@@ -151,7 +151,14 @@ export function drawFurnacesRelative(viewerPosition: Position): void {
       continue;
     }
     drawFurnaceArtwork(ctx, screen.x, screen.y, radius, now);
-    drawFurnaceLabel(ctx, screen.x, screen.y, radius, furnace.name);
+    drawFurnaceLabel(
+      ctx,
+      screen.x,
+      screen.y,
+      radius,
+      furnace.name,
+      furnace.id === TOWN_HEARTH.id ? 'STORE' : 'DELIVERY ZONE'
+    );
   }
 }
 

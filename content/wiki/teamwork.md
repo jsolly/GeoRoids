@@ -55,7 +55,8 @@ cargo and drops the cable. A colossal deposit needs two Tow Cables before it
 will haul, and both Haulers who deliver it receive the points. Bring a towed
 rock to
 an arena furnace to deliver it. The Hauler and every scanning pilot recorded on the
-rock receive the same delivery points. A rock with no scan tag still pays
+rock receive that delivery. A pilot who built streets receives a higher personal
+payout; everyone else receives the base reward. A rock with no scan tag still pays
 the Hauler for the delivery.
 
 Boost Coupling aims a rock at its nearest furnace on the first E and launches
@@ -80,6 +81,9 @@ find it; the whole street plan is drawn there, lit or not. Zoomed out, a lit
 mark is an amber flame pin at the same size as the other chart landmarks; the
 nearby view and closer restore the three-tongue campfire. A delivery consumes
 the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
+Streets a pilot built raise only that pilot's payout. Town Square also holds a
+store: spend your own score there on a hull paint. The paint stays on your ship
+through death, reconnect, restart, and the monthly score reset.
 Faint pipes join each street lot
 to the nearer grate and end at Town Square. Dragging a rock or a spider into a
 street furnace lights that whole run, and a bright head travels from the source

@@ -1,6 +1,7 @@
 import type { Player } from '../entities/player/Player';
 import { canvasManager } from '../rendering/canvasSurface';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { isTownStoreOpen } from '../ui/townStoreState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { reconcilePlayerInput } from './keybindings';
@@ -47,7 +48,7 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
     lives: player.lives,
     exploding: player.ship.exploding,
   });
-  if (isShipSchematicOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (isShipSchematicOpen() || isTownStoreOpen() || player.lives <= 0 || player.ship.exploding) {
     logger.debug('MOUSE', 'Mouse down ignored - player dead or exploding', { playerId: player.id });
     return;
   }

@@ -65,6 +65,13 @@ test('a street stays dark until its nearer lot is a legal parent', () => {
   expect(validLitCivicLotIds(['built:pilot:1'])).toBe(false);
   expect(validLitCivicLotIds('street-1-0')).toBe(false);
   expect(validCivicModules([{ id: 'street-1-0', builderName: 'Ada' }])).toBe(true);
+  expect(
+    validCivicModules([{ id: 'street-1-0', builderName: 'Ada', builderId: 'client-ada' }])
+  ).toBe(true);
+  expect(validCivicModules([{ id: 'street-1-0', builderName: 'Ada', builderId: '' }])).toBe(false);
+  expect(validCivicModules([{ id: 'street-1-0', builderName: 'Ada', builderId: 'bad\nid' }])).toBe(
+    false
+  );
   expect(civicModuleName('Ada', first.name)).toBe(`Ada's ${first.name}`);
   expect(civicModuleName('', first.name)).toBe(first.name);
   expect(validCivicModules([{ id: 'street-2-0', builderName: 'Ada' }])).toBe(false);

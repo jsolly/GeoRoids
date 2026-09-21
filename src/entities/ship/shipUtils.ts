@@ -149,7 +149,7 @@ export function isShipCollisionImmune(ship: ShipCollisionState): boolean {
 }
 
 /**
- * Freeze the local hull while the map or schematic is open. Closing arms the
+ * Freeze the local hull while the map, schematic, or town store is open. Closing arms the
  * same blink window as a respawn so an overlapping rock cannot kill immediately.
  * Returns true when the hold state changed.
  */

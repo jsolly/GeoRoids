@@ -78,5 +78,6 @@ and the final-life state shows the game-over overlay.
 ## Score values
 
 Asteroid breaks, shard pickups, satellite pickups, and furnace deliveries each
-award their own score value. A furnace delivery gives the Hauler and every
-Surveyor recorded on the rock the same delivery points.
+award their own score value. A furnace delivery pays the Hauler and every
+Surveyor recorded on the rock. A pilot who built streets receives more on their
+own payout.

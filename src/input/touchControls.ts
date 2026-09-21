@@ -8,6 +8,7 @@ import {
   SHIP_SCHEMATIC_LONG_PRESS_MS,
 } from '../ui/shipSchematic';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { isTownStoreOpen } from '../ui/townStoreState';
 import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
 import { logger } from '../utils/Logger';
@@ -130,7 +131,7 @@ export function setTouchHeading(player: Player, heading: number | null): void {
 }
 
 export function setTouchFire(player: Player, held: boolean): void {
-  if (isShipSchematicOpen()) {
+  if (isShipSchematicOpen() || isTownStoreOpen()) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
     return;
@@ -152,7 +153,7 @@ export function setTouchFire(player: Player, held: boolean): void {
 }
 
 export function triggerTouchAbility(player: Player): boolean {
-  if (isShipSchematicOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (isShipSchematicOpen() || isTownStoreOpen() || player.lives <= 0 || player.ship.exploding) {
     return false;
   }
   return player.ship.activateAbility();
@@ -200,7 +201,7 @@ function isInPlay(): boolean {
 }
 
 function isBoostMenuOpen(): boolean {
-  return isUniverseMapOpen() || isShipSchematicOpen();
+  return isUniverseMapOpen() || isShipSchematicOpen() || isTownStoreOpen();
 }
 
 export function syncTouchChrome(

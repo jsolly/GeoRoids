@@ -1,3 +1,4 @@
+import { purchasedHullColor } from '../../../shared/townStore';
 import type {
   HaulerUtilityId,
   Position,
@@ -232,7 +233,7 @@ export class Player {
     if (data.boost !== undefined && this.type !== 'local') {
       this.ship.boost = { ...data.boost };
     }
-    if (data.color !== undefined && this.type !== 'local') {
+    if (data.color !== undefined && (this.type !== 'local' || purchasedHullColor(data.color))) {
       this.color = data.color;
       this.ship.color = data.color;
     }

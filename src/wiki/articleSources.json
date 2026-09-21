@@ -48,6 +48,9 @@
     "src/entities/ship/hullOutlines.ts",
     "tests/unit/ui/universeMap.test.ts",
     "src/ui/shipSchematic.ts",
+    "src/ui/townStore.ts",
+    "src/ui/townStoreState.ts",
+    "shared/townStore.ts",
     "src/ui/schematicJoinHint.ts",
     "src/core/services/InputManager.ts",
     "src/entities/ship/shipUtils.ts",
@@ -56,6 +59,7 @@
     "server/communication/MessageHandler.ts",
     "server/communication/clientCommandDecoder.ts",
     "tests/unit/ui/shipSchematic.test.ts",
+    "tests/unit/ui/town-store-opens-beside-town-square.test.ts",
     "tests/unit/ui/schematicJoinHint.test.ts",
     "tests/unit/entities/input/keyboardControls.test.ts",
     "tests/unit/server/boosted-flight-stays-inside-the-kit-envelope.test.ts",
@@ -377,6 +381,8 @@
     "tests/integration/browser/e2e/surveyor-tags-a-spider-with-a-moving-beacon.test.ts",
     "shared/furnaceField.ts",
     "tests/unit/server/surveyors-build-persistent-crew-furnaces.test.ts",
+    "shared/townStore.ts",
+    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts"
   ],
@@ -456,6 +462,9 @@
     "tests/unit/shared/utc-score-season.test.ts",
     "src/rendering/hud/resourceMapMark.ts",
     "shared/furnaceField.ts",
-    "server/core/TerrainSpiderManager.ts"
+    "server/core/TerrainSpiderManager.ts",
+    "shared/townStore.ts",
+    "src/ui/townStore.ts",
+    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts"
   ]
 }

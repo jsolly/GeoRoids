@@ -46,18 +46,33 @@ export class FurnaceField {
     return id === TOWN_HEARTH.id || this.lit.has(id);
   }
 
+  modulesBuiltBy(playerId: string) {
+    let built = 0;
+    for (const module of this.modules) {
+      if (module.builderId === playerId) {
+        built += 1;
+      }
+    }
+    return built;
+  }
+
   replaceLit(modules: readonly CivicModule[]): void {
     if (
       modules.length === this.modules.length &&
       modules.every(
         (module, index) =>
           module.id === this.modules[index]?.id &&
-          module.builderName === this.modules[index]?.builderName
+          module.builderName === this.modules[index]?.builderName &&
+          module.builderId === this.modules[index]?.builderId
       )
     ) {
       return;
     }
-    this.modules = modules.map((module) => ({ id: module.id, builderName: module.builderName }));
+    this.modules = modules.map((module) => ({
+      id: module.id,
+      builderName: module.builderName,
+      ...(module.builderId ? { builderId: module.builderId } : {}),
+    }));
     this.lit.clear();
     for (const module of this.modules) {
       this.lit.add(module.id);
@@ -65,11 +80,14 @@ export class FurnaceField {
     this.reindex();
   }
 
-  light(id: string, builderName = ''): void {
+  light(id: string, builderName = '', builderId = ''): void {
     if (this.lit.has(id) || !civicLot(id)) {
       return;
     }
-    this.modules = [...this.modules, { id, builderName }];
+    this.modules = [
+      ...this.modules,
+      builderId ? { id, builderName, builderId } : { id, builderName },
+    ];
     this.lit.add(id);
     this.reindex();
   }

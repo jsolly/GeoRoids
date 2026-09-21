@@ -58,6 +58,7 @@ import { canvasManager } from '../rendering/canvasSurface';
 import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
+import { syncTownStoreChrome } from '../ui/townStore';
 import { setPlayView } from '../ui/uiUtils';
 import { bindUniverseMapField } from '../ui/universeMap';
 import { formatGameOverText, preferDeathCause } from '../utils/deathCause';
@@ -772,6 +773,7 @@ export class GameController {
   /** Movement, timers, and swept collisions share one 60 Hz step. */
   private advanceSimulationFrame(currPlayer: Player): void {
     InputManager.getInstance().updateMovementLock();
+    syncTownStoreChrome();
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
     shockwaveManager.update();

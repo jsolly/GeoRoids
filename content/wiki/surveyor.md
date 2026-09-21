@@ -42,7 +42,9 @@ return to a route or furnace that any Surveyor has charted.
 
 Scan does not push rocks or damage ships. A qualifying scan tags the asteroid
 with the Surveyor's ID. If a Hauler later delivers that rock to a furnace, the
-Hauler and every Surveyor recorded on the tag receive the same delivery points.
+Hauler and every Surveyor recorded on the tag receive that delivery. A pilot
+who has built streets receives a higher personal payout; everyone else receives
+the base reward.
 The mineral classification stays with the rock until it is delivered or
 removed, even after the active scan ends. The tag is also retained for the
 delivery reward.
@@ -85,8 +87,12 @@ Equip Build in the ship schematic, then stand inside a dark street foundation
 and press E or tap Build. The tool spends your own score to build that
 designated furnace, and the furnace takes your name. It does not place a hearth
 at an arbitrary position. The nearer lot on that road must already be burning,
-and your score must cover the lot. Deliveries still pay the Hauler and each
-recorded Surveyor personally. A failed build spends neither score nor cooldown;
+and your score must cover the lot. Each street you build raises your own later
+furnace deliveries. The same score buys hull paint at the Town Square store.
+The bonus stays with the pilot who paid, so a later nickname
+change leaves both the furnace name and the bonus where they were. Other pilots
+keep the base reward. Deliveries still pay the Hauler and each recorded Surveyor
+personally. A failed build spends neither score nor cooldown;
 the HUD explains why it failed. A nest whose home would sit inside the new
 furnace's spider occupancy is an illegal site; that miss does not wipe the nest.
 Standing furnaces still scare spiders that enter that occupancy.

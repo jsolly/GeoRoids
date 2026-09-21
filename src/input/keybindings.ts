@@ -1,6 +1,7 @@
 import { GAME } from '../constants';
 import type { Player } from '../entities/player/Player';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { isTownStoreOpen } from '../ui/townStoreState';
 import { logger } from '../utils/Logger';
 import { controlSources } from './controlSources';
 import { steeringTurn } from './pointerSteering';
@@ -100,12 +101,12 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
     switch (ev.code) {
       case 'Space':
         // Space fires while automatic cruise continues.
-        if (!isShipSchematicOpen()) {
+        if (!isShipSchematicOpen() && !isTownStoreOpen()) {
           player.ship.shoot();
         }
         break;
       case 'KeyE':
-        if (!ev.repeat && !isShipSchematicOpen()) {
+        if (!ev.repeat && !isShipSchematicOpen() && !isTownStoreOpen()) {
           player.ship.activateAbility();
         }
         break;

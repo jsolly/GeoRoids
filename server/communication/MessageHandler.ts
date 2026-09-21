@@ -95,6 +95,9 @@ export class MessageHandler {
         case 'setSurveyorUtility':
           this.handleSetSurveyorUtility(ws, command);
           break;
+        case 'buyShipPaint':
+          this.handleBuyShipPaint(ws, command);
+          break;
 
         case 'update':
           this.handlePlayerUpdate(ws, command);
@@ -467,6 +470,31 @@ export class MessageHandler {
       return;
     }
     this.broadcaster.broadcastGameState();
+  }
+
+  private handleBuyShipPaint(ws: WebSocket, command: CommandOf<'buyShipPaint'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id) {
+      return;
+    }
+    const issue = this.gameEngine.buyShipPaint(command.id, command.paintId);
+    const pilot = this.gameEngine.getPlayer(command.id);
+    ws.send(
+      JSON.stringify({
+        type: 'townStoreResult',
+        data: issue
+          ? { message: issue }
+          : {
+              message: this.gameEngine.townStoreNotice(command.paintId),
+              score: pilot?.score,
+              color: pilot?.color,
+            },
+        timestamp: Date.now(),
+      })
+    );
+    if (!issue) {
+      this.broadcaster.broadcastGameState();
+    }
   }
 
   private handleSetSurveyorUtility(ws: WebSocket, command: CommandOf<'setSurveyorUtility'>): void {

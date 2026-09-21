@@ -3,6 +3,7 @@ import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
 import { TOWN_HEARTH } from '../shared/furnaces';
+import { shipPaintById } from '../shared/townStore';
 import { WORLD } from '../shared/world';
 import { DAMAGE } from '../src/constants';
 import type { WebSocketCore } from './communication/WebSocketCore';
@@ -295,6 +296,7 @@ export function handleTestArrangeCrewField(
         'spider-tools',
         'map-icons',
         'furnace',
+        'town-store',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
@@ -318,23 +320,25 @@ export function handleTestArrangeCrewField(
         throw new Error('Validated crew disappeared');
       }
       const position =
-        body['scenario'] === 'spider-tools'
-          ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
-          : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
-            ? { x: 3000 + index * 120, y: 5000 }
-            : body['scenario'] === 'boundary'
-              ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-              : body['scenario'] === 'delivery'
-                ? player.kitId === 'hauler'
-                  ? { x: 0, y: 360 }
-                  : { x: 220, y: 460 }
-                : body['scenario'] === 'tow'
+        body['scenario'] === 'town-store'
+          ? { x: 0, y: 0 }
+          : body['scenario'] === 'spider-tools'
+            ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
+            : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
+              ? { x: 3000 + index * 120, y: 5000 }
+              : body['scenario'] === 'boundary'
+                ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+                : body['scenario'] === 'delivery'
                   ? player.kitId === 'hauler'
-                    ? { x: 0, y: -360 }
-                    : { x: 220, y: -460 }
-                  : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-                    ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                    : { x: index * 120, y: -360 };
+                    ? { x: 0, y: 360 }
+                    : { x: 220, y: 460 }
+                  : body['scenario'] === 'tow'
+                    ? player.kitId === 'hauler'
+                      ? { x: 0, y: -360 }
+                      : { x: 220, y: -460 }
+                    : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                      ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
+                      : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -362,6 +366,7 @@ export function handleTestArrangeCrewField(
         'map-icons',
         'spider-tools',
         'furnace',
+        'town-store',
       ].includes(String(body['scenario']))
         ? 600
         : 0;
@@ -459,6 +464,16 @@ export function handleTestArrangeCrewField(
           maxEnergy: 6,
         },
       });
+    } else if (body['scenario'] === 'town-store') {
+      const paint = shipPaintById('ember');
+      if (!paint) {
+        throw new Error('Town store fixture is missing Ember paint');
+      }
+      for (const player of players) {
+        if (player) {
+          player.score = paint.cost * 2;
+        }
+      }
     } else if (!['empty', 'boundary', 'satellite'].includes(String(body['scenario'])) && first) {
       gameEngine.addAsteroid({
         id: 'crew-fixture-ore',

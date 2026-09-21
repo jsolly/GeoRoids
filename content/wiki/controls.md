@@ -21,8 +21,10 @@ on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
 does not repeatedly activate it. E uses the equipped tool from
 the ship schematic. V opens or closes that schematic, and the Schematic button
-opens it. Escape, the X control, or Return to flight also close it. Firing and E are blocked while it is open.
-The map and schematic hold your ship stationary, including its momentum and
+opens it. B opens or closes the Town Square store while you are inside it.
+Escape, the X control, or Return to flight also close an open menu. Firing and E
+are blocked while the schematic or store is open.
+The map, schematic, and town store hold your ship stationary, including its momentum and
 steering. Closing the menu resumes flight and grants the same brief blink
 protection as a respawn, so a rock that drifted over the hull cannot kill you
 immediately. The world keeps running while a
@@ -61,7 +63,7 @@ if you stopped before it ran empty.
 
 An empty tank stops boost automatically. As soon as some charge returns, press,
 click, or tap to boost again. This interrupts recharging and spends the remaining
-charge; you do not need a full tank. Boost never restarts on its own. Opening the map or schematic stops boost and lets the tank recharge.
+charge; you do not need a full tank. Boost never restarts on its own. Opening the map, schematic, or town store stops boost and lets the tank recharge.
 Respawning starts with a full tank; reconnecting to the same flight preserves
 charge and credits the time spent away toward the refill.
 
@@ -82,6 +84,18 @@ and lock the asteroid thrust heading, then E again to ignite an ordinary rock.
 A colossal deposit stays latched until two couplings are armed; E before that
 crew is ready does not ignite. Its touch button
 changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
+
+## Town store
+
+B or the Store button opens the Town Square store while you are alive and inside
+its radius. On a keyboard the button sits above Schematic and shows the B
+shortcut. On touch the button stays and hides that badge. Opening the store
+closes the map and schematic, holds the ship, and blocks firing. Buying the
+paint you already wear spends nothing. A purchase outside the radius, while the
+ship is destroyed, or without enough score spends nothing and explains why. A
+successful purchase changes the hull and thruster color. That color stays
+through death, reconnect, restart, and the monthly score reset. The store also
+shows how much your own built streets add to your furnace deliveries.
 
 ## Map
 
@@ -112,7 +126,7 @@ Taps and holds on the playfield, HUD, and action buttons do not highlight text
 or open copy-paste banners; those gestures steer, fire, or activate the button.
 Nickname and other form fields on the title screen still accept typing and
 selection.
-Use the ability button for the same action as E. Press and hold your own hull
+Use the Store button at Town Square for the same purchase as B. Use the ability button for the same action as E. Press and hold your own hull
 to open the ship schematic. A short label above the ship on first join repeats
 that hold-to-equip reminder. Use the Boost button at the
 bottom of the screen for the same action as Shift: tap once to start boosting,

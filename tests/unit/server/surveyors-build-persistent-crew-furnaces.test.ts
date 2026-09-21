@@ -130,7 +130,9 @@ test('a Surveyor builds only the street foundation they are standing in and pays
   expect(engine.furnaceBuildNotice()).toBe(`${builtName} is burning`);
   expect(scout.actor.score).toBe(0);
   expect(bystander.score).toBe(street.cost * 2);
-  expect(engine.getGameState().civicModules).toEqual([{ id: street.id, builderName: 'scout' }]);
+  expect(engine.getGameState().civicModules).toEqual([
+    { id: street.id, builderName: 'scout', builderId: 'scout' },
+  ]);
   expect(engine.getGameState().mapAssets).toContainEqual({
     id: `furnace:${street.id}`,
     name: builtName,
@@ -175,7 +177,7 @@ test('a named street and the builder leftover score survive a SQLite restart', (
     expect(engine.useAbility(actor.id)).toBe(true);
     const lit = engine.getGameState().civicModules;
     expect(actor.score).toBe(leftover);
-    expect(lit).toEqual([{ id: street.id, builderName: 'scout' }]);
+    expect(lit).toEqual([{ id: street.id, builderName: 'scout', builderId: 'scout' }]);
     engine.removePlayer(actor.id);
     expect(firstStore.loadWorld()?.civicModules).toEqual(lit);
     firstStore.close();
@@ -340,7 +342,9 @@ test('a raised street toasts the Surveyor with the lot name', () => {
   expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(
     `${civicModuleName('scout', street.name)} is burning`
   );
-  expect(engine.getGameState().civicModules).toEqual([{ id: street.id, builderName: 'scout' }]);
+  expect(engine.getGameState().civicModules).toEqual([
+    { id: street.id, builderName: 'scout', builderId: 'scout' },
+  ]);
   broadcaster.stopPeriodicBroadcast();
 });
 

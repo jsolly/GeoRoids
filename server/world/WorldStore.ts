@@ -8,6 +8,7 @@ import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerM
 import { releaseField } from '../../shared/releaseId';
 import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
+import { purchasedHullColor } from '../../shared/townStore';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
@@ -54,6 +55,8 @@ export interface PersistentPilot {
   tokenHash: string;
   name: string;
   score: number;
+  /** Catalog hull color bought at Town Square. */
+  hullColor?: string;
   lastSeenAt?: number;
   kitId?: ShipKitId;
   position?: Position;
@@ -201,6 +204,10 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
     return undefined;
   }
+  const hullColor = pilot['hullColor'];
+  if (hullColor !== undefined && typeof hullColor !== 'string') {
+    return undefined;
+  }
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
@@ -217,6 +224,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     name,
     score,
     ...(typeof silk === 'number' ? { silk } : {}),
+    ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
     ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),

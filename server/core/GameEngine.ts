@@ -37,6 +37,13 @@ import { advanceShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
+import {
+  insideTownStore,
+  purchasedHullColor,
+  shipPaintById,
+  TOWN_STORE_ISSUE,
+  townDeliveryPoints,
+} from '../../shared/townStore';
 import { utcScoreSeason, WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
@@ -767,6 +774,7 @@ export class GameEngine {
       mass: actor.mass,
       health: actor.health,
       boost: { ...actor.boost },
+      ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
     if (previous === undefined) {
@@ -921,6 +929,9 @@ export class GameEngine {
       flight?.position,
       requestedKit ?? flight?.kitId
     );
+    if (saved.hullColor) {
+      actor.color = saved.hullColor;
+    }
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
     actor.score = saved.lives === 0 ? GAME.STARTING_SCORE : saved.score;
     actor.silk = saved.silk ?? 0;
@@ -1023,6 +1034,7 @@ export class GameEngine {
         scoreReleaseId: SERVER_RELEASE_ID,
         scoreUpdatedAt: now,
         ...releaseField('lastClientReleaseId', pilot.lastClientReleaseId),
+        ...(pilot.hullColor ? { hullColor: pilot.hullColor } : {}),
       });
     }
     for (const actor of this.getAllPlayers()) {
@@ -2749,6 +2761,40 @@ export class GameEngine {
     return this.lastFurnaceBuildNotice;
   }
 
+  /** Spend personal score on a Town Square hull paint. Undefined means the hull changed. */
+  public buyShipPaint(entityId: string, paintId: string): string | undefined {
+    const paint = shipPaintById(paintId);
+    const pilot = this.getPlayer(entityId);
+    if (
+      !paint ||
+      !pilot ||
+      pilot.exploding ||
+      pilot.health <= 0 ||
+      pilot.respawnTimer !== undefined
+    ) {
+      return TOWN_STORE_ISSUE.CLOSED;
+    }
+    if (!insideTownStore(pilot.position)) {
+      return TOWN_STORE_ISSUE.AWAY;
+    }
+    if (pilot.color === paint.color) {
+      return TOWN_STORE_ISSUE.WORN;
+    }
+    const score = Number.isSafeInteger(pilot.score) ? pilot.score : 0;
+    if (score < paint.cost) {
+      return `You need ${paint.cost - Math.max(0, score)} more score`;
+    }
+    pilot.score -= paint.cost;
+    pilot.color = paint.color;
+    this.capturePilot(entityId);
+    return undefined;
+  }
+
+  public townStoreNotice(paintId: string): string {
+    const paint = shipPaintById(paintId);
+    return paint ? `${paint.name} is on your hull` : TOWN_STORE_ISSUE.CLOSED;
+  }
+
   private clearTown(): void {
     this.furnaces.replaceLit([]);
   }
@@ -2764,7 +2810,7 @@ export class GameEngine {
     const builderName = sanitizePlayerName(surveyor.name);
     surveyor.score -= lot.cost;
     this.capturePilot(surveyor.id);
-    this.furnaces.light(lot.id, builderName);
+    this.furnaces.light(lot.id, builderName, surveyor.id);
     this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
     surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
     surveyor.abilityActiveFrames = 0;
@@ -3024,10 +3070,11 @@ export class GameEngine {
     this.removeAsteroid(rock.id);
     const launchers = new Set(ownerIds);
     const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);
-    const points = furnaceReward(rock);
+    const base = furnaceReward(rock);
     const rewards: FurnaceDelivery['rewards'] = [];
     for (const playerId of recipients) {
       const player = this.getPlayer(playerId);
+      const points = townDeliveryPoints(base, this.furnaces.modulesBuiltBy(playerId));
       const score = this.awardPilotPoints(
         playerId,
         points,

@@ -21,6 +21,7 @@ import {
 import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
+import { requestTownStoreClose } from './townStoreState';
 import {
   canPlaceMapAssetLabel,
   canPlaceMapCrewLabel,
@@ -762,7 +763,7 @@ function drawCrew(
     const nearSize = player.type === 'local' ? MAP_LOCAL_SHIP_SIZE : MAP_CREW_SHIP_SIZE;
     const screen = universeMapMarkScreenSize(nearSize, frame.zoom);
     const size = screen / frame.scale;
-    const color = player.type === 'local' ? PALETTE.LOCAL : player.color;
+    const color = player.ship.color;
     const outline = getKitHullOutline(player.ship.kitId);
     context.save();
     context.translate(position.x, position.y);
@@ -967,6 +968,7 @@ function openMap(): void {
   if (!elements || mapOpen || !document.body.classList.contains('in-play')) {
     return;
   }
+  requestTownStoreClose();
   try {
     elements.dialog.showModal();
   } catch (error) {

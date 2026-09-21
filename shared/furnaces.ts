@@ -232,6 +232,19 @@ export function validLitCivicLotIds(value: unknown): value is string[] {
   return litParentReady(ids);
 }
 
+function validModuleBuilderId(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length < 1 || value.length > 128) {
+    return false;
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 32 || code === 127) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Saved modules keep a nickname and the same parent order as lit lot ids. */
 export function validCivicModules(value: unknown): value is CivicModule[] {
   if (!Array.isArray(value)) {
@@ -242,11 +255,14 @@ export function validCivicModules(value: unknown): value is CivicModule[] {
     if (!row || typeof row !== 'object') {
       return false;
     }
-    const built = row as { id?: unknown; builderName?: unknown };
+    const built = row as { id?: unknown; builderName?: unknown; builderId?: unknown };
     if (typeof built.id !== 'string' || ids.has(built.id) || !LOT_BY_ID.has(built.id)) {
       return false;
     }
     if (typeof built.builderName !== 'string' || !MODULE_BUILDER_NAME.test(built.builderName)) {
+      return false;
+    }
+    if ('builderId' in built && !validModuleBuilderId(built.builderId)) {
       return false;
     }
     ids.add(built.id);

@@ -286,6 +286,8 @@ export interface ShockwaveEvent {
 export interface CivicModule {
   id: string;
   builderName: string;
+  /** Public pilot id of the Surveyor who paid. Absent on older unnamed streets. */
+  builderId?: string;
 }
 
 export interface ServerGameState {

@@ -9,7 +9,32 @@ export const FURNACE_BUILD = {
   MIN_DISTANCE: 400,
   /** Leaves room for the 180-unit respawn ring and either ship hull. */
   WORLD_INSET: 500,
+  NOTICE: {
+    BUILT: 'Furnace built',
+    YIELDED: 'Your oldest furnace made way for this new hearth.',
+  },
 } as const;
+
+function furnaceSerial(site: BuiltFurnace): number {
+  const suffix = site.id.slice(site.id.lastIndexOf(':') + 1);
+  const serial = Number(suffix);
+  return Number.isSafeInteger(serial) && serial > 0 ? serial : Number.POSITIVE_INFINITY;
+}
+
+/** Oldest first: explicit placement time, then the id serial used before placedAt existed. */
+export function furnacePlacementOrder(site: BuiltFurnace): number {
+  return typeof site.placedAt === 'number' && Number.isFinite(site.placedAt)
+    ? site.placedAt
+    : furnaceSerial(site);
+}
+
+function byOldestPlacement(left: BuiltFurnace, right: BuiltFurnace): number {
+  return (
+    furnacePlacementOrder(left) - furnacePlacementOrder(right) ||
+    furnaceSerial(left) - furnaceSerial(right) ||
+    left.id.localeCompare(right.id)
+  );
+}
 
 const CELL_SIZE = 1_000;
 type Furnace = (typeof FURNACES)[number];
@@ -46,7 +71,8 @@ export function validBuiltFurnaces(value: unknown): value is BuiltFurnace[] {
       typeof site.position.y !== 'number' ||
       !Number.isFinite(site.position.x) ||
       !Number.isFinite(site.position.y) ||
-      Math.hypot(site.position.x, site.position.y) > WORLD.radius - FURNACE_BUILD.WORLD_INSET
+      Math.hypot(site.position.x, site.position.y) > WORLD.radius - FURNACE_BUILD.WORLD_INSET ||
+      ('placedAt' in site && (typeof site.placedAt !== 'number' || !Number.isFinite(site.placedAt)))
     ) {
       return false;
     }
@@ -88,7 +114,8 @@ export class FurnaceField {
           previous.name === site.name &&
           previous.radius === site.radius &&
           previous.position.x === site.position.x &&
-          previous.position.y === site.position.y
+          previous.position.y === site.position.y &&
+          previous.placedAt === site.placedAt
         );
       })
     ) {
@@ -111,6 +138,30 @@ export class FurnaceField {
     this.built = [...this.built, site];
     this.counts.set(site.ownerId, this.count(site.ownerId) + 1);
     this.index(site);
+  }
+
+  owned(ownerId: string): BuiltFurnace[] {
+    return this.built.filter((site) => site.ownerId === ownerId);
+  }
+
+  nextOwnedSerial(ownerId: string): number {
+    let next = 1;
+    for (const site of this.owned(ownerId)) {
+      const serial = furnaceSerial(site);
+      if (serial !== Number.POSITIVE_INFINITY && serial >= next) {
+        next = serial + 1;
+      }
+    }
+    return next;
+  }
+
+  evictOldestOwned(ownerId: string): BuiltFurnace | undefined {
+    const oldest = this.owned(ownerId).slice().sort(byOldestPlacement)[0];
+    if (!oldest) {
+      return undefined;
+    }
+    this.replace(this.built.filter((site) => site.id !== oldest.id));
+    return oldest;
   }
 
   hasSector(id: string): boolean {

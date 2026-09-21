@@ -70,7 +70,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Furnace construction',
       paragraphs: [
-        `Build Furnace places a ${FURNACE_BUILD.RADIUS}-unit intake at the ship, with ${FURNACE_BUILD.MAX_PER_OWNER} sites per pilot and more than ${FURNACE_BUILD.MIN_DISTANCE} units between furnace centers. Keep at least ${FURNACE_BUILD.WORLD_INSET} units inside the world edge. Successful construction uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Sites persist until the world resets.`,
+        `Build Furnace places a ${FURNACE_BUILD.RADIUS}-unit intake at the ship. Each pilot can keep ${FURNACE_BUILD.MAX_PER_OWNER} sites; placing another removes their oldest first. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units between furnace centers and at least ${FURNACE_BUILD.WORLD_INSET} units inside the world edge. Successful construction uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Sites persist until the world resets.`,
       ],
     },
     {

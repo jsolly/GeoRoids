@@ -4,26 +4,33 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
+import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
+import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { furnaceHeading, tickAsteroidBoost } from '../../../shared/asteroidBoost';
-import { FURNACE_BUILD, FurnaceField, validBuiltFurnaces } from '../../../shared/furnaceField';
+import {
+  FURNACE_BUILD,
+  FurnaceField,
+  furnacePlacementOrder,
+  validBuiltFurnaces,
+} from '../../../shared/furnaceField';
 import { FURNACES } from '../../../shared/furnaces';
 import { validateSnapshotDto } from '../../../shared/snapshotDto';
 import { utcScoreSeason, WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-function builder(engine: GameEngine, id = 'scout') {
-  const socket = new RecordingSocket();
+function builder(engine: GameEngine, id = 'scout', socket = new RecordingSocket()) {
   const actor = engine.addPlayer(id, id, socket, { x: 2200, y: 2200 }, 'surveyor');
   actor.position = { x: 2200, y: 2200 };
   actor.asteroidInteractions = 1;
   const pilot = engine.registerPilot(actor, socket);
   assert(pilot.ok);
   engine.setSurveyorUtility(id, 'build_furnace');
-  return { actor, token: pilot.resumeToken };
+  return { actor, socket, token: pilot.resumeToken };
 }
 
 function buildThree(engine: GameEngine) {
@@ -53,20 +60,35 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
   };
 }
 
-test('each Surveyor can build three furnaces, with landmarks excluded and the fourth refused', () => {
+test('each Surveyor can keep three furnaces, and a fourth yields their oldest site', () => {
   const engine = new GameEngine(42);
   const scout = buildThree(engine);
+  const first = engine.getGameState().builtFurnaces?.[0];
+  const kept = engine.getGameState().builtFurnaces?.slice(1) ?? [];
+  assert(first);
   scout.actor.abilityCooldownFrames = 0;
-  scout.actor.position.x += 600;
   expect(engine.useAbility(scout.actor.id)).toBe(false);
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toContain('3/3');
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe('Too close to another furnace');
+  expect(scout.actor.abilityCooldownFrames).toBe(0);
   expect(engine.getGameState().builtFurnaces).toHaveLength(3);
+  expect(engine.getGameState().builtFurnaces).toContainEqual(first);
+  scout.actor.position.x += 600;
+  expect(engine.useAbility(scout.actor.id)).toBe(true);
+  expect(engine.furnaceBuildNotice()).toBe(FURNACE_BUILD.NOTICE.YIELDED);
+  const sites = engine.getGameState().builtFurnaces ?? [];
+  expect(sites).toHaveLength(3);
+  expect(sites.some((site) => site.id === first.id)).toBe(false);
+  expect(sites).toEqual(expect.arrayContaining(kept));
+  expect(sites.every((site) => site.ownerId === scout.actor.id)).toBe(true);
+  expect(validBuiltFurnaces(sites)).toBe(true);
   const other = builder(engine, 'other');
   other.actor.position = { x: 2200, y: 3200 };
   expect(engine.useAbility(other.actor.id)).toBe(true);
   expect(engine.getGameState().builtFurnaces).toHaveLength(4);
+  expect(
+    engine.getGameState().builtFurnaces?.filter((site) => site.ownerId === 'other')
+  ).toHaveLength(1);
   expect(FURNACES.some((site) => site.id.startsWith('built:'))).toBe(false);
-  // Includes the new structures in the actual transport DTO.
   validateSnapshotDto({ ...engine.getGameState(), collabTags: [], playerProjectiles: [] });
 });
 
@@ -114,8 +136,19 @@ test('furnaces and the owner cap survive the last disconnect and a SQLite restar
       expect(restarted.getGameState().builtFurnaces).toEqual(expected);
       restarted.setSurveyorUtility(resumed.actor.id, 'build_furnace');
       resumed.actor.abilityCooldownFrames = 0;
-      resumed.actor.position = { x: 2200, y: 3200 };
+      const last = expected?.[expected.length - 1];
+      assert(last);
+      resumed.actor.position = { ...last.position };
       expect(restarted.useAbility(resumed.actor.id)).toBe(false);
+      expect(restarted.furnaceBuildIssue(resumed.actor.id)).toBe('Too close to another furnace');
+      expect(restarted.getGameState().builtFurnaces).toEqual(expected);
+      resumed.actor.position = { x: 2200, y: 3200 };
+      expect(restarted.useAbility(resumed.actor.id)).toBe(true);
+      const sites = restarted.getGameState().builtFurnaces ?? [];
+      expect(sites).toHaveLength(3);
+      expect(sites.some((site) => site.id === expected[0]?.id)).toBe(false);
+      expect(sites).toEqual(expect.arrayContaining(expected.slice(1)));
+      expect(validBuiltFurnaces(sites)).toBe(true);
     } finally {
       secondStore.close();
     }
@@ -171,6 +204,16 @@ test('boost guidance chooses a player-built furnace and separate worlds never sh
   expect(validBuiltFurnaces([{ ...field.snapshot()[0], position: { x: Infinity, y: 0 } }])).toBe(
     false
   );
+  expect(validBuiltFurnaces([{ ...field.snapshot()[0], placedAt: Number.NaN }])).toBe(false);
+  expect(validBuiltFurnaces([{ ...field.snapshot()[0], placedAt: 12 }])).toBe(true);
+  expect(
+    validBuiltFurnaces([
+      { ...field.snapshot()[0], id: 'built:pilot:1', ownerId: 'pilot' },
+      { ...field.snapshot()[0], id: 'built:pilot:2', ownerId: 'pilot' },
+      { ...field.snapshot()[0], id: 'built:pilot:3', ownerId: 'pilot' },
+      { ...field.snapshot()[0], id: 'built:pilot:4', ownerId: 'pilot' },
+    ])
+  ).toBe(false);
 });
 
 test('construction leaves room inside the world edge for a full respawn ring', () => {
@@ -255,4 +298,92 @@ test('building a furnace clears a spider already inside its new safe area', () =
   expect(engine.useAbility(actor.id)).toBe(true);
   engine.advanceOneFrame();
   expect(engine.getSpiderField().spiders.some((body) => body.id === spider.id)).toBe(false);
+});
+
+test('a yielded furnace toasts the placing Surveyor over the ability result', () => {
+  const engine = new GameEngine(42);
+  const socket = new RecordingSocket();
+  const scout = builder(engine, 'scout', socket);
+  for (let index = 0; index < 3; index++) {
+    scout.actor.position = { x: 2200 + index * 600, y: 2200 };
+    scout.actor.abilityCooldownFrames = 0;
+    expect(engine.useAbility(scout.actor.id)).toBe(true);
+  }
+  const broadcaster = new GameStateBroadcaster(engine);
+  const handler = new MessageHandler(engine, broadcaster);
+  scout.actor.abilityCooldownFrames = 0;
+  scout.actor.position.x += 600;
+  handler.handleMessage({ type: 'useAbility', id: scout.actor.id, kitId: 'surveyor' }, socket);
+  expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(FURNACE_BUILD.NOTICE.YIELDED);
+  expect(engine.getGameState().builtFurnaces).toHaveLength(3);
+  broadcaster.stopPeriodicBroadcast();
+});
+
+test('legacy furnaces without placedAt still yield in serial order', () => {
+  const field = new FurnaceField();
+  const late = {
+    id: 'built:pilot:2',
+    ownerId: 'pilot',
+    name: 'Later',
+    radius: FURNACE_BUILD.RADIUS,
+    position: { x: 2800, y: 2200 },
+    placedAt: 50,
+  };
+  const early = {
+    id: 'built:pilot:1',
+    ownerId: 'pilot',
+    name: 'Earlier',
+    radius: FURNACE_BUILD.RADIUS,
+    position: { x: 2200, y: 2200 },
+  };
+  field.replace([late, early]);
+  expect(furnacePlacementOrder(early)).toBeLessThan(furnacePlacementOrder(late));
+  expect(field.evictOldestOwned('pilot')?.id).toBe('built:pilot:1');
+  expect(field.snapshot().map((site) => site.id)).toEqual(['built:pilot:2']);
+  expect(field.evictOldestOwned('other')).toBeUndefined();
+  expect(field.nearby(early.position, 1)).toEqual([]);
+});
+
+test('a player-built furnace matches a Works yard for spider occupancy and hunt break', () => {
+  const works = FURNACES.find((site) => site.id === 'works-1-0');
+  assert(works);
+  const field = new FurnaceField();
+  const builtAt = { x: 8000, y: 8000 };
+  field.add({
+    id: 'built:pilot:1',
+    ownerId: 'pilot',
+    name: 'Yard',
+    radius: FURNACE_BUILD.RADIUS,
+    position: builtAt,
+  });
+  const cases = [
+    { manager: new TerrainSpiderManager(() => 0.5), origin: works.position },
+    { manager: new TerrainSpiderManager(() => 0.5, field), origin: builtAt },
+  ];
+  for (const { manager, origin } of cases) {
+    const inside = manager.spawnSpider({ x: origin.x + 80, y: origin.y });
+    assert(inside);
+    const witness = {
+      id: 'witness',
+      position: { x: origin.x + 2_000, y: origin.y },
+      health: 100,
+      exploding: false,
+    };
+    manager.advance({ players: [witness], completedSectors: new Set(), nowFrame: 1 });
+    expect(manager.snapshot().spiders.some((body) => body.id === inside.id)).toBe(false);
+
+    const hunter = manager.spawnSpider({ x: origin.x + 500, y: origin.y });
+    assert(hunter);
+    const sheltered = {
+      id: 'sheltered',
+      position: { x: origin.x + 40, y: origin.y },
+      health: 100,
+      exploding: false,
+    };
+    manager.advance({ players: [sheltered], completedSectors: new Set(), nowFrame: 2 });
+    expect(manager.snapshot().spiders.find((body) => body.id === hunter.id)?.targetId).toBeNull();
+    expect(manager.snapshot().spiders.find((body) => body.id === hunter.id)?.phase).not.toBe(
+      'hunting'
+    );
+  }
 });

@@ -116,6 +116,7 @@ notice with that sector's coordinates. The local radar and universe map shade co
 their green playfield walls, so closed ground stays distinct from spiderwebs.
 
 Surveyors can equip [Build Furnace](/wiki/#surveyor) to place shared delivery
-sites. Each pilot has a separate construction limit; every crew member can use
-the sites. Built furnaces survive reconnects and server restarts until the
-world resets. Active Mineral Scan also drives nearby spiders away from the crew.
+sites. Each pilot can keep three built sites at once; placing another yields
+their oldest. Every crew member can use the sites. Built furnaces survive
+reconnects and server restarts until the world resets. Active Mineral Scan also
+drives nearby spiders away from the crew.

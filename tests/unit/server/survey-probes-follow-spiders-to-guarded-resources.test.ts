@@ -49,18 +49,18 @@ describe('spiders carry Surveyor probes', () => {
     const manager = new SurveyProbeManager();
     const spider = spiderAt('spider', 200);
     const rock = rockAt('rock', 400);
-    expect(manager.launch(pilot, [rock], new Set(), 100, [spider])?.host).toBe(spider);
+    expect(manager.launch(pilot, [rock], 100, [spider])?.host).toBe(spider);
     expect(rock.probe).toBeUndefined();
-    expect(manager.launch(pilot, [rock], new Set(), 101, [spider])).toBeNull();
+    expect(manager.launch(pilot, [rock], 101, [spider])).toBeNull();
     const blocker = rockAt('blocker', 100);
-    expect(manager.launch(pilot, [blocker], new Set(), 102, [spider])?.host).toBe(blocker);
+    expect(manager.launch(pilot, [blocker], 102, [spider])?.host).toBe(blocker);
   });
 
   test('a probe rotates with its spider and scans resources after the spider travels home', () => {
     const manager = new SurveyProbeManager();
     const spider = spiderAt('spider', 200);
     const rock = rockAt('nest-resource', 2000, 100);
-    assert.ok(manager.launch(pilot, [], new Set(), 100, [spider]));
+    assert.ok(manager.launch(pilot, [], 100, [spider]));
     assert.ok(spider.probe);
     const before = probePosition(spider, spider.probe);
     spider.position = { x: 2000, y: 0 };
@@ -91,7 +91,6 @@ describe('spiders carry Surveyor probes', () => {
     const scout = { id: 'scout', position: { x: 17000, y: 5000 }, health: 100, exploding: false };
     const options = {
       players: [scout],
-      completedSectors: new Set<string>(),
       resources: () => [resource],
     };
     spiders.advance({ ...options, nowFrame: 1 });
@@ -105,7 +104,6 @@ describe('spiders carry Surveyor probes', () => {
       probes.launch(
         { ...pilot, position: { x: guard.position.x - 200, y: guard.position.y } },
         [],
-        new Set(),
         100,
         [guard]
       )
@@ -132,17 +130,13 @@ describe('spiders carry Surveyor probes', () => {
   test('asteroid and spider probes share the owner cap, damage, expiry, and host loss cleanup', () => {
     const manager = new SurveyProbeManager();
     const rock = rockAt('oldest', 200);
-    assert.ok(manager.launch(pilot, [rock], new Set(), 100));
+    assert.ok(manager.launch(pilot, [rock], 100));
     const spiders = [0, 1, 2].map((i) => spiderAt(`spider-${i}`, 200, (i + 1) * 200));
     for (const [i, spider] of spiders.entries()) {
       assert.ok(
-        manager.launch(
-          { ...pilot, position: { x: 0, y: spider.position.y } },
-          [],
-          new Set(),
-          101 + i,
-          [spider]
-        )
+        manager.launch({ ...pilot, position: { x: 0, y: spider.position.y } }, [], 101 + i, [
+          spider,
+        ])
       );
     }
     expect(rock.probe).toBeNull();

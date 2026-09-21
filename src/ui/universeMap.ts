@@ -1,6 +1,5 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { sectorBounds } from '../../shared/sectors';
-import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
+import { WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE } from '../constants';
@@ -10,11 +9,7 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
 import { activeScanners, scannedMaterial } from '../entities/ship/surveyScan';
-import {
-  getCompletedSectors,
-  getWorldExploration,
-  getWorldMapAssets,
-} from '../network/worldExploration';
+import { getWorldExploration, getWorldMapAssets } from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
 import {
   drawFurnaceMapMark,
@@ -574,19 +569,6 @@ function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): 
   context.arc(0, 0, WORLD.radius, 0, Math.PI * 2);
   context.stroke();
 
-  context.fillStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.16);
-  context.strokeStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.7);
-  context.lineWidth = 2 / frame.scale;
-  for (const id of getCompletedSectors()) {
-    const parsed = parseSectorId(id);
-    if (!parsed) {
-      continue;
-    }
-    const bounds = sectorBounds(parsed.x, parsed.y);
-    context.fillRect(bounds.minX, bounds.minY, WORLD.sectorSize, WORLD.sectorSize);
-    context.strokeRect(bounds.minX, bounds.minY, WORLD.sectorSize, WORLD.sectorSize);
-  }
-
   context.strokeStyle = hexToRgba(PALETTE.REMOTE, 0.2);
   context.lineWidth = 1 / frame.scale;
   context.beginPath();
@@ -816,12 +798,25 @@ function formatCoordinate(value: number): string {
   return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
 }
 
+const NIBBLE_POPCOUNT = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+
+function exploredCellCount(tiles: readonly ExplorationTile[]): number {
+  let count = 0;
+  for (const tile of tiles) {
+    for (const char of tile.bits) {
+      const nibble = Number.parseInt(char, 16);
+      count += NIBBLE_POPCOUNT[nibble] ?? 0;
+    }
+  }
+  return count;
+}
+
 function updateStatus(revealedAssetCount: number, crewCount: number): void {
   if (!elements) {
     return;
   }
-  const exploredCells = getWorldExploration().length;
-  elements.status.textContent = `Sector ${sectorAt(view.center).x},${sectorAt(view.center).y} · X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored sectors`;
+  const exploredCells = exploredCellCount(getWorldExploration());
+  elements.status.textContent = `X ${formatCoordinate(view.center.x)} Y ${formatCoordinate(view.center.y)} · ${revealedAssetCount} revealed assets · ${crewCount} crew · ${exploredCells} explored cells`;
 }
 
 function updateAccessibleLocations(assets: readonly MapAsset[]): void {

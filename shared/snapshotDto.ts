@@ -288,7 +288,6 @@ const worldRules = {
   builtFurnaces: optional(validBuiltFurnaces),
   spiderField: optional(spiderField),
   exploration: validExploration,
-  completedSectors: array(sectorIdentity),
   mapAssets: array(mapAsset),
   entities: array(entity),
   asteroids: array(asteroid),

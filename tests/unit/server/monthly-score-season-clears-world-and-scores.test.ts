@@ -61,7 +61,6 @@ test('a saved world missing a score season resets instead of restoring last mont
         startedAt: 1,
         generation: WORLD.generation,
         exploration: [],
-        completedSectors: [],
       },
       new Map([
         [

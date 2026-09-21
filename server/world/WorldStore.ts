@@ -6,7 +6,6 @@ import { validExploration } from '../../shared/exploration';
 import { validBuiltFurnaces } from '../../shared/furnaceField';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
-import { readCompletedSectorIds } from '../../shared/sectors';
 import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
 import { isScoreSeason, parseSectorId, sectorAt, WORLD } from '../../shared/world';
@@ -86,7 +85,6 @@ export interface SavedWorld {
   scoreSeason?: string;
   writtenReleaseId?: string;
   exploration: ExplorationTile[];
-  completedSectors: string[];
 }
 
 function readVector(value: unknown): Position | undefined {
@@ -455,8 +453,6 @@ export class WorldStore {
         'writtenReleaseId' in value ? value.writtenReleaseId : undefined
       ),
       exploration: value.exploration,
-      completedSectors:
-        'completedSectors' in value ? readCompletedSectorIds(value.completedSectors) : [],
     };
   }
 

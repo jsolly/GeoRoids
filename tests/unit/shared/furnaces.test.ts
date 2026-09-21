@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { FURNACES, isFurnaceSector } from '../../../shared/furnaces';
+import { FURNACES } from '../../../shared/furnaces';
 import { sectorAt, WORLD } from '../../../shared/world';
 
 test('regional Works sit in sector interiors instead of on four-way corners', () => {
@@ -11,7 +11,6 @@ test('regional Works sit in sector interiors instead of on four-way corners', ()
     expect(site.position.y).toBe((sector.y + 0.5) * WORLD.sectorSize);
     expect(site.position.x % WORLD.sectorSize).not.toBe(0);
     expect(site.position.y % WORLD.sectorSize).not.toBe(0);
-    expect(isFurnaceSector(sector.id)).toBe(true);
   }
 });
 
@@ -22,7 +21,4 @@ test('Works 1:0 sits in the middle of its sector, not on the grid cross', () => 
   }
   expect(furnace.position).toEqual({ x: 5_000, y: 1_000 });
   expect(sectorAt(furnace.position).id).toBe('2,0');
-  expect(isFurnaceSector('2,0')).toBe(true);
-  expect(isFurnaceSector('0,0')).toBe(true);
-  expect(isFurnaceSector('1,0')).toBe(false);
 });

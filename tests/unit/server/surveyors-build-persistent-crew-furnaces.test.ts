@@ -271,9 +271,11 @@ test('unchanged snapshots retain the indexed furnace collection', () => {
   expect(field.nearby({ x: 2200, y: 2200 }, 1)).toEqual([]);
 });
 
-test('a furnace beside a cleared diagonal sector preserves its wall after restart', () => {
+test('a furnace beside harvested ground reloads and a pilot can stand there', () => {
   const store = new WorldStore(':memory:');
   const now = Date.now();
+  let engine: GameEngine | undefined;
+  let restarted: GameEngine | undefined;
   try {
     store.checkpoint(
       {
@@ -282,27 +284,33 @@ test('a furnace beside a cleared diagonal sector preserves its wall after restar
         generation: WORLD.generation,
         scoreSeason: utcScoreSeason(now),
         exploration: [],
-        completedSectors: ['1,1'],
       },
-      new Map(),
+      new Map([['1,1', []]]),
       []
     );
-    const engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
+    engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
     const { actor } = builder(engine);
     actor.position = { x: 1935, y: 1935 };
     expect(engine.useAbility(actor.id)).toBe(true);
+    engine.checkpointWorld();
     engine.removePlayer(actor.id);
-    const restarted = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    expect(restarted.getCompletedSectors()).toContain('1,1');
+    restarted = new GameEngine(42, undefined, new InlineWorldPersistence(store));
     expect(restarted.getGameState().builtFurnaces).toHaveLength(1);
-    const field = new FurnaceField();
-    field.replace(restarted.getGameState().builtFurnaces ?? []);
-    expect(field.hasSector('1,1')).toBe(false);
-    expect(field.hasSector('1,0')).toBe(true);
-    expect(field.hasSector('0,1')).toBe(true);
-    field.replace([]);
-    expect(field.hasSector('1,0')).toBe(false);
+    const standing = restarted.addPlayer('return', 'Return', new RecordingSocket(), {
+      x: 2_500,
+      y: 2_500,
+    });
+    expect(standing.position).toEqual({ x: 2_500, y: 2_500 });
+    restarted.advanceOneFrame();
+    expect(standing.position.x).toBeGreaterThanOrEqual(2_000);
+    expect(standing.position.y).toBeGreaterThanOrEqual(2_000);
+    expect(standing.health).toBeGreaterThan(0);
+    expect(restarted.getAllAsteroids().some((rock) => rock.id.startsWith('deposit-42-1-1-'))).toBe(
+      false
+    );
   } finally {
+    engine?.stopGameLoop();
+    restarted?.stopGameLoop();
     store.close();
   }
 });
@@ -469,7 +477,7 @@ test('a player-built furnace matches a Works yard for spider occupancy and hunt 
       health: 100,
       exploding: false,
     };
-    manager.advance({ players: [witness], completedSectors: new Set(), nowFrame: 1 });
+    manager.advance({ players: [witness], nowFrame: 1 });
     expect(manager.snapshot().spiders.some((body) => body.id === inside.id)).toBe(false);
 
     const hunter = manager.spawnSpider({ x: origin.x + 500, y: origin.y });
@@ -480,7 +488,7 @@ test('a player-built furnace matches a Works yard for spider occupancy and hunt 
       health: 100,
       exploding: false,
     };
-    manager.advance({ players: [sheltered], completedSectors: new Set(), nowFrame: 2 });
+    manager.advance({ players: [sheltered], nowFrame: 2 });
     expect(manager.snapshot().spiders.find((body) => body.id === hunter.id)?.targetId).toBeNull();
     expect(manager.snapshot().spiders.find((body) => body.id === hunter.id)?.phase).not.toBe(
       'hunting'

@@ -26,7 +26,7 @@ more real time. A regular shot mines an asteroid by the configured laser amount;
 core-powered shots multiply that damage by their energy. Loose satellite
 pickups are invulnerable and shots pass through them. Equipped satellites
 can be damaged by asteroid impacts and ricochets. Direct lasers never damage a
-crew hull. After a bounce off the arena wall, a completed-sector wall, or a
+crew hull. After a bounce off the arena wall or a
 reflective asteroid, the shot becomes a ricochet: it damages any live ship
 it then hits, including its owner, and is consumed. Bounced bolts use the
 danger color so a live ricochet is readable. Local shots appear immediately
@@ -62,7 +62,7 @@ controls resume when the server confirms your respawn. Respawn restores the
 kit's health, resets mass growth, clears upgrade state, and grants temporary
 spawn protection. Closing the universe map or ship schematic grants that same
 blink window, because rocks can occupy the hull while it is held. Respawns use the nearest furnace to the death location, 180
-world units from its center at a random angle, skipping completed sectors.
+world units from its center at a random angle.
 
 After game over, a fresh flight starts with 3 lives and score 0. A brief
 disconnect still returns you to the same ship; a long absence does not.

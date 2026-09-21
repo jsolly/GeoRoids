@@ -43,18 +43,17 @@ function deposit(id: string, position: { x: number; y: number }): AsteroidData {
 function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidData[]>): void {
   const field = new RegionalAsteroidField(SEED, store.loadSectors());
   const manager = new AsteroidManager(new RNGService(SEED));
-  const completed = new Set<string>();
   let x = 9_000;
   let y = 9_000;
   while (field.visitedSectorIds().length < SAVED_SECTORS) {
-    field.update(manager, [{ x, y }], completed);
+    field.update(manager, [{ x, y }]);
     x += WORLD.sectorSize * 3;
     if (x > 40_000) {
       x = 9_000;
       y += WORLD.sectorSize * 3;
     }
   }
-  field.update(manager, [{ x: 0, y: 0 }], completed);
+  field.update(manager, [{ x: 0, y: 0 }]);
   const rows = new Map(field.checkpoint(manager));
   for (const [id, rocks] of extra) {
     rows.set(id, rocks);
@@ -66,7 +65,6 @@ function exploreAndSave(store: WorldStore, extra: ReadonlyMap<string, AsteroidDa
       generation: WORLD.generation,
       scoreSeason: utcScoreSeason(WALL_ORIGIN_MS),
       exploration: [],
-      completedSectors: [],
     },
     rows,
     []
@@ -125,12 +123,25 @@ test('an explored world with hundreds of saved sectors keeps each simulation fra
   expect(statements).not.toHaveBeenCalled();
   expect(scripts).not.toHaveBeenCalled();
 
-  // Sector completion still sees every saved sector: the harvested one walls
-  // off once mapped, the one with a deposit left does not.
+  // Mapping harvested ground does not wall it off, move the ship, or refill it.
   engine.revealArea({ x: 7_000, y: 9_000 }, WORLD.sectorSize);
   engine.revealArea({ x: 11_000, y: 9_000 }, WORLD.sectorSize);
-  const completed = engine.evaluateSectorProgress();
-  expect(completed).toContain(harvested);
-  expect(completed).not.toContain(untouched);
-  expect(engine.getCompletedSectors()).toContain(harvested);
+  pilot.position = { x: 7_000, y: 9_000 };
+  pilot.velocity = { x: 0, y: 0 };
+  elapsed += 1000 / 60;
+  engine.advanceOneFrame(clock.now());
+  expect(pilot.position).toEqual({ x: 7_000, y: 9_000 });
+  expect(pilot.health).toBeGreaterThan(0);
+  expect(
+    engine
+      .getAllAsteroids()
+      .some(
+        (rock) =>
+          rock.position.x >= 6_000 &&
+          rock.position.x < 8_000 &&
+          rock.position.y >= 8_000 &&
+          rock.position.y < 10_000
+      )
+  ).toBe(false);
+  expect(engine.getGameState()).not.toHaveProperty('completedSectors');
 });

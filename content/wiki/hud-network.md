@@ -97,15 +97,11 @@ central body and solar panels; an orbit line distinguishes deployed pickups.
 Amber campfires mark discovered furnaces, including player-built sites. Red spiderwebs surround the stationary
 resources guarded by nests, even while their spiders are chasing elsewhere or
 sleeping. The web remains after the guards are killed while the resource remains;
-it disappears when that resource is collected, moved, or its sector completes.
-A Works yard never completes, so a web there lasts until the resource is
-collected or moved.
+it disappears when that resource is collected or moved.
 The universe map uses the same symbols and also shows nearby explored rocks
 and small loot from the current local snapshot.
 Kit hull silhouettes in local and crew colors keep pilots
-identifiable above the world marks. Completed sectors have green shading and borders on both maps and green walls
-in the playfield, distinct from spiderweb hazards. Crossing into a
-new open sector shows a brief HUD notice with that sector's coordinates. Press
+identifiable above the world marks. Press
 V or the Schematic button on desktop, or hold your own hull on touch, to open
 the local ship schematic. M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces

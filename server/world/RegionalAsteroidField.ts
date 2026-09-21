@@ -47,8 +47,7 @@ export class RegionalAsteroidField {
 
   constructor(
     private readonly seed: number,
-    saved: ReadonlyMap<string, AsteroidData[]> = new Map(),
-    private completed: ReadonlySet<string> = new Set()
+    saved: ReadonlyMap<string, AsteroidData[]> = new Map()
   ) {
     this.dormant = new Map(
       [...saved].map(([id, rocks]) => [id, rocks.map(stripTransientProbe)] as const)
@@ -254,9 +253,6 @@ export class RegionalAsteroidField {
     this.savedMotionMigrationApplied = true;
     const generated = new Map<string, Map<string, AsteroidData>>();
     for (const [sector, saved] of this.dormant) {
-      if (this.completed.has(sector)) {
-        continue;
-      }
       let changed = false;
       const rows = saved.map((rock) => {
         if (rock.boost || rock.phenomenon || rock.velocity.x !== 0 || rock.velocity.y !== 0) {
@@ -297,9 +293,6 @@ export class RegionalAsteroidField {
   private load(id: string): AsteroidData[] {
     this.visited.add(id);
     const cached = this.dormant.get(id);
-    if (this.completed.has(id)) {
-      return cached?.filter((rock) => rock.boost?.phase === 'burning') ?? [];
-    }
     if (cached) {
       return cached;
     }
@@ -311,14 +304,13 @@ export class RegionalAsteroidField {
   }
 
   /**
-   * Expand persisted, non-completed sectors exactly once for the density
-   * migration. This is deliberately separate from load(): a missing row means
-   * an unvisited sector, while a missing asteroid in a saved row may be a
-   * legitimate harvest. The world-row density marker makes this operation
-   * durable across restarts, including when every newly added slot is later
-   * destroyed.
+   * Expand persisted sectors exactly once for the density migration. This is
+   * deliberately separate from load(): a missing row means an unvisited
+   * sector, while a missing asteroid in a saved row may be a legitimate
+   * harvest. The world-row density marker makes this operation durable across
+   * restarts, including when every newly added slot is later destroyed.
    */
-  migrateSavedSectors(completed: ReadonlySet<string>): ReadonlyMap<string, AsteroidData[]> {
+  migrateSavedSectors(): ReadonlyMap<string, AsteroidData[]> {
     if (this.savedDensityMigrationApplied) {
       return new Map();
     }
@@ -331,9 +323,8 @@ export class RegionalAsteroidField {
       }
     }
     for (const [id, saved] of this.dormant) {
-      // An empty saved row is a durable depletion tombstone even when the
-      // exploration-completion checkpoint has not reached SQLite yet.
-      if (completed.has(id) || saved.length === 0) {
+      // An empty saved row is a durable harvest tombstone.
+      if (saved.length === 0) {
         continue;
       }
       const rows = this.migrateSector(id, saved, persistedIds);
@@ -349,12 +340,7 @@ export class RegionalAsteroidField {
     return migrated;
   }
 
-  update(
-    manager: AsteroidManager,
-    observers: readonly Position[],
-    completed: ReadonlySet<string>
-  ): AsteroidData[] {
-    this.completed = completed;
+  update(manager: AsteroidManager, observers: readonly Position[]): AsteroidData[] {
     const wanted = new Map<string, { x: number; y: number }>();
     for (const observer of observers) {
       const start = sectorAt({
@@ -369,9 +355,8 @@ export class RegionalAsteroidField {
         for (let x = start.x; x <= end.x; x++) {
           const id = `${x},${y}`;
           if (
-            completed.has(id) ||
             Math.hypot((x + 0.5) * WORLD.sectorSize, (y + 0.5) * WORLD.sectorSize) >
-              WORLD.radius + WORLD.sectorSize
+            WORLD.radius + WORLD.sectorSize
           ) {
             continue;
           }
@@ -385,8 +370,8 @@ export class RegionalAsteroidField {
         wanted.set(sector.id, { x: sector.x, y: sector.y });
       }
     }
-    // Resume saved deliveries once, including cargo inside completed sectors.
-    // The index is built at startup; ticks never scan dormant world history.
+    // Resume saved deliveries once. The index is built at startup; ticks never
+    // scan dormant world history.
     for (const id of this.savedPoweredSectors) {
       const sector = parseSectorId(id);
       if (sector) {

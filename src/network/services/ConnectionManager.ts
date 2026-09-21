@@ -1,6 +1,5 @@
 import { validExploration } from '../../../shared/exploration';
 import { releaseField } from '../../../shared/releaseId';
-import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import {
   SNAPSHOT_VERSION,
   SnapshotDecoder,
@@ -72,9 +71,7 @@ import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage } from '../types';
 import {
-  getCompletedSectors,
   resetWorldExploration,
-  setCompletedSectors,
   setWorldExploration,
   setWorldMapAssets,
   worldFurnaces,
@@ -1325,7 +1322,6 @@ export class ConnectionManager {
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
     worldFurnaces.replace(data.builtFurnaces ?? []);
-    setCompletedSectors(data.completedSectors);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
     }
@@ -1456,11 +1452,6 @@ export class ConnectionManager {
           this.forgetPlayer(id);
         }
       }
-    }
-
-    const localHull = PlayerManager.getInstance().getLocalPlayer()?.ship;
-    if (localHull) {
-      containBodyOutOfCompletedSectors(localHull, getCompletedSectors(), { radius: localHull.r });
     }
 
     // Apply the authoritative field: create unseen roids, then keep pose in sync

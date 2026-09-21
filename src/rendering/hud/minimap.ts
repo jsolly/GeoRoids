@@ -4,9 +4,8 @@ import {
   explorationCellsInView,
   isCellExplored,
 } from '../../../shared/exploration';
-import { sectorBounds } from '../../../shared/sectors';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
-import { parseSectorId, sectorAt, WORLD } from '../../../shared/world';
+import { WORLD } from '../../../shared/world';
 import type {
   ExplorationTile,
   LootData,
@@ -23,11 +22,7 @@ import { getKitHullOutline, projectHullPolyline } from '../../entities/ship/hull
 import type { Ship } from '../../entities/ship/Ship';
 import { strokePhosphorPolyline } from '../../entities/ship/shipRenderer';
 import { activeScanners, scannedMaterial } from '../../entities/ship/surveyScan';
-import {
-  getCompletedSectors,
-  getWorldExploration,
-  worldFurnaces,
-} from '../../network/worldExploration';
+import { getWorldExploration, worldFurnaces } from '../../network/worldExploration';
 import { getSpiderField } from '../../physics/terrain/spiderSession';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
@@ -142,32 +137,6 @@ function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeom
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;
     const size = bounds.size * cellScale + 0.5;
     ctx.fillRect(x, y, size, size);
-  }
-  ctx.restore();
-}
-
-function drawCompletedSectors(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
-  const completed = getCompletedSectors();
-  if (completed.size === 0) {
-    return;
-  }
-  const cellScale = geometry.size / (geometry.radius * 2);
-  ctx.save();
-  ctx.fillStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.22);
-  ctx.strokeStyle = hexToRgba(PALETTE.COMPLETED_SECTOR, 0.7);
-  ctx.lineWidth = 1;
-  for (const id of completed) {
-    const parsed = parseSectorId(id);
-    if (!parsed) {
-      continue;
-    }
-    const bounds = sectorBounds(parsed.x, parsed.y);
-    const x = geometry.x + geometry.size / 2 + (bounds.minX - geometry.center.x) * cellScale;
-    const y = geometry.y + geometry.size / 2 + (bounds.minY - geometry.center.y) * cellScale;
-    const width = WORLD.sectorSize * cellScale;
-    const height = WORLD.sectorSize * cellScale;
-    ctx.fillRect(x, y, width, height);
-    ctx.strokeRect(x, y, width, height);
   }
   ctx.restore();
 }
@@ -540,7 +509,6 @@ function formatCoordinate(value: number): string {
 }
 
 function drawRadarReadout(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
-  const sector = sectorAt(geometry.center);
   const width = Math.min(geometry.size, 112);
   const x = geometry.x + geometry.size / 2;
   const outsideY = geometry.y - 29;
@@ -554,7 +522,7 @@ function drawRadarReadout(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
   ctx.textBaseline = 'top';
   ctx.fillText(`X ${formatCoordinate(geometry.center.x)}`, x, y);
   ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.9);
-  ctx.fillText(`Y ${formatCoordinate(geometry.center.y)} · S${sector.x},${sector.y}`, x, y + 11);
+  ctx.fillText(`Y ${formatCoordinate(geometry.center.y)}`, x, y + 11);
   ctx.restore();
 }
 
@@ -619,7 +587,6 @@ export function drawMiniMap(
 
   try {
     drawExplorationFog(ctx, geometry);
-    drawCompletedSectors(ctx, geometry);
     drawAsteroidMarks(ctx, roids, geometry, scanners);
     drawLootMarks(ctx, loot, geometry);
     drawLoosePickupMarks(ctx, pickups, geometry);

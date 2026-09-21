@@ -102,7 +102,6 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
         generation: WORLD.generation,
         scoreSeason: utcScoreSeason(Date.now()),
         exploration: exploration.snapshot(),
-        completedSectors: [],
       },
       new Map(),
       []

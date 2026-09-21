@@ -182,7 +182,7 @@ test('new deposits and reflective clusters stay inside their saved world sectors
       const angle = (index / 64) * Math.PI * 2;
       return { x: Math.cos(angle) * (WORLD.radius - 50), y: Math.sin(angle) * (WORLD.radius - 50) };
     });
-    field.update(manager, observers, new Set());
+    field.update(manager, observers);
     expect(manager.getAllAsteroids().length).toBeGreaterThan(1000);
     expect(() =>
       store.checkpoint(
@@ -191,7 +191,6 @@ test('new deposits and reflective clusters stay inside their saved world sectors
           startedAt: 1,
           generation: WORLD.generation,
           exploration: [],
-          completedSectors: [],
         },
         field.checkpoint(manager),
         []
@@ -266,7 +265,6 @@ test('checkpoint rejects duplicate asteroid identities before writing sectors', 
           startedAt: 1,
           generation: WORLD.generation,
           exploration: [],
-          completedSectors: [],
         },
         new Map([['0,0', [first, { ...first }]]]),
         []
@@ -286,7 +284,6 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
         startedAt: 1,
         generation: WORLD.generation,
         exploration: [],
-        completedSectors: [],
       },
       new Map([
         ['0,0', [asteroid('first', { x: 20, y: 20 })]],
@@ -302,7 +299,6 @@ test('checkpoint accepts deposits that cross sectors in reverse order', () => {
           startedAt: 1,
           generation: WORLD.generation,
           exploration: [],
-          completedSectors: [],
         },
         new Map([
           ['1,0', [asteroid('first', { x: 2_020, y: 20 })]],
@@ -326,7 +322,6 @@ test('checkpoint refuses a deposit already saved under a sector the batch leaves
       startedAt: 1,
       generation: WORLD.generation,
       exploration: [],
-      completedSectors: [],
     };
     store.checkpoint(world, new Map([['0,0', [asteroid('ore', { x: 20, y: 20 })]]]), []);
     // Rewriting only 1,0 with the same deposit would duplicate it across rows.
@@ -364,7 +359,6 @@ test('an inline reset that fails latches the adapter and leaves no transaction o
       startedAt: 1,
       generation: WORLD.generation,
       exploration: [],
-      completedSectors: [],
     };
     persistence.persist({ world, sectors: new Map(), pilots: [scorePilot(5)] });
     const execOriginal = DatabaseSync.prototype.exec;
@@ -401,7 +395,6 @@ test('a commit SQLite has already rolled back reports the disk error, not a phan
       startedAt: 1,
       generation: WORLD.generation,
       exploration: [],
-      completedSectors: [],
     };
     const execOriginal = DatabaseSync.prototype.exec;
     // A full disk or I/O error ends the transaction inside SQLite before the
@@ -438,7 +431,6 @@ test('a store reused after a checkpoint or reset hands the next load what is on 
       startedAt: 1,
       generation: WORLD.generation,
       exploration: [],
-      completedSectors: [],
     };
     // Committed before anything was loaded: the rows parsed at open time are stale.
     store.checkpoint(world, new Map([['0,0', [asteroid('early', { x: 20, y: 20 })]]]), []);
@@ -572,7 +564,6 @@ test('a restart loads a legacy placement record as monthly score only', () => {
           generation: WORLD.generation,
           scoreSeason: utcScoreSeason(1),
           exploration: [],
-          completedSectors: [],
         },
         new Map(),
         pilots

@@ -4,7 +4,6 @@ import {
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
-import { containBodyOutOfCompletedSectors } from '../../../shared/sectors';
 import {
   advanceShipBoost,
   fullShipBoost,
@@ -26,7 +25,6 @@ import { playExplosionSound } from '../../audio/explosionSound';
 import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
-import { getCompletedSectors } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
@@ -507,7 +505,6 @@ class Ship {
     this.capVelocity(velocityLimit);
     this.knockbackVelocityLimit *= PLAYER_MOTION.knockbackRetention;
     this.position = addPositionAndVelocity(this.position, this.velocity);
-    containBodyOutOfCompletedSectors(this, getCompletedSectors(), { radius: this.r });
   }
 
   private capVelocity(maximum: number): void {

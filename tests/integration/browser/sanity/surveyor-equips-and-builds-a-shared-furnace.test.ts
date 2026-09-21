@@ -52,8 +52,10 @@ for (const viewport of [
       await card.click();
     }
     expect(await card.getAttribute('aria-pressed')).toBe('true');
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Town purse 0');
-    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Build');
+    const schematic = await page.locator('#ship-schematic-dialog').textContent();
+    expect(schematic).toContain('Build');
+    expect(schematic).toContain('your own score');
+    expect(schematic).not.toContain('Town purse');
     expect(await page.locator('[data-utility-id]').count()).toBe(3);
     const layout = await page.locator('#ship-schematic-dialog').evaluate((element) => ({
       width: element.clientWidth,

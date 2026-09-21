@@ -540,7 +540,7 @@ export function drawStreetFoundations(viewerPosition: Position): void {
       screen.y,
       radius,
       lot.name,
-      `PURSE ${lot.cost.toLocaleString('en-US')}`
+      `SCORE ${lot.cost.toLocaleString('en-US')}`
     );
   }
 }

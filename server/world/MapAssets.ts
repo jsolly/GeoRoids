@@ -10,7 +10,7 @@ export class MapAssets {
     exploration: readonly ExplorationTile[],
     loot: readonly LootData[],
     pickups: readonly SatellitePickupData[],
-    litLotIds: ReadonlySet<string> = new Set()
+    moduleNames: ReadonlyMap<string, string> = new Map()
   ): MapAsset[] {
     const candidates: MapAsset[] = FURNACES.map((furnace) => ({
       id: `furnace:${furnace.id}`,
@@ -19,12 +19,12 @@ export class MapAssets {
       name: furnace.name,
     }));
     for (const lot of CIVIC_LOTS) {
-      const lit = litLotIds.has(lot.id);
+      const builtName = moduleNames.get(lot.id);
       candidates.push({
         id: `furnace:${lot.id}`,
-        kind: lit ? 'furnace' : 'foundation',
+        kind: builtName === undefined ? 'foundation' : 'furnace',
         position: lot.position,
-        name: lot.name,
+        name: builtName ?? lot.name,
       });
     }
     for (const drop of loot) {

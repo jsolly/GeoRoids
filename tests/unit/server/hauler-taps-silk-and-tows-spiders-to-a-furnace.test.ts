@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { civicLot, furnaceReward, TOWN_HEARTH } from '../../../shared/furnaces';
+import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { HaulerUtilityId } from '../../../shared-types';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
@@ -93,29 +93,9 @@ describe('Hauler tools interact with living spiders', () => {
         throw new Error('Missing street lot');
       }
       if (kind === 'built') {
-        world.clearAsteroids();
-        const reward = furnaceReward({ material: 'metal', size: 25 });
-        for (let index = 0; index < street.cost / reward; index++) {
-          world.engine.addAsteroid({
-            id: `purse-${kind}-${index}`,
-            position: { x: 0, y: 0 },
-            velocity: { x: 0, y: 0 },
-            size: 25,
-            material: 'metal',
-            health: 75,
-            maxHealth: 75,
-            rotation: 0,
-            angularVelocity: 0,
-            jaggedness: 0.2,
-            offsets: [1, 1, 1, 1],
-            vertices: 4,
-            boost: { phase: 'burning', ownerId: 'purse', angle: 0 },
-          });
-          world.engine.processFurnaceDeliveries();
-          world.engine.drainFurnaceDeliveries();
-        }
         const scout = world.join('Builder', street.position, { kitId: 'surveyor' });
         world.entity(scout).position = { ...street.position };
+        world.entity(scout).score = street.cost;
         world.engine.setSurveyorUtility(scout.id, 'build_furnace');
         world.entity(scout).abilityCooldownFrames = 0;
         expect(world.engine.useAbility(scout.id)).toBe(true);

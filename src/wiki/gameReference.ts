@@ -53,7 +53,7 @@ function streetLots(ring: 1 | 2 | 3) {
   return CIVIC_LOTS.filter((lot) => lot.ring === ring);
 }
 
-function purse(ring: 1 | 2 | 3): string {
+function streetCost(ring: 1 | 2 | 3): string {
   return (streetLots(ring)[0]?.cost ?? 0).toLocaleString('en-US');
 }
 
@@ -64,7 +64,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Starting lives: ${GAME.START_LIVES}; starting score: ${GAME.STARTING_SCORE}. Ship kits: ${SHIP_KIT_IDS.length} (${SHIP_KIT_IDS.map((id) => getShipKit(id).name).join(', ')}).`,
         `Earth-observation pickup hulls: ${SATELLITE_PROFILES.length}.`,
-        `${TOWN_HEARTH.name} is the only pre-lit hearth. ${CIVIC_LOTS.length} street foundations start dark: ${streetLots(1).length} at purse ${purse(1)}, ${streetLots(2).length} at purse ${purse(2)}, and ${streetLots(3).length} at purse ${purse(3)}.`,
+        `${TOWN_HEARTH.name} is the only pre-lit hearth. ${CIVIC_LOTS.length} street foundations start dark: ${streetLots(1).length} at score ${streetCost(1)}, ${streetLots(2).length} at score ${streetCost(2)}, and ${streetLots(3).length} at score ${streetCost(3)}.`,
         `After game over, a fresh flight starts with ${GAME.START_LIVES} lives and score ${GAME.STARTING_SCORE}. A disconnect shorter than ${PLAYER_MOTION.returnToShipMs / 1000} seconds returns you to the same ship; a longer gap starts a new flight with the score you still have. The persistent universe, exploration chart, and delivered progress remain until the UTC calendar month ends, when scores and the shared world both reset.`,
       ],
     },
@@ -83,7 +83,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Furnace construction',
       paragraphs: [
-        `Build lights the ${FURNACE_BUILD.RADIUS}-unit street foundation under the ship. The nearer lot on that road must already be burning, and the shared town purse must cover the lot (${purse(1)}, ${purse(2)}, or ${purse(3)}). A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius ${SPIDER.HIT_RADIUS}) rejects the build without spending purse or cooldown. Success spends that cost and uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Lit streets persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
+        `Build spends the Surveyor's own score to light the ${FURNACE_BUILD.RADIUS}-unit street foundation under the ship. The nearer lot on that road must already be burning, and that pilot's score must cover the lot (${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}). A nest home inside furnace spider occupancy (${SPIDER.FURNACE_SAFE_RADIUS} plus nest hit radius ${SPIDER.HIT_RADIUS}) rejects the build without spending score or cooldown. The lit furnace keeps the builder's name. Success spends that cost and uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Lit streets persist until the world resets. ${TOWN_HEARTH.name} stays lit.`,
       ],
     },
     {
@@ -109,7 +109,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `Hauler lasers deal ${SHIP_ABILITY.ASTEROID_DAMAGE_MULTIPLIER} times normal mining damage to metal asteroids, cooperative large rocks, and colossal deposits. The ability has no ship-targeting mode.`,
         `E attaches the equipped Hauler utility within a fixed ${SHIP_ABILITY.HARPOON_RANGE}-unit hull gap. Resource Tap ejects ${SHIP_ABILITY.TAP_EXTRACT_BURSTS} canisters over ${seconds(SHIP_ABILITY.TAP_EXTRACT_FRAMES)} and leaves the rock intact. Tow Cable keeps the rock's velocity and corrects only when stretched; a successful attachment starts the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.hauler)} cooldown, while E again releases the tether immediately. Ordinary towed cargo that overlaps another asteroid or another ship uses the ordinary collision break and detaches the cable. A colossal deposit needs ${ROID.COLOSSAL_CREW} Tow Cables before it will haul, and ${ROID.COLOSSAL_CREW} Boost Couplings before ignition; ramming it or dragging it into another rock does not shatter it.`,
-        `Furnace intakes are ${TOWN_HEARTH.radius} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor. The same delivery adds that value once to the shared town purse. A street delivery lights the pipe from that grate through each nearer lot to ${TOWN_HEARTH.name}, and the light runs along it at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
+        `Furnace intakes are ${TOWN_HEARTH.radius} units. At size 25, delivery rewards are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })} points for the Hauler and each recorded Surveyor. A street delivery lights the pipe from that grate through each nearer lot to ${TOWN_HEARTH.name}, and the light runs along it at ${FURNACE_PIPE_SPEED.toLocaleString('en-US')} world units per second.`,
       ],
     },
   ],
@@ -217,7 +217,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Shared field values',
       paragraphs: [
         `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited region with no asteroids left stays empty, and ships can still fly through it.`,
-        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} streets leave the square, then ${streetLots(2).length} and ${streetLots(3).length} farther lots. A Surveyor builds the next dark foundation once its nearer lot is burning and the town purse covers ${purse(1)}, ${purse(2)}, or ${purse(3)}. Every Hauler and recorded Surveyor receives the full size-scaled material reward, and that same value is banked once in the purse; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
+        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} streets leave the square, then ${streetLots(2).length} and ${streetLots(3).length} farther lots. A Surveyor builds the next dark foundation with their own score once its nearer lot is burning and that score covers ${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Surveyor receives the full size-scaled material reward; size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}.`,
       ],
     },
   ],

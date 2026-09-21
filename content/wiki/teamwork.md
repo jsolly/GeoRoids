@@ -72,15 +72,15 @@ Town Square is the only furnace that starts burning. It sits at the map center.
 Dark street foundations radiate outward from it. On the playfield a lit hearth
 is a dashed delivery ring around a burning grate, where a column of flame roars
 up the intake and throws embers past it. A dark lot is a dashed ring labeled
-with the purse it still needs. A lit hearth appears on the local minimap as an
+with the score it costs. A lit hearth appears on the local minimap as an
 amber hairline three-tongue campfire after the crew discovers its area and
 remains visible there while it is nearby. Dark lots inside that radar stay
 marked. When a hearth moves beyond the local radar, use the universe map to
 find it; the whole street plan is drawn there, lit or not. Zoomed out, a lit
 mark is an amber flame pin at the same size as the other chart landmarks; the
 nearby view and closer restore the three-tongue campfire. A delivery consumes
-the towed or self-guided rock, pays the Hauler and every recorded Surveyor, and
-banks that same value once in the town purse. Faint pipes join each street lot
+the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
+Faint pipes join each street lot
 to the nearer grate and end at Town Square. Dragging a rock or a spider into a
 street furnace lights that whole run, and a bright head travels from the source
 grate back to Town Square.
@@ -111,8 +111,9 @@ respawns beside the nearest lit hearth. The local radar and universe map keep ex
 cells visible, and the universe map still draws its alignment grid.
 
 Surveyors can equip [Build](/wiki/#surveyor) to light the street foundation they
-are standing in. The nearer lot on that road must already be burning, and the
-town purse must cover the cost. They cannot build a hearth whose spider
-occupancy covers an existing nest. Every crew member can use the sites. Built
-furnaces survive reconnects and server restarts until the world resets. Active
-Mineral Scan also drives nearby spiders away from the crew.
+are standing in. The nearer lot on that road must already be burning, and that
+Surveyor's own score must cover the cost. The furnace takes their name. They
+cannot build a hearth whose spider occupancy covers an existing nest. Every
+crew member can use the sites. Built furnaces survive reconnects and server
+restarts until the world resets. Active Mineral Scan also drives nearby spiders
+away from the crew.

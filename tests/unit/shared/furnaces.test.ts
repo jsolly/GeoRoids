@@ -2,12 +2,14 @@ import { expect, test } from 'vitest';
 import {
   CIVIC_LOTS,
   civicLot,
+  civicModuleName,
   FURNACES,
   isTownSquareArrival,
   pipeToTownSquare,
   TOWN_HEARTH,
   TOWN_SPAWN_RADIUS,
   townSquareSpawn,
+  validCivicModules,
   validLitCivicLotIds,
 } from '../../../shared/furnaces';
 import { WORLD } from '../../../shared/world';
@@ -62,6 +64,12 @@ test('a street stays dark until its nearer lot is a legal parent', () => {
   expect(validLitCivicLotIds(['street-1-0', 'street-1-0'])).toBe(false);
   expect(validLitCivicLotIds(['built:pilot:1'])).toBe(false);
   expect(validLitCivicLotIds('street-1-0')).toBe(false);
+  expect(validCivicModules([{ id: 'street-1-0', builderName: 'Ada' }])).toBe(true);
+  expect(civicModuleName('Ada', first.name)).toBe(`Ada's ${first.name}`);
+  expect(civicModuleName('', first.name)).toBe(first.name);
+  expect(validCivicModules([{ id: 'street-2-0', builderName: 'Ada' }])).toBe(false);
+  expect(validCivicModules([{ id: 'street-1-0', builderName: 'Ada!' }])).toBe(false);
+  expect(validCivicModules([{ id: 'street-1-0', builderName: 'A'.repeat(21) }])).toBe(false);
 });
 
 test('a street pipe runs from the source grate through each nearer lot to Town Square', () => {

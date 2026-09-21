@@ -24,7 +24,7 @@ import type {
   TerrainSpider,
 } from '../shared-types';
 import { validExploration } from './exploration';
-import { validLitCivicLotIds } from './furnaces';
+import { validCivicModules } from './furnaces';
 import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
@@ -285,8 +285,7 @@ const spiderField = shape<SpiderFieldState>({
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
-  townCredit: optional(counter),
-  litCivicLotIds: optional(validLitCivicLotIds),
+  civicModules: optional(validCivicModules),
   spiderField: optional(spiderField),
   exploration: validExploration,
   mapAssets: array(mapAsset),

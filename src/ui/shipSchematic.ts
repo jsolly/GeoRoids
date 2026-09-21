@@ -28,7 +28,6 @@ import {
   surveyorUtilityOf,
 } from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
-import { getTownCredit } from '../network/worldExploration';
 import { drawFurnaceArtwork } from '../rendering/furnaceRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
@@ -300,11 +299,7 @@ function syncCards(): void {
   if (!hauler) {
     const part = SURVEYOR_UTILITY[selectedSurveyorUtility];
     elements.title.textContent = part.name;
-    elements.copy.textContent =
-      part.copy +
-      (selectedSurveyorUtility === 'build_furnace'
-        ? ` Town purse ${getTownCredit().toLocaleString('en-US')}.`
-        : '');
+    elements.copy.textContent = part.copy;
     for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
       const active = button.dataset['utilityId'] === selectedSurveyorUtility;
       button.classList.toggle('is-active', active);

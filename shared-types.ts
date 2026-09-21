@@ -282,11 +282,15 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
+/** A street furnace a Surveyor lit with their own score. */
+export interface CivicModule {
+  id: string;
+  builderName: string;
+}
+
 export interface ServerGameState {
-  /** Shared delivery credit spent to build the next street furnace. */
-  townCredit?: number;
-  /** Civic lots the crew has lit. Geometry lives in the shared street plan. */
-  litCivicLotIds?: string[];
+  /** Street furnaces the crew has lit, named for the Surveyor who paid. */
+  civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */

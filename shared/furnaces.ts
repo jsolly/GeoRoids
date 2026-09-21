@@ -1,4 +1,4 @@
-import type { AsteroidData, Position } from '../shared-types';
+import type { AsteroidData, CivicModule, Position } from '../shared-types';
 import { WORLD } from './world';
 
 /** Respawn and fresh-join ring around the Town Square grate. */
@@ -189,6 +189,30 @@ export function civicLotAt(position: Position): CivicLot | undefined {
   return found;
 }
 
+/** Display name of a street furnace paid for by one Surveyor. */
+export function civicModuleName(builderName: string, streetName: string): string {
+  const builder = builderName.trim().replace(/\s+/gu, ' ');
+  if (!builder) {
+    return streetName;
+  }
+  return `${builder}'s ${streetName}`;
+}
+
+const MODULE_BUILDER_NAME = /^[A-Za-z0-9 ]{0,20}$/u;
+
+function litParentReady(ids: ReadonlySet<string>): boolean {
+  for (const id of ids) {
+    const lot = LOT_BY_ID.get(id);
+    if (!lot) {
+      return false;
+    }
+    if (lot.parentId !== TOWN_HEARTH.id && !ids.has(lot.parentId)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Lit ids must be real lots, unique, and only children of an already-lit parent. */
 export function validLitCivicLotIds(value: unknown): value is string[] {
   if (!Array.isArray(value)) {
@@ -205,16 +229,29 @@ export function validLitCivicLotIds(value: unknown): value is string[] {
     }
     ids.add(id);
   }
-  for (const id of ids) {
-    const lot = LOT_BY_ID.get(id);
-    if (!lot) {
-      return false;
-    }
-    if (lot.parentId !== TOWN_HEARTH.id && !ids.has(lot.parentId)) {
-      return false;
-    }
+  return litParentReady(ids);
+}
+
+/** Saved modules keep a nickname and the same parent order as lit lot ids. */
+export function validCivicModules(value: unknown): value is CivicModule[] {
+  if (!Array.isArray(value)) {
+    return false;
   }
-  return true;
+  const ids = new Set<string>();
+  for (const row of value) {
+    if (!row || typeof row !== 'object') {
+      return false;
+    }
+    const built = row as { id?: unknown; builderName?: unknown };
+    if (typeof built.id !== 'string' || ids.has(built.id) || !LOT_BY_ID.has(built.id)) {
+      return false;
+    }
+    if (typeof built.builderName !== 'string' || !MODULE_BUILDER_NAME.test(built.builderName)) {
+      return false;
+    }
+    ids.add(built.id);
+  }
+  return litParentReady(ids);
 }
 
 export function townSquareSpawn(random: () => number): Position {

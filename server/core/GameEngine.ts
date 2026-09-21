@@ -19,6 +19,7 @@ import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
 import {
   civicLot,
   civicLotAt,
+  civicModuleName,
   furnaceReward,
   TOWN_HEARTH,
   townSquareSpawn,
@@ -41,6 +42,7 @@ import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
   AsteroidData,
+  CivicModule,
   ExplorationTile,
   FurnaceDelivery,
   LootCollected,
@@ -228,8 +230,7 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
   exploration: ExplorationTile[];
-  litCivicLotIds: readonly string[];
-  townCredit: number;
+  civicModules: readonly CivicModule[];
   scoreSeason: string;
   startedAt: number;
   asteroidDensityVersion: number;
@@ -247,7 +248,6 @@ export class GameEngine {
   private exploration = new ExplorationMap();
   private mapAssets = new MapAssets();
   private readonly furnaces = new FurnaceField();
-  private townCredit = 0;
   private readonly regionalField: RegionalAsteroidField;
   private readonly worldSeed: number;
   private worldStartedAt: number;
@@ -338,8 +338,7 @@ export class GameEngine {
     this.rngService = new RNGService(this.worldSeed);
     this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
     if (loaded?.world) {
-      this.townCredit = loaded.world.townCredit ?? 0;
-      this.furnaces.replaceLit(loaded.world.litCivicLotIds ?? []);
+      this.furnaces.replaceLit(loaded.world.civicModules ?? []);
       this.exploration.restore(loaded.world.exploration);
     }
     if ((saved?.asteroidMotionVersion ?? 0) < WORLD.asteroidMotionVersion) {
@@ -1094,8 +1093,7 @@ export class GameEngine {
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
       exploration: this.exploration.snapshot(),
-      litCivicLotIds: this.furnaces.litLotIds(),
-      townCredit: this.townCredit,
+      civicModules: this.furnaces.litModules(),
       scoreSeason: this.scoreSeason,
       startedAt: this.worldStartedAt,
       asteroidDensityVersion: WORLD.asteroidDensityVersion,
@@ -1105,8 +1103,7 @@ export class GameEngine {
     if (
       last &&
       last.exploration === builtFrom.exploration &&
-      last.litCivicLotIds === builtFrom.litCivicLotIds &&
-      last.townCredit === builtFrom.townCredit &&
+      last.civicModules === builtFrom.civicModules &&
       last.scoreSeason === builtFrom.scoreSeason &&
       last.startedAt === builtFrom.startedAt &&
       last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
@@ -1124,8 +1121,7 @@ export class GameEngine {
         scoreSeason: this.scoreSeason,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
-        townCredit: this.townCredit,
-        litCivicLotIds: [...this.furnaces.litLotIds()],
+        civicModules: [...this.furnaces.litModules()],
       },
       builtFrom,
     };
@@ -2539,11 +2535,12 @@ export class GameEngine {
     const exploration = this.exploration.snapshot();
     const loot = this.lootManager.getAll();
     const satellitePickups = this.satellitePickupManager.getAllPickups();
-    const litLots = new Set(this.furnaces.litLotIds());
+    const moduleNames = new Map(
+      this.furnaces.litModules().map((module) => [module.id, this.furnaces.displayName(module.id)])
+    );
     const gameState = {
-      townCredit: this.townCredit,
-      litCivicLotIds: [...this.furnaces.litLotIds()],
-      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups, litLots),
+      civicModules: [...this.furnaces.litModules()],
+      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups, moduleNames),
       exploration: this.exploration.snapshot(),
       entities: allEntities.map(
         (entity) =>
@@ -2734,10 +2731,13 @@ export class GameEngine {
     }
     if (lot.parentId !== TOWN_HEARTH.id && !this.furnaces.isLit(lot.parentId)) {
       const parent = civicLot(lot.parentId);
-      return parent ? `Light ${parent.name} first` : 'Light the nearer street first';
+      return parent
+        ? `Light ${this.furnaces.displayName(parent.id)} first`
+        : 'Light the nearer street first';
     }
-    if (this.townCredit < lot.cost) {
-      return `Town purse needs ${lot.cost - this.townCredit} more`;
+    const score = Number.isSafeInteger(surveyor.score) ? surveyor.score : 0;
+    if (score < lot.cost) {
+      return `You need ${lot.cost - Math.max(0, score)} more score`;
     }
     if (this.spiderManager.furnaceWouldCoverNest(lot.position)) {
       return FURNACE_BUILD.ISSUE.NEST;
@@ -2750,7 +2750,6 @@ export class GameEngine {
   }
 
   private clearTown(): void {
-    this.townCredit = 0;
     this.furnaces.replaceLit([]);
   }
 
@@ -2762,9 +2761,11 @@ export class GameEngine {
     if (!lot) {
       return false;
     }
-    this.townCredit -= lot.cost;
-    this.furnaces.light(lot.id);
-    this.lastFurnaceBuildNotice = `${lot.name} is burning`;
+    const builderName = sanitizePlayerName(surveyor.name);
+    surveyor.score -= lot.cost;
+    this.capturePilot(surveyor.id);
+    this.furnaces.light(lot.id, builderName);
+    this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
     surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
     surveyor.abilityActiveFrames = 0;
     return true;
@@ -3024,10 +3025,6 @@ export class GameEngine {
     const launchers = new Set(ownerIds);
     const recipients = new Set([...launchers, ...(rock.surveyedBy ?? [])]);
     const points = furnaceReward(rock);
-    const nextPurse = this.townCredit + points;
-    if (Number.isSafeInteger(nextPurse)) {
-      this.townCredit = nextPurse;
-    }
     const rewards: FurnaceDelivery['rewards'] = [];
     for (const playerId of recipients) {
       const player = this.getPlayer(playerId);

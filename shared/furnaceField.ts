@@ -1,5 +1,5 @@
-import type { Position } from '../shared-types';
-import { civicLot, FURNACES, nearestFurnace, TOWN_HEARTH } from './furnaces';
+import type { CivicModule, Position } from '../shared-types';
+import { civicLot, civicModuleName, FURNACES, nearestFurnace, TOWN_HEARTH } from './furnaces';
 
 export const FURNACE_BUILD = {
   RADIUS: TOWN_HEARTH.radius,
@@ -22,53 +22,72 @@ interface Hearth {
 
 /** Lit hearths only. Dark street lots stay out of intake, guidance, and spider safety. */
 export class FurnaceField {
-  private litIds: string[] = [];
+  private modules: CivicModule[] = [];
   private readonly lit = new Set<string>();
+  private readonly labels = new Map<string, string>();
   private readonly cells = new Map<string, Hearth[]>();
 
   constructor() {
     this.reindex();
   }
 
-  litLotIds(): readonly string[] {
-    return this.litIds;
+  litModules(): readonly CivicModule[] {
+    return this.modules;
+  }
+
+  /** Name shown for a lit module, or the plan name while the lot is still dark. */
+  displayName(id: string): string {
+    return (
+      this.labels.get(id) ?? civicLot(id)?.name ?? (id === TOWN_HEARTH.id ? TOWN_HEARTH.name : '')
+    );
   }
 
   isLit(id: string): boolean {
     return id === TOWN_HEARTH.id || this.lit.has(id);
   }
 
-  replaceLit(ids: readonly string[]): void {
-    if (ids.length === this.litIds.length && ids.every((id, index) => id === this.litIds[index])) {
+  replaceLit(modules: readonly CivicModule[]): void {
+    if (
+      modules.length === this.modules.length &&
+      modules.every(
+        (module, index) =>
+          module.id === this.modules[index]?.id &&
+          module.builderName === this.modules[index]?.builderName
+      )
+    ) {
       return;
     }
-    this.litIds = [...ids];
+    this.modules = modules.map((module) => ({ id: module.id, builderName: module.builderName }));
     this.lit.clear();
-    for (const id of this.litIds) {
-      this.lit.add(id);
+    for (const module of this.modules) {
+      this.lit.add(module.id);
     }
     this.reindex();
   }
 
-  light(id: string): void {
+  light(id: string, builderName = ''): void {
     if (this.lit.has(id) || !civicLot(id)) {
       return;
     }
-    this.litIds = [...this.litIds, id];
+    this.modules = [...this.modules, { id, builderName }];
     this.lit.add(id);
     this.reindex();
   }
 
   private reindex(): void {
     this.cells.clear();
+    this.labels.clear();
     for (const site of FURNACES) {
       this.index(site);
     }
-    for (const id of this.litIds) {
-      const lot = civicLot(id);
-      if (lot) {
-        this.index(lot);
+    for (const module of this.modules) {
+      const lot = civicLot(module.id);
+      if (!lot) {
+        continue;
       }
+      const name = civicModuleName(module.builderName, lot.name);
+      this.labels.set(lot.id, name);
+      this.index({ id: lot.id, name, position: lot.position, radius: lot.radius });
     }
   }
 

@@ -72,7 +72,6 @@ import { logger } from '../../utils/Logger';
 import type { ClientMessage } from '../types';
 import {
   resetWorldExploration,
-  setTownCredit,
   setWorldExploration,
   setWorldMapAssets,
   worldFurnaces,
@@ -1322,8 +1321,7 @@ export class ConnectionManager {
     setSpiderField(data.spiderField);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
-    worldFurnaces.replaceLit(data.litCivicLotIds ?? []);
-    setTownCredit(data.townCredit ?? 0);
+    worldFurnaces.replaceLit(data.civicModules ?? []);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
     }

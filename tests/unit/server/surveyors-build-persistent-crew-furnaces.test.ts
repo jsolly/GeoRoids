@@ -15,10 +15,11 @@ import { furnaceHeading, tickAsteroidBoost } from '../../../shared/asteroidBoost
 import { FURNACE_BUILD, FurnaceField } from '../../../shared/furnaceField';
 import {
   civicLot,
+  civicModuleName,
   furnaceReward,
   TOWN_HEARTH,
   TOWN_SPAWN_RADIUS,
-  validLitCivicLotIds,
+  validCivicModules,
 } from '../../../shared/furnaces';
 import { validateSnapshotDto } from '../../../shared/snapshotDto';
 import { SPIDER } from '../../../shared/terrainSpider';
@@ -68,17 +69,6 @@ function clearRocks(engine: GameEngine): void {
   }
 }
 
-function bankMetal(engine: GameEngine, count: number): void {
-  clearRocks(engine);
-  for (let index = 0; index < count; index++) {
-    const rock = cargo(`purse-${index}`, { x: 0, y: 0 });
-    rock.boost = { phase: 'burning', ownerId: 'purse', angle: 0 };
-    engine.addAsteroid(rock);
-    engine.processFurnaceDeliveries();
-    engine.drainFurnaceDeliveries();
-  }
-}
-
 test('a fresh flight stands on the town ring even when another pilot is far away', () => {
   const engine = new GameEngine(42);
   engine.addPlayer('far', 'Far', new RecordingSocket(), { x: 20_000, y: 12_000 }, 'hauler');
@@ -86,7 +76,7 @@ test('a fresh flight stands on the town ring even when another pilot is far away
   expect(Math.hypot(fresh.position.x, fresh.position.y)).toBeCloseTo(TOWN_SPAWN_RADIUS, 5);
 });
 
-test('each furnace delivery banks the town purse once', () => {
+test('a furnace delivery pays each contributor and does not bank a shared purse', () => {
   const engine = new GameEngine(42);
   const hauler = engine.addPlayer(
     'hauler',
@@ -103,45 +93,62 @@ test('each furnace delivery banks the town purse once', () => {
   engine.addAsteroid(rock);
   engine.processFurnaceDeliveries();
   const reward = furnaceReward(rock);
-  expect(engine.getGameState().townCredit).toBe(reward);
   expect(hauler.score).toBe(reward);
   expect(scout.actor.score).toBe(reward);
+  expect(engine.getGameState().civicModules).toEqual([]);
+  expect(engine.getGameState()).not.toHaveProperty('townCredit');
   engine.processFurnaceDeliveries();
   expect(engine.drainFurnaceDeliveries()).toHaveLength(1);
-  expect(engine.getGameState().townCredit).toBe(reward);
+  expect(hauler.score).toBe(reward);
 });
 
-test('a Surveyor raises only the street foundation they are standing in', () => {
+test('a Surveyor builds only the street foundation they are standing in and pays with their own score', () => {
   const engine = new GameEngine(42);
   const scout = surveyor(engine);
+  const bystander = engine.addPlayer(
+    'rich',
+    'Rich',
+    new RecordingSocket(),
+    { x: 10, y: 10 },
+    'hauler'
+  );
+  bystander.score = street.cost * 2;
   expect(engine.useAbility(scout.actor.id)).toBe(false);
-  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(`Town purse needs ${street.cost} more`);
-  expect(engine.getGameState().townCredit).toBe(0);
+  expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(`You need ${street.cost} more score`);
+  expect(scout.actor.score).toBe(0);
   expect(scout.actor.abilityCooldownFrames).toBe(0);
-  bankMetal(engine, street.cost / furnaceReward(cargo('rate', { x: 0, y: 0 })));
+  scout.actor.score = street.cost;
   scout.actor.position = { x: 2_200, y: 2_200 };
   expect(engine.useAbility(scout.actor.id)).toBe(false);
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.STAND);
-  expect(engine.getGameState().townCredit).toBe(street.cost);
+  expect(scout.actor.score).toBe(street.cost);
   scout.actor.position = { ...child.position };
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(`Light ${street.name} first`);
   scout.actor.position = { ...street.position };
   expect(engine.useAbility(scout.actor.id)).toBe(true);
-  expect(engine.furnaceBuildNotice()).toBe(`${street.name} is burning`);
-  expect(engine.getGameState().townCredit).toBe(0);
-  expect(engine.getGameState().litCivicLotIds).toEqual([street.id]);
+  const builtName = civicModuleName('scout', street.name);
+  expect(engine.furnaceBuildNotice()).toBe(`${builtName} is burning`);
+  expect(scout.actor.score).toBe(0);
+  expect(bystander.score).toBe(street.cost * 2);
+  expect(engine.getGameState().civicModules).toEqual([{ id: street.id, builderName: 'scout' }]);
+  expect(engine.getGameState().mapAssets).toContainEqual({
+    id: `furnace:${street.id}`,
+    name: builtName,
+    kind: 'furnace',
+    position: street.position,
+  });
   expect(scout.actor.abilityCooldownFrames).toBeGreaterThan(0);
   scout.actor.abilityCooldownFrames = 0;
   expect(engine.useAbility(scout.actor.id)).toBe(false);
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
-  expect(engine.getGameState().litCivicLotIds).toEqual([street.id]);
+  expect(scout.actor.score).toBe(0);
   validateSnapshotDto({ ...engine.getGameState(), collabTags: [], playerProjectiles: [] });
 });
 
-test('a dead ship, a cooldown, and the wrong kit spend neither purse nor a street', () => {
+test('a dead ship, a cooldown, and the wrong kit spend neither score nor a street', () => {
   const engine = new GameEngine(42);
   const { actor } = surveyor(engine);
-  bankMetal(engine, 5);
+  actor.score = street.cost;
   actor.health = 0;
   expect(engine.useAbility(actor.id)).toBe(false);
   expect(engine.furnaceBuildIssue(actor.id)).toBe(FURNACE_BUILD.ISSUE.READY);
@@ -150,41 +157,51 @@ test('a dead ship, a cooldown, and the wrong kit spend neither purse nor a stree
   expect(engine.useAbility(actor.id)).toBe(false);
   actor.abilityCooldownFrames = 0;
   expect(engine.useAbility(actor.id, 'hauler')).toBe(false);
-  expect(engine.getGameState().litCivicLotIds).toEqual([]);
-  expect(engine.getGameState().townCredit).toBe(street.cost);
+  expect(engine.getGameState().civicModules).toEqual([]);
+  expect(actor.score).toBe(street.cost);
   const hauler = engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), undefined, 'hauler');
   expect(engine.setSurveyorUtility(hauler.id, 'build_furnace')).toBe(false);
 });
 
-test('a raised street and its leftover purse survive a SQLite restart', () => {
+test('a named street and the builder leftover score survive a SQLite restart', () => {
   const directory = mkdtempSync(join(tmpdir(), 'town-raise-'));
   const path = join(directory, 'world.sqlite');
   const firstStore = new WorldStore(path);
   try {
     const engine = new GameEngine(42, undefined, new InlineWorldPersistence(firstStore));
     const { actor, token } = surveyor(engine);
-    bankMetal(engine, 6);
+    const leftover = 40;
+    actor.score = street.cost + leftover;
     expect(engine.useAbility(actor.id)).toBe(true);
-    const purse = engine.getGameState().townCredit;
-    const lit = engine.getGameState().litCivicLotIds;
-    expect(purse).toBe(furnaceReward(cargo('rate', { x: 0, y: 0 })));
-    expect(lit).toEqual([street.id]);
+    const lit = engine.getGameState().civicModules;
+    expect(actor.score).toBe(leftover);
+    expect(lit).toEqual([{ id: street.id, builderName: 'scout' }]);
     engine.removePlayer(actor.id);
-    expect(firstStore.loadWorld()?.townCredit).toBe(purse);
-    expect(firstStore.loadWorld()?.litCivicLotIds).toEqual(lit);
+    expect(firstStore.loadWorld()?.civicModules).toEqual(lit);
     firstStore.close();
+    const written = new DatabaseSync(path);
+    const row = written.prepare('SELECT json FROM world WHERE id=1').get() as { json: string };
+    expect(JSON.parse(row.json)).not.toHaveProperty('townCredit');
+    written.close();
     const secondStore = new WorldStore(path);
     try {
       const restarted = new GameEngine(99, undefined, new InlineWorldPersistence(secondStore));
       const resumed = restarted.resumePilot(token, new RecordingSocket(), 'surveyor', 'New name');
       assert(resumed.ok);
-      expect(restarted.getGameState().townCredit).toBe(purse);
-      expect(restarted.getGameState().litCivicLotIds).toEqual(lit);
+      expect(resumed.actor.score).toBe(leftover);
+      expect(restarted.getGameState().civicModules).toEqual(lit);
+      expect(restarted.getGameState().mapAssets).toContainEqual(
+        expect.objectContaining({
+          id: `furnace:${street.id}`,
+          name: civicModuleName('scout', street.name),
+        })
+      );
       restarted.setSurveyorUtility(resumed.actor.id, 'build_furnace');
       resumed.actor.position = { ...street.position };
       resumed.actor.abilityCooldownFrames = 0;
       expect(restarted.useAbility(resumed.actor.id)).toBe(false);
       expect(restarted.furnaceBuildIssue(resumed.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
+      expect(resumed.actor.score).toBe(leftover);
     } finally {
       secondStore.close();
     }
@@ -193,7 +210,7 @@ test('a raised street and its leftover purse survive a SQLite restart', () => {
   }
 });
 
-test('an obsolete personal-furnace save does not restore hearths, and a broken purse fails startup', () => {
+test('an obsolete personal-furnace save does not restore hearths, and a broken module list fails startup', () => {
   const directory = mkdtempSync(join(tmpdir(), 'town-legacy-'));
   const path = join(directory, 'world.sqlite');
   const store = new WorldStore(path);
@@ -206,8 +223,6 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken p
         generation: WORLD.generation,
         scoreSeason: utcScoreSeason(now),
         exploration: [],
-        townCredit: 0,
-        litCivicLotIds: [],
       },
       new Map(),
       []
@@ -215,7 +230,12 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken p
     store.close();
     const db = new DatabaseSync(path);
     const row = db.prepare('SELECT json FROM world WHERE id=1').get() as { json: string };
-    const saved = JSON.parse(row.json) as { builtFurnaces?: unknown; townCredit?: number };
+    const saved = JSON.parse(row.json) as {
+      builtFurnaces?: unknown;
+      townCredit?: number;
+      civicModules?: unknown;
+      litCivicLotIds?: string[];
+    };
     saved.builtFurnaces = [
       {
         id: 'built:pilot:1',
@@ -225,75 +245,67 @@ test('an obsolete personal-furnace save does not restore hearths, and a broken p
         position: { x: 2200, y: 2200 },
       },
     ];
+    saved.townCredit = -1;
     db.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
     db.close();
     const loaded = new WorldStore(path);
     try {
-      expect(loaded.loadWorld()?.litCivicLotIds).toEqual([]);
-      expect(loaded.loadWorld()?.townCredit).toBe(0);
+      expect(loaded.loadWorld()?.civicModules).toEqual([]);
       const engine = new GameEngine(42, undefined, new InlineWorldPersistence(loaded));
-      expect(engine.getGameState().litCivicLotIds).toEqual([]);
+      expect(engine.getGameState().civicModules).toEqual([]);
       expect(engine.furnaceBuildNotice()).toBe('');
+      engine.checkpointWorld();
+      const rewrittenDb = new DatabaseSync(path);
+      const rewritten = rewrittenDb.prepare('SELECT json FROM world WHERE id=1').get() as {
+        json: string;
+      };
+      rewrittenDb.close();
+      const next = JSON.parse(rewritten.json) as { townCredit?: unknown; civicModules?: unknown };
+      expect(next).not.toHaveProperty('townCredit');
+      expect(next.civicModules).toEqual([]);
     } finally {
       loaded.close();
     }
-    const broken = new DatabaseSync(path);
-    saved.townCredit = -1;
-    broken.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
-    broken.close();
-    const rejected = new WorldStore(path);
-    expect(() => rejected.loadWorld()).toThrow(/town purse/iu);
-    rejected.close();
+    const namedOnlyById = new DatabaseSync(path);
+    delete saved.civicModules;
+    saved.litCivicLotIds = [street.id];
+    namedOnlyById.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
+    namedOnlyById.close();
+    const migrated = new WorldStore(path);
+    expect(migrated.loadWorld()?.civicModules).toEqual([{ id: street.id, builderName: '' }]);
+    migrated.close();
     const childOnly = new DatabaseSync(path);
-    saved.townCredit = 0;
-    (saved as { litCivicLotIds?: string[] }).litCivicLotIds = [child.id];
+    saved.civicModules = [{ id: child.id, builderName: 'Ada' }];
+    delete saved.litCivicLotIds;
     childOnly.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
     childOnly.close();
     const orphan = new WorldStore(path);
     expect(() => orphan.loadWorld()).toThrow(/street furnaces/iu);
     orphan.close();
+    const rudeName = new DatabaseSync(path);
+    saved.civicModules = [{ id: street.id, builderName: 'Ada!' }];
+    rudeName.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
+    rudeName.close();
+    const rejected = new WorldStore(path);
+    expect(() => rejected.loadWorld()).toThrow(/street furnaces/iu);
+    rejected.close();
   } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('a full purse does not grow past a safe integer', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'town-purse-'));
-  const path = join(directory, 'world.sqlite');
-  const store = new WorldStore(path);
-  try {
-    const now = Date.now();
-    store.checkpoint(
-      {
-        seed: 42,
-        startedAt: now,
-        generation: WORLD.generation,
-        scoreSeason: utcScoreSeason(now),
-        exploration: [],
-        townCredit: Number.MAX_SAFE_INTEGER,
-        litCivicLotIds: [],
-      },
-      new Map(),
-      []
-    );
-    const engine = new GameEngine(42, undefined, new InlineWorldPersistence(store));
-    engine.addAsteroid(cargo('overflow', { x: 0, y: 0 }));
-    engine.processFurnaceDeliveries();
-    expect(engine.getGameState().townCredit).toBe(Number.MAX_SAFE_INTEGER);
-  } finally {
-    store.close();
     rmSync(directory, { recursive: true, force: true });
   }
 });
 
 test('boost guidance prefers a lit street over the square, and dark lots are not hearths', () => {
   const field = new FurnaceField();
-  expect(field.litLotIds()).toEqual([]);
-  expect(validLitCivicLotIds(field.litLotIds())).toBe(true);
-  field.light(street.id);
-  const first = field.litLotIds();
-  field.replaceLit([...first]);
-  expect(field.litLotIds()).toBe(first);
+  expect(field.litModules()).toEqual([]);
+  expect(validCivicModules(field.litModules())).toBe(true);
+  field.light(street.id, 'Ada');
+  const first = field.litModules();
+  field.replaceLit(first.map((module) => ({ ...module })));
+  expect(field.litModules()).toBe(first);
+  expect(field.displayName(street.id)).toBe(civicModuleName('Ada', street.name));
+  expect(field.nearby(street.position, 1).find((site) => site.id === street.id)?.name).toBe(
+    civicModuleName('Ada', street.name)
+  );
   const rock = cargo('guided', { x: street.position.x + 100, y: street.position.y });
   rock.boost = { phase: 'burning', ownerId: 'pilot', angle: 0 };
   expect(Math.abs(furnaceHeading(rock.position, field))).toBeCloseTo(Math.PI);
@@ -306,7 +318,7 @@ test('boost guidance prefers a lit street over the square, and dark lots are not
 test('raising a street removes a spider already inside its safe radius', () => {
   const engine = new GameEngine(42);
   const { actor } = surveyor(engine);
-  bankMetal(engine, 5);
+  actor.score = street.cost;
   const spider = engine.spawnTerrainSpider({
     x: street.position.x + 200,
     y: street.position.y,
@@ -321,12 +333,14 @@ test('a raised street toasts the Surveyor with the lot name', () => {
   const engine = new GameEngine(42);
   const socket = new RecordingSocket();
   const scout = surveyor(engine, 'scout', socket);
-  bankMetal(engine, 5);
+  scout.actor.score = street.cost;
   const broadcaster = new GameStateBroadcaster(engine);
   const handler = new MessageHandler(engine, broadcaster);
   handler.handleMessage({ type: 'useAbility', id: scout.actor.id, kitId: 'surveyor' }, socket);
-  expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(`${street.name} is burning`);
-  expect(engine.getGameState().litCivicLotIds).toEqual([street.id]);
+  expect(socket.lastReceived('furnaceBuildResult')?.data).toBe(
+    `${civicModuleName('scout', street.name)} is burning`
+  );
+  expect(engine.getGameState().civicModules).toEqual([{ id: street.id, builderName: 'scout' }]);
   broadcaster.stopPeriodicBroadcast();
 });
 

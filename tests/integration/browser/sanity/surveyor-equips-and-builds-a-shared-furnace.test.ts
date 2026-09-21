@@ -1,0 +1,111 @@
+import { expect, test } from 'vitest';
+import {
+  assertNoBrowserDiagnostics,
+  watchBrowserDiagnostics,
+} from '../../utils/browser-diagnostics';
+import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
+import { GameInteractions } from '../../utils/game-interactions';
+import { arrangeCrewField } from '../../utils/test-server-control';
+
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
+
+for (const viewport of [
+  { width: 1280, height: 900, touch: false },
+  { width: 390, height: 844, touch: true },
+]) {
+  test(`a Surveyor equips and builds a persistent crew furnace at ${viewport.width}px`, async () => {
+    const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
+    await page.setViewportSize(viewport);
+    const diagnostics = watchBrowserDiagnostics(page);
+    const game = new GameInteractions(page);
+    await game.navigateToGame();
+    await page.locator('[data-kit-id="surveyor"]').click();
+    await game.startGame();
+    await game.waitForGameReady();
+    await game.waitForServerJoin();
+    await arrangeCrewField([await game.getLocalPlayerId()], 'furnace');
+    await page.waitForFunction(() => {
+      const ship = window.gameController?.getCurrPlayer()?.ship;
+      return (
+        ship && Math.abs(ship.position.x - 3000) < 100 && Math.abs(ship.position.y - 5000) < 100
+      );
+    });
+    const openSchematic = async () => {
+      if (viewport.touch) {
+        const touch = await page.context().newCDPSession(page);
+        await touch.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [{ x: viewport.width / 2, y: viewport.height / 2 }],
+        });
+        await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await touch.detach();
+      } else {
+        await page.keyboard.press('KeyV');
+      }
+    };
+    await openSchematic();
+    const card = page.locator('[data-utility-id="build_furnace"]');
+    if (viewport.touch) {
+      await card.tap();
+    } else {
+      await card.click();
+    }
+    expect(await card.getAttribute('aria-pressed')).toBe('true');
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Built: 0/3');
+    expect(await page.locator('[data-utility-id]').count()).toBe(3);
+    const layout = await page.locator('#ship-schematic-dialog').evaluate((element) => ({
+      width: element.clientWidth,
+      contentWidth: element.scrollWidth,
+      clippedNames: [...element.querySelectorAll('.ship-schematic-card-name')].some(
+        (name) => name.scrollWidth > name.clientWidth || name.scrollHeight > name.clientHeight
+      ),
+    }));
+    expect(layout.contentWidth).toBeLessThanOrEqual(layout.width + 1);
+    expect(layout.clippedNames).toBe(false);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`surveyor-builder-equip-${viewport.width}.png`),
+    });
+    await page.locator('#ship-schematic-return').click();
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'hidden' });
+    if (viewport.touch) {
+      expect(await page.locator('#touch-ability').textContent()).toContain('BUILD');
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
+    await page.waitForFunction(
+      () => window.gameController?.getGameStateManager().getPickupMessage() === 'Furnace built'
+    );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`surveyor-built-furnace-${viewport.width}.png`),
+    });
+    await openSchematic();
+    expect(await page.locator('#ship-schematic-dialog').textContent()).toContain('Built: 1/3');
+    // Keep the ship at its furnace until the shared cooldown expires.
+    await page.waitForFunction(
+      () => (window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames ?? 1) <= 0
+    );
+    await page.waitForTimeout(150);
+    await page.locator('#ship-schematic-return').click();
+    if (viewport.touch) {
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
+    await page.waitForFunction(
+      () =>
+        window.gameController?.getGameStateManager().getPickupMessage() ===
+        'Too close to another furnace'
+    );
+    // The changed Wiki is rendered at both viewport sizes as well.
+    await page.goto(`${new URL(page.url()).origin}/wiki/#surveyor`);
+    const buildHeading = page.getByRole('heading', { name: 'Build furnace', exact: true });
+    await buildHeading.waitFor();
+    await buildHeading.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`surveyor-wiki-${viewport.width}.png`),
+    });
+    assertNoBrowserDiagnostics(diagnostics);
+  }, 45_000);
+}

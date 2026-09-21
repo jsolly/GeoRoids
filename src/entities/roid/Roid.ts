@@ -9,6 +9,7 @@ import type {
 } from '../../../shared-types';
 import { playHitSound as playHitSoundAt } from '../../audio/gameSounds';
 import { DEBUG, GAME, ROID } from '../../constants';
+import { worldFurnaces } from '../../network/worldExploration';
 import { stepAsteroidMotionInto } from '../../physics/asteroidMotion';
 
 class Roid {
@@ -89,7 +90,7 @@ class RoidBelt {
     }
 
     for (const roid of this.roids) {
-      tickAsteroidBoost(roid);
+      tickAsteroidBoost(roid, worldFurnaces);
       stepAsteroidMotionInto(roid.position, roid.velocity, 1, roid.position, roid.velocity);
     }
   }

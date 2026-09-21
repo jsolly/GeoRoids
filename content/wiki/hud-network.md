@@ -94,7 +94,7 @@ silhouette; identified minerals change its color and small surface details.
 Broken hulls mark wreckage, angular fragments mark shards, canisters mark Tap
 loot, and yellow laser emitters mark laser cores. Lilac satellites have a
 central body and solar panels; an orbit line distinguishes deployed pickups.
-Amber campfires mark discovered furnaces. Red spiderwebs surround the stationary
+Amber campfires mark discovered furnaces, including player-built sites. Red spiderwebs surround the stationary
 resources guarded by nests, even while their spiders are chasing elsewhere or
 sleeping. The web remains after the guards are killed while the resource remains;
 it disappears when that resource is collected, moved, or its sector completes.

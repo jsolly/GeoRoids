@@ -1,5 +1,8 @@
 import { EMPTY_EXPLORATION } from '../../shared/exploration';
+import { FurnaceField } from '../../shared/furnaceField';
 import type { ExplorationTile, MapAsset } from '../../shared-types';
+
+export const worldFurnaces = new FurnaceField();
 
 let exploration: ExplorationTile[] = EMPTY_EXPLORATION;
 let mapAssets: MapAsset[] = [];
@@ -45,6 +48,7 @@ export function setCompletedSectors(ids: readonly string[]): void {
 }
 
 export function resetWorldExploration(): void {
+  worldFurnaces.replace([]);
   mapAssets = [];
   exploration = EMPTY_EXPLORATION;
   completedSectors = new Set();

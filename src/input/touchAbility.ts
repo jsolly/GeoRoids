@@ -8,10 +8,12 @@ const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpo
 const SURVEYOR_ABILITY_LABEL: Record<SurveyorUtilityId, string> = {
   mineral_scan: 'SCAN',
   survey_probe: 'PROBE',
+  build_furnace: 'BUILD',
 };
 const SURVEYOR_ABILITY_NAME: Record<SurveyorUtilityId, string> = {
   mineral_scan: 'Mineral scan',
   survey_probe: 'Survey probe',
+  build_furnace: 'Build furnace',
 };
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',

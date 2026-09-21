@@ -294,6 +294,7 @@ export function handleTestArrangeCrewField(
         'spider-nest',
         'spider-tools',
         'map-icons',
+        'furnace',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
@@ -322,7 +323,7 @@ export function handleTestArrangeCrewField(
       const position =
         body['scenario'] === 'spider-tools'
           ? { x: spiderWorks.position.x + 400, y: spiderWorks.position.y }
-          : ['spider-nest', 'map-icons'].includes(String(body['scenario']))
+          : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
             ? { x: 3000 + index * 120, y: 5000 }
             : body['scenario'] === 'boundary'
               ? { x: WORLD.radius - 500 + index * 120, y: 0 }
@@ -355,9 +356,13 @@ export function handleTestArrangeCrewField(
             : body['scenario'] === 'tow'
               ? -Math.PI / 2
               : Math.PI / 2;
-      player.spawnProtectionTimer = ['delivery', 'tow', 'map-icons', 'spider-tools'].includes(
-        String(body['scenario'])
-      )
+      player.spawnProtectionTimer = [
+        'delivery',
+        'tow',
+        'map-icons',
+        'spider-tools',
+        'furnace',
+      ].includes(String(body['scenario']))
         ? 600
         : 0;
       if (body['scenario'] === 'impact' && index === 0) {

@@ -295,7 +295,7 @@ class Ship {
         if (!sent) {
           return false;
         }
-        if (this.kitId === 'surveyor') {
+        if (this.kitId === 'surveyor' && surveyorUtilityOf(this) !== 'build_furnace') {
           // Surveyor tools share the same request, but the probe has no local
           // world effect. Predict only the user-facing timer; asteroid
           // attachment and mineral classification remain server-owned.

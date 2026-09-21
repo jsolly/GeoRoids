@@ -1,8 +1,9 @@
+import { FURNACE_BUILD } from '../../../shared/furnaceField';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import type { ShipKitId, SurveyorUtilityId } from '../../../shared-types';
 import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
 
-export const SURVEYOR_UTILITY_IDS = ['mineral_scan', 'survey_probe'] as const;
+export const SURVEYOR_UTILITY_IDS = ['mineral_scan', 'survey_probe', 'build_furnace'] as const;
 
 export const DEFAULT_SURVEYOR_UTILITY: SurveyorUtilityId = 'mineral_scan';
 export const SURVEYOR_UTILITY_STORAGE_KEY = 'georoids.surveyorUtility';
@@ -12,7 +13,13 @@ export const SURVEYOR_UTILITY = {
     id: 'mineral_scan',
     name: 'Mineral Scan',
     hint: 'Tap to equip',
-    copy: 'Scan minerals for the crew. Earn points when a Hauler delivers them.',
+    copy: 'Scan minerals for the crew and scare nearby spiders away while active. Earn points when a Hauler delivers scanned rocks.',
+  },
+  build_furnace: {
+    id: 'build_furnace',
+    name: 'Build Furnace',
+    hint: `Tap to equip · ${FURNACE_BUILD.MAX_PER_OWNER} max`,
+    copy: `Place a shared furnace at your ship. Keep more than ${FURNACE_BUILD.MIN_DISTANCE} units from other furnaces and clear of sector walls. Your furnaces survive death, reconnects and restarts until the world resets.`,
   },
   survey_probe: {
     id: 'survey_probe',
@@ -23,7 +30,7 @@ export const SURVEYOR_UTILITY = {
 } as const;
 
 export function isSurveyorUtilityId(value: unknown): value is SurveyorUtilityId {
-  return value === 'mineral_scan' || value === 'survey_probe';
+  return value === 'mineral_scan' || value === 'survey_probe' || value === 'build_furnace';
 }
 
 function parseSurveyorUtilityId(value: unknown): SurveyorUtilityId {

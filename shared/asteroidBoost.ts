@@ -1,4 +1,5 @@
 import type { AsteroidBoost, Position, Velocity } from '../shared-types';
+import type { FurnaceField } from './furnaceField';
 import { nearestFurnace } from './furnaces';
 
 export function boostOwnerIds(boost: AsteroidBoost | null | undefined): string[] {
@@ -53,22 +54,25 @@ export const ASTEROID_BOOST = {
   maxSpeed: 2.5,
 } as const;
 
-export function furnaceHeading(position: Position): number {
-  const target = nearestFurnace(position).position;
+export function furnaceHeading(position: Position, furnaces?: FurnaceField): number {
+  const target = (furnaces?.nearest(position) ?? nearestFurnace(position)).position;
   return Math.atan2(position.y - target.y, target.x - position.x);
 }
 
 /** Shared guidance keeps authoritative motion and client prediction in agreement. */
-export function tickAsteroidBoost(body: {
-  boost?: AsteroidBoost | null;
-  position: Position;
-  velocity: Velocity;
-}): void {
+export function tickAsteroidBoost(
+  body: {
+    boost?: AsteroidBoost | null;
+    position: Position;
+    velocity: Velocity;
+  },
+  furnaces?: FurnaceField
+): void {
   const boost = body.boost;
   if (!boost) {
     return;
   }
-  const target = nearestFurnace(body.position).position;
+  const target = (furnaces?.nearest(body.position) ?? nearestFurnace(body.position)).position;
   const dx = target.x - body.position.x;
   const dy = target.y - body.position.y;
   const distance = Math.hypot(dx, dy);

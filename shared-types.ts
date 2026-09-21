@@ -56,7 +56,7 @@ export type ShipKitId = 'surveyor' | 'hauler';
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
 /** Surveyor v1 utility slot. Same E key; one option active. */
-export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe';
+export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe' | 'build_furnace';
 
 export interface AbilityUsedEvent {
   id: string;
@@ -289,7 +289,17 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
+export interface BuiltFurnace {
+  id: string;
+  ownerId: string;
+  name: string;
+  position: Position;
+  radius: number;
+}
+
 export interface ServerGameState {
+  /** Persistent player-built delivery sites. Fixed landmarks are shared definitions. */
+  builtFurnaces?: BuiltFurnace[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */

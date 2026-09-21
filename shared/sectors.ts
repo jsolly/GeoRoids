@@ -97,7 +97,11 @@ export function isInsideCompletedSector(
   return completed.has(sectorAt(position).id);
 }
 
-function circleOverlapsBounds(position: Position, radius: number, bounds: SectorBounds): boolean {
+export function circleOverlapsBounds(
+  position: Position,
+  radius: number,
+  bounds: SectorBounds
+): boolean {
   const nearestX = Math.min(bounds.maxX, Math.max(bounds.minX, position.x));
   const nearestY = Math.min(bounds.maxY, Math.max(bounds.minY, position.y));
   return Math.hypot(position.x - nearestX, position.y - nearestY) < radius;

@@ -7,6 +7,7 @@ import {
 } from '../../shared/constants/health';
 import { SATELLITE_PROFILES } from '../../shared/eoSatellites';
 import { EXPLORATION_RANGE } from '../../shared/exploration';
+import { FURNACE_BUILD } from '../../shared/furnaceField';
 import { FURNACES, furnaceReward } from '../../shared/furnaces';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
@@ -67,13 +68,19 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
   ],
   surveyor: [
     {
+      heading: 'Furnace construction',
+      paragraphs: [
+        `Build Furnace places a ${FURNACE_BUILD.RADIUS}-unit intake at the ship, with ${FURNACE_BUILD.MAX_PER_OWNER} sites per pilot and more than ${FURNACE_BUILD.MIN_DISTANCE} units between furnace centers. Keep at least ${FURNACE_BUILD.WORLD_INSET} units inside the world edge. Successful construction uses the ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)} Surveyor cooldown. Sites persist until the world resets.`,
+      ],
+    },
+    {
       heading: 'Surveyor values',
       paragraphs: [shipStats('surveyor')],
     },
     {
       heading: 'Ability and exploration values',
       paragraphs: [
-        `With Mineral Scan equipped, E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
+        `With Mineral Scan equipped, E runs a ${seconds(SHIP_ABILITY.SCAN_FRAMES)} mineral scan within ${SHIP_ABILITY.SCAN_RANGE} units. While active, a thin cyan radar sweep pulses from the Surveyor to the viewport edge; this visual cue does not expand the scan range. Spiders inside that range flee and cannot bite while the scan is active. The scan cooldown is ${seconds(SHIP_ABILITY.COOLDOWN_FRAMES.surveyor)}; each identified rock keeps its classification and records the Surveyor player ID for a later furnace delivery.`,
         `Survey Probe: launch range ${SURVEY_PROBE.LAUNCH_RANGE} units; beacon scan radius ${SURVEY_PROBE.RANGE} units every ${SURVEY_PROBE.PULSE_MS / 1000} seconds; battery ${SURVEY_PROBE.LIFETIME_MS / 60000} minutes with a warning during the last ${SURVEY_PROBE.WARNING_MS / 1000} seconds. Health: ${SURVEY_PROBE.MAX_HEALTH}. Maximum ${SURVEY_PROBE.MAX_PER_OWNER} active probes per Surveyor; a successful extra attachment replaces the oldest. Attachment cooldown: ${seconds(SURVEY_PROBE.COOLDOWN_FRAMES)}.`,
         `Passive shared exploration reaches ${EXPLORATION_RANGE.surveyor} world units for Surveyor and ${EXPLORATION_RANGE.hauler} for Hauler; revealed cells persist for the match.`,
       ],

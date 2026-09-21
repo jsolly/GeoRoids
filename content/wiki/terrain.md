@@ -93,3 +93,8 @@ and turn on the pilot. Silk has no crafting use yet. Tow Cable can pull a spider
 into a furnace, where it is engulfed with a melodic whimper audible nearby when
 Sound Effects is on. Boost Coupling cannot target spiders. See
 [Hauler utilities](/wiki/#hauler).
+
+An active [Mineral Scan](/wiki/#surveyor) drives spiders away within its scan
+range and stops their bites while they remain inside it. They can hunt again
+after the scan ends or they leave its range. Survey Probes do not repel them.
+Player-built furnaces provide the same spider safe area as fixed furnaces.

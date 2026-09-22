@@ -124,8 +124,8 @@ export function computeHudLayout(
   const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
-        x: padLeft,
-        y: Math.max(padTop + VISUAL.HUD_LIFE_SIZE + 52, clusterClear),
+        x: viewport.width - padRight - miniMapSize,
+        y: viewport.height - padBottom - miniMapSize,
         size: miniMapSize,
       }
     : {
@@ -141,7 +141,10 @@ export function computeHudLayout(
     padBottom,
     lives,
     score: { x: padLeft, y: padTop },
-    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12,
+    notificationY:
+      Math.max(clusterClear, padTop + rowHeight * maxRows) +
+      12 +
+      (viewport.width >= 600 ? 52 : 104),
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,

@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
 
+import {
+  assertNoBrowserDiagnostics,
+  watchBrowserDiagnostics,
+} from '../../utils/browser-diagnostics';
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
@@ -99,12 +103,50 @@ test(
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
+    const diagnostics = watchBrowserDiagnostics(page);
 
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
     // Leave Town Square so the ability button runs Mineral Scan, not Enter store.
     await game.placeShipAt(0, -500);
 
+    await page.evaluate(
+      "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
+    );
+    const hudToggle = page.locator('#debug-hud-toggle');
+    await hudToggle.waitFor({ state: 'visible' });
+    if ((await hudToggle.getAttribute('aria-expanded')) === 'true') {
+      await hudToggle.tap();
+    }
+    const boxes: NonNullable<Awaited<ReturnType<typeof hudToggle.boundingBox>>>[] = [];
+    for (const id of [
+      'ship-schematic-toggle',
+      'universe-map-toggle',
+      'debug-hud-toggle',
+      'touch-boost',
+      'touch-ability',
+    ]) {
+      const box = await page.locator(`#${id}`).boundingBox();
+      if (!box) {
+        throw new Error(`Missing ${id}`);
+      }
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+      expect(box.y + box.height).toBeLessThan(844 / 2);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      for (const other of boxes) {
+        expect(
+          box.x >= other.x + other.width ||
+            other.x >= box.x + box.width ||
+            box.y >= other.y + other.height ||
+            other.y >= box.y + box.height
+        ).toBe(true);
+      }
+      boxes.push(box);
+    }
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('mobile-top-actions-390.png'),
+    });
     const chrome = await page.evaluate(() => {
       const root = document.querySelector<HTMLElement>('#touch-controls');
       const stick = document.querySelector('#touch-stick');
@@ -172,7 +214,10 @@ test(
       .toBe(false);
 
     const beforeTap = await readTouchControlState(page);
-    const tapPoint = await canvasPoint(page, 0.75, 0.5);
+    const tapPoint = await canvasPoint(page, 0.85, 0.65);
+    expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.id, tapPoint)).toBe(
+      'gameCanvas'
+    );
     await page.touchscreen.tap(tapPoint.x, tapPoint.y);
     await game.waitForAnimationFrames(2);
     expect((await readTouchControlState(page)).lastShotTime).toBeGreaterThan(
@@ -190,6 +235,7 @@ test(
         { message: 'Surveyor scan and cooldown should arrive from the server' }
       )
       .toBe(true);
+    assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

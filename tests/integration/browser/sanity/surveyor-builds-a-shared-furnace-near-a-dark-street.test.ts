@@ -34,7 +34,7 @@ for (const viewport of [
       await page.keyboard.press('KeyE');
     }
     await store.waitFor({ state: 'visible' });
-    expect(await store.textContent()).toContain('Ember');
+    expect(await store.textContent()).toContain('Extra life');
     await page.locator('#town-store-return').click();
     await store.waitFor({ state: 'hidden' });
     const openSchematic = async () => {
@@ -83,8 +83,19 @@ for (const viewport of [
       const message = window.gameController?.getGameStateManager().getPickupMessage() ?? '';
       return message.includes(streetName) && message.includes('is burning');
     }, lot.name);
+    expect(
+      await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.abilityActiveFrames)
+    ).toBe(0);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`surveyor-lit-street-${viewport.width}.png`),
+    });
+    await game.placeShipAt(0, 0);
+    await game.waitForAnimationFrames(12);
+    await page.evaluate(
+      "import('/src/fx/furnacePipePulse.ts').then(({noteFurnacePipePulse}) => noteFurnacePipePulse('street-1-0'))"
+    );
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`town-square-pipe-rim-${viewport.width}.png`),
     });
     await page.goto(`${new URL(page.url()).origin}/wiki/#surveyor`);
     const buildHeading = page.getByRole('heading', { name: 'Build', exact: true });

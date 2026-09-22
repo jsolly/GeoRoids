@@ -107,10 +107,10 @@ how much your own built streets add to your furnace deliveries.
 
 Press M or use the on-screen Map button to open the full-screen universe map.
 It opens centered on your ship, showing 5,000 units across so nearby landmarks
-are easy to distinguish. Drag to pan and use the scroll wheel or +/− controls
-to zoom, including all the way out to the whole world. The locate control on
-the map restores the nearby view centered on your ship; Home does the same
-when a keyboard is attached. Your ship and crew draw as their actual hull
+are easy to distinguish. Drag to pan and use the scroll wheel or the +/− controls
+on the map to zoom, including all the way out to the whole world. The locate
+control on the map restores the nearby view centered on your ship; Home does the
+same when a keyboard is attached. Your ship and crew draw as their actual hull
 silhouettes, matching the kit in flight. The shared exploration chart and
 discovered assets persist; each opening returns to your current location.
 On a keyboard, M, Escape, or Close returns to flight. On touch, Map and Close

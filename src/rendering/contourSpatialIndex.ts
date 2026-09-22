@@ -28,6 +28,26 @@ const CELL_SIZE = 256;
 // Terrain sessions replace this array when their immutable contour geometry changes.
 const cache = new WeakMap<readonly ContourLevel[], LevelIndex[]>();
 
+function indexFor(levels: readonly ContourLevel[]): LevelIndex[] {
+  const existing = cache.get(levels);
+  if (existing) {
+    return existing;
+  }
+  const indices = levels.map(buildIndex);
+  cache.set(levels, indices);
+  return indices;
+}
+
+/** Build the viewport candidate grid off the crossing frame. */
+export function warmContourSpatialIndex(levels: readonly ContourLevel[]): void {
+  indexFor(levels);
+}
+
+/** Test helper: true when this contour set already has a candidate grid. */
+export function contourSpatialIndexIsCached(levels: readonly ContourLevel[]): boolean {
+  return cache.has(levels);
+}
+
 function buildIndex(level: ContourLevel): LevelIndex {
   const index: LevelIndex = {
     cells: new Map(),
@@ -83,11 +103,7 @@ export function contourCandidates(
   ) {
     return level.segments;
   }
-  let indices = cache.get(levels);
-  if (!indices) {
-    indices = levels.map(buildIndex);
-    cache.set(levels, indices);
-  }
+  const indices = indexFor(levels);
   const index = indices[levelOrdinal];
   if (!index) {
     return level.segments;

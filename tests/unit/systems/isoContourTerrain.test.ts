@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { GameEngine } from '../../../server/core/GameEngine';
+import { WORLD } from '../../../shared/world';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { contourSegmentCount, extractIsoContours } from '../../../src/physics/terrain/contours';
@@ -12,11 +13,20 @@ import { applySlopeForce } from '../../../src/physics/terrain/slopeForce';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import {
   applyTerrainSeed,
+  builtContourPatchCount,
+  CONTOUR_REGION_STEP,
   ensureTerrain,
+  getTerrainContours,
   getTerrainSeed,
+  peekBuiltContourPatch,
 } from '../../../src/physics/terrain/terrainSession';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import {
+  collectElevationLabels,
+  elevationLabelsAreCached,
+} from '../../../src/rendering/contourLabels';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
+import { contourSpatialIndexIsCached } from '../../../src/rendering/contourSpatialIndex';
 import { TestPath2D } from '../../support/TestPath2D';
 
 const ISO_CONTOUR_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
@@ -24,8 +34,10 @@ const ISO_CONTOUR_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
 const BOUNDS = { cx: 0, cy: 0, radius: 3100 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  ensureTerrain(TERRAIN.DEFAULT_SEED, BOUNDS);
 });
 
 function steepestSample(seed: number): { x: number; y: number; steep: number } {
@@ -285,3 +297,61 @@ test.each([1, 8])(
     expect(downDistance).toBeGreaterThan(upDistance);
   }
 );
+
+test('elevation labels stay a spacing apart on a dense contour patch', () => {
+  const field = createHeightfield(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+  const levels = extractIsoContours(field, 96, TERRAIN.LEVELS, {
+    cx: 0,
+    cy: 0,
+    radius: 2048,
+  });
+  const spacing = VISUAL.CONTOUR_LABEL_SPACING;
+  const labels = collectElevationLabels(levels, spacing);
+  expect(labels.length).toBeGreaterThan(20);
+  for (let i = 0; i < labels.length; i++) {
+    const left = labels[i];
+    if (!left) {
+      continue;
+    }
+    for (let j = i + 1; j < labels.length; j++) {
+      const right = labels[j];
+      if (!right) {
+        continue;
+      }
+      expect(Math.hypot(left.x - right.x, left.y - right.y)).toBeGreaterThanOrEqual(spacing);
+    }
+  }
+});
+
+test('crossing into the next contour patch reuses a warmed neighbor instead of remarching', async () => {
+  vi.useFakeTimers();
+  ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
+  const origin = getTerrainContours({ x: 0, y: 0 }, 800);
+  expect(builtContourPatchCount()).toBe(1);
+  expect(elevationLabelsAreCached(origin, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
+  expect(contourSpatialIndexIsCached(origin)).toBe(true);
+
+  const nextCenter = { x: CONTOUR_REGION_STEP, y: 0 };
+  let neighbor = peekBuiltContourPatch(nextCenter, 800);
+  for (let step = 0; step < 4 && !neighbor; step++) {
+    await vi.advanceTimersByTimeAsync(0);
+    neighbor = peekBuiltContourPatch(nextCenter, 800);
+  }
+  expect(neighbor).toBeDefined();
+  if (!neighbor) {
+    return;
+  }
+  expect(neighbor).not.toBe(origin);
+  expect(elevationLabelsAreCached(neighbor, VISUAL.CONTOUR_LABEL_SPACING)).toBe(true);
+  expect(contourSpatialIndexIsCached(neighbor)).toBe(true);
+  const warmed = builtContourPatchCount();
+  expect(warmed).toBeGreaterThan(1);
+
+  const levels = getTerrainContours(nextCenter, 800);
+  expect(levels).toBe(neighbor);
+  expect(builtContourPatchCount()).toBe(warmed);
+  expect(contourSegmentCount(levels)).toBeGreaterThan(100);
+  expect(
+    levels.some((level) => level.segments.some((segment) => segment.ax > 2048 || segment.bx > 2048))
+  ).toBe(true);
+});

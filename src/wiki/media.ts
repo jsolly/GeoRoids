@@ -66,6 +66,7 @@ export const media: Record<string, WikiMediaEntry> = {
       'src/physics/terrain/terrainTravel.ts',
       'src/entities/ship/cruiseMotion.ts',
       'src/rendering/contourLabels.ts',
+      'src/rendering/contourSpatialIndex.ts',
     ],
   },
   loot: {

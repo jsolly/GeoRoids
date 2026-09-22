@@ -1,5 +1,5 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
-import { CIVIC_LOTS, civicLot, TOWN_HEARTH } from '../../shared/furnaces';
+import { CIVIC_LOTS, pipeHopToParent, TOWN_HEARTH } from '../../shared/furnaces';
 import type { Position } from '../../shared-types';
 import { PALETTE, VISUAL } from '../constants';
 import { activeFurnacePipePulses, furnacePipeFrame } from '../fx/furnacePipePulse';
@@ -11,7 +11,6 @@ import { resolveGlow } from './renderQuality';
 import { strokePhosphorPolyline, type Vec2 } from './vectorJuice';
 
 const furnaceScreen = { x: 0, y: 0 };
-const pipeEnd = { x: 0, y: 0 };
 const pipeHead = { x: 0, y: 0 };
 const PIPE_SCREEN: Array<{ x: number; y: number }> = [
   { x: 0, y: 0 },
@@ -19,6 +18,8 @@ const PIPE_SCREEN: Array<{ x: number; y: number }> = [
   { x: 0, y: 0 },
   { x: 0, y: 0 },
 ];
+const TRAIL_SCREEN: Array<{ x: number; y: number }> = [];
+const trailEmber = { x: 0, y: 0 };
 const FURNACE_COLOR = PALETTE.SATELLITE;
 const FURNACE_LABEL_COLOR = PALETTE.HUD;
 /** Contour samples per flame edge; enough for a curling tongue, few enough to stay hairline. */
@@ -393,17 +394,6 @@ function drawFurnaceLabel(
   ctx.restore();
 }
 
-function parentPosition(lotId: string): Position | undefined {
-  const lot = civicLot(lotId);
-  if (!lot) {
-    return undefined;
-  }
-  if (lot.parentId === TOWN_HEARTH.id) {
-    return TOWN_HEARTH.position;
-  }
-  return civicLot(lot.parentId)?.position;
-}
-
 function segmentNear(viewer: Position, start: Position, end: Position, reach: number): boolean {
   const abx = end.x - start.x;
   const aby = end.y - start.y;
@@ -420,9 +410,141 @@ function segmentNear(viewer: Position, start: Position, end: Position, reach: nu
   return dx * dx + dy * dy <= reach * reach;
 }
 
+function polylineLength(points: readonly Position[], count: number): number {
+  let length = 0;
+  for (let index = 0; index < count - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (!start || !end) {
+      continue;
+    }
+    length += Math.hypot(end.x - start.x, end.y - start.y);
+  }
+  return length;
+}
+
+function pointAlongInto(
+  out: Position,
+  points: readonly Position[],
+  count: number,
+  distance: number
+): void {
+  let remaining = Math.max(0, distance);
+  for (let index = 0; index < count - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (!start || !end) {
+      continue;
+    }
+    const span = Math.hypot(end.x - start.x, end.y - start.y);
+    if (remaining <= span || index === count - 2) {
+      const t = span === 0 ? 1 : Math.min(1, remaining / span);
+      out.x = start.x + (end.x - start.x) * t;
+      out.y = start.y + (end.y - start.y) * t;
+      return;
+    }
+    remaining -= span;
+  }
+  const last = points[count - 1];
+  out.x = last?.x ?? 0;
+  out.y = last?.y ?? 0;
+}
+
+function tracePolyline(ctx: DrawingContext, points: readonly Position[], count: number): void {
+  const first = points[0];
+  if (!first) {
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(first.x, first.y);
+  for (let index = 1; index < count; index += 1) {
+    const point = points[index];
+    if (point) {
+      ctx.lineTo(point.x, point.y);
+    }
+  }
+}
+
 /**
- * Faint pipes join every street lot to the nearer grate, ending at Town Square.
- * A delivery lights that whole run and sends one bright head back to the square.
+ * A burning street's pipeline: a hot core with embers running toward Town Square.
+ * `points` uses the caller's coordinate space. `width` and `glow` use that same space.
+ */
+export function strokeFurnaceFireTrail(
+  ctx: DrawingContext,
+  points: readonly Position[],
+  count: number,
+  now: number,
+  width: number,
+  glow: number,
+  emberSpacing: number
+): void {
+  if (count < 2 || !(width > 0)) {
+    return;
+  }
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([]);
+  ctx.shadowColor = PALETTE.LASER_LOCAL;
+  ctx.shadowBlur = glow;
+  tracePolyline(ctx, points, count);
+  ctx.strokeStyle = hexToRgba(PALETTE.DANGER, 0.72);
+  ctx.lineWidth = width * 2.6;
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(PALETTE.LASER_LOCAL, 0.95);
+  ctx.lineWidth = width;
+  ctx.stroke();
+  ctx.strokeStyle = hexToRgba(PALETTE.LOOT, 1);
+  ctx.lineWidth = Math.max(1, width * 0.45);
+  ctx.stroke();
+  const length = polylineLength(points, count);
+  if (length > 0 && emberSpacing > 0) {
+    const phase = ((now / 1000) * emberSpacing * 0.85) % emberSpacing;
+    const radius = width * 0.9;
+    ctx.shadowBlur = glow * 0.65;
+    for (let distance = phase; distance < length; distance += emberSpacing) {
+      pointAlongInto(trailEmber, points, count, distance);
+      ctx.fillStyle = hexToRgba(
+        Math.floor(distance / emberSpacing) % 2 === 0 ? PALETTE.LASER_LOCAL : PALETTE.LOOT,
+        0.95
+      );
+      ctx.beginPath();
+      ctx.arc(trailEmber.x, trailEmber.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function hopNear(viewer: Position, points: readonly Position[], reach: number): boolean {
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (start && end && segmentNear(viewer, start, end, reach)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function projectHop(viewer: Position, world: readonly Position[]): number {
+  while (TRAIL_SCREEN.length < world.length) {
+    TRAIL_SCREEN.push({ x: 0, y: 0 });
+  }
+  for (let index = 0; index < world.length; index += 1) {
+    const point = world[index];
+    const screen = TRAIL_SCREEN[index];
+    if (!point || !screen) {
+      continue;
+    }
+    canvasManager.worldToScreenInto(screen, point, viewer);
+  }
+  return world.length;
+}
+
+/**
+ * Lit streets show a fire trail along the right-angle pipeline back to Town Square.
+ * A delivery sends one brighter head along that same run.
  */
 export function drawFurnacePipes(viewerPosition: Position, now = performance.now()): void {
   const ctx = canvasManager.getContext();
@@ -434,24 +556,26 @@ export function drawFurnacePipes(viewerPosition: Position, now = performance.now
   const viewport = canvasManager.getViewportSize();
   const reach = Math.hypot(viewport.width, viewport.height) / scale + 200;
   ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.setLineDash([10, 14]);
-  ctx.strokeStyle = hexToRgba(PALETTE.LASER_LOCAL, 0.28);
-  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
   for (const lot of CIVIC_LOTS) {
-    const parent = parentPosition(lot.id);
-    if (!parent || !segmentNear(viewerPosition, lot.position, parent, reach)) {
+    if (!worldFurnaces.isLit(lot.id)) {
       continue;
     }
-    const start = canvasManager.worldToScreenInto(furnaceScreen, lot.position, viewerPosition);
-    const end = canvasManager.worldToScreenInto(pipeEnd, parent, viewerPosition);
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.stroke();
+    const hop = pipeHopToParent(lot.id);
+    if (hop.length < 2 || !hopNear(viewerPosition, hop, reach)) {
+      continue;
+    }
+    const count = projectHop(viewerPosition, hop);
+    strokeFurnaceFireTrail(
+      ctx,
+      TRAIL_SCREEN,
+      count,
+      now,
+      2.2,
+      resolveGlow(VISUAL.FURNACE_FLAME_GLOW),
+      28
+    );
   }
-  ctx.setLineDash([]);
   for (const pulse of activeFurnacePipePulses(now)) {
     const frame = furnacePipeFrame(pulse, now);
     if (!frame) {

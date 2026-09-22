@@ -86,7 +86,7 @@ and do not survive a server restart.
 Equip Build in the ship schematic, then stand inside a dark street foundation
 and press E or tap Build. The tool spends your own score to build that
 designated furnace, and the furnace takes your name. It does not place a hearth
-at an arbitrary position. The nearer lot on that road must already be burning,
+at an arbitrary position. The inward lot on that road must already be burning,
 and your score must cover the lot. Each street you build raises your own later
 furnace deliveries. The same score buys hull paint at the Town Square store.
 The bonus stays with the pilot who paid, so a later nickname
@@ -97,8 +97,11 @@ the HUD explains why it failed. A nest whose home would sit inside the new
 furnace's spider occupancy is an illegal site; that miss does not wipe the nest.
 Standing furnaces still scare spiders that enter that occupancy.
 
-Town Square starts lit at the map center. The street plan radiates outward from
-it, and each farther ring costs more of the builder's score. Built streets keep
+Town Square starts lit at the map center. Street lots are spread unevenly through
+three farther bands, and each farther band costs more of the builder's score.
+The pipeline stays hidden until that lot is burning. A lit street shows a fire
+trail that turns at right angles, like city blocks, through each inward grate on its parent chain
+and ends at Town Square. Built streets keep
 the builder's name and survive death, changing ships, reconnecting, and server
 restarts. They stay until the expedition is reset.
 

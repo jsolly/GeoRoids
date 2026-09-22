@@ -11,9 +11,9 @@ import { NetworkManager } from '../network/networkManager';
 import { worldFurnaces } from '../network/worldExploration';
 import { logger } from '../utils/Logger';
 import { closeShipSchematic } from './shipSchematic';
+import { isShipSchematicOpen } from './shipSchematicState';
 import { bindTownStoreClose, isTownStoreOpen, setTownStoreOpen } from './townStoreState';
 import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
-import { shouldUseTouchControls } from './viewportChrome';
 
 export const TOWN_STORE_IDS = {
   dialog: 'town-store-dialog',
@@ -22,7 +22,6 @@ export const TOWN_STORE_IDS = {
   score: 'town-store-score',
   paints: 'town-store-paints',
   status: 'town-store-status',
-  toggle: 'town-store-toggle',
   return: 'town-store-return',
 } as const;
 
@@ -44,7 +43,6 @@ type StoreElements = {
   score: HTMLElement;
   paints: HTMLElement;
   status: HTMLElement;
-  toggle: HTMLButtonElement;
   return: HTMLButtonElement;
 };
 
@@ -54,12 +52,17 @@ let elements: StoreElements | null = null;
 let openInputRelease: (() => void) | undefined;
 let paintSignature = '';
 
-function townStoreAvailable(): boolean {
+/** Alive local pilot inside the Town Square shopping radius during flight. */
+export function canEnterTownStore(): boolean {
   if (typeof document === 'undefined' || !document.body.classList.contains('in-play')) {
     return false;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player || player.lives <= 0 || player.ship.exploding || player.ship.health <= 0) {
+    return false;
+  }
+  // Tow/ignite chrome wins while hooked — match ability button, not Enter store.
+  if (player.ship.harpoonTargetId) {
     return false;
   }
   return insideTownStore(player.ship.position);
@@ -71,24 +74,6 @@ function streetsBuiltByLocal() {
     return 0;
   }
   return worldFurnaces.modulesBuiltBy(id);
-}
-
-function syncToggleChrome(): void {
-  if (!elements) {
-    return;
-  }
-  const touch = shouldUseTouchControls();
-  elements.toggle.classList.toggle('town-store-touch', touch);
-  const available = townStoreAvailable();
-  elements.toggle.hidden = !available;
-  elements.toggle.setAttribute('aria-hidden', available ? 'false' : 'true');
-  if (touch) {
-    elements.toggle.removeAttribute('aria-keyshortcuts');
-    elements.toggle.setAttribute('aria-label', 'Open town store');
-    return;
-  }
-  elements.toggle.setAttribute('aria-keyshortcuts', 'B');
-  elements.toggle.setAttribute('aria-label', 'Open town store (B)');
 }
 
 function paintRows(): void {
@@ -180,21 +165,6 @@ function ensureElements(): StoreElements | null {
     document.body.appendChild(dialog);
   }
   createDialogMarkup(dialog);
-  let toggle = document.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.toggle}`);
-  if (!toggle) {
-    const gameArea = document.querySelector('#gameArea') ?? document.body;
-    toggle = document.createElement('button');
-    toggle.id = TOWN_STORE_IDS.toggle;
-    toggle.type = 'button';
-    toggle.className = 'town-store-toggle';
-    toggle.innerHTML = 'Store <kbd>B</kbd>';
-    const schematic = gameArea.querySelector('#ship-schematic-toggle');
-    if (schematic) {
-      gameArea.insertBefore(toggle, schematic);
-    } else {
-      gameArea.appendChild(toggle);
-    }
-  }
   const close = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.close}`);
   const yieldLine = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.yield}`);
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
@@ -204,7 +174,7 @@ function ensureElements(): StoreElements | null {
   if (!close || !yieldLine || !score || !paints || !status || !returnButton) {
     return null;
   }
-  return { dialog, close, yieldLine, score, paints, status, toggle, return: returnButton };
+  return { dialog, close, yieldLine, score, paints, status, return: returnButton };
 }
 
 function purchasePaint(paintId: string): void {
@@ -245,14 +215,13 @@ export function applyTownStoreResult(data: unknown): void {
 }
 
 export function syncTownStoreChrome(): void {
-  syncToggleChrome();
   if (isTownStoreOpen()) {
     refreshStoreCopy();
   }
 }
 
 export function openTownStore(): boolean {
-  if (!elements || isTownStoreOpen() || !townStoreAvailable()) {
+  if (!elements || isTownStoreOpen() || !canEnterTownStore()) {
     return false;
   }
   if (isUniverseMapOpen()) {
@@ -301,6 +270,20 @@ function handleDialogClosed(): void {
 }
 
 function handleStoreKeydown(ev: KeyboardEvent): void {
+  if (ev.code === 'KeyE' && !isTownStoreOpen()) {
+    if (!ev.repeat && !isShipSchematicOpen() && canEnterTownStore()) {
+      const target = ev.target;
+      if (
+        !(target instanceof HTMLElement) ||
+        (!target.isContentEditable && !target.matches('input, textarea, select'))
+      ) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openTownStore();
+      }
+    }
+    return;
+  }
   if (ev.code === 'KeyB') {
     const target = ev.target;
     if (
@@ -359,16 +342,6 @@ export function initializeTownStore(options?: { onOpen?: () => void }): void {
   openInputRelease = options?.onOpen;
   initialized = true;
   bindTownStoreClose(closeTownStore);
-  syncToggleChrome();
-  elements.toggle.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    if (isTownStoreOpen()) {
-      closeTownStore();
-      return;
-    }
-    openTownStore();
-  });
   elements.close.addEventListener('click', () => {
     closeTownStore();
   });
@@ -381,11 +354,7 @@ export function initializeTownStore(options?: { onOpen?: () => void }): void {
     closeTownStore();
   });
   document.addEventListener('keydown', handleStoreKeydown, true);
-  window.addEventListener('resize', syncToggleChrome);
-  window.addEventListener('playViewOn', syncToggleChrome);
   window.addEventListener('playViewOff', () => {
     closeTownStore();
-    syncToggleChrome();
   });
-  window.addEventListener('gameStoreClose', syncToggleChrome);
 }

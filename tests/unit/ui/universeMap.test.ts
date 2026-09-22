@@ -186,19 +186,22 @@ describe('universe map play chrome', () => {
     expect(productionMatch?.[1]).not.toMatch(/>E</u);
   });
 
-  test('the locate control sits on the map and restores the nearby ship view', () => {
+  test('zoom and locate controls sit on the map and restore the nearby ship view', () => {
     const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
     const locate = document.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement;
     const zoomIn = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement;
     const zoomOut = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement;
-    const zoomReadout = document.querySelector(
-      `#${UNIVERSE_MAP_IDS.zoomReadout}`
-    ) as HTMLOutputElement;
+    const zoomControls = document.querySelector('.universe-map-zoom') as HTMLElement;
     const stage = document.querySelector('.universe-map-stage');
     const headerActions = document.querySelector('.universe-map-actions');
 
     expect(locate.parentElement).toBe(stage);
+    expect(zoomControls.parentElement).toBe(stage);
+    expect(zoomControls.contains(zoomIn)).toBe(true);
+    expect(zoomControls.contains(zoomOut)).toBe(true);
     expect(headerActions?.contains(locate)).toBe(false);
+    expect(headerActions?.contains(zoomIn)).toBe(false);
+    expect(document.querySelector('#universe-map-zoom')).toBeNull();
     expect(locate.getAttribute('aria-label')).toBe(UNIVERSE_MAP_LOCATE_LABEL);
     expect(locate.querySelector('svg')).not.toBeNull();
 
@@ -215,22 +218,20 @@ describe('universe map play chrome', () => {
       .mockReturnValue(pilot);
     try {
       toggle.click();
-      expect(zoomReadout.textContent).toBe('2400%');
       expect(locate.getAttribute('aria-pressed')).toBe('true');
       expect(locate.style.left).toMatch(/px$/u);
       expect(locate.style.top).toMatch(/px$/u);
+      expect(zoomControls.style.left).toMatch(/px$/u);
+      expect(zoomControls.style.top).toMatch(/px$/u);
 
       zoomIn.click();
-      expect(zoomReadout.textContent).toBe('3240%');
       expect(locate.getAttribute('aria-pressed')).toBe('false');
 
       locate.click();
-      expect(zoomReadout.textContent).toBe('2400%');
       expect(locate.getAttribute('aria-pressed')).toBe('true');
 
       zoomIn.click();
       zoomOut.click();
-      expect(zoomReadout.textContent).toBe('2400%');
       expect(locate.getAttribute('aria-pressed')).toBe('true');
 
       const mapCanvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement;

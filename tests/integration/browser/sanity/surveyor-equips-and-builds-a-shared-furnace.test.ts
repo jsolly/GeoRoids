@@ -24,14 +24,15 @@ for (const viewport of [
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
-    const storeToggle = page.locator('#town-store-toggle');
-    await storeToggle.waitFor({ state: 'visible' });
-    if (viewport.touch) {
-      await storeToggle.tap();
-    } else {
-      await page.keyboard.press('KeyB');
-    }
     const store = page.locator('#town-store-dialog');
+    if (viewport.touch) {
+      await page.waitForFunction(
+        () => document.querySelector('#touch-ability')?.textContent?.includes('ENTER') === true
+      );
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
     await store.waitFor({ state: 'visible' });
     expect(await store.textContent()).toContain('Ember');
     await page.locator('#town-store-return').click();

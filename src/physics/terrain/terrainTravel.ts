@@ -20,17 +20,33 @@ function travelGradient(position: Position): { x: number; y: number; strength: n
     : { x: 0, y: 0, strength: 0 };
 }
 
+function parallelLane(strength: number, uphill: number): boolean {
+  return strength > 0 && Math.abs(uphill) <= Math.sin(TERRAIN.ISOLINE_PARALLEL_TOLERANCE) + 1e-8;
+}
+
+/**
+ * Extra fraction of cruise while the nose is parallel to the local isoline.
+ * Zero on flat ground and for every heading outside the lane. No partial credit.
+ */
+export function isolineParallelBonus(position: Position, angle: number): number {
+  const gradient = travelGradient(position);
+  const heading = cruiseVelocity(angle, 1);
+  const uphill = Math.max(-1, Math.min(1, heading.x * gradient.x + heading.y * gradient.y));
+  return parallelLane(gradient.strength, uphill)
+    ? TERRAIN.ISOLINE_PARALLEL_BONUS * gradient.strength
+    : 0;
+}
+
 /** Nose-relative cruise plus persistent downhill drift across the contours. */
 export function terrainCruiseVelocity(position: Position, angle: number, cruise: number): Velocity {
   const gradient = travelGradient(position);
   const heading = cruiseVelocity(angle, 1);
   const uphill = Math.max(-1, Math.min(1, heading.x * gradient.x + heading.y * gradient.y));
-  const forward =
-    cruise *
-    (1 +
-      gradient.strength *
-        (TERRAIN.DESCENT_SPEED_BONUS * Math.max(0, -uphill) -
-          (1 - TERRAIN.CLIMB_SPEED_FRACTION) * Math.max(0, uphill)));
+  const slope = parallelLane(gradient.strength, uphill)
+    ? TERRAIN.ISOLINE_PARALLEL_BONUS
+    : TERRAIN.DESCENT_SPEED_BONUS * Math.max(0, -uphill) -
+      (1 - TERRAIN.CLIMB_SPEED_FRACTION) * Math.max(0, uphill);
+  const forward = cruise * (1 + gradient.strength * slope);
   const drift = cruise * TERRAIN.CROSS_SLOPE_DRIFT * gradient.strength;
   return {
     x: heading.x * forward - (gradient.x - heading.x * uphill) * drift,

@@ -7,6 +7,7 @@ import { sampleGradient } from '../../../src/physics/terrain/heightfield';
 import { TERRAIN } from '../../../src/physics/terrain/terrainConfig';
 import { ensureTerrain } from '../../../src/physics/terrain/terrainSession';
 import {
+  isolineParallelBonus,
   terrainCruiseVelocity,
   terrainSpeedLimit,
 } from '../../../src/physics/terrain/terrainTravel';
@@ -43,7 +44,7 @@ test.each(['surveyor', 'hauler'] as const)(
   }
 );
 
-test('crossing a steep hillside keeps nearly full cruise with a light downhill tug', () => {
+test('holding the nose parallel to a steep isoline adds speed and keeps a light downhill tug', () => {
   const field = ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
   const gradient = sampleGradient(field, position.x, position.y);
   const magnitude = Math.hypot(gradient.x, gradient.y);
@@ -60,8 +61,12 @@ test('crossing a steep hillside keeps nearly full cruise with a light downhill t
     advanceCruiseVelocity(ship, kit.maxVelocity);
   }
   const downhillDrift = -(ship.velocity.x * gradient.x + ship.velocity.y * gradient.y) / magnitude;
+  const bonus = isolineParallelBonus(position, ship.angle);
+  const speed = Math.hypot(ship.velocity.x, ship.velocity.y);
   expect(TERRAIN.CROSS_SLOPE_DRIFT).toBe(0.16);
-  expect(Math.hypot(ship.velocity.x, ship.velocity.y)).toBeGreaterThan(kit.maxVelocity * 0.98);
+  expect(bonus).toBeGreaterThan(TERRAIN.ISOLINE_PARALLEL_BONUS * 0.6);
+  expect(speed).toBeGreaterThan(kit.maxVelocity * (1 + bonus) * 0.98);
+  expect(speed).toBeLessThanOrEqual(terrainSpeedLimit(position, kit.maxVelocity) + 1e-9);
   expect(downhillDrift).toBeGreaterThan(kit.maxVelocity * 0.1);
   expect(downhillDrift).toBeLessThan(kit.maxVelocity * 0.22);
   const before = { ...ship.velocity };

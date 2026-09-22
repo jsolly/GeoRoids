@@ -2,7 +2,7 @@
 
 The arena contains seeded hills, valleys, and saddles. Elevation combines smooth multi-scale noise with Gaussian landmarks. A flat spawn at the center keeps arriving pilots stable. Equal elevation intervals produce closely spaced contours on steep slopes and widely spaced contours on gentle ground. Faint numbers show relative, unitless elevations, including negative valleys.
 
-Ships accelerate downhill and lose speed uphill. Bots, released pilots, and local ships share the same slope force and existing speed limits.
+Ships accelerate downhill and lose speed uphill. On a slope, a nose within half a Surveyor turn step of the isoline tangent gains an all-or-nothing cruise bonus scaled by steepness. Wing-wind streaks use that same test. The faster cruise stays inside the existing descent speed ceiling, so pose validation does not need a higher cap. The bonus is client cruise only; `terrainSpeedLimit` is unchanged, so a server that already has this ceiling still accepts the lane. Bots, released pilots, and local ships share the same slope force and existing speed limits.
 
 Laser motion is unchanged. Downhill/uphill laser speed is explicitly deferred in [Todoist](https://app.todoist.com/app/task/6hRqv3q4jP2qxVC2) until John resumes it. The existing short contour highlights under shots remain decorative.
 

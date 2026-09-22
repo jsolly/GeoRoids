@@ -56,14 +56,15 @@ export const media: Record<string, WikiMediaEntry> = {
   },
   terrain: {
     title: 'Terrain contours and slope travel',
-    alt: 'A Surveyor rides contour lines, then turns downhill while an arrow shows the descent.',
+    alt: 'A Surveyor rides parallel to contour lines with wind streaks over its wings, then turns downhill while an arrow shows the descent.',
     caption:
-      'Controlled demonstration: automatic thrust follows a contour, then the nose turns downhill so speed more than doubles; an arrow marks the downhill direction.',
+      'Controlled demonstration: a heading held parallel to the contours gains speed and wing-wind streaks, then the nose turns downhill so speed more than doubles; an arrow marks the downhill direction.',
     sources: [
       'src/physics/terrain/heightfield.ts',
       'src/physics/terrain/contours.ts',
       'src/physics/terrain/terrainConfig.ts',
       'src/physics/terrain/terrainTravel.ts',
+      'src/entities/ship/isolineWingWind.ts',
       'src/entities/ship/cruiseMotion.ts',
       'src/rendering/contourLabels.ts',
       'src/rendering/contourSpatialIndex.ts',

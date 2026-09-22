@@ -1,8 +1,8 @@
 ---
 title: Terrain and the boundary
 category: Arena
-summary: Contour lines reveal slopes that change your motion. The outer wall
-  destroys ships that cross it.
+summary: Contour lines reveal slopes that change your motion. A parallel heading
+  is a fast lane. The outer wall destroys ships that cross it.
 order: 120
 related:
   - content/wiki/controls.md
@@ -19,9 +19,10 @@ media:
 The open world contains hills, valleys, and saddles, with a flat starter area at
 the center. Pilots in the same world share the same terrain. The server loads
 nearby world sectors as the crew travels, while the minimap keeps the local
-radar readable. Following the contour lines keeps nearly full cruise. Descents
-are a rush. Steep climbs are only a light tax, enough that a longer contour
-route can still win. Ordinary terrain does not deal damage.
+radar readable. A heading held parallel to those lines is a fast lane. Other
+headings along a slope keep nearly full cruise. Descents are a rush. Steep
+climbs are only a light tax, enough that a longer contour route can still win
+when the lane is held. Ordinary terrain does not deal damage.
 
 The world is circular. Asteroids bounce inward at the outer boundary, keeping
 the remaining deposits in the world. Lasers reflect off the wall and can mine
@@ -35,19 +36,22 @@ remain available between sessions.
 Contour lines are closest together on steep slopes and farther apart on gentle
 ground. Faint numbers mark relative elevations, including negative values in
 valleys. Watch the contours and changes in motion to tell uphill from downhill.
-At the steepest contours, climbing is a bit slower than ordinary cruise, while a
-descent can more than double your speed. Riding along a contour is the easy
-path; a small uphill aim cancels the remaining downhill tug. Both ships can
-climb at any mass without Boost. These effects scale with slope steepness; the
-flat starter area keeps normal handling.
+Hold the nose parallel to a contour and the ship enters a fast lane. It gains
+extra speed, and short wind streaks slide aft across both wings. The lane is
+only that parallel heading. A small turn drops the speed back to ordinary
+cruise and the streaks vanish. Steep climbs are a bit slower than ordinary
+cruise. A descent can more than double your speed and is still faster than the
+lane. These effects scale with slope steepness, kit, mass, and Boost. The flat
+starter area keeps normal handling, with no lane and no streaks.
 
-A longer route along the contour lines can beat a direct steep climb.
-Ride descending slopes for speed, follow the lines when you want easy travel,
-and steer uphill slightly if a hillside starts to tug you down. Boost
-stacks with downhill speed and helps climbs, but is never required to climb.
-Your ship's kit and mass still set the baseline for all of these speeds. Laser paths
-do not interact with terrain; glints where shots cross contours are visual
-feedback, with no terrain reflection or extra damage.
+A longer route along the contour lines can beat a direct steep climb when you
+hold the lane. Ride descending slopes for the highest speed, hold the line when
+you want the lane, and steer uphill slightly if a hillside starts to tug you
+down. Other headings along the slope keep nearly full cruise with that light
+downhill tug. Both ships can climb at any mass without Boost. Boost stacks with
+the lane and with downhill speed, and helps climbs, but is never required to
+climb. Laser paths do not interact with terrain; glints where shots cross
+contours are visual feedback, with no terrain reflection or extra damage.
 
 ## Terrain spiders
 

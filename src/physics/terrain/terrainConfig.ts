@@ -44,6 +44,13 @@ export const TERRAIN = {
   DESCENT_SPEED_BONUS: 1.15,
   /** Light downhill tug so contour-following stays the happy path. */
   CROSS_SLOPE_DRIFT: 0.16,
+  /**
+   * Half of one Surveyor turn step. A released heading can sit in the lane;
+   * the next step leaves it. Outside this angle the bonus is zero.
+   */
+  ISOLINE_PARALLEL_TOLERANCE: Math.PI / 40,
+  /** Extra cruise at full steepness, only while the nose stays in the lane. */
+  ISOLINE_PARALLEL_BONUS: 0.55,
   /** Below this, contour-laser ticks stay off (flat spawn saddle stays quiet). */
   CONTOUR_LASER_MIN_GRAD: 0.00045,
 } as const;

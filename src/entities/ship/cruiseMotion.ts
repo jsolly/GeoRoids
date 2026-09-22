@@ -3,7 +3,7 @@ import { GAME } from '../../constants';
 import { terrainCruiseVelocity } from '../../physics/terrain/terrainTravel';
 import type { Ship } from './Ship';
 
-/** Cruise follows the nose with a terrain-defined climb cost, descent gain, and lateral drift. */
+/** Cruise follows the nose with climb cost, descent gain, the parallel-isoline lane, and lateral drift. */
 export function advanceCruiseVelocity(
   ship: Pick<Ship, 'position' | 'velocity' | 'angle' | 'mass' | 'thrust'>,
   speedLimit: number,

@@ -1,5 +1,6 @@
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, VISUAL } from '../../constants';
+import { isolineParallelBonus } from '../../physics/terrain/terrainTravel';
 import { canvasManager } from '../../rendering/canvasSurface';
 import type { DrawingContext } from '../../rendering/drawingContext';
 import type { PlayfieldSize } from '../../rendering/playfieldCamera';
@@ -23,6 +24,7 @@ import {
   projectHullPolyline,
   projectKitHullEdges,
 } from './hullOutlines';
+import { drawIsolineWingWind } from './isolineWingWind';
 import type { Ship } from './Ship';
 import { SHIP_ABILITY } from './shipKits';
 
@@ -544,6 +546,18 @@ export function drawShipAtPosition(
     shipColor,
     ship.kitId,
     haulerUtilityOf(ship)
+  );
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  drawIsolineWingWind(
+    ctx,
+    screenX,
+    screenY,
+    shipR,
+    ship.angle,
+    ship.kitId,
+    PALETTE.HUD,
+    now,
+    ship.thrusting && isolineParallelBonus(ship.position, ship.angle) > 0
   );
   drawAbilityFx(ctx, ship, screenX, screenY, shipR);
 

@@ -49,6 +49,7 @@ import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
 import { advanceCruiseVelocity } from '../src/entities/ship/cruiseMotion';
 import { getKitHullOutline, projectHullPoint } from '../src/entities/ship/hullOutlines';
+import { drawIsolineWingWind } from '../src/entities/ship/isolineWingWind';
 import { Ship } from '../src/entities/ship/Ship';
 import {
   type AbilityHost,
@@ -77,6 +78,7 @@ import { extractIsoContours } from '../src/physics/terrain/contours';
 import { sampleGradient, sampleHeight } from '../src/physics/terrain/heightfield';
 import { TERRAIN } from '../src/physics/terrain/terrainConfig';
 import { getTerrainField } from '../src/physics/terrain/terrainSession';
+import { isolineParallelBonus } from '../src/physics/terrain/terrainTravel';
 import { drawContourLabels } from '../src/rendering/contourLabels';
 import type { DrawingContext } from '../src/rendering/drawingContext';
 import { drawFurnaceArtwork } from '../src/rendering/furnaceRenderer';
@@ -932,6 +934,7 @@ function makeTerrainDemo(): Demo {
   };
   const gradients: number[] = [Math.hypot(initialGradient.x, initialGradient.y)];
   let sawContourFollow = false;
+  let parallelLaneFrames = 0;
   let maxDownhillSpeed = 0;
   return {
     id: 'terrain',
@@ -939,6 +942,10 @@ function makeTerrainDemo(): Demo {
     verify: () => {
       invariant(contours.length > 0, 'terrain contour extraction returned no levels');
       invariant(sawContourFollow, 'terrain demo did not ride a contour');
+      invariant(
+        parallelLaneFrames >= 20,
+        'terrain demo parallel phase did not hold the isoline lane'
+      );
       invariant(maxDownhillSpeed > cruise * 1.5, 'terrain demo downhill was not a rush');
       invariant(
         gradients.some((gradient) => gradient > 0.0001),
@@ -949,7 +956,7 @@ function makeTerrainDemo(): Demo {
       drawFrameChrome(
         ctx,
         'TERRAIN · CONTOUR TRAVEL',
-        'ride the lines · downhill is a rush',
+        'parallel lane · downhill is a rush',
         frame,
         PALETTE.CONTOUR
       );
@@ -1030,16 +1037,25 @@ function makeTerrainDemo(): Demo {
       });
       ctx.restore();
       const gradient = sampleGradient(field, state.position.x, state.position.y);
+      const inParallelLane = isolineParallelBonus(state.position, state.angle) > 0;
+      if (frame < TERRAIN_DOWNHILL_START_FRAME && inParallelLane) {
+        parallelLaneFrames += 1;
+      }
       const steepness = Math.hypot(gradient.x, gradient.y);
       const directionScale = steepness > 0 ? 64 / steepness : 0;
-      drawShip(
+      const hullRadius = getShipKit('surveyor').size / 2;
+      drawShip(ctx, 'surveyor', { x: 0, y: 0 }, state.angle, PALETTE.LOCAL, hullRadius, true);
+      const nose = screenPoint({ x: 0, y: 0 });
+      drawIsolineWingWind(
         ctx,
-        'surveyor',
-        { x: 0, y: 0 },
+        nose.x,
+        nose.y,
+        hullRadius,
         state.angle,
-        PALETTE.LOCAL,
-        getShipKit('surveyor').size / 2,
-        true
+        'surveyor',
+        PALETTE.HUD,
+        frame * (1000 / FPS),
+        inParallelLane
       );
       drawArrow(
         ctx,
@@ -1058,7 +1074,9 @@ function makeTerrainDemo(): Demo {
       drawTag(
         ctx,
         frame < TERRAIN_DOWNHILL_START_FRAME
-          ? 'ride the contours · arrow is downhill'
+          ? inParallelLane
+            ? 'parallel lane · wind over the wings'
+            : 'lining up on the contour'
           : 'downhill rush · arrow is downhill',
         320,
         286,

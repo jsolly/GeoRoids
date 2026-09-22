@@ -107,6 +107,10 @@ export const VISUAL = {
   THRUSTER_FLICKER_RATIO: 0.4,
   THRUSTER_CORE_RATIO: 0.42,
   THRUSTER_FLICKER_MS: 50,
+  /** Aft-running ticks over the wings while the isoline lane is held. */
+  ISOLINE_WIND_STROKE_WIDTH: 2,
+  ISOLINE_WIND_GLOW: 3,
+  ISOLINE_WIND_PERIOD_MS: 520,
   // Hearth fire is the same open-V as ship thrust, scaled to the delivery zone.
   FURNACE_STROKE_WIDTH: 1.25,
   FURNACE_GLOW: 1.4,

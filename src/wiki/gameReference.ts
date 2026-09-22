@@ -179,7 +179,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Terrain travel values',
       paragraphs: [
-        `At full steepness, climbing speed is ${TERRAIN.CLIMB_SPEED_FRACTION * 100}% of normal cruise and descending speed is ${(1 + TERRAIN.DESCENT_SPEED_BONUS) * 100}% of normal cruise. Cross-slope downhill drift reaches ${TERRAIN.CROSS_SLOPE_DRIFT * 100}% of cruise. Kit, mass, and Boost scale all three together.`,
+        `At full steepness, climbing speed is ${TERRAIN.CLIMB_SPEED_FRACTION * 100}% of normal cruise and descending speed is ${(1 + TERRAIN.DESCENT_SPEED_BONUS) * 100}% of normal cruise. A heading within ${((TERRAIN.ISOLINE_PARALLEL_TOLERANCE * 180) / Math.PI).toFixed(1)}° of an isoline adds ${(TERRAIN.ISOLINE_PARALLEL_BONUS * 100).toFixed(0)}% of cruise at full steepness, and nothing past that angle. Cross-slope downhill drift reaches ${TERRAIN.CROSS_SLOPE_DRIFT * 100}% of cruise. Kit, mass, and Boost scale all of these together.`,
       ],
     },
     {

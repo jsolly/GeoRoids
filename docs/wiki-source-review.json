@@ -1,5 +1,5 @@
 {
-  "note": "Enter-store morph skips while towing; crew fixtures sit outside Town Square shopping radius; wiki documents hooked Hauler Release/Ignite exception.",
+  "note": "Crew fixtures and ability smoke stay outside TOWN_STORE_RADIUS so E/touch keep kit actions; cooperative rock clears the y=-500 ship ring.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -306,7 +306,7 @@
     "src/wiki/shipScorecard.ts": "sha256:d06dcdc59de164aff394f226417c60cc375e3362f690228106b960bbf40d3a92",
     "src/wiki/virtual.d.ts": "sha256:548f80fd5dc538fa61d494dbe3c47bf42d6209943a55387f25e58a21c4c2e70e",
     "src/wiki/wiki.css": "sha256:d47f0c7fb925815758b7578ba53df525f58aa0d6da11a8f08992fae3c55edf58",
-    "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts": "sha256:99563f7dddb2e4bd53a9ff6c5c17b0b135f8542bbf5dc223f577ad5e71ff7f54",
+    "tests/integration/browser/collision/laser-hits-and-destroys-asteroids.test.ts": "sha256:856c885d852ca8773e1dddb84c4463686164c44b07bd32fdb87b0f7b2b32e843",
     "tests/integration/browser/e2e/crew-lasers-leave-teammates-unharmed.test.ts": "sha256:05ebce54f2a715e44e0c8b5e01c04ea2c8a7598748a7f9802608ef0303c5ff1d",
     "tests/integration/browser/e2e/crew-opens-universe-map-and-finds-discovered-furnace.test.ts": "sha256:239ca9bf5ade924674926b2a1a4b0cad1df943b64082370a69540c9396b85353",
     "tests/integration/browser/e2e/crew-scan-tows-and-delivers-for-both-pilots.test.ts": "sha256:a102f7c629e573089d6ebb3cbf9e1264649fc8d6eaf49ca624ba47f68ea82b92",
@@ -330,7 +330,7 @@
     "tests/integration/browser/sanity/pilots-see-mostly-drifting-rocks-at-varied-speeds.test.ts": "sha256:6209e7e45b2449473606b09039ff6e325e90507a36e6a864384f914b0343b725",
     "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts": "sha256:a0b2108977f4054c2488f30fb5e0694ee4b6642e4f368ef8b953c7d0b9f1befa",
     "tests/integration/browser/sanity/surveyor-radar-pulses-cover-the-viewport.test.ts": "sha256:f4a5b1ee0d449de7f28b415d24349a7f5c0122779485eae9aeb258ef1abbe27b",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:9a74b613e95ce430ed4081938a2e47e1e50d384221bf793f9efe8ba69d7579a8",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:3874c2d60d9e8d7031c83abc56852b82f8d299b9591724bbd35c733c4630634a",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:5060ce2c60253186525b6ac7aa1aa7c222f80db034f6d8b3023a43eac0610016",
     "tests/integration/entities/input/mouse.test.ts": "sha256:13cdacd658260eb109b4cdb8a7f133aa3ff40a849a045c9716745619195340ee",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:2bdcb0c6395f2907783226e50fe3489f1edd5ab6e91ac9c96c8fe14784df031d",

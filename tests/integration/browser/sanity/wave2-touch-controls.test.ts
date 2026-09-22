@@ -163,6 +163,8 @@ test(
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    // Spawn ring (180) is inside TOWN_STORE_RADIUS (400); leave so E stays SCAN.
+    await game.placeShipAt(0, -500);
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&

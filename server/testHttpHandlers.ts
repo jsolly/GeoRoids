@@ -495,7 +495,9 @@ export function handleTestArrangeCrewField(
               ? { x: 0, y: -260 }
               : body['scenario'] === 'delivery'
                 ? { x: 0, y: 460 }
-                : { x: 0, y: -460 },
+                : // Default crew poses sit at y=-500; keep the rock clear of that hull
+                  // and outside TOWN_STORE_RADIUS so ability chrome stays kit-native.
+                  { x: 0, y: -620 },
         velocity: { x: 0, y: 0 },
         size: body['scenario'] === 'cooperative' ? 50 : 25,
         health: body['scenario'] === 'mining' ? 25 : 75,

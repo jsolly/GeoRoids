@@ -51,6 +51,8 @@ test(
 
     await page.setViewportSize({ width: 390, height: 844 });
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    // Leave Town Square so the ability button runs Mineral Scan, not Enter store.
+    await game.placeShipAt(0, -500);
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&

@@ -88,7 +88,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Town store values',
       paragraphs: [
-        `The Town Square store opens within ${TOWN_STORE_RADIUS} units of the origin. Near the square, E and the ability button become Enter store; B also toggles the store on a keyboard. The open store holds the ship the same way the map and schematic do. Each street a pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to that pilot's own furnace deliveries. Hull paints cost ${paintPrices()} score.`,
+        `The Town Square store opens within ${TOWN_STORE_RADIUS} units of the origin. Near the square, E and the ability button become Enter store unless a Hauler is hooked, in which case Release or Ignite stays on that control and B will not open the store. Otherwise B toggles the store on a keyboard. The open store holds the ship the same way the map and schematic do. Each street a pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to that pilot's own furnace deliveries. Hull paints cost ${paintPrices()} score.`,
       ],
     },
   ],

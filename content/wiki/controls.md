@@ -21,8 +21,9 @@ on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
 does not repeatedly activate it. E uses the equipped tool from
 the ship schematic. Near Town Square, E becomes Enter store instead of the kit
-ability. V opens or closes that schematic, and the Schematic button
-opens it. B also opens or closes the Town Square store while you are inside it.
+ability, except a hooked Hauler keeps Release or Ignite. V opens or closes that
+schematic, and the Schematic button opens it. B also opens or closes the Town
+Square store while you are inside it and not hooked.
 Escape, the X control, or Return to flight also close an open menu. Firing and E
 are blocked while the schematic or store is open.
 The map, schematic, and town store hold your ship stationary, including its momentum and
@@ -89,14 +90,16 @@ changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 ## Town store
 
 Near Town Square, E and the ability button become Enter store while you are
-alive and inside its radius. Kit scan, probe, and Hauler tools stay unavailable
-until you leave. B also opens or closes the store on a keyboard. Opening the
-store closes the map and schematic, holds the ship, and blocks firing. Buying
-the paint you already wear spends nothing. A purchase outside the radius, while
-the ship is destroyed, or without enough score spends nothing and explains why.
-A successful purchase changes the hull and thruster color. That color stays
-through death, reconnect, and restart. The store also
-shows how much your own built streets add to your furnace deliveries.
+alive and inside its radius. Kit scan, probe, and idle Hauler tools stay
+unavailable until you leave. A Hauler that is already hooked keeps Release or
+Ignite on E and the ability button so tow chrome wins over Enter store; B also
+stays closed while hooked. B otherwise opens or closes the store on a keyboard.
+Opening the store closes the map and schematic, holds the ship, and blocks
+firing. Buying the paint you already wear spends nothing. A purchase outside
+the radius, while the ship is destroyed, or without enough score spends nothing
+and explains why. A successful purchase changes the hull and thruster color.
+That color stays through death, reconnect, and restart. The store also shows
+how much your own built streets add to your furnace deliveries.
 
 ## Map
 

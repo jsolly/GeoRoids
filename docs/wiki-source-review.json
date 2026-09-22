@@ -1,5 +1,5 @@
 {
-  "note": "Enter-store morph skips while towing; crew fixtures sit outside Town Square shopping radius.",
+  "note": "Enter-store morph skips while towing; crew fixtures sit outside Town Square shopping radius; wiki documents hooked Hauler Release/Ignite exception.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -298,7 +298,7 @@
     "src/utils/spawnPosition.ts": "sha256:1a4787336bd4368fdf4d7796f5c0f1835e1bdfda1e230ab58bcc51732e3b7f1d",
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:57cc44e6f15c4ecdcbddea0829760098d8f7af39c684e4aaf608571005203c1d",
-    "src/wiki/gameReference.ts": "sha256:11d1f925119a8fac2fe047e6c8e6535a26674ab641c4fe75bdf3b8f60a2a5dd2",
+    "src/wiki/gameReference.ts": "sha256:03a9dcb3975434f65759bfeb9172d478ae58cdd3304554d64e176b3069d1b178",
     "src/wiki/main.ts": "sha256:9335401816d6f05254cbfec4c1a4a680bb18ae3e489511273d15a8fc1b7c5600",
     "src/wiki/media.ts": "sha256:751c21072b7c64b86e3f66afad859aba3267677939170aac1bc1ea46106f14b0",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
@@ -428,7 +428,7 @@
     "tests/unit/ui/debugIdentity.test.ts": "sha256:8ef0186d8d1605ef5edc2b0a36edadf4a20164d511f2df3f9a33cbecb1979062",
     "tests/unit/ui/schematicJoinHint.test.ts": "sha256:89a7e2be043da12413e4dfc99e75ad5ad477686aa34ee3202c486b28a4e11ab5",
     "tests/unit/ui/shipSchematic.test.ts": "sha256:3636ab3d1d17a991542fdc816d13343f683638a234921048a2621474dfcabec5",
-    "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:cb268e73c3f77a06395ff84c1013ffefd03b47b923058ffba7b763a6dddc6597",
+    "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:a6eea57e97aca627b9a6bd7f713cfaa21bfd3ccacdc826f94ae5834960aaaa13",
     "tests/unit/ui/universeMap.test.ts": "sha256:d5444b97ab1da0c4956eb0b161e507d42db3e483879a801a655f18ed6e25c203",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",

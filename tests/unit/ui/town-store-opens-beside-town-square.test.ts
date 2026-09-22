@@ -156,6 +156,8 @@ test('a hooked Hauler keeps tow chrome instead of Enter store inside Town Square
   expect(chrome.name).not.toBe('Enter store');
   expect(openTownStore()).toBe(false);
   expect(isTownStoreOpen()).toBe(false);
+  document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
+  expect(isTownStoreOpen()).toBe(false);
   // Touch still fires the kit tool (tow/ignite); it must not open the store.
   triggerTouchAbility(player);
   expect(isTownStoreOpen()).toBe(false);

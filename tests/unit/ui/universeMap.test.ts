@@ -166,6 +166,14 @@ describe('universe map play chrome', () => {
     ).toEqual({ x: 420, y: 130 });
   });
 
+  test('the map compass is a North arrow only', () => {
+    const compass = document.querySelector('.universe-map-compass');
+    expect(compass).not.toBeNull();
+    expect(compass?.querySelectorAll('span')).toHaveLength(1);
+    expect(compass?.textContent?.trim()).toBe('N');
+    expect(compass?.textContent).not.toMatch(/E/u);
+  });
+
   test('the locate control sits on the map and restores the nearby ship view', () => {
     const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
     const locate = document.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement;

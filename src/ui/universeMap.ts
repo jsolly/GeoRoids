@@ -334,7 +334,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
     <div class="universe-map-stage">
       <canvas id="${UNIVERSE_MAP_IDS.canvas}" tabindex="0" role="img" aria-label="Shared universe map" aria-details="${UNIVERSE_MAP_IDS.locations}"></canvas>
       <ul id="${UNIVERSE_MAP_IDS.locations}" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
-      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i></div>
       ${locateControlMarkup()}
     </div>
     <footer class="universe-map-footer">

@@ -38,7 +38,6 @@ import {
 import { playLootPickup, playTapEjection, resetResourceMusic } from '../../audio/resourceMusic';
 import { stopSatelliteOrbit, syncSatelliteOrbit } from '../../audio/satelliteOrbitSound';
 import { withoutWorldAudio } from '../../audio/spatialAudio';
-import { GameStateManager } from '../../core/services/GameStateManager';
 import {
   noteDebugPingSent,
   noteDebugPong,
@@ -59,7 +58,11 @@ import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
 import { setSurveyorUtilityOnHost } from '../../entities/ship/shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
-import { preferredSurveyorUtility, surveyorUtilityOf } from '../../entities/ship/surveyorUtility';
+import {
+  isSurveyorUtilityId,
+  preferredSurveyorUtility,
+  surveyorUtilityOf,
+} from '../../entities/ship/surveyorUtility';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
@@ -70,12 +73,7 @@ import { setClientLogContext } from '../../utils/clientLogContext';
 import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage } from '../types';
-import {
-  resetWorldExploration,
-  setWorldExploration,
-  setWorldMapAssets,
-  worldFurnaces,
-} from '../worldExploration';
+import { resetWorldExploration, setWorldExploration, setWorldMapAssets } from '../worldExploration';
 import {
   applyAsteroidFieldPartition,
   asteroidHasSpawnPose,
@@ -1072,11 +1070,6 @@ export class ConnectionManager {
       case 'tapEjected':
         this.handleTapEjected(data);
         break;
-      case 'furnaceBuildResult':
-        if (typeof data === 'string') {
-          GameStateManager.getInstance().setNotice(data);
-        }
-        break;
       case 'townStoreResult':
         window.dispatchEvent(new CustomEvent('townStoreResult', { detail: data }));
         break;
@@ -1324,7 +1317,6 @@ export class ConnectionManager {
     setSpiderField(data.spiderField);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
-    worldFurnaces.replaceLit(data.civicModules ?? []);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
     }
@@ -1403,13 +1395,17 @@ export class ConnectionManager {
         const snapshotUtility =
           entity.type === 'local'
             ? surveyorUtilityOf(entity.ship)
-            : (entityData.surveyorUtility ?? surveyorUtilityOf(entity.ship));
+            : isSurveyorUtilityId(entityData.surveyorUtility)
+              ? entityData.surveyorUtility
+              : entityData.surveyorUtility === undefined
+                ? surveyorUtilityOf(entity.ship)
+                : 'mineral_scan';
         const surveyorToolSelected =
           entity.ship.kitId === 'surveyor' && snapshotUtility !== 'mineral_scan';
         const serverCooldown = entityData.abilityCooldownFrames ?? 0;
         // Mineral Scan predicts its cooldown on send. A snapshot that still
-        // reads 0 must not clear that timer before the server echo. Failed
-        // probe launches and furnace builds stay at 0 and remain usable.
+        // reads 0 must not clear that timer before the server echo. A failed
+        // probe launch stays at 0 and remains usable.
         if (
           entity.type !== 'local' ||
           entity.ship.kitId !== 'surveyor' ||

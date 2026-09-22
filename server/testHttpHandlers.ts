@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
-import { civicLot, TOWN_HEARTH } from '../shared/furnaces';
-import { shipPaintById } from '../shared/townStore';
+import { TOWN_HEARTH } from '../shared/furnaces';
+import { EXTRA_LIFE_COST } from '../shared/townStore';
 import { WORLD } from '../shared/world';
 import { DAMAGE } from '../src/constants';
 import type { WebSocketCore } from './communication/WebSocketCore';
@@ -297,17 +297,12 @@ export function handleTestArrangeCrewField(
         'map-icons',
         'furnace',
         'town-store',
-        'street-build',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
       return;
     }
     const spiderWorks = TOWN_HEARTH;
-    const streetLot = civicLot('street-1-0');
-    if (!streetLot) {
-      throw new Error('Street build fixture is missing its lot');
-    }
     const ids = body['playerIds'] as string[];
     const players = ids.map((id) => gameEngine.getPlayer(id));
     if (
@@ -327,25 +322,23 @@ export function handleTestArrangeCrewField(
       const position =
         body['scenario'] === 'town-store'
           ? { x: 0, y: 0 }
-          : body['scenario'] === 'street-build'
-            ? { ...streetLot.position }
-            : body['scenario'] === 'spider-tools'
-              ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
-              : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
-                ? { x: 3000 + index * 120, y: 5000 }
-                : body['scenario'] === 'boundary'
-                  ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-                  : body['scenario'] === 'delivery'
+          : body['scenario'] === 'spider-tools'
+            ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
+            : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
+              ? { x: 3000 + index * 120, y: 5000 }
+              : body['scenario'] === 'boundary'
+                ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+                : body['scenario'] === 'delivery'
+                  ? player.kitId === 'hauler'
+                    ? { x: 0, y: 360 }
+                    : { x: 220, y: 460 }
+                  : body['scenario'] === 'tow'
                     ? player.kitId === 'hauler'
-                      ? { x: 0, y: 360 }
-                      : { x: 220, y: 460 }
-                    : body['scenario'] === 'tow'
-                      ? player.kitId === 'hauler'
-                        ? { x: 0, y: -360 }
-                        : { x: 220, y: -460 }
-                      : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-                        ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                        : { x: index * 120, y: -360 };
+                      ? { x: 0, y: -360 }
+                      : { x: 220, y: -460 }
+                    : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                      ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
+                      : { x: index * 120, y: -360 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -374,7 +367,6 @@ export function handleTestArrangeCrewField(
         'spider-tools',
         'furnace',
         'town-store',
-        'street-build',
       ].includes(String(body['scenario']))
         ? 600
         : 0;
@@ -383,9 +375,6 @@ export function handleTestArrangeCrewField(
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
       player.abilityCooldownFrames = 0;
-      if (body['scenario'] === 'street-build') {
-        player.score = streetLot.cost;
-      }
       poses.push({
         playerId: player.id,
         position,
@@ -476,13 +465,9 @@ export function handleTestArrangeCrewField(
         },
       });
     } else if (body['scenario'] === 'town-store') {
-      const paint = shipPaintById('ember');
-      if (!paint) {
-        throw new Error('Town store fixture is missing Ember paint');
-      }
       for (const player of players) {
         if (player) {
-          player.score = paint.cost * 2;
+          player.score = EXTRA_LIFE_COST * 2;
         }
       }
     } else if (!['empty', 'boundary', 'satellite'].includes(String(body['scenario'])) && first) {

@@ -49,7 +49,7 @@ test('a scan protects nearby teammates but an out-of-range or dead scanner does 
   expect(manager.snapshot().spiders[0]?.targetId).toBe(teammate.id);
 });
 
-test('the real engine repels only with an active Mineral Scan, not a probe or builder equip', () => {
+test('the real engine repels only with an active Mineral Scan, not a probe equip', () => {
   const engine = new GameEngine(42);
   const actor = engine.addPlayer('scout', 'Scout', new RecordingSocket(), undefined, 'surveyor');
   actor.position = { x: 2200, y: 2200 };
@@ -61,7 +61,7 @@ test('the real engine repels only with an active Mineral Scan, not a probe or bu
   engine.advanceOneFrame();
   expect(engine.getSpiderField().spiders[0]?.position.x).toBeGreaterThan(2250);
   expect(engine.getSpiderField().spiders[0]?.targetId).toBeNull();
-  for (const utility of ['survey_probe', 'build_furnace']) {
+  for (const utility of ['survey_probe'] as const) {
     engine.setSurveyorUtility(actor.id, utility);
     actor.abilityActiveFrames = 100;
     engine.advanceOneFrame();

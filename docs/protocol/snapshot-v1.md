@@ -45,7 +45,10 @@ latch. Reconnection uses authoritative attachment state and never replays an
 ability request.
 
 Surveyor snapshots include optional `surveyorUtility` (`mineral_scan` or
-`survey_probe`; missing means mineral scan). `setSurveyorUtility` accepts only
+`survey_probe`; missing means mineral scan). A server that still equips the
+retired street tool may send `build_furnace`. The decoder keeps that value so
+a later clear still matches the baseline. Play treats it as mineral scan and
+does not build a street. `setSurveyorUtility` accepts only
 the socket owner's Surveyor ID and a valid `utilityId`. `useAbility` launches
 the selected tool; clients never submit a probe pose, target, health, or expiry.
 An asteroid's optional `probe` stores its beacon ID, owner, health, maximum
@@ -54,14 +57,12 @@ and radial offset. The client derives the moving beacon pose from the host.
 An explicit null or absence in a complete asteroid row clears the beacon.
 The server owns attachment, damage, scan pulses, expiry, and replacement.
 
-`civicModules` lists lit street furnaces with `builderName` and an optional
-`builderId`. That id is the public pilot who paid; older unnamed streets omit
-it and grant no delivery bonus. `buyShipPaint` accepts the socket owner's id
-and a catalog `paintId` while that ship is inside the Town Square store.
-Success replies `townStoreResult` with the notice, the new score, and the
-catalog color, then broadcasts. A refusal replies with the notice only and
-spends nothing. A request for another pilot's id is ignored. Player `color`
-stays the kit default until a catalog paint is worn.
+`buyExtraLife` accepts the socket owner's id while that ship is inside the
+Town Square store. Success replies `townStoreResult` with the notice, the new
+score, and the new life count, then broadcasts. A refusal replies with the
+notice only and spends nothing. A request for another pilot's id is ignored.
+The store sells one extra life up to the life cap. Player `color` stays the
+kit default.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps
@@ -106,7 +107,10 @@ Excluded recipients keep their own baseline. Each recipient receives nearby
 asteroids, projectiles, loot and pickups within 2,800 world units on each axis.
 The crew roster, shared exploration, and revealed `mapAssets` remain global.
 These lightweight furnace and valuable-drop markers supply the universe map;
-they do not require distant asteroid geometry. The outbound budget accommodates
+they do not require distant asteroid geometry. Kind `foundation` is a retired
+street lot. Older servers still send one row per lot. The decoder keeps each
+row so a later map delta can update or remove it, and the universe map neither
+draws nor names it. The outbound budget accommodates
 a fully explored 120,000-unit-wide atlas on late joins and resynchronization.
 Each detached view has
 its own encoder; no baseline points at mutable game engine state.

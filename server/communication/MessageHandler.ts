@@ -95,8 +95,8 @@ export class MessageHandler {
         case 'setSurveyorUtility':
           this.handleSetSurveyorUtility(ws, command);
           break;
-        case 'buyShipPaint':
-          this.handleBuyShipPaint(ws, command);
+        case 'buyExtraLife':
+          this.handleBuyExtraLife(ws, command);
           break;
 
         case 'update':
@@ -472,12 +472,12 @@ export class MessageHandler {
     this.broadcaster.broadcastGameState();
   }
 
-  private handleBuyShipPaint(ws: WebSocket, command: CommandOf<'buyShipPaint'>): void {
+  private handleBuyExtraLife(ws: WebSocket, command: CommandOf<'buyExtraLife'>): void {
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
     if (!socketPlayer || socketPlayer.id !== command.id) {
       return;
     }
-    const issue = this.gameEngine.buyShipPaint(command.id, command.paintId);
+    const issue = this.gameEngine.buyExtraLife(command.id);
     const pilot = this.gameEngine.getPlayer(command.id);
     ws.send(
       JSON.stringify({
@@ -485,9 +485,9 @@ export class MessageHandler {
         data: issue
           ? { message: issue }
           : {
-              message: this.gameEngine.townStoreNotice(command.paintId),
+              message: this.gameEngine.townStoreNotice(pilot?.lives ?? 0),
               score: pilot?.score,
-              color: pilot?.color,
+              lives: pilot?.lives,
             },
         timestamp: Date.now(),
       })
@@ -525,17 +525,6 @@ export class MessageHandler {
       : undefined;
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
-    if (socketPlayer.kitId === 'surveyor' && socketPlayer.surveyorUtility === 'build_furnace') {
-      ws.send(
-        JSON.stringify({
-          type: 'furnaceBuildResult',
-          data: activated
-            ? this.gameEngine.furnaceBuildNotice()
-            : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
-          timestamp: Date.now(),
-        })
-      );
-    }
     if (!activated) {
       return;
     }

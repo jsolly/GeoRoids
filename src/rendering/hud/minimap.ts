@@ -4,7 +4,6 @@ import {
   explorationCellsInView,
   isCellExplored,
 } from '../../../shared/exploration';
-import { CIVIC_LOTS } from '../../../shared/furnaces';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { WORLD } from '../../../shared/world';
 import type {
@@ -28,11 +27,7 @@ import { getSpiderField } from '../../physics/terrain/spiderSession';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
 import { resolveGlow } from '../renderQuality';
-import {
-  drawFoundationMapMark,
-  drawFurnaceMapMark,
-  MINIMAP_FURNACE_MARK_SIZE,
-} from './furnaceMapMark';
+import { drawFurnaceMapMark, MINIMAP_FURNACE_MARK_SIZE } from './furnaceMapMark';
 import type { HudLayout } from './hudLayout';
 import { addResourceMapPath, asteroidMapInk, drawResourceMapMark } from './resourceMapMark';
 
@@ -504,20 +499,6 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
       continue;
     }
     drawFurnaceMapMark(ctx, projection.x, projection.y, MINIMAP_FURNACE_MARK_SIZE);
-  }
-  for (const lot of CIVIC_LOTS) {
-    if (worldFurnaces.isLit(lot.id)) {
-      continue;
-    }
-    const dx = lot.position.x - geometry.center.x;
-    const dy = lot.position.y - geometry.center.y;
-    if (Math.hypot(dx, dy) > geometry.radius) {
-      continue;
-    }
-    if (!projectPosition(geometry, lot.position)) {
-      continue;
-    }
-    drawFoundationMapMark(ctx, projection.x, projection.y, MINIMAP_FURNACE_MARK_SIZE);
   }
   ctx.restore();
 }

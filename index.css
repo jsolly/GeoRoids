@@ -218,14 +218,6 @@
     border-bottom: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 35%, transparent);
   }
 
-  .town-store-swatch {
-    width: 28px;
-    height: 28px;
-    flex: 0 0 auto;
-    border: 1px solid var(--palette-hud, #e2e8f0);
-    border-radius: 50%;
-  }
-
   .town-store-copy {
     display: flex;
     flex: 1;

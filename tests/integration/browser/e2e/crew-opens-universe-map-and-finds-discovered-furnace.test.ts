@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { civicLot } from '../../../../shared/furnaces';
+import { TOWN_HEARTH } from '../../../../shared/furnaces';
 import { WORLD } from '../../../../shared/world';
 import {
   assertNoBrowserDiagnostics,
@@ -13,19 +13,13 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 const REVEALED_ASSETS_STATUS_PATTERN = /\d+ revealed assets/u;
 
-const FAR_FURNACE = (() => {
-  const furnace = civicLot('street-2-0');
-  if (!furnace) {
-    throw new Error('Universe map fixture requires an outer street foundation');
-  }
-  return furnace;
-})();
+const DEPARTURE = { x: WORLD.minimapRadius + 4_000, y: 0 };
 
 function formatMapCoordinate(value: number): string {
   return `${value >= 0 ? '+' : ''}${Math.round(value)}`;
 }
 
-const FAR_FURNACE_LOCATION = `X ${formatMapCoordinate(FAR_FURNACE.position.x)}, Y ${formatMapCoordinate(FAR_FURNACE.position.y)}`;
+const TOWN_LOCATION = `X ${formatMapCoordinate(TOWN_HEARTH.position.x)}, Y ${formatMapCoordinate(TOWN_HEARTH.position.y)}`;
 
 type MapFrame = {
   open: boolean;
@@ -127,10 +121,10 @@ test.each([
     await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
     const playerId = await game.getLocalPlayerId();
     await arrangeCrewField([playerId], 'empty');
-    await game.placeShipAt(FAR_FURNACE.position.x, FAR_FURNACE.position.y);
+    await game.placeShipAt(TOWN_HEARTH.position.x, TOWN_HEARTH.position.y);
 
-    // Passive Surveyor exploration reveals the regional cell. The marker must
-    // survive after the pilot returns home, outside the local minimap radius.
+    // Town Square is the only hearth. Its marker must survive after the pilot
+    // leaves it beyond the local minimap radius.
     const assets = await page.evaluateHandle<
       () => readonly import('../../../../shared-types').MapAsset[]
     >(
@@ -142,7 +136,7 @@ test.each([
           () =>
             assets.evaluate(
               (readAssets, id) => readAssets().some((asset) => asset.id === id),
-              `furnace:${FAR_FURNACE.id}`
+              `furnace:${TOWN_HEARTH.id}`
             ),
           {
             timeout: 5000,
@@ -153,10 +147,8 @@ test.each([
     } finally {
       await assets.dispose();
     }
-    await game.placeShipAt(0, 0);
-    expect(Math.hypot(FAR_FURNACE.position.x, FAR_FURNACE.position.y)).toBeGreaterThan(
-      WORLD.minimapRadius
-    );
+    await game.placeShipAt(DEPARTURE.x, DEPARTURE.y);
+    expect(Math.hypot(DEPARTURE.x, DEPARTURE.y)).toBeGreaterThan(WORLD.minimapRadius);
 
     if (!touch) {
       await page.locator('#universe-map-toggle').focus();
@@ -178,8 +170,8 @@ test.each([
       expect(await page.locator('.universe-map-help').textContent()).toMatch(/Esc/u);
     }
     const locations = page.getByRole('list', { name: 'Revealed landmarks and crew coordinates' });
-    await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(FAR_FURNACE.name);
-    expect(await locations.textContent()).toContain(FAR_FURNACE_LOCATION);
+    await expect.poll(() => locations.textContent(), { timeout: 5000 }).toContain(TOWN_HEARTH.name);
+    expect(await locations.textContent()).toContain(TOWN_LOCATION);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(
         `crew-universe-map-${touch ? 'mobile' : 'desktop'}.png`
@@ -209,7 +201,7 @@ test.each([
     expect(await page.locator('#universe-map-zoom').textContent()).toBe('100%');
     const wholeWorld = await readMapFrame(page);
     expect(wholeWorld.labels).toContain('120k across');
-    expect(wholeWorld.labels).toContain(FAR_FURNACE.name);
+    expect(wholeWorld.labels).toContain(TOWN_HEARTH.name);
     await locate.click();
     expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
     expect(await locate.getAttribute('aria-pressed')).toBe('true');
@@ -225,11 +217,11 @@ test.each([
         message: 'the universe map should close',
       })
       .toBe(false);
-    await game.placeShipAt(FAR_FURNACE.position.x, FAR_FURNACE.position.y);
+    await game.placeShipAt(DEPARTURE.x, DEPARTURE.y);
     await page.locator('#universe-map-toggle').click();
     await expect
       .poll(() => page.locator('#universe-map-status').textContent())
-      .toContain(`X ${formatMapCoordinate(FAR_FURNACE.position.x)}`);
+      .toContain(`X ${formatMapCoordinate(DEPARTURE.x)}`);
     expect(await page.locator('#universe-map-zoom').textContent()).toBe('2400%');
     await page.locator('#universe-map-close').click();
     if (!touch) {

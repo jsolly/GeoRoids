@@ -983,4 +983,12 @@
     padding: 1rem 1.5rem;
     border-left: 2px solid currentColor;
   }
+
+  .game-reference summary {
+    cursor: pointer;
+  }
+
+  .game-reference details[open] summary {
+    margin-bottom: 1rem;
+  }
 }

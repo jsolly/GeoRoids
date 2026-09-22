@@ -10,8 +10,8 @@ let mapAssets: MapAsset[] = [];
 export function getWorldMapAssets(): readonly MapAsset[] {
   return mapAssets;
 }
-export function setWorldMapAssets(value: MapAsset[]): void {
-  mapAssets = value;
+export function setWorldMapAssets(value: readonly MapAsset[]): void {
+  mapAssets = value.filter((asset) => asset.kind !== 'foundation');
 }
 
 function sameExploration(
@@ -39,7 +39,6 @@ export function setWorldExploration(value: ExplorationTile[]): void {
 }
 
 export function resetWorldExploration(): void {
-  worldFurnaces.replaceLit([]);
   mapAssets = [];
   exploration = EMPTY_EXPLORATION;
 }

@@ -17,11 +17,6 @@ test('each kit exposes its own E action label and name', () => {
   expect(touchAbilityLabel('unknown-kit')).toBe('SCAN');
 });
 
-test('Build changes the mobile ability label and name', () => {
-  expect(touchAbilityLabel('surveyor', 'build_furnace')).toBe('BUILD');
-  expect(touchAbilityName('surveyor', 'build_furnace')).toBe('Build');
-});
-
 test('Survey Probe changes the mobile ability label, name, and cooldown scale', () => {
   expect(touchAbilityLabel('surveyor', 'survey_probe')).toBe('PROBE');
   expect(touchAbilityName('surveyor', 'survey_probe')).toBe('Survey probe');

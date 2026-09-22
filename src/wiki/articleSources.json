@@ -382,9 +382,8 @@
     "tests/unit/server/survey-probes-follow-spiders-to-guarded-resources.test.ts",
     "tests/integration/browser/e2e/surveyor-tags-a-spider-with-a-moving-beacon.test.ts",
     "shared/furnaceField.ts",
-    "tests/unit/server/surveyors-build-persistent-crew-furnaces.test.ts",
     "shared/townStore.ts",
-    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts",
+    "tests/unit/server/town-square-sells-an-extra-life.test.ts",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts"
   ],
@@ -466,6 +465,6 @@
     "server/core/TerrainSpiderManager.ts",
     "shared/townStore.ts",
     "src/ui/townStore.ts",
-    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts"
+    "tests/unit/server/town-square-sells-an-extra-life.test.ts"
   ]
 }

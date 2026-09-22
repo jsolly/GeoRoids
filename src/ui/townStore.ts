@@ -1,14 +1,7 @@
-import {
-  insideTownStore,
-  purchasedHullColor,
-  SHIP_PAINTS,
-  TOWN_YIELD_PER_MODULE,
-  townDeliveryBonusPercent,
-} from '../../shared/townStore';
+import { EXTRA_LIFE_COST, insideTownStore, MAX_LIVES } from '../../shared/townStore';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { NetworkManager } from '../network/networkManager';
-import { worldFurnaces } from '../network/worldExploration';
 import { logger } from '../utils/Logger';
 import { closeShipSchematic } from './shipSchematic';
 import { bindTownStoreClose, isTownStoreOpen, setTownStoreOpen } from './townStoreState';
@@ -18,9 +11,9 @@ import { shouldUseTouchControls } from './viewportChrome';
 export const TOWN_STORE_IDS = {
   dialog: 'town-store-dialog',
   close: 'town-store-close',
-  yield: 'town-store-yield',
   score: 'town-store-score',
-  paints: 'town-store-paints',
+  offer: 'town-store-offer',
+  price: 'town-store-life-price',
   status: 'town-store-status',
   toggle: 'town-store-toggle',
   return: 'town-store-return',
@@ -40,9 +33,8 @@ const BLOCKED_GAMEPLAY_KEYS = new Set([
 type StoreElements = {
   dialog: HTMLDialogElement;
   close: HTMLButtonElement;
-  yieldLine: HTMLElement;
   score: HTMLElement;
-  paints: HTMLElement;
+  offer: HTMLElement;
   status: HTMLElement;
   toggle: HTMLButtonElement;
   return: HTMLButtonElement;
@@ -52,7 +44,6 @@ let initialized = false;
 let closeInProgress = false;
 let elements: StoreElements | null = null;
 let openInputRelease: (() => void) | undefined;
-let paintSignature = '';
 
 function townStoreAvailable(): boolean {
   if (typeof document === 'undefined' || !document.body.classList.contains('in-play')) {
@@ -63,14 +54,6 @@ function townStoreAvailable(): boolean {
     return false;
   }
   return insideTownStore(player.ship.position);
-}
-
-function streetsBuiltByLocal() {
-  const id = PlayerManager.getInstance().getLocalPlayer()?.id;
-  if (!id) {
-    return 0;
-  }
-  return worldFurnaces.modulesBuiltBy(id);
 }
 
 function syncToggleChrome(): void {
@@ -91,40 +74,36 @@ function syncToggleChrome(): void {
   elements.toggle.setAttribute('aria-label', 'Open town store (B)');
 }
 
-function paintRows(): void {
+function lifeButton(): HTMLButtonElement | null {
   if (!elements) {
-    return;
+    return null;
   }
-  const player = PlayerManager.getInstance().getLocalPlayer();
-  const worn = player?.ship.color;
-  elements.paints.replaceChildren(
-    ...SHIP_PAINTS.map((paint) => {
-      const row = document.createElement('div');
-      row.className = 'town-store-row';
-      const swatch = document.createElement('span');
-      swatch.className = 'town-store-swatch';
-      swatch.style.background = paint.color;
-      swatch.setAttribute('aria-hidden', 'true');
-      const copy = document.createElement('span');
-      copy.className = 'town-store-copy';
-      const name = document.createElement('strong');
-      name.textContent = paint.name;
-      const price = document.createElement('small');
-      price.textContent = `${paint.cost.toLocaleString('en-US')} score`;
-      copy.append(name, price);
-      const buy = document.createElement('button');
-      buy.type = 'button';
-      buy.dataset['paintId'] = paint.id;
-      const already = worn === paint.color;
-      buy.textContent = already ? 'Worn' : 'Buy';
-      buy.disabled = already;
-      buy.addEventListener('click', () => {
-        purchasePaint(paint.id);
-      });
-      row.append(swatch, copy, buy);
-      return row;
-    })
+  const existing = elements.offer.querySelector<HTMLButtonElement>(
+    'button[data-offer="extra-life"]'
   );
+  if (existing) {
+    return existing;
+  }
+  const row = document.createElement('div');
+  row.className = 'town-store-row';
+  const copy = document.createElement('span');
+  copy.className = 'town-store-copy';
+  const name = document.createElement('strong');
+  name.textContent = 'Extra life';
+  const price = document.createElement('small');
+  price.id = TOWN_STORE_IDS.price;
+  price.textContent = `${EXTRA_LIFE_COST.toLocaleString('en-US')} score`;
+  copy.append(name, price);
+  const buy = document.createElement('button');
+  buy.type = 'button';
+  buy.dataset['offer'] = 'extra-life';
+  buy.setAttribute('aria-describedby', TOWN_STORE_IDS.price);
+  buy.addEventListener('click', () => {
+    purchaseExtraLife();
+  });
+  row.append(copy, buy);
+  elements.offer.replaceChildren(row);
+  return buy;
 }
 
 function refreshStoreCopy(): void {
@@ -132,23 +111,22 @@ function refreshStoreCopy(): void {
     return;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
-  const built = streetsBuiltByLocal();
-  const bonus = townDeliveryBonusPercent(built);
-  const perStreet = Math.round(TOWN_YIELD_PER_MODULE * 100);
-  elements.yieldLine.textContent =
-    built === 0
-      ? `Each street you build adds ${perStreet}% to your own furnace deliveries.`
-      : `You built ${built} ${built === 1 ? 'street' : 'streets'}. Your deliveries pay ${bonus}% more.`;
   elements.score.textContent = `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`;
-  const signature = `${player?.ship.color ?? ''}:${built}:${player?.score ?? 0}`;
-  if (signature !== paintSignature) {
-    paintSignature = signature;
-    paintRows();
+  const buy = lifeButton();
+  if (!buy) {
+    return;
+  }
+  const full = (player?.lives ?? 0) >= MAX_LIVES;
+  const wasFocused = document.activeElement === buy;
+  buy.textContent = full ? 'Extra life, lives full' : 'Buy extra life';
+  buy.disabled = full;
+  if (wasFocused && buy.disabled) {
+    elements.return.focus({ preventScroll: true });
   }
 }
 
 function createDialogMarkup(dialog: HTMLDialogElement): void {
-  if (dialog.querySelector(`#${TOWN_STORE_IDS.paints}`)) {
+  if (dialog.querySelector(`#${TOWN_STORE_IDS.offer}`)) {
     return;
   }
   dialog.classList.add('town-store-dialog');
@@ -161,9 +139,8 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       </div>
       <button id="${TOWN_STORE_IDS.close}" type="button" aria-label="Close store">×</button>
     </header>
-    <p id="${TOWN_STORE_IDS.yield}"></p>
     <p id="${TOWN_STORE_IDS.score}"></p>
-    <div id="${TOWN_STORE_IDS.paints}"></div>
+    <div id="${TOWN_STORE_IDS.offer}"></div>
     <p id="${TOWN_STORE_IDS.status}" role="status" aria-live="polite"></p>
     <button id="${TOWN_STORE_IDS.return}" type="button">Return to flight</button>
   `;
@@ -196,26 +173,25 @@ function ensureElements(): StoreElements | null {
     }
   }
   const close = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.close}`);
-  const yieldLine = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.yield}`);
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
-  const paints = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.paints}`);
+  const offer = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`);
   const status = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.status}`);
   const returnButton = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.return}`);
-  if (!close || !yieldLine || !score || !paints || !status || !returnButton) {
+  if (!close || !score || !offer || !status || !returnButton) {
     return null;
   }
-  return { dialog, close, yieldLine, score, paints, status, toggle, return: returnButton };
+  return { dialog, close, score, offer, status, toggle, return: returnButton };
 }
 
-function purchasePaint(paintId: string): void {
+function purchaseExtraLife(): void {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player || !isTownStoreOpen()) {
     return;
   }
   NetworkManager.getInstance().sendMessage({
-    type: 'buyShipPaint',
+    type: 'buyExtraLife',
     id: player.id,
-    data: { paintId },
+    data: {},
   });
 }
 
@@ -237,9 +213,8 @@ export function applyTownStoreResult(data: unknown): void {
   if ('score' in data && typeof data.score === 'number' && Number.isFinite(data.score)) {
     player.score = data.score;
   }
-  if ('color' in data && typeof data.color === 'string' && purchasedHullColor(data.color)) {
-    player.color = data.color;
-    player.ship.color = data.color;
+  if ('lives' in data && typeof data.lives === 'number' && Number.isInteger(data.lives)) {
+    player.lives = data.lives;
   }
   refreshStoreCopy();
 }

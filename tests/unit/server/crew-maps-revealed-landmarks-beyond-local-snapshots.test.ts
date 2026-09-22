@@ -7,19 +7,15 @@ import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersist
 import { MapAssets } from '../../../server/world/MapAssets';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { ExplorationMap } from '../../../shared/exploration';
-import { CIVIC_LOTS, TOWN_HEARTH } from '../../../shared/furnaces';
+import { TOWN_HEARTH } from '../../../shared/furnaces';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import { WORLD } from '../../../shared/world';
 import type { LootData } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('the global map shares the street plan while each pilot receives only nearby asteroid geometry', () => {
-  const distantLot = CIVIC_LOTS.find((lot) => lot.ring === 3);
-  if (!distantLot) {
-    throw new Error('Expected an outer street lot');
-  }
-  const distant = distantLot.position;
+test('the global map shares Town Square while each pilot receives only nearby asteroid geometry', () => {
+  const distant = { x: 40_000, y: 24_000 };
   const engine = new GameEngine(82);
   const broadcaster = new GameStateBroadcaster(engine);
   const nearSocket = new RecordingSocket();
@@ -34,12 +30,14 @@ test('the global map shares the street plan while each pilot receives only nearb
     kind: 'furnace',
     position: TOWN_HEARTH.position,
   });
-  expect(engine.getGameState().mapAssets).toContainEqual({
-    id: `furnace:${distantLot.id}`,
-    name: distantLot.name,
-    kind: 'foundation',
-    position: distant,
-  });
+  expect(engine.getGameState().mapAssets.filter((asset) => asset.kind === 'furnace')).toEqual([
+    {
+      id: `furnace:${TOWN_HEARTH.id}`,
+      name: TOWN_HEARTH.name,
+      kind: 'furnace',
+      position: TOWN_HEARTH.position,
+    },
+  ]);
   engine.tickAbilities();
   broadcaster.broadcastGameState();
   const nearRaw = nearSocket.sent.find((raw) => JSON.parse(raw).type === 'snapshot');
@@ -49,10 +47,10 @@ test('the global map shares the street plan while each pilot receives only nearb
   const far = decodeSnapshotMessage(new SnapshotDecoder(), farRaw);
   expect(near.mapAssets).toEqual(far.mapAssets);
   expect(near.mapAssets).toContainEqual({
-    id: `furnace:${distantLot.id}`,
-    name: distantLot.name,
-    kind: 'foundation',
-    position: distant,
+    id: `furnace:${TOWN_HEARTH.id}`,
+    name: TOWN_HEARTH.name,
+    kind: 'furnace',
+    position: TOWN_HEARTH.position,
   });
   expect(near.asteroids.length).toBeGreaterThan(0);
   expect(far.asteroids.length).toBeGreaterThan(0);
@@ -75,9 +73,9 @@ test('the global map shares the street plan while each pilot receives only nearb
   ).toBe(0);
   scout.position = { x: 0, y: 0 };
   engine.ensureAsteroidField();
-  expect(
-    engine.getGameState().mapAssets.filter((asset) => asset.kind === 'foundation')
-  ).toHaveLength(CIVIC_LOTS.length);
+  expect(engine.getGameState().mapAssets.filter((asset) => asset.kind === 'furnace')).toEqual([
+    expect.objectContaining({ id: `furnace:${TOWN_HEARTH.id}` }),
+  ]);
 });
 
 test('valuable drops appear only after exploration and disappear when collected without mapping ordinary shards', () => {
@@ -89,7 +87,7 @@ test('valuable drops appear only after exploration and disappear when collected 
     { id: 'canister', kind: 'tap', position: { x: 40_000, y: 24_000 }, radius: 28, mass: 0.4 },
   ];
   const cold = assets.snapshot(exploration.snapshot(), drops, []);
-  expect(cold.every((asset) => asset.kind === 'furnace' || asset.kind === 'foundation')).toBe(true);
+  expect(cold.every((asset) => asset.kind === 'furnace')).toBe(true);
   expect(cold.some((asset) => asset.id === 'loot:core')).toBe(false);
   exploration.reveal(drops[0]?.position ?? { x: 0, y: 0 }, 260);
   const revealed = assets.snapshot(exploration.snapshot(), drops, []);
@@ -129,9 +127,9 @@ test('a pilot can join and resynchronize after the crew has explored the entire 
     expect(decoded.mapAssets.filter((asset) => asset.kind === 'furnace')).toContainEqual(
       expect.objectContaining({ id: `furnace:${TOWN_HEARTH.id}` })
     );
-    expect(decoded.mapAssets.filter((asset) => asset.kind === 'foundation').length).toBe(
-      CIVIC_LOTS.length
-    );
+    expect(decoded.mapAssets.filter((asset) => asset.kind === 'furnace')).toEqual([
+      expect.objectContaining({ id: `furnace:${TOWN_HEARTH.id}` }),
+    ]);
     expect(decoded.asteroids.length).toBeGreaterThan(0);
     expect(socket.readyState).toBe(1);
 

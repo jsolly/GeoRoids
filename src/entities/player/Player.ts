@@ -1,4 +1,3 @@
-import { purchasedHullColor } from '../../../shared/townStore';
 import type {
   HaulerUtilityId,
   Position,
@@ -24,6 +23,7 @@ import {
   isSilentHudReset,
   resolveCombatDeathCause,
 } from '../ship/shipUtils';
+import { DEFAULT_SURVEYOR_UTILITY, isSurveyorUtilityId } from '../ship/surveyorUtility';
 
 function copyVec2(dest: { x: number; y: number }, src: { x: number; y: number }): void {
   dest.x = src.x;
@@ -233,7 +233,7 @@ export class Player {
     if (data.boost !== undefined && this.type !== 'local') {
       this.ship.boost = { ...data.boost };
     }
-    if (data.color !== undefined && (this.type !== 'local' || purchasedHullColor(data.color))) {
+    if (data.color !== undefined && this.type !== 'local') {
       this.color = data.color;
       this.ship.color = data.color;
     }
@@ -339,7 +339,9 @@ export class Player {
     // A local tool choice survives stale snapshots while a remote Surveyor
     // follows the authoritative utility row.
     if (data.surveyorUtility !== undefined && this.type !== 'local') {
-      this.ship.surveyorUtility = data.surveyorUtility;
+      this.ship.surveyorUtility = isSurveyorUtilityId(data.surveyorUtility)
+        ? data.surveyorUtility
+        : DEFAULT_SURVEYOR_UTILITY;
     }
     // Handle respawn timer from server
     if (data.respawnTimer !== undefined) {

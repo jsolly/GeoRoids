@@ -29,7 +29,7 @@ import {
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
-import { drawFurnacePipes, drawFurnacesRelative, drawStreetFoundations } from './furnaceRenderer';
+import { drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
@@ -96,8 +96,6 @@ export function drawGame(
   if (roids.length > 0) {
     drawSurveyProbes(roids, currShip.position);
   }
-  drawFurnacePipes(currShip.position);
-  drawStreetFoundations(currShip.position);
   drawFurnacesRelative(currShip.position);
   drawAsteroidShatterBursts(currShip);
 

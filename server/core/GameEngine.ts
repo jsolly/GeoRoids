@@ -15,15 +15,8 @@ import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../share
 import { chooseCrewSpawn } from '../../shared/crewSpawn';
 import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
-import {
-  civicLot,
-  civicLotAt,
-  civicModuleName,
-  furnaceReward,
-  TOWN_HEARTH,
-  townSquareSpawn,
-} from '../../shared/furnaces';
+import { FurnaceField } from '../../shared/furnaceField';
+import { furnaceReward, TOWN_HEARTH, townSquareSpawn } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import {
   blastPush,
@@ -38,18 +31,16 @@ import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import {
+  EXTRA_LIFE_COST,
   insideTownStore,
-  purchasedHullColor,
-  shipPaintById,
+  MAX_LIVES,
   TOWN_STORE_ISSUE,
-  townDeliveryPoints,
 } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
   AsteroidData,
-  CivicModule,
   ExplorationTile,
   FurnaceDelivery,
   LootCollected,
@@ -73,9 +64,7 @@ import {
   isTowCableUtility,
 } from '../../src/entities/ship/haulerUtility';
 import {
-  abilityCooldownFramesFor,
   activateAbilityOnHost,
-  canActivateAbility,
   clearHaulerLatch,
   pullHarpoonTarget,
   setHaulerUtilityOnHost,
@@ -237,7 +226,6 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
   exploration: ExplorationTile[];
-  civicModules: readonly CivicModule[];
   startedAt: number;
   asteroidDensityVersion: number;
   asteroidMotionVersion: number;
@@ -260,7 +248,6 @@ export class GameEngine {
   private readonly pilots = new Map<string, PersistentPilot>();
   private managedField: boolean = true;
   private pendingFurnaceDeliveries: FurnaceDelivery[] = [];
-  private lastFurnaceBuildNotice = '';
   public entityManager: EntityManager;
   private asteroidManager: AsteroidManager;
   private lootManager: LootManager;
@@ -332,7 +319,6 @@ export class GameEngine {
     this.rngService = new RNGService(this.worldSeed);
     this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
     if (loaded?.world) {
-      this.furnaces.replaceLit(loaded.world.civicModules ?? []);
       this.exploration.restore(loaded.world.exploration);
     }
     if ((saved?.asteroidMotionVersion ?? 0) < WORLD.asteroidMotionVersion) {
@@ -666,7 +652,6 @@ export class GameEngine {
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
-    this.clearTown();
     this.rngService.reset();
     this.createAsteroids(scenario === 'combat' ? 80 : ROID.INITIAL_ROID_COUNT);
     this.seedAsteroidInteractions();
@@ -683,7 +668,6 @@ export class GameEngine {
     this.pendingFurnaceDeliveries = [];
     this.exploration.reset();
     this.mapAssets.reset();
-    this.clearTown();
     this.playerMotion.reset();
     this.entityManager.clearAll();
 
@@ -760,7 +744,6 @@ export class GameEngine {
       mass: actor.mass,
       health: actor.health,
       boost: { ...actor.boost },
-      ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
     if (previous === undefined) {
@@ -915,9 +898,6 @@ export class GameEngine {
       flight?.position,
       requestedKit ?? flight?.kitId
     );
-    if (saved.hullColor) {
-      actor.color = saved.hullColor;
-    }
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
     actor.score = saved.lives === 0 ? GAME.STARTING_SCORE : saved.score;
     actor.silk = saved.silk ?? 0;
@@ -1044,7 +1024,6 @@ export class GameEngine {
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
       exploration: this.exploration.snapshot(),
-      civicModules: this.furnaces.litModules(),
       startedAt: this.worldStartedAt,
       asteroidDensityVersion: WORLD.asteroidDensityVersion,
       asteroidMotionVersion: WORLD.asteroidMotionVersion,
@@ -1053,7 +1032,6 @@ export class GameEngine {
     if (
       last &&
       last.exploration === builtFrom.exploration &&
-      last.civicModules === builtFrom.civicModules &&
       last.startedAt === builtFrom.startedAt &&
       last.asteroidDensityVersion === builtFrom.asteroidDensityVersion &&
       last.asteroidMotionVersion === builtFrom.asteroidMotionVersion
@@ -1069,7 +1047,6 @@ export class GameEngine {
         asteroidMotionVersion: WORLD.asteroidMotionVersion,
         writtenReleaseId: SERVER_RELEASE_ID,
         exploration: builtFrom.exploration,
-        civicModules: [...this.furnaces.litModules()],
       },
       builtFrom,
     };
@@ -2483,12 +2460,8 @@ export class GameEngine {
     const exploration = this.exploration.snapshot();
     const loot = this.lootManager.getAll();
     const satellitePickups = this.satellitePickupManager.getAllPickups();
-    const moduleNames = new Map(
-      this.furnaces.litModules().map((module) => [module.id, this.furnaces.displayName(module.id)])
-    );
     const gameState = {
-      civicModules: [...this.furnaces.litModules()],
-      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups, moduleNames),
+      mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups),
       exploration: this.exploration.snapshot(),
       entities: allEntities.map(
         (entity) =>
@@ -2555,9 +2528,6 @@ export class GameEngine {
       return false;
     }
     if (entity.kitId === 'surveyor') {
-      if (surveyorUtilityOf(entity) === 'build_furnace') {
-        return this.buildFurnace(entity);
-      }
       if (surveyorUtilityOf(entity) === 'survey_probe') {
         return this.launchSurveyProbe(entity);
       }
@@ -2661,96 +2631,30 @@ export class GameEngine {
     );
   }
 
-  public furnaceBuildIssue(entityId: string): string | undefined {
-    const surveyor = this.getPlayer(entityId);
-    if (
-      surveyor?.kitId !== 'surveyor' ||
-      !canActivateAbility(surveyor) ||
-      surveyor.respawnTimer !== undefined
-    ) {
-      return FURNACE_BUILD.ISSUE.READY;
-    }
-    const lot = civicLotAt(surveyor.position);
-    if (!lot) {
-      return FURNACE_BUILD.ISSUE.STAND;
-    }
-    if (this.furnaces.isLit(lot.id)) {
-      return FURNACE_BUILD.ISSUE.LIT;
-    }
-    if (lot.parentId !== TOWN_HEARTH.id && !this.furnaces.isLit(lot.parentId)) {
-      const parent = civicLot(lot.parentId);
-      return parent
-        ? `Light ${this.furnaces.displayName(parent.id)} first`
-        : 'Light the nearer street first';
-    }
-    const score = Number.isSafeInteger(surveyor.score) ? surveyor.score : 0;
-    if (score < lot.cost) {
-      return `You need ${lot.cost - Math.max(0, score)} more score`;
-    }
-    if (this.spiderManager.furnaceWouldCoverNest(lot.position)) {
-      return FURNACE_BUILD.ISSUE.NEST;
-    }
-    return undefined;
-  }
-
-  public furnaceBuildNotice(): string {
-    return this.lastFurnaceBuildNotice;
-  }
-
-  /** Spend personal score on a Town Square hull paint. Undefined means the hull changed. */
-  public buyShipPaint(entityId: string, paintId: string): string | undefined {
-    const paint = shipPaintById(paintId);
+  /** Spend personal score on one extra life. Undefined means the life was added. */
+  public buyExtraLife(entityId: string): string | undefined {
     const pilot = this.getPlayer(entityId);
-    if (
-      !paint ||
-      !pilot ||
-      pilot.exploding ||
-      pilot.health <= 0 ||
-      pilot.respawnTimer !== undefined
-    ) {
+    if (!pilot || pilot.exploding || pilot.health <= 0 || pilot.respawnTimer !== undefined) {
       return TOWN_STORE_ISSUE.CLOSED;
     }
     if (!insideTownStore(pilot.position)) {
       return TOWN_STORE_ISSUE.AWAY;
     }
-    if (pilot.color === paint.color) {
-      return TOWN_STORE_ISSUE.WORN;
+    if (pilot.lives >= MAX_LIVES) {
+      return TOWN_STORE_ISSUE.FULL;
     }
     const score = Number.isSafeInteger(pilot.score) ? pilot.score : 0;
-    if (score < paint.cost) {
-      return `You need ${paint.cost - Math.max(0, score)} more score`;
+    if (score < EXTRA_LIFE_COST) {
+      return `You need ${EXTRA_LIFE_COST - Math.max(0, score)} more score`;
     }
-    pilot.score -= paint.cost;
-    pilot.color = paint.color;
+    pilot.score -= EXTRA_LIFE_COST;
+    pilot.lives += 1;
     this.capturePilot(entityId);
     return undefined;
   }
 
-  public townStoreNotice(paintId: string): string {
-    const paint = shipPaintById(paintId);
-    return paint ? `${paint.name} is on your hull` : TOWN_STORE_ISSUE.CLOSED;
-  }
-
-  private clearTown(): void {
-    this.furnaces.replaceLit([]);
-  }
-
-  private buildFurnace(surveyor: GameEntity): boolean {
-    if (this.furnaceBuildIssue(surveyor.id)) {
-      return false;
-    }
-    const lot = civicLotAt(surveyor.position);
-    if (!lot) {
-      return false;
-    }
-    const builderName = sanitizePlayerName(surveyor.name);
-    surveyor.score -= lot.cost;
-    this.capturePilot(surveyor.id);
-    this.furnaces.light(lot.id, builderName, surveyor.id);
-    this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
-    surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
-    surveyor.abilityActiveFrames = 0;
-    return true;
+  public townStoreNotice(lives: number): string {
+    return `You have ${lives} ${lives === 1 ? 'life' : 'lives'}`;
   }
 
   private launchSurveyProbe(surveyor: GameEntity): boolean {
@@ -2965,7 +2869,7 @@ export class GameEngine {
         continue;
       }
       const furnace = this.furnaces
-        .nearby(rock.position, FURNACE_BUILD.RADIUS)
+        .nearby(rock.position, TOWN_HEARTH.radius)
         .find(
           (site) =>
             Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
@@ -2985,7 +2889,7 @@ export class GameEngine {
         continue;
       }
       const furnace = this.furnaces
-        .nearby(rock.position, FURNACE_BUILD.RADIUS)
+        .nearby(rock.position, TOWN_HEARTH.radius)
         .find(
           (site) =>
             Math.hypot(rock.position.x - site.position.x, rock.position.y - site.position.y) <=
@@ -3010,17 +2914,21 @@ export class GameEngine {
     const rewards: FurnaceDelivery['rewards'] = [];
     for (const playerId of recipients) {
       const player = this.getPlayer(playerId);
-      const points = townDeliveryPoints(base, this.furnaces.modulesBuiltBy(playerId));
       const score = this.awardPilotPoints(
         playerId,
-        points,
+        base,
         rock.boost?.phase === 'burning' && launchers.has(playerId)
       );
       if (score === undefined) {
         continue;
       }
       const saved = this.pilots.get(playerId);
-      rewards.push({ playerId, playerName: player?.name ?? saved?.name ?? '', points, score });
+      rewards.push({
+        playerId,
+        playerName: player?.name ?? saved?.name ?? '',
+        points: base,
+        score,
+      });
     }
     this.releaseTowsAttachedTo(rock.id);
     return {

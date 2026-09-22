@@ -12,7 +12,6 @@ import { activeScanners, scannedMaterial } from '../entities/ship/surveyScan';
 import { getWorldExploration, getWorldMapAssets } from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
 import {
-  drawFoundationMapMark,
   drawFurnaceMapMark,
   UNIVERSE_MAP_LANDMARK_SIZE,
   universeMapFurnaceMarkAppearance,
@@ -598,7 +597,7 @@ function drawMapAsset(
   frame: MapFrame,
   showLabel: boolean
 ): void {
-  if (!isFiniteMapPosition(asset.position)) {
+  if (!isFiniteMapPosition(asset.position) || asset.kind === 'foundation') {
     return;
   }
   const screen = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom);
@@ -611,11 +610,6 @@ function drawMapAsset(
     context.save();
     context.scale(1 / frame.scale, 1 / frame.scale);
     drawFurnaceMapMark(context, 0, 0, screen, universeMapFurnaceMarkAppearance(frame.zoom).lod);
-    context.restore();
-  } else if (asset.kind === 'foundation') {
-    context.save();
-    context.scale(1 / frame.scale, 1 / frame.scale);
-    drawFoundationMapMark(context, 0, 0, screen * 0.7);
     context.restore();
   } else {
     const color =

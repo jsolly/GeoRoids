@@ -3,16 +3,13 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
-import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
 import { finiteMotionVector, flightReturnWindowOpen } from '../../shared/playerMotion';
 import { releaseField } from '../../shared/releaseId';
 import { isShipBoostState } from '../../shared/shipBoost';
 import { validateAsteroidDto } from '../../shared/snapshotDto';
-import { purchasedHullColor } from '../../shared/townStore';
 import { parseSectorId, sectorAt, WORLD } from '../../shared/world';
 import type {
   AsteroidData,
-  CivicModule,
   ExplorationTile,
   Position,
   ShipBoostState,
@@ -23,22 +20,6 @@ import { isShipKitId } from '../../src/entities/ship/shipKits';
 import type { LoadedWorld } from './worldPersistence';
 
 const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
-
-function readCivicModules(value: object): CivicModule[] {
-  if ('civicModules' in value) {
-    if (!validCivicModules(value.civicModules)) {
-      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
-    }
-    return value.civicModules;
-  }
-  if ('litCivicLotIds' in value) {
-    if (!validLitCivicLotIds(value.litCivicLotIds)) {
-      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
-    }
-    return value.litCivicLotIds.map((id) => ({ id, builderName: '' }));
-  }
-  return [];
-}
 
 function validSectorId(id: string): boolean {
   return parseSectorId(id) !== null;
@@ -55,8 +36,6 @@ export interface PersistentPilot {
   tokenHash: string;
   name: string;
   score: number;
-  /** Catalog hull color bought at Town Square. */
-  hullColor?: string;
   lastSeenAt?: number;
   kitId?: ShipKitId;
   position?: Position;
@@ -94,8 +73,6 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
-  /** Street furnaces a Surveyor paid for. Absent on older rows. */
-  civicModules?: CivicModule[];
   seed: number;
   startedAt: number;
   generation: number;
@@ -203,10 +180,6 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
     return undefined;
   }
-  const hullColor = pilot['hullColor'];
-  if (hullColor !== undefined && typeof hullColor !== 'string') {
-    return undefined;
-  }
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
@@ -223,7 +196,6 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     name,
     score,
     ...(typeof silk === 'number' ? { silk } : {}),
-    ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
     ...(isShipBoostState(pilot['boost']) ? { boost: { ...pilot['boost'] } } : {}),
     ...readReleaseProvenance(pilot),
@@ -443,7 +415,6 @@ export class WorldStore {
     }
     return {
       seed: value.seed,
-      civicModules: readCivicModules(value),
       startedAt: value.startedAt,
       generation:
         'generation' in value &&

@@ -56,7 +56,7 @@ export type ShipKitId = 'surveyor' | 'hauler';
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
 /** Surveyor v1 utility slot. Same E key; one option active. */
-export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe' | 'build_furnace';
+export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe';
 
 export interface AbilityUsedEvent {
   id: string;
@@ -282,17 +282,7 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
-/** A street furnace a Surveyor lit with their own score. */
-export interface CivicModule {
-  id: string;
-  builderName: string;
-  /** Public pilot id of the Surveyor who paid. Absent on older unnamed streets. */
-  builderId?: string;
-}
-
 export interface ServerGameState {
-  /** Street furnaces the crew has lit, named for the Surveyor who paid. */
-  civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
@@ -311,7 +301,12 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  kind: 'furnace' | 'foundation' | 'laserCore' | 'wreckage' | 'satellite';
+  /**
+   * `foundation` is a retired street lot. Current servers omit it. Older
+   * servers still send one row per lot; the client keeps the row for deltas
+   * and does not draw it.
+   */
+  kind: 'furnace' | 'laserCore' | 'wreckage' | 'satellite' | 'foundation';
   position: Position;
   name: string;
 }

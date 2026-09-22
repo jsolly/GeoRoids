@@ -1,5 +1,4 @@
 import { readReleaseId } from '../../shared/releaseId';
-import { shipPaintById } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type {
   HaulerUtilityId,
@@ -60,9 +59,8 @@ export type ClientCommand =
       utilityId: SurveyorUtilityId;
     }
   | {
-      type: 'buyShipPaint';
+      type: 'buyExtraLife';
       id: string;
-      paintId: string;
     }
   | {
       type: 'update';
@@ -317,14 +315,10 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Surveyor utility');
     }
-    case 'buyShipPaint': {
-      if (!id) {
-        return invalid(type, 'Missing player ID for buyShipPaint');
-      }
-      const paintId = fields['paintId'];
-      return typeof paintId === 'string' && shipPaintById(paintId)
-        ? { ok: true, command: { type, id, paintId } }
-        : invalid(type, 'Invalid ship paint');
+    case 'buyExtraLife': {
+      return id
+        ? { ok: true, command: { type, id } }
+        : invalid(type, 'Missing player ID for buyExtraLife');
     }
     case 'shoot': {
       if (!id) {

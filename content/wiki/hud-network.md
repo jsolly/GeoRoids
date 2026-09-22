@@ -88,8 +88,11 @@ local minimap; touch layouts use a compact leaderboard and an adaptive local
 minimap. The local minimap follows the ship's nearby radar: it shows your ship,
 other players, explored asteroids, loot drops, loose satellite
 pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
-marks follow each entity's current position; destroyed or collected objects
-disappear when the shared state removes them. Asteroids use one jagged rock
+marks follow each entity's current position. A street lot or lit hearth close
+enough to hide under your hull is drawn just clear of the hull on the same
+side as the playfield, so a grate above your ship stays above it on the radar.
+Standing inside the grate still puts the mark under your ship. Destroyed or
+collected objects disappear when the shared state removes them. Asteroids use one jagged rock
 silhouette; identified minerals change its color and small surface details.
 Broken hulls mark wreckage, angular fragments mark shards, canisters mark Tap
 loot, and yellow laser emitters mark laser cores. Lilac satellites have a

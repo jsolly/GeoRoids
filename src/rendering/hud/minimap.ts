@@ -116,6 +116,33 @@ export function projectLocalToMiniMapInto(
   return out;
 }
 
+/** Extra canvas pixels between the local hull and a grate that would otherwise sit under it. */
+export const RADAR_CLOSE_LANDMARK_GAP = 8;
+
+/**
+ * A grate a short way outside the hull still projects inside the ship icon.
+ * Seat that mark just clear of the hull on its true side. A pilot standing
+ * in the grate keeps the mark under the ship.
+ */
+export function seatLandmarkBesideHull(
+  projected: { x: number; y: number },
+  radarCenter: { x: number; y: number },
+  worldDistance: number,
+  siteRadius: number,
+  hullRadius: number,
+  markRadius: number
+): { x: number; y: number } {
+  const dx = projected.x - radarCenter.x;
+  const dy = projected.y - radarCenter.y;
+  const screenDistance = Math.hypot(dx, dy);
+  const clear = hullRadius + markRadius + RADAR_CLOSE_LANDMARK_GAP;
+  if (worldDistance <= siteRadius || screenDistance === 0 || screenDistance >= clear) {
+    return { x: projected.x, y: projected.y };
+  }
+  const scale = clear / screenDistance;
+  return { x: radarCenter.x + dx * scale, y: radarCenter.y + dy * scale };
+}
+
 function isExploredPosition(
   geometry: MiniMapGeometry,
   position: { x: number; y: number }
@@ -486,6 +513,10 @@ function drawTowMarkers(
 /** Furnace destinations become useful landmarks only after the crew reveals them. */
 function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   const { projection } = geometry;
+  const radarCenter = {
+    x: geometry.x + geometry.size / 2,
+    y: geometry.y + geometry.size / 2,
+  };
 
   ctx.save();
   ctx.lineWidth = 1;
@@ -503,7 +534,15 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
     if (!projectPosition(geometry, furnace.position)) {
       continue;
     }
-    drawFurnaceMapMark(ctx, projection.x, projection.y, MINIMAP_FURNACE_MARK_SIZE);
+    const hearth = seatLandmarkBesideHull(
+      projection,
+      radarCenter,
+      distance,
+      furnace.radius,
+      VISUAL.MINIMAP_LOCAL_SIZE,
+      MINIMAP_FURNACE_MARK_SIZE
+    );
+    drawFurnaceMapMark(ctx, hearth.x, hearth.y, MINIMAP_FURNACE_MARK_SIZE);
   }
   for (const lot of CIVIC_LOTS) {
     if (worldFurnaces.isLit(lot.id)) {
@@ -511,13 +550,22 @@ function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeomet
     }
     const dx = lot.position.x - geometry.center.x;
     const dy = lot.position.y - geometry.center.y;
-    if (Math.hypot(dx, dy) > geometry.radius) {
+    const lotDistance = Math.hypot(dx, dy);
+    if (lotDistance > geometry.radius) {
       continue;
     }
     if (!projectPosition(geometry, lot.position)) {
       continue;
     }
-    drawFoundationMapMark(ctx, projection.x, projection.y, MINIMAP_FURNACE_MARK_SIZE);
+    const foundation = seatLandmarkBesideHull(
+      projection,
+      radarCenter,
+      lotDistance,
+      lot.radius,
+      VISUAL.MINIMAP_LOCAL_SIZE,
+      MINIMAP_FURNACE_MARK_SIZE
+    );
+    drawFoundationMapMark(ctx, foundation.x, foundation.y, MINIMAP_FURNACE_MARK_SIZE);
   }
   ctx.restore();
 }

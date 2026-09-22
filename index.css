@@ -387,8 +387,7 @@
     flex-wrap: wrap;
   }
 
-  .universe-map-actions button,
-  .universe-map-actions output {
+  .universe-map-actions button {
     min-height: 32px;
     padding: 0.25rem 0.55rem;
     border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 70%, transparent);
@@ -399,9 +398,6 @@
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.05em;
-  }
-
-  .universe-map-actions button {
     cursor: pointer;
     touch-action: manipulation;
   }
@@ -409,14 +405,6 @@
   .universe-map-actions button:hover,
   .universe-map-actions button:focus-visible {
     border-color: var(--palette-accent, #a78bfa);
-    color: var(--palette-accent, #a78bfa);
-  }
-
-  .universe-map-actions output {
-    display: inline-flex;
-    min-width: 52px;
-    align-items: center;
-    justify-content: center;
     color: var(--palette-accent, #a78bfa);
   }
 
@@ -488,6 +476,40 @@
     box-shadow: 0 0 14px color-mix(in srgb, var(--palette-local, #5eead4) 28%, transparent);
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .universe-map-zoom {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 2;
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .universe-map-zoom button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 70%, transparent);
+    border-radius: 6px;
+    color: var(--palette-accent, #a78bfa);
+    background: color-mix(in srgb, var(--palette-bg, #000011) 82%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--palette-accent, #a78bfa) 22%, transparent);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .universe-map-zoom button:hover,
+  .universe-map-zoom button:focus-visible {
+    border-color: var(--palette-accent, #a78bfa);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
   }
 
   .universe-map-locate-icon {

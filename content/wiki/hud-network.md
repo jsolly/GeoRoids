@@ -88,13 +88,16 @@ local minimap; touch layouts use a compact leaderboard and an adaptive local
 minimap. The local minimap follows the ship's nearby radar: it shows your ship,
 other players, explored asteroids, loot drops, loose satellite
 pickups, and orbiting pickups. Unexplored positions remain under fog. Compact
-marks follow each entity's current position; destroyed or collected objects
-disappear when the shared state removes them. Asteroids use one jagged rock
+marks follow each entity's current position. A street lot or lit hearth close
+enough to hide under your hull is drawn just clear of the hull on the same
+side as the playfield, so a grate above your ship stays above it on the radar.
+Standing inside the grate still puts the mark under your ship. Destroyed or
+collected objects disappear when the shared state removes them. Asteroids use one jagged rock
 silhouette; identified minerals change its color and small surface details.
 Broken hulls mark wreckage, angular fragments mark shards, canisters mark Tap
 loot, and yellow laser emitters mark laser cores. Lilac satellites have a
 central body and solar panels; an orbit line distinguishes deployed pickups.
-Amber campfires mark discovered lit hearths. Hollow rings mark dark street lots that are already inside the local radar, and the universe map draws the whole street plan. Red spiderwebs surround the stationary
+Amber campfires mark discovered lit hearths. Hollow rings mark dark street lots that are already inside the local radar. The universe map marks every street lot. A fire trail appears on the minimap and the universe map only after that street is lit, and it turns at right angles back to Town Square. Red spiderwebs surround the stationary
 resources guarded by nests, even while their spiders are chasing elsewhere or
 sleeping. The web remains after the guards are killed while the resource remains;
 it disappears when that resource is collected or moved.
@@ -102,8 +105,8 @@ The universe map uses the same symbols and also shows nearby explored rocks
 and small loot from the current local snapshot.
 Kit hull silhouettes in local and crew colors keep pilots
 identifiable above the world marks. Press
-V or the Schematic button on desktop, or hold your own hull on touch, to open
-the local ship schematic. M or use the Map button to open the full-screen universe
+V or the Inventory button to open the local ship view. The hull schematic
+sits beside the satellite inventory. M or use the Map button to open the full-screen universe
 map. It uses the crew's shared exploration chart and keeps discovered furnaces
 and other important assets visible across the large world, even when they are
 outside the local radar. A discovered furnace stays marked in the local radar
@@ -111,7 +114,9 @@ while it is within that nearby view. On the universe map, furnace marks keep
 the same zoom scale as satellites, wreckage, laser cores, and ships. Zoomed out,
 they are amber flame pins; the nearby view and closer keep the three-tongue
 campfire. Death, delivery, and pickup
-messages appear in the center for 120 frames, or 2 seconds. On touch screens,
+messages appear in the center for 120 frames, or 2 seconds. A satellite pickup
+also draws a short label above the ship that says the equipment is in inventory
+and how to open Inventory. On touch screens,
 they sit below the top HUD so they do not cover the leaderboard. A health capsule
 appears above a damaged ship; use its remaining fill to judge hull health.
 Every active pilot stays on the leaderboard so the
@@ -167,8 +172,9 @@ sends the first world snapshot.
 The local minimap and full-screen universe map use one persistent shared
 exploration chart. Passive Surveyor reveal reaches 650 world units and passive
 Hauler reveal reaches 260; every crew member contributes to the same
-explored area. Pilots stay readable; the street plan remains marked on the
-universe map, while uncharted asteroid and loot positions stay hidden.
+explored area. Pilots stay readable. Dark street lots remain marked on the
+universe map, and a lit street shows its right-angle fire trail back to Town
+Square, while uncharted asteroid and loot positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
 centered on your current ship; zoom out to see distant discoveries or use the
 locate control on the map to restore the nearby scale. Ships on both the local

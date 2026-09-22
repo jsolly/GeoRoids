@@ -9,7 +9,6 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
-import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 function field(page: Page): Promise<SpiderFieldState> {
@@ -26,19 +25,11 @@ for (const width of [1280, 390]) {
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
     if (mobile) {
-      const session = await page.context().newCDPSession(page);
-      try {
-        await dispatchTouch(session, 'touchStart', [
-          { ...(await centerOf(page, '#gameCanvas')), id: 1 },
-        ]);
-        await page.locator('#ship-schematic-dialog[open]').waitFor();
-      } finally {
-        await dispatchTouch(session, 'touchEnd', []);
-        await session.detach();
-      }
+      await page.locator('#ship-schematic-toggle').tap();
     } else {
       await page.keyboard.press('v');
     }
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     const card = page.locator('[data-utility-id="survey_probe"]');
     if (mobile) {
       await card.tap();

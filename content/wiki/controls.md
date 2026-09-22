@@ -20,8 +20,10 @@ turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
 on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
 does not repeatedly activate it. E uses the equipped tool from
-the ship schematic. V opens or closes that schematic, and the Schematic button
-opens it. B opens or closes the Town Square store while you are inside it.
+the ship view. Near Town Square, E becomes Enter store instead of the kit
+ability, except a hooked Hauler keeps Release or Ignite. V opens or closes that
+view, and the Inventory button opens it. B also opens or closes the Town
+Square store while you are inside it and not hooked.
 Escape, the X control, or Return to flight also close an open menu. Firing and E
 are blocked while the schematic or store is open.
 The map, schematic, and town store hold your ship stationary, including its momentum and
@@ -69,12 +71,15 @@ charge and credits the time spent away toward the refill.
 
 ## Ship schematic
 
-V or the on-screen Schematic button opens the local schematic for either ship.
-The button sits above Map and shows the V shortcut on a keyboard. On touch, the
-button is hidden: press and hold your own hull for a beat; a short rest still
-only steers. When you enter a touch flight, a brief label above your
-ship says to tap and hold to equip tools, then fades. The overlay shows your hull
-and satellite inventory. Choose Equip to launch one stored satellite for
+V or the Inventory button opens the ship view for either kit.
+The button sits above Map. On a keyboard it shows the V shortcut, and the
+title screen lists that shortcut with the other flight keys. Touch flights use
+the same button and hide the badge. Collecting a satellite shows a brief label
+above your ship, then fades. It says the equipment is in your inventory. On
+touch it says to tap Inventory to equip. On desktop it says to press V to
+equip. Collecting another satellite shows the label again. Opening Inventory
+clears it. The view draws your hull beside your
+satellite inventory, with the tool cards underneath. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
 lifetime, derived from health. Surveyor offers Mineral Scan and Survey Probe;
 near a dark street foundation, E becomes Build instead of the equipped tool.
@@ -88,24 +93,26 @@ changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 
 ## Town store
 
-B or the Store button opens the Town Square store while you are alive and inside
-its radius. On a keyboard the button sits above Schematic and shows the B
-shortcut. On touch the button stays and hides that badge. Opening the store
-closes the map and schematic, holds the ship, and blocks firing. Buying the
-paint you already wear spends nothing. A purchase outside the radius, while the
-ship is destroyed, or without enough score spends nothing and explains why. A
-successful purchase changes the hull and thruster color. That color stays
-through death, reconnect, and restart. The store also
-shows how much your own built streets add to your furnace deliveries.
+Near Town Square, E and the ability button become Enter store while you are
+alive and inside its radius. Kit scan, probe, and idle Hauler tools stay
+unavailable until you leave. A Hauler that is already hooked keeps Release or
+Ignite on E and the ability button so tow chrome wins over Enter store; B also
+stays closed while hooked. B otherwise opens or closes the store on a keyboard.
+Opening the store closes the map and schematic, holds the ship, and blocks
+firing. Buying the paint you already wear spends nothing. A purchase outside
+the radius, while the ship is destroyed, or without enough score spends nothing
+and explains why. A successful purchase changes the hull and thruster color.
+That color stays through death, reconnect, and restart. The store also shows
+how much your own built streets add to your furnace deliveries.
 
 ## Map
 
 Press M or use the on-screen Map button to open the full-screen universe map.
 It opens centered on your ship, showing 5,000 units across so nearby landmarks
-are easy to distinguish. Drag to pan and use the scroll wheel or +/− controls
-to zoom, including all the way out to the whole world. The locate control on
-the map restores the nearby view centered on your ship; Home does the same
-when a keyboard is attached. Your ship and crew draw as their actual hull
+are easy to distinguish. Drag to pan and use the scroll wheel or the +/− controls
+on the map to zoom, including all the way out to the whole world. The locate
+control on the map restores the nearby view centered on your ship; Home does the
+same when a keyboard is attached. Your ship and crew draw as their actual hull
 silhouettes, matching the kit in flight. The shared exploration chart and
 discovered assets persist; each opening returns to your current location.
 On a keyboard, M, Escape, or Close returns to flight. On touch, Map and Close
@@ -127,9 +134,11 @@ Taps and holds on the playfield, HUD, and action buttons do not highlight text
 or open copy-paste banners; those gestures steer, fire, or activate the button.
 Nickname and other form fields on the title screen still accept typing and
 selection.
-Use the Store button at Town Square for the same purchase as B. Use the ability button for the same action as E. Press and hold your own hull
-to open the ship schematic. A short label above the ship on first join repeats
-that hold-to-equip reminder. Use the Boost button at the
+Use the ability button for the same action as E, including Enter store at Town
+Square. Use the Inventory button for the same ship view as V. Collecting a
+satellite shows a short label above the ship that says the equipment is in
+your inventory and to tap Inventory to equip, then the label fades. Use the
+Boost button at the
 bottom of the screen for the same action as Shift: tap once to start boosting,
 tap again to stop. The action buttons do not steer the ship or create a pending
 playfield tap shot.

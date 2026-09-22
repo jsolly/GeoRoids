@@ -51,8 +51,7 @@ delivery reward.
 
 ## Survey probe
 
-Open the ship schematic with V or the Schematic button on desktop, or a long
-press on your hull on touch, then select Survey Probe. Press E or tap Probe to
+Open the ship view with V or the Inventory button, then select Survey Probe. Press E or tap Probe to
 fire along your heading. The first
 asteroid or spider in range receives a small beacon on its surface. Aim at an
 unoccupied host; a host already carrying a probe blocks the shot. Walls also block it.
@@ -86,7 +85,7 @@ and do not survive a server restart.
 Near a dark street foundation, E and the ability button become Build instead of
 Mineral Scan or Survey Probe. Stand inside the grate and press E or tap Build.
 The action spends your own score to light that street furnace, and the furnace
-takes your name. It does not place a hearth at an arbitrary position. The nearer
+takes your name. It does not place a hearth at an arbitrary position. The inward
 lot on that road must already be burning, and your score must cover the lot.
 Each street you build raises your own later furnace deliveries. The same score
 buys hull paint at the Town Square store. The bonus stays with the pilot who
@@ -99,8 +98,11 @@ wipe the nest. Standing furnaces still scare spiders that enter that occupancy.
 While Build is offered, scan and probe stay unavailable until you leave the
 street approach.
 
-Town Square starts lit at the map center. The street plan radiates outward from
-it, and each farther ring costs more of the builder's score. Built streets keep
+Town Square starts lit at the map center. Street lots are spread unevenly through
+three farther bands, and each farther band costs more of the builder's score.
+The pipeline stays hidden until that lot is burning. A lit street shows a fire
+trail that turns at right angles, like city blocks, through each inward grate on its parent chain
+and ends at Town Square. Built streets keep
 the builder's name and survive death, changing ships, reconnecting, and server
 restarts. They stay until the expedition is reset.
 
@@ -115,9 +117,10 @@ cannot close the delivery site.
 
 ## Satellite inventory
 
-Loose satellites enter your ship inventory when collected. Open the schematic
-with V or the Schematic button on desktop, or press and hold your hull on
-touch, then choose Equip. One satellite
+Loose satellites enter your ship inventory when collected. Collecting one shows
+a brief label above the ship that says the equipment is in your inventory and
+to open Inventory, then fades. Open the ship view
+with V or the Inventory button, then choose Equip. One satellite
 orbits at a time, identifying nearby asteroids until its health runs out.
 Health drains with time and damage; stored satellites preserve their health. This uses a separate equipment
 slot and leaves your core ability available.

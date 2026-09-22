@@ -24,19 +24,27 @@ for (const viewport of [
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
+    const store = page.locator('#town-store-dialog');
+    if (viewport.touch) {
+      await page.waitForFunction(
+        () => document.querySelector('#touch-ability')?.textContent?.includes('ENTER') === true
+      );
+      await page.locator('#touch-ability').tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
+    await store.waitFor({ state: 'visible' });
+    expect(await store.textContent()).toContain('Ember');
+    await page.locator('#town-store-return').click();
+    await store.waitFor({ state: 'hidden' });
     const openSchematic = async () => {
+      const toggle = page.locator('#ship-schematic-toggle');
       if (viewport.touch) {
-        const touch = await page.context().newCDPSession(page);
-        await touch.send('Input.dispatchTouchEvent', {
-          type: 'touchStart',
-          touchPoints: [{ x: viewport.width / 2, y: viewport.height / 2 }],
-        });
-        await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
-        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        await touch.detach();
+        await toggle.tap();
       } else {
-        await page.keyboard.press('KeyV');
+        await toggle.click();
       }
+      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     };
     await openSchematic();
     expect(await page.locator('[data-utility-id="build_furnace"]').count()).toBe(0);

@@ -24,6 +24,33 @@ test('each kit exposes its own E action label and name', () => {
   expect(touchAbilityLabel('unknown-kit')).toBe('SCAN');
 });
 
+test('near Town Square the ability chrome becomes Enter store for any kit', () => {
+  for (const kitId of ['surveyor', 'hauler'] as const) {
+    const near = readAbilityChrome({
+      kitId,
+      exploding: false,
+      health: 100,
+      abilityCooldownFrames: 90,
+      abilityActiveFrames: 0,
+      position: { x: 0, y: 0 },
+    });
+    expect(near.label).toBe('ENTER');
+    expect(near.name).toBe('Enter store');
+    expect(near.ready).toBe(true);
+    expect(near.cooling).toBe(false);
+    expect(near.cooldownRatio).toBe(0);
+  }
+  const far = readAbilityChrome({
+    kitId: 'surveyor',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    position: { x: 20_000, y: 0 },
+  });
+  expect(far.label).toBe('SCAN');
+});
+
 test('near a dark street lot the Surveyor ability chrome becomes Build', () => {
   resetWorldExploration();
   const near = readAbilityChrome({

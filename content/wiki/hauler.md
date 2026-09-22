@@ -20,8 +20,8 @@ media:
 Hauler is the U-shaped cargo yoke with twin forward towers and two engine
 bells. On the playfield it is about twice Surveyor's linear hull size, so the
 barge reads as a real tug next to the scout. Draw scale, collision, and
-utility latch range share that hull. It has one utility slot. Open the ship schematic with V or the Schematic button
-on desktop, or press and hold your own hull on touch, to swap **Resource Tap**, **Tow
+utility latch range share that hull. It has one utility slot. Open the ship view with V or the Inventory button
+to swap **Resource Tap**, **Tow
 Cable**, and **Boost Coupling**. Equip is immediate. E still fires the equipped tool; there is no
 second ability key. Other pilots cannot open your schematic.
 
@@ -118,9 +118,10 @@ both receive the delivery.
 
 Fly the towed asteroid into a lit furnace to deliver it. Street grates sit
 inside one sector so a towed rock can approach from any side. The furnace is a dashed delivery ring around a burning
-grate with a column of flame roaring up its middle. Faint pipes join each street
-lot to the nearer grate and end at Town Square. A delivery lights that whole
-run, and a bright head travels from the grate that took the rock back to Town
+grate with a column of flame roaring up its middle. The pipeline stays hidden
+until that street is burning. A lit street shows a fire trail from its grate to
+Town Square, turning at right angles through each inward lot on its parent chain. A delivery sends
+a brighter head along that trail from the grate that took the rock back to Town
 Square. Delivery shatters the rock
 in a red outline with a short smoke poof and awards the Hauler. If a Surveyor
 scanned the rock, the Hauler and each Surveyor contributor receive identical
@@ -134,7 +135,7 @@ scale as the other chart marks. Zoomed out it is a flame pin; the nearby view
 keeps the three-tongue campfire.
 
 Tow Cable can also pull a spider behind the Hauler. Drag it into a furnace to
-engulf it in flame; the same pipe lights and the head runs back to Town Square.
+engulf it in flame; a brighter head runs along that street's fire trail back to Town Square.
 With Sound Effects on, nearby pilots hear a brief melodic
 whimper as it disappears.
 
@@ -150,9 +151,10 @@ remains unchanged. Lasers mine asteroids only; they cannot damage teammates.
 
 ## Satellite inventory
 
-Loose satellites enter your ship inventory when collected. Open the schematic
-with V or the Schematic button on desktop, or press and hold your hull on
-touch, then choose Equip. One satellite
+Loose satellites enter your ship inventory when collected. Collecting one shows
+a brief label above the ship that says the equipment is in your inventory and
+to open Inventory, then fades. Open the ship view
+with V or the Inventory button, then choose Equip. One satellite
 orbits at a time, identifying nearby asteroids until its health runs out.
 Health drains with time and damage; stored satellites preserve their health. This uses a separate equipment
 slot and leaves your core ability available.

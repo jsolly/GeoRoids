@@ -2681,7 +2681,7 @@ export class GameEngine {
       const parent = civicLot(lot.parentId);
       return parent
         ? `Light ${this.furnaces.displayName(parent.id)} first`
-        : 'Light the nearer street first';
+        : 'Light the inward street first';
     }
     const score = Number.isSafeInteger(surveyor.score) ? surveyor.score : 0;
     if (score < lot.cost) {

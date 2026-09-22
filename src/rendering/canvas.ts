@@ -18,7 +18,7 @@ import {
   drawThrusterAtPosition,
 } from '../entities/ship/shipRenderer';
 import { shouldDrawShipHull } from '../entities/ship/shipUtils';
-import { drawSchematicJoinHint } from '../ui/schematicJoinHint';
+import { drawSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
 import { drawFieryBoundary } from './boundaryRenderer';
@@ -163,7 +163,7 @@ export function drawGame(
   drawHeadingCue(ctx, viewport, currShip);
 
   if (shouldDrawShipHull(currShip) && !currShip.exploding) {
-    drawSchematicJoinHint(
+    drawSchematicEquipHint(
       ctx,
       viewport.width / 2,
       viewport.height / 2,

@@ -30,12 +30,60 @@ test('a street delivery lights the whole pipe and the head runs to Town Square',
     throw new Error('Missing pipe pulse');
   }
   expect(furnacePipeFrame(pulse, 1_000)?.head).toEqual(street.position);
+  expect(pulse.points.length).toBeGreaterThan(2);
   const midway = furnacePipeFrame(pulse, 1_000 + pulse.travelMs / 2)?.head;
   if (!midway) {
     throw new Error('Missing midway head');
   }
-  expect(midway.x).toBeCloseTo(street.position.x / 2, 5);
-  expect(midway.y).toBeCloseTo(street.position.y / 2, 5);
+  let length = 0;
+  for (let index = 1; index < pulse.points.length; index += 1) {
+    const start = pulse.points[index - 1];
+    const end = pulse.points[index];
+    if (start && end) {
+      length += Math.hypot(end.x - start.x, end.y - start.y);
+    }
+  }
+  let remaining = length / 2;
+  let expected = pulse.points[0] ?? street.position;
+  for (let index = 1; index < pulse.points.length; index += 1) {
+    const start = pulse.points[index - 1];
+    const end = pulse.points[index];
+    if (!start || !end) {
+      continue;
+    }
+    const span = Math.hypot(end.x - start.x, end.y - start.y);
+    if (remaining <= span || index === pulse.points.length - 1) {
+      const t = span === 0 ? 1 : Math.min(1, remaining / span);
+      expected = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
+      break;
+    }
+    remaining -= span;
+  }
+  expect(midway.x).toBeCloseTo(expected.x, 4);
+  expect(midway.y).toBeCloseTo(expected.y, 4);
+  const chordOffset = Math.max(
+    ...pulse.points.map((point) => {
+      const abx = -street.position.x;
+      const aby = -street.position.y;
+      const lengthSquared = abx * abx + aby * aby;
+      const t =
+        lengthSquared === 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(
+                1,
+                ((point.x - street.position.x) * abx + (point.y - street.position.y) * aby) /
+                  lengthSquared
+              )
+            );
+      return Math.hypot(
+        point.x - (street.position.x + abx * t),
+        point.y - (street.position.y + aby * t)
+      );
+    })
+  );
+  expect(chordOffset).toBeGreaterThan(40);
   expect(furnacePipeFrame(pulse, 1_000 + pulse.travelMs)?.head).toEqual(TOWN_HEARTH.position);
   expect(furnacePipeFrame(pulse, 1_000 + pulse.travelMs + FURNACE_PIPE_FADE_MS)).toMatchObject({
     alpha: 0,
@@ -68,9 +116,17 @@ test('a street delivery lights the whole pipe and the head runs to Town Square',
   drawFurnacePipes(street.position, 1_000);
   const lit = strokes.find((stroke) => stroke.width === 3);
   expect(lit?.points[0]).toEqual({ x: 400, y: 300 });
-  expect(lit?.points[1]).toEqual({
+  expect(lit?.points[lit.points.length - 1]).toEqual({
     x: 400 - street.position.x,
     y: 300 - street.position.y,
   });
+  expect(lit?.points.length).toBe(pulse.points.length);
+  for (let index = 1; index < (lit?.points.length ?? 0); index += 1) {
+    const start = lit?.points[index - 1];
+    const end = lit?.points[index];
+    expect(
+      start && end && (Math.abs(start.x - end.x) < 0.001 || Math.abs(start.y - end.y) < 0.001)
+    ).toBe(true);
+  }
   restoreViewport();
 });

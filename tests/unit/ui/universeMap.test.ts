@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -19,6 +21,8 @@ import {
   UNIVERSE_MAP_ZOOM,
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
+
+const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
 
 describe('universe map play chrome', () => {
   const releaseInput = vi.fn();
@@ -166,19 +170,38 @@ describe('universe map play chrome', () => {
     ).toEqual({ x: 420, y: 130 });
   });
 
-  test('the locate control sits on the map and restores the nearby ship view', () => {
+  test('the map compass is a North arrow only', () => {
+    const compass = document.querySelector('.universe-map-compass');
+    expect(compass).not.toBeNull();
+    expect(compass?.querySelectorAll('span')).toHaveLength(1);
+    expect(compass?.querySelector('i')).not.toBeNull();
+    expect(compass?.textContent?.trim()).toBe('N');
+    expect(compass?.textContent).not.toMatch(/E/u);
+
+    // Production HTML keeps the dialog in the page; createDialogMarkup early-returns.
+    const productionMatch = productionHtml.match(
+      /<div class="universe-map-compass"[^>]*>([\s\S]*?)<\/div>/u
+    );
+    expect(productionMatch?.[1]).toMatch(/<span>N<\/span>\s*<i><\/i>/u);
+    expect(productionMatch?.[1]).not.toMatch(/>E</u);
+  });
+
+  test('zoom and locate controls sit on the map and restore the nearby ship view', () => {
     const toggle = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`) as HTMLButtonElement;
     const locate = document.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement;
     const zoomIn = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement;
     const zoomOut = document.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement;
-    const zoomReadout = document.querySelector(
-      `#${UNIVERSE_MAP_IDS.zoomReadout}`
-    ) as HTMLOutputElement;
+    const zoomControls = document.querySelector('.universe-map-zoom') as HTMLElement;
     const stage = document.querySelector('.universe-map-stage');
     const headerActions = document.querySelector('.universe-map-actions');
 
     expect(locate.parentElement).toBe(stage);
+    expect(zoomControls.parentElement).toBe(stage);
+    expect(zoomControls.contains(zoomIn)).toBe(true);
+    expect(zoomControls.contains(zoomOut)).toBe(true);
     expect(headerActions?.contains(locate)).toBe(false);
+    expect(headerActions?.contains(zoomIn)).toBe(false);
+    expect(document.querySelector('#universe-map-zoom')).toBeNull();
     expect(locate.getAttribute('aria-label')).toBe(UNIVERSE_MAP_LOCATE_LABEL);
     expect(locate.querySelector('svg')).not.toBeNull();
 
@@ -195,22 +218,20 @@ describe('universe map play chrome', () => {
       .mockReturnValue(pilot);
     try {
       toggle.click();
-      expect(zoomReadout.textContent).toBe('2400%');
       expect(locate.getAttribute('aria-pressed')).toBe('true');
       expect(locate.style.left).toMatch(/px$/u);
       expect(locate.style.top).toMatch(/px$/u);
+      expect(zoomControls.style.left).toMatch(/px$/u);
+      expect(zoomControls.style.top).toMatch(/px$/u);
 
       zoomIn.click();
-      expect(zoomReadout.textContent).toBe('3240%');
       expect(locate.getAttribute('aria-pressed')).toBe('false');
 
       locate.click();
-      expect(zoomReadout.textContent).toBe('2400%');
       expect(locate.getAttribute('aria-pressed')).toBe('true');
 
       zoomIn.click();
       zoomOut.click();
-      expect(zoomReadout.textContent).toBe('2400%');
       expect(locate.getAttribute('aria-pressed')).toBe('true');
 
       const mapCanvas = document.querySelector(`#${UNIVERSE_MAP_IDS.canvas}`) as HTMLCanvasElement;

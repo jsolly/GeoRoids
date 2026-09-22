@@ -25,21 +25,12 @@ test.each([
     await installAudioProbe(page);
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'hauler', waitForCombatReady: false });
-    const canvas = page.locator('#gameCanvas');
     if (mobile) {
-      const box = await canvas.boundingBox();
-      if (!box) {
-        throw new Error('No game canvas');
-      }
-      const touch = await page.context().newCDPSession(page);
-      const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
-      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
-      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      await touch.detach();
+      await page.locator('#ship-schematic-toggle').tap();
     } else {
       await page.keyboard.press('KeyV');
     }
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     const coupling = page.getByRole('button', { name: /Boost Coupling/u });
     await coupling.click();
     expect(await coupling.getAttribute('aria-pressed')).toBe('true');

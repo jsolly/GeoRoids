@@ -1,4 +1,5 @@
 import { surveyorAbilityBuildsAt } from '../../shared/furnaceField';
+import { insideTownStore } from '../../shared/townStore';
 import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
@@ -51,6 +52,17 @@ function surveyorOffersBuild(host: AbilityChromeHost): boolean {
   );
 }
 
+/** Near Town Square, E / the ability button become Enter store for any kit. */
+function abilityOffersTownStore(host: AbilityChromeHost): boolean {
+  return (
+    !host.exploding &&
+    Number.isFinite(host.health) &&
+    host.health > 0 &&
+    host.position !== undefined &&
+    insideTownStore(host.position)
+  );
+}
+
 /** Short phosphor label for the on-screen kit button. */
 export function touchAbilityLabel(kitId: unknown, utilityId?: unknown): string {
   const kit = getShipKit(kitId);
@@ -87,7 +99,8 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
   const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
-  const offeringBuild = surveyorOffersBuild(host);
+  const offeringStore = !towing && abilityOffersTownStore(host);
+  const offeringBuild = !offeringStore && surveyorOffersBuild(host);
   const readyLabel =
     kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
@@ -97,32 +110,37 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'IGNITE'
         : 'RELEASE'
-      : offeringBuild
-        ? 'BUILD'
-        : kit.id === 'surveyor'
-          ? touchAbilityLabel(kit.id, host.surveyorUtility)
-          : readyLabel,
+      : offeringStore
+        ? 'ENTER'
+        : offeringBuild
+          ? 'BUILD'
+          : kit.id === 'surveyor'
+            ? touchAbilityLabel(kit.id, host.surveyorUtility)
+            : readyLabel,
     name: towing
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'Ignite asteroid boost'
         : 'Release asteroid'
-      : offeringBuild
-        ? 'Build furnace'
-        : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
-          ? 'Arm asteroid boost'
-          : kit.id === 'surveyor'
-            ? touchAbilityName(kit.id, host.surveyorUtility)
-            : touchAbilityName(kit.id),
-    ready: alive && (towing || !cooling),
+      : offeringStore
+        ? 'Enter store'
+        : offeringBuild
+          ? 'Build furnace'
+          : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+            ? 'Arm asteroid boost'
+            : kit.id === 'surveyor'
+              ? touchAbilityName(kit.id, host.surveyorUtility)
+              : touchAbilityName(kit.id),
+    ready: alive && (towing || offeringStore || !cooling),
     active,
-    cooling,
+    cooling: offeringStore ? false : cooling,
     unavailable,
-    cooldownRatio: towing
-      ? 0
-      : abilityCooldownRatio(
-          kit.id,
-          host.abilityCooldownFrames,
-          kit.id === 'surveyor' ? abilityCooldownFramesFor(host) : undefined
-        ),
+    cooldownRatio:
+      towing || offeringStore
+        ? 0
+        : abilityCooldownRatio(
+            kit.id,
+            host.abilityCooldownFrames,
+            kit.id === 'surveyor' ? abilityCooldownFramesFor(host) : undefined
+          ),
   };
 }

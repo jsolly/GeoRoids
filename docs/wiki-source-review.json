@@ -131,7 +131,7 @@
     "shared/stateDiagnostics.ts": "sha256:5f566326e5e1f1a446b7586c9988d574ea4f730d1763e66b1e5974bbcaf21082",
     "shared/surveyProbe.ts": "sha256:c8d967ce82655c1dac85822eac475bef461ee6012c0ca81d86d2020ea946447a",
     "shared/terrainSpider.ts": "sha256:9bc9915f27816a82cb065fad97adde89af1145af49003b26615dbdd271bdfa51",
-    "shared/townStore.ts": "sha256:c4ac659a6881311f5ae159ec918cfdd1ff49b9f563e36338d42ae54fd61eb464",
+    "shared/townStore.ts": "sha256:edd8f11465f74b073e32b0b324e16dbd2404e50a104a5e3dc31b9c4435ed3655",
     "shared/world.ts": "sha256:d005832a49d0fafa55e5d73a6fd0446249b7759260d02c2fc97f43a344a912ed",
     "shared/worldBoundary.ts": "sha256:124867307d89929a670c033c6e18f51d0dd7032833913af23e6a26151927cdba",
     "src/audio/Sound.ts": "sha256:485103d195f6335d7e1327ab6c4928e1e0a44b8caa4afa5a06b82f868ba12cf2",

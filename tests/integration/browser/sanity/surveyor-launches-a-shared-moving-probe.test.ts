@@ -29,17 +29,11 @@ for (const viewport of [
     await arrangeCrewField([playerId, observerId], 'empty');
     await page.bringToFront();
     if (viewport.touch) {
-      const touch = await page.context().newCDPSession(page);
-      await touch.send('Input.dispatchTouchEvent', {
-        type: 'touchStart',
-        touchPoints: [{ x: viewport.width / 2, y: viewport.height / 2 }],
-      });
-      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
-      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      await touch.detach();
+      await page.locator('#ship-schematic-toggle').tap();
     } else {
       await page.keyboard.press('KeyV');
     }
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     const card = page.locator('[data-utility-id="survey_probe"]');
     if (viewport.touch) {
       await card.tap();

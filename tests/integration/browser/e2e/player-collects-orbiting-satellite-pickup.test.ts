@@ -6,7 +6,6 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
-import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
@@ -130,33 +129,25 @@ test.each([
       }
       return texts;
     });
-    expect(equipHint).toContain('to equip tools');
+    expect(equipHint).toContain('Equipment is in your inventory');
+    expect(equipHint).not.toContain('Tap and hold your ship');
     if (width === 390) {
-      expect(equipHint).toContain('Tap and hold your ship');
+      expect(equipHint).toContain('Tap Inventory to equip');
       expect(equipHint).not.toContain('Press V');
     } else {
-      expect(equipHint).toContain('Press V');
-      expect(equipHint).not.toContain('Tap and hold your ship');
+      expect(equipHint).toContain('Press V to equip');
+      expect(equipHint).not.toContain('Tap Inventory');
     }
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`satellite-equip-hint-${capture}.png`),
     });
 
     if (width === 390) {
-      const session = await page.context().newCDPSession(page);
-      const center = await centerOf(page, '#gameCanvas');
-      try {
-        await dispatchTouch(session, 'touchStart', [{ ...center, id: 1 }]);
-        await page.waitForFunction(() =>
-          document.querySelector('dialog#ship-schematic-dialog')?.hasAttribute('open')
-        );
-      } finally {
-        await dispatchTouch(session, 'touchEnd', []);
-        await session.detach();
-      }
+      await page.locator('#ship-schematic-toggle').tap();
     } else {
       await page.keyboard.press('v');
     }
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     const inventory = page.locator('#ship-schematic-inventory');
     await expect.poll(() => inventory.textContent()).toContain(target.name);
     await page.screenshot({

@@ -12,6 +12,30 @@ import {
 } from './playfieldCamera';
 import { configureRenderQuality } from './renderQuality';
 
+const TOGGLE_STEP_PX = 52;
+
+/** Map, Inventory, and Store tops. Short touch screens keep Inventory under the radar. */
+export function playfieldToggleOffsets(
+  miniMap: { y: number; size: number },
+  touchControls: boolean,
+  height: number
+): { mapY: number; schematicY: number; storeY: number } {
+  if (touchControls && height < 500) {
+    const schematicY = miniMap.y + miniMap.size + 8;
+    return {
+      mapY: schematicY + TOGGLE_STEP_PX,
+      schematicY,
+      storeY: schematicY + TOGGLE_STEP_PX * 2,
+    };
+  }
+  const mapY = miniMap.y - 84;
+  return {
+    mapY,
+    schematicY: mapY - TOGGLE_STEP_PX,
+    storeY: mapY - TOGGLE_STEP_PX * 2,
+  };
+}
+
 /** Canvas DOM, viewport, and world/screen mapping. Scene composition lives in `canvas.ts`
  * so entity/HUD painters can import this module without forming an import cycle. */
 class CanvasManager {
@@ -133,11 +157,11 @@ class CanvasManager {
     if (!(chrome instanceof HTMLElement)) {
       return;
     }
-    const mapToggleY =
-      touchControls && height < 500 ? miniMap.y + miniMap.size + 8 : miniMap.y - 84;
+    const offsets = playfieldToggleOffsets(miniMap, touchControls, height);
     chrome.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
-    chrome.style.setProperty('--map-toggle-y', `${mapToggleY}px`);
-    chrome.style.setProperty('--schematic-toggle-y', `${mapToggleY - 52}px`);
+    chrome.style.setProperty('--map-toggle-y', `${offsets.mapY}px`);
+    chrome.style.setProperty('--schematic-toggle-y', `${offsets.schematicY}px`);
+    chrome.style.setProperty('--store-toggle-y', `${offsets.storeY}px`);
     if (chrome.id !== 'gameArea') {
       return;
     }

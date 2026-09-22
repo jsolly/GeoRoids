@@ -41,7 +41,7 @@ describe('equip reminder after a pickup', () => {
     vi.restoreAllMocks();
   });
 
-  test('a touch flight stays unlabeled until a pickup, then paints the hold-to-equip lines and fades', () => {
+  test('a touch flight stays unlabeled until a pickup, then points at the Inventory button and fades', () => {
     vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(true);
     let now = 1_000;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
@@ -58,6 +58,7 @@ describe('equip reminder after a pickup', () => {
     expect(ctx.fillText.mock.calls.map((call) => call[0])).toEqual([
       ...TOUCH_SCHEMATIC_EQUIP_HINT_LINES,
     ]);
+    expect(TOUCH_SCHEMATIC_EQUIP_HINT_LINES.join(' ')).not.toContain('hold');
     const lastLineY = Number(ctx.fillText.mock.calls.at(-1)?.[2]);
     expect(lastLineY).toBe(
       300 -
@@ -85,7 +86,7 @@ describe('equip reminder after a pickup', () => {
     expect(schematicEquipHintAlpha(now)).toBe(1);
   });
 
-  test('a desktop pickup says to press V, and joining alone stays unlabeled', () => {
+  test('a desktop pickup says the hardware is in inventory and to press V', () => {
     vi.spyOn(viewportChrome, 'shouldUseTouchControls').mockReturnValue(false);
     setPlayView(true);
     expect(schematicEquipHintAlpha()).toBe(0);
@@ -99,6 +100,7 @@ describe('equip reminder after a pickup', () => {
     expect(ctx.fillText.mock.calls.map((call) => call[0])).toEqual([
       ...DESKTOP_SCHEMATIC_EQUIP_HINT_LINES,
     ]);
+    expect(DESKTOP_SCHEMATIC_EQUIP_HINT_LINES.join(' ')).not.toContain('hold');
   });
 
   test('a pickup before flight does not arm the reminder', () => {

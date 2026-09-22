@@ -59,6 +59,7 @@
     "server/communication/MessageHandler.ts",
     "server/communication/clientCommandDecoder.ts",
     "tests/unit/ui/shipSchematic.test.ts",
+    "tests/unit/rendering/short-touch-screens-keep-inventory-off-the-radar.test.ts",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts",
     "tests/unit/ui/schematicEquipHint.test.ts",
     "tests/unit/ui/equip-hint-stays-hidden-until-a-pickup.test.ts",

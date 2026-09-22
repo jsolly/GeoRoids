@@ -121,7 +121,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Playfield chrome above the local radar: Map always, Schematic on desktop. */
+  /* Playfield chrome above the local radar: Map and Inventory on every device. */
   .universe-map-toggle,
   .ship-schematic-toggle {
     position: absolute;
@@ -147,7 +147,7 @@
 
   .ship-schematic-toggle {
     top: var(--schematic-toggle-y);
-    min-width: 96px;
+    min-width: 118px;
   }
 
   .town-store-dialog {
@@ -285,10 +285,6 @@
   .universe-map-toggle.universe-map-touch kbd,
   .universe-map-dialog.universe-map-touch kbd,
   .ship-schematic-toggle.ship-schematic-touch kbd {
-    display: none;
-  }
-
-  .ship-schematic-toggle.ship-schematic-touch {
     display: none;
   }
 
@@ -1704,10 +1700,18 @@
     display: none;
   }
 
+  .ship-schematic-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(168px, 280px);
+    gap: 12px 16px;
+    align-items: start;
+    margin: 14px 0;
+  }
+
   .satellite-inventory {
-    border-top: 1px solid var(--palette-hud-muted, #64748b);
-    padding: 12px 0 18px;
-    flex-shrink: 0;
+    min-width: 0;
+    border-left: 1px solid var(--palette-hud-muted, #64748b);
+    padding: 0 0 0 12px;
   }
 
   .satellite-inventory h3 {
@@ -1769,19 +1773,19 @@
 
   .ship-schematic-stage {
     position: relative;
-    flex: 0 0 auto;
-    min-height: 280px;
-    margin: 14px 0;
+    min-width: 0;
+    min-height: 220px;
   }
 
   #ship-schematic-canvas {
     display: block;
     width: 100%;
-    height: 280px;
+    height: 220px;
   }
 
   .ship-schematic-cards {
     display: grid;
+    grid-column: 1 / -1;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
@@ -1867,13 +1871,27 @@
       padding: 12px;
     }
 
-    .ship-schematic-stage {
-      min-height: 160px;
+    .ship-schematic-body {
+      grid-template-columns: minmax(0, 1fr) minmax(132px, 42%);
+      gap: 8px 10px;
       margin: 8px 0;
     }
 
+    .satellite-inventory {
+      padding-left: 8px;
+    }
+
+    .satellite-inventory-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .ship-schematic-stage {
+      min-height: 140px;
+    }
+
     #ship-schematic-canvas {
-      height: 160px;
+      height: 140px;
     }
 
     .ship-schematic-cards {

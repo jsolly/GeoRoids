@@ -51,8 +51,7 @@ delivery reward.
 
 ## Survey probe
 
-Open the ship schematic with V or the Schematic button on desktop, or a long
-press on your hull on touch, then select Survey Probe. Press E or tap Probe to
+Open the ship view with V or the Inventory button, then select Survey Probe. Press E or tap Probe to
 fire along your heading. The first
 asteroid or spider in range receives a small beacon on its surface. Aim at an
 unoccupied host; a host already carrying a probe blocks the shot. Walls also block it.
@@ -116,9 +115,10 @@ cannot close the delivery site.
 
 ## Satellite inventory
 
-Loose satellites enter your ship inventory when collected. Collecting one shows a brief label above the ship that repeats how to open the schematic, then fades. Open the schematic
-with V or the Schematic button on desktop, or press and hold your hull on
-touch, then choose Equip. One satellite
+Loose satellites enter your ship inventory when collected. Collecting one shows
+a brief label above the ship that says the equipment is in your inventory and
+to open Inventory, then fades. Open the ship view
+with V or the Inventory button, then choose Equip. One satellite
 orbits at a time, identifying nearby asteroids until its health runs out.
 Health drains with time and damage; stored satellites preserve their health. This uses a separate equipment
 slot and leaves your core ability available.

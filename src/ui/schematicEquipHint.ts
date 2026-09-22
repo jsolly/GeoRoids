@@ -5,10 +5,13 @@ import { hexToRgba } from '../utils/colorUtils';
 import { shouldUseTouchControls } from './viewportChrome';
 
 export const TOUCH_SCHEMATIC_EQUIP_HINT_LINES = [
-  'Tap and hold your ship',
-  'to equip tools',
+  'Equipment is in your inventory',
+  'Tap Inventory to equip',
 ] as const;
-export const DESKTOP_SCHEMATIC_EQUIP_HINT_LINES = ['Press V', 'to equip tools'] as const;
+export const DESKTOP_SCHEMATIC_EQUIP_HINT_LINES = [
+  'Equipment is in your inventory',
+  'Press V to equip',
+] as const;
 export const SCHEMATIC_EQUIP_HINT_DURATION_MS = 4800;
 export const SCHEMATIC_EQUIP_HINT_FADE_MS = 800;
 export const SCHEMATIC_EQUIP_HINT_GAP_ABOVE_CUE_PX = 12;

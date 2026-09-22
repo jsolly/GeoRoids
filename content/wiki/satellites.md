@@ -36,11 +36,12 @@ grant a combat ability or spawn protection.
 ## Inventory
 
 Collected hardware enters the collecting ship's inventory. Both Surveyors and
-Haulers open the ship schematic with V or the Schematic button on desktop, or
-by pressing and holding their own hull on touch. Stored satellites do not orbit or lose health. A brief notification names the
-satellite you acquired. On touch, a short label above the ship says to tap and
-hold your ship to equip tools, then fades. On desktop, that label says to
-press V to equip tools. Collecting another satellite shows the label again. The inventory lists its health and estimated flight
+Haulers open that list with V or the Inventory button. The same view draws the
+hull beside the list. Stored satellites do not orbit or lose health. A brief notification names the
+satellite you acquired. A short label above the ship says the equipment is in
+your inventory. On touch that label says to tap Inventory to equip. On desktop
+it says to press V to equip. Collecting another satellite shows the label
+again, and opening Inventory clears it. The inventory lists its health and estimated flight
 time without further damage.
 
 ## Equipped satellites

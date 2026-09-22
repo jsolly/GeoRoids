@@ -20,9 +20,9 @@ turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
 on the first press and off on the next; holding the key does not retrigger it.
 E activates the selected kit ability and is edge-triggered, so holding the key
 does not repeatedly activate it. E uses the equipped tool from
-the ship schematic. Near Town Square, E becomes Enter store instead of the kit
+the ship view. Near Town Square, E becomes Enter store instead of the kit
 ability, except a hooked Hauler keeps Release or Ignite. V opens or closes that
-schematic, and the Schematic button opens it. B also opens or closes the Town
+view, and the Inventory button opens it. B also opens or closes the Town
 Square store while you are inside it and not hooked.
 Escape, the X control, or Return to flight also close an open menu. Firing and E
 are blocked while the schematic or store is open.
@@ -71,14 +71,15 @@ charge and credits the time spent away toward the refill.
 
 ## Ship schematic
 
-V or the on-screen Schematic button opens the local schematic for either ship.
-The button sits above Map and shows the V shortcut on a keyboard. On touch, the
-button is hidden: press and hold your own hull for a beat; a short rest still
-only steers. Collecting a satellite shows a brief label above your ship, then
-fades. On touch it says to tap and hold your ship to equip tools. On desktop
-it says to press V to equip tools. Collecting another satellite shows the label
-again. The overlay shows your hull
-and satellite inventory. Choose Equip to launch one stored satellite for
+V or the Inventory button opens the ship view for either kit.
+The button sits above Map. On a keyboard it shows the V shortcut, and the
+title screen lists that shortcut with the other flight keys. Touch flights use
+the same button and hide the badge. Collecting a satellite shows a brief label
+above your ship, then fades. It says the equipment is in your inventory. On
+touch it says to tap Inventory to equip. On desktop it says to press V to
+equip. Collecting another satellite shows the label again. Opening Inventory
+clears it. The view draws your hull beside your
+satellite inventory, with the tool cards underneath. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
 lifetime, derived from health. Surveyor offers Mineral Scan, Survey Probe, and Build;
 the probe fires along your heading and attaches a shared scanning beacon to a rock.
@@ -133,9 +134,10 @@ or open copy-paste banners; those gestures steer, fire, or activate the button.
 Nickname and other form fields on the title screen still accept typing and
 selection.
 Use the ability button for the same action as E, including Enter store at Town
-Square. Press and hold your own hull
-to open the ship schematic. Collecting a satellite repeats that hold-to-equip
-reminder in a short label above the ship, then the label fades. Use the Boost button at the
+Square. Use the Inventory button for the same ship view as V. Collecting a
+satellite shows a short label above the ship that says the equipment is in
+your inventory and to tap Inventory to equip, then the label fades. Use the
+Boost button at the
 bottom of the screen for the same action as Shift: tap once to start boosting,
 tap again to stop. The action buttons do not steer the ship or create a pending
 playfield tap shot.

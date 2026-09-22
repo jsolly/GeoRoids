@@ -45,18 +45,13 @@ for (const viewport of [
       );
     });
     const openSchematic = async () => {
+      const toggle = page.locator('#ship-schematic-toggle');
       if (viewport.touch) {
-        const touch = await page.context().newCDPSession(page);
-        await touch.send('Input.dispatchTouchEvent', {
-          type: 'touchStart',
-          touchPoints: [{ x: viewport.width / 2, y: viewport.height / 2 }],
-        });
-        await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
-        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        await touch.detach();
+        await toggle.tap();
       } else {
-        await page.keyboard.press('KeyV');
+        await toggle.click();
       }
+      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     };
     await openSchematic();
     const card = page.locator('[data-utility-id="build_furnace"]');

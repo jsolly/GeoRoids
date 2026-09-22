@@ -82,8 +82,7 @@ mark is an amber flame pin at the same size as the other chart landmarks; the
 nearby view and closer restore the three-tongue campfire. A delivery consumes
 the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
 Streets a pilot built raise only that pilot's payout. Town Square also holds a
-store: spend your own score there on a hull paint. The paint stays on your ship
-through death, reconnect, and restart.
+store: spend 1,000 of your own score there on one extra life, up to 6 lives.
 The pipeline stays hidden until that street is burning. A lit street shows a
 fire trail from its grate to Town Square, turning at right angles through each
 inward lot on its parent chain. Dragging a rock or a spider into a street furnace sends a brighter

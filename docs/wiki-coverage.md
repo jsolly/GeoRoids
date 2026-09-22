@@ -27,7 +27,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicEquipHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
-| How do I buy a hull color at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyShipPaint, town store tests |
+| How do I buy an extra life at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyExtraLife, town store tests |
 | How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | How do I build furnaces and repel spiders? | surveyor, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, nest keep-out, and scan-defense tests |
 | Can I clear a spider nest by building a furnace on it? | surveyor, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS keep-out, furnace construction tests |

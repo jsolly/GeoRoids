@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { shipPaintById, TOWN_STORE_RADIUS } from '../../../shared/townStore';
+import { EXTRA_LIFE_COST, MAX_LIVES, TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import {
@@ -19,11 +19,6 @@ import {
   TOWN_STORE_IDS,
 } from '../../../src/ui/townStore';
 import { isTownStoreOpen } from '../../../src/ui/townStoreState';
-
-const ember = shipPaintById('ember');
-if (!ember) {
-  throw new Error('Missing Ember paint');
-}
 
 beforeAll(() => {
   Object.defineProperties(HTMLDialogElement.prototype, {
@@ -59,7 +54,7 @@ afterAll(() => {
   Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
 });
 
-test('the store opens at Town Square via E, lists paints, and wears a purchased hull', () => {
+test('the store opens at Town Square via E and buys one extra life', () => {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
     throw new Error('Missing local pilot');
@@ -67,6 +62,7 @@ test('the store opens at Town Square via E, lists paints, and wears a purchased 
   expect(document.querySelector('#town-store-toggle')).toBeNull();
   player.ship.position = { x: 0, y: 0 };
   player.score = 0;
+  player.lives = 3;
   player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
   syncTownStoreChrome();
   const near = readAbilityChrome(player.ship);
@@ -81,33 +77,67 @@ test('the store opens at Town Square via E, lists paints, and wears a purchased 
   document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
   expect(isTownStoreOpen()).toBe(true);
   const dialog = document.querySelector(`#${TOWN_STORE_IDS.dialog}`);
-  expect(dialog?.textContent).toContain('Ember');
-  expect(dialog?.textContent).toContain(ember.cost.toLocaleString('en-US'));
+  expect(dialog?.textContent).toContain('Extra life');
+  expect(dialog?.textContent).toContain(EXTRA_LIFE_COST.toLocaleString('en-US'));
   expect(dialog?.textContent).toContain('10%');
+  expect(dialog?.textContent).not.toContain('Ember');
   expect(player.ship.movementLocked).toBe(true);
 
   const send = vi.spyOn(NetworkManager.getInstance(), 'sendMessage').mockReturnValue(true);
-  dialog?.querySelector<HTMLButtonElement>('button[data-paint-id="ember"]')?.click();
+  const buy = dialog?.querySelector<HTMLButtonElement>('button[data-offer="extra-life"]');
+  expect(buy?.textContent).toBe('Buy extra life');
+  expect(buy?.getAttribute('aria-describedby')).toBe(TOWN_STORE_IDS.price);
+  buy?.click();
   expect(send).toHaveBeenCalledWith({
-    type: 'buyShipPaint',
+    type: 'buyExtraLife',
     id: player.id,
-    data: { paintId: 'ember' },
+    data: {},
   });
-  applyTownStoreResult({ message: `You need ${ember.cost} more score` });
+  applyTownStoreResult({ message: `You need ${EXTRA_LIFE_COST} more score` });
   expect(document.querySelector(`#${TOWN_STORE_IDS.status}`)?.textContent).toContain(
-    `${ember.cost}`
+    `${EXTRA_LIFE_COST}`
   );
-  expect(player.ship.color).not.toBe(ember.color);
+  expect(player.lives).toBe(3);
+  expect(dialog?.querySelector('button[data-offer="extra-life"]')).toBe(buy);
 
-  player.score = ember.cost;
+  buy?.focus();
+  player.score = EXTRA_LIFE_COST;
   applyTownStoreResult({
-    message: 'Ember is on your hull',
+    message: 'You have 4 lives',
     score: 0,
-    color: ember.color,
+    lives: 4,
   });
-  expect(player.ship.color).toBe(ember.color);
+  expect(player.lives).toBe(4);
   expect(player.score).toBe(0);
-  expect(dialog?.textContent).toContain('Worn');
+  expect(dialog?.querySelector('button[data-offer="extra-life"]')).toBe(buy);
+  expect(document.activeElement).toBe(buy);
+
+  player.lives = MAX_LIVES;
+  buy?.focus();
+  applyTownStoreResult({ message: `You already hold ${MAX_LIVES} lives` });
+  expect(buy?.textContent).toBe('Extra life, lives full');
+  expect(buy?.disabled).toBe(true);
+  expect(document.activeElement?.id).toBe(TOWN_STORE_IDS.return);
+
+  const scoreNode = document.querySelector(`#${TOWN_STORE_IDS.score}`);
+  expect(buy).toBeTruthy();
+  expect(scoreNode).toBeTruthy();
+  const priorLabel = buy?.textContent;
+  const priorScore = scoreNode?.textContent;
+  const labelTextNode = buy?.firstChild;
+  const scoreTextNode = scoreNode?.firstChild;
+  expect(labelTextNode).toBeTruthy();
+  expect(scoreTextNode).toBeTruthy();
+  for (let frame = 0; frame < 8; frame += 1) {
+    syncTownStoreChrome();
+  }
+  expect(buy?.textContent).toBe(priorLabel);
+  expect(scoreNode?.textContent).toBe(priorScore);
+  // Same-string textContent assigns replace the Text node; stable chrome must keep it.
+  expect(buy?.firstChild).toBe(labelTextNode);
+  expect(scoreNode?.firstChild).toBe(scoreTextNode);
+  expect(document.querySelector('button[data-offer="extra-life"]')).toBe(buy);
+
   closeTownStore();
   expect(isTownStoreOpen()).toBe(false);
   expect(player.ship.movementLocked).toBe(false);

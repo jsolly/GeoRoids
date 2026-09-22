@@ -61,9 +61,12 @@ The server owns attachment, damage, scan pulses, expiry, and replacement.
 it and grant no delivery bonus. `buyShipPaint` accepts the socket owner's id
 and a catalog `paintId` while that ship is inside the Town Square store.
 Success replies `townStoreResult` with the notice, the new score, and the
-catalog color, then broadcasts. A refusal replies with the notice only and
-spends nothing. A request for another pilot's id is ignored. Player `color`
-stays the kit default until a catalog paint is worn.
+catalog color, then broadcasts. `buyExtraLife` accepts the socket owner's id
+while that ship is inside the store. Success replies `townStoreResult` with
+the notice, the new score, and the new life count, then broadcasts. A refusal
+replies with the notice only and spends nothing. The storefront sells one
+extra life at a time, up to 6 lives. A request for another pilot's id is
+ignored. Player `color` stays the kit default until a catalog paint is worn.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps

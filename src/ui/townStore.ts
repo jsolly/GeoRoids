@@ -1,7 +1,7 @@
 import {
+  EXTRA_LIFE_COST,
   insideTownStore,
-  purchasedHullColor,
-  SHIP_PAINTS,
+  MAX_LIVES,
   TOWN_YIELD_PER_MODULE,
   townDeliveryBonusPercent,
 } from '../../shared/townStore';
@@ -20,7 +20,8 @@ export const TOWN_STORE_IDS = {
   close: 'town-store-close',
   yield: 'town-store-yield',
   score: 'town-store-score',
-  paints: 'town-store-paints',
+  offer: 'town-store-offer',
+  price: 'town-store-life-price',
   status: 'town-store-status',
   return: 'town-store-return',
 } as const;
@@ -41,7 +42,7 @@ type StoreElements = {
   close: HTMLButtonElement;
   yieldLine: HTMLElement;
   score: HTMLElement;
-  paints: HTMLElement;
+  offer: HTMLElement;
   status: HTMLElement;
   return: HTMLButtonElement;
 };
@@ -50,7 +51,6 @@ let initialized = false;
 let closeInProgress = false;
 let elements: StoreElements | null = null;
 let openInputRelease: (() => void) | undefined;
-let paintSignature = '';
 
 /** Alive local pilot inside the Town Square shopping radius during flight. */
 export function canEnterTownStore(): boolean {
@@ -76,40 +76,42 @@ function streetsBuiltByLocal() {
   return worldFurnaces.modulesBuiltBy(id);
 }
 
-function paintRows(): void {
-  if (!elements) {
-    return;
+function setTextIfChanged(node: HTMLElement, text: string): void {
+  if (node.textContent !== text) {
+    node.textContent = text;
   }
-  const player = PlayerManager.getInstance().getLocalPlayer();
-  const worn = player?.ship.color;
-  elements.paints.replaceChildren(
-    ...SHIP_PAINTS.map((paint) => {
-      const row = document.createElement('div');
-      row.className = 'town-store-row';
-      const swatch = document.createElement('span');
-      swatch.className = 'town-store-swatch';
-      swatch.style.background = paint.color;
-      swatch.setAttribute('aria-hidden', 'true');
-      const copy = document.createElement('span');
-      copy.className = 'town-store-copy';
-      const name = document.createElement('strong');
-      name.textContent = paint.name;
-      const price = document.createElement('small');
-      price.textContent = `${paint.cost.toLocaleString('en-US')} score`;
-      copy.append(name, price);
-      const buy = document.createElement('button');
-      buy.type = 'button';
-      buy.dataset['paintId'] = paint.id;
-      const already = worn === paint.color;
-      buy.textContent = already ? 'Worn' : 'Buy';
-      buy.disabled = already;
-      buy.addEventListener('click', () => {
-        purchasePaint(paint.id);
-      });
-      row.append(swatch, copy, buy);
-      return row;
-    })
+}
+
+function lifeButton(): HTMLButtonElement | null {
+  if (!elements) {
+    return null;
+  }
+  const existing = elements.offer.querySelector<HTMLButtonElement>(
+    'button[data-offer="extra-life"]'
   );
+  if (existing) {
+    return existing;
+  }
+  const row = document.createElement('div');
+  row.className = 'town-store-row';
+  const copy = document.createElement('span');
+  copy.className = 'town-store-copy';
+  const name = document.createElement('strong');
+  name.textContent = 'Extra life';
+  const price = document.createElement('small');
+  price.id = TOWN_STORE_IDS.price;
+  price.textContent = `${EXTRA_LIFE_COST.toLocaleString('en-US')} score`;
+  copy.append(name, price);
+  const buy = document.createElement('button');
+  buy.type = 'button';
+  buy.dataset['offer'] = 'extra-life';
+  buy.setAttribute('aria-describedby', TOWN_STORE_IDS.price);
+  buy.addEventListener('click', () => {
+    purchaseExtraLife();
+  });
+  row.append(copy, buy);
+  elements.offer.replaceChildren(row);
+  return buy;
 }
 
 function refreshStoreCopy(): void {
@@ -120,20 +122,34 @@ function refreshStoreCopy(): void {
   const built = streetsBuiltByLocal();
   const bonus = townDeliveryBonusPercent(built);
   const perStreet = Math.round(TOWN_YIELD_PER_MODULE * 100);
-  elements.yieldLine.textContent =
+  setTextIfChanged(
+    elements.yieldLine,
     built === 0
       ? `Each street you build adds ${perStreet}% to your own furnace deliveries.`
-      : `You built ${built} ${built === 1 ? 'street' : 'streets'}. Your deliveries pay ${bonus}% more.`;
-  elements.score.textContent = `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`;
-  const signature = `${player?.ship.color ?? ''}:${built}:${player?.score ?? 0}`;
-  if (signature !== paintSignature) {
-    paintSignature = signature;
-    paintRows();
+      : `You built ${built} ${built === 1 ? 'street' : 'streets'}. Your deliveries pay ${bonus}% more.`
+  );
+  setTextIfChanged(
+    elements.score,
+    `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`
+  );
+  const buy = lifeButton();
+  if (!buy) {
+    return;
+  }
+  const full = (player?.lives ?? 0) >= MAX_LIVES;
+  const label = full ? 'Extra life, lives full' : 'Buy extra life';
+  const wasFocused = document.activeElement === buy;
+  setTextIfChanged(buy, label);
+  if (buy.disabled !== full) {
+    buy.disabled = full;
+  }
+  if (wasFocused && buy.disabled) {
+    elements.return.focus({ preventScroll: true });
   }
 }
 
 function createDialogMarkup(dialog: HTMLDialogElement): void {
-  if (dialog.querySelector(`#${TOWN_STORE_IDS.paints}`)) {
+  if (dialog.querySelector(`#${TOWN_STORE_IDS.offer}`)) {
     return;
   }
   dialog.classList.add('town-store-dialog');
@@ -148,7 +164,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
     </header>
     <p id="${TOWN_STORE_IDS.yield}"></p>
     <p id="${TOWN_STORE_IDS.score}"></p>
-    <div id="${TOWN_STORE_IDS.paints}"></div>
+    <div id="${TOWN_STORE_IDS.offer}"></div>
     <p id="${TOWN_STORE_IDS.status}" role="status" aria-live="polite"></p>
     <button id="${TOWN_STORE_IDS.return}" type="button">Return to flight</button>
   `;
@@ -168,24 +184,24 @@ function ensureElements(): StoreElements | null {
   const close = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.close}`);
   const yieldLine = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.yield}`);
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
-  const paints = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.paints}`);
+  const offer = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`);
   const status = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.status}`);
   const returnButton = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.return}`);
-  if (!close || !yieldLine || !score || !paints || !status || !returnButton) {
+  if (!close || !yieldLine || !score || !offer || !status || !returnButton) {
     return null;
   }
-  return { dialog, close, yieldLine, score, paints, status, return: returnButton };
+  return { dialog, close, yieldLine, score, offer, status, return: returnButton };
 }
 
-function purchasePaint(paintId: string): void {
+function purchaseExtraLife(): void {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player || !isTownStoreOpen()) {
     return;
   }
   NetworkManager.getInstance().sendMessage({
-    type: 'buyShipPaint',
+    type: 'buyExtraLife',
     id: player.id,
-    data: { paintId },
+    data: {},
   });
 }
 
@@ -207,9 +223,8 @@ export function applyTownStoreResult(data: unknown): void {
   if ('score' in data && typeof data.score === 'number' && Number.isFinite(data.score)) {
     player.score = data.score;
   }
-  if ('color' in data && typeof data.color === 'string' && purchasedHullColor(data.color)) {
-    player.color = data.color;
-    player.ship.color = data.color;
+  if ('lives' in data && typeof data.lives === 'number' && Number.isInteger(data.lives)) {
+    player.lives = data.lives;
   }
   refreshStoreCopy();
 }

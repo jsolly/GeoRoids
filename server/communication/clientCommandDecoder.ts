@@ -65,6 +65,10 @@ export type ClientCommand =
       paintId: string;
     }
   | {
+      type: 'buyExtraLife';
+      id: string;
+    }
+  | {
       type: 'update';
       id: string;
       update: PlayerMovementUpdate;
@@ -325,6 +329,11 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return typeof paintId === 'string' && shipPaintById(paintId)
         ? { ok: true, command: { type, id, paintId } }
         : invalid(type, 'Invalid ship paint');
+    }
+    case 'buyExtraLife': {
+      return id
+        ? { ok: true, command: { type, id } }
+        : invalid(type, 'Missing player ID for buyExtraLife');
     }
     case 'shoot': {
       if (!id) {

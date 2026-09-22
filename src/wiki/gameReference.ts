@@ -22,7 +22,12 @@ import { BOOST } from '../../shared/shipBoost';
 import { GROWTH } from '../../shared/shipGrowth';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import { SPIDER } from '../../shared/terrainSpider';
-import { SHIP_PAINTS, TOWN_STORE_RADIUS, TOWN_YIELD_PER_MODULE } from '../../shared/townStore';
+import {
+  EXTRA_LIFE_COST,
+  MAX_LIVES,
+  TOWN_STORE_RADIUS,
+  TOWN_YIELD_PER_MODULE,
+} from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type { ShipKitId } from '../../shared-types';
 import { DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP, SHOCKWAVE } from '../constants';
@@ -58,12 +63,6 @@ function streetCost(ring: 1 | 2 | 3): string {
   return (streetLots(ring)[0]?.cost ?? 0).toLocaleString('en-US');
 }
 
-function paintPrices(): string {
-  return SHIP_PAINTS.map((paint) => `${paint.name} ${paint.cost.toLocaleString('en-US')}`).join(
-    ', '
-  );
-}
-
 export const gameReference: Record<string, { heading: string; paragraphs: string[] }[]> = {
   'field-manual': [
     {
@@ -88,7 +87,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Town store values',
       paragraphs: [
-        `The Town Square store opens within ${TOWN_STORE_RADIUS} units of the origin. Near the square, E and the ability button become Enter store unless a Hauler is hooked, in which case Release or Ignite stays on that control and B will not open the store. Otherwise B toggles the store on a keyboard. The open store holds the ship the same way the map and schematic do. Each street a pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to that pilot's own furnace deliveries. Hull paints cost ${paintPrices()} score.`,
+        `The Town Square store opens within ${TOWN_STORE_RADIUS} units of the origin. Near the square, E and the ability button become Enter store unless a Hauler is hooked, in which case Release or Ignite stays on that control and B will not open the store. Otherwise B toggles the store on a keyboard. The open store holds the ship the same way the map and schematic do. Each street a pilot built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to that pilot's own furnace deliveries. An extra life costs ${EXTRA_LIFE_COST.toLocaleString('en-US')} score, up to ${MAX_LIVES} lives.`,
       ],
     },
   ],
@@ -230,7 +229,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       heading: 'Shared field values',
       paragraphs: [
         `World radius is ${WORLD.radius.toLocaleString('en-US')} units with ${WORLD.sectorSize.toLocaleString('en-US')}-unit sectors. Passive exploration ranges are Surveyor ${EXPLORATION_RANGE.surveyor} and Hauler ${EXPLORATION_RANGE.hauler} world units. Active Surveyor scans reach ${SHIP_ABILITY.SCAN_RANGE}; explored cells persist and are shared by every pilot. Player cruise uses speed scale ${GAME.PLAYER_SPEED_SCALE}. A visited region with no asteroids left stays empty, and ships can still fly through it.`,
-        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} street lots sit in the first band, then ${streetLots(2).length} and ${streetLots(3).length} farther lots scattered through outer bands. A Surveyor builds the next dark foundation with their own score once its inward parent lot is burning and that score covers ${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Surveyor receives the size-scaled material reward, and each street that recipient built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to their own payout. Size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}. The Town Square store, within ${TOWN_STORE_RADIUS} units of the origin, sells hull paints for ${paintPrices()} score.`,
+        `${TOWN_HEARTH.name} (${TOWN_HEARTH.radius}-unit intake) is the only pre-lit hearth. ${streetLots(1).length} street lots sit in the first band, then ${streetLots(2).length} and ${streetLots(3).length} farther lots scattered through outer bands. A Surveyor builds the next dark foundation with their own score once its inward parent lot is burning and that score covers ${streetCost(1)}, ${streetCost(2)}, or ${streetCost(3)}. The furnace keeps the builder's name. Every Hauler and recorded Surveyor receives the size-scaled material reward, and each street that recipient built adds ${Math.round(TOWN_YIELD_PER_MODULE * 100)}% to their own payout. Size-25 base values are ice ${furnaceReward({ material: 'ice', size: 25 })}, metal ${furnaceReward({ material: 'metal', size: 25 })}, and rubble ${furnaceReward({ material: 'rubble', size: 25 })}. The Town Square store, within ${TOWN_STORE_RADIUS} units of the origin, sells one extra life for ${EXTRA_LIFE_COST.toLocaleString('en-US')} score, up to ${MAX_LIVES} lives.`,
       ],
     },
   ],

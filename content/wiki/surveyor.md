@@ -88,7 +88,7 @@ The action spends your own score to light that street furnace, and the furnace
 takes your name. It does not place a hearth at an arbitrary position. The inward
 lot on that road must already be burning, and your score must cover the lot.
 Each street you build raises your own later furnace deliveries. The same score
-buys hull paint at the Town Square store. The bonus stays with the pilot who
+buys an extra life at the Town Square store. The bonus stays with the pilot who
 paid, so a later nickname change leaves both the furnace name and the bonus
 where they were. Other pilots keep the base reward. Deliveries still pay the
 Hauler and each recorded Surveyor personally. A failed build spends neither

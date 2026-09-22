@@ -38,7 +38,9 @@ import { applyLootMass, applyShipMass, GROWTH } from '../../shared/shipGrowth';
 import { boundedDiagnosticError, captureDiagnosticActorState } from '../../shared/stateDiagnostics';
 import { SURVEY_PROBE } from '../../shared/surveyProbe';
 import {
+  EXTRA_LIFE_COST,
   insideTownStore,
+  MAX_LIVES,
   purchasedHullColor,
   shipPaintById,
   TOWN_STORE_ISSUE,
@@ -2733,6 +2735,32 @@ export class GameEngine {
   public townStoreNotice(paintId: string): string {
     const paint = shipPaintById(paintId);
     return paint ? `${paint.name} is on your hull` : TOWN_STORE_ISSUE.CLOSED;
+  }
+
+  /** Spend personal score on one extra life. Undefined means the life was added. */
+  public buyExtraLife(entityId: string): string | undefined {
+    const pilot = this.getPlayer(entityId);
+    if (!pilot || pilot.exploding || pilot.health <= 0 || pilot.respawnTimer !== undefined) {
+      return TOWN_STORE_ISSUE.CLOSED;
+    }
+    if (!insideTownStore(pilot.position)) {
+      return TOWN_STORE_ISSUE.AWAY;
+    }
+    if (pilot.lives >= MAX_LIVES) {
+      return TOWN_STORE_ISSUE.FULL;
+    }
+    const score = Number.isSafeInteger(pilot.score) ? pilot.score : 0;
+    if (score < EXTRA_LIFE_COST) {
+      return `You need ${EXTRA_LIFE_COST - Math.max(0, score)} more score`;
+    }
+    pilot.score -= EXTRA_LIFE_COST;
+    pilot.lives += 1;
+    this.capturePilot(entityId);
+    return undefined;
+  }
+
+  public extraLifeNotice(lives: number): string {
+    return `You have ${lives} ${lives === 1 ? 'life' : 'lives'}`;
   }
 
   private clearTown(): void {

@@ -1,12 +1,12 @@
 {
-  "note": "Map zoom controls stay on the chart after Enter store, scattered streets, and radar side landed.",
+  "note": "North arrow compass stays with map zoom controls.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
     "docs/protocol/snapshot-v1.md": "sha256:87b6a7ad4079b9179c6a437b1e65e173a75bab1d20bcb5e10fc9e14501809382",
     "docs/sounds.md": "sha256:19807cb343ab8600961924da17857bf7a469170ac72748684150eff322bd628c",
-    "index.css": "sha256:1ad2526f0ed63a49250827a7b79294c280af50cb12438eb669264e633251d6f9",
-    "index.html": "sha256:c7e1a0345937ed6d964e0490ebbd8fcef051fb3f3bfdb99891939d5a08539e46",
+    "index.css": "sha256:468f09219f888addc685c490a94c247a9d29f6f2822d98a714c8d70425021b78",
+    "index.html": "sha256:16f7095ac1a8222af90c7746c7b0e58fb095bd6cc95a9f54e29ce2476a99cde0",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:54bb156a4f03c98660851b6d9aa27f462b736a73f0c9ed72ed7c5adf92d54fff",
     "public/music/README.md": "sha256:bc37faf582c661603145329bc3759822344b5a49865dc2433b6a8451eca22f9e",
@@ -277,7 +277,7 @@
     "src/ui/townStore.ts": "sha256:916f78d57b775f898b1605c6f8f000bb356442930228562bd5d4843774fdfea4",
     "src/ui/townStoreState.ts": "sha256:98ced1c612ca84284d02cadd5594db413f3dec736a1beaeca56519ee242d4cd2",
     "src/ui/uiUtils.ts": "sha256:a883b7c2882c6723a52bf751ecc76d740bb119acdf4e364dc00cca7a01d7b537",
-    "src/ui/universeMap.ts": "sha256:a422177757d6bd163835333abaacfee6e33b65c5b1abcd39bf46ab44fd76d93f",
+    "src/ui/universeMap.ts": "sha256:27ada665f03e6f24ba924965df33b6aa0cde34c8b707c8493451b0b35f5c2030",
     "src/ui/universeMapLabels.ts": "sha256:e8c7098cdbd2b4faee6906253237955f8fc5c288e661d2a47ec813c0a7a75c49",
     "src/ui/viewportChrome.ts": "sha256:67f21640834b68c25f3445beb65f4f441c94f3af0842e656c8bb289e9166e217",
     "src/utils/Logger.ts": "sha256:ac81f71d2a46c00656f4be9477f2d83311952bc8d43a5cb016326b5bfd60a166",
@@ -434,7 +434,7 @@
     "tests/unit/ui/shipSchematic.test.ts": "sha256:3636ab3d1d17a991542fdc816d13343f683638a234921048a2621474dfcabec5",
     "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-street.test.ts": "sha256:6a97e002c31d24dc38d912d28f0d270b0debf4afa1f6b685697ee59e2c5cedf1",
     "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:a6eea57e97aca627b9a6bd7f713cfaa21bfd3ccacdc826f94ae5834960aaaa13",
-    "tests/unit/ui/universeMap.test.ts": "sha256:54cbc23ae54871aecf0163dadfcb5ff9c2095aee081b618b5abd98bb5e258c79",
+    "tests/unit/ui/universeMap.test.ts": "sha256:fc4e622df747259ec02e630dc8de693ccbae7c77c73161cddb9da1d51ff7a96e",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",
     "wiki/index.html": "sha256:db965f362604cba8cbf3411ac7fc2af33485cfdfa132fd5d8017461cf3a45677"

@@ -6,7 +6,6 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
-import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
@@ -103,22 +102,52 @@ test.each([
     expect(
       await page.evaluate(() => window.gameController?.getGameStateManager().getPickupMessage())
     ).toBe(`${target.name} acquired`);
+    const equipHint = await page.evaluate(() => {
+      const canvasElement = document.querySelector('#gameCanvas');
+      const controller = window.gameController;
+      if (!canvasElement || !controller) {
+        return [];
+      }
+      const original = CanvasRenderingContext2D.prototype.fillText;
+      const texts: string[] = [];
+      CanvasRenderingContext2D.prototype.fillText = function (
+        this: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        maxWidth?: number
+      ): void {
+        if (this.canvas === canvasElement) {
+          texts.push(text);
+        }
+        original.call(this, text, x, y, maxWidth);
+      };
+      try {
+        controller.renderGame();
+      } finally {
+        CanvasRenderingContext2D.prototype.fillText = original;
+      }
+      return texts;
+    });
+    expect(equipHint).toContain('Equipment is in your inventory');
+    expect(equipHint).not.toContain('Tap and hold your ship');
+    if (width === 390) {
+      expect(equipHint).toContain('Tap Inventory to equip');
+      expect(equipHint).not.toContain('Press V');
+    } else {
+      expect(equipHint).toContain('Press V to equip');
+      expect(equipHint).not.toContain('Tap Inventory');
+    }
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`satellite-equip-hint-${capture}.png`),
+    });
 
     if (width === 390) {
-      const session = await page.context().newCDPSession(page);
-      const center = await centerOf(page, '#gameCanvas');
-      try {
-        await dispatchTouch(session, 'touchStart', [{ ...center, id: 1 }]);
-        await page.waitForFunction(() =>
-          document.querySelector('dialog#ship-schematic-dialog')?.hasAttribute('open')
-        );
-      } finally {
-        await dispatchTouch(session, 'touchEnd', []);
-        await session.detach();
-      }
+      await page.locator('#ship-schematic-toggle').tap();
     } else {
       await page.keyboard.press('v');
     }
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     const inventory = page.locator('#ship-schematic-inventory');
     await expect.poll(() => inventory.textContent()).toContain(target.name);
     await page.screenshot({

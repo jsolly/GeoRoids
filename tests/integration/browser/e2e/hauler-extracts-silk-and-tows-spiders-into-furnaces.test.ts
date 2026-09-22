@@ -9,7 +9,6 @@ import {
 import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { arrangeCrewField } from '../../utils/test-server-control';
-import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 function field(page: Page): Promise<SpiderFieldState> {
@@ -32,20 +31,12 @@ for (const width of [1280, 390]) {
     const id = await game.getLocalPlayerId();
     const use = () => (mobile ? page.locator('#touch-ability').tap() : page.keyboard.press('e'));
     const open = async () => {
-      if (!mobile) {
+      if (mobile) {
+        await page.locator('#ship-schematic-toggle').tap();
+      } else {
         await page.keyboard.press('v');
-        return;
       }
-      const session = await page.context().newCDPSession(page);
-      try {
-        await dispatchTouch(session, 'touchStart', [
-          { ...(await centerOf(page, '#gameCanvas')), id: 1 },
-        ]);
-        await page.locator('#ship-schematic-dialog[open]').waitFor();
-      } finally {
-        await dispatchTouch(session, 'touchEnd', []);
-        await session.detach();
-      }
+      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     };
     const works = TOWN_HEARTH;
     const arrange = async (angle: number) => {

@@ -142,7 +142,7 @@ test('title menu presents the keyboard and ability control hint', () => {
   expect(hint?.textContent?.toLowerCase()).not.toContain('shield');
 });
 
-test('playfield chrome ships a desktop Schematic button with the V shortcut', () => {
+test('playfield chrome ships an Inventory button with the V shortcut', () => {
   const toggle = document.querySelector('#ship-schematic-toggle');
   const map = document.querySelector('#universe-map-toggle');
   expect(toggle?.tagName).toBe('BUTTON');
@@ -152,7 +152,7 @@ test('playfield chrome ships a desktop Schematic button with the V shortcut', ()
     Node.DOCUMENT_POSITION_FOLLOWING
   );
   expect(productionHtml).toContain('id="ship-schematic-toggle"');
-  expect(productionHtml).toContain('Schematic <kbd>V</kbd>');
+  expect(productionHtml).toContain('Inventory <kbd>V</kbd>');
   expect(productionHtml.indexOf('id="ship-schematic-toggle"')).toBeLessThan(
     productionHtml.indexOf('id="universe-map-toggle"')
   );

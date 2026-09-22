@@ -52,9 +52,9 @@ export function shouldUseTouchControls(query: ViewportQuery = queryViewport()): 
 }
 
 export const DESKTOP_CONTROLS_HINT =
-  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V schematic · B town store · M map';
+  'Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V inventory · B town store · M map';
 export const TOUCH_CONTROLS_HINT =
-  'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Hold ship to equip · Store at Town Square · Map button';
+  'Always thrust · Drag to steer · Tap to fire · Boost · Ability · Inventory button · Store at Town Square · Map button';
 
 export function controlsHintFor(
   query: ViewportQuery = queryViewport()

@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest';
-import { STEERING } from '../../../../src/constants';
-import { PLAYFIELD_CLOSE_SCALE } from '../../../../src/rendering/playfieldCamera';
-import { SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX } from '../../../../src/ui/schematicJoinHint';
+import { playfieldToggleOffsets } from '../../../../src/rendering/canvasSurface';
+import { hudLayoutForCanvas } from '../../../../src/rendering/hud/hudLayout';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -29,75 +28,30 @@ for (const viewport of [
     await game.waitForGameReady();
     await game.waitForServerJoin();
     const schematicToggle = page.locator('#ship-schematic-toggle');
-    if (viewport.touch) {
-      expect(await schematicToggle.isVisible()).toBe(false);
-      const hintHandle = await page.waitForFunction(
-        () => {
-          const canvasElement = document.querySelector('#gameCanvas');
-          const controller = window.gameController;
-          const ship = controller?.getCurrPlayer()?.ship;
-          if (!canvasElement || !controller || !ship) {
-            return false;
-          }
-          const original = CanvasRenderingContext2D.prototype.fillText;
-          const texts: { text: string; y: number }[] = [];
-          CanvasRenderingContext2D.prototype.fillText = function (
-            this: CanvasRenderingContext2D,
-            text: string,
-            x: number,
-            y: number,
-            maxWidth?: number
-          ): void {
-            if (this.canvas === canvasElement) {
-              texts.push({ text, y });
-            }
-            original.call(this, text, x, y, maxWidth);
-          };
-          try {
-            controller.renderGame();
-          } finally {
-            CanvasRenderingContext2D.prototype.fillText = original;
-          }
-          const hold = texts.find((line) => line.text === 'Tap and hold your ship');
-          const equip = texts.find((line) => line.text === 'to equip tools');
-          return hold && equip ? texts : false;
-        },
-        undefined,
-        { timeout: 4000 }
-      );
-      const hintLines = (await hintHandle.jsonValue()) as { text: string; y: number }[];
-      const hold = hintLines.find((line) => line.text === 'Tap and hold your ship');
-      const equip = hintLines.find((line) => line.text === 'to equip tools');
-      expect(hold).toBeDefined();
-      expect(equip).toBeDefined();
-      const shipR = await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.r ?? 0);
-      const cueTip = Math.max(STEERING.ARROW_DISTANCE_PX, shipR * PLAYFIELD_CLOSE_SCALE + 32);
-      expect(equip?.y).toBeCloseTo(
-        viewport.height / 2 - cueTip - SCHEMATIC_JOIN_HINT_GAP_ABOVE_CUE_PX,
-        0
-      );
-      expect(equip?.y).toBeLessThan(viewport.height / 2 - cueTip);
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`join-hint-${viewport.width}.png`),
-      });
-    }
-    await game.waitForNetworkAsteroids(1);
-    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    await schematicToggle.waitFor({ state: 'visible' });
+    expect(await schematicToggle.textContent()).toContain('Inventory');
     if (viewport.touch) {
       const touch = await page.context().newCDPSession(page);
       await touch.send('Input.dispatchTouchEvent', {
         type: 'touchStart',
         touchPoints: [{ x: viewport.width / 2, y: viewport.height / 2 }],
       });
-      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+      await page.waitForTimeout(900);
+      expect(await page.locator('#ship-schematic-dialog').isVisible()).toBe(false);
       await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await touch.detach();
+      expect(await page.locator('#ship-schematic-toggle kbd').isVisible()).toBe(false);
     } else {
-      expect(await schematicToggle.isVisible()).toBe(true);
       expect(await page.locator('#ship-schematic-toggle kbd').isVisible()).toBe(true);
-      await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`schematic-button-${viewport.width}.png`),
-      });
+    }
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`inventory-button-${viewport.width}.png`),
+    });
+    await game.waitForNetworkAsteroids(1);
+    await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    if (viewport.touch) {
+      await schematicToggle.tap();
+    } else {
       await schematicToggle.click();
     }
     const dialog = page.locator('#ship-schematic-dialog');
@@ -112,13 +66,25 @@ for (const viewport of [
       const layout = await page.evaluate(() => {
         const cards = document.querySelector('#ship-schematic-cards');
         const inventory = document.querySelector('.satellite-inventory');
+        const canvas = document.querySelector('#ship-schematic-canvas');
         const modal = document.querySelector('#ship-schematic-dialog');
-        if (!(cards instanceof HTMLElement) || !inventory || !(modal instanceof HTMLElement)) {
+        if (
+          !(cards instanceof HTMLElement) ||
+          !(inventory instanceof HTMLElement) ||
+          !(canvas instanceof HTMLElement) ||
+          !(modal instanceof HTMLElement)
+        ) {
           throw new Error('Missing schematic content');
         }
+        const cardsBox = cards.getBoundingClientRect();
+        const inventoryBox = inventory.getBoundingClientRect();
+        const canvasBox = canvas.getBoundingClientRect();
+        const modalBox = modal.getBoundingClientRect();
         return {
-          cardsBottom: cards.getBoundingClientRect().bottom,
-          inventoryTop: inventory.getBoundingClientRect().top,
+          inventoryBesideHull: inventoryBox.left >= canvasBox.right - 2,
+          inventoryInView: inventoryBox.top < modalBox.bottom && inventoryBox.bottom > modalBox.top,
+          cardsBelow:
+            cardsBox.top >= canvasBox.bottom - 2 && cardsBox.top >= inventoryBox.bottom - 2,
           width: modal.clientWidth,
           contentWidth: modal.scrollWidth,
           clippedNames: [...cards.querySelectorAll('.ship-schematic-card-name')].some(
@@ -126,7 +92,9 @@ for (const viewport of [
           ),
         };
       });
-      expect(layout.inventoryTop).toBeGreaterThanOrEqual(layout.cardsBottom);
+      expect(layout.inventoryBesideHull).toBe(true);
+      expect(layout.inventoryInView).toBe(true);
+      expect(layout.cardsBelow).toBe(true);
       expect(layout.contentWidth).toBeLessThanOrEqual(layout.width + 1);
       expect(layout.clippedNames).toBe(false);
       await dialog.evaluate((el) => el.scrollTo(0, 0));
@@ -157,5 +125,53 @@ for (const viewport of [
     }
     expect(await dialog.isVisible()).toBe(false);
     assertNoBrowserDiagnostics(diagnostics);
-  }, 20000);
+  }, 40000);
 }
+
+test('a short touch screen keeps Inventory under the radar and above Map', async () => {
+  const width = 844;
+  const height = 390;
+  const page = await browserManager.recreatePage({ hasTouch: true });
+  await page.setViewportSize({ width, height });
+  const game = new GameInteractions(page);
+  await game.navigateToGame();
+  await page.locator('[data-kit-id="hauler"]').click();
+  await game.startGame();
+  await game.waitForGameReady();
+  const toggle = page.locator('#ship-schematic-toggle');
+  await toggle.waitFor({ state: 'visible' });
+  const expected = playfieldToggleOffsets(
+    hudLayoutForCanvas({ width, height }).miniMap,
+    true,
+    height
+  );
+  const stack = await page.evaluate(() => {
+    const area = document.querySelector('#gameArea');
+    const inventory = document.querySelector('#ship-schematic-toggle');
+    const map = document.querySelector('#universe-map-toggle');
+    if (
+      !(area instanceof HTMLElement) ||
+      !(inventory instanceof HTMLElement) ||
+      !(map instanceof HTMLElement)
+    ) {
+      throw new Error('Missing playfield controls');
+    }
+    const inventoryBox = inventory.getBoundingClientRect();
+    const mapBox = map.getBoundingClientRect();
+    return {
+      schematicY: Number.parseFloat(area.style.getPropertyValue('--schematic-toggle-y')),
+      mapY: Number.parseFloat(area.style.getPropertyValue('--map-toggle-y')),
+      inventoryBottom: inventoryBox.bottom,
+      inventoryRight: inventoryBox.right,
+      mapTop: mapBox.top,
+      width: window.innerWidth,
+    };
+  });
+  expect(stack.schematicY).toBe(expected.schematicY);
+  expect(stack.mapY).toBe(expected.mapY);
+  expect(stack.inventoryBottom).toBeLessThanOrEqual(stack.mapTop + 1);
+  expect(stack.inventoryRight).toBeLessThanOrEqual(stack.width + 1);
+  await page.screenshot({
+    path: screenshotManager.getScreenshotPath('inventory-button-short-touch.png'),
+  });
+});

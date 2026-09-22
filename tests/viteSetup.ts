@@ -8,7 +8,7 @@ if (typeof window !== 'undefined') {
     <div id="gameWrapper">
       <div id="start-screen" class="screen">
         <h1>GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V schematic · B town store · M map</p>
+        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V inventory · B town store · M map</p>
         <div class="game-modes">
           <div>
             <label for="playerNameInput" class="nickname-label">Your Nickname</label>
@@ -112,9 +112,9 @@ if (typeof window !== 'undefined') {
           id="ship-schematic-toggle"
           type="button"
           class="ship-schematic-toggle"
-          aria-label="Open ship schematic (V)"
+          aria-label="Open inventory and ship schematic (V)"
           aria-keyshortcuts="V"
-        >Schematic <kbd>V</kbd></button>
+        >Inventory <kbd>V</kbd></button>
         <button
           id="universe-map-toggle"
           type="button"

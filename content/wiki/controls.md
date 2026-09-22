@@ -73,7 +73,9 @@ charge and credits the time spent away toward the refill.
 
 V or the Inventory button opens the ship view for either kit.
 On desktop, the button sits above Map. Mobile controls sit together near the
-top of the playfield, below the score and player list. On a keyboard it shows the V shortcut, and the
+top of the playfield, below the score and three-row player list. Inventory,
+Map, the optional debug HUD toggle, and the ability share one compact row;
+Boost sits directly underneath. On a keyboard it shows the V shortcut, and the
 title screen lists that shortcut with the other flight keys. Touch flights use
 the same button and hide the badge. Collecting a satellite shows a brief label
 above your ship, then fades. It says the equipment is in your inventory. On

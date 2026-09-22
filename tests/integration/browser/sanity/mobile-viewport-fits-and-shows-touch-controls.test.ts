@@ -14,6 +14,7 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 test('title and gameplay stay sharp through density changes without a viewport resize', async () => {
   const page = await browserManager.recreatePage();
   await page.setViewportSize({ width: 800, height: 600 });
+  const diagnostics = watchBrowserDiagnostics(page);
   const game = new GameInteractions(page);
   await game.navigateToGame();
   const resizeCount = await page.evaluateHandle(() => {
@@ -87,6 +88,12 @@ test('title and gameplay stay sharp through density changes without a viewport r
       })
     ).toEqual({ width: 800, height: 600 });
     expect(await resizeCount.evaluate((count) => count.value)).toBe(0);
+    await session.send('Emulation.clearDeviceMetricsOverride');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('desktop-actions-1280.png'),
+    });
+    assertNoBrowserDiagnostics(diagnostics);
   } finally {
     await session.send('Emulation.clearDeviceMetricsOverride');
     await session.detach();
@@ -144,6 +151,25 @@ test(
       }
       boxes.push(box);
     }
+    const [inventory, map, hud, boostBox, abilityBox] = boxes;
+    if (!inventory || !map || !hud || !boostBox || !abilityBox) {
+      throw new Error('Expected all five action buttons');
+    }
+    expect(inventory.y).toBeLessThan(100);
+    expect([map.y, hud.y, abilityBox.y]).toEqual([inventory.y, inventory.y, inventory.y]);
+    expect(boostBox.y).toBeGreaterThanOrEqual(inventory.y + inventory.height);
+    await page.locator('#ship-schematic-toggle').tap();
+    await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
+    await page
+      .locator('#ship-schematic-dialog')
+      .getByRole('button', { name: 'Close ship and inventory', exact: true })
+      .tap();
+    await page.locator('#universe-map-toggle').tap();
+    await page.locator('#universe-map-dialog').waitFor({ state: 'visible' });
+    await page.locator('#universe-map-close').tap();
+    await hudToggle.tap();
+    expect(await hudToggle.getAttribute('aria-expanded')).toBe('true');
+    await hudToggle.tap();
     await page.screenshot({
       path: screenshotManager.getScreenshotPath('mobile-top-actions-390.png'),
     });
@@ -235,6 +261,27 @@ test(
         { message: 'Surveyor scan and cooldown should arrive from the server' }
       )
       .toBe(true);
+    for (const viewport of [
+      { width: 320, height: 700 },
+      { width: 844, height: 390 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await game.waitForAnimationFrames(2);
+      await hudToggle.tap();
+      const debugBox = await page.locator('#debug-hud').boundingBox();
+      expect(debugBox?.x).toBeGreaterThanOrEqual(0);
+      expect(debugBox && debugBox.x + debugBox.width).toBeLessThanOrEqual(viewport.width);
+      const rowTops = await Promise.all(
+        ['ship-schematic-toggle', 'universe-map-toggle', 'debug-hud-toggle', 'touch-ability'].map(
+          async (id) => (await page.locator(`#${id}`).boundingBox())?.y
+        )
+      );
+      expect(new Set(rowTops).size).toBe(1);
+      await page.screenshot({
+        path: screenshotManager.getScreenshotPath(`mobile-actions-${viewport.width}.png`),
+      });
+      await hudToggle.tap();
+    }
     assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT

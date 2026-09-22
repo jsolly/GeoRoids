@@ -42,13 +42,13 @@ test('phone portrait keeps notices below the leaderboard and radar above the abi
   expect(layout.notificationY).toBeGreaterThan(layout.kitNameY + 18);
 });
 
-test('phone landscape parks the radar under lives so it misses the stick', () => {
+test('phone landscape keeps the radar below the top action buttons', () => {
   const layout = computeHudLayout(
     { width: 844, height: 390 },
     { touchControls: true, safeArea: ZERO }
   );
   expect(layout.miniMap.y).toBeGreaterThan(layout.score.y + 28);
-  expect(layout.miniMap.x).toBe(layout.lives.x);
+  expect(layout.miniMap.x + layout.miniMap.size).toBe(844 - layout.padRight);
   expect(layout.leaderboard.maxRows).toBe(4);
 });
 

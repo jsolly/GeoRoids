@@ -29,6 +29,69 @@ async function expectOnlyCurrentLoop(page: Page, count: number): Promise<void> {
     .toBe(JSON.stringify([count]));
 }
 
+async function expectAudioControlsReachable(page: Page, mobile: boolean): Promise<void> {
+  const layout = await page.evaluate(() => {
+    const controls = [
+      'restart-audio-play',
+      'ship-schematic-toggle',
+      'universe-map-toggle',
+      'touch-boost',
+      'touch-ability',
+      'debug-hud-toggle',
+      'copy-debug-diagnostics',
+    ].flatMap((id) => {
+      const element = document.querySelector(`#${id}`);
+      const rect = element?.getBoundingClientRect();
+      if (!element || !rect || rect.width === 0 || rect.height === 0) {
+        return [];
+      }
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return [
+        {
+          id,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          height: rect.height,
+          reachable: hit === element || (hit !== null && element.contains(hit)),
+        },
+      ];
+    });
+    return {
+      controls,
+      width: innerWidth,
+      height: innerHeight,
+      openCanvas: [0.25, 0.6].every(
+        (x) => document.elementFromPoint(innerWidth * x, innerHeight * 0.85)?.id === 'gameCanvas'
+      ),
+    };
+  });
+  const restart = layout.controls.find(({ id }) => id === 'restart-audio-play');
+  expect(restart).toBeDefined();
+  expect(restart?.height).toBeGreaterThanOrEqual(44);
+  if (mobile) {
+    expect(restart?.bottom).toBeLessThan(layout.height / 2);
+    expect(layout.openCanvas).toBe(true);
+  }
+  for (const [index, control] of layout.controls.entries()) {
+    expect(control.reachable, `${control.id} must receive its own taps`).toBe(true);
+    expect(control.left).toBeGreaterThanOrEqual(0);
+    expect(control.right).toBeLessThanOrEqual(layout.width);
+    expect(control.top).toBeGreaterThanOrEqual(0);
+    expect(control.bottom).toBeLessThanOrEqual(layout.height);
+    for (const other of layout.controls.slice(index + 1)) {
+      expect(
+        control.left >= other.right ||
+          other.left >= control.right ||
+          control.top >= other.bottom ||
+          other.top >= control.bottom,
+        `${control.id} must not overlap ${other.id}`
+      ).toBe(true);
+    }
+  }
+}
+
 for (const browserType of [chromium, webkit]) {
   describe(browserType.name(), () => {
     const { browserManager, screenshotManager } = createBrowserScenarioHooks(
@@ -37,10 +100,11 @@ for (const browserType of [chromium, webkit]) {
     );
     for (const viewport of [
       { name: 'desktop', width: 1280, height: 900 },
-      { name: 'mobile', width: 390, height: 844 },
+      { name: 'mobile', width: 390, height: 630 },
+      { name: 'landscape', width: 844, height: 390 },
     ]) {
       test(`${viewport.name} pilot restarts title and flight music without changing the flight or preferences`, async () => {
-        const mobile = viewport.name === 'mobile';
+        const mobile = viewport.name !== 'desktop';
         const page = await browserManager.recreatePage({ music: true, hasTouch: mobile });
         await page.setViewportSize(viewport);
         await installAudioProbe(page, true, { music: true });
@@ -103,15 +167,7 @@ for (const browserType of [chromium, webkit]) {
           await page.locator('body').evaluate((body) => body.classList.contains('debug-on'))
         ).toBe(false);
         const playRestart = page.locator('#restart-audio-play');
-        const restartBox = await playRestart.boundingBox();
-        const boostBox = await page.locator('#touch-boost').boundingBox();
-        if (!restartBox || !boostBox) {
-          throw new Error('Audio and Boost controls must be visible');
-        }
-        expect(restartBox.height).toBeGreaterThanOrEqual(44);
-        expect(restartBox.x).toBeGreaterThanOrEqual(0);
-        expect(restartBox.x + restartBox.width).toBeLessThanOrEqual(viewport.width);
-        expect(restartBox.y + restartBox.height).toBeLessThanOrEqual(boostBox.y);
+        await expectAudioControlsReachable(page, mobile);
         if (mobile) {
           await playRestart.tap();
         } else {
@@ -141,6 +197,29 @@ for (const browserType of [chromium, webkit]) {
           `audio-restart-play-${browserType.name()}-${viewport.name}.png`
         );
         await page.screenshot({ path: flightScreenshot });
+        const debugScreenshots: string[] = [];
+        await page.evaluate(
+          "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(true))"
+        );
+        for (const debugState of ['expanded', 'collapsed']) {
+          const toggle = page.locator('#debug-hud-toggle');
+          if ((await toggle.getAttribute('aria-expanded')) !== String(debugState === 'expanded')) {
+            if (mobile) {
+              await toggle.tap();
+            } else {
+              await toggle.click();
+            }
+          }
+          await expectAudioControlsReachable(page, mobile);
+          const screenshot = screenshotManager.getScreenshotPath(
+            `audio-restart-debug-${debugState}-${browserType.name()}-${viewport.name}.png`
+          );
+          await page.screenshot({ path: screenshot });
+          debugScreenshots.push(screenshot);
+        }
+        await page.evaluate(
+          "import('/src/ui/debugIdentity.ts').then(({applyDebugPreference}) => applyDebugPreference(false))"
+        );
         expect(errors).toEqual([]);
         expect(warnings).toEqual([]);
 
@@ -207,6 +286,7 @@ for (const browserType of [chromium, webkit]) {
               routes: ['/', '/wiki/#hud-network'],
               titleScreenshot,
               flightScreenshot,
+              debugScreenshots,
               wikiScreenshot,
               playerId,
               socketsBefore,

@@ -102,7 +102,8 @@ Town Square starts lit at the map center. Street lots are spread unevenly throug
 three farther bands, and each farther band costs more of the builder's score.
 The pipeline stays hidden until that lot is burning. A lit street shows a fire
 trail that turns at right angles, like city blocks, through each inward grate on its parent chain
-and ends at Town Square. Built streets keep
+and ends at Town Square. In the playfield, pipes meet each furnace's outer
+circle, leaving its flame and grate unobstructed. Built streets keep
 the builder's name and survive death, changing ships, reconnecting, and server
 restarts. They stay until the expedition is reset.
 

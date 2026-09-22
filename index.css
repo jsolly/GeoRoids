@@ -10,6 +10,7 @@
     --palette-danger: #f43f5e;
     --palette-laser: #fde68a;
     --font-mono: "Courier New", ui-monospace, monospace;
+    --mobile-controls-top: 132px;
     --map-toggle-x: 0px;
     --map-toggle-y: 0px;
     --schematic-toggle-y: 0px;
@@ -146,6 +147,8 @@
   }
 
   .ship-schematic-toggle {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
     top: var(--schematic-toggle-y);
     min-width: 118px;
   }
@@ -1602,6 +1605,101 @@
 
     #start-screen {
       --start-control-width: 100%;
+    }
+  }
+
+  /* Mobile actions stay above the steering and tap-to-fire area. */
+  body.touch-play .ship-schematic-toggle,
+  body.touch-play .universe-map-toggle {
+    top: var(--mobile-controls-top);
+    right: auto;
+  }
+
+  body.touch-play .ship-schematic-toggle {
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  body.touch-play .universe-map-toggle {
+    left: calc(max(12px, env(safe-area-inset-left)) + 126px);
+  }
+
+  body.in-play.touch-play .debug-play-stack {
+    top: var(--mobile-controls-top);
+    right: max(12px, env(safe-area-inset-right));
+    bottom: auto;
+    left: max(12px, env(safe-area-inset-left));
+    max-width: none;
+    align-items: flex-end;
+    z-index: 26;
+  }
+
+  body.touch-play #audio-recovery-play {
+    position: absolute;
+    top: 104px;
+    left: 0;
+    width: 120px;
+  }
+
+  body.touch-play #audio-recovery-play .audio-restart,
+  body.touch-play #audio-recovery-play .audio-status {
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  body.touch-play .debug-hud-toggle {
+    height: 44px;
+  }
+
+  body.touch-play .debug-hud {
+    position: absolute;
+    top: 104px;
+    right: 0;
+    width: min(240px, calc(100% - 128px));
+    max-width: calc(100vw - 24px);
+  }
+
+  body.touch-play .touch-boost,
+  body.touch-play .touch-ability {
+    top: calc(var(--mobile-controls-top) + 52px);
+    bottom: auto;
+    height: 44px;
+    border-radius: 8px;
+  }
+
+  body.touch-play .touch-boost {
+    left: max(12px, env(safe-area-inset-left));
+    width: calc(
+      100% -
+      max(12px, env(safe-area-inset-left)) -
+      max(12px, env(safe-area-inset-right)) -
+      72px
+    );
+    transform: none;
+  }
+
+  body.touch-play .touch-ability {
+    right: max(12px, env(safe-area-inset-right));
+    width: 64px;
+  }
+
+  @media (min-width: 600px) {
+    body.touch-play #audio-recovery-play {
+      top: 52px;
+    }
+
+    body.touch-play .touch-boost,
+    body.touch-play .touch-ability {
+      top: var(--mobile-controls-top);
+    }
+
+    body.touch-play .touch-boost {
+      left: calc(max(12px, env(safe-area-inset-left)) + 186px);
+      width: 152px;
+    }
+
+    body.touch-play .touch-ability {
+      left: calc(max(12px, env(safe-area-inset-left)) + 346px);
+      right: auto;
     }
   }
 

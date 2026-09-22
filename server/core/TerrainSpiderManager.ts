@@ -565,31 +565,19 @@ export class TerrainSpiderManager {
           distanceBetween(b.position, spider.position)
       )[0];
     if (scanner) {
-      spider.phase = 'scuttling';
-      spider.targetId = null;
-      const away =
-        distanceBetween(spider.position, scanner.position) > POSITION_EPSILON
-          ? Math.atan2(
-              spider.position.y - scanner.position.y,
-              spider.position.x - scanner.position.x
-            )
-          : spider.angle;
-      // A blocked exit may slide along a sector or world edge, but never toward the scanner.
-      for (const turn of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]) {
-        const angle = away + turn;
-        const next = {
-          x: spider.position.x + Math.cos(angle) * SPIDER.HUNT_SPEED,
-          y: spider.position.y + Math.sin(angle) * SPIDER.HUNT_SPEED,
-        };
-        if (this.canOccupy(next, SPIDER.HIT_RADIUS)) {
-          spider.angle = normalizeAngle(angle);
-          spider.position = next;
-          break;
-        }
-      }
+      this.fleeFrom(spider, scanner.position);
       return;
     }
     const territory = spider.territory;
+    const target = spider.targetId ? playerById.get(spider.targetId) : undefined;
+    if (target && !this.canOccupy(target.position, target.radius ?? 0)) {
+      // Shelter overrides an existing chase before it can move or bite.
+      if (territory.kind === 'guard') {
+        territory.activity = 'returning';
+      }
+      this.fleeFrom(spider, target.position);
+      return;
+    }
     if (territory.kind === 'guard') {
       if (
         spider.phase === 'hunting' &&
@@ -606,9 +594,9 @@ export class TerrainSpiderManager {
       }
     }
     if (spider.phase !== 'hunting') {
-      const target = this.findHuntTarget(spider, players);
-      if (target) {
-        spider.targetId = target.id;
+      const nextTarget = this.findHuntTarget(spider, players);
+      if (nextTarget) {
+        spider.targetId = nextTarget.id;
         spider.phase = 'hunting';
         if (territory.kind === 'guard') {
           territory.chaseUntil = nowFrame + SPIDER.NEST_CHASE_FRAMES;
@@ -630,12 +618,10 @@ export class TerrainSpiderManager {
       return;
     }
 
-    const target = spider.targetId ? playerById.get(spider.targetId) : undefined;
     if (
       !target ||
       (territory.kind === 'guard' &&
         distanceBetween(target.position, territory.home) > SPIDER.NEST_LEASH_DISTANCE) ||
-      !this.canOccupy(target.position, target.radius ?? 0) ||
       distanceBetween(target.position, spider.position) > SPIDER.HUNT_RELEASE_DISTANCE
     ) {
       spider.targetId = null;
@@ -674,6 +660,28 @@ export class TerrainSpiderManager {
         attackerId: 'spider',
       });
       spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
+    }
+  }
+
+  private fleeFrom(spider: RuntimeSpider, origin: Position): void {
+    spider.phase = 'scuttling';
+    spider.targetId = null;
+    const away =
+      distanceBetween(spider.position, origin) > POSITION_EPSILON
+        ? Math.atan2(spider.position.y - origin.y, spider.position.x - origin.x)
+        : spider.angle;
+    // A blocked exit may slide along a sector or world edge, but never toward the source of protection.
+    for (const turn of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]) {
+      const angle = away + turn;
+      const next = {
+        x: spider.position.x + Math.cos(angle) * SPIDER.HUNT_SPEED,
+        y: spider.position.y + Math.sin(angle) * SPIDER.HUNT_SPEED,
+      };
+      if (this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+        spider.angle = normalizeAngle(angle);
+        spider.position = next;
+        break;
+      }
     }
   }
 

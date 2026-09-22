@@ -6,6 +6,9 @@ import {
   bindPlayerNetworkPort,
   resetPlayerNetworkPort,
 } from '../../../src/entities/player/playerNetworkPort';
+import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
+import { readAbilityChrome } from '../../../src/input/touchAbility';
+import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
 import {
   applyTownStoreResult,
@@ -56,23 +59,26 @@ afterAll(() => {
   Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
 });
 
-test('the store opens at Town Square, lists paints, and wears a purchased hull', () => {
+test('the store opens at Town Square via E, lists paints, and wears a purchased hull', () => {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
     throw new Error('Missing local pilot');
   }
+  expect(document.querySelector('#town-store-toggle')).toBeNull();
   player.ship.position = { x: 0, y: 0 };
   player.score = 0;
+  player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
   syncTownStoreChrome();
-  const toggle = document.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.toggle}`);
-  expect(toggle?.hidden).toBe(false);
-  expect(toggle?.textContent).toMatch(/Store/u);
+  const near = readAbilityChrome(player.ship);
+  expect(near.label).toBe('ENTER');
+  expect(near.name).toBe('Enter store');
+  expect(near.ready).toBe(true);
+  expect(near.cooldownRatio).toBe(0);
   player.ship.position = { x: TOWN_STORE_RADIUS + 20, y: 0 };
-  syncTownStoreChrome();
-  expect(toggle?.hidden).toBe(true);
   expect(openTownStore()).toBe(false);
+  expect(readAbilityChrome(player.ship).label).toBe('HOOK');
   player.ship.position = { x: 40, y: 0 };
-  document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
+  document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
   expect(isTownStoreOpen()).toBe(true);
   const dialog = document.querySelector(`#${TOWN_STORE_IDS.dialog}`);
   expect(dialog?.textContent).toContain('Ember');
@@ -106,4 +112,32 @@ test('the store opens at Town Square, lists paints, and wears a purchased hull',
   expect(isTownStoreOpen()).toBe(false);
   expect(player.ship.movementLocked).toBe(false);
   send.mockRestore();
+});
+
+test('B still toggles the store on a keyboard without an on-screen Store button', () => {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (!player) {
+    throw new Error('Missing local pilot');
+  }
+  player.ship.position = { x: 0, y: 0 };
+  document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
+  expect(isTownStoreOpen()).toBe(true);
+  document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
+  expect(isTownStoreOpen()).toBe(false);
+});
+
+test('touch ability opens the store near Town Square instead of firing the kit tool', () => {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (!player) {
+    throw new Error('Missing local pilot');
+  }
+  player.ship.position = { x: 0, y: 0 };
+  player.ship.abilityCooldownFrames = 0;
+  expect(triggerTouchAbility(player)).toBe(true);
+  expect(isTownStoreOpen()).toBe(true);
+  closeTownStore();
+  player.ship.position = { x: TOWN_STORE_RADIUS + 50, y: 0 };
+  expect(readAbilityChrome(player.ship).label).toBe('HOOK');
+  expect(triggerTouchAbility(player)).toBe(false);
+  expect(isTownStoreOpen()).toBe(false);
 });

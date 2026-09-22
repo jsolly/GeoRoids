@@ -57,6 +57,7 @@ import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
 import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
 import { showNetworkBanner } from '../ui/networkStatus';
+import { showSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { syncTownStoreChrome } from '../ui/townStore';
 import { setPlayView } from '../ui/uiUtils';
@@ -395,6 +396,7 @@ export class GameController {
       return;
     }
     this.gameStateManager.setPickupMessage(detail.pickupName);
+    showSchematicEquipHint();
   };
 
   private handleFurnaceDelivery = (event: Event): void => {

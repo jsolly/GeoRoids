@@ -103,6 +103,44 @@ test.each([
     expect(
       await page.evaluate(() => window.gameController?.getGameStateManager().getPickupMessage())
     ).toBe(`${target.name} acquired`);
+    const equipHint = await page.evaluate(() => {
+      const canvasElement = document.querySelector('#gameCanvas');
+      const controller = window.gameController;
+      if (!canvasElement || !controller) {
+        return [];
+      }
+      const original = CanvasRenderingContext2D.prototype.fillText;
+      const texts: string[] = [];
+      CanvasRenderingContext2D.prototype.fillText = function (
+        this: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        maxWidth?: number
+      ): void {
+        if (this.canvas === canvasElement) {
+          texts.push(text);
+        }
+        original.call(this, text, x, y, maxWidth);
+      };
+      try {
+        controller.renderGame();
+      } finally {
+        CanvasRenderingContext2D.prototype.fillText = original;
+      }
+      return texts;
+    });
+    expect(equipHint).toContain('to equip tools');
+    if (width === 390) {
+      expect(equipHint).toContain('Tap and hold your ship');
+      expect(equipHint).not.toContain('Press V');
+    } else {
+      expect(equipHint).toContain('Press V');
+      expect(equipHint).not.toContain('Tap and hold your ship');
+    }
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`satellite-equip-hint-${capture}.png`),
+    });
 
     if (width === 390) {
       const session = await page.context().newCDPSession(page);

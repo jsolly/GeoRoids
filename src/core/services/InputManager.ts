@@ -16,7 +16,7 @@ import {
 } from '../../input/mouse';
 import { initializePlayfieldSelection } from '../../input/playfieldSelection';
 import { initializeTouchControls } from '../../input/touchControls';
-import { initializeSchematicJoinHint } from '../../ui/schematicJoinHint';
+import { initializeSchematicEquipHint } from '../../ui/schematicEquipHint';
 import { initializeShipSchematic } from '../../ui/shipSchematic';
 import { isShipSchematicOpen } from '../../ui/shipSchematicState';
 import { initializeTownStore } from '../../ui/townStore';
@@ -156,7 +156,7 @@ export class InputManager {
     initializeUniverseMap({ onOpen: releaseInput });
     initializeShipSchematic({ onOpen: releaseInput });
     initializeTownStore({ onOpen: releaseInput });
-    initializeSchematicJoinHint();
+    initializeSchematicEquipHint();
     window.addEventListener('gameMapClose', () => {
       this.updateMovementLock();
     });

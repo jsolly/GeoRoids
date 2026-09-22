@@ -112,18 +112,24 @@ test('the store opens at Town Square and buys one extra life', () => {
   expect(buy?.disabled).toBe(true);
   expect(document.activeElement?.id).toBe(TOWN_STORE_IDS.return);
 
-  const labelNode = buy;
   const scoreNode = document.querySelector(`#${TOWN_STORE_IDS.score}`);
-  expect(labelNode).toBeTruthy();
+  expect(buy).toBeTruthy();
   expect(scoreNode).toBeTruthy();
-  const priorLabel = labelNode?.textContent;
+  const priorLabel = buy?.textContent;
   const priorScore = scoreNode?.textContent;
+  const labelTextNode = buy?.firstChild;
+  const scoreTextNode = scoreNode?.firstChild;
+  expect(labelTextNode).toBeTruthy();
+  expect(scoreTextNode).toBeTruthy();
   for (let frame = 0; frame < 8; frame += 1) {
     syncTownStoreChrome();
   }
-  expect(labelNode?.textContent).toBe(priorLabel);
+  expect(buy?.textContent).toBe(priorLabel);
   expect(scoreNode?.textContent).toBe(priorScore);
-  expect(labelNode).toBe(buy);
+  // Same-string textContent assigns replace the Text node; stable chrome must keep it.
+  expect(buy?.firstChild).toBe(labelTextNode);
+  expect(scoreNode?.firstChild).toBe(scoreTextNode);
+  expect(document.querySelector('button[data-offer="extra-life"]')).toBe(buy);
 
   closeTownStore();
   expect(isTownStoreOpen()).toBe(false);

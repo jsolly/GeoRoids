@@ -61,6 +61,10 @@ export function canEnterTownStore(): boolean {
   if (!player || player.lives <= 0 || player.ship.exploding || player.ship.health <= 0) {
     return false;
   }
+  // Tow/ignite chrome wins while hooked — match ability button, not Enter store.
+  if (player.ship.harpoonTargetId) {
+    return false;
+  }
   return insideTownStore(player.ship.position);
 }
 

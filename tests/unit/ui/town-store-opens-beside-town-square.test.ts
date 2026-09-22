@@ -141,3 +141,27 @@ test('touch ability opens the store near Town Square instead of firing the kit t
   expect(triggerTouchAbility(player)).toBe(false);
   expect(isTownStoreOpen()).toBe(false);
 });
+
+test('a hooked Hauler keeps tow chrome instead of Enter store inside Town Square', () => {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (!player) {
+    throw new Error('Missing local pilot');
+  }
+  player.ship.position = { x: 0, y: 0 };
+  player.ship.harpoonTargetId = 'tow-rock';
+  player.ship.abilityCooldownFrames = 0;
+  syncTownStoreChrome();
+  const chrome = readAbilityChrome(player.ship);
+  expect(chrome.label).not.toBe('ENTER');
+  expect(chrome.name).not.toBe('Enter store');
+  expect(openTownStore()).toBe(false);
+  expect(isTownStoreOpen()).toBe(false);
+  // Touch still fires the kit tool (tow/ignite); it must not open the store.
+  triggerTouchAbility(player);
+  expect(isTownStoreOpen()).toBe(false);
+  player.ship.harpoonTargetId = null;
+  syncTownStoreChrome();
+  expect(readAbilityChrome(player.ship).label).toBe('ENTER');
+  expect(openTownStore()).toBe(true);
+  closeTownStore();
+});

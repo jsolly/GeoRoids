@@ -337,15 +337,15 @@ export function handleTestArrangeCrewField(
                   ? { x: WORLD.radius - 500 + index * 120, y: 0 }
                   : body['scenario'] === 'delivery'
                     ? player.kitId === 'hauler'
-                      ? { x: 0, y: 360 }
+                      ? { x: 0, y: 550 }
                       : { x: 220, y: 460 }
                     : body['scenario'] === 'tow'
                       ? player.kitId === 'hauler'
-                        ? { x: 0, y: -360 }
+                        ? { x: 0, y: -500 }
                         : { x: 220, y: -460 }
                       : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
                         ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                        : { x: index * 120, y: -360 };
+                        : { x: index * 120, y: -500 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,

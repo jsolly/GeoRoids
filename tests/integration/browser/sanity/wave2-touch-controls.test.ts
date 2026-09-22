@@ -284,6 +284,7 @@ test.each(KITS)(
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId });
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
+    await game.placeShipAt(0, -500);
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&
@@ -543,6 +544,8 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    // Stay outside Town Square so E stays SCAN instead of Enter store.
+    await game.placeShipAt(0, -500);
     await page.waitForFunction(
       () =>
         document.body.classList.contains('touch-play') &&

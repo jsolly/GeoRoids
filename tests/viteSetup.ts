@@ -101,14 +101,6 @@ if (typeof window !== 'undefined') {
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button
-          id="town-store-toggle"
-          type="button"
-          class="town-store-toggle"
-          hidden
-          aria-label="Open town store (B)"
-          aria-keyshortcuts="B"
-        >Store <kbd>B</kbd></button>
-        <button
           id="ship-schematic-toggle"
           type="button"
           class="ship-schematic-toggle"

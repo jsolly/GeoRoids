@@ -21,6 +21,8 @@ beforeEach(() => {
     type: 'local',
     input: new MockPlayerInput(),
   });
+  // Stay outside Town Square so E/ability tests exercise kit tools, not Enter store.
+  player.ship.position = { x: 2_000, y: 0 };
   canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
   canvas.setPointerCapture = vi.fn();

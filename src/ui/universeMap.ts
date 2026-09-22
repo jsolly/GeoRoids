@@ -1,4 +1,5 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
+import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
 import { WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
@@ -9,8 +10,9 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
 import { activeScanners, scannedMaterial } from '../entities/ship/surveyScan';
-import { getWorldExploration, getWorldMapAssets } from '../network/worldExploration';
+import { getWorldExploration, getWorldMapAssets, worldFurnaces } from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
+import { strokeFurnaceFireTrail } from '../rendering/furnaceRenderer';
 import {
   drawFoundationMapMark,
   drawFurnaceMapMark,
@@ -38,7 +40,6 @@ export const UNIVERSE_MAP_IDS = {
   center: 'universe-map-center',
   zoomIn: 'universe-map-zoom-in',
   zoomOut: 'universe-map-zoom-out',
-  zoomReadout: 'universe-map-zoom',
   status: 'universe-map-status',
   locations: 'universe-map-locations',
 } as const;
@@ -102,7 +103,7 @@ type UniverseMapElements = {
   center: HTMLButtonElement;
   zoomIn: HTMLButtonElement;
   zoomOut: HTMLButtonElement;
-  zoomReadout: HTMLOutputElement;
+  zoomControls: HTMLElement;
   status: HTMLElement;
   locations: HTMLUListElement;
   help: HTMLElement;
@@ -202,7 +203,7 @@ function isNearbyLocalView(): boolean {
   return Math.hypot(view.center.x - expected.x, view.center.y - expected.y) < 1;
 }
 
-function positionLocateControl(): void {
+function positionMapOverlayControls(): void {
   if (!elements) {
     return;
   }
@@ -213,6 +214,10 @@ function positionLocateControl(): void {
   elements.center.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
   elements.center.style.right = 'auto';
   elements.center.style.bottom = 'auto';
+  elements.zoomControls.style.left = `${Math.round(frame.x + inset)}px`;
+  elements.zoomControls.style.top = `${Math.round(frame.y + frame.size - inset - size)}px`;
+  elements.zoomControls.style.right = 'auto';
+  elements.zoomControls.style.bottom = 'auto';
 }
 
 function updateLocateControl(): void {
@@ -272,16 +277,7 @@ function setViewZoom(zoom: number, anchor?: { x: number; y: number }): void {
     view.zoom = nextZoom;
     setViewCenter(view.center);
   }
-  updateZoomReadout();
   updateLocateControl();
-}
-
-function updateZoomReadout(): void {
-  if (!elements) {
-    return;
-  }
-  elements.zoomReadout.value = `${Math.round(view.zoom * 100)}%`;
-  elements.zoomReadout.textContent = `${Math.round(view.zoom * 100)}%`;
 }
 
 function createButton(id: string, label: string, ariaLabel = label): HTMLButtonElement {
@@ -325,16 +321,17 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
       </div>
       <div class="universe-map-actions">
-        <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
-        <output id="${UNIVERSE_MAP_IDS.zoomReadout}" aria-label="Map zoom">2400%</output>
-        <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
         <button id="${UNIVERSE_MAP_IDS.close}" type="button" aria-label="Close">Close <kbd>Esc</kbd></button>
       </div>
     </header>
     <div class="universe-map-stage">
       <canvas id="${UNIVERSE_MAP_IDS.canvas}" tabindex="0" role="img" aria-label="Shared universe map" aria-details="${UNIVERSE_MAP_IDS.locations}"></canvas>
       <ul id="${UNIVERSE_MAP_IDS.locations}" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
-      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i></div>
+      <div class="universe-map-zoom">
+        <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
+        <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>
+      </div>
       ${locateControlMarkup()}
     </div>
     <footer class="universe-map-footer">
@@ -418,11 +415,9 @@ function ensureElements(): UniverseMapElements | null {
   const close = dialog.querySelector(`#${UNIVERSE_MAP_IDS.close}`) as HTMLButtonElement | null;
   const center = dialog.querySelector(`#${UNIVERSE_MAP_IDS.center}`) as HTMLButtonElement | null;
   const stage = dialog.querySelector('.universe-map-stage');
+  const zoomControls = dialog.querySelector('.universe-map-zoom') as HTMLElement | null;
   const zoomIn = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomIn}`) as HTMLButtonElement | null;
   const zoomOut = dialog.querySelector(`#${UNIVERSE_MAP_IDS.zoomOut}`) as HTMLButtonElement | null;
-  const zoomReadout = dialog.querySelector(
-    `#${UNIVERSE_MAP_IDS.zoomReadout}`
-  ) as HTMLOutputElement | null;
   const status = dialog.querySelector(`#${UNIVERSE_MAP_IDS.status}`) as HTMLElement | null;
   const locations = dialog.querySelector(
     `#${UNIVERSE_MAP_IDS.locations}`
@@ -433,9 +428,9 @@ function ensureElements(): UniverseMapElements | null {
     !close ||
     !center ||
     !stage ||
+    !zoomControls ||
     !zoomIn ||
     !zoomOut ||
-    !zoomReadout ||
     !status ||
     !locations ||
     !help
@@ -443,6 +438,9 @@ function ensureElements(): UniverseMapElements | null {
     return null;
   }
   decorateLocateControl(center, stage);
+  if (zoomControls.parentElement !== stage) {
+    stage.append(zoomControls);
+  }
   close.setAttribute('aria-label', 'Close');
   return {
     dialog,
@@ -452,7 +450,7 @@ function ensureElements(): UniverseMapElements | null {
     center,
     zoomIn,
     zoomOut,
-    zoomReadout,
+    zoomControls,
     status,
     locations,
     help,
@@ -541,6 +539,15 @@ function getExplorationRaster(): HTMLCanvasElement | null {
 function isRevealed(position: Position, exploration: readonly ExplorationTile[]): boolean {
   const cell = explorationCellAt(position);
   return cell !== null && isCellExplored(exploration, cell);
+}
+
+/** Street lots stay on the chart before their ground is explored. Loot does not. */
+function chartShowsAsset(asset: MapAsset, exploration: readonly ExplorationTile[]): boolean {
+  return (
+    asset.kind === 'furnace' ||
+    asset.kind === 'foundation' ||
+    isRevealed(asset.position, exploration)
+  );
 }
 
 function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): void {
@@ -858,12 +865,25 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   );
 }
 
+/** Lit streets only. Dark lots stay marked, with no line back to Town Square. */
+function drawLitFurnacePipes(context: CanvasRenderingContext2D, frame: MapFrame): void {
+  const now = performance.now();
+  const width = 2.6 / frame.scale;
+  for (const lot of CIVIC_LOTS) {
+    if (!worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    const hop = pipeHopToParent(lot.id);
+    strokeFurnaceFireTrail(context, hop, hop.length, now, width, 12 / frame.scale, 480);
+  }
+}
+
 function renderMap(): void {
   if (!elements || !mapOpen) {
     return;
   }
   resizeCanvas();
-  positionLocateControl();
+  positionMapOverlayControls();
   updateLocateControl();
   const context = elements.canvas.getContext('2d');
   if (!context) {
@@ -885,12 +905,11 @@ function renderMap(): void {
 
   const exploration = getWorldExploration();
   drawMapBackground(context, frame);
+  drawLitFurnacePipes(context, frame);
   drawNearbyResources(context, frame, exploration);
   let revealedAssetCount = 0;
   let drawnLabelCount = 0;
-  const revealedAssets = getWorldMapAssets().filter((asset) =>
-    isRevealed(asset.position, exploration)
-  );
+  const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));
   updateAccessibleLocations(revealedAssets);
   const labelRects: MapLabelRect[] = [];
   revealedAssets.sort((left, right) => {
@@ -991,7 +1010,6 @@ function openMap(): void {
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameMapOpen'));
   playFeedback('interface');
-  updateZoomReadout();
   renderMap();
   startRenderLoop();
   elements.close.focus({ preventScroll: true });
@@ -1221,7 +1239,6 @@ export function initializeUniverseMap(options?: { onOpen?: () => void }): void {
       document.querySelector<HTMLInputElement>('#playerNameInput')?.focus({ preventScroll: true });
     }
   });
-  updateZoomReadout();
   syncMapInputChrome();
 }
 

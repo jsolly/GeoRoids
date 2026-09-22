@@ -13,7 +13,6 @@
     --map-toggle-x: 0px;
     --map-toggle-y: 0px;
     --schematic-toggle-y: 0px;
-    --store-toggle-y: 0px;
     --action-cool: 0;
   }
 
@@ -124,8 +123,7 @@
 
   /* Playfield chrome above the local radar: Map and Inventory on every device. */
   .universe-map-toggle,
-  .ship-schematic-toggle,
-  .town-store-toggle {
+  .ship-schematic-toggle {
     position: absolute;
     left: var(--map-toggle-x);
     top: var(--map-toggle-y);
@@ -150,15 +148,6 @@
   .ship-schematic-toggle {
     top: var(--schematic-toggle-y);
     min-width: 118px;
-  }
-
-  .town-store-toggle {
-    top: var(--store-toggle-y);
-    min-width: 74px;
-  }
-
-  .town-store-toggle[hidden] {
-    display: none;
   }
 
   .town-store-dialog {
@@ -263,9 +252,7 @@
   .universe-map-toggle:hover,
   .universe-map-toggle:focus-visible,
   .ship-schematic-toggle:hover,
-  .ship-schematic-toggle:focus-visible,
-  .town-store-toggle:hover,
-  .town-store-toggle:focus-visible {
+  .ship-schematic-toggle:focus-visible {
     color: var(--palette-hud, #e2e8f0);
     border-color: var(--palette-hud, #e2e8f0);
     box-shadow: 0 0 16px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
@@ -273,8 +260,7 @@
 
   .universe-map-toggle kbd,
   .universe-map-dialog kbd,
-  .ship-schematic-toggle kbd,
-  .town-store-toggle kbd {
+  .ship-schematic-toggle kbd {
     padding: 0.08rem 0.25rem;
     border: 1px solid currentColor;
     border-radius: 3px;
@@ -287,8 +273,7 @@
   @media (pointer: coarse), (hover: none) {
     .universe-map-toggle kbd,
     .universe-map-dialog kbd,
-    .ship-schematic-toggle kbd,
-    .town-store-toggle kbd {
+    .ship-schematic-toggle kbd {
       display: none;
     }
   }
@@ -299,8 +284,7 @@
 
   .universe-map-toggle.universe-map-touch kbd,
   .universe-map-dialog.universe-map-touch kbd,
-  .ship-schematic-toggle.ship-schematic-touch kbd,
-  .town-store-toggle.town-store-touch kbd {
+  .ship-schematic-toggle.ship-schematic-touch kbd {
     display: none;
   }
 
@@ -383,8 +367,7 @@
     flex-wrap: wrap;
   }
 
-  .universe-map-actions button,
-  .universe-map-actions output {
+  .universe-map-actions button {
     min-height: 32px;
     padding: 0.25rem 0.55rem;
     border: 1px solid color-mix(in srgb, var(--palette-hud-muted, #64748b) 70%, transparent);
@@ -395,9 +378,6 @@
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.05em;
-  }
-
-  .universe-map-actions button {
     cursor: pointer;
     touch-action: manipulation;
   }
@@ -405,14 +385,6 @@
   .universe-map-actions button:hover,
   .universe-map-actions button:focus-visible {
     border-color: var(--palette-accent, #a78bfa);
-    color: var(--palette-accent, #a78bfa);
-  }
-
-  .universe-map-actions output {
-    display: inline-flex;
-    min-width: 52px;
-    align-items: center;
-    justify-content: center;
     color: var(--palette-accent, #a78bfa);
   }
 
@@ -453,18 +425,22 @@
     display: grid;
     width: 28px;
     justify-items: center;
-    gap: 2px;
-    color: var(--palette-hud-muted, #64748b);
+    gap: 3px;
+    color: var(--palette-hud, #e2e8f0);
     font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.55rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
     pointer-events: none;
   }
 
   .universe-map-compass i {
     display: block;
-    width: 1px;
-    height: 22px;
-    background: linear-gradient(var(--palette-accent, #a78bfa), transparent);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 11px solid var(--palette-accent, #a78bfa);
   }
 
   .universe-map-locate {
@@ -484,6 +460,40 @@
     box-shadow: 0 0 14px color-mix(in srgb, var(--palette-local, #5eead4) 28%, transparent);
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .universe-map-zoom {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 2;
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .universe-map-zoom button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 70%, transparent);
+    border-radius: 6px;
+    color: var(--palette-accent, #a78bfa);
+    background: color-mix(in srgb, var(--palette-bg, #000011) 82%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--palette-accent, #a78bfa) 22%, transparent);
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .universe-map-zoom button:hover,
+  .universe-map-zoom button:focus-visible {
+    border-color: var(--palette-accent, #a78bfa);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--palette-accent, #a78bfa) 45%, transparent);
   }
 
   .universe-map-locate-icon {

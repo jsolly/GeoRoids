@@ -69,19 +69,25 @@ export function furnacePipeFrame(
   now: number
 ): { head: Position; alpha: number } | undefined {
   const elapsed = now - pulse.startedAt;
-  if (elapsed < 0 || elapsed > pulse.travelMs + FURNACE_PIPE_FADE_MS) {
+  if (elapsed < 0 || elapsed > pulse.travelMs + FURNACE_PIPE_FADE_MS + 1e-4) {
     return undefined;
   }
   const travel = Math.min(1, pulse.travelMs === 0 ? 1 : elapsed / pulse.travelMs);
-  const alpha =
+  const rawAlpha =
     elapsed <= pulse.travelMs ? 1 : 1 - (elapsed - pulse.travelMs) / FURNACE_PIPE_FADE_MS;
+  const alpha = rawAlpha <= 1e-6 ? 0 : rawAlpha;
+  const arrived = pulse.travelMs === 0 || elapsed + 1e-4 >= pulse.travelMs;
+  if (arrived) {
+    const last = pulse.points[pulse.points.length - 1];
+    return { head: last ? { x: last.x, y: last.y } : { x: 0, y: 0 }, alpha };
+  }
   return { head: pointAlongPipe(pulse.points, travel * pipeLength(pulse.points)), alpha };
 }
 
 export function activeFurnacePipePulses(now = performance.now()): readonly FurnacePipePulse[] {
   for (let index = pulses.length - 1; index >= 0; index -= 1) {
     const pulse = pulses[index];
-    if (pulse && now - pulse.startedAt > pulse.travelMs + FURNACE_PIPE_FADE_MS) {
+    if (pulse && now - pulse.startedAt > pulse.travelMs + FURNACE_PIPE_FADE_MS + 1e-4) {
       pulses.splice(index, 1);
     }
   }

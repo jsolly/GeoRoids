@@ -42,6 +42,50 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(await page.locator('.ship-card').count()).toBe(2);
     expect(await page.locator('.demo img[src$=".gif"]').count()).toBe(0);
     await page.screenshot({ path: resolve(output, 'wiki-desktop.png'), fullPage: true });
+    const indexOffset = await page.evaluate(() => {
+      const card = document.querySelector('.topic-card');
+      if (!(card instanceof HTMLElement)) {
+        return 0;
+      }
+      const y = Math.max(0, card.getBoundingClientRect().top + window.scrollY - 240);
+      window.scrollTo(0, y);
+      return window.scrollY;
+    });
+    expect(indexOffset).toBeGreaterThan(200);
+    await expect.poll(() => page.evaluate(() => history.state?.wikiScrollY)).toBe(indexOffset);
+    await page.reload();
+    await page.locator('.topic-card').first().waitFor();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.locator('.topic-card').first().click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    const articleOffset = await page.evaluate(() => {
+      window.scrollTo(0, 480);
+      return window.scrollY;
+    });
+    expect(articleOffset).toBeGreaterThan(200);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.goForward();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, articleOffset))
+      .toBe(true);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.locator('.topic-card').first().click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, indexOffset))
+      .toBe(true);
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+    });
     await page.locator('.comparison summary').click();
     expect(await page.locator('tbody tr').count()).toBe(2);
     await page.locator('#wiki-search').fill('furnace');
@@ -119,11 +163,25 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(haulerContent).toContain('Boost Coupling E');
     expect(haulerContent).toContain('IGNITE on touch');
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
+    const haulerOffset = await page.evaluate(() => {
+      const link = document.querySelector('.related-link');
+      if (!(link instanceof HTMLElement)) {
+        return 0;
+      }
+      const y = Math.max(0, link.getBoundingClientRect().top + window.scrollY - 280);
+      window.scrollTo(0, y);
+      return window.scrollY;
+    });
+    expect(haulerOffset).toBeGreaterThan(200);
     await page.locator('.related-link').first().click();
     await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Controls');
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
     await page.screenshot({ path: resolve(output, 'wiki-controls-desktop.png'), fullPage: true });
     await page.goBack();
     await expect.poll(() => page.locator('h1').textContent()).toBe('Hauler');
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, haulerOffset))
+      .toBe(true);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#missing-entry`);
     await expect.poll(() => page.locator('h1').textContent()).toContain('not in the manual');
     for (const article of articles) {
@@ -201,6 +259,33 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       }
     }
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${TestConfig.GAME_URL}/wiki/`);
+    await page.locator('.ship-card').first().waitFor();
+    const mobileOffset = await page.evaluate(() => {
+      const card = document.querySelector('.topic-card');
+      if (!(card instanceof HTMLElement)) {
+        return 0;
+      }
+      const y = Math.max(0, card.getBoundingClientRect().top + window.scrollY - 240);
+      window.scrollTo(0, y);
+      return window.scrollY;
+    });
+    expect(mobileOffset).toBeGreaterThan(200);
+    await page.locator('.topic-card').first().click();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    const mobileArticleOffset = await page.evaluate(() => {
+      window.scrollTo(0, 320);
+      return window.scrollY;
+    });
+    expect(mobileArticleOffset).toBeGreaterThan(200);
+    await page.goBack();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, mobileOffset))
+      .toBe(true);
+    await page.goForward();
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y) <= 1, mobileArticleOffset))
+      .toBe(true);
     await page.goto(`${TestConfig.GAME_URL}/wiki/`);
     await page.locator('.ship-card').first().waitFor();
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();

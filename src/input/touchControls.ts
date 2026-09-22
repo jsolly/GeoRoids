@@ -3,6 +3,7 @@ import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
+import { canEnterTownStore, openTownStore } from '../ui/townStore';
 import { isTownStoreOpen } from '../ui/townStoreState';
 import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
@@ -149,6 +150,9 @@ export function setTouchFire(player: Player, held: boolean): void {
 export function triggerTouchAbility(player: Player): boolean {
   if (isShipSchematicOpen() || isTownStoreOpen() || player.lives <= 0 || player.ship.exploding) {
     return false;
+  }
+  if (canEnterTownStore()) {
+    return openTownStore();
   }
   return player.ship.activateAbility();
 }

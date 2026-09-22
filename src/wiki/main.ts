@@ -4,6 +4,7 @@ import { serializeKitHullSvg } from '../entities/ship/hullOutlines';
 import { isShipKitId, listShipKits, SHIP_ABILITY } from '../entities/ship/shipKits';
 import type { WikiArticle } from './article';
 import { setMediaSource, shouldAutoplayMedia } from './mediaPlayback';
+import { WikiScrollMemory } from './scrollMemory';
 import { searchArticles } from './search';
 import { mountShipRadar, shipScorecard } from './shipScorecard';
 
@@ -28,6 +29,71 @@ const status = requiredElement('#search-status', HTMLElement);
 const nav = requiredElement('#article-nav', HTMLElement);
 const categories = [...new Set(articles.map((article) => article.category))];
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const scrollIdKey = 'wikiScrollId';
+const scrollYKey = 'wikiScrollY';
+
+function historyScroll(state: unknown): { id?: string; y?: number } {
+  if (!state || typeof state !== 'object') {
+    return {};
+  }
+  const record = state as Record<string, unknown>;
+  const id = record[scrollIdKey];
+  const y = record[scrollYKey];
+  return {
+    ...(typeof id === 'string' && id ? { id } : {}),
+    ...(typeof y === 'number' && Number.isFinite(y) && y >= 0 ? { y } : {}),
+  };
+}
+
+function rememberEntry(id: string, y: number): void {
+  const current =
+    history.state && typeof history.state === 'object'
+      ? { ...(history.state as Record<string, unknown>) }
+      : {};
+  if (current[scrollIdKey] === id && current[scrollYKey] === y) {
+    return;
+  }
+  try {
+    history.replaceState({ ...current, [scrollIdKey]: id, [scrollYKey]: y }, '');
+  } catch {
+    // A browser can reject a burst of history updates. The in-memory offset
+    // still restores Back and Forward in this document.
+  }
+}
+
+let scrollGeneration = 0;
+function writeScroll(y: number): void {
+  const ticket = ++scrollGeneration;
+  window.scrollTo(0, y);
+  requestAnimationFrame(() => {
+    if (ticket === scrollGeneration) {
+      window.scrollTo(0, y);
+    }
+  });
+}
+
+const initialScroll = historyScroll(history.state);
+const initialEntryId = initialScroll.id ?? crypto.randomUUID();
+const scrollMemory = new WikiScrollMemory(
+  initialEntryId,
+  writeScroll,
+  rememberEntry,
+  () => window.scrollY
+);
+if (!initialScroll.id) {
+  rememberEntry(initialEntryId, initialScroll.y ?? window.scrollY);
+}
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+
+function routeKey(): string {
+  try {
+    return decodeURIComponent(window.location.hash.slice(1));
+  } catch {
+    return 'invalid-link';
+  }
+}
 
 function escapeHtml(text: string): string {
   return text.replace(
@@ -133,6 +199,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+let searchHeld = false;
+
 function renderSearch(): void {
   disposeRadar();
   disposeRadar = () => {};
@@ -140,7 +208,15 @@ function renderSearch(): void {
   const query = search.value.trim();
   if (!query) {
     renderRoute(false);
+    if (searchHeld) {
+      searchHeld = false;
+      scrollMemory.release();
+    }
     return;
+  }
+  if (!searchHeld) {
+    scrollMemory.hold(window.scrollY);
+    searchHeld = true;
   }
   const results = searchArticles(articles, query);
   content.innerHTML = `<section class="search-results"><p class="eyebrow">SEARCH THE MANUAL</p><h1>Results for “${escapeHtml(query)}”</h1><p>${results.length} ${results.length === 1 ? 'entry' : 'entries'} found</p>${results.length ? `<div class="topic-grid">${results.map(card).join('')}</div>` : '<div class="empty-state"><h2>No matching entries</h2><p>Try a ship name, “furnace”, “minerals”, or “asteroid”.</p><button type="button" id="reset-results">Show all topics</button></div>'}</section>`;
@@ -153,6 +229,10 @@ function resetSearch(): void {
   search.value = '';
   clearSearch.hidden = true;
   renderRoute(false);
+  if (searchHeld) {
+    searchHeld = false;
+    scrollMemory.release();
+  }
   search.focus();
 }
 
@@ -160,12 +240,7 @@ function renderRoute(moveFocus = true): void {
   disposeRadar();
   disposeRadar = () => {};
   status.textContent = '';
-  let id = '';
-  try {
-    id = decodeURIComponent(window.location.hash.slice(1));
-  } catch {
-    id = 'invalid-link';
-  }
+  const id = routeKey();
   const article = articles.find((item) => item.id === id);
   const isIndex = !id || id === 'ships' || id === 'content';
   renderNavigation(isIndex ? '' : id);
@@ -180,11 +255,16 @@ function renderRoute(moveFocus = true): void {
   }
   if (moveFocus) {
     content.focus({ preventScroll: true });
-    if (id === 'ships') {
-      content.querySelector('#ships')?.scrollIntoView();
-    } else {
-      window.scrollTo(0, 0);
-    }
+    scrollMemory.show(
+      () => crypto.randomUUID(),
+      () => {
+        if (id === 'ships') {
+          content.querySelector('#ships')?.scrollIntoView();
+          return;
+        }
+        window.scrollTo(0, 0);
+      }
+    );
   }
 }
 
@@ -194,9 +274,49 @@ requiredElement('#search-form', HTMLFormElement).addEventListener('submit', (eve
   event.preventDefault();
   content.focus();
 });
+window.addEventListener(
+  'scroll',
+  () => {
+    scrollMemory.noteScroll(window.scrollY);
+  },
+  { passive: true }
+);
+window.addEventListener('popstate', (event) => {
+  const destination = historyScroll(event.state);
+  scrollMemory.prepareForTraversal(destination.id, destination.y, window.scrollY);
+});
+document.addEventListener(
+  'click',
+  (event) => {
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !(event.target instanceof Element)
+    ) {
+      return;
+    }
+    const anchor = event.target.closest('a');
+    if (!(anchor instanceof HTMLAnchorElement)) {
+      return;
+    }
+    const href = anchor.getAttribute('href');
+    if (!href || href === (window.location.hash || '#')) {
+      return;
+    }
+    if (!href.startsWith('#')) {
+      scrollMemory.prepareForDocumentLeave(window.scrollY);
+      return;
+    }
+    scrollMemory.prepareForLink(window.scrollY);
+  },
+  true
+);
 window.addEventListener('hashchange', () => {
   search.value = '';
   clearSearch.hidden = true;
+  searchHeld = false;
   if (window.innerWidth < 800) {
     navigation.open = false;
   }
@@ -229,9 +349,25 @@ document.addEventListener('click', (event) => {
   event.preventDefault();
   search.value = '';
   clearSearch.hidden = true;
+  searchHeld = false;
   renderRoute();
 });
 if (window.innerWidth < 800) {
   navigation.open = false;
 }
 renderRoute(false);
+if (initialScroll.y !== undefined) {
+  scrollMemory.restoreSaved(initialScroll.y);
+}
+window.addEventListener('pagehide', () => {
+  scrollMemory.capture(window.scrollY);
+});
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) {
+    return;
+  }
+  const saved = historyScroll(history.state).y;
+  if (saved !== undefined) {
+    scrollMemory.restoreSaved(saved);
+  }
+});

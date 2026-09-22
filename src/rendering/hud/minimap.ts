@@ -4,7 +4,7 @@ import {
   explorationCellsInView,
   isCellExplored,
 } from '../../../shared/exploration';
-import { CIVIC_LOTS } from '../../../shared/furnaces';
+import { CIVIC_LOTS, pipeHopToParent } from '../../../shared/furnaces';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
 import { WORLD } from '../../../shared/world';
 import type {
@@ -27,6 +27,7 @@ import { getWorldExploration, worldFurnaces } from '../../network/worldExplorati
 import { getSpiderField } from '../../physics/terrain/spiderSession';
 import { hexToRgba } from '../../utils/colorUtils';
 import { logger } from '../../utils/Logger';
+import { strokeFurnaceFireTrail } from '../furnaceRenderer';
 import { resolveGlow } from '../renderQuality';
 import {
   drawFoundationMapMark,
@@ -483,11 +484,81 @@ function drawTowMarkers(
   ctx.restore();
 }
 
+const MINIMAP_PIPE_SCREEN: Array<{ x: number; y: number }> = [];
+
+function polylineHitsRadar(
+  points: readonly { x: number; y: number }[],
+  center: { x: number; y: number },
+  radius: number
+): boolean {
+  const reach = radius * radius;
+  for (const point of points) {
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    if (dx * dx + dy * dy <= reach) {
+      return true;
+    }
+  }
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    if (!start || !end) {
+      continue;
+    }
+    const abx = end.x - start.x;
+    const aby = end.y - start.y;
+    const lengthSquared = abx * abx + aby * aby;
+    const t =
+      lengthSquared === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1, ((center.x - start.x) * abx + (center.y - start.y) * aby) / lengthSquared)
+          );
+    const dx = center.x - (start.x + abx * t);
+    const dy = center.y - (start.y + aby * t);
+    if (dx * dx + dy * dy <= reach) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Fire only after the street is lit, clipped to the radar disc. */
+function drawLitFurnacePipes(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
+  const now = performance.now();
+  for (const lot of CIVIC_LOTS) {
+    if (!worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    const hop = pipeHopToParent(lot.id);
+    if (hop.length < 2 || !polylineHitsRadar(hop, geometry.center, geometry.radius)) {
+      continue;
+    }
+    while (MINIMAP_PIPE_SCREEN.length < hop.length) {
+      MINIMAP_PIPE_SCREEN.push({ x: 0, y: 0 });
+    }
+    for (let index = 0; index < hop.length; index += 1) {
+      const world = hop[index];
+      const screen = MINIMAP_PIPE_SCREEN[index];
+      if (!world || !screen) {
+        continue;
+      }
+      const normalizedX = (world.x - geometry.center.x) / geometry.radius;
+      const normalizedY = (world.y - geometry.center.y) / geometry.radius;
+      screen.x = geometry.x + geometry.size / 2 + normalizedX * (geometry.size / 2);
+      screen.y = geometry.y + geometry.size / 2 + normalizedY * (geometry.size / 2);
+    }
+    strokeFurnaceFireTrail(ctx, MINIMAP_PIPE_SCREEN, hop.length, now, 1.6, resolveGlow(3), 16);
+  }
+}
+
 /** Furnace destinations become useful landmarks only after the crew reveals them. */
 function drawFurnaceMarks(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   const { projection } = geometry;
 
   ctx.save();
+  drawLitFurnacePipes(ctx, geometry);
   ctx.lineWidth = 1;
   ctx.shadowBlur = resolveGlow(4);
   for (const furnace of worldFurnaces.nearby(geometry.center, geometry.radius)) {

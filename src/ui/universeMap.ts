@@ -1,4 +1,5 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
+import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
 import { WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
@@ -9,8 +10,9 @@ import { PlayerManager } from '../entities/player/PlayerManager';
 import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
 import { activeScanners, scannedMaterial } from '../entities/ship/surveyScan';
-import { getWorldExploration, getWorldMapAssets } from '../network/worldExploration';
+import { getWorldExploration, getWorldMapAssets, worldFurnaces } from '../network/worldExploration';
 import { getSpiderField } from '../physics/terrain/spiderSession';
+import { strokeFurnaceFireTrail } from '../rendering/furnaceRenderer';
 import {
   drawFoundationMapMark,
   drawFurnaceMapMark,
@@ -543,6 +545,15 @@ function isRevealed(position: Position, exploration: readonly ExplorationTile[])
   return cell !== null && isCellExplored(exploration, cell);
 }
 
+/** Street lots stay on the chart before their ground is explored. Loot does not. */
+function chartShowsAsset(asset: MapAsset, exploration: readonly ExplorationTile[]): boolean {
+  return (
+    asset.kind === 'furnace' ||
+    asset.kind === 'foundation' ||
+    isRevealed(asset.position, exploration)
+  );
+}
+
 function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): void {
   context.fillStyle = '#050914';
   context.fillRect(-WORLD.radius, -WORLD.radius, WORLD_DIAMETER, WORLD_DIAMETER);
@@ -858,6 +869,19 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   );
 }
 
+/** Lit streets only. Dark lots stay marked, with no line back to Town Square. */
+function drawLitFurnacePipes(context: CanvasRenderingContext2D, frame: MapFrame): void {
+  const now = performance.now();
+  const width = 2.6 / frame.scale;
+  for (const lot of CIVIC_LOTS) {
+    if (!worldFurnaces.isLit(lot.id)) {
+      continue;
+    }
+    const hop = pipeHopToParent(lot.id);
+    strokeFurnaceFireTrail(context, hop, hop.length, now, width, 12 / frame.scale, 480);
+  }
+}
+
 function renderMap(): void {
   if (!elements || !mapOpen) {
     return;
@@ -885,12 +909,11 @@ function renderMap(): void {
 
   const exploration = getWorldExploration();
   drawMapBackground(context, frame);
+  drawLitFurnacePipes(context, frame);
   drawNearbyResources(context, frame, exploration);
   let revealedAssetCount = 0;
   let drawnLabelCount = 0;
-  const revealedAssets = getWorldMapAssets().filter((asset) =>
-    isRevealed(asset.position, exploration)
-  );
+  const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));
   updateAccessibleLocations(revealedAssets);
   const labelRects: MapLabelRect[] = [];
   revealedAssets.sort((left, right) => {

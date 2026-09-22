@@ -138,7 +138,6 @@ class CanvasManager {
     chrome.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
     chrome.style.setProperty('--map-toggle-y', `${mapToggleY}px`);
     chrome.style.setProperty('--schematic-toggle-y', `${mapToggleY - 52}px`);
-    chrome.style.setProperty('--store-toggle-y', `${mapToggleY - 104}px`);
     if (chrome.id !== 'gameArea') {
       return;
     }

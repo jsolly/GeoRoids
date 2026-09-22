@@ -176,9 +176,9 @@ test(
     await Promise.all([hauler.waitForRemotePlayers(1), surveyor.waitForRemotePlayers(1)]);
 
     await arrangeCrewField([haulerId, surveyorId], 'delivery');
-    await Promise.all([hauler.placeShipAt(0, 360), surveyor.placeShipAt(220, 460)]);
+    await Promise.all([hauler.placeShipAt(0, 550), surveyor.placeShipAt(220, 460)]);
     await Promise.all([
-      waitForFixture(haulerPage, 'hauler', { x: 0, y: 360 }),
+      waitForFixture(haulerPage, 'hauler', { x: 0, y: 550 }),
       waitForFixture(surveyorPage, 'surveyor', { x: 220, y: 460 }),
     ]);
 

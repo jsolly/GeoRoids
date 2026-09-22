@@ -337,15 +337,15 @@ export function handleTestArrangeCrewField(
                   ? { x: WORLD.radius - 500 + index * 120, y: 0 }
                   : body['scenario'] === 'delivery'
                     ? player.kitId === 'hauler'
-                      ? { x: 0, y: 360 }
+                      ? { x: 0, y: 550 }
                       : { x: 220, y: 460 }
                     : body['scenario'] === 'tow'
                       ? player.kitId === 'hauler'
-                        ? { x: 0, y: -360 }
+                        ? { x: 0, y: -500 }
                         : { x: 220, y: -460 }
                       : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
                         ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                        : { x: index * 120, y: -360 };
+                        : { x: index * 120, y: -500 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -495,7 +495,9 @@ export function handleTestArrangeCrewField(
               ? { x: 0, y: -260 }
               : body['scenario'] === 'delivery'
                 ? { x: 0, y: 460 }
-                : { x: 0, y: -460 },
+                : // Default crew poses sit at y=-500; keep the rock clear of that hull
+                  // and outside TOWN_STORE_RADIUS so ability chrome stays kit-native.
+                  { x: 0, y: -620 },
         velocity: { x: 0, y: 0 },
         size: body['scenario'] === 'cooperative' ? 50 : 25,
         health: body['scenario'] === 'mining' ? 25 : 75,

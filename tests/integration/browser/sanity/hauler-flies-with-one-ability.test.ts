@@ -191,7 +191,7 @@ test.each([
     // Use the actual render loop after a main-thread stall, then verify that a
     // shot survives acknowledgement and subsequent authoritative snapshots.
     await arrangeCrewField([playerId], 'empty');
-    await game.placeShipAt(0, -360);
+    await game.placeShipAt(0, -500);
     await game.waitForCombatReady();
     await page.evaluate(() => {
       const until = performance.now() + 250;

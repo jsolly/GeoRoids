@@ -102,6 +102,8 @@ test(
 
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false });
+    // Leave Town Square so the ability button runs Mineral Scan, not Enter store.
+    await game.placeShipAt(0, -500);
 
     const chrome = await page.evaluate(() => {
       const root = document.querySelector<HTMLElement>('#touch-controls');

@@ -173,6 +173,21 @@ next gesture by queuing its retry outside the gesture handler. That rejection is
 initialization failure. Looping beds start again once the shared context is
 running.
 
+The title screen and playfield both expose **Restart audio**, including when
+Debug is off. A trusted tap or keyboard activation replaces the shared context
+and its sample/bed playback objects, then starts the current menu, playfield or
+danger bed when ready. It retains Sound Effects and Music preferences and does
+not reconnect the player. Turning both preferences off prevents a restart from
+allocating audio. The visible confirmation reports that a restart was requested,
+not that the device produced audible output.
+
+Context state and a library's playing flag do not prove speaker output. A visible,
+enabled context can report `running` while its clock is stalled. The runtime
+checks clock progress outside the simulation loop and defers a detected stall's
+context replacement until the next trusted user gesture. Diagnostics preserve
+clock progress and recovery state for the next report. A progressing clock can
+still accompany an inaudible device route; the explicit restart remains available.
+
 These choices follow [MDN's short-sample guidance](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices)
 and [shared-context recommendation](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext).
 Decoded [buffers can be reused across inexpensive playback nodes](https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode).

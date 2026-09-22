@@ -6,6 +6,7 @@ import { setStoredItem } from '../utils/safeStorage';
 import {
   activateAudio,
   canPlayAudio,
+  disposeAudioSound,
   muteMusicKeepSession,
   registerMusicBedAvailability,
   registerMusicSound,
@@ -184,7 +185,7 @@ function ensureHowls(audio: AudioLibrary): void {
     if (src.length === 0 || howls[kind]) {
       continue;
     }
-    howls[kind] = new audio.Howl({
+    const howl = new audio.Howl({
       src: [...src],
       html5: false,
       preload: true,
@@ -193,18 +194,29 @@ function ensureHowls(audio: AudioLibrary): void {
       pool: 1,
       volume: 0,
       onload: () => {
-        syncMusicBeds();
+        if (howls[kind] === howl) {
+          syncMusicBeds();
+        }
       },
       onloaderror: (_id, error) => {
+        if (howls[kind] !== howl) {
+          return;
+        }
         logger.warn('SOUND', 'Music bed failed to load', { bed: kind, error });
         handleBedLoadError(kind);
       },
       onplayerror: (id, error) => {
+        if (howls[kind] !== howl) {
+          return;
+        }
         logger.warn('SOUND', 'Music bed failed to play', { bed: kind, error });
         howls[kind]?.stop(id);
       },
       onfade: (id) => {
         const bed = howls[kind];
+        if (bed !== howl) {
+          return;
+        }
         const faded = bed?.volume(id);
         if (!fadingOut.has(fadeKey(kind, id))) {
           return;
@@ -217,6 +229,7 @@ function ensureHowls(audio: AudioLibrary): void {
         bed?.stop(id);
       },
     });
+    howls[kind] = howl;
   }
 }
 
@@ -256,18 +269,25 @@ export function setMusic(pref: boolean): void {
 
 export function setMusicBedCatalogForTests(next: MusicBedCatalog): void {
   stopImmediate();
-  for (const kind of MUSIC_BED_IDS) {
-    howls[kind]?.unload();
-    delete howls[kind];
-  }
-  dangerFailed = false;
+  unloadBeds();
   setCatalog(next);
   registerMusicBedAvailability(musicBedsAreConfigured());
   resetMusicThreats();
 }
 
+function unloadBeds(): void {
+  for (const kind of MUSIC_BED_IDS) {
+    const howl = howls[kind];
+    if (howl) {
+      disposeAudioSound(howl);
+    }
+    delete howls[kind];
+  }
+  dangerFailed = false;
+}
+
 registerMusicBedAvailability(musicBedsAreConfigured());
-registerMusicSound(startMusic, stopImmediate);
+registerMusicSound(startMusic, stopImmediate, unloadBeds);
 registerMusicThreatListener(syncMusicBeds);
 window.addEventListener('playViewOn', syncMusicBeds);
 window.addEventListener('playViewOff', onPlayViewOff);

@@ -70,6 +70,7 @@ class FakeHowl {
     this.loaded = false;
     this.stop();
   });
+  off = vi.fn();
 }
 
 class FakeContext extends EventTarget {
@@ -86,6 +87,10 @@ class FakeContext extends EventTarget {
     this.changeState('suspended');
     return Promise.resolve();
   });
+  close = vi.fn((): Promise<void> => {
+    this.changeState('closed');
+    return Promise.resolve();
+  });
   constructor() {
     super();
     FakeContext.instances.push(this);
@@ -95,7 +100,7 @@ class FakeContext extends EventTarget {
     this.dispatchEvent(new Event('statechange'));
   }
   createGain() {
-    return { connect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
+    return { connect: vi.fn(), disconnect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
   }
   createBuffer() {
     return {};
@@ -324,6 +329,57 @@ test('an interrupted phone session restarts the bed after a deferred device star
   expect(bed.playing()).toBe(true);
   expect(bed.play.mock.calls.length).toBeGreaterThan(1);
   expect(errors.mock.calls.some((call) => call[0] === 'SOUND')).toBe(false);
+});
+
+test('restarting silent audio preserves the danger bed and muted effects without replaying cues', async () => {
+  const { restartAudio, readAudioDiagnostics } = await import('../../../src/audio/audioRuntime');
+  const { readMusicDiagnostics } = await import('../../../src/audio/musicBeds');
+  const cue = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  setMusic(true);
+  await enterPlay();
+  pushMusicThreat();
+  await settle();
+  cue.play();
+  setSound(false);
+  const previousBeds = FakeHowl.instances.filter((howl) => howl.options.loop);
+  const previousContext = FakeContext.instances[0];
+  const registrations = vi.mocked(document.addEventListener).mock.calls.length;
+  expect(readMusicDiagnostics().currentBed).toBe('danger');
+  expect(restartAudio()).toBe(true);
+  await settle();
+  expect(previousContext?.close).toHaveBeenCalledOnce();
+  expect(previousBeds.every((bed) => bed.unload.mock.calls.length === 1)).toBe(true);
+  expect(vi.mocked(document.addEventListener).mock.calls).toHaveLength(registrations);
+  expect(readAudioDiagnostics()).toMatchObject({
+    soundEnabled: false,
+    musicEnabled: true,
+    contextState: 'running',
+  });
+  expect(readMusicDiagnostics()).toMatchObject({
+    currentBed: 'danger',
+    beds: [
+      { bed: 'menu', playing: false },
+      { bed: 'inGame', playing: false },
+      { bed: 'danger', playing: true },
+    ],
+  });
+  // Old asynchronous load failures must not unload the replacement bed.
+  for (const bed of previousBeds) {
+    bed.options.onloaderror?.(0, 'Late failure from discarded audio');
+    bed.options.onplayerror?.(0, 'Late failure from discarded audio');
+  }
+  expect(readMusicDiagnostics().currentBed).toBe('danger');
+  expect(FakeHowl.instances.filter((howl) => howl.loaded && !howl.options.loop)).toHaveLength(0);
+  setSound(true);
+  await settle();
+  const freshCue = FakeHowl.instances.find((howl) => howl.loaded && !howl.options.loop);
+  expect(freshCue?.play).not.toHaveBeenCalled();
+  cue.play();
+  expect(freshCue?.play).toHaveBeenCalledOnce();
+  clearMusicThreat();
+  await settle();
+  expect(readMusicDiagnostics().currentBed).toBe('inGame');
 });
 
 test('an interrupted hidden session stays silent when the OS auto-resumes', async () => {

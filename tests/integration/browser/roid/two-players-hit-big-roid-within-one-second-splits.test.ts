@@ -162,7 +162,8 @@ test(
     await game2.bootGame({ waitForCombatReady: false });
     const playerIds = await Promise.all([game1.getLocalPlayerId(), game2.getLocalPlayerId()]);
     await arrangeCrewField(playerIds, 'cooperative');
-    await Promise.all([game1.placeShipAt(-35, -340), game2.placeShipAt(35, -340)]);
+    // Stay outside Town Square (radius 400) beside the cooperative fixture at y=-620.
+    await Promise.all([game1.placeShipAt(-35, -500), game2.placeShipAt(35, -500)]);
     await Promise.all([game1.waitForCombatReady(), game2.waitForCombatReady()]);
     await expect
       .poll(async () => (await game1.getAsteroidPositions()).map((rock) => rock.id))

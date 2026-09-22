@@ -33,7 +33,7 @@ test(
     await game.bootGame();
     await arrangeCrewField([await game.getLocalPlayerId()], 'mining');
     await game.waitForCombatReady();
-    await game.placeShipAt(0, -360);
+    await game.placeShipAt(0, -500);
     await page.evaluate(() => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
       if (!ship) {

@@ -1,5 +1,5 @@
 {
-  "note": "Inward parent-lot wording after scatter; min-bend fire trails with bend/span lock; index parents intentional.",
+  "note": "Scatter streets plus field-manual scroll memory; source review regenerated after merging main.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -299,9 +299,10 @@
     "src/wiki/article.ts": "sha256:b62f1df19562aa8d5f970a31a162080adaf833e1ac97f68c2a229f4b8dde13fe",
     "src/wiki/articleSources.json": "sha256:87a81b63d85a55fba49eb2ab447cacd40b683230801d7bbd25df7ed73ef632a3",
     "src/wiki/gameReference.ts": "sha256:271255d4d3744d69b4f5384c8d6934559f46c4a5ec6571765c2cbbe855de638b",
-    "src/wiki/main.ts": "sha256:9335401816d6f05254cbfec4c1a4a680bb18ae3e489511273d15a8fc1b7c5600",
+    "src/wiki/main.ts": "sha256:2bd1dfe2d2b14c755a8d718a1fb3f58b39fae242e42afb05a87e21f1d769165a",
     "src/wiki/media.ts": "sha256:751c21072b7c64b86e3f66afad859aba3267677939170aac1bc1ea46106f14b0",
     "src/wiki/mediaPlayback.ts": "sha256:642adacbffd7dc70307a4197531664ce7eed12f4f032d535ab5aa17e9b1eb4c9",
+    "src/wiki/scrollMemory.ts": "sha256:e5b4cc7ad9526e82994d0a24bee7cfad8f5be167cc4ce710923589c41c6617ff",
     "src/wiki/search.ts": "sha256:1ea0f78400fe463ce11c6e1b7f8b2d503729599b222b2409606cf16035f87e41",
     "src/wiki/shipScorecard.ts": "sha256:d06dcdc59de164aff394f226417c60cc375e3362f690228106b960bbf40d3a92",
     "src/wiki/virtual.d.ts": "sha256:548f80fd5dc538fa61d494dbe3c47bf42d6209943a55387f25e58a21c4c2e70e",

@@ -86,7 +86,7 @@ store: spend your own score there on a hull paint. The paint stays on your ship
 through death, reconnect, and restart.
 The pipeline stays hidden until that street is burning. A lit street shows a
 fire trail from its grate to Town Square, turning at right angles through each
-nearer lot. Dragging a rock or a spider into a street furnace sends a brighter
+inward lot on its parent chain. Dragging a rock or a spider into a street furnace sends a brighter
 head along that trail from the source grate back to Town Square.
 
 ## Shared chart
@@ -114,7 +114,7 @@ respawns beside the nearest lit hearth. The local radar and universe map keep ex
 cells visible, and the universe map still draws its alignment grid.
 
 Surveyors can equip [Build](/wiki/#surveyor) to light the street foundation they
-are standing in. The nearer lot on that road must already be burning, and that
+are standing in. The inward lot on that road must already be burning, and that
 Surveyor's own score must cover the cost. The furnace takes their name. They
 cannot build a hearth whose spider occupancy covers an existing nest. Every
 crew member can use the sites. Built furnaces survive reconnects and server

@@ -120,7 +120,7 @@ Fly the towed asteroid into a lit furnace to deliver it. Street grates sit
 inside one sector so a towed rock can approach from any side. The furnace is a dashed delivery ring around a burning
 grate with a column of flame roaring up its middle. The pipeline stays hidden
 until that street is burning. A lit street shows a fire trail from its grate to
-Town Square, turning at right angles through each nearer lot. A delivery sends
+Town Square, turning at right angles through each inward lot on its parent chain. A delivery sends
 a brighter head along that trail from the grate that took the rock back to Town
 Square. Delivery shatters the rock
 in a red outline with a short smoke poof and awards the Hauler. If a Surveyor

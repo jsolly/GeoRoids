@@ -291,7 +291,7 @@ function cityBlockTail(from: Position, to: Position, salt: number): Position[] {
   const preferHorizontal = unitHash(salt ^ 0x17ab) < 0.5;
   let fallback: Position[] = [];
   let chosen: Position[] | undefined;
-  let chosenBend = -1;
+  let chosenBend = Number.POSITIVE_INFINITY;
   for (const horizontalFirst of [preferHorizontal, !preferHorizontal]) {
     for (const side of [baseSide, -baseSide]) {
       for (const split of [baseSplit, 0.3, 0.55, 0.72]) {
@@ -307,7 +307,7 @@ function cityBlockTail(from: Position, to: Position, salt: number): Position[] {
             (best, point) => Math.max(best, distanceToSegment(point, from, to)),
             0
           );
-          if (bend > chosenBend) {
+          if (bend < chosenBend) {
             chosen = tail;
             chosenBend = bend;
           }

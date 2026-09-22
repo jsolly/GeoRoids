@@ -104,7 +104,7 @@ function cornerCount(points: readonly { x: number; y: number }[]) {
   return corners;
 }
 
-test('a street stays dark until its nearer lot is a legal parent', () => {
+test('a street stays dark until its inward parent lot is lit', () => {
   const first = civicLot('street-1-0');
   const second = civicLot('street-2-0');
   const third = civicLot('street-3-1');
@@ -141,7 +141,37 @@ test('a street stays dark until its nearer lot is a legal parent', () => {
   expect(validCivicModules([{ id: 'street-1-0', builderName: 'A'.repeat(21) }])).toBe(false);
 });
 
-test('a street pipe turns at right angles through each nearer lot to Town Square', () => {
+test('scatter keeps index parents even when another inward lot is closer', () => {
+  const mismatches: string[] = [];
+  for (const lot of CIVIC_LOTS) {
+    if (lot.ring === 1) {
+      expect(lot.parentId).toBe(TOWN_HEARTH.id);
+      continue;
+    }
+    const candidates =
+      lot.ring === 2
+        ? CIVIC_LOTS.filter((other) => other.ring === 1)
+        : CIVIC_LOTS.filter((other) => other.ring === lot.ring - 1);
+    const nearest = candidates.reduce((best, other) => {
+      const distance = Math.hypot(
+        lot.position.x - other.position.x,
+        lot.position.y - other.position.y
+      );
+      const bestDistance = Math.hypot(
+        lot.position.x - best.position.x,
+        lot.position.y - best.position.y
+      );
+      return distance < bestDistance ? other : best;
+    });
+    if (nearest.id !== lot.parentId) {
+      mismatches.push(`${lot.id}->${lot.parentId} nearest=${nearest.id}`);
+    }
+  }
+  // Scatter intentionally keeps road parents by ring index, not geometric nearest.
+  expect(mismatches.length).toBeGreaterThan(0);
+});
+
+test('a street pipe turns at right angles through each inward parent lot to Town Square', () => {
   const first = civicLot('street-1-0');
   const second = civicLot('street-2-0');
   const third = civicLot('street-3-1');

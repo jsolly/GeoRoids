@@ -112,17 +112,36 @@ test('the radar draws a fire trail when only the pipe crosses the disc', () => {
         continue;
       }
       const length = Math.hypot(end.x - start.x, end.y - start.y);
-      if (length < radius * 3) {
+      if (length < radius * 1.5) {
         continue;
       }
-      const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      const ship = {
-        x: mid.x + ((start.y - end.y) / length) * 120,
-        y: mid.y + ((end.x - start.x) / length) * 120,
-      };
-      const outside = hop.every((point) => Math.hypot(point.x - ship.x, point.y - ship.y) > radius);
-      if (outside) {
-        crossing = { lotId: lot.id, ship };
+      // Offset the ship so every hop vertex sits outside the radar while the
+      // chord still clips the disc (min-bend routes can be shorter than max-bend).
+      for (const offset of [80, 120, 160, 220]) {
+        const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+        const ship = {
+          x: mid.x + ((start.y - end.y) / length) * offset,
+          y: mid.y + ((end.x - start.x) / length) * offset,
+        };
+        const outside = hop.every(
+          (point) => Math.hypot(point.x - ship.x, point.y - ship.y) > radius
+        );
+        if (!outside) {
+          continue;
+        }
+        // Segment must still enter the radar disc.
+        let closest = Number.POSITIVE_INFINITY;
+        for (let t = 0; t <= 1; t += 0.05) {
+          const x = start.x + (end.x - start.x) * t;
+          const y = start.y + (end.y - start.y) * t;
+          closest = Math.min(closest, Math.hypot(x - ship.x, y - ship.y));
+        }
+        if (closest <= radius) {
+          crossing = { lotId: lot.id, ship };
+          break;
+        }
+      }
+      if (crossing) {
         break;
       }
     }

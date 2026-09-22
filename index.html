@@ -226,9 +226,6 @@
           <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
         </div>
         <div class="universe-map-actions">
-          <button id="universe-map-zoom-out" type="button" aria-label="Zoom out">−</button>
-          <output id="universe-map-zoom" aria-label="Map zoom">2400%</output>
-          <button id="universe-map-zoom-in" type="button" aria-label="Zoom in">+</button>
           <button id="universe-map-close" type="button" aria-label="Close">Close <kbd>Esc</kbd></button>
         </div>
       </header>
@@ -242,6 +239,10 @@
         ></canvas>
         <ul id="universe-map-locations" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
         <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+        <div class="universe-map-zoom">
+          <button id="universe-map-zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="universe-map-zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
         <button
           id="universe-map-center"
           type="button"

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { Player } from '../../../src/entities/player/Player';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -19,6 +21,8 @@ import {
   UNIVERSE_MAP_ZOOM,
 } from '../../../src/ui/universeMap';
 import { logger } from '../../../src/utils/Logger';
+
+const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
 
 describe('universe map play chrome', () => {
   const releaseInput = vi.fn();
@@ -164,6 +168,22 @@ describe('universe map play chrome', () => {
     expect(
       mapWorldToCanvas({ x: 100, y: -50 }, { x: 0, y: 0 }, { x: 20, y: 30, size: 400, scale: 2 })
     ).toEqual({ x: 420, y: 130 });
+  });
+
+  test('the map compass is a North arrow only', () => {
+    const compass = document.querySelector('.universe-map-compass');
+    expect(compass).not.toBeNull();
+    expect(compass?.querySelectorAll('span')).toHaveLength(1);
+    expect(compass?.querySelector('i')).not.toBeNull();
+    expect(compass?.textContent?.trim()).toBe('N');
+    expect(compass?.textContent).not.toMatch(/E/u);
+
+    // Production HTML keeps the dialog in the page; createDialogMarkup early-returns.
+    const productionMatch = productionHtml.match(
+      /<div class="universe-map-compass"[^>]*>([\s\S]*?)<\/div>/u
+    );
+    expect(productionMatch?.[1]).toMatch(/<span>N<\/span>\s*<i><\/i>/u);
+    expect(productionMatch?.[1]).not.toMatch(/>E</u);
   });
 
   test('zoom and locate controls sit on the map and restore the nearby ship view', () => {

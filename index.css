@@ -429,18 +429,22 @@
     display: grid;
     width: 28px;
     justify-items: center;
-    gap: 2px;
-    color: var(--palette-hud-muted, #64748b);
+    gap: 3px;
+    color: var(--palette-hud, #e2e8f0);
     font-family: "Courier New", ui-monospace, monospace;
-    font-size: 0.55rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
     pointer-events: none;
   }
 
   .universe-map-compass i {
     display: block;
-    width: 1px;
-    height: 22px;
-    background: linear-gradient(var(--palette-accent, #a78bfa), transparent);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 11px solid var(--palette-accent, #a78bfa);
   }
 
   .universe-map-locate {

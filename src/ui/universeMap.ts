@@ -327,7 +327,7 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
     <div class="universe-map-stage">
       <canvas id="${UNIVERSE_MAP_IDS.canvas}" tabindex="0" role="img" aria-label="Shared universe map" aria-details="${UNIVERSE_MAP_IDS.locations}"></canvas>
       <ul id="${UNIVERSE_MAP_IDS.locations}" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
-      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+      <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i></div>
       <div class="universe-map-zoom">
         <button id="${UNIVERSE_MAP_IDS.zoomOut}" type="button" aria-label="Zoom out">−</button>
         <button id="${UNIVERSE_MAP_IDS.zoomIn}" type="button" aria-label="Zoom in">+</button>

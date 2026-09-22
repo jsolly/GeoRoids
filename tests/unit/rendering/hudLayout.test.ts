@@ -35,7 +35,7 @@ test('phone portrait keeps notices below the leaderboard and radar above the abi
   expect(layout.lives.y).toBeGreaterThanOrEqual(12);
   expect(layout.miniMap.x + layout.miniMap.size).toBeLessThanOrEqual(390 - 12);
   expect(layout.miniMap.y + layout.miniMap.size).toBeLessThanOrEqual(844 - 12 - 112);
-  expect(layout.leaderboard.maxRows).toBeLessThanOrEqual(6);
+  expect(layout.leaderboard.maxRows).toBe(3);
   expect(layout.notificationY).toBeGreaterThan(
     layout.leaderboard.y + layout.leaderboard.rowHeight * layout.leaderboard.maxRows
   );
@@ -49,7 +49,7 @@ test('phone landscape keeps the radar below the top action buttons', () => {
   );
   expect(layout.miniMap.y).toBeGreaterThan(layout.score.y + 28);
   expect(layout.miniMap.x + layout.miniMap.size).toBe(844 - layout.padRight);
-  expect(layout.leaderboard.maxRows).toBe(4);
+  expect(layout.leaderboard.maxRows).toBe(3);
 });
 
 test('safe-area insets push lives off the notch', () => {

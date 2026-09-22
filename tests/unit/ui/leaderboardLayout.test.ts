@@ -88,9 +88,6 @@ test('crew scores sort stably while current-player emphasis and compact row limi
     '3.',
     'Pilot',
     '80',
-    '4.',
-    'Local',
-    '70',
   ]);
   const names = calls.filter((_, index) => index % 3 === 1);
   expect(names).toEqual(
@@ -98,7 +95,6 @@ test('crew scores sort stably while current-player emphasis and compact row limi
       ['Echo', 18, 'rgba(125, 211, 252, 0.78)'],
       ['Relay', 34, 'rgba(125, 211, 252, 0.78)'],
       ['Pilot', 50, 'rgba(125, 211, 252, 0.92)'],
-      ['Local', 66, 'rgba(94, 234, 212, 0.78)'],
     ].map(([text, y, color]) => ({
       text,
       x: 684,
@@ -110,7 +106,7 @@ test('crew scores sort stably while current-player emphasis and compact row limi
   );
   expect(
     calls.filter((_, index) => index % 3 === 2).map(({ x, textAlign }) => ({ x, textAlign }))
-  ).toEqual(Array.from({ length: 4 }, () => ({ x: 828, textAlign: 'right' })));
+  ).toEqual(Array.from({ length: 3 }, () => ({ x: 828, textAlign: 'right' })));
   expect(strokes).toHaveLength(0);
   expect(ctx.textAlign).toBe('center');
   expect(ctx.font).toBe('18px serif');

@@ -1608,26 +1608,48 @@
     }
   }
 
-  /* Mobile actions stay above the steering and tap-to-fire area. */
+  /* Compact action row above the steering area, with Boost underneath. */
+  body.touch-play #gameArea {
+    --action-left: max(12px, env(safe-area-inset-left));
+    --action-right: max(12px, env(safe-area-inset-right));
+    --action-width: calc((100vw - var(--action-left) - var(--action-right) - 18px) / 4);
+  }
+
   body.touch-play .ship-schematic-toggle,
-  body.touch-play .universe-map-toggle {
+  body.touch-play .universe-map-toggle,
+  body.touch-play .touch-ability,
+  body.touch-play .debug-hud-toggle {
+    box-sizing: border-box;
+    height: 44px;
+    min-width: 0;
+    padding: 0 3px;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    border-radius: 6px;
+  }
+
+  body.touch-play .ship-schematic-toggle,
+  body.touch-play .universe-map-toggle,
+  body.touch-play .touch-ability {
     top: var(--mobile-controls-top);
+    bottom: auto;
     right: auto;
+    width: var(--action-width);
   }
 
   body.touch-play .ship-schematic-toggle {
-    left: max(12px, env(safe-area-inset-left));
+    left: var(--action-left);
   }
 
   body.touch-play .universe-map-toggle {
-    left: calc(max(12px, env(safe-area-inset-left)) + 126px);
+    left: calc(var(--action-left) + var(--action-width) + 6px);
   }
 
   body.in-play.touch-play .debug-play-stack {
     top: var(--mobile-controls-top);
-    right: max(12px, env(safe-area-inset-right));
+    left: var(--action-left);
+    right: var(--action-right);
     bottom: auto;
-    left: max(12px, env(safe-area-inset-left));
     max-width: none;
     align-items: flex-end;
     z-index: 26;
@@ -1647,7 +1669,8 @@
   }
 
   body.touch-play .debug-hud-toggle {
-    height: 44px;
+    width: var(--action-width);
+    margin-right: calc(var(--action-width) + 6px);
   }
 
   body.touch-play .debug-hud {
@@ -1658,48 +1681,29 @@
     max-width: calc(100vw - 24px);
   }
 
-  body.touch-play .touch-boost,
-  body.touch-play .touch-ability {
-    top: calc(var(--mobile-controls-top) + 52px);
+  body.touch-play .touch-boost {
+    top: calc(var(--mobile-controls-top) + 50px);
     bottom: auto;
     height: 44px;
-    border-radius: 8px;
-  }
-
-  body.touch-play .touch-boost {
-    left: max(12px, env(safe-area-inset-left));
-    width: calc(
-      100% -
-      max(12px, env(safe-area-inset-left)) -
-      max(12px, env(safe-area-inset-right)) -
-      72px
-    );
+    border-radius: 6px;
+    left: var(--action-left);
+    width: calc(100% - var(--action-left) - var(--action-right));
     transform: none;
   }
 
   body.touch-play .touch-ability {
-    right: max(12px, env(safe-area-inset-right));
-    width: 64px;
+    left: calc(var(--action-left) + (var(--action-width) + 6px) * 3);
   }
 
   @media (min-width: 600px) {
     body.touch-play #audio-recovery-play {
-      top: 52px;
-    }
-
-    body.touch-play .touch-boost,
-    body.touch-play .touch-ability {
-      top: var(--mobile-controls-top);
+      top: 50px;
+      left: 0;
     }
 
     body.touch-play .touch-boost {
-      left: calc(max(12px, env(safe-area-inset-left)) + 186px);
-      width: 152px;
-    }
-
-    body.touch-play .touch-ability {
-      left: calc(max(12px, env(safe-area-inset-left)) + 346px);
-      right: auto;
+      left: calc(var(--action-left) + 128px);
+      width: calc(100% - var(--action-left) - var(--action-right) - 128px);
     }
   }
 

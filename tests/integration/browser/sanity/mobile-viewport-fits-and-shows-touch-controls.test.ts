@@ -139,7 +139,9 @@ test(
       }
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(390);
-      expect(box.y + box.height).toBeLessThan(844 / 2);
+      if (id !== 'touch-boost') {
+        expect(box.y + box.height).toBeLessThan(844 / 2);
+      }
       expect(box.height).toBeGreaterThanOrEqual(44);
       for (const other of boxes) {
         expect(
@@ -157,7 +159,8 @@ test(
     }
     expect(inventory.y).toBeLessThan(100);
     expect([map.y, hud.y, abilityBox.y]).toEqual([inventory.y, inventory.y, inventory.y]);
-    expect(boostBox.y).toBeGreaterThanOrEqual(inventory.y + inventory.height);
+    expect(boostBox.y + boostBox.height).toBe(844 - 28);
+    expect(boostBox.x + boostBox.width / 2).toBe(390 / 2);
     await page.locator('#ship-schematic-toggle').tap();
     await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     await page
@@ -277,6 +280,14 @@ test(
         )
       );
       expect(new Set(rowTops).size).toBe(1);
+      const bottomBoost = await page.locator('#touch-boost').boundingBox();
+      if (!bottomBoost) {
+        throw new Error('Missing bottom Boost button');
+      }
+      expect(bottomBoost.y + bottomBoost.height).toBe(
+        viewport.height - (viewport.width > viewport.height && viewport.height <= 500 ? 20 : 28)
+      );
+      expect(bottomBoost.x + bottomBoost.width / 2).toBe(viewport.width / 2);
       await page.screenshot({
         path: screenshotManager.getScreenshotPath(`mobile-actions-${viewport.width}.png`),
       });

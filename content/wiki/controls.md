@@ -75,7 +75,7 @@ V or the Inventory button opens the ship view for either kit.
 On desktop, the button sits above Map. Mobile controls sit together near the
 top of the playfield, below the score and three-row player list. Inventory,
 Map, the optional debug HUD toggle, and the ability share one compact row;
-Boost sits directly underneath. On a keyboard it shows the V shortcut, and the
+Boost sits separately at the bottom center of the screen. On a keyboard it shows the V shortcut, and the
 title screen lists that shortcut with the other flight keys. Touch flights use
 the same button and hide the badge. Collecting a satellite shows a brief label
 above your ship, then fades. It says the equipment is in your inventory. On
@@ -141,7 +141,7 @@ Use the ability button for the same action as E, including Enter store at Town
 Square. Use the Inventory button for the same ship view as V. Collecting a
 satellite shows a short label above the ship that says the equipment is in
 your inventory and to tap Inventory to equip, then the label fades. Use the
-Boost button near the
-top of the screen for the same action as Shift: tap once to start boosting,
+Boost button at the
+bottom center of the screen for the same action as Shift: tap once to start boosting,
 tap again to stop. The action buttons do not steer the ship or create a pending
 playfield tap shot.

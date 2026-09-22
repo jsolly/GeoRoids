@@ -1608,7 +1608,7 @@
     }
   }
 
-  /* Compact action row above the steering area, with Boost underneath. */
+  /* Compact action row above the steering area; Boost stays at bottom center. */
   body.touch-play #gameArea {
     --action-left: max(12px, env(safe-area-inset-left));
     --action-right: max(12px, env(safe-area-inset-right));
@@ -1681,16 +1681,6 @@
     max-width: calc(100vw - 24px);
   }
 
-  body.touch-play .touch-boost {
-    top: calc(var(--mobile-controls-top) + 50px);
-    bottom: auto;
-    height: 44px;
-    border-radius: 6px;
-    left: var(--action-left);
-    width: calc(100% - var(--action-left) - var(--action-right));
-    transform: none;
-  }
-
   body.touch-play .touch-ability {
     left: calc(var(--action-left) + (var(--action-width) + 6px) * 3);
   }
@@ -1699,11 +1689,6 @@
     body.touch-play #audio-recovery-play {
       top: 50px;
       left: 0;
-    }
-
-    body.touch-play .touch-boost {
-      left: calc(var(--action-left) + 128px);
-      width: calc(100% - var(--action-left) - var(--action-right) - 128px);
     }
   }
 

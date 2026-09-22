@@ -1,11 +1,11 @@
 {
-  "note": "Reviewed compact mobile action row, three-row touch leaderboard and Controls guidance. Reconciled audio recovery with separate control and debug columns; verified mobile and audio browser scenarios. Gameplay rules and demonstrations unchanged.",
+  "note": "Restored Boost to its original bottom-center position, separate from the compact top action row; corrected Controls placement guidance. No gameplay or demonstration changes.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
     "docs/protocol/snapshot-v1.md": "sha256:7a30c7593bb82b5e1e97e0eeeed95323cac7950c397fbf13ee327e349191ddbd",
     "docs/sounds.md": "sha256:4ad7b5d7da2aa2a8b3ffad410445e311944c15ab00c30fa52eac012ce11c56ab",
-    "index.css": "sha256:9f0a625c1d395d9f6a4280bf4d5965ee87a4d0cd7f0c991af57a12c54b82d8ca",
+    "index.css": "sha256:bbfc4faa66067abda427aa5de001b9c8ec2d74bc3b1b74fc24dbae6d98b82e3e",
     "index.html": "sha256:46c8fcf78bd343df34b415990fe444afc88bc7389013d5f00abba865b1f5dd88",
     "middleware.ts": "sha256:d0927640db64fad245eef3d599c5bfb5792853457dce83e3e5f64f2a898dfa22",
     "package.json": "sha256:54bb156a4f03c98660851b6d9aa27f462b736a73f0c9ed72ed7c5adf92d54fff",

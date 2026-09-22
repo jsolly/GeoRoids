@@ -111,15 +111,23 @@ function refreshStoreCopy(): void {
     return;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
-  elements.score.textContent = `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`;
+  const scoreText = `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`;
+  if (elements.score.textContent !== scoreText) {
+    elements.score.textContent = scoreText;
+  }
   const buy = lifeButton();
   if (!buy) {
     return;
   }
   const full = (player?.lives ?? 0) >= MAX_LIVES;
+  const label = full ? 'Extra life, lives full' : 'Buy extra life';
   const wasFocused = document.activeElement === buy;
-  buy.textContent = full ? 'Extra life, lives full' : 'Buy extra life';
-  buy.disabled = full;
+  if (buy.textContent !== label) {
+    buy.textContent = label;
+  }
+  if (buy.disabled !== full) {
+    buy.disabled = full;
+  }
   if (wasFocused && buy.disabled) {
     elements.return.focus({ preventScroll: true });
   }

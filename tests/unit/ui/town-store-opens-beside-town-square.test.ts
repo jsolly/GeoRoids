@@ -111,6 +111,20 @@ test('the store opens at Town Square and buys one extra life', () => {
   expect(buy?.textContent).toBe('Extra life, lives full');
   expect(buy?.disabled).toBe(true);
   expect(document.activeElement?.id).toBe(TOWN_STORE_IDS.return);
+
+  const labelNode = buy;
+  const scoreNode = document.querySelector(`#${TOWN_STORE_IDS.score}`);
+  expect(labelNode).toBeTruthy();
+  expect(scoreNode).toBeTruthy();
+  const priorLabel = labelNode?.textContent;
+  const priorScore = scoreNode?.textContent;
+  for (let frame = 0; frame < 8; frame += 1) {
+    syncTownStoreChrome();
+  }
+  expect(labelNode?.textContent).toBe(priorLabel);
+  expect(scoreNode?.textContent).toBe(priorScore);
+  expect(labelNode).toBe(buy);
+
   closeTownStore();
   expect(isTownStoreOpen()).toBe(false);
   expect(player.ship.movementLocked).toBe(false);

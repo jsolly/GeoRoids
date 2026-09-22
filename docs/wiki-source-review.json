@@ -1,5 +1,5 @@
 {
-  "note": "Short field-manual sections stay beside their existing GIFs. Exact tuning stays in the collapsed current-values disclosure. Streets, pipes, Surveyor Build, and hull paints stay removed; the store sells one extra life and B only opens it. Older servers may still send map kind foundation and surveyorUtility build_furnace. The decoder keeps both so later map deltas and utility clears still apply. The universe map omits foundation lots. Play treats build_furnace as mineral scan and does not build. Demonstrations were not regenerated.",
+  "note": "Town store Buy label and score lines rewrite only when values change.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -273,7 +273,7 @@
     "src/ui/shipKitSelect.ts": "sha256:ac7e71725a6b95ab23bfee69bc15a3d98f32f0bbf8c578f8e8c102a41e999890",
     "src/ui/shipSchematic.ts": "sha256:40fc9f5c5297d393b16a4e69dacc5bcac265a2de759af7fc407e7c703ccc2395",
     "src/ui/shipSchematicState.ts": "sha256:ac4298985cf52ae195dd7e69eb51a793221acc9c586b7fa0322db37d8bf37cb3",
-    "src/ui/townStore.ts": "sha256:79e9fb71669519b4c66da0094932af5dc7216e852cf188864e83563483679b47",
+    "src/ui/townStore.ts": "sha256:25ba93e62770bb4b602bfe7d169c97f07f7d94ede905ec49655c8d286babc767",
     "src/ui/townStoreState.ts": "sha256:98ced1c612ca84284d02cadd5594db413f3dec736a1beaeca56519ee242d4cd2",
     "src/ui/uiUtils.ts": "sha256:a883b7c2882c6723a52bf751ecc76d740bb119acdf4e364dc00cca7a01d7b537",
     "src/ui/universeMap.ts": "sha256:40ee034f90335f82667dafe1ab86e17bbb15d113af38579e6c1d1122f37c8a0a",
@@ -426,7 +426,7 @@
     "tests/unit/ui/debugIdentity.test.ts": "sha256:8ef0186d8d1605ef5edc2b0a36edadf4a20164d511f2df3f9a33cbecb1979062",
     "tests/unit/ui/schematicJoinHint.test.ts": "sha256:89a7e2be043da12413e4dfc99e75ad5ad477686aa34ee3202c486b28a4e11ab5",
     "tests/unit/ui/shipSchematic.test.ts": "sha256:3636ab3d1d17a991542fdc816d13343f683638a234921048a2621474dfcabec5",
-    "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:6e94f89359e23ca63960bc24a2780df212b6a7971339236dfe6e90365d7fba72",
+    "tests/unit/ui/town-store-opens-beside-town-square.test.ts": "sha256:2f0bd3e6ee8323de79651083b1ff80a6ad26cf137ec8c14d52a1ceb8b4939473",
     "tests/unit/ui/universeMap.test.ts": "sha256:d5444b97ab1da0c4956eb0b161e507d42db3e483879a801a655f18ed6e25c203",
     "tests/unit/utils/player-name.test.ts": "sha256:5a7b475b674079608e7f97a88f5aeeecc821f3aa85e35fd817eaac82e22e9d3f",
     "vite.config.ts": "sha256:ff43a90e9d553ab8733ee8f008a201c798ac8c999c845cffe4414199d05b63ab",

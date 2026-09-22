@@ -1,8 +1,17 @@
 import type { CivicModule, Position } from '../shared-types';
-import { civicLot, civicModuleName, FURNACES, nearestFurnace, TOWN_HEARTH } from './furnaces';
+import {
+  civicLot,
+  civicLotWithin,
+  civicModuleName,
+  FURNACES,
+  nearestFurnace,
+  TOWN_HEARTH,
+} from './furnaces';
 
 export const FURNACE_BUILD = {
   RADIUS: TOWN_HEARTH.radius,
+  /** World units from a dark lot where Surveyor E becomes Build. */
+  APPROACH: 220,
   ISSUE: {
     NEST: 'Too close to a spider nest',
     STAND: 'Stand inside a street foundation',
@@ -10,6 +19,15 @@ export const FURNACE_BUILD = {
     READY: 'Furnace builder not ready',
   },
 } as const;
+
+/** Surveyor E builds instead of scan/probe while a dark street lot is this close. */
+export function surveyorAbilityBuildsAt(
+  position: Position,
+  isLit: (lotId: string) => boolean
+): boolean {
+  const lot = civicLotWithin(position, FURNACE_BUILD.APPROACH);
+  return Boolean(lot && !isLit(lot.id));
+}
 
 const CELL_SIZE = 1_000;
 

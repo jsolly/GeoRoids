@@ -20,7 +20,6 @@ import type {
   ShipKitId,
   SnapshotCollabTag,
   SpiderFieldState,
-  SurveyorUtilityId,
   TerrainSpider,
 } from '../shared-types';
 import { validExploration } from './exploration';
@@ -57,11 +56,9 @@ const haulerUtility = enumeration<HaulerUtilityId>({
   boost_coupling: true,
   tow_cable: true,
 });
-const surveyorUtility = enumeration<SurveyorUtilityId>({
-  mineral_scan: true,
-  survey_probe: true,
-  build_furnace: true,
-});
+// `build_furnace` is a retired equip token. Older clients may still send it.
+const surveyorUtility: Rule = (value) =>
+  value === 'mineral_scan' || value === 'survey_probe' || value === 'build_furnace';
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,

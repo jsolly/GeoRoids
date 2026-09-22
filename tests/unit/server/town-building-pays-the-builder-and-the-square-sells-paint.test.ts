@@ -76,7 +76,6 @@ test('a street the Surveyor paid for raises only that pilot furnace payout', () 
   scout.asteroidInteractions = 1;
   const registered = engine.registerPilot(scout, scoutSocket);
   assert(registered.ok);
-  engine.setSurveyorUtility(scout.id, 'build_furnace');
   scout.abilityCooldownFrames = 0;
   scout.score = street.cost;
   expect(engine.useAbility(scout.id)).toBe(true);

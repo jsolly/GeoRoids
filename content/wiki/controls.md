@@ -81,8 +81,9 @@ equip. Collecting another satellite shows the label again. Opening Inventory
 clears it. The view draws your hull beside your
 satellite inventory, with the tool cards underneath. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
-lifetime, derived from health. Surveyor offers Mineral Scan, Survey Probe, and Build;
-the probe fires along your heading and attaches a shared scanning beacon to a rock.
+lifetime, derived from health. Surveyor offers Mineral Scan and Survey Probe;
+near a dark street foundation, E becomes Build instead of the equipped tool.
+The probe fires along your heading and attaches a shared scanning beacon to a rock.
 Hauler has three utility cards and a looping tool animation;
 selecting a utility card equips that tool immediately. Boost Coupling uses E to arm
 and lock the asteroid thrust heading, then E again to ignite an ordinary rock.

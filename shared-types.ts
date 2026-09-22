@@ -56,7 +56,7 @@ export type ShipKitId = 'surveyor' | 'hauler';
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
 /** Surveyor v1 utility slot. Same E key; one option active. */
-export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe' | 'build_furnace';
+export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe';
 
 export interface AbilityUsedEvent {
   id: string;

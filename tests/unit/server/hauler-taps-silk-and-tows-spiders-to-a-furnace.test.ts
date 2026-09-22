@@ -96,7 +96,6 @@ describe('Hauler tools interact with living spiders', () => {
         const scout = world.join('Builder', street.position, { kitId: 'surveyor' });
         world.entity(scout).position = { ...street.position };
         world.entity(scout).score = street.cost;
-        world.engine.setSurveyorUtility(scout.id, 'build_furnace');
         world.entity(scout).abilityCooldownFrames = 0;
         expect(world.engine.useAbility(scout.id)).toBe(true);
       }

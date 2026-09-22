@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { surveyorAbilityBuildsAt } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
@@ -524,8 +525,11 @@ export class MessageHandler {
       ? this.gameEngine.getAsteroid(socketPlayer.harpoonTargetId)
       : undefined;
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
+    const offeringBuild =
+      socketPlayer.kitId === 'surveyor' &&
+      surveyorAbilityBuildsAt(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
-    if (socketPlayer.kitId === 'surveyor' && socketPlayer.surveyorUtility === 'build_furnace') {
+    if (offeringBuild) {
       ws.send(
         JSON.stringify({
           type: 'furnaceBuildResult',

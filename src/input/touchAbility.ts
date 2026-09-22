@@ -1,20 +1,20 @@
+import { surveyorAbilityBuildsAt } from '../../shared/furnaceField';
 import { insideTownStore } from '../../shared/townStore';
 import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { abilityCooldownFramesFor } from '../entities/ship/shipAbilities';
 import { getShipKit, SHIP_ABILITY, type ShipAbilityId } from '../entities/ship/shipKits';
 import { surveyorUtilityOf } from '../entities/ship/surveyorUtility';
+import { worldFurnaces } from '../network/worldExploration';
 
 const ABILITY_LABEL: Record<ShipAbilityId, string> = { surveyScan: 'SCAN', harpoon: 'HOOK' };
 const SURVEYOR_ABILITY_LABEL: Record<SurveyorUtilityId, string> = {
   mineral_scan: 'SCAN',
   survey_probe: 'PROBE',
-  build_furnace: 'BUILD',
 };
 const SURVEYOR_ABILITY_NAME: Record<SurveyorUtilityId, string> = {
   mineral_scan: 'Mineral scan',
   survey_probe: 'Survey probe',
-  build_furnace: 'Build',
 };
 const HAULER_READY_LABEL: Record<HaulerUtilityId, string> = {
   resource_tap: 'TAP',
@@ -43,6 +43,14 @@ type AbilityChromeState = {
   unavailable: boolean;
   cooldownRatio: number;
 };
+
+function surveyorOffersBuild(host: AbilityChromeHost): boolean {
+  return (
+    getShipKit(host.kitId).id === 'surveyor' &&
+    host.position !== undefined &&
+    surveyorAbilityBuildsAt(host.position, (id) => worldFurnaces.isLit(id))
+  );
+}
 
 /** Near Town Square, E / the ability button become Enter store for any kit. */
 function abilityOffersTownStore(host: AbilityChromeHost): boolean {
@@ -92,6 +100,7 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
   const unavailable = !alive;
   const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
   const offeringStore = !towing && abilityOffersTownStore(host);
+  const offeringBuild = !offeringStore && surveyorOffersBuild(host);
   const readyLabel =
     kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
@@ -103,20 +112,24 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
         : 'RELEASE'
       : offeringStore
         ? 'ENTER'
-        : kit.id === 'surveyor'
-          ? touchAbilityLabel(kit.id, host.surveyorUtility)
-          : readyLabel,
+        : offeringBuild
+          ? 'BUILD'
+          : kit.id === 'surveyor'
+            ? touchAbilityLabel(kit.id, host.surveyorUtility)
+            : readyLabel,
     name: towing
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'Ignite asteroid boost'
         : 'Release asteroid'
       : offeringStore
         ? 'Enter store'
-        : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
-          ? 'Arm asteroid boost'
-          : kit.id === 'surveyor'
-            ? touchAbilityName(kit.id, host.surveyorUtility)
-            : touchAbilityName(kit.id),
+        : offeringBuild
+          ? 'Build furnace'
+          : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+            ? 'Arm asteroid boost'
+            : kit.id === 'surveyor'
+              ? touchAbilityName(kit.id, host.surveyorUtility)
+              : touchAbilityName(kit.id),
     ready: alive && (towing || offeringStore || !cooling),
     active,
     cooling: offeringStore ? false : cooling,

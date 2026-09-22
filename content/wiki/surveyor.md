@@ -82,19 +82,21 @@ and do not survive a server restart.
 
 ## Build
 
-Equip Build in the ship schematic, then stand inside a dark street foundation
-and press E or tap Build. The tool spends your own score to build that
-designated furnace, and the furnace takes your name. It does not place a hearth
-at an arbitrary position. The inward lot on that road must already be burning,
-and your score must cover the lot. Each street you build raises your own later
-furnace deliveries. The same score buys hull paint at the Town Square store.
-The bonus stays with the pilot who paid, so a later nickname
-change leaves both the furnace name and the bonus where they were. Other pilots
-keep the base reward. Deliveries still pay the Hauler and each recorded Surveyor
-personally. A failed build spends neither score nor cooldown;
-the HUD explains why it failed. A nest whose home would sit inside the new
-furnace's spider occupancy is an illegal site; that miss does not wipe the nest.
-Standing furnaces still scare spiders that enter that occupancy.
+Near a dark street foundation, E and the ability button become Build instead of
+Mineral Scan or Survey Probe. Stand inside the grate and press E or tap Build.
+The action spends your own score to light that street furnace, and the furnace
+takes your name. It does not place a hearth at an arbitrary position. The inward
+lot on that road must already be burning, and your score must cover the lot.
+Each street you build raises your own later furnace deliveries. The same score
+buys hull paint at the Town Square store. The bonus stays with the pilot who
+paid, so a later nickname change leaves both the furnace name and the bonus
+where they were. Other pilots keep the base reward. Deliveries still pay the
+Hauler and each recorded Surveyor personally. A failed build spends neither
+score nor cooldown; the HUD explains why it failed. A nest whose home would sit
+inside the new furnace's spider occupancy is an illegal site; that miss does not
+wipe the nest. Standing furnaces still scare spiders that enter that occupancy.
+While Build is offered, scan and probe stay unavailable until you leave the
+street approach.
 
 Town Square starts lit at the map center. Street lots are spread unevenly through
 three farther bands, and each farther band costs more of the builder's score.

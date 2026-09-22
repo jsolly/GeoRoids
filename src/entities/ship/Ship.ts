@@ -3,6 +3,7 @@ import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
 } from '../../../shared/constants/health';
+import { surveyorAbilityBuildsAt } from '../../../shared/furnaceField';
 import { PLAYER_MOTION } from '../../../shared/playerMotion';
 import {
   advanceShipBoost,
@@ -25,6 +26,7 @@ import { playExplosionSound } from '../../audio/explosionSound';
 import { playFeedback } from '../../audio/feedbackSounds';
 import { GAME, PALETTE, SHIP } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
+import { worldFurnaces } from '../../network/worldExploration';
 import { applySharedShipSlope } from '../../physics/terrain/applyShipSlope';
 import { terrainSpeedLimit } from '../../physics/terrain/terrainTravel';
 import { isGenericDeathCause } from '../../utils/deathCause';
@@ -293,10 +295,14 @@ class Ship {
         if (!sent) {
           return false;
         }
-        if (this.kitId === 'surveyor' && surveyorUtilityOf(this) !== 'build_furnace') {
+        if (
+          this.kitId === 'surveyor' &&
+          !surveyorAbilityBuildsAt(this.position, (id) => worldFurnaces.isLit(id))
+        ) {
           // Surveyor tools share the same request, but the probe has no local
           // world effect. Predict only the user-facing timer; asteroid
-          // attachment and mineral classification remain server-owned.
+          // attachment and mineral classification remain server-owned. Near a
+          // dark street the server builds instead, so skip local scan timing.
           this.abilityCooldownFrames = abilityCooldownFramesFor(this);
           this.abilityActiveFrames =
             surveyorUtilityOf(this) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;

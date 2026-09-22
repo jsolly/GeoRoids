@@ -15,7 +15,7 @@ import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../share
 import { chooseCrewSpawn } from '../../shared/crewSpawn';
 import { epochField } from '../../shared/epochField';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
+import { FURNACE_BUILD, FurnaceField, surveyorAbilityBuildsAt } from '../../shared/furnaceField';
 import {
   civicLot,
   civicLotAt,
@@ -2555,7 +2555,7 @@ export class GameEngine {
       return false;
     }
     if (entity.kitId === 'surveyor') {
-      if (surveyorUtilityOf(entity) === 'build_furnace') {
+      if (surveyorAbilityBuildsAt(entity.position, (id) => this.furnaces.isLit(id))) {
         return this.buildFurnace(entity);
       }
       if (surveyorUtilityOf(entity) === 'survey_probe') {
@@ -2695,6 +2695,10 @@ export class GameEngine {
 
   public furnaceBuildNotice(): string {
     return this.lastFurnaceBuildNotice;
+  }
+
+  public isFurnaceLit(id: string): boolean {
+    return this.furnaces.isLit(id);
   }
 
   /** Spend personal score on a Town Square hull paint. Undefined means the hull changed. */

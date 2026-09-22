@@ -78,7 +78,10 @@ terrain keeps its normal shape and movement rules.
 
 Guards pursue pilots who approach their patrol, but return home after a brief
 chase or when the pilot leaves their territory. Roaming hunters pursue farther;
-escape their range or reach a protected area to lose them. A spider kills with
+escape their range or reach a protected area to lose them. Reaching a lit
+furnace's safe area immediately breaks an active chase and turns the spider
+away before it can bite. Nest guards then return home. Dark foundations offer
+no protection. A spider kills with
 a single bite on contact, regardless of remaining health. A red screen edge
 warns when you are being hunted. Sound Effects adds ominous nearby tones and a
 sharper pursuit cue; Music switches to the danger bed during a hunt.

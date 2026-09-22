@@ -1,6 +1,4 @@
 import { expect, test } from 'vitest';
-import { playfieldToggleOffsets } from '../../../../src/rendering/canvasSurface';
-import { hudLayoutForCanvas } from '../../../../src/rendering/hud/hudLayout';
 import {
   assertNoBrowserDiagnostics,
   watchBrowserDiagnostics,
@@ -30,6 +28,13 @@ for (const viewport of [
     const schematicToggle = page.locator('#ship-schematic-toggle');
     await schematicToggle.waitFor({ state: 'visible' });
     expect(await schematicToggle.textContent()).toContain('Inventory');
+    const buttonBox = await schematicToggle.boundingBox();
+    if (!buttonBox) {
+      throw new Error('Missing Inventory button bounds');
+    }
+    expect(buttonBox.x).toBeGreaterThanOrEqual(0);
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(viewport.width - 12);
+    expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(viewport.height);
     if (viewport.touch) {
       const touch = await page.context().newCDPSession(page);
       await touch.send('Input.dispatchTouchEvent', {
@@ -128,7 +133,7 @@ for (const viewport of [
   }, 40000);
 }
 
-test('a short touch screen keeps Inventory under the radar and above Map', async () => {
+test('a short touch screen keeps all action buttons at the top', async () => {
   const width = 844;
   const height = 390;
   const page = await browserManager.recreatePage({ hasTouch: true });
@@ -140,37 +145,21 @@ test('a short touch screen keeps Inventory under the radar and above Map', async
   await game.waitForGameReady();
   const toggle = page.locator('#ship-schematic-toggle');
   await toggle.waitFor({ state: 'visible' });
-  const expected = playfieldToggleOffsets(
-    hudLayoutForCanvas({ width, height }).miniMap,
-    true,
-    height
-  );
-  const stack = await page.evaluate(() => {
-    const area = document.querySelector('#gameArea');
-    const inventory = document.querySelector('#ship-schematic-toggle');
-    const map = document.querySelector('#universe-map-toggle');
-    if (
-      !(area instanceof HTMLElement) ||
-      !(inventory instanceof HTMLElement) ||
-      !(map instanceof HTMLElement)
-    ) {
-      throw new Error('Missing playfield controls');
+  for (const id of [
+    'ship-schematic-toggle',
+    'universe-map-toggle',
+    'touch-boost',
+    'touch-ability',
+  ]) {
+    const box = await page.locator(`#${id}`).boundingBox();
+    if (!box) {
+      throw new Error(`Missing ${id}`);
     }
-    const inventoryBox = inventory.getBoundingClientRect();
-    const mapBox = map.getBoundingClientRect();
-    return {
-      schematicY: Number.parseFloat(area.style.getPropertyValue('--schematic-toggle-y')),
-      mapY: Number.parseFloat(area.style.getPropertyValue('--map-toggle-y')),
-      inventoryBottom: inventoryBox.bottom,
-      inventoryRight: inventoryBox.right,
-      mapTop: mapBox.top,
-      width: window.innerWidth,
-    };
-  });
-  expect(stack.schematicY).toBe(expected.schematicY);
-  expect(stack.mapY).toBe(expected.mapY);
-  expect(stack.inventoryBottom).toBeLessThanOrEqual(stack.mapTop + 1);
-  expect(stack.inventoryRight).toBeLessThanOrEqual(stack.width + 1);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThan(height / 2);
+  }
   await page.screenshot({
     path: screenshotManager.getScreenshotPath('inventory-button-short-touch.png'),
   });

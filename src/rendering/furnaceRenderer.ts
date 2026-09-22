@@ -556,6 +556,17 @@ export function drawFurnacePipes(viewerPosition: Position, now = performance.now
   const viewport = canvasManager.getViewportSize();
   const reach = Math.hypot(viewport.width, viewport.height) / scale + 200;
   ctx.save();
+  // Keep both the standing fire trail and delivery pulses outside every hearth.
+  // The ring is drawn afterward, so each pipe meets its rim without covering the flame.
+  ctx.beginPath();
+  ctx.rect(0, 0, viewport.width, viewport.height);
+  for (const furnace of worldFurnaces.nearby(viewerPosition, reach)) {
+    const screen = canvasManager.worldToScreenInto(furnaceScreen, furnace.position, viewerPosition);
+    const radius = furnace.radius * scale;
+    ctx.moveTo(screen.x + radius, screen.y);
+    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  }
+  ctx.clip('evenodd');
   ctx.setLineDash([]);
   for (const lot of CIVIC_LOTS) {
     if (!worldFurnaces.isLit(lot.id)) {

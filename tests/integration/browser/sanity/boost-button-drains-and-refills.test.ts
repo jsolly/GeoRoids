@@ -113,12 +113,14 @@ test('a narrow-phone Debug overlay keeps boost and the ability disc fully on scr
   await page.addInitScript(() => localStorage.setItem('debugOn', 'true'));
   const game = new GameInteractions(page);
   await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+  await game.placeShipAt(0, -500);
   const panel = page.locator('#debug-hud');
   const boost = page.locator('#touch-boost');
   await panel.waitFor({ state: 'visible' });
   await boost.waitFor({ state: 'visible' });
   const ability = page.locator('#touch-ability');
   await ability.waitFor({ state: 'visible' });
+  await expect.poll(() => ability.textContent()).toBe('SCAN');
   const chrome = await page.evaluate(() => {
     const box = (el: Element | null) => {
       if (!el) {

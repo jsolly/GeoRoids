@@ -1,7 +1,7 @@
 ---
 title: Loot and growth
 category: Systems
-summary: Collect loot for mass and score, or shoot a drop to push nearby small rocks.
+summary: Pick up mass, or shoot a drop to shove a small rock.
 order: 80
 related:
   - content/wiki/hauler.md
@@ -15,49 +15,12 @@ media:
 
 ## Loot and mass
 
-Growth uses the same base health curve for every kit. When a pickup raises
-maximum health, it adds the same amount to current health; it does not fully
-repair existing damage. For a heavy kit such as Hauler, the first small mass
-pickup can lower its starting maximum health to the shared growth value.
-Laser cores do not add mass. Hull draw size and collision radius stay at the
-kit base; collecting does not enlarge the silhouette.
-
-Asteroid breaks can release shards, and an environmental ship death releases
-wreckage. A Resource Tap ejects cream canisters with amber tips in spaced bursts during
-extraction; the asteroid stays intact. The full reward is split across the
-canisters, and each one can be collected separately. That Tap loot is not a diamond chip. A death converts a base amount plus a fraction of the destroyed
-ship's excess mass into pellets, subject to per-pellet and global limits. Loot
-expires after its configured lifetime. A nearby drop is pulled toward a living
-ship once it comes within magnet range. Tap canisters use a stronger pull when
-a Hauler is nearby. The pull adds to whatever motion the
-drop already has, including motion from its existing velocity. Collecting still
-happens when the drop overlaps the kit hull, not an inflated ship hitbox.
-A map or schematic hold does not collect loot until you return to flight.
-Mass follows a shared growth curve:
-greater mass raises health capacity while reducing thrust and speed;
-the growth model soft-caps mass and enforces minimum thrust
-and speed scales. Death resets the growth.
-
-A shard has a score value. A reflective core grants stronger laser charges with
-energy 2, scores when collected, expires after a timed lifetime, and is cleared
-on death. The shared reflection rules cap laser energy; enhanced energy also
-lets a laser apply the metal hit twice.
-
-Spider silk comes from using Resource Tap on a spider. Collect it as a separate
-material in your inventory; it has no crafting use yet and does not grant ore,
-mass, or score. The tapped spider shudders and becomes hostile.
+Shards and wreckage add mass and health, not a bigger hull. More mass means a tougher, slower ship until you die. Tap canisters and spider silk are separate, and silk has no use yet.
 
 ## Shoot a drop
 
-A laser can detonate a nearby loot drop when the shooter is within its arm
-range. The drop is removed and its shot-triggered blast is safe for every crew
-hull, including the shooter and teammates. It adds an outward velocity impulse
-to small asteroids. A rock is affected when its edge reaches the blast radius;
-the blast does not deal ship damage or consume a life.
+Shoot a nearby drop to blast small rocks outward. The blast does not hurt a ship.
 
 ## Pickup melody
 
-With Sound Effects on, collecting material plays a bright crystal note. Quick
-pickups continue a composed phrase, while a pause starts it again. Laser cores
-use a brighter voice in the same melody. Resource Tap ejections provide the
-lower accompanying notes.
+With sound on, quick pickups play a short crystal phrase.

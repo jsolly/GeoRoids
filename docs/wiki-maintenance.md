@@ -10,6 +10,8 @@ Edit articles in Pages CMS, or edit `content/wiki/*.md` directly. See [publishin
 
 Use `docs/wiki-coverage.md` as the inventory. A new ship or player-facing mechanic needs an entry or a documented section within an existing entry, plus cross-links. New important interactions need the same treatment. Do not interpret a passing hash check as proof that editorial coverage is complete.
 
+Keep each section to a short explanation. When a demonstration sits on that heading, the GIF carries the mechanic and the paragraph only says what it shows. Exact tuning stays in the generated values, collapsed under Current game values.
+
 ## Ship profiles
 
 Each ship page pairs an Apache ECharts SVG radar with seven base-stat ratings and exact values. `src/wiki/shipScorecard.ts` derives both displays from the current ship definitions. Each stat maps linearly from the fleet minimum to maximum onto 1–5 bubbles, rounded to a whole bubble. Size, shot interval, and ability cooldown reverse the scale so smaller or shorter scores higher. Equal fleet-wide values score 3. These compare base stats, not ability effectiveness or an overall ship ranking.

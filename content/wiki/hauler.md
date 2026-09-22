@@ -150,7 +150,7 @@ remains unchanged. Lasers mine asteroids only; they cannot damage teammates.
 
 ## Satellite inventory
 
-Loose satellites enter your ship inventory when collected. Open the schematic
+Loose satellites enter your ship inventory when collected. Collecting one shows a brief label above the ship that repeats how to open the schematic, then fades. Open the schematic
 with V or the Schematic button on desktop, or press and hold your hull on
 touch, then choose Equip. One satellite
 orbits at a time, identifying nearby asteroids until its health runs out.

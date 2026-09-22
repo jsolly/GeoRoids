@@ -72,8 +72,10 @@ charge and credits the time spent away toward the refill.
 V or the on-screen Schematic button opens the local schematic for either ship.
 The button sits above Map and shows the V shortcut on a keyboard. On touch, the
 button is hidden: press and hold your own hull for a beat; a short rest still
-only steers. When you enter a touch flight, a brief label above your
-ship says to tap and hold to equip tools, then fades. The overlay shows your hull
+only steers. Collecting a satellite shows a brief label above your ship, then
+fades. On touch it says to tap and hold your ship to equip tools. On desktop
+it says to press V to equip tools. Collecting another satellite shows the label
+again. The overlay shows your hull
 and satellite inventory. Choose Equip to launch one stored satellite for
 temporary nearby asteroid identification. The inventory displays its remaining
 lifetime, derived from health. Surveyor offers Mineral Scan, Survey Probe, and Build;
@@ -127,8 +129,8 @@ or open copy-paste banners; those gestures steer, fire, or activate the button.
 Nickname and other form fields on the title screen still accept typing and
 selection.
 Use the Store button at Town Square for the same purchase as B. Use the ability button for the same action as E. Press and hold your own hull
-to open the ship schematic. A short label above the ship on first join repeats
-that hold-to-equip reminder. Use the Boost button at the
+to open the ship schematic. Collecting a satellite repeats that hold-to-equip
+reminder in a short label above the ship, then the label fades. Use the Boost button at the
 bottom of the screen for the same action as Shift: tap once to start boosting,
 tap again to stop. The action buttons do not steer the ship or create a pending
 playfield tap shot.

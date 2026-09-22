@@ -70,24 +70,24 @@ deposit. After ignition it passes through ships and objects, ignores
 weapons, and cannot be scanned or worked on again before furnace intake.
 
 Town Square is the only furnace that starts burning. It sits at the map center.
-Dark street foundations radiate outward from it. On the playfield a lit hearth
+Dark street foundations are spread unevenly through three farther bands. On the playfield a lit hearth
 is a dashed delivery ring around a burning grate, where a column of flame roars
 up the intake and throws embers past it. A dark lot is a dashed ring labeled
 with the score it costs. A lit hearth appears on the local minimap as an
 amber hairline three-tongue campfire after the crew discovers its area and
 remains visible there while it is nearby. Dark lots inside that radar stay
 marked. When a hearth moves beyond the local radar, use the universe map to
-find it; the whole street plan is drawn there, lit or not. Zoomed out, a lit
+find it. Dark lots stay marked on that map. A fire trail appears there only after the street is lit, turning at right angles back to Town Square. Zoomed out, a lit
 mark is an amber flame pin at the same size as the other chart landmarks; the
 nearby view and closer restore the three-tongue campfire. A delivery consumes
 the towed or self-guided rock and pays the Hauler and every recorded Surveyor.
 Streets a pilot built raise only that pilot's payout. Town Square also holds a
 store: spend your own score there on a hull paint. The paint stays on your ship
 through death, reconnect, and restart.
-Faint pipes join each street lot
-to the nearer grate and end at Town Square. Dragging a rock or a spider into a
-street furnace lights that whole run, and a bright head travels from the source
-grate back to Town Square.
+The pipeline stays hidden until that street is burning. A lit street shows a
+fire trail from its grate to Town Square, turning at right angles through each
+inward lot on its parent chain. Dragging a rock or a spider into a street furnace sends a brighter
+head along that trail from the source grate back to Town Square.
 
 ## Shared chart
 
@@ -98,9 +98,9 @@ revealed for the crew after that ship moves away. Surveyor passive reveal
 reaches 650 world units; Hauler passive reveal reaches 260. An active Surveyor
 scan reaches 1,200 world units and also classifies minerals in that range on
 every teammate's radar. Uncharted asteroid and loot positions stay
-hidden until a crew member reveals their area. The street plan stays marked on
-the universe map, and pilots stay
-readable on both maps. Both maps draw each pilot's hull silhouette.
+hidden until a crew member reveals their area. Dark street lots stay marked on
+the universe map. A lit street adds a right-angle fire trail back to Town Square.
+Pilots stay readable on both maps. Both maps draw each pilot's hull silhouette.
 Close the overview with the Close control, or with M or Escape on a keyboard.
 
 ## Harvested ground
@@ -114,7 +114,7 @@ respawns beside the nearest lit hearth. The local radar and universe map keep ex
 cells visible, and the universe map still draws its alignment grid.
 
 Surveyors can equip [Build](/wiki/#surveyor) to light the street foundation they
-are standing in. The nearer lot on that road must already be burning, and that
+are standing in. The inward lot on that road must already be burning, and that
 Surveyor's own score must cover the cost. The furnace takes their name. They
 cannot build a hearth whose spider occupancy covers an existing nest. Every
 crew member can use the sites. Built furnaces survive reconnects and server

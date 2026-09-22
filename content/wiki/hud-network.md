@@ -94,7 +94,7 @@ silhouette; identified minerals change its color and small surface details.
 Broken hulls mark wreckage, angular fragments mark shards, canisters mark Tap
 loot, and yellow laser emitters mark laser cores. Lilac satellites have a
 central body and solar panels; an orbit line distinguishes deployed pickups.
-Amber campfires mark discovered lit hearths. Hollow rings mark dark street lots that are already inside the local radar, and the universe map draws the whole street plan. Red spiderwebs surround the stationary
+Amber campfires mark discovered lit hearths. Hollow rings mark dark street lots that are already inside the local radar. The universe map marks every street lot. A fire trail appears on the minimap and the universe map only after that street is lit, and it turns at right angles back to Town Square. Red spiderwebs surround the stationary
 resources guarded by nests, even while their spiders are chasing elsewhere or
 sleeping. The web remains after the guards are killed while the resource remains;
 it disappears when that resource is collected or moved.
@@ -167,8 +167,9 @@ sends the first world snapshot.
 The local minimap and full-screen universe map use one persistent shared
 exploration chart. Passive Surveyor reveal reaches 650 world units and passive
 Hauler reveal reaches 260; every crew member contributes to the same
-explored area. Pilots stay readable; the street plan remains marked on the
-universe map, while uncharted asteroid and loot positions stay hidden.
+explored area. Pilots stay readable. Dark street lots remain marked on the
+universe map, and a lit street shows its right-angle fire trail back to Town
+Square, while uncharted asteroid and loot positions stay hidden.
 Open the universe map with M or the Map button. It starts with a nearby view
 centered on your current ship; zoom out to see distant discoveries or use the
 locate control on the map to restore the nearby scale. Ships on both the local

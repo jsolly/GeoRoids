@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
 import { SURVEY_PROBE } from '../../../shared/surveyProbe';
-import type { SurveyorUtilityId } from '../../../shared-types';
 import { Player } from '../../../src/entities/player/Player';
 import { Ship } from '../../../src/entities/ship/Ship';
 import {
@@ -131,11 +130,4 @@ test('a stale snapshot cannot replace the local probe preference while remotes f
   });
   remote.updateFromServer({ kitId: 'surveyor', surveyorUtility: 'survey_probe' });
   expect(remote.ship.surveyorUtility).toBe('survey_probe');
-
-  remote.ship.surveyorUtility = 'survey_probe';
-  remote.updateFromServer({
-    kitId: 'surveyor',
-    surveyorUtility: 'build_furnace' as SurveyorUtilityId,
-  });
-  expect(remote.ship.surveyorUtility).toBe('mineral_scan');
 });

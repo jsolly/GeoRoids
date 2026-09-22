@@ -1,6 +1,5 @@
 import { segmentCircleContact } from '../../shared/asteroidPhenomena';
-import { FurnaceField } from '../../shared/furnaceField';
-import { TOWN_HEARTH } from '../../shared/furnaces';
+import { FURNACE_BUILD, FurnaceField } from '../../shared/furnaceField';
 import { SPIDER } from '../../shared/terrainSpider';
 import { WORLD } from '../../shared/world';
 import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-types';
@@ -155,6 +154,18 @@ export class TerrainSpiderManager {
         position: copyPosition(event.position),
       })),
     };
+  }
+
+  /**
+   * True when a furnace at `position` would occupy a known nest home the same
+   * way standing hearths hide webs and cull guards: dist < FURNACE_SAFE_RADIUS
+   * + HIT_RADIUS. Cleared deposits (web gone) are not keep-out.
+   */
+  public furnaceWouldCoverNest(position: Position): boolean {
+    return this.nestMarkers.some(
+      (nest) =>
+        distanceBetween(position, nest.position) < SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS
+    );
   }
 
   public isAttackActive(attack: SpiderAttack): boolean {
@@ -669,7 +680,7 @@ export class TerrainSpiderManager {
   private consumeAtFurnace(spider: RuntimeSpider, start: Position): boolean {
     const midpoint = { x: (start.x + spider.position.x) / 2, y: (start.y + spider.position.y) / 2 };
     const furnace = this.furnaces
-      .nearby(midpoint, distanceBetween(start, spider.position) / 2 + TOWN_HEARTH.radius)
+      .nearby(midpoint, distanceBetween(start, spider.position) / 2 + FURNACE_BUILD.RADIUS)
       .find(
         (site) =>
           segmentCircleContact(start, spider.position, site.position, site.radius) !== undefined

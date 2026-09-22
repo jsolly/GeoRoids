@@ -30,7 +30,7 @@
       <div id="start-screen" class="screen">
         <p class="terrain-eyebrow">Read the terrain. Explore together.</p>
         <h1>GeoRoids</h1>
-        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V schematic · B town store · M map</p>
+        <p id="controls-hint" class="controls-hint">Always thrust · Mouse, A/D or left/right arrows to steer · Space fires · Shift or right-click boost · E ability · V inventory · B town store · M map</p>
         <p class="manual-entry"><a href="/wiki/">Open field manual →</a></p>
 
         <!-- Join the multiplayer session -->
@@ -176,20 +176,12 @@
         </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <button
-          id="town-store-toggle"
-          type="button"
-          class="town-store-toggle"
-          hidden
-          aria-label="Open town store (B)"
-          aria-keyshortcuts="B"
-        >Store <kbd>B</kbd></button>
-        <button
           id="ship-schematic-toggle"
           type="button"
           class="ship-schematic-toggle"
-          aria-label="Open ship schematic (V)"
+          aria-label="Open inventory and ship schematic (V)"
           aria-keyshortcuts="V"
-        >Schematic <kbd>V</kbd></button>
+        >Inventory <kbd>V</kbd></button>
         <button
           id="universe-map-toggle"
           type="button"
@@ -234,9 +226,6 @@
           <p class="universe-map-subtitle">Your nearby discoveries. Zoom out to explore the whole world.</p>
         </div>
         <div class="universe-map-actions">
-          <button id="universe-map-zoom-out" type="button" aria-label="Zoom out">−</button>
-          <output id="universe-map-zoom" aria-label="Map zoom">2400%</output>
-          <button id="universe-map-zoom-in" type="button" aria-label="Zoom in">+</button>
           <button id="universe-map-close" type="button" aria-label="Close">Close <kbd>Esc</kbd></button>
         </div>
       </header>
@@ -249,7 +238,11 @@
           aria-details="universe-map-locations"
         ></canvas>
         <ul id="universe-map-locations" class="universe-map-accessible" aria-label="Revealed landmarks and crew coordinates"></ul>
-        <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i><span>E</span></div>
+        <div class="universe-map-compass" aria-hidden="true"><span>N</span><i></i></div>
+        <div class="universe-map-zoom">
+          <button id="universe-map-zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="universe-map-zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
         <button
           id="universe-map-center"
           type="button"

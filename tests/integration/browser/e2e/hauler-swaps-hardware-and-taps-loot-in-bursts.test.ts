@@ -8,7 +8,6 @@ import { createBrowserScenarioHooks } from '../../utils/browser-scenario-setup';
 import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
-import { centerOf, dispatchTouch } from '../../utils/touch-input';
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 const WS_PATH = /\/ws(?:\?|$)/u;
@@ -53,21 +52,12 @@ test.each([1280, 954, 390])(
     });
     const id = await game.getLocalPlayerId();
     const openSchematic = async () => {
-      if (!mobile) {
+      if (mobile) {
+        await page.locator('#ship-schematic-toggle').tap();
+      } else {
         await page.keyboard.press('v');
-        return;
       }
-      const session = await page.context().newCDPSession(page);
-      try {
-        const center = await centerOf(page, '#gameCanvas');
-        await dispatchTouch(session, 'touchStart', [{ ...center, id: 1 }]);
-        await page.waitForFunction(() =>
-          document.querySelector('#ship-schematic-dialog')?.hasAttribute('open')
-        );
-      } finally {
-        await dispatchTouch(session, 'touchEnd', []);
-        await session.detach();
-      }
+      await page.locator('#ship-schematic-dialog').waitFor({ state: 'visible' });
     };
     const useAbility = () =>
       mobile ? page.locator('#touch-ability').tap() : page.keyboard.press('e');

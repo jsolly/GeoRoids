@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import { civicLot } from '../../../shared/furnaces';
 import { Player } from '../../../src/entities/player/Player';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { MockPlayerInput } from '../../../src/input/MockPlayerInput';
@@ -9,12 +10,81 @@ import {
   touchAbilityName,
 } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
+import { resetWorldExploration } from '../../../src/network/worldExploration';
+
+const street = civicLot('street-1-0');
+if (!street) {
+  throw new Error('Missing street lot');
+}
 
 test('each kit exposes its own E action label and name', () => {
   expect(touchAbilityLabel('surveyor')).toBe('SCAN');
   expect(touchAbilityLabel('hauler')).toBe('HOOK');
   expect(touchAbilityName('hauler')).toBe('Harpoon');
   expect(touchAbilityLabel('unknown-kit')).toBe('SCAN');
+});
+
+test('near Town Square the ability chrome becomes Enter store for any kit', () => {
+  for (const kitId of ['surveyor', 'hauler'] as const) {
+    const near = readAbilityChrome({
+      kitId,
+      exploding: false,
+      health: 100,
+      abilityCooldownFrames: 90,
+      abilityActiveFrames: 0,
+      position: { x: 0, y: 0 },
+    });
+    expect(near.label).toBe('ENTER');
+    expect(near.name).toBe('Enter store');
+    expect(near.ready).toBe(true);
+    expect(near.cooling).toBe(false);
+    expect(near.cooldownRatio).toBe(0);
+  }
+  const far = readAbilityChrome({
+    kitId: 'surveyor',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    position: { x: 20_000, y: 0 },
+  });
+  expect(far.label).toBe('SCAN');
+});
+
+test('near a dark street lot the Surveyor ability chrome becomes Build', () => {
+  resetWorldExploration();
+  const near = readAbilityChrome({
+    kitId: 'surveyor',
+    surveyorUtility: 'mineral_scan',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    position: { ...street.position },
+  });
+  expect(near.label).toBe('BUILD');
+  expect(near.name).toBe('Build furnace');
+  const probing = readAbilityChrome({
+    kitId: 'surveyor',
+    surveyorUtility: 'survey_probe',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    position: { ...street.position },
+  });
+  expect(probing.label).toBe('BUILD');
+  const far = readAbilityChrome({
+    kitId: 'surveyor',
+    surveyorUtility: 'mineral_scan',
+    exploding: false,
+    health: 100,
+    abilityCooldownFrames: 0,
+    abilityActiveFrames: 0,
+    position: { x: 20_000, y: 20_000 },
+  });
+  expect(far.label).toBe('SCAN');
+  expect(far.name).toBe('Mineral scan');
 });
 
 test('Survey Probe changes the mobile ability label, name, and cooldown scale', () => {

@@ -1,6 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
+import { surveyorAbilityBuildsAt } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
@@ -94,6 +95,9 @@ export class MessageHandler {
           break;
         case 'setSurveyorUtility':
           this.handleSetSurveyorUtility(ws, command);
+          break;
+        case 'buyShipPaint':
+          this.handleBuyShipPaint(ws, command);
           break;
         case 'buyExtraLife':
           this.handleBuyExtraLife(ws, command);
@@ -472,6 +476,31 @@ export class MessageHandler {
     this.broadcaster.broadcastGameState();
   }
 
+  private handleBuyShipPaint(ws: WebSocket, command: CommandOf<'buyShipPaint'>): void {
+    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
+    if (!socketPlayer || socketPlayer.id !== command.id) {
+      return;
+    }
+    const issue = this.gameEngine.buyShipPaint(command.id, command.paintId);
+    const pilot = this.gameEngine.getPlayer(command.id);
+    ws.send(
+      JSON.stringify({
+        type: 'townStoreResult',
+        data: issue
+          ? { message: issue }
+          : {
+              message: this.gameEngine.townStoreNotice(command.paintId),
+              score: pilot?.score,
+              color: pilot?.color,
+            },
+        timestamp: Date.now(),
+      })
+    );
+    if (!issue) {
+      this.broadcaster.broadcastGameState();
+    }
+  }
+
   private handleBuyExtraLife(ws: WebSocket, command: CommandOf<'buyExtraLife'>): void {
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
     if (!socketPlayer || socketPlayer.id !== command.id) {
@@ -485,7 +514,7 @@ export class MessageHandler {
         data: issue
           ? { message: issue }
           : {
-              message: this.gameEngine.townStoreNotice(pilot?.lives ?? 0),
+              message: this.gameEngine.extraLifeNotice(pilot?.lives ?? 0),
               score: pilot?.score,
               lives: pilot?.lives,
             },
@@ -524,7 +553,21 @@ export class MessageHandler {
       ? this.gameEngine.getAsteroid(socketPlayer.harpoonTargetId)
       : undefined;
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
+    const offeringBuild =
+      socketPlayer.kitId === 'surveyor' &&
+      surveyorAbilityBuildsAt(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
+    if (offeringBuild) {
+      ws.send(
+        JSON.stringify({
+          type: 'furnaceBuildResult',
+          data: activated
+            ? this.gameEngine.furnaceBuildNotice()
+            : (this.gameEngine.furnaceBuildIssue(playerId) ?? 'Furnace builder not ready'),
+          timestamp: Date.now(),
+        })
+      );
+    }
     if (!activated) {
       return;
     }

@@ -166,13 +166,13 @@ describe('Hauler ship schematic overlay', () => {
     expect(looped.rockAngle).toBe(turning.rockAngle);
   });
 
-  test('the desktop Schematic button shows V and opens the overlay', () => {
+  test('the desktop Inventory button shows V and opens the ship view', () => {
     const toggle = document.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.toggle}`);
     expect(toggle).toBeInstanceOf(HTMLButtonElement);
     expect(toggle?.hidden).toBe(false);
     expect(toggle?.getAttribute('aria-keyshortcuts')).toBe('V');
     expect(toggle?.querySelector('kbd')?.textContent).toBe('V');
-    expect(toggle?.textContent).toMatch(/Schematic/u);
+    expect(toggle?.textContent).toMatch(/Inventory/u);
     const map = document.querySelector(`#${UNIVERSE_MAP_IDS.toggle}`);
     expect(toggle && map ? toggle.compareDocumentPosition(map) : 0).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
@@ -182,7 +182,7 @@ describe('Hauler ship schematic overlay', () => {
     closeShipSchematic();
   });
 
-  test('touch chrome hides the Schematic button', () => {
+  test('touch chrome keeps the Inventory button and hides its keyboard badge', () => {
     const toggle = document.querySelector<HTMLButtonElement>(`#${SHIP_SCHEMATIC_IDS.toggle}`);
     const innerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
     const innerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
@@ -190,9 +190,10 @@ describe('Hauler ship schematic overlay', () => {
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
     try {
       window.dispatchEvent(new Event('resize'));
-      expect(toggle?.hidden).toBe(true);
+      expect(toggle?.hidden).toBe(false);
       expect(toggle?.classList.contains('ship-schematic-touch')).toBe(true);
       expect(toggle?.getAttribute('aria-keyshortcuts')).toBeNull();
+      expect(toggle?.textContent).toMatch(/Inventory/u);
     } finally {
       if (innerWidth) {
         Object.defineProperty(window, 'innerWidth', innerWidth);

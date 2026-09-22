@@ -49,7 +49,6 @@ export const SHIP_SCHEMATIC_IDS = {
   toggle: 'ship-schematic-toggle',
 } as const;
 
-export const SHIP_SCHEMATIC_LONG_PRESS_MS = 700;
 export const BOOST_COUPLING_DEMO_DURATION_MS = 3200;
 
 const BOOST_COUPLING_ATTACH_START_MS = 220;
@@ -110,11 +109,9 @@ let selectedSurveyorUtility: SurveyorUtilityId = preferredSurveyorUtility();
 function decorateSchematicToggle(toggle: HTMLButtonElement): void {
   toggle.type = 'button';
   toggle.classList.add('ship-schematic-toggle');
-  if (!toggle.querySelector('kbd')) {
-    const shortcut = document.createElement('kbd');
-    shortcut.textContent = 'V';
-    toggle.replaceChildren('Schematic ', shortcut);
-  }
+  const shortcut = toggle.querySelector('kbd') ?? document.createElement('kbd');
+  shortcut.textContent = 'V';
+  toggle.replaceChildren('Inventory ', shortcut);
 }
 
 function syncSchematicInputChrome(): void {
@@ -122,15 +119,15 @@ function syncSchematicInputChrome(): void {
     return;
   }
   const touch = shouldUseTouchControls();
+  elements.toggle.hidden = false;
   elements.toggle.classList.toggle('ship-schematic-touch', touch);
-  elements.toggle.hidden = touch;
   if (touch) {
     elements.toggle.removeAttribute('aria-keyshortcuts');
-    elements.toggle.setAttribute('aria-label', 'Open ship schematic');
+    elements.toggle.setAttribute('aria-label', 'Open inventory and ship schematic');
     return;
   }
   elements.toggle.setAttribute('aria-keyshortcuts', 'V');
-  elements.toggle.setAttribute('aria-label', 'Open ship schematic (V)');
+  elements.toggle.setAttribute('aria-label', 'Open inventory and ship schematic (V)');
 }
 
 function createDialogMarkup(dialog: HTMLDialogElement): void {
@@ -143,20 +140,22 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
     <header class="ship-schematic-header">
       <div>
         <p class="ship-schematic-eyebrow">HAULER</p>
-        <h2 id="ship-schematic-title">Ship schematic</h2>
+        <h2 id="ship-schematic-title">Ship and inventory</h2>
       </div>
-      <button id="${SHIP_SCHEMATIC_IDS.close}" type="button" aria-label="Close schematic">×</button>
+      <button id="${SHIP_SCHEMATIC_IDS.close}" type="button" aria-label="Close ship and inventory">×</button>
     </header>
-    <div class="ship-schematic-stage">
-      <canvas id="${SHIP_SCHEMATIC_IDS.canvas}" role="img" aria-label="Hauler equipment schematic"></canvas>
+    <div class="ship-schematic-body">
+      <div class="ship-schematic-stage">
+        <canvas id="${SHIP_SCHEMATIC_IDS.canvas}" role="img" aria-label="Ship equipment schematic"></canvas>
+      </div>
+      <section class="satellite-inventory" aria-labelledby="satellite-inventory-title">
+        <h3 id="satellite-inventory-title">Inventory</h3>
+        <p>${satelliteInventoryDescription()}</p>
+        <div id="${SHIP_SCHEMATIC_IDS.inventory}"></div>
+        <span id="satellite-inventory-status" class="satellite-inventory-status" role="status" aria-atomic="true"></span>
+      </section>
       <div id="${SHIP_SCHEMATIC_IDS.cards}" class="ship-schematic-cards"></div>
     </div>
-    <section class="satellite-inventory" aria-labelledby="satellite-inventory-title">
-      <h3 id="satellite-inventory-title">Inventory</h3>
-      <p>${satelliteInventoryDescription()}</p>
-      <div id="${SHIP_SCHEMATIC_IDS.inventory}"></div>
-      <span id="satellite-inventory-status" class="satellite-inventory-status" role="status" aria-atomic="true"></span>
-    </section>
     <footer class="ship-schematic-footer">
       <div class="ship-schematic-detail">
         <div>
@@ -761,19 +760,6 @@ function stopRenderLoop(): void {
     window.cancelAnimationFrame(frameRequest);
     frameRequest = null;
   }
-}
-
-export function isPointerOnLocalShip(clientX: number, clientY: number): boolean {
-  const player = PlayerManager.getInstance().getLocalPlayer();
-  const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
-  if (!player || !canvas || player.lives <= 0) {
-    return false;
-  }
-  const rect = canvas.getBoundingClientRect();
-  const dx = clientX - (rect.left + rect.width / 2);
-  const dy = clientY - (rect.top + rect.height / 2);
-  const scale = rect.width / Math.max(1, canvas.width);
-  return Math.hypot(dx, dy) <= player.ship.r * scale + 20;
 }
 
 export function openShipSchematic(): boolean {

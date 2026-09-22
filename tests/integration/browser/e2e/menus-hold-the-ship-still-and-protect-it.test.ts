@@ -38,17 +38,7 @@ test.each([
     } else if (menu === 'map') {
       await page.locator('#universe-map-toggle').tap();
     } else {
-      const session = await page.context().newCDPSession(page);
-      try {
-        const center = await centerOf(page, '#gameCanvas');
-        await dispatchTouch(session, 'touchStart', [{ ...center, id: 1 }]);
-        await page.waitForFunction(() =>
-          document.querySelector('#ship-schematic-dialog')?.hasAttribute('open')
-        );
-      } finally {
-        await dispatchTouch(session, 'touchEnd', []);
-        await session.detach();
-      }
+      await page.locator('#ship-schematic-toggle').tap();
     }
     const dialog = page.locator(menu === 'map' ? '#universe-map-dialog' : '#ship-schematic-dialog');
     await expect.poll(() => dialog.isVisible()).toBe(true);

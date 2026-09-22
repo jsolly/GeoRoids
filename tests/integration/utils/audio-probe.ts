@@ -240,7 +240,9 @@ export async function installAudioProbe(
   );
 }
 
-/** Match the native playback probe to a decoded authored sample. */
+/** Match the native playback probe to a decoded authored sample.
+ * One millisecond covers a single priming sample between Howler and a fresh decode.
+ */
 export function readSamplePlaybackRates(page: Page, name: string): Promise<number[]> {
   return page.evaluate(async (sampleName) => {
     const response = await fetch(`/sounds/${sampleName}.m4a`);
@@ -253,7 +255,7 @@ export function readSamplePlaybackRates(page: Page, name: string): Promise<numbe
       document.documentElement.dataset['audioEvents'] ?? '[]'
     );
     return events
-      .filter((event) => Math.abs(event.duration - buffer.duration) < 0.00001)
+      .filter((event) => Math.abs(event.duration - buffer.duration) < 0.001)
       .map((event) => event.rate);
   }, name);
 }

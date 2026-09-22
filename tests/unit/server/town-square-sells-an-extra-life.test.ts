@@ -11,7 +11,6 @@ import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcas
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { EXTRA_LIFE_COST, MAX_LIVES, TOWN_STORE_ISSUE } from '../../../shared/townStore';
-import { WORLD } from '../../../shared/world';
 import { PALETTE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
@@ -121,118 +120,6 @@ test('Town Square sells one extra life and keeps the new count across a restart'
       expect(resumed.actor.lives).toBe(6);
       expect(resumed.actor.score).toBe(0);
       expect(resumed.actor.color).toBe(PALETTE.REMOTE);
-    } finally {
-      secondStore.close();
-    }
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('a saved street list still loads and the next checkpoint drops it', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'town-legacy-'));
-  const path = join(directory, 'world.sqlite');
-  const startedAt = 1_700_000_000_000;
-  const exploration = [{ id: '0,0', bits: `${'0'.repeat(63)}1` }];
-  const store = new WorldStore(path);
-  try {
-    store.checkpoint(
-      {
-        seed: 7,
-        startedAt,
-        generation: WORLD.generation,
-        exploration,
-      },
-      new Map(),
-      []
-    );
-    store.close();
-    const db = new DatabaseSync(path);
-    const row = db.prepare('SELECT json FROM world WHERE id=1').get() as { json: string };
-    const saved = JSON.parse(row.json) as { civicModules?: unknown };
-    saved.civicModules = [{ id: 'street-1-0', builderName: 'Ada' }];
-    db.prepare('UPDATE world SET json=? WHERE id=1').run(JSON.stringify(saved));
-    db.close();
-    const loaded = new WorldStore(path);
-    try {
-      expect(loaded.loadWorld()).toMatchObject({ seed: 7, startedAt, exploration });
-      expect(loaded.loadWorld()).not.toHaveProperty('civicModules');
-      const engine = new GameEngine(42, undefined, new InlineWorldPersistence(loaded));
-      engine.checkpointWorld();
-      const rewrittenDb = new DatabaseSync(path);
-      const rewritten = rewrittenDb.prepare('SELECT json FROM world WHERE id=1').get() as {
-        json: string;
-      };
-      rewrittenDb.close();
-      const world = JSON.parse(rewritten.json) as {
-        seed: number;
-        startedAt: number;
-        exploration: typeof exploration;
-      };
-      expect(world).toMatchObject({ seed: 7, startedAt, exploration });
-      expect(world).not.toHaveProperty('civicModules');
-    } finally {
-      loaded.close();
-    }
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('a painted pilot keeps score and lives and the next checkpoint drops the paint', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'town-paint-'));
-  const path = join(directory, 'world.sqlite');
-  const firstStore = new WorldStore(path);
-  try {
-    const engine = new GameEngine(42, undefined, new InlineWorldPersistence(firstStore));
-    const socket = new RecordingSocket();
-    const pilot = engine.addPlayer('pilot', 'Pilot', socket, { x: 0, y: 0 }, 'hauler');
-    pilot.score = 2500;
-    pilot.lives = 4;
-    pilot.health = 100;
-    pilot.asteroidInteractions = 1;
-    const registered = engine.registerPilot(pilot, socket);
-    assert(registered.ok);
-    engine.checkpointWorld();
-    engine.removePlayer(pilot.id);
-    firstStore.close();
-    const db = new DatabaseSync(path);
-    const row = db.prepare('SELECT json FROM pilots WHERE id=?').get(pilot.id) as { json: string };
-    const saved = JSON.parse(row.json) as { hullColor?: string; score: number; lives: number };
-    saved.hullColor = '#c45b2d';
-    db.prepare('UPDATE pilots SET json=? WHERE id=?').run(JSON.stringify(saved), pilot.id);
-    db.close();
-    const painted = new DatabaseSync(path);
-    const paintedRow = painted.prepare('SELECT json FROM pilots WHERE id=?').get(pilot.id) as {
-      json: string;
-    };
-    painted.close();
-    expect(JSON.parse(paintedRow.json)).toMatchObject({
-      hullColor: '#c45b2d',
-      score: 2500,
-      lives: 4,
-    });
-    const secondStore = new WorldStore(path);
-    try {
-      const restarted = new GameEngine(99, undefined, new InlineWorldPersistence(secondStore));
-      const resumed = restarted.resumePilot(
-        registered.resumeToken,
-        new RecordingSocket(),
-        'hauler'
-      );
-      assert(resumed.ok);
-      expect(resumed.actor.score).toBe(2500);
-      expect(resumed.actor.lives).toBe(4);
-      expect(resumed.actor.color).toBe(PALETTE.REMOTE);
-      restarted.checkpointWorld();
-      const rewrittenDb = new DatabaseSync(path);
-      const rewritten = rewrittenDb.prepare('SELECT json FROM pilots WHERE id=?').get(pilot.id) as {
-        json: string;
-      };
-      rewrittenDb.close();
-      const stored = JSON.parse(rewritten.json) as { score: number; lives: number };
-      expect(stored).toMatchObject({ score: 2500, lives: 4 });
-      expect(stored).not.toHaveProperty('hullColor');
     } finally {
       secondStore.close();
     }

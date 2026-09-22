@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { CIVIC_LOTS } from '../../../shared/furnaces';
 import { WORLD } from '../../../shared/world';
 import type { ShipKitId } from '../../../shared-types';
 import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
@@ -516,8 +517,11 @@ describe('painted HUD composition', () => {
 
     draw();
 
+    const darkLotsInRadar = CIVIC_LOTS.filter(
+      (lot) => Math.hypot(lot.position.x, lot.position.y) <= WORLD.minimapRadius
+    );
     expect(arc.mock.calls[0]).toEqual([736, 536, 48, 0, Math.PI * 2]);
-    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(0);
+    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(darkLotsInRadar.length);
     expect(strokes[0]).toEqual({
       points: [],
       closed: true,
@@ -582,8 +586,10 @@ describe('painted HUD composition', () => {
     const haulerOutline = getKitHullOutline('hauler');
     const surveyorMarks = 1 + surveyorOutline.extras.length;
     const haulerMarks = 1 + haulerOutline.extras.length;
-    // One arena ring, four world layers, then kit hulls.
-    expect(strokes).toHaveLength(1 + 4 + surveyorMarks * 2 * 3 + haulerMarks * 2);
+    // One arena ring, four world layers, nearby street foundations, then kit hulls.
+    expect(strokes).toHaveLength(
+      1 + 4 + darkLotsInRadar.length + surveyorMarks * 2 * 3 + haulerMarks * 2
+    );
     const radarX = layout.miniMap.x + layout.miniMap.size / 2;
     const radarY = layout.miniMap.y + layout.miniMap.size / 2;
     const peerX = radarX + layout.miniMap.size / 4;
@@ -689,7 +695,7 @@ describe('painted HUD composition', () => {
     draw();
 
     expect(arc.mock.calls[0]).toEqual([736, 536, 48, 0, Math.PI * 2]);
-    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(0);
+    expect(arc.mock.calls.filter((call) => call[2] === 4)).toHaveLength(darkLotsInRadar.length);
     expect(filledPaths).toHaveLength(1);
     expect(strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#E8D5A3'))).toEqual(
       []

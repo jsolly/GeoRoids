@@ -10,7 +10,7 @@ Edit articles in Pages CMS, or edit `content/wiki/*.md` directly. See [publishin
 
 Use `docs/wiki-coverage.md` as the inventory. A new ship or player-facing mechanic needs an entry or a documented section within an existing entry, plus cross-links. New important interactions need the same treatment. Do not interpret a passing hash check as proof that editorial coverage is complete.
 
-Keep each section to a short explanation. When a demonstration sits on that heading, the GIF carries the mechanic and the paragraph only says what it shows. Exact tuning stays in the generated values, collapsed under Current game values.
+Back and Forward return to the scroll position of that visit, including after a reload. A new visit opens at the top.
 
 ## Ship profiles
 

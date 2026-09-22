@@ -32,6 +32,7 @@ import {
 import { SatellitePickupManager } from '../entities/satellitePickup/SatellitePickupManager';
 import { bindHarpoonFieldSource, publishHarpoonField } from '../entities/ship/harpoonField';
 import { diagnoseHarpoonLatch } from '../entities/ship/shipAbilities';
+import { noteFurnacePipePulse, resetFurnacePipePulses } from '../fx/furnacePipePulse';
 import { playLocalHaptic } from '../fx/haptics';
 import { shockwaveManager } from '../fx/ShockwaveManager';
 import { tickTouchControls } from '../input/touchControls';
@@ -56,6 +57,7 @@ import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
 import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
 import { showNetworkBanner } from '../ui/networkStatus';
+import { showSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
 import { syncTownStoreChrome } from '../ui/townStore';
 import { setPlayView } from '../ui/uiUtils';
@@ -148,6 +150,7 @@ export class GameController {
   // Game lifecycle methods
   newGame(playerName?: string, kitId?: ShipKitId): void {
     clearAsteroidShatters();
+    resetFurnacePipePulses();
     this.simulationAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
@@ -393,11 +396,13 @@ export class GameController {
       return;
     }
     this.gameStateManager.setPickupMessage(detail.pickupName);
+    showSchematicEquipHint();
   };
 
   private handleFurnaceDelivery = (event: Event): void => {
     const delivery = (event as CustomEvent<FurnaceDelivery>).detail;
     markFurnaceAsteroidShatter(delivery.asteroidId);
+    noteFurnacePipePulse(delivery.furnaceId);
     const reward = delivery.rewards.find(
       (item) => item.playerId === this.networkManager.getLocalPlayerId()
     );

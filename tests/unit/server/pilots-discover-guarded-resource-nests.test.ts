@@ -4,7 +4,8 @@ import { RNGService } from '../../../server/core/RNGService';
 import { type SpiderResource, spiderResources } from '../../../server/core/spiderResources';
 import { TerrainSpiderManager } from '../../../server/core/TerrainSpiderManager';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
-import { TOWN_HEARTH } from '../../../shared/furnaces';
+import { FurnaceField } from '../../../shared/furnaceField';
+import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { SPIDER } from '../../../shared/terrainSpider';
 import type { AsteroidData, Position } from '../../../shared-types';
 import { DAMAGE, ROID } from '../../../src/constants';
@@ -128,9 +129,43 @@ test('nests never materialize beside a pilot or in a furnace yard', () => {
   });
   expect(worksYard.snapshot().nests).toEqual([]);
   expect(worksYard.snapshot().spiders).toEqual([]);
+  const lot = civicLot('street-1-0');
+  if (!lot) {
+    throw new Error('Missing street lot');
+  }
+  const field = new FurnaceField();
+  field.light(lot.id);
+  const builtYard = new TerrainSpiderManager(() => 0.5, field);
   const { manager, step } = setup();
+  builtYard.advance({
+    players: [
+      {
+        id: 'pilot',
+        position: { x: lot.position.x - 2_000, y: lot.position.y },
+        health: 100,
+        exploding: false,
+      },
+    ],
+    resources: () => [{ id: 'ore', position: { ...lot.position }, value: 1 }],
+    nowFrame: 1,
+  });
+  expect(builtYard.snapshot().nests).toEqual([]);
+  expect(builtYard.snapshot().spiders).toEqual([]);
   step(60);
   expect(manager.snapshot().spiders.length).toBeGreaterThan(0);
+});
+
+test('a furnace site inside nest occupancy covers that nest, and a site on the occupancy edge does not', () => {
+  const { manager, step } = setup();
+  step();
+  expect(manager.snapshot().nests).toHaveLength(1);
+  const occupancy = SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS;
+  expect(manager.furnaceWouldCoverNest({ x: home.x + occupancy - 1, y: home.y })).toBe(true);
+  expect(
+    manager.furnaceWouldCoverNest({ x: home.x + SPIDER.FURNACE_SAFE_RADIUS - 1, y: home.y })
+  ).toBe(true);
+  expect(manager.furnaceWouldCoverNest({ x: home.x + occupancy, y: home.y })).toBe(false);
+  expect(manager.snapshot().nests).toHaveLength(1);
 });
 
 test('valuable resources away from a widely spaced nest site remain unguarded', () => {

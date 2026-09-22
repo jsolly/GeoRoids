@@ -1,7 +1,8 @@
 ---
 title: Controls
 category: Start here
-summary: Thrust stays on. Steer, fire, Boost, and use E.
+summary: Automatic thrust on every device, with keyboard or pointer steering,
+  firing, Boost, and kit abilities.
 order: 20
 related:
   - content/wiki/field-manual.md
@@ -14,28 +15,130 @@ media:
 
 ## Keyboard
 
-Thrust stays on. A/D or the arrows turn, Space fires, Shift toggles Boost, and E uses the equipped tool. V opens the schematic, B opens the Town Square store, and M opens the map. Those menus hold the ship. Closing one blinks you back into flight.
+The thrusters stay on while you are alive and viewing the playfield. ArrowLeft or A and ArrowRight or D
+turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
+on the first press and off on the next; holding the key does not retrigger it.
+E activates the selected kit ability and is edge-triggered, so holding the key
+does not repeatedly activate it. E uses the equipped tool from
+the ship view. Near Town Square, E becomes Enter store instead of the kit
+ability, except a hooked Hauler keeps Release or Ignite. V opens or closes that
+view, and the Inventory button opens it. B also opens or closes the Town
+Square store while you are inside it and not hooked.
+Escape, the X control, or Return to flight also close an open menu. Firing and E
+are blocked while the schematic or store is open.
+The map, schematic, and town store hold your ship stationary, including its momentum and
+steering. Closing the menu resumes flight and grants the same brief blink
+protection as a respawn, so a rock that drifted over the hull cannot kill you
+immediately. The world keeps running while a
+menu is open: asteroids, ricochets, and the arena wall pass through your ship
+without colliding, and satellite health continues draining. Loose satellite
+pickups and loot stay on the field until you return to flight. You cannot lose a
+life from world hazards until you return to flight and blink protection ends.
+F is unbound.
+
+Your kit, mass, and terrain affect acceleration and speed. Surveyor and Hauler
+share the same cruise speed. Boost multiplies that cruise and thrust, and
+Surveyor's multiplier is stronger than Hauler's. Each kit page lists its
+handling values. Turns have a capped rate; the arrow ahead of the hull shows
+the current heading. Releasing steering keeps the attained heading and automatic
+thrust. On slopes, following a contour keeps nearly full cruise with a light
+downhill tug. Steep climbs are only a bit slower; descents more than double
+ordinary cruise and stack with Boost.
+Combat knockback can still push the ship. W and ArrowUp are unbound.
 
 ## Mouse
 
-The pointer sets your heading. Hold the left button to fire. Right-click toggles Boost.
+Move the mouse to steer from the canvas center toward the pointer. The ship
+turns toward that heading rather than snapping instantly. Hold the left mouse
+button to fire. Right-click toggles Boost on, and a second right-click turns it
+off, just like Shift. Releasing the mouse button keeps Boost on until the tank runs empty.
+Arrow keys or A/D take over steering
+until you move the pointer again.
 
 ## Boost charge
 
-Shift, right-click, and the Boost button share one tank. Press again to stop. Any charge left can start another burst.
+Shift, right-click, and the Boost button share one limited tank. The button is
+visible during flight on desktop and touch. While boosting, its amber fill drains
+from the top down. Switch boost off early to save charge; the inactive cyan fill
+rises from the bottom as the tank recharges. A partly filled tank can boost again
+if you stopped before it ran empty.
+
+An empty tank stops boost automatically. As soon as some charge returns, press,
+click, or tap to boost again. This interrupts recharging and spends the remaining
+charge; you do not need a full tank. Boost never restarts on its own. Opening the map, schematic, or town store stops boost and lets the tank recharge.
+Respawning starts with a full tank; reconnecting to the same flight preserves
+charge and credits the time spent away toward the refill.
 
 ## Ship schematic
 
-V, the Schematic button, or a long press on your hull swaps tools and equips one satellite. Hauler's Boost Coupling arms on the first E and ignites on the second.
+V or the Inventory button opens the ship view for either kit.
+The button sits above Map. On a keyboard it shows the V shortcut, and the
+title screen lists that shortcut with the other flight keys. Touch flights use
+the same button and hide the badge. Collecting a satellite shows a brief label
+above your ship, then fades. It says the equipment is in your inventory. On
+touch it says to tap Inventory to equip. On desktop it says to press V to
+equip. Collecting another satellite shows the label again. Opening Inventory
+clears it. The view draws your hull beside your
+satellite inventory, with the tool cards underneath. Choose Equip to launch one stored satellite for
+temporary nearby asteroid identification. The inventory displays its remaining
+lifetime, derived from health. Surveyor offers Mineral Scan and Survey Probe;
+near a dark street foundation, E becomes Build instead of the equipped tool.
+The probe fires along your heading and attaches a shared scanning beacon to a rock.
+Hauler has three utility cards and a looping tool animation;
+selecting a utility card equips that tool immediately. Boost Coupling uses E to arm
+and lock the asteroid thrust heading, then E again to ignite an ordinary rock.
+A colossal deposit stays latched until two couplings are armed; E before that
+crew is ready does not ignite. Its touch button
+changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
 
 ## Town store
 
-Inside Town Square, B opens the store. The Buy button spends score for one extra life, up to the life cap. A refused purchase spends nothing.
+Near Town Square, E and the ability button become Enter store while you are
+alive and inside its radius. Kit scan, probe, and idle Hauler tools stay
+unavailable until you leave. A Hauler that is already hooked keeps Release or
+Ignite on E and the ability button so tow chrome wins over Enter store; B also
+stays closed while hooked. B otherwise opens or closes the store on a keyboard.
+Opening the store closes the map and schematic, holds the ship, and blocks
+firing. An extra life costs 1,000 score, up to 6 lives including the three a
+flight starts with. Buying another life at that cap spends nothing. A purchase
+outside the radius, while the ship is destroyed, or without enough score spends
+nothing and explains why. The store also shows how much your own built streets
+add to your furnace deliveries.
 
 ## Map
 
-M opens the universe map on your ship. Drag to pan and scroll to zoom. M or Close returns you to flight.
+Press M or use the on-screen Map button to open the full-screen universe map.
+It opens centered on your ship, showing 5,000 units across so nearby landmarks
+are easy to distinguish. Drag to pan and use the scroll wheel or the +/− controls
+on the map to zoom, including all the way out to the whole world. The locate
+control on the map restores the nearby view centered on your ship; Home does the
+same when a keyboard is attached. Your ship and crew draw as their actual hull
+silhouettes, matching the kit in flight. The shared exploration chart and
+discovered assets persist; each opening returns to your current location.
+On a keyboard, M, Escape, or Close returns to flight. On touch, Map and Close
+do not show keyboard badges; use those buttons instead.
 
 ## Touch
 
-Touch and hold the playfield to steer, and tap to fire. Boost, Store, and the ability button match Shift, B, and E. Hold your own hull to open the schematic.
+Touch and hold the playfield to steer toward your finger. Drag to change
+direction; release and the ship keeps thrusting along its attained heading.
+Resting near the center of the hull keeps the current heading, so tiny finger
+movements cannot whip the ship around. Watch the arrow ahead of the hull when
+your finger covers the ship. A quick one-finger tap fires once on release. While holding
+one finger to steer, tap anywhere on the playfield with another finger to fire
+immediately, or hold that second finger for continuous fire until it is lifted.
+If the browser drops a held finger without a release, the next single-finger
+drag steers again instead of only firing, including when that finger lands
+near the last heading. A second finger that is still down keeps firing.
+Taps and holds on the playfield, HUD, and action buttons do not highlight text
+or open copy-paste banners; those gestures steer, fire, or activate the button.
+Nickname and other form fields on the title screen still accept typing and
+selection.
+Use the ability button for the same action as E, including Enter store at Town
+Square. Use the Inventory button for the same ship view as V. Collecting a
+satellite shows a short label above the ship that says the equipment is in
+your inventory and to tap Inventory to equip, then the label fades. Use the
+Boost button at the
+bottom of the screen for the same action as Shift: tap once to start boosting,
+tap again to stop. The action buttons do not steer the ship or create a pending
+playfield tap shot.

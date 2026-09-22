@@ -9,27 +9,28 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | ID | Category | Coverage |
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, saved score, brief-disconnect return |
-| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, desktop Schematic button, first-join hold-to-equip hint, Town Square store, and map/schematic/store hold with blink on return |
-| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, moving probe beacons, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, and double metal mining damage |
+| controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, Inventory button on desktop and touch, satellite-pickup label pointing at Inventory, Town Square store, and map/schematic/store hold with blink on return |
+| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named street furnaces paid with personal score, scattered street lots, right-angle fire trails only after a street is lit, a personal delivery bonus per street built, nest keep-out, moving probe beacons, and delivery tags |
+| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the street is lit, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, sparse resource nests (a web lasts until its guarded resource is collected or moved), value-scaled guard groups, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
-| teamwork | Systems | One shared crew, scan-to-tow furnace loop, shared furnace delivery, Town Square extra lives, harvested ground that stays empty and flyable, and persistent exploration |
-| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
+| teamwork | Systems | One shared crew, scan-to-tow furnace loop, personal delivery yield, Town Square store, scattered street lots with right-angle fire trails only after a street is lit, harvested ground that stays empty and flyable, and persistent exploration |
+| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, right-angle furnace fire trails only after a street is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
 ## Coverage matrix
 
 | Player question | Article | Primary source families |
 | --- | --- | --- |
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
-| How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicJoinHint.ts, haulerUtility.ts, shipAbilities.ts |
+| How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicEquipHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
 | How do I buy an extra life at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyExtraLife, town store tests |
 | How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
-| How does Mineral Scan repel spiders? | surveyor, terrain | GameEngine.ts, TerrainSpiderManager.ts, and scan-defense tests |
+| How do I build furnaces and repel spiders? | surveyor, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, nest keep-out, and scan-defense tests |
+| Can I clear a spider nest by building a furnace on it? | surveyor, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS keep-out, furnace construction tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
@@ -113,8 +114,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   exploration reaches 260; the chart persists and is shared by every pilot.
   The local minimap follows the nearby radar, while M or the on-screen Map
   button opens a full-screen universe overview. Pilots stay readable;
-  discovered furnace and other important asset markers remain visible on the
-  overview while uncharted asteroid, loot, and furnace positions remain hidden.
+  Street furnaces and dark foundations stay marked on the overview before that
+  ground is explored. A fire trail appears only after that street is lit.
+  Uncharted asteroid and loot positions remain hidden.
 - Hauler mining damage is doubled for metal asteroids, cooperative large rocks,
   and colossal deposits;
   normal asteroid mining damage remains configured per material. Large ice

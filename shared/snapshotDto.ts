@@ -20,10 +20,10 @@ import type {
   ShipKitId,
   SnapshotCollabTag,
   SpiderFieldState,
-  SurveyorUtilityId,
   TerrainSpider,
 } from '../shared-types';
 import { validExploration } from './exploration';
+import { validCivicModules } from './furnaces';
 import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
@@ -56,17 +56,9 @@ const haulerUtility = enumeration<HaulerUtilityId>({
   boost_coupling: true,
   tow_cable: true,
 });
-/**
- * Retired street tool. Older servers still send it, and the decoder keeps it
- * so a later clear matches. Play treats it as mineral scan.
- */
-const RETIRED_SURVEYOR_UTILITY = 'build_furnace';
+// `build_furnace` is a retired equip token. Older clients may still send it.
 const surveyorUtility: Rule = (value) =>
-  value === RETIRED_SURVEYOR_UTILITY ||
-  enumeration<SurveyorUtilityId>({
-    mineral_scan: true,
-    survey_probe: true,
-  })(value);
+  value === 'mineral_scan' || value === 'survey_probe' || value === 'build_furnace';
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,
@@ -232,7 +224,7 @@ const collabTag = shape<SnapshotCollabTag>({
 });
 const mapAsset = shape<MapAsset>({
   id: string,
-  kind: choice('furnace', 'laserCore', 'wreckage', 'satellite', 'foundation'),
+  kind: choice('furnace', 'foundation', 'laserCore', 'wreckage', 'satellite'),
   position,
   name: string,
 });
@@ -290,6 +282,7 @@ const spiderField = shape<SpiderFieldState>({
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
+  civicModules: optional(validCivicModules),
   spiderField: optional(spiderField),
   exploration: validExploration,
   mapAssets: array(mapAsset),

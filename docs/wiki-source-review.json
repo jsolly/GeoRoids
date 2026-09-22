@@ -1,5 +1,5 @@
 {
-  "note": "Inward parent-lot wording after scatter; min-bend fire trails; index parents intentional.",
+  "note": "Inward parent-lot wording after scatter; min-bend fire trails with bend/span lock; index parents intentional.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -419,7 +419,7 @@
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts": "sha256:08663b16895bc882b5bf984d4471083076ef0fc52d2f201b64945a6b73e274f4",
     "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts": "sha256:cba5ca0bfcea25908e389590ea3de7e00ee089f96c61e62ecc78b296d8c692dc",
     "tests/unit/shared/crewSpawn.test.ts": "sha256:66765c476129c84bde5a0c8e43590083a3a76966b055f8fb36cdb3b45b1d02d8",
-    "tests/unit/shared/furnaces.test.ts": "sha256:6b36c023da513f47a71a13613f3286621939dd32d8bb746c5cc8312ea6011e11",
+    "tests/unit/shared/furnaces.test.ts": "sha256:b7cb5013e7668769e9f335da07602faee4c5b957e9458dbe902be2caee985776",
     "tests/unit/shared/surveyors-reveal-more-shared-map-than-haulers.test.ts": "sha256:d1f4b03ddc100ffa3738864dd723a70fd8bc022b92e9c411beefa3695e839848",
     "tests/unit/systems/contourLaser.test.ts": "sha256:22d1c84ba91d08cbca213c0b69d683d147087e07cf3358b2aa0621487ff4ef5f",
     "tests/unit/systems/hudReadability.test.ts": "sha256:2917e6854f757082d0b5698554a7c7202191b2e6a49f66c3a4358937f0e17ac9",

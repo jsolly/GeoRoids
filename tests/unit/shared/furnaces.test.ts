@@ -225,6 +225,39 @@ function distanceToSegment(
   return Math.hypot(point.x - (start.x + abx * t), point.y - (start.y + aby * t));
 }
 
+function hopBend(hop: readonly { x: number; y: number }[]): number {
+  if (hop.length < 2) {
+    return 0;
+  }
+  const from = hop[0];
+  const to = hop[hop.length - 1];
+  if (!from || !to) {
+    return 0;
+  }
+  return hop
+    .slice(1, -1)
+    .reduce((best, point) => Math.max(best, distanceToSegment(point, from, to)), 0);
+}
+
+test('a street pipe prefers the shorter clear bend toward its parent', () => {
+  for (const lot of CIVIC_LOTS) {
+    const hop = pipeHopToParent(lot.id);
+    const from = hop[0];
+    const to = hop[hop.length - 1];
+    if (!from || !to) {
+      continue;
+    }
+    const spanX = Math.abs(to.x - from.x);
+    const spanY = Math.abs(to.y - from.y);
+    if (spanX < 1 || spanY < 1) {
+      continue;
+    }
+    // Max-bend selection among the same clear candidates exceeds half the span;
+    // min-bend stays at or below it for every current lot.
+    expect(hopBend(hop)).toBeLessThanOrEqual(0.5 * Math.max(spanX, spanY));
+  }
+});
+
 test('a street pipe stays outside every other grate', () => {
   const grates = [TOWN_HEARTH, ...CIVIC_LOTS];
   for (const lot of CIVIC_LOTS) {

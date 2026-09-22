@@ -1,5 +1,5 @@
 {
-  "note": "Scatter streets plus field-manual scroll memory; source review regenerated after merging main.",
+  "note": "Radar keeps a nearby street on its true side after scattered lots and scroll memory landed.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -254,7 +254,7 @@
     "src/rendering/hud/hudLayout.ts": "sha256:05136ac7907c2e1aa80d9dfda7e1f5cc1f43e388ddaf12b67e58da54ceaedc11",
     "src/rendering/hud/leaderboard.ts": "sha256:9b11db76cc6635998907bccc4a9f388aa458beb8d3d7c07bb51ff39bfa9e1b47",
     "src/rendering/hud/lives.ts": "sha256:c3a720b506376823b62344d8a2e094ddceae8477d1cb302dc188e16811c3238f",
-    "src/rendering/hud/minimap.ts": "sha256:a8bed4a8cef9010a0936eef5f20f1bc6aa359442a47c8ac48bd84c3d66b412d8",
+    "src/rendering/hud/minimap.ts": "sha256:c48bf33cb5112cf29499f7f719735c1125e5f8be486273d140b9f32107ab448e",
     "src/rendering/hud/resourceMapMark.ts": "sha256:3a6ced471b85870c9a1c16cd802743c36006f4531ceff409ed06d0e484a5f1df",
     "src/rendering/playfieldCamera.ts": "sha256:57f526c939e5e78115e92dc5548bf57a0f94f5c2873fe2884ff4e574bf772e1f",
     "src/rendering/renderError.ts": "sha256:426004f76c64f1e368bad54c746a8799c7bc7044a701717a5bb083f3b4c94a99",

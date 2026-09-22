@@ -31,6 +31,13 @@ off skips loading effect files. When you enable effects, they become
 available as they load; missed sounds do not play later. On phones, lifting
 your finger after a tap retries blocked audio startup. Copy Diagnostics includes
 audio context state and music loading/playback state if sound remains silent.
+If sound stops, use **Restart audio** below the title settings or above Boost
+during play. It restarts sound and music without rejoining or changing your
+preferences. **Audio restart requested** confirms the request; it cannot confirm
+what comes out of your speakers. If both audio checkboxes are off, enable Sound
+Effects or Music on the title screen first. A stalled audio clock can also trigger
+a restart on your next tap. If audio is still silent, check the device's volume
+and output destination, such as Bluetooth headphones.
 The Haptics checkbox stays off until you turn it on, and this browser remembers
 that choice. With Haptics on, your own shots, hull hits, deaths, Boost starts,
 kit abilities, pickups, and furnace deliveries buzz the device. Crew action

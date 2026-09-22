@@ -15,6 +15,7 @@ export async function installAudioProbe(
         rate: number;
         loop: boolean;
         bufferId: number;
+        contextId: number;
         position?: { x: number; z: number; model: string; rolloff: number };
       }> = [];
       const connections = new WeakMap<AudioNode, AudioNode>();
@@ -50,6 +51,8 @@ export async function installAudioProbe(
       const buffers = new WeakMap<AudioBuffer, number>();
       let nextBufferId = 0;
       let contexts = 0;
+      const contextIds = new WeakMap<BaseAudioContext, number>();
+      const contextStates: AudioContextState[] = [];
       let media = 0;
       let decoded = 0;
       const activeTones = new Set<OscillatorNode>();
@@ -63,6 +66,10 @@ export async function installAudioProbe(
           [...active].filter((node) => node.loop).length
         );
         document.documentElement.dataset['audioContexts'] = String(contexts);
+        document.documentElement.dataset['audioContextStates'] = JSON.stringify(contextStates);
+        document.documentElement.dataset['activeLoopContexts'] = JSON.stringify(
+          [...active].filter((node) => node.loop).map((node) => contextIds.get(node.context))
+        );
         document.documentElement.dataset['audioMedia'] = String(media);
         document.documentElement.dataset['decodedAudio'] = String(decoded);
         document.documentElement.dataset['activeTones'] = String(activeTones.size);
@@ -76,11 +83,29 @@ export async function installAudioProbe(
       };
       const NativeContext = window.AudioContext;
       window.AudioContext = class extends NativeContext {
+        private frozenTime: number | null = null;
+
+        override get currentTime(): number {
+          if (
+            document.documentElement.dataset['freezeAudioContext'] === String(contextIds.get(this))
+          ) {
+            this.frozenTime ??= super.currentTime;
+            return this.frozenTime;
+          }
+          return super.currentTime;
+        }
+
         constructor(options?: AudioContextOptions) {
           super(options);
           contexts++;
+          const id = contexts;
+          contextIds.set(this, id);
           const publishState = () => {
-            document.documentElement.dataset['audioContextState'] = this.state;
+            contextStates[id - 1] = this.state;
+            if (id === contexts) {
+              document.documentElement.dataset['audioContextState'] = this.state;
+            }
+            publish();
           };
           this.addEventListener('statechange', publishState);
           publishState();
@@ -190,6 +215,7 @@ export async function installAudioProbe(
         }
         const event: (typeof events)[number] = {
           bufferId: this.buffer ? (buffers.get(this.buffer) ?? 0) : 0,
+          contextId: contextIds.get(this.context) ?? 0,
           duration: this.buffer?.duration ?? 0,
           rate: this.playbackRate.value,
           loop: this.loop,

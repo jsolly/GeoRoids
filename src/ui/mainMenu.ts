@@ -1,6 +1,7 @@
-import { activateAudio } from '../audio/audioRuntime';
+import { activateAudio, restartAudio } from '../audio/audioRuntime';
 import { setMusic } from '../audio/musicBeds';
 import { setSound } from '../audio/Sound';
+import { musicIsOn, soundIsOn } from '../constants/user-preferences';
 import { GameController } from '../core/gameController';
 import { hapticsApiAvailable, setHaptics, syncHapticsControl } from '../fx/haptics';
 import { readStoredResumeName } from '../network/services/resumeCredential';
@@ -204,6 +205,32 @@ attachEventListener(musicCheckBox, 'change', (ev) => {
   const target = ev.target as HTMLInputElement;
   setMusic(target.checked);
 });
+
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-audio-restart]')) {
+  button.addEventListener('click', (event) => {
+    const requested = restartAudio();
+    const status = button.parentElement?.querySelector('.audio-status');
+    if (status) {
+      status.textContent = requested
+        ? 'Audio restart requested'
+        : !soundIsOn() && !musicIsOn()
+          ? 'Enable Sound Effects or Music first'
+          : 'Audio restart unavailable. Try again.';
+    }
+    if (event.detail > 0) {
+      // Pointer users return to flight controls; keyboard users keep their focus.
+      button.blur();
+    }
+  });
+  for (const type of ['keydown', 'keyup']) {
+    button.addEventListener(type, (event) => {
+      if (event instanceof KeyboardEvent && (event.code === 'Space' || event.code === 'Enter')) {
+        // Keep native keyboard activation without also firing the ship.
+        event.stopPropagation();
+      }
+    });
+  }
+}
 
 syncHapticsControl();
 attachEventListener(hapticsCheckBox, 'change', (ev) => {

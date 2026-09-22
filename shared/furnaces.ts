@@ -174,6 +174,20 @@ export function civicLot(id: string): CivicLot | undefined {
   return LOT_BY_ID.get(id);
 }
 
+/** Nearest street lot whose center is within `reach` world units. */
+export function civicLotWithin(position: Position, reach: number): CivicLot | undefined {
+  let found: CivicLot | undefined;
+  let best = reach;
+  for (const lot of CIVIC_LOTS) {
+    const distance = Math.hypot(position.x - lot.position.x, position.y - lot.position.y);
+    if (distance <= best) {
+      found = lot;
+      best = distance;
+    }
+  }
+  return found;
+}
+
 /** The dark or lit foundation whose grate contains this point, if any. */
 export function civicLotAt(position: Position): CivicLot | undefined {
   let found: CivicLot | undefined;

@@ -113,8 +113,9 @@ on the ring around Town Square. A brief return keeps the same ship, and death
 respawns beside the nearest lit hearth. The local radar and universe map keep explored
 cells visible, and the universe map still draws its alignment grid.
 
-Surveyors can equip [Build](/wiki/#surveyor) to light the street foundation they
-are standing in. The nearer lot on that road must already be burning, and that
+Surveyors light a [street foundation](/wiki/#surveyor) by standing near a dark
+lot so E becomes Build, then standing inside the grate and pressing E.
+The nearer lot on that road must already be burning, and that
 Surveyor's own score must cover the cost. The furnace takes their name. They
 cannot build a hearth whose spider occupancy covers an existing nest. Every
 crew member can use the sites. Built furnaces survive reconnects and server

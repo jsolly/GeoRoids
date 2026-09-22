@@ -58,7 +58,6 @@ function surveyor(engine: GameEngine, id = 'scout', socket = new RecordingSocket
   actor.asteroidInteractions = 1;
   const pilot = engine.registerPilot(actor, socket);
   assert(pilot.ok);
-  engine.setSurveyorUtility(id, 'build_furnace');
   actor.abilityCooldownFrames = 0;
   return { actor, socket, token: pilot.resumeToken };
 }
@@ -118,7 +117,11 @@ test('a Surveyor builds only the street foundation they are standing in and pays
   expect(scout.actor.score).toBe(0);
   expect(scout.actor.abilityCooldownFrames).toBe(0);
   scout.actor.score = street.cost;
-  scout.actor.position = { x: 2_200, y: 2_200 };
+  // Inside approach range of a dark lot, but outside the grate — Build is offered and refuses.
+  scout.actor.position = {
+    x: street.position.x + FURNACE_BUILD.RADIUS + 40,
+    y: street.position.y,
+  };
   expect(engine.useAbility(scout.actor.id)).toBe(false);
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.STAND);
   expect(scout.actor.score).toBe(street.cost);
@@ -141,8 +144,10 @@ test('a Surveyor builds only the street foundation they are standing in and pays
   });
   expect(scout.actor.abilityCooldownFrames).toBeGreaterThan(0);
   scout.actor.abilityCooldownFrames = 0;
-  expect(engine.useAbility(scout.actor.id)).toBe(false);
+  // Lit lot: E returns to Mineral Scan; Build is no longer offered here.
   expect(engine.furnaceBuildIssue(scout.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
+  expect(engine.useAbility(scout.actor.id)).toBe(true);
+  expect(scout.actor.abilityActiveFrames).toBeGreaterThan(0);
   expect(scout.actor.score).toBe(0);
   validateSnapshotDto({ ...engine.getGameState(), collabTags: [], playerProjectiles: [] });
 });
@@ -162,7 +167,7 @@ test('a dead ship, a cooldown, and the wrong kit spend neither score nor a stree
   expect(engine.getGameState().civicModules).toEqual([]);
   expect(actor.score).toBe(street.cost);
   const hauler = engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), undefined, 'hauler');
-  expect(engine.setSurveyorUtility(hauler.id, 'build_furnace')).toBe(false);
+  expect(engine.setSurveyorUtility(hauler.id, 'mineral_scan')).toBe(false);
 });
 
 test('a named street and the builder leftover score survive a SQLite restart', () => {
@@ -198,11 +203,10 @@ test('a named street and the builder leftover score survive a SQLite restart', (
           name: civicModuleName('scout', street.name),
         })
       );
-      restarted.setSurveyorUtility(resumed.actor.id, 'build_furnace');
       resumed.actor.position = { ...street.position };
       resumed.actor.abilityCooldownFrames = 0;
-      expect(restarted.useAbility(resumed.actor.id)).toBe(false);
       expect(restarted.furnaceBuildIssue(resumed.actor.id)).toBe(FURNACE_BUILD.ISSUE.LIT);
+      expect(restarted.useAbility(resumed.actor.id)).toBe(true);
       expect(resumed.actor.score).toBe(leftover);
     } finally {
       secondStore.close();

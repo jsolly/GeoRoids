@@ -28,7 +28,6 @@ import {
   surveyorUtilityOf,
 } from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
-import { drawFurnaceArtwork } from '../rendering/furnaceRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { renderSatelliteInventory, satelliteInventoryDescription } from './satelliteInventory';
@@ -621,12 +620,8 @@ function drawToolLoop(
     strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'surveyor');
     ctx.shadowBlur = 0;
     ctx.strokeStyle = PALETTE.HUD_MUTED;
-    if (selectedSurveyorUtility !== 'build_furnace') {
-      drawDemoAsteroid(ctx, rockX, rockY, 13, now / 900);
-    }
-    if (selectedSurveyorUtility === 'build_furnace') {
-      drawFurnaceArtwork(ctx, width * 0.7, midY, 20, now);
-    } else if (selectedSurveyorUtility === 'mineral_scan') {
+    drawDemoAsteroid(ctx, rockX, rockY, 13, now / 900);
+    if (selectedSurveyorUtility === 'mineral_scan') {
       ctx.strokeStyle = PALETTE.LOOT;
       ctx.globalAlpha = 0.35 + pulse * 0.45;
       for (const ring of [14, 23, 32]) {

@@ -45,9 +45,11 @@ latch. Reconnection uses authoritative attachment state and never replays an
 ability request.
 
 Surveyor snapshots include optional `surveyorUtility` (`mineral_scan` or
-`survey_probe`; missing means mineral scan). `setSurveyorUtility` accepts only
-the socket owner's Surveyor ID and a valid `utilityId`. `useAbility` launches
-the selected tool; clients never submit a probe pose, target, health, or expiry.
+`survey_probe`; missing means mineral scan). Retired wire token `build_furnace`
+still decodes and readers map it to mineral scan; `setSurveyorUtility` rejects
+it. Near a dark street lot within approach range, `useAbility` builds that
+street instead of launching the equipped scan or probe. Clients never submit a
+probe pose, target, health, or expiry.
 An asteroid's optional `probe` stores its beacon ID, owner, health, maximum
 health, attachment and expiry times in epoch milliseconds, and its local angle
 and radial offset. The client derives the moving beacon pose from the host.

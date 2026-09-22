@@ -1118,8 +1118,47 @@
     pointer-events: none;
   }
 
-  body.in-play.debug-on .debug-play-stack {
+  body.in-play .debug-play-stack {
     display: flex;
+  }
+
+  .audio-restart {
+    min-height: 44px;
+    padding: 0.4rem 0.65rem;
+    color: var(--palette-accent, #a78bfa);
+    font:
+      600 0.7rem / 1.3 "Courier New",
+      ui-monospace,
+      monospace;
+    background: var(--palette-bg, #000011);
+    border: 1px solid color-mix(in srgb, var(--palette-accent, #a78bfa) 55%, transparent);
+    border-radius: 4px;
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+
+  .audio-restart:hover,
+  .audio-restart:focus-visible {
+    color: var(--palette-hud, #e2e8f0);
+    border-color: currentColor;
+  }
+
+  .audio-status {
+    max-width: 240px;
+    margin: 0.3rem 0 0;
+    padding: 0.25rem;
+    color: var(--palette-hud, #e2e8f0);
+    font:
+      0.65rem / 1.35 "Courier New",
+      ui-monospace,
+      monospace;
+    background: var(--palette-bg, #000011);
+  }
+
+  .audio-status:empty {
+    margin: 0;
+    padding: 0;
+    background: transparent;
   }
 
   .debug-diagnostics-copy,
@@ -1573,7 +1612,7 @@
   body.touch-play #gameArea {
     --action-left: max(12px, env(safe-area-inset-left));
     --action-right: max(12px, env(safe-area-inset-right));
-    --action-width: calc((100% - var(--action-left) - var(--action-right) - 18px) / 4);
+    --action-width: calc((100vw - var(--action-left) - var(--action-right) - 18px) / 4);
   }
 
   body.touch-play .ship-schematic-toggle,
@@ -1608,23 +1647,37 @@
 
   body.in-play.touch-play .debug-play-stack {
     top: var(--mobile-controls-top);
-    left: calc(var(--action-left) + (var(--action-width) + 6px) * 2);
-    width: var(--action-width);
-    right: auto;
+    left: var(--action-left);
+    right: var(--action-right);
     bottom: auto;
+    max-width: none;
     align-items: flex-end;
     z-index: 26;
   }
 
-  body.touch-play .debug-hud-toggle {
+  body.touch-play #audio-recovery-play {
+    position: absolute;
+    top: 104px;
+    left: 0;
+    width: 120px;
+  }
+
+  body.touch-play #audio-recovery-play .audio-restart,
+  body.touch-play #audio-recovery-play .audio-status {
+    box-sizing: border-box;
     width: 100%;
+  }
+
+  body.touch-play .debug-hud-toggle {
+    width: var(--action-width);
+    margin-right: calc(var(--action-width) + 6px);
   }
 
   body.touch-play .debug-hud {
     position: absolute;
     top: 104px;
-    right: calc(-1 * (var(--action-width) + 6px));
-    width: 240px;
+    right: 0;
+    width: min(240px, calc(100% - 128px));
     max-width: calc(100vw - 24px);
   }
 
@@ -1640,6 +1693,18 @@
 
   body.touch-play .touch-ability {
     left: calc(var(--action-left) + (var(--action-width) + 6px) * 3);
+  }
+
+  @media (min-width: 600px) {
+    body.touch-play #audio-recovery-play {
+      top: 50px;
+      left: 0;
+    }
+
+    body.touch-play .touch-boost {
+      left: calc(var(--action-left) + 128px);
+      width: calc(100% - var(--action-left) - var(--action-right) - 128px);
+    }
   }
 
   .touch-controls.is-desktop .touch-ability {

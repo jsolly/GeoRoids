@@ -11,6 +11,13 @@ let resuming: Promise<void> | undefined;
 let suspending: Promise<void> | undefined;
 let needsPlaybackRestart = false;
 let musicBedsRegistered = false;
+let listenersInstalled = false;
+let clockTimer: ReturnType<typeof setInterval> | undefined;
+let clockSample: { time: number; observedAt: number } | undefined;
+let clockProgress: 'not-observed' | 'advancing' | 'stalled' = 'not-observed';
+let contextRestarts = 0;
+let lastRestartReason: 'manual' | 'stalled-clock' | null = null;
+const resetHooks = new Set<() => void>();
 const sfxInitializers = new Set<(audio: AudioLibrary) => void>();
 const musicInitializers = new Set<(audio: AudioLibrary) => void>();
 const sfxStopHooks = new Set<() => void>();
@@ -98,6 +105,38 @@ function restartPlayback(): void {
   initializeSfx();
   initializeMusic();
   needsPlaybackRestart = false;
+  monitorClock();
+}
+
+function stopClockMonitor(): void {
+  clearInterval(clockTimer);
+  clockTimer = undefined;
+  clockSample = undefined;
+  clockProgress = 'not-observed';
+}
+
+function monitorClock(): void {
+  if (clockTimer !== undefined || !contextIsLive() || !context) {
+    return;
+  }
+  clockSample = { time: context.currentTime, observedAt: performance.now() };
+  clockTimer = setInterval(() => {
+    if (!contextIsLive() || !context || !clockSample) {
+      stopClockMonitor();
+      return;
+    }
+    const now = performance.now();
+    if (context.currentTime > clockSample.time) {
+      clockSample = { time: context.currentTime, observedAt: now };
+      clockProgress = 'advancing';
+    } else if (now - clockSample.observedAt >= 2000 && clockProgress !== 'stalled') {
+      clockProgress = 'stalled';
+      logger.warn('SOUND', 'Audio clock stalled; next gesture will restart audio', {
+        contextState: context.state,
+        contextTime: context.currentTime,
+      });
+    }
+  }, 1000);
 }
 
 function suspend(): void {
@@ -110,14 +149,21 @@ function suspend(): void {
   ) {
     return;
   }
-  suspending = context
+  const target = context;
+  suspending = target
     .suspend()
-    .catch(handleContextControlError)
+    .catch((error: unknown) => {
+      if (context === target) {
+        handleContextControlError(error);
+      }
+    })
     .finally(() => {
-      suspending = undefined;
-      syncState();
-      if (sessionEnabled()) {
-        resume();
+      if (context === target) {
+        suspending = undefined;
+        syncState();
+        if (sessionEnabled()) {
+          resume();
+        }
       }
     });
 }
@@ -142,30 +188,46 @@ function resume(fromGesture = false): void {
     }
     return;
   }
-  const attempt = context
+  const target = context;
+  const attempt = target
     .resume()
-    .catch(handleContextControlError)
-    .finally(() => {
-      if (resuming === attempt) {
-        resuming = undefined;
+    .catch((error: unknown) => {
+      if (context === target) {
+        handleContextControlError(error);
       }
-      syncState();
-      if (!sessionEnabled()) {
-        suspend();
-      } else if (context?.state === 'running') {
-        restartPlayback();
+    })
+    .finally(() => {
+      if (context === target) {
+        if (resuming === attempt) {
+          resuming = undefined;
+        }
+        syncState();
+        if (!sessionEnabled()) {
+          suspend();
+        } else if (context.state === 'running') {
+          restartPlayback();
+        }
       }
     });
   resuming = attempt;
 }
 
-function resumeFromGesture(): void {
+function resumeFromGesture(event: Event): void {
+  // The explicit button handles its click once, after pointer/touch capture.
+  if (event.target instanceof Element && event.target.closest('[data-audio-restart]')) {
+    return;
+  }
+  if (clockProgress === 'stalled' && event.isTrusted) {
+    rebuildAudio('stalled-clock');
+    return;
+  }
   resume(true);
 }
 
 function onContextStateChange(): void {
   syncState();
   if (context?.state !== 'running') {
+    stopClockMonitor();
     stopSources();
     needsPlaybackRestart = true;
     if (!sessionEnabled()) {
@@ -185,6 +247,7 @@ function onContextStateChange(): void {
 }
 
 function onVisibilityChange(): void {
+  stopClockMonitor();
   if (sessionEnabled()) {
     library?.Howler.mute(false);
     resume();
@@ -219,6 +282,65 @@ function contextIsLive(): boolean {
   return sessionEnabled() && context?.state === 'running';
 }
 
+function bindLibraryContext(): void {
+  if (!library || !context || library.Howler.ctx === context) {
+    return;
+  }
+  library.Howler.masterGain?.disconnect();
+  library.Howler.ctx = context;
+  library.Howler.masterGain = context.createGain();
+  library.Howler.masterGain.connect(context.destination);
+  syncState();
+}
+
+function rebuildAudio(reason: 'manual' | 'stalled-clock'): boolean {
+  if (!sessionEnabled() || typeof AudioContext === 'undefined') {
+    return false;
+  }
+  const previous = context;
+  stopClockMonitor();
+  stopSources();
+  // Remove Howler listeners before unloading, so discarded beds cannot restart.
+  for (const reset of resetHooks) {
+    reset();
+  }
+  previous?.removeEventListener('statechange', onContextStateChange);
+  context = undefined;
+  resuming = undefined;
+  suspending = undefined;
+  needsPlaybackRestart = false;
+  if (previous && previous.state !== 'closed') {
+    void previous.close().catch((error: unknown) => {
+      logger.warn('SOUND', 'Previous audio context failed to close', {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+  contextRestarts++;
+  lastRestartReason = reason;
+  // Keep creation and resume inside the trusted gesture, without awaiting close.
+  activateAudio();
+  logger.info('SOUND', 'Audio context restart requested', { reason, contextRestarts });
+  return context !== undefined;
+}
+
+/** User-requested recovery also covers silent output while the clock advances. */
+export function restartAudio(): boolean {
+  return rebuildAudio('manual');
+}
+
+/** Retire Howler's transport as well as its sources before replacing a sound. */
+export function disposeAudioSound(sound: Howl): void {
+  sound.off();
+  sound.unload();
+  // Howler 2.2.4 leaves XHRs alive after unload. Its late onerror otherwise
+  // deletes the shared URL buffer cache and reloads the discarded Howl as HTML
+  // media. Disable that fallback only after unload has cleaned Web Audio nodes.
+  if ('_webAudio' in sound) {
+    sound._webAudio = false;
+  }
+}
+
 /** Music beds register here so SFX-only tests never open a music session. */
 export function registerMusicBedAvailability(available: boolean): void {
   musicBedsRegistered = available;
@@ -237,10 +359,13 @@ export function activateAudio(): void {
       // Creating/resuming before the dynamic import preserves iOS user activation.
       context = new AudioContext();
       context.addEventListener('statechange', onContextStateChange);
-      document.addEventListener('visibilitychange', onVisibilityChange);
-      document.addEventListener('pointerdown', resumeFromGesture, true);
-      document.addEventListener('touchend', resumeFromGesture, true);
-      document.addEventListener('keydown', resumeFromGesture, true);
+      if (!listenersInstalled) {
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        document.addEventListener('pointerdown', resumeFromGesture, true);
+        document.addEventListener('touchend', resumeFromGesture, true);
+        document.addEventListener('keydown', resumeFromGesture, true);
+        listenersInstalled = true;
+      }
       const unlock = context.createBufferSource();
       unlock.buffer = context.createBuffer(1, 1, context.sampleRate);
       unlock.connect(context.destination);
@@ -257,6 +382,7 @@ export function activateAudio(): void {
       return;
     }
   }
+  bindLibraryContext();
   resume(true);
   if (library) {
     library.Howler.mute(false);
@@ -274,10 +400,7 @@ export function activateAudio(): void {
       if (!context) {
         return;
       }
-      audio.Howler.ctx = context;
-      audio.Howler.masterGain = context.createGain();
-      audio.Howler.masterGain.connect(context.destination);
-      syncState();
+      bindLibraryContext();
       audio.Howler.mute(!sessionEnabled());
       initializeSfx();
       initializeMusic();
@@ -293,10 +416,12 @@ export function activateAudio(): void {
 
 export function registerAudioSound(
   initialize: (audio: AudioLibrary) => void,
-  stop: () => void
+  stop: () => void,
+  reset: () => void
 ): void {
   sfxInitializers.add(initialize);
   sfxStopHooks.add(stop);
+  resetHooks.add(reset);
   if (library && sfxEnabled()) {
     initialize(library);
   }
@@ -304,10 +429,12 @@ export function registerAudioSound(
 
 export function registerMusicSound(
   initialize: (audio: AudioLibrary) => void,
-  stop: () => void
+  stop: () => void,
+  reset: () => void
 ): void {
   musicInitializers.add(initialize);
   musicStopHooks.add(stop);
+  resetHooks.add(reset);
   if (library && musicEnabled()) {
     initialize(library);
   }
@@ -318,6 +445,7 @@ export function registerSoundStopHook(stop: () => void): void {
 }
 
 export function muteAudio(): void {
+  stopClockMonitor();
   stopSources();
   library?.Howler.mute(true);
   suspend();
@@ -361,6 +489,9 @@ export function readAudioDiagnostics() {
     musicEnabled: musicIsOn(),
     contextState: context?.state ?? 'not-created',
     contextTime: context?.currentTime ?? null,
+    clockProgress,
+    contextRestarts,
+    lastRestartReason,
     sampleRate: context?.sampleRate ?? null,
     libraryLoaded: library !== undefined,
     resumePending: resuming !== undefined,

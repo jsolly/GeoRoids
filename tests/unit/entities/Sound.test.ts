@@ -35,6 +35,11 @@ class FakeHowl {
     }
   }
   pos = vi.fn();
+  off = vi.fn();
+  unload = vi.fn(() => {
+    this.voices.clear();
+    this.loaded = false;
+  });
   end(id: number) {
     if (!this.options.loop) {
       this.voices.delete(id);
@@ -57,6 +62,10 @@ class FakeContext extends EventTarget {
     this.changeState('suspended');
     return Promise.resolve();
   });
+  close = vi.fn((): Promise<void> => {
+    this.changeState('closed');
+    return Promise.resolve();
+  });
   constructor() {
     super();
     FakeContext.instances.push(this);
@@ -66,7 +75,7 @@ class FakeContext extends EventTarget {
     this.dispatchEvent(new Event('statechange'));
   }
   createGain() {
-    return { connect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
+    return { connect: vi.fn(), disconnect: vi.fn(), gain: { setValueAtTime: vi.fn() } };
   }
   createBuffer() {
     return {};
@@ -79,6 +88,8 @@ class FakeContext extends EventTarget {
 let Sound: typeof import('../../../src/audio/Sound').Sound;
 let setSound: typeof import('../../../src/audio/Sound').setSound;
 let activateAudio: typeof import('../../../src/audio/audioRuntime').activateAudio;
+let restartAudio: typeof import('../../../src/audio/audioRuntime').restartAudio;
+let readAudioDiagnostics: typeof import('../../../src/audio/audioRuntime').readAudioDiagnostics;
 let logger: typeof import('../../../src/utils/Logger').logger;
 let loadLibrary = vi.fn();
 let globalAudio: { state: string; mute: ReturnType<typeof vi.fn> };
@@ -126,7 +137,9 @@ beforeEach(async () => {
   loadLibrary = vi.fn(() => ({ Howl: FakeHowl, Howler: globalAudio }));
   vi.doMock('howler', () => loadLibrary());
   ({ Sound, setSound } = await import('../../../src/audio/Sound'));
-  ({ activateAudio } = await import('../../../src/audio/audioRuntime'));
+  ({ activateAudio, restartAudio, readAudioDiagnostics } = await import(
+    '../../../src/audio/audioRuntime'
+  ));
   ({ logger } = await import('../../../src/utils/Logger'));
 });
 
@@ -139,6 +152,102 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.doUnmock('howler');
+  vi.useRealTimers();
+});
+
+test('a stalled clock ignores synthetic input and a manual restart drops old shots', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  const sound = new Sound('sounds/laser.m4a', 2);
+  setSound(true);
+  await settle();
+  sound.play();
+  const oldContext = context();
+  const oldHowl = howl();
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  // Reading diagnostics and waiting do not create a context outside a gesture.
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(FakeContext.instances).toHaveLength(1);
+  document.dispatchEvent(new Event('pointerdown'));
+  await settle();
+  expect(FakeContext.instances).toHaveLength(1);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  expect(restartAudio()).toBe(true);
+  await settle();
+  expect(oldContext.close).toHaveBeenCalledOnce();
+  expect(oldHowl.unload).toHaveBeenCalledOnce();
+  expect(oldHowl.voices.size).toBe(0);
+  expect(FakeContext.instances).toHaveLength(2);
+  const nextHowl = FakeHowl.instances[1];
+  expect(nextHowl?.play).not.toHaveBeenCalled();
+  sound.play();
+  expect(nextHowl?.play).toHaveBeenCalledOnce();
+  expect(readAudioDiagnostics()).toMatchObject({
+    contextState: 'running',
+    contextRestarts: 1,
+    lastRestartReason: 'manual',
+  });
+});
+
+test('an advancing clock and a hidden tab never trigger audio reconstruction', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  setSound(true);
+  await settle();
+  context().currentTime = 1;
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(readAudioDiagnostics().clockProgress).toBe('advancing');
+  document.dispatchEvent(new Event('pointerdown'));
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(readAudioDiagnostics().clockProgress).toBe('not-observed');
+  expect(restartAudio()).toBe(false);
+  hidden.mockReturnValue(false);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await settle();
+  document.dispatchEvent(new Event('pointerdown'));
+  expect(FakeContext.instances).toHaveLength(1);
+});
+
+test('a manual audio restart replaces silent output even when its clock is advancing and respects mute', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
+  expect(restartAudio()).toBe(false);
+  expect(FakeContext.instances).toHaveLength(0);
+  setSound(true);
+  await settle();
+  context().currentTime = 1;
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(readAudioDiagnostics().clockProgress).toBe('advancing');
+  expect(restartAudio()).toBe(true);
+  await settle();
+  expect(FakeContext.instances).toHaveLength(2);
+  expect(readAudioDiagnostics()).toMatchObject({ soundEnabled: true, lastRestartReason: 'manual' });
+  setSound(false);
+  expect(restartAudio()).toBe(false);
+  expect(FakeContext.instances).toHaveLength(2);
+});
+
+test('a discarded pending resume cannot change the replacement audio session', async () => {
+  setSound(true);
+  await settle();
+  const previous = context();
+  previous.changeState('suspended');
+  let rejectOldResume: (error: Error) => void = () => {};
+  previous.resume.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectOldResume = reject;
+      })
+  );
+  activateAudio();
+  expect(readAudioDiagnostics().resumePending).toBe(true);
+  expect(restartAudio()).toBe(true);
+  await settle();
+  const before = readAudioDiagnostics();
+  rejectOldResume(audioDeviceError());
+  await settle();
+  expect(readAudioDiagnostics()).toEqual(before);
+  expect(readAudioDiagnostics()).toMatchObject({ contextState: 'running', resumePending: false });
 });
 
 test('cold muted construction and simulation allocate no library, context or media', async () => {

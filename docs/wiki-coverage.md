@@ -45,7 +45,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | What damages me, protects me, and resets on respawn? | combat-survival, teamwork | shared/combat.ts, EntityManager.ts, GameEngine.ts, combat tests |
 | How does harvested ground stay open while the shared field continues? | teamwork, hud-network | shared/exploration.ts, shared/world.ts, shared/crewSpawn.ts, GameEngine.ts |
 | How do I read the HUD, open the universe map, and recover from a disconnect? | hud-network | src/rendering/hud/, universe map input and renderer, ConnectionManager.ts, broadcaster, snapshot protocol |
-| How do I mute sound effects or music? | hud-network | src/constants/user-preferences.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
+| How do I mute or restart sound effects and music? | hud-network | src/constants/user-preferences.ts, src/ui/mainMenu.ts, src/audio/audioRuntime.ts, src/audio/musicBeds.ts, src/audio/musicThreat.ts, src/audio/Sound.ts |
 | How do I copy a Player ID so an agent can filter Railway logs? | hud-network | src/ui/debugIdentity.ts, src/utils/clientLogContext.ts, docs/diagnostics.md |
 | How do I turn on haptics, and which phones can vibrate? | hud-network | src/fx/haptics.ts, src/ui/mainMenu.ts, src/constants/user-preferences.ts |
 

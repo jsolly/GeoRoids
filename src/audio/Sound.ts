@@ -6,6 +6,7 @@ import { setStoredItem } from '../utils/safeStorage';
 import {
   activateAudio,
   canPlayAudio,
+  disposeAudioSound,
   muteSfxKeepSession,
   registerAudioSound,
 } from './audioRuntime';
@@ -65,7 +66,13 @@ export class Sound {
         };
         this.howl ??= new audio.Howl(options);
       },
-      () => this.stop()
+      () => this.stop(),
+      () => {
+        if (this.howl) {
+          disposeAudioSound(this.howl);
+        }
+        this.howl = undefined;
+      }
     );
   }
 

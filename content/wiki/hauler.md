@@ -35,6 +35,10 @@ Ordinary towed rocks break when they hit another rock or ship, damaging other sh
 
 Press E to arm a rock toward its nearest furnace, then E again to ignite autonomous delivery; colossal deposits need two armed Haulers first. Swap tools before ignition to cancel, or lose the attachment by leaving range. Once ignited, cargo ignores hazards and tools until delivery pays its launchers and recorded scanning pilots.
 
+## Spider bites
+
+A towed spider can still bite nearby ships, including your Hauler if you double back into it. Only proximity to the spider triggers a bite; crossing the cable is safe. [Mineral Scan and safe areas](/wiki/#terrain) still protect you.
+
 ## Spider rescue
 
 Towing a living spider attracts rescuers that can bite through your cable. Bring a Scout to repel them with Mineral Scan, or reach a lit furnace to burn the captive. Releasing the spider ends its rescue call.

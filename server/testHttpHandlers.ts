@@ -297,6 +297,7 @@ export function handleTestArrangeCrewField(
         'spider-nest',
         'spider-tools',
         'spider-rescue',
+        'spider-tow-bite',
         'belt-escape',
         'belt-pursuit',
         'map-icons',
@@ -336,25 +337,30 @@ export function handleTestArrangeCrewField(
           ? { x: 0, y: 0 }
           : ['street-build', 'street-escape', 'street-travel'].includes(String(body['scenario']))
             ? { ...streetLot.position }
-            : body['scenario'] === 'spider-rescue'
-              ? { x: 4400 + index * 120, y: 2200 }
-              : body['scenario'] === 'spider-tools'
-                ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
-                : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
-                  ? { x: 3000 + index * 120, y: 5000 }
-                  : body['scenario'] === 'boundary'
-                    ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-                    : body['scenario'] === 'delivery'
-                      ? player.kitId === 'hauler'
-                        ? { x: 0, y: 550 }
-                        : { x: 220, y: 460 }
-                      : body['scenario'] === 'tow'
+            : body['scenario'] === 'spider-tow-bite'
+              ? { x: 4400, y: 2200 + index * 600 }
+              : body['scenario'] === 'spider-rescue'
+                ? { x: 4400 + index * 120, y: 2200 }
+                : body['scenario'] === 'spider-tools'
+                  ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
+                  : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
+                    ? { x: 3000 + index * 120, y: 5000 }
+                    : body['scenario'] === 'boundary'
+                      ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+                      : body['scenario'] === 'delivery'
                         ? player.kitId === 'hauler'
-                          ? { x: 0, y: -500 }
-                          : { x: 220, y: -460 }
-                        : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-                          ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                          : { x: index * 120, y: -500 };
+                          ? { x: 0, y: 550 }
+                          : { x: 220, y: 460 }
+                        : body['scenario'] === 'tow'
+                          ? player.kitId === 'hauler'
+                            ? { x: 0, y: -500 }
+                            : { x: 220, y: -460 }
+                          : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                            ? {
+                                x: -220,
+                                y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0),
+                              }
+                            : { x: index * 120, y: -500 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -368,7 +374,9 @@ export function handleTestArrangeCrewField(
       // Delivery faces screen-up, which decreases world y, from the positive-y
       // approach into Town Square. Tow uses that same heading from the
       // negative-y side so the hooked rock moves farther from the hearth.
-      player.angle = ['spider-tools', 'spider-rescue'].includes(String(body['scenario']))
+      player.angle = ['spider-tools', 'spider-rescue', 'spider-tow-bite'].includes(
+        String(body['scenario'])
+      )
         ? Math.PI
         : body['scenario'] === 'reflection' ||
             body['scenario'] === 'probe' ||
@@ -427,7 +435,12 @@ export function handleTestArrangeCrewField(
         throw new Error('Could not spawn chasing spider');
       }
     }
-    if (body['scenario'] === 'spider-rescue') {
+    if (body['scenario'] === 'spider-tow-bite') {
+      gameEngine.clearSpiderField();
+      if (!gameEngine.spawnTerrainSpider({ x: 4580, y: 2200 })) {
+        throw new Error('Spider bite fixture could not spawn its captive');
+      }
+    } else if (body['scenario'] === 'spider-rescue') {
       gameEngine.clearSpiderField();
       if (
         !gameEngine.spawnTerrainSpider({ x: 4580, y: 2200 }) ||

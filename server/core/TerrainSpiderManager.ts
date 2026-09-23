@@ -323,7 +323,9 @@ export class TerrainSpiderManager {
           x: start.x + spider.velocity.x,
           y: start.y + spider.velocity.y,
         });
-        this.consumeAtFurnace(spider, start);
+        if (!this.consumeAtFurnace(spider, start)) {
+          this.biteWhileTowed(spider, players, nowFrame, attacks);
+        }
         continue;
       }
       spider.velocity.x = 0;
@@ -694,16 +696,64 @@ export class TerrainSpiderManager {
       }
       spider.position = next;
     }
+    this.bite(spider, target, nowFrame, attacks);
+  }
+
+  /** A tow restrains movement, but ships within reach can still be bitten. */
+  private biteWhileTowed(
+    spider: RuntimeSpider,
+    players: readonly SpiderActor[],
+    nowFrame: number,
+    attacks: SpiderAttack[]
+  ): void {
+    spider.rescuing = false;
+    spider.phase = 'scuttling';
+    spider.targetId = null;
+    if (
+      !this.canOccupy(spider.position, SPIDER.HIT_RADIUS) ||
+      players.some(
+        (player) =>
+          player.scanning &&
+          distanceBetween(player.position, spider.position) <= SHIP_ABILITY.SCAN_RANGE
+      )
+    ) {
+      return;
+    }
+    const target = players
+      .filter(
+        (player) =>
+          this.canOccupy(player.position, player.radius ?? 0) &&
+          distanceBetween(player.position, spider.position) <=
+            SPIDER.BITE_DISTANCE + POSITION_EPSILON
+      )
+      .sort(
+        (a, b) =>
+          distanceBetween(a.position, spider.position) -
+            distanceBetween(b.position, spider.position) || a.id.localeCompare(b.id)
+      )[0];
+    if (!target) {
+      return;
+    }
+    spider.phase = 'hunting';
+    spider.targetId = target.id;
+    spider.angle = normalizeAngle(
+      Math.atan2(target.position.y - spider.position.y, target.position.x - spider.position.x)
+    );
+    this.bite(spider, target, nowFrame, attacks);
+  }
+
+  private bite(
+    spider: RuntimeSpider,
+    target: SpiderActor,
+    nowFrame: number,
+    attacks: SpiderAttack[]
+  ): void {
     if (
       distanceBetween(spider.position, target.position) <=
         SPIDER.BITE_DISTANCE + POSITION_EPSILON &&
       nowFrame >= spider.biteReadyAt
     ) {
-      attacks.push({
-        spiderId: spider.id,
-        targetId: target.id,
-        attackerId: 'spider',
-      });
+      attacks.push({ spiderId: spider.id, targetId: target.id, attackerId: 'spider' });
       spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
     }
   }

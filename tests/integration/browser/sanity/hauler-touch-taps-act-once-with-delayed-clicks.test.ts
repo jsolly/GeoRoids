@@ -23,9 +23,12 @@ for (const browserType of [chromium, webkit]) {
       browserType
     );
 
-    test.each([0, 250])(
-      'one Hauler tap stays hooked when its click arrives %i ms later',
-      async (delay) => {
+    test.each([
+      { firstTapDelayMs: 4100, clickDelayMs: 0 },
+      { firstTapDelayMs: 0, clickDelayMs: 250 },
+    ])(
+      'one Hauler tap after $firstTapDelayMs ms stays hooked when its click arrives $clickDelayMs ms later',
+      async ({ firstTapDelayMs, clickDelayMs }) => {
         const page = await browserManager.recreatePage({ hasTouch: true });
         await page.setViewportSize({ width: 390, height: 844 });
         const diagnostics = watchBrowserDiagnostics(page);
@@ -91,9 +94,16 @@ for (const browserType of [chromium, webkit]) {
           haulerUtility: 'tow_cable',
           waitForCombatReady: false,
         });
-        // The Hauler tows away from every furnace: the cargo must still be
-        // hooked when the release tap comes after the three-second cooldown,
-        // however slowly the browser gets there.
+        // Hold this input fixture beside its cargo. Slow WebKit taps must not
+        // let automatic cruise move the target beyond hook range beforehand.
+        await page.evaluate(() => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          if (!ship) {
+            throw new Error('Hauler input fixture has no local ship');
+          }
+          ship.thrust = 0;
+          ship.velocity = { x: 0, y: 0 };
+        });
         await arrangeCrewField([await game.getLocalPlayerId()], 'tow');
         await page.waitForFunction(() =>
           window.gameController
@@ -102,12 +112,13 @@ for (const browserType of [chromium, webkit]) {
             .some((rock) => rock.id === 'crew-fixture-ore')
         );
         const ability = page.locator('#touch-ability');
+        await page.waitForTimeout(firstTapDelayMs);
         await ability.tap();
         await expect.poll(() => targets, POLL).toEqual(['crew-fixture-ore']);
         await expect.poll(() => ability.textContent(), POLL).toBe('RELEASE');
         // Emulate the follow-up pointer click independently of the browser's tap
         // heuristic. It may arrive in a later task after the server confirms Hook.
-        await page.waitForTimeout(delay);
+        await page.waitForTimeout(clickDelayMs);
         await ability.dispatchEvent('click', { bubbles: true, detail: 1 });
         const afterHook = snapshots;
         await expect.poll(() => snapshots, POLL).toBeGreaterThan(afterHook + 4);
@@ -121,13 +132,13 @@ for (const browserType of [chromium, webkit]) {
         ).toBeGreaterThan(0);
         await page.screenshot({
           path: screenshotManager.getScreenshotPath(
-            `hauler-single-tap-${browserType.name()}-${delay}.png`
+            `hauler-single-tap-${browserType.name()}-${clickDelayMs}.png`
           ),
         });
 
         // Cover release both during cooldown and after a new hook is allowed.
         // In the latter case a duplicate request would immediately reattach.
-        if (delay > 0) {
+        if (clickDelayMs > 0) {
           await page.waitForFunction(
             () => window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames === 0
           );
@@ -135,7 +146,7 @@ for (const browserType of [chromium, webkit]) {
         }
         await ability.tap();
         await expect.poll(() => targets, POLL).toEqual(['crew-fixture-ore', null]);
-        await page.waitForTimeout(delay);
+        await page.waitForTimeout(clickDelayMs);
         await ability.dispatchEvent('click', { bubbles: true, detail: 1 });
         const afterRelease = snapshots;
         await expect.poll(() => snapshots, POLL).toBeGreaterThan(afterRelease + 4);

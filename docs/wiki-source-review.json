@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed the combined asteroid belt and central ricochet court after main integration. Map drawing and accessible location lists retain both landmarks; Terrain and source references retain both features. Server laser ordering compares crawler hits with the nearest court/world surface. Desktop/mobile pursuit, long lunges, host escape/direct kills and court bank-shot combat pass. Existing demonstrations remain accurate; independent affected ship lenses are clean.",
+  "note": "Reviewed combined belt and ricochet-court rules, map landmarks, accessible locations and laser ordering. Wiki source references retain both features; demonstrations unchanged. Desktop/mobile court combat, pursuit, long lunges, escapes and direct kills pass. Stabilized the mining fixture by holding its first pilot in map mode during teammate startup and protecting the return to mining; both mining cases now pass with unchanged assertions. Affected ship review lenses are clean.",
   "hashes": {
     ".pages.yml": "sha256:f949e654a948a6aa1bd94d7edd533d09dd4e9fb03103e6bfcc341034be75dee4",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",

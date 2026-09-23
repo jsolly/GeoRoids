@@ -72,6 +72,8 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`asteroid-belt-windup-${viewport.name}.png`),
     });
     await game.placeShipAt(home.x - 250, home.y);
+    // Hold the first pilot safely while the other client joins.
+    await page.locator('#universe-map-toggle').click();
     const second = await browserManager.createAdditionalPage();
     const secondDiagnostics = watchBrowserDiagnostics(second);
     const crewmate = new GameInteractions(second);
@@ -81,13 +83,13 @@ for (const viewport of [
       .poll(async () => (await field(second)).spiders.some((s) => s.id === crawler.id))
       .toBe(true);
     // Discover the actual belt through the server, then inspect the shared map.
-    await page.locator('#universe-map-toggle').click();
     await expect
       .poll(() => page.locator('#universe-map-locations').textContent())
       .toContain('Asteroid belt');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`asteroid-belt-map-${viewport.name}.png`),
     });
+    await game.armSpawnProtection();
     await page.locator('#universe-map-close').click();
     const hostId = crawler.crawler.hostId;
     const health = await page.evaluate(

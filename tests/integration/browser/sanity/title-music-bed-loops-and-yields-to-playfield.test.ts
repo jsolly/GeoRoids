@@ -272,7 +272,9 @@ for (const browserType of [chromium, webkit]) {
           .toBe('0');
         await page.goto(new URL('/wiki/#hud-network', page.url()).href);
         await expect.poll(() => page.locator('body').textContent()).toContain('Restart audio');
-        await page.getByText('Restart audio', { exact: true }).scrollIntoViewIfNeeded();
+        await page
+          .getByText('If sound stops, use Restart audio', { exact: false })
+          .scrollIntoViewIfNeeded();
         const wikiScreenshot = screenshotManager.getScreenshotPath(
           `audio-restart-wiki-${browserType.name()}-${viewport.name}.png`
         );

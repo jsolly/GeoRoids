@@ -12,188 +12,26 @@ related:
 media: []
 ---
 
+## Read the HUD
+
+The HUD shows lives, score, kit, ability, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. Pickup and death messages explain what just happened.
+
+## Radar and universe map
+
+The minimap shows nearby space; M or Map opens the full shared chart. Discovered furnaces appear as flames, dark street lots stay marked, and only lit streets show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
+
 ## Probe beacons
 
-A pulsing cyan ring around a rock's minimap mark identifies a live
-[Survey Probe](/wiki/#surveyor). Follow that rock to survey more of the field.
-On the playfield the small diamond has a green health bar and emits expanding
-scan rings. Amber pulses warn that its battery is nearly empty.
+A pulsing cyan radar marker identifies a live Survey Probe. Follow its moving host to find scanned minerals; amber pulses warn of a low battery.
 
-## What the HUD shows
+## Sound and haptics
 
-Before entering a game, set your pilot name, choose a kit, and use Sound
-Effects, Music, and Haptics on the title screen. Sound Effects mutes cues already
-playing; Music loops a quiet title bed and an in-game bed after Enter Game.
-In-play danger can temporarily switch to a threat bed, then the playfield
-loop returns. Music off silences every bed, including danger, without muting
-cues. This browser remembers both audio checkboxes. Starting with Sound Effects
-off skips loading effect files. When you enable effects, they become
-available as they load; missed sounds do not play later. On phones, lifting
-your finger after a tap retries blocked audio startup. Copy Diagnostics includes
-audio context state and music loading/playback state if sound remains silent.
-If sound stops, use **Restart audio** below the title settings or in the playfield
-controls. It restarts sound and music without rejoining or changing your
-preferences. **Audio restart requested** confirms the request; it cannot confirm
-what comes out of your speakers. If both audio checkboxes are off, enable Sound
-Effects or Music on the title screen first. A stalled audio clock can also trigger
-a restart on your next tap. If audio is still silent, check the device's volume
-and output destination, such as Bluetooth headphones.
-The Haptics checkbox stays off until you turn it on, and this browser remembers
-that choice. With Haptics on, your own shots, hull hits, deaths, Boost starts,
-kit abilities, pickups, and furnace deliveries buzz the device. Crew action
-around you does not. Haptics use the web Vibration API: many Android browsers
-can vibrate, while iPhone browsers cannot. If this browser has no vibration
-API, the checkbox stays off and explained, and turning it on does nothing.
-Native apps can use richer haptic engines; this web client does not wrap a native
-shell.
-
-Open Advanced and enable Debug to show this browser's Player ID and page
-session ID. The Player ID is the same `playerId` already written on join and
-motion STATE records; it appears after Enter Game confirms the ship. Copy it
-and send it to an agent so they can find this ship in production logs with
-`@playerId:` plus that value. The page session ID matches `@sessionId:` on
-forwarded client records. Debug stays off unless you turn it on; this browser
-remembers the checkbox. It does not publish your nickname or resume token.
-While Debug is on, a compact HUD stays on the playfield. Its **Copy diagnostics**
-button copies the Player ID, current ship, connection, browser, release, and
-live touch input (heading, reserved steering finger, held fire, and how many
-fingers the browser still reports) plus up to 80 recent client warnings,
-errors and state records for a bug report. It excludes private resume credentials.
-Successful copies show **Copied!** for three seconds. If copying fails, the button
-says **Copy failed**. The HUD shows live FPS, ping, snapshot age, motion epoch,
-world counts, and short client/server release IDs.
-Use **Hide HUD** during play to collapse the health overlay without turning off
-Debug. **Show HUD** brings it back. This browser remembers the HUD visibility
-separately from the Debug checkbox.
-The debug panel sits above the flight controls so Boost remains visible, and
-the kit ability button stays fully on the playfield.
-Those health lines stay on-screen only; they are not written to Railway.
-
-Sounds share a soft crystal-synth palette and a common musical key. Shots are
-short tuned plucks; asteroid destruction is a rounded impact with a gentle
-crystal tail. Resource Tap ejections play lower notes, and successive material
-pickups answer with a melody. Three quick pickups complete a short phrase;
-longer streaks vary it, and a pause starts a fresh phrase. Automatic thrust is silent. Nearby action is louder; off-screen combat
-cues stay silent. Nearby shots and asteroid breaks come from their direction
-around your ship: left/right match the screen, and up/down become front/back.
-Headphones give the clearest 3D effect; the game outputs spatial stereo rather
-than dedicated surround channels. Tow cables have attach and release cues. Orbital pickup
-and pickup-break sounds differ from ship lasers. Laser cores and
-material pickups have separate voices, as do kit abilities and respawning.
-Boost start and stop, hull damage, satellite equip, and opening or closing the
-map and schematic have quiet feedback. Furnace rewards play a short resolving
-phrase even when your contribution was made away from the delivery; game over
-has a lower closing phrase. Steering, recharge, map movement and regeneration
-stay silent. Your equipped satellite plays a soft chime once per orbit, with silence between passes; a permanent
-connection failure sounds once. Changing ships on the title screen plays a
-quiet selection note, and entering a flight plays a welcoming phrase once the
-world is ready.
-
-The HUD shows lives as kit hull icons, score, kit name, and the current ability.
-Desktop layouts include a leaderboard of every active player row and a
-local minimap; touch layouts use a compact leaderboard and an adaptive local
-minimap. The local minimap follows the ship's nearby radar: it shows your ship,
-other players, explored asteroids, loot drops, loose satellite
-pickups, and orbiting pickups. Explored ground has a pale blue tint; unexplored
-positions remain under dark fog, making the shared exploration boundary visible. Compact
-marks follow each entity's current position. A street lot or lit hearth close
-enough to hide under your hull is drawn just clear of the hull on the same
-side as the playfield, so a grate above your ship stays above it on the radar.
-Standing inside the grate still puts the mark under your ship. Destroyed or
-collected objects disappear when the shared state removes them. Asteroids use one jagged rock
-silhouette; identified minerals change its color and small surface details.
-Broken hulls mark wreckage, angular fragments mark shards, canisters mark Tap
-loot, and yellow laser emitters mark laser cores. Lilac satellites have a
-central body and solar panels; an orbit line distinguishes deployed pickups.
-Amber campfires mark discovered lit hearths. Hollow rings mark dark street lots that are already inside the local radar. The universe map marks every street lot. A fire trail appears on the minimap and the universe map only after that street is lit, and it turns at right angles back to Town Square. Red spiderwebs surround the stationary
-resources guarded by nests, even while their spiders are chasing elsewhere or
-sleeping. The web remains after the guards are killed while the resource remains;
-it disappears when that resource is collected or moved.
-The universe map uses the same symbols and also shows nearby explored rocks
-and small loot from the current local snapshot.
-Kit hull silhouettes in local and crew colors keep pilots
-identifiable above the world marks. Press
-V or the Inventory button to open the local ship view. The hull schematic
-sits beside the satellite inventory. M or use the Map button to open the full-screen universe
-map. It uses the crew's shared exploration chart and keeps discovered furnaces
-and other important assets visible across the large world, even when they are
-outside the local radar. A discovered furnace stays marked in the local radar
-while it is within that nearby view. On the universe map, furnace marks keep
-the same zoom scale as satellites, wreckage, laser cores, and ships. Zoomed out,
-they are amber flame pins; the nearby view and closer keep the three-tongue
-campfire. Death, delivery, and pickup
-messages appear in the center for 120 frames, or 2 seconds. A satellite pickup
-also draws a short label above the ship that says the equipment is in inventory
-and how to open Inventory. On touch screens,
-they sit below the top HUD so they do not cover the leaderboard. A health capsule
-appears above a damaged ship; use its remaining fill to judge hull health.
-Every active pilot stays on the leaderboard so the
-crew can see shared asteroid work and delivery points.
-
-## Display refresh rate
-
-Flight, projectiles, abilities, exploration, and HUD message timers advance at the shared
-simulation rate. A faster display does not increase ship speed or shorten
-cooldowns. After a visible stall, the client catches up only within its
-bounded simulation window; switching back from a hidden tab instead resumes
-from current server state.
-
-If your predicted flight drifts beyond the server's movement limits, your ship
-returns to its last accepted position and resumes flight there. This correction
-keeps the visible ship, shots, and asteroid impacts in the same place. A brief
-network stall that delivers up to about one second of held position reports all
-at once is not a drift, and neither is a stall in the server's own game loop:
-that stalled time is credited to your next report, those reports are accepted,
-and your ship stays where you flew it.
+The title screen has separate Sound Effects, Music, and Haptics settings, saved in this browser. Haptics require browser vibration support and are unavailable on iPhone browsers. If sound stops, use Restart audio, then check your device volume and output.
 
 ## Connection interruptions
 
-Keep the game tab up to date. If the server asks you to update the client,
-reload the page before joining again. Older game versions cannot join. The
-browser and server remember which game versions issued this tab's resume token
-and last saved its score, and when those writes happened, so a later update can
-migrate that progress instead of guessing. A score saved while you are offline
-records the server version without a client version.
+The game reconnects automatically; if it returns to the title screen, choose Enter Game. A brief interruption restores your ship, while a longer absence starts a new flight with your saved score unless you reached game over. Reload when the game requests an update.
 
-Switching away from the game releases held movement and fire controls. On
-return, the client requests current server state and resumes drawing without
-replaying the time the tab was hidden. Leaving the app, locking the phone, or a
-reconnect can also interrupt this browser's audio session. Sound Effects and
-Music stop for that interruption and start again when audio is running,
-including on the next tap if the speaker is not ready yet.
+## Diagnostics
 
-The game automatically tries to reconnect after a lost connection. During an
-interruption, the local view may lag behind the shared world; wait for the
-connection to recover before relying on a pickup or hit result. If joining
-fails or reconnect attempts are exhausted, the game returns to the title
-screen. Select Enter Game to try again. Reloading the page continues this
-browser's current score if you still have lives. A brief disconnect, including
-a quick return from the title screen, puts you back on the same ship. After
-about 30 seconds away, Enter Game starts a new flight with that score instead of
-the old location. After game over, Enter Game starts at score 0. You can change
-your nickname on the title screen before Enter Game.
-The playfield stays on the title screen until the server acknowledges join and
-sends the first world snapshot.
-
-## Surveyor scan
-
-The local minimap and full-screen universe map use one persistent shared
-exploration chart. Passive Surveyor reveal reaches 650 world units and passive
-Hauler reveal reaches 260; every crew member contributes to the same
-explored area. Pilots stay readable. Dark street lots remain marked on the
-universe map, and a lit street shows its right-angle fire trail back to Town
-Square, while uncharted asteroid and loot positions stay hidden.
-Open the universe map with M or the Map button. It starts with a nearby view
-centered on your current ship; zoom out to see distant discoveries or use the
-locate control on the map to restore the nearby scale. Ships on both the local
-radar and the chart use each pilot's hull silhouette. Close it with M, Escape, or
-the Close control.
-On touch, Map and Close hide keyboard badges.
-
-Press E or tap Scan to identify nearby asteroid minerals on every teammate's
-radar. An active scan reaches 1,200 world units around its Surveyor. All asteroid types keep the same rock outline: ice is pale cyan with a crack,
-metal is gold with parallel seams, and rubble is orange with chipped details.
-The classification remains visible for that rock while it is in the nearby
-radar, even after the active scan ends. Unscanned rocks keep a smaller slate rock outline.
-The Surveyor's scan also records its player ID on the rock for a later furnace
-delivery.
+Enable Advanced Debug for player and session IDs, frame rate, and connection health. Use Copy Diagnostics when reporting trouble, including silent audio.

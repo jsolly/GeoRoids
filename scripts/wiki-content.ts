@@ -175,7 +175,7 @@ export function readWikiArticles(root = process.cwd()): WikiArticle[] {
       category,
       summary,
       order,
-      html: `${bodyHtml}${referenceHtml ? `<aside class="game-reference" aria-label="Values from the game"><p class="eyebrow">CURRENT GAME VALUES · AUTOMATICALLY UPDATED</p>${referenceHtml}</aside>` : ''}`,
+      html: `${bodyHtml}${referenceHtml ? `<details class="game-reference"><summary>Exact values and detailed rules</summary>${referenceHtml}</details>` : ''}`,
       searchText: flattened
         .filter(
           (token) =>

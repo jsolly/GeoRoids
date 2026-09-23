@@ -1125,7 +1125,8 @@ export class GameInteractions {
 
   /** Burn through all lives until the game-over flow stops the session. */
   async dieUntilGameOver(): Promise<void> {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    const startingLives = await this.getLives();
+    for (let attempt = 0; attempt < startingLives; attempt++) {
       const lives = await this.getLives();
       if (lives <= 0 || !(await this.isGameRunning())) {
         break;

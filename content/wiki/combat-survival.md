@@ -27,12 +27,27 @@ core-powered shots multiply that damage by their energy. Loose satellite
 pickups are invulnerable and shots pass through them. Equipped satellites
 can be damaged by asteroid impacts and ricochets. Direct lasers never damage a
 crew hull. After a bounce off the arena wall or a
-reflective asteroid, the shot becomes a ricochet: it damages any live ship
+reflective asteroid or court reflector, the shot becomes a ricochet: it damages any live ship
 it then hits, including its owner, and is consumed. Bounced bolts use the
 danger color so a live ricochet is readable. Local shots appear immediately
 and stay visible while the server confirms them; the server still controls
 hits and removal.
 Shots also damage and kill terrain spiders without changing your firing limits.
+
+## Ricochet Court
+
+Meet at the Ricochet Court northeast of Town Square for informal duels. There
+is one permanent court, marked on both maps even before you explore it. Four
+angled cyan energy panels provide bank shots with open approaches between them.
+Ships fly straight through the panels without collision damage. Lasers reflect
+from either side at the same angle they arrive, keeping their speed and energy.
+The panels cannot be mined or destroyed and do not award laser cores.
+
+Aim at a panel to bank a shot toward another pilot. Direct shots still pass
+harmlessly through ships; after a bank, the shot can damage any unprotected
+hull, including your own. Existing protection, damage, lives, and respawn rules
+still apply. There is no matchmaking or separate duel score. Shots can leave
+the court through its gaps, so watch for stray ricochets when passing nearby.
 
 ## Damage and protection
 

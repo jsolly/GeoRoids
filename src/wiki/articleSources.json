@@ -253,7 +253,12 @@
     "shared/townStore.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -294,7 +299,12 @@
     "shared/townStore.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ],
   "hud-network": [
     "shared/gameClock.ts",
@@ -391,7 +401,12 @@
     "tests/unit/server/harvested-ground-stays-flyable.test.ts",
     "shared/furnaceField.ts",
     "server/core/GameEngine.ts",
-    "server/core/TerrainSpiderManager.ts"
+    "server/core/TerrainSpiderManager.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ],
   "scout": [
     "src/entities/ship/shipKits.ts",
@@ -532,6 +547,11 @@
     "shared/equipment.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ]
 }

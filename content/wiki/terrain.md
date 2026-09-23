@@ -49,6 +49,13 @@ Your ship's kit and mass still set the baseline for all of these speeds. Laser p
 do not interact with terrain; glints where shots cross contours are visual
 feedback, with no terrain reflection or extra damage.
 
+## Ricochet Court
+
+The single Ricochet Court sits northeast of Town Square and is marked on both
+maps. Its cyan energy panels reflect lasers while letting ships pass through.
+Use it as a meeting place for informal bank-shot duels. See
+[Ricochet Court combat rules](/wiki/#combat-survival) for damage and protection.
+
 ## Terrain spiders
 
 Spiders guard resource nests throughout the explored field. Each nest starts

@@ -130,6 +130,10 @@ appears above a damaged ship; use its remaining fill to judge hull health.
 Every active pilot stays on the leaderboard so the
 crew can see shared asteroid work and delivery points.
 
+The Ricochet Court northeast of Town Square is a permanent public landmark on
+both maps, visible even before exploration. Its open-corner cyan marker identifies
+the energy reflectors used for [bank-shot duels](/wiki/#combat-survival).
+
 ## Display refresh rate
 
 Flight, projectiles, abilities, exploration, and HUD message timers advance at the shared

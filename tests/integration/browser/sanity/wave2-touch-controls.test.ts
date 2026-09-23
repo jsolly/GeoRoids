@@ -19,7 +19,7 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirna
 
 const KITS = [
   { kitId: 'scout' as const, label: 'SCAN', name: 'Mineral scan' },
-  { kitId: 'hauler' as const, label: 'TAP', name: 'Harpoon' },
+  { kitId: 'hauler' as const, label: 'HOOK', name: 'Harpoon' },
 ];
 
 async function tapTouchPoint(

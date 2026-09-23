@@ -178,7 +178,7 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
       ctx.textBaseline = 'top';
       ctx.fillStyle = color;
       ctx.shadowColor = PALETTE.BG;
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur = resolveGlow(4);
       ctx.fillText(
         equipment ? EQUIPMENT[equipment].name.toUpperCase() : 'TAP CANISTER',
         screen.x,

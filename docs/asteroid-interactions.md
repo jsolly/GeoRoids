@@ -21,11 +21,22 @@ lifetime limit. Reflection follows the server's authoritative collision result;
 the client does not offer a selection-dependent path preview.
 
 Direct crew shots leave every crew ship unharmed, including
-the shooter. After a bounce off a wall or reflective face, the same shot
+the shooter. After a bounce off a wall, reflective face, or court panel, the same shot
 becomes a ricochet that damages any hull it then hits and is consumed. A broken reflector leaves one laser core: collect
 it for 150 points and six stronger shots, usable for 60 seconds. The upgrade
 expires on death. Shots, damage, charge use, and collection belong to the shared
 world, so reconnecting does not replay rewards.
+
+## Ricochet Court
+
+One permanent court northeast of Town Square uses the fixed segments in
+`shared/ricochetCourt.ts`. Client prediction and authoritative lasers query the
+same swept geometry through `shared/laserSurface.ts`, selecting the nearest
+surface before resolving other hits. The panels reflect from either side
+without changing shot energy or speed. They never participate in ship or
+asteroid collision and require no persistent records or protocol additions.
+The court is a public landmark on both maps; ordinary protection, ricochet
+friendly fire, bounce limits, and shot expiration still apply.
 
 ## Multiplayer protocol
 

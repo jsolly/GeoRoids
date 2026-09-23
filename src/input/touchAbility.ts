@@ -53,7 +53,7 @@ function scoutOffersBuild(host: AbilityChromeHost): boolean {
   );
 }
 
-/** Near Town Square, E / the ability button become Enter store for any kit. */
+/** Inside a lit furnace footprint, E and the ability button offer travel for either kit. */
 function abilityOffersTownStore(host: AbilityChromeHost): boolean {
   return (
     !host.furnaceTransit &&

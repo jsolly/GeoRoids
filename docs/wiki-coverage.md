@@ -126,7 +126,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   and server restarts, and offline pilots retain their credit.
 - Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
   never damage crew hulls. After a bounce off the arena wall or a reflective
-  asteroid, a laser becomes a ricochet: it deals the
+  asteroid or a court energy panel, a laser becomes a ricochet: it deals the
   configured laser hit times its energy to the first live hull it meets,
   including its owner, and is consumed. Asteroid impacts remain world hazards
   and remove 25 health per impact, including a towed rock that hits another ship.
@@ -183,8 +183,14 @@ and mobile checks cover locked cards, pickup-to-equip, visible glowing hardware,
 and the thicker arcade laser core without changing projectile physics.
 
 Furnace travel follows shared pipe geometry between lit destinations. E opens
-the furnace menu at either ship's nearby hearth, with Town Square retaining
+the furnace menu inside the hearth’s visible footprint, with Town Square retaining
 250-score life purchases. New flights start with five lives. Final-life loss
 clears personal score, silk, equipment, and paint, while shared furnaces remain.
 Verify server socket/proximity/destination checks, transit action suppression,
 arrival reconciliation, reconnect behavior, and desktop/mobile rocket visuals.
+
+The single Ricochet Court northeast of Town Square is covered in Combat survival,
+Terrain, Teamwork, and HUD/network. Panels reflect lasers from both sides without
+amplifying energy, let ships pass through, persist as fixed geometry, and appear
+on both maps before discovery. Duels use ordinary protection, damage and respawn
+rules; shots may escape through the gaps.

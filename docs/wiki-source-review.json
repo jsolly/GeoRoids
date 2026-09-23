@@ -1,5 +1,5 @@
 {
-  "note": "Reviewed integration with Scout salvage and furnace travel: retained belt recovery, crawler combat and persistence rules; combined snapshot validators and source references; updated terrain tools to Scout. Forty-four focused gameplay tests and five desktop/mobile browser scenarios covering two-client belt mining, pursuit, long lunges and Wiki navigation passed.",
+  "note": "Reviewed touch tap fixture correction: native browser tap replaces runner waits during contact; awaited press observer retains no-fire-before-release, firing, automatic thrust and clean diagnostics assertions. All nine touch browser scenarios passed. No player rules or demonstrations changed.",
   "hashes": {
     ".pages.yml": "sha256:a5bc4164a31fcb4a64cada6e51ad5586b9a81208ffb832c0b9a4d49430d3e84e",
     "docs/diagnostics.md": "sha256:e8005299b7aa5580308ab404fc07c3dcb644b480f9ff0715f9cefc3f98a29118",
@@ -346,7 +346,7 @@
     "tests/integration/browser/sanity/scout-radar-pulses-cover-the-viewport.test.ts": "sha256:b607833154cb0792eacf5f32ef9609e6c06ea8f7cc0aa1071306f108a0c29961",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts": "sha256:31f764f9bfe4c005d319d68d8ff971faf28110fd89ffcc2157aac8dcf013f045",
     "tests/integration/browser/sanity/title-music-bed-loops-and-yields-to-playfield.test.ts": "sha256:5317babcd79168fd811cf9556237663de4fb61046c5d922712b7dc958f6291da",
-    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:98b47213fd83e274b56cadada68b011b7e55102d35eca633dc82087ef55a42ae",
+    "tests/integration/browser/sanity/wave2-touch-controls.test.ts": "sha256:c1b335d2cbcbf9b91fdf3ff288ad0e798006cb73c1cd53a933ae89940da23f84",
     "tests/integration/entities/input/keybindings.test.ts": "sha256:5060ce2c60253186525b6ac7aa1aa7c222f80db034f6d8b3023a43eac0610016",
     "tests/integration/entities/input/mouse.test.ts": "sha256:13cdacd658260eb109b4cdb8a7f133aa3ff40a849a045c9716745619195340ee",
     "tests/integration/server/pilots-see-health-recover-after-an-asteroid-impact.test.ts": "sha256:2bdcb0c6395f2907783226e50fe3489f1edd5ab6e91ac9c96c8fe14784df031d",

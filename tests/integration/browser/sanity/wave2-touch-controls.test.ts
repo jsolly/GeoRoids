@@ -120,34 +120,38 @@ test(
     const game = new GameInteractions(page);
     await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     const tapPoint = await canvasPoint(page, 0.75, 0.5);
-    const session = await page.context().newCDPSession(page);
-    let touchActive = false;
-    try {
-      const beforeTap = await readLocalTouchState(page);
-      await dispatchTouch(session, 'touchStart', [{ ...tapPoint, id: 1 }]);
-      touchActive = true;
-      await game.waitForAnimationFrames(2);
-      const duringTap = await readLocalTouchState(page);
-      expect(duringTap.thrusting).toBe(true);
-      expect(duringTap.lastShotTime).toBe(beforeTap.lastShotTime);
-
-      await dispatchTouch(session, 'touchEnd', []);
-      touchActive = false;
-      await game.waitForAnimationFrames(2);
-      const afterTap = await readLocalTouchState(page);
-      expect(afterTap.lastShotTime).toBeGreaterThan(beforeTap.lastShotTime);
-      expect(afterTap.thrusting).toBe(true);
-      expect(afterTap.canShoot).toBe(true);
-      expect(diagnostics).toEqual({ errors: [], warnings: [] });
-    } finally {
-      try {
-        if (touchActive) {
-          await dispatchTouch(session, 'touchCancel', []);
-        }
-      } finally {
-        await session.detach();
-      }
-    }
+    const beforeTap = await readLocalTouchState(page);
+    // Observe the press inside the browser; runner round trips must not turn
+    // a quick tap into the game's intentional long-hold steering gesture.
+    const press = await page.evaluateHandle(() => {
+      const observed: { lastShotTime: number | null; thrusting: boolean | null } = {
+        lastShotTime: null,
+        thrusting: null,
+      };
+      document.addEventListener(
+        'pointerdown',
+        () => {
+          const ship = window.gameController?.getCurrPlayer()?.ship;
+          if (ship) {
+            observed.lastShotTime = ship.lastShotTime;
+            observed.thrusting = ship.thrusting;
+          }
+        },
+        { once: true }
+      );
+      return observed;
+    });
+    await page.touchscreen.tap(tapPoint.x, tapPoint.y);
+    const duringTap = await press.jsonValue();
+    await press.dispose();
+    expect(duringTap.thrusting).toBe(true);
+    expect(duringTap.lastShotTime).toBe(beforeTap.lastShotTime);
+    await game.waitForAnimationFrames(2);
+    const afterTap = await readLocalTouchState(page);
+    expect(afterTap.lastShotTime).toBeGreaterThan(beforeTap.lastShotTime);
+    expect(afterTap.thrusting).toBe(true);
+    expect(afterTap.canShoot).toBe(true);
+    expect(diagnostics).toEqual({ errors: [], warnings: [] });
   },
   TestConfig.DEFAULT_TIMEOUT
 );

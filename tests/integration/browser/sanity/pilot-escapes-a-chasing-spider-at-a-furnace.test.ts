@@ -46,7 +46,7 @@ for (const width of [1280, 390]) {
       path: screenshotManager.getScreenshotPath(`spider-retreat-${width}.png`),
     });
     await page.goto(`${new URL(page.url()).origin}/wiki/#terrain`);
-    const heading = page.getByRole('heading', { name: 'Terrain spiders', exact: true });
+    const heading = page.getByRole('heading', { name: 'Survive a hunt', exact: true });
     await heading.waitFor();
     await heading.scrollIntoViewIfNeeded();
     await page.screenshot({

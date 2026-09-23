@@ -237,7 +237,12 @@
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
     "shared/beltCrawler.ts",
     "server/core/BeltCrawlerManager.ts",
-    "src/rendering/beltRenderer.ts"
+    "src/rendering/beltRenderer.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -272,7 +277,12 @@
     "tests/unit/server/bounced-lasers-damage-crew-hulls.test.ts",
     "tests/unit/systems/lasers-ricochet-inside-world.test.ts",
     "shared/terrainSpider.ts",
-    "server/core/TerrainSpiderManager.ts"
+    "server/core/TerrainSpiderManager.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ],
   "hud-network": [
     "shared/gameClock.ts",
@@ -369,7 +379,12 @@
     "tests/unit/server/harvested-ground-stays-flyable.test.ts",
     "shared/furnaceField.ts",
     "server/core/GameEngine.ts",
-    "server/core/TerrainSpiderManager.ts"
+    "server/core/TerrainSpiderManager.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ],
   "surveyor": [
     "src/entities/ship/shipKits.ts",
@@ -494,6 +509,11 @@
     "server/core/TerrainSpiderManager.ts",
     "shared/townStore.ts",
     "src/ui/townStore.ts",
-    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts"
+    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts",
+    "shared/ricochetCourt.ts",
+    "shared/laserSurface.ts",
+    "src/rendering/ricochetCourtRenderer.ts",
+    "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
   ]
 }

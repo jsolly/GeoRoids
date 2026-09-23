@@ -22,7 +22,9 @@ field. The match has one shared crew.
 
 Direct ship lasers, ship-to-ship ramming, and the Hauler tow cable never
 damage a teammate. After a laser bounces off a wall or reflective asteroid, it
-becomes a ricochet that can hurt you or another pilot. The Hauler ability
+becomes a ricochet that can hurt you or another pilot. The permanent
+[Ricochet Court](/wiki/#combat-survival) northeast of Town Square offers
+laser-only energy reflectors for informal duels. The Hauler ability
 attaches only to asteroids; it cannot select, pull, or throw a ship.
 Asteroids and the arena boundary remain world
 hazards, including a towed rock that hits another ship; shot-triggered loot

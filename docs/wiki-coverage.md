@@ -127,7 +127,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   and server restarts, and offline pilots retain their credit.
 - Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
   never damage crew hulls. After a bounce off the arena wall or a reflective
-  asteroid, a laser becomes a ricochet: it deals the
+  asteroid or a court energy panel, a laser becomes a ricochet: it deals the
   configured laser hit times its energy to the first live hull it meets,
   including its owner, and is consumed. Asteroid impacts remain world hazards
   and remove 25 health per impact, including a towed rock that hits another ship.
@@ -176,3 +176,9 @@ covers probes riding spiders back to guarded resources, sharing the existing
 beacon limits and expiry. Server scenarios prove extraction, persistence,
 protected-area towing and release, consumption, and nest scans; desktop/mobile
 browser scenarios exercise both ships' controls and the changed wiki sections.
+
+The single Ricochet Court northeast of Town Square is covered in Combat survival,
+Terrain, Teamwork, and HUD/network. Panels reflect lasers from both sides without
+amplifying energy, let ships pass through, persist as fixed geometry, and appear
+on both maps before discovery. Duels use ordinary protection, damage and respawn
+rules; shots may escape through the gaps.

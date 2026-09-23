@@ -20,6 +20,10 @@ The HUD shows lives, score, kit, ability, and the crew leaderboard. A thin healt
 
 The minimap shows nearby space; M or Map opens the full shared chart. Discovered furnaces appear as flames, dark street lots stay marked, and only lit streets show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
 
+## Ricochet Court
+
+The cyan open-corner marker northeast of Town Square is always visible on both maps. See [bank-shot duels](/wiki/#combat-survival) before entering.
+
 ## Probe beacons
 
 A pulsing cyan radar marker identifies a live Survey Probe. Follow its moving host to find scanned minerals; amber pulses warn of a low battery.

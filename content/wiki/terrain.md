@@ -22,6 +22,10 @@ Close contour lines mean steep ground: downhill accelerates you, uphill slows yo
 
 The circular wall destroys a vulnerable ship on contact. Rocks bounce inward, and reflected lasers become dangerous ricochets.
 
+## Ricochet Court
+
+Northeast of Town Square, cyan court panels reflect lasers but let ships pass through. See [bank-shot duels](/wiki/#combat-survival) for the rules.
+
 ## Spider nests
 
 Red map webs mark discovered guarded resources; the mark disappears when the resource is collected or moved. Guards chase briefly and return home, while rare roaming hunters pursue farther. Red contours and a red screen edge warn of nearby spiders and pursuit.

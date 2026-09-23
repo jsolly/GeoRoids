@@ -18,7 +18,11 @@ media:
 
 ## Firing while moving
 
-Hold fire to repeat shots, which inherit your ship's motion. Direct crew shots mine rocks and kill spiders without hurting pilots. After a wall or reflective-rock bounce, a shot becomes a dangerous ricochet that can hit anyone.
+Hold fire to repeat shots, which inherit your ship's motion. Direct crew shots mine rocks and kill spiders without hurting pilots. After a wall, reflective-rock, or court-panel bounce, a shot becomes a dangerous ricochet that can hit anyone.
+
+## Ricochet Court
+
+Meet at the cyan court northeast of Town Square for informal bank-shot duels; it stays marked on both maps before exploration. Its indestructible panels reflect lasers without changing their energy, while ships pass through safely. Banked shots can escape through the gaps and hurt anyone, with normal lives and protection rules and no separate duel score.
 
 ## Damage and protection
 

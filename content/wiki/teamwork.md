@@ -16,7 +16,7 @@ media: []
 
 ## One crew
 
-Everyone flies on the same team. Direct lasers and ship collisions are safe, but ricochets and towed rocks can hurt teammates.
+Everyone flies on the same team, with informal duels at the [Ricochet Court](/wiki/#combat-survival). Direct lasers and ship collisions are safe, but ricochets and towed rocks can hurt teammates.
 
 ## Scan, tow, deliver
 

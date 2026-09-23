@@ -28,7 +28,7 @@ export function isFiniteMapPosition(value: Position | undefined): value is Posit
 }
 
 export function canPlaceMapAssetLabel(
-  asset: MapAsset,
+  asset: Pick<MapAsset, 'name' | 'position'>,
   frame: MapLabelFrame,
   viewCenter: Position,
   occupied: MapLabelRect[]

@@ -1,7 +1,7 @@
 ---
 title: HUD and the shared world
 category: Systems
-summary: Read lives, health, the local radar, the universe map, and scores. Understand what
+summary: Read cargo, health, the local radar, the universe map, and scores. Understand what
   to do if the connection drops.
 order: 150
 related:
@@ -14,7 +14,7 @@ media: []
 
 ## Read the HUD
 
-The HUD shows lives, score, kit, ability, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. Pickup and death messages explain what just happened.
+The HUD shows your bank, cargo capacity, kit, ability, shared settlement progress and resource requirements, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. Pickup and death messages explain what just happened.
 
 ## Travel prompt
 
@@ -22,7 +22,7 @@ Inside a lit furnace's visible footprint, the travel prompt and TRAVEL button op
 
 ## Radar and universe map
 
-The minimap shows nearby space; M or Map opens the full shared chart. Discovered furnaces appear as flames, dark street lots stay marked, and only lit streets show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
+The minimap shows nearby space; M or Map opens the full shared chart. Discovered furnaces appear as flames, dark furnace lots stay marked, and only lit furnaces show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.
 
 ## Ricochet Court
 
@@ -38,7 +38,7 @@ The title screen has separate Sound Effects, Music, and Haptics settings, saved 
 
 ## Connection interruptions
 
-The game reconnects automatically; if it returns to the title screen, choose Enter Game. A brief interruption restores your ship, while a longer absence starts a new flight with your saved score unless you reached game over. Reload when the game requests an update.
+The game reconnects automatically; if it returns to the title screen, choose Enter Game. A brief interruption restores your ship. Banked points remain safe, and carrying cargo preserves your field position even after a longer absence. Reload when the game requests an update.
 
 ## Diagnostics
 

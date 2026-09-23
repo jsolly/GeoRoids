@@ -129,14 +129,13 @@ test('a later score write updates score provenance without rotating the credenti
   expect(saved.scoreUpdatedAt).toBe(issuedAt + 5_000);
 });
 
-test('game over restamps score provenance and keeps the issued credential', () => {
+test('death preserves bank provenance and keeps the issued credential', () => {
   const store = worldStore();
   const engine = engineWithStore(store);
   const socket = new RecordingSocket();
   const actor = engine.addPlayer('pilot', 'Pilot', socket, { x: 400, y: 0 });
   actor.asteroidInteractions = 1;
   assert(engine.registerPilot(actor, socket, CLIENT_RELEASE).ok);
-  actor.lives = 1;
   actor.score = 1200;
   actor.spawnProtectionTimer = 0;
   engine.checkpointWorld();
@@ -145,7 +144,7 @@ test('game over restamps score provenance and keeps the issued credential', () =
 
   const saved = store.loadPilots().find((pilot) => pilot.id === 'pilot');
   assert(saved);
-  expect(saved.score).toBe(GAME.STARTING_SCORE);
+  expect(saved.score).toBe(1200);
   expect(saved.credentialReleaseId).toBe(SERVER_RELEASE_ID);
   expect(saved.credentialClientReleaseId).toBe(CLIENT_RELEASE);
   expect(saved.scoreReleaseId).toBe(SERVER_RELEASE_ID);
@@ -216,6 +215,8 @@ test('legacy pilots without release stamps still load, and invalid stamps are dr
       tokenHash: 'd'.repeat(64),
       name: 'Pilot',
       score: 42,
+      cargo: 0,
+      purchases: [],
       scoreReleaseId: SCORE_RELEASE,
       lastClientReleaseId: PRIOR_RELEASE,
     },

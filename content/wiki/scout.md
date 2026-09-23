@@ -15,7 +15,7 @@ media:
 
 ## Mineral scan
 
-Scout starts with Mineral Scan and turns faster and boosts harder than Hauler. Select Mineral Scan in Inventory, then press E or Scan to share nearby mineral classification and earn credit when those rocks are mined or delivered. Active scans also repel spiders within range and stop their bites.
+Scout starts with Mineral Scan and turns faster and boosts harder than Hauler. Select Mineral Scan in Inventory, then press E or Scan to share nearby mineral classification and earn banked credit when ore-bearing rocks are delivered. Active scans also repel spiders within range and stop their bites.
 
 ## Survey probe
 
@@ -23,7 +23,7 @@ Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip
 
 ## Build
 
-At a dark street foundation, E becomes Build: enter the grate and spend your score to light it, with the inward street already lit. Your named furnaces persist, provide delivery, respawn, and rocket-travel stops, and increase your own later delivery payouts. Failed builds spend nothing.
+At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and rocket-travel stops, and serve the shared settlement. Failed builds spend nothing.
 
 ## Build a refuge
 
@@ -31,4 +31,4 @@ You can build during a chase, even during tool cooldown or on a nest-covered fou
 
 ## Exploration
 
-Scout reveals more of the shared chart as it flies than Hauler. Mineral colors stay with identified rocks: cyan ice, gold metal, and orange rubble. Use the [map](/wiki/#hud-network) to return to discoveries.
+Scout reveals more of the shared chart as it flies than Hauler. Mineral colors stay with identified rocks: cyan ice, gold metal, orange rubble, and violet crystal; many rocks contain no ore. Use the [map](/wiki/#hud-network) to return to discoveries.

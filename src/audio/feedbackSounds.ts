@@ -10,7 +10,6 @@ const feedback = {
   boostIgnite: new Sound('/sounds/boost-ignite.m4a', 3, 0.05),
   hullDamage: new Sound('/sounds/hull-damage.m4a', 2, 0.065),
   delivery: new Sound('/sounds/delivery.m4a', 2, 0.075),
-  gameOver: new Sound('/sounds/game-over.m4a', 1, 0.07),
   interface: new Sound('/sounds/interface.m4a', 2, 0.025),
   satelliteEquip: new Sound('/sounds/satellite-equip.m4a', 2, 0.05),
 };

@@ -33,11 +33,11 @@ Toggle Boost off to save charge and let the tank refill. An empty tank stops Boo
 
 V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-growth) and equip [satellites](/wiki/#satellites). Map, Inventory, and the furnace menu hold your ship safely while the world keeps moving; satellite health still drains and you cannot collect pickups. Close with Escape or the close control to resume flight with brief blink protection.
 
-## Furnace travel and extra lives
+## Furnace travel and store
 
 Inside a lit furnace's visible footprint, follow the travel prompt and press E or tap TRAVEL to open the destination map; B also toggles the menu. Choose another lit furnace for a free rocket ride along the pipes, taking at most two seconds; dark foundations are not destinations. Boarding releases cargo, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
 
-Town Square's menu also sells extra lives for 250 score each, up to six. A fresh flight starts with five lives.
+Town Square's menu also offers placeholders purchased with banked points. Higher settlement levels unlock more offers; purchases have no gameplay effect.
 
 ## Map
 

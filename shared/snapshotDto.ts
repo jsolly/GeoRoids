@@ -26,6 +26,7 @@ import type {
 import type { BeltRecoveryWarning } from './asteroidBelt';
 import { ASTEROID_BELT } from './asteroidBelt';
 import { BELT_CRAWLER } from './beltCrawler';
+import { validSettlement } from './economy';
 import { validEquipment } from './equipment';
 import { validExploration } from './exploration';
 import { civicLot, TOWN_HEARTH, validCivicModules } from './furnaces';
@@ -74,6 +75,7 @@ const lootKind = enumeration<LootKind>({
   resource_tap: true,
   boost_coupling: true,
   survey_probe: true,
+  points: true,
 });
 const array =
   (rule: Rule): Rule =>
@@ -91,7 +93,12 @@ const shape = <T>(rules: Shape<T>): Rule => {
 };
 const position = shape<{ x: number; y: number }>({ x: number, y: number });
 const energy: Rule = (value) => number(value) && (value as number) >= 0 && (value as number) <= 8;
-const material = enumeration<AsteroidMaterial>({ ice: true, metal: true, rubble: true });
+const material = enumeration<AsteroidMaterial>({
+  ice: true,
+  metal: true,
+  rubble: true,
+  crystal: true,
+});
 const motion = shape<PlayerMotionState>({
   epoch: counter,
   mode: choice('free', 'handoff'),
@@ -140,7 +147,8 @@ const entity = shape<ServerEntityData>({
   thrusting: boolean,
   boost: optional(isShipBoostState),
   color: string,
-  lives: number,
+  cargo: counter,
+  purchases: array(string),
   score: number,
   health: number,
   maxHealth: number,
@@ -208,6 +216,7 @@ const asteroidShape = shape<AsteroidData>({
   offsets: array(number),
   isCollabTarget: optional(boolean),
   material: optional(material),
+  ore: optional((value) => value === null || material(value)),
   surveyedBy: optional(array(string)),
   miningContributors: optional(array(string)),
   phenomenon: optional(reflective),
@@ -230,6 +239,7 @@ const asteroid: Rule = (value) => {
   );
 };
 const loot = shape<LootData>({
+  points: optional(counter),
   id: string,
   position,
   mass: number,
@@ -351,6 +361,7 @@ const spiderField = shape<SpiderFieldState>({
 });
 const worldRules = {
   serverTime: optional(number),
+  settlement: validSettlement,
   civicModules: optional(validCivicModules),
   spiderField: optional(spiderField),
   beltRecovery: optional(

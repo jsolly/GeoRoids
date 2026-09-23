@@ -63,7 +63,7 @@ for (const width of [1280, 390]) {
         .toBe(captive.id);
       const target = victim === 'hauler' ? game : other;
       const targetId = victim === 'hauler' ? ownerId : passerId;
-      const lives = await target.getLives();
+      const targetPage = victim === 'hauler' ? page : otherPage;
       await page.screenshot({
         path: screenshotManager.getScreenshotPath(`towed-spider-before-${victim}-${width}.png`),
       });
@@ -73,7 +73,12 @@ for (const width of [1280, 390]) {
       }
       // Put the real connected ship into reach; server combat must produce and broadcast the bite.
       await placePlayer(targetId, live.position);
-      await expect.poll(() => target.getLives(), { interval: 25 }).toBe(lives - 1);
+      await expect
+        .poll(
+          () => targetPage.evaluate(() => window.gameController?.getCurrPlayer()?.ship.health),
+          { interval: 25 }
+        )
+        .toBe(0);
       const witness = victim === 'hauler' ? otherPage : page;
       await expect
         .poll(() =>
@@ -82,17 +87,19 @@ for (const width of [1280, 390]) {
               window.gameController
                 ?.getPlayerManager()
                 .getNonLocalPlayers()
-                .find((p) => p.id === id)?.lives,
+                .find((p) => p.id === id)?.ship.health,
             targetId
           )
         )
-        .toBe(lives - 1);
+        .toBe(0);
       if (victim === 'passer') {
         expect(await latch()).toBe(captive.id);
       }
       await page.screenshot({
         path: screenshotManager.getScreenshotPath(`towed-spider-bite-${victim}-${width}.png`),
       });
+      await target.waitForShipAlive(25000);
+      expect(await target.isGameRunning()).toBe(true);
       await page.goto(`${TestConfig.GAME_URL}/wiki/#hauler`);
       const rule = page.locator('p').filter({ hasText: 'A towed spider can still bite' });
       await rule.scrollIntoViewIfNeeded();

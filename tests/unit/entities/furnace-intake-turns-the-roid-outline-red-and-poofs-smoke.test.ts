@@ -182,7 +182,7 @@ test('the playfield still paints a furnace poof after the last rock leaves the b
   recordAsteroidShatter(consumedRock(), 2000, 'furnace');
   const strokes = recordStrokes(ctx);
 
-  drawGame(pilot, new RoidBelt(), 0, 0, '', 3, [pilot]);
+  drawGame(pilot, new RoidBelt(), 0, 0, '', [pilot]);
 
   ctx.strokeStyle = PALETTE.DANGER;
   const danger = ctx.strokeStyle;

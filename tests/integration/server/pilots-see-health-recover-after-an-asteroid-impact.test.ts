@@ -44,7 +44,6 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
       engine.updateAsteroid(asteroid.id, { position: { x: 1000, y: -1000 } });
     }
     engine.parkSatellitePickups({ x: 1000, y: 1000 });
-    const lives = target.lives;
     const maxHealth = target.maxHealth;
     expect(target.health).toBe(SHIP.MAX_HEALTH);
     const decoders = peers.map(() => ({ decoder: new SnapshotDecoder(), offset: 0 }));
@@ -79,7 +78,7 @@ test('both pilots see the same delayed health recovery after an asteroid impact'
         const observed = snapshot.entities.find((entity) => entity.id === 'target');
         assert.ok(observed);
         expect(observed.health).toBeCloseTo(health, 8);
-        expect(observed).toMatchObject({ lives, maxHealth, exploding: false });
+        expect(observed).toMatchObject({ maxHealth, exploding: false });
         peer.assertHealthy();
       }
     }

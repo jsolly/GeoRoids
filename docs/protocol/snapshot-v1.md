@@ -47,8 +47,8 @@ ability request.
 Scout snapshots include optional `scoutUtility` (`mineral_scan` or
 `survey_probe`; missing means mineral scan). Retired wire token `build_furnace`
 still decodes and readers map it to mineral scan; `setScoutUtility` rejects
-it. Near a dark street lot within approach range, `useAbility` builds that
-street instead of launching the equipped scan or probe. Clients never submit a
+it. Near a dark furnace lot within approach range, `useAbility` builds that
+furnace instead of launching the equipped scan or probe. Clients never submit a
 probe pose, target, health, or expiry.
 An asteroid's optional `probe` stores its beacon ID, owner, health, maximum
 health, attachment and expiry times in epoch milliseconds, and its local angle
@@ -56,17 +56,20 @@ and radial offset. The client derives the moving beacon pose from the host.
 An explicit null or absence in a complete asteroid row clears the beacon.
 The server owns attachment, damage, scan pulses, expiry, and replacement.
 
-`civicModules` lists lit street furnaces with `builderName` and an optional
-`builderId`. That id is the public pilot who paid; older unnamed streets omit
-it and grant no delivery bonus. `buyShipPaint` accepts the socket owner's id
-and a catalog `paintId` while that ship is inside the Town Square store.
-Success replies `townStoreResult` with the notice, the new score, and the
-catalog color, then broadcasts. `buyExtraLife` accepts the socket owner's id
-while that ship is inside the store. Success replies `townStoreResult` with
-the notice, the new score, and the new life count, then broadcasts. A refusal
-replies with the notice only and spends nothing. The storefront sells one
-extra life at a time, up to 6 lives. A request for another pilot's id is
-ignored. Player `color` stays the kit default until a catalog paint is worn.
+`civicModules` lists lit furnaces with `builderName` and an optional
+`builderId`. That id is the public pilot who paid; older unnamed furnaces omit
+it. Attribution does not change delivery rewards. `buyStoreItem` accepts the
+socket owner's id and catalog `offerId`. The server checks living state,
+Town Square proximity, settlement level, bank balance, and existing receipt.
+Success returns `townStoreResult` with a notice, banked `score`, and `purchases`.
+Repeated purchases spend nothing. Placeholder offers grant no gameplay effect.
+Old owned hull colors remain readable, but paint and life purchases are retired.
+
+Entities carry `cargo`, banked `score`, and `purchases`; there is no lives field.
+World snapshots include `settlement` with level, points and four resource balances.
+Asteroids may contain `ore` (null means barren); older rows derive it from a stable
+ID hash. Point loot has kind `points` and a point quantity. Furnace refinement
+credits resources once per rock and personal rewards once per distinct contributor.
 
 The codec preserves all public JSON fields recursively. Future keyed arrays automatically participate in delta
 encoding and other fields replace safely. Exhaustive shared DTO validator maps

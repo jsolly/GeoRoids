@@ -171,7 +171,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
             shipId: local.ship.id,
             position: { ...local.ship.position },
             health: local.ship.health,
-            lives: local.lives,
+            cargo: local.cargo,
+            purchases: local.purchases,
             exploding: local.ship.exploding,
           },
           asteroids: belt.roids.map((roid) => ({
@@ -347,7 +348,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
       const after = snapshot();
       if (
         after.local.health !== before.local.health ||
-        after.local.lives !== before.local.lives ||
+        after.local.health !== before.local.health ||
         after.local.exploding ||
         after.local.position.x !== 0 ||
         after.local.position.y !== 0 ||
@@ -397,11 +398,9 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           '../src/rendering/hud/hudLayout'
         );
         const { drawScoreOverlay, drawTextOverlay } = await import('../src/rendering/hud/gameInfo');
-        const { drawLivesIndicator } = await import('../src/rendering/hud/lives');
         const { drawMiniMap } = await import('../src/rendering/hud/minimap');
         const { drawLeaderboard } = await import('../src/rendering/hud/leaderboard');
         const { entityFactory } = await import('../src/entities/EntityFactory');
-        const { PALETTE } = await import('../src/constants/index');
         const { drawFieryBoundary } = await import('../src/rendering/boundaryRenderer');
         const { getGameBoundary } = await import('../src/physics/boundary');
         const reads = { safeAreaStyles: 0, pointerMediaQueries: 0 };
@@ -453,9 +452,8 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
           SatellitePickupManager.getInstance().getAll(),
           []
         );
-        drawScoreOverlay(ctx, layout, canvas, local.score, local.lives);
-        drawLivesIndicator(ctx, layout, local.lives, PALETTE.LOCAL, local.ship.kitId);
-        drawTextOverlay(ctx, layout, canvas, 'Game Over: killed by Benchmark Rival', 1);
+        drawScoreOverlay(ctx, layout, canvas, local.score);
+        drawTextOverlay(ctx, layout, canvas, 'You were killed by an asteroid', 1);
         const rival = entityFactory.createRemotePlayer(
           'benchmark-rival',
           'Benchmark Rival',
@@ -465,7 +463,7 @@ async function runClientFixture(options: ClientOptions & { observe: boolean }) {
         drawLeaderboard(ctx, layout, [local, rival], local.id);
         record = false;
         if (
-          !textCalls.includes('GAME OVER') ||
+          !textCalls.some((text) => text.includes('killed by')) ||
           !textCalls.some((text) => text.includes('Benchmark')) ||
           (canvasCalls['canvas.fillText'] ?? 0) < 2
         ) {

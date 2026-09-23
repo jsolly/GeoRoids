@@ -3,6 +3,7 @@ import { logger } from '../../setup/serverLogger';
 import { tickAsteroidBoost } from '../../shared/asteroidBoost';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import { isColossalAsteroid } from '../../shared/asteroidScale';
+import { oreResource } from '../../shared/economy';
 import { FurnaceField } from '../../shared/furnaceField';
 import { WORLD } from '../../shared/world';
 import type { ActiveCollabTag, AsteroidData, Position } from '../../shared-types';
@@ -580,6 +581,8 @@ export class AsteroidManager {
         vertices: newVertices,
         offsets: newOffsets,
         ...(destroyed.material ? { material: destroyed.material } : {}),
+        ore: oreResource(destroyed),
+        surveyedBy: [...(destroyed.surveyedBy ?? [])],
       });
     }
 

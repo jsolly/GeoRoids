@@ -57,15 +57,14 @@ test(
         message: 'server should confirm destruction of the chosen asteroid',
       })
       .toBe(true);
-    await expect
-      .poll(
-        async () => {
-          await game.waitForAnimationFrames(8);
-          return game.getScore();
-        },
-        { timeout: 12000, message: 'destroying an asteroid should award points' }
-      )
-      .toBe(initialScore + pointsForRoidSize(target.radius));
+    const points = await page.evaluate(() =>
+      window.gameController
+        ?.getLoot()
+        .filter((drop) => drop.kind === 'points')
+        .reduce((sum, drop) => sum + (drop.points ?? 0), 0)
+    );
+    expect(points).toBe(pointsForRoidSize(target.radius));
+    expect(await game.getScore()).toBe(initialScore);
   },
   TestConfig.DEFAULT_TIMEOUT
 );

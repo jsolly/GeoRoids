@@ -131,11 +131,8 @@ export class MessageHandler {
         case 'setScoutUtility':
           this.handleSetScoutUtility(ws, command);
           break;
-        case 'buyShipPaint':
-          this.handleBuyShipPaint(ws, command);
-          break;
-        case 'buyExtraLife':
-          this.handleBuyExtraLife(ws, command);
+        case 'buyStoreItem':
+          this.handleBuyStoreItem(ws, command);
           break;
 
         case 'update':
@@ -474,7 +471,7 @@ export class MessageHandler {
       attackerId,
       damage,
       remainingHealth: outcome.entity.health,
-      remainingLives: outcome.entity.lives,
+
       isDestroyed: outcome.isDestroyed,
       targetType: outcome.entity.type,
     });
@@ -511,12 +508,12 @@ export class MessageHandler {
     this.broadcaster.broadcastGameState();
   }
 
-  private handleBuyShipPaint(ws: WebSocket, command: CommandOf<'buyShipPaint'>): void {
+  private handleBuyStoreItem(ws: WebSocket, command: CommandOf<'buyStoreItem'>): void {
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
     if (!socketPlayer || socketPlayer.id !== command.id) {
       return;
     }
-    const issue = this.gameEngine.buyShipPaint(command.id, command.paintId);
+    const issue = this.gameEngine.buyStoreItem(command.id, command.offerId);
     const pilot = this.gameEngine.getPlayer(command.id);
     ws.send(
       JSON.stringify({
@@ -524,34 +521,9 @@ export class MessageHandler {
         data: issue
           ? { message: issue }
           : {
-              message: this.gameEngine.townStoreNotice(command.paintId),
+              message: this.gameEngine.townStoreNotice(command.offerId),
               score: pilot?.score,
-              color: pilot?.color,
-            },
-        timestamp: Date.now(),
-      })
-    );
-    if (!issue) {
-      this.broadcaster.broadcastGameState();
-    }
-  }
-
-  private handleBuyExtraLife(ws: WebSocket, command: CommandOf<'buyExtraLife'>): void {
-    const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (!socketPlayer || socketPlayer.id !== command.id) {
-      return;
-    }
-    const issue = this.gameEngine.buyExtraLife(command.id);
-    const pilot = this.gameEngine.getPlayer(command.id);
-    ws.send(
-      JSON.stringify({
-        type: 'townStoreResult',
-        data: issue
-          ? { message: issue }
-          : {
-              message: this.gameEngine.extraLifeNotice(pilot?.lives ?? 0),
-              score: pilot?.score,
-              lives: pilot?.lives,
+              purchases: pilot?.purchases,
             },
         timestamp: Date.now(),
       })

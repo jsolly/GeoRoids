@@ -164,7 +164,7 @@ function renderPolyline(
 
 function renderMaterial(
   ctx: RenderContext,
-  material: 'ice' | 'metal' | 'rubble',
+  material: 'ice' | 'metal' | 'rubble' | 'crystal',
   x: number,
   y: number,
   radius: number,
@@ -518,7 +518,7 @@ function makeAsteroid(
   id: string,
   position: Position,
   size: number,
-  material: 'ice' | 'metal' | 'rubble',
+  material: 'ice' | 'metal' | 'rubble' | 'crystal',
   rotation = 0
 ): AsteroidData {
   const offsets =

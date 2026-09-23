@@ -161,7 +161,7 @@ class CanvasManager {
     const hud = hudLayoutForCanvas({ width, height });
     chrome.style.setProperty(
       '--mobile-controls-top',
-      `${Math.max(hud.kitNameY + 24, hud.leaderboard.y + hud.leaderboard.rowHeight * hud.leaderboard.maxRows) + 12}px`
+      `${Math.max(hud.economyBottomY, hud.leaderboard.y + hud.leaderboard.rowHeight * hud.leaderboard.maxRows) + 12}px`
     );
     chrome.style.setProperty('--map-toggle-x', `${miniMap.x}px`);
     chrome.style.setProperty('--map-toggle-y', `${offsets.mapY}px`);

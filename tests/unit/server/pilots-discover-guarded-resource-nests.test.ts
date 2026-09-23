@@ -131,7 +131,7 @@ test('nests never materialize beside a pilot or in a furnace yard', () => {
   expect(worksYard.snapshot().spiders).toEqual([]);
   const lot = civicLot('street-1-0');
   if (!lot) {
-    throw new Error('Missing street lot');
+    throw new Error('Missing furnace lot');
   }
   const field = new FurnaceField();
   field.light(lot.id);

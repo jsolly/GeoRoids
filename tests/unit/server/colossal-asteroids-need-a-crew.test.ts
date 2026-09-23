@@ -194,7 +194,7 @@ describe('Colossal asteroids need a crew', () => {
     expect(last.newAsteroids.every((fragment) => !isColossalAsteroid(fragment.size))).toBe(true);
     expect(last.newAsteroids[0]?.size).toBe(ROID.COLOSSAL_SIZE * 0.5);
     expect(last.newAsteroids[1]?.size).toBe(ROID.COLOSSAL_SIZE * 0.5);
-    expect(engine.getPlayer('p1')?.score).toBe(ROID.POINTS_COLOSSAL);
+    expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 
   test('a Hauler fragments a colossal deposit in half as many hits', () => {

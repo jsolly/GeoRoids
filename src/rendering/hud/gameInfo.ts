@@ -1,20 +1,23 @@
+import {
+  cargoCapacity,
+  RESOURCES,
+  settlementProgress,
+  settlementRecipe,
+} from '../../../shared/economy';
 import { PALETTE, VISUAL } from '../../constants';
 import { GameStateManager } from '../../core/services/GameStateManager';
 import { PlayerManager } from '../../entities/player/PlayerManager';
 import { getShipKit } from '../../entities/ship/shipKits';
+import { getSettlement } from '../../network/worldExploration';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { PlayfieldSize } from '../playfieldCamera';
-import { layoutHudCluster } from './cluster';
 import { type HudLayout, scaleHudFont } from './hudLayout';
-
-const GAME_OVER_PREFIX_PATTERN = /^Game Over:\s*/iu;
 
 export function drawScoreOverlay(
   ctx: CanvasRenderingContext2D,
   layout: HudLayout,
   viewport: PlayfieldSize,
-  score: number,
-  lives: number
+  score: number
 ): void {
   ctx.save();
   ctx.fillStyle = PALETTE.HUD;
@@ -23,10 +26,10 @@ export function drawScoreOverlay(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
 
-  const { score: origin } = layoutHudCluster(lives);
-  const dx = layout.lives.x - VISUAL.HUD_INSET;
-  const dy = layout.lives.y - VISUAL.HUD_INSET;
-  ctx.fillText(score.toString(), origin.x + dx, origin.y + dy);
+  const origin = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET + 10 };
+  const dx = layout.balance.x - VISUAL.HUD_INSET;
+  const dy = layout.balance.y - VISUAL.HUD_INSET;
+  ctx.fillText(`Bank ${score.toLocaleString()}`, origin.x + dx, origin.y + dy);
 
   ctx.font = scaleHudFont(VISUAL.NAME_LABEL_FONT, layout.hudTypeScale);
   ctx.textBaseline = 'top';
@@ -48,6 +51,44 @@ export function drawScoreOverlay(
     ctx.fillText(gameStateManager.getPickupMessage(), viewportWidth / 2, pickupY);
   }
 
+  const pilot = PlayerManager.getInstance().getLocalPlayer();
+  if (pilot) {
+    const settlement = getSettlement();
+    const recipe = settlementRecipe(settlement.level);
+    const x = layout.balance.x;
+    const y = layout.kitNameY + 20;
+    const width = Math.min(340, viewportWidth - x - layout.padRight);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '12px Arial';
+    ctx.fillStyle = PALETTE.HUD;
+    ctx.fillText(
+      `Cargo ${pilot.cargo}/${cargoCapacity(pilot.ship.kitId)} · Return to a furnace`,
+      x,
+      y
+    );
+    const progress = settlementProgress(settlement);
+    ctx.fillText(
+      `Settlement ${settlement.level} → ${settlement.level + 1} · ${Math.floor(progress * 100)}%`,
+      x,
+      y + 20
+    );
+    ctx.fillStyle = hexToRgba(PALETTE.HUD, 0.18);
+    ctx.fillRect(x, y + 37, width, 5);
+    ctx.fillStyle = PALETTE.SATELLITE;
+    ctx.fillRect(x, y + 37, width * progress, 5);
+    ctx.fillStyle = PALETTE.HUD_MUTED;
+    ctx.font = '10px Arial';
+    ctx.fillText(`Points ${settlement.points}/${recipe.points}`, x, y + 47);
+    ctx.fillText(
+      RESOURCES.map((key) => `${key} ${settlement.resources[key]}/${recipe.resources[key]}`).join(
+        ' · '
+      ),
+      x,
+      y + 61,
+      width
+    );
+  }
   ctx.restore();
 }
 
@@ -100,46 +141,13 @@ export function drawTextOverlay(
   ctx.save();
 
   const isDeathMessage = text.toLowerCase().includes('killed by');
-  const isGameOver = text.toLowerCase().includes('game over');
   const viewportWidth = viewport.width;
   const viewportHeight = viewport.height;
   const centerX = viewportWidth / 2;
   const centerY = viewportHeight / 2;
   const scale = layout.overlayFontScale;
 
-  if (isGameOver) {
-    ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.8);
-    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
-
-    ctx.fillStyle = hexToRgba(PALETTE.DANGER, alpha);
-    ctx.font = `bold ${Math.round(48 * scale)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('GAME OVER', centerX, centerY - 80 * scale);
-
-    if (isDeathMessage) {
-      const deathCause = text.replace(GAME_OVER_PREFIX_PATTERN, '');
-      ctx.fillStyle = hexToRgba(PALETTE.HUD, alpha);
-      ctx.font = `${Math.round(24 * scale)}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      const maxWidth = viewportWidth * 0.8;
-      drawMultiLineText(
-        ctx,
-        deathCause,
-        centerX,
-        centerY + 20 * scale,
-        maxWidth,
-        32 * scale,
-        alpha
-      );
-    }
-
-    ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, alpha * 0.8);
-    ctx.font = `${Math.round(16 * scale)}px Arial`;
-    ctx.fillText('Returning to main menu...', centerX, centerY + 120 * scale);
-  } else if (isDeathMessage) {
+  if (isDeathMessage) {
     ctx.fillStyle = hexToRgba(PALETTE.BG, alpha * 0.7);
     ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 

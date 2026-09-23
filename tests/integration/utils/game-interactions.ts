@@ -414,27 +414,6 @@ export class GameInteractions {
     });
   }
 
-  /**
-   * Get the current number of lives
-   */
-  async getLives(): Promise<number> {
-    return await this.page.evaluate(() => {
-      const gc = window.gameController;
-      if (!gc) {
-        throw new Error('gameController is not available');
-      }
-      const nm = gc.getNetworkManager();
-      const localId = nm.getLocalPlayerId();
-      const fromNetwork = localId ? nm.getPlayer(localId) : undefined;
-      const local = gc.getPlayerManager().getLocalPlayer();
-      const player = fromNetwork ?? local;
-      if (!player) {
-        throw new Error('No local player available');
-      }
-      return player.lives;
-    });
-  }
-
   // ==========================================================================
   // Deterministic test primitives
   //
@@ -444,7 +423,17 @@ export class GameInteractions {
   // no gameplay-hostile debug flags required.
   // ==========================================================================
 
-  /** Server-assigned id of the local player (used as attackerId in damage). */
+  /** Points currently at risk in the hold. */
+  getCargo(): Promise<number> {
+    return this.page.evaluate(() => {
+      const player = window.gameController?.getCurrPlayer();
+      if (!player) {
+        throw new Error('No local player available');
+      }
+      return player.cargo;
+    });
+  }
+
   async getLocalPlayerId(): Promise<string> {
     return await this.page.evaluate(() => {
       const gc = window.gameController;
@@ -771,7 +760,7 @@ export class GameInteractions {
     );
   }
 
-  /** Record the cause carried by the next authoritative life-loss event. */
+  /** Record the cause carried by the next authoritative death event. */
   private async observeNextDeathCause(): Promise<void> {
     await this.page.evaluate(() => {
       const testWindow = window as typeof window & { __testDeathCause?: string };
@@ -790,11 +779,16 @@ export class GameInteractions {
   }
 
   private async requireObservedDeathCause(expected: 'asteroid' | 'boundary'): Promise<void> {
+    await this.page.waitForFunction(
+      () => Boolean((window as typeof window & { __testDeathCause?: string }).__testDeathCause),
+      undefined,
+      { timeout: 5000 }
+    );
     const observed = await this.page.evaluate(
       () => (window as typeof window & { __testDeathCause?: string }).__testDeathCause ?? null
     );
     const expectedLabel = describeDeathCause(expected);
-    if (observed !== expectedLabel) {
+    if (describeDeathCause(observed ?? undefined) !== expectedLabel) {
       throw new Error(`Expected ${expectedLabel} death, observed ${observed ?? 'no causal event'}`);
     }
   }
@@ -816,7 +810,6 @@ export class GameInteractions {
   }
 
   async crashShipIntoAsteroidUntilDestroyed(): Promise<{ x: number; y: number }> {
-    const startLives = await this.getLives();
     await this.observeNextDeathCause();
     const usedAsteroids = new Set<string>();
     let lastImpact = { x: 0, y: 0 };
@@ -851,7 +844,7 @@ export class GameInteractions {
       await this.waitForAnimationFrames(5);
       await this.page.waitForTimeout(100);
 
-      if ((await this.getLives()) < startLives) {
+      if ((await this.getShipHealth()) <= 0) {
         // Move off the impact point so split fragments cannot re-damage the
         // ship while we wait for the server respawn reposition.
         await this.page.evaluate(({ x, y }) => {
@@ -945,7 +938,8 @@ export class GameInteractions {
           health: ship?.health,
           exploding: ship?.exploding,
           position: ship?.position,
-          lives: player?.lives,
+          cargo: player?.cargo,
+          purchases: player?.purchases,
           deathPosition: deathPoint,
         };
       },
@@ -982,7 +976,7 @@ export class GameInteractions {
     });
   }
 
-  /** HUD overlay text (game over, death messages). */
+  /** HUD overlay text. */
   async getHudText(): Promise<string> {
     return await this.page.evaluate(() => {
       const gc = window.gameController;
@@ -1080,10 +1074,9 @@ export class GameInteractions {
 
   async dieOnceViaBoundary(): Promise<{ x: number; y: number }> {
     await this.waitForCombatReady();
-    const livesBefore = await this.getLives();
     await this.observeNextDeathCause();
     const loot = await this.getLoot();
-    const rotation = Math.max(0, 3 - livesBefore) * ((Math.PI * 2) / 3);
+    const rotation = 0;
     const deathPosition = Array.from({ length: 24 }, (_, index) => {
       const angle = rotation + (index * Math.PI * 2) / 24;
       const point = {
@@ -1100,43 +1093,26 @@ export class GameInteractions {
     }
     const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
-      // A final boundary death disconnects before another motion acknowledgement
-      // can arrive. Finish fixture placement inside the arena, then cross the
-      // wall through the real client collision path.
+      // Finish fixture placement inside the arena, then cross the wall through
+      // the real client collision path.
       await this.placeShipAt(
         (deathPosition.x * (WORLD.radius - 100)) / (WORLD.radius + 50),
         (deathPosition.y * (WORLD.radius - 100)) / (WORLD.radius + 50)
       );
       await this.setPredictedShipPosition(deathPosition.x, deathPosition.y);
       // Observe enough collision frames for a ship whose collected mass raised
-      // its health above the base 100, including the final game-over transition.
+      // its health above the base 100, before waiting for the authoritative death event.
       await this.waitForAnimationFrames(4);
       await this.page.waitForTimeout(100);
-      if ((await this.getLives()) < livesBefore) {
+      if ((await this.getShipHealth()) <= 0) {
         await this.requireObservedDeathCause('boundary');
-        if ((await this.getLives()) > 0 && (await this.isGameRunning())) {
+        if (await this.isGameRunning()) {
           await this.waitForRandomRespawnPlacement(deathPosition, 25000);
         }
         return { x: deathPosition.x, y: deathPosition.y };
       }
     }
-    throw new Error('boundary crossing should cost a life');
-  }
-
-  /** Burn through all lives until the game-over flow stops the session. */
-  async dieUntilGameOver(): Promise<void> {
-    const startingLives = await this.getLives();
-    for (let attempt = 0; attempt < startingLives; attempt++) {
-      const lives = await this.getLives();
-      if (lives <= 0 || !(await this.isGameRunning())) {
-        break;
-      }
-      await this.dieOnceViaBoundary();
-      if ((await this.getLives()) > 0 && (await this.isGameRunning())) {
-        await this.waitForShipAlive(25000);
-        await this.waitForCombatReady();
-      }
-    }
+    throw new Error('boundary crossing should destroy the ship');
   }
 
   /** Wait until the local ship is alive again (ignores respawn placement). */

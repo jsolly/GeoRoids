@@ -9,7 +9,7 @@ vi.mock('../../../src/utils/logForwarder', () => ({
 
 import { AUDIO } from '../../../src/constants';
 
-// Keep real audio diagnostics and logger assertions without opening a server connection.
+// Audio unit tests must not connect to a developer's running game server.
 vi.mock('../../../src/utils/logForwarder', () => ({
   startClientLogForwarder: vi.fn(),
   forwardLogToServer: vi.fn(),

@@ -112,7 +112,7 @@ describe('Satellite pickups', () => {
     const pilot = gameEngine.getPlayer('pilot');
     assert.ok(pilot);
 
-    expect(pilot.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(pilot.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(pilot.spawnProtectionTimer).toBe(0);
     expect(attached.state).toBe('orbiting');
     expect(attached.ownerId).toBe('pilot');
@@ -137,11 +137,11 @@ describe('Satellite pickups', () => {
     gameEngine.tickSatellitePickups();
 
     expect(gameEngine.getSatellitePickup(pickup.id)?.ownerId).toBe('first');
-    expect(gameEngine.getPlayer('first')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
-    expect(gameEngine.getPlayer('second')?.score).toBe(0);
+    expect(gameEngine.getPlayer('first')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
     gameEngine.tickSatellitePickups();
-    expect(gameEngine.getPlayer('first')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
-    expect(gameEngine.getPlayer('second')?.score).toBe(0);
+    expect(gameEngine.getPlayer('first')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.getPlayer('second')?.cargo).toBe(0);
   });
 
   test('collected hardware stays stored and only one owned satellite can be equipped', () => {
@@ -273,7 +273,7 @@ describe('Satellite pickups', () => {
     expect(respawned?.state).toBe('loose');
     expect(respawned?.ownerId).toBeNull();
     expect(respawned?.health).toBe(SATELLITE_PICKUP.HEALTH);
-    expect(gameEngine.getPlayer('pilot')?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(gameEngine.getPlayer('pilot')?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
   });
 
   test('owner death releases a damaged orbiting pickup while preserving its remaining health', () => {
@@ -367,7 +367,7 @@ describe('Satellite pickups', () => {
     });
     gameEngine.tickSatellitePickups();
     expect(gameEngine.getSatellitePickup(pickup.id)?.state).toBe('loose');
-    expect(gameEngine.getPlayer('pilot')?.score).toBe(0);
+    expect(gameEngine.getPlayer('pilot')?.cargo).toBe(0);
   });
 
   test('resetting the world clears pickups', () => {

@@ -30,12 +30,11 @@ import {
   liveLaserPositions,
 } from './contourLaserRenderer';
 import { drawIsoContours } from './contourRenderer';
-import { drawFurnacePipes, drawFurnacesRelative, drawStreetFoundations } from './furnaceRenderer';
+import { drawFurnaceFoundations, drawFurnacePipes, drawFurnacesRelative } from './furnaceRenderer';
 import { drawHeadingCue } from './headingCueRenderer';
 import { drawDebugInfo, drawScoreOverlay, drawTextOverlay } from './hud/gameInfo';
 import { hudLayoutForCanvas } from './hud/hudLayout';
 import { drawLeaderboard } from './hud/leaderboard';
-import { drawLivesIndicator } from './hud/lives';
 import { drawMiniMap } from './hud/minimap';
 import { drawRicochetCourt } from './ricochetCourtRenderer';
 import { drawShockwaves } from './shockwaveRenderer';
@@ -51,7 +50,6 @@ export function drawGame(
   currScore: number,
   textAlpha: number,
   text: string,
-  lives: number,
   allPlayers: Player[]
 ): void {
   const currShip = currPlayer.ship;
@@ -101,7 +99,7 @@ export function drawGame(
     drawSurveyProbes(roids, currShip.position);
   }
   drawFurnacePipes(currShip.position);
-  drawStreetFoundations(currShip.position);
+  drawFurnaceFoundations(currShip.position);
   drawFurnacesRelative(currShip.position);
   drawAsteroidShatterBursts(currShip);
 
@@ -179,9 +177,7 @@ export function drawGame(
   const otherPlayers = allPlayers.filter((player) => player.id !== localId);
   drawMiniMap(ctx, hudLayout, currShip, roids, loot, satellitePickups, otherPlayers);
 
-  drawScoreOverlay(ctx, hudLayout, viewport, currScore, lives);
-
-  drawLivesIndicator(ctx, hudLayout, lives, currPlayer.color, currShip.kitId);
+  drawScoreOverlay(ctx, hudLayout, viewport, currScore);
 
   if (text && textAlpha > 0) {
     drawTextOverlay(ctx, hudLayout, viewport, text, textAlpha);

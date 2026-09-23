@@ -16,16 +16,14 @@ import {
 
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
-async function expectPilotsAliveWithUnchangedLives(
+async function expectPilotsAliveWithUnchangedHealth(
   game1: GameInteractions,
   game2: GameInteractions,
   id1: string,
   id2: string,
-  expectedLives: readonly [number, number]
+  expectedHealth: readonly [number, number]
 ): Promise<void> {
   const [
-    lives1,
-    lives2,
     health1,
     health2,
     exploding1,
@@ -35,8 +33,6 @@ async function expectPilotsAliveWithUnchangedLives(
     remoteIds1,
     remoteIds2,
   ] = await Promise.all([
-    game1.getLives(),
-    game2.getLives(),
     game1.getShipHealth(),
     game2.getShipHealth(),
     game1.isShipExploding(),
@@ -47,8 +43,8 @@ async function expectPilotsAliveWithUnchangedLives(
     game2.getRemotePlayerIds(),
   ]);
 
-  expect(lives1).toBe(expectedLives[0]);
-  expect(lives2).toBe(expectedLives[1]);
+  expect(health1).toBe(expectedHealth[0]);
+  expect(health2).toBe(expectedHealth[1]);
   expect(health1).toBeGreaterThan(0);
   expect(health2).toBeGreaterThan(0);
   expect(exploding1).toBe(false);
@@ -67,11 +63,11 @@ test(
     const diagnostics2 = watchBrowserDiagnostics(page2);
     const id1 = await localPlayerId(page1);
     const id2 = await localPlayerId(page2);
-    const livesBeforeFirstExchange: [number, number] = [
-      await game1.getLives(),
-      await game2.getLives(),
+    const healthBeforeFirstExchange: [number, number] = [
+      await game1.getShipHealth(),
+      await game2.getShipHealth(),
     ];
-    await expectPilotsAliveWithUnchangedLives(game1, game2, id1, id2, livesBeforeFirstExchange);
+    await expectPilotsAliveWithUnchangedHealth(game1, game2, id1, id2, healthBeforeFirstExchange);
 
     const [local1, remote1] = await Promise.all([
       observeLaser(page1, id1, false),
@@ -85,15 +81,15 @@ test(
       waitForLaserCleanup(page1, id1, false),
       waitForLaserCleanup(page2, id1, true),
     ]);
-    await expectPilotsAliveWithUnchangedLives(game1, game2, id1, id2, livesBeforeFirstExchange);
+    await expectPilotsAliveWithUnchangedHealth(game1, game2, id1, id2, healthBeforeFirstExchange);
 
     await parkLaserClients([game1, game2]);
-    const livesBeforeSecondExchange: [number, number] = [
-      await game1.getLives(),
-      await game2.getLives(),
+    const healthBeforeSecondExchange: [number, number] = [
+      await game1.getShipHealth(),
+      await game2.getShipHealth(),
     ];
-    expect(livesBeforeSecondExchange).toEqual(livesBeforeFirstExchange);
-    await expectPilotsAliveWithUnchangedLives(game1, game2, id1, id2, livesBeforeSecondExchange);
+    expect(healthBeforeSecondExchange).toEqual(healthBeforeFirstExchange);
+    await expectPilotsAliveWithUnchangedHealth(game1, game2, id1, id2, healthBeforeSecondExchange);
 
     const [local2, remote2] = await Promise.all([
       observeLaser(page2, id2, false),
@@ -107,7 +103,7 @@ test(
       waitForLaserCleanup(page2, id2, false),
       waitForLaserCleanup(page1, id2, true),
     ]);
-    await expectPilotsAliveWithUnchangedLives(game1, game2, id1, id2, livesBeforeSecondExchange);
+    await expectPilotsAliveWithUnchangedHealth(game1, game2, id1, id2, healthBeforeSecondExchange);
     await page1.screenshot({
       path: screenshotManager.getScreenshotPath('slower-projectiles-desktop.png'),
     });

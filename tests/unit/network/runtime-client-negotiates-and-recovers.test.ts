@@ -292,7 +292,6 @@ describe('actual ConnectionManager WebSocket message path', () => {
       damage: 10,
       remainingHealth: 90,
       isDestroyed: false,
-      remainingLives: 3,
     };
     ws.receive('playerDamaged', damage);
     expect(played).toContain('/sounds/hull-damage.m4a');
@@ -704,10 +703,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(baseline).encode(1));
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
-    }).toEqual({ health: 100, lives: 3, maxHealth: 100, exploding: false });
+    }).toEqual({ health: 100, cargo: 0, purchases: [], maxHealth: 100, exploding: false });
 
     const damaged = structuredClone(baseline);
     const damagedEntity = damaged.entities[0];
@@ -720,10 +720,11 @@ describe('actual ConnectionManager WebSocket message path', () => {
     );
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
-    }).toEqual({ health: 75, lives: 3, maxHealth: 100, exploding: false });
+    }).toEqual({ health: 75, cargo: 0, purchases: [], maxHealth: 100, exploding: false });
 
     const healing = structuredClone(damaged);
     const healingEntity = healing.entities[0];
@@ -734,12 +735,14 @@ describe('actual ConnectionManager WebSocket message path', () => {
     ws.receive('snapshot', new SnapshotEncoder(healing).encode(3, { sequence: 2, state: damaged }));
     expect({
       health: player.ship.health,
-      lives: player.lives,
+      cargo: player.cargo,
+      purchases: player.purchases,
       maxHealth: player.ship.maxHealth,
       exploding: player.ship.exploding,
     }).toEqual({
       health: regeneratedHealth,
-      lives: 3,
+      cargo: 0,
+      purchases: [],
       maxHealth: 100,
       exploding: false,
     });

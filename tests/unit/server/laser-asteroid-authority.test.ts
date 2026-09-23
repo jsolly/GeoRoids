@@ -64,7 +64,10 @@ describe('Server laser↔asteroid authority', () => {
     expect(first.newAsteroids).toHaveLength(0);
     expect(second.applied).toBe(false);
     expect(second.newAsteroids).toHaveLength(0);
-    expect(engine.getPlayer('p1')?.score).toBe(ROID.POINTS_MEDIUM);
+    expect(engine.getPlayer('p1')?.score).toBe(0);
+    expect(engine.getLoot().find((drop) => drop.kind === 'points')?.points).toBe(
+      ROID.POINTS_MEDIUM
+    );
     expect(engine.getAsteroid('roid-once')).toBeUndefined();
     expect(engine.getAsteroidCount()).toBe(0);
   });
@@ -88,12 +91,12 @@ describe('Server laser↔asteroid authority', () => {
     expect(partner.outcome).toBe('destroyed');
     expect(partner.split).toBe(true);
     expect(partner.newAsteroids).toHaveLength(2);
-    expect(engine.getPlayer('p1')?.score).toBe(ROID.POINTS_LARGE);
-    expect(engine.getPlayer('p2')?.score).toBe(ROID.POINTS_LARGE);
+    expect(engine.getPlayer('p1')?.score).toBe(0);
+    expect(engine.getPlayer('p2')?.score).toBe(0);
     expect(engine.getAsteroid('roid-collab')).toBeUndefined();
   });
 
-  test('large-rock destruction pays each distinct miner and Scout one full value', () => {
+  test('large-rock destruction leaves points in space without banking them for contributors', () => {
     const engine = new GameEngine();
     engine.addPlayer('miner-a', 'Miner A', {} as never, { x: 0, y: 0 });
     engine.addPlayer('miner-b', 'Miner B', {} as never, { x: 10, y: 0 });
@@ -107,9 +110,9 @@ describe('Server laser↔asteroid authority', () => {
     const result = engine.applyLaserAsteroidHit(target.id, 'miner-b', 'laser', 100);
 
     expect(result.outcome).toBe('destroyed');
-    expect(engine.getPlayer('miner-a')?.score).toBe(ROID.POINTS_LARGE);
-    expect(engine.getPlayer('miner-b')?.score).toBe(ROID.POINTS_LARGE);
-    expect(engine.getPlayer('scout')?.score).toBe(ROID.POINTS_LARGE);
+    expect(engine.getPlayer('miner-a')?.score).toBe(0);
+    expect(engine.getPlayer('miner-b')?.score).toBe(0);
+    expect(engine.getPlayer('scout')?.score).toBe(0);
   });
 
   test('server laser tick breaks an overlapping medium asteroid once', () => {
@@ -127,7 +130,7 @@ describe('Server laser↔asteroid authority', () => {
 
     const again = engine.advanceLasersAndResolveHits();
     expect(again).toHaveLength(0);
-    expect(engine.getPlayer('p1')?.score).toBe(ROID.POINTS_MEDIUM);
+    expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 
   test('server laser tick tags a large asteroid without finishing the collab window', () => {
@@ -157,7 +160,7 @@ describe('Server laser↔asteroid authority', () => {
     expect(firstHit.applied).toBe(true);
     expect(firstHit.points).toBe(ROID.POINTS_MEDIUM);
     expect(playerHit.applied).toBe(false);
-    expect(engine.getPlayer('p2')?.score).toBe(ROID.POINTS_MEDIUM);
+    expect(engine.getPlayer('p2')?.score).toBe(0);
     expect(engine.getPlayer('p1')?.score).toBe(0);
   });
 });
@@ -299,12 +302,15 @@ describe('Asteroid destruction over real sockets', () => {
         ]);
         expect(received.filter((message) => message.type === 'asteroidCreateBatch')).toEqual([]);
         expect(received.filter((message) => message.type === 'scoreUpdate')).toEqual([
-          { type: 'scoreUpdate', data: { playerId: pilot.id, score: scoreBefore + points } },
+          { type: 'scoreUpdate', data: { playerId: pilot.id, score: scoreBefore } },
         ]);
         expect(server.gameEngine.getAllAsteroids().map((asteroid) => asteroid.id)).toEqual([
           untouched.id,
         ]);
-        expect(pilot.score).toBe(scoreBefore + points);
+        expect(pilot.score).toBe(scoreBefore);
+        expect(server.gameEngine.getLoot().find((drop) => drop.kind === 'points')?.points).toBe(
+          points
+        );
         expect(states.at(-1)?.asteroids.map((asteroid) => asteroid.id)).toEqual([untouched.id]);
       } finally {
         clock.mockRestore();

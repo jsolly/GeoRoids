@@ -2,10 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CIVIC_LOTS } from '../../../shared/furnaces';
 import { WORLD } from '../../../shared/world';
 import type { ShipKitId } from '../../../shared-types';
-import { PALETTE, SHIP, TITLE, VISUAL } from '../../../src/constants';
+import { PALETTE, TITLE, VISUAL } from '../../../src/constants';
 import { getKitHullOutline, projectHullPolyline } from '../../../src/entities/ship/hullOutlines';
 import { applyShipKitToShip } from '../../../src/entities/ship/shipKits';
-import { layoutHudCluster } from '../../../src/rendering/hud/cluster';
 import {
   FURNACE_MAP_INK,
   MINIMAP_FURNACE_MARK_SIZE,
@@ -238,58 +237,19 @@ describe('painted HUD composition', () => {
     vi.resetModules();
   });
 
-  test('three upright life hulls accompany the score and kit', async () => {
-    expect(VISUAL.HUD_LIFE_SIZE).toBe(14);
-    expect(VISUAL.HUD_LIFE_SIZE).toBeLessThan(SHIP.SIZE / 2);
-    expect(VISUAL.HUD_INSET).toBe(16);
-    expect(VISUAL.SCORE_FONT).toBe('14px Arial');
-
+  test('the HUD shows bank, finite cargo, and shared settlement requirements', async () => {
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
-    const { drawLivesIndicator } = await import('../../../src/rendering/hud/lives');
     const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
     const player = PlayerManager.getInstance().createLocalPlayer('scout');
-
+    player.cargo = 123;
     const ctx = canvasContext();
-    const { strokes, texts } = recordCanvas(ctx);
-    const layout = computeHudLayout(ctx.canvas, { touchControls: false });
-
-    drawLivesIndicator(ctx, layout, 3, PALETTE.LOCAL, player.ship.kitId);
-    const hulls = strokes.filter((call) => call.style === normalizedCanvasColor(ctx, '#5EEAD4'));
-    const silhouette = getKitHullOutline('scout').hull;
-    expect(strokes).toHaveLength(6);
-    expect(hulls).toHaveLength(3);
-    for (const [index, hull] of hulls.entries()) {
-      expect(hull.closed).toBe(true);
-      expect(hull.points).toHaveLength(silhouette.points.length);
-      const xs = hull.points.map(([x]) => x);
-      const ys = hull.points.map(([, y]) => y);
-      expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(10);
-      expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(6);
-      expect(Math.min(...ys)).toBeLessThan(23);
-      const centerX = 23 + index * 20;
-      expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(centerX, 0);
-    }
-
-    drawScoreOverlay(ctx, layout, ctx.canvas, 4321, 3);
-    expect(texts).toEqual([
-      {
-        text: '4321',
-        x: 80,
-        y: 23,
-        style: normalizedCanvasColor(ctx, '#E2E8F0'),
-        font: '14px Arial',
-        align: 'left',
-      },
-      {
-        text: 'Scout',
-        x: 16,
-        y: 38,
-        style: normalizedCanvasColor(ctx, 'rgba(100,116,139,0.85)'),
-        font: '11px Arial',
-        align: 'left',
-      },
-    ]);
+    const { texts } = recordCanvas(ctx);
+    drawScoreOverlay(ctx, computeHudLayout(ctx.canvas, { touchControls: false }), ctx.canvas, 4321);
+    expect(texts.some((row) => row.text === 'Bank 4,321')).toBe(true);
+    expect(texts.some((row) => row.text.includes('Cargo 123/500'))).toBe(true);
+    expect(texts.some((row) => row.text.includes('Settlement 1'))).toBe(true);
+    expect(texts.some((row) => row.text.includes('crystal 0/20'))).toBe(true);
   });
 
   test('the local radar marks only nearby revealed furnaces, leaving distant discoveries to the universe map', async () => {
@@ -587,7 +547,7 @@ describe('painted HUD composition', () => {
     const haulerOutline = getKitHullOutline('hauler');
     const scoutMarks = 1 + scoutOutline.extras.length;
     const haulerMarks = 1 + haulerOutline.extras.length;
-    // One arena ring, four world layers, street foundations, the court, then kit hulls.
+    // One arena ring, four world layers, nearby furnace foundations, then kit hulls.
     expect(strokes).toHaveLength(
       1 + 4 + darkLotsInRadar.length + 1 + scoutMarks * 2 * 3 + haulerMarks * 2
     );
@@ -736,30 +696,4 @@ test('locked palette hexes stay the #415/#435 playfield swatch', () => {
   });
   expect(TITLE.ACCENT).toBe('#A78BFA');
   expect(PALETTE).not.toHaveProperty('ACCENT_UI');
-});
-
-test('layoutHudCluster keeps three lives and the score in one compact strip', () => {
-  const three = layoutHudCluster(3);
-  expect(three.lifeCenters).toHaveLength(3);
-  expect(three.lifeCenters[0]).toEqual({
-    x: VISUAL.HUD_INSET + VISUAL.HUD_LIFE_SIZE / 2,
-    y: VISUAL.HUD_INSET + VISUAL.HUD_LIFE_SIZE / 2,
-  });
-  const last = three.lifeCenters[2];
-  const first = three.lifeCenters[0];
-  expect(first).toBeDefined();
-  expect(last).toBeDefined();
-  if (!first || !last) {
-    throw new Error('expected three life centers');
-  }
-  expect(three.score.x).toBeGreaterThan(last.x + VISUAL.HUD_LIFE_SIZE / 2);
-  expect(three.score.x).toBeLessThan(120);
-  expect(three.score.y).toBe(first.y);
-
-  const none = layoutHudCluster(0);
-  expect(none.lifeCenters).toEqual([]);
-  expect(none.score).toEqual({
-    x: VISUAL.HUD_INSET,
-    y: VISUAL.HUD_INSET + VISUAL.HUD_LIFE_SIZE / 2,
-  });
 });

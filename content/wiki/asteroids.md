@@ -21,7 +21,7 @@ Ice breaks easily, metal takes repeated hits, and larger rubble fragments into s
 
 ## Cooperative splits and score
 
-Two different pilots hitting a large ice rock in quick succession split it and earn shared credit. A repeat hit by one pilot or an expired collaboration window breaks it without that split; metal and rubble follow their own rules. Split shockwaves push nearby ships and rocks without direct damage, and all recorded miners and scanners share mining rewards.
+Two different pilots hitting a large ice rock in quick succession split it and leave collectible point loot. A repeat hit by one pilot or an expired collaboration window breaks it without that split; metal and rubble follow their own rules. Split shockwaves push nearby ships and rocks without direct damage, and mining leaves points to pick up and haul home; delivery contributors share banked furnace rewards.
 
 ## Colossal deposits
 
@@ -42,3 +42,7 @@ Head east to mine the metal-rich belt or tow its deposits to a furnace; explored
 ## Belt spiders
 
 Black, red-eyed crawlers round rock cover and hop between nearby rocks to chase you. Shoot exposed bodies without destroying their rocks, and retreat beyond their telegraphed lunges; solid rock blocks both attacks and shots. When a host breaks, survivors leap to a reachable rock with their wounds intact, or die if none is reachable.
+
+## Ore and refining
+
+Many asteroids are barren. Scouts and equipped satellites reveal ore: ice, metal, rubble, or crystal. Bring ore-bearing rocks to a furnace using a tow cable or Boost Coupling to refine them into shared materials and valuable banked rewards for delivery contributors. Mining produces point loot to haul home. Splitting a rock reduces its total recoverable ore; intact deliveries preserve the most value.

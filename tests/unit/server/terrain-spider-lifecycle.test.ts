@@ -204,10 +204,10 @@ for (const site of ['town-square', 'street-1-0']) {
   );
 }
 
-test('a dark street foundation does not break a spider chase', () => {
+test('a dark furnace foundation does not break a spider chase', () => {
   const lot = civicLot('street-1-0');
   if (!lot) {
-    throw new Error('Missing street');
+    throw new Error('Missing furnace');
   }
   const manager = new TerrainSpiderManager(() => 0.5);
   const pilot = actorAt({ ...lot.position });

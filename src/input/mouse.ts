@@ -22,7 +22,7 @@ export function handleMouseMove(ev: MouseEvent, player: Player): void {
   if (isSyntheticTouchMouse(ev)) {
     return;
   }
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
 
@@ -45,10 +45,14 @@ export function handleMouseDown(ev: MouseEvent, player: Player): void {
   logger.debug('MOUSE', 'Mouse down event', {
     button: ev.button,
     playerId: player.id,
-    lives: player.lives,
     exploding: player.ship.exploding,
   });
-  if (isShipSchematicOpen() || isTownStoreOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (
+    isShipSchematicOpen() ||
+    isTownStoreOpen() ||
+    player.ship.health <= 0 ||
+    player.ship.exploding
+  ) {
     logger.debug('MOUSE', 'Mouse down ignored - player dead or exploding', { playerId: player.id });
     return;
   }
@@ -67,7 +71,7 @@ export function handleMouseUp(ev: MouseEvent, player: Player): void {
     return;
   }
   // Early return for dead/exploding players
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
 

@@ -307,12 +307,10 @@ describe('server-authoritative combat', () => {
       source: 'collision',
       healthBefore: DAMAGE.LASER_HIT,
       healthAfter: 0,
-      livesBefore: 5,
-      livesAfter: 4,
     });
     expect(stateEvents[2]?.[2]).toMatchObject({
       playerId: 'p1',
-      state: { health: SHIP.MAX_HEALTH, lives: 4, exploding: false },
+      state: { health: SHIP.MAX_HEALTH, exploding: false },
     });
   });
 
@@ -509,6 +507,5 @@ describe('server-authoritative combat', () => {
     );
 
     expect(engine.getPlayer('nova')?.health).toBe(0);
-    expect(engine.getPlayer('nova')?.lives).toBe(4);
   });
 });

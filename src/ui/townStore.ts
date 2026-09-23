@@ -1,16 +1,10 @@
 import { TOWN_HEARTH } from '../../shared/furnaces';
 import { litTravelDestinations, nearestTravelFurnace } from '../../shared/furnaceTravel';
-import {
-  EXTRA_LIFE_COST,
-  insideTownStore,
-  MAX_LIVES,
-  TOWN_YIELD_PER_MODULE,
-  townDeliveryBonusPercent,
-} from '../../shared/townStore';
+import { insideTownStore, STORE_OFFERS } from '../../shared/townStore';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { NetworkManager } from '../network/networkManager';
-import { worldFurnaces } from '../network/worldExploration';
+import { getSettlement, worldFurnaces } from '../network/worldExploration';
 import { logger } from '../utils/Logger';
 import { renderFurnaceTravelMap } from './furnaceTravelMap';
 import { closeShipSchematic } from './shipSchematic';
@@ -21,10 +15,8 @@ import { closeUniverseMap, isUniverseMapOpen } from './universeMap';
 export const TOWN_STORE_IDS = {
   dialog: 'town-store-dialog',
   close: 'town-store-close',
-  yield: 'town-store-yield',
   score: 'town-store-score',
   offer: 'town-store-offer',
-  price: 'town-store-life-price',
   status: 'town-store-status',
   return: 'town-store-return',
   destinations: 'town-store-destinations',
@@ -44,7 +36,6 @@ const BLOCKED_GAMEPLAY_KEYS = new Set([
 type StoreElements = {
   dialog: HTMLDialogElement;
   close: HTMLButtonElement;
-  yieldLine: HTMLElement;
   score: HTMLElement;
   offer: HTMLElement;
   destinations: HTMLElement;
@@ -63,7 +54,7 @@ export function canEnterTownStore(): boolean {
     return false;
   }
   const player = PlayerManager.getInstance().getLocalPlayer();
-  if (!player || player.lives <= 0 || player.ship.exploding || player.ship.health <= 0) {
+  if (!player || player.ship.exploding || player.ship.health <= 0) {
     return false;
   }
   if (player.ship.furnaceTransit) {
@@ -72,50 +63,10 @@ export function canEnterTownStore(): boolean {
   return nearestTravelFurnace(player.ship.position, worldFurnaces) !== undefined;
 }
 
-function streetsBuiltByLocal() {
-  const id = PlayerManager.getInstance().getLocalPlayer()?.id;
-  if (!id) {
-    return 0;
-  }
-  return worldFurnaces.modulesBuiltBy(id);
-}
-
 function setTextIfChanged(node: HTMLElement, text: string): void {
   if (node.textContent !== text) {
     node.textContent = text;
   }
-}
-
-function lifeButton(): HTMLButtonElement | null {
-  if (!elements) {
-    return null;
-  }
-  const existing = elements.offer.querySelector<HTMLButtonElement>(
-    'button[data-offer="extra-life"]'
-  );
-  if (existing) {
-    return existing;
-  }
-  const row = document.createElement('div');
-  row.className = 'town-store-row';
-  const copy = document.createElement('span');
-  copy.className = 'town-store-copy';
-  const name = document.createElement('strong');
-  name.textContent = 'Extra life';
-  const price = document.createElement('small');
-  price.id = TOWN_STORE_IDS.price;
-  price.textContent = `${EXTRA_LIFE_COST.toLocaleString('en-US')} score`;
-  copy.append(name, price);
-  const buy = document.createElement('button');
-  buy.type = 'button';
-  buy.dataset['offer'] = 'extra-life';
-  buy.setAttribute('aria-describedby', TOWN_STORE_IDS.price);
-  buy.addEventListener('click', () => {
-    purchaseExtraLife();
-  });
-  row.append(copy, buy);
-  elements.offer.replaceChildren(row);
-  return buy;
 }
 
 function requestFurnaceTravel(destinationId: string): void {
@@ -161,32 +112,50 @@ function refreshStoreCopy(): void {
       elements.destinations.replaceChildren();
     }
   }
-  const built = streetsBuiltByLocal();
-  const bonus = townDeliveryBonusPercent(built);
-  const perStreet = Math.round(TOWN_YIELD_PER_MODULE * 100);
-  setTextIfChanged(
-    elements.yieldLine,
-    built === 0
-      ? `Each street you build adds ${perStreet}% to your own furnace deliveries.`
-      : `You built ${built} ${built === 1 ? 'street' : 'streets'}. Your deliveries pay ${bonus}% more.`
-  );
+  const level = getSettlement().level;
   setTextIfChanged(
     elements.score,
-    `Score ${Math.max(0, Math.floor(player?.score ?? 0)).toLocaleString('en-US')}`
+    `Bank ${(player?.score ?? 0).toLocaleString()} · Settlement level ${level}`
   );
-  const buy = lifeButton();
-  if (!buy) {
-    return;
+  if (!elements.offer.children.length) {
+    for (const offer of STORE_OFFERS) {
+      const row = document.createElement('div');
+      row.className = 'town-store-row';
+      const copy = document.createElement('span');
+      copy.className = 'town-store-copy';
+      const name = document.createElement('strong');
+      name.textContent = offer.name;
+      const price = document.createElement('small');
+      price.id = `town-store-price-${offer.id}`;
+      price.textContent = `${offer.cost} banked points · Level ${offer.level} · No gameplay effect`;
+      copy.append(name, price);
+      const buy = document.createElement('button');
+      buy.type = 'button';
+      buy.dataset['offer'] = offer.id;
+      buy.setAttribute('aria-describedby', price.id);
+      buy.addEventListener('click', () => purchasePlaceholder(offer.id));
+      row.append(copy, buy);
+      elements.offer.append(row);
+    }
   }
-  const full = (player?.lives ?? 0) >= MAX_LIVES;
-  const label = full ? 'Extra life, lives full' : 'Buy extra life';
-  const wasFocused = document.activeElement === buy;
-  setTextIfChanged(buy, label);
-  if (buy.disabled !== full) {
-    buy.disabled = full;
-  }
-  if (wasFocused && buy.disabled) {
-    elements.return.focus({ preventScroll: true });
+  for (const offer of STORE_OFFERS) {
+    const button = elements.offer.querySelector<HTMLButtonElement>(
+      `button[data-offer="${offer.id}"]`
+    );
+    if (!button) {
+      continue;
+    }
+    const owned = player?.purchases.includes(offer.id) ?? false;
+    const locked = level < offer.level;
+    const hadFocus = document.activeElement === button;
+    button.disabled = owned || locked || (player?.score ?? 0) < offer.cost;
+    if (button.disabled && hadFocus) {
+      elements.return.focus();
+    }
+    setTextIfChanged(
+      button,
+      owned ? 'Purchased' : locked ? `Unlocks at level ${offer.level}` : `Buy ${offer.name}`
+    );
   }
 }
 
@@ -204,7 +173,6 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
       </div>
       <button id="${TOWN_STORE_IDS.close}" type="button" aria-label="Close store">×</button>
     </header>
-    <p id="${TOWN_STORE_IDS.yield}"></p>
     <p id="${TOWN_STORE_IDS.score}"></p>
     <div id="${TOWN_STORE_IDS.offer}"></div>
     <h3>Destination map</h3>
@@ -227,27 +195,26 @@ function ensureElements(): StoreElements | null {
   }
   createDialogMarkup(dialog);
   const close = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.close}`);
-  const yieldLine = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.yield}`);
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
   const offer = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`);
   const destinations = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.destinations}`);
   const status = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.status}`);
   const returnButton = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.return}`);
-  if (!close || !yieldLine || !score || !offer || !destinations || !status || !returnButton) {
+  if (!close || !score || !offer || !destinations || !status || !returnButton) {
     return null;
   }
-  return { dialog, close, yieldLine, score, offer, destinations, status, return: returnButton };
+  return { dialog, close, score, offer, destinations, status, return: returnButton };
 }
 
-function purchaseExtraLife(): void {
+function purchasePlaceholder(offerId: string): void {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player || !isTownStoreOpen() || !insideTownStore(player.ship.position)) {
     return;
   }
   NetworkManager.getInstance().sendMessage({
-    type: 'buyExtraLife',
+    type: 'buyStoreItem',
     id: player.id,
-    data: {},
+    data: { offerId },
   });
 }
 
@@ -269,8 +236,12 @@ export function applyTownStoreResult(data: unknown): void {
   if ('score' in data && typeof data.score === 'number' && Number.isFinite(data.score)) {
     player.score = data.score;
   }
-  if ('lives' in data && typeof data.lives === 'number' && Number.isInteger(data.lives)) {
-    player.lives = data.lives;
+  if (
+    'purchases' in data &&
+    Array.isArray(data.purchases) &&
+    data.purchases.every((id) => typeof id === 'string')
+  ) {
+    player.purchases = [...data.purchases];
   }
   refreshStoreCopy();
 }

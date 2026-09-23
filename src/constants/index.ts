@@ -10,8 +10,7 @@ import { getStoredItem } from '../utils/safeStorage';
 // GAME CONFIGURATION
 // ============================================================================
 export const GAME = {
-  // Lives and scoring
-  START_LIVES: 5,
+  // Bank starting balance and simulation timing
   STARTING_SCORE: 0,
 
   // Physics
@@ -141,10 +140,7 @@ export const VISUAL = {
   MINIMAP_VOID_ALPHA: 0.5,
   MINIMAP_RING_ALPHA: 0.85,
   HUD_INSET: 16,
-  HUD_LIFE_SIZE: 14,
-  HUD_LIFE_HEADING: Math.PI / 2,
-  HUD_LIFE_GAP: 6,
-  HUD_SCORE_GAP: 10,
+  HUD_BALANCE_HEIGHT: 14,
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,

@@ -8,7 +8,7 @@ const FACTION_OR_TEAM_PATTERN = /FACTION_LABELS|getSideColor|faction/iu;
 const TEAM_SCORE_PATTERN = /teamScore|team win|TEAM SCORE/iu;
 
 test('delivery toast does not replace the score', () => {
-  const scoreDraw = gameInfoSrc.indexOf('fillText(score.toString()');
+  const scoreDraw = gameInfoSrc.indexOf('fillText(`Bank ');
   const deliveryDraw = gameInfoSrc.indexOf('hasPickupMessage()');
   expect(scoreDraw).toBeGreaterThan(0);
   expect(deliveryDraw).toBeGreaterThan(scoreDraw);

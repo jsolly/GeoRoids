@@ -5,6 +5,19 @@ import type { DrawingContext } from '../../rendering/drawingContext';
 
 type Point = readonly [number, number];
 const DETAILS: Record<AsteroidMaterial, readonly (readonly Point[])[]> = {
+  crystal: [
+    [
+      [0, -0.8],
+      [0.55, 0],
+      [0, 0.8],
+      [-0.55, 0],
+      [0, -0.8],
+    ],
+    [
+      [0, -0.8],
+      [0, 0.8],
+    ],
+  ],
   ice: [
     [
       [-0.72, 0.05],

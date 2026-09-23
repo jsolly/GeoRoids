@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, expect, test, vi } from 'vitest';
+import { emptySettlement } from '../../../shared/economy';
 import {
   captureSnapshot,
   type SnapshotBaseline,
@@ -143,7 +144,6 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       if (tick >= 30 && tick < 60) {
         pilot.health = 0;
         pilot.exploding = true;
-        pilot.lives = 2;
         pilot.respawnTimer = 60 - tick;
         pilot.deathCause = 'boundary';
       }
@@ -293,6 +293,7 @@ describe('pilots reconstruct complete authoritative worlds', () => {
       satellitePickups: [],
       playerProjectiles: [],
       collabTags: [],
+      settlement: emptySettlement(),
       exploration: [],
       mapAssets: [],
       gameTime: 1,

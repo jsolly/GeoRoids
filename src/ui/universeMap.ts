@@ -1,4 +1,5 @@
 import { beltSlotPosition, beltSlots } from '../../shared/asteroidBelt';
+import { oreResource } from '../../shared/economy';
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
 import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
 import { RICOCHET_COURT } from '../../shared/ricochetCourt';
@@ -546,7 +547,7 @@ function isRevealed(position: Position, exploration: readonly ExplorationTile[])
   return cell !== null && isCellExplored(exploration, cell);
 }
 
-/** Street lots stay on the chart before their ground is explored. Loot does not. */
+/** Furnace lots stay on the chart before their ground is explored. Loot does not. */
 function chartShowsAsset(asset: MapAsset, exploration: readonly ExplorationTile[]): boolean {
   return (
     asset.kind === 'furnace' ||
@@ -703,7 +704,7 @@ function drawNearbyResources(
     }
     const material =
       roid.surveyedBy && roid.surveyedBy.length > 0
-        ? roid.material
+        ? (oreResource(roid) ?? undefined)
         : scanners
             .map((scanner) => scannedMaterial(scanner, roid))
             .find((value) => value !== undefined);
@@ -902,7 +903,7 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   );
 }
 
-/** Lit streets only. Dark lots stay marked, with no line back to Town Square. */
+/** Lit furnaces only. Dark lots stay marked, with no line back to Town Square. */
 function drawLitFurnacePipes(context: CanvasRenderingContext2D, frame: MapFrame): void {
   const now = performance.now();
   const width = 2.6 / frame.scale;

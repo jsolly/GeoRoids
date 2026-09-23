@@ -98,7 +98,6 @@ test.each(
     engine.advanceCombatFrame();
     engine.resolveAuthoritativeCombat();
     expect(pilot.health).toBe(pilot.maxHealth);
-    const lives = pilot.lives;
     pilot.overlayHold = false;
     pilot.spawnProtectionTimer = 0;
     pilot.health = health;
@@ -109,7 +108,6 @@ test.each(
     }
     expect(pilot.health).toBe(0);
     expect(pilot.exploding).toBe(true);
-    expect(pilot.lives).toBe(lives - 1);
     expect(pilot.deathCause).toBe('spider');
   }
 );

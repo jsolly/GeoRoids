@@ -55,7 +55,6 @@ describe('Crew survival against world hazards', () => {
 
     const destroyed = engine.handleShipDamage('p1', 'asteroid', 100).isDestroyed;
     expect(destroyed).toBe(true);
-    expect(engine.getPlayer('p1')?.lives).toBe(4);
     expect(engine.getPlayer('p1')?.respawnTimer).toBe(SHIP.RESPAWN_DELAY_FRAMES);
   });
 

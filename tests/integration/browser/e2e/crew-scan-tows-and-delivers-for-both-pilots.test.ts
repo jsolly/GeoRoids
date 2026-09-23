@@ -15,7 +15,7 @@ import { arrangeCrewField } from '../../utils/test-server-control';
 const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirname);
 
 const FIXTURE_ASTEROID_ID = 'crew-fixture-ore';
-const DELIVERY_REWARD = furnaceReward({ material: 'metal', size: 25 });
+const DELIVERY_REWARD = furnaceReward({ id: 'test', ore: 'metal', material: 'metal', size: 25 });
 
 type CrewState = {
   score: number;

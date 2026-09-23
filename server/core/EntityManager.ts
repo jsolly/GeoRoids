@@ -20,7 +20,7 @@ import type {
   ShipKitId,
   Velocity,
 } from '../../shared-types';
-import { GAME, PALETTE, SHIP } from '../../src/constants';
+import { PALETTE, SHIP } from '../../src/constants';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import {
   applyShipKitStats,
@@ -46,7 +46,8 @@ export interface GameEntity {
   thrusting: boolean;
   boost: ShipBoostState;
   color: string;
-  lives: number;
+  cargo: number;
+  purchases: string[];
   score: number;
   health: number;
   maxHealth: number;
@@ -220,7 +221,8 @@ export class EntityManager {
       thrusting: false,
       boost: fullShipBoost(),
       color: PALETTE.REMOTE,
-      lives: GAME.START_LIVES,
+      cargo: 0,
+      purchases: [],
       score: 0,
       health: 100,
       maxHealth: 100,
@@ -273,19 +275,12 @@ export class EntityManager {
     return entity;
   }
 
-  private shouldScheduleRespawn(entity: GameEntity): boolean {
-    return entity.lives > 0;
-  }
-
   /**
    * Do not reset an existing countdown (that stacked a second wait and felt
-   * like freeze-stick). Last-life pilots stay dead.
+   * like freeze-stick). Every pilot returns to flight.
    */
   public scheduleShipRespawn(entity: GameEntity): void {
     if (entity.respawnTimer !== undefined) {
-      return;
-    }
-    if (!this.shouldScheduleRespawn(entity)) {
       return;
     }
     entity.respawnTimer = SHIP.RESPAWN_DELAY_FRAMES;
@@ -314,7 +309,7 @@ export class EntityManager {
     return finishedExploding;
   }
 
-  // Shared ship respawn for living pilots.
+  // Shared ship respawn for all pilots.
   public updateRespawns(): string[] {
     const finishedRespawning: string[] = [];
 
@@ -325,12 +320,6 @@ export class EntityManager {
         }
 
         if (entity.respawnTimer === 0) {
-          // A leftover timer must not resurrect a player who already spent their last life.
-          if (!this.shouldScheduleRespawn(entity)) {
-            delete entity.respawnTimer;
-            continue;
-          }
-
           this.respawnShip(entity);
           finishedRespawning.push(entityId);
           logger.debug('ENTITY', 'Entity respawned', {

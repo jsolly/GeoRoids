@@ -1,5 +1,5 @@
 import type { AsteroidData } from '../../shared-types';
-import type { PersistentPilot, SavedWorld } from './WorldStore';
+import type { PersistentPilot, SavedEconomy, SavedWorld } from './WorldStore';
 
 /** Messages the game thread sends to the world-store worker. */
 export type WorldStoreWorkerRequest =
@@ -7,6 +7,7 @@ export type WorldStoreWorkerRequest =
       type: 'persist';
       id: number;
       world: SavedWorld | undefined;
+      economy: SavedEconomy | undefined;
       /** Structured clone carries the Map as-is; the worker validates its contents. */
       sectors: ReadonlyMap<string, AsteroidData[]>;
       pilots: PersistentPilot[];

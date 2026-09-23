@@ -161,8 +161,8 @@ authoritative state; slow delivery is recorded without failing the run.
 Raw delivery intervals and unanswered measured pings remain in the report; an
 unanswered measured probe fails the run. Shot rates are offered commands. Each
 negotiated pilot must also observe an authoritative projectile born after its
-first measured movement acknowledgment. Game-over pilots leave and rejoin on their existing socket; `gameJoins`
-records this session churn separately from TCP connections. It measures generator CPU, memory and event-loop
+first measured movement acknowledgment. Dead pilots wait for the normal respawn on their existing socket; `gameJoins`
+records actual joins separately from TCP connections. It measures generator CPU, memory and event-loop
 delay alongside server health and client delivery. A shared-host run does not
 establish Railway capacity or prove an independent load generator has headroom.
 
@@ -239,7 +239,7 @@ The browser alternates trusted steering/fire presses on anchored one-second slot
 available ability controls. Reports require authoritative movement and
 new projectile witnesses. A five-minute run additionally requires at least 300
 input steps. Skipped slots are accepted only when their scheduled instant falls
-inside a recorded browser game-over recovery of at most ten seconds. Peer setup
+inside a recorded browser respawn recovery of at most ten seconds. Peer setup
 and unexplained active-play stalls do not qualify. Recovery duration and skipped
 slot counts remain in comparison evidence; at least 300 measured actions and
 slots are still required. Raw `inputToRenderMs` samples, rather than the offered step count,

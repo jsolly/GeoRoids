@@ -1,3 +1,4 @@
+import { oreResource } from '../../../shared/economy';
 import {
   cellWorldBounds,
   explorationCellAt,
@@ -312,7 +313,7 @@ function drawAsteroidMarks(
     }
     const material =
       roid.surveyedBy && roid.surveyedBy.length > 0
-        ? roid.material
+        ? (oreResource(roid) ?? undefined)
         : scanners
             .map((scanner) => scannedMaterial(scanner, roid))
             .find((value) => value !== undefined);
@@ -555,7 +556,7 @@ function polylineHitsRadar(
   return false;
 }
 
-/** Fire only after the street is lit, clipped to the radar disc. */
+/** Fire only after the furnace is lit, clipped to the radar disc. */
 function drawLitFurnacePipes(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   const now = performance.now();
   for (const lot of CIVIC_LOTS) {

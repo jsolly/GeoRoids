@@ -49,6 +49,7 @@ function cargo(id: string, position: { x: number; y: number }): AsteroidData {
     velocity: { x: 0, y: 0 },
     size: 25,
     material: 'metal',
+    ore: 'metal',
     health: 75,
     maxHealth: 75,
     rotation: 0,
@@ -98,7 +99,6 @@ test('a restart preserves mined sectors, shared discoveries and offline Scout de
   expect(resumed.actor.id).toBe('scout');
   expect(resumed.actor.name).toBe('Bob');
   expect(resumed.actor.score).toBe(points);
-  expect(resumed.actor.lives).toBe(5);
   expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
   expect(second.getAsteroid('delivery')).toBeUndefined();
   const cell = explorationCellAt({ x: 900, y: 0 });
@@ -179,7 +179,6 @@ test('a drifting deposit crosses into a sleeping sector once and preserves that 
 test('a private-token reconnect preserves progress while selecting the Hauler kit', () => {
   const engine = new GameEngine(82);
   const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
-  original.actor.lives = 2;
   original.actor.score = 450;
   const replacement = new RecordingSocket();
   const resumed = engine.resumePilot(original.token, replacement, 'hauler', 'Bob');
@@ -189,7 +188,8 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
     id: 'scout',
     name: 'Bob',
     kitId: 'hauler',
-    lives: 2,
+    cargo: 0,
+    purchases: [],
     score: 450,
     ws: replacement,
     position: { x: 200, y: 300 },
@@ -201,7 +201,6 @@ test('a private-token reconnect preserves progress while selecting the Hauler ki
 test('leaving then entering again returns to the same ship with the saved score', () => {
   const engine = new GameEngine(82);
   const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
-  original.actor.lives = 2;
   original.actor.score = 450;
   original.actor.health = 40;
   original.actor.angle = 1.25;
@@ -212,7 +211,8 @@ test('leaving then entering again returns to the same ship with the saved score'
     id: 'scout',
     name: 'Bob',
     kitId: 'hauler',
-    lives: 2,
+    cargo: 0,
+    purchases: [],
     score: 450,
     position: { x: 200, y: 300 },
     angle: 1.25,
@@ -227,7 +227,6 @@ test('checkpoints store the saved score and a recent flight', () => {
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
   const original = pilot(engine, 'scout', 'scout', { x: 200, y: 300 });
   original.actor.score = 450;
-  original.actor.lives = 2;
   engine.checkpointWorld();
   const saved = store.loadPilots()[0];
   assert(saved);
@@ -237,14 +236,15 @@ test('checkpoints store the saved score and a recent flight', () => {
     score: 450,
     kitId: 'scout',
     position: { x: 200, y: 300 },
-    lives: 2,
+    cargo: 0,
+    purchases: [],
   });
   expect(saved.tokenHash).toMatch(PILOT_TOKEN_HASH_PATTERN);
   expect(saved.lastSeenAt).toEqual(expect.any(Number));
   engine.stopGameLoop();
 });
 
-test('resuming during an explosion keeps the pending life loss until the server respawns', () => {
+test('resuming during an explosion keeps the pending respawn until the server respawns', () => {
   const engine = new GameEngine(82);
   const original = pilot(engine, 'scout', 'scout');
   original.actor.spawnProtectionTimer = 0;
@@ -258,7 +258,8 @@ test('resuming during an explosion keeps the pending life loss until the server 
   expect(resumed.actor).toBe(original.actor);
   expect(resumed.actor).toMatchObject({
     health: 0,
-    lives: 4,
+    cargo: 0,
+    purchases: [],
     score: 210,
     exploding: true,
     respawnTimer: remaining,
@@ -268,7 +269,6 @@ test('resuming during an explosion keeps the pending life loss until the server 
     engine.advanceCombatFrame();
   }
   expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
-  expect(resumed.actor.lives).toBe(4);
   expect(resumed.actor.score).toBe(210);
   expect(resumed.actor.exploding).toBe(false);
   expect(resumed.actor.spawnProtectionTimer).toBeGreaterThan(0);

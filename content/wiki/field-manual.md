@@ -22,4 +22,4 @@ Everyone shares one crew, one chart, and a persistent world. Mine rocks, collect
 
 ## Your next life
 
-You start with five lives; ordinary deaths reset growth and upgrades but keep score, salvaged tools, silk, and paint. Losing your last life clears that personal progress, and your next flight starts with five lives and starter tools. A brief disconnect returns you to the same ship.
+Deaths reset growth and temporary upgrades and drop your carried points in a stash that expires after two minutes. Banked points, salvaged tools, silk, and paint remain safe. Respawns are unlimited. A brief disconnect returns you to the same ship.

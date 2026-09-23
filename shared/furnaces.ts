@@ -1,4 +1,5 @@
 import type { AsteroidData, CivicModule, Position } from '../shared-types';
+import { oreResource, oreYield } from './economy';
 import { WORLD } from './world';
 
 /** Respawn and fresh-join ring around the Town Square grate. */
@@ -11,7 +12,7 @@ export const TOWN_HEARTH = {
   radius: 85,
 } as const;
 
-/** Always-lit hearths. Street lots start dark and join this set when built. */
+/** Always-lit hearths. Furnace lots start dark and join this set when built. */
 export const FURNACES = [TOWN_HEARTH] satisfies {
   id: string;
   name: string;
@@ -29,7 +30,7 @@ interface CivicLot {
   parentId: string;
 }
 
-const STREET_NAMES = ['East', 'Northeast', 'North', 'West', 'South', 'Southeast'] as const;
+const DIRECTION_NAMES = ['East', 'Northeast', 'North', 'West', 'South', 'Southeast'] as const;
 const ROMAN = ['', 'I', 'II', 'III'] as const;
 const RINGS = [
   { ring: 1 as const, count: 6, radius: 1_600, cost: 1_500, offsetDeg: 15 },
@@ -85,10 +86,10 @@ function placeOnRing(radius: number, angle: number, placed: readonly Position[])
     }
     return position;
   }
-  throw new Error(`No street lot at radius ${radius}`);
+  throw new Error(`No furnace lot at radius ${radius}`);
 }
 
-function streetIndex(ring: number, index: number): number {
+function directionIndex(ring: number, index: number): number {
   if (ring === 1) {
     return index;
   }
@@ -99,7 +100,7 @@ function streetIndex(ring: number, index: number): number {
 }
 
 function layoutCivicLots(): CivicLot[] {
-  const drafts: Array<Omit<CivicLot, 'name'> & { street: number }> = [];
+  const drafts: Array<Omit<CivicLot, 'name'> & { direction: number }> = [];
   const placed: Position[] = [];
   for (const spec of RINGS) {
     const step = (2 * Math.PI) / spec.count;
@@ -111,9 +112,10 @@ function layoutCivicLots(): CivicLot[] {
         180;
       const position = placeOnRing(spec.radius + radial, offset + index * step + angular, placed);
       placed.push(position);
-      const street = streetIndex(spec.ring, index);
+      const direction = directionIndex(spec.ring, index);
       const previousRing = RINGS[RINGS.indexOf(spec) - 1];
       const parentSlot = previousRing ? Math.floor(index / (spec.count / previousRing.count)) : 0;
+      // Keep saved furnace IDs stable; pipe routing also hashes these addresses.
       const parentId = previousRing ? `street-${previousRing.ring}-${parentSlot}` : TOWN_HEARTH.id;
       drafts.push({
         id: `street-${spec.ring}-${index}`,
@@ -122,19 +124,19 @@ function layoutCivicLots(): CivicLot[] {
         ring: spec.ring,
         cost: spec.cost,
         parentId,
-        street,
+        direction,
       });
     }
   }
   const counts = new Map<string, number>();
   return drafts.map((draft) => {
-    const key = `${draft.street}:${draft.ring}`;
+    const key = `${draft.direction}:${draft.ring}`;
     const seen = counts.get(key) ?? 0;
     counts.set(key, seen + 1);
-    const street = STREET_NAMES[draft.street] ?? 'Street';
-    const base = `${street} Street ${ROMAN[draft.ring]}`;
+    const direction = DIRECTION_NAMES[draft.direction] ?? 'Outer';
+    const base = `${direction} Furnace ${ROMAN[draft.ring]}`;
     const siblings = drafts.filter(
-      (other) => other.street === draft.street && other.ring === draft.ring
+      (other) => other.direction === draft.direction && other.ring === draft.ring
     ).length;
     const name = siblings > 1 ? `${base} ${String.fromCharCode(65 + seen)}` : base;
     return {
@@ -151,7 +153,7 @@ function layoutCivicLots(): CivicLot[] {
 
 export const CIVIC_LOTS: readonly CivicLot[] = layoutCivicLots();
 
-/** How fast a delivery light runs along the street pipes, in world units per second. */
+/** How fast a delivery light runs along the furnace pipes, in world units per second. */
 export const FURNACE_PIPE_SPEED = 2_400;
 
 const LOT_BY_ID = new Map(CIVIC_LOTS.map((lot) => [lot.id, lot]));
@@ -375,7 +377,7 @@ export function civicLot(id: string): CivicLot | undefined {
   return LOT_BY_ID.get(id);
 }
 
-/** Nearest street lot whose center is within `reach` world units. */
+/** Nearest furnace lot whose center is within `reach` world units. */
 export function civicLotWithin(position: Position, reach: number): CivicLot | undefined {
   let found: CivicLot | undefined;
   let best = reach;
@@ -403,13 +405,13 @@ export function civicLotAt(position: Position): CivicLot | undefined {
   return found;
 }
 
-/** Display name of a street furnace paid for by one Scout. */
-export function civicModuleName(builderName: string, streetName: string): string {
+/** Display name of a furnace paid for by one Scout. */
+export function civicModuleName(builderName: string, furnaceName: string): string {
   const builder = builderName.trim().replace(/\s+/gu, ' ');
   if (!builder) {
-    return streetName;
+    return furnaceName;
   }
-  return `${builder}'s ${streetName}`;
+  return `${builder}'s ${furnaceName}`;
 }
 
 const MODULE_BUILDER_NAME = /^[A-Za-z0-9 ]{0,20}$/u;
@@ -497,11 +499,14 @@ export function isTownSquareArrival(position: Position): boolean {
   return Math.abs(Math.hypot(position.x, position.y) - TOWN_SPAWN_RADIUS) < 1;
 }
 
-const MATERIAL_POINTS = { ice: 150, metal: 300, rubble: 100 };
+const MATERIAL_POINTS = { ice: 15, metal: 30, rubble: 10, crystal: 60 };
 
 /** Each contributor receives the full delivery value. */
-export function furnaceReward(rock: Pick<AsteroidData, 'material' | 'size'>): number {
-  return MATERIAL_POINTS[rock.material ?? 'rubble'] * Math.max(1, Math.round(rock.size / 25));
+export function furnaceReward(
+  rock: Pick<AsteroidData, 'id' | 'material' | 'size' | 'ore'>
+): number {
+  const resource = oreResource(rock);
+  return resource ? MATERIAL_POINTS[resource] * oreYield(rock) : Math.max(1, oreYield(rock));
 }
 
 /** The Town Square is the only pre-lit landmark. */

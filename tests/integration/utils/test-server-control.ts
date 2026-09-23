@@ -146,7 +146,10 @@ export async function arrangeCrewField(
     | 'map-icons'
     | 'furnace'
     | 'town-store'
-    | 'street-build'
+    | 'cargo'
+    | 'full-cargo'
+    | 'settlement-delivery'
+    | 'furnace-build'
     | 'street-escape'
     | 'street-travel'
 ): Promise<ReadonlyMap<string, number>> {

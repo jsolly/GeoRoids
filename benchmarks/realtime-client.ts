@@ -658,7 +658,7 @@ try {
     const intervals: Interval[] = [];
     const warmupIntervals: Interval[] = [];
     const restarts: Array<{
-      kind: 'browser-gameover' | 'peer-rejoin';
+      kind: 'browser-respawn' | 'peer-rejoin';
       startedAt: number;
       durationMs: number;
     }> = [];
@@ -1154,7 +1154,8 @@ try {
               const controller = window.gameController;
               const player = controller?.getCurrPlayer();
               return player &&
-                player.lives > 0 &&
+                player.ship.health > 0 &&
+                !player.ship.exploding &&
                 controller?.getNetworkManager().isConnected &&
                 window.georoidsPerformance &&
                 !window.georoidsPerformance.read().pendingJoin
@@ -1206,7 +1207,7 @@ try {
                 return {
                   departed:
                     player?.id !== playerId ||
-                    (player?.lives ?? 0) <= 0 ||
+                    (player?.ship.health ?? 0) <= 0 ||
                     !window.gameController?.getNetworkManager().isConnected ||
                     !interval ||
                     interval.pendingJoin,
@@ -1360,8 +1361,14 @@ try {
       async function recoverBrowser(target: Interval[]) {
         const restartAt = performance.now();
         await releaseInput();
-        await page.locator('#start-game').waitFor({ state: 'visible', timeout: 6000 });
-        await page.locator('#start-game').click();
+        await page.waitForFunction(
+          () => {
+            const player = window.gameController?.getCurrPlayer();
+            return player && player.ship.health > 0 && !player.ship.exploding;
+          },
+          undefined,
+          { timeout: 15000 }
+        );
         await page.waitForFunction(
           () =>
             window.gameController?.getNetworkManager().isConnected &&
@@ -1372,7 +1379,7 @@ try {
         );
         target.push(await drain(page));
         restarts.push({
-          kind: 'browser-gameover',
+          kind: 'browser-respawn',
           startedAt: restartAt,
           durationMs: performance.now() - restartAt,
         });
@@ -1478,21 +1485,13 @@ try {
             Object.values(interval.metrics).every((metric) => metric.omittedSamples === 0),
             'Raw samples omitted'
           );
-          const dead = await page.evaluate(
-            () => (window.gameController?.getCurrPlayer()?.lives ?? 0) <= 0
+          const frames = Object.entries(interval.metrics)
+            .filter(([name]) => name.endsWith('.frameCpuMs'))
+            .reduce((sum, [, metric]) => sum + metric.count, 0);
+          assert(
+            frames > 0 || interval.durationMs < 100,
+            'No active game frames during observation'
           );
-          if (dead) {
-            await recoverBrowser(target);
-            await arrange(target);
-          } else {
-            const frames = Object.entries(interval.metrics)
-              .filter(([name]) => name.endsWith('.frameCpuMs'))
-              .reduce((sum, [, metric]) => sum + metric.count, 0);
-            assert(
-              frames > 0 || interval.durationMs < 100,
-              'No active game frames during observation'
-            );
-          }
           const response = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) });
           assert(response.ok, 'Server health failed');
           const healthSample: unknown = await response.json();

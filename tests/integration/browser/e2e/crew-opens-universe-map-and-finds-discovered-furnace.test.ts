@@ -16,7 +16,7 @@ const REVEALED_ASSETS_STATUS_PATTERN = /\d+ revealed assets/u;
 const FAR_FURNACE = (() => {
   const furnace = civicLot('street-2-0');
   if (!furnace) {
-    throw new Error('Universe map fixture requires an outer street foundation');
+    throw new Error('Universe map fixture requires an outer furnace foundation');
   }
   return furnace;
 })();
@@ -238,12 +238,6 @@ test.each([
     await page.locator('#universe-map-close').click();
     if (!touch) {
       expect(await page.evaluate(() => document.activeElement?.id)).toBe('universe-map-toggle');
-      await page.locator('#universe-map-toggle').click();
-      await page.evaluate(() => window.gameController?.gameOver('boundary'));
-      await expect
-        .poll(() => page.evaluate(() => document.activeElement?.id), { timeout: 5000 })
-        .toBe('playerNameInput');
-      expect(await page.locator('#universe-map-dialog').isVisible()).toBe(false);
     }
 
     assertNoBrowserDiagnostics(diagnostics);

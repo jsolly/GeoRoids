@@ -55,10 +55,10 @@ function wideTrail(ctx: CanvasRenderingContext2D, draw: () => void): Position[][
   return trails;
 }
 
-test('the radar draws a fire trail only after that street is lit', () => {
-  const street = civicLot('street-1-0');
-  if (!street) {
-    throw new Error('Missing street lot');
+test('the radar draws a fire trail only after that furnace is lit', () => {
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing furnace lot');
   }
   const player = new Player({
     id: 'scout',
@@ -66,7 +66,7 @@ test('the radar draws a fire trail only after that street is lit', () => {
     type: 'local',
     input: new MockPlayerInput(),
   });
-  player.ship.position = { ...street.position };
+  player.ship.position = { ...furnace.position };
   const canvas = document.createElement('canvas');
   canvas.width = 1000;
   canvas.height = 800;
@@ -77,11 +77,11 @@ test('the radar draws a fire trail only after that street is lit', () => {
   const layout = computeHudLayout(canvas, { touchControls: false });
   const draw = () => drawMiniMap(ctx, layout, player.ship, [], [], [], []);
   expect(wideStrokes(ctx, draw)).toBe(0);
-  worldFurnaces.light(street.id, 'Ada');
+  worldFurnaces.light(furnace.id, 'Ada');
   const trail = wideTrail(ctx, draw);
   expect(trail).toHaveLength(1);
   const drawn = trail[0] ?? [];
-  const hop = pipeHopToParent(street.id);
+  const hop = pipeHopToParent(furnace.id);
   const center = player.ship.position;
   const expected = hop.map((world) => ({
     x:
@@ -174,9 +174,9 @@ test('the radar draws a fire trail when only the pipe crosses the disc', () => {
 });
 
 test('the radar hides a lit pipe that misses the disc', () => {
-  const street = civicLot('street-1-0');
-  if (!street) {
-    throw new Error('Missing street lot');
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing furnace lot');
   }
   const player = new Player({
     id: 'scout',
@@ -193,7 +193,7 @@ test('the radar hides a lit pipe that misses the disc', () => {
     throw new Error('Expected a canvas');
   }
   const layout = computeHudLayout(canvas, { touchControls: false });
-  worldFurnaces.light(street.id, 'Ada');
+  worldFurnaces.light(furnace.id, 'Ada');
   const draw = () => drawMiniMap(ctx, layout, player.ship, [], [], [], []);
   expect(wideStrokes(ctx, draw)).toBe(0);
 });

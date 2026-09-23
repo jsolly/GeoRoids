@@ -45,9 +45,9 @@ describe('destroy-drop shards on the #458 loot path', () => {
     expect(shards).toHaveLength(1);
     expect(shards[0]?.position).toEqual({ x: 20, y: 30 });
     expect(shards[0]?.mass).toBe(GROWTH.SHARD_MASS);
-    expect(engine.getGameState().loot).toHaveLength(1);
-    expect(engine.getDiagnostics().loot).toBe(1);
-    expect(player.score).toBe(ROID.POINTS_SMALL);
+    expect(engine.getGameState().loot).toHaveLength(2);
+    expect(engine.getDiagnostics().loot).toBe(2);
+    expect(player.score).toBe(0);
   });
 
   test('collecting a shard uses existing mass growth and a small score', () => {
@@ -60,17 +60,17 @@ describe('destroy-drop shards on the #458 loot path', () => {
 
     const collected = engine.collectLoot();
 
-    expect(collected).toHaveLength(1);
+    expect(collected).toHaveLength(2);
     expect(player.mass).toBeCloseTo(applyLootMass(beforeMass, GROWTH.SHARD_MASS));
-    expect(player.score).toBe(ROID.POINTS_SMALL + GROWTH.SHARD_SCORE);
-    expect(engine.getLoot()).toHaveLength(0);
+    expect(player.cargo).toBe(ROID.POINTS_SMALL + GROWTH.SHARD_SCORE);
+    expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
     const broadcaster = new GameStateBroadcaster(engine);
     broadcaster.broadcastGameState();
     broadcaster.broadcastGameState();
     const notifications = ws.inbox.filter((message) => message.type === 'lootCollected');
-    expect(notifications).toHaveLength(1);
-    expect(notifications[0]?.data).toEqual({
-      lootId: collected[0]?.lootId,
+    expect(notifications).toHaveLength(2);
+    expect(notifications.map((message) => message.data)).toContainEqual({
+      lootId: collected.find((drop) => drop.mass > 0)?.lootId,
       collectorId: player.id,
       kind: 'shard',
       position: { x: 20, y: 30 },
@@ -82,7 +82,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
     const player = engine.addPlayer('p1', 'Pilot', new RecordingSocket(), { x: 20, y: 30 });
     addSmallAsteroid(engine, 'roid-1');
     engine.handleAsteroidHit('roid-1', player.id, 'laser');
-    expect(engine.collectLoot()).toHaveLength(1);
+    expect(engine.collectLoot()).toHaveLength(2);
     engine.resetForTesting();
     expect(engine.drainLootCollections()).toEqual([]);
   });
@@ -102,7 +102,7 @@ describe('destroy-drop shards on the #458 loot path', () => {
     const blast = engine.handleLootExplode(shooter.id, shard.id);
 
     expect(blast.success).toBe(true);
-    expect(engine.getLoot()).toHaveLength(0);
+    expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
     expect(bystander.health).toBe(healthBefore);
     expect(shooter.health).toBe(100);
   });
@@ -168,10 +168,10 @@ describe('destroy-drop shards on the #458 loot path', () => {
     engine.addPlayer('p1', 'Pilot', ws, { x: 0, y: 0 });
     addSmallAsteroid(engine, 'roid-1', 12);
     engine.handleAsteroidHit('roid-1', 'p1', 'laser');
-    expect(engine.getDiagnostics().loot).toBe(1);
+    expect(engine.getDiagnostics().loot).toBe(2);
 
     engine.resetForTesting();
-    expect(engine.getLoot()).toHaveLength(0);
+    expect(engine.getLoot().filter((drop) => drop.kind !== 'points')).toHaveLength(0);
     expect(engine.getDiagnostics().loot).toBe(0);
   });
 });

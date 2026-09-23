@@ -121,7 +121,7 @@ export function renderFurnaceTravelMap(
   hint.className = 'furnace-travel-hint';
   hint.textContent =
     destinations.length === 0
-      ? 'No other furnaces are lit yet. Build a street furnace to open a route.'
+      ? 'No other furnaces are lit yet. Build a furnace to open a route.'
       : 'Select a lit furnace to travel. Scroll the map to explore.';
   container.replaceChildren(viewport, caption, hint);
   // Center the departure furnace on dense maps without smooth motion.

@@ -39,26 +39,26 @@ function recordStrokes(): {
   return { strokes, restoreViewport };
 }
 
-test('a dark street draws no pipeline back to Town Square', () => {
-  const street = civicLot('street-1-0');
-  if (!street) {
-    throw new Error('Missing street lot');
+test('a dark furnace draws no pipeline back to Town Square', () => {
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing furnace lot');
   }
   worldFurnaces.replaceLit([]);
   const recorded = recordStrokes();
-  drawFurnacePipes(street.position, 1_000);
+  drawFurnacePipes(furnace.position, 1_000);
   expect(recorded.strokes).toHaveLength(0);
   recorded.restoreViewport();
 });
 
-test('a lit street draws a right-angle fire trail toward Town Square', () => {
-  const street = civicLot('street-1-0');
-  if (!street) {
-    throw new Error('Missing street lot');
+test('a lit furnace draws a right-angle fire trail toward Town Square', () => {
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing furnace lot');
   }
-  worldFurnaces.light(street.id, 'Ada');
+  worldFurnaces.light(furnace.id, 'Ada');
   const recorded = recordStrokes();
-  drawFurnacePipes(street.position, 1_000);
+  drawFurnacePipes(furnace.position, 1_000);
   const strokes = recorded.strokes;
   expect(strokes).toHaveLength(3);
   const trail = strokes[0];
@@ -68,12 +68,12 @@ test('a lit street draws a right-angle fire trail toward Town Square', () => {
   expect(trail.points.length).toBeGreaterThanOrEqual(5);
   expect(trail.points[0]).toEqual({ x: 400, y: 300 });
   const end = trail.points[trail.points.length - 1];
-  expect(end?.x).toBeCloseTo(400 - street.position.x, 4);
-  expect(end?.y).toBeCloseTo(300 - street.position.y, 4);
+  expect(end?.x).toBeCloseTo(400 - furnace.position.x, 4);
+  expect(end?.y).toBeCloseTo(300 - furnace.position.y, 4);
   for (const stroke of strokes) {
     const last = stroke.points[stroke.points.length - 1];
-    expect(last?.x).toBeCloseTo(400 - street.position.x, 4);
-    expect(last?.y).toBeCloseTo(300 - street.position.y, 4);
+    expect(last?.x).toBeCloseTo(400 - furnace.position.x, 4);
+    expect(last?.y).toBeCloseTo(300 - furnace.position.y, 4);
   }
   let corners = 0;
   for (let index = 1; index < trail.points.length - 1; index += 1) {

@@ -14,8 +14,8 @@ function schedule() {
     missedSlots: index === 10 ? 3 : 0,
   }));
 }
-const recovery = { kind: 'browser-gameover', startedAt: 9900, durationMs: 3100 };
-test('planned game-over recovery retains skipped slots without rejecting active-play cadence', () => {
+const recovery = { kind: 'browser-respawn', startedAt: 9900, durationMs: 3100 };
+test('planned respawn recovery retains skipped slots without rejecting active-play cadence', () => {
   expect(inspectInputCadence(schedule(), [recovery]).recoverySkippedSlots).toBe(3);
 });
 test('unexplained delays and peer setup cannot excuse missed active-play inputs', () => {

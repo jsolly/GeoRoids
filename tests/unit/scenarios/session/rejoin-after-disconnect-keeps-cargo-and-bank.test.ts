@@ -12,22 +12,22 @@ describe('Rejoin after a dropped socket', () => {
     ace = world.join('Ace');
     world.wearOffJoinInvulnerability();
     const ship = world.entity(ace);
-    ship.lives = 2;
     ship.score = 210;
+    ship.cargo = 123;
   });
 
   afterEach(() => {
     world.dispose();
   });
 
-  test('the same pilot id comes back with the same lives and score, not a fresh 3/0', () => {
+  test('the same pilot id comes back with the same cargo and bank', () => {
     world.dropTransport(ace);
     expect(world.engine.getPlayerBySocket(ace.socket)).toBeUndefined();
     ace = world.resume(ace);
 
     const ship = world.entity(ace);
-    expect(ship.lives).toBe(2);
     expect(ship.score).toBe(210);
+    expect(ship.cargo).toBe(123);
     expect(ship.spawnProtectionTimer ?? 0).toBe(0);
   });
 
@@ -38,13 +38,12 @@ describe('Rejoin after a dropped socket', () => {
     ace = world.resume(ace, { x: 0, y: 0 });
 
     const next = world.entity(ace);
-    expect(next.lives).toBe(2);
     expect(next.score).toBe(210);
     expect(next.position).toEqual({ x: 2_400, y: 1_800 });
     expect(next.spawnProtectionTimer ?? 0).toBe(0);
   });
 
-  test('a new client id with the same name does not leave a second Ace at 3/0', () => {
+  test('a new client id with the same name does not create a duplicate pilot', () => {
     const cloneSocket = world.attemptJoin('ace-clone', ace.name, { x: 1, y: 1 });
 
     expect(world.engine.getPlayerCount()).toBe(1);

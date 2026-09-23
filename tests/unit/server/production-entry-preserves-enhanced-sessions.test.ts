@@ -14,7 +14,6 @@ import railwayConfig from '../../../.railway/railway';
 import { WorldStore } from '../../../server/world/WorldStore';
 import { SnapshotDecoder } from '../../../shared/snapshotProtocol';
 import type { ServerGameSnapshot } from '../../../shared-types';
-import { GAME } from '../../../src/constants';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const WHITESPACE_SPLIT_PATTERN = /\s+/u;
@@ -248,7 +247,6 @@ test('the production entry restores the same pilot and explored world from its c
   expect(savedWorld?.exploration.length).toBeGreaterThan(0);
   expect(savedPilot?.id).toBe('persisted-pilot');
   expect(savedPilot?.lastSeenAt).toEqual(expect.any(Number));
-  expect(savedPilot?.lives).toBe(GAME.START_LIVES);
 
   const nextPort = await start(0, path);
   const returning = await pilot(nextPort);
@@ -257,7 +255,6 @@ test('the production entry restores the same pilot and explored world from its c
   const restored = (await returning.state()).entities.find(
     (entity) => entity.id === 'persisted-pilot'
   );
-  expect(restored?.lives).toBe(savedPilot?.lives);
   expect(restored?.position).toEqual(savedPilot?.position);
   expect(restored?.score).toBeGreaterThanOrEqual(savedPilot?.score ?? 0);
   await stopProduction();

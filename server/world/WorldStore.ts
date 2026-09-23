@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { type BeltSlotState, readBeltState } from '../../shared/asteroidBelt';
+import { emptySettlement, validSettlement } from '../../shared/economy';
 import { epochField } from '../../shared/epochField';
 import { validEquipment } from '../../shared/equipment';
 import { validExploration } from '../../shared/exploration';
@@ -18,6 +19,8 @@ import type {
   EquipmentId,
   ExplorationTile,
   Position,
+  SavedPointLoot,
+  SettlementState,
   ShipBoostState,
   ShipKitId,
   Velocity,
@@ -30,13 +33,13 @@ const PILOT_TOKEN_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 function readCivicModules(value: object): CivicModule[] {
   if ('civicModules' in value) {
     if (!validCivicModules(value.civicModules)) {
-      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
+      throw new Error('Saved furnaces are invalid; refusing to replace player progress');
     }
     return value.civicModules;
   }
   if ('litCivicLotIds' in value) {
     if (!validLitCivicLotIds(value.litCivicLotIds)) {
-      throw new Error('Saved street furnaces are invalid; refusing to replace player progress');
+      throw new Error('Saved furnaces are invalid; refusing to replace player progress');
     }
     return value.litCivicLotIds.map((id) => ({ id, builderName: '' }));
   }
@@ -59,6 +62,8 @@ export interface PersistentPilot {
   tokenHash: string;
   name: string;
   score: number;
+  cargo?: number;
+  purchases?: string[];
   /** Catalog hull color bought at Town Square. */
   hullColor?: string;
   lastSeenAt?: number;
@@ -66,7 +71,6 @@ export interface PersistentPilot {
   position?: Position;
   velocity?: Velocity;
   angle?: number;
-  lives?: number;
   mass?: number;
   health?: number;
   boost?: ShipBoostState;
@@ -92,14 +96,18 @@ export interface RestorableFlight extends PersistentPilot {
   kitId: ShipKitId;
   position: Position;
   angle: number;
-  lives: number;
   mass: number;
   health: number;
 }
 
+export interface SavedEconomy {
+  settlement: SettlementState;
+  pointLoot: SavedPointLoot[];
+}
+
 export interface SavedWorld {
   asteroidBelt?: BeltSlotState[];
-  /** Street furnaces a Scout paid for. Absent on older rows. */
+  /** Furnaces a Scout paid for. Absent on older rows. */
   civicModules?: CivicModule[];
   seed: number;
   startedAt: number;
@@ -133,7 +141,6 @@ function readOptionalFlight(
   const lastSeenAt = pilot['lastSeenAt'];
   const position = readVector(pilot['position']);
   const angle = pilot['angle'];
-  const lives = pilot['lives'];
   const mass = pilot['mass'];
   const health = pilot['health'];
   const kitId = pilot['kitId'];
@@ -145,10 +152,6 @@ function readOptionalFlight(
     !validWorldPosition(position) ||
     typeof angle !== 'number' ||
     !Number.isFinite(angle) ||
-    typeof lives !== 'number' ||
-    !Number.isInteger(lives) ||
-    lives < 0 ||
-    lives > 99 ||
     typeof mass !== 'number' ||
     !Number.isFinite(mass) ||
     mass <= 0 ||
@@ -165,7 +168,6 @@ function readOptionalFlight(
     kitId,
     position,
     angle,
-    lives,
     mass,
     health,
     ...(velocity && finiteMotionVector(velocity) ? { velocity } : {}),
@@ -208,6 +210,20 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   if (equipment !== undefined && !validEquipment(equipment)) {
     return undefined;
   }
+  const cargo = pilot['cargo'];
+  const purchases = pilot['purchases'];
+  if (
+    cargo !== undefined &&
+    (typeof cargo !== 'number' || !Number.isSafeInteger(cargo) || cargo < 0)
+  ) {
+    return undefined;
+  }
+  if (
+    purchases !== undefined &&
+    (!Array.isArray(purchases) || !purchases.every((offerId) => typeof offerId === 'string'))
+  ) {
+    return undefined;
+  }
   const silk = pilot['silk'];
   if (silk !== undefined && (typeof silk !== 'number' || !Number.isSafeInteger(silk) || silk < 0)) {
     return undefined;
@@ -232,6 +248,8 @@ function readPilot(value: unknown): PersistentPilot | undefined {
     name,
     score,
     ...(equipment !== undefined ? { equipment: [...equipment] } : {}),
+    cargo: typeof cargo === 'number' ? cargo : 0,
+    purchases: Array.isArray(purchases) ? purchases : [],
     ...(typeof silk === 'number' ? { silk } : {}),
     ...(typeof hullColor === 'string' && purchasedHullColor(hullColor) ? { hullColor } : {}),
     ...readOptionalFlight(pilot),
@@ -240,7 +258,7 @@ function readPilot(value: unknown): PersistentPilot | undefined {
   };
 }
 
-/** Restore pose only when last-seen is present, recent, and the ship still has lives. */
+/** Restore pose only when last-seen is present, recent, and the hull is alive. */
 export function restorableFlight(
   pilot: PersistentPilot,
   now: number
@@ -249,19 +267,17 @@ export function restorableFlight(
   const kitId = pilot.kitId;
   const position = pilot.position;
   const angle = pilot.angle;
-  const lives = pilot.lives;
   const mass = pilot.mass;
   const health = pilot.health;
   if (
     lastSeenAt === undefined ||
-    !flightReturnWindowOpen(lastSeenAt, now) ||
+    (!flightReturnWindowOpen(lastSeenAt, now) && (pilot.cargo ?? 0) === 0) ||
     !isShipKitId(kitId) ||
     position === undefined ||
     angle === undefined ||
-    lives === undefined ||
-    lives <= 0 ||
     mass === undefined ||
-    health === undefined
+    health === undefined ||
+    health <= 0
   ) {
     return undefined;
   }
@@ -271,7 +287,6 @@ export function restorableFlight(
     kitId,
     position,
     angle,
-    lives,
     mass,
     health,
   };
@@ -305,6 +320,7 @@ export class WorldStore {
       this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
         CREATE TABLE IF NOT EXISTS world (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS sectors (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS economy (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS pilots (id TEXT PRIMARY KEY, json TEXT NOT NULL);`);
       // Persist the retired kit name once at startup, before validating saved flights.
       this.db.exec(`UPDATE pilots SET json = json_set(json, '$.kitId', 'scout')
@@ -514,7 +530,18 @@ export class WorldStore {
   }
 
   load(): LoadedWorld {
-    return { world: this.loadWorld(), pilots: this.loadPilots(), sectors: this.loadSectors() };
+    const row = this.db.prepare('SELECT json FROM economy WHERE id=1').get();
+    const saved: unknown = row ? JSON.parse(String(row['json'])) : {};
+    if (!saved || typeof saved !== 'object') {
+      throw new Error('Invalid saved economy');
+    }
+    const economy = { settlement: readSettlement(saved), pointLoot: readPointLoot(saved) };
+    return {
+      economy,
+      world: this.loadWorld(),
+      pilots: this.loadPilots(),
+      sectors: this.loadSectors(),
+    };
   }
 
   /** One saved row, for tests and tooling; the server reads the world once through `load`. */
@@ -542,7 +569,8 @@ export class WorldStore {
   checkpoint(
     world: SavedWorld | undefined,
     sectors: ReadonlyMap<string, AsteroidData[]>,
-    pilots: readonly PersistentPilot[]
+    pilots: readonly PersistentPilot[],
+    economy?: SavedEconomy
   ): void {
     const validatedSectors = [...sectors].map(([id, rocks]): [string, AsteroidData[]] => [
       id,
@@ -557,6 +585,11 @@ export class WorldStore {
     try {
       if (worldJson !== undefined && this.worldJson !== worldJson) {
         this.db.prepare('INSERT OR REPLACE INTO world(id,json) VALUES(1,?)').run(worldJson);
+      }
+      if (economy) {
+        this.db
+          .prepare('INSERT OR REPLACE INTO economy(id,json) VALUES(1,?)')
+          .run(JSON.stringify(economy));
       }
       const sectorWrite = this.db.prepare('INSERT OR REPLACE INTO sectors(id,json) VALUES(?,?)');
       for (const [id, rocks] of validatedSectors) {
@@ -587,7 +620,9 @@ export class WorldStore {
   reset(): void {
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      this.db.exec('DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world;');
+      this.db.exec(
+        'DELETE FROM sectors; DELETE FROM pilots; DELETE FROM world; DELETE FROM economy;'
+      );
       this.db.exec('COMMIT');
     } catch (error) {
       this.rollback();
@@ -614,4 +649,44 @@ export class WorldStore {
   close(): void {
     this.db.close();
   }
+}
+
+function readSettlement(value: object): SettlementState {
+  if (!('settlement' in value)) {
+    return emptySettlement();
+  }
+  if (!validSettlement(value.settlement)) {
+    throw new Error('Invalid saved settlement');
+  }
+  return value.settlement;
+}
+function readPointLoot(value: object): SavedPointLoot[] {
+  if (!('pointLoot' in value)) {
+    return [];
+  }
+  if (!Array.isArray(value.pointLoot)) {
+    throw new Error('Invalid saved point loot');
+  }
+  const drops: SavedPointLoot[] = [];
+  for (const row of value.pointLoot) {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      typeof row.id !== 'string' ||
+      !finiteMotionVector(row.position) ||
+      !Number.isSafeInteger(row.points) ||
+      row.points < 0 ||
+      typeof row.expiresAt !== 'number' ||
+      !Number.isFinite(row.expiresAt)
+    ) {
+      throw new Error('Invalid saved point loot');
+    }
+    drops.push({
+      id: row.id,
+      position: { ...row.position },
+      points: row.points,
+      expiresAt: row.expiresAt,
+    });
+  }
+  return drops;
 }

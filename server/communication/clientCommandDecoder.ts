@@ -1,5 +1,5 @@
 import { readReleaseId } from '../../shared/releaseId';
-import { shipPaintById } from '../../shared/townStore';
+import { storeOffer } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
 import type {
   HaulerUtilityId,
@@ -61,13 +61,9 @@ export type ClientCommand =
       utilityId: ScoutUtilityId;
     }
   | {
-      type: 'buyShipPaint';
+      type: 'buyStoreItem';
       id: string;
-      paintId: string;
-    }
-  | {
-      type: 'buyExtraLife';
-      id: string;
+      offerId: string;
     }
   | {
       type: 'update';
@@ -331,19 +327,14 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Scout utility');
     }
-    case 'buyShipPaint': {
+    case 'buyStoreItem': {
       if (!id) {
-        return invalid(type, 'Missing player ID for buyShipPaint');
+        return invalid(type, 'Missing player ID for buyStoreItem');
       }
-      const paintId = fields['paintId'];
-      return typeof paintId === 'string' && shipPaintById(paintId)
-        ? { ok: true, command: { type, id, paintId } }
-        : invalid(type, 'Invalid ship paint');
-    }
-    case 'buyExtraLife': {
-      return id
-        ? { ok: true, command: { type, id } }
-        : invalid(type, 'Missing player ID for buyExtraLife');
+      const offerId = fields['offerId'];
+      return typeof offerId === 'string' && storeOffer(offerId)
+        ? { ok: true, command: { type, id, offerId } }
+        : invalid(type, 'Invalid store offer');
     }
     case 'shoot': {
       if (!id) {

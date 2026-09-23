@@ -32,7 +32,6 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 | Boost start and stop/depletion | Low ascending/descending two-note acknowledgements |
 | Boost Coupling ignition | Rounded push with a rising C/G crystal tail |
 | Furnace reward | E4–G4–C5 cadence for each rewarded pilot, including distant collaborators |
-| Game over | G3–E3–C3 descending resolution, once per run |
 | Ship selection, map, schematic and utility selection | Quiet crystal tick on actual open/close/change |
 | Satellite equip | C4–G4 confirmation when stored hardware enters orbit |
 | Local satellite orbit | Soft C4/C5 chime once per orbit, with silence between passes; HRTF movement follows orbital phase |
@@ -43,7 +42,7 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 The audit traced firing, damage/death/respawn, asteroid destruction/splits,
 resource extraction/collection, tools, boost, satellite inventory, furnace
 rewards, and in-flight menus. Missing boost transitions, surviving hull damage,
-coupling ignition, satellite equip, game-over and menu feedback now have cues.
+coupling ignition, satellite equip and menu feedback now have cues.
 Furnace delivery now has its own cadence rather than reusing orbital pickup.
 A permanent connection failure sounds once until connection recovery. Local
 shots, boost controls and predicted boundary death intentionally acknowledge

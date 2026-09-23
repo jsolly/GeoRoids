@@ -9,6 +9,7 @@ import {
   tickTouchControls,
 } from '../../../src/input/touchControls';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import * as townStore from '../../../src/ui/townStore';
 
 let player: Player;
 let canvas: HTMLCanvasElement;
@@ -462,4 +463,44 @@ test('a nearby second finger keeps firing after the reserved steer id disappears
   expect(controlSources.pointerHeading).not.toBe(heading);
   expect(controlSources.touchFire).toBe(true);
   expect(readTouchControlDiagnostics().steerPointerHeld).toBe(true);
+});
+
+test('releasing a tow while entering furnace range does not turn the same touch into store entry', () => {
+  player.ship.position = { x: 500, y: 0 };
+  player.ship.harpoonTargetId = 'tow-rock';
+  const activate = vi.spyOn(player.ship, 'activateAbility').mockImplementation(() => {
+    player.ship.harpoonTargetId = null;
+    player.ship.position = { x: 0, y: 0 };
+    return true;
+  });
+  const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
+  const ability = document.querySelector<HTMLElement>('#touch-ability');
+  if (!ability) {
+    throw new Error('Ability button missing');
+  }
+  ability.setPointerCapture = vi.fn();
+  ability.hasPointerCapture = () => false;
+  pointer('pointerdown', 81, 0, 330, 164, ability);
+  expect(activate).toHaveBeenCalledTimes(1);
+  pointer('pointerup', 81, 10, 330, 164, ability);
+  touchChange('touchend', []);
+  ability.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(openStore).not.toHaveBeenCalled();
+});
+
+test('store entry waits for the completed click and survives normal touch-end cleanup', () => {
+  player.ship.position = { x: 0, y: 0 };
+  const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
+  const ability = document.querySelector<HTMLElement>('#touch-ability');
+  if (!ability) {
+    throw new Error('Ability button missing');
+  }
+  ability.setPointerCapture = vi.fn();
+  ability.hasPointerCapture = () => false;
+  pointer('pointerdown', 82, 0, 330, 164, ability);
+  pointer('pointerup', 82, 10, 330, 164, ability);
+  touchChange('touchend', []);
+  expect(openStore).not.toHaveBeenCalled();
+  ability.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(openStore).toHaveBeenCalledTimes(1);
 });

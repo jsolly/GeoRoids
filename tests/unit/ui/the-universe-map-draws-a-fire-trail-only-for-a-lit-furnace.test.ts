@@ -60,10 +60,10 @@ function mountUniverseMap(): { toggle: HTMLButtonElement; ctx: CanvasRenderingCo
   return { toggle, ctx };
 }
 
-test('the universe map draws a fire trail only for a lit street', () => {
-  const street = civicLot('street-1-0');
-  if (!street) {
-    throw new Error('Missing street lot');
+test('the universe map draws a fire trail only for a lit furnace', () => {
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing furnace lot');
   }
   const { toggle, ctx } = mountUniverseMap();
   const fireTrail = () => {
@@ -81,11 +81,11 @@ test('the universe map draws a fire trail only for a lit street', () => {
     return count;
   };
   expect(fireTrail()).toBe(0);
-  worldFurnaces.light(street.id, 'Ada');
+  worldFurnaces.light(furnace.id, 'Ada');
   expect(fireTrail()).toBe(1);
 });
 
-test('the universe map marks street lots before that ground is explored', () => {
+test('the universe map marks furnace lots before that ground is explored', () => {
   const { toggle, ctx } = mountUniverseMap();
   const core = {
     id: 'loot:core',

@@ -227,7 +227,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       expect(destroyB.data).toEqual(destroyA.data);
       expect(shockwaveA.data).toEqual({ origin: target.position, asteroidId: target.id });
       expect(shockwaveB.data).toEqual(shockwaveA.data);
-      expect(scoreA.data).toEqual({ playerId: 'player-b', score: ROID.POINTS_LARGE });
+      expect(scoreA.data).toEqual({ playerId: 'player-b', score: 0 });
       expect(scoreB.data).toEqual(scoreA.data);
       const fragmentsA = asteroidIds(createA);
       const fragmentsB = asteroidIds(createB);
@@ -239,7 +239,7 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
       expect(countType(playerA, 'shockwave')).toBe(1);
       expect(countType(playerA, 'scoreUpdate')).toBe(1);
       expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
-      expect(server.gameEngine.getPlayer('player-b')?.score).toBe(ROID.POINTS_LARGE);
+      expect(server.gameEngine.getPlayer('player-b')?.score).toBe(0);
       expect(playerA.failures).toEqual([]);
       expect(playerB.failures).toEqual([]);
     } finally {
@@ -314,13 +314,13 @@ describe('Scenario: two players hit a big roid within 1s → split', () => {
         collabSplit: false,
         origin: target.position,
       });
-      expect(score.data).toEqual({ playerId: 'solo-player', score: ROID.POINTS_LARGE });
+      expect(score.data).toEqual({ playerId: 'solo-player', score: 0 });
       expect(countType(client, 'shockwave')).toBe(0);
       expect(countType(client, 'asteroidCreateBatch')).toBe(0);
       expect(countType(client, 'asteroidDestroy')).toBe(1);
       expect(countType(client, 'scoreUpdate')).toBe(1);
       expect(server.gameEngine.getAsteroid(target.id)).toBeUndefined();
-      expect(server.gameEngine.getPlayer('solo-player')?.score).toBe(ROID.POINTS_LARGE);
+      expect(server.gameEngine.getPlayer('solo-player')?.score).toBe(0);
       expect(client.failures).toEqual([]);
     } finally {
       clock.mockRestore();

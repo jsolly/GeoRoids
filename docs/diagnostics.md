@@ -52,7 +52,7 @@ received or applied the packet.
 
 The corresponding client checkpoint records the accepted packet metadata and
 three observations: `clientBeforeApply`, `authoritativeRow`, and
-`clientAfterApply`. Compare health, lives, position, velocity, motion epoch and
+`clientAfterApply`. Compare health, cargo, position, velocity, motion epoch and
 acknowledged input where available. Position differences can be normal during
 prediction and reconciliation; do not diagnose desynchronization from a single
 unequal coordinate. Rejected snapshots record the baseline/sequence problem

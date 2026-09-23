@@ -22,7 +22,7 @@ Hold fire to repeat shots, which inherit your ship's motion. Direct crew shots m
 
 ## Ricochet Court
 
-Meet at the cyan court northeast of Town Square for informal bank-shot duels; it stays marked on both maps before exploration. Its indestructible panels reflect lasers without changing their energy, while ships pass through safely. Banked shots can escape through the gaps and hurt anyone, with normal lives and protection rules and no separate duel score.
+Meet at the cyan court northeast of Town Square for informal bank-shot duels; it stays marked on both maps before exploration. Its indestructible panels reflect lasers without changing their energy, while ships pass through safely. Banked shots can escape through the gaps and hurt anyone, with normal death and protection rules and no separate duel score.
 
 ## Damage and protection
 
@@ -30,8 +30,8 @@ Asteroid impacts remove health; the outer wall and a spider bite each kill a vul
 
 ## Lives and respawn
 
-You start with five lives; death costs one and respawns you near the nearest lit furnace with restored health and brief protection. Ordinary deaths keep score, salvaged tools, silk, and paint but reset growth and upgrades. Losing your last life clears that personal progress; starting again gives you five lives, starter tools, and zero score.
+Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, silk, and paint remain safe. There are no lives or game over. Growth and temporary upgrades reset.
 
 ## Recovery
 
-Health regenerates after a delay without damage. Buy extra lives for 250 score each at [Town Square](/wiki/#controls), up to six lives.
+Health regenerates after a delay without damage. Bank cargo at a lit furnace, then spend banked points on placeholders at [Town Square](/wiki/#controls).

@@ -10,11 +10,10 @@ import type {
   ShipKitId,
 } from '../../../shared-types';
 import { playRespawn } from '../../audio/interactionSounds';
-import { GAME } from '../../constants';
 import { playLocalHaptic } from '../../fx/haptics';
 import type { PlayerInput } from '../../input/PlayerInput';
 import { getPlayerColor } from '../../utils/colorUtils';
-import { isStaleGameOverSnapshot, preferDeathCause } from '../../utils/deathCause';
+import { preferDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import { Ship } from '../ship/Ship';
 import { applySharedHarpoonLatch } from '../ship/shipAbilities';
@@ -40,7 +39,8 @@ export class Player {
   score: number = 0;
   silk = 0;
   lastUpdate: number = Date.now();
-  lives: number = GAME.START_LIVES;
+  cargo = 0;
+  purchases: string[] = [];
   color: string; // Player's unique color for lasers and other visual elements
   deathCause?: string; // Environmental death cause
   input: PlayerInput; // Unified input system for all player types
@@ -49,6 +49,17 @@ export class Player {
   // again, trust the server for position (so the respawn point is adopted).
   // While alive it predicts locally and ignores the lagging server echo.
   private adoptServerPosition = false;
+  private reportedDeath = false;
+
+  reportDeath(): void {
+    if (this.type !== 'local' || this.reportedDeath) {
+      return;
+    }
+    this.reportedDeath = true;
+    window.dispatchEvent(
+      new CustomEvent('playerDied', { detail: { playerId: this.id, deathCause: this.deathCause } })
+    );
+  }
 
   /** Ship position when death forced server-authoritative movement (respawn latch). */
   private respawnLatchOrigin: Position | null = null;
@@ -99,7 +110,8 @@ export class Player {
     position?: Position;
     velocity?: Position;
     angle?: number;
-    lives?: number;
+    cargo?: number;
+    purchases?: string[];
     score?: number;
     silk?: number;
     equipment?: EquipmentId[];
@@ -175,7 +187,7 @@ export class Player {
       !isLocal || this.adoptServerPosition || wasInTransit || this.ship.furnaceTransit !== null;
 
     // Infer wall from the pre-echo pose. Adopting a lagged inside position
-    // first is what turned last-life wall GO into a generic overlay.
+    // first is what turned a wall death into a generic overlay.
     const inferenceShip = {
       position: { x: this.ship.position.x, y: this.ship.position.y },
       r: this.ship.r,
@@ -210,37 +222,17 @@ export class Player {
       this.deathCause = preferDeathCause(explodeCause, this.deathCause) ?? explodeCause;
     }
 
-    const snapshotDeathCause = this.deathCause ?? data.deathCause;
-    const staleSnapshot =
-      isLocal &&
-      data.lives !== undefined &&
-      isStaleGameOverSnapshot({
-        prevLives: this.lives,
-        nextLives: data.lives,
-        ...(snapshotDeathCause !== undefined ? { deathCause: snapshotDeathCause } : {}),
-        health: data.health ?? this.ship.health,
-        exploding: data.exploding ?? this.ship.exploding,
-      });
-    if (data.lives !== undefined && !staleSnapshot) {
-      const prevLives = this.lives;
-      this.lives = data.lives;
-      if (isLocal && prevLives > this.lives) {
-        window.dispatchEvent(
-          new CustomEvent('playerDied', {
-            detail: {
-              playerId: this.id,
-              deathCause: resolveCombatDeathCause(
-                preferDeathCause(this.deathCause, data.deathCause, this.ship.lastExplodeCause),
-                inferenceShip
-              ),
-              isGameOver: this.lives <= 0,
-            },
-          })
-        );
-      }
+    if (data.exploding === true || data.health === 0) {
+      this.reportDeath();
     }
-    if (data.score !== undefined && !staleSnapshot) {
+    if (data.score !== undefined) {
       this.score = data.score;
+    }
+    if (data.cargo !== undefined) {
+      this.cargo = data.cargo;
+    }
+    if (data.purchases !== undefined) {
+      this.purchases = [...data.purchases];
     }
     // Thrusting is client-owned for the local player (keyboard/mouse input).
     // The server echo lacks thrusting when updates omit it, which flickers the flame.
@@ -250,7 +242,7 @@ export class Player {
     if (data.boost !== undefined && this.type !== 'local') {
       this.ship.boost = { ...data.boost };
     }
-    if (data.color !== undefined && !staleSnapshot) {
+    if (data.color !== undefined) {
       const color =
         this.type === 'local' && !purchasedHullColor(data.color)
           ? getPlayerColor('local')
@@ -259,9 +251,7 @@ export class Player {
       this.ship.color = color;
     }
     if (data.health !== undefined) {
-      if (isLocal && this.lives <= 0) {
-        this.ship.health = 0;
-      } else {
+      {
         const wasDead = this.ship.health <= 0;
         const wasExploding = this.ship.exploding;
         const oldHealth = this.ship.health;
@@ -311,6 +301,7 @@ export class Player {
           this.ship.health > 0 &&
           (data.health === undefined || data.health > 0)
         ) {
+          this.reportedDeath = false;
           playRespawn(this.ship.position);
           playLocalHaptic(this.type === 'local', 'pickup');
           delete this.ship.lastExplodeCause;

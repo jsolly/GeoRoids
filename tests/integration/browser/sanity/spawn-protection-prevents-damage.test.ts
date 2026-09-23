@@ -27,7 +27,7 @@ test(
     await game.waitForServerSpawnProtection();
 
     const protectedHealth = await game.getShipHealth();
-    const protectedLives = await game.getLives();
+    const protectedLives = await game.getShipHealth();
     const placement = await placePlayer(playerId, { x: 0, y: -460 });
     await page.waitForFunction(
       (motionEpoch) =>
@@ -51,7 +51,7 @@ test(
 
     await page.waitForTimeout(500);
     expect(await game.getShipHealth()).toBe(protectedHealth);
-    expect(await game.getLives()).toBe(protectedLives);
+    expect(await game.getShipHealth()).toBe(protectedLives);
 
     expect((await game.getAsteroidPositions()).some((rock) => rock.id === 'crew-fixture-ore')).toBe(
       true
@@ -64,7 +64,7 @@ test(
         message: 'the same environmental impact should apply after protection expires',
       })
       .toBe(protectedHealth - 25);
-    expect(await game.getLives()).toBe(protectedLives);
+    expect(await game.getShipHealth()).toBe(protectedLives);
     assertNoBrowserDiagnostics(diagnostics);
   },
   TestConfig.DEFAULT_TIMEOUT * 2

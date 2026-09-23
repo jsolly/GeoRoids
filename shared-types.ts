@@ -127,7 +127,13 @@ export interface PlayerLeave {
 }
 
 // Game state types that might be shared
-export type AsteroidMaterial = 'ice' | 'metal' | 'rubble';
+export type AsteroidMaterial = 'ice' | 'metal' | 'rubble' | 'crystal';
+
+export interface SettlementState {
+  level: number;
+  points: number;
+  resources: Record<AsteroidMaterial, number>;
+}
 
 export interface AsteroidPhenomenon {
   kind: 'reflective';
@@ -204,6 +210,8 @@ export interface AsteroidData {
   beltCrawlerIds?: string[];
   /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
+  /** Null is barren. Absent old rocks use a stable ID-derived deposit. */
+  ore?: AsteroidMaterial | null;
   /** Pilots who identified this deposit by scan or satellite; retained until it leaves the field. */
   surveyedBy?: string[];
   /** Pilots who have mined this deposit; persisted until the deposit is destroyed. */
@@ -219,7 +227,7 @@ export interface AsteroidData {
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
 export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
 
-export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk' | EquipmentId;
+export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk' | EquipmentId | 'points';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -235,7 +243,15 @@ export interface TapEjected {
   position: Position;
 }
 
+export interface SavedPointLoot {
+  id: string;
+  position: Position;
+  points: number;
+  expiresAt: number;
+}
+
 export interface LootData {
+  points?: number;
   id: string;
   position: Position;
   mass: number;
@@ -295,18 +311,19 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
-/** A street furnace a Scout lit with their own score. */
+/** A furnace a Scout lit with their own score. */
 export interface CivicModule {
   id: string;
   builderName: string;
-  /** Public pilot id of the Scout who paid. Absent on older unnamed streets. */
+  /** Public pilot id of the Scout who paid. Absent on older unnamed furnaces. */
   builderId?: string;
 }
 
 export interface ServerGameState {
   /** Epoch milliseconds for client animation clocks. */
   serverTime?: number;
-  /** Street furnaces the crew has lit, named for the Scout who paid. */
+  settlement: SettlementState;
+  /** Furnaces the crew has lit, named for the Scout who paid. */
   civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
@@ -379,7 +396,8 @@ export interface ServerEntityData {
   /** Omitted only by servers predating the independently deployed boost update. */
   boost?: ShipBoostState;
   color: string;
-  lives: number;
+  cargo: number;
+  purchases: string[];
   score: number;
   health: number;
   maxHealth: number;

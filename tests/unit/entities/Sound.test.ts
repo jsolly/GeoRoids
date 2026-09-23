@@ -1,7 +1,7 @@
 import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-// Keep real audio diagnostics and logger assertions without opening a server connection.
+// Audio unit tests must not connect to a developer's running game server.
 vi.mock('../../../src/utils/logForwarder', () => ({
   startClientLogForwarder: vi.fn(),
   forwardLogToServer: vi.fn(),

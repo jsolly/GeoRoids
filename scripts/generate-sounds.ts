@@ -45,10 +45,6 @@ const recipes: Record<string, Recipe> = {
     duration: 0.9,
     tones: [bell(4, 0, 0.5, 0.4), bell(7, 0.11, 0.5, 0.38), bell(12, 0.22, 0.65, 0.45)],
   },
-  'game-over': {
-    duration: 0.95,
-    tones: [bell(-5, 0, 0.5, 0.42), bell(-8, 0.15, 0.5, 0.36), bell(-12, 0.3, 0.65, 0.45)],
-  },
   interface: { duration: 0.16, tones: [bell(12, 0, 0.16, 0.38, 0.08)] },
   'satellite-equip': { duration: 0.44, tones: [bell(0, 0, 0.3, 0.35), bell(7, 0.08, 0.34, 0.38)] },
   'tap-eject': { duration: 0.36, tones: [bell(0, 0, 0.36, 0.6, 0.1), body(-24, 0.055, 0.22)] },

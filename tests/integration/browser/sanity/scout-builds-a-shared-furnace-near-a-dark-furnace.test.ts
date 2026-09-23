@@ -14,7 +14,7 @@ for (const viewport of [
   { width: 1280, height: 900, touch: false },
   { width: 390, height: 844, touch: true },
 ]) {
-  test(`a Scout builds a shared furnace near a dark street at ${viewport.width}px`, async () => {
+  test(`a Scout builds a shared furnace near a dark furnace at ${viewport.width}px`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
@@ -34,7 +34,11 @@ for (const viewport of [
       await page.keyboard.press('KeyE');
     }
     await store.waitFor({ state: 'visible' });
-    expect(await store.textContent()).toContain('Extra life');
+    expect(await store.textContent()).toContain('Placeholder A');
+    expect(await store.textContent()).not.toMatch(/street|deliveries|bonus|10%/iu);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`town-store-furnaces-${viewport.width}.png`),
+    });
     await page.locator('#town-store-return').click();
     await store.waitFor({ state: 'hidden' });
     const openSchematic = async () => {
@@ -55,9 +59,9 @@ for (const viewport of [
     await page.locator('#ship-schematic-dialog').waitFor({ state: 'hidden' });
     const lot = civicLot('street-1-0');
     if (!lot) {
-      throw new Error('Missing street lot');
+      throw new Error('Missing furnace lot');
     }
-    await arrangeCrewField([await game.getLocalPlayerId()], 'street-build');
+    await arrangeCrewField([await game.getLocalPlayerId()], 'furnace-build');
     await page.waitForFunction(({ x, y }) => {
       const ship = window.gameController?.getCurrPlayer()?.ship;
       return Boolean(
@@ -79,15 +83,16 @@ for (const viewport of [
       });
       await page.keyboard.press('KeyE');
     }
-    await page.waitForFunction((streetName) => {
+    await page.waitForFunction((furnaceName) => {
       const message = window.gameController?.getGameStateManager().getPickupMessage() ?? '';
-      return message.includes(streetName) && message.includes('is burning');
+      return message.includes(furnaceName) && message.includes('is burning');
     }, lot.name);
+    await page.waitForFunction(() => window.gameController?.getCurrPlayer()?.score === 0);
     expect(
       await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.abilityActiveFrames)
     ).toBe(0);
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`scout-lit-street-${viewport.width}.png`),
+      path: screenshotManager.getScreenshotPath(`scout-lit-furnace-${viewport.width}.png`),
     });
     await game.placeShipAt(0, 0);
     await game.waitForAnimationFrames(12);

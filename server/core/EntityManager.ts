@@ -12,7 +12,6 @@ import type {
   EquipmentId,
   FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   PlayerMotionState,
   Position,
   ScoutUtilityId,
@@ -76,7 +75,6 @@ export interface GameEntity {
   deathCause?: string;
   asteroidInteractions?: 1;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 }
 
 export class EntityManager {

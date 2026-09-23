@@ -17,7 +17,6 @@ import type {
   ShipKitId,
 } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
-import { lootStrokeColor } from '../../entities/loot/lootRenderer';
 import type { Player } from '../../entities/player/Player';
 import type { Roid } from '../../entities/roid/Roid';
 import type { SatellitePickup } from '../../entities/satellitePickup/SatellitePickup';
@@ -52,7 +51,6 @@ type RadarMark = {
 const LOOT_MARK_KINDS = [
   'wreckage',
   'shard',
-  'laserCore',
   'tap',
   'silk',
   'resource_tap',
@@ -369,7 +367,7 @@ function drawLootMarks(
       }
       if (!painted) {
         ctx.save();
-        ctx.strokeStyle = lootStrokeColor(kind);
+        ctx.strokeStyle = PALETTE.LOOT;
         ctx.lineWidth = 1;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';

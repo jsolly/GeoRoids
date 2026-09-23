@@ -3,11 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { GROWTH } from '../../../shared/shipGrowth';
 import { PALETTE, VISUAL } from '../../../src/constants';
 import { LootField } from '../../../src/entities/loot/LootField';
-import {
-  drawLootRelative,
-  lootScreenRadius,
-  lootStrokeColor,
-} from '../../../src/entities/loot/lootRenderer';
+import { drawLootRelative, lootScreenRadius } from '../../../src/entities/loot/lootRenderer';
 import { Ship } from '../../../src/entities/ship/Ship';
 import { HAULER_TETHER_COLOR } from '../../../src/entities/ship/shipKits';
 import { Point } from '../../../src/physics/Point';
@@ -38,9 +34,6 @@ afterEach(() => {
 });
 
 test('wreckage and shards share locked cream', () => {
-  expect(lootStrokeColor('wreckage')).toBe(PALETTE.LOOT);
-  expect(lootStrokeColor('shard')).toBe(PALETTE.LOOT);
-
   expect(PALETTE.LOOT).toBe('#E8D5A3');
   expect(PALETTE.LOOT).toBe(HAULER_TETHER_COLOR);
 });

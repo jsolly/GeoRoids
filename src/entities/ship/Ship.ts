@@ -18,7 +18,6 @@ import type {
   EquipmentId,
   FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   PlayerMotionState,
   Position,
   ScoutUtilityId,
@@ -79,7 +78,6 @@ class Ship {
   /** Constrained/released/handoff transforms are advanced by the negotiated predictor. */
   serverOwnsMotion: boolean = false;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 
   exploding: boolean = false;
   lasers: Laser[] = [];

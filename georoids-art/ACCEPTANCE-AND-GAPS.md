@@ -136,7 +136,7 @@ Recovered art and gameplay landed in PRs #493/#499/#500, with final production f
 
 ## New asteroid interaction cues
 
-Reflective clusters use flat slate facets with small amber charge cues. Laser cores use an amber diamond/bolt mark and show remaining charges in a passive flight readout. Hauler's basic E harpoon uses one cream `#E8D5A3` cable with an amber `#FDE68A` endpoint. Its attached asteroid passes through the Hauler harmlessly until release. Extra asteroid selection, spin controls, and payload cables have been removed.
+Reflective clusters use flat slate facets with small amber charge cues. Hauler's basic E harpoon uses one cream `#E8D5A3` cable with an amber `#FDE68A` endpoint. Its attached asteroid passes through the Hauler harmlessly until release. Extra asteroid selection, spin controls, and payload cables have been removed.
 
 ## Cloud agents
 

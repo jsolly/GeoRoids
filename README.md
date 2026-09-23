@@ -22,7 +22,7 @@ Choose a ship, enter the game, steer with the mouse or left/right arrow keys whi
 
 Every player belongs to the crew. Direct crew lasers pass through ships; a bounced shot becomes a ricochet that can hurt you or another pilot. Tow a scanned asteroid into a furnace to give both the Hauler and its Scouts the full reward, including Scouts who are offline.
 
-Reflective asteroid clusters can bounce lasers and release laser-core upgrades. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, core charges and the shared snapshot behavior.
+Reflective asteroid clusters can bounce lasers and release ordinary salvage. The [asteroid interactions guide](docs/asteroid-interactions.md) covers reflection, ricochet energy and the shared snapshot behavior.
 
 ## Field manual
 

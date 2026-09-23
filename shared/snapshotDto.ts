@@ -6,7 +6,6 @@ import type {
   AsteroidProbe,
   FurnaceTransit,
   HaulerUtilityId,
-  LaserUpgrade,
   LootData,
   LootKind,
   MapAsset,
@@ -69,7 +68,6 @@ const scoutUtility: Rule = (value) =>
 const lootKind = enumeration<LootKind>({
   shard: true,
   wreckage: true,
-  laserCore: true,
   tap: true,
   silk: true,
   resource_tap: true,
@@ -105,7 +103,6 @@ const motion = shape<PlayerMotionState>({
   ack: counter,
   anchor: optional(position),
 });
-const upgrade = shape<LaserUpgrade>({ charges: counter, expiresAt: number });
 const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
   kind: choice('reflective'),
   clusterId: string,
@@ -166,7 +163,6 @@ const entity = shape<ServerEntityData>({
   scoutUtility: optional(scoutUtility),
   deathCause: optional(string),
   playerMotion: optional(motion),
-  laserUpgrade: optional(upgrade),
 });
 const armedBoost = shape<Extract<AsteroidBoost, { phase: 'armed' }>>({
   phase: choice('armed'),
@@ -293,7 +289,7 @@ const collabTag = shape<SnapshotCollabTag>({
 });
 const mapAsset = shape<MapAsset>({
   id: string,
-  kind: choice('furnace', 'foundation', 'laserCore', 'wreckage', 'satellite'),
+  kind: choice('furnace', 'foundation', 'wreckage', 'satellite'),
   position,
   name: string,
 });

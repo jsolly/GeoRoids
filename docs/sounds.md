@@ -17,7 +17,6 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 | --- | --- |
 | Resource Tap ejection | Lower C4–G4–E4–C5 plucks with a small rounded pop |
 | Material pickup | C5-root crystal instrument; three-note answers begin E5–G5–C6 |
-| Laser core pickup | Brighter octave partial in the same pickup phrase |
 | Orbital pickup | G4–C5 answering interval |
 | Harpoon launch, latch, release | Low plucks, seated latch tone, descending release |
 | Scout scan | C4–G4–D5 rising shimmer |
@@ -101,7 +100,7 @@ another's melody steps. Each accepted event sounds immediately; simultaneous
 pickups form a chord instead of queuing a delayed tune. Pickups cycle through
 four composed three-note answers, with bounded register rather than endless
 ascending pitch. After 1.4 seconds without an audible resource note the phrase
-restarts. Laser cores share the melody with a brighter instrument.
+restarts.
 
 The server emits `tapEjected` for each created canister before collection
 notifications and snapshots. The client validates positions and deduplicates

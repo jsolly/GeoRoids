@@ -8,13 +8,20 @@ export const TERRAIN = {
   DEFAULT_SEED: 0x7ec01d,
   /** Height samples across the arena diameter for marching squares. */
   GRID_SIZE: 224,
-  /** Evenly spaced iso levels (tight lines = steep). */
+  /** Original contour density; elevation intervals compress over the plains. */
   LEVELS: 18,
   /** World units per noise cell — varied hills within the close gameplay view. */
   FEATURE_SCALE: 650,
   OCTAVES: 4,
   LACUNARITY: 2,
   PERSISTENCE: 0.48,
+  /** Compress low relief into broad, nearly level plains. */
+  FLAT_HEIGHT_BAND: 0.2,
+  /** Plains retain one percent of the underlying height variation. */
+  PLAIN_RELIEF_SCALE: 0.01,
+  /** Smoothly join relief to the plains without a slope discontinuity. */
+  FLAT_TRANSITION: 0.04,
+  RELIEF_GAIN: 2,
   /** Seeded gaussian hills/valleys in the mid-ring so the map has readable landmarks. */
   LANDMARK_COUNT: 6,
   LANDMARK_MIN_RADIUS: 0.32,

@@ -13,9 +13,6 @@ export const ASTEROID_INTERACTIONS = {
   maxBounces: 8,
   /** Inverse-scaled age guard keeps reflection travel distance unchanged. */
   maxLaserFrames: Math.ceil(300 / GAME.MOTION_SCALE),
-  coreCharges: 6,
-  coreLifetimeMs: 60_000,
-  coreScore: 150,
 } as const;
 
 /**

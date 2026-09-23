@@ -151,7 +151,6 @@ function isLootKind(value: unknown): value is LootKind {
   return (
     value === 'shard' ||
     value === 'wreckage' ||
-    value === 'laserCore' ||
     value === 'tap' ||
     value === 'silk' ||
     isEquipmentId(value)
@@ -563,7 +562,6 @@ export class ConnectionManager {
       localShip.serverOwnsMotion = false;
       delete localShip.playerMotion;
       localShip.furnaceTransit = null;
-      delete localShip.laserUpgrade;
     }
 
     this.resetSnapshotSession();
@@ -1430,11 +1428,6 @@ export class ConnectionManager {
         entity.ship.abilityActiveFrames = scoutToolSelected
           ? 0
           : (entityData.abilityActiveFrames ?? 0);
-        if (entityData.laserUpgrade) {
-          entity.ship.laserUpgrade = { ...entityData.laserUpgrade };
-        } else {
-          delete entity.ship.laserUpgrade;
-        }
 
         if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
           delete entity.deathCause;
@@ -1567,7 +1560,7 @@ export class ConnectionManager {
       }
     }
     this.playedLootCollectionIds.add(data.lootId);
-    playLootPickup(data.kind, data.position);
+    playLootPickup(data.position);
     playLocalHaptic(data.collectorId === this.getLocalPlayerId(), 'pickup');
   }
 

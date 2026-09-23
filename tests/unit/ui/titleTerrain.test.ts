@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { initTitleTerrain } from '../../../src/rendering/titleTerrain';
 
-const TITLE_TERRAIN_LABEL_PATTERN = /^-?\d+\.\d{2}$/u;
+const TITLE_TERRAIN_LABEL_PATTERN = /^-?\d+\.(?:\d{2}|\d{4})$/u;
 const originalViewport = { width: window.innerWidth, height: window.innerHeight };
 const productionHtml = readFileSync(resolve(__dirname, '../../../index.html'), 'utf8');
 

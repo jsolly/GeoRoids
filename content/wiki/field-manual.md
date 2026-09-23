@@ -22,4 +22,4 @@ Everyone shares one crew, one chart, and a persistent world. Mine rocks, collect
 
 ## Your next life
 
-Deaths reset growth and temporary upgrades and drop your carried points in a stash that expires after two minutes. Banked points, salvaged tools, silk, and paint remain safe. Respawns are unlimited. A brief disconnect returns you to the same ship.
+Deaths reset growth and drop your carried points in a stash that expires after two minutes. Banked points, salvaged tools, silk, and paint remain safe. Respawns are unlimited. A brief disconnect returns you to the same ship.

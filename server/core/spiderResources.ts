@@ -32,7 +32,7 @@ export function spiderResources(
     resources.push({
       id: drop.id,
       position: drop.position,
-      value: drop.kind === 'laserCore' ? 2 : drop.mass >= 0.75 ? 1 : 0,
+      value: drop.mass >= 0.75 ? 1 : 0,
     });
   }
   for (const pickup of pickups) {

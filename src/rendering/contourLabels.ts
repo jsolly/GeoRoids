@@ -68,7 +68,12 @@ export function collectElevationLabels(
         continue;
       }
       // Elevation is relative and unitless, as in the shared heightfield.
-      const label: ElevationLabel = { x, y, angle, text: level.height.toFixed(2) };
+      const label: ElevationLabel = {
+        x,
+        y,
+        angle,
+        text: level.height.toFixed(Math.abs(level.height) < 0.01 ? 4 : 2),
+      };
       labels.push(label);
       const key = cellKey(ix, iy);
       const bucket = buckets.get(key);

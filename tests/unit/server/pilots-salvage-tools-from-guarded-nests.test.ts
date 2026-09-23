@@ -137,7 +137,7 @@ test('guarded caches contain mixed salvage and occasionally one tool from every 
   for (let seed = 0; seed < 100; seed++) {
     const kinds = cacheKinds(seed);
     expect(cacheKinds(seed)).toEqual(kinds);
-    expect(kinds).toEqual(expect.arrayContaining(['shard', 'tap', 'silk', 'laserCore']));
+    expect(kinds).toEqual(expect.arrayContaining(['shard', 'tap', 'silk']));
     const tools = kinds.filter(isEquipmentId);
     expect(tools.length).toBeLessThanOrEqual(1);
     if (tools.length === 0) {

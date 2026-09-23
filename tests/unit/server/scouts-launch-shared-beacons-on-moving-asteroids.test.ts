@@ -218,12 +218,12 @@ describe('authoritative Scout probes', () => {
     expect(engine.useAbility(scout.id, 'scout')).toBe(true);
     assert.ok(host.probe);
 
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 }, now.value);
+    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
     engine.advanceLasersAndResolveHits(now.value + 1);
     expect(host.probe?.health).toBe(SURVEY_PROBE.MAX_HEALTH - 25);
     expect(host.health).toBe(host.maxHealth);
 
-    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 }, now.value + 2);
+    engine.spawnLaser('shooter', { x: 120, y: 0 }, { x: 60, y: 0 });
     engine.advanceLasersAndResolveHits(now.value + 3);
     expect(host.probe).toBeNull();
     expect(engine.getAsteroid(host.id)).toBe(host);

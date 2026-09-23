@@ -529,11 +529,11 @@ export class GameEngine {
       this.departedPlayers.push(id);
     }
     this.advanceFurnaceTravel(serverNow);
-    this.tickAbilities(serverNow);
+    this.tickAbilities();
     this.tickSurveyProbes(serverNow);
     this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
-    this.collectLoot(serverNow);
+    this.collectLoot();
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion();
     this.advanceSpiderField();
@@ -1998,7 +1998,6 @@ export class GameEngine {
     }
     this.cancelArmedBoost(entity.id, entity.harpoonTargetId);
     this.playerMotion.invalidateLife(entity.id, this.getServerTime());
-    delete entity.laserUpgrade;
     this.satellitePickupManager.releaseOwner(entity.id);
     this.lootManager.spawnFromKill(entity, this.gameTime);
     this.lootManager.spawnPoints(entity.position, entity.cargo);
@@ -2035,10 +2034,6 @@ export class GameEngine {
         if (equipment) {
           this.dropEquipmentAt(result.destroyed.position, equipment);
         }
-      }
-
-      if (result.destroyed.phenomenon?.kind === 'reflective') {
-        this.lootManager.spawnLaserCore(result.destroyed.position, this.gameTime);
       }
     }
     return result;
@@ -2175,7 +2170,7 @@ export class GameEngine {
     if (available < 1) {
       return null;
     }
-    const laser = this.spawnLaser(ownerId, start, velocity, now);
+    const laser = this.spawnLaser(ownerId, start, velocity);
     if (!laser) {
       return null;
     }
@@ -2185,12 +2180,7 @@ export class GameEngine {
   }
 
   /** Spawn a simulated shot for a player `shoot` or a server-authored test. */
-  public spawnLaser(
-    ownerId: string,
-    start: Position,
-    velocity: Velocity,
-    now = this.getServerTime()
-  ): ServerLaser | null {
+  public spawnLaser(ownerId: string, start: Position, velocity: Velocity): ServerLaser | null {
     const position = this.validatePosition(start);
     const vx = typeof velocity?.x === 'number' && Number.isFinite(velocity.x) ? velocity.x : NaN;
     const vy = typeof velocity?.y === 'number' && Number.isFinite(velocity.y) ? velocity.y : NaN;
@@ -2204,7 +2194,6 @@ export class GameEngine {
     }
 
     this.laserSeq += 1;
-    const owner = this.getPlayer(ownerId);
     const laser: ServerLaser = {
       id: `server-laser-${this.laserNonce}-${ownerId}-${this.laserSeq}`,
       ownerId,
@@ -2218,20 +2207,6 @@ export class GameEngine {
       bounces: 0,
       age: 0,
     };
-    if (owner?.laserUpgrade && owner.laserUpgrade.expiresAt <= now) {
-      delete owner.laserUpgrade;
-    }
-    if (
-      owner?.laserUpgrade &&
-      owner.laserUpgrade.expiresAt > now &&
-      owner.laserUpgrade.charges > 0
-    ) {
-      laser.energy = 2;
-      owner.laserUpgrade.charges--;
-      if (owner.laserUpgrade.charges === 0) {
-        delete owner.laserUpgrade;
-      }
-    }
     this.lasers.push(laser);
     // Match bounded event queues; ability rings get their own single activation cue.
     if (this.pendingShotSounds.length >= 256) {
@@ -2536,7 +2511,7 @@ export class GameEngine {
           origin: { ...rock.position },
         };
       }
-      // Core charges double one physical shot's metal chip; each logical shot
+      // Energized ricochets double one physical shot's metal chip; each logical shot
       // is still consumed once and terminal drops/score happen only once.
       let hit = this.applyLaserAsteroidHit(
         rock.id,
@@ -2665,7 +2640,6 @@ export class GameEngine {
             ...(entity.kitId === 'hauler' ? { haulerUtility: haulerUtilityOf(entity) } : {}),
             ...(entity.kitId === 'scout' ? { scoutUtility: scoutUtilityOf(entity) } : {}),
             ...(entity.playerMotion !== undefined ? { playerMotion: entity.playerMotion } : {}),
-            ...(entity.laserUpgrade !== undefined ? { laserUpgrade: entity.laserUpgrade } : {}),
             ...(entity.deathCause !== undefined ? { deathCause: entity.deathCause } : {}),
           }) satisfies ServerEntityData
       ),
@@ -3014,7 +2988,7 @@ export class GameEngine {
     return this.surveyProbeManager.damage(hostId, damage);
   }
 
-  public tickAbilities(now = this.getServerTime()): void {
+  public tickAbilities(): void {
     this.entityManager.tickAbilityState();
     const rocks = this.getAllAsteroids();
     const asteroidIndex = new AsteroidSpatialIndex(rocks);
@@ -3038,9 +3012,6 @@ export class GameEngine {
             ? SHIP_ABILITY.SCAN_RANGE
             : EXPLORATION_RANGE[entity.kitId]
         );
-      }
-      if (entity.laserUpgrade && entity.laserUpgrade.expiresAt <= now) {
-        delete entity.laserUpgrade;
       }
       const scanRange =
         entity.kitId === 'scout' && entity.abilityActiveFrames > 0
@@ -3311,9 +3282,7 @@ export class GameEngine {
   }
 
   /** Server-authoritative pickup: first overlapping live ship wins. */
-  public collectLoot(
-    now = this.getServerTime()
-  ): Array<{ collectorId: string; lootId: string; mass: number }> {
+  public collectLoot(): Array<{ collectorId: string; lootId: string; mass: number }> {
     const collected = this.lootManager.collectOverlaps(this.entityManager.getAllEntities());
     const results: Array<{ collectorId: string; lootId: string; mass: number }> = [];
     const events: LootCollected[] = [];
@@ -3343,16 +3312,6 @@ export class GameEngine {
         results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
         continue;
       }
-      if (loot.kind === 'laserCore') {
-        collector.laserUpgrade = {
-          charges: ASTEROID_INTERACTIONS.coreCharges,
-          expiresAt: now + ASTEROID_INTERACTIONS.coreLifetimeMs,
-        };
-        this.addCargo(collector, ASTEROID_INTERACTIONS.coreScore);
-        results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
-        continue;
-      }
-
       applyShipMass(collector, applyLootMass(collector.mass ?? GROWTH.BASE_MASS, loot.mass));
       if (loot.kind === 'shard') {
         this.addCargo(collector, GROWTH.SHARD_SCORE);

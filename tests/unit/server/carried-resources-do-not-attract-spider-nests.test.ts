@@ -46,13 +46,13 @@ test('moving ore and carried satellites do not turn a pilot into a nest anchor',
   ).toEqual([]);
 });
 
-test('colossal deposits and laser cores attract larger groups than ordinary ore and loose pickups', () => {
-  const core: LootData = {
-    id: 'core',
+test('colossal deposits attract larger groups than ordinary ore and loose pickups', () => {
+  const salvage: LootData = {
+    id: 'salvage',
     position: ore.position,
-    kind: 'laserCore',
+    kind: 'wreckage',
     radius: 10,
-    mass: 0,
+    mass: 1,
   };
   const resources = spiderResources(
     [
@@ -60,14 +60,14 @@ test('colossal deposits and laser cores attract larger groups than ordinary ore 
       ore,
       { ...ore, id: 'colossal', size: ROID.COLOSSAL_SIZE },
     ],
-    [core],
+    [salvage],
     [pickup]
   );
   expect(resources.map(({ id, value }) => [id, value])).toEqual([
     ['ice', 0],
     ['ore', 1],
     ['colossal', 2],
-    ['core', 2],
+    ['salvage', 1],
     ['satellite', 1],
   ]);
 });

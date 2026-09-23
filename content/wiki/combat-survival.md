@@ -30,7 +30,7 @@ Asteroid impacts remove health; the outer wall and a spider bite each kill a vul
 
 ## Lives and respawn
 
-Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, silk, and paint remain safe. There are no lives or game over. Growth and temporary upgrades reset.
+Death drops your carried points in a stash anyone can collect. Stashes expire after two minutes. You respawn near a lit furnace with restored health and brief protection; banked points, salvaged tools, silk, and paint remain safe. There are no lives or game over. Growth resets.
 
 ## Recovery
 

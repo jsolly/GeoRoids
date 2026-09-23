@@ -49,7 +49,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           osRelease: '1',
           arch: 'arm64',
           cpuModel: 'fixture',
-          browser: { name: 'chromium', version: '1', launchFlags: [] },
+          browser: { name: 'chromium', version: '1', launchFlags: [], headed: false },
           physicalDevice: false,
           measurementSource: 'emulated-touch',
           gpu: { supported: true },
@@ -63,6 +63,7 @@ async function fixture(directory: string, kind: 'quality' | 'product' = 'quality
           seed: 42,
           cpuSlowdown: 1,
           network: 'clean',
+          headed: false,
         },
       },
       details: {
@@ -239,6 +240,13 @@ test.each(['quality', 'product'] as const)(
         [
           (r: typeof original) => {
             r.metadata.environment.gpu = { supported: false };
+          },
+          'Device, viewport',
+        ],
+        [
+          (r: typeof original) => {
+            r.measurement.parameters.headed = true;
+            r.metadata.environment.browser.headed = true;
           },
           'Device, viewport',
         ],

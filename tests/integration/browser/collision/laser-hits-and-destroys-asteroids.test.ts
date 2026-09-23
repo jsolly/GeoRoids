@@ -5,7 +5,7 @@ import { GameInteractions } from '../../utils/game-interactions';
 import { TestConfig } from '../../utils/test-config';
 import { arrangeCrewField } from '../../utils/test-server-control';
 
-const { browserManager } = createBrowserScenarioHooks();
+const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 type ReceivedMessage = {
   type?: string;
@@ -57,6 +57,9 @@ test(
         message: 'server should confirm destruction of the chosen asteroid',
       })
       .toBe(true);
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath('asteroid-destruction-debris.png'),
+    });
     const points = await page.evaluate(() =>
       window.gameController
         ?.getLoot()

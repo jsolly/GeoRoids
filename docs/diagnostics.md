@@ -66,6 +66,11 @@ live touch list stays dead until the next pointerdown, so putting the finger
 back near the last heading reclaims steering instead of only firing. A second
 finger that is still down keeps firing.
 
+For rendering investigations, copied diagnostics also include the terrain seed,
+ship angle, device pixel ratio, canvas CSS/backing dimensions, and active graphics
+settings. Match these when reproducing low FPS: a large high-DPI canvas can cost
+much more to draw even when the entity counts and network timing are healthy.
+
 Repeated motion rejections and damage reports are sampled; death and respawn
 transitions remain explicit. Browser runtime errors and rejected promises enter
 the same pipeline. A failed game frame stops the affected loop and presents a

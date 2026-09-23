@@ -43,7 +43,10 @@ assert(
   typeof cohort === 'string' && cohort.length > 0,
   'Name the exact device/browser/OS/settings cohort'
 );
-assert(scenario === 'traversal' || scenario === 'combat', 'Declare traversal or combat');
+assert(
+  scenario === 'traversal' || scenario === 'combat' || scenario === 'dense-combat',
+  'Declare traversal, combat or dense-combat'
+);
 const experiment = record(manifest['experiment']);
 assert(
   experiment['kind'] === 'quality' || experiment['kind'] === 'product',
@@ -254,7 +257,7 @@ async function summarize(path: unknown, arm: ReturnType<typeof parseArm>) {
     assert(Array.isArray(run['peers']), 'Missing protocol peer evidence');
     assert.equal(
       run['peers'].length,
-      scenario === 'combat' ? 4 : 0,
+      scenario === 'traversal' ? 0 : 4,
       'Wrong protocol peer population'
     );
     const peers = run['peers'].map(record);

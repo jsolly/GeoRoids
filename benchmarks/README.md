@@ -342,6 +342,65 @@ non-software renderer; the default Chromium channel remains the Playwright
 bundled browser. Unsupported WebKit GPU inspection is explicit. Neither browser
 emulation nor a software renderer establishes the behavior of a phone GPU.
 
+Add `--headed` to open a visible browser window for desktop captures. Headless
+remains the default. The report records the mode in browser metadata,
+measurement parameters and scenario constraints, so paired comparisons cannot
+mix headed and headless runs. Keep the benchmark window in front and let its
+scripted inputs drive the ship. A visible window alone does not prove hardware
+acceleration; add `--chromium-gpu` to require the checked GPU path.
+
+Run this from `/Users/johnsolly/code/GeoRoids` or the absolute implementation
+worktree path, using the actual display DPR. The desktop case is 1920×1080 CSS
+pixels; reports retain both CSS and backing dimensions and require the admitted
+page and game canvas to be visible:
+
+```sh
+./scripts/test-runner.sh --benchmark-client --viewport desktop --headed --chromium-gpu \
+  --dpr 2 --scenario combat --seed 42 --warmup 30 --seconds 180 \
+  --output .performance/desktop-combat.json
+```
+
+Combat begins with five pilots, 80 asteroids, and six pickups. Review the
+`populationSamples` visible counts and authoritative projectile witnesses before
+interpreting timing. The desktop combat pilot offers trusted Space presses on an
+independent 250 ms schedule between its one-second steering steps. That matches
+the Scout's 250 ms cooldown; the Hauler's 280 ms cooldown and five-live-laser cap
+can reduce admitted shots. `desktopFire` records measured offered/completed
+presses and skipped slots. Pending presses never overlap, and firing stops during
+recovery and cleanup. Desktop traversal presses Space once per step; each of the
+four combat peers offers two shots per second.
+
+Use `--scenario dense-combat` for an additional compact asteroid workload. It
+starts the same five pilots, 80 ordinary seeded asteroids and six pickups, but
+places all asteroids on a compact 110-unit grid with zero initial translation.
+Material, health, shape, rotation, and reflective-pocket offsets remain intact;
+every initial asteroid clears the hulls and Town Square hearth. The hashed
+fixture manifest records the layout and complete starting asteroid state.
+
+After arrangement, ordinary physics, firing, damage, splitting, towing and
+impulses run unchanged. Rocks are never topped up or reset during the run; a
+peer rejoin fails this scenario instead of reseeding its field. Warmup can
+consume asteroids, and a finite field can still deplete. Review per-second visible
+population and actual damage/tag/destruction witnesses over the complete measured
+window before calling it sustained collision load. A dense starting count alone
+is insufficient. Normal `combat` remains the existing sparse drifting fixture.
+
+`combatWitness` records actual `playerDamaged`, `asteroidTagged`,
+`asteroidDestroy`, and `shockwave` messages. Player damage preserves the target,
+attacker, damage, remaining health, and destruction flag. An `asteroid` attacker
+identifies a ship/asteroid collision; `ricochet`, `spider`, and `boundary` identify
+other hazards. Asteroid tags retain the asteroid and shooter IDs and tag expiry.
+Supplemental health decreases come from successive measured snapshots. The
+report retains receipt times, event origins or the last known target position, and
+whether that position lies inside the last sampled browser viewport with the
+camera sample's age. Both successful and failed reports preserve this evidence.
+Each event series retains at most 4,096 rows and reports omissions separately
+from total counts. Snapshot baselines reset across joins and fixture arrangement.
+Health decreases do not identify their cause; furnace consumption is reported
+when supplied by a destruction event. These observations do not impose a minimum
+visible laser population or collision count, and missing objects alone never
+count as collisions.
+
 Chromium runs record successful gameplay WebSocket negotiation independently of
 `--trace`, including the negotiated extension header. Use the same harness when
 checking compression negotiation across runs; that witness does not claim that

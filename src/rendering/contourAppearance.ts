@@ -1,23 +1,37 @@
 import type { Position } from '../../shared-types';
 import { TERRAIN } from '../physics/terrain/terrainConfig';
 
-/** Warm uphill, cool downhill, neutral when travel crosses the slope. */
-export function contourSlopeColor(slope: number, alpha: number, passage = 0): string {
-  const amount = Math.min(
-    1,
-    Math.max(0, Math.abs(slope) - TERRAIN.TRAVEL_FLAT_GRADIENT) /
-      (TERRAIN.TRAVEL_STEEP_GRADIENT - TERRAIN.TRAVEL_FLAT_GRADIENT)
-  );
+/** Hue 211°, the quiet contour ink. Lightness is the only change along the ramp. */
+const CONTOUR_SATURATION = 0.15;
+const UPHILL_LIGHTNESS = 0.36;
+const DOWNHILL_LIGHTNESS = 0.72;
+
+function slateChannels(lightness: number): [number, number, number] {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * CONTOUR_SATURATION;
+  // Hue 211 sits in the blue sector, so red carries only the lightness match.
+  const x = chroma * (1 - Math.abs(((211 / 60) % 2) - 1));
+  const match = lightness - chroma / 2;
+  return [
+    Math.round(match * 255),
+    Math.round((x + match) * 255),
+    Math.round((chroma + match) * 255),
+  ];
+}
+
+function rampLightness(slope: number, passage: number): number {
+  const span = TERRAIN.TRAVEL_STEEP_GRADIENT - TERRAIN.TRAVEL_FLAT_GRADIENT;
+  const amount = Math.min(1, Math.max(0, (Math.abs(slope) - TERRAIN.TRAVEL_FLAT_GRADIENT) / span));
   const mix = amount * amount * (3 - 2 * amount);
-  const warm = slope > 0;
-  // Bright violet marks the passage; meaningful slopes still take amber/blue priority.
-  const baseR = 124 + (179 - 124) * passage;
-  const baseG = 137 + (136 - 137) * passage;
-  const baseB = 154 + (255 - 154) * passage;
-  const r = Math.round(baseR + ((warm ? 220 : 103) - baseR) * mix);
-  const g = Math.round(baseG + ((warm ? 164 : 168) - baseG) * mix);
-  const b = Math.round(baseB + ((warm ? 91 : 223) - baseB) * mix);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const alongSlope = slope > 0 ? 0.5 * (1 - mix) : 0.5 * (1 + mix);
+  const shortcut = Math.min(1, Math.max(0, passage));
+  const position = alongSlope + (1 - alongSlope) * shortcut;
+  return UPHILL_LIGHTNESS + (DOWNHILL_LIGHTNESS - UPHILL_LIGHTNESS) * position;
+}
+
+/** Darker slate uphill, lighter slate downhill. Shortcuts stay on the light end. */
+export function contourSlopeColor(slope: number, alpha: number, passage = 0): string {
+  const [red, green, blue] = slateChannels(rampLightness(slope, passage));
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 /** Local climb along the straight route from the ship to a contour point. */

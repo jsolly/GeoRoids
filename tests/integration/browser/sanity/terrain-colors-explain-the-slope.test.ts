@@ -30,30 +30,33 @@ const compareTerrainFrames = `(async () => {
     return readCtx.getImageData(0, 0, canvas.width, canvas.height).data;
   });
   let changes = 0;
-  let warm = 0;
-  let cool = 0;
+  let light = 0;
+  let chromatic = 0;
+  let lightBehind = 0;
+  let checksum = 0;
+  const isLightEnd = (r, g, b) => r >= 88 && g >= r - 2 && b > r && b - r < 40 && g < r + 22;
+  const isOldHue = (r, g, b) => r > b + 40 || (b > r + 25 && r > g + 12);
   for (let i = 0; i < frames[0].length; i += 4) {
-    if (frames[0][i] !== frames[1][i] || frames[0][i+1] !== frames[1][i+1] || frames[0][i+2] !== frames[1][i+2]) changes++;
-    if (frames[0][i] > frames[0][i+2] + 50) warm++;
-    if (frames[0][i+2] > frames[0][i] + 50 && frames[0][i+2] > 45) cool++;
+    const r = frames[0][i];
+    const g = frames[0][i + 1];
+    const b = frames[0][i + 2];
+    if (r !== frames[1][i] || g !== frames[1][i + 1] || b !== frames[1][i + 2]) changes++;
+    if (isLightEnd(r, g, b)) light++;
+    if (isOldHue(r, g, b)) chromatic++;
+    if (i % 16 === 0) checksum = (checksum + r * 3 + g * 5 + b * 7) >>> 0;
   }
-  let behindColor = 0;
-  let violetBehind = 0;
   for (let y = 0; y < canvas.height; y++) {
     for (let x = 0; x < canvas.width / 2; x++) {
       const i = (y * canvas.width + x) * 4;
-      // Violet passage markers are omnidirectional; only slope colors belong in the cone.
-      const warmSlope = frames[0][i] > frames[0][i+2] + 50;
-      const coolSlope = frames[0][i+2] > frames[0][i] + 50 && frames[0][i+1] > frames[0][i] + 10;
-      if (warmSlope || coolSlope) behindColor++;
-      if (frames[0][i+2] > frames[0][i] + 25 && frames[0][i] > frames[0][i+1] + 12) violetBehind++;
+      // Shortcuts use the light end in every direction. Amber and violet are gone.
+      if (isLightEnd(frames[0][i], frames[0][i + 1], frames[0][i + 2])) lightBehind++;
     }
   }
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(saved, 0, 0);
   ctx.restore();
-  return {changes, warm, cool, behindColor, violetBehind};
+  return {changes, light, chromatic, lightBehind, checksum};
 })()`;
 
 for (const viewport of [
@@ -77,31 +80,31 @@ for (const viewport of [
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const moving = await page.evaluate<{
       changes: number;
-      warm: number;
-      cool: number;
-      behindColor: number;
-      violetBehind: number;
+      light: number;
+      chromatic: number;
+      lightBehind: number;
+      checksum: number;
     }>(compareTerrainFrames);
     expect(moving.changes).toBe(0);
-    expect(moving.warm).toBeGreaterThan(50);
-    expect(moving.behindColor).toBe(0);
-    expect(moving.violetBehind).toBeGreaterThan(50);
+    expect(moving.light).toBeGreaterThan(50);
+    expect(moving.chromatic).toBe(0);
+    expect(moving.lightBehind).toBeGreaterThan(50);
     await page.screenshot({ path: `/tmp/georoids-color-terrain-${viewport.name}.png` });
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForFunction(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
     const still = await page.evaluate<{
       changes: number;
-      warm: number;
-      cool: number;
-      behindColor: number;
-      violetBehind: number;
+      light: number;
+      chromatic: number;
+      lightBehind: number;
+      checksum: number;
     }>(compareTerrainFrames);
     expect(still.changes).toBe(0);
-    expect(still.warm).toBe(moving.warm);
-    expect(still.cool).toBe(moving.cool);
-    expect(still.behindColor).toBe(moving.behindColor);
-    expect(still.violetBehind).toBe(moving.violetBehind);
+    expect(still.light).toBe(moving.light);
+    expect(still.chromatic).toBe(moving.chromatic);
+    expect(still.lightBehind).toBe(moving.lightBehind);
+    expect(still.checksum).toBe(moving.checksum);
     expect(problems).toEqual([]);
   });
 }

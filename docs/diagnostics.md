@@ -2,9 +2,11 @@
 
 The client and authoritative server use the same versioned JSON log envelope.
 Server records go to `logs/server.log`; forwarded browser records go to
-`logs/client.log`. Both also reach Railway's standard output. Browser warnings,
-errors and selected `STATE` events are forwarded through `/logs`; ordinary
-debug output stays local. Logging must not construct entity dumps every frame.
+`logs/client.log`. Both also reach Railway's standard output. Production
+browsers forward warnings, errors, and `player_died` / `player_respawned`.
+Reconnect and snapshot info stay in the browser (Copy Diagnostics still keeps
+the recent local trail). Development also forwards other `STATE` info. Debug
+output stays in the browser. Logging must not construct entity dumps every frame.
 
 ## Find the same incident on both sides
 
@@ -133,7 +135,14 @@ must report failure even when the same records reached Railway standard output.
 
 Each file retains its current 10 MiB segment and one rotation. Browser and file
 queues are capped at 256 KiB; the browser also checks socket backpressure.
-Client ingress limits each socket to 120 messages and 256 KiB per minute. Inspect
+Client ingress limits each socket to 120 messages and 256 KiB per minute.
+The socket is terminated once it passes that quota, or on the first malformed
+or invalid frame. Later frames on it are ignored, and a malformed frame warns
+once. A page keeps one log socket and waits five seconds before opening
+another, including after that close. An idle log socket does not reconnect.
+Log upgrades over 6 per minute per address are refused before the handshake,
+so the browser does not treat them as open and drop its queue. Gameplay
+upgrades keep a separate budget of 50 per minute. Inspect
 `logging.clientIngress` for accepted, invalid, rate-limited, dropped, queued and
 failed-write counts, and `logging.serverWriter` for server-file outcomes.
 `logging.gameplayIngress` reports the per-connection `/ws` message budget

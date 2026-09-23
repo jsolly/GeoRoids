@@ -20,7 +20,7 @@ Broad gentle plains connect hills and valleys. Dense contour lines preserve the 
 
 The 75° view ahead colors contours amber for an uphill approach and blue for downhill, assuming you fly straight toward that point.
 
-Winding shortcuts have bright violet lines and a faint glow. Follow a passage in either direction for up to 50% extra cruise speed; turning across it loses the boost. These narrow cuts reward watching the terrain and steering through bends.
+Winding shortcuts have bright violet lines. Follow a passage in either direction for up to 50% extra cruise speed; turning across it loses the boost. These narrow cuts reward watching the terrain and steering through bends.
 
 ## Outer boundary
 

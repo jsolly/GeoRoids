@@ -48,6 +48,7 @@ interface LiveReportMetadata {
       readonly name: string;
       readonly version: string;
       readonly launchFlags: readonly string[];
+      readonly headed?: boolean;
     };
     readonly measurementSource: 'host' | 'emulated-touch' | 'physical-device';
     readonly physicalDevice: boolean;
@@ -161,7 +162,7 @@ function liveInputHashes(root = ROOT) {
 export function collectLiveReportMetadata(
   options: {
     root?: string;
-    browser?: { name: string; version: string; launchFlags?: readonly string[] };
+    browser?: { name: string; version: string; launchFlags?: readonly string[]; headed?: boolean };
     measurementSource?: LiveReportMetadata['environment']['measurementSource'];
     gpu?: object;
   } = {}
@@ -173,6 +174,7 @@ export function collectLiveReportMetadata(
         name: options.browser.name,
         version: options.browser.version,
         launchFlags: [...(options.browser.launchFlags ?? [])],
+        ...(options.browser.headed !== undefined ? { headed: options.browser.headed } : {}),
       }
     : undefined;
   return {

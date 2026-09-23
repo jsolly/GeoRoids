@@ -481,7 +481,12 @@ export class GameInteractions {
     });
     const placement = await placePlayer(playerId, { x, y });
     await this.waitForFixtureMotionEpoch(placement.motionEpoch);
-    await this.setPredictedShipPosition(x, y, { clearSpawnProtection: true });
+    await this.setPredictedShipPosition(x, y, {
+      clearSpawnProtection: true,
+      ...(placement.motionEpoch !== undefined
+        ? { expectedMotionEpoch: placement.motionEpoch }
+        : {}),
+    });
   }
 
   private async waitForFixtureMotionEpoch(motionEpoch: number | undefined): Promise<void> {
@@ -491,7 +496,9 @@ export class GameInteractions {
     await this.page.waitForFunction(
       (expectedEpoch) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
-        return ship?.playerMotion?.epoch === expectedEpoch;
+        // Immediate collision/death can advance this connection's epoch before
+        // the placement snapshot is observed by the test.
+        return (ship?.playerMotion?.epoch ?? -1) >= expectedEpoch;
       },
       motionEpoch,
       { timeout: 5000, polling: 25 }
@@ -501,13 +508,18 @@ export class GameInteractions {
   private async setPredictedShipPosition(
     x: number,
     y: number,
-    options: { clearSpawnProtection?: boolean } = {}
+    options: { clearSpawnProtection?: boolean; expectedMotionEpoch?: number } = {}
   ): Promise<void> {
     await this.page.evaluate(
-      ({ x: worldX, y: worldY, clearSpawnProtection: clearProtection }) => {
+      ({ x: worldX, y: worldY, clearSpawnProtection: clearProtection, expectedMotionEpoch }) => {
         const ship = window.gameController?.getPlayerManager()?.getLocalPlayer?.()?.ship;
         if (!ship) {
           throw new Error('No local ship to align after fixture placement');
+        }
+        // Check in the same browser task as the writes so a death or respawn
+        // that superseded this placement keeps its authoritative pose.
+        if (expectedMotionEpoch !== undefined && ship.playerMotion?.epoch !== expectedMotionEpoch) {
+          return;
         }
         ship.position = { x: worldX, y: worldY };
         ship.velocity = { x: 0, y: 0 };
@@ -518,7 +530,12 @@ export class GameInteractions {
           ship.spawnProtectionTimer = 0;
         }
       },
-      { x, y, clearSpawnProtection: options.clearSpawnProtection ?? false }
+      {
+        x,
+        y,
+        clearSpawnProtection: options.clearSpawnProtection ?? false,
+        expectedMotionEpoch: options.expectedMotionEpoch,
+      }
     );
   }
 
@@ -844,7 +861,12 @@ export class GameInteractions {
       await this.waitForAnimationFrames(5);
       await this.page.waitForTimeout(100);
 
-      if ((await this.getShipHealth()) <= 0) {
+      const deathObserved = await this.page.evaluate(() =>
+        Boolean((window as typeof window & { __testDeathCause?: string }).__testDeathCause)
+      );
+      if (deathObserved || (await this.getShipHealth()) <= 0) {
+        // The authoritative event survives a respawn between test observations.
+        await this.requireObservedDeathCause('asteroid');
         // Move off the impact point so split fragments cannot re-damage the
         // ship while we wait for the server respawn reposition.
         await this.page.evaluate(({ x, y }) => {
@@ -852,12 +874,14 @@ export class GameInteractions {
           if (!ship) {
             throw new Error('No local ship after asteroid impact');
           }
+          if (ship.health > 0) {
+            return;
+          }
           const dist = Math.hypot(x, y) || 1;
           const step = Math.min(400, dist);
           ship.position = { x: x - (x / dist) * step, y: y - (y / dist) * step };
           ship.velocity = { x: 0, y: 0 };
         }, lastImpact);
-        await this.requireObservedDeathCause('asteroid');
         return lastImpact;
       }
     }

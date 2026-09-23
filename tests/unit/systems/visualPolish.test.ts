@@ -24,12 +24,8 @@ import { ensureTerrain, getTerrainField } from '../../../src/physics/terrain/ter
 import { canvasManager } from '../../../src/rendering/canvasSurface';
 import { drawContourLaserTicks } from '../../../src/rendering/contourLaserRenderer';
 import { drawIsoContours } from '../../../src/rendering/contourRenderer';
-import {
-  burstTick,
-  driftSegment,
-  easeOutCubic,
-  laserBoltOffsets,
-} from '../../../src/rendering/vectorJuice';
+import { configureRenderQuality } from '../../../src/rendering/renderQuality';
+import { burstTick, driftSegment, easeOutCubic } from '../../../src/rendering/vectorJuice';
 import { hexToRgba } from '../../../src/utils/colorUtils';
 import { TestPath2D } from '../../support/TestPath2D';
 import { setWindowViewport } from '../../support/viewport';
@@ -68,10 +64,12 @@ function recordingContext() {
   let points: Array<{ x: number; y: number }> = [];
   let arcs: Array<Parameters<CanvasRenderingContext2D['arc']>> = [];
   let closed = false;
+  let commands: Array<'move' | 'line'> = [];
   const strokes: Array<{
     points: typeof points;
     arcs: typeof arcs;
     closed: boolean;
+    commands: typeof commands;
     color: typeof ctx.strokeStyle;
     width: number;
     alpha: number;
@@ -86,15 +84,18 @@ function recordingContext() {
   const stroke = ctx.stroke.bind(ctx);
   vi.spyOn(ctx, 'beginPath').mockImplementation(() => {
     points = [];
+    commands = [];
     arcs = [];
     closed = false;
     begin();
   });
   vi.spyOn(ctx, 'moveTo').mockImplementation((x, y) => {
+    commands.push('move');
     points.push({ x, y });
     move(x, y);
   });
   vi.spyOn(ctx, 'lineTo').mockImplementation((x, y) => {
+    commands.push('line');
     points.push({ x, y });
     line(x, y);
   });
@@ -114,6 +115,7 @@ function recordingContext() {
       points: [...strokePoints],
       arcs: [...arcs],
       closed,
+      commands: [...commands],
       color: ctx.strokeStyle,
       width: ctx.lineWidth,
       alpha: ctx.globalAlpha,
@@ -189,63 +191,56 @@ test.each(['tow_cable', 'resource_tap', 'boost_coupling'] as const)(
   }
 );
 
-test('local and remote shots draw broad glowing bolts with bright cores, then hits draw a ring and ticks', () => {
+test('local and remote shots retain their glowing artwork and direction, then hits draw a ring and ticks', () => {
   const { ctx, strokes, fill } = recordingContext();
   const local = new Laser({ x: 30, y: 60 }, { x: 3, y: 4 }, 0, 0);
   local.serverId = 'local-diagonal';
   const remote = new Laser({ x: -20, y: 80 }, { x: 0, y: -5 }, 0, 0);
   remote.serverId = 'remote-vertical';
   const viewer = { x: 10, y: 20 };
-  const scale = canvasManager.getPlayfieldScale();
-  const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
-  const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
   const localScreen = canvasManager.worldToScreen(local.position, viewer);
   const remoteScreen = canvasManager.worldToScreen(remote.position, viewer);
-  const localOffsets = laserBoltOffsets(local.velocity.x, local.velocity.y, bolt, trailLength);
-  const remoteOffsets = laserBoltOffsets(remote.velocity.x, remote.velocity.y, bolt, trailLength);
-  ctx.save();
-  const expectedBlur = [VISUAL.LASER_GLOW * 0.55, 0, VISUAL.LASER_GLOW, 0, 0].map((blur) => {
-    ctx.shadowBlur = blur;
-    return ctx.shadowBlur;
+  const images: Array<{ source: HTMLCanvasElement; transform: DOMMatrix; x: number; y: number }> =
+    [];
+  const drawImage = ctx.drawImage.bind(ctx);
+  vi.spyOn(ctx, 'drawImage').mockImplementation((...args) => {
+    const source = args[0];
+    if (!(source instanceof HTMLCanvasElement)) {
+      throw new Error('Expected cached bolt artwork');
+    }
+    images.push({ source, transform: ctx.getTransform(), x: args[1], y: args[2] });
+    Reflect.apply(drawImage, ctx, args);
   });
-  ctx.restore();
-  for (const { shot, color, screen, offsets } of [
-    { shot: local, color: PALETTE.LASER_LOCAL, screen: localScreen, offsets: localOffsets },
-    { shot: remote, color: PALETTE.LASER_LOCAL, screen: remoteScreen, offsets: remoteOffsets },
+  for (const { shot, screen } of [
+    { shot: local, screen: localScreen },
+    { shot: remote, screen: remoteScreen },
   ]) {
-    const trail = [
-      {
-        x: screen.x - offsets.halfX - offsets.trailX,
-        y: screen.y - offsets.halfY - offsets.trailY,
-      },
-      { x: screen.x - offsets.halfX, y: screen.y - offsets.halfY },
-    ];
-    const body = [
-      { x: screen.x - offsets.halfX, y: screen.y - offsets.halfY },
-      { x: screen.x + offsets.halfX, y: screen.y + offsets.halfY },
-    ];
+    images.length = 0;
     strokes.length = 0;
-    drawLaserBolts([shot], color, viewer);
-    expect(strokes.map((path) => path.points)).toEqual([trail, trail, body, body, body]);
-    expect(strokes.map((path) => path.width)).toEqual([
-      VISUAL.LASER_STROKE_WIDTH * 0.7,
-      VISUAL.LASER_STROKE_WIDTH * 0.7,
-      VISUAL.LASER_STROKE_WIDTH,
-      VISUAL.LASER_STROKE_WIDTH,
-      VISUAL.LASER_CORE_WIDTH,
-    ]);
-    expect(strokes.map((path) => path.color)).toEqual([
-      ...[0.19, 0.38, 0.5, 1].map((alpha) => canvasColor(ctx, hexToRgba(color, alpha))),
-      canvasColor(ctx, VISUAL.LASER_CORE_COLOR),
-    ]);
-    expect(strokes.map((path) => path.blur)).toEqual(expectedBlur);
-    expect(strokes.slice(0, 4).every((path) => path.shadow === canvasColor(ctx, color))).toBe(true);
-    expect(
-      strokes.every(
-        (path) => !path.closed && path.width <= VISUAL.LASER_STROKE_WIDTH && path.alpha === 1
-      )
-    ).toBe(true);
-    expect(strokes.flatMap((path) => path.arcs)).toEqual([]);
+    drawLaserBolts([shot], PALETTE.LASER_LOCAL, viewer);
+    expect(images).toHaveLength(1);
+    expect(strokes).toEqual([]);
+    const artwork = images[0];
+    if (!artwork) {
+      throw new Error('Shot did not draw its artwork');
+    }
+    const angle = Math.atan2(shot.velocity.y, shot.velocity.x);
+    expect(artwork.transform.a).toBeCloseTo(Math.cos(angle));
+    expect(artwork.transform.b).toBeCloseTo(Math.sin(angle));
+    expect(artwork.transform.e).toBeCloseTo(screen.x);
+    expect(artwork.transform.f).toBeCloseTo(screen.y);
+    const sprite = artwork.source.getContext('2d');
+    if (!sprite) {
+      throw new Error('Cached bolt has no drawing context');
+    }
+    const x = -artwork.x;
+    const y = -artwork.y;
+    expect([...sprite.getImageData(x, y, 1, 1).data]).toEqual([255, 248, 225, 255]);
+    expect([...sprite.getImageData(x, y + 2, 1, 1).data]).toEqual([253, 230, 138, 255]);
+    const trail = sprite.getImageData(x - VISUAL.LASER_LENGTH / 2 - 10, y, 1, 1).data;
+    expect(trail[3]).toBeGreaterThan(90);
+    expect(trail[3]).toBeLessThan(200);
+    expect(sprite.getImageData(x, y + 9, 1, 1).data[3]).toBeGreaterThan(0);
   }
   expect(fill).not.toHaveBeenCalled();
 
@@ -253,14 +248,20 @@ test('local and remote shots draw broad glowing bolts with bright cores, then hi
   strokes.length = 0;
   drawLaserBolts([local], PALETTE.LASER_LOCAL, viewer);
   const ringRadius = VISUAL.LASER_EXPLODE_RADIUS * 0.55;
-  const firstTick = burstTick(
-    localScreen.x,
-    localScreen.y,
-    0,
-    ringRadius * 0.35,
-    ringRadius * 1.35
-  );
-  expect(strokes).toHaveLength(5);
+  const hitTicks = Array.from({ length: VISUAL.LASER_HIT_TICKS }, (_, index) => {
+    const tick = burstTick(
+      localScreen.x,
+      localScreen.y,
+      (index * Math.PI * 2) / VISUAL.LASER_HIT_TICKS,
+      ringRadius * 0.35,
+      ringRadius * 1.35
+    );
+    return [
+      { x: tick.x1, y: tick.y1 },
+      { x: tick.x2, y: tick.y2 },
+    ];
+  }).flat();
+  expect(strokes).toHaveLength(2);
   expect(strokes[0]?.arcs[0]).toEqual([
     localScreen.x,
     localScreen.y,
@@ -269,14 +270,64 @@ test('local and remote shots draw broad glowing bolts with bright cores, then hi
     Math.PI * 2,
     false,
   ]);
-  expect(strokes.slice(1).map((path) => path.points.length)).toEqual([2, 2, 2, 2]);
-  expect(strokes[1]?.points).toEqual([
-    { x: firstTick.x1, y: firstTick.y1 },
-    { x: firstTick.x2, y: firstTick.y2 },
-  ]);
-  expect(strokes.map((path) => path.width)).toEqual([1.25, 1, 1, 1, 1]);
+  expect(strokes[1]?.points).toEqual(hitTicks);
+  expect(strokes[1]?.commands).toEqual(
+    Array.from({ length: VISUAL.LASER_HIT_TICKS }, () => ['move', 'line']).flat()
+  );
+  expect(strokes.map((path) => path.width)).toEqual([1.25, 1]);
   expect(strokes.every((path) => path.color === canvasColor(ctx, PALETTE.LASER_LOCAL))).toBe(true);
   expect(fill).not.toHaveBeenCalled();
+});
+
+test('moving pilots reuse both bolt colors and rebuild artwork when display quality changes', () => {
+  const { ctx, strokes } = recordingContext();
+  const images: HTMLCanvasElement[] = [];
+  const transforms: DOMMatrix[] = [];
+  const drawImage = ctx.drawImage.bind(ctx);
+  vi.spyOn(ctx, 'drawImage').mockImplementation((...args) => {
+    const source = args[0];
+    if (!(source instanceof HTMLCanvasElement)) {
+      throw new Error('Expected cached bolt artwork');
+    }
+    images.push(source);
+    transforms.push(ctx.getTransform());
+    Reflect.apply(drawImage, ctx, args);
+  });
+  const shots = [
+    { position: { x: 0, y: 0 }, velocity: { x: 0, y: 0 }, explodeTime: 0, bounceCount: 0 },
+    { position: { x: 20, y: 0 }, velocity: { x: 0, y: 1 }, explodeTime: 0, bounceCount: 1 },
+  ];
+  drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
+  drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 10, y: 20 });
+  drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: -10, y: 5 });
+  expect(new Set(images).size).toBe(2);
+  expect(images[0]).toBe(images[2]);
+  expect(images[1]).toBe(images[3]);
+  expect(transforms[0]?.a).toBe(1);
+  expect(transforms[0]?.b).toBe(0);
+  expect(transforms[1]?.a).toBeCloseTo(0);
+  expect(transforms[1]?.b).toBeCloseTo(1);
+  expect(strokes).toEqual([]);
+
+  const first = images[0];
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
+  const denser = images[6];
+  expect(denser).not.toBe(first);
+  expect(denser?.getContext('2d')?.getTransform().a).toBe(2);
+
+  configureRenderQuality('?performance=1&renderGlow=off', false);
+  drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
+  const noGlow = images[8];
+  expect(noGlow).not.toBe(denser);
+  if (!noGlow || !denser) {
+    throw new Error('Quality change did not render bolt artwork');
+  }
+  expect(noGlow.width).toBeLessThan(denser.width);
+  configureRenderQuality('', false);
+  drawLaserBolts(shots, PALETTE.LASER_LOCAL, { x: 0, y: 0 });
+  expect(images[10]).not.toBe(noGlow);
+  expect(images[10]?.width).toBe(denser.width);
 });
 
 test('local and remote kit thrusters draw two open V contours only while thrusting alive', () => {
@@ -374,7 +425,7 @@ test('a destroyed scout breaks into drifting hull edges, an expanding ring and u
   expect(burstTick(0, 0, 0, 4, 10)).toEqual({ x1: 4, y1: 0, x2: 10, y2: 0 });
   const edges = projectKitHullEdges(400, 300, 20, 0, 'scout');
   expect(edges.length).toBeGreaterThan(6);
-  expect(strokes).toHaveLength(1 + edges.length + VISUAL.EXPLOSION_SPARKS + 4);
+  expect(strokes).toHaveLength(1 + edges.length + 2);
   expect(strokes[0]?.arcs[0]).toEqual([400, 300, 52.125, 0, Math.PI * 2]);
   expect(strokes.slice(1, 1 + edges.length).map((path) => path.points)).toEqual(
     edges.map(([a, b]) => {
@@ -391,29 +442,51 @@ test('a destroyed scout breaks into drifting hull edges, an expanding ring and u
   const midX = (edgeA.x + edgeB.x) / 2;
   const midY = (edgeA.y + edgeB.y) / 2;
   expect(Math.hypot(midX - 400, midY - 300)).toBeGreaterThan(5);
-  const sparks = strokes.slice(1 + edges.length, 1 + edges.length + VISUAL.EXPLOSION_SPARKS);
-  const ticks = strokes.slice(1 + edges.length + VISUAL.EXPLOSION_SPARKS);
-  expect(sparks.every((path) => path.points.length === 2)).toBe(true);
-  const sparkInner = sparks[0]?.points[0];
-  const sparkOuter = sparks[0]?.points[1];
-  if (!sparkInner || !sparkOuter) {
-    throw new Error('Destroyed scout did not draw a complete spark');
-  }
-  expect(Math.hypot(sparkInner.x - 400, sparkInner.y - 300)).toBeCloseTo(27.125);
-  expect(Math.hypot(sparkOuter.x - 400, sparkOuter.y - 300)).toBeCloseTo(36.125);
-  expect(ticks[0]?.points).toEqual([
-    { x: 411, y: 300 },
-    { x: 441.25, y: 300 },
-  ]);
+  const sparks = strokes[1 + edges.length];
+  const ticks = strokes[2 + edges.length];
+  expect(sparks?.points).toEqual(
+    Array.from({ length: VISUAL.EXPLOSION_SPARKS }, (_, index) => {
+      const tick = burstTick(
+        400,
+        300,
+        0.35 + (index * Math.PI * 2) / VISUAL.EXPLOSION_SPARKS,
+        27.125,
+        36.125
+      );
+      return [
+        { x: expect.closeTo(tick.x1, 10), y: expect.closeTo(tick.y1, 10) },
+        { x: expect.closeTo(tick.x2, 10), y: expect.closeTo(tick.y2, 10) },
+      ];
+    }).flat()
+  );
+  expect(sparks?.commands).toEqual(
+    Array.from({ length: VISUAL.EXPLOSION_SPARKS }, () => ['move', 'line']).flat()
+  );
+  expect(ticks?.points).toEqual(
+    Array.from({ length: VISUAL.EXPLOSION_HIT_TICKS }, (_, index) => {
+      const tick = burstTick(
+        400,
+        300,
+        (index * Math.PI * 2) / VISUAL.EXPLOSION_HIT_TICKS,
+        11,
+        41.25
+      );
+      return [
+        { x: tick.x1, y: tick.y1 },
+        { x: tick.x2, y: tick.y2 },
+      ];
+    }).flat()
+  );
+  expect(ticks?.commands).toEqual(
+    Array.from({ length: VISUAL.EXPLOSION_HIT_TICKS }, () => ['move', 'line']).flat()
+  );
   expect(strokes[0]?.color).toBe(canvasColor(ctx, hexToRgba(PALETTE.LOCAL, 0.575 * 0.85)));
   expect(
     strokes
-      .slice(1, 1 + edges.length + VISUAL.EXPLOSION_SPARKS)
+      .slice(1, 2 + edges.length)
       .every((path) => path.color === canvasColor(ctx, hexToRgba(PALETTE.LOCAL, 0.575)))
   ).toBe(true);
-  expect(
-    ticks.every((path) => path.color === canvasColor(ctx, hexToRgba(PALETTE.LOCAL, 0.575 * 0.75)))
-  ).toBe(true);
+  expect(ticks?.color).toBe(canvasColor(ctx, hexToRgba(PALETTE.LOCAL, 0.575 * 0.75)));
   expect(fill).not.toHaveBeenCalled();
 });
 
@@ -429,8 +502,9 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
   const { ctx, strokes } = recordingContext();
   const prior = getTerrainField();
   try {
+    configureRenderQuality('', false);
     ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: 3100 });
-    drawIsoContours({ x: 1000, y: 0 }, 0);
+    drawIsoContours({ x: -303, y: 337 }, 0);
     expect(strokes.some((path) => path.points.length > 0)).toBe(true);
     expect(
       strokes
@@ -438,11 +512,10 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
         .every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))
     ).toBe(true);
     expect(
-      strokes.every(
-        (path) => path.blur >= 0 && path.blur <= 4 && path.width === VISUAL.CONTOUR_STROKE_WIDTH
-      )
+      strokes.every((path) => path.blur === 0 && path.width === VISUAL.CONTOUR_STROKE_WIDTH)
     ).toBe(true);
-    expect(strokes.some((path) => path.blur === 0)).toBe(true);
+    // A flat passage has violet RGB even when its opacity varies by distance.
+    expect(strokes.some((path) => String(path.color).startsWith('rgba(179, 136, 255,'))).toBe(true);
     strokes.length = 0;
     drawContourLaserTicks({ x: -2100, y: 700 }, [{ x: -2100, y: 700 }]);
     expect(strokes).toHaveLength(1);

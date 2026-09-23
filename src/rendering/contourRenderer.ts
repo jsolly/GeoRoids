@@ -9,7 +9,6 @@ import { contourSlopeColor, previewConeWeight, radialSlope } from './contourAppe
 import { contourSlope } from './contourDisplay';
 import { drawContourLabels } from './contourLabels';
 import { contourCandidates } from './contourSpatialIndex';
-import { resolveGlow } from './renderQuality';
 
 type ContourSegment = ContourLevel['segments'][number];
 
@@ -101,11 +100,8 @@ export function drawIsoContours(shipPosition: Position, headingAngle: number): v
         Math.max(0.85 * weight, 0.75 * slope.passage),
         slope.passage
       );
-      ctx.shadowColor = `rgba(179, 136, 255, ${0.35 * slope.passage})`;
-      ctx.shadowBlur = resolveGlow(4 * slope.passage);
       ctx.lineWidth = VISUAL.CONTOUR_STROKE_WIDTH;
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
   }
 

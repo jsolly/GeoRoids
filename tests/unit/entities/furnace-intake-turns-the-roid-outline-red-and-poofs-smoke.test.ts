@@ -60,10 +60,12 @@ function recordStrokes(ctx: CanvasRenderingContext2D) {
   let points: Array<[number, number]> = [];
   let arcs: Array<Parameters<CanvasRenderingContext2D['arc']>> = [];
   let closed = false;
+  let commands: Array<'move' | 'line'> = [];
   const strokes: Array<{
     points: Array<[number, number]>;
     arcs: Array<Parameters<CanvasRenderingContext2D['arc']>>;
     closed: boolean;
+    commands: typeof commands;
     style: typeof ctx.strokeStyle;
     width: number;
     alpha: number;
@@ -76,15 +78,18 @@ function recordStrokes(ctx: CanvasRenderingContext2D) {
   const stroke = ctx.stroke.bind(ctx);
   vi.spyOn(ctx, 'beginPath').mockImplementation(() => {
     points = [];
+    commands = [];
     arcs = [];
     closed = false;
     beginPath();
   });
   vi.spyOn(ctx, 'moveTo').mockImplementation((x, y) => {
+    commands.push('move');
     points.push([x, y]);
     moveTo(x, y);
   });
   vi.spyOn(ctx, 'lineTo').mockImplementation((x, y) => {
+    commands.push('line');
     points.push([x, y]);
     lineTo(x, y);
   });
@@ -101,6 +106,7 @@ function recordStrokes(ctx: CanvasRenderingContext2D) {
       points: [...points],
       arcs: [...arcs],
       closed,
+      commands: [...commands],
       style: ctx.strokeStyle,
       width: ctx.lineWidth,
       alpha: ctx.globalAlpha,
@@ -135,9 +141,10 @@ test('furnace intake shatters the rock in danger-red with a short smoke poof ins
   const edges = strokes.filter((path) => !path.closed && path.arcs.length === 0);
   const wisps = strokes.filter((path) => path.arcs.length === 1);
   expect(strokes.filter((path) => path.closed)).toEqual([]);
-  expect(edges).toHaveLength(4);
+  expect(edges).toHaveLength(1);
   expect(wisps).toHaveLength(VISUAL.ROID_FURNACE_SMOKE_WISPS);
-  expect(edges.map((path) => path.style)).toEqual([danger, danger, danger, danger]);
+  expect(edges.map((path) => path.style)).toEqual([danger]);
+  expect(edges[0]?.commands).toEqual(Array.from({ length: 4 }, () => ['move', 'line']).flat());
   expect(wisps.map((path) => path.style)).toEqual(
     Array(VISUAL.ROID_FURNACE_SMOKE_WISPS).fill(smoke)
   );
@@ -159,7 +166,11 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
   ctx.strokeStyle = PALETTE.ROID;
   const slate = ctx.strokeStyle;
   const firstBreak = strokes.filter((path) => !path.closed);
-  expect(firstBreak).toHaveLength(8);
+  expect(firstBreak).toHaveLength(2);
+  expect(firstBreak.map((path) => path.commands)).toEqual([
+    Array.from({ length: 4 }, () => ['move', 'line']).flat(),
+    Array.from({ length: VISUAL.LASER_HIT_TICKS }, () => ['move', 'line']).flat(),
+  ]);
   expect(firstBreak.every((path) => path.style === slate && path.arcs.length === 0)).toBe(true);
 
   markFurnaceAsteroidShatter(pending.id);
@@ -170,8 +181,9 @@ test('a furnace delivery retags an in-flight shatter so the outline goes red and
   const danger = ctx.strokeStyle;
   const edges = strokes.filter((path) => !path.closed && path.arcs.length === 0);
   const wisps = strokes.filter((path) => path.arcs.length === 1);
-  expect(edges).toHaveLength(4);
-  expect(edges.map((path) => path.style)).toEqual([danger, danger, danger, danger]);
+  expect(edges).toHaveLength(1);
+  expect(edges.map((path) => path.style)).toEqual([danger]);
+  expect(edges[0]?.commands).toEqual(Array.from({ length: 4 }, () => ['move', 'line']).flat());
   expect(wisps).toHaveLength(VISUAL.ROID_FURNACE_SMOKE_WISPS);
 });
 
@@ -192,25 +204,18 @@ test('the playfield still paints a furnace poof after the last rock leaves the b
     (path) => !path.closed && path.arcs.length === 0 && path.style === danger
   );
   const wisps = strokes.filter((path) => path.arcs.length === 1 && path.style === smoke);
-  expect(edges).toHaveLength(4);
+  expect(edges).toHaveLength(1);
   expect(wisps).toHaveLength(VISUAL.ROID_FURNACE_SMOKE_WISPS);
-  expect(edges.map((path) => path.points)).toEqual([
-    [
-      [494, 330],
-      [480, 344],
-    ],
-    [
-      [480, 344],
-      [466, 330],
-    ],
-    [
-      [466, 330],
-      [480, 316],
-    ],
-    [
-      [480, 316],
-      [494, 330],
-    ],
+  expect(edges[0]?.points).toEqual([
+    [494, 330],
+    [480, 344],
+    [480, 344],
+    [466, 330],
+    [466, 330],
+    [480, 316],
+    [480, 316],
+    [494, 330],
   ]);
+  expect(edges[0]?.commands).toEqual(Array.from({ length: 4 }, () => ['move', 'line']).flat());
   expect(wisps.every((path) => (path.arcs[0]?.[1] ?? 330) < 330)).toBe(true);
 });

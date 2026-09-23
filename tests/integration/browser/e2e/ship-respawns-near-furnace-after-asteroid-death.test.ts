@@ -18,22 +18,10 @@ test(
     await game.bootGame();
     await game.waitForCombatReady();
 
-    const initialHealth = await game.getShipHealth();
+    // The helper requires the authoritative asteroid death event, which remains
+    // observable even if the short respawn finishes before the next test step.
     const deathPosition = await game.crashShipIntoAsteroidUntilDestroyed();
-
-    await expect
-      .poll(() => game.getShipHealth(), {
-        timeout: 15000,
-        message: 'asteroid collision should cost a life',
-      })
-      .toBeLessThan(initialHealth);
-
-    const afterDeath = await game.getShipPosition();
-    const respawnPosition = await game.waitForServerRespawnAwayFrom(
-      deathPosition,
-      90000,
-      afterDeath
-    );
+    const respawnPosition = await game.waitForRandomRespawnPlacement(deathPosition);
     expectFurnaceRespawnPlacement(deathPosition, respawnPosition);
     const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);
     expect(health).toBe(maxHealth);

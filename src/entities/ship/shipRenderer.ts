@@ -8,7 +8,6 @@ import { resolveGlow } from '../../rendering/renderQuality';
 import {
   driftSegment,
   easeOutCubic,
-  laserBoltOffsets,
   strokeBurstTicks,
   strokePhosphorPolyline as strokeJuicePolyline,
   thrusterFlameGeometry,
@@ -398,6 +397,139 @@ export function drawShipExplosionAtPosition(
   );
 }
 
+interface LaserBoltSprite {
+  canvas: HTMLCanvasElement;
+  originX: number;
+  originY: number;
+}
+
+interface LaserBoltSprites {
+  dpr: number;
+  scale: number;
+  glow: number;
+  baseColor: string;
+  // drawLaserBolts supplies only baseColor or the bounced-bolt danger color.
+  // Replacing this cache on a baseColor change bounds it to two sprites.
+  colors: Map<string, LaserBoltSprite>;
+}
+
+let laserBoltSprites: LaserBoltSprites | null = null;
+
+/** Read once per drawLaserBolts batch, outside its projectile loop. */
+function prepareLaserBoltSprites(
+  ctx: CanvasRenderingContext2D,
+  baseColor: string,
+  scale: number
+): LaserBoltSprites {
+  const transform = ctx.getTransform();
+  const dpr = Math.hypot(transform.a, transform.b);
+  const glow = resolveGlow(VISUAL.LASER_GLOW);
+  if (
+    !laserBoltSprites ||
+    laserBoltSprites.dpr !== dpr ||
+    laserBoltSprites.scale !== scale ||
+    laserBoltSprites.glow !== glow ||
+    laserBoltSprites.baseColor !== baseColor
+  ) {
+    laserBoltSprites = { dpr, scale, glow, baseColor, colors: new Map() };
+  }
+  return laserBoltSprites;
+}
+
+/** The existing trail, body and white core, painted once facing screen-right. */
+function paintLaserBolt(
+  ctx: DrawingContext,
+  x: number,
+  y: number,
+  color: string,
+  scale: number
+): void {
+  const halfLength = (VISUAL.LASER_LENGTH / 2) * scale;
+  const trailLength = VISUAL.LASER_TRAIL_LENGTH * scale;
+  strokePhosphorSegment(
+    ctx,
+    x - halfLength - trailLength,
+    y,
+    x - halfLength,
+    y,
+    color,
+    VISUAL.LASER_STROKE_WIDTH * 0.7,
+    VISUAL.LASER_GLOW * 0.55,
+    0.38
+  );
+  strokePhosphorSegment(
+    ctx,
+    x - halfLength,
+    y,
+    x + halfLength,
+    y,
+    color,
+    VISUAL.LASER_STROKE_WIDTH,
+    VISUAL.LASER_GLOW
+  );
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = VISUAL.LASER_CORE_COLOR;
+  ctx.beginPath();
+  ctx.moveTo(x - halfLength, y);
+  ctx.lineTo(x + halfLength, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function laserBoltSprite(cache: LaserBoltSprites, color: string): LaserBoltSprite {
+  const existing = cache.colors.get(color);
+  if (existing) {
+    return existing;
+  }
+
+  const halfLength = (VISUAL.LASER_LENGTH / 2) * cache.scale;
+  const trailLength = VISUAL.LASER_TRAIL_LENGTH * cache.scale;
+  // Match the main context's DPR transform and the painter's existing blur values.
+  // Keep room for the round stroke caps and the complete soft halo in backing pixels.
+  const padding = Math.ceil(VISUAL.LASER_STROKE_WIDTH / 2 + (3 * cache.glow + 2) / cache.dpr);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil((halfLength * 2 + trailLength + padding * 2) * cache.dpr);
+  canvas.height = Math.ceil(padding * 2 * cache.dpr);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Laser bolt canvas context unavailable');
+  }
+  const sprite = { canvas, originX: padding + halfLength + trailLength, originY: padding };
+  ctx.setTransform(cache.dpr, 0, 0, cache.dpr, 0, 0);
+  paintLaserBolt(ctx, sprite.originX, sprite.originY, color, cache.scale);
+  cache.colors.set(color, sprite);
+  return sprite;
+}
+
+function drawCachedLaserBolt(
+  ctx: CanvasRenderingContext2D,
+  cache: LaserBoltSprites,
+  color: string,
+  x: number,
+  y: number,
+  velocityX: number,
+  velocityY: number
+): void {
+  const sprite = laserBoltSprite(cache, color);
+  // A stationary bolt faces screen-right.
+  const angle = Math.hypot(velocityX, velocityY) > 0 ? Math.atan2(velocityY, velocityX) : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.shadowBlur = 0;
+  ctx.drawImage(
+    sprite.canvas,
+    -sprite.originX,
+    -sprite.originY,
+    sprite.canvas.width / cache.dpr,
+    sprite.canvas.height / cache.dpr
+  );
+  ctx.restore();
+}
+
 export function drawLaserBolts(
   lasers: Array<{
     position: Position;
@@ -420,6 +552,9 @@ export function drawLaserBolts(
   const cullPad =
     (VISUAL.LASER_LENGTH + VISUAL.LASER_EXPLODE_RADIUS) * canvasManager.getPlayfieldScale();
 
+  const scale = canvasManager.getPlayfieldScale();
+  const sprites = prepareLaserBoltSprites(ctx, color, scale);
+
   for (const laser of lasers) {
     const screenPos = canvasManager.worldToScreenInto(laserScreen, laser.position, viewerPosition);
     if (
@@ -433,45 +568,15 @@ export function drawLaserBolts(
 
     const boltColor = laserBoltColor(color, laser.bounceCount);
     if (laser.explodeTime === 0) {
-      const scale = canvasManager.getPlayfieldScale();
-      const bolt = (VISUAL.LASER_LENGTH / 2) * scale;
-      const { halfX, halfY, trailX, trailY } = laserBoltOffsets(
+      drawCachedLaserBolt(
+        ctx,
+        sprites,
+        boltColor,
+        screenPos.x,
+        screenPos.y,
         laser.velocity.x,
-        laser.velocity.y,
-        bolt,
-        VISUAL.LASER_TRAIL_LENGTH * scale
+        laser.velocity.y
       );
-      strokePhosphorSegment(
-        ctx,
-        screenPos.x - halfX - trailX,
-        screenPos.y - halfY - trailY,
-        screenPos.x - halfX,
-        screenPos.y - halfY,
-        boltColor,
-        VISUAL.LASER_STROKE_WIDTH * 0.7,
-        VISUAL.LASER_GLOW * 0.55,
-        0.38
-      );
-      strokePhosphorSegment(
-        ctx,
-        screenPos.x - halfX,
-        screenPos.y - halfY,
-        screenPos.x + halfX,
-        screenPos.y + halfY,
-        boltColor,
-        VISUAL.LASER_STROKE_WIDTH,
-        VISUAL.LASER_GLOW
-      );
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = VISUAL.LASER_CORE_COLOR;
-      ctx.beginPath();
-      ctx.moveTo(screenPos.x - halfX, screenPos.y - halfY);
-      ctx.lineTo(screenPos.x + halfX, screenPos.y + halfY);
-      ctx.stroke();
-      ctx.restore();
     } else {
       const t = 1 - laser.explodeTime / Math.ceil(LASER.EXPLODE_DURATION * GAME.FPS);
       const ringRadius = VISUAL.LASER_EXPLODE_RADIUS * (0.55 + t * 1.15);

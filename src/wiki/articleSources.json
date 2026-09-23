@@ -184,7 +184,11 @@
     "tests/integration/browser/sanity/pilots-enter-a-denser-mixed-asteroid-field.test.ts",
     "tests/integration/browser/sanity/pilots-see-mostly-drifting-rocks-at-varied-speeds.test.ts",
     "tests/integration/browser/sanity/pilots-play-pinball-through-reflective-pockets.test.ts",
-    "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts"
+    "tests/unit/server/pilots-ricochet-through-reflective-clusters.test.ts",
+    "shared/asteroidBelt.ts",
+    "shared/beltCrawler.ts",
+    "server/core/BeltCrawlerManager.ts",
+    "src/rendering/beltRenderer.ts"
   ],
   "satellites": [
     "shared/eoSatellites.ts",
@@ -248,6 +252,9 @@
     "server/core/GameEngine.ts",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
+    "shared/beltCrawler.ts",
+    "server/core/BeltCrawlerManager.ts",
+    "src/rendering/beltRenderer.ts",
     "shared/equipment.ts",
     "shared/furnaceTravel.ts",
     "shared/townStore.ts",

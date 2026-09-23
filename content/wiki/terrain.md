@@ -41,3 +41,7 @@ One bite kills, so shoot the spider, escape its range, or reach a lit furnace's 
 ## Spider tools
 
 Haulers can extract silk or tow a spider into a furnace, although towing calls rescuers that can cut the cable. Scouts can attach a probe to follow a guard home to its resource. See the [Hauler](/wiki/#hauler) and [Scout](/wiki/#scout) tools.
+
+## Belt crawlers
+
+The eastern belt also has spiders that cling to rocks and hop between them. Their attacks and tool limits differ from terrain spiders; see [Belt spiders](/wiki/#asteroids).

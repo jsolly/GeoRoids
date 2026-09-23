@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
+import type { BeltSlotState } from '../../shared/asteroidBelt';
 import { boostOwnerIds, removeBoostOwner } from '../../shared/asteroidBoost';
 import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import {
@@ -135,6 +136,7 @@ import {
   AsteroidManager,
   type ExpiredCollabHit,
 } from './AsteroidManager.ts';
+import { BeltCrawlerManager } from './BeltCrawlerManager';
 import { CollisionAuthority, separateShipFromAsteroid } from './CollisionAuthority';
 import { EntityManager, type GameEntity } from './EntityManager';
 import { GameLoopHealth, type GameLoopHealthSnapshot } from './GameLoopHealth';
@@ -257,6 +259,7 @@ function settledWithin(promise: Promise<void>, timeoutMs: number): Promise<boole
 
 /** What the last flushed world row was built from; the row is only sent again when this changes. */
 interface FlushedWorldRow {
+  asteroidBelt: readonly BeltSlotState[];
   exploration: ExplorationTile[];
   civicModules: readonly CivicModule[];
   startedAt: number;
@@ -287,6 +290,7 @@ export class GameEngine {
   private lootManager: LootManager;
   private satellitePickupManager: SatellitePickupManager;
   private spiderManager: TerrainSpiderManager;
+  private readonly beltCrawlers = new BeltCrawlerManager((id) => this.getAsteroid(id));
   private rngService: RNGService;
   private collisionAuthority = new CollisionAuthority();
   private combatSink: CombatSink | null = null;
@@ -352,7 +356,11 @@ export class GameEngine {
     this.worldSeed = loaded?.world?.seed ?? rngSeed ?? TERRAIN.DEFAULT_SEED;
     this.worldStartedAt = loaded?.world?.startedAt ?? this.serverClock.now();
     this.rngService = new RNGService(this.worldSeed);
-    this.regionalField = new RegionalAsteroidField(this.worldSeed, loaded?.sectors);
+    this.regionalField = new RegionalAsteroidField(
+      this.worldSeed,
+      loaded?.sectors,
+      loaded?.world?.asteroidBelt
+    );
     if (loaded?.world) {
       this.furnaces.replaceLit(loaded.world.civicModules ?? []);
       this.exploration.restore(loaded.world.exploration);
@@ -372,7 +380,13 @@ export class GameEngine {
       () => this.getServerTime(),
       this.furnaces
     );
-    this.asteroidManager = new AsteroidManager(this.rngService, this.furnaces);
+    this.asteroidManager = new AsteroidManager(this.rngService, this.furnaces, (rock) => {
+      this.beltCrawlers.escapeDestroyedHost(
+        rock,
+        this.asteroidManager.getAllAsteroids(),
+        this.gameTime
+      );
+    });
     this.lootManager = new LootManager(this.rngService);
     this.satellitePickupManager = new SatellitePickupManager(this.rngService);
     this.spiderManager = new TerrainSpiderManager(() => this.rngService.random(), this.furnaces);
@@ -517,12 +531,12 @@ export class GameEngine {
     this.advanceFurnaceTravel(serverNow);
     this.tickAbilities(serverNow);
     this.tickSurveyProbes(serverNow);
-    this.advanceSpiderField();
     this.entityManager.updateHealthRegeneration();
     this.lootManager.expire(this.gameTime, this.entityManager.getAllEntities());
     this.collectLoot(serverNow);
     this.tickSatellitePickups();
     this.asteroidManager.updateMotion();
+    this.advanceSpiderField();
     this.processFurnaceDeliveries();
     if (this.gameTime % 60 === 0) {
       this.seedAsteroidInteractions();
@@ -681,6 +695,7 @@ export class GameEngine {
     this.pendingSpiderAttacks = [];
     this.satellitePickupManager.clear();
     this.spiderManager.clear();
+    this.beltCrawlers.clear();
   }
 
   /** Atomic between-tick arrangement for the benchmark process's private control socket. */
@@ -1028,6 +1043,9 @@ export class GameEngine {
    * more than one batch behind the one in flight.
    */
   public checkpointWorld(): void {
+    if (this.managedField) {
+      this.regionalField.reconcileBelt(this.asteroidManager, this.getServerTime());
+    }
     if (this.persistenceFailure) {
       throw this.persistenceFailure;
     }
@@ -1078,6 +1096,7 @@ export class GameEngine {
    */
   private worldRowIfChanged(): { world: SavedWorld; builtFrom: FlushedWorldRow } | undefined {
     const builtFrom: FlushedWorldRow = {
+      asteroidBelt: this.regionalField.beltState(),
       exploration: this.exploration.snapshot(),
       civicModules: this.furnaces.litModules(),
       startedAt: this.worldStartedAt,
@@ -1087,6 +1106,7 @@ export class GameEngine {
     const last = this.lastFlushedWorldRow;
     if (
       last &&
+      last.asteroidBelt === builtFrom.asteroidBelt &&
       last.exploration === builtFrom.exploration &&
       last.civicModules === builtFrom.civicModules &&
       last.startedAt === builtFrom.startedAt &&
@@ -1097,6 +1117,7 @@ export class GameEngine {
     }
     return {
       world: {
+        asteroidBelt: [...builtFrom.asteroidBelt],
         seed: this.worldSeed,
         startedAt: this.worldStartedAt,
         generation: WORLD.generation,
@@ -1251,7 +1272,8 @@ export class GameEngine {
   }
 
   public getSpiderField() {
-    return this.spiderManager.snapshot();
+    const field = this.spiderManager.snapshot();
+    return { ...field, spiders: [...field.spiders, ...this.beltCrawlers.snapshot()] };
   }
 
   /** Deterministic arrangement hook for server scenarios and diagnostics. */
@@ -1261,6 +1283,7 @@ export class GameEngine {
 
   public clearSpiderField(): void {
     this.spiderManager.clear();
+    this.beltCrawlers.clear();
     this.pendingSpiderAttacks = [];
   }
 
@@ -1317,7 +1340,21 @@ export class GameEngine {
           this.satellitePickupManager.getNestResources()
         ),
     });
-    this.pendingSpiderAttacks.push(...attacks);
+    this.pendingSpiderAttacks.push(
+      ...attacks,
+      ...this.beltCrawlers.advance({
+        rocks: this.asteroidManager.getAllAsteroids(),
+        players: this.entityManager.getAllEntities().map((entity) => ({
+          id: entity.id,
+          position: entity.position,
+          health: entity.health,
+          exploding: entity.exploding,
+          ...(entity.respawnTimer !== undefined ? { respawnTimer: entity.respawnTimer } : {}),
+          radius: hullRadiusForKit(entity.kitId),
+        })),
+        nowFrame: this.gameTime,
+      })
+    );
     for (const entity of this.entityManager.getAllEntities()) {
       if (
         entity.harpoonTargetId &&
@@ -1372,6 +1409,13 @@ export class GameEngine {
 
   public removeAsteroid(asteroidId: string): AsteroidData | undefined {
     const removed = this.asteroidManager.removeAsteroid(asteroidId);
+    if (removed) {
+      this.beltCrawlers.escapeDestroyedHost(
+        removed,
+        this.asteroidManager.getAllAsteroids(),
+        this.gameTime
+      );
+    }
     this.surveyProbeManager.unregister(asteroidId);
     if (removed?.probe) {
       removed.probe = null;
@@ -1469,10 +1513,14 @@ export class GameEngine {
     if (!this.managedField) {
       return [];
     }
-    const created = this.regionalField.update(this.asteroidManager, [
-      ...this.entityManager.getAllEntities().map((entity) => entity.position),
-      ...this.surveyProbeManager.observerPositions(),
-    ]);
+    const created = this.regionalField.update(
+      this.asteroidManager,
+      [
+        ...this.entityManager.getAllEntities().map((entity) => entity.position),
+        ...this.surveyProbeManager.observerPositions(),
+      ],
+      this.getServerTime()
+    );
     this.seedAsteroidInteractions();
     return created;
   }
@@ -1805,7 +1853,10 @@ export class GameEngine {
     }
 
     for (const attack of this.pendingSpiderAttacks.splice(0)) {
-      if (!this.spiderManager.isAttackActive(attack)) {
+      if (
+        !this.spiderManager.isAttackActive(attack) &&
+        !this.beltCrawlers.isAttackActive(attack, this.asteroidManager.getAllAsteroids())
+      ) {
         continue;
       }
       const target = this.entityManager.getEntity(attack.targetId);
@@ -2351,7 +2402,12 @@ export class GameEngine {
       const auxiliary = auxiliaryHits.sort(
         (a, b) => a.distance - b.distance || a.id.localeCompare(b.id)
       )[0];
-      const spiderHit = this.spiderManager.findLaserHit(start, end);
+      const terrainHit = this.spiderManager.findLaserHit(start, end);
+      const crawlerHit = this.beltCrawlers.findLaserHit(start, end);
+      const spiderHit =
+        crawlerHit && (!terrainHit || crawlerHit.distance < terrainHit.distance)
+          ? crawlerHit
+          : terrainHit;
       if (
         auxiliary &&
         (!spiderHit || auxiliary.distance <= spiderHit.distance) &&
@@ -2386,7 +2442,8 @@ export class GameEngine {
         (!impact || spiderHit.distance < impact.distance) &&
         (!surface || spiderHit.distance < surface.distance)
       ) {
-        this.spiderManager.resolveLaserHit(start, end, DAMAGE.LASER_HIT * laser.energy);
+        const predators = spiderHit === crawlerHit ? this.beltCrawlers : this.spiderManager;
+        predators.resolveLaserHit(start, end, DAMAGE.LASER_HIT * laser.energy);
         laser.hasExploded = true;
         return null;
       }
@@ -2611,7 +2668,8 @@ export class GameEngine {
       gameTime: this.gameTime,
       isPaused: this.isPaused,
       terrainSeed: getTerrainSeed(),
-      spiderField: this.spiderManager.snapshot(),
+      spiderField: this.getSpiderField(),
+      beltRecovery: this.regionalField.recoveryWarnings(this.getServerTime()),
     } satisfies ServerGameState & Record<keyof ServerGameState, unknown>;
 
     return gameState;

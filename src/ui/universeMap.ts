@@ -1,3 +1,4 @@
+import { beltSlotPosition, beltSlots } from '../../shared/asteroidBelt';
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
 import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
 import { RICOCHET_COURT } from '../../shared/ricochetCourt';
@@ -554,6 +555,31 @@ function chartShowsAsset(asset: MapAsset, exploration: readonly ExplorationTile[
   );
 }
 
+const beltMapPositions = beltSlots().map(beltSlotPosition);
+
+function drawDiscoveredBelt(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  exploration: readonly ExplorationTile[]
+): void {
+  const revealed = beltMapPositions.filter((position) => isRevealed(position, exploration));
+  context.save();
+  context.strokeStyle = '#e9b96d';
+  context.fillStyle = '#e9b96d';
+  context.lineWidth = 1.5 / frame.scale;
+  for (const position of revealed) {
+    context.beginPath();
+    context.arc(position.x, position.y, 3 / frame.scale, 0, Math.PI * 2);
+    context.stroke();
+  }
+  const label = revealed[Math.floor(revealed.length / 2)];
+  if (label) {
+    context.font = `${11 / frame.scale}px monospace`;
+    context.fillText('ASTEROID BELT', label.x + 12 / frame.scale, label.y - 15 / frame.scale);
+  }
+  context.restore();
+}
+
 function drawMapBackground(context: CanvasRenderingContext2D, frame: MapFrame): void {
   context.fillStyle = '#050914';
   context.fillRect(-WORLD.radius, -WORLD.radius, WORLD_DIAMETER, WORLD_DIAMETER);
@@ -845,7 +871,13 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   const local = PlayerManager.getInstance().getLocalPlayer();
   const crew = PlayerManager.getInstance().getNonLocalPlayers();
   const players = local ? [local, ...crew] : crew;
+  const knownBelt = beltMapPositions.find((position) =>
+    isRevealed(position, getWorldExploration())
+  );
   const locations = [
+    ...(knownBelt
+      ? [{ name: 'Asteroid belt · rich mining / surface crawlers', position: knownBelt }]
+      : []),
     { name: `${RICOCHET_COURT.name} · bank-shot dueling`, position: RICOCHET_COURT.center },
     ...assets.map((asset) => ({ name: `${asset.name} (${asset.kind})`, position: asset.position })),
     ...getSpiderField()
@@ -938,6 +970,7 @@ function renderMap(): void {
   drawMapBackground(context, frame);
   drawLitFurnacePipes(context, frame);
   drawNearbyResources(context, frame, exploration);
+  drawDiscoveredBelt(context, frame, exploration);
   let revealedAssetCount = 0;
   let drawnLabelCount = 0;
   const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));

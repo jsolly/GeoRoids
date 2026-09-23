@@ -1,3 +1,10 @@
+import {
+  ASTEROID_BELT,
+  type BeltRecoveryWarning,
+  type BeltSlotState,
+  beltAsteroid,
+  beltSlots,
+} from '../../shared/asteroidBelt';
 import { asteroidMaterialAt, MATERIAL_OUTLINES } from '../../shared/asteroidMaterials';
 import {
   ASTEROID_INTERACTIONS,
@@ -38,20 +45,46 @@ function stationarySlot(index: number): boolean {
  */
 export class RegionalAsteroidField {
   private active = new Set<string>();
+  private belt: BeltSlotState[];
   private readonly dormant: Map<string, AsteroidData[]>;
   private changed = new Map<string, AsteroidData[]>();
   private visited = new Set<string>();
   private savedDensityMigrationApplied = false;
+  private readonly densityMigrationSectors = new Set<string>();
   private savedMotionMigrationApplied = false;
   private readonly savedPoweredSectors = new Set<string>();
 
   constructor(
     private readonly seed: number,
-    saved: ReadonlyMap<string, AsteroidData[]> = new Map()
+    saved: ReadonlyMap<string, AsteroidData[]> = new Map(),
+    savedBelt?: readonly BeltSlotState[]
   ) {
     this.dormant = new Map(
       [...saved].map(([id, rocks]) => [id, rocks.map(stripTransientProbe)] as const)
     );
+    for (const [id, rocks] of saved) {
+      if (rocks.length > 0) {
+        this.densityMigrationSectors.add(id);
+      }
+    }
+    this.belt =
+      savedBelt?.map((entry) => ({ ...entry })) ??
+      beltSlots().map((slot) => ({ slot, generation: 0, recoverAt: null }));
+    // Additive rollout touches only the finite belt footprint, including previously mined sectors.
+    // The durable ledger distinguishes a new feature from a legitimately missing host.
+    for (const entry of this.belt) {
+      const rock = beltAsteroid(this.seed, entry.slot, entry.generation);
+      const sector = sectorAt(rock.position);
+      let rows = this.dormant.get(sector.id);
+      if (!rows) {
+        rows = this.generate(sector.x, sector.y);
+        this.dormant.set(sector.id, rows);
+      }
+      if (!savedBelt && !rows.some((existing) => existing.id === rock.id)) {
+        rows.push(rock);
+        this.changed.set(sector.id, rows);
+      }
+    }
     for (const [id, rocks] of saved) {
       if (rocks.some((rock) => rock.boost?.phase === 'burning')) {
         this.savedPoweredSectors.add(id);
@@ -324,7 +357,7 @@ export class RegionalAsteroidField {
     }
     for (const [id, saved] of this.dormant) {
       // An empty saved row is a durable harvest tombstone.
-      if (saved.length === 0) {
+      if (!this.densityMigrationSectors.has(id)) {
         continue;
       }
       const rows = this.migrateSector(id, saved, persistedIds);
@@ -340,7 +373,11 @@ export class RegionalAsteroidField {
     return migrated;
   }
 
-  update(manager: AsteroidManager, observers: readonly Position[]): AsteroidData[] {
+  update(
+    manager: AsteroidManager,
+    observers: readonly Position[],
+    now = Date.now()
+  ): AsteroidData[] {
     const wanted = new Map<string, { x: number; y: number }>();
     for (const observer of observers) {
       const start = sectorAt({
@@ -396,7 +433,87 @@ export class RegionalAsteroidField {
       }
     }
     this.active = new Set(wanted.keys());
+    created.push(...this.reconcileBelt(manager, now));
     return created;
+  }
+
+  /** A small tow can cross a sector edge without vacating the belt slot. */
+  private dormantBeltHost(home: AsteroidData): AsteroidData | undefined {
+    const start = sectorAt({
+      x: home.position.x - ASTEROID_BELT.removalDistance,
+      y: home.position.y - ASTEROID_BELT.removalDistance,
+    });
+    const end = sectorAt({
+      x: home.position.x + ASTEROID_BELT.removalDistance,
+      y: home.position.y + ASTEROID_BELT.removalDistance,
+    });
+    for (let y = start.y; y <= end.y; y++) {
+      for (let x = start.x; x <= end.x; x++) {
+        const host = this.dormant.get(`${x},${y}`)?.find((rock) => rock.id === home.id);
+        if (host) {
+          return host;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /** Bounded to the fixed landmark, independent of explored-world size. */
+  reconcileBelt(manager: AsteroidManager, now = Date.now()): AsteroidData[] {
+    const created: AsteroidData[] = [];
+    let changed = false;
+    const next = this.belt.map((entry): BeltSlotState => {
+      const home = beltAsteroid(this.seed, entry.slot, entry.generation);
+      const sector = sectorAt(home.position).id;
+      if (entry.recoverAt === null) {
+        const host = manager.getAsteroid(home.id) ?? this.dormantBeltHost(home);
+        if (
+          host &&
+          Math.hypot(host.position.x - home.position.x, host.position.y - home.position.y) <=
+            ASTEROID_BELT.removalDistance
+        ) {
+          return entry;
+        }
+        changed = true;
+        return { ...entry, recoverAt: now + ASTEROID_BELT.recoveryMs };
+      }
+      if (now < entry.recoverAt) {
+        return entry;
+      }
+      const renewed = { slot: entry.slot, generation: entry.generation + 1, recoverAt: null };
+      const rock = beltAsteroid(this.seed, renewed.slot, renewed.generation);
+      if (this.active.has(sector)) {
+        manager.addAsteroid(rock);
+        created.push(rock);
+      } else {
+        const rows = [...(this.dormant.get(sector) ?? []), rock];
+        this.dormant.set(sector, rows);
+        this.changed.set(sector, rows);
+      }
+      changed = true;
+      return renewed;
+    });
+    if (changed) {
+      this.belt = next;
+    }
+    return created;
+  }
+
+  /** Identity changes only when a timer starts or a replacement is created. */
+  beltState(): readonly BeltSlotState[] {
+    return this.belt;
+  }
+
+  recoveryWarnings(now = Date.now()): BeltRecoveryWarning[] {
+    return this.belt.flatMap((entry) => {
+      if (entry.recoverAt === null || entry.recoverAt - now > ASTEROID_BELT.warningMs) {
+        return [];
+      }
+      const rock = beltAsteroid(this.seed, entry.slot, entry.generation);
+      return [
+        { slot: entry.slot, position: rock.position, size: rock.size, recoverAt: entry.recoverAt },
+      ];
+    });
   }
 
   private sleepDistantSectors(manager: AsteroidManager, wanted: ReadonlySet<string>): void {
@@ -480,7 +597,17 @@ export class RegionalAsteroidField {
     this.changed.clear();
     this.visited.clear();
     this.savedPoweredSectors.clear();
+    this.densityMigrationSectors.clear();
     this.savedDensityMigrationApplied = false;
+    this.belt = beltSlots().map((slot) => ({ slot, generation: 0, recoverAt: null }));
+    for (const entry of this.belt) {
+      const rock = beltAsteroid(this.seed, entry.slot, 0);
+      const sector = sectorAt(rock.position);
+      const rows = this.dormant.get(sector.id) ?? this.generate(sector.x, sector.y);
+      rows.push(rock);
+      this.dormant.set(sector.id, rows);
+      this.changed.set(sector.id, rows);
+    }
   }
 
   hasVisited(id: string): boolean {

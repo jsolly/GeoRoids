@@ -17,7 +17,7 @@ media:
 
 ## Field and materials
 
-Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Metal shards carry more mass. Deposits stay harvested when you return to a region.
+Ice breaks easily, metal takes repeated hits, and larger rubble fragments into smaller pieces. Metal shards carry more mass. Outside the asteroid belt, deposits stay harvested when you return to a region.
 
 ## Cooperative splits and score
 
@@ -34,3 +34,11 @@ Reflective metal faces bounce lasers and increase their energy until a charge or
 ## Powered rocks
 
 A cream arrow marks an armed Boost Coupling; exhaust means the rock is delivering itself. Scan it before ignition, because powered cargo ignores new scans, tools, weapons, and collisions. Existing contributors still receive delivery credit.
+
+## Asteroid belt
+
+Head east to mine the metal-rich belt or tow its deposits to a furnace; explored belt locations stay marked on the universe map. Mining or carrying away a deposit starts its recovery timer, which continues through absences and server restarts. An amber warning marks a returning rock even when pilots are nearby; chipping a deposit does not heal it or restart the timer.
+
+## Belt spiders
+
+Black, red-eyed crawlers round rock cover and hop between nearby rocks to chase you. Shoot exposed bodies without destroying their rocks, and retreat beyond their telegraphed lunges; solid rock blocks both attacks and shots. When a host breaks, survivors leap to a reachable rock with their wounds intact, or die if none is reachable.

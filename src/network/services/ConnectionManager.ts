@@ -64,6 +64,7 @@ import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
+import { setBeltRecovery } from '../../rendering/beltRenderer';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { getClientReleaseId } from '../../utils/buildInfo';
 import { setClientLogContext } from '../../utils/clientLogContext';
@@ -999,6 +1000,7 @@ export class ConnectionManager {
         break;
       case 'sessionExpired': {
         setSpiderField(undefined);
+        setBeltRecovery();
         // Remove the previous map key before initializeAsteroidSync changes
         // the local Player object's id for the replacement session.
         const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1113,6 +1115,7 @@ export class ConnectionManager {
     this.playedTapEjectionIds.clear();
     this.playedLootExplosionIds.clear();
     setSpiderField(undefined);
+    setBeltRecovery();
     this.shotAcknowledgements = false;
     AuthoritativeProjectileField.getInstance().clear();
     this.clearJoinCompletionTimer();
@@ -1327,6 +1330,7 @@ export class ConnectionManager {
 
   private handleSnapshotState(data: ServerGameSnapshot): void {
     setSpiderField(data.spiderField);
+    setBeltRecovery(data.beltRecovery);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
     worldFurnaces.replaceLit(data.civicModules ?? []);

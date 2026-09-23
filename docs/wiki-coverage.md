@@ -35,6 +35,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
+| Where is the rich belt, how do crawlers attack, and when do mined deposits return? | asteroids, terrain | shared/asteroidBelt.ts, shared/beltCrawler.ts, RegionalAsteroidField.ts, BeltCrawlerManager.ts, belt scenario tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
 | Why won't this huge rock tow, ignite, or break from a ram? | asteroids, hauler, teamwork | shared/asteroidScale.ts, GameEngine.ts, colossal crew tests |
 | How does a Hauler tow an asteroid to a furnace? | hauler, teamwork | src/entities/ship/shipAbilities.ts, towCable.ts, shared/furnaces.ts, GameEngine.ts |

@@ -14,12 +14,13 @@ for (const viewport of [
   { width: 1280, height: 900, touch: false },
   { width: 390, height: 844, touch: true },
 ]) {
-  test(`Surveyor equips and fires a shared moving beacon at ${viewport.width} pixels`, async () => {
+  test(`Scout equips and fires a shared moving beacon at ${viewport.width} pixels`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
+    await game.collectEquipment(['survey_probe']);
     const observer = await browserManager.createPage();
     const observerDiagnostics = watchBrowserDiagnostics(observer);
     const hauler = new GameInteractions(observer);
@@ -119,7 +120,7 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`probe-flight-${viewport.width}.png`),
     });
     // The Wiki is a separate entry: verify its new rules at each viewport too.
-    await page.goto(`${TestConfig.GAME_URL}/wiki/#surveyor`);
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#scout`);
     await page.getByRole('heading', { name: 'Survey probe', exact: true }).waitFor();
     await page.getByRole('heading', { name: 'Survey probe', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({

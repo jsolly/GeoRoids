@@ -17,7 +17,7 @@ media:
 
 ## Utility slot
 
-Hauler is the larger, slower-turning cargo ship with stronger mining lasers. Open Inventory with V or its button to choose Resource Tap, Tow Cable, or Boost Coupling; E uses the selected tool.
+Hauler is the larger, slower-turning cargo ship with stronger mining lasers and Tow Cable as its starter tool. Find Resource Tap and Boost Coupling as [rare equipment drops](/wiki/#loot-growth), usually in spider nests, then choose them in Inventory with V or its button. E uses the selected tool.
 
 ## Resource Tap E
 
@@ -37,7 +37,7 @@ Press E to arm a rock toward its nearest furnace, then E again to ignite autonom
 
 ## Spider rescue
 
-Towing a living spider attracts rescuers that can bite through your cable. Bring a Surveyor to repel them with Mineral Scan, or reach a lit furnace to burn the captive. Releasing the spider ends its rescue call.
+Towing a living spider attracts rescuers that can bite through your cable. Bring a Scout to repel them with Mineral Scan, or reach a lit furnace to burn the captive. Releasing the spider ends its rescue call.
 
 ## Mining lasers
 

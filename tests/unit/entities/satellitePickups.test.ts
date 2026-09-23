@@ -31,11 +31,7 @@ describe('Satellite pickups', () => {
     vi.clearAllMocks();
   });
 
-  function addPilot(
-    id = 'pilot',
-    position = { x: 0, y: 0 },
-    kitId: 'surveyor' | 'hauler' = 'surveyor'
-  ) {
+  function addPilot(id = 'pilot', position = { x: 0, y: 0 }, kitId: 'scout' | 'hauler' = 'scout') {
     const pilot = gameEngine.addPlayer(id, id, new RecordingSocket(), position, kitId);
     gameEngine.updatePlayer(id, { spawnProtectionTimer: 0 });
     return pilot;
@@ -300,7 +296,7 @@ describe('Satellite pickups', () => {
     expect(gameEngine.getSatellitePickup(attached.id)).toEqual(released);
   });
 
-  test('Surveyor mass does not expand a satellite orbit beyond the kit hull', () => {
+  test('Scout mass does not expand a satellite orbit beyond the kit hull', () => {
     addPilot();
     gameEngine.updatePlayer('pilot', { mass: GROWTH.SOFT_MAX_MASS });
     const pilot = gameEngine.getPlayer('pilot');
@@ -317,8 +313,8 @@ describe('Satellite pickups', () => {
     expect(pilot.mass).toBe(GROWTH.SOFT_MAX_MASS);
   });
 
-  test('a Hauler satellite orbits farther than a same-mass Surveyor and clears the barge hull', () => {
-    addPilot('scout', { x: 0, y: 0 }, 'surveyor');
+  test('a Hauler satellite orbits farther than a same-mass Scout and clears the barge hull', () => {
+    addPilot('scout', { x: 0, y: 0 }, 'scout');
     addPilot('barge', { x: 4000, y: 0 }, 'hauler');
     const [scoutPickup, bargePickup] = gameEngine.getAllSatellitePickups();
     assert.ok(scoutPickup);

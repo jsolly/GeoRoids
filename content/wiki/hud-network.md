@@ -16,6 +16,10 @@ media: []
 
 The HUD shows lives, score, kit, ability, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. Pickup and death messages explain what just happened.
 
+## Travel prompt
+
+Inside a lit furnace's visible footprint, the travel prompt and TRAVEL button open its destination map. Choose another lit furnace for a [free rocket ride](/wiki/#controls).
+
 ## Radar and universe map
 
 The minimap shows nearby space; M or Map opens the full shared chart. Discovered furnaces appear as flames, dark street lots stay marked, and only lit streets show fire trails. Explored ground has a pale blue tint; dark fog hides uncharted rocks and loot.

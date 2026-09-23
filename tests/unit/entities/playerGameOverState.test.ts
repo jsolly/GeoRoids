@@ -83,7 +83,7 @@ describe('local player game-over state', () => {
       exploding: false,
     });
 
-    expect(player.lives).toBe(3);
+    expect(player.lives).toBe(5);
     expect(deaths).toEqual([]);
     expect(player.ship.health).toBe(100);
   });

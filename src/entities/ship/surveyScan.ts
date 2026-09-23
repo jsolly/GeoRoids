@@ -11,14 +11,14 @@ type Scanner = {
 
 function isActiveScanner(scanner: Scanner): boolean {
   return (
-    scanner.kitId === 'surveyor' &&
+    scanner.kitId === 'scout' &&
     scanner.abilityActiveFrames > 0 &&
     !scanner.exploding &&
     scanner.health > 0
   );
 }
 
-/** Active scanners share their classification, centered on each Surveyor. */
+/** Active scanners share their classification, centered on each Scout. */
 export function activeScanners(viewer: Scanner, others: readonly Scanner[]): Scanner[] {
   return [viewer, ...others].filter((scanner) => isActiveScanner(scanner));
 }

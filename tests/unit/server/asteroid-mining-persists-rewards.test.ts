@@ -56,7 +56,7 @@ function pilot(
   engine: GameEngine,
   id: string,
   position = { x: 0, y: 0 },
-  kit: 'surveyor' | 'hauler' = 'surveyor'
+  kit: 'scout' | 'hauler' = 'scout'
 ) {
   const socket = new RecordingSocket();
   const actor = engine.addPlayer(id, id, socket, position, kit);
@@ -175,23 +175,23 @@ test('a collaborative laser break saves fragments and every contributor score by
   ).toBe(true);
 });
 
-test('expired collaborative mining credits an offline miner and Surveyor by the next flush', () => {
+test('expired collaborative mining credits an offline miner and Scout by the next flush', () => {
   const worldStore = store();
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const miner = pilot(engine, 'offline-miner');
   const active = pilot(engine, 'active-pilot', { x: 10, y: 0 });
-  const surveyor = pilot(engine, 'survey-contributor', { x: 20, y: 0 });
+  const scout = pilot(engine, 'survey-contributor', { x: 20, y: 0 });
   const target = largeIce('persisted-expiry-target');
-  target.surveyedBy = [surveyor.id];
+  target.surveyedBy = [scout.id];
   engine.addAsteroid(target);
 
   expect(engine.applyLaserAsteroidHit(target.id, miner.id, 'laser', 0).outcome).toBe('tagged');
   engine.removePlayer(miner.id);
   const expired = engine.flushExpiredCollabHits(ROID.COLLAB_SPLIT_WINDOW_MS + 1);
 
-  expect(expired[0]?.contributors).toEqual([miner.id, surveyor.id]);
+  expect(expired[0]?.contributors).toEqual([miner.id, scout.id]);
   expect(active.score).toBe(0);
-  expect(surveyor.score).toBe(ROID.POINTS_LARGE);
+  expect(scout.score).toBe(ROID.POINTS_LARGE);
   engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === miner.id)?.score).toBe(
     ROID.POINTS_LARGE
@@ -254,7 +254,7 @@ test('a regional unload and reload keeps partial mining contributors on the rock
   );
 });
 
-test('a metal chip credits an offline first Hauler when a Surveyor lands the terminal hit', () => {
+test('a metal chip credits an offline first Hauler when a Scout lands the terminal hit', () => {
   const worldStore = store();
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const firstMiner = pilot(engine, 'offline-metal', { x: 0, y: 0 }, 'hauler');
@@ -349,18 +349,18 @@ test('a partially mined metal deposit keeps its offline contributor after restar
   );
 });
 
-test('an accidental hull break preserves credit for an offline miner and Surveyor', () => {
+test('an accidental hull break preserves credit for an offline miner and Scout', () => {
   const worldStore = store();
   const engine = new GameEngine(82, undefined, new InlineWorldPersistence(worldStore));
   const miner = pilot(engine, 'collision-miner', { x: 0, y: 0 }, 'hauler');
-  const surveyor = pilot(engine, 'collision-surveyor', { x: 10, y: 0 });
+  const scout = pilot(engine, 'collision-scout', { x: 10, y: 0 });
   const rammer = pilot(engine, 'collision-finisher', { x: 20, y: 0 });
   const target = highHpIce('collision-cargo');
-  target.surveyedBy = [surveyor.id];
+  target.surveyedBy = [scout.id];
   engine.addAsteroid(target);
   expect(engine.handleAsteroidDamage(target.id, miner.id).destroyed).toBe(false);
   engine.removePlayer(miner.id);
-  engine.removePlayer(surveyor.id);
+  engine.removePlayer(scout.id);
 
   const result = engine.handleAsteroidHit(target.id, rammer.id, 'collision');
   expect(result.outcome).toBe('destroyed');
@@ -368,7 +368,7 @@ test('an accidental hull break preserves credit for an offline miner and Surveyo
   expect(result.newAsteroids).toHaveLength(0);
   expect(rammer.score).toBe(ROID.POINTS_LARGE);
   engine.checkpointWorld();
-  for (const id of [miner.id, surveyor.id]) {
+  for (const id of [miner.id, scout.id]) {
     expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === id)?.score).toBe(
       ROID.POINTS_LARGE
     );

@@ -30,10 +30,10 @@ function rock(id: string, x: number, size: number): AsteroidData {
   };
 }
 
-test('a Hauler collides with a rock that a same-mass Surveyor still clears', () => {
+test('a Hauler collides with a rock that a same-mass Scout still clears', () => {
   const engine = new GameEngine(11);
   try {
-    const surveyor = engine.addPlayer('surveyor', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
+    const scout = engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 });
     const hauler = engine.addPlayer(
       'hauler',
       'Barge',
@@ -41,15 +41,15 @@ test('a Hauler collides with a rock that a same-mass Surveyor still clears', () 
       { x: 0, y: 0 },
       'hauler'
     );
-    engine.updatePlayer(surveyor.id, { position: { x: 0, y: 0 }, spawnProtectionTimer: 0 });
+    engine.updatePlayer(scout.id, { position: { x: 0, y: 0 }, spawnProtectionTimer: 0 });
     engine.updatePlayer(hauler.id, { position: { x: 0, y: 0 }, spawnProtectionTimer: 0 });
 
     const rockSize = 10;
-    const gapPastSurveyor = hullRadiusForKit('surveyor') + rockSize + 2;
-    const candidate = rock('near-miss', gapPastSurveyor, rockSize);
+    const gapPastScout = hullRadiusForKit('scout') + rockSize + 2;
+    const candidate = rock('near-miss', gapPastScout, rockSize);
     const collisions = new CollisionAuthority();
 
-    expect(collisions.collectShipAsteroidHits([surveyor], [candidate])).toEqual([]);
+    expect(collisions.collectShipAsteroidHits([scout], [candidate])).toEqual([]);
     expect(collisions.collectShipAsteroidHits([hauler], [candidate])).toEqual([
       { shipId: hauler.id, asteroidId: candidate.id },
     ]);

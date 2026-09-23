@@ -1,7 +1,14 @@
+import { isEquipmentId } from '../../../shared/equipment';
 import type { LootData, LootKind, Position } from '../../../shared-types';
 
 function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
-  if (kind === 'shard' || kind === 'laserCore' || kind === 'tap' || kind === 'silk') {
+  if (
+    kind === 'shard' ||
+    kind === 'laserCore' ||
+    kind === 'tap' ||
+    kind === 'silk' ||
+    isEquipmentId(kind)
+  ) {
     return kind;
   }
   return 'wreckage';

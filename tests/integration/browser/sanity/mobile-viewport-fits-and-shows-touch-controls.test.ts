@@ -261,7 +261,7 @@ test(
             const ship = window.gameController?.getCurrPlayer()?.ship;
             return Boolean(ship && ship.abilityCooldownFrames > 0 && ship.abilityActiveFrames > 0);
           }),
-        { message: 'Surveyor scan and cooldown should arrive from the server' }
+        { message: 'Scout scan and cooldown should arrive from the server' }
       )
       .toBe(true);
     for (const viewport of [

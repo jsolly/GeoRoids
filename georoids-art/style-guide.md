@@ -20,7 +20,7 @@ Also: collectible **EO satellite** pickups (six distinct hardware silhouettes, l
 
 Ship classes and collaborative roles are detailed in [`cooperative-ships.md`](cooperative-ships.md). Beauty bar and locked playfield palette above still rule.
 
-**Current roster:** Surveyor (nimble mineral scanner) and Hauler (asteroid towing, delivery, and mining).
+**Current roster:** Scout (nimble mineral scanner) and Hauler (asteroid towing, delivery, and mining).
 
 **Crew rule:** Every scoreboard pilot is an ally. Keep ownership colors distinct and show shared delivery rewards clearly.
 

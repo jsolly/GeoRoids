@@ -12,7 +12,7 @@ interface SurveyProbeLaunchHost {
   id: string;
   position: Position;
   angle: number;
-  kitId: 'surveyor' | 'hauler';
+  kitId: 'scout' | 'hauler';
   exploding: boolean;
   health: number;
   respawnTimer?: number;
@@ -37,7 +37,7 @@ type ProbeHost = AsteroidData | TerrainSpider;
 type HostLookup = (hostId: string) => ProbeHost | undefined;
 type ProbeScan = (pulse: SurveyProbePulse) => void;
 
-/** Owns transient Surveyor beacons while host DTOs carry their wire state. */
+/** Owns transient Scout beacons while host DTOs carry their wire state. */
 export class SurveyProbeManager {
   private readonly hosts = new Map<string, ProbeHost>();
   private readonly pulseAt = new Map<string, number>();
@@ -84,26 +84,26 @@ export class SurveyProbeManager {
   }
 
   public launch(
-    surveyor: SurveyProbeLaunchHost,
+    scout: SurveyProbeLaunchHost,
     asteroids: readonly AsteroidData[],
     now: number,
     spiders: readonly TerrainSpider[] = []
   ): { host: ProbeHost; probe: AsteroidProbe } | null {
     if (
-      surveyor.kitId !== 'surveyor' ||
-      surveyor.exploding ||
-      surveyor.health <= 0 ||
-      surveyor.respawnTimer !== undefined ||
-      surveyor.abilityCooldownFrames > 0
+      scout.kitId !== 'scout' ||
+      scout.exploding ||
+      scout.health <= 0 ||
+      scout.respawnTimer !== undefined ||
+      scout.abilityCooldownFrames > 0
     ) {
       return null;
     }
 
-    const direction = { x: Math.cos(surveyor.angle), y: -Math.sin(surveyor.angle) };
-    const nose = hullRadiusForKit(surveyor.kitId);
+    const direction = { x: Math.cos(scout.angle), y: -Math.sin(scout.angle) };
+    const nose = hullRadiusForKit(scout.kitId);
     const start = {
-      x: surveyor.position.x + direction.x * nose,
-      y: surveyor.position.y + direction.y * nose,
+      x: scout.position.x + direction.x * nose,
+      y: scout.position.y + direction.y * nose,
     };
     const end = {
       x: start.x + direction.x * SURVEY_PROBE.LAUNCH_RANGE,
@@ -157,7 +157,7 @@ export class SurveyProbeManager {
     }
 
     const ownerProbes = [...this.hosts.values()].filter(
-      (candidate) => candidate.probe?.ownerId === surveyor.id
+      (candidate) => candidate.probe?.ownerId === scout.id
     );
     if (ownerProbes.length >= SURVEY_PROBE.MAX_PER_OWNER) {
       const oldest = ownerProbes.sort((left, right) => {
@@ -181,7 +181,7 @@ export class SurveyProbeManager {
       ('rotation' in host ? host.rotation : host.angle);
     const probe: AsteroidProbe = {
       id: `survey-probe-${randomUUID()}`,
-      ownerId: surveyor.id,
+      ownerId: scout.id,
       health: SURVEY_PROBE.MAX_HEALTH,
       maxHealth: SURVEY_PROBE.MAX_HEALTH,
       attachedAt: now,

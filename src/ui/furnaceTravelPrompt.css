@@ -1,0 +1,22 @@
+@layer georoids {
+  #furnace-travel-prompt {
+    position: fixed;
+    z-index: 12;
+    top: calc(50% + 84px);
+    left: 50%;
+    max-width: calc(100vw - 32px);
+    transform: translateX(-50%);
+    padding: 10px 14px;
+    border: 1px solid #ffe29a;
+    border-radius: 6px;
+    background: rgb(0 0 17 / 92%);
+    color: #ffe29a;
+    font: 700 12px / 1.6 var(--font-mono, monospace);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #furnace-travel-prompt[hidden] {
+    display: none;
+  }
+}

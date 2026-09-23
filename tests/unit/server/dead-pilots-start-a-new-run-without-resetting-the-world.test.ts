@@ -32,7 +32,7 @@ test('a final-life death starts a new flight at score 0 and keeps crew explorati
       'Bob'
     );
     assert(continued.ok);
-    expect(continued.actor.lives).toBe(3);
+    expect(continued.actor.lives).toBe(5);
     expect(continued.actor.score).toBe(GAME.STARTING_SCORE);
     expect(continued.actor.name).toBe('Bob');
     expect(continued.actor.health).toBe(continued.actor.maxHealth);
@@ -44,7 +44,7 @@ test('a final-life death starts a new flight at score 0 and keeps crew explorati
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
     const resumed = restarted.resumePilot(continued.resumeToken, new RecordingSocket());
     assert(resumed.ok);
-    expect(resumed.actor.lives).toBe(3);
+    expect(resumed.actor.lives).toBe(5);
     expect(resumed.actor.score).toBe(GAME.STARTING_SCORE);
     expect(resumed.actor.health).toBe(resumed.actor.maxHealth);
     expect(restarted.getGameState().exploration).toEqual(revealed);

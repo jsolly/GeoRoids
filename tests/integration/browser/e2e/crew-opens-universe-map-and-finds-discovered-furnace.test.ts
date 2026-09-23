@@ -124,12 +124,12 @@ test.each([
     await page.setViewportSize({ width, height });
 
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const playerId = await game.getLocalPlayerId();
     await arrangeCrewField([playerId], 'empty');
     await game.placeShipAt(FAR_FURNACE.position.x, FAR_FURNACE.position.y);
 
-    // Passive Surveyor exploration reveals the regional cell. The marker must
+    // Passive Scout exploration reveals the regional cell. The marker must
     // survive after the pilot returns home, outside the local minimap radius.
     const assets = await page.evaluateHandle<
       () => readonly import('../../../../shared-types').MapAsset[]
@@ -261,7 +261,7 @@ test(
     await page.setViewportSize({ width: 1280, height: 900 });
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const teammatePage = await browserManager.createAdditionalPage();
     const teammate = new GameInteractions(teammatePage);
     await teammate.bootGame({ kitId: 'hauler', waitForCombatReady: false });
@@ -364,7 +364,7 @@ test.each([
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize({ width, height });
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     await arrangeCrewField([await game.getLocalPlayerId()], 'map-icons');
     const field = await page.evaluateHandle<
       () => import('../../../../shared-types').SpiderFieldState

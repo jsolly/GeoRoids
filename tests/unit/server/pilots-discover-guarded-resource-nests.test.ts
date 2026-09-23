@@ -13,7 +13,7 @@ import { DAMAGE, ROID } from '../../../src/constants';
 const home = { x: 15_000, y: 5_000 };
 const approach = { x: home.x - 2_000, y: home.y };
 const homeSector = '7,2';
-const nestCellId = '1,0';
+const nestCellId = '3,1';
 function setup(value: SpiderResource['value'] = 1) {
   const manager = new TerrainSpiderManager(() => 0.5);
   const pilot = { id: 'pilot', position: { ...approach }, health: 100, exploding: false };
@@ -32,11 +32,11 @@ function distance(a: Position, b: Position) {
 }
 
 test.each([0, 1, 2] as const)(
-  'resource value %i creates the matching guard group before the pilot reaches it',
+  'resource value %i has ten guards before the pilot reaches it',
   (value) => {
     const { manager, step } = setup(value);
     step();
-    expect(manager.snapshot().spiders).toHaveLength(SPIDER.NEST_GUARDS[value]);
+    expect(manager.snapshot().spiders).toHaveLength(10);
     step(600);
     for (const spider of manager.snapshot().spiders) {
       expect(distance(spider.position, home)).toBeLessThanOrEqual(
@@ -155,25 +155,13 @@ test('nests never materialize beside a pilot or in a furnace yard', () => {
   expect(manager.snapshot().spiders.length).toBeGreaterThan(0);
 });
 
-test('a furnace site inside nest occupancy covers that nest, and a site on the occupancy edge does not', () => {
-  const { manager, step } = setup();
-  step();
-  expect(manager.snapshot().nests).toHaveLength(1);
-  const occupancy = SPIDER.FURNACE_SAFE_RADIUS + SPIDER.HIT_RADIUS;
-  expect(manager.furnaceWouldCoverNest({ x: home.x + occupancy - 1, y: home.y })).toBe(true);
-  expect(
-    manager.furnaceWouldCoverNest({ x: home.x + SPIDER.FURNACE_SAFE_RADIUS - 1, y: home.y })
-  ).toBe(true);
-  expect(manager.furnaceWouldCoverNest({ x: home.x + occupancy, y: home.y })).toBe(false);
-  expect(manager.snapshot().nests).toHaveLength(1);
-});
-
-test('valuable resources away from a widely spaced nest site remain unguarded', () => {
+test('resources away from a cell center can anchor a guarded nest', () => {
   const { manager, resource, pilot, step } = setup(2);
   resource.position = { x: 2200, y: 2200 };
   pilot.position = { x: 4000, y: 2200 };
   step(120);
-  expect(manager.snapshot().spiders).toEqual([]);
+  expect(manager.snapshot().spiders).toHaveLength(10);
+  expect(manager.snapshot().nests[0]?.position).toEqual(resource.position);
 });
 
 test('an empty server preserves cleared nests and pauses the roaming clock', () => {
@@ -196,14 +184,14 @@ test('dormant guards cannot reappear directly on any returning pilot', () => {
   expect(manager.snapshot().spiders).toEqual([]);
   pilot.position = { ...approach };
   step(60);
-  expect(manager.snapshot().spiders).toHaveLength(4);
+  expect(manager.snapshot().spiders).toHaveLength(10);
 });
 
 test('shooting guards from outside detection range postpones a due roaming attack', () => {
   const { manager, step } = setup();
   step(14_399);
   const guards = manager.snapshot().spiders;
-  expect(guards).toHaveLength(4);
+  expect(guards).toHaveLength(10);
   for (const spider of guards) {
     manager.resolveLaserHit(spider.position, spider.position, SPIDER.MAX_HEALTH);
   }
@@ -215,7 +203,7 @@ test('multiplayer nest creation and sleeping guards share the same active popula
   const manager = new TerrainSpiderManager(() => 0.5);
   const resources: SpiderResource[] = Array.from({ length: 8 }, (_, index) => ({
     id: `deposit-${index}`,
-    position: { x: -35_000 + index * SPIDER.NEST_SPACING, y: 15_000 },
+    position: { x: -35_000 + index * SPIDER.NEST_SPACING * 2, y: 15_000 },
     value: 2,
   }));
   const players = resources.map((resource, index) => ({
@@ -230,13 +218,13 @@ test('multiplayer nest creation and sleeping guards share the same active popula
     nowFrame: 1,
   });
   const sleepingIds = manager.snapshot().spiders.map(({ id }) => id);
-  expect(sleepingIds).toHaveLength(7);
+  expect(sleepingIds).toHaveLength(10);
   manager.advance({
     players: players.slice(1),
     resources: () => resources,
     nowFrame: 61,
   });
-  expect(manager.snapshot().spiders).toHaveLength(42);
+  expect(manager.snapshot().spiders).toHaveLength(40);
   expect(manager.snapshot().spiders.some(({ id }) => sleepingIds.includes(id))).toBe(false);
   manager.advance({
     players,
@@ -244,7 +232,7 @@ test('multiplayer nest creation and sleeping guards share the same active popula
     nowFrame: 121,
   });
   expect(manager.snapshot().spiders).toHaveLength(SPIDER.MAX_ACTIVE);
-  expect(manager.snapshot().spiders.filter(({ id }) => sleepingIds.includes(id))).toHaveLength(6);
+  expect(manager.snapshot().spiders.filter(({ id }) => sleepingIds.includes(id))).toHaveLength(8);
 });
 
 test('the map marks the guarded deposit while its spiders chase, sleep, and remain cleared', () => {
@@ -373,3 +361,52 @@ test.each(['collected', 'moved'] as const)(
     expect(manager.snapshot().nests.some((nest) => nest.resourceId === deposit.id)).toBe(false);
   }
 );
+
+test('nearby resource cells each have ten guards and seed treasure only on first discovery', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  const resources: SpiderResource[] = [
+    { id: 'west-ore', position: { x: 14_800, y: 5_000 }, value: 0 },
+    { id: 'east-ore', position: { x: 15_200, y: 5_000 }, value: 2 },
+  ];
+  const pilot = { id: 'pilot', position: { x: 15_000, y: 7_000 }, health: 100, exploding: false };
+  const created: string[] = [];
+  const advance = (nowFrame: number) =>
+    manager.advance({
+      players: [pilot],
+      resources: () => resources,
+      nowFrame,
+      onNestCreated: (nest) => {
+        expect(
+          manager
+            .snapshot()
+            .spiders.filter(
+              (spider) => distance(spider.position, nest.position) <= SPIDER.NEST_PATROL_RADIUS
+            )
+        ).toHaveLength(10);
+        created.push(nest.resourceId);
+      },
+    });
+  advance(1);
+  expect(manager.snapshot().nests).toHaveLength(2);
+  expect(manager.snapshot().spiders).toHaveLength(20);
+  expect(created).toEqual(['west-ore', 'east-ore']);
+  manager.suspend();
+  advance(61);
+  for (const spider of manager.snapshot().spiders) {
+    manager.removeSpider(spider.id);
+  }
+  advance(121);
+  expect(created).toEqual(['west-ore', 'east-ore']);
+  expect(manager.snapshot().spiders).toEqual([]);
+});
+
+test('resource-centered nests still leave the starter area safe', () => {
+  const manager = new TerrainSpiderManager(() => 0.5);
+  manager.advance({
+    players: [{ id: 'pilot', position: { x: 2_500, y: 0 }, health: 100, exploding: false }],
+    resources: () => [{ id: 'starter-ore', position: { x: 500, y: 0 }, value: 2 }],
+    nowFrame: 1,
+  });
+  expect(manager.snapshot().nests).toEqual([]);
+  expect(manager.snapshot().spiders).toEqual([]);
+});

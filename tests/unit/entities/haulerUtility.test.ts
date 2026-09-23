@@ -32,10 +32,10 @@ function host(kitId: AbilityHost['kitId'] = 'hauler'): AbilityHost {
   };
 }
 
-test('missing Hauler utility keeps the legacy tow cable', () => {
+test('a new Hauler starts with the freely available tow cable', () => {
   expect(parseHaulerUtilityId('nope')).toBe(UNSET_HAULER_UTILITY);
   expect(haulerUtilityOf(host())).toBe('tow_cable');
-  expect(PREFERRED_HAULER_UTILITY).toBe('resource_tap');
+  expect(PREFERRED_HAULER_UTILITY).toBe('tow_cable');
   expect(HAULER_UTILITY.resource_tap.name).toBe('Resource Tap');
 });
 

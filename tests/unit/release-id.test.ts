@@ -45,7 +45,7 @@ describe('published field manual routing', () => {
   );
 
   test('leaves demonstration assets on their ordinary static path', () => {
-    const response = middleware(new Request('https://www.georoids.com/wiki/media/surveyor.gif'));
+    const response = middleware(new Request('https://www.georoids.com/wiki/media/scout.gif'));
     expect(response.headers.get('x-middleware-next')).toBe('1');
     expect(response.headers.get('x-middleware-rewrite')).toBeNull();
   });

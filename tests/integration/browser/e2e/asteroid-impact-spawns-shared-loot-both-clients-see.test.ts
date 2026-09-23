@@ -64,7 +64,7 @@ test(
     });
 
     await impactedPilot.bootGame({ kitId: 'hauler', waitForCombatReady: false });
-    await collector.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await collector.bootGame({ kitId: 'scout', waitForCombatReady: false });
     const [impactedPilotId, collectorId] = await Promise.all([
       impactedPilot.getLocalPlayerId(),
       collector.getLocalPlayerId(),

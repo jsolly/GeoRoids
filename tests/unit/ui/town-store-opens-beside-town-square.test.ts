@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
 import { EXTRA_LIFE_COST, MAX_LIVES, TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
@@ -10,6 +11,7 @@ import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
+import { worldFurnaces } from '../../../src/network/worldExploration';
 import {
   applyTownStoreResult,
   closeTownStore,
@@ -66,8 +68,8 @@ test('the store opens at Town Square via E and buys one extra life', () => {
   player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
   syncTownStoreChrome();
   const near = readAbilityChrome(player.ship);
-  expect(near.label).toBe('ENTER');
-  expect(near.name).toBe('Enter store');
+  expect(near.label).toBe('TRAVEL');
+  expect(near.name).toBe('Choose furnace destination');
   expect(near.ready).toBe(true);
   expect(near.cooldownRatio).toBe(0);
   player.ship.position = { x: TOWN_STORE_RADIUS + 20, y: 0 };
@@ -172,7 +174,7 @@ test('touch ability opens the store near Town Square instead of firing the kit t
   expect(isTownStoreOpen()).toBe(false);
 });
 
-test('a hooked Hauler keeps tow chrome instead of Enter store inside Town Square', () => {
+test('a hooked Hauler opens furnace travel and keeps release controls away from furnaces', () => {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
     throw new Error('Missing local pilot');
@@ -180,20 +182,71 @@ test('a hooked Hauler keeps tow chrome instead of Enter store inside Town Square
   player.ship.position = { x: 0, y: 0 };
   player.ship.harpoonTargetId = 'tow-rock';
   player.ship.abilityCooldownFrames = 0;
-  syncTownStoreChrome();
-  const chrome = readAbilityChrome(player.ship);
-  expect(chrome.label).not.toBe('ENTER');
-  expect(chrome.name).not.toBe('Enter store');
-  expect(openTownStore()).toBe(false);
-  expect(isTownStoreOpen()).toBe(false);
-  document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', bubbles: true }));
-  expect(isTownStoreOpen()).toBe(false);
-  // Touch still fires the kit tool (tow/ignite); it must not open the store.
-  triggerTouchAbility(player);
-  expect(isTownStoreOpen()).toBe(false);
-  player.ship.harpoonTargetId = null;
-  syncTownStoreChrome();
-  expect(readAbilityChrome(player.ship).label).toBe('ENTER');
+  expect(readAbilityChrome(player.ship).label).toBe('TRAVEL');
   expect(openTownStore()).toBe(true);
+  closeTownStore();
+  player.ship.position = { x: 800, y: 0 };
+  expect(readAbilityChrome(player.ship).label).toBe('RELEASE');
+  expect(openTownStore()).toBe(false);
+  player.ship.harpoonTargetId = null;
+});
+
+test('a lit street offers free travel to Town Square and other lit streets but no life store', () => {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  const street = civicLot('street-1-0');
+  if (!player || !street) {
+    throw new Error('Missing travel fixture');
+  }
+  worldFurnaces.replaceLit([
+    { id: street.id, builderName: 'Pilot' },
+    { id: 'street-1-1', builderName: 'Friend' },
+  ]);
+  player.ship.position = { ...street.position };
+  expect(openTownStore()).toBe(true);
+  expect(document.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`)?.hidden).toBe(true);
+  expect(document.querySelector(`[data-furnace-id="${street.id}"]`)).toBeNull();
+  expect(document.querySelector('[data-furnace-id="street-1-1"]')).not.toBeNull();
+  expect(document.querySelector('[data-furnace-id="street-1-2"]')).toBeNull();
+  const send = vi.spyOn(NetworkManager.getInstance(), 'sendMessage').mockReturnValue(true);
+  document.querySelector<HTMLButtonElement>(`[data-furnace-id="${TOWN_HEARTH.id}"]`)?.click();
+  expect(send).toHaveBeenCalledWith({
+    type: 'travelFurnace',
+    id: player.id,
+    data: { destinationId: TOWN_HEARTH.id },
+  });
+  window.dispatchEvent(new CustomEvent('furnaceTravelResult', { detail: { ok: true } }));
+  expect(isTownStoreOpen()).toBe(false);
+  send.mockRestore();
+  worldFurnaces.replaceLit([]);
+});
+
+test('a touch boarding gesture opens the map only after its click completes', () => {
+  closeTownStore();
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  if (!player) {
+    throw new Error('Missing local pilot');
+  }
+  player.ship.position = { x: 0, y: 0 };
+  player.lives = 5;
+  player.ship.health = 100;
+  player.ship.exploding = false;
+  player.ship.furnaceTransit = null;
+  const ability = document.querySelector<HTMLButtonElement>('#touch-ability');
+  if (!ability) {
+    throw new Error('Missing touch ability');
+  }
+  ability.setPointerCapture = vi.fn();
+  ability.hasPointerCapture = vi.fn().mockReturnValue(true);
+  ability.releasePointerCapture = vi.fn();
+  ability.dispatchEvent(
+    new PointerEvent('pointerdown', { pointerId: 7, pointerType: 'touch', bubbles: true })
+  );
+  expect(isTownStoreOpen()).toBe(false);
+  ability.dispatchEvent(
+    new PointerEvent('pointerup', { pointerId: 7, pointerType: 'touch', bubbles: true })
+  );
+  expect(isTownStoreOpen()).toBe(false);
+  ability.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true }));
+  expect(isTownStoreOpen()).toBe(true);
   closeTownStore();
 });

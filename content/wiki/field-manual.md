@@ -6,7 +6,7 @@ summary: Learn the two ships, read the hazards, and understand what happens
 order: 10
 related:
   - content/wiki/controls.md
-  - content/wiki/surveyor.md
+  - content/wiki/scout.md
   - content/wiki/asteroids.md
   - content/wiki/teamwork.md
   - content/wiki/hud-network.md
@@ -14,7 +14,7 @@ related:
 
 ## Start flying
 
-Choose Surveyor to explore and scan, or Hauler to extract and deliver ore, then select Enter Game. Thrust is automatic; learn [steering and firing](/wiki/#controls) before heading out.
+Choose Scout to explore with Mineral Scan, or Hauler to deliver ore with Tow Cable, then select Enter Game. Other tools must be salvaged before you can equip them. Thrust is automatic; learn [steering and firing](/wiki/#controls) before heading out.
 
 ## Your expedition
 
@@ -22,4 +22,4 @@ Everyone shares one crew, one chart, and a persistent world. Mine rocks, collect
 
 ## Your next life
 
-Death costs a life and resets growth and upgrades, but keeps your score. Game over starts your next flight with fresh lives and zero score; a brief disconnect returns you to the same ship.
+You start with five lives; ordinary deaths reset growth and upgrades but keep score, salvaged tools, silk, and paint. Losing your last life clears that personal progress, and your next flight starts with five lives and starter tools. A brief disconnect returns you to the same ship.

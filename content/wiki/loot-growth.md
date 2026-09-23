@@ -21,9 +21,15 @@ Nearby shards, wreckage, and Tap canisters pull toward you and add mass when col
 
 Reflective cores temporarily strengthen your lasers without adding mass. Death clears the upgrade.
 
+## Salvaged equipment
+
+Scout starts with Mineral Scan and Hauler with Tow Cable; find Resource Tap, Boost Coupling, or Survey Probe to unlock its inventory card. Look for large, labeled, glowing hardware in spider nests, which have a 65% chance to contain a tool, or among laser-mined asteroid drops with a 1.5% chance. Either ship can collect any tool, but only its matching kit can equip it.
+
+Tools add no mass or score and survive ordinary deaths, reconnects, and server restarts. Final death clears them along with silk, score, and paint. Duplicates stay for teammates, and shooting cannot destroy equipment.
+
 ## Shoot a drop
 
-Shoot a loot drop from nearby to detonate it and push small rocks away. The blast consumes the drop but cannot hurt any crew hull.
+Shoot a non-equipment loot drop from nearby to detonate it and push small rocks away. The blast consumes the drop but cannot hurt any crew hull.
 
 ## Spider silk
 

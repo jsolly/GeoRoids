@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 function arrangeFlight() {
-  game.newGame('Clock pilot', 'surveyor');
+  game.newGame('Clock pilot', 'scout');
   const ship = game.getCurrPlayer()?.ship;
   assert.ok(ship);
   ship.position = { x: 0, y: 0 };

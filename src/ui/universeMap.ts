@@ -367,7 +367,7 @@ function drawMapLegend(dialog: HTMLDialogElement): void {
           kind === 'You'
             ? PlayerManager.getInstance().getLocalPlayer()
             : PlayerManager.getInstance().getNonLocalPlayers()[0];
-        const hull = getKitHullOutline(player?.ship.kitId ?? 'surveyor');
+        const hull = getKitHullOutline(player?.ship.kitId ?? 'scout');
         if (traceMapPolyline(ctx, projectHullPolyline(8, 8, 6, Math.PI / 2, hull.hull), true)) {
           ctx.stroke();
         }

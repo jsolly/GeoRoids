@@ -26,7 +26,7 @@ function metal(id: string): AsteroidData {
   };
 }
 
-test('Hauler breaks metal in two shots while Surveyor needs three and teammate lasers pass through', () => {
+test('Hauler breaks metal in two shots while Scout needs three and teammate lasers pass through', () => {
   const hauler = engine.addPlayer(
     'hauler',
     'Hauler',
@@ -34,41 +34,35 @@ test('Hauler breaks metal in two shots while Surveyor needs three and teammate l
     { x: 0, y: 0 },
     'hauler'
   );
-  const surveyor = engine.addPlayer(
-    'surveyor',
-    'Surveyor',
+  const scout = engine.addPlayer(
+    'scout',
+    'Scout',
     new RecordingSocket(),
     { x: 100, y: 0 },
-    'surveyor'
+    'scout'
   );
   engine.addAsteroid(metal('heavy-mining'));
   engine.addAsteroid(metal('light-mining'));
   expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('tagged');
   expect(engine.getAsteroid('heavy-mining')?.health).toBe(25);
   expect(engine.handleAsteroidHit('heavy-mining', hauler.id).outcome).toBe('destroyed');
-  expect(engine.handleAsteroidHit('light-mining', surveyor.id).outcome).toBe('tagged');
-  expect(engine.handleAsteroidHit('light-mining', surveyor.id).outcome).toBe('tagged');
-  expect(engine.handleAsteroidHit('light-mining', surveyor.id).outcome).toBe('destroyed');
+  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('tagged');
+  expect(engine.handleAsteroidHit('light-mining', scout.id).outcome).toBe('destroyed');
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
   }
   hauler.spawnProtectionTimer = 0;
-  surveyor.spawnProtectionTimer = 0;
-  const health = surveyor.health;
+  scout.spawnProtectionTimer = 0;
+  const health = scout.health;
   engine.spawnLaser(hauler.id, { x: 50, y: 0 }, { x: 80, y: 0 });
   engine.advanceLasersAndResolveHits();
-  expect(surveyor.health).toBe(health);
+  expect(scout.health).toBe(health);
   expect(engine.getServerLasers()).toHaveLength(1);
 });
 
 test('a Hauler laser retains mining strength after its owner leaves', () => {
-  engine.addPlayer(
-    'observer',
-    'Observer',
-    new RecordingSocket(),
-    { x: -1000, y: -1000 },
-    'surveyor'
-  );
+  engine.addPlayer('observer', 'Observer', new RecordingSocket(), { x: -1000, y: -1000 }, 'scout');
   engine.addPlayer('departing-hauler', 'Hauler', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
@@ -95,7 +89,7 @@ test('Hauler improves collaborative HP mining while ordinary one-hit rocks stay 
 
 test('Hauler mining still requires different pilots to split the largest ice', () => {
   engine.addPlayer('miner', 'Miner', new RecordingSocket(), { x: 0, y: 0 }, 'hauler');
-  engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 100, y: 0 }, 'surveyor');
+  engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 100, y: 0 }, 'scout');
   for (const id of ['solo-ice', 'shared-ice']) {
     engine.addAsteroid({ ...metal(id), material: 'ice', size: ROID.COLLAB_SPLIT_MIN_SIZE });
   }

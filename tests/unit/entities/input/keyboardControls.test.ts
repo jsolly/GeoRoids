@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setSelectedShipKitId('surveyor');
+  setSelectedShipKitId('scout');
   publishHarpoonField([]);
 });
 
@@ -93,14 +93,14 @@ test('Shift toggles Boost on and off without holding', () => {
   expect(player.ship.boosting).toBe(false);
 });
 
-test('KeyE preserves the joined Surveyor when the title menu has a stale Hauler selection', () => {
+test('KeyE preserves the joined Scout when the title menu has a stale Hauler selection', () => {
   setSelectedShipKitId('hauler');
   publishHarpoonField([{ id: 'rock-1', position: { x: 80, y: 0 }, velocity: { x: 0, y: 0 } }]);
-  expect(player.ship.kitId).toBe('surveyor');
+  expect(player.ship.kitId).toBe('scout');
   const health = player.ship.health;
   const speed = player.ship.maxVelocity;
   press('KeyE');
-  expect(player.ship.kitId).toBe('surveyor');
+  expect(player.ship.kitId).toBe('scout');
   expect(player.ship.health).toBe(health);
   expect(player.ship.maxVelocity).toBe(speed);
   expect(player.ship.harpoonTargetId).toBeNull();

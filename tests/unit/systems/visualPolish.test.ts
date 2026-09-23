@@ -140,7 +140,7 @@ function pilot(id: string, type: Player['type'] = 'local') {
   return new Player({ id, name: id, type, input: new MockPlayerInput() });
 }
 
-const KITS: ReadonlyArray<{ id: ShipKitId }> = [{ id: 'surveyor' }, { id: 'hauler' }];
+const KITS: ReadonlyArray<{ id: ShipKitId }> = [{ id: 'scout' }, { id: 'hauler' }];
 
 test('every playable kit draws its outlined hull and retained details without filling', () => {
   const { ctx, strokes, fill } = recordingContext();
@@ -189,7 +189,7 @@ test.each(['tow_cable', 'resource_tap', 'boost_coupling'] as const)(
   }
 );
 
-test('local and remote shots draw short thicker trails, then the identified hit draws a ring and ticks', () => {
+test('local and remote shots draw broad glowing bolts with bright cores, then hits draw a ring and ticks', () => {
   const { ctx, strokes, fill } = recordingContext();
   const local = new Laser({ x: 30, y: 60 }, { x: 3, y: 4 }, 0, 0);
   local.serverId = 'local-diagonal';
@@ -204,7 +204,7 @@ test('local and remote shots draw short thicker trails, then the identified hit 
   const localOffsets = laserBoltOffsets(local.velocity.x, local.velocity.y, bolt, trailLength);
   const remoteOffsets = laserBoltOffsets(remote.velocity.x, remote.velocity.y, bolt, trailLength);
   ctx.save();
-  const expectedBlur = [VISUAL.LASER_GLOW * 0.55, 0, VISUAL.LASER_GLOW, 0].map((blur) => {
+  const expectedBlur = [VISUAL.LASER_GLOW * 0.55, 0, VISUAL.LASER_GLOW, 0, 0].map((blur) => {
     ctx.shadowBlur = blur;
     return ctx.shadowBlur;
   });
@@ -226,18 +226,20 @@ test('local and remote shots draw short thicker trails, then the identified hit 
     ];
     strokes.length = 0;
     drawLaserBolts([shot], color, viewer);
-    expect(strokes.map((path) => path.points)).toEqual([trail, trail, body, body]);
+    expect(strokes.map((path) => path.points)).toEqual([trail, trail, body, body, body]);
     expect(strokes.map((path) => path.width)).toEqual([
       VISUAL.LASER_STROKE_WIDTH * 0.7,
       VISUAL.LASER_STROKE_WIDTH * 0.7,
       VISUAL.LASER_STROKE_WIDTH,
       VISUAL.LASER_STROKE_WIDTH,
+      VISUAL.LASER_CORE_WIDTH,
     ]);
-    expect(strokes.map((path) => path.color)).toEqual(
-      [0.19, 0.38, 0.5, 1].map((alpha) => canvasColor(ctx, hexToRgba(color, alpha)))
-    );
+    expect(strokes.map((path) => path.color)).toEqual([
+      ...[0.19, 0.38, 0.5, 1].map((alpha) => canvasColor(ctx, hexToRgba(color, alpha))),
+      canvasColor(ctx, VISUAL.LASER_CORE_COLOR),
+    ]);
     expect(strokes.map((path) => path.blur)).toEqual(expectedBlur);
-    expect(strokes.every((path) => path.shadow === canvasColor(ctx, color))).toBe(true);
+    expect(strokes.slice(0, 4).every((path) => path.shadow === canvasColor(ctx, color))).toBe(true);
     expect(
       strokes.every(
         (path) => !path.closed && path.width <= VISUAL.LASER_STROKE_WIDTH && path.alpha === 1
@@ -353,10 +355,10 @@ test('local and remote kit thrusters draw two open V contours only while thrusti
   expect(fill).not.toHaveBeenCalled();
 });
 
-test('a destroyed surveyor breaks into drifting hull edges, an expanding ring and unfilled sparks', () => {
+test('a destroyed scout breaks into drifting hull edges, an expanding ring and unfilled sparks', () => {
   const { ctx, strokes, fill } = recordingContext();
-  const ship = pilot('destroyed-surveyor').ship;
-  ship.kitId = 'surveyor';
+  const ship = pilot('destroyed-scout').ship;
+  ship.kitId = 'scout';
   ship.r = 20;
   ship.angle = 0;
   ship.exploding = true;
@@ -370,7 +372,7 @@ test('a destroyed surveyor breaks into drifting hull edges, an expanding ring an
   expect(easeOutCubic(1)).toBe(1);
   expect(easeOutCubic(0.5)).toBe(0.875);
   expect(burstTick(0, 0, 0, 4, 10)).toEqual({ x1: 4, y1: 0, x2: 10, y2: 0 });
-  const edges = projectKitHullEdges(400, 300, 20, 0, 'surveyor');
+  const edges = projectKitHullEdges(400, 300, 20, 0, 'scout');
   expect(edges.length).toBeGreaterThan(6);
   expect(strokes).toHaveLength(1 + edges.length + VISUAL.EXPLOSION_SPARKS + 4);
   expect(strokes[0]?.arcs[0]).toEqual([400, 300, 52.125, 0, Math.PI * 2]);
@@ -384,7 +386,7 @@ test('a destroyed surveyor breaks into drifting hull edges, an expanding ring an
   const edgeA = firstEdge?.[0];
   const edgeB = firstEdge?.[1];
   if (!edgeA || !edgeB) {
-    throw new Error('Destroyed surveyor did not draw its first drifting hull edge');
+    throw new Error('Destroyed scout did not draw its first drifting hull edge');
   }
   const midX = (edgeA.x + edgeB.x) / 2;
   const midY = (edgeA.y + edgeB.y) / 2;
@@ -395,7 +397,7 @@ test('a destroyed surveyor breaks into drifting hull edges, an expanding ring an
   const sparkInner = sparks[0]?.points[0];
   const sparkOuter = sparks[0]?.points[1];
   if (!sparkInner || !sparkOuter) {
-    throw new Error('Destroyed surveyor did not draw a complete spark');
+    throw new Error('Destroyed scout did not draw a complete spark');
   }
   expect(Math.hypot(sparkInner.x - 400, sparkInner.y - 300)).toBeCloseTo(27.125);
   expect(Math.hypot(sparkOuter.x - 400, sparkOuter.y - 300)).toBeCloseTo(36.125);

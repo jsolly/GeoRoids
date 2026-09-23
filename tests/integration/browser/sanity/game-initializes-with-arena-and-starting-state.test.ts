@@ -20,7 +20,7 @@ test(
     await game.verifyGameArea();
     await game.waitForAsteroids(20);
 
-    expect(await game.getLives()).toBe(3);
+    expect(await game.getLives()).toBe(5);
     expect(await game.getScore()).toBe(0);
     const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);
     expect(health).toBe(maxHealth);
@@ -35,9 +35,7 @@ test(
       }))
     );
     expect(pilots.every((pilot) => pilot.id.length > 0 && pilot.name.length > 0)).toBe(true);
-    expect(pilots.every((pilot) => pilot.kitId === 'surveyor' || pilot.kitId === 'hauler')).toBe(
-      true
-    );
+    expect(pilots.every((pilot) => pilot.kitId === 'scout' || pilot.kitId === 'hauler')).toBe(true);
     expect(pilots.every((pilot) => pilot.hasLegacyTeamField === false)).toBe(true);
     expect(pilots.every((pilot) => pilot.type === 'local' || pilot.type === 'remote')).toBe(true);
   },

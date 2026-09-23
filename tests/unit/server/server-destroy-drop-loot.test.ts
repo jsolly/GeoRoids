@@ -121,7 +121,8 @@ async function startWorld(): Promise<{
   for (const asteroid of server.gameEngine.getAllAsteroids()) {
     server.gameEngine.removeAsteroid(asteroid.id);
   }
-  server.gameEngine.parkSatellitePickups({ x: -2_400, y: -2_400 });
+  // Keep unrelated pickup resources inside the nest-free launch neighborhood.
+  server.gameEngine.parkSatellitePickups({ x: -700, y: -700 });
   expect(server.gameEngine.getLoot()).toEqual([]);
 
   return { server, playerA, playerB, decoderA, decoderB };

@@ -61,7 +61,7 @@ function deliver(engine: GameEngine, id: string, haulerId: string, scoutId: stri
   return furnaceReward(rock);
 }
 
-test('a street the Surveyor paid for raises only that pilot furnace payout', () => {
+test('a street the Scout paid for raises only that pilot furnace payout', () => {
   const engine = new GameEngine(42);
   const hauler = engine.addPlayer(
     'hauler',
@@ -71,7 +71,7 @@ test('a street the Surveyor paid for raises only that pilot furnace payout', () 
     'hauler'
   );
   const scoutSocket = new RecordingSocket();
-  const scout = engine.addPlayer('scout', 'scout', scoutSocket, { ...street.position }, 'surveyor');
+  const scout = engine.addPlayer('scout', 'scout', scoutSocket, { ...street.position }, 'scout');
   scout.position = { ...street.position };
   scout.asteroidInteractions = 1;
   const registered = engine.registerPilot(scout, scoutSocket);
@@ -136,7 +136,7 @@ test('an unnamed street grants no delivery bonus', () => {
       'scout',
       new RecordingSocket(),
       { x: 10, y: 0 },
-      'surveyor'
+      'scout'
     );
     const base = deliver(engine, 'legacy', hauler.id, scout.id);
     expect(hauler.score).toBe(base);
@@ -164,7 +164,7 @@ test('Town Square sells a hull paint once and keeps it across a restart', () => 
       'Rich',
       new RecordingSocket(),
       { x: 10, y: 0 },
-      'surveyor'
+      'scout'
     );
     bystander.score = ember.cost * 3;
     expect(engine.buyShipPaint(pilot.id, ember.id)).toBe(`You need ${ember.cost} more score`);

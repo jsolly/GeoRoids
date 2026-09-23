@@ -13,7 +13,7 @@ import { TestConfig } from '../../utils/test-config';
 const { browserManager, screenshotManager } = createBrowserScenarioHooks();
 
 test.each(['Shift', 'right-click'])(
-  '%s boost raises Surveyor cruise and a second press returns to downhill cruise',
+  '%s boost raises Scout cruise and a second press returns to downhill cruise',
   async (input) => {
     const page = browserManager.getCurrentPage();
     if (!page) {
@@ -30,7 +30,7 @@ test.each(['Shift', 'right-click'])(
       }
     };
     const game = new GameInteractions(page);
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     await game.placeShipAt(-2200, 650);
     await game.armSpawnProtection();
     await page.evaluate(() => {
@@ -80,9 +80,7 @@ test.each(['Shift', 'right-click'])(
       }
       return Math.hypot(ship.velocity.x, ship.velocity.y);
     });
-    expect(boosted).toBeLessThanOrEqual(
-      downhillCap * getShipKit('surveyor').boostMultiplier + 1e-6
-    );
+    expect(boosted).toBeLessThanOrEqual(downhillCap * getShipKit('scout').boostMultiplier + 1e-6);
 
     if (input === 'right-click') {
       await page.screenshot({ path: screenshotManager.getScreenshotPath('boost-desktop.png') });
@@ -121,7 +119,7 @@ test.each(['Shift', 'right-click'])(
           { id: 'controls', text: 'right-click to toggle Boost' },
           { id: 'terrain', text: 'Boost stacks with downhill speed' },
           { id: 'hauler', text: 'Cargo keeps its momentum' },
-          { id: 'surveyor', text: 'turns faster and boosts harder than Hauler' },
+          { id: 'scout', text: 'turns faster and boosts harder than Hauler' },
           { id: 'asteroids', text: 'Fresh interior sectors have' },
         ]) {
           await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);

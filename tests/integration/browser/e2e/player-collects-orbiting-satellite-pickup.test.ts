@@ -11,7 +11,7 @@ const { browserManager, screenshotManager } = createBrowserScenarioHooks(__dirna
 
 test.each([
   { width: 1280, kitId: 'hauler' },
-  { width: 390, kitId: 'surveyor' },
+  { width: 390, kitId: 'scout' },
   { width: 390, kitId: 'hauler' },
 ] as const)(
   'a $kitId stores a satellite and equips it from the schematic at $width pixels',

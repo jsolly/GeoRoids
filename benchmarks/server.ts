@@ -339,7 +339,7 @@ export async function runServerSample(
         `Benchmark Pilot ${index}`,
         peer,
         participantPosition(index, options.players),
-        'surveyor'
+        'scout'
       );
       participantIds.push(id);
     }

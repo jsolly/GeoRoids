@@ -25,6 +25,7 @@ let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
+let abilityTravelClick = false;
 let boostPointerId: number | null = null;
 let abilityButton: HTMLButtonElement | null = null;
 let boostButton: HTMLButtonElement | null = null;
@@ -637,13 +638,17 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
   ability.setPointerCapture(ev.pointerId);
   setAbilityPressed(true);
   const player = requireLocalPlayer();
-  if (player) {
+  abilityTravelClick = canEnterTownStore();
+  if (player && !abilityTravelClick) {
     triggerTouchAbility(player);
     syncAbilityChrome(player);
   }
 }
 
 function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
+  if (ev.type === 'pointercancel') {
+    abilityTravelClick = false;
+  }
   if (ev.pointerId !== abilityPointerId) {
     return;
   }
@@ -655,18 +660,23 @@ function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
 }
 
 function onAbilityClick(ev: MouseEvent): void {
-  // Pointer presses already activate on pointerdown. Their click can arrive
-  // later; only keyboard/accessibility/programmatic clicks have no click count.
-  if (ev.detail !== 0) {
+  // Open the modal on the completed click: opening on pointerdown can send the
+  // same finger's synthesized click to the new dialog's Close button.
+  const travelClick = abilityTravelClick;
+  abilityTravelClick = false;
+  if (ev.detail !== 0 && !travelClick) {
     return;
   }
   ev.preventDefault();
+  ev.stopPropagation();
+  if (travelClick && !canEnterTownStore()) {
+    return;
+  }
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchAbility(player);
     syncAbilityChrome(player);
   }
-  ev.stopPropagation();
 }
 
 function onBoostPointerDown(ev: PointerEvent, boost: HTMLElement): void {

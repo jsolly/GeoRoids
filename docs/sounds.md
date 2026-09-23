@@ -20,7 +20,7 @@ The deterministic PCM generator uses the system `afconvert` to encode mono
 | Laser core pickup | Brighter octave partial in the same pickup phrase |
 | Orbital pickup | G4–C5 answering interval |
 | Harpoon launch, latch, release | Low plucks, seated latch tone, descending release |
-| Surveyor scan | C4–G4–D5 rising shimmer |
+| Scout scan | C4–G4–D5 rising shimmer |
 | Flight entry and respawn | C4–E4–G4–C5 welcoming phrase |
 | Ship and orbital shots | Short G4 and C4 pulses, without pitch randomization |
 | Hits | Rounded low impact with a soft C4 overtone |

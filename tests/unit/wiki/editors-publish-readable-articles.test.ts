@@ -50,9 +50,9 @@ test('an editor adds a formatted searchable article without changing application
   expect(searchArticles(articles, 'orbiting').map((entry) => entry.id)).toContain('practice');
   expect(article?.sources).toEqual([]);
   expect(article?.related).toEqual(['controls']);
-  const surveyor = articles.find((entry) => entry.id === 'surveyor');
-  expect(surveyor?.html).toContain(String(getShipKit('surveyor').maxHealth));
-  expect(surveyor?.html).toContain(
+  const scout = articles.find((entry) => entry.id === 'scout');
+  expect(scout?.html).toContain(String(getShipKit('scout').maxHealth));
+  expect(scout?.html).toContain(
     '<details class="game-reference"><summary>Exact values and detailed rules</summary>'
   );
 });

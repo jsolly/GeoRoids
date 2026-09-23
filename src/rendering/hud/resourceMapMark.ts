@@ -159,6 +159,32 @@ export function addResourceMapPath(
         );
       }
       return;
+    case 'boost_coupling':
+      move(-0.65, -0.75);
+      line(0.65, -0.75);
+      line(0.45, 0.35);
+      line(-0.45, 0.35);
+      ctx.closePath();
+      move(-0.4, 0.35);
+      line(0, 1.1);
+      line(0.4, 0.35);
+      move(-0.9, -0.3);
+      line(0.9, -0.3);
+      return;
+    case 'survey_probe':
+      move(0, -1);
+      line(0.55, 0);
+      line(0, 0.8);
+      line(-0.55, 0);
+      ctx.closePath();
+      move(-1, -0.55);
+      line(-0.7, 0);
+      line(-1, 0.55);
+      move(1, -0.55);
+      line(0.7, 0);
+      line(1, 0.55);
+      return;
+    case 'resource_tap':
     case 'tap':
       move(-0.55, -0.35);
       line(-0.55, 0.6);

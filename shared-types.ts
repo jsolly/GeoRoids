@@ -57,13 +57,13 @@ export interface Velocity {
 
 // Network update interface - only what needs to be synced
 /** Chosen at join. Shared by every player ship. */
-export type ShipKitId = 'surveyor' | 'hauler';
+export type ShipKitId = 'scout' | 'hauler';
 
 /** Hauler v1 utility slot. Same E key; one option active. */
 export type HaulerUtilityId = 'resource_tap' | 'tow_cable' | 'boost_coupling';
 
-/** Surveyor v1 utility slot. Same E key; one option active. */
-export type SurveyorUtilityId = 'mineral_scan' | 'survey_probe';
+/** Scout v1 utility slot. Same E key; one option active. */
+export type ScoutUtilityId = 'mineral_scan' | 'survey_probe';
 
 export interface AbilityUsedEvent {
   id: string;
@@ -172,7 +172,7 @@ export type AsteroidBoost =
   | { phase: 'armed'; ownerId: string; angle: number; couplings?: string[] }
   | { phase: 'burning'; ownerId: string; angle: number; couplings?: string[] };
 
-/** Transient Surveyor hardware attached to one asteroid face. */
+/** Transient Scout hardware attached to one asteroid face. */
 export interface AsteroidProbe {
   id: string;
   ownerId: string;
@@ -217,7 +217,9 @@ export interface AsteroidData {
 }
 
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
-export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk';
+export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
+
+export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk' | EquipmentId;
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -293,16 +295,18 @@ export interface ShockwaveEvent {
   asteroidId?: string;
 }
 
-/** A street furnace a Surveyor lit with their own score. */
+/** A street furnace a Scout lit with their own score. */
 export interface CivicModule {
   id: string;
   builderName: string;
-  /** Public pilot id of the Surveyor who paid. Absent on older unnamed streets. */
+  /** Public pilot id of the Scout who paid. Absent on older unnamed streets. */
   builderId?: string;
 }
 
 export interface ServerGameState {
-  /** Street furnaces the crew has lit, named for the Surveyor who paid. */
+  /** Epoch milliseconds for client animation clocks. */
+  serverTime?: number;
+  /** Street furnaces the crew has lit, named for the Scout who paid. */
   civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
@@ -351,9 +355,19 @@ export interface ShipBoostState {
   charge: number;
 }
 
+export interface FurnaceTransit {
+  sourceId: string;
+  destinationId: string;
+  startedAt: number;
+  durationMs: number;
+}
+
 export interface ServerEntityData {
+  furnaceTransit?: FurnaceTransit | null;
   /** Stored spider silk, retained across flights. */
   silk?: number;
+  /** Salvaged tools owned by this pilot, retained across flights. */
+  equipment?: EquipmentId[];
   id: string;
   name: string;
   type: 'player';
@@ -381,8 +395,8 @@ export interface ServerEntityData {
   harpoonLatchPos?: Position;
   /** Equipped Hauler utility. Omitted on other kits. Missing means tow cable. */
   haulerUtility?: HaulerUtilityId;
-  /** Equipped Surveyor utility. Omitted on other kits. Missing means mineral scan. */
-  surveyorUtility?: SurveyorUtilityId;
+  /** Equipped Scout utility. Omitted on other kits. Missing means mineral scan. */
+  scoutUtility?: ScoutUtilityId;
   /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Hangar bake. Topology: delta-wing. Source: src/entities/ship/hullOutlines.ts -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="surveyor delta-wing">
-  <title>surveyor — delta-wing</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="scout delta-wing">
+  <title>scout — delta-wing</title>
   <rect width="64" height="64" fill="#000011"/>
   <g fill="none" stroke="#5EEAD4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
     <path d="M31.65 18.88 L32.8 19.32 L32.59 20.87 L36.79 20.94 L35.8 23.62 L33.27 25.24 L33.2 25.78 L34.96 28.08 L35.87 30.31 L37.49 30.54 L39.33 33.01 L42.03 33.69 L44.63 33.39 L55.15 28.99 L57.38 26.79 L56.77 24.32 L57.47 23.62 L58.46 23.71 L59 24.56 L58.32 25.85 L58.69 30 L57.99 30.92 L56.77 31.32 L40.71 44.44 L39.87 44.28 L39.72 42.75 L37.8 41.23 L35.73 40.38 L34.72 40.38 L34.04 40.99 L34.35 44.14 L33.64 45.12 L30.12 44.98 L29.58 44.14 L29.58 41.53 L29.96 40.99 L29.21 40.38 L26.13 41.23 L24.04 42.99 L24.04 44.28 L23.2 44.44 L6.76 30.99 L5.68 30.61 L5.23 30 L5.61 25.78 L5 25.24 L5 24.25 L5.68 23.62 L7 24.02 L7.16 25.17 L6.53 25.85 L6.53 26.79 L8.62 28.92 L19.3 33.39 L22.75 33.62 L24.67 32.92 L26.37 30.61 L27.96 30.38 L29.04 28.01 L30.19 26.93 L30.8 25.31 L28.13 23.62 L27.12 20.94 L31.41 20.87 L31.11 19.49 Z"/>

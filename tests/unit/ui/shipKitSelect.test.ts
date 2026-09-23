@@ -8,16 +8,16 @@ import {
 } from '../../../src/ui/shipKitSelect';
 
 beforeEach(() => {
-  setSelectedShipKitId('surveyor');
+  setSelectedShipKitId('scout');
   mountShipKitSelect();
 });
 
-test('kit picker lists the two kits and selects Surveyor by default', () => {
+test('kit picker lists the two kits and selects Scout by default', () => {
   const buttons = [...document.querySelectorAll<HTMLButtonElement>('#ship-kit-grid [data-kit-id]')];
   expect(buttons.map((button) => button.dataset['kitId'])).toEqual(
     listShipKits().map((kit) => kit.id)
   );
-  expect(getSelectedShipKitId()).toBe('surveyor');
+  expect(getSelectedShipKitId()).toBe('scout');
   expect(buttons[0]?.classList.contains('is-selected')).toBe(true);
   expect(buttons.every((button) => button.querySelector('svg.ship-kit-silhouette'))).toBe(true);
 });
@@ -30,7 +30,7 @@ test('clicking Hauler stores that kit for join', () => {
   expect(hauler.getAttribute('aria-pressed')).toBe('true');
 });
 
-test('Hauler selection survives a remount so join is not stuck on Surveyor', () => {
+test('Hauler selection survives a remount so join is not stuck on Scout', () => {
   const hauler = document.querySelector<HTMLButtonElement>('[data-kit-id="hauler"]');
   assert.ok(hauler);
   hauler.click();

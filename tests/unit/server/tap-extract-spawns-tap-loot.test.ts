@@ -41,6 +41,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
     world.clearAsteroids();
     addRock();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    world.entity(alice).equipment = ['resource_tap'];
     world.send(alice, {
       type: 'setHaulerUtility',
       id: alice.id,
@@ -108,6 +109,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
     world.clearAsteroids();
     addRock();
     alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+    world.entity(alice).equipment = ['resource_tap'];
     world.send(alice, {
       type: 'setHaulerUtility',
       id: alice.id,
@@ -135,6 +137,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
       world.clearAsteroids();
       addRock();
       alice = world.join('Alice', { x: 0, y: 0 }, { kitId: 'hauler' });
+      world.entity(alice).equipment = ['resource_tap'];
       world.send(alice, {
         type: 'setHaulerUtility',
         id: alice.id,

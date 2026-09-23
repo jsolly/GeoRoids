@@ -1,3 +1,4 @@
+import { isEquipmentId } from '../../../shared/equipment';
 import { validExploration } from '../../../shared/exploration';
 import { releaseField } from '../../../shared/releaseId';
 import {
@@ -55,11 +56,10 @@ import { PlayerManager } from '../../entities/player/PlayerManager';
 import { recordAsteroidLatch } from '../../entities/roid/roidRenderer';
 import { SatellitePickupManager } from '../../entities/satellitePickup/SatellitePickupManager';
 import { findHarpoonFieldBody, setHoldEmptyHarpoonField } from '../../entities/ship/harpoonField';
-import { preferredHaulerUtility } from '../../entities/ship/haulerUtility';
-import { setSurveyorUtilityOnHost } from '../../entities/ship/shipAbilities';
+import { scoutUtilityOf } from '../../entities/ship/scoutUtility';
+import { setScoutUtilityOnHost } from '../../entities/ship/shipAbilities';
 import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entities/ship/shipKits';
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
-import { preferredSurveyorUtility, surveyorUtilityOf } from '../../entities/ship/surveyorUtility';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
@@ -153,7 +153,8 @@ function isLootKind(value: unknown): value is LootKind {
     value === 'wreckage' ||
     value === 'laserCore' ||
     value === 'tap' ||
-    value === 'silk'
+    value === 'silk' ||
+    isEquipmentId(value)
   );
 }
 
@@ -562,6 +563,7 @@ export class ConnectionManager {
     if (localShip) {
       localShip.serverOwnsMotion = false;
       delete localShip.playerMotion;
+      localShip.furnaceTransit = null;
       delete localShip.laserUpgrade;
     }
 
@@ -806,7 +808,7 @@ export class ConnectionManager {
       return;
     }
     const ship = PlayerManager.getInstance().getLocalShip();
-    if (!ship) {
+    if (!ship || ship.furnaceTransit) {
       return;
     }
     const pose = this.motionReconciliation.buildHandoffPose(ship);
@@ -1078,6 +1080,9 @@ export class ConnectionManager {
         if (typeof data === 'string') {
           GameStateManager.getInstance().setNotice(data);
         }
+        break;
+      case 'furnaceTravelResult':
+        window.dispatchEvent(new CustomEvent('furnaceTravelResult', { detail: data }));
         break;
       case 'townStoreResult':
         window.dispatchEvent(new CustomEvent('townStoreResult', { detail: data }));
@@ -1406,24 +1411,24 @@ export class ConnectionManager {
         }
         const snapshotUtility =
           entity.type === 'local'
-            ? surveyorUtilityOf(entity.ship)
-            : (entityData.surveyorUtility ?? surveyorUtilityOf(entity.ship));
-        const surveyorToolSelected =
-          entity.ship.kitId === 'surveyor' && snapshotUtility !== 'mineral_scan';
+            ? scoutUtilityOf(entity.ship)
+            : (entityData.scoutUtility ?? scoutUtilityOf(entity.ship));
+        const scoutToolSelected =
+          entity.ship.kitId === 'scout' && snapshotUtility !== 'mineral_scan';
         const serverCooldown = entityData.abilityCooldownFrames ?? 0;
         // Mineral Scan predicts its cooldown on send. A snapshot that still
         // reads 0 must not clear that timer before the server echo. Failed
         // probe launches and furnace builds stay at 0 and remain usable.
         if (
           entity.type !== 'local' ||
-          entity.ship.kitId !== 'surveyor' ||
-          surveyorToolSelected ||
+          entity.ship.kitId !== 'scout' ||
+          scoutToolSelected ||
           serverCooldown > 0 ||
           entity.ship.abilityCooldownFrames <= 0
         ) {
           entity.ship.abilityCooldownFrames = serverCooldown;
         }
-        entity.ship.abilityActiveFrames = surveyorToolSelected
+        entity.ship.abilityActiveFrames = scoutToolSelected
           ? 0
           : (entityData.abilityActiveFrames ?? 0);
         if (entityData.laserUpgrade) {
@@ -1434,6 +1439,9 @@ export class ConnectionManager {
 
         if (!entityData.deathCause && !entityData.exploding && entityData.health > 0) {
           delete entity.deathCause;
+        }
+        if (data.serverTime !== undefined) {
+          entity.ship.furnaceClockOffsetMs = data.serverTime - Date.now();
         }
         entity.updateFromServer(entityData);
         if (isLocalPlayer) {
@@ -1674,7 +1682,7 @@ export class ConnectionManager {
         applyShipKitToShip(localPlayer.ship, authoritativeKit);
       }
       if (localPlayer.ship.kitId === 'hauler') {
-        const utility = preferredHaulerUtility();
+        const utility = 'tow_cable';
         localPlayer.ship.haulerUtility = utility;
         this.sendMessage({
           type: 'setHaulerUtility',
@@ -1682,11 +1690,11 @@ export class ConnectionManager {
           data: { utilityId: utility },
         });
       }
-      if (localPlayer.ship.kitId === 'surveyor') {
-        const utility = preferredSurveyorUtility();
-        setSurveyorUtilityOnHost(localPlayer.ship, utility);
+      if (localPlayer.ship.kitId === 'scout') {
+        const utility = 'mineral_scan';
+        setScoutUtilityOnHost(localPlayer.ship, utility);
         this.sendMessage({
-          type: 'setSurveyorUtility',
+          type: 'setScoutUtility',
           id: localPlayer.id,
           data: { utilityId: utility },
         });

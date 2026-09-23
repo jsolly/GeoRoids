@@ -3,7 +3,7 @@ import { EMPTY_EXPLORATION } from '../../../shared/exploration';
 import type { AsteroidMaterial, ServerGameSnapshot, ShipKitId } from '../../../shared-types';
 
 export function snapshotFixture(tick = 0): ServerGameSnapshot {
-  const kits: ShipKitId[] = ['surveyor', 'hauler'];
+  const kits: ShipKitId[] = ['scout', 'hauler'];
   const materials: AsteroidMaterial[] = ['ice', 'metal', 'rubble'];
   return {
     exploration: EMPTY_EXPLORATION,

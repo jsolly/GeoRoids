@@ -1,9 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { SHIP_ABILITY } from '../../../src/entities/ship/shipKits';
 import {
-  drawSurveyorScanFx,
-  type SurveyorScanVisualHost,
-  surveyorScanPulseGeometry,
+  drawScoutScanFx,
+  type ScoutScanVisualHost,
+  scoutScanPulseGeometry,
 } from '../../../src/entities/ship/shipRenderer';
 
 afterEach(() => {
@@ -14,25 +14,25 @@ function radarContext(): CanvasRenderingContext2D {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) {
-    throw new Error('Surveyor radar scenarios require a canvas context');
+    throw new Error('Scout radar scenarios require a canvas context');
   }
   return context;
 }
 
-function surveyorHost(): SurveyorScanVisualHost {
+function scoutHost(): ScoutScanVisualHost {
   return {
-    kitId: 'surveyor',
+    kitId: 'scout',
     abilityActiveFrames: SHIP_ABILITY.SCAN_FRAMES,
     health: 100,
     exploding: false,
   };
 }
 
-test('an active Surveyor pulse starts at the hull and reaches the farthest desktop corner', () => {
+test('an active Scout pulse starts at the hull and reaches the farthest desktop corner', () => {
   const viewport = { width: 800, height: 600 };
-  const start = surveyorScanPulseGeometry(0, 400, 300, 24, SHIP_ABILITY.SCAN_FRAMES, viewport);
-  const midpoint = surveyorScanPulseGeometry(0, 400, 300, 24, 300, viewport);
-  const edge = surveyorScanPulseGeometry(0, 400, 300, 24, 241, viewport);
+  const start = scoutScanPulseGeometry(0, 400, 300, 24, SHIP_ABILITY.SCAN_FRAMES, viewport);
+  const midpoint = scoutScanPulseGeometry(0, 400, 300, 24, 300, viewport);
+  const edge = scoutScanPulseGeometry(0, 400, 300, 24, 241, viewport);
 
   expect(start?.radius).toBe(24);
   expect(start?.alpha).toBeGreaterThan(0);
@@ -40,23 +40,23 @@ test('an active Surveyor pulse starts at the hull and reaches the farthest deskt
   expect(midpoint?.alpha).toBeCloseTo(start?.alpha ?? 0);
   expect(edge?.radius).toBeGreaterThan(Math.hypot(400, 300) * 1.08);
   expect(edge?.alpha).toBeGreaterThan(0);
-  expect(surveyorScanPulseGeometry(0, 400, 300, 24, 240, viewport)).toBeUndefined();
-  expect(surveyorScanPulseGeometry(1, 400, 300, 24, 240, viewport)?.radius).toBeCloseTo(24);
+  expect(scoutScanPulseGeometry(0, 400, 300, 24, 240, viewport)).toBeUndefined();
+  expect(scoutScanPulseGeometry(1, 400, 300, 24, 240, viewport)?.radius).toBeCloseTo(24);
 });
 
 test('the final mobile pulse uses viewport pixels and fades without leaving a later pulse', () => {
   const viewport = { width: 390, height: 844 };
-  const edge = surveyorScanPulseGeometry(2, 195, 422, 24, 1, viewport);
+  const edge = scoutScanPulseGeometry(2, 195, 422, 24, 1, viewport);
 
   expect(edge?.radius).toBeGreaterThan(Math.hypot(195, 422) * 1.08);
   expect(edge?.alpha).toBeGreaterThan(0);
   expect(edge?.alpha).toBeLessThan(0.02);
-  expect(surveyorScanPulseGeometry(0, 195, 422, 24, 0, viewport)).toBeUndefined();
-  expect(surveyorScanPulseGeometry(1, 195, 422, 24, 0, viewport)).toBeUndefined();
-  expect(surveyorScanPulseGeometry(2, 195, 422, 24, 0, viewport)).toBeUndefined();
+  expect(scoutScanPulseGeometry(0, 195, 422, 24, 0, viewport)).toBeUndefined();
+  expect(scoutScanPulseGeometry(1, 195, 422, 24, 0, viewport)).toBeUndefined();
+  expect(scoutScanPulseGeometry(2, 195, 422, 24, 0, viewport)).toBeUndefined();
 });
 
-test('only a living active Surveyor paints the cyan sweep', () => {
+test('only a living active Scout paints the cyan sweep', () => {
   const context = radarContext();
   const arcs: number[] = [];
   const strokes: string[] = [];
@@ -71,8 +71,8 @@ test('only a living active Surveyor paints the cyan sweep', () => {
     stroke();
   });
 
-  const host = surveyorHost();
-  drawSurveyorScanFx(context, host, 400, 300, 24, { width: 800, height: 600 });
+  const host = scoutHost();
+  drawScoutScanFx(context, host, 400, 300, 24, { width: 800, height: 600 });
   expect(arcs).toHaveLength(1);
   expect(arcs[0]).toBe(24);
   expect(strokes).toHaveLength(1);
@@ -80,16 +80,16 @@ test('only a living active Surveyor paints the cyan sweep', () => {
 
   arcs.length = 0;
   strokes.length = 0;
-  drawSurveyorScanFx(context, { ...host, kitId: 'hauler' }, 400, 300, 24, {
+  drawScoutScanFx(context, { ...host, kitId: 'hauler' }, 400, 300, 24, {
     width: 800,
     height: 600,
   });
-  drawSurveyorScanFx(context, { ...host, abilityActiveFrames: 0 }, 400, 300, 24, {
+  drawScoutScanFx(context, { ...host, abilityActiveFrames: 0 }, 400, 300, 24, {
     width: 800,
     height: 600,
   });
-  drawSurveyorScanFx(context, { ...host, health: 0 }, 400, 300, 24, { width: 800, height: 600 });
-  drawSurveyorScanFx(context, { ...host, exploding: true }, 400, 300, 24, {
+  drawScoutScanFx(context, { ...host, health: 0 }, 400, 300, 24, { width: 800, height: 600 });
+  drawScoutScanFx(context, { ...host, exploding: true }, 400, 300, 24, {
     width: 800,
     height: 600,
   });

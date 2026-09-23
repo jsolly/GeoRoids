@@ -25,13 +25,13 @@ export type AsteroidHitOutcome = {
   newAsteroids: AsteroidData[];
   split: boolean;
   expiresAt?: number;
-  /** Laser miners and Surveyors credited for this destruction. */
+  /** Laser miners and Scouts credited for this destruction. */
   contributors?: string[];
 };
 
 export type ExpiredCollabHit = {
   playerId: string;
-  /** Every laser miner and Surveyor credited for the destroyed deposit. */
+  /** Every laser miner and Scout credited for the destroyed deposit. */
   contributors: string[];
   points: number;
   destroyed: AsteroidData;

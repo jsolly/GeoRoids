@@ -2,7 +2,7 @@
 
 The source pack was recovered from Game Director on September 7, 2026. Its ZIP SHA-256 is `33ba9fd279504d8862fadb3bc7b5add13a4abf8f2a4fc32ea2a36dfd47c01bb2`. Review screenshots and v1 drafts are historical references; the original v2 contact and play-scale PNGs are archived source references.
 
-Current direction lives in `style-guide.md`, `ship-world-palette.md`, `cooperative-ships.md`, and `eo-satellites/roster-and-briefs.md`. The existing repository's ship implementation notes take precedence over the older source pack's contradictory optional-Hook and temporary-saucer language. There are exactly two player kits, Surveyor and Hauler.
+Current direction lives in `style-guide.md`, `ship-world-palette.md`, `cooperative-ships.md`, and `eo-satellites/roster-and-briefs.md`. The existing repository's ship implementation notes take precedence over the older source pack's contradictory optional-Hook and temporary-saucer language. There are exactly two player kits, Scout and Hauler.
 
 `src/entities/ship/hullOutlines.ts` traces the hangar yoke and delta-wing
 drawings. The two `ships-v2/*.svg` files and the runtime use those contours.

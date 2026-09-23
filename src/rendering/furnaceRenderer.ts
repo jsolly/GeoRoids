@@ -643,7 +643,7 @@ export function drawFurnacePipes(viewerPosition: Position, now = performance.now
   ctx.restore();
 }
 
-/** Dark street lots. A dashed ring with no flame until a Surveyor builds it. */
+/** Dark street lots. A dashed ring with no flame until a Scout builds it. */
 export function drawStreetFoundations(viewerPosition: Position): void {
   const ctx = canvasManager.getContext();
   const cvs = canvasManager.getCanvas();

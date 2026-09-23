@@ -3,8 +3,8 @@ import { getStoredItem, setStoredItem } from '../../utils/safeStorage';
 
 export const HAULER_UTILITY_IDS = ['tow_cable', 'resource_tap', 'boost_coupling'] as const;
 
-/** New Hauler flights start on Resource Tap. */
-export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'resource_tap';
+/** New Hauler flights start with the freely available Tow Cable. */
+export const PREFERRED_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 /** Missing snapshot / legacy host keeps the existing tow cable. */
 export const UNSET_HAULER_UTILITY: HaulerUtilityId = 'tow_cable';
 

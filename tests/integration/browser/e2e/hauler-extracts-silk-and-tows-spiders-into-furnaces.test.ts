@@ -25,9 +25,9 @@ for (const width of [1280, 390]) {
     const game = new GameInteractions(page);
     await game.bootGame({
       kitId: 'hauler',
-      haulerUtility: 'resource_tap',
       waitForCombatReady: false,
     });
+    await game.collectEquipment(['resource_tap'], 'resource_tap');
     const id = await game.getLocalPlayerId();
     const use = () => (mobile ? page.locator('#touch-ability').tap() : page.keyboard.press('e'));
     const open = async () => {

@@ -30,8 +30,8 @@ Asteroid impacts remove health; the outer wall and a spider bite each kill a vul
 
 ## Lives and respawn
 
-Death costs one life and respawns you near the nearest lit furnace with restored health and brief protection. Score survives, but growth and upgrades reset; dark foundations are not respawn sites. Losing your last life ends the flight, and starting again resets score.
+You start with five lives; death costs one and respawns you near the nearest lit furnace with restored health and brief protection. Ordinary deaths keep score, salvaged tools, silk, and paint but reset growth and upgrades. Losing your last life clears that personal progress; starting again gives you five lives, starter tools, and zero score.
 
 ## Recovery
 
-Health regenerates after a delay without damage. Spend score on extra lives at the [Town Square store](/wiki/#controls).
+Health regenerates after a delay without damage. Buy extra lives for 250 score each at [Town Square](/wiki/#controls), up to six lives.

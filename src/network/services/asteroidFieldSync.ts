@@ -206,6 +206,7 @@ export interface AsteroidKinematicTarget {
   r: number;
   isCollabTarget?: boolean;
   material?: AsteroidMaterial;
+  ore?: AsteroidMaterial | null;
   offsets?: number[];
   vertices?: number;
   jaggedness?: number;
@@ -247,6 +248,11 @@ export function applyAsteroidKinematics(
       delete roid.material;
     }
     roid.isCollabTarget = updates.isCollabTarget ?? false;
+    if (updates.ore !== undefined) {
+      roid.ore = updates.ore;
+    } else {
+      delete roid.ore;
+    }
     if (updates.surveyedBy) {
       roid.surveyedBy = [...updates.surveyedBy];
     } else {

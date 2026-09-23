@@ -55,7 +55,7 @@ test.each(['dead', 'exploding', 'schematic'])(
   'right click cannot start boost while the pilot is %s',
   (state) => {
     if (state === 'dead') {
-      player.lives = 0;
+      player.ship.health = 0;
     }
     if (state === 'exploding') {
       player.ship.exploding = true;

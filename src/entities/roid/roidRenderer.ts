@@ -1,4 +1,5 @@
 import { isColossalAsteroid } from '../../../shared/asteroidScale';
+import { oreResource, oreYield } from '../../../shared/economy';
 import type { AsteroidMaterial } from '../../../shared-types';
 import { PALETTE, ROID, VISUAL } from '../../constants';
 import type { Ship } from '../../entities/ship/Ship';
@@ -380,6 +381,19 @@ export function drawRoidsRelative(ship: Ship, roids: Roid[]): void {
         roid.angle,
         roid.health / roid.maxHealth
       );
+    }
+    if (roid.surveyedBy?.length) {
+      const resource = oreResource(roid);
+      ctx.save();
+      ctx.font = '11px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = resource ? '#B7EFDD' : '#94A3B8';
+      ctx.fillText(
+        resource ? `${resource.toUpperCase()} · ${oreYield({ size: roid.r })} ore` : 'BARREN',
+        screenPos.x,
+        screenPos.y + r + 16
+      );
+      ctx.restore();
     }
     drawRoidInteractionCues(ctx, roid, r, screenPos.x, screenPos.y);
     drawAsteroidBoost(ctx, roid, screenPos.x, screenPos.y, r);

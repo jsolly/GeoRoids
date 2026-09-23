@@ -71,7 +71,7 @@ test(
     ]);
     await Promise.all([impactedPilot.waitForRemotePlayers(1), collector.waitForRemotePlayers(1)]);
 
-    const livesBefore = await impactedPilot.getLives();
+    const healthBefore = await impactedPilot.getShipHealth();
     const scoreBefore = await collector.getScore();
     const knownLoot = new Set((await collector.getLoot()).map((drop) => drop.id));
     damageMessages.length = 0;
@@ -81,11 +81,11 @@ test(
     await arrangeCrewField([impactedPilotId, collectorId], 'impact');
 
     await expect
-      .poll(() => impactedPilot.getLives(), {
+      .poll(() => impactedPilot.getShipHealth(), {
         timeout: 8000,
         message: 'the fixture asteroid should cost the impacted pilot one life',
       })
-      .toBeLessThan(livesBefore);
+      .toBeLessThan(healthBefore);
 
     await expect
       .poll(

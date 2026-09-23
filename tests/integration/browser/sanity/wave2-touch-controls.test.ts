@@ -415,7 +415,6 @@ test(
     await page.setViewportSize({ width: 390, height: 844 });
     const game = new GameInteractions(page);
     await game.bootGame();
-    const livesBefore = await game.getLives();
     const stick = await centerOf(page, '#gameCanvas');
     const firePoint = await canvasPoint(page, 0.75, 0.5);
     const session = await page.context().newCDPSession(page);
@@ -458,9 +457,9 @@ test(
         canShoot: true,
         abilityDisabled: 'true',
       });
-      // Local death disables controls before the server confirms the lost life.
+      // Local death disables controls before the server confirms destruction.
       // dieOnceViaBoundary waits for that confirmation and the respawn placement.
-      expect(await game.getLives()).toBe(livesBefore - 1);
+      expect(await game.getShipHealth()).toBe(await game.getShipMaxHealth());
       await page.waitForFunction(() => {
         const player = window.gameController?.getCurrPlayer();
         return player && !player.ship.exploding && player.ship.health > 0 && player.ship.thrusting;

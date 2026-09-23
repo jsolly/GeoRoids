@@ -37,7 +37,7 @@ export function buildClientDiagnostics(): string {
           position: ship.position,
           velocity: ship.velocity,
           health: ship.health,
-          lives: player?.lives,
+
           exploding: ship.exploding,
           thrusting: ship.thrusting,
           movementLocked: ship.movementLocked,

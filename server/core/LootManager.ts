@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { cargoCapacity, ECONOMY } from '../../shared/economy';
 import { EQUIPMENT_DROPS, EQUIPMENT_IDS, isEquipmentId } from '../../shared/equipment';
 import {
   addLootMagnetPull,
@@ -6,7 +8,7 @@ import {
   lootOverlap,
   planKillLoot,
 } from '../../shared/shipGrowth';
-import type { EquipmentId, LootData, Position, Velocity } from '../../shared-types';
+import type { EquipmentId, LootData, Position, SavedPointLoot, Velocity } from '../../shared-types';
 import { hullRadiusForKit } from '../../src/entities/ship/shipKits';
 import type { GameEntity } from './EntityManager';
 import type { RNGService } from './RNGService';
@@ -19,6 +21,7 @@ interface TrackedLoot extends LootData {
 }
 
 export class LootManager {
+  public pointRevision = 0;
   private loot = new Map<string, TrackedLoot>();
   private nextId = 1;
   private rng: RNGService;
@@ -66,6 +69,53 @@ export class LootManager {
     this.loot.set(drop.id, drop);
     this.enforceCap();
     return this.toPublic(drop);
+  }
+
+  public spawnPoints(position: Position, points: number): void {
+    if (points <= 0) {
+      return;
+    }
+    const drop: TrackedLoot = {
+      id: `points-${randomUUID()}`,
+      position: { ...position },
+      points,
+      mass: 0,
+      radius: GROWTH.LOOT_RADIUS + 2,
+      kind: 'points',
+      expiresAt: Date.now() + (ECONOMY.deathLootFrames / 60) * 1000,
+      velocity: { x: 0, y: 0 },
+    };
+    this.loot.set(drop.id, drop);
+    this.pointRevision++;
+    this.enforceCap();
+  }
+
+  public savedPoints(): SavedPointLoot[] {
+    return [...this.loot.values()]
+      .filter((drop) => drop.kind === 'points' && drop.expiresAt > Date.now())
+      .map((drop) => ({
+        id: drop.id,
+        position: { ...drop.position },
+        points: drop.points ?? 0,
+        expiresAt: drop.expiresAt,
+      }));
+  }
+
+  public restorePoints(drops: SavedPointLoot[]): void {
+    for (const drop of drops) {
+      if (drop.expiresAt <= Date.now()) {
+        continue;
+      }
+      this.loot.set(drop.id, {
+        ...drop,
+        position: { ...drop.position },
+        kind: 'points',
+        mass: 0,
+        radius: GROWTH.LOOT_RADIUS + 2,
+        velocity: { x: 0, y: 0 },
+      });
+    }
+    this.pointRevision++;
   }
 
   public get(lootId: string): LootData | undefined {
@@ -173,6 +223,9 @@ export class LootManager {
       return undefined;
     }
     this.loot.delete(lootId);
+    if (drop.kind === 'points') {
+      this.pointRevision++;
+    }
     return this.toPublic(drop);
   }
 
@@ -186,6 +239,11 @@ export class LootManager {
     const drops = [...this.loot.values()].sort((a, b) => a.id.localeCompare(b.id));
     for (const drop of drops) {
       if ((drop.ejectFramesLeft ?? 0) > 0) {
+        continue;
+      }
+      if (drop.kind === 'points' && drop.expiresAt <= Date.now()) {
+        this.loot.delete(drop.id);
+        this.pointRevision++;
         continue;
       }
       const winner = collectors.find((entity) => {
@@ -210,6 +268,10 @@ export class LootManager {
         const claimed = claimedEquipment.get(winner.id) ?? new Set<EquipmentId>();
         claimed.add(drop.kind);
         claimedEquipment.set(winner.id, claimed);
+      }
+      if (drop.kind === 'points') {
+        winner.cargo = Math.min(cargoCapacity(winner.kitId), winner.cargo + (drop.points ?? 0));
+        this.pointRevision++;
       }
       this.loot.delete(drop.id);
       collected.push({ collector: winner, loot: this.toPublic(drop) });
@@ -248,7 +310,13 @@ export class LootManager {
       drop.position.y += drop.velocity.y;
       drop.velocity.x *= GROWTH.LOOT_DRAG;
       drop.velocity.y *= GROWTH.LOOT_DRAG;
-      if (gameTime >= drop.expiresAt) {
+      if (
+        drop.kind === 'points' &&
+        (drop.velocity.x !== 0 || drop.velocity.y !== 0 || Date.now() >= drop.expiresAt)
+      ) {
+        this.pointRevision++;
+      }
+      if ((drop.kind === 'points' ? Date.now() : gameTime) >= drop.expiresAt) {
         this.loot.delete(id);
       }
     }
@@ -273,6 +341,7 @@ export class LootManager {
 
   public clear(): void {
     this.loot.clear();
+    this.pointRevision++;
   }
 
   private createPellet(origin: Position, mass: number, gameTime: number): TrackedLoot {
@@ -293,15 +362,19 @@ export class LootManager {
   }
 
   private enforceCap(): void {
-    if (this.loot.size <= GROWTH.MAX_LOOT) {
+    const disposable = [...this.loot.values()].filter((drop) => drop.kind !== 'points');
+    if (disposable.length <= GROWTH.MAX_LOOT) {
       return;
     }
-    const oldest = [...this.loot.values()];
-    const overflow = this.loot.size - GROWTH.MAX_LOOT;
+    const oldest = disposable;
+    const overflow = disposable.length - GROWTH.MAX_LOOT;
     for (let i = 0; i < overflow; i++) {
       const drop = oldest[i];
       if (drop) {
         this.loot.delete(drop.id);
+        if (drop.kind === 'points') {
+          this.pointRevision++;
+        }
       }
     }
   }
@@ -313,6 +386,7 @@ export class LootManager {
       mass: drop.mass,
       radius: drop.radius,
       kind: drop.kind,
+      ...(drop.points !== undefined ? { points: drop.points } : {}),
     };
 
     return publicDrop;

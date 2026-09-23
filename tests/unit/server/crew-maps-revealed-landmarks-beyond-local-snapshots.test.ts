@@ -14,10 +14,10 @@ import type { LootData } from '../../../shared-types';
 import { decodeSnapshotMessage } from '../../support/decodeSnapshotMessage';
 import { RecordingSocket } from '../../support/recordingSocket';
 
-test('the global map shares the street plan while each pilot receives only nearby asteroid geometry', () => {
+test('the global map shares the furnace plan while each pilot receives only nearby asteroid geometry', () => {
   const distantLot = CIVIC_LOTS.find((lot) => lot.ring === 3);
   if (!distantLot) {
-    throw new Error('Expected an outer street lot');
+    throw new Error('Expected an outer furnace lot');
   }
   const distant = distantLot.position;
   const engine = new GameEngine(82);

@@ -132,8 +132,7 @@ export class PlayerMotionService {
       actor.health > 0 &&
       Number.isFinite(actor.health) &&
       !actor.exploding &&
-      actor.respawnTimer === undefined &&
-      actor.lives > 0
+      actor.respawnTimer === undefined
     );
   }
 

@@ -64,7 +64,6 @@ test.each(['ArrowUp', 'KeyW', 'KeyZ'])(
 );
 
 test('a dead pilot cannot restart thrust, turn, or fire', () => {
-  player.lives = 0;
   reconcilePlayerInput(player);
   const shoot = vi.spyOn(player.ship, 'shoot');
   press('ArrowLeft');

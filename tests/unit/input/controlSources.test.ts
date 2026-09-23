@@ -89,7 +89,7 @@ test('firing touch shoots once and re-arms on release', () => {
 });
 
 test('dead player cannot fire from touch input', () => {
-  player.lives = 0;
+  player.ship.health = 0;
   const shoot = vi.spyOn(player.ship, 'shoot');
   setTouchFire(player, true);
   expect(shoot).not.toHaveBeenCalled();

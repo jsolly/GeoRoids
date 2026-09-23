@@ -43,7 +43,7 @@ test(
     ).toBeNull();
 
     const beforeHealth = await teammate.getShipHealth();
-    const beforeLives = await teammate.getLives();
+    const beforeLives = await teammate.getShipHealth();
     const beforeShooterScore = await shooter.getScore();
     const beforeTeammateScore = await teammate.getScore();
     const field = await shooterPage.evaluateHandle<AuthoritativeProjectileField>(
@@ -75,7 +75,7 @@ test(
     await field.dispose();
 
     expect(await teammate.getShipHealth()).toBe(beforeHealth);
-    expect(await teammate.getLives()).toBe(beforeLives);
+    expect(await teammate.getShipHealth()).toBe(beforeLives);
     expect(await shooter.getScore()).toBe(beforeShooterScore);
     expect(await teammate.getScore()).toBe(beforeTeammateScore);
     expect(await shooter.getPlayerHealthById(teammateId)).toBe(beforeHealth);
@@ -92,7 +92,7 @@ test(
       .toBeGreaterThan(frame + 3);
     expect(await shooter.getShipHealth()).toBeGreaterThan(0);
     expect(await teammate.getShipHealth()).toBe(beforeHealth);
-    expect(await teammate.getLives()).toBe(beforeLives);
+    expect(await teammate.getShipHealth()).toBe(beforeLives);
     expect(await shooter.getScore()).toBe(beforeShooterScore);
     expect(await teammate.getScore()).toBe(beforeTeammateScore);
     assertNoBrowserDiagnostics(shooterDiagnostics);

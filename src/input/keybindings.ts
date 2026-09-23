@@ -33,7 +33,7 @@ export function getPressedKeysForPlayer(player: Player): Set<string> {
 
 /** The live local ship cruises regardless of which controls are held. */
 function updateCruise(player: Player): void {
-  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
+  const alive = player.ship.health > 0 && !player.ship.exploding;
   player.ship.thrusting = alive && !player.ship.movementLocked;
   if (!alive) {
     player.ship.stopBoost();
@@ -49,12 +49,7 @@ function turnSpeedForShip(player: Player): number {
 }
 
 function updateTurnFromKeys(player: Player): void {
-  if (
-    player.ship.movementLocked ||
-    player.lives <= 0 ||
-    player.ship.health <= 0 ||
-    player.ship.exploding
-  ) {
+  if (player.ship.movementLocked || player.ship.health <= 0 || player.ship.exploding) {
     player.ship.angularVelocity = 0;
     return;
   }
@@ -88,11 +83,10 @@ export function reconcilePlayerInput(player: Player): void {
 export function keyDown(ev: KeyboardEvent, player: Player): void {
   logger.debug('KEYBINDINGS', 'KeyDown called', {
     key: ev.code,
-    playerLives: player.lives,
     shipExploding: player.ship.exploding,
   });
 
-  if (player.lives > 0 && !player.ship.exploding) {
+  if (player.ship.health > 0 && !player.ship.exploding) {
     if (ev.code in keys) {
       keys[ev.code] = true;
     }
@@ -133,7 +127,6 @@ export function keyDown(ev: KeyboardEvent, player: Player): void {
 export function keyUp(ev: KeyboardEvent, player: Player): void {
   logger.debug('KEYBINDINGS', 'KeyUp called', {
     key: ev.code,
-    playerLives: player.lives,
     shipExploding: player.ship.exploding,
   });
 
@@ -158,7 +151,7 @@ export function keyUp(ev: KeyboardEvent, player: Player): void {
   }
 
   // Reconcile cruise/turn from the remaining held keys. Done regardless of
-  // lives/exploding so releasing a key never leaves a dead ship stuck
+  // health/exploding so releasing a key never leaves a dead ship stuck
   // thrusting or spinning. Both arrows and WASD funnel through the same
   // aggregate helpers.
   switch (ev.code) {

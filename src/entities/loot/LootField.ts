@@ -3,6 +3,7 @@ import type { LootData, LootKind, Position } from '../../../shared-types';
 
 function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
   if (
+    kind === 'points' ||
     kind === 'shard' ||
     kind === 'laserCore' ||
     kind === 'tap' ||
@@ -34,6 +35,7 @@ export class LootField {
       mass: drop.mass,
       radius: drop.radius,
       kind: normalizeKind(drop.kind),
+      ...(drop.points !== undefined ? { points: drop.points } : {}),
     }));
   }
 

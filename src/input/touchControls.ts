@@ -25,7 +25,7 @@ let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
-let abilityTravelClick = false;
+let pendingAbilityClick: 'store' | 'ability' | null = null;
 let boostPointerId: number | null = null;
 let abilityButton: HTMLButtonElement | null = null;
 let boostButton: HTMLButtonElement | null = null;
@@ -108,7 +108,10 @@ function syncLiveTouches(ev: TouchEvent): void {
 function onTouchListChange(ev: TouchEvent): void {
   syncLiveTouches(ev);
   if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
-    resetTouchInteraction(requireLocalPlayer(), { forgetTouches: false });
+    resetTouchInteraction(requireLocalPlayer(), {
+      forgetTouches: false,
+      preserveAbilityClick: ev.type === 'touchend',
+    });
   }
 }
 
@@ -138,7 +141,7 @@ export function setTouchFire(player: Player, held: boolean): void {
     return;
   }
 
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     controlSources.touchFire = false;
     player.ship.canShoot = true;
     return;
@@ -149,7 +152,12 @@ export function setTouchFire(player: Player, held: boolean): void {
 }
 
 export function triggerTouchAbility(player: Player): boolean {
-  if (isShipSchematicOpen() || isTownStoreOpen() || player.lives <= 0 || player.ship.exploding) {
+  if (
+    isShipSchematicOpen() ||
+    isTownStoreOpen() ||
+    player.ship.health <= 0 ||
+    player.ship.exploding
+  ) {
     return false;
   }
   if (canEnterTownStore()) {
@@ -159,13 +167,7 @@ export function triggerTouchAbility(player: Player): boolean {
 }
 
 function triggerTouchBoost(player: Player): boolean {
-  if (
-    !isInPlay() ||
-    isBoostMenuOpen() ||
-    player.lives <= 0 ||
-    player.ship.health <= 0 ||
-    player.ship.exploding
-  ) {
+  if (!isInPlay() || isBoostMenuOpen() || player.ship.health <= 0 || player.ship.exploding) {
     syncBoostChrome(player);
     return false;
   }
@@ -181,7 +183,7 @@ export function tickTouchControls(player: Player): void {
       syncAbilityChrome(player);
     }
   }
-  if (player.lives <= 0 || player.ship.exploding) {
+  if (player.ship.health <= 0 || player.ship.exploding) {
     resetTouchInteraction(player);
     return;
   }
@@ -306,7 +308,7 @@ function syncBoostChrome(player: Player): void {
   const charge = state.charge;
   const percent = Math.round(charge * 100);
   const inPlay = isInPlay();
-  const alive = player.lives > 0 && player.ship.health > 0 && !player.ship.exploding;
+  const alive = player.ship.health > 0 && !player.ship.exploding;
   const menuOpen = isBoostMenuOpen();
   const active = alive && state.phase === 'active' && player.ship.boosting;
   const empty = charge <= 0;
@@ -365,7 +367,10 @@ function clearSteerHoldTimer(): void {
 }
 
 /** Clear every pointer source when the browser takes the gesture away. */
-function resetTouchInteraction(player: Player | null, options?: { forgetTouches?: boolean }): void {
+function resetTouchInteraction(
+  player: Player | null,
+  options?: { forgetTouches?: boolean; preserveAbilityClick?: boolean }
+): void {
   const canvas = canvasManager.getCanvas();
   const ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
   const boost = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
@@ -379,6 +384,9 @@ function resetTouchInteraction(player: Player | null, options?: { forgetTouches?
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
+  if (!options?.preserveAbilityClick) {
+    pendingAbilityClick = null;
+  }
   boostPointerId = null;
   releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(canvas, activeFirePointerId);
@@ -504,7 +512,7 @@ function onPlayfieldPointerDown(ev: PointerEvent): void {
     return;
   }
   const player = requireLocalPlayer();
-  if (!player || player.lives <= 0 || player.ship.exploding) {
+  if (!player || player.ship.health <= 0 || player.ship.exploding) {
     return;
   }
   ev.preventDefault();
@@ -638,8 +646,10 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
   ability.setPointerCapture(ev.pointerId);
   setAbilityPressed(true);
   const player = requireLocalPlayer();
-  abilityTravelClick = canEnterTownStore();
-  if (player && !abilityTravelClick) {
+  // Complete the opening click before showing a modal: releasing capture
+  // early can retarget its synthetic click to a newly appeared dialog control.
+  pendingAbilityClick = canEnterTownStore() ? 'store' : 'ability';
+  if (player && pendingAbilityClick === 'ability') {
     triggerTouchAbility(player);
     syncAbilityChrome(player);
   }
@@ -647,7 +657,7 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
 
 function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
   if (ev.type === 'pointercancel') {
-    abilityTravelClick = false;
+    pendingAbilityClick = null;
   }
   if (ev.pointerId !== abilityPointerId) {
     return;
@@ -655,23 +665,29 @@ function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
   ev.preventDefault();
   ev.stopPropagation();
   abilityPointerId = null;
+  if (ev.type === 'pointercancel') {
+    pendingAbilityClick = null;
+  }
   releasePointerCapture(ability, ev.pointerId);
   setAbilityPressed(false);
 }
 
 function onAbilityClick(ev: MouseEvent): void {
-  // Open the modal on the completed click: opening on pointerdown can send the
-  // same finger's synthesized click to the new dialog's Close button.
-  const travelClick = abilityTravelClick;
-  abilityTravelClick = false;
-  if (ev.detail !== 0 && !travelClick) {
+  const action = pendingAbilityClick;
+  pendingAbilityClick = null;
+  if (action === 'store') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    openTownStore();
+    return;
+  }
+  // Pointer presses already activate on pointerdown. Their click can arrive
+  // later; only keyboard/accessibility/programmatic clicks have no click count.
+  if (ev.detail !== 0) {
     return;
   }
   ev.preventDefault();
   ev.stopPropagation();
-  if (travelClick && !canEnterTownStore()) {
-    return;
-  }
   const player = requireLocalPlayer();
   if (player) {
     triggerTouchAbility(player);

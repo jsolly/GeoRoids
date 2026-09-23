@@ -250,9 +250,7 @@ export class Pilot {
       return;
     }
     assert(entity, 'Pilot has no authoritative entity');
-    if (entity.lives <= 0) {
-      this.send({ type: 'leave', data: {} });
-      this.joinGame();
+    if (entity.health <= 0 || entity.exploding || entity.respawnTimer !== undefined) {
       return;
     }
     this.sequence++;

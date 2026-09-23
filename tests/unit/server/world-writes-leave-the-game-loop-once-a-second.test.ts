@@ -12,7 +12,7 @@ import type {
   WorldPersistenceDiagnostics,
 } from '../../../server/world/worldPersistence';
 import type { AsteroidData } from '../../../shared-types';
-import { GAME, ROID } from '../../../src/constants';
+import { GAME } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 const WALL_ORIGIN_MS = 10_000;
@@ -75,7 +75,7 @@ test('a mining break and its score reach the database on the next one-second flu
 
   expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('tagged');
   expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('destroyed');
-  expect(miner.score).toBe(ROID.POINTS_MEDIUM);
+  expect(miner.score).toBe(0);
   // The break is a terminal, score-bearing event, yet nothing touches storage yet.
   expect(commits).not.toHaveBeenCalled();
   expect(store.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(true);
@@ -87,7 +87,7 @@ test('a mining break and its score reach the database on the next one-second flu
   frame();
   expect(commits).toHaveBeenCalledTimes(1);
   expect(store.loadSector('0,0')?.some((rock) => rock.id === target.id)).toBe(false);
-  expect(miner.score).toBeGreaterThanOrEqual(ROID.POINTS_MEDIUM);
+  expect(miner.score).toBeGreaterThanOrEqual(0);
   expect(store.loadPilots().find((pilot) => pilot.id === miner.id)?.score).toBe(miner.score);
 
   // Another second of ordinary flight is one more batch, and the last
@@ -171,7 +171,7 @@ test('a commit still in flight defers the next flush, which then carries everyth
   persistence.pendingBatches = 1;
   expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('tagged');
   expect(engine.handleAsteroidHit(target.id, miner.id, 'laser').outcome).toBe('destroyed');
-  expect(miner.score).toBeGreaterThanOrEqual(ROID.POINTS_MEDIUM);
+  expect(miner.score).toBeGreaterThanOrEqual(0);
   for (let tick = 0; tick < GAME.FPS; tick++) {
     frame();
   }

@@ -20,7 +20,6 @@ test(
     await game.verifyGameArea();
     await game.waitForAsteroids(20);
 
-    expect(await game.getLives()).toBe(5);
     expect(await game.getScore()).toBe(0);
     const [health, maxHealth] = await Promise.all([game.getShipHealth(), game.getShipMaxHealth()]);
     expect(health).toBe(maxHealth);

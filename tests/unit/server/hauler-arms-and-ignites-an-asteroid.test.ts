@@ -307,10 +307,10 @@ describe('A Hauler arms an asteroid, then sends it on a furnace-guided delivery'
     expect(world.engine.getLoot()).toEqual([]);
   });
 
-  test('delivery still pays its original launcher after the launcher loses the last life', () => {
+  test('delivery still pays its original launcher after the launcher dies', () => {
     activate(alice);
     activate(alice);
-    world.entity(alice).lives = 0;
+    world.entity(alice).health = 0;
     rock.position = { ...nearestFurnace(rock.position).position };
     world.engine.processFurnaceDeliveries();
     expect(world.entity(alice).score).toBe(furnaceReward(rock));

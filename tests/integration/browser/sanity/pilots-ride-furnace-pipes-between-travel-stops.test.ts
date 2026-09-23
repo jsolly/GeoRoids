@@ -17,7 +17,6 @@ for (const width of [1280, 390]) {
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
-    expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.lives)).toBe(5);
     const lot = civicLot('street-1-0');
     if (!lot) {
       throw new Error('Missing street travel fixture');
@@ -88,14 +87,15 @@ for (const width of [1280, 390]) {
     });
     await page.keyboard.press('KeyE');
     await menu.waitFor({ state: 'visible' });
-    expect(await page.locator('#town-store-life-price').textContent()).toContain('250');
     const scoreBefore = await page.evaluate(
       () => window.gameController?.getCurrPlayer()?.score ?? 0
     );
-    await menu.getByRole('button', { name: 'Buy extra life' }).click();
-    await page.waitForFunction(() => window.gameController?.getCurrPlayer()?.lives === 6);
+    await menu.locator('[data-offer="placeholder-1"]').click();
+    await page.waitForFunction(() =>
+      window.gameController?.getCurrPlayer()?.purchases.includes('placeholder-1')
+    );
     expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.score)).toBe(
-      scoreBefore - 250
+      scoreBefore - 100
     );
     const back = menu.locator('[data-furnace-id="street-1-0"]');
     expect(await back.isEnabled()).toBe(true);

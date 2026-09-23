@@ -102,7 +102,7 @@ describe('A Hauler Resource Tap extracts four canisters and leaves the rock', ()
     world.engine.updatePlayer(alice.id, { position: { ...(settled?.position ?? tap.position) } });
     const collected = world.engine.collectLoot();
     expect(collected.some((entry) => entry.lootId === tap.id)).toBe(true);
-    expect(world.entity(alice).score).toBeGreaterThanOrEqual(GROWTH.TAP_LOOT_SCORE);
+    expect(world.entity(alice).cargo).toBeGreaterThanOrEqual(GROWTH.TAP_LOOT_SCORE);
   });
 
   test('the last pilot leaving discards unheard ejections before a later join', () => {

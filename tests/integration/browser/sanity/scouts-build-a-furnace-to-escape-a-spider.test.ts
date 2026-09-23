@@ -65,7 +65,9 @@ for (const width of [1280, 390]) {
         { timeout: 8000 }
       )
       .toBeGreaterThan(300);
-    expect(await page.evaluate(() => window.gameController?.getCurrPlayer()?.lives)).toBe(5);
+    expect(
+      await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.health ?? 0)
+    ).toBeGreaterThan(0);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`furnace-escape-${width}.png`),
     });

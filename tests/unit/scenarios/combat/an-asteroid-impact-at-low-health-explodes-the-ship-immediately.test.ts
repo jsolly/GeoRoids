@@ -73,12 +73,10 @@ describe('Server view: environmental damage', () => {
 
     expect(world.entity(bob).health).toBe(0);
     expect(world.entity(bob).exploding).toBe(true);
-    expect(world.entity(bob).lives).toBe(GAME.START_LIVES - 1);
     expect(bob.socket.lastReceived('playerDamaged')?.data).toMatchObject({
       targetPlayerId: bob.id,
       remainingHealth: 0,
       isDestroyed: true,
-      remainingLives: GAME.START_LIVES - 1,
     });
     expect(bob.socket.lastReceived('playerDamaged')?.data).toMatchObject({
       targetPlayerId: bob.id,

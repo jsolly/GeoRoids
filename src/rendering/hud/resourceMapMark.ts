@@ -6,6 +6,8 @@ type ResourceMapIcon = 'asteroid' | 'satellite' | 'nest' | LootKind;
 
 export function asteroidMapInk(material: AsteroidMaterial | undefined) {
   switch (material) {
+    case 'crystal':
+      return '#D8B4FE';
     case 'ice':
       return '#A5F3FC';
     case 'metal':
@@ -185,6 +187,7 @@ export function addResourceMapPath(
       line(1, 0.55);
       return;
     case 'resource_tap':
+    case 'points':
     case 'tap':
       move(-0.55, -0.35);
       line(-0.55, 0.6);

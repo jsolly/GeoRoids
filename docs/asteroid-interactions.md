@@ -9,8 +9,7 @@ A Hauler presses **E** to attach to a nearby asteroid and tows it at the cable's
 original length. Press **E** again to release it. Attached cargo cannot damage its
 Hauler or be destroyed by crew lasers. Other asteroids remain dangerous; crew
 ships can overlap safely. Tow surveyed cargo into a furnace to award the Hauler
-and each contributing Scout. A pilot who built streets receives a higher
-personal payout.
+and each contributing Scout. Construction attribution does not change personal payouts.
 
 ## Reflective clusters and laser cores
 
@@ -23,7 +22,7 @@ the client does not offer a selection-dependent path preview.
 Direct crew shots leave every crew ship unharmed, including
 the shooter. After a bounce off a wall, reflective face, or court panel, the same shot
 becomes a ricochet that damages any hull it then hits and is consumed. A broken reflector leaves one laser core: collect
-it for 150 points and six stronger shots, usable for 60 seconds. The upgrade
+it for 150 carried points and six stronger shots, usable for 60 seconds. The upgrade
 expires on death. Shots, damage, charge use, and collection belong to the shared
 world, so reconnecting does not replay rewards.
 
@@ -45,17 +44,15 @@ server with a private resume token. Unsupported clients cannot join. The server
 owns projectile collisions, and clients render keyed projectile snapshots.
 Reflective phenomena are generated with each world sector and persist with its
 deposits across restarts. Private resume tokens recover a
-browser's current score across disconnects and server restarts while the ship
-still has lives. They appear only on the joined socket, not in the common
-public world. Join also records the client and server Git identities that
-issued that token and last wrote the score, plus the server times of those
-writes, so a later deploy can migrate saved progress. Server-only score writes
+browser's bank, cargo and purchase receipts across disconnects and server restarts.
+Tokens appear only on the joined socket, not in the common public world. Join
+records the client and server Git identities that issued the token and last
+wrote the bank, plus the server times of those writes. Server-only bank writes
 omit a client identity. Those stamps do not replace the snapshot-v1 join gate.
-A live reconnect while the ship still has lives keeps the current pose. After
-the socket is gone, Enter Game returns you to that ship for 30 seconds; a
-longer gap starts a new flight with that score. Game over zeros the score and
-starts a new flight. Scores and the shared world stay until `WORLD.generation`
-changes.
+A brief reconnect keeps the current pose; carrying cargo preserves that field
+position even after a longer absence. Death drops carried points with a two-minute
+expiry and always schedules a respawn. Banked points survive. Bank balances and
+the shared world stay until `WORLD.generation` changes.
 
 ## Updating open clients
 

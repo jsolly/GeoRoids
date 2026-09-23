@@ -12,9 +12,9 @@ import {
   seatLandmarkBesideHull,
 } from '../../../src/rendering/hud/minimap';
 
-const SOUTHEAST = CIVIC_LOTS.find((lot) => lot.name === 'Southeast Street I');
+const SOUTHEAST = CIVIC_LOTS.find((lot) => lot.name === 'Southeast Furnace I');
 if (!SOUTHEAST) {
-  throw new Error('Southeast Street I is part of the street plan');
+  throw new Error('Southeast Furnace I is part of the furnace plan');
 }
 
 function radarCenter(layout: ReturnType<typeof computeHudLayout>): { x: number; y: number } {
@@ -100,7 +100,7 @@ test('a grate above the ship stays above the radar hull, and one below stays bel
   expect(Math.hypot(inside.x - center.x, inside.y - center.y)).toBeLessThan(clear);
 });
 
-test('a street farther than the hull keeps its true radar position', () => {
+test('a furnace farther than the hull keeps its true radar position', () => {
   const player = new Player({
     id: 'pilot',
     name: 'John',

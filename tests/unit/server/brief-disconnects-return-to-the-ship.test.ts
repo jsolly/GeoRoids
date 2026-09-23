@@ -17,10 +17,9 @@ function registerPilot(engine: GameEngine, id: string, position: { x: number; y:
   return { actor, token: registered.resumeToken };
 }
 
-test('Enter Game after a brief leave puts the ship back with the same lives and hull', () => {
+test('Enter Game after a brief leave puts the ship back with the same cargo and hull', () => {
   const engine = new GameEngine(82);
   const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
-  original.actor.lives = 2;
   original.actor.score = 210;
   original.actor.health = 40;
   original.actor.mass = 6;
@@ -34,7 +33,8 @@ test('Enter Game after a brief leave puts the ship back with the same lives and 
     id: 'scout',
     name: 'Bob',
     kitId: 'scout',
-    lives: 2,
+    cargo: 0,
+    purchases: [],
     score: 210,
     health: 40,
     mass: 6,
@@ -57,7 +57,6 @@ test('a long absence starts a new flight with the saved score', () => {
   try {
     const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
-    original.actor.lives = 2;
     original.actor.score = 210;
     original.actor.health = 40;
     engine.removePlayer('scout');
@@ -71,7 +70,8 @@ test('a long absence starts a new flight with the saved score', () => {
       id: 'scout',
       name: 'Bob',
       kitId: 'scout',
-      lives: 5,
+      cargo: 0,
+      purchases: [],
       score: 210,
       health: resumed.actor.maxHealth,
     });
@@ -89,7 +89,6 @@ test('a restart inside the return window restores the ship and refills only elap
   try {
     const engine = new GameEngine(82, clock, new InlineWorldPersistence(store));
     const original = registerPilot(engine, 'scout', { x: 2_400, y: 1_800 });
-    original.actor.lives = 1;
     original.actor.score = 880;
     original.actor.health = 22;
     original.actor.boost = { phase: 'exhausted', charge: 0.4 };
@@ -102,7 +101,8 @@ test('a restart inside the return window restores the ship and refills only elap
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
       id: 'scout',
-      lives: 1,
+      cargo: 0,
+      purchases: [],
       score: 880,
       health: 22,
       boost: { phase: 'exhausted', charge: 0.5 },

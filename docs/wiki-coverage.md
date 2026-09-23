@@ -10,15 +10,15 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, saved score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, Inventory button on desktop and touch, satellite-pickup label pointing at Inventory, Town Square store, and map/schematic/store hold with blink on return |
-| scout | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named street furnaces paid with personal score, scattered street lots, right-angle fire trails only after a street is lit, a personal delivery bonus per street built, escape construction and living spider retreat, moving probe beacons, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the street is lit, and double metal mining damage |
+| scout | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named furnaces paid with personal score, scattered furnace lots, right-angle fire trails only after a furnace is lit, escape construction and living spider retreat, moving probe beacons, and delivery tags |
+| hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the furnace is lit, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
 | terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
-| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
-| teamwork | Systems | One shared crew, scan-to-tow furnace loop, personal delivery yield, Town Square store, scattered street lots with right-angle fire trails only after a street is lit, harvested ground that stays empty and flyable, and persistent exploration |
-| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, right-angle furnace fire trails only after a street is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
+| combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, cargo loss, unlimited respawn, brief-disconnect return, and score |
+| teamwork | Systems | One shared crew, scan-to-tow furnace loop, equal contributor delivery rewards, Town Square store, scattered furnace lots with right-angle fire trails only after a furnace is lit, harvested ground that stays empty and flyable, and persistent exploration |
+| hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, right-angle furnace fire trails only after a furnace is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
 
 ## Coverage matrix
 
@@ -27,7 +27,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | How do I move, aim, fire, boost, or use E? | controls | src/input/, src/constants/index.ts, input tests |
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicEquipHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
-| How do I buy an extra life at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyExtraLife, town store tests |
+| How do I buy a placeholder at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyStoreItem, town store tests |
 | How do I launch, follow, or shoot down a probe beacon? | scout, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
 | How do I build furnaces and repel spiders? | scout, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, escape construction and living spider retreat, and scan-defense tests |
 | Can I clear a spider nest by building a furnace on it? | scout, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS retreat, furnace construction tests |
@@ -115,8 +115,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   exploration reaches 260; the chart persists and is shared by every pilot.
   The local minimap follows the nearby radar, while M or the on-screen Map
   button opens a full-screen universe overview. Pilots stay readable;
-  Street furnaces and dark foundations stay marked on the overview before that
-  ground is explored. A fire trail appears only after that street is lit.
+  Furnaces and dark foundations stay marked on the overview before that
+  ground is explored. A fire trail appears only after that furnace is lit.
   Uncharted asteroid and loot positions remain hidden.
 - Hauler mining damage is doubled for metal asteroids, cooperative large rocks,
   and colossal deposits;
@@ -148,7 +148,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   health intact. Broken or exhausted hardware respawns loose and full.
 - Damaged ships show a thin floating health capsule above the hull during
   normal play; numeric health text is a debug view. The top-left HUD carries
-  lives, score, current ability, and kit. The leaderboard includes every active
+  cargo, bank, settlement, current ability, and kit. The leaderboard includes every active
   player.
 - A laser detonation of any loot kind removes the drop and leaves every nearby
   crew hull unharmed. It pushes only rocks of size 24 or smaller. Satellite
@@ -185,8 +185,8 @@ and the thicker arcade laser core without changing projectile physics.
 
 Furnace travel follows shared pipe geometry between lit destinations. E opens
 the furnace menu inside the hearth’s visible footprint, with Town Square retaining
-250-score life purchases. New flights start with five lives. Final-life loss
-clears personal score, silk, equipment, and paint, while shared furnaces remain.
+level-gated placeholder purchases. Death drops cargo while banks, silk, equipment,
+and paint remain safe.
 Verify server socket/proximity/destination checks, transit action suppression,
 arrival reconciliation, reconnect behavior, and desktop/mobile rocket visuals.
 
@@ -195,3 +195,12 @@ Terrain, Teamwork, and HUD/network. Panels reflect lasers from both sides withou
 amplifying energy, let ships pass through, persist as fixed geometry, and appear
 on both maps before discovery. Duels use ordinary protection, damage and respawn
 rules; shots may escape through the gaps.
+
+## Cargo and settlement
+
+Loot and growth covers finite holds, overflow disposal, furnace deposits, safe banks,
+transferable death stashes and expiry. Asteroids covers barren rocks, crystal,
+scan results and reduced ore from fragments. Teamwork covers the five settlement
+requirements, surplus, station growth and level-gated placeholder purchases.
+Combat and survival covers unlimited respawns. Controls covers inert store
+transactions; HUD and network covers the shared progress display.

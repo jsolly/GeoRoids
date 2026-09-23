@@ -51,7 +51,6 @@ test('an already bounced shot damages the first live hull and is consumed', () =
   expect(shot.hasExploded).toBe(true);
   expect(engine.getServerLasers()).toEqual([]);
   expect(teammate.health).toBe(health - DAMAGE.LASER_HIT * 2);
-  expect(teammate.lives).toBe(5);
   expect(shooter.health).toBe(shooter.maxHealth);
 });
 

@@ -545,7 +545,8 @@ test('a restart loads a legacy placement record as saved score only', () => {
         kitId: 'scout',
         position: { x: WORLD.radius - 1, y: 0 },
         angle: 1.5,
-        lives: 1,
+        cargo: 0,
+        purchases: [],
         mass: 9,
         health: 1,
         maxHealth: 100,
@@ -556,7 +557,7 @@ test('a restart loads a legacy placement record as saved score only', () => {
     const store = new WorldStore(path);
     try {
       const pilots = store.loadPilots();
-      expect(pilots).toEqual([scorePilot(777)]);
+      expect(pilots).toEqual([{ ...scorePilot(777), cargo: 0, purchases: [] }]);
       store.checkpoint(
         {
           seed: 1,
@@ -573,7 +574,11 @@ test('a restart loads a legacy placement record as saved score only', () => {
     const rewritten = new DatabaseSync(path);
     try {
       const row = rewritten.prepare('SELECT json FROM pilots').get();
-      expect(JSON.parse(String(row?.['json']))).toEqual(scorePilot(777));
+      expect(JSON.parse(String(row?.['json']))).toEqual({
+        ...scorePilot(777),
+        cargo: 0,
+        purchases: [],
+      });
     } finally {
       rewritten.close();
     }
@@ -595,7 +600,8 @@ test('a restart loads a recent flight only when lastSeenAt is present', () => {
       position: { x: 400, y: 800 },
       velocity: { x: 3, y: -1 },
       angle: 0.5,
-      lives: 2,
+      cargo: 0,
+      purchases: [],
       mass: 8,
       health: 40,
     };
@@ -644,7 +650,7 @@ test('stored spider silk survives a world checkpoint and reload without becoming
   try {
     const pilot = { ...scorePilot(5), silk: 7 };
     store.checkpoint(undefined, new Map(), [pilot]);
-    expect(store.loadPilots()).toEqual([pilot]);
+    expect(store.loadPilots()).toEqual([{ ...pilot, cargo: 0, purchases: [] }]);
   } finally {
     store.close();
   }
@@ -672,7 +678,10 @@ test('a saved Surveyor resumes as Scout without losing flight state across repea
     for (let run = 0; run < 2; run += 1) {
       const store = new WorldStore(path);
       try {
-        expect(store.loadPilots()).toEqual([{ ...saved, kitId: 'scout' }]);
+        const { lives: _legacyLives, ...flight } = saved;
+        expect(store.loadPilots()).toEqual([
+          { ...flight, kitId: 'scout', cargo: 0, purchases: [] },
+        ]);
       } finally {
         store.close();
       }

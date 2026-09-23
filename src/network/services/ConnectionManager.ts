@@ -62,13 +62,13 @@ import { applyShipKitToShip, DEFAULT_SHIP_KIT_ID, getShipKit } from '../../entit
 import { shouldApplyDamagedHealth } from '../../entities/ship/shipUtils';
 import { playLocalHaptic } from '../../fx/haptics';
 import { reconcilePlayerInput } from '../../input/keybindings';
+import { setSettlement } from '../../network/worldExploration';
 import { setSpiderField } from '../../physics/terrain/spiderSession';
 import { applyTerrainSeed } from '../../physics/terrain/terrainSession';
 import { setBeltRecovery } from '../../rendering/beltRenderer';
 import { getSelectedShipKitId } from '../../ui/shipKitSelect';
 import { getClientReleaseId } from '../../utils/buildInfo';
 import { setClientLogContext } from '../../utils/clientLogContext';
-import { describeDeathCause } from '../../utils/deathCause';
 import { logger } from '../../utils/Logger';
 import type { ClientMessage } from '../types';
 import {
@@ -185,7 +185,6 @@ function captureClientPlayerState(player: Player) {
     angle: player.ship.angle,
     health: player.ship.health,
     maxHealth: player.ship.maxHealth,
-    lives: player.lives,
     score: player.score,
     exploding: player.ship.exploding,
     spawnProtectionTimer: player.serverSpawnProtectionTimer,
@@ -1061,7 +1060,6 @@ export class ConnectionManager {
             damage: number;
             remainingHealth: number;
             isDestroyed: boolean;
-            remainingLives?: number;
           }
         );
         break;
@@ -1333,6 +1331,7 @@ export class ConnectionManager {
     setBeltRecovery(data.beltRecovery);
     applyTerrainSeed(data.terrainSeed);
     setWorldMapAssets(data.mapAssets);
+    setSettlement(data.settlement);
     worldFurnaces.replaceLit(data.civicModules ?? []);
     if (validExploration(data.exploration)) {
       setWorldExploration(data.exploration);
@@ -1357,7 +1356,7 @@ export class ConnectionManager {
           if (isLocalPlayer) {
             // Adopt the game-loop's local player as the single source of truth
             // for the local ship, so server-authoritative state (health, score,
-            // lives, respawn) flows into the same object the game loop renders,
+            // cargo, respawn) flows into the same object the game loop renders,
             // collides, and attributes damage with. Align its id to the
             // server-assigned id.
             if (localPlayer) {
@@ -1783,7 +1782,6 @@ export class ConnectionManager {
     damage: number;
     remainingHealth: number;
     isDestroyed: boolean;
-    remainingLives?: number;
   }): void {
     logger.debug('NETWORK', 'Player damaged', {
       targetPlayerId: data.targetPlayerId,
@@ -1791,7 +1789,6 @@ export class ConnectionManager {
       damage: data.damage,
       remainingHealth: data.remainingHealth,
       isDestroyed: data.isDestroyed,
-      remainingLives: data.remainingLives,
     });
 
     const localPlayer = PlayerManager.getInstance().getLocalPlayer();
@@ -1799,10 +1796,6 @@ export class ConnectionManager {
       localPlayer &&
         (localPlayer.id === data.targetPlayerId || this.getLocalPlayerId() === data.targetPlayerId)
     );
-    const prevLocalLives =
-      isLocalTarget && localPlayer && data.remainingLives !== undefined
-        ? localPlayer.lives
-        : undefined;
     const beforeHealth = isLocalTarget && localPlayer ? localPlayer.ship.health : undefined;
 
     let targetPlayer = this.allPlayers.get(data.targetPlayerId);
@@ -1822,10 +1815,10 @@ export class ConnectionManager {
     if (data.attackerId) {
       targetPlayer.deathCause = data.attackerId;
     }
-    if (data.remainingLives !== undefined) {
-      targetPlayer.lives = data.remainingLives;
-    }
 
+    if (data.isDestroyed) {
+      targetPlayer.reportDeath();
+    }
     this.applyDamageToLocalPlayerIfTarget(data);
 
     this.applyAuthoritativeDamageHealth(targetPlayer, data.remainingHealth, data.isDestroyed);
@@ -1842,17 +1835,6 @@ export class ConnectionManager {
       targetPlayer.ship.explode(data.attackerId);
     }
 
-    if (
-      localPlayer &&
-      prevLocalLives !== undefined &&
-      data.remainingLives !== undefined &&
-      prevLocalLives > data.remainingLives
-    ) {
-      const deathCause = describeDeathCause(data.attackerId);
-      localPlayer.deathCause = deathCause;
-      this.dispatchLocalPlayerDied(localPlayer, data.remainingLives, deathCause);
-    }
-
     if (isLocalTarget) {
       const observedAt = Date.now();
       const shouldLogDamage = data.isDestroyed || observedAt - this.lastDamageStateLogAt >= 1000;
@@ -1865,36 +1847,16 @@ export class ConnectionManager {
           damage: data.damage,
           ...(beforeHealth !== undefined ? { healthBefore: beforeHealth } : {}),
           healthAfter: data.remainingHealth,
-          ...(prevLocalLives !== undefined ? { livesBefore: prevLocalLives } : {}),
-          ...(data.remainingLives !== undefined ? { livesAfter: data.remainingLives } : {}),
           ...(this.serverReleaseId ? { serverReleaseId: this.serverReleaseId } : {}),
         });
       }
     }
   }
 
-  /** Fire playerDied when server reports a life loss before game-state sync arrives. */
-  private dispatchLocalPlayerDied(
-    localPlayer: Player,
-    remainingLives: number,
-    deathCause: string
-  ): void {
-    window.dispatchEvent(
-      new CustomEvent('playerDied', {
-        detail: {
-          playerId: localPlayer.id,
-          deathCause,
-          isGameOver: remainingLives <= 0,
-        },
-      })
-    );
-  }
-
   /** Keep PlayerManager's local ship in sync when damage hits a network duplicate. */
   private applyDamageToLocalPlayerIfTarget(data: {
     targetPlayerId: string;
     remainingHealth: number;
-    remainingLives?: number;
     isDestroyed: boolean;
     attackerId: string;
   }): void {
@@ -1911,9 +1873,6 @@ export class ConnectionManager {
     this.applyAuthoritativeDamageHealth(localPlayer, data.remainingHealth, data.isDestroyed);
     if (data.attackerId) {
       localPlayer.deathCause = data.attackerId;
-    }
-    if (data.remainingLives !== undefined) {
-      localPlayer.lives = data.remainingLives;
     }
     if (data.isDestroyed && !localPlayer.ship.exploding) {
       localPlayer.ship.explode(data.attackerId);

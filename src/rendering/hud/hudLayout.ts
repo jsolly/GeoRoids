@@ -14,7 +14,7 @@ export type HudLayout = {
   padLeft: number;
   padRight: number;
   padBottom: number;
-  lives: { x: number; y: number };
+  balance: { x: number; y: number };
   score: { x: number; y: number };
   notificationY: number;
   leaderboard: {
@@ -28,6 +28,7 @@ export type HudLayout = {
   overlayFontScale: number;
   hudTypeScale: number;
   kitNameY: number;
+  economyBottomY: number;
 };
 
 /** Scale a canvas font such as `14px Arial` for the compact touch HUD. */
@@ -82,14 +83,14 @@ export function computeHudLayout(
   const hudTypeScale = touch ? (viewport.width < 480 ? 1.18 : 1.1) : 1;
 
   if (!touch) {
-    const lives = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
-    const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+    const balance = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
+    const kitNameY = balance.y + VISUAL.HUD_BALANCE_HEIGHT + 8;
     return {
       padTop: 0,
       padLeft: 0,
       padRight: 0,
       padBottom: 0,
-      lives,
+      balance,
       score: { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET },
       notificationY: 12,
       leaderboard: {
@@ -107,6 +108,7 @@ export function computeHudLayout(
       overlayFontScale,
       hudTypeScale,
       kitNameY,
+      economyBottomY: kitNameY + 96,
     };
   }
 
@@ -119,8 +121,8 @@ export function computeHudLayout(
   const rowHeight = compactHeight ? 16 : 18;
   const maxRows = 3;
   const miniMapSize = compactHeight ? 64 : 80;
-  const lives = { x: padLeft, y: padTop };
-  const kitNameY = lives.y + VISUAL.HUD_LIFE_SIZE + 8;
+  const balance = { x: padLeft, y: padTop };
+  const kitNameY = balance.y + VISUAL.HUD_BALANCE_HEIGHT + 8;
   const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
@@ -139,9 +141,9 @@ export function computeHudLayout(
     padLeft,
     padRight,
     padBottom,
-    lives,
+    balance,
     score: { x: padLeft, y: padTop },
-    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 12 + 100,
+    notificationY: Math.max(clusterClear + 96, padTop + rowHeight * maxRows) + 64,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
@@ -153,6 +155,7 @@ export function computeHudLayout(
     overlayFontScale,
     hudTypeScale,
     kitNameY,
+    economyBottomY: kitNameY + 96,
   };
 }
 

@@ -12,9 +12,9 @@ import {
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { resetWorldExploration } from '../../../src/network/worldExploration';
 
-const street = civicLot('street-1-0');
-if (!street) {
-  throw new Error('Missing street lot');
+const furnace = civicLot('street-1-0');
+if (!furnace) {
+  throw new Error('Missing furnace lot');
 }
 
 test('each kit exposes its own E action label and name', () => {
@@ -51,7 +51,7 @@ test('near Town Square the ability chrome becomes Enter store for any kit', () =
   expect(far.label).toBe('SCAN');
 });
 
-test('near a dark street lot the Scout ability chrome becomes Build', () => {
+test('near a dark furnace lot the Scout ability chrome becomes Build', () => {
   resetWorldExploration();
   const near = readAbilityChrome({
     kitId: 'scout',
@@ -60,7 +60,7 @@ test('near a dark street lot the Scout ability chrome becomes Build', () => {
     health: 100,
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
-    position: { ...street.position },
+    position: { ...furnace.position },
   });
   expect(near.label).toBe('BUILD');
   expect(near.name).toBe('Build furnace');
@@ -71,7 +71,7 @@ test('near a dark street lot the Scout ability chrome becomes Build', () => {
     health: 100,
     abilityCooldownFrames: 0,
     abilityActiveFrames: 0,
-    position: { ...street.position },
+    position: { ...furnace.position },
   });
   expect(probing.label).toBe('BUILD');
   const far = readAbilityChrome({
@@ -192,7 +192,7 @@ test('a Scout can build an escape furnace while its scan or probe is cooling dow
       health: 100,
       abilityCooldownFrames: 120,
       abilityActiveFrames: 60,
-      position: street.position,
+      position: furnace.position,
     });
     expect(chrome.label).toBe('BUILD');
     expect(chrome.ready).toBe(true);

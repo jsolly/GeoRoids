@@ -76,6 +76,16 @@ describe('shared ship HUD and respawn timers', () => {
     expect(isServerRespawnActive(12)).toBe(true);
   });
 
+  test.each(['local', 'remote'] as const)(
+    'a %s pilot spending the exact furnace cost shows zero score',
+    (type) => {
+      const player = new Player({ id: type, name: 'Builder', type, input: new MockPlayerInput() });
+      player.score = 1_500;
+      player.updateFromServer({ score: 0, cargo: 0, purchases: [] });
+      expect(player.score).toBe(0);
+    }
+  );
+
   test.each(SHIP_KINDS)('$kind explodes and flashes on a boundary hit', ({ options }) => {
     const ship = new Ship(options);
     ship.health = 100;

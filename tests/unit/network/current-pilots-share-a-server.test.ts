@@ -404,13 +404,13 @@ describe('current pilots share the production handler and broadcaster', () => {
     const collector = engine.getPlayer('recovery');
     assert.ok(collector, 'recovery player');
     collector.position = { ...core.position };
-    const score = collector.score;
+    const score = collector.cargo;
     engine.collectLoot();
     expect(collector.laserUpgrade?.charges).toBe(6);
-    expect(collector.score).toBeGreaterThanOrEqual(score + 150);
-    const collectedScore = collector.score;
+    expect(collector.cargo).toBeGreaterThanOrEqual(score + 150);
+    const collectedScore = collector.cargo;
     engine.collectLoot();
-    expect(collector.score).toBe(collectedScore);
+    expect(collector.cargo).toBe(collectedScore);
     broadcaster.broadcastGameState();
     expect(
       decodeAll(recovery)

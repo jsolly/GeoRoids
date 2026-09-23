@@ -90,7 +90,7 @@ describe('Server scoring via automatic satellite pickup collection', () => {
     });
     server.gameEngine.tickSatellitePickups();
 
-    expect(server.gameEngine.getPlayer(playerId)?.score).toBe(SATELLITE_PICKUP.SCORE_BONUS);
+    expect(server.gameEngine.getPlayer(playerId)?.cargo).toBe(SATELLITE_PICKUP.SCORE_BONUS);
     expect(server.gameEngine.getSatellitePickup(pickup.id)?.ownerId).toBe(playerId);
     server.wsCore.getBroadcaster().broadcastGameState();
 

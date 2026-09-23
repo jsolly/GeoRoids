@@ -84,10 +84,10 @@ test.each([
     expect(await pose()).toEqual(held);
     expect(held.velocity).toEqual({ x: 0, y: 0 });
     expect(held.thrusting).toBe(false);
-    const lives = await game.getLives();
+    const health = await game.getShipHealth();
     await arrangeCrewField([id], 'impact');
     await game.waitForAnimationFrames(30);
-    expect(await game.getLives()).toBe(lives);
+    expect(await game.getShipHealth()).toBe(health);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`stationary-${menu}-${width}.png`),
     });

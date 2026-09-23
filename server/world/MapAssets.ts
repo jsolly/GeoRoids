@@ -39,7 +39,7 @@ export class MapAssets {
       }
       candidates.push({
         id: `loot:${drop.id}`,
-        kind: drop.kind,
+        kind: drop.kind === 'points' ? 'wreckage' : drop.kind,
         position: drop.position,
         name: drop.kind === 'laserCore' ? 'Laser core' : 'Salvage',
       });

@@ -18,15 +18,15 @@ test(
     await game.bootGame();
     await game.waitForCombatReady();
 
-    const initialLives = await game.getLives();
+    const initialHealth = await game.getShipHealth();
     const deathPosition = await game.crashShipIntoAsteroidUntilDestroyed();
 
     await expect
-      .poll(() => game.getLives(), {
+      .poll(() => game.getShipHealth(), {
         timeout: 15000,
         message: 'asteroid collision should cost a life',
       })
-      .toBeLessThan(initialLives);
+      .toBeLessThan(initialHealth);
 
     const afterDeath = await game.getShipPosition();
     const respawnPosition = await game.waitForServerRespawnAwayFrom(

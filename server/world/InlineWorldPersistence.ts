@@ -33,7 +33,7 @@ export class InlineWorldPersistence implements WorldPersistence {
     }
     const started = performance.now();
     try {
-      this.store.checkpoint(batch.world, batch.sectors, batch.pilots);
+      this.store.checkpoint(batch.world, batch.sectors, batch.pilots, batch.economy);
     } catch (error) {
       this.fail(
         error instanceof Error ? error : new Error('World commit failed', { cause: error })

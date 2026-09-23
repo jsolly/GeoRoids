@@ -107,7 +107,7 @@ test('KeyE preserves the joined Scout when the title menu has a stale Hauler sel
 });
 
 test('WASD is ignored while dead', () => {
-  player.lives = 0;
+  player.ship.health = 0;
   reconcilePlayerInput(player);
   press('KeyW');
   press('KeyA');

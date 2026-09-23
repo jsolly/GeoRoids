@@ -118,16 +118,16 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
     const cores = engine.getLoot().filter((drop) => drop.kind === 'laserCore');
     expect(cores).toHaveLength(1);
-    const score = pilot.score;
+    const score = pilot.cargo;
     engine.handleAsteroidHit(reflector.id, pilot.id);
-    expect(pilot.score).toBe(score);
+    expect(pilot.cargo).toBe(score);
     const core = cores[0];
     assert.ok(core, 'laser core');
     pilot.position = { ...core.position };
     engine.collectLoot();
-    const after = pilot.score;
+    const after = pilot.cargo;
     engine.collectLoot();
-    expect(pilot.score).toBe(after);
+    expect(pilot.cargo).toBe(after);
     expect(pilot.laserUpgrade?.charges).toBe(6);
     expect(after).toBeGreaterThanOrEqual(score + ASTEROID_INTERACTIONS.coreScore);
     for (let index = 0; index < 6; index++) {

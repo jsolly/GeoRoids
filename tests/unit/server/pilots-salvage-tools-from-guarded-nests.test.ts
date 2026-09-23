@@ -10,7 +10,6 @@ import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersist
 import { WorldStore } from '../../../server/world/WorldStore';
 import { EQUIPMENT_DROPS, EQUIPMENT_IDS, isEquipmentId } from '../../../shared/equipment';
 import { GROWTH } from '../../../shared/shipGrowth';
-import { GAME, PALETTE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('fresh pilots can use their starter tool but cannot equip rare tools before collecting them', () => {
@@ -81,7 +80,6 @@ test('salvaged tools survive an ordinary death, reconnect, and a server restart'
     actor.silk = 12;
     actor.color = '#FBBF24';
     actor.score = 400;
-    actor.lives = 2;
     actor.spawnProtectionTimer = 0;
     expect(engine.handleShipDamage(actor.id, 'asteroid', actor.health).isDestroyed).toBe(true);
     const continued = engine.resumePilot(registered.resumeToken, new RecordingSocket(), 'hauler');
@@ -191,14 +189,12 @@ test('nest rewards never seed further nests while ordinary salvage remains eligi
   }
 });
 
-test('the final life clears personal progress immediately and survives a restart', () => {
+test('death preserves bank and equipment through a restart', () => {
   const store = new WorldStore(':memory:');
   try {
     const engine = new GameEngine(82, undefined, new InlineWorldPersistence(store));
     const socket = new RecordingSocket();
     const actor = engine.addPlayer('pilot', 'Pilot', socket, undefined, 'hauler');
-    expect(actor.lives).toBe(5);
-    expect(GAME.START_LIVES).toBe(5);
     actor.asteroidInteractions = 1;
     const registered = engine.registerPilot(actor, socket);
     assert(registered.ok);
@@ -210,38 +206,38 @@ test('the final life clears personal progress immediately and survives a restart
     actor.score = 900;
     actor.color = '#FBBF24';
     expect(engine.setHaulerUtility(actor.id, 'resource_tap')).toBe(true);
-    actor.lives = 1;
     actor.spawnProtectionTimer = 0;
     engine.handleShipDamage(actor.id, 'asteroid', actor.health);
     expect(actor).toMatchObject({
-      lives: 0,
-      score: 0,
-      silk: 0,
-      equipment: [],
-      color: PALETTE.REMOTE,
-      haulerUtility: 'tow_cable',
-      scoutUtility: 'mineral_scan',
+      score: 900,
+      silk: 20,
+      equipment: [...EQUIPMENT_IDS],
+      color: '#FBBF24',
+      haulerUtility: 'resource_tap',
     });
     engine.checkpointWorld();
-    expect(store.loadPilots()[0]).toMatchObject({ lives: 0, score: 0, silk: 0, equipment: [] });
-    expect(store.loadPilots()[0]).not.toHaveProperty('hullColor');
+    expect(store.loadPilots()[0]).toMatchObject({
+      score: 900,
+      silk: 20,
+      equipment: [...EQUIPMENT_IDS],
+    });
+    expect(store.loadPilots()[0]?.hullColor).toBe('#FBBF24');
     const restarted = new GameEngine(0, undefined, new InlineWorldPersistence(store));
     const resumed = restarted.resumePilot(registered.resumeToken, new RecordingSocket(), 'hauler');
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
-      lives: 5,
-      score: 0,
-      silk: 0,
-      equipment: [],
-      color: PALETTE.REMOTE,
+      score: 900,
+      silk: 20,
+      equipment: [...EQUIPMENT_IDS],
+      color: '#FBBF24',
     });
-    expect(restarted.setHaulerUtility(actor.id, 'resource_tap')).toBe(false);
+    expect(restarted.setHaulerUtility(actor.id, 'resource_tap')).toBe(true);
   } finally {
     store.close();
   }
 });
 
-test('an eliminated saved flight cannot restore old equipment, paint, score, or silk', () => {
+test('a dead saved flight retains bank, equipment, paint, and silk', () => {
   const store = new WorldStore(':memory:');
   try {
     const token = 'b'.repeat(64);
@@ -256,7 +252,7 @@ test('an eliminated saved flight cannot restore old equipment, paint, score, or 
         mass: 1,
         health: 0,
         score: 900,
-        lives: 0,
+
         silk: 12,
         equipment: [...EQUIPMENT_IDS],
         hullColor: '#FBBF24',
@@ -267,13 +263,12 @@ test('an eliminated saved flight cannot restore old equipment, paint, score, or 
     const resumed = engine.resumePilot(token, new RecordingSocket(), 'scout');
     assert(resumed.ok);
     expect(resumed.actor).toMatchObject({
-      lives: 5,
-      score: 0,
-      silk: 0,
-      equipment: [],
-      color: PALETTE.REMOTE,
+      score: 900,
+      silk: 12,
+      equipment: [...EQUIPMENT_IDS],
+      color: '#FBBF24',
     });
-    expect(engine.setScoutUtility(resumed.actor.id, 'survey_probe')).toBe(false);
+    expect(engine.setScoutUtility(resumed.actor.id, 'survey_probe')).toBe(true);
   } finally {
     store.close();
   }

@@ -104,9 +104,9 @@
     "shared/shipGrowth.ts",
     "shared/furnaces.ts",
     "tests/unit/shared/furnaces.test.ts",
-    "tests/unit/rendering/a-dark-street-hides-its-pipeline-until-it-is-lit.test.ts",
-    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-street-is-lit.test.ts",
-    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-street.test.ts",
+    "tests/unit/rendering/a-dark-furnace-hides-its-pipeline-until-it-is-lit.test.ts",
+    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-furnace-is-lit.test.ts",
+    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts",
     "tests/unit/rendering/delivery-lights-the-pipe-back-to-town-square.test.ts",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts",
     "src/rendering/furnaceRenderer.ts",
@@ -146,7 +146,9 @@
     "shared/townStore.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "shared/economy.ts",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -311,7 +313,9 @@
     "shared/laserSurface.ts",
     "src/rendering/ricochetCourtRenderer.ts",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
-    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
+    "shared/economy.ts",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
   ],
   "hud-network": [
     "shared/gameClock.ts",
@@ -336,7 +340,6 @@
     "tests/integration/browser/sanity/boost-button-drains-and-refills.test.ts",
     "docs/diagnostics.md",
     "src/entities/ship/shipRenderer.ts",
-    "src/rendering/hud/lives.ts",
     "src/rendering/hud/leaderboard.ts",
     "src/rendering/hud/minimap.ts",
     "src/rendering/hud/furnaceMapMark.ts",
@@ -369,7 +372,7 @@
     "tests/unit/network/pilots-recover-complete-snapshots.test.ts",
     "tests/unit/network/pilots-reconcile-respawns-and-reconnects.test.ts",
     "tests/unit/network/failed-connections-settle-and-recover.test.ts",
-    "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-lives-and-score.test.ts",
+    "tests/unit/scenarios/session/rejoin-after-disconnect-keeps-cargo-and-bank.test.ts",
     "tests/unit/server/brief-disconnects-return-to-the-ship.test.ts",
     "tests/unit/server/pilots-recover-after-delayed-movement.test.ts",
     "tests/unit/server/pilot-release-stamps-credential-and-score-writes.test.ts",
@@ -402,9 +405,9 @@
     "src/ui/shipKitSelect.ts",
     "src/rendering/hud/resourceMapMark.ts",
     "tests/unit/shared/furnaces.test.ts",
-    "tests/unit/rendering/a-dark-street-hides-its-pipeline-until-it-is-lit.test.ts",
-    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-street-is-lit.test.ts",
-    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-street.test.ts",
+    "tests/unit/rendering/a-dark-furnace-hides-its-pipeline-until-it-is-lit.test.ts",
+    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-furnace-is-lit.test.ts",
+    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts",
     "tests/unit/server/harvested-ground-stays-flyable.test.ts",
     "shared/furnaceField.ts",
     "server/core/GameEngine.ts",
@@ -413,7 +416,9 @@
     "shared/laserSurface.ts",
     "src/rendering/ricochetCourtRenderer.ts",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
-    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
+    "shared/economy.ts",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
   ],
   "scout": [
     "src/entities/ship/shipKits.ts",
@@ -448,19 +453,20 @@
     "shared/furnaces.ts",
     "src/rendering/furnaceRenderer.ts",
     "tests/unit/shared/furnaces.test.ts",
-    "tests/unit/rendering/a-dark-street-hides-its-pipeline-until-it-is-lit.test.ts",
-    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-street-is-lit.test.ts",
-    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-street.test.ts",
+    "tests/unit/rendering/a-dark-furnace-hides-its-pipeline-until-it-is-lit.test.ts",
+    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-furnace-is-lit.test.ts",
+    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts",
     "tests/unit/server/scouts-build-persistent-crew-furnaces.test.ts",
     "shared/townStore.ts",
-    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts",
     "tests/unit/server/pilots-discover-guarded-resource-nests.test.ts",
     "tests/unit/server/mineral-scans-drive-spiders-away.test.ts",
     "shared/equipment.ts",
     "shared/furnaceTravel.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "shared/economy.ts",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
   ],
   "loot-growth": [
     "shared/shipGrowth.ts",
@@ -486,7 +492,9 @@
     "shared/townStore.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
-    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts"
+    "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
+    "shared/economy.ts",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
   ],
   "teamwork": [
     "shared-types.ts",
@@ -541,15 +549,14 @@
     "tests/unit/server/nearby-asteroid-queries-stay-local-as-the-world-grows.test.ts",
     "tests/unit/shared/crewSpawn.test.ts",
     "tests/unit/shared/furnaces.test.ts",
-    "tests/unit/rendering/a-dark-street-hides-its-pipeline-until-it-is-lit.test.ts",
-    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-street-is-lit.test.ts",
-    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-street.test.ts",
+    "tests/unit/rendering/a-dark-furnace-hides-its-pipeline-until-it-is-lit.test.ts",
+    "tests/unit/rendering/radar-shows-a-fire-trail-only-after-the-furnace-is-lit.test.ts",
+    "tests/unit/ui/the-universe-map-draws-a-fire-trail-only-for-a-lit-furnace.test.ts",
     "src/rendering/hud/resourceMapMark.ts",
     "shared/furnaceField.ts",
     "server/core/TerrainSpiderManager.ts",
     "shared/townStore.ts",
     "src/ui/townStore.ts",
-    "tests/unit/server/town-building-pays-the-builder-and-the-square-sells-paint.test.ts",
     "shared/furnaceTravel.ts",
     "shared/equipment.ts",
     "tests/unit/server/pilots-travel-between-lit-furnaces.test.ts",
@@ -559,6 +566,8 @@
     "shared/laserSurface.ts",
     "src/rendering/ricochetCourtRenderer.ts",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
-    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
+    "shared/economy.ts",
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
   ]
 }

@@ -18,18 +18,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('a street delivery lights the whole pipe and the head runs to Town Square', () => {
-  const street = civicLot('street-1-0');
-  if (!street) {
-    throw new Error('Missing East Street');
+test('a furnace delivery lights the whole pipe and the head runs to Town Square', () => {
+  const furnace = civicLot('street-1-0');
+  if (!furnace) {
+    throw new Error('Missing East Furnace');
   }
   expect(noteFurnacePipePulse(TOWN_HEARTH.id, 0)).toBe(false);
-  expect(noteFurnacePipePulse(street.id, 1_000)).toBe(true);
+  expect(noteFurnacePipePulse(furnace.id, 1_000)).toBe(true);
   const pulse = activeFurnacePipePulses(1_000)[0];
   if (!pulse) {
     throw new Error('Missing pipe pulse');
   }
-  expect(furnacePipeFrame(pulse, 1_000)?.head).toEqual(street.position);
+  expect(furnacePipeFrame(pulse, 1_000)?.head).toEqual(furnace.position);
   expect(pulse.points.length).toBeGreaterThan(2);
   const midway = furnacePipeFrame(pulse, 1_000 + pulse.travelMs / 2)?.head;
   if (!midway) {
@@ -44,7 +44,7 @@ test('a street delivery lights the whole pipe and the head runs to Town Square',
     }
   }
   let remaining = length / 2;
-  let expected = pulse.points[0] ?? street.position;
+  let expected = pulse.points[0] ?? furnace.position;
   for (let index = 1; index < pulse.points.length; index += 1) {
     const start = pulse.points[index - 1];
     const end = pulse.points[index];
@@ -63,8 +63,8 @@ test('a street delivery lights the whole pipe and the head runs to Town Square',
   expect(midway.y).toBeCloseTo(expected.y, 4);
   const chordOffset = Math.max(
     ...pulse.points.map((point) => {
-      const abx = -street.position.x;
-      const aby = -street.position.y;
+      const abx = -furnace.position.x;
+      const aby = -furnace.position.y;
       const lengthSquared = abx * abx + aby * aby;
       const t =
         lengthSquared === 0
@@ -73,13 +73,13 @@ test('a street delivery lights the whole pipe and the head runs to Town Square',
               0,
               Math.min(
                 1,
-                ((point.x - street.position.x) * abx + (point.y - street.position.y) * aby) /
+                ((point.x - furnace.position.x) * abx + (point.y - furnace.position.y) * aby) /
                   lengthSquared
               )
             );
       return Math.hypot(
-        point.x - (street.position.x + abx * t),
-        point.y - (street.position.y + aby * t)
+        point.x - (furnace.position.x + abx * t),
+        point.y - (furnace.position.y + aby * t)
       );
     })
   );
@@ -113,12 +113,12 @@ test('a street delivery lights the whole pipe and the head runs to Town Square',
   vi.spyOn(ctx, 'stroke').mockImplementation(() => {
     strokes.push({ points: [...points], width: ctx.lineWidth });
   });
-  drawFurnacePipes(street.position, 1_000);
+  drawFurnacePipes(furnace.position, 1_000);
   const lit = strokes.find((stroke) => stroke.width === 3);
   expect(lit?.points[0]).toEqual({ x: 400, y: 300 });
   expect(lit?.points[lit.points.length - 1]).toEqual({
-    x: 400 - street.position.x,
-    y: 300 - street.position.y,
+    x: 400 - furnace.position.x,
+    y: 300 - furnace.position.y,
   });
   expect(lit?.points.length).toBe(pulse.points.length);
   for (let index = 1; index < (lit?.points.length ?? 0); index += 1) {

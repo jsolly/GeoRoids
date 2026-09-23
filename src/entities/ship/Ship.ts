@@ -319,7 +319,7 @@ class Ship {
           // Scout tools share the same request, but the probe has no local
           // world effect. Predict only the user-facing timer; asteroid
           // attachment and mineral classification remain server-owned. Near a
-          // dark street the server builds instead, so skip local scan timing.
+          // dark furnace the server builds instead, so skip local scan timing.
           this.abilityCooldownFrames = abilityCooldownFramesFor(this);
           this.abilityActiveFrames =
             scoutUtilityOf(this) === 'mineral_scan' ? SHIP_ABILITY.SCAN_FRAMES : 0;

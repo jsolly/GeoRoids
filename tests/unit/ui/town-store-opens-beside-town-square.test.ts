@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { civicLot, TOWN_HEARTH } from '../../../shared/furnaces';
-import { EXTRA_LIFE_COST, MAX_LIVES, TOWN_STORE_RADIUS } from '../../../shared/townStore';
+import { TOWN_STORE_RADIUS } from '../../../shared/townStore';
 import { InputManager } from '../../../src/core/services/InputManager';
 import { PlayerManager } from '../../../src/entities/player/PlayerManager';
 import {
@@ -56,15 +56,14 @@ afterAll(() => {
   Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
 });
 
-test('the store opens at Town Square via E and buys one extra life', () => {
+test('the store opens at Town Square via E and buys a placeholder without an upgrade', () => {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
     throw new Error('Missing local pilot');
   }
   expect(document.querySelector('#town-store-toggle')).toBeNull();
   player.ship.position = { x: 0, y: 0 };
-  player.score = 0;
-  player.lives = 3;
+  player.score = 100;
   player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
   syncTownStoreChrome();
   const near = readAbilityChrome(player.ship);
@@ -79,47 +78,33 @@ test('the store opens at Town Square via E and buys one extra life', () => {
   document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
   expect(isTownStoreOpen()).toBe(true);
   const dialog = document.querySelector(`#${TOWN_STORE_IDS.dialog}`);
-  expect(dialog?.textContent).toContain('Extra life');
-  expect(dialog?.textContent).toContain(EXTRA_LIFE_COST.toLocaleString('en-US'));
-  expect(dialog?.textContent).toContain('10%');
+  expect(dialog?.textContent).toContain('Placeholder A');
+  expect(dialog?.textContent).toContain('100');
+  expect(dialog?.textContent).not.toMatch(/deliveries|bonus|10%/iu);
   expect(dialog?.textContent).not.toContain('Ember');
   expect(player.ship.movementLocked).toBe(true);
 
   const send = vi.spyOn(NetworkManager.getInstance(), 'sendMessage').mockReturnValue(true);
-  const buy = dialog?.querySelector<HTMLButtonElement>('button[data-offer="extra-life"]');
-  expect(buy?.textContent).toBe('Buy extra life');
-  expect(buy?.getAttribute('aria-describedby')).toBe(TOWN_STORE_IDS.price);
+  const buy = dialog?.querySelector<HTMLButtonElement>('button[data-offer="placeholder-1"]');
+  expect(buy?.textContent).toBe('Buy Placeholder A');
+  expect(buy?.getAttribute('aria-describedby')).toBe('town-store-price-placeholder-1');
+  buy?.focus();
   buy?.click();
   expect(send).toHaveBeenCalledWith({
-    type: 'buyExtraLife',
+    type: 'buyStoreItem',
     id: player.id,
-    data: {},
+    data: { offerId: 'placeholder-1' },
   });
-  applyTownStoreResult({ message: `You need ${EXTRA_LIFE_COST} more score` });
-  expect(document.querySelector(`#${TOWN_STORE_IDS.status}`)?.textContent).toContain(
-    `${EXTRA_LIFE_COST}`
-  );
-  expect(player.lives).toBe(3);
-  expect(dialog?.querySelector('button[data-offer="extra-life"]')).toBe(buy);
-
-  buy?.focus();
-  player.score = EXTRA_LIFE_COST;
   applyTownStoreResult({
-    message: 'You have 4 lives',
+    message: 'Placeholder A purchased. No upgrade granted.',
     score: 0,
-    lives: 4,
+    purchases: ['placeholder-1'],
   });
-  expect(player.lives).toBe(4);
   expect(player.score).toBe(0);
-  expect(dialog?.querySelector('button[data-offer="extra-life"]')).toBe(buy);
-  expect(document.activeElement).toBe(buy);
-
-  player.lives = MAX_LIVES;
-  buy?.focus();
-  applyTownStoreResult({ message: `You already hold ${MAX_LIVES} lives` });
-  expect(buy?.textContent).toBe('Extra life, lives full');
+  expect(buy?.textContent).toBe('Purchased');
   expect(buy?.disabled).toBe(true);
   expect(document.activeElement?.id).toBe(TOWN_STORE_IDS.return);
+  expect(dialog?.textContent).toContain('Unlocks at level 2');
 
   const scoreNode = document.querySelector(`#${TOWN_STORE_IDS.score}`);
   expect(buy).toBeTruthy();
@@ -138,7 +123,7 @@ test('the store opens at Town Square via E and buys one extra life', () => {
   // Same-string textContent assigns replace the Text node; stable chrome must keep it.
   expect(buy?.firstChild).toBe(labelTextNode);
   expect(scoreNode?.firstChild).toBe(scoreTextNode);
-  expect(document.querySelector('button[data-offer="extra-life"]')).toBe(buy);
+  expect(document.querySelector('button[data-offer="placeholder-1"]')).toBe(buy);
 
   closeTownStore();
   expect(isTownStoreOpen()).toBe(false);
@@ -227,7 +212,6 @@ test('a touch boarding gesture opens the map only after its click completes', ()
     throw new Error('Missing local pilot');
   }
   player.ship.position = { x: 0, y: 0 };
-  player.lives = 5;
   player.ship.health = 100;
   player.ship.exploding = false;
   player.ship.furnaceTransit = null;

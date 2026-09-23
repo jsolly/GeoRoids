@@ -18,7 +18,7 @@ test(
     await game.bootGame();
     await game.waitForAsteroids(1);
 
-    const initialScore = await game.getScore();
+    const initialCargo = await game.getCargo();
     const initialMass = await game.getShipMass();
     const roids = await game.getAsteroidPositions();
     const target =
@@ -58,11 +58,11 @@ test(
       .poll(
         async () => {
           await game.waitForAnimationFrames(6);
-          return game.getScore();
+          return game.getCargo();
         },
-        { timeout: 10000, message: 'flying over the shard should tick score' }
+        { timeout: 10000, message: 'flying over the shard should add carried points' }
       )
-      .toBeGreaterThan(initialScore);
+      .toBeGreaterThan(initialCargo);
 
     await expect
       .poll(

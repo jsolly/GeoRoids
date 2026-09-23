@@ -1225,22 +1225,27 @@ export class GameEngine {
   }
 
   private advanceSpiderField(): void {
-    const towedIds = new Set(
-      this.entityManager
-        .getAllEntities()
-        .filter(
-          (entity) =>
-            isTowCableUtility(entity) &&
-            entity.harpoonTargetId &&
-            !entity.exploding &&
-            entity.health > 0
-        )
-        .map((entity) => entity.harpoonTargetId)
-        .filter((id): id is string => id !== null && id !== undefined)
-    );
+    const spiderTows = this.entityManager
+      .getAllEntities()
+      .flatMap((entity) =>
+        entity.harpoonTargetId &&
+        isTowCableUtility(entity) &&
+        !entity.exploding &&
+        entity.health > 0
+          ? [{ ownerId: entity.id, spiderId: entity.harpoonTargetId }]
+          : []
+      );
+    const towedIds = new Set(spiderTows.map((tow) => tow.spiderId));
     const previousIds = new Set(this.spiderManager.getBodies().map((spider) => spider.id));
     const attacks = this.spiderManager.advance({
       towedIds,
+      spiderTows,
+      releaseTow: (ownerId, spiderId) => {
+        const owner = this.entityManager.getEntity(ownerId);
+        if (owner?.harpoonTargetId === spiderId && isTowCableUtility(owner)) {
+          clearHaulerLatch(owner);
+        }
+      },
       players: this.entityManager.getAllEntities().map((entity) => ({
         id: entity.id,
         position: entity.position,

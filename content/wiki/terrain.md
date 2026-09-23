@@ -64,7 +64,8 @@ even after its resource is collected or mined. Leftover guards stay until
 they are killed.
 
 Rare roaming hunters can still approach, with minutes between attempts and a
-quiet interval after spider combat. There is no immediate roaming ambush when
+quiet interval after spider combat. Towing a living spider overrides that quiet
+interval with more frequent rescue arrivals. There is no immediate roaming ambush when
 a flight starts. The starter area and furnaces remain safe
 from roaming spiders; a Hauler can drag a captured spider into a furnace.
 Surveyors cannot build a street furnace when an existing nest home would sit inside
@@ -95,7 +96,12 @@ map/schematic hold still prevent bite damage.
 Hauler's Resource Tap extracts collectible silk from a spider, making it shudder
 and turn on the pilot. Silk has no crafting use yet. Tow Cable can pull a spider
 into a furnace, where it is engulfed with a melodic whimper audible nearby when
-Sound Effects is on. Boost Coupling cannot target spiders. See
+Sound Effects is on. Towing a living spider attracts nearby spiders to its cable.
+A rescuer that reaches the cable bites it through, freeing the captured spider.
+Rescue arrivals stop when the spider is released or killed. Mineral Scan still
+repels rescuers, and starter and lit-furnace safe areas remain protected.
+Towing asteroids and using Resource Tap do not summon rescue arrivals.
+Boost Coupling cannot target spiders. See
 [Hauler utilities](/wiki/#hauler).
 
 An active [Mineral Scan](/wiki/#surveyor) drives spiders away within its scan

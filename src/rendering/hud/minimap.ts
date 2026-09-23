@@ -155,16 +155,15 @@ function isExploredPosition(
 /** Draw the shared exploration mask behind known world marks. */
 function drawExplorationFog(ctx: CanvasRenderingContext2D, geometry: MiniMapGeometry): void {
   ctx.save();
-  ctx.fillStyle = hexToRgba(PALETTE.BG, 0.78);
+  // Give explored ground its own ink: dark fog over a dark void alone is invisible.
+  const exploredInk = hexToRgba(PALETTE.REMOTE, 0.18);
   const cellScale = geometry.size / (geometry.radius * 2);
   for (const cell of explorationCellsInView({
     cx: geometry.center.x,
     cy: geometry.center.y,
     radius: geometry.radius,
   })) {
-    if (isCellExplored(geometry.exploration, cell)) {
-      continue;
-    }
+    ctx.fillStyle = isCellExplored(geometry.exploration, cell) ? exploredInk : PALETTE.BG;
     const bounds = cellWorldBounds(cell);
     const x = geometry.x + geometry.size / 2 + (bounds.x - geometry.center.x) * cellScale;
     const y = geometry.y + geometry.size / 2 + (bounds.y - geometry.center.y) * cellScale;

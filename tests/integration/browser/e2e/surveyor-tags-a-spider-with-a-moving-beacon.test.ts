@@ -90,8 +90,7 @@ for (const width of [1280, 390]) {
       await page.goto(new URL(`/wiki/#${route}`, page.url()).href);
       const heading = page
         .getByRole('heading', {
-          name:
-            route === 'hauler' ? 'Hauler' : route === 'surveyor' ? 'Surveyor' : 'Terrain spiders',
+          name: route === 'hauler' ? 'Hauler' : route === 'surveyor' ? 'Surveyor' : 'Spider tools',
           exact: true,
         })
         .first();
@@ -101,10 +100,10 @@ for (const width of [1280, 390]) {
         .filter({
           hasText:
             route === 'hauler'
-              ? 'Tapping a spider extracts'
+              ? 'Tap a spider for limited silk'
               : route === 'surveyor'
-                ? 'Attach a probe to a guarding spider'
-                : "Hauler's Resource Tap extracts collectible silk",
+                ? 'tagging a guard can reveal its resource nest'
+                : 'Surveyors can attach a probe to follow a guard home',
         })
         .first();
       await changedText.waitFor();

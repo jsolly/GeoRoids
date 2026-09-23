@@ -157,11 +157,11 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
       WHITESPACE_COLLAPSE_PATTERN,
       ' '
     );
-    expect(haulerContent).toContain('E attaches a tow cable to the nearest living asteroid');
-    expect(haulerContent).toContain('never reels a rock into the hull or throws it');
+    expect(haulerContent).toContain('Press E near a rock or spider to latch');
+    expect(haulerContent).toContain('Cargo keeps its momentum');
     expect(haulerContent).not.toMatch(HAULER_LEGACY_TERMS_PATTERN);
     expect(haulerContent).toContain('Boost Coupling E');
-    expect(haulerContent).toContain('IGNITE on touch');
+    expect(haulerContent).toContain('then E again to ignite autonomous delivery');
     await page.screenshot({ path: resolve(output, 'wiki-hauler-desktop.png'), fullPage: true });
     const haulerOffset = await page.evaluate(() => {
       const link = document.querySelector('.related-link');
@@ -337,7 +337,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.goto(`${TestConfig.GAME_URL}/wiki/#controls`);
     expect(
       (await page.locator('#content').textContent())?.replace(WHITESPACE_COLLAPSE_PATTERN, ' ')
-    ).toContain('Touch and hold the playfield to steer');
+    ).toContain('Hold and drag one finger to steer');
     await page.screenshot({ path: resolve(output, 'wiki-controls-mobile.png'), fullPage: true });
     await page.goto(`${TestConfig.GAME_URL}/wiki/#satellites`);
     await expect.poll(() => page.locator('h1').textContent()).toBe('Satellites and pickups');

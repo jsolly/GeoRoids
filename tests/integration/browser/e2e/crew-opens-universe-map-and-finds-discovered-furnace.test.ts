@@ -516,7 +516,10 @@ test.each([
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article}`);
       await page.locator('#content h1').waitFor({ state: 'visible' });
       await page
-        .getByText(article === 'terrain' ? 'A red spiderweb' : 'Red spiderwebs', { exact: false })
+        .getByText(
+          article === 'terrain' ? 'Red map webs' : 'Discovered furnaces appear as flames',
+          { exact: false }
+        )
         .scrollIntoViewIfNeeded();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true

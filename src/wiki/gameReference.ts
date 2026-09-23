@@ -149,6 +149,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
       paragraphs: [
         `The eastern belt contains ${beltSlots().length} metal deposits around ${ASTEROID_BELT.radius.toLocaleString('en-US')} world units from launch. Destroying a deposit or moving it more than ${ASTEROID_BELT.removalDistance} units from home starts a ${ASTEROID_BELT.recoveryMs / 60000}-minute replacement timer. The final ${ASTEROID_BELT.warningMs / 1000} seconds show the reformation warning.`,
         `A belt crawler has ${BELT_CRAWLER.MAX_HEALTH} health. Its lunge extends ${BELT_CRAWLER.LUNGE_REACH} units after ${frameValue(BELT_CRAWLER.WINDUP_FRAMES)} of warning, then takes ${frameValue(BELT_CRAWLER.RECOVERY_FRAMES)} to recover. Pursuit hops and destroyed-host escapes take ${frameValue(BELT_CRAWLER.ESCAPE_FRAMES)} to reach a clear rock surface within ${BELT_CRAWLER.ESCAPE_DISTANCE} units.`,
+        'Belt crawlers cannot be tapped, probed, towed directly or repelled by Mineral Scan. They cannot attack during a hop; towing their host carries them along.',
       ],
     },
     {

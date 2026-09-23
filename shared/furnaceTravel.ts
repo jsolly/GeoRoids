@@ -3,9 +3,9 @@ import type { FurnaceField } from './furnaceField';
 import { civicLot, pipeToTownSquare, TOWN_HEARTH } from './furnaces';
 
 export const FURNACE_TRAVEL = {
-  MIN_DURATION_MS: 600,
-  MAX_DURATION_MS: 2_000,
-  SPEED: 12_000,
+  MIN_DURATION_MS: 3_000,
+  MAX_DURATION_MS: 8_000,
+  SPEED: 3_000,
 } as const;
 
 export function nearestTravelFurnace(position: Position, field: FurnaceField) {

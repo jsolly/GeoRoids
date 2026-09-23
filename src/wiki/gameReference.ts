@@ -18,6 +18,7 @@ import {
   TOWN_HEARTH,
   TOWN_SPAWN_RADIUS,
 } from '../../shared/furnaces';
+import { FURNACE_TRAVEL } from '../../shared/furnaceTravel';
 import { MAX_CATCH_UP_TICKS } from '../../shared/gameClock';
 import { LOOT_BLAST } from '../../shared/lootBlast';
 import { PLAYER_MOTION } from '../../shared/playerMotion';
@@ -84,7 +85,7 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     {
       heading: 'Town store values',
       paragraphs: [
-        `E or the ability button inside any lit furnace’s visible footprint opens Furnace travel. B toggles the same menu. The approach prompt shows Press E to travel, or Tap TRAVEL to open map on touch screens. Select another lit furnace on the destination map for a free rocket ride along the pipe network, lasting 0.6–2 seconds. Boarding releases towed cargo and couplings; the ship is protected and cannot act during the ride. The menu holds the ship like the map and schematic. Town Square offers level-gated placeholder purchases that spend banked points with no gameplay effect.`,
+        `Inside any lit furnace’s visible footprint, press E on desktop or tap the travel prompt on mobile to open Furnace travel. B toggles the same menu. The mobile ability button keeps the equipped tool; the approach prompt shows Tap to travel. Select another lit furnace on the destination map for a free rocket ride along the pipe network, lasting ${FURNACE_TRAVEL.MIN_DURATION_MS / 1000}–${FURNACE_TRAVEL.MAX_DURATION_MS / 1000} seconds. Boarding releases towed cargo and couplings; the ship is protected and cannot act during the ride. The menu holds the ship like the map and schematic. Town Square offers level-gated placeholder purchases that spend banked points with no gameplay effect.`,
       ],
     },
   ],

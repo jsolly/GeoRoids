@@ -60,8 +60,7 @@ for (const viewport of [
     });
     await game.placeShipAt(0, 0);
     if (viewport.touch) {
-      await expect.poll(() => page.locator('#touch-ability').textContent()).toMatch(/TRAVEL/iu);
-      await page.locator('#touch-ability').tap();
+      await page.getByRole('button', { name: 'Tap to travel' }).tap();
     } else {
       await page.keyboard.press('KeyB');
     }

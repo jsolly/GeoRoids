@@ -9,6 +9,7 @@ import {
   tickTouchControls,
 } from '../../../src/input/touchControls';
 import { canvasManager } from '../../../src/rendering/canvasSurface';
+import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import * as townStore from '../../../src/ui/townStore';
 
 let player: Player;
@@ -22,7 +23,7 @@ beforeEach(() => {
     type: 'local',
     input: new MockPlayerInput(),
   });
-  // Stay outside Town Square so E/ability tests exercise kit tools, not Enter store.
+  // Keep ordinary tool scenarios away from contextual furnace actions.
   player.ship.position = { x: 2_000, y: 0 };
   canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
@@ -488,19 +489,19 @@ test('releasing a tow while entering furnace range does not turn the same touch 
   expect(openStore).not.toHaveBeenCalled();
 });
 
-test('store entry waits for the completed click and survives normal touch-end cleanup', () => {
+test('furnace prompt entry waits for the completed click and survives touch-end cleanup', () => {
   player.ship.position = { x: 0, y: 0 };
+  vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
   const openStore = vi.spyOn(townStore, 'openTownStore').mockReturnValue(true);
-  const ability = document.querySelector<HTMLElement>('#touch-ability');
-  if (!ability) {
-    throw new Error('Ability button missing');
+  syncFurnaceTravelPrompt();
+  const prompt = document.querySelector<HTMLElement>('#furnace-travel-prompt button');
+  if (!prompt) {
+    throw new Error('Furnace prompt missing');
   }
-  ability.setPointerCapture = vi.fn();
-  ability.hasPointerCapture = () => false;
-  pointer('pointerdown', 82, 0, 330, 164, ability);
-  pointer('pointerup', 82, 10, 330, 164, ability);
+  pointer('pointerdown', 82, 0, 195, 500, prompt);
+  pointer('pointerup', 82, 10, 195, 500, prompt);
   touchChange('touchend', []);
   expect(openStore).not.toHaveBeenCalled();
-  ability.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  prompt.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
   expect(openStore).toHaveBeenCalledTimes(1);
 });

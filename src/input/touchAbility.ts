@@ -1,5 +1,4 @@
 import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
-import { nearestTravelFurnace } from '../../shared/furnaceTravel';
 import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
 import { haulerUtilityOf } from '../entities/ship/haulerUtility';
 import { scoutUtilityOf } from '../entities/ship/scoutUtility';
@@ -53,18 +52,6 @@ function scoutOffersBuild(host: AbilityChromeHost): boolean {
   );
 }
 
-/** Inside a lit furnace footprint, E and the ability button offer travel for either kit. */
-function abilityOffersTownStore(host: AbilityChromeHost): boolean {
-  return (
-    !host.furnaceTransit &&
-    !host.exploding &&
-    Number.isFinite(host.health) &&
-    host.health > 0 &&
-    host.position !== undefined &&
-    nearestTravelFurnace(host.position, worldFurnaces) !== undefined
-  );
-}
-
 /** Short phosphor label for the on-screen kit button. */
 export function touchAbilityLabel(kitId: unknown, utilityId?: unknown): string {
   const kit = getShipKit(kitId);
@@ -101,9 +88,8 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
     !host.furnaceTransit && !host.exploding && Number.isFinite(host.health) && host.health > 0;
   const cooling = Number.isFinite(host.abilityCooldownFrames) && host.abilityCooldownFrames > 0;
   const unavailable = !alive;
-  const offeringStore = abilityOffersTownStore(host);
-  const towing = !offeringStore && kit.id === 'hauler' && Boolean(host.harpoonTargetId);
-  const offeringBuild = !offeringStore && scoutOffersBuild(host);
+  const towing = kit.id === 'hauler' && Boolean(host.harpoonTargetId);
+  const offeringBuild = scoutOffersBuild(host);
   const readyLabel =
     kit.id === 'hauler' ? HAULER_READY_LABEL[haulerUtilityOf(host)] : ABILITY_LABEL[kit.abilityId];
   const active =
@@ -113,32 +99,28 @@ export function readAbilityChrome(host: AbilityChromeHost): AbilityChromeState {
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'IGNITE'
         : 'RELEASE'
-      : offeringStore
-        ? 'TRAVEL'
-        : offeringBuild
-          ? 'BUILD'
-          : kit.id === 'scout'
-            ? touchAbilityLabel(kit.id, host.scoutUtility)
-            : readyLabel,
+      : offeringBuild
+        ? 'BUILD'
+        : kit.id === 'scout'
+          ? touchAbilityLabel(kit.id, host.scoutUtility)
+          : readyLabel,
     name: towing
       ? haulerUtilityOf(host) === 'boost_coupling'
         ? 'Ignite asteroid boost'
         : 'Release asteroid'
-      : offeringStore
-        ? 'Choose furnace destination'
-        : offeringBuild
-          ? 'Build furnace'
-          : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
-            ? 'Arm asteroid boost'
-            : kit.id === 'scout'
-              ? touchAbilityName(kit.id, host.scoutUtility)
-              : touchAbilityName(kit.id),
-    ready: alive && (towing || offeringStore || offeringBuild || !cooling),
+      : offeringBuild
+        ? 'Build furnace'
+        : kit.id === 'hauler' && haulerUtilityOf(host) === 'boost_coupling'
+          ? 'Arm asteroid boost'
+          : kit.id === 'scout'
+            ? touchAbilityName(kit.id, host.scoutUtility)
+            : touchAbilityName(kit.id),
+    ready: alive && (towing || offeringBuild || !cooling),
     active,
-    cooling: offeringStore || offeringBuild ? false : cooling,
+    cooling: offeringBuild ? false : cooling,
     unavailable,
     cooldownRatio:
-      towing || offeringStore || offeringBuild
+      towing || offeringBuild
         ? 0
         : abilityCooldownRatio(
             kit.id,

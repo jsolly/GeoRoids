@@ -16,14 +16,14 @@ test('a furnace rocket follows server time despite clock skew and accepts its ar
     sourceId: 'town-square',
     destinationId: 'street-1-0',
     startedAt: 1_000,
-    durationMs: 600,
+    durationMs: 3_000,
   };
-  const now = vi.spyOn(Date, 'now').mockReturnValue(11_300);
+  const now = vi.spyOn(Date, 'now').mockReturnValue(12_500);
   player.ship.furnaceClockOffsetMs = -10_000;
   player.updateFromServer({ furnaceTransit: transit });
   player.ship.angularVelocity = 5;
   player.ship.update();
-  expect(player.ship.position).toEqual(furnaceTravelPose(transit, 1_300).position);
+  expect(player.ship.position).toEqual(furnaceTravelPose(transit, 2_500).position);
   expect(player.ship.angularVelocity).toBe(0);
   const lasers = player.ship.lasers.length;
   player.ship.shoot();
@@ -31,9 +31,9 @@ test('a furnace rocket follows server time despite clock skew and accepts its ar
   expect(player.ship.lasers).toHaveLength(lasers);
   expect(player.ship.activateAbility()).toBe(false);
   expect(player.ship.toggleBoost()).toBe(false);
-  now.mockReturnValue(11_600);
+  now.mockReturnValue(14_000);
   player.ship.update();
-  const arrival = furnaceTravelPose(transit, 1_600).position;
+  const arrival = furnaceTravelPose(transit, 4_000).position;
   expect(player.ship.position).toEqual(arrival);
   player.updateFromServer({
     furnaceTransit: null,

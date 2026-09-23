@@ -2,20 +2,41 @@
   #furnace-travel-prompt {
     position: fixed;
     z-index: 12;
-    top: calc(50% + 84px);
+    top: min(calc(50% + 84px), calc(100% - max(20px, env(safe-area-inset-bottom, 0px)) - 112px));
     left: 50%;
     max-width: calc(100vw - 32px);
     transform: translateX(-50%);
-    padding: 10px 14px;
-    border: 1px solid #ffe29a;
-    border-radius: 6px;
-    background: rgb(0 0 17 / 92%);
+
     color: #ffe29a;
     font: 700 12px / 1.6 var(--font-mono, monospace);
     text-align: center;
     pointer-events: none;
   }
 
+  #furnace-travel-prompt button,
+  #furnace-travel-prompt span {
+    display: block;
+    padding: 10px 14px;
+    border: 1px solid #ffe29a;
+    border-radius: 6px;
+    background: rgb(0 0 17 / 92%);
+    color: inherit;
+    font: inherit;
+  }
+
+  #furnace-travel-prompt button {
+    min-height: 44px;
+    pointer-events: auto;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  #furnace-travel-prompt button:focus-visible {
+    outline: 2px solid #ffe29a;
+    outline-offset: 3px;
+  }
+
+  #furnace-travel-prompt [hidden],
   #furnace-travel-prompt[hidden] {
     display: none;
   }

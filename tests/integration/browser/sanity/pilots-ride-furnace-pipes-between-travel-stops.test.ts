@@ -39,15 +39,22 @@ for (const width of [1280, 390]) {
       .toBe(true);
     const prompt = page.locator('#furnace-travel-prompt');
     await prompt.waitFor({ state: 'visible' });
-    expect(await prompt.textContent()).toBe(
-      width === 390 ? 'Tap TRAVEL to open map' : 'Press E to travel'
+    expect(await prompt.locator(width === 390 ? 'button' : 'span').textContent()).toBe(
+      width === 390 ? 'Tap to travel' : 'Press E to travel'
     );
+    expect(await page.locator('[data-audio-restart]').count()).toBe(0);
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`furnace-travel-prompt-${width}.png`),
     });
     if (width === 390) {
-      expect(await page.locator('#touch-ability').textContent()).toContain('TRAVEL');
-      await page.locator('#touch-ability').tap();
+      const ability = page.locator('#touch-ability');
+      expect(await ability.textContent()).toBe('SCAN');
+      await ability.tap();
+      await page.waitForFunction(
+        () => (window.gameController?.getCurrPlayer()?.ship.abilityCooldownFrames ?? 0) > 0
+      );
+      expect(await page.locator('#town-store-dialog').isVisible()).toBe(false);
+      await prompt.getByRole('button', { name: 'Tap to travel' }).tap();
     } else {
       await page.keyboard.press('KeyE');
     }
@@ -75,6 +82,11 @@ for (const width of [1280, 390]) {
     await page.waitForFunction(() =>
       Boolean(window.gameController?.getCurrPlayer()?.ship.furnaceTransit)
     );
+    expect(
+      await page.evaluate(
+        () => window.gameController?.getCurrPlayer()?.ship.furnaceTransit?.durationMs
+      )
+    ).toBe(3_000);
     await page.keyboard.press('KeyV');
     expect(await page.locator('#ship-schematic-dialog').isVisible()).toBe(false);
     await game.waitForAnimationFrames(3);
@@ -85,7 +97,11 @@ for (const width of [1280, 390]) {
       const ship = window.gameController?.getCurrPlayer()?.ship;
       return ship && !ship.furnaceTransit && Math.hypot(ship.position.x, ship.position.y) < 220;
     });
-    await page.keyboard.press('KeyE');
+    if (width === 390) {
+      await prompt.getByRole('button', { name: 'Tap to travel' }).tap();
+    } else {
+      await page.keyboard.press('KeyE');
+    }
     await menu.waitFor({ state: 'visible' });
     const scoreBefore = await page.evaluate(
       () => window.gameController?.getCurrPlayer()?.score ?? 0
@@ -117,6 +133,52 @@ for (const width of [1280, 390]) {
     });
     await game.placeShipAt(lot.position.x, lot.position.y);
     await prompt.waitFor({ state: 'visible' });
+    if (width === 390) {
+      for (const viewport of [
+        { width: 320, height: 568 },
+        { width: 844, height: 390 },
+        { width: 568, height: 320 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await game.waitForAnimationFrames(3);
+        const button = prompt.getByRole('button', { name: 'Tap to travel' });
+        expect(await button.isVisible()).toBe(true);
+        const travelBounds = await button.boundingBox();
+        const boostBounds = await page.locator('#touch-boost').boundingBox();
+        if (!travelBounds || !boostBounds) {
+          throw new Error('Missing travel or Boost control bounds');
+        }
+        expect(travelBounds.y + travelBounds.height).toBeLessThan(boostBounds.y);
+        await page.screenshot({
+          path: screenshotManager.getScreenshotPath(`furnace-prompt-resized-${viewport.width}.png`),
+        });
+        if (viewport.width === 568) {
+          const shotBefore = await page.evaluate(
+            () => window.gameController?.getCurrPlayer()?.ship.lastShotTime
+          );
+          await button.focus();
+          await page.keyboard.press('Space');
+          expect(
+            await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.lastShotTime)
+          ).toBe(shotBefore);
+        } else {
+          await button.tap();
+        }
+        await menu.waitFor({ state: 'visible' });
+        await page.keyboard.press('Escape');
+        await menu.waitFor({ state: 'hidden' });
+      }
+    }
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.goto(new URL('/wiki/#controls', page.url()).href);
+    await page
+      .getByText('The mobile ability button keeps your equipped tool available over a furnace.', {
+        exact: false,
+      })
+      .waitFor();
+    await page.screenshot({
+      path: screenshotManager.getScreenshotPath(`mobile-controls-wiki-${width}.png`),
+    });
     assertNoBrowserDiagnostics(diagnostics);
   }, 30000);
 }

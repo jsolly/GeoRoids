@@ -14,11 +14,11 @@ media: []
 
 ## Read the HUD
 
-The HUD shows your bank, cargo capacity, kit, ability, shared settlement progress and resource requirements, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. Pickup and death messages explain what just happened.
+The HUD shows your bank, cargo capacity, kit, ability, shared settlement progress and resource requirements, and the crew leaderboard. A thin health bar appears above a damaged ship, and the Boost button shows charge. On mobile, two compact lines show bank and cargo, then kit and settlement level progress; the detailed points and resource requirements remain in the desktop HUD. Pickup and death messages explain what just happened.
 
 ## Travel prompt
 
-Inside a lit furnace's visible footprint, the travel prompt and TRAVEL button open its destination map. Choose another lit furnace for a [free rocket ride](/wiki/#controls).
+Inside a lit furnace's visible footprint, tap the travel prompt on mobile or press E on desktop to open its destination map. Your mobile ability button keeps its equipped tool. Choose another lit furnace for a [free rocket ride](/wiki/#controls).
 
 ## Radar and universe map
 
@@ -34,7 +34,7 @@ A pulsing cyan radar marker identifies a live Survey Probe. Follow its moving ho
 
 ## Sound and haptics
 
-The title screen has separate Sound Effects, Music, and Haptics settings, saved in this browser. Haptics require browser vibration support and are unavailable on iPhone browsers. If sound stops, use Restart audio, then check your device volume and output.
+The title screen has separate Sound Effects, Music, and Haptics settings, saved in this browser. Haptics require browser vibration support and are unavailable on iPhone browsers. If sound stops, tap the game to let automatic audio recovery retry, and check your device volume and output.
 
 ## Connection interruptions
 

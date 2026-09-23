@@ -7,6 +7,7 @@ import { WorldStore } from '../../../server/world/WorldStore';
 import { FurnaceField } from '../../../shared/furnaceField';
 import { civicLot, pipeToTownSquare, TOWN_HEARTH } from '../../../shared/furnaces';
 import {
+  furnaceTravelDuration,
   furnaceTravelPose,
   nearestTravelFurnace,
   planFurnaceRoute,
@@ -47,6 +48,7 @@ test('a pilot rides the existing pipe, ignores flight commands and arrives in a 
   });
   const transit = actor.furnaceTransit;
   assert(transit);
+  expect(transit.durationMs).toBe(3_000);
   const startedEpoch = actor.playerMotion?.epoch ?? 0;
   expect(startedEpoch).toBeGreaterThan(epoch);
   expect(world.engine.travelFurnace(actor.id, street.id)).toBe('Already travelling');
@@ -204,4 +206,11 @@ test('a mid-ride checkpoint saves the safe arrival instead of a position inside 
     engine.stopGameLoop();
     store.close();
   }
+});
+
+test('furnace rides take at least three seconds and scale with pipe length up to eight', () => {
+  const origin = { x: 0, y: 0 };
+  expect(furnaceTravelDuration([origin, { x: 1_000, y: 0 }])).toBe(3_000);
+  expect(furnaceTravelDuration([origin, { x: 9_000, y: 0 }, { x: 9_000, y: 6_000 }])).toBe(5_000);
+  expect(furnaceTravelDuration([origin, { x: 30_000, y: 0 }])).toBe(8_000);
 });

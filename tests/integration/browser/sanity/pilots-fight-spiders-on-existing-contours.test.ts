@@ -224,9 +224,9 @@ for (const viewport of [
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
       .toBe('suspended');
     await page.goto(new URL('/wiki/#terrain', page.url()).href);
-    await page.getByRole('heading', { name: 'Terrain spiders', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Survive a hunt', exact: true }).waitFor();
     await page
-      .getByRole('heading', { name: 'Terrain spiders', exact: true })
+      .getByRole('heading', { name: 'Survive a hunt', exact: true })
       .evaluate((heading) => heading.scrollIntoView({ block: 'start', behavior: 'instant' }));
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`spider-wiki-${viewport.name}.png`),

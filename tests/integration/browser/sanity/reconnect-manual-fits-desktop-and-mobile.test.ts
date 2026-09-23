@@ -21,7 +21,9 @@ for (const viewport of [
     const diagnostics = watchBrowserDiagnostics(page);
     await page.setViewportSize(viewport);
     await page.goto(`${TestConfig.GAME_URL}/wiki/#hud-network`);
-    const instructions = page.getByText('Keep the game tab up to date.', { exact: false });
+    const instructions = page.getByText('Reload when the game requests an update.', {
+      exact: false,
+    });
     await instructions.waitFor({ state: 'visible' });
     await instructions.scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -32,9 +34,24 @@ for (const viewport of [
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
       GIF_SRC_SUFFIX_PATTERN
     );
+    const reference = page.locator('details.game-reference');
+    const referenceRules = reference.locator('section').first();
+    expect(await reference.getAttribute('open')).toBeNull();
+    expect(await referenceRules.isVisible()).toBe(false);
+    const summary = reference.locator('summary');
+    await summary.focus();
+    await page.keyboard.press('Enter');
+    expect(await referenceRules.isVisible()).toBe(true);
+    expect(await reference.textContent()).toContain('Resource Tap ejects');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`performance-wiki-${viewport.name}.png`),
     });
+    await page.keyboard.press('Space');
+    expect(await reference.getAttribute('open')).toBeNull();
+    expect(await referenceRules.isVisible()).toBe(false);
     assertNoBrowserDiagnostics(diagnostics);
   });
 }

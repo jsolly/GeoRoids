@@ -30,19 +30,29 @@ test.each([
           if (!(canvas instanceof HTMLCanvasElement)) {
             throw new Error('Expected the running game canvas');
           }
-          const context = canvas.getContext('2d');
-          if (!context) {
-            throw new Error('Expected the rendered game frame');
-          }
           const display = canvas.getBoundingClientRect();
           const scaleX = canvas.width / display.width;
           const scaleY = canvas.height / display.height;
-          const pixels = context.getImageData(
+          // Sample a copy so polling does not change the game's canvas readback mode.
+          const sample = document.createElement('canvas');
+          sample.width = bounds.size * scaleX;
+          sample.height = bounds.size * scaleY;
+          const context = sample.getContext('2d', { willReadFrequently: true });
+          if (!context) {
+            throw new Error('Expected a radar sampling context');
+          }
+          context.drawImage(
+            canvas,
             bounds.x * scaleX,
             bounds.y * scaleY,
-            bounds.size * scaleX,
-            bounds.size * scaleY
-          ).data;
+            sample.width,
+            sample.height,
+            0,
+            0,
+            sample.width,
+            sample.height
+          );
+          const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
           let explored = 0;
           let fog = 0;
           for (let index = 0; index < pixels.length; index += 4) {

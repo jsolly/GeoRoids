@@ -1,5 +1,6 @@
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
 import { CIVIC_LOTS, pipeHopToParent } from '../../shared/furnaces';
+import { RICOCHET_COURT } from '../../shared/ricochetCourt';
 import { WORLD } from '../../shared/world';
 import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
@@ -21,6 +22,7 @@ import {
   universeMapMarkScreenSize,
 } from '../rendering/hud/furnaceMapMark';
 import { asteroidMapInk, drawResourceMapMark } from '../rendering/hud/resourceMapMark';
+import { drawCourtMapMark } from '../rendering/ricochetCourtRenderer';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
 import { requestTownStoreClose } from './townStoreState';
@@ -347,7 +349,7 @@ function drawMapLegend(dialog: HTMLDialogElement): void {
     return;
   }
   legend.replaceChildren();
-  for (const kind of ['You', 'Crew', 'Furnace', 'Resources', 'Nest', 'Uncharted']) {
+  for (const kind of ['You', 'Crew', 'Furnace', 'Court', 'Resources', 'Nest', 'Uncharted']) {
     const item = document.createElement('span');
     const canvas = document.createElement('canvas');
     canvas.className = 'map-key';
@@ -370,6 +372,8 @@ function drawMapLegend(dialog: HTMLDialogElement): void {
         }
       } else if (kind === 'Furnace') {
         drawFurnaceMapMark(ctx, 8, 8, 6);
+      } else if (kind === 'Court') {
+        drawCourtMapMark(ctx, 8, 8, 7);
       } else if (kind === 'Resources') {
         drawResourceMapMark(ctx, 'asteroid', 8, 8, 5, PALETTE.ROID);
       } else if (kind === 'Nest') {
@@ -842,6 +846,7 @@ function updateAccessibleLocations(assets: readonly MapAsset[]): void {
   const crew = PlayerManager.getInstance().getNonLocalPlayers();
   const players = local ? [local, ...crew] : crew;
   const locations = [
+    { name: `${RICOCHET_COURT.name} · bank-shot dueling`, position: RICOCHET_COURT.center },
     ...assets.map((asset) => ({ name: `${asset.name} (${asset.kind})`, position: asset.position })),
     ...getSpiderField()
       .nests.filter(
@@ -878,6 +883,32 @@ function drawLitFurnacePipes(context: CanvasRenderingContext2D, frame: MapFrame)
   }
 }
 
+function drawCourtLandmark(
+  context: CanvasRenderingContext2D,
+  frame: MapFrame,
+  labelRects: MapLabelRect[]
+): void {
+  const markSize = universeMapMarkScreenSize(UNIVERSE_MAP_LANDMARK_SIZE, frame.zoom);
+  const showLabel = canPlaceMapAssetLabel(
+    { name: RICOCHET_COURT.name, position: RICOCHET_COURT.center },
+    frame,
+    view.center,
+    labelRects
+  );
+  context.save();
+  context.translate(RICOCHET_COURT.center.x, RICOCHET_COURT.center.y);
+  context.scale(1 / frame.scale, 1 / frame.scale);
+  drawCourtMapMark(context, 0, 0, markSize);
+  if (showLabel) {
+    context.font = '12px "Courier New", monospace';
+    context.textAlign = 'center';
+    context.textBaseline = 'top';
+    context.fillStyle = hexToRgba(PALETTE.REMOTE, 0.9);
+    context.fillText(RICOCHET_COURT.name, 0, markSize * 1.6);
+  }
+  context.restore();
+}
+
 function renderMap(): void {
   if (!elements || !mapOpen) {
     return;
@@ -912,6 +943,7 @@ function renderMap(): void {
   const revealedAssets = getWorldMapAssets().filter((asset) => chartShowsAsset(asset, exploration));
   updateAccessibleLocations(revealedAssets);
   const labelRects: MapLabelRect[] = [];
+  drawCourtLandmark(context, frame, labelRects);
   revealedAssets.sort((left, right) => {
     const furnacePriority = Number(right.kind === 'furnace') - Number(left.kind === 'furnace');
     if (furnacePriority !== 0) {

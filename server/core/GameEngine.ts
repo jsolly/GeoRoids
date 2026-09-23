@@ -25,6 +25,7 @@ import {
   townSquareSpawn,
 } from '../../shared/furnaces';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
+import { findLaserSurfaceImpact } from '../../shared/laserSurface';
 import {
   blastPush,
   inBlastRadius,
@@ -47,7 +48,6 @@ import {
   townDeliveryPoints,
 } from '../../shared/townStore';
 import { WORLD } from '../../shared/world';
-import { findWorldBoundaryImpact } from '../../shared/worldBoundary';
 import type {
   ActiveCollabTag,
   AsteroidData,
@@ -2238,7 +2238,7 @@ export class GameEngine {
         .filter((nearbyRock) => this.getAsteroid(nearbyRock.id) === nearbyRock);
       const rocks = nearbyRocks.filter((nearbyRock) => !cargo.has(nearbyRock.id));
       const impact = findNearestAsteroidImpact(start, end, rocks, laser.lastAsteroidId);
-      const boundary = findWorldBoundaryImpact(start, end);
+      const surface = findLaserSurfaceImpact(start, end);
       const distance = Math.hypot(end.x - start.x, end.y - start.y);
       const owner = this.getPlayer(laser.ownerId);
       const hulls = laserDamagesShips(laser.bounces)
@@ -2294,7 +2294,7 @@ export class GameEngine {
         (!impact ||
           auxiliary.distance < impact.distance ||
           (auxiliary.distance === impact.distance && auxiliary.kind === 'surveyProbe')) &&
-        (!boundary || auxiliary.distance < boundary.distance)
+        (!surface || auxiliary.distance < surface.distance)
       ) {
         laser.hasExploded = true;
         if (auxiliary.kind === 'satellitePickup') {
@@ -2320,25 +2320,25 @@ export class GameEngine {
         spiderHit &&
         (!auxiliary || spiderHit.distance < auxiliary.distance) &&
         (!impact || spiderHit.distance < impact.distance) &&
-        (!boundary || spiderHit.distance < boundary.distance)
+        (!surface || spiderHit.distance < surface.distance)
       ) {
         this.spiderManager.resolveLaserHit(start, end, DAMAGE.LASER_HIT * laser.energy);
         laser.hasExploded = true;
         return null;
       }
-      if (boundary && (!impact || boundary.distance <= impact.distance)) {
+      if (surface && (!impact || surface.distance <= impact.distance)) {
         if (laser.bounces >= ASTEROID_INTERACTIONS.maxBounces) {
           laser.hasExploded = true;
           return null;
         }
-        laser.velocity = reflectVector(laser.velocity, boundary.normal);
+        laser.velocity = reflectVector(laser.velocity, surface.normal);
         laser.bounces++;
         delete laser.lastAsteroidId;
         const speed = getVelocityMagnitude(laser.velocity);
-        const remaining = Math.max(0, distance - boundary.distance);
+        const remaining = Math.max(0, distance - surface.distance);
         start = {
-          x: boundary.point.x - boundary.normal.x * 1e-5,
-          y: boundary.point.y - boundary.normal.y * 1e-5,
+          x: surface.point.x - surface.normal.x * 1e-5,
+          y: surface.point.y - surface.normal.y * 1e-5,
         };
         end = {
           x: start.x + (laser.velocity.x / speed) * remaining,

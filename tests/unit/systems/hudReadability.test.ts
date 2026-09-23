@@ -529,9 +529,9 @@ describe('painted HUD composition', () => {
       style: normalizedCanvasColor(ctx, 'rgba(100,116,139,0.85)'),
       width: 1,
     });
-    expect(
-      rectangles.some(({ style }) => style === normalizedCanvasColor(ctx, 'rgba(0, 0, 17, 0.78)'))
-    ).toBe(true);
+    expect(rectangles.some(({ style }) => style === normalizedCanvasColor(ctx, PALETTE.BG))).toBe(
+      true
+    );
     expect(
       rectangles.filter(({ style }) => style === normalizedCanvasColor(ctx, 'rgba(0, 0, 17, 0.72)'))
     ).toHaveLength(1);

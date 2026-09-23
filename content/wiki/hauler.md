@@ -139,6 +139,11 @@ engulf it in flame; a brighter head runs along that street's fire trail back to 
 With Sound Effects on, nearby pilots hear a brief melodic
 whimper as it disappears.
 
+Towing a living spider draws nearby spiders and more frequent rescue arrivals.
+Rescuers chase the tow cable and can bite it through to free their companion.
+A Surveyor's active Mineral Scan repels them, and lit furnaces remain safe.
+Releasing the spider ends the rescue call; towing an asteroid does not trigger it.
+
 ## Mining lasers
 
 Hauler deals double mining damage to metal asteroids, cooperative large rocks,

@@ -294,6 +294,7 @@ export function handleTestArrangeCrewField(
         'probe',
         'spider-nest',
         'spider-tools',
+        'spider-rescue',
         'map-icons',
         'furnace',
         'town-store',
@@ -329,23 +330,25 @@ export function handleTestArrangeCrewField(
           ? { x: 0, y: 0 }
           : body['scenario'] === 'street-build'
             ? { ...streetLot.position }
-            : body['scenario'] === 'spider-tools'
-              ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
-              : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
-                ? { x: 3000 + index * 120, y: 5000 }
-                : body['scenario'] === 'boundary'
-                  ? { x: WORLD.radius - 500 + index * 120, y: 0 }
-                  : body['scenario'] === 'delivery'
-                    ? player.kitId === 'hauler'
-                      ? { x: 0, y: 550 }
-                      : { x: 220, y: 460 }
-                    : body['scenario'] === 'tow'
+            : body['scenario'] === 'spider-rescue'
+              ? { x: 4400 + index * 120, y: 2200 }
+              : body['scenario'] === 'spider-tools'
+                ? { x: spiderWorks.position.x + 800 + index * 120, y: spiderWorks.position.y }
+                : ['spider-nest', 'map-icons', 'furnace'].includes(String(body['scenario']))
+                  ? { x: 3000 + index * 120, y: 5000 }
+                  : body['scenario'] === 'boundary'
+                    ? { x: WORLD.radius - 500 + index * 120, y: 0 }
+                    : body['scenario'] === 'delivery'
                       ? player.kitId === 'hauler'
-                        ? { x: 0, y: -500 }
-                        : { x: 220, y: -460 }
-                      : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
-                        ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
-                        : { x: index * 120, y: -500 };
+                        ? { x: 0, y: 550 }
+                        : { x: 220, y: 460 }
+                      : body['scenario'] === 'tow'
+                        ? player.kitId === 'hauler'
+                          ? { x: 0, y: -500 }
+                          : { x: 220, y: -460 }
+                        : body['scenario'] === 'reflection' || body['scenario'] === 'probe'
+                          ? { x: -220, y: -460 + (body['scenario'] === 'probe' ? index * 160 : 0) }
+                          : { x: index * 120, y: -500 };
       if (
         !gameEngine.playerMotion.placeActorForTesting(
           player.id,
@@ -359,19 +362,19 @@ export function handleTestArrangeCrewField(
       // Delivery faces screen-up, which decreases world y, from the positive-y
       // approach into Town Square. Tow uses that same heading from the
       // negative-y side so the hooked rock moves farther from the hearth.
-      player.angle =
-        body['scenario'] === 'spider-tools'
-          ? Math.PI
-          : body['scenario'] === 'reflection' ||
-              body['scenario'] === 'probe' ||
-              body['scenario'] === 'boundary'
-            ? 0
-            : Math.PI / 2;
+      player.angle = ['spider-tools', 'spider-rescue'].includes(String(body['scenario']))
+        ? Math.PI
+        : body['scenario'] === 'reflection' ||
+            body['scenario'] === 'probe' ||
+            body['scenario'] === 'boundary'
+          ? 0
+          : Math.PI / 2;
       player.spawnProtectionTimer = [
         'delivery',
         'tow',
         'map-icons',
         'spider-tools',
+        'spider-rescue',
         'furnace',
         'town-store',
         'street-build',
@@ -400,7 +403,15 @@ export function handleTestArrangeCrewField(
       gameEngine.parkSatellitePickups();
     }
     const first = poses[0];
-    if (body['scenario'] === 'spider-tools') {
+    if (body['scenario'] === 'spider-rescue') {
+      gameEngine.clearSpiderField();
+      if (
+        !gameEngine.spawnTerrainSpider({ x: 4580, y: 2200 }) ||
+        !gameEngine.spawnTerrainSpider({ x: 4490, y: 2600 })
+      ) {
+        throw new Error('Spider rescue fixture could not spawn its spiders');
+      }
+    } else if (body['scenario'] === 'spider-tools') {
       gameEngine.clearSpiderField();
       if (
         !gameEngine.spawnTerrainSpider({

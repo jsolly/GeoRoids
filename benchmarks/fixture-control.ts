@@ -120,7 +120,6 @@ export async function startFixtureControl(
           delete actor.respawnTimer;
           delete actor.explodeTime;
           delete actor.deathCause;
-          delete actor.laserUpgrade;
           actor.harpoonTargetId = null;
           delete actor.harpoonLatchPos;
           const angle = (index * Math.PI * 2) / actors.length;

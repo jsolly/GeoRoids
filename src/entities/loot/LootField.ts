@@ -5,7 +5,6 @@ function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
   if (
     kind === 'points' ||
     kind === 'shard' ||
-    kind === 'laserCore' ||
     kind === 'tap' ||
     kind === 'silk' ||
     isEquipmentId(kind)
@@ -15,7 +14,7 @@ function normalizeKind(kind: LootData['kind'] | undefined): LootKind {
   return 'wreckage';
 }
 
-/** Client snapshot of server-authoritative loot (wreckage, shards, laser cores). */
+/** Client snapshot of server-authoritative loot (wreckage, shards, tap canisters, silk). */
 export class LootField {
   private static instance: LootField;
   private loot: LootData[] = [];

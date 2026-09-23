@@ -430,7 +430,7 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
   const prior = getTerrainField();
   try {
     ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: 3100 });
-    drawIsoContours({ x: 1000, y: 0 });
+    drawIsoContours({ x: 1000, y: 0 }, 0);
     expect(strokes.some((path) => path.points.length > 0)).toBe(true);
     expect(
       strokes
@@ -438,14 +438,13 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
         .every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))
     ).toBe(true);
     expect(
-      strokes.every((path) =>
-        [VISUAL.CONTOUR_ALPHA, VISUAL.CONTOUR_INDEX_ALPHA].some(
-          (alpha) => path.color === canvasColor(ctx, hexToRgba(PALETTE.CONTOUR, alpha))
-        )
+      strokes.every(
+        (path) => path.blur >= 0 && path.blur <= 4 && path.width === VISUAL.CONTOUR_STROKE_WIDTH
       )
     ).toBe(true);
+    expect(strokes.some((path) => path.blur === 0)).toBe(true);
     strokes.length = 0;
-    drawContourLaserTicks({ x: 1000, y: 0 }, [{ x: 1100, y: 0 }]);
+    drawContourLaserTicks({ x: -2100, y: 700 }, [{ x: -2100, y: 700 }]);
     expect(strokes).toHaveLength(1);
     expect(strokes[0]?.points).toHaveLength(2);
     expect(strokes[0]?.color).toBe(
@@ -456,7 +455,7 @@ test('terrain and contour laser renderers emit finite muted strokes at runtime',
         .flatMap((path) => path.points)
         .every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))
     ).toBe(true);
-    expect(VISUAL.CONTOUR_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.SHIP_STROKE_WIDTH);
+    expect(VISUAL.CONTOUR_STROKE_WIDTH).toBe(1);
     expect(VISUAL.CONTOUR_LASER_STROKE_WIDTH).toBeLessThanOrEqual(VISUAL.LASER_STROKE_WIDTH);
     expect(lootScreenRadius(20, 1)).toBeGreaterThan(0);
     expect(lootScreenRadius(Number.POSITIVE_INFINITY, 1)).toBeNull();

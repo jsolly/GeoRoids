@@ -1,5 +1,5 @@
 import { EQUIPMENT, isEquipmentId } from '../../../shared/equipment';
-import type { LootData, LootKind } from '../../../shared-types';
+import type { LootData } from '../../../shared-types';
 import { PALETTE, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
 import { addResourceMapPath } from '../../rendering/hud/resourceMapMark';
@@ -8,13 +8,6 @@ import { resolveGlow } from '../../rendering/renderQuality';
 import { hexToRgba } from '../../utils/colorUtils';
 import type { Ship } from '../ship/Ship';
 import { LootField } from './LootField';
-
-export function lootStrokeColor(kind: LootKind): typeof PALETTE.LASER_LOCAL | typeof PALETTE.LOOT {
-  if (kind === 'laserCore') {
-    return PALETTE.LASER_LOCAL;
-  }
-  return PALETTE.LOOT;
-}
 
 /** Outline canister / tap head. Cream body, amber nub. Not a diamond chip. */
 export function traceTapCanister(
@@ -114,11 +107,10 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
     if (prominent && !reducedMotion) {
       screen.y += Math.sin(now / 450 + drop.position.x * 0.01) * 6 * scale;
     }
-    const isCore = drop.kind === 'laserCore';
     const isShard = drop.kind === 'shard';
     const isTap = drop.kind === 'tap';
     const isDenseShard = isShard && Number.isFinite(drop.mass) && drop.mass >= 0.5;
-    const color = lootStrokeColor(drop.kind);
+    const color = PALETTE.LOOT;
     const pulse =
       prominent && !reducedMotion
         ? 1 + 0.08 * Math.sin((now / VISUAL.TAP_LOOT_PULSE_MS) * Math.PI * 2)
@@ -140,12 +132,6 @@ export function drawLootRelative(ship: Ship, loot: readonly LootData[]): void {
         return;
       }
       traceDiamond(ctx, screen.x, screen.y, r);
-      if (isCore) {
-        ctx.moveTo(screen.x - r * 0.45, screen.y + r * 0.3);
-        ctx.lineTo(screen.x + r * 0.1, screen.y - r * 0.55);
-        ctx.lineTo(screen.x - r * 0.1, screen.y + r * 0.55);
-        ctx.lineTo(screen.x + r * 0.45, screen.y - r * 0.3);
-      }
       if (isShard) {
         traceDiamond(ctx, screen.x, screen.y, r * VISUAL.LOOT_SHARD_INNER);
         if (isDenseShard) {

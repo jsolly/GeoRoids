@@ -1,4 +1,4 @@
-import type { LootKind, Position } from '../../shared-types';
+import type { Position } from '../../shared-types';
 import { AUDIO } from '../constants';
 import { soundIsOn } from '../constants/user-preferences';
 import { logger } from '../utils/Logger';
@@ -13,7 +13,6 @@ const EXTRACTION_NOTES = [0, 7, 4, 12];
 const PHRASE_GAP_MS = 1400;
 const extraction = new Sound(...AUDIO.TAP_EJECT);
 const pickup = new Sound(...AUDIO.LOOT_PICKUP);
-const core = new Sound(...AUDIO.CORE_PICKUP);
 let lastNoteAt = Number.NEGATIVE_INFINITY;
 let pickupStep = 0;
 let extractionStep = 0;
@@ -25,7 +24,6 @@ export function resetResourceMusic(): void {
   extractionStep = 0;
   extraction.stop();
   pickup.stop();
-  core.stop();
 }
 registerSoundStopHook(resetResourceMusic);
 
@@ -69,6 +67,6 @@ export function playTapEjection(position: Position): void {
   playResourceNote('extraction', extraction, position);
 }
 
-export function playLootPickup(kind: LootKind, position?: Position): void {
-  playResourceNote('pickup', kind === 'laserCore' ? core : pickup, position);
+export function playLootPickup(position?: Position): void {
+  playResourceNote('pickup', pickup, position);
 }

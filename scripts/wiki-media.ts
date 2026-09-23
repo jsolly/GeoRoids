@@ -43,7 +43,7 @@ import { cruiseSpeed, cruiseVelocity } from '../shared/shipFlight';
 import { applyLootMass, GROWTH, lootOverlap } from '../shared/shipGrowth';
 import type { AsteroidData, Position, SatellitePickupTypeId, Velocity } from '../shared-types';
 import { DAMAGE, GAME, PALETTE, SATELLITE_PICKUP, SHIP, TITLE, VISUAL } from '../src/constants';
-import { lootScreenRadius, lootStrokeColor } from '../src/entities/loot/lootRenderer';
+import { lootScreenRadius } from '../src/entities/loot/lootRenderer';
 import { drawAsteroidMaterialDetails } from '../src/entities/roid/materialArt';
 import { drawRoidInteractionCues } from '../src/entities/roid/roidRenderer';
 import { drawEoSatelliteOutline } from '../src/entities/satellite/eoOutlines';
@@ -782,7 +782,7 @@ function makeHaulerDemo(): Demo {
 }
 
 function makeMovementDemo(): Demo {
-  const state = {
+  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
     position: { x: -500, y: 160 },
     velocity: { x: 0, y: 0 },
     angle: 0,
@@ -907,7 +907,7 @@ function makeTerrainDemo(): Demo {
   const contours = extractIsoContours(field);
   const cruise = cruiseSpeed(1, SHIP.MAX_VELOCITY);
   const initialGradient = sampleGradient(field, start.x, start.y);
-  const state = {
+  const state: Parameters<typeof advanceCruiseVelocity>[0] = {
     position: copyPosition(start),
     velocity: { x: 0, y: 0 },
     angle: headingAlongContour(initialGradient.x, initialGradient.y, 0),
@@ -1224,24 +1224,10 @@ function makeLootDemo(): Demo {
         drawLaser(ctx, { x: 0, y: 0 }, { x: 150 * displayScale, y: 0 });
       }
       if (!firstRemoved) {
-        drawLootDiamond(
-          ctx,
-          firstDrop.position,
-          firstDrop.radius,
-          lootStrokeColor(firstDrop.kind),
-          1,
-          displayScale
-        );
+        drawLootDiamond(ctx, firstDrop.position, firstDrop.radius, PALETTE.LOOT, 1, displayScale);
       }
       if (secondVisible && !collected && liveSecond) {
-        drawLootDiamond(
-          ctx,
-          liveSecond.position,
-          liveSecond.radius,
-          lootStrokeColor(liveSecond.kind),
-          1,
-          displayScale
-        );
+        drawLootDiamond(ctx, liveSecond.position, liveSecond.radius, PALETTE.LOOT, 1, displayScale);
       }
       const blastAge = frame - explosionFrame;
       if (detonated && blastAge >= 0 && blastAge <= 12) {

@@ -1,9 +1,8 @@
-# Reflective asteroids and laser cores
+# Reflective asteroids
 
 Reflective metal clusters are part of the shared asteroid field. Fire normally
 with **Space**; the ordinary controls remain available while a shot is in
-flight. The passive HUD keeps the laser-core charge count visible when a core
-upgrade is active. There is no asteroid selection or tool mode.
+flight. There is no asteroid selection or tool mode.
 
 A Hauler presses **E** to attach to a nearby asteroid and tows it at the cable's
 original length. Press **E** again to release it. Attached cargo cannot damage its
@@ -11,7 +10,7 @@ Hauler or be destroyed by crew lasers. Other asteroids remain dangerous; crew
 ships can overlap safely. Tow surveyed cargo into a furnace to award the Hauler
 and each contributing Scout. Construction attribution does not change personal payouts.
 
-## Reflective clusters and laser cores
+## Reflective clusters
 
 Flat, faceted metal clusters reflect shots from their actual polygon faces. Each
 bounce increases the shot's energy and charges the rock it hits. A rock breaks
@@ -21,9 +20,7 @@ the client does not offer a selection-dependent path preview.
 
 Direct crew shots leave every crew ship unharmed, including
 the shooter. After a bounce off a wall, reflective face, or court panel, the same shot
-becomes a ricochet that damages any hull it then hits and is consumed. A broken reflector leaves one laser core: collect
-it for 150 carried points and six stronger shots, usable for 60 seconds. The upgrade
-expires on death. Shots, damage, charge use, and collection belong to the shared
+becomes a ricochet that damages any hull it then hits and is consumed. A broken reflector leaves ordinary salvage. Shots, damage, and collection belong to the shared
 world, so reconnecting does not replay rewards.
 
 ## Ricochet Court

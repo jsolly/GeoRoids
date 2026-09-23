@@ -402,7 +402,7 @@ test('a terminal reflected shot credits the offline pilot who first charged the 
   expect(second.score).toBe(0);
   engine.checkpointWorld();
   expect(worldStore.loadPilots().find((savedPilot) => savedPilot.id === first.id)?.score).toBe(0);
-  expect(engine.getLoot().filter((drop) => drop.kind === 'laserCore')).toHaveLength(1);
+  expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
   expect(worldStore.loadSector('0,0')?.some((sectorRock) => sectorRock.id === target.id)).toBe(
     false
   );

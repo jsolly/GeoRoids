@@ -144,7 +144,7 @@ export const VISUAL = {
   SCORE_FONT: '14px Arial',
   NAME_LABEL_FONT: '11px Arial',
   NAME_LABEL_ALPHA: 0.4,
-  // Iso-contours: hairline slate, no glow. Index lines are only slightly stronger.
+  // Original hairline contours with directional route colors inside the steering cone.
   CONTOUR_STROKE_WIDTH: 1,
   CONTOUR_ALPHA: 0.16,
   CONTOUR_INDEX_ALPHA: 0.24,
@@ -330,7 +330,6 @@ export const AUDIO = {
   ORBITAL_PICKUP: ['/sounds/orbital-pickup.m4a', 4, 0.04],
   TAP_EJECT: ['/sounds/tap-eject.m4a', 4, 0.055],
   LOOT_PICKUP: ['/sounds/loot-pickup.m4a', 8, 0.065],
-  CORE_PICKUP: ['/sounds/core-pickup.m4a', 4, 0.04],
   SURVEY_SCAN: ['/sounds/survey-scan.m4a', 3, 0.035],
   RESPAWN: ['/sounds/respawn.m4a', 3, 0.035],
   ASTEROID_EXPLODE: ['/sounds/asteroid-explode.m4a', 5, 0.045],

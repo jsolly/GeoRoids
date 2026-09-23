@@ -41,7 +41,7 @@ export class MapAssets {
         id: `loot:${drop.id}`,
         kind: drop.kind === 'points' ? 'wreckage' : drop.kind,
         position: drop.position,
-        name: drop.kind === 'laserCore' ? 'Laser core' : 'Salvage',
+        name: 'Salvage',
       });
     }
     for (const pickup of pickups) {

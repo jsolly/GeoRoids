@@ -271,7 +271,13 @@
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
     "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
     "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts",
-    "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts"
+    "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts",
+    "src/physics/terrain/passages.ts",
+    "src/rendering/contourAppearance.ts",
+    "src/rendering/contourDisplay.ts",
+    "tests/unit/entities/pilots-find-speed-passages-through-hills.test.ts",
+    "tests/integration/browser/sanity/pilots-follow-winding-speed-passages.test.ts",
+    "tests/integration/browser/sanity/terrain-colors-explain-the-slope.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
@@ -487,7 +493,7 @@
     "tests/unit/server/tap-extract-spawns-tap-loot.test.ts",
     "tests/unit/entities/tapLootRenderer.test.ts",
     "tests/unit/entities/haulerUtility.test.ts",
-    "tests/integration/browser/sanity/reflective-asteroids-grant-core-upgrades.test.ts",
+    "tests/integration/browser/sanity/reflective-asteroids-leave-ordinary-salvage.test.ts",
     "server/world/WorldStore.ts",
     "src/ui/satelliteInventory.ts",
     "tests/unit/server/hauler-taps-silk-and-tows-spiders-to-a-furnace.test.ts",

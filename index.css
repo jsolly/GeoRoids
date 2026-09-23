@@ -1823,24 +1823,6 @@
     text-underline-offset: 4px;
   }
 
-  /* Passive laser-core readout never captures playfield input. */
-  #flight-upgrade {
-    position: absolute;
-    top: 112px;
-    left: 16px;
-    max-width: min(260px, 60vw);
-    color: var(--palette-laser, #fde68a);
-    font: 11px / 1.5 var(--font-mono, monospace);
-    pointer-events: none;
-    overflow-wrap: anywhere;
-  }
-  @media (max-height: 500px) {
-    #flight-upgrade {
-      top: 76px;
-      font-size: 10px;
-    }
-  }
-
   .ship-schematic-dialog {
     width: min(920px, calc(100vw - 24px));
     max-height: calc(100dvh - 24px);

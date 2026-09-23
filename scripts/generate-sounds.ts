@@ -49,10 +49,6 @@ const recipes: Record<string, Recipe> = {
   'satellite-equip': { duration: 0.44, tones: [bell(0, 0, 0.3, 0.35), bell(7, 0.08, 0.34, 0.38)] },
   'tap-eject': { duration: 0.36, tones: [bell(0, 0, 0.36, 0.6, 0.1), body(-24, 0.055, 0.22)] },
   'loot-pickup': { duration: 0.55, tones: [bell(12, 0, 0.55, 0.62, 0.22)] },
-  'core-pickup': {
-    duration: 0.65,
-    tones: [bell(12, 0, 0.65, 0.55, 0.3), bell(24, 0.045, 0.4, 0.12)],
-  },
   'orbital-pickup': { duration: 0.6, tones: [bell(7, 0, 0.42), bell(12, 0.09, 0.48, 0.38)] },
   'harpoon-launch': { duration: 0.24, tones: [body(-12, 0.18, 0.5), bell(0, 0.04, 0.2, 0.25)] },
   'harpoon-latch': { duration: 0.28, tones: [bell(-5, 0, 0.28, 0.6), body(-24, 0.09, 0.2)] },

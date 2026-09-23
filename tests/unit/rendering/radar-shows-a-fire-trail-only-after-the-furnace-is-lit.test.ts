@@ -19,7 +19,7 @@ function wideStrokes(ctx: CanvasRenderingContext2D, draw: () => void) {
   const spy = vi.spyOn(ctx, 'stroke').mockImplementation(function stroke(
     this: CanvasRenderingContext2D
   ) {
-    if (this.lineWidth >= 4) {
+    if (this.lineWidth * Math.hypot(this.getTransform().a, this.getTransform().b) >= 4) {
       count += 1;
     }
   });
@@ -43,7 +43,7 @@ function wideTrail(ctx: CanvasRenderingContext2D, draw: () => void): Position[][
     lineTo(x, y);
   });
   vi.spyOn(ctx, 'stroke').mockImplementation(function strokeTrail(this: CanvasRenderingContext2D) {
-    if (this.lineWidth >= 4) {
+    if (this.lineWidth * Math.hypot(this.getTransform().a, this.getTransform().b) >= 4) {
       trails.push(current.map((point) => ({ ...point })));
     }
     stroke();

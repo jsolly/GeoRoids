@@ -4,10 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { MessageHandler } from '../../../server/communication/MessageHandler';
 import { GameEngine } from '../../../server/core/GameEngine';
 import { GameStateBroadcaster } from '../../../server/services/GameStateBroadcaster';
-import {
-  ASTEROID_INTERACTIONS,
-  previewChargedReflections,
-} from '../../../shared/asteroidPhenomena';
+import { previewChargedReflections } from '../../../shared/asteroidPhenomena';
 import { captureSnapshot } from '../../../shared/snapshotProtocol';
 import type { AsteroidData } from '../../../shared-types';
 import { GAME, LASER } from '../../../src/constants';
@@ -109,42 +106,39 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(reflector.phenomenon?.energy).toBe(charge);
   });
 
-  test('charging the same rock destroys it once and collecting its core grants exactly six upgraded shots', () => {
+  test('charging a reflector destroys it once, leaves ordinary salvage, and preserves normal firing', () => {
     const { engine, pilot, reflector } = arena();
     for (let index = 0; index < 6; index++) {
       engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 });
       engine.advanceLasersAndResolveHits();
     }
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
-    const cores = engine.getLoot().filter((drop) => drop.kind === 'laserCore');
-    expect(cores).toHaveLength(1);
+    expect(engine.getLoot().filter((drop) => drop.kind === 'shard')).toHaveLength(1);
+    const shard = engine.getLoot().find((drop) => drop.kind === 'shard');
+    assert.ok(shard, 'ordinary salvage');
+    expect(shard.kind).toBe('shard');
     const score = pilot.cargo;
     engine.handleAsteroidHit(reflector.id, pilot.id);
     expect(pilot.cargo).toBe(score);
-    const core = cores[0];
-    assert.ok(core, 'laser core');
-    pilot.position = { ...core.position };
+    pilot.position = { ...shard.position };
     engine.collectLoot();
-    const after = pilot.cargo;
+    const collectedScore = pilot.cargo;
+    expect(collectedScore).toBeGreaterThan(score);
     engine.collectLoot();
-    expect(pilot.cargo).toBe(after);
-    expect(pilot.laserUpgrade?.charges).toBe(6);
-    expect(after).toBeGreaterThanOrEqual(score + ASTEROID_INTERACTIONS.coreScore);
-    for (let index = 0; index < 6; index++) {
-      expect(engine.spawnLaser(pilot.id, { x: 500, y: 500 }, { x: 1, y: 0 })?.energy).toBe(2);
+    expect(pilot.cargo).toBe(collectedScore);
+    for (let index = 0; index < 7; index++) {
+      expect(engine.spawnLaser(pilot.id, { x: 500, y: 500 }, { x: 1, y: 0 })?.energy).toBe(1);
     }
-    expect(pilot.laserUpgrade).toBeUndefined();
-    expect(engine.spawnLaser(pilot.id, { x: 500, y: 500 }, { x: 1, y: 0 })?.energy).toBe(1);
   });
 
-  test('the aim preview ends at the same energy threshold as the actual upgraded shot', () => {
+  test('the aim preview ends at the same energy threshold as an already energized ricochet', () => {
     const { engine, reflector } = arena();
     if (reflector.phenomenon?.kind !== 'reflective') {
       throw new Error('fixture');
     }
     reflector.phenomenon.energy = 4;
     const normal = previewChargedReflections({ x: -50, y: 0 }, { x: 1, y: 0 }, [reflector], 200, 1);
-    const upgraded = previewChargedReflections(
+    const energized = previewChargedReflections(
       { x: -50, y: 0 },
       { x: 1, y: 0 },
       [reflector],
@@ -152,8 +146,8 @@ describe('reflected shots remain authoritative across snapshots and resource col
       2
     );
     expect(normal.segments).toHaveLength(2);
-    expect(upgraded.segments).toHaveLength(1);
-    expect(upgraded.termination).toBe('blocked');
+    expect(energized.segments).toHaveLength(1);
+    expect(energized.termination).toBe('blocked');
     const shot = engine.spawnLaser('pilot', { x: -50, y: 0 }, { x: 40, y: 0 });
     assert.ok(shot, 'threshold shot');
     shot.energy = 2;
@@ -161,17 +155,6 @@ describe('reflected shots remain authoritative across snapshots and resource col
     expect(shot.hasExploded).toBe(true);
     expect(shot.bounces).toBe(0);
     expect(engine.getAsteroid(reflector.id)).toBeUndefined();
-  });
-
-  test('unused core charges expire from authoritative snapshots before the next ordinary shot', () => {
-    const { engine, pilot } = arena();
-    pilot.laserUpgrade = { charges: 4, expiresAt: Date.now() - 1 };
-    engine.tickAbilities();
-    expect(pilot.laserUpgrade).toBeUndefined();
-    expect(
-      snapshot(engine).entities.find((entity) => entity.id === pilot.id)?.laserUpgrade
-    ).toBeUndefined();
-    expect(engine.spawnLaser(pilot.id, { x: -50, y: 0 }, { x: 40, y: 0 })?.energy).toBe(1);
   });
 
   test('projectile identities never repeat across world reset or a new server instance', () => {

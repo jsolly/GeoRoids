@@ -12,10 +12,10 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, Inventory button on desktop and touch, satellite-pickup label pointing at Inventory, Town Square store, and map/schematic/store hold with blink on return |
 | scout | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named furnaces paid with personal score, scattered furnace lots, right-angle fire trails only after a furnace is lit, escape construction and living spider retreat, moving probe beacons, and delivery tags |
 | hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the furnace is lit, and double metal mining damage |
-| loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
+| loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
-| terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
+| terrain | Arena | Broad gentle plains, seeded hills and valleys, dense contour elevations, 75° amber/blue slope preview, violet winding passages with up to 50% cruise boost, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, cargo loss, unlimited respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, equal contributor delivery rewards, Town Square store, scattered furnace lots with right-angle fire trails only after a furnace is lit, harvested ground that stays empty and flyable, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, right-angle furnace fire trails only after a furnace is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
@@ -33,7 +33,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | Can I clear a spider nest by building a furnace on it? | scout, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS retreat, furnace construction tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
-| How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
+| How do mass, shards, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
 | What happens when I shoot a loot drop? | loot-growth, combat-survival | shared/lootBlast.ts, server/core/GameEngine.ts, loot tests |
 | Where is the rich belt, how do crawlers attack, and when do mined deposits return? | asteroids, terrain | shared/asteroidBelt.ts, shared/beltCrawler.ts, RegionalAsteroidField.ts, BeltCrawlerManager.ts, belt scenario tests |
 | Why did an asteroid split, fragment, reflect, or award a score? | asteroids | server/core/AsteroidManager.ts, shared asteroid helpers, split/reflection tests |
@@ -162,7 +162,6 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 - Mass pickups use the shared 100-base-health growth curve, not each kit's
   starting health. A small first pickup can lower Hauler's 140 starting maximum;
   increases in the calculated maximum add only that gain to current health.
-  Laser cores take a separate collection path and do not add mass.
 - Cooperative splits automatically expire without a second qualifying hit.
   Their fast and heavy shockwaves push ships and asteroids without direct
   damage; metal and rubble follow their own break rules.

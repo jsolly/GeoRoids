@@ -157,21 +157,6 @@ export class LootManager {
     return this.toPublic(drop);
   }
 
-  public spawnLaserCore(position: Position, gameTime: number): LootData {
-    const drop: TrackedLoot = {
-      id: `core-${this.nextId++}`,
-      position: { ...position },
-      mass: 0,
-      radius: GROWTH.LOOT_RADIUS + 3,
-      kind: 'laserCore',
-      expiresAt: gameTime + GROWTH.LOOT_TTL_FRAMES,
-      velocity: { x: 0, y: 0 },
-    };
-    this.loot.set(drop.id, drop);
-    this.enforceCap();
-    return this.toPublic(drop);
-  }
-
   public spawnEquipment(position: Position, gameTime: number, kind: EquipmentId): LootData {
     const drop: TrackedLoot = {
       id: `equipment-${this.nextId++}`,
@@ -200,7 +185,6 @@ export class LootManager {
       this.spawnShard(at(2), gameTime, 0.25),
       this.spawnTap(at(3), gameTime, { x: 0, y: 0 }),
       this.spawnSilk(at(4), gameTime, { x: 0, y: 0 }),
-      this.spawnLaserCore(at(5), gameTime),
     ];
     if (this.rng.random() < EQUIPMENT_DROPS.NEST_CHANCE) {
       const equipment = EQUIPMENT_IDS[Math.floor(this.rng.random() * EQUIPMENT_IDS.length)];

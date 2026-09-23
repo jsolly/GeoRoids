@@ -29,7 +29,7 @@ These rare, stationary landmarks resist rams and need many laser hits to split. 
 
 ## Reflection and charge
 
-Reflective metal faces bounce lasers and increase their energy until a charge or bounce limit stops the chain. Charged rocks can break and release a laser core. A bounced shot can hurt any pilot, including its shooter.
+Reflective metal faces bounce lasers and increase their energy until a charge or bounce limit stops the chain. Charged rocks can break and release ordinary salvage. A bounced shot can hurt any pilot, including its shooter.
 
 ## Powered rocks
 

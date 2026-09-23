@@ -149,11 +149,6 @@ export interface PlayerMotionState {
   anchor?: Position;
 }
 
-export interface LaserUpgrade {
-  charges: number;
-  expiresAt: number;
-}
-
 export interface PlayerProjectileState {
   /** Ability bolts do not consume the regular weapon limit. */
 
@@ -227,7 +222,7 @@ export interface AsteroidData {
 /** Shared world pickups. Kill loot is wreckage; destroy-drop is shard; Tap extract is tap. */
 export type EquipmentId = 'resource_tap' | 'boost_coupling' | 'survey_probe';
 
-export type LootKind = 'shard' | 'wreckage' | 'laserCore' | 'tap' | 'silk' | EquipmentId | 'points';
+export type LootKind = 'shard' | 'wreckage' | 'tap' | 'silk' | EquipmentId | 'points';
 
 /** One accepted collection, emitted before the next world snapshot. */
 export interface LootCollected {
@@ -344,7 +339,7 @@ export interface ServerGameState {
 
 export interface MapAsset {
   id: string;
-  kind: 'furnace' | 'foundation' | 'laserCore' | 'wreckage' | 'satellite';
+  kind: 'furnace' | 'foundation' | 'wreckage' | 'satellite';
   position: Position;
   name: string;
 }
@@ -418,7 +413,6 @@ export interface ServerEntityData {
   /** Last environmental cause (boundary, asteroid, or ricochet). Omitted after respawn. */
   deathCause?: string;
   playerMotion?: PlayerMotionState;
-  laserUpgrade?: LaserUpgrade;
 }
 
 /** Optional monotonic probe identity; bare heartbeat messages remain supported. */

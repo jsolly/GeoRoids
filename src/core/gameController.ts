@@ -55,7 +55,6 @@ import {
 } from '../physics/terrain/terrainSession';
 import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
-import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
 import { syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
@@ -94,7 +93,6 @@ export class GameController {
   private recentShockwaveKeys = new Set<string>();
   private readonly localFirstPlayers: Player[] = [];
   private simulationAccumulatorMs = 0;
-  private laserUpgradeReadout: LaserUpgradeReadout | undefined;
 
   private constructor() {
     this.gameStateManager = GameStateManager.getInstance();
@@ -149,7 +147,6 @@ export class GameController {
     this.simulationAccumulatorMs = 0;
     // Create new player
     this.playerManager.createLocalPlayer(kitId ?? getSelectedShipKitId());
-    this.laserUpgradeReadout?.update(undefined);
 
     // Set the player name if provided
     if (playerName) {
@@ -166,9 +163,6 @@ export class GameController {
       this.resetSessionForNewGame();
       clientPerformance.join(joinStartedAt);
       this.newGame(playerName, kitId ?? getSelectedShipKitId());
-      this.laserUpgradeReadout ??= new LaserUpgradeReadout(
-        document.querySelector('#gameArea') ?? document.body
-      );
 
       // Reset button text to default state
       this.inputManager.resetButtonText();
@@ -431,7 +425,6 @@ export class GameController {
   }
 
   private resetSessionForNewGame(): void {
-    this.laserUpgradeReadout?.update(undefined);
     this.gameStateManager.clearOverlay();
     canvasManager.clearPlayfield();
     PlayerNetwork.getInstance().stopNetworkUpdates();
@@ -761,8 +754,5 @@ export class GameController {
 
     // Render the current game state
     drawGame(currPlayer, this.currRoidBelt, currScore, textAlpha, text, playersToRender);
-    this.laserUpgradeReadout?.update(
-      currPlayer.ship.exploding ? undefined : currPlayer.ship.laserUpgrade
-    );
   }
 }

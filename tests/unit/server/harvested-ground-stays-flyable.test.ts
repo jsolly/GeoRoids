@@ -105,7 +105,7 @@ test('an old completed-sector list does not wall harvested ground or refill it',
     expect(crossed.ok).toBe(true);
     expect(pilot.position).toEqual({ x: 2_020, y: 800 });
     engine.ensureAsteroidField();
-    const shot = engine.spawnLaser('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 }, joinedAt);
+    const shot = engine.spawnLaser('pilot', { x: 1_980, y: 1_400 }, { x: 50, y: 0 });
     expect(shot).not.toBeNull();
     engine.advanceLasersAndResolveHits(joinedAt);
     const liveShot = engine.getServerLasers().find((laser) => laser.id === shot?.id);

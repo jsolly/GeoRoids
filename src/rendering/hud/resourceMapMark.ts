@@ -97,24 +97,6 @@ export function addResourceMapPath(
         }
       }
       return;
-    case 'laserCore':
-      // Horizontal emitter and a long beam, distinct from an upright Tap canister.
-      move(-1, -0.5);
-      line(-0.1, -0.5);
-      line(0.2, -0.25);
-      line(0.2, 0.25);
-      line(-0.1, 0.5);
-      line(-1, 0.5);
-      ctx.closePath();
-      move(-0.6, -0.5);
-      line(-0.6, 0.5);
-      move(0.2, 0);
-      line(1.45, 0);
-      move(0.6, -0.5);
-      line(1, -0.7);
-      move(0.6, 0.5);
-      line(1, 0.7);
-      return;
     case 'wreckage':
       // Broken ship hull and a detached panel, rather than another rock.
       move(-0.9, 0.75);

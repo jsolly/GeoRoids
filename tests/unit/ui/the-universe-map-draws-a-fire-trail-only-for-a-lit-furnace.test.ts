@@ -87,10 +87,10 @@ test('the universe map draws a fire trail only for a lit furnace', () => {
 
 test('the universe map marks furnace lots before that ground is explored', () => {
   const { toggle, ctx } = mountUniverseMap();
-  const core = {
-    id: 'loot:core',
-    kind: 'laserCore' as const,
-    name: 'Laser core',
+  const salvage = {
+    id: 'loot:salvage',
+    kind: 'wreckage' as const,
+    name: 'Salvage',
     position: { x: 1_000, y: 1_000 },
   };
   setWorldMapAssets([
@@ -106,7 +106,7 @@ test('the universe map marks furnace lots before that ground is explored', () =>
       name: lot.name,
       position: { ...lot.position },
     })),
-    core,
+    salvage,
   ]);
   const locations = document.querySelector(`#${UNIVERSE_MAP_IDS.locations}`);
   const draw = (): { rings: number; text: string } => {
@@ -133,11 +133,11 @@ test('the universe map marks furnace lots before that ground is explored', () =>
     expect(hidden.text).toContain(lot.name);
   }
   expect(hidden.text).toContain(TOWN_HEARTH.name);
-  expect(hidden.text).not.toContain(core.name);
+  expect(hidden.text).not.toContain(salvage.name);
   const explored = new ExplorationMap();
-  explored.reveal(core.position, 400);
+  explored.reveal(salvage.position, 400);
   setWorldExploration(explored.snapshot());
   const revealed = draw();
   expect(revealed.rings).toBe(CIVIC_LOTS.length);
-  expect(revealed.text).toContain(core.name);
+  expect(revealed.text).toContain(salvage.name);
 });

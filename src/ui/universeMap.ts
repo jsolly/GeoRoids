@@ -8,7 +8,6 @@ import type { ExplorationTile, MapAsset, Position } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE } from '../constants';
 import { LootField } from '../entities/loot/LootField';
-import { lootStrokeColor } from '../entities/loot/lootRenderer';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import type { Roid } from '../entities/roid/Roid';
 import { getKitHullOutline, projectHullPolyline } from '../entities/ship/hullOutlines';
@@ -656,12 +655,7 @@ function drawMapAsset(
     drawFoundationMapMark(context, 0, 0, screen * 0.7);
     context.restore();
   } else {
-    const color =
-      asset.kind === 'laserCore'
-        ? PALETTE.LASER_LOCAL
-        : asset.kind === 'satellite'
-          ? PALETTE.SATELLITE
-          : PALETTE.LOOT;
+    const color = asset.kind === 'satellite' ? PALETTE.SATELLITE : PALETTE.LOOT;
     context.scale(1 / frame.scale, 1 / frame.scale);
     drawResourceMapMark(context, asset.kind, 0, 0, screen, color);
     context.scale(frame.scale, frame.scale);
@@ -733,7 +727,7 @@ function drawNearbyResources(
       drop.position.x * frame.scale,
       drop.position.y * frame.scale,
       universeMapMarkScreenSize(6, frame.zoom),
-      lootStrokeColor(drop.kind)
+      PALETTE.LOOT
     );
   }
   context.restore();

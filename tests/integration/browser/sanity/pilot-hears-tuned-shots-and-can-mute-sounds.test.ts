@@ -231,7 +231,9 @@ for (const viewport of [
       path: screenshotManager.getScreenshotPath(`audio-${viewport.name}.png`),
     });
     await page.goto(new URL('/wiki/#hud-network', page.url()).href);
-    await expect.poll(() => page.locator('body').textContent()).toContain('crystal');
+    await expect
+      .poll(() => page.locator('body').textContent())
+      .toContain('separate Sound Effects, Music, and Haptics settings');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`audio-wiki-${viewport.name}.png`),
     });

@@ -124,8 +124,10 @@ for (const viewport of [
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset['audioContextState']))
       .toBe('suspended');
-    await page.goto(new URL('/wiki/#hauler', page.url()).href);
-    await expect.poll(() => page.locator('body').textContent()).toContain('crystal');
+    await page.goto(new URL('/wiki/#loot-growth', page.url()).href);
+    await expect
+      .poll(() => page.locator('body').textContent())
+      .toContain('quick pickups play successive notes of a short melody');
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`crystal-wiki-${viewport.name}.png`),
     });

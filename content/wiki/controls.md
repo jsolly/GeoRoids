@@ -15,141 +15,30 @@ media:
 
 ## Keyboard
 
-The thrusters stay on while you are alive and viewing the playfield. ArrowLeft or A and ArrowRight or D
-turn the ship; opposing turn inputs cancel. Space fires. Shift toggles Boost
-on the first press and off on the next; holding the key does not retrigger it.
-E activates the selected kit ability and is edge-triggered, so holding the key
-does not repeatedly activate it. E uses the equipped tool from
-the ship view. Inside a lit furnace’s visible footprint, E opens Furnace travel instead of the kit
-ability, including while towing. Choosing a destination releases the cargo.
-V opens or closes the ship view, and the Inventory button opens it. B also
-opens or closes Furnace travel while you are inside a lit furnace’s footprint.
-Escape, the X control, or Return to flight also close an open menu. Firing and E
-are blocked while the schematic or store is open.
-The map, schematic, and town store hold your ship stationary, including its momentum and
-steering. Closing the menu resumes flight and grants the same brief blink
-protection as a respawn, so a rock that drifted over the hull cannot kill you
-immediately. The world keeps running while a
-menu is open: asteroids, ricochets, and the arena wall pass through your ship
-without colliding, and satellite health continues draining. Loose satellite
-pickups and loot stay on the field until you return to flight. You cannot lose a
-life from world hazards until you return to flight and blink protection ends.
-F is unbound.
-
-Your kit, mass, and terrain affect acceleration and speed. Scout and Hauler
-share the same cruise speed. Boost multiplies that cruise and thrust, and
-Scout's multiplier is stronger than Hauler's. Each kit page lists its
-handling values. Turns have a capped rate; the arrow ahead of the hull shows
-the current heading. Releasing steering keeps the attained heading and automatic
-thrust. On slopes, following a contour keeps nearly full cruise with a light
-downhill tug. Steep climbs are only a bit slower; descents more than double
-ordinary cruise and stack with Boost.
-Combat knockback can still push the ship. W and ArrowUp are unbound.
+Steer with A/D or Left/Right, hold Space to fire, and press E for your equipped tool. Thrust is automatic; Shift toggles Boost.
 
 ## Mouse
 
-Move the mouse to steer from the canvas center toward the pointer. The ship
-turns toward that heading rather than snapping instantly. Hold the left mouse
-button to fire. Right-click toggles Boost on, and a second right-click turns it
-off, just like Shift. Releasing the mouse button keeps Boost on until the tank runs empty.
-Arrow keys or A/D take over steering
-until you move the pointer again.
-
-## Boost charge
-
-Shift, right-click, and the Boost button share one limited tank. The button is
-visible during flight on desktop and touch. While boosting, its amber fill drains
-from the top down. Switch boost off early to save charge; the inactive cyan fill
-rises from the bottom as the tank recharges. A partly filled tank can boost again
-if you stopped before it ran empty.
-
-An empty tank stops boost automatically. As soon as some charge returns, press,
-click, or tap to boost again. This interrupts recharging and spends the remaining
-charge; you do not need a full tank. Boost never restarts on its own. Opening the map, schematic, or town store stops boost and lets the tank recharge.
-Respawning starts with a full tank; reconnecting to the same flight preserves
-charge and credits the time spent away toward the refill.
-
-## Ship schematic
-
-V or the Inventory button opens the ship view for either kit.
-On desktop, the button sits above Map. Mobile controls sit together near the
-top of the playfield, below the score and three-row player list. Inventory,
-Map, the optional debug HUD toggle, and the ability share one compact row;
-Boost sits separately at the bottom center of the screen. On a keyboard it shows the V shortcut, and the
-title screen lists that shortcut with the other flight keys. Touch flights use
-the same button and hide the badge. Collecting a satellite shows a brief label
-above your ship, then fades. It says the equipment is in your inventory. On
-touch it says to tap Inventory to equip. On desktop it says to press V to
-equip. Collecting another satellite shows the label again. Opening Inventory
-clears it. The view draws your hull beside your
-satellite inventory, with the tool cards underneath. Choose Equip to launch one stored satellite for
-temporary nearby asteroid identification. The inventory displays its remaining
-lifetime, derived from health. Scout starts with Mineral Scan and can find Survey Probe;
-near a dark street foundation, E becomes Build instead of the equipped tool.
-The probe fires along your heading and attaches a shared scanning beacon to a rock.
-Hauler has three utility cards and a looping tool animation;
-Tow Cable is available from the start. Resource Tap and Boost Coupling stay
-locked until collected as rare drops. Selecting an owned utility card equips
-that tool immediately. Boost Coupling uses E to arm
-and lock the asteroid thrust heading, then E again to ignite an ordinary rock.
-A colossal deposit stays latched until two couplings are armed; E before that
-crew is ready does not ignite. Its touch button
-changes from ARM to IGNITE. Swap tools to cancel an armed coupling.
-
-## Furnace travel and extra lives
-
-Inside any lit furnace’s visible footprint, press E or the ability button to open **Furnace travel**.
-An on-site prompt says **Press E to travel** on desktop or **Tap TRAVEL to open map**
-on touch screens. Click or tap another lit furnace on the destination map,
-including Town Square. Your current furnace is marked **You are here**.
-Travel is free: your ship
-rides a fast rocket along the existing right-angle piping, taking roughly one
-or two seconds. During the ride you cannot steer, fire, use tools, collect loot,
-or take damage. You arrive at the destination furnace ready to fly again.
-Dark foundations are not destinations. With no other furnaces built, the menu
-explains that there is nowhere to travel yet.
-
-Town Square's menu also sells extra lives for **250 score**, up to **6 lives**.
-A new flight starts with **5 lives**. A purchase at the cap, away from Town
-Square, while destroyed, or without enough score spends nothing. The menu
-shows how much your own built streets add to furnace deliveries. B opens or
-closes the same menu on a keyboard. Opening it closes the map and schematic,
-holds the ship, and blocks firing. Boarding releases any towed cargo.
-
-## Map
-
-Press M or use the on-screen Map button to open the full-screen universe map.
-It opens centered on your ship, showing 5,000 units across so nearby landmarks
-are easy to distinguish. Drag to pan and use the scroll wheel or the +/− controls
-on the map to zoom, including all the way out to the whole world. The locate
-control on the map restores the nearby view centered on your ship; Home does the
-same when a keyboard is attached. Your ship and crew draw as their actual hull
-silhouettes, matching the kit in flight. The shared exploration chart and
-discovered assets persist; each opening returns to your current location.
-On a keyboard, M, Escape, or Close returns to flight. On touch, Map and Close
-do not show keyboard badges; use those buttons instead.
+Move the pointer to steer toward it, hold left-click to fire, and right-click to toggle Boost. Keyboard steering takes over until you move the pointer again.
 
 ## Touch
 
-Touch and hold the playfield to steer toward your finger. Drag to change
-direction; release and the ship keeps thrusting along its attained heading.
-Resting near the center of the hull keeps the current heading, so tiny finger
-movements cannot whip the ship around. Watch the arrow ahead of the hull when
-your finger covers the ship. A quick one-finger tap fires once on release. While holding
-one finger to steer, tap anywhere on the playfield with another finger to fire
-immediately, or hold that second finger for continuous fire until it is lifted.
-If the browser drops a held finger without a release, the next single-finger
-drag steers again instead of only firing, including when that finger lands
-near the last heading. A second finger that is still down keeps firing.
-Taps and holds on the playfield, HUD, and action buttons do not highlight text
-or open copy-paste banners; those gestures steer, fire, or activate the button.
-Nickname and other form fields on the title screen still accept typing and
-selection.
-Use the ability button for the same action as E, including Furnace travel at Town
-Square. Use the Inventory button for the same ship view as V. Collecting a
-satellite shows a short label above the ship that says the equipment is in
-your inventory and to tap Inventory to equip, then the label fades. Use the
-Boost button at the
-bottom center of the screen for the same action as Shift: tap once to start boosting,
-tap again to stop. The action buttons do not steer the ship or create a pending
-playfield tap shot.
+Hold and drag one finger to steer; release to keep your heading. Tap to fire once, or hold a second finger to fire continuously while steering. Use the on-screen ability and Boost buttons for tools and speed.
+
+## Boost charge
+
+Toggle Boost off to save charge and let the tank refill. An empty tank stops Boost; activate it again when any charge returns.
+
+## Inventory and menus
+
+V or Inventory opens your ship schematic to choose [owned tools](/wiki/#loot-growth) and equip [satellites](/wiki/#satellites). Map, Inventory, and the furnace menu hold your ship safely while the world keeps moving; satellite health still drains and you cannot collect pickups. Close with Escape or the close control to resume flight with brief blink protection.
+
+## Furnace travel and extra lives
+
+Inside a lit furnace's visible footprint, follow the travel prompt and press E or tap TRAVEL to open the destination map; B also toggles the menu. Choose another lit furnace for a free rocket ride along the pipes, taking at most two seconds; dark foundations are not destinations. Boarding releases cargo, and you cannot steer, fire, change tools, collect loot, or take damage during the ride.
+
+Town Square's menu also sells extra lives for 250 score each, up to six. A fresh flight starts with five lives.
+
+## Map
+
+M or Map opens the shared universe chart. Drag to pan, use the wheel or zoom buttons, and use Locate or Home to return to your ship. M, Escape, or Close returns to flight.

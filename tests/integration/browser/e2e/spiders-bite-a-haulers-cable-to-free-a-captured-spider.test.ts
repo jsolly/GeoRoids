@@ -58,7 +58,12 @@ for (const width of [1280, 390]) {
     });
     for (const article of ['terrain', 'hauler']) {
       await page.goto(`${TestConfig.GAME_URL}/wiki/#${article}`);
-      const rescueRule = page.locator('p').filter({ hasText: 'Towing a living spider' }).last();
+      const rescueRule = page
+        .locator('p')
+        .filter({
+          hasText: article === 'hauler' ? 'Towing a living spider' : 'towing calls rescuers',
+        })
+        .last();
       await rescueRule.waitFor({ state: 'visible' });
       await rescueRule.scrollIntoViewIfNeeded();
       await page.screenshot({

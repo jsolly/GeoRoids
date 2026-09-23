@@ -116,13 +116,16 @@ test.each(['Shift', 'right-click'])(
       ]) {
         await page.setViewportSize(viewport);
         for (const article of [
-          { id: 'controls', text: 'Right-click toggles Boost on,' },
+          { id: 'controls', text: 'right-click to toggle Boost' },
           { id: 'terrain', text: 'Boost stacks with downhill speed' },
-          { id: 'hauler', text: 'a cable winch and hook' },
-          { id: 'scout', text: 'The sweep is a visual cue' },
-          { id: 'asteroids', text: 'roughly four drifting rocks' },
+          { id: 'hauler', text: 'Cargo keeps its momentum' },
+          { id: 'scout', text: 'turns faster and boosts harder than Hauler' },
+          { id: 'asteroids', text: 'Fresh interior sectors have' },
         ]) {
           await page.goto(`${TestConfig.GAME_URL}/wiki/#${article.id}`);
+          if (article.id === 'asteroids') {
+            await page.locator('.game-reference summary').click();
+          }
           await page.getByText(article.text, { exact: false }).waitFor();
           await page.screenshot({
             path: screenshotManager.getScreenshotPath(`boost-${article.id}-${viewport.name}.png`),

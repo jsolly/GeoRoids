@@ -140,6 +140,7 @@ export async function arrangeCrewField(
     | 'spider-nest'
     | 'spider-tools'
     | 'spider-rescue'
+    | 'spider-tow-bite'
     | 'belt-escape'
     | 'belt-pursuit'
     | 'map-icons'

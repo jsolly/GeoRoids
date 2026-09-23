@@ -170,7 +170,8 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 ## Spider utility interactions
 
 Hauler and terrain articles cover tapping finite silk reserves, provocation,
-towing spiders into a furnace, and the furnace whimper. Loot and growth covers the
+towing spiders into a furnace, proximity bites against passing ships or their own
+Hauler while attached, and the furnace whimper. Loot and growth covers the
 separate silk inventory, which grants neither ore score nor hull mass. Scout
 covers probes riding spiders back to guarded resources, sharing the existing
 beacon limits and expiry. Server scenarios prove extraction, persistence,

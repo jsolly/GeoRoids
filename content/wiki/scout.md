@@ -23,7 +23,7 @@ Find Survey Probe as a rare equipment drop, usually in a spider nest, then equip
 
 ## Build
 
-At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and rocket-travel stops, and serve the shared settlement. Failed builds spend nothing.
+At a dark furnace foundation, E becomes Build: enter the grate and spend your score to light it, with the inward furnace already lit. Your named furnaces persist, provide delivery, respawn, and fast-travel stops, and serve the shared settlement. Failed builds spend nothing.
 
 ## Build a refuge
 

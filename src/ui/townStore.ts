@@ -20,6 +20,9 @@ export const TOWN_STORE_IDS = {
   status: 'town-store-status',
   return: 'town-store-return',
   destinations: 'town-store-destinations',
+  choices: 'town-store-choices',
+  travel: 'town-store-travel',
+  back: 'town-store-back',
 } as const;
 
 const BLOCKED_GAMEPLAY_KEYS = new Set([
@@ -39,10 +42,15 @@ type StoreElements = {
   score: HTMLElement;
   offer: HTMLElement;
   destinations: HTMLElement;
+  choices: HTMLElement;
+  travel: HTMLElement;
+  back: HTMLButtonElement;
   status: HTMLElement;
   return: HTMLButtonElement;
 };
 
+type TownView = 'entry' | 'store' | 'travel';
+let view: TownView = 'entry';
 let initialized = false;
 let closeInProgress = false;
 let elements: StoreElements | null = null;
@@ -61,6 +69,28 @@ export function canEnterTownStore(): boolean {
     return false;
   }
   return nearestTravelFurnace(player.ship.position, worldFurnaces) !== undefined;
+}
+
+/** Whether the current boarding stop also offers the Town Square store. */
+export function isAtTownSquare(): boolean {
+  const player = PlayerManager.getInstance().getLocalPlayer();
+  return (
+    player != null &&
+    nearestTravelFurnace(player.ship.position, worldFurnaces)?.id === TOWN_HEARTH.id
+  );
+}
+
+function selectView(next: TownView): void {
+  view = next;
+  if (!elements) {
+    return;
+  }
+  elements.status.textContent = '';
+  refreshStoreCopy();
+  const panel =
+    next === 'entry' ? elements.choices : next === 'store' ? elements.offer : elements.travel;
+  const first = panel.querySelector<HTMLButtonElement>('button:not(:disabled)');
+  (first ?? elements.back).focus({ preventScroll: true });
 }
 
 function setTextIfChanged(node: HTMLElement, text: string): void {
@@ -91,11 +121,18 @@ function refreshStoreCopy(): void {
   const player = PlayerManager.getInstance().getLocalPlayer();
   const source = player ? nearestTravelFurnace(player.ship.position, worldFurnaces) : undefined;
   const town = source?.id === TOWN_HEARTH.id;
-  elements.offer.hidden = !town;
-  const heading = elements.dialog.querySelector('#town-store-title');
+  const activeView = town ? view : 'travel';
+  elements.choices.hidden = !town || activeView !== 'entry';
+  elements.offer.hidden = activeView !== 'store';
+  elements.travel.hidden = activeView !== 'travel';
+  elements.back.hidden = !town || activeView === 'entry';
+  const heading = elements.dialog.querySelector<HTMLElement>('#town-store-title');
   const eyebrow = elements.dialog.querySelector('.town-store-eyebrow');
   if (heading) {
-    heading.textContent = 'Furnace travel';
+    setTextIfChanged(
+      heading,
+      activeView === 'entry' ? 'Town Square' : activeView === 'store' ? 'Store' : 'Furnace travel'
+    );
   }
   if (eyebrow) {
     eyebrow.textContent = source?.name ?? 'FURNACE';
@@ -104,7 +141,7 @@ function refreshStoreCopy(): void {
   const signature = `${source?.id ?? ''}|${destinations
     .map((destination) => `${destination.id}:${destination.name}`)
     .join('|')}`;
-  if (elements.destinations.dataset['destinations'] !== signature) {
+  if (activeView === 'travel' && elements.destinations.dataset['destinations'] !== signature) {
     elements.destinations.dataset['destinations'] = signature;
     if (source) {
       renderFurnaceTravelMap(elements.destinations, source, destinations, requestFurnaceTravel);
@@ -171,13 +208,20 @@ function createDialogMarkup(dialog: HTMLDialogElement): void {
         <p class="town-store-eyebrow">TOWN SQUARE</p>
         <h2 id="town-store-title">Store</h2>
       </div>
-      <button id="${TOWN_STORE_IDS.close}" type="button" aria-label="Close store">×</button>
+      <button id="${TOWN_STORE_IDS.close}" type="button" aria-label="Close menu">×</button>
     </header>
     <p id="${TOWN_STORE_IDS.score}"></p>
-    <div id="${TOWN_STORE_IDS.offer}"></div>
+    <div id="${TOWN_STORE_IDS.choices}" class="town-store-choices">
+      <button type="button" data-town-view="store">Store</button>
+      <button type="button" data-town-view="travel">Fast Travel</button>
+    </div>
+    <div id="${TOWN_STORE_IDS.offer}" hidden></div>
+    <section id="${TOWN_STORE_IDS.travel}" hidden>
     <h3>Destination map</h3>
-    <p>Ride a rocket along the pipes to any lit furnace. Travel is free.</p>
+    <p>Ride your ship along the pipes to any lit furnace. Travel is free.</p>
     <div id="${TOWN_STORE_IDS.destinations}" class="furnace-destinations"></div>
+    </section>
+    <button id="${TOWN_STORE_IDS.back}" type="button" hidden>Back to Town Square</button>
     <p id="${TOWN_STORE_IDS.status}" role="status" aria-live="polite"></p>
     <button id="${TOWN_STORE_IDS.return}" type="button">Return to flight</button>
   `;
@@ -198,12 +242,36 @@ function ensureElements(): StoreElements | null {
   const score = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.score}`);
   const offer = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.offer}`);
   const destinations = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.destinations}`);
+  const choices = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.choices}`);
+  const travel = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.travel}`);
+  const back = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.back}`);
   const status = dialog.querySelector<HTMLElement>(`#${TOWN_STORE_IDS.status}`);
   const returnButton = dialog.querySelector<HTMLButtonElement>(`#${TOWN_STORE_IDS.return}`);
-  if (!close || !score || !offer || !destinations || !status || !returnButton) {
+  if (
+    !close ||
+    !score ||
+    !offer ||
+    !destinations ||
+    !status ||
+    !returnButton ||
+    !choices ||
+    !travel ||
+    !back
+  ) {
     return null;
   }
-  return { dialog, close, score, offer, destinations, status, return: returnButton };
+  return {
+    dialog,
+    close,
+    score,
+    offer,
+    destinations,
+    choices,
+    travel,
+    back,
+    status,
+    return: returnButton,
+  };
 }
 
 function purchasePlaceholder(offerId: string): void {
@@ -270,13 +338,15 @@ export function openTownStore(): boolean {
     );
     return false;
   }
+  view = isAtTownSquare() ? 'entry' : 'travel';
   setTownStoreOpen(true);
   elements.status.textContent = '';
   refreshStoreCopy();
   openInputRelease?.();
   window.dispatchEvent(new CustomEvent('gameStoreOpen'));
   playFeedback('interface');
-  elements.close.focus({ preventScroll: true });
+  const firstChoice = elements.choices.querySelector<HTMLButtonElement>('button');
+  (view === 'entry' && firstChoice ? firstChoice : elements.close).focus({ preventScroll: true });
   return true;
 }
 
@@ -382,6 +452,13 @@ export function initializeTownStore(options?: { onOpen?: () => void }): void {
   openInputRelease = options?.onOpen;
   initialized = true;
   bindTownStoreClose(closeTownStore);
+  elements.choices
+    .querySelector('[data-town-view="store"]')
+    ?.addEventListener('click', () => selectView('store'));
+  elements.choices
+    .querySelector('[data-town-view="travel"]')
+    ?.addEventListener('click', () => selectView('travel'));
+  elements.back.addEventListener('click', () => selectView('entry'));
   elements.close.addEventListener('click', () => {
     closeTownStore();
   });

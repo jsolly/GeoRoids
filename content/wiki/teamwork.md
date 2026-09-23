@@ -28,7 +28,7 @@ Every pilot reveals part of the persistent crew map, with Scout covering more gr
 
 ## Named furnaces
 
-Town Square starts lit; Scouts spend score to build outward through dark furnace foundations. A lit furnace gains a fire trail back to the square and becomes a shared delivery site, spider refuge, and respawn point. See [furnace travel and store](/wiki/#controls) to ride rockets between lit stops or buy placeholders at Town Square.
+Town Square starts lit; Scouts spend score to build outward through dark furnace foundations. A lit furnace gains a fire trail back to the square and becomes a shared delivery site, spider refuge, and respawn point. See [furnace travel and store](/wiki/#controls) to ride your ship between lit stops or buy placeholders at Town Square.
 
 ## Persistent world
 

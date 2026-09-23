@@ -1,6 +1,6 @@
 import './furnaceTravelPrompt.css';
 import { isShipSchematicOpen } from './shipSchematicState';
-import { canEnterTownStore, openTownStore } from './townStore';
+import { canEnterTownStore, isAtTownSquare, openTownStore } from './townStore';
 import { isTownStoreOpen } from './townStoreState';
 import { isUniverseMapOpen } from './universeMap';
 import { shouldUseTouchControls } from './viewportChrome';
@@ -51,6 +51,8 @@ export function syncFurnaceTravelPrompt(): void {
   }
   const touch = shouldUseTouchControls();
   if (travelButton && keyboardHint) {
+    travelButton.textContent = isAtTownSquare() ? 'Enter' : 'Tap to travel';
+    keyboardHint.textContent = isAtTownSquare() ? 'Press E to enter' : 'Press E to travel';
     travelButton.hidden = !touch;
     keyboardHint.hidden = touch;
   }

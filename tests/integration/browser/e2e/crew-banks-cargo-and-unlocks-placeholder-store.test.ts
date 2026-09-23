@@ -60,12 +60,13 @@ for (const viewport of [
     });
     await game.placeShipAt(0, 0);
     if (viewport.touch) {
-      await page.getByRole('button', { name: 'Tap to travel' }).tap();
+      await page.getByRole('button', { name: 'Enter', exact: true }).tap();
     } else {
       await page.keyboard.press('KeyB');
     }
     const store = page.locator('#town-store-dialog');
     await store.waitFor({ state: 'visible' });
+    await store.getByRole('button', { name: 'Store', exact: true }).click();
     expect(await store.textContent()).toContain('No gameplay effect');
     await store.locator('[data-offer="placeholder-2"]').click();
     await expect.poll(() => game.getScore()).toBe(before.bank - 250);

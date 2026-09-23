@@ -6,6 +6,7 @@ import type { Position, SpiderFieldState, TerrainSpider } from '../../shared-typ
 import { SHIP_ABILITY } from '../../src/entities/ship/shipKits';
 import { sampleGradient } from '../../src/physics/terrain/heightfield';
 import { getTerrainField } from '../../src/physics/terrain/terrainSession';
+import { nearestRescueTow } from './spiderRescueTarget';
 import type { SpiderResource } from './spiderResources';
 
 interface SpiderActor {
@@ -23,6 +24,8 @@ interface SpiderAdvanceOptions {
   players: readonly SpiderActor[];
   nowFrame: number;
   towedIds?: ReadonlySet<string>;
+  spiderTows?: readonly { ownerId: string; spiderId: string }[];
+  releaseTow?: (ownerId: string, spiderId: string) => void;
   resources?: () => readonly SpiderResource[];
   dormantResource?: (id: string, home: Position) => SpiderResource | undefined;
 }
@@ -31,6 +34,11 @@ export interface SpiderAttack {
   spiderId: string;
   targetId: string;
   attackerId: 'spider';
+}
+
+interface SpiderTow {
+  owner: SpiderActor;
+  friend: RuntimeSpider;
 }
 
 interface SpiderBodyHit {
@@ -57,6 +65,7 @@ interface RuntimeSpider extends TerrainSpider {
   silkBursts: number;
   displaced: boolean;
   biteReadyAt: number;
+  rescuing: boolean;
   territory: Territory;
 }
 
@@ -134,6 +143,7 @@ export class TerrainSpiderManager {
   private spiderSequence = 0;
   private nextSpawnFrame: number | null = null;
   private nextNestFrame = 0;
+  private nextRescueFrame: number | null = null;
   private nowFrame = 0;
   private readonly nests = new Map<string, SpiderNest>();
   private nestMarkers: SpiderFieldState['nests'] = [];
@@ -170,13 +180,14 @@ export class TerrainSpiderManager {
 
   public isAttackActive(attack: SpiderAttack): boolean {
     const spider = this.spiders.get(attack.spiderId);
-    return spider?.phase === 'hunting' && spider.targetId === attack.targetId;
+    return spider?.phase === 'hunting' && !spider.rescuing && spider.targetId === attack.targetId;
   }
 
   /** Pause population without forgetting cleared or wounded territories. */
   public suspend(): void {
     this.removeDistantBodies([]);
     this.nextSpawnFrame = null;
+    this.nextRescueFrame = null;
     this.nextNestFrame = 0;
   }
 
@@ -184,6 +195,7 @@ export class TerrainSpiderManager {
     this.spiders.clear();
     this.consumed = [];
     this.nextSpawnFrame = null;
+    this.nextRescueFrame = null;
     this.nextNestFrame = 0;
     this.nests.clear();
     this.nestMarkers = [];
@@ -215,6 +227,7 @@ export class TerrainSpiderManager {
       silkBursts: SPIDER.SILK_BURSTS,
       displaced: false,
       biteReadyAt: 0,
+      rescuing: false,
       territory: { kind: 'roaming' },
     };
     this.spiders.set(spider.id, spider);
@@ -300,6 +313,17 @@ export class TerrainSpiderManager {
       this.scheduleRoamer(nowFrame);
     }
 
+    const tows: SpiderTow[] = [];
+    for (const tow of options.spiderTows ?? []) {
+      const owner = playerById.get(tow.ownerId);
+      const friend = this.spiders.get(tow.spiderId);
+      if (owner && friend && friend.health > 0 && options.towedIds?.has(friend.id)) {
+        tows.push({ owner, friend });
+      }
+    }
+    if (tows.length > 0 && this.nextRescueFrame === null) {
+      this.nextRescueFrame = nowFrame + SPIDER.RESCUE_SPAWN_INTERVAL_FRAMES;
+    }
     const attacks: SpiderAttack[] = [];
     for (const spider of [...this.spiders.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       if (options.towedIds?.has(spider.id)) {
@@ -319,7 +343,21 @@ export class TerrainSpiderManager {
         }
         spider.displaced = false;
       }
-      this.advanceSpider(spider, players, playerById, nowFrame, attacks);
+      this.advanceSpider(spider, players, playerById, nowFrame, attacks, tows, options.releaseTow);
+    }
+
+    const rescueOwners = tows
+      .filter(({ owner, friend }) => this.canRescue(owner, friend))
+      .map(({ owner }) => owner);
+    if (rescueOwners.length > 0 && nowFrame >= (this.nextRescueFrame ?? Infinity)) {
+      const roamers = [...this.spiders.values()].filter(
+        (spider) => spider.territory.kind === 'roaming'
+      );
+      if (roamers.length < SPIDER.MAX_RESCUE_ROAMERS) {
+        this.spawnNearPlayers(rescueOwners, players);
+      }
+      // A global deadline survives release/re-latch and failed spawn attempts.
+      this.nextRescueFrame = nowFrame + SPIDER.RESCUE_SPAWN_INTERVAL_FRAMES;
     }
 
     // A nest encounter also buys a full quiet interval before another ambush.
@@ -551,8 +589,11 @@ export class TerrainSpiderManager {
     players: readonly SpiderActor[],
     playerById: ReadonlyMap<string, SpiderActor>,
     nowFrame: number,
-    attacks: SpiderAttack[]
+    attacks: SpiderAttack[],
+    tows: SpiderTow[],
+    releaseTow: SpiderAdvanceOptions['releaseTow']
   ): void {
+    spider.rescuing = false;
     const scanner = players
       .filter(
         (player) =>
@@ -592,6 +633,9 @@ export class TerrainSpiderManager {
         this.returnHome(spider, territory);
         return;
       }
+    }
+    if (releaseTow && this.rescueFriend(spider, tows, nowFrame, releaseTow)) {
+      return;
     }
     if (spider.phase !== 'hunting') {
       const nextTarget = this.findHuntTarget(spider, players);
@@ -661,6 +705,61 @@ export class TerrainSpiderManager {
       });
       spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
     }
+  }
+
+  private canRescue(owner: SpiderActor, friend: RuntimeSpider): boolean {
+    return (
+      this.spiders.has(friend.id) &&
+      friend.health > 0 &&
+      this.canOccupy(owner.position, owner.radius ?? 0) &&
+      this.canOccupy(friend.position, SPIDER.HIT_RADIUS)
+    );
+  }
+
+  private rescueFriend(
+    spider: RuntimeSpider,
+    tows: SpiderTow[],
+    nowFrame: number,
+    releaseTow: NonNullable<SpiderAdvanceOptions['releaseTow']>
+  ): boolean {
+    const rescue = nearestRescueTow(
+      spider.position,
+      tows.filter((tow) => tow.friend.id !== spider.id && this.canRescue(tow.owner, tow.friend)),
+      spider.territory.kind === 'guard' ? spider.territory.home : undefined
+    );
+    if (!rescue) {
+      return false;
+    }
+    const { tow: chosenTow, point, distance } = rescue;
+    const stride = Math.min(SPIDER.HUNT_SPEED, Math.max(0, distance - SPIDER.BITE_DISTANCE));
+    const angle = Math.atan2(point.y - spider.position.y, point.x - spider.position.x);
+    const next = {
+      x: spider.position.x + Math.cos(angle) * stride,
+      y: spider.position.y + Math.sin(angle) * stride,
+    };
+    if (!this.canOccupy(next, SPIDER.HIT_RADIUS)) {
+      return false;
+    }
+    if (spider.territory.kind === 'guard' && spider.phase !== 'hunting') {
+      spider.territory.chaseUntil = nowFrame + SPIDER.NEST_CHASE_FRAMES;
+    }
+    spider.phase = 'hunting';
+    spider.targetId = chosenTow.owner.id;
+    spider.rescuing = true;
+    spider.angle = normalizeAngle(angle);
+    spider.position = next;
+    if (
+      distanceBetween(next, point) <= SPIDER.BITE_DISTANCE + POSITION_EPSILON &&
+      nowFrame >= spider.biteReadyAt
+    ) {
+      releaseTow(chosenTow.owner.id, chosenTow.friend.id);
+      tows.splice(tows.indexOf(chosenTow), 1);
+      spider.biteReadyAt = nowFrame + SPIDER.BITE_COOLDOWN_FRAMES;
+      spider.shudderFrames = SPIDER.SHUDDER_FRAMES;
+      spider.phase = 'scuttling';
+      spider.targetId = null;
+    }
+    return true;
   }
 
   private fleeFrom(spider: RuntimeSpider, origin: Position): void {
@@ -826,7 +925,7 @@ export class TerrainSpiderManager {
     );
   }
 
-  private spawnNearPlayers(players: readonly SpiderActor[]): boolean {
+  private spawnNearPlayers(players: readonly SpiderActor[], allPlayers = players): boolean {
     for (let attempt = 0; attempt < SPAWN_ATTEMPTS; attempt++) {
       const player = players[(this.spawnTargetIndex + attempt) % players.length];
       if (!player || !this.canOccupy(player.position, player.radius ?? 0)) {
@@ -841,7 +940,7 @@ export class TerrainSpiderManager {
         x: player.position.x + Math.cos(angle) * distance,
         y: player.position.y + Math.sin(angle) * distance,
       };
-      if (!this.validSpawn(position, players)) {
+      if (!this.validSpawn(position, allPlayers)) {
         continue;
       }
       const spawned = this.spawnSpider(position, angle);

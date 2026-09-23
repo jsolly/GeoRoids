@@ -3,6 +3,12 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { AUDIO } from '../../../src/constants';
 
+// Keep real audio diagnostics and logger assertions without opening a server connection.
+vi.mock('../../../src/utils/logForwarder', () => ({
+  startClientLogForwarder: vi.fn(),
+  forwardLogToServer: vi.fn(),
+}));
+
 class FakeHowl {
   static instances: FakeHowl[] = [];
   readonly voices = new Map<number, { volume: number }>();

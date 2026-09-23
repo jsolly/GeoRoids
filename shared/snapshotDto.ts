@@ -22,6 +22,9 @@ import type {
   SpiderFieldState,
   TerrainSpider,
 } from '../shared-types';
+import type { BeltRecoveryWarning } from './asteroidBelt';
+import { ASTEROID_BELT } from './asteroidBelt';
+import { BELT_CRAWLER } from './beltCrawler';
 import { validExploration } from './exploration';
 import { validCivicModules } from './furnaces';
 import { isShipBoostState } from './shipBoost';
@@ -150,7 +153,19 @@ const probe = shape<AsteroidProbe>({
   angle: number,
   radialOffset: number,
 });
-const asteroid = shape<AsteroidData>({
+const asteroidShape = shape<AsteroidData>({
+  beltCrawlerIds: optional(
+    (value) =>
+      Array.isArray(value) && value.length <= BELT_CRAWLER.MAX_ACTIVE && value.every(string)
+  ),
+  beltCrawlerHealth: optional(
+    (value) =>
+      Array.isArray(value) &&
+      value.length <= BELT_CRAWLER.MAX_ACTIVE &&
+      value.every(
+        (health: unknown) => typeof health === 'number' && Number.isFinite(health) && health >= 0
+      )
+  ),
   id: string,
   position,
   velocity: position,
@@ -170,6 +185,21 @@ const asteroid = shape<AsteroidData>({
   boost: optional((value) => value === null || armedBoost(value) || burningBoost(value)),
   probe: optional((value) => value === null || probe(value)),
 });
+const asteroid: Rule = (value) => {
+  if (!asteroidShape(value) || typeof value !== 'object' || value === null) {
+    return false;
+  }
+  if (!('beltCrawlerIds' in value) || value.beltCrawlerIds === undefined) {
+    return true;
+  }
+  return (
+    Array.isArray(value.beltCrawlerIds) &&
+    'beltCrawlerHealth' in value &&
+    Array.isArray(value.beltCrawlerHealth) &&
+    value.beltCrawlerIds.length === value.beltCrawlerHealth.length &&
+    new Set(value.beltCrawlerIds).size === value.beltCrawlerIds.length
+  );
+};
 const loot = shape<LootData>({
   id: string,
   position,
@@ -239,6 +269,15 @@ const spider = shape<TerrainSpider>({
   angle: number,
   phase: choice('scuttling', 'hunting'),
   shudderFrames: optional(number),
+  crawler: optional(
+    shape<NonNullable<TerrainSpider['crawler']>>({
+      hostId: string,
+      anchor: position,
+      phase: choice('crawling', 'winding', 'lunging', 'recovering', 'escaping'),
+      progress: (value) =>
+        typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1,
+    })
+  ),
   probe: optional((value) => value === null || probe(value)),
   targetId: (value) => value === null || string(value),
 });
@@ -278,12 +317,25 @@ const consumedSpider = shape<NonNullable<SpiderFieldState['consumed']>[number]>(
 });
 const spiderField = shape<SpiderFieldState>({
   consumed: optional(uniqueRows(consumedSpider, SPIDER.MAX_ACTIVE)),
-  spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE),
+  spiders: uniqueRows(spider, SPIDER.MAX_ACTIVE + BELT_CRAWLER.MAX_ACTIVE),
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
   civicModules: optional(validCivicModules),
   spiderField: optional(spiderField),
+  beltRecovery: optional(
+    (value) =>
+      Array.isArray(value) &&
+      value.length <= ASTEROID_BELT.columns * ASTEROID_BELT.rows &&
+      value.every(
+        shape<BeltRecoveryWarning>({
+          slot: counter,
+          position,
+          size: number,
+          recoverAt: number,
+        })
+      )
+  ),
   exploration: validExploration,
   mapAssets: array(mapAsset),
   entities: array(entity),

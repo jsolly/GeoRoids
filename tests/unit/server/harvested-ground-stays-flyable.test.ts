@@ -123,7 +123,14 @@ test('an old completed-sector list does not wall harvested ground or refill it',
     expect(engine.getAsteroid(`deposit-${seed}-0-0-0`)).toBeDefined();
     engine.revealArea({ x: 2_500, y: 200 }, 100);
     engine.checkpointWorld();
-    expect(store.loadSector('1,0')).toEqual([]);
+    // Only the additive belt rollout may populate this old harvest tombstone.
+    // Ordinary harvested deposits remain absent; no extra rows are tolerated.
+    expect(
+      store
+        .loadSector('1,0')
+        ?.map((row) => row.id)
+        .sort()
+    ).toEqual([`belt-${seed}-93-0`, `belt-${seed}-96-0`]);
     engine.stopGameLoop();
     engine = undefined;
     store.close();

@@ -295,6 +295,8 @@ export function handleTestArrangeCrewField(
         'spider-nest',
         'spider-tools',
         'spider-rescue',
+        'belt-escape',
+        'belt-pursuit',
         'map-icons',
         'furnace',
         'town-store',
@@ -375,6 +377,8 @@ export function handleTestArrangeCrewField(
         'map-icons',
         'spider-tools',
         'spider-rescue',
+        'belt-escape',
+        'belt-pursuit',
         'furnace',
         'town-store',
         'street-build',
@@ -410,6 +414,43 @@ export function handleTestArrangeCrewField(
         !gameEngine.spawnTerrainSpider({ x: 4490, y: 2600 })
       ) {
         throw new Error('Spider rescue fixture could not spawn its spiders');
+      }
+    } else if (body['scenario'] === 'belt-escape' || body['scenario'] === 'belt-pursuit') {
+      gameEngine.clearSpiderField();
+      for (const [id, x, health] of [
+        ['belt-1-0-0', 0, body['scenario'] === 'belt-escape' ? 25 : 150],
+        ['crew-fixture-escape-destination', 180, 150],
+      ] as const) {
+        gameEngine.addAsteroid({
+          id,
+          position: { x, y: -620 },
+          velocity: { x: 0, y: 0 },
+          size: 55,
+          health,
+          maxHealth: 150,
+          material: 'metal',
+          rotation: 0,
+          angularVelocity: 0,
+          jaggedness: 0,
+          vertices: 4,
+          offsets: [1, 1, 1, 1],
+        });
+      }
+      if (body['scenario'] === 'belt-pursuit') {
+        gameEngine.addAsteroid({
+          id: 'crew-fixture-pursuit-destination',
+          position: { x: 360, y: -620 },
+          velocity: { x: 0, y: 0 },
+          size: 55,
+          health: 150,
+          maxHealth: 150,
+          material: 'metal',
+          rotation: 0,
+          angularVelocity: 0,
+          jaggedness: 0,
+          vertices: 4,
+          offsets: [1, 1, 1, 1],
+        });
       }
     } else if (body['scenario'] === 'spider-tools') {
       gameEngine.clearSpiderField();

@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { type BeltSlotState, readBeltState } from '../../shared/asteroidBelt';
 import { epochField } from '../../shared/epochField';
 import { validExploration } from '../../shared/exploration';
 import { validCivicModules, validLitCivicLotIds } from '../../shared/furnaces';
@@ -94,6 +95,7 @@ export interface RestorableFlight extends PersistentPilot {
 }
 
 export interface SavedWorld {
+  asteroidBelt?: BeltSlotState[];
   /** Street furnaces a Surveyor paid for. Absent on older rows. */
   civicModules?: CivicModule[];
   seed: number;
@@ -441,8 +443,10 @@ export class WorldStore {
     ) {
       throw new Error('Saved world is invalid; refusing to replace player progress');
     }
+    const asteroidBelt = readBeltState('asteroidBelt' in value ? value.asteroidBelt : undefined);
     return {
       seed: value.seed,
+      ...(asteroidBelt ? { asteroidBelt } : {}),
       civicModules: readCivicModules(value),
       startedAt: value.startedAt,
       generation:

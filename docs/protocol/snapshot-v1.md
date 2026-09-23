@@ -269,3 +269,22 @@ acknowledgments without letting an older echo undo a newer toggle. Active echoes
 cannot replenish an active tank or restart a locally exhausted one. Respawns
 restore a full tank; brief reconnects preserve the tank, and persisted recent
 flights restore it with elapsed inactive recharge. Menus stop active boost.
+
+## Asteroid belt
+
+`beltRecovery` lists imminent belt replacements with `slot`, `position`, `size`
+and absolute `recoverAt` time. An empty list clears warnings. Clients draw a
+non-colliding amber ring before the authoritative replacement appears.
+
+Belt spiders share `spiderField.spiders` with terrain spiders. Their `crawler`
+object contains `hostId`, the surface `anchor`, phase (`crawling`, `winding`,
+`lunging`, `recovering` or `escaping`) and normalized `progress`. Position, health and
+attack targets remain server-owned. Clients render rock-occluded crawlers as
+faint silhouettes, rather than exposing a shootable target through cover.
+`beltCrawlerHealth` on an asteroid carries persistent occupant health; parallel
+`beltCrawlerIds` retain identity when a spider transfers to another host. Zero
+health entries prevent revival on sector reload. During `escaping`, `hostId`
+and `anchor` identify the destination, while `position` follows the visible leap.
+This phase covers both pursuit hops between living rocks and escapes from a
+destroyed host. The client folds the legs instead of drawing feet attached across
+the gap.

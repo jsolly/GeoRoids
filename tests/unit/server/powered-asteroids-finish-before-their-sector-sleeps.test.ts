@@ -4,6 +4,7 @@ import { AsteroidManager } from '../../../server/core/AsteroidManager';
 import { RNGService } from '../../../server/core/RNGService';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
+import { beltAsteroid } from '../../../shared/asteroidBelt';
 import type { AsteroidData } from '../../../shared-types';
 
 function rock(): AsteroidData {
@@ -119,7 +120,10 @@ test.each(['interest update', 'checkpoint'] as const)(
     } else {
       field.checkpoint(manager);
     }
-    expect(manager.getAllAsteroids()).toEqual([deposit]);
-    expect(field.checkpoint(manager).get('1,0')).toEqual([deposit]);
+    // The two new belt slots are additive; entering this sector must still
+    // restore no ordinary harvested deposits during either activation path.
+    const expected = [deposit, beltAsteroid(42, 93, 0), beltAsteroid(42, 96, 0)];
+    expect(manager.getAllAsteroids()).toEqual(expected);
+    expect(field.checkpoint(manager).get('1,0')).toEqual(expected);
   }
 );

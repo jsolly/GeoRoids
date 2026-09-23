@@ -7,6 +7,7 @@ import { RNGService } from '../../../server/core/RNGService';
 import { InlineWorldPersistence } from '../../../server/world/InlineWorldPersistence';
 import { RegionalAsteroidField } from '../../../server/world/RegionalAsteroidField';
 import { WorldStore } from '../../../server/world/WorldStore';
+import { beltSlotForAsteroid } from '../../../shared/asteroidBelt';
 import { ASTEROID_INTERACTIONS } from '../../../shared/asteroidPhenomena';
 import { WORLD } from '../../../shared/world';
 import type { AsteroidData } from '../../../shared-types';
@@ -104,7 +105,9 @@ test('saved legacy sectors add only missing slots and preserve harvested and mov
   expect(neighbor?.filter((rock) => rock.id.startsWith(`deposit-${seed}-1-0-`))).toHaveLength(
     addedNeighborSlots
   );
-  expect(neighbor).toHaveLength(addedNeighborSlots + 1);
+  expect(neighbor?.filter((rock) => beltSlotForAsteroid(rock.id) === undefined)).toHaveLength(
+    addedNeighborSlots + 1
+  );
   expect(field.migrateSavedSectors()).toEqual(new Map());
 });
 
@@ -214,7 +217,9 @@ test('saved stationary deposits wake once without restoring mined ore or resetti
     second.ensureAsteroidField();
     expect(second.getAsteroid(awakened.id)?.velocity).toEqual({ x: 0, y: 0 });
     expect(second.getAsteroid(harvested.id)).toBeUndefined();
-    expect(store.loadSector('2,0')).toEqual([]);
+    expect(
+      store.loadSector('2,0')?.filter((rock) => beltSlotForAsteroid(rock.id) === undefined)
+    ).toEqual([]);
   } finally {
     first?.stopGameLoop();
     second?.stopGameLoop();

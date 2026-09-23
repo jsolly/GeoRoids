@@ -108,3 +108,12 @@ An active [Mineral Scan](/wiki/#surveyor) drives spiders away within its scan
 range and stops their bites while they remain inside it. They can hunt again
 after the scan ends or they leave its range. Survey Probes do not repel them.
 A built street furnace provides the same spider safe area as Town Square.
+
+## Belt crawlers
+
+The [asteroid belt](/wiki/#asteroids) also has a distinct surface predator.
+These spiders cling to metal deposits instead of walking the contours. They
+move around rock cover and telegraph a short anchored lunge. Ordinary terrain
+spiders still inhabit the surrounding area. Mineral Scan, spider tapping,
+probes and direct spider towing apply to terrain spiders; belt crawlers stay
+attached to their host until shot or destroyed with it.

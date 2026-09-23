@@ -28,6 +28,13 @@ export interface TerrainSpider {
   shudderFrames?: number;
   probe?: AsteroidProbe | null;
   targetId: string | null;
+  /** Present only on spiders anchored to an asteroid belt deposit. */
+  crawler?: {
+    hostId: string;
+    anchor: Position;
+    phase: 'crawling' | 'winding' | 'lunging' | 'recovering' | 'escaping';
+    progress: number;
+  };
 }
 
 export interface SpiderFieldState {
@@ -191,6 +198,10 @@ export interface AsteroidData {
   maxHealth: number;
   vertices: number;
   offsets: number[];
+  /** Attached belt crawler health; zero remains dead until the deposit regenerates. */
+  beltCrawlerHealth?: number[];
+  /** Stable identities follow crawlers to their new host after an escape. */
+  beltCrawlerIds?: string[];
   /** Mineral composition when present on the asteroid. */
   material?: AsteroidMaterial;
   /** Pilots who identified this deposit by scan or satellite; retained until it leaves the field. */
@@ -295,6 +306,7 @@ export interface ServerGameState {
   civicModules?: CivicModule[];
   /** Server-owned terrain predators, pursuit targets, and remaining health. */
   spiderField?: SpiderFieldState;
+  beltRecovery?: import('./shared/asteroidBelt').BeltRecoveryWarning[];
   /** Shared explored minimap cells, encoded as a fixed-width hexadecimal bitset. */
   exploration: ExplorationTile[];
   /** Revealed landmarks and valuable drops, independent of local simulation visibility. */

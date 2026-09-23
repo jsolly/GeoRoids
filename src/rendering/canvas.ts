@@ -21,6 +21,7 @@ import { shouldDrawShipHull } from '../entities/ship/shipUtils';
 import { drawSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getLaserColor } from '../utils/colorUtils';
 import { isDebugMode } from '../utils/debugUtils';
+import { drawBeltEncounters } from './beltRenderer';
 import { drawFieryBoundary } from './boundaryRenderer';
 import { canvasManager } from './canvasSurface';
 import {
@@ -93,6 +94,7 @@ export function drawGame(
   drawFieryBoundary(currShip.position);
 
   drawRoidsRelative(currShip, roids);
+  drawBeltEncounters(currShip.position, roids);
   if (roids.length > 0) {
     drawSurveyProbes(roids, currShip.position);
   }

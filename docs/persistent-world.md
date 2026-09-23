@@ -52,3 +52,25 @@ Production requires `GEOROIDS_WORLD_PATH=/data/world.sqlite` and the `world-data
 Keep the database and its `-wal` and `-shm` files on that mounted volume. Enable daily and weekly volume backups in Railway and verify their live schedule after attaching the volume. For a manual copy, stop the service cleanly first or use SQLite's backup API; copying only the live database file can omit committed WAL transactions. Restore to the same path before starting the server. Invalid saved data stops startup instead of regenerating progress silently. A failed commit, reported back from the worker, blocks new gameplay, makes `/health` return 503, and reaches the fatal shutdown path on the next simulation tick, even when the world is paused. Shutdown closes resources without retrying the unacknowledged world mutation; the restart loads the last committed state. `/health` also reports `world.loop` (discarded simulation debt, longest stall, stall count) and `world.persistence` (pending and committed batches, last commit time); a clock step blocked for 250 ms or more logs `game_loop_stalled`.
 
 Do not run multiple server replicas against the same world. The game loop has one authoritative writer; changing replica count requires a different world ownership design.
+
+## Asteroid belt recovery
+
+The world row stores a finite `asteroidBelt` ledger with a generation and
+absolute recovery deadline per belt location. Existing worlds receive the new
+belt additively; ordinary harvested deposits stay harvested. Destroying a belt
+host or carrying it away starts the configured five-minute timer. The deadline
+continues through pauses, sleeping sectors and restarts; due deposits are
+reconstructed in memory when the simulation reconciles the belt. Replacement
+IDs include a generation, so old cargo remains independent of its replacement.
+The final ten seconds are announced in snapshots as `beltRecovery` warnings.
+
+Attached crawler health is stored as `beltCrawlerHealth`, with persistent
+identities in the parallel `beltCrawlerIds` array. A pursuit hop or successful escape moves
+ownership and remaining health to the destination before the animation starts,
+so a restart cannot duplicate or heal the moving spider. Vacated native slots do not spawn replacement guards.
+Transfers reuse dead occupant slots so repeated hops do not grow saved arrays. Sleeping sectors do not
+trigger escape. Crawl positions and leap/lunge phases are transient; a reload
+resumes the spider attached to its saved host.
+Belt reconciliation examines only the fixed belt locations and nearby sectors,
+never the saved world's full sector history, and uses the existing worker
+checkpoint batch. The usual hard-crash write-behind loss window still applies.

@@ -1,0 +1,19 @@
+import { DAMAGE, GAME } from '../src/constants';
+
+/** Surface predators stay anchored even while reaching out to bite. */
+export const BELT_CRAWLER = {
+  MAX_ACTIVE: 96,
+  ESCAPE_DISTANCE: 300,
+  ESCAPE_FRAMES: 36,
+  PURSUIT_PROGRESS: 40,
+  PURSUIT_REPLAN_FRAMES: 15,
+  MAX_HEALTH: DAMAGE.LASER_HIT * 3,
+  HIT_RADIUS: 12,
+  SURFACE_OFFSET: 14,
+  CRAWL_SPEED: 2.2 * GAME.MOTION_SCALE,
+  ACQUIRE_DISTANCE: 700,
+  LUNGE_REACH: 130,
+  WINDUP_FRAMES: 42,
+  LUNGE_FRAMES: 18,
+  RECOVERY_FRAMES: 54,
+} as const;

@@ -60,7 +60,8 @@ export class AsteroidManager {
 
   constructor(
     rngService: RNGService,
-    private readonly furnaces = new FurnaceField()
+    private readonly furnaces = new FurnaceField(),
+    private readonly onDestroyed?: (rock: AsteroidData) => void
   ) {
     this.rng = rngService;
   }
@@ -517,6 +518,7 @@ export class AsteroidManager {
       this.asteroids.set(fragment.id, fragment);
     }
 
+    this.onDestroyed?.(destroyed);
     return {
       outcome: 'destroyed',
       destroyed,

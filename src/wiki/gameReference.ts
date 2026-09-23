@@ -1,6 +1,8 @@
+import { ASTEROID_BELT, beltSlots } from '../../shared/asteroidBelt';
 import { asteroidShardMass } from '../../shared/asteroidMaterials';
 import { ASTEROID_INTERACTIONS } from '../../shared/asteroidPhenomena';
 import { colossalMiningHealth } from '../../shared/asteroidScale';
+import { BELT_CRAWLER } from '../../shared/beltCrawler';
 import {
   calculateHealthRegenDelayFrames,
   calculateHealthRegenPerFrame,
@@ -142,6 +144,13 @@ export const gameReference: Record<string, { heading: string; paragraphs: string
     },
   ],
   asteroids: [
+    {
+      heading: 'Belt recovery and crawler values',
+      paragraphs: [
+        `The eastern belt contains ${beltSlots().length} metal deposits around ${ASTEROID_BELT.radius.toLocaleString('en-US')} world units from launch. Destroying a deposit or moving it more than ${ASTEROID_BELT.removalDistance} units from home starts a ${ASTEROID_BELT.recoveryMs / 60000}-minute replacement timer. The final ${ASTEROID_BELT.warningMs / 1000} seconds show the reformation warning.`,
+        `A belt crawler has ${BELT_CRAWLER.MAX_HEALTH} health. Its lunge extends ${BELT_CRAWLER.LUNGE_REACH} units after ${frameValue(BELT_CRAWLER.WINDUP_FRAMES)} of warning, then takes ${frameValue(BELT_CRAWLER.RECOVERY_FRAMES)} to recover. Pursuit hops and destroyed-host escapes take ${frameValue(BELT_CRAWLER.ESCAPE_FRAMES)} to reach a clear rock surface within ${BELT_CRAWLER.ESCAPE_DISTANCE} units.`,
+      ],
+    },
     {
       heading: 'Field and material values',
       paragraphs: [

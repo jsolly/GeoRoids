@@ -94,7 +94,6 @@ class FakeContext extends EventTarget {
 let Sound: typeof import('../../../src/audio/Sound').Sound;
 let setSound: typeof import('../../../src/audio/Sound').setSound;
 let activateAudio: typeof import('../../../src/audio/audioRuntime').activateAudio;
-let restartAudio: typeof import('../../../src/audio/audioRuntime').restartAudio;
 let readAudioDiagnostics: typeof import('../../../src/audio/audioRuntime').readAudioDiagnostics;
 let logger: typeof import('../../../src/utils/Logger').logger;
 let loadLibrary = vi.fn();
@@ -113,6 +112,26 @@ function context() {
     throw new Error('Expected context');
   }
   return ctx;
+}
+
+// Invoke the registered listener with a trusted-event double. Browser coverage
+// separately verifies that native gestures recover a frozen AudioContext.
+function trustedPointerDown(): void {
+  const listener = vi
+    .mocked(document.addEventListener)
+    .mock.calls.filter(([type]) => type === 'pointerdown')
+    .at(-1)?.[1];
+  if (typeof listener !== 'function') {
+    throw new Error('Expected audio gesture listener');
+  }
+  listener.call(
+    document,
+    new Proxy(new Event('pointerdown'), {
+      get(target, property, receiver) {
+        return property === 'isTrusted' ? true : Reflect.get(target, property, receiver);
+      },
+    })
+  );
 }
 
 function audioDeviceError(): DOMException {
@@ -143,9 +162,7 @@ beforeEach(async () => {
   loadLibrary = vi.fn(() => ({ Howl: FakeHowl, Howler: globalAudio }));
   vi.doMock('howler', () => loadLibrary());
   ({ Sound, setSound } = await import('../../../src/audio/Sound'));
-  ({ activateAudio, restartAudio, readAudioDiagnostics } = await import(
-    '../../../src/audio/audioRuntime'
-  ));
+  ({ activateAudio, readAudioDiagnostics } = await import('../../../src/audio/audioRuntime'));
   ({ logger } = await import('../../../src/utils/Logger'));
 });
 
@@ -161,7 +178,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('a stalled clock ignores synthetic input and a manual restart drops old shots', async () => {
+test('a stalled clock ignores synthetic input and trusted recovery drops old shots', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
   const sound = new Sound('sounds/laser.m4a', 2);
   setSound(true);
@@ -178,7 +195,7 @@ test('a stalled clock ignores synthetic input and a manual restart drops old sho
   await settle();
   expect(FakeContext.instances).toHaveLength(1);
   expect(readAudioDiagnostics().clockProgress).toBe('stalled');
-  expect(restartAudio()).toBe(true);
+  trustedPointerDown();
   await settle();
   expect(oldContext.close).toHaveBeenCalledOnce();
   expect(oldHowl.unload).toHaveBeenCalledOnce();
@@ -191,7 +208,7 @@ test('a stalled clock ignores synthetic input and a manual restart drops old sho
   expect(readAudioDiagnostics()).toMatchObject({
     contextState: 'running',
     contextRestarts: 1,
-    lastRestartReason: 'manual',
+    lastRestartReason: 'stalled-clock',
   });
 });
 
@@ -207,7 +224,8 @@ test('an advancing clock and a hidden tab never trigger audio reconstruction', a
   document.dispatchEvent(new Event('visibilitychange'));
   await vi.advanceTimersByTimeAsync(5000);
   expect(readAudioDiagnostics().clockProgress).toBe('not-observed');
-  expect(restartAudio()).toBe(false);
+  trustedPointerDown();
+  expect(FakeContext.instances).toHaveLength(1);
   hidden.mockReturnValue(false);
   document.dispatchEvent(new Event('visibilitychange'));
   await settle();
@@ -215,25 +233,8 @@ test('an advancing clock and a hidden tab never trigger audio reconstruction', a
   expect(FakeContext.instances).toHaveLength(1);
 });
 
-test('a manual audio restart replaces silent output even when its clock is advancing and respects mute', async () => {
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
-  expect(restartAudio()).toBe(false);
-  expect(FakeContext.instances).toHaveLength(0);
-  setSound(true);
-  await settle();
-  context().currentTime = 1;
-  await vi.advanceTimersByTimeAsync(1000);
-  expect(readAudioDiagnostics().clockProgress).toBe('advancing');
-  expect(restartAudio()).toBe(true);
-  await settle();
-  expect(FakeContext.instances).toHaveLength(2);
-  expect(readAudioDiagnostics()).toMatchObject({ soundEnabled: true, lastRestartReason: 'manual' });
-  setSound(false);
-  expect(restartAudio()).toBe(false);
-  expect(FakeContext.instances).toHaveLength(2);
-});
-
 test('a discarded pending resume cannot change the replacement audio session', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'performance'] });
   setSound(true);
   await settle();
   const previous = context();
@@ -247,7 +248,10 @@ test('a discarded pending resume cannot change the replacement audio session', a
   );
   activateAudio();
   expect(readAudioDiagnostics().resumePending).toBe(true);
-  expect(restartAudio()).toBe(true);
+  previous.changeState('running');
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(readAudioDiagnostics().clockProgress).toBe('stalled');
+  trustedPointerDown();
   await settle();
   const before = readAudioDiagnostics();
   rejectOldResume(audioDeviceError());

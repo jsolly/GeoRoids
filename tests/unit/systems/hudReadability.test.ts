@@ -252,6 +252,24 @@ describe('painted HUD composition', () => {
     expect(texts.some((row) => row.text.includes('crystal 0/20'))).toBe(true);
   });
 
+  test('phone status fits two lines and leaves room for the action row', async () => {
+    const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
+    const { drawScoreOverlay } = await import('../../../src/rendering/hud/gameInfo');
+    const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');
+    const player = PlayerManager.getInstance().createLocalPlayer('hauler');
+    player.cargo = 123;
+    const ctx = canvasContext();
+    const { texts } = recordCanvas(ctx);
+    const viewport = { width: 390, height: 844 };
+    const layout = computeHudLayout(viewport, { touchControls: true });
+    drawScoreOverlay(ctx, layout, viewport, 12385);
+    expect(texts.map((row) => row.text)).toEqual([
+      'Bank 12,385 · Cargo 123/1500',
+      'Hauler · Settlement 1 → 2 · 0%',
+    ]);
+    expect(layout.economyBottomY - layout.balance.y).toBeLessThanOrEqual(40);
+  });
+
   test('the local radar marks only nearby revealed furnaces, leaving distant discoveries to the universe map', async () => {
     const { PlayerManager } = await import('../../../src/entities/player/PlayerManager');
     const { computeHudLayout } = await import('../../../src/rendering/hud/hudLayout');

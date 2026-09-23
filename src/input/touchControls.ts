@@ -3,7 +3,6 @@ import type { Player } from '../entities/player/Player';
 import { PlayerManager } from '../entities/player/PlayerManager';
 import { canvasManager } from '../rendering/canvasSurface';
 import { isShipSchematicOpen } from '../ui/shipSchematicState';
-import { canEnterTownStore, openTownStore } from '../ui/townStore';
 import { isTownStoreOpen } from '../ui/townStoreState';
 import { isUniverseMapOpen } from '../ui/universeMap';
 import { shouldUseTouchControls } from '../ui/viewportChrome';
@@ -25,7 +24,6 @@ let steerHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let steerTap: { x: number; y: number; startedAt: number; canFire: boolean } | null = null;
 let firePointerId: number | null = null;
 let abilityPointerId: number | null = null;
-let pendingAbilityClick: 'store' | 'ability' | null = null;
 let boostPointerId: number | null = null;
 let abilityButton: HTMLButtonElement | null = null;
 let boostButton: HTMLButtonElement | null = null;
@@ -110,7 +108,6 @@ function onTouchListChange(ev: TouchEvent): void {
   if (ev.type !== 'touchstart' && liveTouchPoints.size === 0) {
     resetTouchInteraction(requireLocalPlayer(), {
       forgetTouches: false,
-      preserveAbilityClick: ev.type === 'touchend',
     });
   }
 }
@@ -159,9 +156,6 @@ export function triggerTouchAbility(player: Player): boolean {
     player.ship.exploding
   ) {
     return false;
-  }
-  if (canEnterTownStore()) {
-    return openTownStore();
   }
   return player.ship.activateAbility();
 }
@@ -367,10 +361,7 @@ function clearSteerHoldTimer(): void {
 }
 
 /** Clear every pointer source when the browser takes the gesture away. */
-function resetTouchInteraction(
-  player: Player | null,
-  options?: { forgetTouches?: boolean; preserveAbilityClick?: boolean }
-): void {
+function resetTouchInteraction(player: Player | null, options?: { forgetTouches?: boolean }): void {
   const canvas = canvasManager.getCanvas();
   const ability = document.querySelector<HTMLElement>(`#${ABILITY_ID}`);
   const boost = document.querySelector<HTMLElement>(`#${BOOST_ID}`);
@@ -384,9 +375,6 @@ function resetTouchInteraction(
   steerTap = null;
   firePointerId = null;
   abilityPointerId = null;
-  if (!options?.preserveAbilityClick) {
-    pendingAbilityClick = null;
-  }
   boostPointerId = null;
   releasePointerCapture(canvas, activeSteerPointerId);
   releasePointerCapture(canvas, activeFirePointerId);
@@ -646,41 +634,24 @@ function onAbilityPointerDown(ev: PointerEvent, ability: HTMLElement): void {
   ability.setPointerCapture(ev.pointerId);
   setAbilityPressed(true);
   const player = requireLocalPlayer();
-  // Complete the opening click before showing a modal: releasing capture
-  // early can retarget its synthetic click to a newly appeared dialog control.
-  pendingAbilityClick = canEnterTownStore() ? 'store' : 'ability';
-  if (player && pendingAbilityClick === 'ability') {
+  if (player) {
     triggerTouchAbility(player);
     syncAbilityChrome(player);
   }
 }
 
 function onAbilityPointerUp(ev: PointerEvent, ability: HTMLElement): void {
-  if (ev.type === 'pointercancel') {
-    pendingAbilityClick = null;
-  }
   if (ev.pointerId !== abilityPointerId) {
     return;
   }
   ev.preventDefault();
   ev.stopPropagation();
   abilityPointerId = null;
-  if (ev.type === 'pointercancel') {
-    pendingAbilityClick = null;
-  }
   releasePointerCapture(ability, ev.pointerId);
   setAbilityPressed(false);
 }
 
 function onAbilityClick(ev: MouseEvent): void {
-  const action = pendingAbilityClick;
-  pendingAbilityClick = null;
-  if (action === 'store') {
-    ev.preventDefault();
-    ev.stopPropagation();
-    openTownStore();
-    return;
-  }
   // Pointer presses already activate on pointerdown. Their click can arrive
   // later; only keyboard/accessibility/programmatic clicks have no click count.
   if (ev.detail !== 0) {

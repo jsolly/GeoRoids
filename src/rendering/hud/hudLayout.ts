@@ -10,6 +10,7 @@ export type SafeAreaInsets = {
 };
 
 export type HudLayout = {
+  compact: boolean;
   padTop: number;
   padLeft: number;
   padRight: number;
@@ -86,6 +87,7 @@ export function computeHudLayout(
     const balance = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET };
     const kitNameY = balance.y + VISUAL.HUD_BALANCE_HEIGHT + 8;
     return {
+      compact: false,
       padTop: 0,
       padLeft: 0,
       padRight: 0,
@@ -117,12 +119,12 @@ export function computeHudLayout(
   const padTop = Math.max(12, safe.top + 8);
   const padBottom = Math.max(12, safe.bottom + 8);
   const compactHeight = viewport.height < 500;
-  const boardWidth = viewport.width < 400 ? 148 : 168;
+  const boardWidth = Math.min(168, Math.round(viewport.width * 0.3));
   const rowHeight = compactHeight ? 16 : 18;
   const maxRows = 3;
   const miniMapSize = compactHeight ? 64 : 80;
   const balance = { x: padLeft, y: padTop };
-  const kitNameY = balance.y + VISUAL.HUD_BALANCE_HEIGHT + 8;
+  const kitNameY = balance.y + 20;
   const clusterClear = kitNameY + Math.round(18 * hudTypeScale);
   const miniMap = compactHeight
     ? {
@@ -137,13 +139,14 @@ export function computeHudLayout(
       };
 
   return {
+    compact: true,
     padTop,
     padLeft,
     padRight,
     padBottom,
     balance,
     score: { x: padLeft, y: padTop },
-    notificationY: Math.max(clusterClear + 96, padTop + rowHeight * maxRows) + 64,
+    notificationY: Math.max(clusterClear, padTop + rowHeight * maxRows) + 64,
     leaderboard: {
       x: viewport.width - boardWidth - padRight,
       y: padTop,
@@ -155,7 +158,7 @@ export function computeHudLayout(
     overlayFontScale,
     hudTypeScale,
     kitNameY,
-    economyBottomY: kitNameY + 96,
+    economyBottomY: kitNameY + 18,
   };
 }
 

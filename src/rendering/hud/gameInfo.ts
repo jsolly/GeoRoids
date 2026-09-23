@@ -29,7 +29,19 @@ export function drawScoreOverlay(
   const origin = { x: VISUAL.HUD_INSET, y: VISUAL.HUD_INSET + 10 };
   const dx = layout.balance.x - VISUAL.HUD_INSET;
   const dy = layout.balance.y - VISUAL.HUD_INSET;
-  ctx.fillText(`Bank ${score.toLocaleString()}`, origin.x + dx, origin.y + dy);
+  const pilot = PlayerManager.getInstance().getLocalPlayer();
+  const compactWidth = layout.leaderboard.x - layout.balance.x - 12;
+  if (layout.compact && pilot) {
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText(
+      `Bank ${score.toLocaleString()} · Cargo ${pilot.cargo}/${cargoCapacity(pilot.ship.kitId)}`,
+      origin.x + dx,
+      origin.y + dy,
+      compactWidth
+    );
+  } else {
+    ctx.fillText(`Bank ${score.toLocaleString()}`, origin.x + dx, origin.y + dy);
+  }
 
   ctx.font = scaleHudFont(VISUAL.NAME_LABEL_FONT, layout.hudTypeScale);
   ctx.textBaseline = 'top';
@@ -38,7 +50,18 @@ export function drawScoreOverlay(
   if (localShip) {
     const kit = getShipKit(localShip.kitId);
     ctx.fillStyle = hexToRgba(PALETTE.HUD_MUTED, 0.85);
-    ctx.fillText(kit.name, VISUAL.HUD_INSET + dx, layout.kitNameY);
+    if (layout.compact) {
+      const settlement = getSettlement();
+      ctx.font = '12px Arial';
+      ctx.fillText(
+        `${kit.name} · Settlement ${settlement.level} → ${settlement.level + 1} · ${Math.floor(settlementProgress(settlement) * 100)}%`,
+        VISUAL.HUD_INSET + dx,
+        layout.kitNameY,
+        compactWidth
+      );
+    } else {
+      ctx.fillText(kit.name, VISUAL.HUD_INSET + dx, layout.kitNameY);
+    }
   }
 
   const gameStateManager = GameStateManager.getInstance();
@@ -51,8 +74,7 @@ export function drawScoreOverlay(
     ctx.fillText(gameStateManager.getPickupMessage(), viewportWidth / 2, pickupY);
   }
 
-  const pilot = PlayerManager.getInstance().getLocalPlayer();
-  if (pilot) {
+  if (pilot && !layout.compact) {
     const settlement = getSettlement();
     const recipe = settlementRecipe(settlement.level);
     const x = layout.balance.x;

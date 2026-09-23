@@ -12,6 +12,7 @@ import { readAbilityChrome } from '../../../src/input/touchAbility';
 import { triggerTouchAbility } from '../../../src/input/touchControls';
 import { NetworkManager } from '../../../src/network/networkManager';
 import { worldFurnaces } from '../../../src/network/worldExploration';
+import { syncFurnaceTravelPrompt } from '../../../src/ui/furnaceTravelPrompt';
 import {
   applyTownStoreResult,
   closeTownStore,
@@ -67,10 +68,10 @@ test('the store opens at Town Square via E and buys a placeholder without an upg
   player.ship.abilityCooldownFrames = SHIP_ABILITY.COOLDOWN_FRAMES.hauler;
   syncTownStoreChrome();
   const near = readAbilityChrome(player.ship);
-  expect(near.label).toBe('TRAVEL');
-  expect(near.name).toBe('Choose furnace destination');
-  expect(near.ready).toBe(true);
-  expect(near.cooldownRatio).toBe(0);
+  expect(near.label).toBe('HOOK');
+  expect(near.name).toBe('Harpoon');
+  expect(near.ready).toBe(false);
+  expect(near.cooldownRatio).toBe(1);
   player.ship.position = { x: TOWN_STORE_RADIUS + 20, y: 0 };
   expect(openTownStore()).toBe(false);
   expect(readAbilityChrome(player.ship).label).toBe('HOOK');
@@ -143,16 +144,18 @@ test('B still toggles the store on a keyboard without an on-screen Store button'
   expect(isTownStoreOpen()).toBe(false);
 });
 
-test('touch ability opens the store near Town Square instead of firing the kit tool', () => {
+test('touch ability uses the kit tool over Town Square without opening the store', () => {
   const player = PlayerManager.getInstance().getLocalPlayer();
   if (!player) {
     throw new Error('Missing local pilot');
   }
   player.ship.position = { x: 0, y: 0 };
   player.ship.abilityCooldownFrames = 0;
+  const activate = vi.spyOn(player.ship, 'activateAbility').mockReturnValue(true);
   expect(triggerTouchAbility(player)).toBe(true);
-  expect(isTownStoreOpen()).toBe(true);
-  closeTownStore();
+  expect(activate).toHaveBeenCalledOnce();
+  expect(isTownStoreOpen()).toBe(false);
+  activate.mockRestore();
   player.ship.position = { x: TOWN_STORE_RADIUS + 50, y: 0 };
   expect(readAbilityChrome(player.ship).label).toBe('HOOK');
   expect(triggerTouchAbility(player)).toBe(false);
@@ -167,7 +170,7 @@ test('a hooked Hauler opens furnace travel and keeps release controls away from 
   player.ship.position = { x: 0, y: 0 };
   player.ship.harpoonTargetId = 'tow-rock';
   player.ship.abilityCooldownFrames = 0;
-  expect(readAbilityChrome(player.ship).label).toBe('TRAVEL');
+  expect(readAbilityChrome(player.ship).label).toBe('RELEASE');
   expect(openTownStore()).toBe(true);
   closeTownStore();
   player.ship.position = { x: 800, y: 0 };
@@ -215,9 +218,11 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   player.ship.health = 100;
   player.ship.exploding = false;
   player.ship.furnaceTransit = null;
-  const ability = document.querySelector<HTMLButtonElement>('#touch-ability');
+  const width = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390);
+  syncFurnaceTravelPrompt();
+  const ability = document.querySelector<HTMLButtonElement>('#furnace-travel-prompt button');
   if (!ability) {
-    throw new Error('Missing touch ability');
+    throw new Error('Missing furnace prompt');
   }
   ability.setPointerCapture = vi.fn();
   ability.hasPointerCapture = vi.fn().mockReturnValue(true);
@@ -233,4 +238,5 @@ test('a touch boarding gesture opens the map only after its click completes', ()
   ability.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true }));
   expect(isTownStoreOpen()).toBe(true);
   closeTownStore();
+  width.mockRestore();
 });

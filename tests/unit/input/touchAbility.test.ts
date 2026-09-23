@@ -24,7 +24,7 @@ test('each kit exposes its own E action label and name', () => {
   expect(touchAbilityLabel('unknown-kit')).toBe('SCAN');
 });
 
-test('near Town Square the ability chrome becomes Enter store for any kit', () => {
+test('over Town Square each touch ability retains its kit tool and cooldown', () => {
   for (const kitId of ['scout', 'hauler'] as const) {
     const near = readAbilityChrome({
       kitId,
@@ -34,11 +34,11 @@ test('near Town Square the ability chrome becomes Enter store for any kit', () =
       abilityActiveFrames: 0,
       position: { x: 0, y: 0 },
     });
-    expect(near.label).toBe('TRAVEL');
-    expect(near.name).toBe('Choose furnace destination');
-    expect(near.ready).toBe(true);
-    expect(near.cooling).toBe(false);
-    expect(near.cooldownRatio).toBe(0);
+    expect(near.label).toBe(kitId === 'scout' ? 'SCAN' : 'HOOK');
+    expect(near.name).toBe(kitId === 'scout' ? 'Mineral scan' : 'Harpoon');
+    expect(near.ready).toBe(false);
+    expect(near.cooling).toBe(true);
+    expect(near.cooldownRatio).toBeGreaterThan(0);
   }
   const far = readAbilityChrome({
     kitId: 'scout',

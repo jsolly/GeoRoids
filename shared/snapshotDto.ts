@@ -4,6 +4,7 @@ import type {
   AsteroidMaterial,
   AsteroidPhenomenon,
   AsteroidProbe,
+  FurnaceTransit,
   HaulerUtilityId,
   LaserUpgrade,
   LootData,
@@ -22,8 +23,10 @@ import type {
   SpiderFieldState,
   TerrainSpider,
 } from '../shared-types';
+import { validEquipment } from './equipment';
 import { validExploration } from './exploration';
-import { validCivicModules } from './furnaces';
+import { civicLot, TOWN_HEARTH, validCivicModules } from './furnaces';
+import { FURNACE_TRAVEL } from './furnaceTravel';
 import { isShipBoostState } from './shipBoost';
 import { SPIDER } from './terrainSpider';
 import { WORLD } from './world';
@@ -48,7 +51,7 @@ const enumeration =
   (value) =>
     typeof value === 'string' && Object.hasOwn(values, value);
 const kit = enumeration<ShipKitId>({
-  surveyor: true,
+  scout: true,
   hauler: true,
 });
 const haulerUtility = enumeration<HaulerUtilityId>({
@@ -57,7 +60,7 @@ const haulerUtility = enumeration<HaulerUtilityId>({
   tow_cable: true,
 });
 // `build_furnace` is a retired equip token. Older clients may still send it.
-const surveyorUtility: Rule = (value) =>
+const scoutUtility: Rule = (value) =>
   value === 'mineral_scan' || value === 'survey_probe' || value === 'build_furnace';
 const lootKind = enumeration<LootKind>({
   shard: true,
@@ -65,6 +68,9 @@ const lootKind = enumeration<LootKind>({
   laserCore: true,
   tap: true,
   silk: true,
+  resource_tap: true,
+  boost_coupling: true,
+  survey_probe: true,
 });
 const array =
   (rule: Rule): Rule =>
@@ -96,7 +102,30 @@ const reflective = shape<Extract<AsteroidPhenomenon, { kind: 'reflective' }>>({
   energy,
   maxEnergy: energy,
 });
+const hearthId: Rule = (value) =>
+  typeof value === 'string' && (value === TOWN_HEARTH.id || civicLot(value) !== undefined);
+const transit = shape<FurnaceTransit>({
+  sourceId: hearthId,
+  destinationId: hearthId,
+  startedAt: (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0,
+  durationMs: (value) =>
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= FURNACE_TRAVEL.MIN_DURATION_MS &&
+    value <= FURNACE_TRAVEL.MAX_DURATION_MS,
+});
 const entity = shape<ServerEntityData>({
+  furnaceTransit: optional(
+    (value) =>
+      value === null ||
+      (transit(value) &&
+        typeof value === 'object' &&
+        value !== null &&
+        'sourceId' in value &&
+        'destinationId' in value &&
+        value.sourceId !== value.destinationId)
+  ),
+  equipment: optional(validEquipment),
   silk: optional((value) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0),
   id: string,
   name: string,
@@ -123,7 +152,7 @@ const entity = shape<ServerEntityData>({
   harpoonTargetId: optional((value) => value === null || string(value)),
   harpoonLatchPos: optional(position),
   haulerUtility: optional(haulerUtility),
-  surveyorUtility: optional(surveyorUtility),
+  scoutUtility: optional(scoutUtility),
   deathCause: optional(string),
   playerMotion: optional(motion),
   laserUpgrade: optional(upgrade),
@@ -282,6 +311,7 @@ const spiderField = shape<SpiderFieldState>({
   nests: uniqueRows(nest, (2 * Math.ceil(WORLD.radius / SPIDER.NEST_SPACING)) ** 2),
 });
 const worldRules = {
+  serverTime: optional(number),
   civicModules: optional(validCivicModules),
   spiderField: optional(spiderField),
   exploration: validExploration,

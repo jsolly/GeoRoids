@@ -18,7 +18,7 @@ describe('ship growth math', () => {
     expect(maxHealthFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_HEALTH);
     expect(thrustScaleFromMass(GROWTH.BASE_MASS)).toBe(1);
     expect(maxVelocityFromMass(GROWTH.BASE_MASS)).toBe(SHIP.MAX_VELOCITY);
-    expect(hullRadiusForKit('surveyor')).toBe(SHIP.SIZE / 2);
+    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
   });
 
   test('collecting loot grows mass and HP with a slither slowdown, not hull size', () => {
@@ -27,7 +27,7 @@ describe('ship growth math', () => {
     expect(maxHealthFromMass(grown)).toBeGreaterThan(SHIP.MAX_HEALTH);
     expect(thrustScaleFromMass(grown)).toBeLessThan(1);
     expect(maxVelocityFromMass(grown)).toBeLessThan(SHIP.MAX_VELOCITY);
-    expect(hullRadiusForKit('surveyor')).toBe(SHIP.SIZE / 2);
+    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
     expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
   });
 
@@ -40,7 +40,7 @@ describe('ship growth math', () => {
     expect(mass).toBeGreaterThan(GROWTH.SOFT_MAX_MASS - 0.2);
     expect(maxHealthFromMass(mass)).toBe(Math.round(SHIP.MAX_HEALTH * GROWTH.MAX_HEALTH_SCALE));
     expect(thrustScaleFromMass(mass)).toBeGreaterThanOrEqual(GROWTH.MIN_THRUST_SCALE);
-    expect(hullRadiusForKit('surveyor')).toBe(SHIP.SIZE / 2);
+    expect(hullRadiusForKit('scout')).toBe(SHIP.SIZE / 2);
     expect(hullRadiusForKit('hauler')).toBe(SHIP.SIZE);
   });
 
@@ -70,25 +70,25 @@ describe('ship growth math', () => {
 
   test('loot overlap uses the kit hull radius', () => {
     const origin = { x: 0, y: 0 };
-    const surveyorRadius = hullRadiusForKit('surveyor');
-    const nearby = { x: surveyorRadius + GROWTH.LOOT_RADIUS - 1, y: 0 };
-    const far = { x: surveyorRadius + GROWTH.LOOT_RADIUS + 4, y: 0 };
-    expect(lootOverlap(origin, surveyorRadius, nearby, GROWTH.LOOT_RADIUS)).toBe(true);
-    expect(lootOverlap(origin, surveyorRadius, far, GROWTH.LOOT_RADIUS)).toBe(false);
+    const scoutRadius = hullRadiusForKit('scout');
+    const nearby = { x: scoutRadius + GROWTH.LOOT_RADIUS - 1, y: 0 };
+    const far = { x: scoutRadius + GROWTH.LOOT_RADIUS + 4, y: 0 };
+    expect(lootOverlap(origin, scoutRadius, nearby, GROWTH.LOOT_RADIUS)).toBe(true);
+    expect(lootOverlap(origin, scoutRadius, far, GROWTH.LOOT_RADIUS)).toBe(false);
   });
 
-  test('a larger kit hull reaches loot that a Surveyor hull still misses', () => {
+  test('a larger kit hull reaches loot that a Scout hull still misses', () => {
     const origin = { x: 0, y: 0 };
-    const justPastSurveyor = {
-      x: hullRadiusForKit('surveyor') + GROWTH.LOOT_RADIUS + 4,
+    const justPastScout = {
+      x: hullRadiusForKit('scout') + GROWTH.LOOT_RADIUS + 4,
       y: 0,
     };
-    expect(
-      lootOverlap(origin, hullRadiusForKit('surveyor'), justPastSurveyor, GROWTH.LOOT_RADIUS)
-    ).toBe(false);
-    expect(
-      lootOverlap(origin, hullRadiusForKit('hauler'), justPastSurveyor, GROWTH.LOOT_RADIUS)
-    ).toBe(true);
+    expect(lootOverlap(origin, hullRadiusForKit('scout'), justPastScout, GROWTH.LOOT_RADIUS)).toBe(
+      false
+    );
+    expect(lootOverlap(origin, hullRadiusForKit('hauler'), justPastScout, GROWTH.LOOT_RADIUS)).toBe(
+      true
+    );
   });
 
   test('loot magnet adds pull toward the nearest ship without replacing velocity', () => {

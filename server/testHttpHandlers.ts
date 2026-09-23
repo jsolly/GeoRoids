@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import process from 'node:process';
 import { logger } from '../setup/serverLogger';
 import { calculateHealthRegenDelayFrames } from '../shared/constants/health';
+import { EQUIPMENT_IDS } from '../shared/equipment';
 import { civicLot, TOWN_HEARTH } from '../shared/furnaces';
 import { shipPaintById } from '../shared/townStore';
 import { WORLD } from '../shared/world';
@@ -285,6 +286,7 @@ export function handleTestArrangeCrewField(
         'delivery',
         'tow',
         'empty',
+        'equipment',
         'boundary',
         'impact',
         'mining',
@@ -299,6 +301,8 @@ export function handleTestArrangeCrewField(
         'furnace',
         'town-store',
         'street-build',
+        'street-escape',
+        'street-travel',
       ].includes(String(body['scenario']))
     ) {
       respond(400, { error: 'Invalid crew fixture' });
@@ -328,7 +332,7 @@ export function handleTestArrangeCrewField(
       const position =
         body['scenario'] === 'town-store'
           ? { x: 0, y: 0 }
-          : body['scenario'] === 'street-build'
+          : ['street-build', 'street-escape', 'street-travel'].includes(String(body['scenario']))
             ? { ...streetLot.position }
             : body['scenario'] === 'spider-rescue'
               ? { x: 4400 + index * 120, y: 2200 }
@@ -386,8 +390,8 @@ export function handleTestArrangeCrewField(
         player.healthRegenTimer = calculateHealthRegenDelayFrames();
       }
       player.abilityCooldownFrames = 0;
-      if (body['scenario'] === 'street-build') {
-        player.score = streetLot.cost;
+      if (['street-build', 'street-escape', 'street-travel'].includes(String(body['scenario']))) {
+        player.score = streetLot.cost + (body['scenario'] === 'street-travel' ? 250 : 0);
       }
       poses.push({
         playerId: player.id,
@@ -403,6 +407,22 @@ export function handleTestArrangeCrewField(
       gameEngine.parkSatellitePickups();
     }
     const first = poses[0];
+    if (body['scenario'] === 'equipment' && first) {
+      for (const [index, equipment] of EQUIPMENT_IDS.entries()) {
+        gameEngine.dropEquipmentAt(
+          { x: first.position.x + 220 + index * 150, y: first.position.y },
+          equipment
+        );
+      }
+    }
+    if (body['scenario'] === 'street-escape') {
+      gameEngine.clearSpiderField();
+      if (
+        !gameEngine.spawnTerrainSpider({ x: streetLot.position.x + 200, y: streetLot.position.y })
+      ) {
+        throw new Error('Could not spawn chasing spider');
+      }
+    }
     if (body['scenario'] === 'spider-rescue') {
       gameEngine.clearSpiderField();
       if (

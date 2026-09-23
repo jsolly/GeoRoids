@@ -14,13 +14,13 @@ for (const viewport of [
   { width: 1280, height: 900, touch: false },
   { width: 390, height: 844, touch: true },
 ]) {
-  test(`a Surveyor builds a shared furnace near a dark street at ${viewport.width}px`, async () => {
+  test(`a Scout builds a shared furnace near a dark street at ${viewport.width}px`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
     await game.navigateToGame();
-    await page.locator('[data-kit-id="surveyor"]').click();
+    await page.locator('[data-kit-id="scout"]').click();
     await game.startGame();
     await game.waitForGameReady();
     await game.waitForServerJoin();
@@ -70,12 +70,12 @@ for (const viewport of [
       );
       expect(await page.locator('#touch-ability').textContent()).toContain('BUILD');
       await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`surveyor-ability-build-${viewport.width}.png`),
+        path: screenshotManager.getScreenshotPath(`scout-ability-build-${viewport.width}.png`),
       });
       await page.locator('#touch-ability').tap();
     } else {
       await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`surveyor-ability-build-${viewport.width}.png`),
+        path: screenshotManager.getScreenshotPath(`scout-ability-build-${viewport.width}.png`),
       });
       await page.keyboard.press('KeyE');
     }
@@ -87,7 +87,7 @@ for (const viewport of [
       await page.evaluate(() => window.gameController?.getCurrPlayer()?.ship.abilityActiveFrames)
     ).toBe(0);
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`surveyor-lit-street-${viewport.width}.png`),
+      path: screenshotManager.getScreenshotPath(`scout-lit-street-${viewport.width}.png`),
     });
     await game.placeShipAt(0, 0);
     await game.waitForAnimationFrames(12);
@@ -97,12 +97,12 @@ for (const viewport of [
     await page.screenshot({
       path: screenshotManager.getScreenshotPath(`town-square-pipe-rim-${viewport.width}.png`),
     });
-    await page.goto(`${new URL(page.url()).origin}/wiki/#surveyor`);
+    await page.goto(`${new URL(page.url()).origin}/wiki/#scout`);
     const buildHeading = page.getByRole('heading', { name: 'Build', exact: true });
     await buildHeading.waitFor();
     await buildHeading.scrollIntoViewIfNeeded();
     await page.screenshot({
-      path: screenshotManager.getScreenshotPath(`surveyor-wiki-${viewport.width}.png`),
+      path: screenshotManager.getScreenshotPath(`scout-wiki-${viewport.width}.png`),
     });
     assertNoBrowserDiagnostics(diagnostics);
   }, 60_000);

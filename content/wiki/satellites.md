@@ -18,7 +18,7 @@ media:
 
 ## Six Earth-observation hulls
 
-Glowing Landsat 7, Terra, Aqua, GOES-16, ENVISAT, and WorldView-3 satellites are collectible scanning hardware. Fly close to claim one automatically for your inventory and earn score; loose satellites are invulnerable.
+Glowing Landsat 7, Terra, Aqua, GOES-16, ENVISAT, and WorldView-3 satellites are collectible scanning hardware. Find them loose in the field or among nest salvage while supply remains. Fly close to claim one automatically for your inventory and earn score; loose satellites are invulnerable.
 
 ## Equipped satellites
 

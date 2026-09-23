@@ -56,6 +56,7 @@ import {
 import { drawGame } from '../rendering/canvas';
 import { canvasManager } from '../rendering/canvasSurface';
 import { LaserUpgradeReadout } from '../rendering/hud/LaserUpgradeReadout';
+import { syncFurnaceTravelPrompt } from '../ui/furnaceTravelPrompt';
 import { showNetworkBanner } from '../ui/networkStatus';
 import { showSchematicEquipHint } from '../ui/schematicEquipHint';
 import { getSelectedShipKitId } from '../ui/shipKitSelect';
@@ -776,6 +777,7 @@ export class GameController {
   private advanceSimulationFrame(currPlayer: Player): void {
     InputManager.getInstance().updateMovementLock();
     syncTownStoreChrome();
+    syncFurnaceTravelPrompt();
     tickTouchControls(currPlayer);
     currPlayer.ship.update();
     shockwaveManager.update();

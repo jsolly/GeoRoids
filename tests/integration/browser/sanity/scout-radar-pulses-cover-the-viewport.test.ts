@@ -13,12 +13,12 @@ for (const viewport of [
   { width: 1280, height: 900, touch: false },
   { width: 390, height: 844, touch: true },
 ]) {
-  test(`Surveyor radar sweeps the ${viewport.width}-pixel viewport and stops when the scan ends`, async () => {
+  test(`Scout radar sweeps the ${viewport.width}-pixel viewport and stops when the scan ends`, async () => {
     const page = await browserManager.recreatePage({ hasTouch: viewport.touch });
     await page.setViewportSize(viewport);
     const diagnostics = watchBrowserDiagnostics(page);
     const game = new GameInteractions(page);
-    await game.bootGame({ kitId: 'surveyor', waitForCombatReady: false });
+    await game.bootGame({ kitId: 'scout', waitForCombatReady: false });
     await arrangeCrewField([await game.getLocalPlayerId()], 'empty');
     await game.placeShipAt(20000, 20000);
     const probe = await page.evaluateHandle(() => {
@@ -66,7 +66,7 @@ for (const viewport of [
         .poll(() => probe.evaluate((value) => value.maxRadius), { timeout: 3500, interval: 16 })
         .toBeGreaterThan(Math.min(viewport.width, viewport.height) * 0.35);
       await page.screenshot({
-        path: screenshotManager.getScreenshotPath(`surveyor-radar-${viewport.width}.png`),
+        path: screenshotManager.getScreenshotPath(`scout-radar-${viewport.width}.png`),
       });
       await expect
         .poll(() => probe.evaluate((value) => value.maxRadius), { timeout: 6000 })

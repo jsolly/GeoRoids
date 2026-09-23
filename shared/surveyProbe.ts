@@ -1,6 +1,6 @@
 import type { AsteroidProbe, Position } from '../shared-types';
 
-/** Authoritative Surveyor probe tuning shared by the server and renderer. */
+/** Authoritative Scout probe tuning shared by the server and renderer. */
 export const SURVEY_PROBE = {
   /** Radius of the scan around the beacon. */
   RANGE: 600,
@@ -10,7 +10,7 @@ export const SURVEY_PROBE = {
   PULSE_MS: 3_000,
   /** Time a beacon remains attached to its host. */
   LIFETIME_MS: 300_000,
-  /** Maximum active beacons credited to one Surveyor. */
+  /** Maximum active beacons credited to one Scout. */
   MAX_PER_OWNER: 3,
   /** Collision and rendered radius of the beacon. */
   RADIUS: 10,
@@ -18,7 +18,7 @@ export const SURVEY_PROBE = {
   MAX_HEALTH: 40,
   /** Client warning threshold before expiry. */
   WARNING_MS: 30_000,
-  /** Frames before the same Surveyor may launch another beacon. */
+  /** Frames before the same Scout may launch another beacon. */
   COOLDOWN_FRAMES: 180,
 } as const;
 

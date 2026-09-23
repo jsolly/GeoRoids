@@ -10,12 +10,12 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | --- | --- | --- |
 | field-manual | Start here | Arena orientation, two kits, starting a life, saved score, brief-disconnect return |
 | controls | Start here | Automatic thrust, shared cruise speed, Boost toggle, capped keyboard/mouse/touch steering, heading cue, hull dead zone, playfield tap-to-fire, Inventory button on desktop and touch, satellite-pickup label pointing at Inventory, Town Square store, and map/schematic/store hold with blink on return |
-| surveyor | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named street furnaces paid with personal score, scattered street lots, right-angle fire trails only after a street is lit, a personal delivery bonus per street built, nest keep-out, moving probe beacons, and delivery tags |
-| hauler | Ships | Stats scorecard, ~2× Surveyor hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the street is lit, and double metal mining damage |
+| scout | Ships | Stats scorecard, shared cruise, stronger Boost, passive exploration reveal, shared active radar mineral scan, scan spider repulsion, persistent named street furnaces paid with personal score, scattered street lots, right-angle fire trails only after a street is lit, a personal delivery bonus per street built, escape construction and living spider retreat, moving probe beacons, and delivery tags |
+| hauler | Ships | Stats scorecard, ~2× Scout hull, shared cruise, weaker Boost, schematic utility slot, Resource Tap extract, self-guided Boost Coupling, momentum-preserving tow cable, cargo collision break, crew-scale colossal tows and couplings, furnace delivery with a red shatter and smoke poof, a right-angle fire trail only after the street is lit, and double metal mining damage |
 | loot-growth | Systems | Loot mass and health (fixed kit hull size), Tap canister extract, reflective core, shoot-a-drop blast |
 | asteroids | Arena | Materials, health, score, rubble fragments, cooperative splits, rare colossal deposits, reflection, armed coupling and furnace-guided powered flight |
 | satellites | Arena | Six stationary, glowing, invulnerable EO pickups, ship inventory, equipped scanning and exhaustion, and map/schematic hold skips scoop |
-| terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, sparse resource nests (a web lasts until its guarded resource is collected or moved), value-scaled guard groups, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
+| terrain | Arena | Seeded hills and valleys, contour elevations, climb penalties, downhill speed gains, cross-slope drift, circular boundary, no ordinary terrain damage, denser resource nests with mixed salvage and rare equipment (a web lasts until its guarded resource is collected or moved), ten initial guards per nest, territorial pursuit and return, rare roaming hunters, contour trails, hunt warnings, bites, and shootable spider health |
 | combat-survival | Combat | Damage, teammate safety, asteroid-impact survival, map/schematic hold immunity and blink on return, lives, respawn, brief-disconnect return, and score |
 | teamwork | Systems | One shared crew, scan-to-tow furnace loop, personal delivery yield, Town Square store, scattered street lots with right-angle fire trails only after a street is lit, harvested ground that stays empty and flyable, and persistent exploration |
 | hud-network | Systems | Health capsule, shared leaderboard, exploration fog, local minimap, full-screen universe map, right-angle furnace fire trails only after a street is lit, HUD values, Sound Effects, Music, and Haptics settings, Advanced Debug player/session IDs, reconnect, brief-disconnect return |
@@ -28,9 +28,9 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 | How do I open the Hauler schematic and swap Tap, Tow, or Boost Coupling? | controls, hauler | src/ui/shipSchematic.ts, src/ui/schematicEquipHint.ts, haulerUtility.ts, shipAbilities.ts |
 | What happens to my ship while the map, schematic, or town store is open? | controls, satellites, combat-survival, loot-growth | InputManager.ts, shipUtils.ts, townStore.ts, GameEngine overlay hold, combat immunity tests |
 | How do I buy an extra life at Town Square? | controls, teamwork | shared/townStore.ts, src/ui/townStore.ts, GameEngine buyExtraLife, town store tests |
-| How do I launch, follow, or shoot down a probe beacon? | surveyor, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
-| How do I build furnaces and repel spiders? | surveyor, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, nest keep-out, and scan-defense tests |
-| Can I clear a spider nest by building a furnace on it? | surveyor, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS keep-out, furnace construction tests |
+| How do I launch, follow, or shoot down a probe beacon? | scout, controls, teamwork, hud-network | shared/surveyProbe.ts, server/core/GameEngine.ts, src/entities/roid/surveyProbeRenderer.ts |
+| How do I build furnaces and repel spiders? | scout, terrain, controls, teamwork | shared/furnaceField.ts, GameEngine.ts, TerrainSpiderManager.ts, furnace persistence, escape construction and living spider retreat, and scan-defense tests |
+| Can I clear a spider nest by building a furnace on it? | scout, terrain | TerrainSpiderManager nest homes, FURNACE_SAFE_RADIUS retreat, furnace construction tests |
 | Which of the two kits fits my next flight? | Each ship article | src/entities/ship/shipKits.ts, shipAbilities.ts, kit tests |
 | What are the exact hull, shot, and E timing values? | Each ship article | Kit data, SHIP_ABILITY.COOLDOWN_FRAMES, constants |
 | How do mass, shards, cores, and death loot work? | loot-growth | shared/shipGrowth.ts, server/core/LootManager.ts |
@@ -52,7 +52,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 ## Maintenance rules
 
 - Keep article IDs and related IDs resolvable. The two kit IDs must remain
-  surveyor and hauler; controls is the getting-started
+  scout and hauler; controls is the getting-started
   entry used by the home page.
 - Keep every article sources array as plain text paths that exist in the
   checkout. Include the definition that owns an exact value and the test or
@@ -89,7 +89,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   successful attachment starts the three-second ability cooldown, but E again
   releases the cable immediately; an out-of-range attempt leaves the cooldown
   unchanged. A towed rock delivered inside a furnace's
-  85-unit intake is consumed and awards the Hauler plus every recorded Surveyor
+  85-unit intake is consumed and awards the Hauler plus every recorded Scout
   the full material reward. Towed ordinary cargo that overlaps another asteroid uses the
   ordinary collision break on both rocks and drops the cable; a towed colossal
   deposit breaks the other rock and keeps its cables. Towed ordinary cargo that
@@ -99,18 +99,18 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   and towed collisions do not shatter it.
 - Boost Coupling arms the nearest available asteroid and points it at its nearest
   furnace. Ordinary rocks ignite on the second E and pay that launcher plus recorded
-  Surveyors at intake. A colossal deposit stays armed until two couplings are latched;
-  those launchers and recorded Surveyors are paid. Dropping one colossal coupling
+  Scouts at intake. A colossal deposit stays armed until two couplings are latched;
+  those launchers and recorded Scouts are paid. Dropping one colossal coupling
   leaves the other armed. Swapping tools, losing range, dying, or disconnecting
   cancels an ordinary armed coupling.
   Ignited cargo passes through objects and ignores
   tools, weapons, scanning, and blast impulses. An empty world pauses guidance;
   saved sectors retain delivery ownership across reloads and resume powered cargo
   after a restart.
-- Surveyor E classifies nearby minerals on every teammate radar for the active
+- Scout E classifies nearby minerals on every teammate radar for the active
   1,200-unit scan range; each qualifying rock keeps that classification while
-  it remains in the nearby radar and records the Surveyor player ID for delivery.
-  Surveyor passive exploration reaches 650 world units and Hauler passive
+  it remains in the nearby radar and records the Scout player ID for delivery.
+  Scout passive exploration reaches 650 world units and Hauler passive
   exploration reaches 260; the chart persists and is shared by every pilot.
   The local minimap follows the nearby radar, while M or the on-screen Map
   button opens a full-screen universe overview. Pilots stay readable;
@@ -121,7 +121,7 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
   and colossal deposits;
   normal asteroid mining damage remains configured per material. Large ice
   collaboration requires distinct pilot IDs; both contributors receive the
-  collaboration score. Every miner and recorded Surveyor receives the full
+  collaboration score. Every miner and recorded Scout receives the full
   mining reward; partial-rock contributor history survives saved-region reloads
   and server restarts, and offline pilots retain their credit.
 - Unbounced ship lasers, ship-to-ship ramming, tow cables, and shot-triggered loot blasts
@@ -170,11 +170,24 @@ are also recorded by article ID in `src/wiki/articleSources.json`. Editorial tex
 
 Hauler and terrain articles cover tapping finite silk reserves, provocation,
 towing spiders into a furnace, and the furnace whimper. Loot and growth covers the
-separate silk inventory, which grants neither ore score nor hull mass. Surveyor
+separate silk inventory, which grants neither ore score nor hull mass. Scout
 covers probes riding spiders back to guarded resources, sharing the existing
 beacon limits and expiry. Server scenarios prove extraction, persistence,
 protected-area towing and release, consumption, and nest scans; desktop/mobile
 browser scenarios exercise both ships' controls and the changed wiki sections.
+
+Equipment ownership is server-authoritative and saved with each pilot. Starter
+tools are Tow Cable and Mineral Scan; rare tools unlock only after collection.
+Nest cache provenance prevents reward drops from spawning more nests. Desktop
+and mobile checks cover locked cards, pickup-to-equip, visible glowing hardware,
+and the thicker arcade laser core without changing projectile physics.
+
+Furnace travel follows shared pipe geometry between lit destinations. E opens
+the furnace menu inside the hearth’s visible footprint, with Town Square retaining
+250-score life purchases. New flights start with five lives. Final-life loss
+clears personal score, silk, equipment, and paint, while shared furnaces remain.
+Verify server socket/proximity/destination checks, transit action suppression,
+arrival reconciliation, reconnect behavior, and desktop/mobile rocket visuals.
 
 The single Ricochet Court northeast of Town Square is covered in Combat survival,
 Terrain, Teamwork, and HUD/network. Panels reflect lasers from both sides without

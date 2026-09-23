@@ -72,16 +72,16 @@ describe('LootManager destroy-drop shards', () => {
     expect(after?.position.x).toBeCloseTo(80 - GROWTH.LOOT_MAGNET_ACCEL * (2 + GROWTH.LOOT_DRAG));
   });
 
-  test('a Hauler collects a shard that a same-mass Surveyor still misses', () => {
+  test('a Hauler collects a shard that a same-mass Scout still misses', () => {
     const manager = new LootManager(new RNGService(7));
     const engine = new GameEngine(7);
     try {
-      const surveyor = engine.addPlayer(
+      const scout = engine.addPlayer(
         'scout',
         'Scout',
         new RecordingSocket(),
         { x: 0, y: 0 },
-        'surveyor'
+        'scout'
       );
       const hauler = engine.addPlayer(
         'barge',
@@ -90,9 +90,9 @@ describe('LootManager destroy-drop shards', () => {
         { x: 0, y: 0 },
         'hauler'
       );
-      const justPastSurveyor = hullRadiusForKit('surveyor') + GROWTH.LOOT_RADIUS + 4;
-      const shard = manager.spawnShard({ x: justPastSurveyor, y: 0 }, 20);
-      const collected = manager.collectOverlaps([surveyor, hauler]);
+      const justPastScout = hullRadiusForKit('scout') + GROWTH.LOOT_RADIUS + 4;
+      const shard = manager.spawnShard({ x: justPastScout, y: 0 }, 20);
+      const collected = manager.collectOverlaps([scout, hauler]);
       expect(collected).toEqual([
         { collector: hauler, loot: expect.objectContaining({ id: shard.id }) },
       ]);
@@ -101,22 +101,22 @@ describe('LootManager destroy-drop shards', () => {
     }
   });
 
-  test('a mass-grown Surveyor still misses a shard just past the kit hull', () => {
+  test('a mass-grown Scout still misses a shard just past the kit hull', () => {
     const manager = new LootManager(new RNGService(7));
     const engine = new GameEngine(7);
     try {
-      const surveyor = engine.addPlayer(
+      const scout = engine.addPlayer(
         'scout',
         'Scout',
         new RecordingSocket(),
         { x: 0, y: 0 },
-        'surveyor'
+        'scout'
       );
       engine.updatePlayer('scout', { mass: GROWTH.SOFT_MAX_MASS });
-      expect(surveyor.mass).toBe(GROWTH.SOFT_MAX_MASS);
-      const justPastSurveyor = hullRadiusForKit('surveyor') + GROWTH.LOOT_RADIUS + 4;
-      const shard = manager.spawnShard({ x: justPastSurveyor, y: 0 }, 20);
-      expect(manager.collectOverlaps([surveyor])).toEqual([]);
+      expect(scout.mass).toBe(GROWTH.SOFT_MAX_MASS);
+      const justPastScout = hullRadiusForKit('scout') + GROWTH.LOOT_RADIUS + 4;
+      const shard = manager.spawnShard({ x: justPastScout, y: 0 }, 20);
+      expect(manager.collectOverlaps([scout])).toEqual([]);
       expect(manager.get(shard.id)?.id).toBe(shard.id);
     } finally {
       engine.stopGameLoop();

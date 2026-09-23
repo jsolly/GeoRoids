@@ -11,7 +11,7 @@ import { RecordingSocket } from '../../support/recordingSocket';
 let engine: GameEngine;
 beforeEach(() => {
   engine = new GameEngine(42);
-  engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 }, 'surveyor');
+  engine.addPlayer('scout', 'Scout', new RecordingSocket(), { x: 0, y: 0 }, 'scout');
   engine.addPlayer('hauler', 'Hauler', new RecordingSocket(), { x: 100, y: 0 }, 'hauler');
   for (const rock of engine.getAllAsteroids()) {
     engine.removeAsteroid(rock.id);
@@ -46,7 +46,7 @@ function actor(id: string) {
   return value;
 }
 
-test('a Surveyor identifies cargo and both pilots receive the full furnace reward exactly once', () => {
+test('a Scout identifies cargo and both pilots receive the full furnace reward exactly once', () => {
   const rock = deposit();
   engine.addAsteroid(rock);
   const initial = { scout: actor('scout').score, hauler: actor('hauler').score };
@@ -134,7 +134,7 @@ test('a second Hauler cannot steal attached cargo and loose rocks do not pay at 
   expect(engine.drainFurnaceDeliveries()).toEqual([]);
 });
 
-test('scans retain map discoveries after expiry without crediting distant Surveyors', () => {
+test('scans retain map discoveries after expiry without crediting distant Scouts', () => {
   const rock = deposit();
   engine.addAsteroid(rock);
   const far = deposit('far', { x: SHIP_ABILITY.SCAN_RANGE + 10, y: 0 });

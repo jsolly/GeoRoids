@@ -32,7 +32,7 @@ expected health, score, death, delivery, or pickup into the fixture.
 
 Observe a specific target and result: a teammate's health remaining unchanged
 after a shot or overlap, the same projectile on both clients, a rock's
-Surveyor tag reaching the Hauler, or a matched delivery banner and score on
+Scout tag reaching the Hauler, or a matched delivery banner and score on
 every contributor. Watch transient banners/events before triggering the
 action. Poll for snapshots with deadlines instead of assuming an arbitrary
 delay is enough.

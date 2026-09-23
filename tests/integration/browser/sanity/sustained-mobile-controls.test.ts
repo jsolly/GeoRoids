@@ -50,7 +50,7 @@ test(
     const game = new GameInteractions(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await game.bootGame({ waitForCombatReady: false, kitId: 'surveyor' });
+    await game.bootGame({ waitForCombatReady: false, kitId: 'scout' });
     // Leave Town Square so the ability button runs Mineral Scan, not Enter store.
     await game.placeShipAt(0, -500);
     await page.waitForFunction(

@@ -154,7 +154,7 @@
   }
 
   .town-store-dialog {
-    width: min(420px, calc(100vw - 24px));
+    width: min(640px, calc(100vw - 24px));
     max-height: calc(100dvh - 24px);
     margin: auto;
     padding: 18px 20px 16px;
@@ -232,12 +232,103 @@
   }
 
   .town-store-row button,
+  .furnace-destinations button,
   #town-store-return {
     min-height: 36px;
     padding: 0.3rem 0.7rem;
     font: 700 0.7rem / 1 var(--font-mono, monospace);
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  .furnace-destinations {
+    display: grid;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .furnace-travel-viewport {
+    max-height: min(42dvh, 340px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    border: 1px solid #334155;
+    background: #07131d;
+    scrollbar-width: thin;
+  }
+
+  .furnace-travel-map {
+    position: relative;
+    background-image:
+      linear-gradient(#14232e 1px, transparent 1px),
+      linear-gradient(90deg, #14232e 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .furnace-travel-pipes {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: #b89558;
+    stroke-width: 2;
+    opacity: 0.65;
+    pointer-events: none;
+  }
+
+  .furnace-destinations .furnace-travel-marker {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 64px;
+    height: 64px;
+    padding: 4px;
+    transform: translate(-50%, -50%);
+    border-radius: 8px;
+    background: #10202c;
+    color: #fde68a;
+    border-color: #b89558;
+    text-align: center;
+    letter-spacing: normal;
+    text-transform: none;
+    cursor: pointer;
+  }
+
+  .furnace-travel-marker:hover,
+  .furnace-travel-marker:focus-visible {
+    z-index: 1;
+    outline: 3px solid #5eead4;
+    outline-offset: 2px;
+  }
+
+  .furnace-destinations .furnace-travel-marker[aria-current] {
+    color: #5eead4;
+    border-color: #5eead4;
+    opacity: 1;
+    cursor: default;
+  }
+
+  .furnace-travel-symbol {
+    font-size: 23px;
+    line-height: 1;
+  }
+
+  .furnace-travel-label {
+    width: 100%;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .town-store-dialog h3 {
+    font: 700 0.85rem / 1.5 var(--font-mono, monospace);
+    color: var(--palette-hud, #e2e8f0);
   }
 
   .town-store-dialog button:disabled {
@@ -1942,6 +2033,16 @@
 
   .ship-schematic-card.is-active {
     border-color: var(--palette-local, #5eead4);
+  }
+
+  .ship-schematic-card:disabled {
+    cursor: not-allowed;
+    border-style: dashed;
+  }
+
+  .ship-schematic-card:disabled .ship-schematic-badge {
+    visibility: visible;
+    color: var(--palette-hud-muted, #64748b);
   }
 
   .ship-schematic-card.is-active .ship-schematic-badge {

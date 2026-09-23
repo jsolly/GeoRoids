@@ -10,18 +10,17 @@ import {
 
 export const FURNACE_BUILD = {
   RADIUS: TOWN_HEARTH.radius,
-  /** World units from a dark lot where Surveyor E becomes Build. */
+  /** World units from a dark lot where Scout E becomes Build. */
   APPROACH: 220,
   ISSUE: {
-    NEST: 'Too close to a spider nest',
     STAND: 'Stand inside a street foundation',
     LIT: 'This street is already burning',
     READY: 'Furnace builder not ready',
   },
 } as const;
 
-/** Surveyor E builds instead of scan/probe while a dark street lot is this close. */
-export function surveyorAbilityBuildsAt(
+/** Scout E builds instead of scan/probe while a dark street lot is this close. */
+export function scoutAbilityBuildsAt(
   position: Position,
   isLit: (lotId: string) => boolean
 ): boolean {

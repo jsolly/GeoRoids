@@ -1,3 +1,4 @@
+import { isEquipmentId } from '../../shared/equipment';
 import { explorationCellAt, isCellExplored } from '../../shared/exploration';
 import { CIVIC_LOTS, FURNACES } from '../../shared/furnaces';
 import type { ExplorationTile, LootData, MapAsset, SatellitePickupData } from '../../shared-types';
@@ -28,7 +29,12 @@ export class MapAssets {
       });
     }
     for (const drop of loot) {
-      if (drop.kind === 'shard' || drop.kind === 'tap' || drop.kind === 'silk') {
+      if (
+        drop.kind === 'shard' ||
+        drop.kind === 'tap' ||
+        drop.kind === 'silk' ||
+        isEquipmentId(drop.kind)
+      ) {
         continue;
       }
       candidates.push({

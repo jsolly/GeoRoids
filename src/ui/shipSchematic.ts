@@ -1,4 +1,5 @@
-import type { HaulerUtilityId, ShipKitId, SurveyorUtilityId } from '../../shared-types';
+import { canEquipUtility } from '../../shared/equipment';
+import type { HaulerUtilityId, ScoutUtilityId, ShipKitId } from '../../shared-types';
 import { playFeedback } from '../audio/feedbackSounds';
 import { PALETTE, VISUAL } from '../constants';
 import { traceTapCanister } from '../entities/loot/lootRenderer';
@@ -17,16 +18,16 @@ import {
   projectHullPoint,
   projectHullPolyline,
 } from '../entities/ship/hullOutlines';
-import { setHaulerUtilityOnHost, setSurveyorUtilityOnHost } from '../entities/ship/shipAbilities';
+import {
+  preferredScoutUtility,
+  rememberScoutUtility,
+  SCOUT_UTILITY,
+  SCOUT_UTILITY_IDS,
+  scoutUtilityOf,
+} from '../entities/ship/scoutUtility';
+import { setHaulerUtilityOnHost, setScoutUtilityOnHost } from '../entities/ship/shipAbilities';
 import { SHIP_ABILITY } from '../entities/ship/shipKits';
 import { strokeKitHullOutline } from '../entities/ship/shipRenderer';
-import {
-  preferredSurveyorUtility,
-  rememberSurveyorUtility,
-  SURVEYOR_UTILITY,
-  SURVEYOR_UTILITY_IDS,
-  surveyorUtilityOf,
-} from '../entities/ship/surveyorUtility';
 import { NetworkManager } from '../network/networkManager';
 import { hexToRgba } from '../utils/colorUtils';
 import { logger } from '../utils/Logger';
@@ -104,7 +105,7 @@ let frameRequest: number | null = null;
 let openInputRelease: (() => void) | undefined;
 let elements: SchematicElements | null = null;
 let selectedUtility: HaulerUtilityId = preferredHaulerUtility();
-let selectedSurveyorUtility: SurveyorUtilityId = preferredSurveyorUtility();
+let selectedScoutUtility: ScoutUtilityId = preferredScoutUtility();
 
 function decorateSchematicToggle(toggle: HTMLButtonElement): void {
   toggle.type = 'button';
@@ -243,7 +244,7 @@ function canOpenForLocalShip(): boolean {
     return false;
   }
   const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
-  return ship !== undefined && ship.health > 0 && !ship.exploding;
+  return ship !== undefined && ship.health > 0 && !ship.exploding && !ship.furnaceTransit;
 }
 
 function mountCards(): void {
@@ -269,9 +270,9 @@ function mountCards(): void {
       appendCard(id, part.name, part.hint, () => equipUtility(id));
     }
   } else {
-    for (const id of SURVEYOR_UTILITY_IDS) {
-      const part = SURVEYOR_UTILITY[id];
-      appendCard(id, part.name, part.hint, () => equipSurveyorUtility(id));
+    for (const id of SCOUT_UTILITY_IDS) {
+      const part = SCOUT_UTILITY[id];
+      appendCard(id, part.name, part.hint, () => equipScoutUtility(id));
     }
   }
 }
@@ -280,8 +281,13 @@ function syncCards(): void {
   if (!elements) {
     return;
   }
-  const kit = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
+  const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+  const kit = ship?.kitId ?? 'hauler';
   const hauler = kit === 'hauler';
+  if (ship) {
+    selectedUtility = haulerUtilityOf(ship);
+    selectedScoutUtility = scoutUtilityOf(ship);
+  }
   if (elements.cards.dataset['kitId'] !== kit) {
     mountCards();
   }
@@ -289,18 +295,36 @@ function syncCards(): void {
   elements.tool.hidden = false;
   const eyebrow = elements.dialog.querySelector('.ship-schematic-eyebrow');
   if (eyebrow) {
-    eyebrow.textContent = hauler ? 'HAULER' : 'SURVEYOR';
+    eyebrow.textContent = hauler ? 'HAULER' : 'SCOUT';
   }
-  elements.canvas.setAttribute(
-    'aria-label',
-    `${hauler ? 'Hauler' : 'Surveyor'} equipment schematic`
-  );
+  elements.canvas.setAttribute('aria-label', `${hauler ? 'Hauler' : 'Scout'} equipment schematic`);
+  for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
+    const id = button.dataset['utilityId'];
+    const available = ship !== undefined && canEquipUtility(ship, id);
+    button.disabled = !available;
+    const hint = button.querySelector('.ship-schematic-card-hint');
+    if (hint) {
+      const haulerId = HAULER_UTILITY_IDS.find((utility) => utility === id);
+      const scoutId = SCOUT_UTILITY_IDS.find((utility) => utility === id);
+      hint.textContent = !available
+        ? 'Find in spider nests'
+        : haulerId
+          ? HAULER_UTILITY[haulerId].hint
+          : scoutId
+            ? SCOUT_UTILITY[scoutId].hint
+            : '';
+    }
+    const badge = button.querySelector('.ship-schematic-badge');
+    if (badge) {
+      badge.textContent = available ? 'ACTIVE' : 'LOCKED';
+    }
+  }
   if (!hauler) {
-    const part = SURVEYOR_UTILITY[selectedSurveyorUtility];
+    const part = SCOUT_UTILITY[selectedScoutUtility];
     elements.title.textContent = part.name;
     elements.copy.textContent = part.copy;
     for (const button of elements.cards.querySelectorAll<HTMLButtonElement>('[data-utility-id]')) {
-      const active = button.dataset['utilityId'] === selectedSurveyorUtility;
+      const active = button.dataset['utilityId'] === selectedScoutUtility;
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     }
@@ -317,7 +341,8 @@ function syncCards(): void {
 }
 
 export function equipUtility(utilityId: HaulerUtilityId): void {
-  if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId !== 'hauler') {
+  const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+  if (ship?.kitId !== 'hauler' || ship.furnaceTransit || !canEquipUtility(ship, utilityId)) {
     return;
   }
   if (selectedUtility !== utilityId) {
@@ -342,24 +367,25 @@ export function equipUtility(utilityId: HaulerUtilityId): void {
   syncCards();
 }
 
-function equipSurveyorUtility(utilityId: SurveyorUtilityId): void {
-  if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId !== 'surveyor') {
+function equipScoutUtility(utilityId: ScoutUtilityId): void {
+  const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
+  if (ship?.kitId !== 'scout' || ship.furnaceTransit || !canEquipUtility(ship, utilityId)) {
     return;
   }
-  if (selectedSurveyorUtility !== utilityId) {
+  if (selectedScoutUtility !== utilityId) {
     playFeedback('interface');
   }
-  selectedSurveyorUtility = utilityId;
-  rememberSurveyorUtility(utilityId);
+  selectedScoutUtility = utilityId;
+  rememberScoutUtility(utilityId);
   const player = PlayerManager.getInstance().getLocalPlayer();
-  if (player?.ship.kitId === 'surveyor') {
-    setSurveyorUtilityOnHost(player.ship, utilityId);
+  if (player?.ship.kitId === 'scout') {
+    setScoutUtilityOnHost(player.ship, utilityId);
   }
   if (player) {
     const network = NetworkManager.getInstance();
     if (network.isConnected) {
       network.sendMessage({
-        type: 'setSurveyorUtility',
+        type: 'setScoutUtility',
         id: network.getLocalPlayerId() || player.id,
         data: { utilityId },
       });
@@ -601,7 +627,7 @@ function drawToolLoop(
 ): void {
   ctx.clearRect(0, 0, width, height);
   const kit = PlayerManager.getInstance().getLocalPlayer()?.ship.kitId ?? 'hauler';
-  if (kit === 'surveyor') {
+  if (kit === 'scout') {
     const shipX = width * 0.2;
     const midY = height * 0.5;
     const radius = 18;
@@ -616,11 +642,11 @@ function drawToolLoop(
     ctx.strokeStyle = PALETTE.LOCAL;
     ctx.shadowColor = PALETTE.LOCAL;
     ctx.shadowBlur = VISUAL.SHIP_GLOW;
-    strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'surveyor');
+    strokeKitHullOutline(ctx, shipX, midY, radius, 0, PALETTE.LOCAL, 'scout');
     ctx.shadowBlur = 0;
     ctx.strokeStyle = PALETTE.HUD_MUTED;
     drawDemoAsteroid(ctx, rockX, rockY, 13, now / 900);
-    if (selectedSurveyorUtility === 'mineral_scan') {
+    if (selectedScoutUtility === 'mineral_scan') {
       ctx.strokeStyle = PALETTE.LOOT;
       ctx.globalAlpha = 0.35 + pulse * 0.45;
       for (const ring of [14, 23, 32]) {
@@ -728,6 +754,7 @@ function renderOverlay(): void {
   if (!elements || !isShipSchematicOpen()) {
     return;
   }
+  syncCards();
   renderSatelliteInventory(elements.inventory, elements.inventoryStatus, elements.return);
   resizeCanvas(elements.canvas, 640, 360);
   resizeCanvas(elements.tool, 220, 80);
@@ -788,11 +815,11 @@ export function openShipSchematic(): boolean {
   const ship = PlayerManager.getInstance().getLocalPlayer()?.ship;
   if (ship?.kitId === 'hauler') {
     selectedUtility = haulerUtilityOf(ship);
-  } else if (ship?.kitId === 'surveyor') {
-    selectedSurveyorUtility = surveyorUtilityOf(ship);
+  } else if (ship?.kitId === 'scout') {
+    selectedScoutUtility = scoutUtilityOf(ship);
   } else {
     selectedUtility = preferredHaulerUtility();
-    selectedSurveyorUtility = preferredSurveyorUtility();
+    selectedScoutUtility = preferredScoutUtility();
   }
   mountCards();
   syncCards();
@@ -897,20 +924,23 @@ export function initializeShipSchematic(options?: { onOpen?: () => void }): void
   });
   elements.return.addEventListener('click', () => {
     closeShipSchematic();
+    // Return to flight restores gameplay focus; native Space must not reopen the HUD button.
+    const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+    if (canvas) {
+      canvas.tabIndex = -1;
+      canvas.focus({ preventScroll: true });
+    }
   });
   const hullCanvas = elements.canvas;
   hullCanvas.addEventListener('click', (ev) => {
     const rect = hullCanvas.getBoundingClientRect();
     const left = ev.clientX < rect.left + rect.width / 2;
-    if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId === 'surveyor') {
+    if (PlayerManager.getInstance().getLocalPlayer()?.ship.kitId === 'scout') {
       const index = Math.min(
-        SURVEYOR_UTILITY_IDS.length - 1,
-        Math.max(
-          0,
-          Math.floor(((ev.clientX - rect.left) / rect.width) * SURVEYOR_UTILITY_IDS.length)
-        )
+        SCOUT_UTILITY_IDS.length - 1,
+        Math.max(0, Math.floor(((ev.clientX - rect.left) / rect.width) * SCOUT_UTILITY_IDS.length))
       );
-      equipSurveyorUtility(SURVEYOR_UTILITY_IDS[index] ?? 'mineral_scan');
+      equipScoutUtility(SCOUT_UTILITY_IDS[index] ?? 'mineral_scan');
     } else {
       equipUtility(left ? 'tow_cable' : 'resource_tap');
     }

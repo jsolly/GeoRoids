@@ -14,7 +14,7 @@ import {
 const position = { x: 2250, y: 0 };
 afterEach(() => ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius }));
 
-test.each(['surveyor', 'hauler'] as const)(
+test.each(['scout', 'hauler'] as const)(
   '%s can climb steep contours at any mass without boost, but descents are much faster',
   (kitId) => {
     const field = ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
@@ -48,7 +48,7 @@ test('crossing a steep hillside keeps nearly full cruise with a light downhill t
   const gradient = sampleGradient(field, position.x, position.y);
   const magnitude = Math.hypot(gradient.x, gradient.y);
   const uphill = Math.atan2(-gradient.y, gradient.x);
-  const kit = getShipKit('surveyor');
+  const kit = getShipKit('scout');
   const ship = {
     position,
     angle: uphill + Math.PI / 2,
@@ -71,7 +71,7 @@ test('crossing a steep hillside keeps nearly full cruise with a light downhill t
 
 test('flat starter terrain preserves the normal cap and steep descents have a bounded ceiling for every heading', () => {
   ensureTerrain(TERRAIN.DEFAULT_SEED, { cx: 0, cy: 0, radius: WORLD.radius });
-  const cruise = getShipKit('surveyor').maxVelocity;
+  const cruise = getShipKit('scout').maxVelocity;
   expect(terrainSpeedLimit({ x: 0, y: 0 }, cruise)).toBe(cruise);
   for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
     const velocity = terrainCruiseVelocity(position, angle, cruise);

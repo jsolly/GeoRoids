@@ -53,7 +53,7 @@ test(
     const hudAfterRestart = (await game.getHudText()).toLowerCase();
     expect(hudAfterRestart).not.toContain('game over');
     expect(hudAfterRestart).not.toContain('unknown');
-    expect(await game.getLives()).toBe(3);
+    expect(await game.getLives()).toBe(5);
     expect(await game.isGameRunning()).toBe(true);
 
     await page.waitForTimeout(5000);

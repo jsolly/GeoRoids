@@ -54,6 +54,9 @@ const LOOT_MARK_KINDS = [
   'laserCore',
   'tap',
   'silk',
+  'resource_tap',
+  'boost_coupling',
+  'survey_probe',
 ] satisfies readonly LootKind[];
 
 // These marks stay visible at the radar's world scale without borrowing the

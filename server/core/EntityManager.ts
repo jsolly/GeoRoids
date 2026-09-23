@@ -9,16 +9,18 @@ import { TOWN_SPAWN_RADIUS } from '../../shared/furnaces';
 import { fullShipBoost, stopShipBoost } from '../../shared/shipBoost';
 import { applyShipMass, GROWTH, resetShipMass } from '../../shared/shipGrowth';
 import type {
+  EquipmentId,
+  FurnaceTransit,
   HaulerUtilityId,
   LaserUpgrade,
   PlayerMotionState,
   Position,
+  ScoutUtilityId,
   ShipBoostState,
   ShipKitId,
-  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
-import { PALETTE, SHIP } from '../../src/constants';
+import { GAME, PALETTE, SHIP } from '../../src/constants';
 import { tickAbilityHost } from '../../src/entities/ship/shipAbilities';
 import {
   applyShipKitStats,
@@ -30,7 +32,9 @@ import type { RNGService } from './RNGService';
 
 /** Authoritative live ship state; GameEngine owns persisted pilot progress. */
 export interface GameEntity {
+  furnaceTransit?: FurnaceTransit | null;
   silk?: number;
+  equipment?: EquipmentId[];
   id: string;
   name: string;
   type: 'player';
@@ -64,7 +68,7 @@ export interface GameEntity {
   harpoonTargetId: string | null;
   harpoonLatchPos?: Position;
   haulerUtility?: HaulerUtilityId;
-  surveyorUtility?: SurveyorUtilityId;
+  scoutUtility?: ScoutUtilityId;
   tapExtractFrames?: number;
   tapExtractCompleted?: boolean;
   /** Environmental cause of the current death (cleared on respawn). */
@@ -216,7 +220,7 @@ export class EntityManager {
       thrusting: false,
       boost: fullShipBoost(),
       color: PALETTE.REMOTE,
-      lives: 3,
+      lives: GAME.START_LIVES,
       score: 0,
       health: 100,
       maxHealth: 100,

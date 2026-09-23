@@ -126,8 +126,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await expect
       .poll(() => page.locator('.demo img').first().getAttribute('src'))
       .toMatch(PNG_SRC_SUFFIX_PATTERN);
-    await page.goto(`${TestConfig.GAME_URL}/wiki/#surveyor`);
-    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Surveyor');
+    await page.goto(`${TestConfig.GAME_URL}/wiki/#scout`);
+    await expect.poll(() => page.locator('.article-header h1').textContent()).toBe('Scout');
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
       PNG_SRC_SUFFIX_PATTERN
@@ -290,8 +290,8 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     await page.locator('.ship-card').first().waitFor();
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     await page.locator('#navigation summary').click();
-    await page.locator('#article-nav a[href="#surveyor"]').click();
-    await expect.poll(() => page.locator('h1').textContent()).toBe('Surveyor');
+    await page.locator('#article-nav a[href="#scout"]').click();
+    await expect.poll(() => page.locator('h1').textContent()).toBe('Scout');
     expect(await page.locator('#navigation').getAttribute('open')).toBeNull();
     expect(await page.locator('.demo button').count()).toBe(0);
     expect(await page.locator('.demo img').first().getAttribute('src')).toMatch(
@@ -305,7 +305,7 @@ test('pilots find rules and see autoplay demonstrations on desktop and mobile', 
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true);
-    await page.screenshot({ path: resolve(output, 'wiki-surveyor-mobile.png'), fullPage: true });
+    await page.screenshot({ path: resolve(output, 'wiki-scout-mobile.png'), fullPage: true });
     await page.locator('.ship-rating-guide summary').click();
     expect(await page.locator('.ship-rating-guide p').isVisible()).toBe(true);
     expect(await page.locator('.ship-rating-guide p').textContent()).toContain('Smaller size');

@@ -11,7 +11,7 @@ import { getStoredItem } from '../utils/safeStorage';
 // ============================================================================
 export const GAME = {
   // Lives and scoring
-  START_LIVES: 3,
+  START_LIVES: 5,
   STARTING_SCORE: 0,
 
   // Physics
@@ -80,12 +80,14 @@ export const TITLE = {
 export const VISUAL = {
   SHIP_STROKE_WIDTH: 1.25,
   SHIP_GLOW: 1.25,
-  // Thicker short cream dash plus a faint heading ghost — still a shot, never a beam.
-  LASER_STROKE_WIDTH: 3.5,
-  LASER_LENGTH: 24,
-  LASER_TRAIL_LENGTH: 13,
+  // Broad glowing bolts with a bright core and a short trailing streak.
+  LASER_STROKE_WIDTH: 7,
+  LASER_CORE_WIDTH: 2.5,
+  LASER_CORE_COLOR: '#FFF8E1',
+  LASER_LENGTH: 34,
+  LASER_TRAIL_LENGTH: 20,
   LASER_EXPLODE_RADIUS: 16,
-  LASER_GLOW: 6,
+  LASER_GLOW: 14,
   LASER_HIT_TICKS: 4,
   HEALTH_CAPSULE_HEIGHT: 1.5,
   BOUNDARY_STROKE_WIDTH: 1.25,
@@ -184,7 +186,7 @@ export const SHIP = {
   TURN_SPEED: 450, // degrees per second
   THRUST: 5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
   MAX_VELOCITY: 2 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
-  SIZE: 30, // Surveyor / classic hull height in pixels. Hauler uses kit size.
+  SIZE: 30, // Scout / classic hull height in pixels. Hauler uses kit size.
 
   // Combat
   MAX_LASERS: 5, // maximum lasers a ship can have at once

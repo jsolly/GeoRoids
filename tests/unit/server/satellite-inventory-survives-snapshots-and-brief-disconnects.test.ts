@@ -23,7 +23,7 @@ test('inventory follows its owner across snapshot interest and reconnect grace, 
     'Observer',
     observerSocket,
     { x: 10000, y: 0 },
-    'surveyor'
+    'scout'
   );
   owner.asteroidInteractions = 1;
   const registration = engine.registerPilot(owner, socket);

@@ -59,7 +59,7 @@ import {
 } from '../src/entities/ship/shipAbilities';
 import { getShipKit, hullRadiusForKit } from '../src/entities/ship/shipKits';
 import {
-  drawSurveyorScanFx,
+  drawScoutScanFx,
   strokeKitHullOutline,
   strokePhosphorSegment,
 } from '../src/entities/ship/shipRenderer';
@@ -91,7 +91,7 @@ import { recordSatelliteDemo, type SatelliteDemoPanel } from './wiki-satellite-d
 
 type RenderContext = DrawingContext;
 type MediaId =
-  | 'surveyor'
+  | 'scout'
   | 'hauler'
   | 'movement'
   | 'terrain'
@@ -103,7 +103,7 @@ type MediaId =
   | 'survival';
 
 const MEDIA_IDS: readonly MediaId[] = [
-  'surveyor',
+  'scout',
   'hauler',
   'movement',
   'terrain',
@@ -543,8 +543,8 @@ function makeAsteroid(
   };
 }
 
-function makeSurveyorDemo(): Demo {
-  const host = makeAbilityHost('surveyor', { x: 0, y: 0 });
+function makeScoutDemo(): Demo {
+  const host = makeAbilityHost('scout', { x: 0, y: 0 });
   const teammate = makeAbilityHost('hauler', { x: 210, y: 35 });
   const rocks = [
     makeAsteroid('scan-ice', { x: -100, y: -50 }, 26, 'ice'),
@@ -554,13 +554,13 @@ function makeSurveyorDemo(): Demo {
   const activated = activateAbilityOnHost(host);
   invariant(
     activated.activated && activated.abilityId === 'surveyScan',
-    'Surveyor scan must activate'
+    'Scout scan must activate'
   );
   let classified = false;
   let sharedClassification = false;
   let tagged = false;
   return {
-    id: 'surveyor',
+    id: 'scout',
     posterFrame: 10,
     verify: () => {
       invariant(
@@ -584,20 +584,16 @@ function makeSurveyorDemo(): Demo {
       }
       drawFrameChrome(
         ctx,
-        'SURVEYOR · MINERAL SCAN',
+        'SCOUT · MINERAL SCAN',
         'E scan → shared crew radar → persistent delivery tag',
         frame
       );
-      const surveyorScreen = screenPoint(host.position);
-      drawSurveyorScanFx(
-        ctx,
-        host,
-        surveyorScreen.x,
-        surveyorScreen.y,
-        hullRadiusForKit('surveyor'),
-        { width: WIDTH, height: HEIGHT }
-      );
-      drawShip(ctx, 'surveyor', host.position, Math.PI / 2, PALETTE.LOCAL);
+      const scoutScreen = screenPoint(host.position);
+      drawScoutScanFx(ctx, host, scoutScreen.x, scoutScreen.y, hullRadiusForKit('scout'), {
+        width: WIDTH,
+        height: HEIGHT,
+      });
+      drawShip(ctx, 'scout', host.position, Math.PI / 2, PALETTE.LOCAL);
       drawShip(ctx, 'hauler', teammate.position, Math.PI, PALETTE.REMOTE);
       for (const rock of rocks) {
         const material = rock.surveyedBy?.length ? rock.material : scannedMaterial(host, rock);
@@ -631,7 +627,7 @@ function makeSurveyorDemo(): Demo {
         210,
         325
       );
-      drawTag(ctx, 'Surveyor + teammate see the same marks', 330, 110, PALETTE.REMOTE);
+      drawTag(ctx, 'Scout + teammate see the same marks', 330, 110, PALETTE.REMOTE);
     },
   };
 }
@@ -646,15 +642,12 @@ function makeHaulerDemo(): Demo {
   const target = {
     ...makeAsteroid('demo-rock', { x: anchor.x - 220, y: anchor.y }, 34, 'metal'),
     kind: 'asteroid' as const,
-    surveyedBy: ['surveyor-demo'],
+    surveyedBy: ['scout-demo'],
   };
-  const surveyor = makeAbilityHost('surveyor', { x: anchor.x - 235, y: anchor.y - 62 });
-  const scan = activateAbilityOnHost(surveyor);
-  invariant(
-    scan.activated && scan.abilityId === 'surveyScan',
-    'Surveyor scan did not tag the haul'
-  );
-  invariant(scannedMaterial(surveyor, target) === 'metal', 'Surveyor scan missed the hauled metal');
+  const scout = makeAbilityHost('scout', { x: anchor.x - 235, y: anchor.y - 62 });
+  const scan = activateAbilityOnHost(scout);
+  invariant(scan.activated && scan.abilityId === 'surveyScan', 'Scout scan did not tag the haul');
+  invariant(scannedMaterial(scout, target) === 'metal', 'Scout scan missed the hauled metal');
   const world: AbilityWorld = {
     asteroids: [target],
   };
@@ -685,10 +678,7 @@ function makeHaulerDemo(): Demo {
         releasedFrame !== undefined && host.harpoonTargetId === null,
         'E did not release after delivery'
       );
-      invariant(
-        target.surveyedBy?.includes('surveyor-demo') === true,
-        'delivery lost the Surveyor tag'
-      );
+      invariant(target.surveyedBy?.includes('scout-demo') === true, 'delivery lost the Scout tag');
       const recipients = new Set(['hauler-demo', ...(target.surveyedBy ?? [])]);
       const reward = furnaceReward(target);
       invariant(
@@ -743,7 +733,7 @@ function makeHaulerDemo(): Demo {
         y: target.position.y - anchor.y,
       };
       const displayTarget = toScene(target.position);
-      const displaySurveyor = toScene(surveyor.position);
+      const displayScout = toScene(scout.position);
       if (!delivered) {
         drawRoid(ctx, { ...target, position: sceneTarget, rotation: targetRotation }, displayScale);
       }
@@ -760,11 +750,11 @@ function makeHaulerDemo(): Demo {
       );
       drawShip(
         ctx,
-        'surveyor',
-        displaySurveyor,
+        'scout',
+        displayScout,
         Math.PI / 2,
         PALETTE.REMOTE,
-        hullRadiusForKit('surveyor') * displayScale
+        hullRadiusForKit('scout') * displayScale
       );
       const furnaceScreen = screenPoint({ x: 0, y: 0 });
       drawFurnaceArtwork(
@@ -786,13 +776,7 @@ function makeHaulerDemo(): Demo {
         110,
         '#FDE68A'
       );
-      drawTag(
-        ctx,
-        'Surveyor scan → Hauler tow → furnace → both score',
-        400,
-        286,
-        PALETTE.HUD_MUTED
-      );
+      drawTag(ctx, 'Scout scan → Hauler tow → furnace → both score', 400, 286, PALETTE.HUD_MUTED);
     },
   };
 }
@@ -851,11 +835,11 @@ function makeMovementDemo(): Demo {
       renderSegment(ctx, a.x, a.y, b.x, b.y, PALETTE.LOCAL, 1, 2);
       drawShip(
         ctx,
-        'surveyor',
+        'scout',
         { x: position.x * displayScale, y: position.y * displayScale },
         angles[frame + 1] ?? 0,
         PALETTE.LOCAL,
-        getShipKit('surveyor').size / 2,
+        getShipKit('scout').size / 2,
         true
       );
       drawTag(
@@ -1034,11 +1018,11 @@ function makeTerrainDemo(): Demo {
       const directionScale = steepness > 0 ? 64 / steepness : 0;
       drawShip(
         ctx,
-        'surveyor',
+        'scout',
         { x: 0, y: 0 },
         state.angle,
         PALETTE.LOCAL,
-        getShipKit('surveyor').size / 2,
+        getShipKit('scout').size / 2,
         true
       );
       drawArrow(
@@ -1205,7 +1189,7 @@ function makeLootDemo(): Demo {
         }
         if (
           liveSecond &&
-          lootOverlap(shooter, hullRadiusForKit('surveyor'), liveSecond.position, liveSecond.radius)
+          lootOverlap(shooter, hullRadiusForKit('scout'), liveSecond.position, liveSecond.radius)
         ) {
           const removed = lootManager.remove(secondDrop.id);
           if (removed !== undefined) {
@@ -1269,10 +1253,10 @@ function makeLootDemo(): Demo {
           Math.max(0, 0.8 - blastAge * 0.06)
         );
       }
-      const shipRadius = hullRadiusForKit('surveyor');
+      const shipRadius = hullRadiusForKit('scout');
       drawShip(
         ctx,
-        'surveyor',
+        'scout',
         { x: shooter.x * displayScale, y: shooter.y * displayScale },
         0,
         PALETTE.LOCAL,
@@ -1707,7 +1691,7 @@ function drawShipHealthCapsule(ctx: RenderContext, ship: Ship): void {
 }
 
 function makeSurvivalDemo(): Demo {
-  const ship = new Ship({ position: { x: -92, y: 0 }, kitId: 'surveyor' });
+  const ship = new Ship({ position: { x: -92, y: 0 }, kitId: 'scout' });
   ship.angle = 0;
   const rock = makeAsteroid('survival-rock', { x: 130, y: 0 }, 32, 'rubble', 0.35);
   rock.velocity = { x: -1.4, y: 0 };
@@ -1760,7 +1744,7 @@ function makeSurvivalDemo(): Demo {
         }
       });
       drawRoid(ctx, rock);
-      drawShip(ctx, 'surveyor', ship.position, ship.angle, PALETTE.LOCAL, ship.r, impacted);
+      drawShip(ctx, 'scout', ship.position, ship.angle, PALETTE.LOCAL, ship.r, impacted);
       drawShipHealthCapsule(ctx, ship);
       if (ship.impactFlashFrames > 0) {
         const progress = 1 - ship.impactFlashFrames / SHIP.IMPACT_FLASH_FRAMES;
@@ -1799,7 +1783,7 @@ function makePickupsDemo(): Demo {
   const owner = {
     id: 'pilot',
     position: { x: 0, y: 0 },
-    radius: hullRadiusForKit('surveyor'),
+    radius: hullRadiusForKit('scout'),
     health: 100,
     exploding: false,
   };
@@ -1889,7 +1873,7 @@ function makePickupsDemo(): Demo {
       if (loose) {
         drawPickup(ctx, loose, 0.35);
       }
-      drawShip(ctx, 'surveyor', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('surveyor').size / 2);
+      drawShip(ctx, 'scout', { x: 0, y: 0 }, 0, PALETTE.LOCAL, getShipKit('scout').size / 2);
       drawTag(
         ctx,
         firstPickup?.state === 'orbiting'
@@ -1914,7 +1898,7 @@ function makePickupsDemo(): Demo {
 
 function buildDemos(): Demo[] {
   return [
-    makeSurveyorDemo(),
+    makeScoutDemo(),
     makeHaulerDemo(),
     makeMovementDemo(),
     makeTerrainDemo(),

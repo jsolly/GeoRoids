@@ -15,7 +15,7 @@ import { PALETTE } from '../../../src/constants';
 import { RecordingSocket } from '../../support/recordingSocket';
 
 test('Town Square sells one extra life and keeps the new count across a restart', () => {
-  expect(EXTRA_LIFE_COST).toBe(1000);
+  expect(EXTRA_LIFE_COST).toBe(250);
   expect(MAX_LIVES).toBe(6);
   const directory = mkdtempSync(join(tmpdir(), 'town-store-'));
   const path = join(directory, 'world.sqlite');
@@ -36,7 +36,7 @@ test('Town Square sells one extra life and keeps the new count across a restart'
       'Rich',
       new RecordingSocket(),
       { x: 10, y: 0 },
-      'surveyor'
+      'scout'
     );
     bystander.score = 3000;
     bystander.lives = 3;
@@ -53,10 +53,10 @@ test('Town Square sells one extra life and keeps the new count across a restart'
       expect(pilot.lives).toBe(lives);
     };
 
-    refuse('You need 1000 more score');
-    pilot.score = 999;
+    refuse('You need 250 more score');
+    pilot.score = 249;
     refuse('You need 1 more score');
-    pilot.score = 1000;
+    pilot.score = 250;
     pilot.position = { x: 450, y: 0 };
     refuse(TOWN_STORE_ISSUE.AWAY);
     pilot.position = { x: 0, y: 0 };
@@ -71,7 +71,7 @@ test('Town Square sells one extra life and keeps the new count across a restart'
     delete pilot.respawnTimer;
 
     pilot.lives = 5;
-    pilot.score = 1000;
+    pilot.score = 250;
     handler.handleMessage({ type: 'buyExtraLife', id: pilot.id }, socket);
     expect(socket.lastReceived('townStoreResult')?.data).toEqual({
       message: 'You have 6 lives',

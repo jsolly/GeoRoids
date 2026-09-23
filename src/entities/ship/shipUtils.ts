@@ -41,26 +41,6 @@ export function isServerRespawnActive(respawnTimer?: number): boolean {
   return respawnTimer !== undefined && respawnTimer > 0;
 }
 
-/**
- * Established session progress must not snap back to a fresh 3-life / 0-score
- * spawn unless this really is a new local player object.
- */
-export function isSilentHudReset(
-  currentLives: number,
-  currentScore: number,
-  incomingLives?: number,
-  incomingScore?: number
-): boolean {
-  if (incomingLives === undefined && incomingScore === undefined) {
-    return false;
-  }
-  const nextLives = incomingLives ?? currentLives;
-  const nextScore = incomingScore ?? currentScore;
-  // Game-over (0 lives) may start a new ship at 3/0; mid-run progress must not.
-  const established = currentLives > 0 && (currentScore > 0 || currentLives < GAME.START_LIVES);
-  return established && nextLives === GAME.START_LIVES && nextScore === GAME.STARTING_SCORE;
-}
-
 /** Explode / clear the exploding flag. Shared by local and remote ships. */
 export function applySharedShipExplodingFlag(
   ship: Pick<SharedShipCombatVisuals, 'exploding' | 'health' | 'explode'>,

@@ -14,8 +14,14 @@ import { asteroidCrewNeeded, isColossalAsteroid } from '../../shared/asteroidSca
 import { isCombatantImmune, isWorldHazard, laserDamagesShips } from '../../shared/combat';
 import { chooseCrewSpawn } from '../../shared/crewSpawn';
 import { epochField } from '../../shared/epochField';
+import {
+  canEquipUtility,
+  EQUIPMENT_DROPS,
+  EQUIPMENT_IDS,
+  isEquipmentId,
+} from '../../shared/equipment';
 import { EXPLORATION_RANGE, ExplorationMap } from '../../shared/exploration';
-import { FURNACE_BUILD, FurnaceField, surveyorAbilityBuildsAt } from '../../shared/furnaceField';
+import { FURNACE_BUILD, FurnaceField, scoutAbilityBuildsAt } from '../../shared/furnaceField';
 import {
   civicLot,
   civicLotAt,
@@ -24,6 +30,12 @@ import {
   TOWN_HEARTH,
   townSquareSpawn,
 } from '../../shared/furnaces';
+import {
+  furnaceTravelDuration,
+  furnaceTravelPose,
+  nearestTravelFurnace,
+  planFurnaceRoute,
+} from '../../shared/furnaceTravel';
 import { consumeTickAccumulator, GAME_TICK_MS, MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { findLaserSurfaceImpact } from '../../shared/laserSurface';
 import {
@@ -67,21 +79,29 @@ import type {
   TapEjected,
   Velocity,
 } from '../../shared-types';
-import { CANVAS, DAMAGE, GAME, LASER, ROID, SATELLITE_PICKUP, SHIP } from '../../src/constants';
+import {
+  CANVAS,
+  DAMAGE,
+  GAME,
+  LASER,
+  PALETTE,
+  ROID,
+  SATELLITE_PICKUP,
+  SHIP,
+} from '../../src/constants';
 import { pointsForRoidSize } from '../../src/entities/roid/roidScore';
 import {
   haulerUtilityOf,
   isResourceTapUtility,
   isTowCableUtility,
 } from '../../src/entities/ship/haulerUtility';
+import { scoutUtilityOf } from '../../src/entities/ship/scoutUtility';
 import {
-  abilityCooldownFramesFor,
   activateAbilityOnHost,
-  canActivateAbility,
   clearHaulerLatch,
   pullHarpoonTarget,
   setHaulerUtilityOnHost,
-  setSurveyorUtilityOnHost,
+  setScoutUtilityOnHost,
   tickTapExtract,
 } from '../../src/entities/ship/shipAbilities';
 import {
@@ -90,7 +110,6 @@ import {
   hullRadiusForKit,
   SHIP_ABILITY,
 } from '../../src/entities/ship/shipKits';
-import { surveyorUtilityOf } from '../../src/entities/ship/surveyorUtility';
 import { getAsteroidFieldRadius } from '../../src/physics/asteroidMotion';
 import { checkBoundaryCollision } from '../../src/physics/collision/collisionDetection';
 import { framesToMs, SHOCKWAVE_WAVES, type ShockwaveWaveSpec } from '../../src/physics/shockwave';
@@ -292,6 +311,7 @@ export class GameEngine {
   private readonly laserNonce = randomUUID();
   private readonly surveyProbeManager = new SurveyProbeManager();
   public readonly playerMotion = new PlayerMotionService();
+  private readonly furnaceTravelFrames = new Map<string, number>();
   private departedPlayers: string[] = [];
   private decoratedFieldId?: string | undefined;
   private pendingLootBlasts: Array<{
@@ -494,6 +514,7 @@ export class GameEngine {
       this.removePlayer(id);
       this.departedPlayers.push(id);
     }
+    this.advanceFurnaceTravel(serverNow);
     this.tickAbilities(serverNow);
     this.tickSurveyProbes(serverNow);
     this.advanceSpiderField();
@@ -725,6 +746,10 @@ export class GameEngine {
   }
 
   public removePlayer(id: string): GameEntity | undefined {
+    const traveler = this.getPlayer(id);
+    if (traveler?.furnaceTransit) {
+      this.finishFurnaceTravel(traveler, this.getServerTime());
+    }
     this.capturePilot(id);
     this.playerMotion.forgetActor(id);
     const departing = this.getPlayer(id);
@@ -747,22 +772,29 @@ export class GameEngine {
     const previous = this.pilots.get(actor.id);
     const lastClientReleaseId = readReleaseId(clientReleaseId) ?? previous?.lastClientReleaseId;
     const now = this.getServerTime();
+    const arrival = actor.furnaceTransit
+      ? furnaceTravelPose(
+          actor.furnaceTransit,
+          actor.furnaceTransit.startedAt + actor.furnaceTransit.durationMs
+        )
+      : undefined;
     const flight = {
       id: actor.id,
       tokenHash,
       name: actor.name,
-      score: actor.score,
-      silk: actor.silk ?? 0,
+      score: actor.lives === 0 ? GAME.STARTING_SCORE : actor.score,
+      silk: actor.lives === 0 ? 0 : (actor.silk ?? 0),
+      equipment: actor.lives === 0 ? [] : [...(actor.equipment ?? [])],
       lastSeenAt: now,
       kitId: actor.kitId,
-      position: { x: actor.position.x, y: actor.position.y },
-      velocity: { x: actor.velocity.x, y: actor.velocity.y },
-      angle: actor.angle,
+      position: arrival?.position ?? { x: actor.position.x, y: actor.position.y },
+      velocity: arrival ? { x: 0, y: 0 } : { x: actor.velocity.x, y: actor.velocity.y },
+      angle: arrival?.angle ?? actor.angle,
       lives: actor.lives,
       mass: actor.mass,
       health: actor.health,
       boost: { ...actor.boost },
-      ...(purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
+      ...(actor.lives > 0 && purchasedHullColor(actor.color) ? { hullColor: actor.color } : {}),
       ...releaseField('lastClientReleaseId', lastClientReleaseId),
     };
     if (previous === undefined) {
@@ -917,12 +949,13 @@ export class GameEngine {
       flight?.position,
       requestedKit ?? flight?.kitId
     );
-    if (saved.hullColor) {
+    if (saved.lives !== 0 && saved.hullColor) {
       actor.color = saved.hullColor;
     }
     this.applyRequestedPilotIdentity(actor, undefined, requestedName, false);
     actor.score = saved.lives === 0 ? GAME.STARTING_SCORE : saved.score;
-    actor.silk = saved.silk ?? 0;
+    actor.silk = saved.lives === 0 ? 0 : (saved.silk ?? 0);
+    actor.equipment = saved.lives === 0 ? [] : [...(saved.equipment ?? [])];
     if (flight) {
       this.restoreRecentFlight(actor, flight, requestedKit);
     }
@@ -1183,6 +1216,9 @@ export class GameEngine {
 
   public transportClosed(ws: WebSocket): boolean {
     const actor = this.entityManager.getEntityBySocket(ws);
+    if (actor?.furnaceTransit) {
+      this.finishFurnaceTravel(actor, this.getServerTime());
+    }
     const closed = this.playerMotion.transportClosed(ws, this.getServerTime());
     if (closed && actor && this.cancelArmedBoost(actor.id, actor.harpoonTargetId)) {
       clearHaulerLatch(actor);
@@ -1195,6 +1231,10 @@ export class GameEngine {
   }
 
   public updatePlayer(id: string, updates: Partial<GameEntity>): GameEntity | undefined {
+    const actor = this.getPlayer(id);
+    if (actor?.furnaceTransit) {
+      return actor;
+    }
     return this.entityManager.updateEntity(id, updates);
   }
 
@@ -1257,11 +1297,15 @@ export class GameEngine {
           : {}),
         radius: hullRadiusForKit(entity.kitId),
         scanning:
-          entity.kitId === 'surveyor' &&
-          surveyorUtilityOf(entity) === 'mineral_scan' &&
+          entity.kitId === 'scout' &&
+          scoutUtilityOf(entity) === 'mineral_scan' &&
           entity.abilityActiveFrames > 0,
       })),
       nowFrame: this.gameTime,
+      onNestCreated: (nest) => {
+        this.lootManager.spawnNestCache(nest.position, this.gameTime);
+        this.satellitePickupManager.spawnNestPickup(nest.position);
+      },
       dormantResource: (id, home) => {
         const rock = this.regionalField.dormantAsteroid(id, home);
         return rock ? spiderResources([rock], [], [])[0] : undefined;
@@ -1269,8 +1313,8 @@ export class GameEngine {
       resources: () =>
         spiderResources(
           this.asteroidManager.getAllAsteroids(),
-          this.lootManager.getAll(),
-          this.satellitePickupManager.getAllPickups()
+          this.lootManager.getNestResources(),
+          this.satellitePickupManager.getNestResources()
         ),
     });
     this.pendingSpiderAttacks.push(...attacks);
@@ -1296,6 +1340,9 @@ export class GameEngine {
   public setOverlayHold(id: string, held: boolean): void {
     const entity = this.entityManager.getEntity(id);
     if (!entity) {
+      return;
+    }
+    if (entity.furnaceTransit) {
       return;
     }
     const wasHeld = entity.overlayHold === true;
@@ -1501,7 +1548,7 @@ export class GameEngine {
 
   public equipSatellite(entityId: string, pickupId: string): boolean {
     const owner = this.entityManager.getEntity(entityId);
-    if (!owner || owner.respawnTimer !== undefined || this.isPaused) {
+    if (!owner || owner.furnaceTransit || owner.respawnTimer !== undefined || this.isPaused) {
       return false;
     }
     return (
@@ -1611,7 +1658,7 @@ export class GameEngine {
     if (!existing) {
       return { applied: false, isDestroyed: false };
     }
-    if (isCombatantImmune(existing)) {
+    if (existing.furnaceTransit || isCombatantImmune(existing)) {
       return { applied: false, isDestroyed: false };
     }
 
@@ -1893,8 +1940,14 @@ export class GameEngine {
     entity.lives = Math.max(0, entity.lives - 1);
     if (entity.lives === 0) {
       entity.score = GAME.STARTING_SCORE;
+      entity.silk = 0;
+      entity.equipment = [];
+      entity.color = PALETTE.REMOTE;
+      entity.haulerUtility = 'tow_cable';
+      entity.scoutUtility = 'mineral_scan';
     }
     this.entityManager.scheduleShipRespawn(entity);
+    this.capturePilot(entity.id);
   }
 
   private miningDamage(playerId: string): number {
@@ -1924,6 +1977,13 @@ export class GameEngine {
         result.destroyed.surveyedBy ?? []
       );
       this.dropShardAt(result.destroyed.position, asteroidShardMass(result.destroyed.material));
+      if (cause === 'laser' && this.rngService.random() < EQUIPMENT_DROPS.ASTEROID_CHANCE) {
+        const equipment =
+          EQUIPMENT_IDS[Math.floor(this.rngService.random() * EQUIPMENT_IDS.length)];
+        if (equipment) {
+          this.dropEquipmentAt(result.destroyed.position, equipment);
+        }
+      }
 
       if (result.destroyed.phenomenon?.kind === 'reflective') {
         this.lootManager.spawnLaserCore(result.destroyed.position, this.gameTime);
@@ -2014,6 +2074,7 @@ export class GameEngine {
     const shooter = this.entityManager.getEntity(ownerId);
     if (
       !shooter ||
+      shooter.furnaceTransit ||
       shooter.health <= 0 ||
       shooter.exploding ||
       shooter.respawnTimer !== undefined ||
@@ -2271,7 +2332,10 @@ export class GameEngine {
             kind: 'satellitePickup' as const,
           })),
         ...this.getLoot()
-          .filter((loot) => owner && inLootArmRange(owner.position, loot.position))
+          .filter(
+            (loot) =>
+              owner && !isEquipmentId(loot.kind) && inLootArmRange(owner.position, loot.position)
+          )
           .map((loot) => ({
             id: loot.id,
             position: loot.position,
@@ -2494,6 +2558,7 @@ export class GameEngine {
       this.furnaces.litModules().map((module) => [module.id, this.furnaces.displayName(module.id)])
     );
     const gameState = {
+      serverTime: this.getServerTime(),
       civicModules: [...this.furnaces.litModules()],
       mapAssets: this.mapAssets.snapshot(exploration, loot, satellitePickups, moduleNames),
       exploration: this.exploration.snapshot(),
@@ -2501,6 +2566,7 @@ export class GameEngine {
         (entity) =>
           ({
             id: entity.id,
+            furnaceTransit: entity.furnaceTransit ?? null,
             name: entity.name,
             type: entity.type,
             position: entity.position,
@@ -2531,8 +2597,9 @@ export class GameEngine {
             ...(entity.harpoonLatchPos !== undefined
               ? { harpoonLatchPos: entity.harpoonLatchPos }
               : {}),
+            equipment: [...(entity.equipment ?? [])],
             ...(entity.kitId === 'hauler' ? { haulerUtility: haulerUtilityOf(entity) } : {}),
-            ...(entity.kitId === 'surveyor' ? { surveyorUtility: surveyorUtilityOf(entity) } : {}),
+            ...(entity.kitId === 'scout' ? { scoutUtility: scoutUtilityOf(entity) } : {}),
             ...(entity.playerMotion !== undefined ? { playerMotion: entity.playerMotion } : {}),
             ...(entity.laserUpgrade !== undefined ? { laserUpgrade: entity.laserUpgrade } : {}),
             ...(entity.deathCause !== undefined ? { deathCause: entity.deathCause } : {}),
@@ -2552,7 +2619,7 @@ export class GameEngine {
 
   public useAbility(entityId: string, requestedKitId?: unknown): boolean {
     const entity = this.entityManager.getEntity(entityId);
-    if (!entity) {
+    if (!entity || entity.furnaceTransit) {
       return false;
     }
     // Kit selection is authoritative at join time. Keep accepting the
@@ -2561,11 +2628,11 @@ export class GameEngine {
     if (requestedKitId !== undefined && requestedKitId !== entity.kitId) {
       return false;
     }
-    if (entity.kitId === 'surveyor') {
-      if (surveyorAbilityBuildsAt(entity.position, (id) => this.furnaces.isLit(id))) {
+    if (entity.kitId === 'scout') {
+      if (scoutAbilityBuildsAt(entity.position, (id) => this.furnaces.isLit(id))) {
         return this.buildFurnace(entity);
       }
-      if (surveyorUtilityOf(entity) === 'survey_probe') {
+      if (scoutUtilityOf(entity) === 'survey_probe') {
         return this.launchSurveyProbe(entity);
       }
       const activated = activateAbilityOnHost(entity).activated;
@@ -2629,11 +2696,11 @@ export class GameEngine {
   }
 
   private surveyNearbyAsteroids(
-    surveyor: GameEntity,
+    scout: GameEntity,
     asteroids = this.getAllAsteroids(),
     range: number = SHIP_ABILITY.SCAN_RANGE
   ): void {
-    this.surveyFromPosition(surveyor.id, surveyor.position, asteroids, range);
+    this.surveyFromPosition(scout.id, scout.position, asteroids, range);
   }
 
   private surveyFromPosition(
@@ -2669,15 +2736,17 @@ export class GameEngine {
   }
 
   public furnaceBuildIssue(entityId: string): string | undefined {
-    const surveyor = this.getPlayer(entityId);
+    const scout = this.getPlayer(entityId);
     if (
-      surveyor?.kitId !== 'surveyor' ||
-      !canActivateAbility(surveyor) ||
-      surveyor.respawnTimer !== undefined
+      scout?.kitId !== 'scout' ||
+      scout.exploding ||
+      scout.health <= 0 ||
+      scout.furnaceTransit ||
+      scout.respawnTimer !== undefined
     ) {
       return FURNACE_BUILD.ISSUE.READY;
     }
-    const lot = civicLotAt(surveyor.position);
+    const lot = civicLotAt(scout.position);
     if (!lot) {
       return FURNACE_BUILD.ISSUE.STAND;
     }
@@ -2690,18 +2759,101 @@ export class GameEngine {
         ? `Light ${this.furnaces.displayName(parent.id)} first`
         : 'Light the inward street first';
     }
-    const score = Number.isSafeInteger(surveyor.score) ? surveyor.score : 0;
+    const score = Number.isSafeInteger(scout.score) ? scout.score : 0;
     if (score < lot.cost) {
       return `You need ${lot.cost - Math.max(0, score)} more score`;
-    }
-    if (this.spiderManager.furnaceWouldCoverNest(lot.position)) {
-      return FURNACE_BUILD.ISSUE.NEST;
     }
     return undefined;
   }
 
   public furnaceBuildNotice(): string {
     return this.lastFurnaceBuildNotice;
+  }
+
+  /** Validate the destination against live world state before taking motion ownership. */
+  public travelFurnace(entityId: string, destinationId: string): string | undefined {
+    const actor = this.getPlayer(entityId);
+    if (
+      !actor ||
+      actor.exploding ||
+      actor.health <= 0 ||
+      actor.lives <= 0 ||
+      actor.respawnTimer !== undefined
+    ) {
+      return 'Your ship is not ready to travel';
+    }
+    if (actor.furnaceTransit) {
+      return 'Already travelling';
+    }
+    const source = nearestTravelFurnace(actor.position, this.furnaces);
+    if (!source) {
+      return 'Move onto a lit furnace';
+    }
+    if (!this.furnaces.isLit(destinationId)) {
+      return 'That furnace is not lit';
+    }
+    const route = planFurnaceRoute(source.id, destinationId);
+    if (route.length < 2) {
+      return 'Choose another lit furnace';
+    }
+    const now = this.getServerTime();
+    this.cancelArmedBoost(actor.id, actor.harpoonTargetId);
+    clearHaulerLatch(actor);
+    actor.abilityActiveFrames = 0;
+    stopShipBoost(actor.boost);
+    actor.velocity = { x: 0, y: 0 };
+    actor.thrusting = false;
+    actor.overlayHold = true;
+    actor.furnaceTransit = {
+      sourceId: source.id,
+      destinationId,
+      startedAt: now,
+      durationMs: furnaceTravelDuration(route),
+    };
+    actor.position = { ...source.position };
+    this.furnaceTravelFrames.set(actor.id, this.gameTime);
+    this.playerMotion.handoffActor(actor.id, now);
+    return undefined;
+  }
+
+  private finishFurnaceTravel(actor: GameEntity, now: number): void {
+    const transit = actor.furnaceTransit;
+    if (!transit) {
+      return;
+    }
+    const pose = furnaceTravelPose(transit, transit.startedAt + transit.durationMs);
+    actor.position = pose.position;
+    actor.angle = pose.angle;
+    actor.velocity = { x: 0, y: 0 };
+    actor.thrusting = false;
+    actor.furnaceTransit = null;
+    actor.overlayHold = false;
+    actor.spawnProtectionTimer = SHIP.INVINCIBILITY_DURATION_FRAMES;
+    actor.lastUpdate = now;
+    this.furnaceTravelFrames.delete(actor.id);
+    this.playerMotion.handoffActor(actor.id, now);
+  }
+
+  private advanceFurnaceTravel(now: number): void {
+    for (const [id, frame] of this.furnaceTravelFrames) {
+      const actor = this.getPlayer(id);
+      const transit = actor?.furnaceTransit;
+      if (!actor || !transit) {
+        this.furnaceTravelFrames.delete(id);
+        continue;
+      }
+      const pose = furnaceTravelPose(
+        transit,
+        transit.startedAt + (this.gameTime - frame) * GAME_TICK_MS
+      );
+      actor.position = pose.position;
+      actor.angle = pose.angle;
+      actor.velocity = { x: 0, y: 0 };
+      actor.lastUpdate = now;
+      if (pose.progress >= 1) {
+        this.finishFurnaceTravel(actor, now);
+      }
+    }
   }
 
   public isFurnaceLit(id: string): boolean {
@@ -2715,6 +2867,7 @@ export class GameEngine {
     if (
       !paint ||
       !pilot ||
+      pilot.furnaceTransit ||
       pilot.exploding ||
       pilot.health <= 0 ||
       pilot.respawnTimer !== undefined
@@ -2745,7 +2898,13 @@ export class GameEngine {
   /** Spend personal score on one extra life. Undefined means the life was added. */
   public buyExtraLife(entityId: string): string | undefined {
     const pilot = this.getPlayer(entityId);
-    if (!pilot || pilot.exploding || pilot.health <= 0 || pilot.respawnTimer !== undefined) {
+    if (
+      !pilot ||
+      pilot.furnaceTransit ||
+      pilot.exploding ||
+      pilot.health <= 0 ||
+      pilot.respawnTimer !== undefined
+    ) {
       return TOWN_STORE_ISSUE.CLOSED;
     }
     if (!insideTownStore(pilot.position)) {
@@ -2772,25 +2931,24 @@ export class GameEngine {
     this.furnaces.replaceLit([]);
   }
 
-  private buildFurnace(surveyor: GameEntity): boolean {
-    if (this.furnaceBuildIssue(surveyor.id)) {
+  private buildFurnace(scout: GameEntity): boolean {
+    if (this.furnaceBuildIssue(scout.id)) {
       return false;
     }
-    const lot = civicLotAt(surveyor.position);
+    const lot = civicLotAt(scout.position);
     if (!lot) {
       return false;
     }
-    const builderName = sanitizePlayerName(surveyor.name);
-    surveyor.score -= lot.cost;
-    this.capturePilot(surveyor.id);
-    this.furnaces.light(lot.id, builderName, surveyor.id);
+    const builderName = sanitizePlayerName(scout.name);
+    scout.score -= lot.cost;
+    this.capturePilot(scout.id);
+    this.furnaces.light(lot.id, builderName, scout.id);
+    this.spiderManager.repelProtectedSpiders();
     this.lastFurnaceBuildNotice = `${civicModuleName(builderName, lot.name)} is burning`;
-    surveyor.abilityCooldownFrames = abilityCooldownFramesFor(surveyor);
-    surveyor.abilityActiveFrames = 0;
     return true;
   }
 
-  private launchSurveyProbe(surveyor: GameEntity): boolean {
+  private launchSurveyProbe(scout: GameEntity): boolean {
     const now = this.getServerTime();
     this.surveyProbeManager.prune(
       now,
@@ -2798,7 +2956,7 @@ export class GameEngine {
     );
     const asteroids = this.getAllAsteroids();
     const result = this.surveyProbeManager.launch(
-      surveyor,
+      scout,
       asteroids,
       now,
       this.spiderManager.getBodies()
@@ -2806,7 +2964,7 @@ export class GameEngine {
     if (!result) {
       return false;
     }
-    surveyor.abilityCooldownFrames = SURVEY_PROBE.COOLDOWN_FRAMES;
+    scout.abilityCooldownFrames = SURVEY_PROBE.COOLDOWN_FRAMES;
     this.surveyProbeManager.pulseNow(
       result.host,
       result.probe,
@@ -2847,7 +3005,7 @@ export class GameEngine {
       if (!entity.exploding && entity.health > 0 && entity.respawnTimer === undefined) {
         this.exploration.reveal(
           entity.position,
-          entity.kitId === 'surveyor' && entity.abilityActiveFrames > 0
+          entity.kitId === 'scout' && entity.abilityActiveFrames > 0
             ? SHIP_ABILITY.SCAN_RANGE
             : EXPLORATION_RANGE[entity.kitId]
         );
@@ -2856,7 +3014,7 @@ export class GameEngine {
         delete entity.laserUpgrade;
       }
       const scanRange =
-        entity.kitId === 'surveyor' && entity.abilityActiveFrames > 0
+        entity.kitId === 'scout' && entity.abilityActiveFrames > 0
           ? SHIP_ABILITY.SCAN_RANGE
           : this.satellitePickupManager.countOrbitingFor(entity.id) > 0
             ? SATELLITE_PICKUP.SCAN_RANGE
@@ -2939,10 +3097,13 @@ export class GameEngine {
 
   public setHaulerUtility(entityId: string, utilityId: unknown): boolean {
     const entity = this.entityManager.getEntity(entityId);
-    if (!entity) {
+    if (!entity || entity.furnaceTransit) {
       return false;
     }
     const targetId = entity.harpoonTargetId;
+    if (!canEquipUtility(entity, utilityId)) {
+      return false;
+    }
     const changed = setHaulerUtilityOnHost(entity, utilityId);
     if (changed && entity.harpoonTargetId !== targetId) {
       this.cancelArmedBoost(entity.id, targetId);
@@ -2950,12 +3111,12 @@ export class GameEngine {
     return changed;
   }
 
-  public setSurveyorUtility(entityId: string, utilityId: unknown): boolean {
+  public setScoutUtility(entityId: string, utilityId: unknown): boolean {
     const entity = this.entityManager.getEntity(entityId);
-    if (entity?.kitId !== 'surveyor') {
+    if (entity?.kitId !== 'scout' || entity.furnaceTransit) {
       return false;
     }
-    return setSurveyorUtilityOnHost(entity, utilityId);
+    return canEquipUtility(entity, utilityId) && setScoutUtilityOnHost(entity, utilityId);
   }
 
   private cancelArmedBoost(ownerId: string, targetId: string | null): boolean {
@@ -3113,6 +3274,13 @@ export class GameEngine {
     };
   }
 
+  public dropEquipmentAt(
+    position: Position,
+    equipment: import('../../shared-types').EquipmentId
+  ): LootData {
+    return this.lootManager.spawnEquipment(position, this.gameTime, equipment);
+  }
+
   public getLoot(): LootData[] {
     return this.lootManager.getAll();
   }
@@ -3131,6 +3299,13 @@ export class GameEngine {
         kind: loot.kind,
         position: { ...loot.position },
       });
+      if (isEquipmentId(loot.kind)) {
+        collector.equipment = [...(collector.equipment ?? []), loot.kind];
+        collector.lastUpdate = this.getServerTime();
+        this.capturePilot(collector.id);
+        results.push({ collectorId: collector.id, lootId: loot.id, mass: collector.mass });
+        continue;
+      }
       if (loot.kind === 'silk') {
         collector.silk = (collector.silk ?? 0) + 1;
         collector.lastUpdate = this.getServerTime();
@@ -3200,7 +3375,7 @@ export class GameEngine {
     }
 
     const loot = this.lootManager.get(lootId);
-    if (!loot || !inLootArmRange(shooter.position, loot.position)) {
+    if (!loot || isEquipmentId(loot.kind) || !inLootArmRange(shooter.position, loot.position)) {
       return empty;
     }
 

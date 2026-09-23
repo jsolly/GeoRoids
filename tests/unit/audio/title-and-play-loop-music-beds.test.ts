@@ -1,6 +1,12 @@
 import type { HowlOptions } from 'howler';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+// Audio diagnostics stay real; forwarding them must not open a logging socket in unit tests.
+vi.mock('../../../src/utils/logForwarder', () => ({
+  startClientLogForwarder: vi.fn(),
+  forwardLogToServer: vi.fn(),
+}));
+
 import { AUDIO } from '../../../src/constants';
 
 // Keep real audio diagnostics and logger assertions without opening a server connection.

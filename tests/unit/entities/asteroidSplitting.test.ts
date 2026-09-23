@@ -61,19 +61,19 @@ describe('Collaborative asteroid split', () => {
     expect(asteroidManager.getActiveCollabTags()).toEqual([]);
   });
 
-  test('expiry retains every miner and recorded Surveyor exactly once', () => {
+  test('expiry retains every miner and recorded Scout exactly once', () => {
     asteroidManager.addAsteroid(
       makeAsteroid({
         id: 'big-expiry-contributors',
         size: ROID.SIZE,
-        surveyedBy: ['surveyor', 'player-a', 'surveyor'],
+        surveyedBy: ['scout', 'player-a', 'scout'],
       })
     );
 
     asteroidManager.registerLaserHit('big-expiry-contributors', 'player-a', 0);
     const expired = asteroidManager.expireStaleHits(ROID.COLLAB_SPLIT_WINDOW_MS + 1);
 
-    expect(expired[0]?.contributors).toEqual(['player-a', 'surveyor']);
+    expect(expired[0]?.contributors).toEqual(['player-a', 'scout']);
   });
 
   test('two distinct pilots hitting a big roid within 1s also splits', () => {

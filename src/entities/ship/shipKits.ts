@@ -1,9 +1,9 @@
 import type { ShipKitId } from '../../../shared-types';
 import { GAME, SHIP } from '../../constants';
 
-export const SHIP_KIT_IDS = ['surveyor', 'hauler'] as const;
+export const SHIP_KIT_IDS = ['scout', 'hauler'] as const;
 
-export const DEFAULT_SHIP_KIT_ID: ShipKitId = 'surveyor';
+export const DEFAULT_SHIP_KIT_ID: ShipKitId = 'scout';
 
 export type ShipAbilityId = 'surveyScan' | 'harpoon';
 
@@ -24,14 +24,14 @@ interface ShipKit {
 }
 
 export const SHIP_HULL_TOPOLOGY = {
-  surveyor: 'delta-wing',
+  scout: 'delta-wing',
   hauler: 'cargo-yoke',
 } as const;
 
 export const SHIP_HULL_STYLE = { stroke: '#5EEAD4', background: '#000011' } as const;
 
-/** Linear playfield size vs Surveyor (`SHIP.SIZE`). Product bar: ~2× barge. */
-export const HAULER_TO_SURVEYOR_SIZE = 2;
+/** Linear playfield size vs Scout (`SHIP.SIZE`). Product bar: ~2× barge. */
+export const HAULER_TO_SCOUT_SIZE = 2;
 
 /** Hauler cable. Cream line separates the cable from the hull. */
 export const HAULER_TETHER_COLOR = '#E8D5A3';
@@ -49,19 +49,18 @@ export const SHIP_ABILITY = {
   SCAN_FRAMES: 6 * GAME.FPS,
   ASTEROID_DAMAGE_MULTIPLIER: 2,
   COOLDOWN_FRAMES: {
-    surveyor: 10 * GAME.FPS,
+    scout: 10 * GAME.FPS,
     hauler: 180,
   },
 } as const;
 
 const KITS: Record<ShipKitId, ShipKit> = {
-  surveyor: {
-    id: 'surveyor',
-    name: 'Surveyor',
+  scout: {
+    id: 'scout',
+    name: 'Scout',
     abilityId: 'surveyScan',
     abilityName: 'Mineral scan',
-    abilityHint:
-      'E uses Mineral Scan or Survey Probe. V opens the schematic so you can swap the tool.',
+    abilityHint: 'Start with Mineral Scan. Find Survey Probe in spider nests. V opens inventory.',
     maxHealth: SHIP.MAX_HEALTH,
     size: SHIP.SIZE,
     thrust: SHIP.THRUST,
@@ -76,9 +75,9 @@ const KITS: Record<ShipKitId, ShipKit> = {
     abilityId: 'harpoon',
     abilityName: 'Harpoon',
     abilityHint:
-      'E latches the equipped tool — Resource Tap, Tow Cable, or Boost Coupling. V opens the schematic.',
+      'Start with Tow Cable. Find Resource Tap and Boost Coupling in spider nests. V opens inventory.',
     maxHealth: 140,
-    size: SHIP.SIZE * HAULER_TO_SURVEYOR_SIZE,
+    size: SHIP.SIZE * HAULER_TO_SCOUT_SIZE,
     thrust: 4.5 * GAME.MOTION_SCALE * GAME.PLAYER_SPEED_SCALE,
     maxVelocity: SHIP.MAX_VELOCITY,
     boostMultiplier: 1.35,

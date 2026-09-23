@@ -35,9 +35,9 @@ export const GROWTH = {
   LOOT_MAGNET_ACCEL: 0.24 * GAME.MOTION_SCALE,
   SCATTER_MIN: 16,
   SCATTER_MAX: 40,
-  MAX_LOOT: 48,
+  MAX_LOOT: 192,
   LOOT_TTL_FRAMES: 20 * 60,
-  /** Surveyor-base HP multiplier at SOFT_MAX_MASS. */
+  /** Scout-base HP multiplier at SOFT_MAX_MASS. */
   MAX_HEALTH_SCALE: 2.2,
   MIN_THRUST_SCALE: 0.55,
   MIN_SPEED_SCALE: 0.6,

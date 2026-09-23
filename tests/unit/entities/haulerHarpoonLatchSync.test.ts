@@ -44,7 +44,7 @@ test('local Hauler keeps the cable through a brief socket rejoin snapshot gap', 
   expect(canDrawHaulerHarpoon(local.ship)).toBe(true);
 });
 
-test('local Hauler keeps its kit when a stale snapshot echoes surveyor', () => {
+test('local Hauler keeps its kit when a stale snapshot echoes scout', () => {
   const local = new Player({
     id: 'alice',
     name: 'Alice',
@@ -53,7 +53,7 @@ test('local Hauler keeps its kit when a stale snapshot echoes surveyor', () => {
     kitId: 'hauler',
   });
   local.updateFromServer({
-    kitId: 'surveyor',
+    kitId: 'scout',
     harpoonTargetId: 'server-asteroid-10',
   });
   expect(local.ship.kitId).toBe('hauler');
@@ -89,30 +89,30 @@ test('a Hauler snapshot keeps the barge hull at any mass', () => {
   });
   local.updateFromServer({ mass: GROWTH.BASE_MASS });
   expect(local.ship.r).toBe(hullRadiusForKit('hauler'));
-  expect(local.ship.r).toBeGreaterThan(hullRadiusForKit('surveyor'));
+  expect(local.ship.r).toBeGreaterThan(hullRadiusForKit('scout'));
 
   const remote = new Player({
     id: 'bob',
     name: 'Bob',
     type: 'remote',
     input: new MockPlayerInput(),
-    kitId: 'surveyor',
+    kitId: 'scout',
   });
   remote.updateFromServer({ kitId: 'hauler', mass: GROWTH.SOFT_MAX_MASS });
   expect(remote.ship.kitId).toBe('hauler');
   expect(remote.ship.r).toBe(hullRadiusForKit('hauler'));
 });
 
-test('a Surveyor snapshot keeps the kit hull after many loot-mass updates', () => {
+test('a Scout snapshot keeps the kit hull after many loot-mass updates', () => {
   const local = new Player({
     id: 'scout',
     name: 'Scout',
     type: 'local',
     input: new MockPlayerInput(),
-    kitId: 'surveyor',
+    kitId: 'scout',
   });
   const baseRadius = local.ship.r;
-  expect(baseRadius).toBe(hullRadiusForKit('surveyor'));
+  expect(baseRadius).toBe(hullRadiusForKit('scout'));
   local.updateFromServer({ mass: GROWTH.SOFT_MAX_MASS });
   expect(local.ship.mass).toBe(GROWTH.SOFT_MAX_MASS);
   expect(local.ship.r).toBe(baseRadius);

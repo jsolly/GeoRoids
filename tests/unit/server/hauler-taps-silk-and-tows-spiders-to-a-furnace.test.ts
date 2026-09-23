@@ -24,6 +24,9 @@ describe('Hauler tools interact with living spiders', () => {
   afterEach(() => world.dispose());
 
   function equip(utilityId: HaulerUtilityId) {
+    if (utilityId !== 'tow_cable') {
+      world.entity(pilot).equipment = [utilityId];
+    }
     world.send(pilot, { type: 'setHaulerUtility', id: pilot.id, data: { utilityId } });
     world.entity(pilot).abilityCooldownFrames = 0;
   }
@@ -93,7 +96,7 @@ describe('Hauler tools interact with living spiders', () => {
         throw new Error('Missing street lot');
       }
       if (kind === 'built') {
-        const scout = world.join('Builder', street.position, { kitId: 'surveyor' });
+        const scout = world.join('Builder', street.position, { kitId: 'scout' });
         world.entity(scout).position = { ...street.position };
         world.entity(scout).score = street.cost;
         world.entity(scout).abilityCooldownFrames = 0;

@@ -7,10 +7,10 @@ import {
   isCellExplored,
 } from '../../../shared/exploration';
 
-test('Surveyor passive vision clears a wider persistent area than Hauler vision', () => {
+test('Scout passive vision clears a wider persistent area than Hauler vision', () => {
   const scout = new ExplorationMap();
   const hauler = new ExplorationMap();
-  scout.reveal({ x: 0, y: 0 }, EXPLORATION_RANGE.surveyor);
+  scout.reveal({ x: 0, y: 0 }, EXPLORATION_RANGE.scout);
   hauler.reveal({ x: 0, y: 0 }, EXPLORATION_RANGE.hauler);
   const cell = explorationCellAt({ x: 450, y: 0 });
   if (cell === null) {

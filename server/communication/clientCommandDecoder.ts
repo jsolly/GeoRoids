@@ -5,13 +5,13 @@ import type {
   HaulerUtilityId,
   PingMessage,
   Position,
+  ScoutUtilityId,
   ShipKitId,
-  SurveyorUtilityId,
   Velocity,
 } from '../../shared-types';
 import { isHaulerUtilityId } from '../../src/entities/ship/haulerUtility';
+import { isScoutUtilityId } from '../../src/entities/ship/scoutUtility';
 import { isShipKitId } from '../../src/entities/ship/shipKits';
-import { isSurveyorUtilityId } from '../../src/entities/ship/surveyorUtility';
 
 type WireRecord = Record<string, unknown>;
 
@@ -40,6 +40,7 @@ export type ClientCommand =
       resumeToken?: string;
       clientReleaseId?: string;
     }
+  | { type: 'travelFurnace'; id: string; destinationId: string }
   | { type: 'equipSatellite'; id: string; pickupId: string }
   | { type: 'leave' }
   | { type: 'snapshotResync' }
@@ -55,9 +56,9 @@ export type ClientCommand =
       utilityId: HaulerUtilityId;
     }
   | {
-      type: 'setSurveyorUtility';
+      type: 'setScoutUtility';
       id: string;
-      utilityId: SurveyorUtilityId;
+      utilityId: ScoutUtilityId;
     }
   | {
       type: 'buyShipPaint';
@@ -297,6 +298,15 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
       return decodeUpdate(id, fields);
     case 'useAbility':
       return decodeUseAbility(id, fields);
+    case 'travelFurnace': {
+      const destinationId = fields['destinationId'];
+      return id &&
+        typeof destinationId === 'string' &&
+        destinationId.length > 0 &&
+        destinationId.length <= 128
+        ? { ok: true, command: { type, id, destinationId } }
+        : invalid(type, 'Invalid furnace travel request');
+    }
     case 'equipSatellite': {
       const pickupId = fields['pickupId'];
       return id && typeof pickupId === 'string' && pickupId.length > 0 && pickupId.length <= 128
@@ -312,14 +322,14 @@ export function decodeClientCommand(message: unknown): ClientCommandDecodeResult
         ? { ok: true, command: { type, id, utilityId } }
         : invalid(type, 'Invalid Hauler utility');
     }
-    case 'setSurveyorUtility': {
+    case 'setScoutUtility': {
       if (!id) {
-        return invalid(type, 'Missing player ID for setSurveyorUtility');
+        return invalid(type, 'Missing player ID for setScoutUtility');
       }
       const utilityId = fields['utilityId'];
-      return isSurveyorUtilityId(utilityId)
+      return isScoutUtilityId(utilityId)
         ? { ok: true, command: { type, id, utilityId } }
-        : invalid(type, 'Invalid Surveyor utility');
+        : invalid(type, 'Invalid Scout utility');
     }
     case 'buyShipPaint': {
       if (!id) {

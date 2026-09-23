@@ -1,3 +1,4 @@
+import { planFurnaceRoute } from '../../../shared/furnaceTravel';
 import type { HaulerUtilityId, Position, ShipKitId, Velocity } from '../../../shared-types';
 import { GAME, LASER, PALETTE, SHIP, VISUAL } from '../../constants';
 import { canvasManager } from '../../rendering/canvasSurface';
@@ -461,6 +462,16 @@ export function drawLaserBolts(
         VISUAL.LASER_STROKE_WIDTH,
         VISUAL.LASER_GLOW
       );
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineWidth = VISUAL.LASER_CORE_WIDTH;
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = VISUAL.LASER_CORE_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(screenPos.x - halfX, screenPos.y - halfY);
+      ctx.lineTo(screenPos.x + halfX, screenPos.y + halfY);
+      ctx.stroke();
+      ctx.restore();
     } else {
       const t = 1 - laser.explodeTime / Math.ceil(LASER.EXPLODE_DURATION * GAME.FPS);
       const ringRadius = VISUAL.LASER_EXPLODE_RADIUS * (0.55 + t * 1.15);
@@ -499,6 +510,46 @@ export function drawLasers(
   drawLaserBolts(ship.lasers, color ?? PALETTE.LASER_LOCAL, viewerShipPosition ?? ship.position);
 }
 
+/** Transit replaces the hull with a bright pipe rocket. */
+function drawFurnaceRocket(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  angle: number
+): void {
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const flame = reducedMotion ? 2 : 2.2 + Math.sin(performance.now() / 45) * 0.35;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = PALETTE.LASER_LOCAL;
+  ctx.shadowColor = PALETTE.LASER_LOCAL;
+  ctx.shadowBlur = resolveGlow(18);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.65, -radius * 0.3);
+  ctx.lineTo(-radius * flame, 0);
+  ctx.lineTo(-radius * 0.65, radius * 0.3);
+  ctx.stroke();
+  ctx.strokeStyle = PALETTE.LOCAL;
+  ctx.shadowColor = PALETTE.LOCAL;
+  ctx.beginPath();
+  ctx.moveTo(radius * 1.35, 0);
+  ctx.lineTo(radius * 0.35, -radius * 0.45);
+  ctx.lineTo(-radius * 0.6, -radius * 0.45);
+  ctx.lineTo(-radius * 0.85, -radius * 0.8);
+  ctx.lineTo(-radius * 0.85, radius * 0.8);
+  ctx.lineTo(-radius * 0.6, radius * 0.45);
+  ctx.lineTo(radius * 0.35, radius * 0.45);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
 // Ship rendering with world coordinates (for other players)
 export function drawShipAtPosition(
   ship: Ship,
@@ -529,6 +580,31 @@ export function drawShipAtPosition(
     return;
   }
 
+  if (ship.furnaceTransit) {
+    ctx.save();
+    ctx.strokeStyle = hexToRgba(PALETTE.LASER_LOCAL, 0.55);
+    ctx.lineWidth = 3;
+    ctx.shadowColor = PALETTE.LASER_LOCAL;
+    ctx.shadowBlur = resolveGlow(8);
+    ctx.beginPath();
+    const route = planFurnaceRoute(ship.furnaceTransit.sourceId, ship.furnaceTransit.destinationId);
+    for (let index = 0; index < route.length; index++) {
+      const point = route[index];
+      if (!point) {
+        continue;
+      }
+      const projected = canvasManager.worldToScreen(point, shipPosition);
+      if (index === 0) {
+        ctx.moveTo(projected.x, projected.y);
+      } else {
+        ctx.lineTo(projected.x, projected.y);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+    drawFurnaceRocket(ctx, screenX, screenY, shipR, ship.angle);
+    return;
+  }
   if (ship.blinkCount > 0 && !ship.blinkOn) {
     return;
   }
@@ -645,37 +721,37 @@ export function drawHaulerHarpoonVfx(
   ctx.restore();
 }
 
-const SURVEYOR_SCAN_PULSE_COUNT = 3;
-const SURVEYOR_SCAN_PULSE_FRAMES = SHIP_ABILITY.SCAN_FRAMES / SURVEYOR_SCAN_PULSE_COUNT;
-const SURVEYOR_SCAN_EDGE_OVERSHOOT = 1.1;
-const SURVEYOR_SCAN_FADE_START = 0.75;
-const SURVEYOR_SCAN_MAX_ALPHA = 0.28;
+const SCOUT_SCAN_PULSE_COUNT = 3;
+const SCOUT_SCAN_PULSE_FRAMES = SHIP_ABILITY.SCAN_FRAMES / SCOUT_SCAN_PULSE_COUNT;
+const SCOUT_SCAN_EDGE_OVERSHOOT = 1.1;
+const SCOUT_SCAN_FADE_START = 0.75;
+const SCOUT_SCAN_MAX_ALPHA = 0.28;
 
-export interface SurveyorScanVisualHost {
+export interface ScoutScanVisualHost {
   kitId: Ship['kitId'];
   abilityActiveFrames: number;
   health: number;
   exploding: boolean;
 }
 
-interface SurveyorScanPulse {
+interface ScoutScanPulse {
   readonly radius: number;
   readonly alpha: number;
 }
 
 /** One of three expanding radar pulses, measured in viewport pixels. */
-export function surveyorScanPulseGeometry(
+export function scoutScanPulseGeometry(
   pulseIndex: number,
   screenX: number,
   screenY: number,
   shipR: number,
   abilityActiveFrames: number,
   viewport: Readonly<PlayfieldSize>
-): SurveyorScanPulse | undefined {
+): ScoutScanPulse | undefined {
   if (
     !Number.isInteger(pulseIndex) ||
     pulseIndex < 0 ||
-    pulseIndex >= SURVEYOR_SCAN_PULSE_COUNT ||
+    pulseIndex >= SCOUT_SCAN_PULSE_COUNT ||
     !Number.isFinite(abilityActiveFrames) ||
     abilityActiveFrames <= 0
   ) {
@@ -686,8 +762,8 @@ export function surveyorScanPulseGeometry(
     SHIP_ABILITY.SCAN_FRAMES,
     Math.max(0, SHIP_ABILITY.SCAN_FRAMES - abilityActiveFrames)
   );
-  const pulseElapsed = elapsedFrames - pulseIndex * SURVEYOR_SCAN_PULSE_FRAMES;
-  if (pulseElapsed < 0 || pulseElapsed >= SURVEYOR_SCAN_PULSE_FRAMES) {
+  const pulseElapsed = elapsedFrames - pulseIndex * SCOUT_SCAN_PULSE_FRAMES;
+  if (pulseElapsed < 0 || pulseElapsed >= SCOUT_SCAN_PULSE_FRAMES) {
     return undefined;
   }
 
@@ -695,28 +771,27 @@ export function surveyorScanPulseGeometry(
   const farthestCornerY = Math.max(screenY, viewport.height - screenY);
   const edgeRadius = Math.max(
     shipR,
-    Math.hypot(farthestCornerX, farthestCornerY) * SURVEYOR_SCAN_EDGE_OVERSHOOT
+    Math.hypot(farthestCornerX, farthestCornerY) * SCOUT_SCAN_EDGE_OVERSHOOT
   );
-  const progress = pulseElapsed / SURVEYOR_SCAN_PULSE_FRAMES;
-  const fade =
-    progress <= SURVEYOR_SCAN_FADE_START ? 1 : (1 - progress) / (1 - SURVEYOR_SCAN_FADE_START);
+  const progress = pulseElapsed / SCOUT_SCAN_PULSE_FRAMES;
+  const fade = progress <= SCOUT_SCAN_FADE_START ? 1 : (1 - progress) / (1 - SCOUT_SCAN_FADE_START);
   return {
     radius: shipR + (edgeRadius - shipR) * progress,
-    alpha: SURVEYOR_SCAN_MAX_ALPHA * fade,
+    alpha: SCOUT_SCAN_MAX_ALPHA * fade,
   };
 }
 
-/** Draw the Surveyor radar sweep in viewport space; it never changes scan gameplay. */
-export function drawSurveyorScanFx(
+/** Draw the Scout radar sweep in viewport space; it never changes scan gameplay. */
+export function drawScoutScanFx(
   ctx: DrawingContext,
-  host: SurveyorScanVisualHost,
+  host: ScoutScanVisualHost,
   screenX: number,
   screenY: number,
   shipR: number,
   viewport: Readonly<PlayfieldSize>
 ): void {
   if (
-    host.kitId !== 'surveyor' ||
+    host.kitId !== 'scout' ||
     host.exploding ||
     host.health <= 0 ||
     host.abilityActiveFrames <= 0
@@ -724,8 +799,8 @@ export function drawSurveyorScanFx(
     return;
   }
 
-  for (let pulseIndex = 0; pulseIndex < SURVEYOR_SCAN_PULSE_COUNT; pulseIndex += 1) {
-    const pulse = surveyorScanPulseGeometry(
+  for (let pulseIndex = 0; pulseIndex < SCOUT_SCAN_PULSE_COUNT; pulseIndex += 1) {
+    const pulse = scoutScanPulseGeometry(
       pulseIndex,
       screenX,
       screenY,
@@ -758,7 +833,7 @@ function drawAbilityFx(
   screenY: number,
   shipR: number
 ): void {
-  drawSurveyorScanFx(ctx, ship, screenX, screenY, shipR, canvasManager.getViewportSize());
+  drawScoutScanFx(ctx, ship, screenX, screenY, shipR, canvasManager.getViewportSize());
 }
 
 function drawShipImpactFlash(

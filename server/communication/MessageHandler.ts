@@ -1,7 +1,7 @@
 import type { WebSocket } from 'ws';
 import { logger } from '../../setup/serverLogger';
 import { isClientOwnedCollisionAttacker } from '../../shared/combat';
-import { surveyorAbilityBuildsAt } from '../../shared/furnaceField';
+import { scoutAbilityBuildsAt } from '../../shared/furnaceField';
 import { isTownSquareArrival } from '../../shared/furnaces';
 import { MAX_TICK_DEBT_MS } from '../../shared/gameClock';
 import { nearbyWorldRows } from '../../shared/world';
@@ -53,6 +53,22 @@ export class MessageHandler {
     }
     const command = decoded.command;
     const commandType = command.type;
+    if (
+      this.gameEngine.getPlayerBySocket(ws)?.furnaceTransit &&
+      [
+        'update',
+        'shoot',
+        'collisionDamage',
+        'useAbility',
+        'equipSatellite',
+        'setHaulerUtility',
+        'setScoutUtility',
+        'buyShipPaint',
+        'buyExtraLife',
+      ].includes(commandType)
+    ) {
+      return;
+    }
 
     try {
       switch (commandType) {
@@ -76,6 +92,25 @@ export class MessageHandler {
           }
           break;
 
+        case 'travelFurnace': {
+          const owner = this.gameEngine.getPlayerBySocket(ws);
+          if (owner?.id !== command.id) {
+            break;
+          }
+          const issue = this.gameEngine.travelFurnace(command.id, command.destinationId);
+          ws.send(
+            JSON.stringify({
+              type: 'furnaceTravelResult',
+              data: { ok: !issue, message: issue ?? 'Travelling' },
+              timestamp: this.gameEngine.getServerTime(),
+            })
+          );
+          if (!issue) {
+            this.broadcaster.broadcastGameState();
+          }
+          break;
+        }
+
         case 'useAbility':
           this.handleUseAbility(ws, command);
           break;
@@ -93,8 +128,8 @@ export class MessageHandler {
         case 'setHaulerUtility':
           this.handleSetHaulerUtility(ws, command);
           break;
-        case 'setSurveyorUtility':
-          this.handleSetSurveyorUtility(ws, command);
+        case 'setScoutUtility':
+          this.handleSetScoutUtility(ws, command);
           break;
         case 'buyShipPaint':
           this.handleBuyShipPaint(ws, command);
@@ -526,12 +561,12 @@ export class MessageHandler {
     }
   }
 
-  private handleSetSurveyorUtility(ws: WebSocket, command: CommandOf<'setSurveyorUtility'>): void {
+  private handleSetScoutUtility(ws: WebSocket, command: CommandOf<'setScoutUtility'>): void {
     const socketPlayer = this.gameEngine.getPlayerBySocket(ws);
-    if (!socketPlayer || socketPlayer.id !== command.id || socketPlayer.kitId !== 'surveyor') {
+    if (!socketPlayer || socketPlayer.id !== command.id || socketPlayer.kitId !== 'scout') {
       return;
     }
-    if (!this.gameEngine.setSurveyorUtility(command.id, command.utilityId)) {
+    if (!this.gameEngine.setScoutUtility(command.id, command.utilityId)) {
       return;
     }
     this.broadcaster.broadcastGameState();
@@ -554,8 +589,8 @@ export class MessageHandler {
       : undefined;
     const wasArmed = latchedTarget?.boost?.phase === 'armed';
     const offeringBuild =
-      socketPlayer.kitId === 'surveyor' &&
-      surveyorAbilityBuildsAt(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
+      socketPlayer.kitId === 'scout' &&
+      scoutAbilityBuildsAt(socketPlayer.position, (id) => this.gameEngine.isFurnaceLit(id));
     const activated = this.gameEngine.useAbility(playerId, command.kitId);
     if (offeringBuild) {
       ws.send(

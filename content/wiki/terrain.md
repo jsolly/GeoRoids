@@ -40,7 +40,7 @@ One bite kills, so shoot the spider, escape its range, or reach a lit furnace's 
 
 ## Spider tools
 
-Haulers can extract silk or tow a spider into a furnace, although towing calls rescuers that can cut the cable. Scouts can attach a probe to follow a guard home to its resource. See the [Hauler](/wiki/#hauler) and [Scout](/wiki/#scout) tools.
+Haulers can extract silk or tow a spider into a furnace, but the captive can still bite ships within reach, including its Hauler, and towing calls rescuers that can cut the cable. Scouts can attach a probe to follow a guard home to its resource. See the [Hauler](/wiki/#hauler) and [Scout](/wiki/#scout) tools.
 
 ## Belt crawlers
 

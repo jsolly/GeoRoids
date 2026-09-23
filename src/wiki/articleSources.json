@@ -148,7 +148,9 @@
     "tests/unit/server/pilots-salvage-tools-from-guarded-nests.test.ts",
     "tests/integration/browser/sanity/scouts-build-a-furnace-to-escape-a-spider.test.ts",
     "shared/economy.ts",
-    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts"
+    "tests/unit/server/pilots-haul-bank-die-and-build-a-settlement.test.ts",
+    "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts",
+    "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts"
   ],
   "asteroids": [
     "server/core/AsteroidManager.ts",
@@ -267,7 +269,9 @@
     "shared/laserSurface.ts",
     "src/rendering/ricochetCourtRenderer.ts",
     "tests/unit/server/pilots-bank-shots-at-the-central-court.test.ts",
-    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts"
+    "tests/integration/browser/e2e/pilots-duel-at-the-central-ricochet-court.test.ts",
+    "tests/unit/server/towed-spiders-bite-ships-within-reach.test.ts",
+    "tests/integration/browser/e2e/towed-spiders-bite-passing-ships-and-their-hauler.test.ts"
   ],
   "combat-survival": [
     "src/constants/index.ts",
